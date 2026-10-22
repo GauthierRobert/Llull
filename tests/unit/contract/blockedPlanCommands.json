@@ -25,28 +25,12 @@
       "move_faces"
     ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_creased_cube_topology.json": [
-      "bridge_cage_faces",
-      "check_subdivision",
-      "extrude_cage_faces",
-      "inset_cage_faces",
-      "loop_cut_cage"
-    ],
-    "docs/design/04-direct-freeform-editing/validation/plans/target_grip_cage_tools.json": [
-      "check_subdivision",
-      "evaluate_subdivision",
-      "extrude_cage_faces",
-      "inset_cage_faces",
-      "loop_cut_cage",
-      "select_cage_elements",
-      "set_cage_crease",
-      "set_cage_symmetry"
+      "bridge_cage_faces"
     ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_nurbs_point_drag.json": [
       "edit_nurbs_surface"
     ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_subd_to_nurbs.json": [
-      "check_subdivision",
-      "evaluate_subdivision",
       "subdivision_to_nurbs"
     ],
     "docs/design/05-implicit-lattice/validation/plans/target_cylindrical_gyroid_sleeve.json": [

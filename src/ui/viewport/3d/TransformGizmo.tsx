@@ -18,6 +18,7 @@ import { toRenderPosition } from './floatingOrigin';
 import { type Snap3DType, type SnapPoint3D, collectSnapCandidates3D, snap3d } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
 import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
+import { useDirectEditStore } from '@ui/store/directEditStore';
 
 // 'dragging-changed' is not in Object3DEventMap.
 type DraggingDispatcher = {
@@ -50,6 +51,7 @@ export function TransformGizmo({
   const dispatch = useStore((s) => s.dispatch);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
+  const editingCage = useDirectEditStore((s) => s.entityId !== null && s.entityId === selectedId);
   const onLockedLayer = useStore((s) => entity !== undefined && s.document.layers[entity.layerId]?.locked === true);
 
   const targetRef = useRef<THREE.Group | null>(null);
@@ -179,7 +181,7 @@ export function TransformGizmo({
   }, [handleDraggingChanged]);
 
   // Generated building geometry is edited through its element (Building panel), not the gizmo.
-  if (!entity || onLockedLayer || entity.tags?.includes('bim') === true) return null;
+  if (!entity || editingCage || onLockedLayer || entity.tags?.includes('bim') === true) return null;
 
   const [x, y, z] = toRenderPosition(entity.position, renderOrigin);
 

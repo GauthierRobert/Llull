@@ -10,7 +10,8 @@ import { sketchPath } from './sketchCurves';
 import { catmullRomBeziers, sampleChain } from '../../geometry/curveSegments';
 import { boundaryPatchCage, coonsSides } from '../../geometry/boundaryPatch';
 import { cageProblem } from '../../geometry/subdivision';
-import { cageData, cageText, levelsField, sizeProblem } from './subdivision';
+import { cageData, cageText, levelsField, sizeProblem } from '../subdivision/shared';
+import { initialElementIds } from '../../geometry/subd/elements';
 
 const MAX_PATCH_CELLS = 24;
 
@@ -78,14 +79,20 @@ export const surfaceFromCurves = defineCommand({
     if (typeof sides === 'string') return fail(sides);
     const cage = boundaryPatchCage(sides, cells[0], cells[1], thickness, flip);
     if (typeof cage === 'string') return fail(cage);
-    const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
+    const problem = sizeProblem(cage, levels)?.message ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
     const origin = centroid3(cage.vertices);
     const id = idOrNext(explicitId, 'subd');
     const entity = newEntity(
       'subdivision',
       id,
-      { vertices: cage.vertices.map((p) => sub3(p, origin)), faces: cage.faces, creases: cage.creases, levels },
+      {
+        vertices: cage.vertices.map((p) => sub3(p, origin)),
+        faces: cage.faces,
+        creases: cage.creases,
+        levels,
+        elementIds: initialElementIds(cage.vertices.length, cage.faces.length),
+      },
       origin,
       params.color ?? DEFAULT_SOLID_COLOR,
       { name, layerId: existingLayerOrDefault(doc, layerId) },

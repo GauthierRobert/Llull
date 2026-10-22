@@ -1,0 +1,101 @@
+/* ---- Direct cage editing bar (04 DIR) --------------------------------------- */
+
+.cage-bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--chrome-gap) + 52px + 56px);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 6px;
+  max-width: calc(100% - 2 * var(--space-4));
+  padding: 8px 10px;
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius-float);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(10px);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  z-index: 16;
+}
+
+.cage-bar__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cage-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 10px;
+  border-right: 1px solid var(--divider);
+}
+
+.cage-bar__group select,
+.cage-bar__field input {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font: inherit;
+  color: var(--fg);
+}
+
+.cage-bar__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+
+.cage-bar__field input {
+  width: 64px;
+}
+
+.cage-bar__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.cage-bar__button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.cage-bar__button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.cage-bar__button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cage-bar__status {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.cage-bar__status--error {
+  color: var(--danger);
+}
+
+.cage-bar__hint {
+  color: var(--fg-subtle);
+}

@@ -6,21 +6,31 @@
  */
 
 import type { SubdivisionEntity, Vec3 } from '../model/types';
-import { add3, centroid3, scale3 } from '../lib/vec3';
+import { add3, centroid3, lerp3, scale3 } from '../lib/vec3';
 import type { Triangle } from './triangles';
+import { edgeKey } from './subd/edgeKey';
+import {
+  type CreaseMethod,
+  type SharpnessSource,
+  type VertexRule,
+  childEdgeSharpness,
+  edgeSharpnessMap,
+  partitionSharpness,
+  uniformChild,
+  vertexRule,
+  vertexSharpnessArray,
+  SHARP_MAX,
+} from './subd/sharpness';
 
 /** Deepest refinement accepted (each level multiplies the face count by 4). */
 export const MAX_SUBDIVISION_LEVELS = 4;
 
-/** A polygon cage: vertices, counter-clockwise (outside view) faces, sharp edges. */
-export interface Cage {
+/** A polygon cage: vertices, counter-clockwise (outside view) faces, infinitely sharp edges and optional semi-sharp creases. */
+export interface Cage extends SharpnessSource {
   readonly vertices: ReadonlyArray<Vec3>;
   readonly faces: ReadonlyArray<ReadonlyArray<number>>;
-  readonly creases: ReadonlyArray<readonly [number, number]>;
+  readonly creaseMethod?: CreaseMethod | undefined;
 }
-
-/** Order-independent key of the edge a–b. */
-export const edgeKey = (a: number, b: number): string => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
 /**
  * First vertex whose faces do not form one fan (closed manifold assumed edge-wise): walking from
@@ -81,8 +91,27 @@ export function cageProblem(cage: Cage): string | null {
   for (let v = 0; v < count; v++) if (!used.has(v)) return `vertex ${v} is not used by any face`;
   const pinched = pinchedVertex(cage.faces, count);
   if (pinched !== null) return `vertex ${pinched} joins separate fans of faces (a pinch); give each sheet its own vertex`;
+  const infinite = new Set<string>();
   for (const [a, b] of cage.creases) {
     if (!directed.has(`${a}>${b}`)) return `crease ${a}-${b} is not an edge of the cage`;
+    if (infinite.has(edgeKey(a, b))) return `crease ${a}-${b} is listed twice`;
+    infinite.add(edgeKey(a, b));
+  }
+  const semi = new Set<string>();
+  for (const { a, b, s } of cage.edgeSharpness ?? []) {
+    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `sharp edge ${a}-${b} is not an edge of the cage`;
+    if (!(s > 0 && s < SHARP_MAX))
+      return `edge ${a}-${b} sharpness must be in (0, ${SHARP_MAX}) (got ${s}); infinite sharpness belongs in creases`;
+    if (infinite.has(edgeKey(a, b))) return `edge ${a}-${b} is in both creases and edgeSharpness`;
+    if (semi.has(edgeKey(a, b))) return `edge ${a}-${b} is listed twice in edgeSharpness`;
+    semi.add(edgeKey(a, b));
+  }
+  const corners = new Set<number>();
+  for (const { v, s } of cage.vertexSharpness ?? []) {
+    if (!Number.isInteger(v) || v < 0 || v >= count) return `sharp vertex ${v} is outside 0..${count - 1}`;
+    if (!(s > 0 && s <= SHARP_MAX)) return `vertex ${v} sharpness must be in (0, ${SHARP_MAX}] (got ${s})`;
+    if (corners.has(v)) return `vertex ${v} is listed twice in vertexSharpness`;
+    corners.add(v);
   }
   return null;
 }
@@ -91,19 +120,21 @@ interface EdgeInfo {
   readonly a: number;
   readonly b: number;
   readonly faces: number[];
-  readonly sharp: boolean;
+  readonly sharpness: number;
 }
 
-/** One Catmull-Clark step (cage assumed valid: see cageProblem). */
+/** One Catmull-Clark step with semi-sharp creases (cage assumed valid: see cageProblem). */
 function subdivideOnce(cage: Cage): Cage {
   const { vertices, faces } = cage;
-  const sharpKeys = new Set(cage.creases.map(([a, b]) => edgeKey(a, b)));
+  const method = cage.creaseMethod ?? 'uniform';
+  const sharpness = edgeSharpnessMap(cage);
+  const cornerSharpness = vertexSharpnessArray(cage, vertices.length);
   const edges = new Map<string, EdgeInfo>();
   faces.forEach((face, f) =>
     face.forEach((a, i) => {
       const b = face[(i + 1) % face.length] as number;
       const key = edgeKey(a, b);
-      const edge = edges.get(key) ?? { a, b, faces: [], sharp: sharpKeys.has(key) };
+      const edge = edges.get(key) ?? { a, b, faces: [], sharpness: sharpness.get(key) ?? 0 };
       edge.faces.push(f);
       edges.set(key, edge);
     }),
@@ -113,7 +144,10 @@ function subdivideOnce(cage: Cage): Cage {
   const edgeIndex = new Map(edgeList.map((edge, i) => [edgeKey(edge.a, edge.b), i]));
   const edgePoints = edgeList.map((edge) => {
     const ends = [vertices[edge.a] as Vec3, vertices[edge.b] as Vec3];
-    return edge.sharp ? centroid3(ends) : centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
+    const sharp = centroid3(ends);
+    if (edge.sharpness >= 1) return sharp;
+    const smooth = centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
+    return edge.sharpness <= 0 ? smooth : lerp3(smooth, sharp, edge.sharpness);
   });
   const incident = vertices.map((): EdgeInfo[] => []);
   const adjacentFaces = vertices.map((): number[] => []);
@@ -122,18 +156,40 @@ function subdivideOnce(cage: Cage): Cage {
     incident[edge.b]?.push(edge);
   }
   faces.forEach((face, f) => face.forEach((v) => adjacentFaces[v]?.push(f)));
-  const vertexPoints = vertices.map((p, v): Vec3 => {
-    const around = incident[v] as EdgeInfo[];
-    const sharp = around.filter((edge) => edge.sharp);
-    if (sharp.length > 2) return p;
-    if (sharp.length === 2) {
-      const [first, second] = sharp.map((edge) => vertices[edge.a === v ? edge.b : edge.a] as Vec3);
+  const other = (edge: EdgeInfo, v: number): number => (edge.a === v ? edge.b : edge.a);
+  /** Child sharpness of the half of `edge` that touches `v`. */
+  const childAt = (edge: EdgeInfo, v: number): number =>
+    childEdgeSharpness(
+      edge.sharpness,
+      method,
+      (incident[v] as EdgeInfo[]).filter((e) => e !== edge && e.sharpness > 0).map((e) => e.sharpness),
+    );
+  const position = (v: number, rule: VertexRule, sharpEdges: readonly EdgeInfo[]): Vec3 => {
+    const p = vertices[v] as Vec3;
+    if (rule === 'corner') return p;
+    if (rule === 'crease') {
+      const [first, second] = sharpEdges.map((edge) => vertices[other(edge, v)] as Vec3);
       return scale3(add3(add3(scale3(p, 6), first as Vec3), second as Vec3), 1 / 8);
     }
+    const around = incident[v] as EdgeInfo[];
     const n = around.length;
     const q = centroid3((adjacentFaces[v] as number[]).map((f) => facePoints[f] as Vec3));
     const r = centroid3(around.map((edge) => centroid3([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])));
     return scale3(add3(add3(q, scale3(r, 2)), scale3(p, n - 3)), 1 / n);
+  };
+  const childCorner = vertices.map((_, v) => uniformChild(cornerSharpness[v] as number));
+  const vertexPoints = vertices.map((_, v): Vec3 => {
+    const around = incident[v] as EdgeInfo[];
+    const sharp = around.filter((edge) => edge.sharpness > 0);
+    const parentRule = vertexRule(sharp.length, cornerSharpness[v] as number);
+    const childSharp = sharp.filter((edge) => childAt(edge, v) > 0);
+    const childRule = vertexRule(childSharp.length, childCorner[v] as number);
+    const parent = position(v, parentRule, sharp);
+    if (parentRule === childRule) return parent;
+    const faded = sharp.filter((edge) => childAt(edge, v) <= 0).map((edge) => edge.sharpness);
+    if (childCorner[v] === 0 && (cornerSharpness[v] as number) > 0) faded.push(cornerSharpness[v] as number);
+    const weight = Math.min(1, faded.reduce((total, s) => total + s, 0) / Math.max(1, faded.length));
+    return lerp3(position(v, childRule, childSharp), parent, weight);
   });
   const edgeBase = vertices.length;
   const faceBase = edgeBase + edgeList.length;
@@ -146,16 +202,23 @@ function subdivideOnce(cage: Cage): Cage {
       edgeVertex(face[(i - 1 + face.length) % face.length] as number, v),
     ]),
   );
-  const creases = edgeList
-    .filter((edge) => edge.sharp)
-    .flatMap((edge): Array<[number, number]> => {
-      const middle = edgeVertex(edge.a, edge.b);
-      return [
-        [edge.a, middle],
-        [middle, edge.b],
-      ];
-    });
-  return { vertices: [...vertexPoints, ...edgePoints, ...facePoints], faces: quads, creases };
+  const children = edgeList.flatMap((edge): Array<readonly [number, number, number]> => {
+    const middle = edgeVertex(edge.a, edge.b);
+    return [
+      [edge.a, middle, childAt(edge, edge.a)],
+      [middle, edge.b, childAt(edge, edge.b)],
+    ];
+  });
+  const { creases, edgeSharpness } = partitionSharpness(children);
+  const cornerEntries = childCorner.flatMap((s, v) => (s > 0 ? [{ v, s }] : []));
+  return {
+    vertices: [...vertexPoints, ...edgePoints, ...facePoints],
+    faces: quads,
+    creases,
+    ...(edgeSharpness.length > 0 ? { edgeSharpness } : {}),
+    ...(cornerEntries.length > 0 ? { vertexSharpness: cornerEntries } : {}),
+    ...(cage.creaseMethod !== undefined ? { creaseMethod: cage.creaseMethod } : {}),
+  };
 }
 
 /** The cage refined `levels` times. */
@@ -166,10 +229,7 @@ export function subdivide(cage: Cage, levels: number): Cage {
 }
 
 /** Closed, outward-wound triangles of a subdivision solid; `origin` is added to every vertex. */
-export function subdivisionTriangles(
-  entity: Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases' | 'levels'>,
-  origin: Vec3 = [0, 0, 0],
-): Triangle[] {
+export function subdivisionTriangles(entity: Cage & Pick<SubdivisionEntity, 'levels'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
   const surface = subdivide(entity, entity.levels);
   const at = (v: number): Vec3 => add3(surface.vertices[v] as Vec3, origin);
   return surface.faces.flatMap((face) => {

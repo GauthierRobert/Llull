@@ -43,6 +43,8 @@ import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
 import { FeatureStartBar } from './manipulators/FeatureStartBar';
+import { CageEditLayer } from './cage/CageEditLayer';
+import { CageEditBar } from './cage/CageEditBar';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
 // Idempotent, StrictMode-safe.
@@ -131,6 +133,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <Entities />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />
+        <CageEditLayer onDraggingChanged={onDraggingChanged} />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
@@ -185,6 +188,7 @@ export function Viewport3D(): React.ReactElement {
 
       <ScreenAnchorOverlay />
       <FeatureStartBar />
+      <CageEditBar />
       <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />

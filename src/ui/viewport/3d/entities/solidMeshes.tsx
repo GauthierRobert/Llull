@@ -139,8 +139,11 @@ function LoftMesh({ entity, ...shell }: Props<'loft'>): React.ReactElement {
 }
 
 function SubdivisionMesh({ entity, ...shell }: Props<'subdivision'>): React.ReactElement {
-  const { vertices, faces, creases, levels } = entity;
-  const triangles = useMemo(() => subdivisionTriangles({ vertices, faces, creases, levels }), [vertices, faces, creases, levels]);
+  const { vertices, faces, creases, levels, edgeSharpness, vertexSharpness, creaseMethod } = entity;
+  const triangles = useMemo(
+    () => subdivisionTriangles({ vertices, faces, creases, levels, edgeSharpness, vertexSharpness, creaseMethod }),
+    [vertices, faces, creases, levels, edgeSharpness, vertexSharpness, creaseMethod],
+  );
   return <TriangleSoupMesh entity={entity} triangles={triangles} surface={surface(0.45, 0.1, 0.9)} {...shell} />;
 }
 

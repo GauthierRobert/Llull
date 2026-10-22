@@ -4,6 +4,8 @@
  */
 
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
+import { subdivide } from '../geometry/subdivision';
+import { settleLevels } from '../geometry/subd/settle';
 import { isCurve3D, isSheet } from '../model/curveKinds';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
@@ -104,8 +106,18 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         // Untrusted documents (load_document) reach code generation: force a safe integer.
         segments: safeSegments(entity.segments),
       };
-    case 'subdivision':
-      return { kind: 'subdivision', vertices: entity.vertices, faces: entity.faces, creases: entity.creases, levels: entity.levels };
+    case 'subdivision': {
+      // semi-sharp creases are not in the Python port: export the cage refined (with them) until they have decayed
+      const settle = settleLevels(entity);
+      const cage = settle === 0 ? entity : subdivide(entity, settle);
+      return {
+        kind: 'subdivision',
+        vertices: cage.vertices,
+        faces: cage.faces,
+        creases: cage.creases,
+        levels: Math.max(0, entity.levels - settle),
+      };
+    }
     case 'mesh':
     case 'sweep':
     case 'loft':

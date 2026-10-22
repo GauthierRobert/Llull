@@ -7,8 +7,6 @@ import { addWedge, addPyramid } from './prismatic';
 import { extrudeProfile, revolveProfile } from './profile';
 import { sweepProfile } from './sweep';
 import { loftSections } from './loft';
-import { addSubdivisionSolid } from './subdivision';
-import { editSubdivisionCage } from './subdivisionCage';
 import { surfaceFromCurves } from './surfaceFromCurves';
 import { addSpurGear } from './gears';
 import { addCoil } from './coil';
@@ -31,8 +29,6 @@ export const solidsCommands = commandCatalog(
   revolveProfile,
   sweepProfile,
   loftSections,
-  addSubdivisionSolid,
-  editSubdivisionCage,
   surfaceFromCurves,
   addSpurGear,
   addCoil,

@@ -10,6 +10,7 @@ import { registerCommands } from './commandTable';
 import { onPluginInstalled } from '../plugins/host';
 import { documentCommands } from './document/catalog';
 import { solidsCommands } from './solids/catalog';
+import { subdivisionCommands } from './subdivision/catalog';
 import { draw2dCommands } from './draw2d/catalog';
 import { modify2dCommands } from './modify2d/catalog';
 import { editCommands } from './edit/catalog';
@@ -37,6 +38,7 @@ import { wrapCommands } from './wrap/catalog';
 registerCommands('core', [
   ...documentCommands,
   ...solidsCommands,
+  ...subdivisionCommands,
   ...draw2dCommands,
   ...modify2dCommands,
   ...editCommands,

@@ -133,6 +133,18 @@ export const plans: Record<string, GoldenAction[]> = {
     },
     { command: 'edit_subdivision_cage', params: { id: '$saddle', region: { min: [-200, -100, -50], max: [200, 100, -1] }, crease: true } },
   ],
+  subdivision_cage_tools: [
+    { command: 'add_subdivision_solid', params: { box: { size: [40, 20, 10], segments: [4, 2, 1] }, levels: 2, name: 'grip' }, as: 'grip' },
+    { command: 'set_cage_symmetry', params: { id: '$grip', planes: ['x'] } },
+    { command: 'extrude_cage_faces', params: { id: '$grip', faces: [0, 1, 2, 3], distance: 8 } },
+    { command: 'inset_cage_faces', params: { id: '$grip', faces: [0, 1, 2, 3], thickness: 2, depth: -1 } },
+    { command: 'loop_cut_cage', params: { id: '$grip', edge: [0, 15], cuts: 2 } },
+    { command: 'set_cage_crease', params: { id: '$grip', edges: 'all', sharpness: 0.5, vertices: [0], method: 'chaikin' } },
+    {
+      command: 'edit_subdivision_cage',
+      params: { id: '$grip', faces: [0, 1], translate: [0, 0, 3], falloff: { radius: 12, shape: 'smooth', metric: 'topological' } },
+    },
+  ],
   surface_from_curves_hood: [
     {
       command: 'surface_from_curves',

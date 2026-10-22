@@ -8,24 +8,24 @@ import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
-import { finiteVec3OrZero, map3 } from '../../lib/vec3';
-import { entityLocalToWorld } from '../../geometry/entityFrame';
+import { finiteVec3OrZero } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid, rotationField, existingLayerOrDefault, namedSolidStyleFields, explicitIdTaken } from './shared';
-import { type Cage, edgeKey, MAX_SUBDIVISION_LEVELS, boxCage, cageProblem, cylinderCage } from '../../geometry/subdivision';
-import { roundTo } from '../../lib/compactNumber';
+import {
+  DEFAULT_SOLID_COLOR,
+  commitSolid,
+  rotationField,
+  existingLayerOrDefault,
+  namedSolidStyleFields,
+  explicitIdTaken,
+} from '../solids/shared';
+import { type Cage, boxCage, cageProblem, cylinderCage } from '../../geometry/subdivision';
+import { edgeKey } from '../../geometry/subd/edgeKey';
+import { SHARP_MAX, edgeSharpnessMap, partitionSharpness } from '../../geometry/subd/sharpness';
+import { initialElementIds } from '../../geometry/subd/elements';
+import { dirRejection } from './codes';
+import { cageData, cageText, levelsField, sizeProblem } from './shared';
 
-/** Largest cage accepted (vertices); the surface grows ×4 per level. */
-const MAX_CAGE_VERTICES = 2000;
 const MAX_SEGMENTS = 32;
-
-export const levelsField = z
-  .number()
-  .int()
-  .describe(
-    `Subdivision levels 0..${MAX_SUBDIVISION_LEVELS} (0 = the faceted cage itself; 2-3 is smooth; ` +
-      'each level quadruples the face count).',
-  );
 
 const creasesField = z
   .array(z.tuple([z.number().int(), z.number().int()]))
@@ -63,29 +63,32 @@ function cageOf(
   return { vertices, faces, creases: [] };
 }
 
-/** `edges` without repeats (a-b and b-a are the same edge). */
-function uniqueEdges(edges: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
-  const seen = new Map<string, [number, number]>();
-  for (const [a, b] of edges) if (!seen.has(edgeKey(a, b))) seen.set(edgeKey(a, b), [a, b]);
-  return [...seen.values()];
+/** Sharpness entries merged into the entity form: infinite edges in `creases`, finite ones in `edgeSharpness` (a repeated edge keeps its larger value). */
+function sharpnessOf(
+  creases: ReadonlyArray<readonly [number, number]>,
+  semi: ReadonlyArray<{ a: number; b: number; s: number }>,
+): ReturnType<typeof partitionSharpness> {
+  const merged = edgeSharpnessMap({ creases, edgeSharpness: semi });
+  const seen = new Set<string>();
+  const entries: Array<[number, number, number]> = [];
+  for (const [a, b] of [...creases, ...semi.map(({ a, b }): [number, number] => [a, b])]) {
+    const key = edgeKey(a, b);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push([a, b, merged.get(key) as number]);
+  }
+  return partitionSharpness(entries);
 }
 
-export const cageText = (cage: Cage, levels: number): string =>
-  `${cage.vertices.length}-vertex / ${cage.faces.length}-face cage, ${levels} level(s)` +
-  (cage.creases.length > 0 ? `, ${cage.creases.length} crease(s)` : '');
-
-/** Why `levels` / the cage size are out of range (null when fine). */
-export function sizeProblem(cage: Cage, levels: number): string | null {
-  if (!Number.isInteger(levels) || levels < 0 || levels > MAX_SUBDIVISION_LEVELS)
-    return `levels must be an integer 0..${MAX_SUBDIVISION_LEVELS} (got ${levels})`;
-  if (cage.vertices.length > MAX_CAGE_VERTICES) return `the cage has ${cage.vertices.length} vertices (max ${MAX_CAGE_VERTICES})`;
-  return null;
-}
+const rangeProblem = (entries: ReadonlyArray<{ s: number }>): string | null => {
+  const bad = entries.find(({ s }) => !(s > 0 && s <= SHARP_MAX));
+  return bad === undefined ? null : `sharpness ${bad.s} is outside (0, ${SHARP_MAX}]`;
+};
 
 /**
  * @affects creates 1 subdivision entity at `position`
- * @invariant cage is a closed, consistently wound 2-manifold; creases are cage edges
- * @failure no / several cage sources, bad sizes, open or mis-wound cage, bad levels, duplicate id -> no-op
+ * @invariant cage is a closed, consistently wound 2-manifold; creases are cage edges; every vertex and face gets a stable element id minted by this step
+ * @failure no / several cage sources, bad sizes, open or mis-wound cage (DIR_CAGE_OPEN), bad levels (DIR_LEVELS_RANGE), too many vertices (DIR_CAGE_TOO_LARGE), sharpness out of range (DIR_SHARPNESS_RANGE), duplicate id -> no-op
  */
 export const addSubdivisionSolid = defineCommand({
   name: 'add_subdivision_solid',
@@ -97,8 +100,8 @@ export const addSubdivisionSolid = defineCommand({
     'cage (`vertices` local to `position` + `faces` as vertex-index loops wound counter-clockwise seen ' +
     'from outside). Then shape it with edit_subdivision_cage (move / scale regions of cage vertices, ' +
     'with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); ' +
-    'creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in ' +
-    'world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, ' +
+    'creased edges stay sharp. Semi-sharp creases: `edgeSharpness` / `vertexSharpness` (0..10). Returns data { vertexCount, faceCount, ' +
+    'vertices, vertexIds, faceIds } (cage vertices in world coordinates, by index, with their stable element ids) to aim later edits. A closed solid: booleans, blend_union, ' +
     'measurement and export all work. With the OCC kernel a smooth solid (levels >= 1) is an exact ' +
     'B-spline solid — one bicubic face per refined cage quad, exactly the limit surface away from ' +
     'extraordinary vertices and creases (close to it there) — so STEP export and booleans are exact; levels 0 stays faceted.',
@@ -128,6 +131,28 @@ export const addSubdivisionSolid = defineCommand({
       .describe('Custom cage faces (use with vertices); the cage must be closed.')
       .optional(),
     creases: creasesField.optional(),
+    edgeSharpness: z
+      .array(
+        z.object({
+          a: z.number().int().describe('Cage vertex index of one end.'),
+          b: z.number().int().describe('Cage vertex index of the other end.'),
+          s: z
+            .number()
+            .describe(`Sharpness 0 < s <= ${SHARP_MAX}: the edge stays crisp for about s subdivision levels (${SHARP_MAX} = infinite).`),
+        }),
+      )
+      .describe('Semi-sharp cage edges (OpenSubdiv creases). Use creases for infinitely sharp ones.')
+      .optional(),
+    vertexSharpness: z
+      .array(
+        z.object({ v: z.number().int().describe('Cage vertex index.'), s: z.number().describe(`Corner sharpness 0 < s <= ${SHARP_MAX}.`) }),
+      )
+      .describe('Semi-sharp cage corners: the vertex stays a point for about s levels.')
+      .optional(),
+    creaseMethod: z
+      .enum(['uniform', 'chaikin'])
+      .describe('How sharpness decays per level: uniform (default, minus 1) or chaikin (smoothed).')
+      .optional(),
     levels: levelsField.optional(),
     position: vec3('World position of the cage origin. Defaults to [0, 0, 0].').optional(),
     rotation: rotationField(),
@@ -135,19 +160,40 @@ export const addSubdivisionSolid = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_subdivision_solid');
-    const { levels = 3, creases = [], position = [0, 0, 0], rotation, layerId, name } = params;
+    const { levels = 3, creases = [], edgeSharpness = [], vertexSharpness = [], position = [0, 0, 0], rotation, layerId, name } = params;
     const explicitId = params.id;
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const base = cageOf(params.box, params.cylinder, params.vertices, params.faces);
     if (typeof base === 'string') return fail(base);
-    const cage: Cage = { ...base, creases: uniqueEdges(creases) };
-    const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
+    const range = rangeProblem(edgeSharpness) ?? rangeProblem(vertexSharpness);
+    if (range !== null) return dirRejection(doc, 'add_subdivision_solid', 'DIR_SHARPNESS_RANGE', range, [], ['params.edgeSharpness']);
+    const sharp = sharpnessOf(creases, edgeSharpness);
+    const cage: Cage = {
+      ...base,
+      creases: sharp.creases,
+      ...(sharp.edgeSharpness.length > 0 ? { edgeSharpness: sharp.edgeSharpness } : {}),
+      ...(vertexSharpness.length > 0 ? { vertexSharpness } : {}),
+      ...(params.creaseMethod !== undefined ? { creaseMethod: params.creaseMethod } : {}),
+    };
+    const size = sizeProblem(cage, levels);
+    if (size !== null) return dirRejection(doc, 'add_subdivision_solid', size.code, size.message);
+    const problem = cageProblem(cage);
+    if (problem?.includes('must be closed')) return dirRejection(doc, 'add_subdivision_solid', 'DIR_CAGE_OPEN', problem);
     if (problem !== null) return fail(problem);
     const id = idOrNext(explicitId, 'subd');
     const entity: SubdivisionEntity = newEntity(
       'subdivision',
       id,
-      { vertices: cage.vertices, faces: cage.faces, creases: cage.creases, levels },
+      {
+        vertices: cage.vertices,
+        faces: cage.faces,
+        creases: cage.creases,
+        ...(cage.edgeSharpness !== undefined ? { edgeSharpness: cage.edgeSharpness } : {}),
+        ...(cage.vertexSharpness !== undefined ? { vertexSharpness: cage.vertexSharpness } : {}),
+        ...(cage.creaseMethod !== undefined ? { creaseMethod: cage.creaseMethod } : {}),
+        levels,
+        elementIds: initialElementIds(cage.vertices.length, cage.faces.length),
+      },
       position,
       params.color ?? DEFAULT_SOLID_COLOR,
       { rotation: finiteVec3OrZero(rotation), name, layerId: existingLayerOrDefault(doc, layerId) },
@@ -155,17 +201,3 @@ export const addSubdivisionSolid = defineCommand({
     return { ...commitSolid(doc, entity, `add_subdivision_solid: created "${id}" (${cageText(cage, levels)})`), data: cageData(entity) };
   },
 });
-
-/** `data` of the cage commands: counts plus the cage vertices in world coordinates. */
-export function cageData(entity: { vertices: readonly Vec3[]; faces: readonly unknown[]; position: Vec3; rotation: Vec3 }): {
-  vertexCount: number;
-  faceCount: number;
-  vertices: Vec3[];
-} {
-  return { vertexCount: entity.vertices.length, faceCount: entity.faces.length, vertices: entity.vertices.map((p) => worldOf(p, entity)) };
-}
-
-/** World coordinates of a cage point. */
-export function worldOf(p: Vec3, entity: { position: Vec3; rotation: Vec3 }): Vec3 {
-  return map3(entityLocalToWorld(entity, p), (value) => roundTo(value, 6));
-}

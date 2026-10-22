@@ -6,9 +6,12 @@
  * Pure; the OCC kernel builds B-spline faces from these poles.
  */
 
-import type { SubdivisionEntity, Vec3 } from '../model/types';
+import type { Vec3 } from '../model/types';
 import { add3, scale3 } from '../lib/vec3';
-import { type Cage, edgeKey, subdivide } from './subdivision';
+import { type Cage, subdivide } from './subdivision';
+import { edgeKey } from './subd/edgeKey';
+import { settleLevels } from './subd/settle';
+import { SHARP_MAX } from './subd/sharpness';
 
 /** Sixteen control points of a bicubic Bézier patch, `poles[i * 4 + j]` = P(i, j). */
 export type BezierPatch = readonly Vec3[];
@@ -59,9 +62,10 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
       }
     }),
   );
+  const hard = new Set((cage.vertexSharpness ?? []).filter((corner) => corner.s >= SHARP_MAX).map((corner) => corner.v));
   const corners = vertices.map((p, v): Vec3 => {
     const creases = creaseNeighbours[v] as number[];
-    if (creases.length > 2) return p;
+    if (hard.has(v) || creases.length > 2) return p;
     if (creases.length === 2) {
       const [a, b] = creases.map(at) as [Vec3, Vec3];
       return scale3(add3(add3(a, b), scale3(p, 4)), 1 / 6);
@@ -92,8 +96,8 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
  * Bézier patches of a subdivision solid (local frame), from its cage refined `refine` times
  * (>= 1 so every face is a quad). One patch per refined face.
  */
-export function subdivisionPatches(entity: Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'>, refine = 1): BezierPatch[] {
-  return quadCagePatches(subdivide(entity, Math.max(1, refine)));
+export function subdivisionPatches(entity: Cage, refine = 1): BezierPatch[] {
+  return quadCagePatches(subdivide(entity, Math.max(1, refine, settleLevels(entity))));
 }
 
 const bernstein = (t: number): [number, number, number, number] => {

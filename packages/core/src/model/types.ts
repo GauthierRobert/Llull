@@ -6,6 +6,7 @@ import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
+import type { CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
 import type { FaceSlabRecipe } from './faceSlab';
 import type { Decal } from './decal';
 import type { TextLayout } from './fonts';
@@ -278,9 +279,10 @@ export interface LoftEntity extends BaseEntity {
 
 /**
  * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by Catmull-Clark subdivision; cage edges
- * listed in `creases` stay sharp.
- * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels
- * @see add_subdivision_solid, edit_subdivision_cage
+ * listed in `creases` stay infinitely sharp, `edgeSharpness` / `vertexSharpness` hold semi-sharp values.
+ * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels; an edge is in `creases` (infinite) or in
+ *   `edgeSharpness` (0 < s < 10), never both; `elementIds` are parallel to `vertices` / `faces` and survive topology edits
+ * @see add_subdivision_solid, edit_subdivision_cage, set_cage_crease, set_cage_symmetry
  */
 export interface SubdivisionEntity extends BaseEntity {
   readonly kind: 'subdivision';
@@ -288,6 +290,11 @@ export interface SubdivisionEntity extends BaseEntity {
   faces: ReadonlyArray<ReadonlyArray<number>>;
   creases: ReadonlyArray<readonly [number, number]>;
   levels: number;
+  edgeSharpness?: ReadonlyArray<CageEdgeSharpness>;
+  vertexSharpness?: ReadonlyArray<CageVertexSharpness>;
+  creaseMethod?: 'uniform' | 'chaikin';
+  symmetry?: CageSymmetry;
+  elementIds: CageElementIds;
 }
 
 export interface LineEntity extends BaseEntity {

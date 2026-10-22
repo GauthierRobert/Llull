@@ -63,8 +63,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-3b** 03 WRP left after M0–M3 (done 2026-10-22, §13): M4 geodesic / parametric charts, emboss on doubly curved faces,
   `split_face_by_curves`, `create_curve_on_face`, CFF fonts, kerning, multi-line, decal + knurl; M5 single-line fonts, text on curve,
   `pattern_on_face`, modeled knurl; WRP golden plan (native). _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /
-  inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: —_
+- `[TODO]` **DES-4b** 04 DIR left after MVP (done 2026-10-23, §13: M0, M2, M3 commands + M1 cage UI and M3 UI tools): M1 B-rep drag
+  handles (`push_pull_face` / `replace_face` / `draft_faces`), control-net overlays, loop-cut factor drag, desktop-app pass on cage editing
+  (pointer capture, gizmo + floating origin); M4 `edit_nurbs` ops + `subdivision_to_nurbs`; M5 open cages, bridge / bevel / delete / fill /
+  weld / slide; M6 `/preview`, `move_faces`, `delete_faces`; `squash_steps`; `freeform` toolset view. _Lane 2 + 1 + native_ _deps: —_
 - `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,
   `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: — (mesh asset store = DES-7b M3, adopt when built)_
 

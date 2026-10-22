@@ -491,3 +491,80 @@ Total MVP (M0–M3) ≈ 12 eng-weeks; V1 (M4–M6) ≈ 12; V2 ≈ 5.
 
 See [FUNCTIONAL_SPEC.md §11](FUNCTIONAL_SPEC.md#11-references) ([R1]–[R30]); validation sources and grades in
 [validation/sources.md](validation/sources.md).
+
+## 13. As built (core part: M0, M2, M3 commands, DES-4, 2026-10-22)
+
+Owner decisions applied: stable step-scoped element ids instead of indices (D1), one history step per drag (`squash_steps` not built), T-splines out of scope (D5), Catmull-Clark in the
+TypeScript core (D4), and no compatibility with old documents: `SubdivisionEntity.elementIds` is **required** (a saved cage without it is refused on load). Not built here (UI agent / later
+milestones): M1 (picking overlays, drag sessions, `directEditStore`), the M3 UI tools, M4 and beyond (`edit_nurbs` ops, `subdivision_to_nurbs`, `bridge_cage_faces`, bevel, delete, fill, weld, slide,
+open cages, `move_faces`, `delete_faces`, `/preview`, bench), and the `freeform` toolset (every tool belongs to exactly one toolset, so the new commands are in `3d`).
+
+- M0 data: `SubdivisionEntity` v2 (`model/types.ts`; helper types in `model/subdivisionCage.ts`): `edgeSharpness`, `vertexSharpness`, `creaseMethod`, `symmetry`, `elementIds`. `creases` stays the list of
+  infinitely sharp edges; a semi-sharp edge (0 < s < 10) lives in `edgeSharpness`, never in both (`partitionSharpness`). Guard: `geometry/subd/validate.ts` (called from `commands/persistence/guards.ts`)
+  plus `cageProblem` (semi-sharp edges must be cage edges, s in (0, 10]).
+- M0 code: `lib/falloff.ts` (the 7 curves of Blender `calculatePropRatio`, `softWeight`, Dijkstra `graphDistances`; the deform pack keeps its own two-curve ramp); `commands/subdivision/` catalog (the two
+  commands moved from `solids/`, names unchanged, `solids/subdivision*.ts` deleted); `surface_from_curves` mints element ids too.
+- Subdivision math lives in `geometry/subd/` (not `lib/subd/`: `lib` may only depend on the vector types): `sharpness.ts` (OpenSubdiv rules: edge s >= 1 midpoint, 0 < s < 1 blend, vertex rule smooth / crease /
+  corner, Uniform and Chaikin child sharpness, fractional rule blend with w = mean parent sharpness of the edges that become smooth); the refinement itself stays in `geometry/subdivision.ts`
+  (`subdivideOnce`); `limit.ts` (vertex masks, Halstead tangent masks, 4 x 4 B-spline patches, local refinement to depth 4), `topology.ts`, `elements.ts` (ids, references, `DIR_REF_LOST` /
+  `DIR_ELEMENT_KIND`), `symmetry.ts`, `regionOps.ts` (extrude / inset), `loops.ts` (rings, edge loops, loop cut), `volume.ts`, `pick.ts`.
+- M2 commands: `edit_subdivision_cage` v2, `set_cage_crease`, `set_cage_symmetry`, `select_cage_elements`, `evaluate_subdivision`, `check_subdivision`. M3 commands: `extrude_cage_faces`,
+  `inset_cage_faces`, `loop_cut_cage`.
+
+### 13.1 Deviations from the spec text
+
+- Element ids: minted eagerly at creation as `v-<step>.<index>` / `f-<step>.<index>` (the step key is shared by the commands of one `build_project`); new elements get `v-<step>.<n>` from the step's id source,
+  skipping ids already in the entity. Index references are resolved and recorded as ids in the FeatureStep (`recordExtras`; `vertexIndices` is replaced by `vertices`). Edge id: `e:<idA>|<idB>` (sorted).
+  Plans written with `f-1.2` assume the creating step is step 1 and that the element index equals the id suffix.
+- `CageSymmetry` is `{ planes, partners, tolerance }`: `partners[k][v]` = mirror of `v` through `planes[k]` (itself on the plane); `pairs` / `onPlane` / `radial` / `isolated` are not stored. Edits are
+  symmetrised generically: each mirror orbit follows its lowest-index driven vertex (reflected delta), on-plane vertices are projected back; `symmetry: 'ignore'` skips it. Topology commands process the
+  mirror closure of the selection once and re-pair afterwards; a result that is not symmetric within the stored tolerance is refused (`DIR_SYMMETRY_BROKEN`).
+- `edit_subdivision_cage`: selection by `vertexIndices` (kept), `vertices`, `edges`, `faces` or `region`; `falloff` is a radius or `{ radius, shape, metric }`; `rotate { axis (world), angleDeg, pivot? }`;
+  order scale, rotate, translate. Distances and the default pivot are measured on world vertices rounded to 1e-6 (as before, so legacy edits are bit-identical).
+- `select_cage_elements`: `nearest`, `loopFrom`, `ringFrom`, `region`, `within`, `faces { normal, within }` (`within` = 1 - cos of the cone), `grow`, `kind`; lists are capped at 5000.
+- `evaluate_subdivision`: limits are returned in world coordinates rounded to 1e-12; samples `{ face, u, v }` need a quad face (otherwise flagged `degenerate` / `DIR_EVAL_DEGENERATE`); curvature is the
+  principal k1 >= k2, positive when convex; at an extraordinary vertex the sample falls back to the vertex limit point (`approximate: true`, no derivatives).
+- `check_subdivision`: the limit volume is the ratio-1/4 extrapolation of the two finest level meshes (<= 40 000 quads, level <= 5). Kernel-optional: with a kernel that has `faceQuery`, `data.limitPatches`
+  reports the exact patch solid volume and the worst seam gap and tangent angle from `edgeContinuity` over the face-graph edges (tested with a scripted kernel; not run against the native sidecar). The
+  self-intersection test runs on the finest level with <= 20 000 triangles.
+- Extrude / inset: boundary vertices of each edge-connected region are duplicated, the region faces keep their ids and move; side quads are `[a, b, b', a']`. Sharpness of region-boundary edges is copied onto
+  the new rim, interior edges follow their moved endpoints, corner sharpness is copied. Inset uses the even offset t (m1 + m2) / (1 + m1 . m2) (each new edge exactly `thickness` from its old edge on planar
+  faces); a collapsing loop (an inset edge turning against its old direction) is refused, with the largest valid thickness found by bisection.
+- Loop cut: `edge` crosses the loop; consecutive strip quads are `[s_j, t_j, t_(j+1), s_(j+1)]`; `factor` is measured from the first vertex of the picked pair; a strip that reaches an n-gon is `DIR_LOOP_NOT_QUAD`.
+- Semi-sharp creases are exact in the level mesh, `check_subdivision`, `evaluate_subdivision` (vertex masks after `settleLevels`, samples by descent) and the exact patches / Python export, which refine
+  `ceil(max finite sharpness)` steps (cap 3, `geometry/subd/settle.ts`) before applying the infinite-crease rules; a larger sharpness keeps a residual that is treated as smooth there. Review fixes: loop-cut
+  records the edge in the caller's order; `symmetrize` follows the strongest-weighted image; an `ignore` edit that breaks the mirror clears `symmetry`; `check_subdivision` also reports
+  `DIR_CHECK_SELF_INTERSECTION_PARTIAL`, `DIR_CHECK_LIMIT_VOLUME_UNAVAILABLE`, `DIR_CHECK_VOLUME_NON_FINITE`, `DIR_CHECK_PATCH_SEAM_GAP` / `_ANGLE`; `cageProblem` rejects duplicate / conflicting sharpness; codes
+  `DIR_REGION_PINCH`, `DIR_LOOP_SELF_CROSS`. `previewCageCommand().triangles` are world space with the full placement; `pickCage` vertex / edge hits carry `t`.
+- Codes added to section 7.1: `DIR_ENTITY_NOT_FOUND`, `DIR_SELECTION_CONFLICT`, `DIR_NOTHING_TO_DO`, `DIR_FALLOFF_INVALID`, `DIR_LEVELS_RANGE`, `DIR_CAGE_TOO_LARGE` (2000 vertices), `DIR_DIRECTION_ZERO`,
+  `DIR_REGION_DEGENERATE`, `DIR_LOOP_CUTS_RANGE`, `DIR_SYMMETRY_BROKEN`, `DIR_CAGE_INVALID`, `DIR_EVAL_BUDGET`, `DIR_SELECTOR_INVALID`. `DIR_INSET_TOO_THICK` also covers thickness <= 0.
+
+### 13.2 Measured (VC results)
+
+| VC           | Result                                                                                                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01           | lambda(n), n = 3..12, equals the table to 1e-11; valence-5 limit point within 3e-3 and normal within cos > 1 - 3e-3 of the level-6 mesh on an asymmetric bipyramid                    |
+| 02 / 03      | corner (0.5, 0.5, 0.5) error 0, face centre (0, 0, 68/81) 4.9e-13, edge midpoint (0, 395/648, 395/648) 4.3e-13, corner normal 3.7e-13 (through `evaluate_subdivision`, 1e-12 rounding) |
+| 04 / 05      | CLI `run baseline_subd_cage_today.json` (native kernel installed, mass from the display mesh): 2.6646247896794573, 8, 6.318191422352206, 6.878201798351067; 9/9 steps ok            |
+| 06           | the 26 world vertices of `cage_edit_cases.json` within 1e-6; volume 6.31819142235 to 6.87820179835 (1e-9 rel)                                                                       |
+| 07           | every edge at s = 1 / 2 / 0.5, level 4: 6.318191422352203 / 7.5641986705638535 / 4.233575762418375 (match the reference to 1e-9 rel)                                                 |
+| 10           | 7 shapes x 21 samples equal `falloff_curves.json` to 1e-11                                                                                                                          |
+| 11           | mirror vertex delta (-0.3, 0.2, 0.4), `check_subdivision` maxDeviation < 1e-12                                                                                                      |
+| 19 / 20 / 21 | V 12 / E 20 / F 10 / Euler 2 each; creased volumes 12, 6.833333333333333, 8 (same through the CLI plan)                                                                             |
+| 27           | codes `DIR_REF_LOST`, `DIR_SHARPNESS_RANGE`, `DIR_ELEMENT_KIND`, `DIR_LOOP_NOT_QUAD` raised with the expected paths                                                                 |
+| 28           | histogram {3: 8}, Euler 2, genus 0, mesh volume 2.6646247896794573, limit estimate 2.6204138 (reference 2.62041911579, 5e-6), `DIR_CHECK_LEVEL_MESH_DEVIATION` warn                  |
+| 30           | `edit_step_params` on the extrude distance keeps the later steps on the same ids; a missing id answers `DIR_REF_LOST` and leaves the history unchanged (deleting a face needs M5)   |
+| 40           | 4 top faces of the seg [2,2,2] box by normal cone; the equator loop has 8 edges                                                                                                     |
+
+Plans on the native CLI: `target_creased_cube_topology.json` steps 0-11 and 14-16 ok (`bridge_cage_faces` is M5); `target_grip_cage_tools.json` runs to the end except step 6: `set_cage_crease { loopFrom:
+[0, 15] }` is refused with `DIR_REF_LOST` because the loop cut just split edge [0, 15] (use a vertex id from `data.newVertices`). Its extrude selects four of the eight top faces (`select_cage_elements`
+returns all eight) and the mirror closure adds their images. Timing (386-vertex cage, level 3): edit 10 ms, extrude / inset 9-10 ms, loop cut 7 ms, evaluate all vertices 10 ms, `check_subdivision`
+372 ms (1946-vertex cage: 364 ms at level 3).
+
+### 13.3 For the UI agent
+
+All commands are pure `execute(doc, name, params)` calls, so a drag preview is `previewCageCommand(doc, name, params, maxLevels)` (`commands/subdivision/preview.ts`): it never keeps the result, mints the ids
+the commit will mint, and returns `{ ok, summary, error, entity, displayLevels, triangles }` (large cages are shown at <= 2 levels). Picking helpers in `geometry/subd/pick.ts`: `localRay` (world ray to
+entity frame), `pickCage(entity, ray, tolerance)` (face under the ray, vertex / edge within the tolerance, with ids), `nearestCageElements(entity, point)`; loops and rings use `select_cage_elements`
+(`loopFrom` / `ringFrom`) or `edgeLoop` / `walkRing` from `geometry/subd/loops.ts`. Send element ids in commit params (indices are accepted and recorded). `data` of every cage command carries `vertexIds` /
+`faceIds` parallel to `vertices` / faces.

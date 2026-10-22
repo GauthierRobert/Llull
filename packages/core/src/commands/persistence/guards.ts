@@ -23,6 +23,7 @@ import { isHexColor } from '../../lib/isHexColor';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
 import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/subdivision';
+import { subdivisionFieldsProblem } from '../../geometry/subd/validate';
 import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
 import {
@@ -116,7 +117,10 @@ function subdivisionProblem(v: Record<string, unknown>): string | null {
     return 'creases must be [a, b] vertex index pairs';
   if (!Number.isInteger(levels) || (levels as number) < 0 || (levels as number) > MAX_SUBDIVISION_LEVELS)
     return `levels must be an integer 0..${MAX_SUBDIVISION_LEVELS}`;
-  return cageProblem({ vertices, faces, creases } as Cage);
+  return (
+    subdivisionFieldsProblem(v) ??
+    cageProblem({ vertices, faces, creases, edgeSharpness: v['edgeSharpness'], vertexSharpness: v['vertexSharpness'] } as Cage)
+  );
 }
 
 /** Optional variable-section stations of a sweep, or null when absent / valid. */
