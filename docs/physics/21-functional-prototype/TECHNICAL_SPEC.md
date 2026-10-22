@@ -712,8 +712,8 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | Item                       | Budget (named)                                                                                                                                                           |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Parts per `check_assembly` | 500; pairs after broad phase 20 000                                                                                                                                      |
-| Thickness rays             | 2000 per part by default, 200 000 total (TS path); native `geomq`: higher cap, target set from VC-FPR-37 measurement — TBD measure                                       |
-| `check_motion_clearance`   | 4000 samples × 200 pairs; reference engine < 5 s on the desktop (TS path); native `geomq`: target ≥ 10× the pose × pair product in the same time (target, TBD — measure) |
+| Thickness rays             | 2000 per part by default, 200 000 total (TS path); native `geomq`: 4·10⁶ total (measured 5.3 s on 20 000 triangles, §12)                                                  |
+| `check_motion_clearance`   | 4000 samples × 200 pairs; reference engine < 5 s on the desktop (TS path); native `geomq`: up-front batch of up to 10⁶ pose × pair queries, measured 7× faster end to end (§12) |
 | Simulation                 | 2 × 10⁶ steps (reference engine: 2 cycles at 5800 rpm, dt 14.4 µs ≈ 2900 steps)                                                                                          |
 | `compare_to_reference`     | ≤ 12 operating points × (settle + 2 cycles); Rotax curve (9 points) < 30 s on the desktop; the timestep-halving run is counted once                                      |
 | Review tab                 | open a saved result < 300 ms; playback ≥ 30 fps with overlays                                                                                                            |
@@ -810,9 +810,28 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
   engine yet (RS-6).
 - Callers through the port: the wall-thickness rays of `check_assembly` (engine provenance in `data.geometryQueries` when rays ran;
   the ray budget is `limits.maxThicknessRays`) and the obstruction test of `compute_view_factors` (PHY-03). Pair classification of
-  `check_assembly` stays on `kernel.distance` / `analyze` (kernel-exact, not a mesh query). `check_motion_clearance` still calls
-  `meshBvh` directly: moving it onto `minDistanceBatch` is the remaining RS-6 wiring (poses there carry per-mesh start offsets).
+  `check_assembly` stays on `kernel.distance` / `analyze` (kernel-exact, not a mesh query).
 - Tests: `tests/unit/geometryQueries.test.ts`.
+- **RS-6 native engine (as built 2026-10-21).** Crate `solver/crates/llull-geomq` (`llull-compute geomq <folder>`, contract in its
+  `lib.rs`): a transliteration of `meshBvh.ts` / `triangleQueries.ts` (same tree build, traversal order and pruning; Rust does not fuse
+  multiply-adds), rayon over independent queries, Rust CPU only, so `deterministic: true`, device `cpu`. Host:
+  `server/src/native/geometryQueryEngine.ts` (spawnSync per batch, §11 item 10), installed by the CLI and the backend when `llull-compute`
+  exists; a failed run is logged and the batch is answered by the TS engine (provenance, which names the engine of the last batch,
+  then says `meshBvh`), except where that would run far past the TS caps: a failed distance batch over 10⁴ queries throws (the motion
+  sweep then skips its prefetch) and a failed view-factor run above 400 facets is refused with `THM_FACET_LIMIT`. Port additions:
+  `placedDistanceBatch(meshes, queries)` (one `bvhMinDistance` per query with its own placement and bound; `minDistanceBatch` is expressed
+  through it), `limits.motionPrefetchQueries` (0 on the TS engine) and the optional `viewFactorExchange` (PHY-03 §13).
+  `check_motion_clearance` (`packages/domain-dynamics/src/commands/motionPrefetch.ts`): when the engine prefetches, the pair distances at
+  every recorded sample (else at the coarse anchors, else none) go out as one unbounded `placedDistanceBatch`; the sequential sweep reads
+  them at integer samples (filtered by its bound: the same minimum and witness as its bounded query) and keeps `meshBvh` for substeps,
+  bisection and the golden search, so its numbers do not change. Native caps: 4·10⁶ thickness rays, 10⁶ prefetched pose × pair queries.
+  VC-FPR-37: crate fixture (`tests/unit/native/geomqReference.test.ts` → `cargo test -p llull-geomq`: seeded meshes, 60 placed queries,
+  200 rays, bit for bit) and `server/tests/geomqNative.test.ts` (engine batches; check_assembly thickness, check_motion_clearance VC-FPR-18 /
+  19 identical to the TS engine). Measured on a Core Ultra 9 185H (22 threads), process start included: 200 000 rays on a 20 000-triangle
+  mesh 0.32 s (TS 1.7 s), 10⁶ rays 1.3 s, 4·10⁶ rays 5.3 s; unbounded placed distances between 2 400-triangle meshes 10⁵ in 3.1 s (TS
+  250 s), 10⁶ in 32 s; `check_motion_clearance` on a rotating rod past 12 cylinders (12 pairs × 2 001 samples, identical result) 0.76–0.89 s
+  against 5.8–8.2 s on TS. Not built: the wgpu traversal (the CPU meets the §8 targets; GPU would only be an exploration fast path), plant
+  09 instance-BVH queries and the physics 13 broad phase on `llull-bvh` (options of RS-6).
 
 ### M3b realism (FPR-E): as built, 2026-10-19
 
@@ -913,7 +932,7 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   the chord and over-stated the clearance by ~2 µm), contact-interval edges are **bisected** to 1e-3 of the sample spacing, and the closest
   approach is refined by a golden-section search within one sample (`packages/domain-dynamics/src/commands/motionRefine.ts`). VC-FPR-18 (4.87508 mm at
   ±2.8624°) and VC-FPR-19 (contact on ±21.2735°) pass at the spec tolerances (`tests/unit/checkMotionClearance.test.ts`). Still direct
-  `meshBvh`, not `ctx.geometryQueries` (RS-6 wiring).
+  `meshBvh`, not `ctx.geometryQueries` (RS-6 wiring; done 2026-10-21 as an up-front batch, §12).
 - `check_prototype` (`packages/domain-dynamics/src/commands/checkPrototype.ts`, toolset `analysis`): check_assembly → mobility → check_motion_clearance →
   check_dynamics, plus for engines `check_timestep_convergence` and `compare_to_reference` (the M3b deferral: both are **folded into the
   dynamics check**, their items carry their `accuracy`). The mechanism row uses the **rank DOF of `inspect_dynamics`** (a Gruebler count
@@ -983,7 +1002,7 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   The tessellation fit rejects boxes and prisms (a facet must span at most 30 degrees about the axis) and splits same-radius journals at axial
   gaps. Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than
   `ctx.geometryQueries.minDistanceBatch`: the sweep is sequential (a running bound per pair, adaptive refinement, contact bisection), a batch
-  over all poses up front would lose the early-outs; the wiring belongs to the native `geomq` (RS-6). VC-34 is partial: only the reference
+  over all poses up front would lose the early-outs; the wiring belongs to the native `geomq` (RS-6: built 2026-10-21 as a prefetch the sweep reads, so the early-outs stay, §12). VC-34 is partial: only the reference
   and timestep items carry `accuracy`.
 
 **M5 (UI, `src/ui/panels/review/`).** Verdict line and stale dispositions; dispositions sent with the check's `inputsHash`; `info` status

@@ -35,8 +35,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   primitives; plan time dominated by one OCCT sweep boolean (13–15 s); native follow-ups in LIM1-scale.md (JSON depth, relative display
   tolerance, multi-tool cut). _deps: —_
 - `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. `npm run native:check` passes with MSVC (2026-10-21, KRN-MSVC).
-- `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
-- `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: RS wave*
+- `[TODO]` **RS follow-ups** RS-6 options (wgpu BVH traversal for geomq, plant 09 instance BVH / VC-VIS-60 (a), physics 13 broad phase VC-COR-17); plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: RS wave*
 - `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
   mapping and the compliance ratio, a timeout checkpoint (`deadlineS`) so a killed run resumes, VC-TOP-34 on a hardware GPU (GPU cap): `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §13–§14. _deps: —_
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: — (CFD-M1 done 2026-10-20, f58bc668)_

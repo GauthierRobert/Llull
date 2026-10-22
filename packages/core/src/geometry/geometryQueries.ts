@@ -1,7 +1,7 @@
 /**
  * Injected batch mesh-query port (PHY-21 TR-FPR-19, RS1 §2 rule 1). Interface + the always-available TS engine on `meshBvh`; a host may
- * install a faster one (native `llull-compute geomq`) with `setGeometryQueryEngine`. Commands read it from `ctx.geometryQueries` and fall
- * back to `resolveGeometryQueries(...)` (the default engine) when it is null/absent. Synchronous, framework-agnostic, no native imports.
+ * install a faster one (native `llull-compute geomq`, RS-6) with `setGeometryQueryEngine`. Commands read it from `ctx.geometryQueries` and
+ * fall back to `resolveGeometryQueries(...)` (the default engine) when it is null/absent. Synchronous, framework-agnostic, no native imports.
  * @invariant every batch method returns exactly one result per input item, in input order; an empty batch returns []
  * @invariant a conforming engine reproduces the default engine's numbers (same hits, same distances) up to its declared determinism
  */
@@ -26,6 +26,11 @@ interface GeometryQueryLimits {
   readonly maxViewFactorFacets: number;
   /** Largest total thickness-ray count accepted by `check_assembly`. */
   readonly maxThicknessRays: number;
+  /**
+   * Largest pose × pair product `check_motion_clearance` sends up front as one `placedDistanceBatch` (every recorded sample, else the
+   * coarse anchors). 0 = never: on the TS engine the sequential sweep with its early-outs is cheaper than distances at every sample.
+   */
+  readonly motionPrefetchQueries: number;
 }
 
 export interface MeshRay {
@@ -42,6 +47,22 @@ export interface OcclusionSegment {
   readonly skip: readonly number[];
 }
 
+/** A planar radiating triangle: corners counter-clockwise about the emitting `normal` (unit), its centroid and area (the cae `Facet`). */
+export interface ViewFacet {
+  readonly corners: Triangle;
+  readonly normal: Vec3;
+  readonly centroid: Vec3;
+  readonly area: number;
+}
+
+/** Closest points of mesh `a` and mesh `b` placed by `placement` in a's frame (null = same frame), when within `maxDistance` (may be Infinity). */
+export interface PlacedDistanceQuery {
+  readonly a: number;
+  readonly b: number;
+  readonly placement: RigidTransform | null;
+  readonly maxDistance: number;
+}
+
 export interface GeometryQueryEngine {
   readonly provenance: GeometryQueryProvenance;
   readonly limits: GeometryQueryLimits;
@@ -56,10 +77,20 @@ export interface GeometryQueryEngine {
     pairs: readonly (readonly [number, number])[],
     maxDistance: number,
   ): (BvhDistance | null)[][];
+  /** Per query: `bvhMinDistance(tree a, tree b, maxDistance, placement)`; witness points in mesh a's frame. */
+  placedDistanceBatch(meshes: readonly MeshData[], queries: readonly PlacedDistanceQuery[]): (BvhDistance | null)[];
   /** First double-sided surface hit of each ray with t in [tMin, maxT], else null. */
   rayCastBatch(mesh: MeshData, rays: readonly MeshRay[], maxT: number): (BvhRayHit | null)[];
   /** Per segment: true when the open segment crosses the interior of any non-skipped occluder triangle. */
   segmentOcclusionBatch(occluders: readonly Triangle[], segments: readonly OcclusionSegment[]): boolean[];
+  /**
+   * Optional (RS-6, the native engine): exchange matrix A_I F_IJ (length unit squared) between the facet groups `surfaces` (PHY-03
+   * TR-THM-20), every facing pair of facets of different surfaces by contour integral. `blockers` non-null = obstruction on: a pair is
+   * dropped when the open segment between its centroids crosses another facet (of any surface, or a blocker). Absent, or null returned
+   * (not answered, e.g. a failed native run), = the caller runs its TypeScript reference (cae `viewFactorExchangeReference`, which uses
+   * `segmentOcclusionBatch`); a matrix returned = the same numbers.
+   */
+  viewFactorExchange?(surfaces: readonly (readonly ViewFacet[])[], blockers: readonly ViewFacet[] | null): number[][] | null;
 }
 
 type Mat3 = RigidTransform['rotation'];
@@ -81,24 +112,43 @@ function relativePlacement(a: RigidTransform | null, b: RigidTransform | null): 
   return { rotation: rotation as unknown as Mat3, translation };
 }
 
+/** `minDistanceBatch` expressed as one `placedDistanceBatch` (pose-major), reshaped to `[pose][pair]`: shared by every engine. */
+export function minDistanceByPlacement(
+  placed: GeometryQueryEngine['placedDistanceBatch'],
+  meshes: readonly MeshData[],
+  poses: readonly (readonly (RigidTransform | null)[])[],
+  pairs: readonly (readonly [number, number])[],
+  maxDistance: number,
+): (BvhDistance | null)[][] {
+  const queries = poses.flatMap((pose) =>
+    pairs.map(([a, b]): PlacedDistanceQuery => ({ a, b, placement: relativePlacement(pose[a] ?? null, pose[b] ?? null), maxDistance })),
+  );
+  const flat = queries.length === 0 ? [] : placed(meshes, queries);
+  return poses.map((_, p) => flat.slice(p * pairs.length, (p + 1) * pairs.length));
+}
+
+/** `placedDistanceBatch` of the TS engine: one tree per mesh index, built on first use. */
+function placedByMeshBvh(meshes: readonly MeshData[], queries: readonly PlacedDistanceQuery[]): (BvhDistance | null)[] {
+  const trees = new Map<number, MeshBvh>();
+  const treeOf = (index: number): MeshBvh => {
+    let tree = trees.get(index);
+    if (tree === undefined) {
+      tree = buildMeshBvh(meshes[index] ?? { positions: [], indices: [] });
+      trees.set(index, tree);
+    }
+    return tree;
+  };
+  return queries.map((query) => bvhMinDistance(treeOf(query.a), treeOf(query.b), query.maxDistance, query.placement));
+}
+
 /** The TS engine: deterministic AABB trees (`meshBvh`) and brute-force segment/triangle tests. Always available, browser included. */
 export const meshBvhEngine: GeometryQueryEngine = {
   provenance: { engine: 'meshBvh', device: 'cpu', deterministic: true },
-  limits: { maxViewFactorFacets: 400, maxThicknessRays: 200_000 },
+  limits: { maxViewFactorFacets: 400, maxThicknessRays: 200_000, motionPrefetchQueries: 0 },
   minDistanceBatch(meshes, poses, pairs, maxDistance) {
-    const trees = new Map<number, MeshBvh>();
-    const treeOf = (index: number): MeshBvh => {
-      let tree = trees.get(index);
-      if (tree === undefined) {
-        tree = buildMeshBvh(meshes[index] ?? { positions: [], indices: [] });
-        trees.set(index, tree);
-      }
-      return tree;
-    };
-    return poses.map((pose) =>
-      pairs.map(([i, j]) => bvhMinDistance(treeOf(i), treeOf(j), maxDistance, relativePlacement(pose[i] ?? null, pose[j] ?? null))),
-    );
+    return minDistanceByPlacement(placedByMeshBvh, meshes, poses, pairs, maxDistance);
   },
+  placedDistanceBatch: placedByMeshBvh,
   rayCastBatch(mesh, rays, maxT) {
     if (rays.length === 0) return [];
     const tree = buildMeshBvh(mesh);
