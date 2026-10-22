@@ -39,7 +39,8 @@ export const SOURCE_SHA256 = 'f6e272b6aaa14743a611eb4b8d7affa98986cdcaa60f5a91ca
 const SOURCE_DIR_NAME = 'occt-V7_9_2';
 
 // First-level toolkits; OCCT's cmake adds their dependencies (TKXCAF pulls TKVCAF/TKV3d/TKService/TKHLR, built without any
-// windowing or font backend below). Keep in step with OCCT_LIBS in solver/crates/llull-kernel-occt/build.rs.
+// windowing or font backend below). Keep in step with OCCT_LIBS in solver/crates/llull-kernel-occt/build.rs; TKDESTL is for Netgen
+// only (solver/scripts/build-netgen.mjs links its OCC geometry against this prefix and needs it).
 const TOOLKITS = [
   'TKernel',
   'TKMath',
@@ -61,6 +62,7 @@ const TOOLKITS = [
   'TKDE',
   'TKDESTEP',
   'TKDEIGES',
+  'TKDESTL',
   'TKCDF',
   'TKLCAF',
   'TKCAF',
@@ -152,7 +154,14 @@ async function download(target) {
 function stampMatches(prefix) {
   try {
     const stamp = JSON.parse(readFileSync(join(prefix, STAMP), 'utf8'));
-    return stamp.version === OCCT_VERSION && stamp.sha256 === SOURCE_SHA256 && stamp.recipe === RECIPE;
+    // a prefix built before a toolkit joined TOOLKITS is rebuilt too
+    const built = new Set(stamp.toolkits ?? []);
+    return (
+      stamp.version === OCCT_VERSION &&
+      stamp.sha256 === SOURCE_SHA256 &&
+      stamp.recipe === RECIPE &&
+      TOOLKITS.every((toolkit) => built.has(toolkit))
+    );
   } catch {
     return false;
   }

@@ -1,0 +1,18 @@
+[package]
+name = "llull-netgen"
+description = "Netgen 6.2 (nglib + ngcore, shared, LGPL-2.1 dynamic linking) and the OCCT it meshes, behind a narrow cxx facade for llull-mesh"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+# Exports DEP_NETGEN_LIB_DIR / DEP_NETGEN_BIN_DIR / DEP_NETGEN_OCCT_LIB_DIR / DEP_NETGEN_OCCT_BIN_DIR to dependents (runtime search path).
+links = "netgen"
+
+[dependencies]
+cxx = "1"
+
+[build-dependencies]
+cxx-build = "1"
+
+[lints]
+workspace = true
