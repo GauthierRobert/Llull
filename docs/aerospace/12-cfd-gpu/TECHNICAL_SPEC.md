@@ -394,7 +394,7 @@ CPU backend runs everywhere, so every VC has a CI path. Coverage 90/85/90/90 app
 | M4 | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario | M2 | 7 eng-weeks |
 | M5 | Grid study (`gridStudy`, GCI), pinned literature benchmarks (Schäfer-Turek 3D, AIJ, ONERA M6), performance gate | M3, M4 | 3 eng-weeks |
 | V1 | cumulant D3Q27, interpolated walls, ABL inlet + comfort maps, defeaturing via 07 FTR, time-accurate + animation, viscous drag estimate | M5 | ≈ 8 eng-weeks |
-| V2 | PyFR body-fitted mode (bundled CPython, Gmsh mesh), nozzle / plume (11 FLD) | V1 | ≈ 8 eng-weeks |
+| V2 | PyFR body-fitted mode (bundled CPython, Netgen mesh), nozzle / plume (11 FLD) | V1 | ≈ 8 eng-weeks |
 
 MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay (same overlay component, 05 field data).
 

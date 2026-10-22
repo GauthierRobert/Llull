@@ -15,7 +15,7 @@ for behaviour: `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` (05), `docs
 | Thermal FE discipline | `packages/domain-cae/src/thermal/` (Proposal **B** of PHY-03 §2.1: discipline inside `domain-cae`) | PHY-03 §2.1 |
 | Thermo-mechanical FE discipline | `packages/domain-cae/src/thermomech/` (same) | PHY-04 §2 |
 | Pure physics queries already built | unchanged in core (`commands/thermal`, `commands/thermomech`, `commands/materiallab`) | §13 of each pack |
-| Meshing (Netgen 6.2.2604 in the `llull-mesh` sidecar since NG1; Gmsh 4.15.2 Python API when written), solving (`ccx`), artifact store | `server/` (`server/src/fea/*`), `solver/bins/llull-mesh`, CLI verbs | 05 §5.4, §5.9 |
+| Meshing (Netgen 6.2.2604 in the `llull-mesh` sidecar), solving (`ccx`), artifact store | `server/` (`server/src/fea/*`), `solver/bins/llull-mesh`, CLI verbs | 05 §5.4, §5.9 |
 
 Why Proposal B: no package may import another package (`plugins-and-kernels-depend-on-core-only`) and the physics FE parts must
 call the 05 deck writer and readers; inside one package they compose by plain imports, with no new core extension port.

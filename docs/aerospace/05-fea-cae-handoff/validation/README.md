@@ -26,8 +26,8 @@ Tolerances are **llull acceptance choices**, explained per case. No source claim
 | `plans/*.plan.json` | draft plans | `build_project` action lists. The geometry steps use existing llull commands. The analysis steps use the **proposed** commands of TECHNICAL_SPEC §4 (`create_analysis`, `set_part_idealization`, `add_fea_constraint`, `add_fea_load`, `set_mesh_controls`, `add_result_probe`) and the **proposed gap 08** material commands (`define_material_record`, `set_material_property`, `create_material` + `recordId`). They stay drafts until those commands exist. |
 | `sources.md` | register | Every external source, its access date, and what was verified. |
 
-No third-party file is stored in this folder. Every external file is GPL (CalculiX, FeenoX) or too large
-(the Gmsh wheel), so each one is pinned by URL, commit and sha256. The M4 test fixture loader downloads
+No third-party file is stored in this folder. Every external file is GPL (CalculiX, FeenoX),
+so each one is pinned by URL, commit and sha256. The M4 test fixture loader downloads
 them into a git-ignored cache and checks their hashes.
 
 ## Real use cases (value statements are sourced)
@@ -36,9 +36,9 @@ them into a git-ignored cache and checks their hashes.
 | - | -------- | --------------- | ----------------- | ----- |
 | U1 | Show that a part has positive margins under limit loads × 1.5 | Every part 25 transport-category airframe structure | 14 CFR 25.303 requires FoS = 1.5 on limit loads, and 25.305 requires ultimate loads to be carried 3 s without failure [S1, S1a]. The factor has been US practice since the Air Corps adopted it in 1930/1934 [S5]. | VC-FEA-20, 30, 31 |
 | U2 | Spaceflight hardware margins | NASA programmes and suppliers | NASA-STD-5001B defines MS = allowable / (limit × FoS) − 1 for yield and ultimate [S2]. NASA-HDBK-5026 requires positive MS [S4]. | VC-FEA-20 |
-| U3 | Hand a mesh/deck to the analysis department's Nastran | OEM stress offices. NASTRAN has been the NASA structural analysis system since the early 1970s, "the first of its kind" [S31]. | The BDF card set (GRID, CTETRA, CQUAD4, PSHELL, MAT1, SPC1, FORCE, PLOAD4) is the de facto exchange format, and open tools read and write it (pyNastran [S14], meshio [S13], Gmsh [S10]). | VC-FEA-15 |
-| U4 | Fully open, offline analysis loop on a desktop | Small suppliers, universities, CubeSat teams | FreeCAD FEM already chains Gmsh/Netgen → CalculiX → FRD import [S15], which shows the stack works. CalculiX ships 638 regression decks with reference outputs [S30]. | VC-FEA-16, 40–44 |
-| U5 | Solver/element verification before trusting results | All analysis groups | Commercial vendors publish NAFEMS LE1/LE10 verification (Abaqus, OptiStruct, COMSOL [S40–S45]). Open-source FeenoX + Gmsh reproduces 92.7011 and −5.37968 MPa [S43]. | VC-FEA-30, 31 |
+| U3 | Hand a mesh/deck to the analysis department's Nastran | OEM stress offices. NASTRAN has been the NASA structural analysis system since the early 1970s, "the first of its kind" [S31]. | The BDF card set (GRID, CTETRA, CQUAD4, PSHELL, MAT1, SPC1, FORCE, PLOAD4) is the de facto exchange format, and open tools read and write it (pyNastran [S14], meshio [S13]). | VC-FEA-15 |
+| U4 | Fully open, offline analysis loop on a desktop | Small suppliers, universities, CubeSat teams | FreeCAD FEM already chains Netgen → CalculiX → FRD import [S15], which shows the stack works. CalculiX ships 638 regression decks with reference outputs [S30]. | VC-FEA-16, 40–44 |
+| U5 | Solver/element verification before trusting results | All analysis groups | Commercial vendors publish NAFEMS LE1/LE10 verification (Abaqus, OptiStruct, COMSOL [S40–S45]). Open-source FeenoX reproduces 92.7011 and −5.37968 MPa [S43]. | VC-FEA-30, 31 |
 
 ## Validation cases
 

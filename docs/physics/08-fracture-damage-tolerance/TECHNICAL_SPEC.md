@@ -310,7 +310,7 @@ transport progress), AF-42 (`--dry-run`).
    confirmed by a human.
 4. **OQ-FRC-04** Walker convention (γ and the exponent grouping) to store per model; confirm with the data source.
 5. **OQ-FRC-05** Centre-crack secant validity limit: llull proposes 2a/W ≤ 0.7; find a source for the accuracy statement.
-6. **OQ-FRC-06** Crack seam: Netgen (NG1) has no equivalent of the Gmsh `Crack` plugin; implement node duplication in
+6. **OQ-FRC-06** Crack seam: Netgen (NG1) has no crack-seam node duplication, so llull implements it in
    `llull-mesh` or in `@phys` after meshing.
 7. **OQ-FRC-07** NAFEMS R0020 original values (paid): obtain the publication to confirm the 3.0 target and test 2.2.
 8. **OQ-FRC-08** AFGROW (commercial, LexTech) / NASGRO cross-runs as acceptance evidence: who runs them and with which

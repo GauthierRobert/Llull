@@ -36,8 +36,8 @@ The gap closes in three steps:
 | History of the 1.5 factor | The US Air Corps adopted the ultimate factor of 1.5 in 1930 and wrote it into design requirements in 1934. | The factor is configurable and its origin is documented. | [R5] |
 | Spaceflight hardware | NASA programmes compute MS = allowable / (limit × FoS) − 1 for yield and ultimate, and both MS must be positive. | The same equation, with a yield factor and an ultimate factor per analysis. | [R3], [R6] |
 | Nastran as lingua franca | NASTRAN, the NASA Structural Analysis System, was completed in the early 1970s, "the first of its kind" in FEA. BDF bulk data stays the exchange format between design and stress groups. | BDF export (GRID, CTETRA, CQUAD4/CTRIA3, PSHELL/PSOLID, MAT1, SPC1, FORCE, PLOAD4). | [R31], [R14] |
-| Open-source FEA stack | FreeCAD FEM chains Gmsh/Netgen meshing, a CalculiX solver and FRD import. CalculiX uses ABAQUS-style input and ships 638 verification decks. | The same proven stack, driven by llull commands, the CLI and MCP, offline on the desktop. | [R15], [R30] |
-| Solver verification | Commercial solvers publish NAFEMS LE1 and LE10 verification (Abaqus, OptiStruct, COMSOL), and FeenoX + Gmsh reproduces both. | NAFEMS LE1 and LE10 in llull's quality gate. | [R40]–[R45] |
+| Open-source FEA stack | FreeCAD FEM chains Netgen meshing, a CalculiX solver and FRD import. CalculiX uses ABAQUS-style input and ships 638 verification decks. | The same proven stack, driven by llull commands, the CLI and MCP, offline on the desktop. | [R15], [R30] |
+| Solver verification | Commercial solvers publish NAFEMS LE1 and LE10 verification (Abaqus, OptiStruct, COMSOL), and FeenoX reproduces both. | NAFEMS LE1 and LE10 in llull's quality gate. | [R40]–[R45] |
 | Thin-walled airframe parts | Skins, ribs, frames and sheet-metal clips are modelled as shells on midsurfaces in commercial pre-processors. | Midsurface extraction for constant-thickness parts and shell idealization (V1). | — (llull design; see §10) |
 
 **Value statements** (sourced only; no invented ROI):
@@ -102,7 +102,7 @@ User stories:
 | FR-FEA-03 | MUST | MS uses **allowables** (Ftu, Fty, optionally Fsu, Fcy) read from the gap 08 record, with their basis (A, B, S, …) and provenance carried unchanged into the MS report. No basis substitution (gap 08 FR-MAT-06). | MS needs allowables, and their provenance must be visible | [R3], gap 08 |
 | FR-FEA-04 | MUST | **Part idealization** per part: `solid` (3D), `plane_stress` (2D region plus thickness), and `shell` (surface plus thickness and offset). `beam` is V2. | Thin parts are analysed as shells, and LE1 is plane stress | [R40], [R30] |
 | FR-FEA-05 | SHOULD | **Midsurface extraction** for constant-thickness thin-walled solids. It reports coverage (the share of face area that was paired) and lists unpaired faces, and it is derived geometry that never edits the design. | Airframe sheet-metal and machined thin walls are meshed as shells | — |
-| FR-FEA-06 | SHOULD | **Defeaturing** of the analysis geometry: remove holes, fillets and chamfers below a size or picked by point, using derived geometry only. | Small features drive the mesh size without changing the global stiffness | [R10] (`occ.defeature`) |
+| FR-FEA-06 | SHOULD | **Defeaturing** of the analysis geometry: remove holes, fillets and chamfers below a size or picked by point, using derived geometry only. | Small features drive the mesh size without changing the global stiffness | OCCT `BRepAlgoAPI_Defeaturing` |
 | FR-FEA-07 | MUST | **Constraints** (`fixed`, `pinned`, `symmetry`, `displacement` per DOF) on faces, edges or points. Targets are given as `facesNear` / `edgesNear` / `pointsNear` and are re-resolved after parametric edits, as `fillet_edge` already does. | Topological naming (KI5): indices are not stable | L1 (KI5) |
 | FR-FEA-08 | MUST | **Loads**: force (as a total distributed over the target, or per node), pressure (positive is compressive), gravity/acceleration and moment. Each load belongs to a named **load case** tagged `limit` or `ultimate`. | 25.301/25.303 distinguish limit from ultimate loads | [R2], [R1] |
 | FR-FEA-09 | MUST | **Meshing** with Netgen (`llull-mesh`): tet4/tet10, and tri3/tri6/quad4/quad8 for plane stress and shells. Controls: global size, order, local size at targets. The mesh is deterministic and reproducible from geometry plus controls plus mesher version. Adequacy warnings flag fewer than 2 elements through the thickness or span. | Netgen (nglib) exposes these; second order by straight mid-edge nodes added by `llull-mesh`. CalculiX simplebeam shows a single element is 10 % stiff | [R11], [R30] |
@@ -124,7 +124,7 @@ User stories:
 | FR-FEA-24 | MUST | The **validation suite** (NAFEMS LE1/LE10, analytic cases, CalculiX reference decks) runs in CI and gates releases. | Credibility of the results | [R40]–[R45], [R30] |
 | FR-FEA-25 | MUST | **Units**: decks use a consistent system derived from the document unit (mm gives N-mm-t-s, m gives N-m-kg-s, in gives lbf-in-(lbf·s²/in)-s). The deck header names the system, and every conversion is tested. | FE codes have no units, so the user must keep them consistent | [R30] |
 | FR-FEA-26 | COULD | **Netgen** as an alternative tet mesher (LGPL). | Licence flexibility and robustness on some geometries | [R11] |
-| FR-FEA-27 | COULD | **Structured / hex-dominant meshing** for simple prismatic parts (structured sweep plus recombine). | Better accuracy per DOF on beams and plates | [R10] |
+| FR-FEA-27 | COULD | **Structured / hex-dominant meshing** for simple prismatic parts (structured sweep plus recombine). | Better accuracy per DOF on beams and plates | — |
 | FR-FEA-28 | SHOULD | **Licence compliance** for the bundled tools. CalculiX (GPL) is shipped as a separate program, not linked; Netgen (LGPL-2.1) is shipped as shared libraries that `llull-mesh` links dynamically. Both come with their licence texts and the corresponding source or a written offer, and are listed in the About box. | GPL / LGPL obligations | [R11], [R30] |
 | FR-FEA-29 | COULD | Run a **user-installed Nastran or MYSTRAN** through a configured external command, then OP2 import. | Lets the stress office's solver close the loop | [R14] |
 | FR-FEA-30 | COULD (V2) | **Composite shell properties** (PCOMP / `*SHELL SECTION, COMPOSITE`) from gap 06 laminates. | Composite airframe structure | — |
@@ -299,7 +299,7 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 
 | Risk / assumption | Impact | Mitigation |
 | ----------------- | ------ | ---------- |
-| GPL licensing of CalculiX [R30] inside a desktop installer | Legal | Separate executable, no linking. Ship the licence and source. The mesher is Netgen (LGPL-2.1, linked dynamically) [R11] since NG1, replacing GPL Gmsh [R10]. Needs a legal decision (TECHNICAL_SPEC §11). |
+| GPL licensing of CalculiX [R30] inside a desktop installer | Legal | Separate executable, no linking. Ship the licence and source. The mesher is Netgen (LGPL-2.1, linked dynamically) [R11] since NG1. Needs a legal decision (TECHNICAL_SPEC §11). |
 | A general midsurface is unsolved for arbitrary solids. Junctions and variable thickness are hard | Users trust bad shells | MVP limits it to constant-thickness face-pairs with a coverage report and visual check. Unpaired regions block shell export unless the user accepts them. |
 | Face mapping between the llull B-rep and the mesher's (Netgen) B-rep after the STEP round-trip | Loads land on the wrong faces | Match by centroid, area and normal with a tolerance. Ambiguity is an error and nothing is guessed (TR-FEA-32). |
 | Users read nodal-averaged FRD stresses at singularities (re-entrant corners, point loads) as real | Non-conservative or over-conservative MS | Report singularity warnings (point loads, sharp re-entrant edges). Element (integration point) stresses are available. Documentation. |
@@ -316,7 +316,6 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 - [R4] EASA Easy Access Rules for Large Aeroplanes (CS-25) — EASA — https://www.easa.europa.eu/en/document-library/easy-access-rules/online-publications/easy-access-rules-large-aeroplanes-cs-25 (accessed 2026-10; catalogue only)
 - [R5] NASA NTRS 20150003482 (history of the 1.5 factor of safety) — NASA — https://ntrs.nasa.gov/api/citations/20150003482/downloads/20150003482.pdf (accessed 2026-10, search)
 - [R6] NASA-HDBK-5026 — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/Baseline/0/NASA-HDBK-5026-Final-8-12-2024.pdf (accessed 2026-10, search)
-- [R10] Gmsh 4.15.2 (PyPI wheel, LICENSE, API), the mesher before NG1 — Geuzaine & Remacle — https://pypi.org/project/gmsh/4.15.2/ (accessed 2026-10)
 - [R11] Netgen — NGSolve — https://github.com/NGSolve/netgen (accessed 2026-10)
 - [R12] The Verdict Library Reference Manual SAND2007-2853 — Sandia — https://github.com/sandialabs/verdict (accessed 2026-10)
 - [R13] meshio — https://github.com/nschloe/meshio (accessed 2026-10)

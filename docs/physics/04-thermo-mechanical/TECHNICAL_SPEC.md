@@ -371,7 +371,7 @@ and the expression evaluator to `lib/expression.ts` (§11 Q3) so the plugin can 
 | `check_thermo_mechanical`, `thermal_distortion_report` (Jacobi plane fit), `dispose_fit_result` (human gate) | `thermomech/{check,distortion,plane,dispose}.ts` |
 | Staleness chain thermal → thermo_static (TR-TMC-10) | `hash/inputHash.ts`: the dependent case hashes the source case's results hash **and** its current input hash |
 
-FE benchmarks, real Gmsh 4.15.2 (the mesher before NG1) + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adapted plans in `server/tests/fixtures/thermomech/`, run by
+FE benchmarks, the previous mesher + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adapted plans in `server/tests/fixtures/thermomech/`, run by
 `npm run quality:physics`): VC-TMC-01.a/b/c (−251.997 / −359.996 / −629.994 MPa), 02 LE11 (−103.43 MPa vs −105, −1.5 %, OCC kernel, full
 FeenoX section revolved), 05.a/b/c sequential thick cylinder (−206.93 / 133.69 / −208.40 MPa, ≤ 1.4 %), 08.b/c/d thermal bow
 (`thermal_distortion_report` agrees with the probe), 60, 61, 63, and the fit plan (06.a–d). VC-TMC-50 is verified on its
@@ -384,7 +384,7 @@ key is closed by §14.
   and element blocks when the hashes differ; a missing mesh or a different discretisation is still `TMC_MESH_MISMATCH`.
 - **Table fields** read `{ kind: 'fe_table', rows }` from the artifact store under the artifact hash; the `fea_import_field` transport that
   writes it is built (2026-10-17, see §14).
-- **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in Gmsh (seen before NG1). Initial temperatures are written
+- **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in the previous mesher (seen before NG1). Initial temperatures are written
   per node (no set-name dependency). `TMC_THERMAL_CATEGORY_UNSET` is a warning (`add_fea_load` always sets a category).
 - **Human gate:** `dispose_fit_result` verifies through `ctx.humanSignature`; none is installed (09 PLM), so agents get `TMC_HUMAN_GATE`.
 
@@ -405,7 +405,7 @@ key is closed by §14.
 
 ## 14. PHY-04 closure (2026-10-17)
 
-Built on the 05 slice; every number below was measured with Gmsh 4.15.2 (the mesher before NG1) and CalculiX 2.21 (`npm --prefix server test -- feaThermomech`, recorded for
+Built on the 05 slice; every number below was measured with the previous mesher and CalculiX 2.21 (`npm --prefix server test -- feaThermomech`, recorded for
 `npm run quality:physics`).
 
 | Item | What | Where |
@@ -484,7 +484,7 @@ mesh artifact hash: the canonical hash of a 200k-node mesh costs 8 s in TS, the 
 ## 16. M4b: transient coupled step, orthotropic CTE, stack-ups at temperature, bimetal FE (2026-10-19)
 
 Built in `packages/domain-cae` (plugin `cae`, toolset `analysis`); core is touched only by additive model types (`model/analysis.ts`) and the optional
-`direction` argument of `materialCteProvider`. No Gmsh, CalculiX or `llull-kernel` was available on the build host: the deck writers are proved by text
+`direction` argument of `materialCteProvider`. No mesher, CalculiX or `llull-kernel` was available on the build host: the deck writers are proved by text
 assertions, the FRD readers by hand-built fixtures, and the FE runs (`server/tests/feaThermomechTransient.test.ts`) skip with a logged reason.
 **None of the FE numbers below has been measured yet**; the first run on a machine with the tools is the validation (see "Unverified").
 
@@ -521,7 +521,7 @@ assertions, the FRD readers by hand-built fixtures, and the FE runs (`server/tes
 **Still open:** a non-uniform initial temperature field for a transient; orthotropic stiffness (E1/E2/E3, `*ELASTIC, TYPE=ORTHO` from 06 laminates); amplitudes on
 mechanical loads; the `llull guide` section; a signing implementation (09 PLM).
 
-**SOLVER-VERIFY (2026-10-20, Gmsh 4.15.2 (the mesher before NG1) + CalculiX 2.21 conda-forge, Windows 11).** The "Unverified" list above, measured:
+**SOLVER-VERIFY (2026-10-20, the previous mesher + CalculiX 2.21 conda-forge, Windows 11).** The "Unverified" list above, measured:
 
 1. **Pre-heating step: the first build did not run.** ccx 2.21 refused `*TEMPERATURE, OP=NEW` in the coupled step ("a *TEMPERATURE card is detected but no thermal
    *INITIAL CONDITIONS are given") and, with that card removed, stopped with "in nonlinear calculations energy output requests, if any, must be specified in the first

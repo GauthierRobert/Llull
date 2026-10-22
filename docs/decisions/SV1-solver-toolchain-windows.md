@@ -2,7 +2,7 @@
 
 **Status:** recorded (install record + what it verified). **Owner authorisation:** the user authorised installing the full solver toolchain.
 
-> Superseded in part: the Gmsh rows and `LLULL_GMSH_PYTHON` below are replaced by Netgen in `llull-mesh` ([NG1](NG1-netgen-mesher.md)); the rest of the record stands.
+> Superseded in part: the previous mesher (its row and environment variable, removed here) is replaced by Netgen in `llull-mesh` ([NG1](NG1-netgen-mesher.md)); the rest of the record stands.
 
 ## Decision
 
@@ -13,7 +13,6 @@ the environment the server already reads. No repo default changes: the server st
 | --- | --- | --- | --- | --- |
 | Miniforge | 26.7.2-0 | `winget install CondaForge.Miniforge3 --scope user` (`/InstallationType=JustMe /AddToPath=0`) | `%USERPROFILE%\miniforge3` | winget manifest hash verified |
 | Python | 3.12.15 (conda-forge) | `conda create -n llull-fea python=3.12 calculix=2.21=h27aae45_3 numpy` | `...\envs\llull-fea\python.exe` | conda-forge |
-| Gmsh | 4.15.2 | `pip install gmsh==4.15.2` (wheel) in `llull-fea` | same env | PyPI (the version `server/python/llull_mesh.py` reports) |
 | pyNastran | 1.4.1 (pulls numpy 1.26.4) | `pip install pyNastran` in `llull-fea` | same env | PyPI |
 | CalculiX ccx | 2.21 (`calculix 2.21 h27aae45_3`, conda-forge win-64, built 2023-07-29) | in `llull-fea` | `...\envs\llull-fea\Library\bin\ccx.exe` (needs `Library\bin` and `Library\mingw-w64\bin` on PATH) | sha256 `1cfaaed97f80ef56006d3ee1b325f708ed44c51a6268565d1de943c569427b43` |
 | CadQuery | 2.8.0 | `conda create -n llull-cq python=3.12`, `pip install --only-binary :all: "cadquery>=2.4"` (server/python/requirements.txt) | `...\envs\llull-cq\python.exe` | PyPI wheels |
@@ -35,7 +34,7 @@ binaries were therefore built with the GNU target `x86_64-pc-windows-gnu`:
   toolkits after the static facade (a single-pass GNU ld otherwise leaves the facade's OCCT symbols undefined).
 
 Run environment of the suites (PowerShell): `PATH` += `llull-fea`, its `Library\bin`, `Library\mingw-w64\bin`, the OCCT `bin`, w64devkit `bin`;
-`LLULL_GMSH_PYTHON` / `LLULL_TEST_FEA_PYTHON` / `LLULL_PYNASTRAN_PYTHON` = the `llull-fea` python; `LLULL_PYTHON` = the `llull-cq` python
+`LLULL_TEST_FEA_PYTHON` / `LLULL_PYNASTRAN_PYTHON` = the `llull-fea` python; `LLULL_PYTHON` = the `llull-cq` python
 (STEP / code exchange); `LLULL_CCX` = the ccx above; `LLULL_OCCT_DIR` as above for `cargo`.
 
 ## What ran (all with the tools present)

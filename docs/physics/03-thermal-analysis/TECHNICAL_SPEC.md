@@ -553,9 +553,9 @@ so no core extension port was needed.
 | Deck sections §5.1 (materials tabulated from PHY-01 models, `*HEAT TRANSFER`, BCs, `*FILM`, `*RADIATE` incl. `CAVITY=`, output) | `thermal/{deck,deckMaterial,deckLoads,deckStep,deckNames}.ts`, assembled by the 05 `writeInp` |
 | Summary + heat balance §5.5 | `thermal/{summary,heatBalance,bcFlows,storedEnergy,meshGeometry}.ts` |
 | `analysis_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
-| Solve path | server `fea_mesh` (`llull-mesh`, Netgen 6.2.2604; Gmsh 4.15.2 before NG1) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
+| Solve path | server `fea_mesh` (`llull-mesh`, Netgen 6.2.2604) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
 
-FE benchmarks, real Gmsh 4.15.2 (the mesher before NG1) + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
+FE benchmarks, the previous mesher + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
 `server/tests/fixtures/thermal/`, run by `npm run quality:physics`): VC-THM-01.a–d (wall), 03 (T3 36.48 °C vs 36.60, 0.33 %), 04 (T4
 18.2542 vs 18.2538), 05 (T2 927.004 K, exact σ), 14.a/b (oneel8ra), plus 61 (all ten set-ups, CLI), 50 (incl. the dependent thermo_static going stale), 62, 63 at unit level and an
 open-cavity case against the exact view-factor network (0.5 %).
@@ -586,7 +586,7 @@ open-cavity case against the exact view-factor network (0.5 %).
 **Still open:** phase change (V2); ε(T) tables (needs PHY-15 emissivity data, absent) and `render_view field=temperature` (M4 V1); h(T) in transient
 cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 
-**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 (the mesher before NG1) through plan -> `fea_mesh` -> `fea_solve` -> `analysis_report`:**
+**V1 additions (2026-10-17), all measured on ccx 2.21 with the previous mesher through plan -> `fea_mesh` -> `fea_solve` -> `analysis_report`:**
 
 | Item | Result |
 | ---- | ------ |

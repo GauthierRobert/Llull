@@ -70,7 +70,7 @@ results were not reachable (open question 4 of TECHNICAL_SPEC).
 ## How the cross-check was run (not part of the generator)
 
 On 2026-10-15, in an isolated scratch directory: topoptlab 1.0.0 sdist (sha256 `4978a92a…090e`), NumPy 2.5.3 and the
-SciPy 1.18.1 wheel; optional imports that MBB does not use (matplotlib, mmapy, cvxopt, pyamg, gmsh, meshio, symfem,
+SciPy 1.18.1 wheel; optional imports that MBB does not use (matplotlib, mmapy, cvxopt, pyamg, meshio, symfem,
 sympy) were stubbed; called `main(nelx=60, nely=20, volfrac=0.5, rmin=1.5, ft=0|1, optimizer="oc", bcs=mbb_2d)` and
 read the returned objective. topoptlab's `ft=0` is the sensitivity filter and `ft=1` the density filter (its own
 numbering differs from top88's 1/2).

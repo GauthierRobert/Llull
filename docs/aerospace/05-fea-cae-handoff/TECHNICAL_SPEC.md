@@ -12,14 +12,14 @@ Gap id **FEA** · status: specification · written 2026-10-15 · functional spec
 | Materials | `Material { name, density, color, metalness, roughness, finish? }`, `create_material`, `assign_material` | `packages/core/src/model/types.ts` (`Material`), `packages/core/src/commands/document/materials.ts` | No E, ν or allowables. Density is in g/(doc unit)³, used by `mass_properties` |
 | Exact geometry | `GeometryKernel` with `evaluate`, `tessellate`, `topology` (faces with surface type and area, edges with mid points and samples) and `exportStep` | `packages/core/src/geometry/kernel.ts`, `packages/kernel-occt/src/*` | No face normals or centroids in `ShapeFace`, and no midsurface or defeature recipe nodes |
 | Topological targeting | `edgesNear` points re-resolved per replay (KI5) | `packages/core/src/commands/brep/edgeSelection.ts` | Edges only. No `facesNear` |
-| Python bridge | One short-lived CPython process per request (CadQuery), hard timeout (default 120 s), at most 2 concurrent runs, environment allow-list | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py` | No `gmsh` op |
+| Python bridge | One short-lived CPython process per request (CadQuery), hard timeout (default 120 s), at most 2 concurrent runs, environment allow-list | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py` | No mesh op |
 | Child processes | `trackChild()` registry with SIGKILL on shutdown | `server/src/childProcesses.ts` | Ready to reuse for `ccx` |
 | Exchange transport | `CadExchangePort` and hand-written MCP exchange tools that apply document changes through the command bus | `packages/mcp/src/exchangeTools.ts`, `server/src/exchangeRoutes.ts`, `server/src/cli/exchange.ts` | A pattern to copy for `fea_mesh` / `fea_solve` / `fea_import_results` |
-| Desktop | Electron runs the unchanged server, and relocatable CPython plus CadQuery are staged by `desktop/scripts/prepare-python.mjs` (KI6) | `desktop/` | No `ccx` binary and no `gmsh` wheel |
+| Desktop | Electron runs the unchanged server, and relocatable CPython plus CadQuery are staged by `desktop/scripts/prepare-python.mjs` (KI6) | `desktop/` | No `ccx` binary and no mesher |
 | MCP toolsets | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil` | `packages/mcp/src/toolsets.ts` | No `analysis` toolset. `TOOLSET_NAMES` must gain `'analysis'` plus a getter returning `pluginToolNames('analysis')` and the ✱ transport names (invariant: every registered command and exchange tool belongs to exactly one toolset) |
 | Plugins | `CadPlugin { name, toolset, commands, guards?, document? }`. `installDefaultPlugins()` installs building, industrial and civil | `packages/core/src/plugins/plugin.ts`, `src/app/plugins.ts` | — |
 
-A `grep` of `packages/`, `server/src` and `server/python` for `nastran|calculix|gmsh|von mises|finite element`
+A `grep` of `packages/`, `server/src` and `server/python` for `nastran|calculix|mesher|von mises|finite element`
 finds nothing outside the AEC frame code: there is no FE capability today.
 
 ## 2. Target architecture
@@ -604,7 +604,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
 | M1 | Data model (`CadDocument.analysis`, `FeaMaterialView` over gap 08 records), plugin skeleton, commands create/idealize(solid, plane_stress)/constraint/load/mesh controls/factors, `facesNear`, face centroid/normal in OCC topology, staleness hashes, unit tests | 01 KRN (exact faces on desktop) | 3 w |
-| M2 | Bridge op `mesh` (Gmsh), face map, artifact store, `record_fe_mesh`, Verdict port + quality gate, CLI `fea mesh/quality`, desktop wheel staging | M1 | 3 w |
+| M2 | Bridge op `mesh`, face map, artifact store, `record_fe_mesh`, Verdict port + quality gate, CLI `fea mesh/quality`, desktop wheel staging | M1 | 3 w |
 | M3 | INP writer, bundled `ccx` (`desktop/scripts/prepare-ccx.mjs`), `fea_solve`, FRD/DAT readers, `record_fea_results`, result overlay, probes, margins, analytic checks, VC-10…14, 20–22, 30, 31, 40–44 | M2 | 4 w |
 | M4 | MCP toolset and prompt, REST routes, golden plans, quality:fea, production-gate scenario, licence packaging | M3 | 2 w |
 | M5 (V1) | BDF writer + pyNastran check, OP2 import, VTU export, RBE3/distributing coupling, Netgen option | M4 | 3 w |
@@ -612,7 +612,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
-**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `hand_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
+**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `hand_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
 
 Cross-gap: **08 MAT** owns the material record (E, ν, G, density, allowables with basis and provenance); FEA M1 depends on 08 M1–M2. **01 KRN** supplies stable
 exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results with the revision.
@@ -620,7 +620,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 ## 11. Open questions / decisions needed
 
 1. **GPL in the desktop installer** (CalculiX GPL-2.0 [R30]). Do we ship it bundled as a separate program with source archives, or download it
-   on first use? This needs a legal decision. The mesher is no longer GPL: NG1 replaced Gmsh (GPL-2.0+ with exception [R10]) with Netgen (LGPL-2.1, linked dynamically) [R11].
+   on first use? This needs a legal decision. The mesher is not GPL: Netgen (LGPL-2.1, linked dynamically) [R11], NG1.
 2. **CalculiX binaries per OS.** Do we build from source in CI (SPOOLES/ARPACK, optional PARDISO), or use third-party builds? Provenance
    and reproducibility for tool qualification have to be settled either way.
 3. **Mesh in the document versus the cache.** TR-FEA-05 proposes the cache, with a `.llullz` bundle for sharing. Live sync (L6) does not carry artifacts, so
@@ -641,12 +641,11 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 - [R1] 14 CFR §25.303 — eCFR — https://www.ecfr.gov/current/title-14/chapter-I/subchapter-C/part-25/subpart-C/subject-group-ECFR6dd5e5c4b86d1bc/section-25.303 (accessed 2026-10, search)
 - [R2] 14 CFR §25.301, §25.305 — GPO — https://www.govinfo.gov/content/pkg/CFR-2010-title14-vol1/pdf/CFR-2010-title14-vol1-sec25-305.pdf (accessed 2026-10, search)
 - [R3] NASA-STD-5001B (w/ Change 3) — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/B-w/CHANGE-3/3/2022-10-24-NASA-STD-5001B-w-Change-3-Approved.pdf (accessed 2026-10, search)
-- [R10] Gmsh 4.15.2 wheel (gmsh.py API, LICENSE.txt, CHANGELOG.txt), the mesher before NG1 — https://pypi.org/project/gmsh/4.15.2/ (accessed 2026-10)
 - [R11] Netgen (6.2.2604: nglib + ngcore, LGPL-2.1; the mesher since NG1) — https://github.com/NGSolve/netgen (accessed 2026-10)
 - [R12] Verdict Library Reference Manual SAND2007-2853 — Sandia — https://github.com/sandialabs/verdict (accessed 2026-10)
 - [R13] meshio — https://github.com/nschloe/meshio (accessed 2026-10)
 - [R14] pyNastran (card docstrings) — https://github.com/SteveDoyle2/pyNastran (accessed 2026-10); [R14a] Altair CQUAD4 — https://help.altair.com/hwsolvers/os/topics/solvers/os/cquad4_bulk_r.htm (search)
-- [R15] FreeCAD FEM (`importCcxFrdResults.py`, gmshtools, CalculiX tools) — https://github.com/FreeCAD/FreeCAD/tree/4a1904f8db57d4a31e44cdb1dd984d4c98447c10/src/Mod/Fem (accessed 2026-10)
+- [R15] FreeCAD FEM (`importCcxFrdResults.py`, CalculiX tools) — https://github.com/FreeCAD/FreeCAD/tree/4a1904f8db57d4a31e44cdb1dd984d4c98447c10/src/Mod/Fem (accessed 2026-10)
 - [R30] CalculiX source / manual / tests — https://github.com/Dhondtguido/CalculiX/tree/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c (accessed 2026-10)
 - [R43] FeenoX NAFEMS examples — https://github.com/seamplex/feenox/tree/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples (accessed 2026-10)
 - Other references (R4–R6, R20–R22, R31, R40–R45): see [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
@@ -656,7 +655,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 ## 13. Implementation status (2026-10-19)
 
 > **Mesher (NG1, 2026-10-22):** `llull-mesh` now meshes with Netgen 6.2.2604 (§5.4, [NG1](../../decisions/NG1-netgen-mesher.md)). The dated
-> entries below record the mesher of their time (Gmsh: the Python bridge, then the Gmsh 4.15.2 C API in `llull-mesh`); their measurements are of Gmsh meshes.
+> entries below record the previous mesher (the Python bridge, then a C API in `llull-mesh`); their measurements are of its meshes.
 
 **Built: a minimal slice**, driven by physics packs PHY-03 / PHY-04 (owner decision; design `docs/physics/FE_PIPELINE_DESIGN.md`).
 
@@ -665,14 +664,14 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 | Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
 | Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `analysis_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
 | INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
-| Transports `fea_mesh` (`llull-mesh` sidecar: Netgen 6.2.2604 since NG1, Gmsh 4.15.2 before), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `solver/bins/llull-mesh/`, `packages/mcp/src/feaTools.ts` |
+| Transports `fea_mesh` (`llull-mesh` sidecar: Netgen 6.2.2604), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `solver/bins/llull-mesh/`, `packages/mcp/src/feaTools.ts` |
 
-Verified end to end with real Gmsh + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
+Verified end to end with the previous mesher + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
 benchmarks.
 
 **Bonded multi-part meshes (V1, built 2026-10-17):** `set_mesh_controls { bonding: 'separate' | 'conformal' }` (default `separate`, stored as absent so existing mesh hashes are unchanged; `conformal` is part of the mesh input hash). `separate` meshes every analysed part on its own (no shared nodes; contact needs this). `conformal` fragments all parts into ONE shape with OCCT's general fuse (`BOPAlgo_Builder`) and meshes it once, so touching parts share their interface nodes and faces; ids stay global and contiguous, element blocks (and so ELSETs / materials) stay per entity, and a target still resolves against the faces of its own part. It needs exact STEP geometry (OCC kernel): any STL part is refused with `FEA_BONDING_UNSUPPORTED`; parts that overlap in volume (a fragment owned by two parts) are refused with `FEA_BONDING_OVERLAP` (subtract one from the other so that they only touch). Used by PHY-04 NAFEMS T1 (`docs/physics/04-thermo-mechanical/TECHNICAL_SPEC.md` §14). Tests: `tests/unit/cae/{setup,hash}.test.ts`, `server/tests/feaMeshBridge.test.ts` (shared interface nodes, refusals).
 
-**Deviations:** targets are resolved by the mesher (closest Gmsh surface / node to the given points), not by the TR-FEA-32 face map,
+**Deviations:** targets are resolved by the mesher (closest mesh surface / node to the given points), not by the TR-FEA-32 face map,
 because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
 tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.
 Forces on edges / points are split equally over the target nodes (faces: area-consistent since 2026-10-19, see below). Probes use the nearest node
@@ -734,7 +733,7 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   (open question 10) and never counts as outside. `inverted` counts tets and quads with SJ <= 0 and zero-area triangles (the export / solve gate). Checked against `validation/mesh_quality_reference.json`
   (VC-FEA-07). The solid-tet deck still refuses 2D element types; the 2D metrics are ready for the shell / plane-stress part. The quality summary stays a diagnostic outside the trust comparison.
 - **Tests.** `tests/unit/cae/{verdict,eigenChecks,disposeMargin,analyticCheck,loadDistribution}.test.ts`, golden plans `fea_modal_cantilever` and `fea_buckling_column_moment`,
-  `server/tests/feaEigen.test.ts` (real Gmsh + ccx, skipped without them; it now also cross-checks `data.eigen` and `hand_check`). Not run on this machine (no `ccx` / `gmsh`): VC-FEA-11 / 12 / 41 / 42 against
+  `server/tests/feaEigen.test.ts` (real mesher + ccx, skipped without them; it now also cross-checks `data.eigen` and `hand_check`). Not run on this machine (no `ccx` / mesher): VC-FEA-11 / 12 / 41 / 42 against
   a real solver, the free-free modal deck, the participation-table layout and the `*FREQUENCY n, min, max` band.
 
 **Review fixes (2026-10-17), documented behaviour changes:**
@@ -803,7 +802,7 @@ adapter the GPU tests skip with the logged reason. Measured raster stage (4 vCPU
 CPU 0.06–0.08 / 0.22–0.42 / 0.52–0.55 s (incl. process start) at 480×320 / 960×640 / 2000×2000; `auto` goes native from 1e6 supersampled pixels.
 The whole render is 2–4 s, dominated by the TS plot set-up (artifact trust, faces), which stays in TS.
 
-**FEA-REST part 2 (2026-10-20): M5 interop, face map, result access.** None of this ran against Nastran, ParaView, ccx or Gmsh on the dev machine (none installed);
+**FEA-REST part 2 (2026-10-20): M5 interop, face map, result access.** None of this ran against Nastran, ParaView, ccx or the mesher on the dev machine (none installed);
 what is verified is stated per item.
 
 - **Nastran BDF** (`decks/bdfWriter.ts`, `decks/bdf/{fields,model,loads}.ts`; `fea_export format=nastran_bdf`). Small-field fixed format (8-character fields, blank
@@ -826,13 +825,13 @@ what is verified is stated per item.
 - **VTU** (`results/vtuWriter.ts`; `fea_export format=vtu [encoding=base64]`): UnstructuredGrid with points, cells (tets, quadratic tets, shells), `part` and `element_id`
   cell arrays and, when current verified results are recorded, `U_k`, `S_k`, `von_mises_k` per result set; ASCII or inline base64 binary (header and data encoded separately).
   Not opened in ParaView here.
-- **Netgen mesher: deferred.** The bridge only knows Gmsh; `MeshControls.mesher` stays `gmsh`. (Superseded by NG1: Netgen is now the only mesher.)
+- **Mesher.** Netgen is the only mesher (`MeshControls.mesher: 'netgen'`, NG1).
 - **Face map (TR-FEA-32).** The server asks `kernel.faceQuery.faceDetails` for each STEP part's faces (area, centroid) and `faceQuery.distance` for the kernel face nearest to each
-  `facesNear` point (`server/src/fea/faceRefs.ts`); the mesher request carries `parts[].faces` and `targets[].faceIndices`. `llull-mesh` (`solid.rs`) matches faces to Gmsh surfaces by area and
+  `facesNear` point (`server/src/fea/faceRefs.ts`); the mesher request carries `parts[].faces` and `targets[].faceIndices`. `llull-mesh` (`solid.rs`) matches faces to mesher surfaces by area and
   centroid (1e-6, `AMBIGUOUS_FACE_MAP` when two match), resolves such a target to the mapped surfaces and returns `faceMap` (stored in the mesh artifact, shown in `MeshSummary.faceMap`).
-  Fallbacks, all to today's nearest-surface resolution: no face query (Manifold), a point farther than 1e-3 of the diagonal from every face, a face with no Gmsh match, conformal bonding
+  Fallbacks, all to today's nearest-surface resolution: no face query (Manifold), a point farther than 1e-3 of the diagonal from every face, a face with no mesher match, conformal bonding
   (fragmentation splits faces), STL parts. The point resolution still runs first, so `FEA_TARGET_UNRESOLVED` / `FEA_TARGET_AMBIGUOUS` are unchanged. **The Python side could not be run or
-  even compiled here (no Python, no Gmsh)**; the TS side is tested with a fake kernel and a fake bridge (`tests/unit/cae/faceMapRequest.test.ts`). `edgesNear` / `intersectPlane` unchanged.
+  even compiled here (no Python, no mesher)**; the TS side is tested with a fake kernel and a fake bridge (`tests/unit/cae/faceMapRequest.test.ts`). `edgesNear` / `intersectPlane` unchanged.
 - **Result access.** `set_result_view` (presentation data on the case, not in the input hash), `fea_result_field` (read-only registry query: a field at the extreme nodes, named nodes,
   nearest nodes of points or probes, with min / max / mean over the whole result set, from the verified artifact), and `set_buckling_preload` (a load case applied in a `*STATIC` step
   before `*BUCKLE`; the reference is the first other load case; measured with ccx 2.21: the factors multiply preload + reference, see SOLVER-VERIFY; the preload is in the input hash). Without a preload the deck is unchanged (one `*BUCKLE` step).
@@ -841,7 +840,7 @@ what is verified is stated per item.
   `set_margin_band`, `inputHash` in the signed disposition payload, a bounding-box note on `FEA_MESH_ADEQUACY`, element-type guard in `meshQuality`.
 - **Not done:** large-field BDF, `*DISTRIBUTING COUPLING`, Netgen, foreign-mesh review-only imports, double-precision OP2, OP2 shell / hex stresses, `.llullz` result bundling, UI panels (part 3).
 
-**FEA-REST part 3 (2026-10-20): M6 shells, plane stress, composites, M4 leftovers, UI, part-2 review fixes.** No Gmsh, CalculiX, Nastran or Python on the dev
+**FEA-REST part 3 (2026-10-20): M6 shells, plane stress, composites, M4 leftovers, UI, part-2 review fixes.** No mesher, CalculiX, Nastran or Python on the dev
 machine: every deck is proven by text tests, every reader by hand-built fixtures, and the Python side (`server/python/llull_shell.py`, the `llull_mesh.py`
 changes) was **not run or even compiled**. Real-tool tests skip with a logged reason.
 
@@ -901,10 +900,10 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   behaviour at kinks is still unverified (only flat parts were run). **Margins on shells:** for 2D-part nodes `compute_margins` takes the largest of STRESS, STRESS_TOP and STRESS_BOT per node
   (criterion evaluated on each; the row names the governing `fibre`), so bending is not averaged away.
 - **Defeaturing** (`defeature_for_analysis { analysisId, entityId, maxFeatureSize?, facesNear?, clear? }`, `AnalysisCase.defeature`, in the mesh input hash). The
-  kernel path (`BRepAlgoAPI_Defeaturing` as a recipe node) is not reachable through the kernel interface: Gmsh `occ.defeature` in the bridge (OCCT `BRepAlgoAPI_Defeaturing` in `llull-mesh` since NG1) on STEP parts removes
+  kernel path (`BRepAlgoAPI_Defeaturing` as a recipe node) is not reachable through the kernel interface: OCCT `BRepAlgoAPI_Defeaturing` in `llull-mesh` on STEP parts removes
   cylinder / torus faces of radius <= maxFeatureSize (principal curvature at the parametric centre) and the faces nearest to `facesNear`; a failure is
   `FEA_DEFEATURE_FAILED` naming the faces; STL parts are refused; the face map is skipped for a defeatured part; `fea_mesh` reports `data.defeatured`. Chamfer strips
-  are not detected. **Unverified** (no Gmsh here).
+  are not detected. **Unverified** (no mesher here).
 - **Singularity policy (open question 8, decided)** in `compute_margins` / `dispose_margin`: sources = nodes of force / moment loads and of SOLID-part supports whose
   target has no mesh face (points, edges). Supports of shell / plane-stress parts are never sources: a side-wall point resolves to the shell edge, and the clamped root
   is where the peak bending is (the first build excluded it: review finding, fixed). Default exclusion radius 2 x mesh globalSize (`data.singularScreening.radius`,
@@ -935,7 +934,7 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   fail verification on replay.
 - **Tests.** `tests/unit/cae/{shellSetup,shellDeck,shellTransports,marginsSingularity,reviewFixesPart2}.test.ts`, `tests/golden/feaExports.test.ts`,
   `tests/component/AnalysisRest.test.tsx`. Not run anywhere: a real shell / plane-stress / composite solve, the shell pressure signs, the expansion mapping on a real
-  .frd, Gmsh 2D meshing and defeaturing, PCOMP / MAT8 / CORD2R in Nastran.
+  .frd, 2D meshing and defeaturing, PCOMP / MAT8 / CORD2R in Nastran.
 - **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, composites on non-planar parts, shell-solid coupling, pressure on plane-stress edges, plane
   strain, chamfer detection, offsets of plain PSHELL in the BDF, sandwich cores, `*DISTRIBUTING COUPLING`, Netgen, large-field BDF, `.llullz` bundling.
 
@@ -962,8 +961,8 @@ laminate (`packages/domain-cae/src/margins/plyMargins.ts`), per load case and no
 - **Tests.** `tests/unit/cae/plyMargins.test.ts` (+ `plyMarginsFixtures.ts`): recovery against CLT, rows against `strengthRatio` on the CLT truth, factors, FAIL
   / disposition, refusals and the skip reasons.
 
-**SOLVER-VERIFY (2026-10-20): measured with Gmsh 4.15.2 (pip wheel) + CalculiX 2.21 (conda-forge `calculix 2.21 h27aae45_3`) + pyNastran 1.4.1 on Windows 11**
-(install record `docs/decisions/SV1-solver-toolchain-windows.md`). Every FE suite in `server/tests/` that needs only Gmsh + ccx now runs (the native-kernel ones: see
+**SOLVER-VERIFY (2026-10-20): measured with the previous mesher + CalculiX 2.21 (conda-forge `calculix 2.21 h27aae45_3`) + pyNastran 1.4.1 on Windows 11**
+(install record `docs/decisions/SV1-solver-toolchain-windows.md`). Every FE suite in `server/tests/` that needs only the mesher + ccx now runs (the native-kernel ones: see
 that record). Findings, each with a test that runs when the tools are present:
 
 | Item (was unverified) | Measured | Consequence |
