@@ -1,9 +1,0 @@
-ply,sequence,order,material,orientation,rosette,zones,area_mm2,mass
-P1,S1,0,T700_thinply_75,45,R_axial,,46181.41201,5.368589146
-P2,S2,1,T700_thinply_75,-45,R_axial,,46181.41201,5.368589146
-P3,S3,2,T700_thinply_75,0,R_axial,,46181.41201,5.368589146
-P4,S4,3,T700_thinply_75,90,R_axial,,46181.41201,5.368589146
-P5,S5,4,T700_thinply_75,90,R_axial,,46181.41201,5.368589146
-P6,S6,5,T700_thinply_75,0,R_axial,,46181.41201,5.368589146
-P7,S7,6,T700_thinply_75,-45,R_axial,,46181.41201,5.368589146
-P8,S8,7,T700_thinply_75,45,R_axial,,46181.41201,5.368589146

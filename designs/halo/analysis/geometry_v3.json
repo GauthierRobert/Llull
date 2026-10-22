@@ -1,3 +1,0 @@
-{"_note": "HALO v3 final (halo_v3.lld): 8 x (fixed strut 24 + plain flap 80, cf/c 0.76, dCLmax ~0.9 on the whole vane), duct chord 172",
- "ringLe": 215, "ringChord": 172, "sigma": 1.2, "loopTipR": 195.14, "bellR": 32.5, "loopChord": 24, "loopsUpper": 3, "loopsLower": 4,
- "vaneChord": 105, "vaneSpan": 143.1, "vaneClMax": 0.9, "vaneAxisFactor": 4.83, "vaneCpZ": -31, "cd0": 0.052, "spanEfficiency": 2.0}
