@@ -66,7 +66,7 @@ User stories:
   `VNV_ORDER_MISMATCH`; the agent explains that the levels are probably not in the asymptotic range.
 - **US-4 (operator).** The agent measured values itself (e.g. from a hand-off solver). It calls `check_convergence`
   with `samples=[{h, value}…]` and gets the same report; no document change.
-- **US-5 (maintainer / agent).** After a CalculiX or Gmsh upgrade, `llull run_benchmarks --json` runs every pack's
+- **US-5 (maintainer / agent).** After a CalculiX or Netgen (`llull-mesh`) upgrade, `llull run_benchmarks --json` runs every pack's
   cases. All A-grade cases must pass; B-grade drift is reported as `warn`; `TBD` cases are `skip`.
 - **US-6 (operator → reviewer).** Before a 05 margin of safety is shown to a reviewer, `check_verification` must not
   report `VNV_NO_CONVERGENCE_STUDY` or `VNV_GCI_ABOVE_TARGET` for the governing result, or the margin row carries the
@@ -137,7 +137,7 @@ verdict and GCI, every `unverified` input, what needs a human (AF-36).
 ### 6.2 MCP agent (cloud)
 
 `check_convergence`, `compare_to_expected` and `check_verification` are registry tools (toolset `analysis`) and behave
-exactly as on the CLI. `run_convergence_study` exists only where the host has Gmsh and CalculiX (else
+exactly as on the CLI. `run_convergence_study` exists only where the host has `llull-mesh` (Netgen) and CalculiX (else
 `VNV_TOOL_MISSING`, AF-41). `run_benchmarks` is a host/CI transport, not exposed to cloud agents by default.
 
 ### 6.3 Desktop UI (review surface only)
@@ -154,7 +154,7 @@ exactly as on the CLI. `run_convergence_study` exists only where the host has Gm
 | Capability | CLI (primary) | MCP (cloud) | UI (review) | Notes |
 | ---------- | ------------- | ----------- | ----------- | ----- |
 | Convergence arithmetic | `llull check_convergence --json` | same | — | pure, read-only |
-| Convergence study of a 05 case | `llull run_convergence_study` | when host has Gmsh + ccx | progress, plot | transport + validated record command |
+| Convergence study of a 05 case | `llull run_convergence_study` | when host has llull-mesh + ccx | progress, plot | transport + validated record command |
 | Readiness | `llull check_verification --json` | same | panel | codes §7.1 |
 | One-case judge | `llull compare_to_expected --json` | same | — | pure |
 | Benchmark corpus | `llull run_benchmarks`, `npm run quality:physics` | host-only | report viewer | CI / desktop |

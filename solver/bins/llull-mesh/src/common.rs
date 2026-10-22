@@ -1,19 +1,18 @@
-//! Shared pieces of the mesher: the error type, request field access, distances on the Gmsh model, Python-compatible number text.
+//! Shared pieces of the mesher: the error type, request field access, distances, Python-compatible number text (the response matches
+//! the Python mesher llull-mesh replaced, so messages and residuals print the same).
 
-use llull_gmsh::{Gmsh, GmshError};
 use serde_json::Value;
-use std::collections::HashMap;
 
 pub type Point = [f64; 3];
 
-/// Classification of STL facets into faces (llull_mesh.py CLASSIFY_ANGLE).
+/// Classification of STL facets into faces: a facet edge sharper than this splits two faces (llull_mesh.py CLASSIFY_ANGLE).
 pub const CLASSIFY_ANGLE_DEG: f64 = 40.0;
 /// A point is on two faces / edges when their distances differ by at most this fraction of the model diagonal.
 pub const AMBIGUOUS_REL: f64 = 1e-6;
 /// A point resolves to nothing when the nearest face / edge is further than this fraction of the model diagonal.
 pub const UNRESOLVED_REL: f64 = 1e-3;
 
-/// A mesher failure: `code` is a FEA_* code the host maps to a tool error; `None` is an unexpected Gmsh error (FEA_MESH_FAILED).
+/// A mesher failure: `code` is a FEA_* code the host maps to a tool error; `None` is an unexpected Netgen / OCCT error (FEA_MESH_FAILED).
 #[derive(Debug)]
 pub struct MeshError {
     pub code: Option<&'static str>,
@@ -26,9 +25,9 @@ impl MeshError {
     }
 }
 
-impl From<GmshError> for MeshError {
-    fn from(error: GmshError) -> Self {
-        Self { code: None, message: format!("Gmsh: {error}") }
+impl From<llull_netgen::Error> for MeshError {
+    fn from(error: llull_netgen::Error) -> Self {
+        Self { code: None, message: format!("Netgen: {error}") }
     }
 }
 
@@ -84,51 +83,14 @@ pub fn dist(a: &[f64], b: &[f64]) -> f64 {
     py_sum(a.iter().zip(b).map(|(x, y)| (x - y) * (x - y))).sqrt()
 }
 
-/// Length of the diagonal of the model's bounding box (1 for an empty / degenerate box).
-pub fn model_diagonal(gmsh: &Gmsh) -> MeshResult<f64> {
-    let b = gmsh.bounding_box(-1, -1)?;
-    let d = dist(&b[..3], &b[3..]);
-    Ok(if d == 0.0 { 1.0 } else { d })
-}
-
-/// Every node of the current model: tag -> xyz.
-pub fn node_coords(gmsh: &Gmsh) -> MeshResult<HashMap<usize, Point>> {
-    let (tags, xyz) = gmsh.nodes(-1, -1, false)?;
-    Ok(tags.iter().enumerate().map(|(i, &tag)| (tag, [xyz[3 * i], xyz[3 * i + 1], xyz[3 * i + 2]])).collect())
-}
-
-/// Triangles (3 or 6 nodes) of a mesh surface.
-pub fn surface_triangles(gmsh: &Gmsh, surface: i32) -> MeshResult<Vec<Vec<usize>>> {
-    const TRI3: i32 = 2;
-    let mut out = Vec::new();
-    for (element_type, nodes) in gmsh.elements(2, surface)? {
-        let width = if element_type == TRI3 { 3 } else { 6 };
-        out.extend(nodes.chunks_exact(width).map(<[usize]>::to_vec));
+/// Length of the diagonal of a bounding box `[min xyz, max xyz]` (1 for an empty / degenerate box).
+pub fn diagonal(bounds: &[f64; 6]) -> f64 {
+    let d = dist(&bounds[..3], &bounds[3..]);
+    if d == 0.0 {
+        1.0
+    } else {
+        d
     }
-    Ok(out)
-}
-
-/// Distance from `point` to the TRIMMED entity (the closest point alone measures the untrimmed plane / cylinder / line): when the
-/// projection falls outside the trimmed entity, the nearest of its boundary entities.
-pub fn trimmed_distance(gmsh: &Gmsh, dim: i32, tag: i32, point: &Point) -> MeshResult<f64> {
-    let (closest, parametric) = gmsh.closest_point(dim, tag, point)?;
-    let d = dist(point, &closest);
-    match gmsh.is_inside(dim, tag, &parametric, true) {
-        Ok(inside) if inside > 0 => return Ok(d),
-        Ok(_) => {}
-        // discrete (STL) entities: the closest point already lies on the mesh
-        Err(_) => return Ok(d),
-    }
-    let mut best = f64::INFINITY;
-    for (boundary_dim, boundary_tag) in gmsh.boundary(&[(dim, tag)], false, false, false)? {
-        let distance = if boundary_dim >= 1 {
-            trimmed_distance(gmsh, boundary_dim, boundary_tag.abs(), point)?
-        } else {
-            dist(point, &gmsh.value(0, boundary_tag.abs(), &[])?)
-        };
-        best = best.min(distance);
-    }
-    Ok(if best < f64::INFINITY { best } else { d })
 }
 
 /// `(distance, tag)` ascending by distance then tag.

@@ -1,15 +1,15 @@
 /**
  * Wall convection and radiation benchmarks through the real pipeline (plan -> fea_mesh -> fea_solve -> analysis_report), judged with the PHY-00
  * judge against the pack's expected_results.json: VC-THM-01.a-d, VC-THM-05 (NAFEMS T2), VC-THM-14.a/b (CalculiX oneel8ra) and the open-cavity
- * plates of VC-THM-09/10. Plans: server/tests/fixtures/thermal. Skipped without gmsh / ccx.
+ * plates of VC-THM-09/10. Plans: server/tests/fixtures/thermal. Skipped without llull-mesh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@cae/thermal/thermalClosedForms';
 import { closeCase, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('wall and radiation benchmarks (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('wall and radiation benchmarks (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('radiation');

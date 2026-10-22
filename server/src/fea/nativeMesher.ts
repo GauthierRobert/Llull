@@ -1,7 +1,7 @@
 /**
- * The FE mesher behind `fea_mesh`: the native `llull-mesh` sidecar (solver/bins/llull-mesh, Gmsh through its C API). One JSON request on
- * stdin, one JSON response line on stdout (documented in solver/bins/llull-mesh/src/main.rs).
- * Environment: LLULL_MESH_BIN / LLULL_NATIVE_DIR (binary, nativeBinary.ts), LLULL_GMSH_LIB (the Gmsh shared library, read by llull-mesh).
+ * The FE mesher behind `fea_mesh`: the native `llull-mesh` sidecar (solver/bins/llull-mesh, Netgen + OCCT shared libraries). One JSON request
+ * on stdin, one JSON response line on stdout (documented in solver/bins/llull-mesh/src/main.rs).
+ * Environment: LLULL_MESH_BIN / LLULL_NATIVE_DIR (binary, nativeBinary.ts).
  */
 
 import { runProcess } from '../processRunner';
@@ -11,7 +11,7 @@ const MAX_STDERR_BYTES = 64 * 1024;
 /** Below V8's longest string (2^29 - 24 UTF-16 units), so the response still decodes. */
 const MAX_OUTPUT_BYTES = 500 * 1024 * 1024;
 
-/** The response line of llull-mesh: the last non-empty line of its stdout (anything Gmsh printed before it is ignored). */
+/** The response line of llull-mesh: the last non-empty line of its stdout (anything a library printed before it is ignored). */
 export function parseMesherOutput(stdout: string): MesherResponse | null {
   const line = stdout
     .split('\n')
@@ -27,6 +27,17 @@ export function parseMesherOutput(stdout: string): MesherResponse | null {
   } catch {
     return null;
   }
+}
+
+/** Windows STATUS_DLL_NOT_FOUND (as Node reports it, unsigned or signed). */
+const DLL_NOT_FOUND = [0xc0000135, -0x3ffffecb];
+
+/** llull-mesh started but its shared libraries (Netgen, OCCT) did not load: an install problem, not a meshing one. */
+export function librariesMissing(exitCode: number | null, stderr: string): boolean {
+  return (
+    (exitCode !== null && DLL_NOT_FOUND.includes(exitCode)) ||
+    /error while loading shared libraries|Library not loaded|image not found/.test(stderr)
+  );
 }
 
 /** One mesh request through `llull-mesh`; rejects when the process cannot run or answers nothing. */
@@ -55,6 +66,8 @@ export async function callNativeMesher(
   if (run.timedOut) throw new Error(`llull-mesh timed out after ${timeoutMs} ms`);
   if (run.aborted) throw new Error(`llull-mesh output exceeded ${MAX_OUTPUT_BYTES / 1024 / 1024} MB`);
   const response = parseMesherOutput(Buffer.concat(stdout).toString('utf8'));
+  if (response === null && librariesMissing(run.exitCode, run.stderr))
+    throw new Error(`llull-mesh "${binary}" cannot load its Netgen / OCCT libraries: ${run.stderr.trim().slice(-500)}; FEA_TOOL_MISSING`);
   if (response === null)
     throw new Error(`llull-mesh exited with code ${String(run.exitCode)} without a response. ${run.stderr.trim().slice(-2000)}`);
   return response;

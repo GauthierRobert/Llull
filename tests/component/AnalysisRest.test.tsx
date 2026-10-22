@@ -148,7 +148,7 @@ describe('AnalysisPanel FEA-REST UI', () => {
     };
     mocks.casePatch = {
       mesh: {
-        mesher: 'gmsh',
+        mesher: 'netgen',
         elementFamily: 'shell_quad',
         order: 2,
         globalSize: 4,

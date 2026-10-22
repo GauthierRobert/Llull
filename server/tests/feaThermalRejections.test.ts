@@ -1,6 +1,6 @@
 /**
  * VC-THM-61 through the CLI: the deliberately wrong set-up of thm_rejections.plan.json and its variants return stable codes with a
- * remediation text and ids, before any mesh or solve. Needs no gmsh or ccx.
+ * remediation text and ids, before any mesh or solve. Needs no mesher or ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

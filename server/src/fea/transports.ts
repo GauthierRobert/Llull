@@ -1,4 +1,4 @@
-/** The `FeaToolsPort` of the server and CLI: Gmsh through the llull-mesh sidecar, CalculiX through a tracked child, artifacts in the store. */
+/** The `FeaToolsPort` of the server and CLI: Netgen through the llull-mesh sidecar, CalculiX through a tracked child, artifacts in the store. */
 
 import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';

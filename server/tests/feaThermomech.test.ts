@@ -1,19 +1,19 @@
 /**
- * PHY-04 thermo-mechanical benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report probes),
+ * PHY-04 thermo-mechanical benchmarks through the real pipeline (plan -> fea_mesh (Netgen) -> fea_solve (CalculiX) -> analysis_report probes),
  * judged against docs/physics/04-thermo-mechanical/validation/expected_results.json with the PHY-00 judge. The plans are the pack's drafts
- * adapted to the built commands (fixtures/thermomech/*.plan.json). The OCC kernel gives exact STEP geometry (LE11 needs it: the Manifold
- * facets of its spheres are rejected by Gmsh). Skipped without Gmsh or CalculiX.
+ * adapted to the built commands (fixtures/thermomech/*.plan.json). The OCC kernel gives exact STEP geometry (LE11 needs it: its spheres
+ * are meshed from their exact faces, not from Manifold facets). Skipped without llull-mesh or CalculiX.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_COMMAND_ERROR } from '../src/cli/main';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { isRecord } from '@lib/isRecord';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {

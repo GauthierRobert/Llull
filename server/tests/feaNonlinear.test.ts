@@ -1,5 +1,5 @@
 /**
- * Nonlinear static pipeline end to end with the real tools (gmsh + ccx 2.21; skipped without them): a 10 x 10 x 40 mm bar of J2 perfectly
+ * Nonlinear static pipeline end to end with the real tools (netgen + ccx 2.21; skipped without them): a 10 x 10 x 40 mm bar of J2 perfectly
  * plastic steel (E 210 GPa, yield 250 MPa) is pulled by displacement control past yield and driven back to zero displacement (2 steps), and
  * loaded by pressure inside the elastic range. The reaction-displacement curve read per increment from the .dat must give the elastic stiffness
  * E A / L, the plastic plateau sigma_y A0 / (1 + strain) (uniaxial, constant volume, NLGEOM), the permanent set at zero reaction and the
@@ -18,7 +18,7 @@ import { isRecord } from '@lib/isRecord';
 import { extractCurves } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 const AREA = 100; // mm^2
 const LENGTH = 40; // mm
@@ -245,7 +245,7 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('nonlinear static pipeline (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('nonlinear static pipeline (netgen + ccx)', () => {
   it('pulls a perfectly plastic bar through yield and back: elastic stiffness, plastic plateau, permanent set, convergence', async () => {
     const { results, solve, summary } = await solvePlan(PULL_PLAN, 'pull');
     expect(results.convergence?.length).toBeGreaterThan(2);

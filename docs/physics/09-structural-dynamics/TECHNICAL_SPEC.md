@@ -571,14 +571,14 @@ check (`DYN_PSD_GRID_NOT_CONVERGED` in `unverifiedReasons` above 1e-4).
 | 06 | pass (max deviation 3.9e-7 ≤ 2e-6) | `math.test.ts` |
 | 12 | not built (residual-flexibility share; the effective-mass bookkeeping is tested instead) | — |
 | 17 | pass (9 SSD headings for n = 5, m = 1) | `deck.test.ts` (synthetic CalculiX-layout DAT) |
-| 21 | pass at 1e-6 (not only 5 %) on exact Euler-Bernoulli modal data recorded through `record_fea_results`; the FE run needs ccx + Gmsh (absent here) | `results.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
+| 21 | pass at 1e-6 (not only 5 %) on exact Euler-Bernoulli modal data recorded through `record_fea_results`; the FE run needs ccx + the mesher (absent here) | `results.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
 | 22 | reader pass on the quoted fractions (synthetic table body) | `deck.test.ts` |
 | 31 (partial) | pass: base-motion convention vs beamdy10bm modal coordinates (above) | `math.test.ts` |
 | 40, 41, 42 (5 of 7 codes; `DYN_BASE_ACCEL_TRANSIENT` waits for transients, M5), 43, 45 | pass | `setup.test.ts`, `deck.test.ts`, `report.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
 | 44 | not built: 05 `dispose_margin` does not exist yet | — |
 | 47 | pass (`*DAMPING,STRUCTURAL=0.02`, refusal without the property, zeta_eq = eta / 2) | `deck.test.ts`, `math.test.ts` |
 | 48 | pass, bit-identical: crate fixtures (EB strip + seeded viscous / structural bases, any thread count) and end to end through fea_solve | `solver/crates/llull-post/tests/random_reference.rs`, `tests/unit/native/dynamicsReference.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
-| 15, 20, 30, 32 | not run: CalculiX and Gmsh are not installed on the build machine (integration gate) | — |
+| 15, 20, 30, 32 | not run: CalculiX and the mesher are not installed on the build machine (integration gate) | — |
 
 **Measured (Windows laptop, `compute` profile, GNU toolchain, 2026-10-19):** 20 000 nodes x 60 modes x 12 components: TypeScript reference
 1.32 s, `llull-compute post random` 0.44 s including the 86 MB job folder I/O (bit-identical); 29 547 nodes x 6 modes: TS 0.15 s, native 0.31 s

@@ -84,7 +84,7 @@ limit analysis, independent of elasticity) are exact.
 
 `set_nonlinear_controls`, `add_analysis_step`, `add_curve_probe` and `set_part_constitutive_set` (plugin `cae`, toolset `analysis`) are
 registered; `create_analysis` accepts `nonlinear_static`. `nls_cantilever_plastic_collapse` and `nls_thick_cylinder` run through
-`build_project` (`tests/unit/cae/nonlinear/plans.test.ts`) and, with ccx 2.21 + Gmsh, through mesh and solve
+`build_project` (`tests/unit/cae/nonlinear/plans.test.ts`) and, with ccx 2.21 + the previous mesher, through mesh and solve
 (`server/tests/feaNonlinearPacks.test.ts`). Differences between the plan files and what is built:
 
 - `elementFamily: hex_dominant` is not built (`set_mesh_controls` knows `tet`); the replay uses quadratic tets. VC-NLS-40.b measured

@@ -2,12 +2,12 @@
  * Temperature-dependent film coefficient h(T) (`filmTable`) through the real pipeline. CalculiX has no table on `*FILM`, so the
  * deck writes a tied gap conductance to a prescribed-temperature sink layer (thermal/deckFilmSink.ts). Closed form: a 0.1 m slab of k = 50 W/(m K)
  * held at 100 degC on one face and cooled on the other by h(T) = 100 + 2 T into 20 degC has the face temperature Ts solving
- * k (100 - Ts) / L = (100 + 2 Ts)(Ts - 20), i.e. Ts^2 + 280 Ts - 26000 = 0. Skipped without gmsh / ccx.
+ * k (100 - Ts) / L = (100 + 2 Ts)(Ts - 20), i.e. Ts^2 + 280 Ts - 26000 = 0. Skipped without llull-mesh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, editStep, loadPlan, openCase, type PlanStep, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 const FACE_TEMPERATURE = (-280 + Math.sqrt(280 ** 2 + 4 * 26000)) / 2;
 const FLUX_W_M2 = (50 * (100 - FACE_TEMPERATURE)) / 0.1;
@@ -25,7 +25,7 @@ function transientPlan(film: Record<string, unknown>): PlanStep[] {
   ];
 }
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('film coefficient table h(T) (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('film coefficient table h(T) (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('filmtable');

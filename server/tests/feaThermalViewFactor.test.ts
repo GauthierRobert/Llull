@@ -2,7 +2,7 @@
  * VC-THM-30: the view factor CalculiX uses in a cavity (`*RADIATE, CAVITY=` through the real pipeline) against `compute_view_factors` and
  * the closed form 0.199824895698 (VC-THM-09.a: two parallel directly opposed unit squares 1 m apart); the converged CalculiX factor is judged
  * against the pack value (pinned 2026-10-17, abs 5e-4).
- * Plans: server/tests/fixtures/thermal/thm_parallel_plates_cavity. Skipped without gmsh / ccx.
+ * Plans: server/tests/fixtures/thermal/thm_parallel_plates_cavity. Skipped without llull-mesh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@cae/thermal/thermalClosedForms';
 import { closeCase, editStep, expectCase, loadPlan, openCase, type PlanStep, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 /** Plate 1 is held at 1 K (as is the environment) and plate 2 at 500 K, so the plate-1 balance is -sigma F12 (T2^4 - 1) A. */
 const [T_PLATE_1, T_PLATE_2] = [1, 500];
@@ -54,7 +54,7 @@ function plan(size: number, order: number): PlanStep[] {
   ];
 }
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('VC-THM-30: CalculiX cavity view factor vs compute_view_factors (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('VC-THM-30: CalculiX cavity view factor vs compute_view_factors (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('viewfactor');

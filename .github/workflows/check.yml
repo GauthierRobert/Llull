@@ -31,15 +31,17 @@ jobs:
         working-directory: solver
       - run: node scripts/nativeCheck.mjs
 
-  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), every server suite that runs the real kernel
-  # (closed-form expectations; the WASM kernel is retired, LC1 step 5), then
+  # Native OCCT kernel (RS-1) and FE mesher (NG1): crates llull-kernel-occt + llull-netgen, bins llull-kernel + llull-mesh (clippy, cargo
+  # test), every server suite that runs the real kernel or mesher (closed-form expectations; the WASM kernel is retired, LC1 step 5), then
   # the desktop native bundle. OCCT 7.9.2 is built SHARED by solver/scripts/build-occt.mjs (pinned source + sha256, ~60 min on 4 cores)
-  # into an install prefix cached by version + source sha + recipe; warm runs reuse it through LLULL_OCCT_DIR and take a few minutes.
+  # into an install prefix cached by version + source sha + recipe; Netgen 6.2.2604 likewise by solver/scripts/build-netgen.mjs against
+  # that prefix (cached with both scripts' hashes). Warm runs reuse them through LLULL_OCCT_DIR / LLULL_NETGEN_DIR and take a few minutes.
   native-kernel:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     env:
       LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
+      LLULL_NETGEN_DIR: ${{ github.workspace }}/netgen-6.2.2604
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,6 +62,16 @@ jobs:
           sudo apt-get install -y ninja-build
           node solver/scripts/build-occt.mjs
       - uses: actions/cache@v4
+        id: netgen
+        with:
+          path: netgen-6.2.2604
+          key: netgen-6.2.2604-0a614193-${{ runner.os }}-${{ hashFiles('solver/scripts/build-netgen.mjs', 'solver/scripts/build-occt.mjs') }}
+      - name: Build Netgen 6.2.2604 shared (cache miss only)
+        if: steps.netgen.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y ninja-build
+          node solver/scripts/build-netgen.mjs
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -70,7 +82,7 @@ jobs:
       - run: node scripts/nativeCheck.mjs
         env:
           LLULL_NATIVE_KERNEL: '1'
-      - run: cargo build --release -p llull-kernel
+      - run: cargo build --release -p llull-kernel -p llull-mesh
         working-directory: solver
       - run: npm ci
       - run: npm --prefix server ci
@@ -78,15 +90,16 @@ jobs:
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
-      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, llull-mesh with the
-      # bundled Gmsh library (from the pinned PyPI wheel), licence notices.
-      - run: python3 -m pip install --user gmsh==4.15.2 && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1
+      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, llull-mesh resolving
+      # Netgen via $ORIGIN/netgen/lib (and Netgen OCCT via ../../occt/lib), licence notices.
       - run: node desktop/scripts/prepare-native.mjs
       - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
-      - run: ldd desktop/build/native/gmsh/lib/libgmsh.so.* && ! ldd desktop/build/native/gmsh/lib/libgmsh.so.* | grep 'not found'
+      - run: ldd desktop/build/native/llull-mesh && ! ldd desktop/build/native/llull-mesh | grep 'not found'
+      - run: ldd desktop/build/native/netgen/lib/libnglib.so && ! ldd desktop/build/native/netgen/lib/libnglib.so | grep 'not found'
 
-  # The desktop native bundle on Windows (macOS deferred): OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
-  # (which runs both bundled binaries with --version), then the native kernel parity suite against the bundle itself.
+  # The desktop native bundle on Windows (macOS deferred): OCCT 7.9.2 and Netgen 6.2.2604 shared (cached per OS), llull-compute +
+  # llull-kernel + llull-mesh, prepare-native.mjs (which runs the bundled binaries with --version), then the native kernel parity and mesher
+  # suites against the bundle itself.
   native-bundle:
     strategy:
       fail-fast: false
@@ -96,6 +109,7 @@ jobs:
     timeout-minutes: 240
     env:
       LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
+      LLULL_NETGEN_DIR: ${{ github.workspace }}/netgen-6.2.2604
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -116,6 +130,14 @@ jobs:
         if: steps.occt.outputs.cache-hit != 'true'
         run: node solver/scripts/build-occt.mjs
       - uses: actions/cache@v4
+        id: netgen
+        with:
+          path: netgen-6.2.2604
+          key: netgen-6.2.2604-0a614193-${{ runner.os }}-${{ hashFiles('solver/scripts/build-netgen.mjs', 'solver/scripts/build-occt.mjs') }}
+      - name: Build Netgen 6.2.2604 shared (cache miss only)
+        if: steps.netgen.outputs.cache-hit != 'true'
+        run: node solver/scripts/build-netgen.mjs
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -123,16 +145,10 @@ jobs:
           key: native-bundle-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/rust-toolchain.toml') }}
       - run: rustup toolchain install
         working-directory: solver
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m pip install gmsh==4.15.2
       - run: node desktop/scripts/prepare-native.mjs
-        env:
-          LLULL_GMSH_PYTHON: python
       - run: npm ci
       - run: npm --prefix server ci
-      - run: npx vitest run --config vitest.config.mts tests/nativeKernelPrimitives.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts tests/nativeMesher.test.ts tests/meshParity.test.ts
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelPrimitives.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts tests/nativeMesher.test.ts tests/feaMeshNative.test.ts
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'

@@ -3,7 +3,6 @@
 
 use crate::common::*;
 use crate::raw::RawMesh;
-use llull_gmsh::Gmsh;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
@@ -13,7 +12,7 @@ fn nearest_node(nodes: &[usize], coords: &HashMap<usize, Point>, point: &Point) 
 }
 
 fn missing_node(tag: usize) -> MeshError {
-    MeshError::new("FEA_MESH_FAILED", format!("Gmsh node {tag} of an element has no coordinates"))
+    MeshError::new("FEA_MESH_FAILED", format!("node {tag} of an element has no coordinates"))
 }
 
 fn coordinates(coords: &HashMap<usize, Point>, tag: usize) -> MeshResult<Point> {
@@ -25,34 +24,26 @@ struct PartNodes {
     renumber: HashMap<usize, usize>,
 }
 
-fn configure(gmsh: &Gmsh) -> MeshResult<()> {
-    for option in ["General.Terminal", "General.NumThreads", "Mesh.MaxNumThreads1D", "Mesh.MaxNumThreads2D", "Mesh.MaxNumThreads3D"] {
-        gmsh.set_number(option, if option == "General.Terminal" { 0.0 } else { 1.0 })?;
-    }
-    Ok(())
-}
-
-fn mesh_parts(gmsh: &Gmsh, parts: &[Value], targets: &[Value], controls: &Value, scale: f64, workdir: &Path) -> MeshResult<Vec<RawMesh>> {
+fn mesh_parts(parts: &[Value], targets: &[Value], controls: &Value, scale: f64, workdir: &Path) -> MeshResult<Vec<RawMesh>> {
     if controls.get("bonding").and_then(Value::as_str) == Some("conformal") {
-        return crate::conformal::mesh_conformal(gmsh, parts, targets, controls, scale, workdir);
+        return crate::conformal::mesh_conformal(parts, targets, controls, scale, workdir);
     }
     let mut raws = Vec::new();
     for (index, part) in parts.iter().enumerate() {
         let entity_id = text(part, "entityId")?;
         let own: Vec<&Value> = targets.iter().filter(|t| t.get("entityId").and_then(Value::as_str) == Some(entity_id)).collect();
-        gmsh.clear()?;
         let kind = field(part, "geometry")?.get("kind").and_then(Value::as_str);
         raws.push(if kind == Some("midsurface") {
-            crate::shell::mesh_midsurface_part(gmsh, part, &own, controls, scale)?
+            crate::shell::mesh_midsurface_part(part, &own, controls, scale)?
         } else {
-            crate::solid::mesh_part(gmsh, part, &own, controls, scale, &workdir.join(format!("part_{index}")))?
+            crate::solid::mesh_part(part, &own, controls, scale, &workdir.join(format!("part_{index}")))?
         });
     }
     Ok(raws)
 }
 
-/// The response of a `mesh` request (Gmsh already initialised).
-pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
+/// The response of a `mesh` request.
+pub fn mesh(request: &Value, workdir: &Path) -> MeshResult<Value> {
     let single;
     let parts: &[Value] = match request.get("parts").and_then(Value::as_array) {
         Some(parts) => parts,
@@ -65,9 +56,7 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
     let scale = request.get("lengthScale").and_then(Value::as_f64).unwrap_or(1.0);
     let controls = field(request, "controls")?;
     let targets = list(request, "targets");
-    configure(gmsh)?;
-    let version = gmsh.get_string("General.Version")?;
-    let raws = mesh_parts(gmsh, parts, targets, controls, scale, workdir)?;
+    let raws = mesh_parts(parts, targets, controls, scale, workdir)?;
 
     let (mut nodes_out, mut blocks, mut defeatured) = (Vec::new(), Vec::new(), Vec::new());
     let (mut node_sets, mut face_sets, mut residuals) = (Map::new(), Map::new(), Map::new());
@@ -181,8 +170,8 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
     let face_map: Vec<Value> = raws.iter().flat_map(|raw| raw.face_map.iter().cloned()).collect();
     let summary: BTreeMap<&str, Value> = BTreeMap::from([
         ("ok", json!(true)),
-        ("mesher", json!("gmsh")),
-        ("mesherVersion", json!(version)),
+        ("mesher", json!("netgen")),
+        ("mesherVersion", json!(llull_netgen::netgen_version())),
         ("nodes", json!(nodes_out)),
         ("blocks", json!(blocks)),
         ("nodeSets", Value::Object(node_sets)),

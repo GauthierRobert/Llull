@@ -15,7 +15,7 @@ for behaviour: `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` (05), `docs
 | Thermal FE discipline | `packages/domain-cae/src/thermal/` (Proposal **B** of PHY-03 §2.1: discipline inside `domain-cae`) | PHY-03 §2.1 |
 | Thermo-mechanical FE discipline | `packages/domain-cae/src/thermomech/` (same) | PHY-04 §2 |
 | Pure physics queries already built | unchanged in core (`commands/thermal`, `commands/thermomech`, `commands/materiallab`) | §13 of each pack |
-| Meshing (Gmsh 4.15.2 Python API), solving (`ccx`), artifact store | `server/` (`server/python/llull_bridge.py` op `mesh`, `server/src/fea/*`), CLI verbs | 05 §5.4, §5.9 |
+| Meshing (Netgen 6.2.2604 in the `llull-mesh` sidecar), solving (`ccx`), artifact store | `server/` (`server/src/fea/*`), `solver/bins/llull-mesh`, CLI verbs | 05 §5.4, §5.9 |
 
 Why Proposal B: no package may import another package (`plugins-and-kernels-depend-on-core-only`) and the physics FE parts must
 call the 05 deck writer and readers; inside one package they compose by plain imports, with no new core extension port.
@@ -27,8 +27,8 @@ create_analysis (heat_steady | heat_transient | thermo_static | static) ─┐ s
 add_fea_constraint / add_fea_load / set_mesh_controls / add_thermal_bc …  ├─ in doc.analysis.cases[id] (pure, feature steps)
 set_reference_temperature / set_temperature_field …                       ┘
         │
-  ✱ fea_mesh  (server): export the analysed solids to STEP (ctx.kernel.exportStep, OCC) → bridge op `mesh` (Gmsh):
-              tet mesh + target resolution (facesNear / pointsNear → nearest Gmsh surface / node by closest point)
+  ✱ fea_mesh  (server): export the analysed solids to STEP (ctx.kernel.exportStep, OCC) → `llull-mesh` (Netgen):
+              tet mesh + target resolution (facesNear → face map, else nearest mesh face; pointsNear → nearest node)
               → FeMeshArtifact JSON → FeArtifactStore (sha256) → dispatch record_fe_mesh { analysisId, summary }
   ✱ fea_solve (server): writeInp(doc, case, mesh) (pure @cae) → `ccx -i job` → parseFrd / parseDat (pure @cae)
               → FeResultsArtifact JSON → store → dispatch record_fea_results { analysisId, summary }
@@ -88,10 +88,10 @@ density from PHY-01 models (tabulated over the case temperature range) or `Mater
 Built: solid idealization only (tet C3D4 / C3D10); static, heat_steady, heat_transient, thermo_static; constraints fixed / pinned /
 displacement / symmetry (planar); loads force / pressure / gravity; thermal BCs of PHY-03 §3.1; PHY-04 field sources uniform /
 expression / thermal_result (same mesh) / table. Not built (stay in the 05 backlog): modal, buckling, shells, plane stress,
-midsurface, defeature, Nastran BDF, OP2, `dispose_margin`, quality port beyond Gmsh's own metrics,
+midsurface, defeature, Nastran BDF, OP2, `dispose_margin`, quality port beyond the mesher's own metrics,
 UI panels, cavity radiation deck and contact conductance (PHY-03 V1: see its §13). Built since this note (PHY-04 TECHNICAL_SPEC §14):
 `compute_margins`, `fea_import_field`, the steady coupled procedure and mesh mapping, and bonded multi-part meshes (`set_mesh_controls bonding: 'conformal'`: all
-parts fragmented in one Gmsh model so touching parts share interface nodes, STEP only; 05 TECHNICAL_SPEC §13).
+parts fragmented into one shape (OCCT general fuse) so touching parts share interface nodes, STEP only; 05 TECHNICAL_SPEC §13).
 Human gates (`dispose_thermal_limit`, `dispose_fit_result`) verify through `ctx.humanSignature`; no implementation is installed
 (09 PLM is not built), so every call is refused with the `*_HUMAN_GATE` code, which is the specified agent-path behaviour.
 
@@ -132,6 +132,5 @@ per part → step sections (static → 05 `staticStep(ctx)`; `heat_*` → `therm
 | `@cae/thermal/summary.ts` (thermal) | `thermalResultsSummary(doc, analysisId, mesh, results): ThermalResultsSummary` (§5.5 balance, probes, extremes) |
 
 Field names in `FeResultsArtifact.steps[].fields`: the FRD block names (`DISP`, `STRESS`, `TOSTRAIN`, `NDTEMP`, `FLUX`, `RFL`), components as
-written by CalculiX. Element faces use the CalculiX labels (tet: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1). Gmsh tet10 node order
-differs from CalculiX C3D10: the mesher swaps the last two mid-edge nodes (Gmsh 3-4 / 2-4 edges → CalculiX 2-4 / 3-4) so the artifact
-is already in CalculiX order.
+written by CalculiX. Element faces use the CalculiX labels (tet: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1). `llull-mesh` adds the
+tet10 mid-edge nodes itself in CalculiX C3D10 order (1-2, 2-3, 3-1, 1-4, 2-4, 3-4), so the artifact is already in CalculiX order.

@@ -1,6 +1,6 @@
 /**
- * llull-mesh (Gmsh) on boxes: STL geometry (Manifold kernel) and exact STEP (OCC kernel, when it loads). Skipped without llull-mesh and a
- * Gmsh library. Meshes are coarse to keep the suite fast.
+ * llull-mesh (Netgen) on boxes: STL geometry (Manifold kernel) and exact STEP (OCC kernel, when it loads). Skipped without a built
+ * llull-mesh. Meshes are coarse to keep the suite fast.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -12,7 +12,7 @@ import type { FeMeshArtifact } from '@core/model/analysis';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { callNativeMesher } from '../src/fea/nativeMesher';
 import { partGeometry } from '../src/fea/feaGeometry';
-import { HAS_GMSH, MESH_BIN } from './feaTestSupport';
+import { HAS_MESHER, MESH_BIN } from './feaTestSupport';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 
 interface MeshReply {
@@ -81,11 +81,11 @@ function expectFacesOnSet(reply: MeshReply, key: string): void {
   }
 }
 
-describe.skipIf(!HAS_GMSH)('llull-mesh — STL geometry (Manifold)', () => {
+describe.skipIf(!HAS_MESHER)('llull-mesh — STL geometry (Manifold)', () => {
   it.each([1, 2] as const)('meshes a box with tet order %i and resolves faces and points', async (order) => {
     const reply = await mesh(request(manifold, order));
     expect(reply.ok, reply.error).toBe(true);
-    expect(reply.mesherVersion).toMatch(/^4\./);
+    expect(reply.mesherVersion).toMatch(/^6\.2\./);
     expect(reply.nodes.length).toBeGreaterThan(8);
     const block = reply.blocks[0];
     expect(block?.type).toBe(order === 1 ? 'C3D4' : 'C3D10');
@@ -155,7 +155,7 @@ describe.skipIf(!HAS_GMSH)('llull-mesh — STL geometry (Manifold)', () => {
   });
 });
 
-describe.skipIf(!HAS_GMSH)('llull-mesh — exact STEP geometry (OCC)', () => {
+describe.skipIf(!HAS_MESHER)('llull-mesh — exact STEP geometry (OCC)', () => {
   it('meshes the STEP of a box with the same target resolution', async (context) => {
     if (occt === null) context.skip();
     const reply = await mesh(request(occt as GeometryKernel, 2));
@@ -168,7 +168,7 @@ describe.skipIf(!HAS_GMSH)('llull-mesh — exact STEP geometry (OCC)', () => {
   });
 });
 
-describe.skipIf(!HAS_GMSH)('llull-mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
+describe.skipIf(!HAS_MESHER)('llull-mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
   it('resolves a point on each of two equal-height boss tops to that boss face only', async (context) => {
     if (occt === null) context.skip();
     const kernel = occt as GeometryKernel;
@@ -226,7 +226,7 @@ describe.skipIf(!HAS_GMSH)('llull-mesh — facesNear on trimmed faces (coplanar 
   });
 });
 
-describe.skipIf(!HAS_GMSH)('llull-mesh — conformal bonding of touching parts', () => {
+describe.skipIf(!HAS_MESHER)('llull-mesh — conformal bonding of touching parts', () => {
   let touching: CadDocument;
   const pair: string[] = [];
 

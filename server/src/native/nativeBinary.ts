@@ -1,6 +1,6 @@
 /**
  * Locates the native binaries of the Rust workspace `solver/` (docs/decisions/RS1-native-compute.md): `llull-compute` (jobs),
- * `llull-kernel` (native OCCT) and `llull-mesh` (Gmsh FE mesher). Order: the per-binary override (`LLULL_COMPUTE`, `LLULL_KERNEL_BIN`,
+ * `llull-kernel` (native OCCT) and `llull-mesh` (Netgen FE mesher). Order: the per-binary override (`LLULL_COMPUTE`, `LLULL_KERNEL_BIN`,
  * `LLULL_MESH_BIN`), then `LLULL_NATIVE_DIR`
  * (the desktop bundle), then a local build (`solver/target/compute` for llull-compute's `compute` profile, then `solver/target/release`),
  * else null — callers refuse with `NATIVE_TOOL_MISSING`.

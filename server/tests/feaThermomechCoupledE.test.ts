@@ -1,9 +1,9 @@
 /**
- * Coupled temperature-displacement with a temperature-dependent Young's modulus through the real Gmsh + CalculiX: the restrained bar of
+ * Coupled temperature-displacement with a temperature-dependent Young's modulus through the real Netgen (llull-mesh) + CalculiX: the restrained bar of
  * tmc_coupled_bar (both ends 120 degC, 20 degC reference, alpha 1.2e-5 1/K, restrained along x) with E(T) as a table
  * (200 GPa at 20 degC, 185 at 300, 170 at 500). The solved field is uniform 120 degC, so sigma_xx = -E(120 degC) alpha dT
  * = -(200 - 15 x 100 / 280) GPa x 1.2e-5 x 100 K = -233.57 MPa (the constant 200 GPa at the reference would give -240.0 MPa, +2.8 %).
- * Skipped without Gmsh or CalculiX.
+ * Skipped without llull-mesh or CalculiX.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -12,10 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 beforeAll(async () => {
   workspace = new Workspace();

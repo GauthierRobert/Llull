@@ -209,7 +209,7 @@ checked once, by 12 CFD. It writes:
 - OpenFOAM: `constant/triSurface/body.stl` (one solid per boundary tag), `system/blockMeshDict` (the farfield box),
   `system/snappyHexMeshDict`, `0/` fields from the free stream, `simpleFoam` (low speed) or `rhoCentralFoam`
   (compressible) controls;
-- SU2: a Gmsh volume mesh (bundled Python Gmsh, as in 05 FEA) and a `.cfg` with the markers and free stream.
+- SU2: a Netgen volume mesh (`llull-mesh`, as in 05 FEA) and a `.cfg` with the markers and free stream.
 
 `cfd_import_external` reads the external forces and surface Cp (OpenFOAM `forces` function object and surface
 sampling; SU2 `history.csv` and `surface_flow.csv`), stores them in the 12 CFD result store, and records them with
@@ -279,7 +279,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
 ## 11. Open questions
 
-1. Licensing of a bundled XFOIL (GPL) on the desktop: same decision as Gmsh / CalculiX (decision 5).
+1. Licensing of a bundled XFOIL (GPL) on the desktop: same decision as CalculiX (decision 5).
 2. Should `analyze_wing` read its planform from a `loft_sections` entity rather than from numbers? This needs
    the section-ring fix of 02 SRF (24-point resampling).
 3. Should rider CdA presets (Defraeye 2010) be shipped as a sourced table? They are B-grade, and a choice for the

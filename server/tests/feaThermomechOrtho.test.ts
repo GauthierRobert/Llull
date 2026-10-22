@@ -1,8 +1,8 @@
 /**
- * PHY-04 M4b orthotropic CTE (TR-TMC-25) through the real Gmsh + CalculiX 2.21: `*EXPANSION, TYPE=ORTHO` with the isotropic `*ELASTIC` of 05 and,
+ * PHY-04 M4b orthotropic CTE (TR-TMC-25) through the real Netgen (llull-mesh) + CalculiX 2.21: `*EXPANSION, TYPE=ORTHO` with the isotropic `*ELASTIC` of 05 and,
  * with `set_material_orientation`, `*ORIENTATION` named on the solid section. A free 10 mm cube (one face held per axis) heated 20 -> 120 degC
  * with alpha 1 / 2 / 3 = 10 / 20 / 30 ppm per K grows 10 x alpha_i x 100 along each material direction: 0.01 / 0.02 / 0.03 mm, stress free.
- * Rotating material direction 1 onto the document y axis swaps the x and y growth. Manifold geometry (a box); skipped without Gmsh or CalculiX.
+ * Rotating material direction 1 onto the document y axis swaps the x and y growth. Manifold geometry (a box); skipped without llull-mesh or CalculiX.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, planPath, Workspace } from './feaThermomechSupport';
 
 type Step = { command: string; params: Record<string, unknown>; as?: string };
@@ -72,7 +72,7 @@ async function growth(name: string, orientation: Step[]): Promise<{ deck: string
   return { deck: String(dataOf(exported.json)['text']), u, vonMises: isRecord(max) ? Number(max['value']) : Number.NaN };
 }
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('orthotropic thermal expansion in CalculiX 2.21', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('orthotropic thermal expansion in CalculiX 2.21', () => {
   it('grows 10 x alpha_i x dT along each axis with *EXPANSION, TYPE=ORTHO and an isotropic *ELASTIC, stress free', async () => {
     const { deck, u, vonMises } = await growth('ortho', []);
     expect(deck).toContain('*EXPANSION, TYPE=ORTHO, ZERO=20');

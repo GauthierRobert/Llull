@@ -1,7 +1,7 @@
 /**
  * PHY-04 thermal bow (VC-TMC-08) and the Al housing / steel shaft fit (VC-TMC-06) through the `llull` CLI. The beams carry a linear
  * through-thickness field (T = 20 - 4 (z - 2.5) degC, 20 K over h = 5 mm, alpha 2.3e-5): FE curvature kappa = alpha dT / h, no stress.
- * The fit plan has no FE; it needs neither Gmsh nor CalculiX.
+ * The fit plan has no FE; it needs neither llull-mesh nor CalculiX.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,10 +10,10 @@ import { EXIT_OK } from '../src/cli/main';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {

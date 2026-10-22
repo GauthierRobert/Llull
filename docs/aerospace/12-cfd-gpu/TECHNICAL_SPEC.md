@@ -8,7 +8,7 @@ local only, GPU first) are in FUNCTIONAL_SPEC, top of file.
 - **Aerodynamics at formula level** (`packages/domain-aero/src/aerodynamics/`, 10 AER): atmosphere, panel method, lifting line,
   frontal area, drag, skin friction. **Compressible 1D relations** (`packages/domain-aero/src/fluids/`, 11 FLD): isentropic, normal and
   oblique shocks, Prandtl-Meyer. No flow field exists anywhere.
-- **The external-solver template exists** in the FEA work (05): Gmsh through the Python bridge and CalculiX as a tracked child
+- **The external-solver template exists** in the FEA work (05): the native `llull-mesh` sidecar (Netgen) and CalculiX as tracked children
   (`server/src/fea/{transports,ccxProcess,feaSolve}.ts`); results stored by content hash (`server/src/fea/artifactStore`), then
   written into the document by validated record commands (`record_fe_mesh`, `record_fea_results`, 05 §4.1 trust model). The CLI runs
   these transports (`server/src/cli/exchange.ts`, `usage.ts`).
@@ -394,7 +394,7 @@ CPU backend runs everywhere, so every VC has a CI path. Coverage 90/85/90/90 app
 | M4 | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario | M2 | 7 eng-weeks |
 | M5 | Grid study (`gridStudy`, GCI), pinned literature benchmarks (Schäfer-Turek 3D, AIJ, ONERA M6), performance gate | M3, M4 | 3 eng-weeks |
 | V1 | cumulant D3Q27, interpolated walls, ABL inlet + comfort maps, defeaturing via 07 FTR, time-accurate + animation, viscous drag estimate | M5 | ≈ 8 eng-weeks |
-| V2 | PyFR body-fitted mode (bundled CPython, Gmsh mesh), nozzle / plume (11 FLD) | V1 | ≈ 8 eng-weeks |
+| V2 | PyFR body-fitted mode (bundled CPython, Netgen mesh), nozzle / plume (11 FLD) | V1 | ≈ 8 eng-weeks |
 
 MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay (same overlay component, 05 field data).
 

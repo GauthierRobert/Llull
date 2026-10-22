@@ -1,16 +1,16 @@
 /**
  * PHY-04 TR-TMC-23 through the real pipeline: the thick cylinder heated by a heat_steady case on a COARSER mesh (global size 3 mm), read by a
- * thermo_static case on a FINER mesh (2 mm) with mapping interpolate. VC-TMC-05.a-c must still hold (2 %). Skipped without Gmsh or CalculiX.
+ * thermo_static case on a FINER mesh (2 mm) with mapping interpolate. VC-TMC-05.a-c must still hold (2 %). Skipped without llull-mesh or CalculiX.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { EXIT_COMMAND_ERROR } from '../src/cli/main';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {

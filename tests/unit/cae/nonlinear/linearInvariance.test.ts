@@ -6,10 +6,14 @@ import { keyedTargets } from '@cae/hash/targets';
 import { caseOf } from '@cae/shared/access';
 import { X0_NODES, barDocument, barMesh } from '../deckFixtures';
 
-/** Literals captured BEFORE the nonlinear lane existed (ENG-1): a linear case must keep these byte for byte. */
-const LINEAR_FULL_HASH = '3bc979c4702161d0a15176c99976424ceccb4a94b8cb24e8292f35aba59a377c';
-const LINEAR_MESH_HASH = '5bc0dc612feca6b72ebe64be6d8b2d4cc2a24d0fda8bc9a6a559b8f0b86149d2';
-const LINEAR_DECK_SHA256 = 'fdac79a992631c46a2d6cea48fc7d76db93b8b30ac6a256144c0b24c1b4a5dbc';
+/**
+ * Literals captured BEFORE the nonlinear lane existed (ENG-1): a linear case must keep these byte for byte. Recaptured once (NG1,
+ * 2026-10-22) when the mesher became Netgen (`mesh.mesher: 'netgen'`): the input hashes changed, and in the deck only the header lines
+ * that print them.
+ */
+const LINEAR_FULL_HASH = 'e6f0f99dacb47011829b1de50de24ae7ebe75c0dbe476a36e285b5e3f0e09d1e';
+const LINEAR_MESH_HASH = '0b1fe5b054fd3325a3cbc04f988f441a0be1e4fb379ce1c7ff17cb611b7ab0d3';
+const LINEAR_DECK_SHA256 = 'a508b48b8cd2f83ba8ca2e05662636d282ef1df5cc2f2a1b88dd52274b1d205b';
 
 describe('linear cases are untouched by the nonlinear lane', () => {
   it('keeps the input hashes and the deck bytes of a static case', () => {

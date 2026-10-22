@@ -1,5 +1,5 @@
 /**
- * npm run quality:physics (PHY-00 FR-VNV-12): run the physics packs' unit tests and the FE benchmark tests (server, real Gmsh +
+ * npm run quality:physics (PHY-00 FR-VNV-12): run the physics packs' unit tests and the FE benchmark tests (server, real Netgen (llull-mesh) +
  * CalculiX when installed) with measurement recording, then judge every
  * docs/physics/<pack>/validation/expected_results.json case with `llull run_benchmarks`. Exit 1 on any grade-A fail or error.
  * Report: .cache/quality-physics/reports/benchmarks.{json,md} (never committed).
@@ -21,7 +21,7 @@ const run = (command, args, env = {}) =>
 const env = { LLULL_PHYSICS_MEASUREMENTS: measurements };
 const tests = run('npx', ['vitest', 'run', 'tests/unit/physics', 'tests/unit/cae'], env);
 if (tests !== 0) process.exit(tests);
-// FE benchmarks through the real Gmsh + CalculiX pipeline (skipped inside the suite when the tools are absent).
+// FE benchmarks through the real Netgen + CalculiX pipeline (skipped inside the suite when the tools are absent).
 const feTests = run('npm', ['--prefix', 'server', 'test', '--', 'feaThermal', 'feaThermomech'], env);
 if (feTests !== 0) process.exit(feTests);
 process.exit(

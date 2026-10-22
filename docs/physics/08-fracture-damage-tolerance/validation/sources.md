@@ -34,5 +34,5 @@ arxiv.org, osti.gov, pmc / europepmc with 403), **catalogue**. Grades **A / B / 
 - NASGRO closure coefficient expressions, threshold and toughness sub-models (primary NASGRO manual not reached).
 - NAFEMS R0020 original values (paid); only the Ansys VM restatement.
 - Centre-crack secant accuracy statement and validity limit.
-- Gmsh `Crack` plugin in the pinned 4.15.2 wheel.
+- Crack seam node duplication (Netgen has none; llull implements it).
 - Scatter factors for thresholds / intervals (AC 25.571-1D, AMC 25.571, NASA-STD-5019 text).

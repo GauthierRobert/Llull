@@ -1,14 +1,14 @@
 /**
- * NAFEMS thermal benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report), judged with the
+ * NAFEMS thermal benchmarks through the real pipeline (plan -> fea_mesh (Netgen) -> fea_solve (CalculiX) -> analysis_report), judged with the
  * PHY-00 judge against the pack's expected_results.json: VC-THM-03 (T3, transient, sine amplitude) and VC-THM-04 (T4, steady, films).
- * Plans: server/tests/fixtures/thermal (the pack's plans adapted to create_material + define_property_model). Skipped without gmsh / ccx.
+ * Plans: server/tests/fixtures/thermal (the pack's plans adapted to create_material + define_property_model). Skipped without llull-mesh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('NAFEMS thermal benchmarks (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('NAFEMS thermal benchmarks (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('nafems');

@@ -13,7 +13,7 @@ Gap id **THM** · status: specification · written 2026-10-15 · functional spec
 | Plugin dependency rule | `plugins-and-kernels-depend-on-core-only`: a `packages/domain-*` module may import only `packages/core` (and itself) | `.dependency-cruiser.cjs` | **A `domain-physics` package cannot import `@cae`** (see §2.1) |
 | After 08 MAT (spec) | `PropertyValue` with `property: 'k' \| 'cp' \| 'cte' \| 'density' …`, `TemperatureDependence { mode, points, temperatureUnit }`, linear interpolation, no extrapolation (`MAT_TEMPERATURE_OUT_OF_RANGE`) | `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md` §3.1, §5.5 | Data only; nothing consumes k / cp |
 | After PHY-01 (spec) | `PropertyModel` on `MaterialRecord.propertyModels?` (`model/propertyModel.ts`); consumer API `resolvePropertyModel` / `evaluatePropertyModel` / `tabulatePropertyModel` (`model/propertyModelEval.ts`); refuses outside the equation range (`PROP_OUT_OF_RANGE`), never extrapolates; PHY-01 names PHY-03 as the builder of `*CONDUCTIVITY` / `*SPECIFIC HEAT` tables through `tabulatePropertyModel` | `docs/physics/01-property-models/TECHNICAL_SPEC.md` §3 | This pack only consumes it |
-| After 05 FEA (spec) | `AnalysisModel` / `AnalysisCase` in core `model/analysis.ts`; `AnalysisType = 'static' \| 'modal' \| 'buckling'`; `FeaTarget` with `facesNear` / `edgesNear` / `pointsNear`; Gmsh `mesh` bridge op; `FeArtifactStore`; INP writer; FRD/DAT readers; `record_fe_mesh` / `record_fea_results` validated against the artifact store; staleness by input hash; transports `fea_mesh`, `fea_solve`, `fea_import_results`, `fea_export` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §2–§5 | Mechanical only; "thermal analysis possible later through CalculiX `*HEAT TRANSFER`" |
+| After 05 FEA (spec) | `AnalysisModel` / `AnalysisCase` in core `model/analysis.ts`; `AnalysisType = 'static' \| 'modal' \| 'buckling'`; `FeaTarget` with `facesNear` / `edgesNear` / `pointsNear`; mesh op (`llull-mesh`, Netgen since NG1); `FeArtifactStore`; INP writer; FRD/DAT readers; `record_fe_mesh` / `record_fea_results` validated against the artifact store; staleness by input hash; transports `fea_mesh`, `fea_solve`, `fea_import_results`, `fea_export` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §2–§5 | Mechanical only; "thermal analysis possible later through CalculiX `*HEAT TRANSFER`" |
 | Bundled solver | CalculiX (05) — its source already contains `*HEAT TRANSFER`, `*FILM`, `*RADIATE`, `*DFLUX`, `*CFLUX`, `*GAP CONDUCTANCE`, `*VIEWFACTOR`, `*PHYSICAL CONSTANTS`, `*CONDUCTIVITY`, `*SPECIFIC HEAT`; **no `*LATENT HEAT`** | `src/calinput.f`, `doc/CalculiX.tex` at commit fd588701 [R7] | Nothing to add to the installer |
 
 ## 2. Target architecture
@@ -94,7 +94,7 @@ plugin, installed in `src/app/plugins.ts`).
 ### 2.2 Stack amendment (RS1, 2026-10-18)
 
 Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-6** moves large view-factor computations with obstruction to
-native code. The rest of the pack does not change: the FE path stays Gmsh + bundled CalculiX (05), and CalculiX still
+native code. The rest of the pack does not change: the FE path stays `llull-mesh` (Netgen) + bundled CalculiX (05), and CalculiX still
 computes its own cavity view factors in the solve.
 
 | Item | Before | Now |
@@ -297,7 +297,7 @@ flux positive into the part (CalculiX "flux entering … positive"); film and ra
 
 ### 5.2 Face and node sets
 
-Targets resolve exactly as in 05 (`facesNear` → face map → Gmsh physical groups). For `*FILM`, `*RADIATE` and `*DFLUX Sx` the
+Targets resolve exactly as in 05 (`facesNear` → face map → mesh face sets). For `*FILM`, `*RADIATE` and `*DFLUX Sx` the
 writer emits one line per (element, face label) on the target faces using TR-THM-11; for `*BOUNDARY` DOF 11 the node set of
 the target faces. Point flux uses `pointsNear` → nearest node (05 TR-FEA-03).
 
@@ -553,9 +553,9 @@ so no core extension port was needed.
 | Deck sections §5.1 (materials tabulated from PHY-01 models, `*HEAT TRANSFER`, BCs, `*FILM`, `*RADIATE` incl. `CAVITY=`, output) | `thermal/{deck,deckMaterial,deckLoads,deckStep,deckNames}.ts`, assembled by the 05 `writeInp` |
 | Summary + heat balance §5.5 | `thermal/{summary,heatBalance,bcFlows,storedEnergy,meshGeometry}.ts` |
 | `analysis_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
-| Solve path | server `fea_mesh` (Gmsh 4.15.2) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
+| Solve path | server `fea_mesh` (`llull-mesh`, Netgen 6.2.2604) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
 
-FE benchmarks, real Gmsh + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
+FE benchmarks, the previous mesher + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
 `server/tests/fixtures/thermal/`, run by `npm run quality:physics`): VC-THM-01.a–d (wall), 03 (T3 36.48 °C vs 36.60, 0.33 %), 04 (T4
 18.2542 vs 18.2538), 05 (T2 927.004 K, exact σ), 14.a/b (oneel8ra), plus 61 (all ten set-ups, CLI), 50 (incl. the dependent thermo_static going stale), 62, 63 at unit level and an
 open-cavity case against the exact view-factor network (0.5 %).
@@ -574,7 +574,7 @@ open-cavity case against the exact view-factor network (0.5 %).
   CalculiX's 5.669e-8 (the exact SI σ misses its 1e-4 tolerance by 2.2e-4 — kept visible by a test). The default stays the exact SI value.
 - **Probes:** temperature probes are interpolated with the containing C3D4 / C3D10 element's shape functions (nearest node was 3 % low
   on T3); other quantities use the nearest node.
-- **Targets** are resolved by the mesher (closest Gmsh surface / node to the given points), not by the 05 face map (TR-FEA-32, needs the
+- **Targets** are resolved by the mesher (closest mesher surface / node to the given points), not by the 05 face map (TR-FEA-32, needs the
   01 face-query port); with the Manifold kernel faces are the 40° crease regions of the tessellation.
 - **Contact conductance:** written, see "V1 additions (2026-10-17)" below.
 - **Human gate:** `dispose_thermal_limit` verifies through `ctx.humanSignature`; no implementation is installed (09 PLM not built), so
@@ -586,7 +586,7 @@ open-cavity case against the exact view-factor network (0.5 %).
 **Still open:** phase change (V2); ε(T) tables (needs PHY-15 emissivity data, absent) and `render_view field=temperature` (M4 V1); h(T) in transient
 cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 
-**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 through plan -> `fea_mesh` -> `fea_solve` -> `analysis_report`:**
+**V1 additions (2026-10-17), all measured on ccx 2.21 with the previous mesher through plan -> `fea_mesh` -> `fea_solve` -> `analysis_report`:**
 
 | Item | Result |
 | ---- | ------ |

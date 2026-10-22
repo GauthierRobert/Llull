@@ -88,7 +88,7 @@ export type Idealization =
     }
   | { readonly kind: 'beam'; readonly section: string };
 
-/** Features removed from one analysed part before meshing (Gmsh `occ.defeature`, STEP parts only). Lengths in document units. */
+/** Features removed from one analysed part before meshing (OCCT defeaturing in the mesher, STEP parts only). Lengths in document units. */
 export interface DefeatureSpec {
   /** Remove cylinder / torus faces of radius <= this: fillets, rounds and small holes. */
   readonly maxFeatureSize?: number;
@@ -128,7 +128,8 @@ export interface FeaLoad {
 }
 
 export interface MeshControls {
-  readonly mesher: 'gmsh' | 'netgen';
+  /** The mesher that meshes the case: Netgen (llull-mesh). */
+  readonly mesher: 'netgen';
   readonly elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
   readonly order: 1 | 2;
   readonly globalSize: number;
