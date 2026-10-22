@@ -129,10 +129,19 @@ describe('document slice', () => {
 });
 
 describe('registration', () => {
-  const names = ['create_cfd_case', 'update_cfd_case', 'delete_cfd_case', 'set_cfd_boundary', 'prepare_cfd_case', 'check_cfd'];
+  const names = [
+    'create_cfd_case',
+    'update_cfd_case',
+    'delete_cfd_case',
+    'set_cfd_boundary',
+    'prepare_cfd_case',
+    'check_cfd',
+    'record_cfd_results',
+    'cfd_report',
+  ];
 
-  it('lists the six commands in the flow toolset, 1:1 with the tool schemas', () => {
-    expect([...TOOLSETS.flow].sort()).toEqual([...names].sort());
+  it('lists the eight commands and the native cfd_solve in the flow toolset, 1:1 with the tool schemas', () => {
+    expect([...TOOLSETS.flow].sort()).toEqual([...names, 'cfd_solve'].sort());
     for (const name of names) {
       expect(getCommand(name), name).toBeDefined();
       expect(toolsetOf(name)).toBe('flow');

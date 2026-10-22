@@ -19,6 +19,8 @@ default-members = [
   "crates/llull-explicit",
   "crates/llull-cloud",
   "crates/llull-geomq",
+  "crates/llull-flow-core",
+  "crates/llull-flow-lbm",
   "bins/llull-compute",
 ]
 
@@ -70,6 +72,13 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.llull-bvh]
+opt-level = 3
+
+# 12 CFD: the lattice-Boltzmann tests run thousands of steps on 10^4..10^5 cells (Poiseuille order, Taylor-Green, sphere).
+[profile.dev.package.llull-flow-core]
+opt-level = 3
+
+[profile.dev.package.llull-flow-lbm]
 opt-level = 3
 
 [profile.release]

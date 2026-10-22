@@ -108,7 +108,8 @@ describe('estimateCase', () => {
     const coarse = estimateCase({ ...input, solver: 'lbm', cellsPerReferenceLength: 32 });
     const fine = estimateCase({ ...input, solver: 'lbm', cellsPerReferenceLength: 64 });
     expect(fine.cells / coarse.cells).toBeGreaterThan(7);
-    expect(coarse.bytes).toBe(coarse.cells * 96);
+    expect(coarse.bytes).toBe(coarse.cells * 204);
+    expect(coarse.cpuBytes).toBe(coarse.cells * 395);
     expect(estimateCase({ ...input, solver: 'euler', cellsPerReferenceLength: 64 }).bytesPerCell).toBe(144);
     expect(coarse.timeEstimateS).toBeGreaterThan(0);
     expect(coarse.basis.join(' ')).toContain('not measured');

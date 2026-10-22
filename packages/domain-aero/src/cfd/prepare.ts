@@ -162,6 +162,12 @@ function emptyReport(cfdCase: CfdCase, checks: CheckRow[], flow: FlowState | nul
   };
 }
 
+/** The report with the surface stage it was built from (the flow job exports that surface); `stage` is null without a usable surface. */
+export interface PreparedCase {
+  readonly report: PrepareReport;
+  readonly stage: SurfaceStage | null;
+}
+
 /**
  * The §5.1 report of one case. Never throws, never changes the document.
  * @invariant deterministic for a given document, case, kernel and options; `geometryHash` is that of the oriented welded surface
@@ -173,6 +179,16 @@ export function prepareCase(
   kernel: GeometryKernel | null,
   options: PrepareOptions = {},
 ): PrepareReport {
+  return prepareCaseWithStage(doc, cfdCase, kernel, options).report;
+}
+
+/** [`prepareCase`] keeping the welded surface (case frame, metres) for the solver export. */
+export function prepareCaseWithStage(
+  doc: CadDocument,
+  cfdCase: CfdCase,
+  kernel: GeometryKernel | null,
+  options: PrepareOptions = {},
+): PreparedCase {
   const resolved = resolveFlow(cfdCase);
   const flow = resolved.ok ? resolved.state : null;
   const checks: CheckRow[] = [
@@ -190,13 +206,13 @@ export function prepareCase(
     checks.push(row('CFD_ENTITY_NOT_FOUND', 'fail', `entities no longer in the document: ${missing.join(', ')}`, { ids: missing }));
   if (leaves.length === 0) {
     checks.push(row('CFD_NO_GEOMETRY', 'fail', 'the case has no 3D solid after the exclusions'));
-    return emptyReport(cfdCase, checks, flow, warnings);
+    return { report: emptyReport(cfdCase, checks, flow, warnings), stage: null };
   }
   checks.push(row('CFD_NO_GEOMETRY', 'pass', `${leaves.length} solid(s) in the flow body`));
   const stage = prepareSurface(doc, cfdCase, leaves, kernel);
   if (stage.surface.triangles.length === 0) {
     checks.push(row('CFD_GEOMETRY_NOT_WATERTIGHT', 'fail', 'the bodies have no usable triangle'));
-    return emptyReport(cfdCase, checks, flow, warnings);
+    return { report: emptyReport(cfdCase, checks, flow, warnings), stage: null };
   }
   checks.push(...surfaceRows(stage));
   if (stage.flipped) warnings.push('the surface was inward oriented (negative signed volume): winding reversed');
@@ -287,7 +303,7 @@ export function prepareCase(
     frame: { x: stage.frame.x, y: stage.frame.y, z: stage.frame.z },
   };
   const status = worstStatus(checks);
-  return {
+  const report: PrepareReport = {
     caseId: cfdCase.id,
     status,
     solver,
@@ -327,6 +343,7 @@ export function prepareCase(
       'small-feature, thin-wall and gap tests use the display tessellation; coplanar triangle overlaps are not detected',
     ],
   };
+  return { report, stage };
 }
 
 /** `not_run` is never a pass: it raises the status to warn, except the neutral memory row when no device was given. */

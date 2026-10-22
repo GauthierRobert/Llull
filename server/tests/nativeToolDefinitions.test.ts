@@ -15,13 +15,14 @@ const named = (name: string): ReturnType<typeof buildNativeToolDefinitions>[numb
 describe('native tool definitions (@protocol)', () => {
   it('declares exactly the tools the server runs', () => {
     for (const { name } of tools) expect(isNativeTool(name) || isScanTool(name), name).toBe(true);
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
   });
 
   it('files each tool in a toolset (analysis for the FE / solver transports)', () => {
     for (const name of ['explicit_run', 'fatigue_field', 'fea_map_field', 'fea_render', 'mtest_run', 'topology_solve']) {
       expect(toolsetOf(name), name).toBe('analysis');
     }
+    expect(toolsetOf('cfd_solve')).toBe('flow');
     expect(toolsetOf('auto_route')).toBe('piping');
     expect(toolsetOf('stackup_monte_carlo')).toBe('pmi');
     expect(toolsetOf('vortex_lattice_solve')).toBe('aerodynamics');
