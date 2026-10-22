@@ -9,7 +9,8 @@ import type { FeTopologyArtifact, TopologyStudy } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { buildTopologyArtifact, buildTopologyJob, type TopologyJob } from '@cae/index';
 import { fieldBytes } from '@cae/topology/artifact';
-import { topologySettingsHash } from '@cae/topology/hash';
+import { topologyInputHash, topologySettingsHash } from '@cae/topology/hash';
+import { pressureLoad } from '@cae/topology/loads';
 import { artifactStore, code, contextWith, data, jobOf, mbbModel, solveAndRecord, studyOf, type Model } from './support';
 
 type Params = Record<string, unknown>;
@@ -330,5 +331,156 @@ describe('V1 report and summary', () => {
     );
     expect(check.items).toContainEqual(expect.objectContaining({ code: 'TOP_CONSTRAINT_VIOLATED', severity: 'fail' }));
     expect(check.status).toBe('fail');
+  });
+});
+
+describe('load refusals of the V1 mapping', () => {
+  const model = mbbModel();
+  const fixedLeft: Params = { kind: 'fixed', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } };
+  const refused = (doc: CadDocument, studyId: string): { code: string; message: string } => {
+    const analysisId =
+      Object.keys(doc.analysis?.cases ?? {}).find((id) => doc.analysis?.cases[id]?.topology?.[studyId] !== undefined) ?? '';
+    const result = buildTopologyJob(doc, studyOf(doc, analysisId, studyId));
+    if (result.ok) throw new Error('expected a refusal');
+    return result;
+  };
+  /** The MBB material with its density removed. */
+  const withoutDensity = (doc: CadDocument): CadDocument => {
+    const materialId = doc.entities[model.entityId]?.materialId ?? '';
+    const material = doc.materials[materialId];
+    if (material === undefined) throw new Error('no material');
+    return { ...doc, materials: { ...doc.materials, [materialId]: { ...material, density: 0 } } };
+  };
+
+  it.each([
+    [
+      'a pressure on a point target (no face)',
+      [
+        {
+          kind: 'pressure',
+          loadCase: 'LC1',
+          category: 'limit',
+          target: { entityId: model.entityId, pointsNear: [[60, 10, 0]] },
+          magnitude: 1,
+        },
+      ],
+      'needs a facesNear target',
+      false,
+    ],
+    [
+      'gravity with an out-of-plane component on a 2D study',
+      [{ kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 100] }],
+      'must lie in the plane',
+      false,
+    ],
+    [
+      'gravity on a material without density',
+      [{ kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 0] }],
+      'has no density',
+      true,
+    ],
+    [
+      'a moment',
+      [
+        {
+          kind: 'moment',
+          loadCase: 'LC1',
+          category: 'limit',
+          target: { entityId: model.entityId, facesNear: [[60, 10, 0.5]] },
+          vector: [0, 0, 5],
+        },
+      ],
+      'is not supported',
+      false,
+    ],
+  ])('refuses %s with TOP_SETUP_INVALID', (_name, loads, message, stripDensity) => {
+    const made = analysisOn(model, { constraints: [fixedLeft], loads });
+    const refusal = refused(stripDensity ? withoutDensity(made.doc) : made.doc, made.studyId);
+    expect(refusal.code).toBe('TOP_SETUP_INVALID');
+    expect(refusal.message).toContain(message);
+  });
+
+  it('refuses a pressure whose face normal leaves the plane of a 2D grid', () => {
+    const grid = {
+      dimension: 2 as const,
+      plane: 'XY' as const,
+      voxel: 1,
+      axes: [0, 1, 2] as const,
+      origin: [0, 0, 0] as const,
+      nx: 4,
+      ny: 2,
+      nz: 1,
+      thickness: 1,
+      count: 8,
+    };
+    const load = { id: 'p', name: 'p', loadCase: 'LC1', category: 'limit' as const, kind: 'pressure' as const, magnitude: 2 };
+    const tilted = pressureLoad(load, grid, { nodes: [0, 5], normal: [0.6, 0, 0.8], faceArea: 10 }, 1);
+    expect(tilted).toContain('not perpendicular to the plane');
+    const straight = pressureLoad(load, grid, { nodes: [0, 5], normal: [1, 0, 0], faceArea: 10 }, 1);
+    expect(straight).toEqual({ dofs: [0, 10], values: [-10, -10] });
+  });
+});
+
+describe('the input hash and the material density', () => {
+  const model = mbbModel();
+  const fixedLeft: Params = { kind: 'fixed', target: { entityId: model.entityId, facesNear: [[0, 10, 0.5]] } };
+  const point: Params = {
+    kind: 'force',
+    loadCase: 'LC1',
+    category: 'limit',
+    target: { entityId: model.entityId, pointsNear: [[60, 20, 0]] },
+    vector: [0, -1, 0],
+  };
+  const denser = (doc: CadDocument): CadDocument => {
+    const materialId = doc.entities[model.entityId]?.materialId ?? '';
+    const material = doc.materials[materialId];
+    if (material === undefined) throw new Error('no material');
+    return { ...doc, materials: { ...doc.materials, [materialId]: { ...material, density: material.density * 2 } } };
+  };
+  const hashOf = (doc: CadDocument, studyId: string): string => {
+    const analysisId =
+      Object.keys(doc.analysis?.cases ?? {}).find((id) => doc.analysis?.cases[id]?.topology?.[studyId] !== undefined) ?? '';
+    return topologyInputHash(doc, studyOf(doc, analysisId, studyId));
+  };
+
+  it('enters the hash only when the case has a gravity load (a solve reads it then), so a density change makes such a result stale', () => {
+    const forceOnly = analysisOn(model, { constraints: [fixedLeft], loads: [point] });
+    expect(hashOf(denser(forceOnly.doc), forceOnly.studyId)).toBe(hashOf(forceOnly.doc, forceOnly.studyId));
+    const weighted = analysisOn(model, {
+      constraints: [fixedLeft],
+      loads: [point, { kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 0] }],
+    });
+    expect(hashOf(denser(weighted.doc), weighted.studyId)).not.toBe(hashOf(weighted.doc, weighted.studyId));
+    // a recorded gravity result reads stale once the density changed
+    const job = okJob(weighted.doc, weighted.studyId);
+    const field = Float32Array.from({ length: 1200 }, (_, n) => (n % 60 < 30 ? 1 : 0));
+    const artifact = buildTopologyArtifact(
+      job,
+      fieldBytes(field),
+      {
+        compliance: 9,
+        perLoadCase: { LC1: 9 },
+        iterations: 3,
+        status: 'converged',
+        history: [],
+        device: 'cpu',
+        deterministic: true,
+        version: 't',
+      },
+      'topopt',
+    ) as FeTopologyArtifact;
+    const store = artifactStore();
+    const hash = store.put(artifact);
+    const recorded = execute(
+      weighted.doc,
+      'record_topology_result',
+      { studyId: weighted.studyId, fieldHash: hash },
+      contextWith(store.port),
+    );
+    expect(recorded.rejected).not.toBe(true);
+    const report = (doc: CadDocument): string =>
+      data<{ state: string }>(execute(doc, 'topology_report', { studyId: weighted.studyId }, contextWith(store.port))).state;
+    expect(report(recorded.document)).toBe('solved');
+    expect(report(denser(recorded.document))).toBe('stale');
   });
 });

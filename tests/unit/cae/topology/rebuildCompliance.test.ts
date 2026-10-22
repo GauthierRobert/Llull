@@ -61,6 +61,8 @@ interface RebuiltOptions {
   readonly displacement?: (uy: number) => readonly number[];
   /** Assign the MBB material (density 0.001 g/mm^3) to the rebuilt box. */
   readonly material?: boolean;
+  /** Element type of the one-tetrahedron mesh (a C3D10 lists the same four corners: the compliance ratio rebuilds linear tets only). */
+  readonly elementType?: 'C3D4' | 'C3D10';
   readonly solve?: boolean;
   readonly analysisType?: 'static' | 'modal';
 }
@@ -68,7 +70,7 @@ interface RebuiltOptions {
 /** The 30 x 20 x 1 rebuild with a 05 static analysis: 1000 N pulled over four nodes that moved `uy` each (F^T u = 1000 uy), recorded with its artifacts. */
 function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, uy: number, options: RebuiltOptions = {}): Rebuilt {
   const { unitSystem = 'N-mm-t-s', loadKind = 'force', loadCase = 'LC1', nodeSet = [2, 4, 6, 8], displaced = true, solve = true } = options;
-  const { displacedNodes = [2, 4, 6, 8], displacement = (value: number) => [0, -value, 0], faceSet = [] } = options;
+  const { displacedNodes = [2, 4, 6, 8], displacement = (value: number) => [0, -value, 0], faceSet = [], elementType = 'C3D4' } = options;
   const added = execute(base, 'add_box', { size: [30, 20, 1], position: [0, 0, 0], anchor: 'min' });
   const entityId = added.affected[0] ?? '';
   const withMaterial =
@@ -114,7 +116,7 @@ function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, 
       [7, 0, 20, 1],
       [8, 30, 20, 1],
     ],
-    blocks: [{ type: 'C3D4', entityId, elements: [[1, 1, 2, 4, 8]] }],
+    blocks: [{ type: elementType, entityId, elements: [[1, 1, 2, 4, 8]] }],
     nodeSets: { [`L_${load.affected[0]}`]: nodeSet },
     faceSets: faceSet.length === 0 ? {} : { [`L_${load.affected[0]}`]: faceSet },
     targets: {},
@@ -252,6 +254,19 @@ describe('compare_to_topology compliance ratio', () => {
     // without a material density, or with a node that did not move, the ratio is unavailable
     unavailable(rebuilt(doc, topology, uy, { loadKind: 'gravity', displacedNodes: [1, 2, 4, 8] }), 'unsupported');
     unavailable(rebuilt(doc, topology, uy, { loadKind: 'gravity', material: true }), 'unsupported');
+    // quadratic tetrahedra are not rebuilt (corner means are the linear weights only)
+    const quadratic = rebuilt(doc, topology, uy, {
+      loadKind: 'gravity',
+      material: true,
+      displacedNodes: [1, 2, 4, 8],
+      elementType: 'C3D10',
+    });
+    unavailable(quadratic, 'unsupported');
+    expect(data<Compare>(compare(quadratic)).complianceStatus.message).toContain('C3D4');
+    unavailable(
+      rebuilt(doc, topology, 0.09, { loadKind: 'pressure', faceSet: [[1, 3]], displacedNodes: [2, 4, 8], elementType: 'C3D10' }),
+      'unsupported',
+    );
   });
 
   it('reports the ratio as unavailable for loads and results it cannot read', () => {

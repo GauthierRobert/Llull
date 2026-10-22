@@ -285,3 +285,78 @@ fn an_mma_run_with_projection_resumes_bit_for_bit_from_its_state() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// Runs `settings` whole (`total` iterations), then with `deadlineS: 0` (checkpoint after the first iteration) and resumes it; the resumed
+/// outputs must equal the whole run's byte for byte (and `extra` is checked on the checkpoint result).
+fn checkpoint_equals_whole(name: &str, job: Value, total: usize, extra: impl Fn(&Value)) {
+    let full = folder(&format!("{name}-full"));
+    let mut whole = job.clone();
+    whole["settings"]["maxIterations"] = json!(total);
+    let (expected, _, _) = run(&full, &whole).unwrap();
+    let part = folder(&format!("{name}-part"));
+    let mut first = job.clone();
+    first["settings"]["maxIterations"] = json!(total);
+    first["settings"]["deadlineS"] = json!(0);
+    let (checkpoint, _, _) = run(&part, &first).unwrap();
+    assert_eq!(checkpoint["status"], "checkpoint", "{checkpoint}");
+    assert_eq!(checkpoint["iterations"], 1);
+    extra(&checkpoint);
+    let start = start_files(&part);
+    let (result, _, _) = run(&part, &with_start(job, &start, 1, total - 1)).unwrap();
+    assert_eq!(result["iterations"], total - 1);
+    assert_eq!(result["status"], expected["status"]);
+    let names = ["design.f64", "field.bin", "displacements.f64"];
+    assert_eq!(files(&full, &names), files(&part, &names), "{name}");
+    let state = |dir: &Path| -> Value { serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap() };
+    assert_eq!(state(&full)["projectionLevel"], state(&part)["projectionLevel"]);
+    for d in [full, part] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+#[test]
+fn a_checkpoint_on_a_beta_bump_iteration_carries_the_new_level() {
+    // betaEvery 1: the first iteration raises β before the deadline is looked at, so the checkpoint state already holds level 1
+    let settings = json!({ "filter": { "kind": "density" }, "projection": { "beta": 8, "betaEvery": 1 } });
+    checkpoint_equals_whole("bump", mbb(30, 10, settings), 6, |checkpoint| {
+        assert_eq!(checkpoint["projection"]["beta"], 2.0);
+    });
+}
+
+#[test]
+fn a_checkpoint_on_a_converging_iteration_at_an_intermediate_beta_bumps_first() {
+    // changeTol 1 converges at once; β is not final, so the run continues at the next level instead of ending
+    let settings = json!({ "filter": { "kind": "density" }, "changeTol": 1, "projection": { "beta": 4, "betaEvery": 100 } });
+    checkpoint_equals_whole("converge-bump", mbb(30, 10, settings), 3, |checkpoint| {
+        assert_eq!(checkpoint["projection"]["beta"], 2.0);
+    });
+}
+
+#[test]
+fn a_converging_iteration_at_the_final_beta_reports_converged_even_past_the_deadline() {
+    let settings = json!({ "filter": { "kind": "density" }, "changeTol": 1, "projection": { "beta": 1, "betaStart": 1 }, "deadlineS": 0 });
+    let dir = folder("converge-deadline");
+    let (with_deadline, field, _) = run(&dir, &mbb(30, 10, settings.clone())).unwrap();
+    assert_eq!(with_deadline["status"], "converged");
+    assert_eq!(with_deadline["iterations"], 1);
+    let plain = folder("converge-plain");
+    let mut without = mbb(30, 10, settings);
+    without["settings"].as_object_mut().unwrap().remove("deadlineS");
+    let (reference, field_ref, _) = run(&plain, &without).unwrap();
+    assert_eq!(reference["status"], "converged");
+    assert_eq!(field, field_ref);
+    // a deadline never turns the last allowed iteration into a checkpoint: the cap reports max_iterations
+    let mut capped = mbb(30, 10, json!({ "maxIterations": 1, "deadlineS": 0 }));
+    capped["settings"]["changeTol"] = json!(1e-12);
+    let (at_cap, _, _) = run(&dir, &capped).unwrap();
+    assert_eq!(at_cap["status"], "max_iterations");
+    for d in [dir, plain] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+#[test]
+fn an_extruded_run_resumes_bit_for_bit_from_a_checkpoint() {
+    let settings = json!({ "filter": { "kind": "density", "radius": 1.5 }, "extrusion": "z" });
+    checkpoint_equals_whole("extrude-resume", cantilever(8, 4, 3, settings), 6, |_| {});
+}

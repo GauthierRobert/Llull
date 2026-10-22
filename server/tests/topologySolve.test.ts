@@ -197,11 +197,14 @@ describe('topology_solve with a fake job runner', () => {
     expect(runner.calls[0]?.timeoutMs).toBe(5000);
     expect(JSON.parse(runner.calls[0]?.files['job.json']?.toString() ?? '{}')).toMatchObject({
       objective: { kind: 'minCompliance' },
-      settings: { device: 'auto', optimizer: 'oc', deadlineS: 1, startIteration: 0 },
+      settings: { device: 'auto', optimizer: 'oc', deadlineS: 0, startIteration: 0 },
     });
-    expect(deadlineOf(5)).toBe(1);
-    expect(deadlineOf(60)).toBe(54);
+    // below the 5 s margin the deadline is 0 (one iteration, then the checkpoint): the kill can never precede the checkpoint's writes
+    expect(deadlineOf(1)).toBe(0);
+    expect(deadlineOf(5)).toBe(0);
+    expect(deadlineOf(6)).toBe(1);
     expect(deadlineOf(8)).toBe(3);
+    expect(deadlineOf(60)).toBe(54);
     expect(deadlineOf(1800)).toBe(1620);
     const light = execute(model.doc, 'set_topology_objective', {
       studyId: model.studyId,

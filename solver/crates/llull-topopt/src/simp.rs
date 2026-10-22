@@ -413,8 +413,8 @@ pub fn optimise(
     let beta_of = |level: u32| settings.projection.map(|p| p.beta_at(level));
     let mut beta = beta_of(level);
     let mut vars: Vec<f64> = match start.design {
-        Some(values) => space.reduce_mean(&pin(values.iter().map(|v| v.clamp(0.0, 1.0)).collect())),
-        None => space.reduce_mean(&pin(vec![problem.volume_fraction; n])),
+        Some(values) => space.variables_of(&pin(values.iter().map(|v| v.clamp(0.0, 1.0)).collect())),
+        None => space.variables_of(&pin(vec![problem.volume_fraction; n])),
     };
     let mut x = expand(&vars);
     // top88 starts from xPhys = x; a resumed or projected run recomputes xPhys from x exactly as the update step does
@@ -524,26 +524,26 @@ pub fn optimise(
         let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
         progress(&row);
         history.push(row);
-        if settings.deadline_s.is_some_and(|deadline| started.elapsed().as_secs_f64() >= deadline) {
+        // convergence and β continuation first, so a checkpoint carries the level and xPhys the uninterrupted run would have
+        let at_final_beta = settings.projection.is_none_or(|p| p.is_final(level));
+        let converged = change <= settings.change_tol;
+        if converged && at_final_beta {
+            break Status::Converged;
+        }
+        if converged
+            || settings
+                .projection
+                .is_some_and(|p| !p.is_final(level) && (settings.start_iteration + iterations).is_multiple_of(p.beta_every))
+        {
+            // β continuation: the same design projects sharper from here on
+            level += 1;
+            beta = beta_of(level);
+            x_phys = physical(&vars, beta);
+        }
+        // the deadline ends the loop only where the cap would not, so a checkpoint never coincides with maxIterations
+        if iterations < settings.max_iterations && settings.deadline_s.is_some_and(|deadline| started.elapsed().as_secs_f64() >= deadline) {
             break Status::Checkpoint;
         }
-        let at_final_beta = settings.projection.is_none_or(|p| p.is_final(level));
-        if change <= settings.change_tol {
-            if at_final_beta {
-                break Status::Converged;
-            }
-            level += 1;
-        } else if settings
-            .projection
-            .is_some_and(|p| !p.is_final(level) && (settings.start_iteration + iterations).is_multiple_of(p.beta_every))
-        {
-            level += 1;
-        } else {
-            continue;
-        }
-        // β continuation: the same design projects sharper from here on
-        beta = beta_of(level);
-        x_phys = physical(&vars, beta);
     };
     // the warm start of the next iteration: what a resumed run needs to continue bit for bit
     let displacements = solver.warm.clone();

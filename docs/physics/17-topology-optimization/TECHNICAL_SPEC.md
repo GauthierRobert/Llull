@@ -616,8 +616,10 @@ ends its bisection when no multiplier reaches the target (`LAMBDA_FLOOR`, the co
 description advises `optimizer: mma` with gravity (tested: a self-weighted plate converges under MMA; `c(2g) = 4 c(g)` for one design). Moments
 stay unsupported (`TOP_SETUP_INVALID`). **Compliance ratio** (`rebuildCompliance.ts`): F^T u of a pressure is `−p · A · (n_out · ū)` over the
 tetrahedron faces of the mesh face set `L_<loadId>` (outward normal = away from the opposite corner, so no face-numbering convention is relied
-on), of gravity `ρ · V_e · (a · ū_e)` over the solid's linear tetrahedra; both exact for linear shape functions; non-tetrahedral elements and
-moments stay `TOP_REBUILD_NOT_ANALYSED` (`unsupported`).
+on), of gravity `ρ · V_e · (a · ū_e)` over the solid's linear tetrahedra; both exact for linear shape functions and built for **C3D4 only** (a
+C3D10 would need midside weights: face load 1/3 per midside, body load −1/20 corners / 1/5 midsides); C3D10, other element types and moments
+stay `TOP_REBUILD_NOT_ANALYSED` (`unsupported`). The material **density enters `inputHash`** when the case has a gravity load (the solve reads
+it then): a density change makes such a result stale and stops `resumeFromLast`; hashes of studies without gravity are unchanged.
 
 ### 15.4 Heaviside projection (TopologySettings.projection)
 
@@ -638,7 +640,9 @@ along the axis (a variable reduction: ξ → x by expansion, gradients summed ov
 filter the filtered field is averaged along the column (the filter stencil is truncated at the grid ends, so the convolution of a uniform column
 is not uniform) — an orthogonal projector, applied again in the chain rule. Without an extrusion axis the design space is the identity and
 every per-voxel operation is a plain copy, so the OC path is bit-identical to RS-2 (VC-TOP-10 / 11 unchanged: 203.19245763987374,
-218.80322106805878). Tested: a 12×6×4 cantilever extruded along z gives a field exactly uniform in k; the MBB extruded along y is uniform in j.
+218.80322106805878). A resumed extruded run rebuilds its variables from the first voxel of each column (`variables_of`; the mean of k equal
+f64 values is not always that value), so it continues bit for bit. Tested: a 12×6×4 cantilever extruded along z gives a field exactly uniform
+in k, the MBB extruded along y is uniform in j, and an extruded checkpoint resumed equals the whole run byte for byte.
 **Minimum member size** (document units): the llull rule `rmin ≥ size / 2`; the job runs with the effective radius `max(radius, size / 2)`
 (`settings.minMemberRule { minMemberSize, radiusVoxels, raised }`, the rule text in the report); a size below `MIN_MEMBER_VOXELS` = 2 voxels is
 **`TOP_MEMBER_SIZE_UNRESOLVED`** at `set_topology_settings` (the grid cannot resolve it). `manufacturing` was already in `inputHash`; optional
@@ -648,9 +652,14 @@ keys are omitted when absent, so earlier hashes are unchanged.
 
 `settings.deadlineS` in `job.json`: after the iteration that crosses the wall-clock budget the loop stops with `status: "checkpoint"`, the
 warning `TOP_DEADLINE`, and every output written (`field.bin`, `design.f64`, `displacements.f64`, `state.json` + `mma.f64`): resuming with
-`startDesign` + `startDisplacements` + `startState` + `startIteration` continues bit for bit (tested: a run stopped after 1 iteration and resumed
-equals the 30-iteration run byte for byte, OC; MMA + projection likewise through the state). The transport passes `deadlineS = max(1,
-min(⌊0.9 timeoutS⌋, timeoutS − 5))` and keeps the hard kill at `timeoutS`; a checkpoint keeps the resume state (`<LLULL_FEA_CACHE>/topology-resume/`,
+`startDesign` + `startDisplacements` + `startState` + `startIteration` continues bit for bit. Order inside an iteration: the convergence test
+first (a converging iteration at the final β reports `converged`, deadline or not), then the β-continuation bump with its xPhys recompute, then
+the deadline — so a checkpoint carries the level and xPhys the uninterrupted run would have; and the deadline is only looked at below the
+iteration cap, so a checkpoint never coincides with `maxIterations` (the resume always has ≥ 1 iteration left). Tested: a run stopped after 1
+iteration and resumed equals the 30-iteration run byte for byte (OC; MMA + projection likewise through the state), and so do a checkpoint on a
+β-bump iteration (`betaEvery: 1`), on a converging intermediate-β iteration, and an extruded run. The transport passes `deadlineS = max(0,
+min(⌊0.9 timeoutS⌋, timeoutS − 5))` — 0 below the 5 s margin, i.e. one iteration then the checkpoint, so the kill can never precede the
+checkpoint's writes — and keeps the hard kill at `timeoutS`; a checkpoint keeps the resume state (`<LLULL_FEA_CACHE>/topology-resume/`,
 now with `.state.json` and `.mma.f64`) and answers **`TOP_SOLVER_TIMEOUT` with `data.resumable: true`, `data.iterations`, `nativeCode:
 TOP_DEADLINE`**; `resumeFromLast` continues it (iterations and history accumulate, the cap counts the iterations done). A kill before the
 checkpoint (the final solve and the writes take longer than the margin) is still the lost-run timeout. Tested with the fake runner and with the

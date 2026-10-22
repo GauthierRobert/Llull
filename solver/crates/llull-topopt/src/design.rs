@@ -89,12 +89,22 @@ impl DesignSpace {
         self.members.iter().map(|members| members.iter().fold(0.0, |acc, &e| acc + per_voxel[e])).collect()
     }
 
-    /// Per variable, the mean over its voxels (a design that was not uniform along the axis, e.g. a resumed one).
+    /// Per variable, the mean over its voxels (the column average of a field).
     pub fn reduce_mean(&self, per_voxel: &[f64]) -> Vec<f64> {
         if self.identity {
             return per_voxel.to_vec();
         }
         self.members.iter().map(|members| members.iter().fold(0.0, |acc, &e| acc + per_voxel[e]) / members.len() as f64).collect()
+    }
+
+    /// The variables a per-voxel design stands for: the first voxel of each column (a design this space produced is uniform along
+    /// the axis, so this is exact — a mean of k equal values is not always that value in floating point; a design from a run without
+    /// the extrusion axis takes its first voxel per column).
+    pub fn variables_of(&self, per_voxel: &[f64]) -> Vec<f64> {
+        if self.identity {
+            return per_voxel.to_vec();
+        }
+        self.members.iter().map(|members| members.first().map_or(0.0, |&e| per_voxel[e])).collect()
     }
 
     /// `per_voxel` with every variable's voxels replaced by their mean (the identity for the identity space): the orthogonal
@@ -149,6 +159,10 @@ mod tests {
         assert_eq!(reduced[0], (grid.element(0, 0, 0) + grid.element(0, 0, 1)) as f64);
         let mean = space.reduce_mean(&gradient);
         assert_eq!(mean[0], (grid.element(0, 0, 0) + grid.element(0, 0, 1)) as f64 / 2.0);
+        let variables = space.variables_of(&gradient);
+        assert_eq!(variables[0], grid.element(0, 0, 0) as f64);
+        assert_eq!(variables[1], grid.element(2, 0, 0) as f64);
+        assert_eq!(DesignSpace::identity(&design).variables_of(&gradient), gradient);
         let uniform = space.uniform(&gradient);
         assert_eq!(uniform[grid.element(0, 0, 0)], mean[0]);
         assert_eq!(uniform[grid.element(0, 0, 1)], mean[0]);

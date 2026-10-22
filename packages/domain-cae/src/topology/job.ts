@@ -112,10 +112,12 @@ function constrainedAxes(grid: TopologyGrid, constraint: FeaConstraint, mapped: 
 }
 
 /** The GRID axis of a world extrusion axis, or an explanation when it is the normal of a 2D grid. */
-function extrusionAxis(grid: TopologyGrid, axis: WorldAxis): WorldAxis | string {
+function extrusionAxis(grid: TopologyGrid, axis: WorldAxis): { readonly axis: WorldAxis } | { readonly error: string } {
   const index = grid.axes.indexOf(GRID_AXES.indexOf(axis));
   const name = GRID_AXES[index];
-  return index < 0 || index >= grid.dimension || name === undefined ? `extrusion axis ${axis} is the normal of the 2D grid plane` : name;
+  return index < 0 || index >= grid.dimension || name === undefined
+    ? { error: `extrusion axis ${axis} is the normal of the 2D grid plane` }
+    : { axis: name };
 }
 
 /**
@@ -144,8 +146,9 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
   const { settings } = study;
   if (study.objective.kind === 'min_volume' && settings.optimizer !== 'mma')
     return refuse('TOP_OPTIMIZER_MISMATCH', 'the min_volume objective needs optimizer mma', [study.id]);
-  const extrusion = study.manufacturing.extrusion === undefined ? undefined : extrusionAxis(grid, study.manufacturing.extrusion.axis);
-  if (extrusion !== undefined && extrusion.length > 1) return refuse('TOP_SETUP_INVALID', extrusion, [study.id]);
+  const extruded = study.manufacturing.extrusion === undefined ? undefined : extrusionAxis(grid, study.manufacturing.extrusion.axis);
+  if (extruded !== undefined && 'error' in extruded) return refuse('TOP_SETUP_INVALID', extruded.error, [study.id]);
+  const extrusion = extruded?.axis;
 
   const unitSystem = analysisCase.unitSystem;
   const lengthFactor = toMetres(doc, 1) / analysisLengthMetres(unitSystem);
@@ -277,7 +280,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
                 betaEvery: projection.betaEvery.value,
               },
             }),
-        ...(extrusion === undefined ? {} : { extrusion: extrusion as WorldAxis }),
+        ...(extrusion === undefined ? {} : { extrusion }),
         ...(minMemberSize === undefined
           ? {}
           : { minMemberRule: { minMemberSize, radiusVoxels, raised: minMemberSize / 2 > settings.filter.radius.value } }),

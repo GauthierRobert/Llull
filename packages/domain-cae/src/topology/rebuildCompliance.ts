@@ -61,7 +61,8 @@ function indexMesh(mesh: FeMeshArtifact): {
   return { position, elements };
 }
 
-const isTet = (type: string): boolean => type === 'C3D4' || type === 'C3D10';
+/** Linear tetrahedra only: the works below weigh the corner displacements equally (linear shape functions; a C3D10 would need midside weights). */
+const isTet = (type: string): boolean => type === 'C3D4';
 
 /** Mean displacement of `nodes`, or the node that has none. */
 function meanDisplacement(nodes: readonly number[], displacement: Displacement): Vec3 | number {
@@ -101,7 +102,7 @@ function pressureWork(load: FeaLoad, mesh: FeMeshArtifact, displacement: Displac
     const element = elements.get(elementId);
     const corners = TET_FACES[face - 1];
     if (element === undefined || corners === undefined || !isTet(element.type))
-      return `pressure '${load.id}': face loads are rebuilt on tetrahedra only (element ${elementId} is ${element?.type ?? 'missing'})`;
+      return `pressure '${load.id}': face loads are rebuilt on linear tetrahedra (C3D4) only (element ${elementId} is ${element?.type ?? 'missing'})`;
     const nodes = corners.map((corner) => element.nodes[corner] ?? -1);
     const opposite = element.nodes.find((_, index) => index < 4 && !corners.includes(index)) ?? -1;
     const points = [...nodes, opposite].map((node) => position.get(node));
@@ -126,7 +127,7 @@ function gravityWork(load: FeaLoad, mesh: FeMeshArtifact, displacement: Displace
   let counted = 0;
   for (const element of elements.values()) {
     if (element.entityId !== entityId) continue;
-    if (!isTet(element.type)) return `gravity '${load.id}': body loads are rebuilt on tetrahedra only (${element.type})`;
+    if (!isTet(element.type)) return `gravity '${load.id}': body loads are rebuilt on linear tetrahedra (C3D4) only (${element.type})`;
     const corners = element.nodes.slice(0, 4);
     const points = corners.map((node) => position.get(node));
     if (points.some((point) => point === undefined)) return `gravity '${load.id}': an element has a node without coordinates`;

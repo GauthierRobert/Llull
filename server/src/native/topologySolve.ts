@@ -31,9 +31,12 @@ export const DEFAULT_TOPOLOGY_TIMEOUT_S = 1800;
 const DEADLINE_SHARE = 0.9;
 const DEADLINE_MARGIN_S = 5;
 
-/** The job's wall-clock budget for a hard timeout of `seconds`: about 90 % of it, at least `DEADLINE_MARGIN_S` short of it, at least 1 s. */
+/**
+ * The job's wall-clock budget for a hard timeout of `seconds`: about 90 % of it, at least `DEADLINE_MARGIN_S` short of it. Below the margin it
+ * is 0: the job checkpoints after its first iteration, so even a tiny timeout keeps the margin for the final solve and the outputs.
+ */
 export const deadlineOf = (seconds: number): number =>
-  Math.max(1, Math.min(Math.floor(seconds * DEADLINE_SHARE), seconds - DEADLINE_MARGIN_S));
+  Math.max(0, Math.min(Math.floor(seconds * DEADLINE_SHARE), seconds - DEADLINE_MARGIN_S));
 
 export interface TopologySolveOptions {
   readonly timeoutS?: number;

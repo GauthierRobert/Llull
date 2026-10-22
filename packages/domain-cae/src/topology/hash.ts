@@ -47,7 +47,8 @@ export function topologySettingsHash(settings: TopologySettings): string {
   );
 }
 
-function domainInputs(doc: CadDocument, study: TopologyStudy): unknown[] {
+/** `withDensity`: the solve reads the material density (gravity loads), so it is part of the input. */
+function domainInputs(doc: CadDocument, study: TopologyStudy, withDensity: boolean): unknown[] {
   const analysisCase = caseOf(doc, study.analysisId);
   return study.designDomain.map((entityId) => {
     const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
@@ -59,19 +60,21 @@ function domainInputs(doc: CadDocument, study: TopologyStudy): unknown[] {
       geometry: entity === undefined ? null : geometryHash(entity),
       materialId: entity?.materialId ?? null,
       elastic: elastic === null ? null : isElasticRefusal(elastic) ? elastic.code : { E: elastic.E, nu: elastic.nu },
+      ...(withDensity ? { density: material?.density ?? null, densityUnit: material?.densityUnit ?? null } : {}),
       idealization: analysisCase !== undefined && Object.hasOwn(analysisCase.parts, entityId) ? analysisCase.parts[entityId] : null,
     };
   });
 }
 
 /**
- * Hash of what a solve reads: the design domain (geometry, material E / nu, idealization), the study definition without its settings, the
- * case's constraints and loads (names excluded), the unit system and the document unit.
+ * Hash of what a solve reads: the design domain (geometry, material E / nu, the density when the case has a gravity load, idealization), the
+ * study definition without its settings, the case's constraints and loads (names excluded), the unit system and the document unit.
  * @failure unknown study -> '' (never equal to an artifact's inputHash, so it reads as stale)
  */
 export function topologyInputHash(doc: CadDocument, study: TopologyStudy): string {
   const analysisCase = caseOf(doc, study.analysisId);
   if (analysisCase === undefined) return '';
+  const hasGravity = analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.kind === 'gravity');
   const strip = <T extends { readonly name: string }>(record: T): Omit<T, 'name'> => {
     const { name, ...rest } = record;
     void name;
@@ -82,7 +85,7 @@ export function topologyInputHash(doc: CadDocument, study: TopologyStudy): strin
       scope: 'topology',
       documentUnit: doc.units,
       unitSystem: analysisCase.unitSystem,
-      domain: domainInputs(doc, study),
+      domain: domainInputs(doc, study, hasGravity),
       study: {
         dimension: study.dimension,
         plane: study.plane ?? null,
