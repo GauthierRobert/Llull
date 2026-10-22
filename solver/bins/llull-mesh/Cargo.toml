@@ -1,0 +1,15 @@
+[package]
+name = "llull-mesh"
+description = "llull FE mesher sidecar: one mesh request (JSON on stdin) -> Gmsh tet / shell mesh + resolved target sets (JSON on stdout)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64 = "0.22"
+llull-gmsh = { path = "../../crates/llull-gmsh" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

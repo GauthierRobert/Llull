@@ -78,9 +78,12 @@ jobs:
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
-      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, licence notices.
+      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, llull-mesh with the
+      # bundled Gmsh library (from the pinned PyPI wheel), licence notices.
+      - run: python3 -m pip install --user gmsh==4.15.2 && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1
       - run: node desktop/scripts/prepare-native.mjs
       - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
+      - run: ldd desktop/build/native/gmsh/lib/libgmsh.so.* && ! ldd desktop/build/native/gmsh/lib/libgmsh.so.* | grep 'not found'
 
   # The desktop native bundle on Windows (macOS deferred): OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
   # (which runs both bundled binaries with --version), then the native kernel parity suite against the bundle itself.
@@ -120,10 +123,16 @@ jobs:
           key: native-bundle-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/rust-toolchain.toml') }}
       - run: rustup toolchain install
         working-directory: solver
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install gmsh==4.15.2
       - run: node desktop/scripts/prepare-native.mjs
+        env:
+          LLULL_GMSH_PYTHON: python
       - run: npm ci
       - run: npm --prefix server ci
-      - run: npx vitest run --config vitest.config.mts tests/nativeKernelPrimitives.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelPrimitives.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts tests/nativeMesher.test.ts tests/meshParity.test.ts
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'

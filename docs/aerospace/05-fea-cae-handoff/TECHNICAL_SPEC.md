@@ -660,7 +660,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 | Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
 | Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `analysis_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
 | INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
-| Transports `fea_mesh` (bridge op `mesh`, Gmsh 4.15.2), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `server/python/llull_mesh.py`, `packages/mcp/src/feaTools.ts` |
+| Transports `fea_mesh` (`llull-mesh` sidecar, Gmsh 4.15.2 C API), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `solver/bins/llull-mesh/`, `packages/mcp/src/feaTools.ts` |
 
 Verified end to end with real Gmsh + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
 benchmarks.
@@ -823,7 +823,7 @@ what is verified is stated per item.
   Not opened in ParaView here.
 - **Netgen mesher: deferred.** The bridge only knows Gmsh; `MeshControls.mesher` stays `gmsh`.
 - **Face map (TR-FEA-32).** The server asks `kernel.faceQuery.faceDetails` for each STEP part's faces (area, centroid) and `faceQuery.distance` for the kernel face nearest to each
-  `facesNear` point (`server/src/fea/faceRefs.ts`); the bridge request carries `parts[].faces` and `targets[].faceIndices`. `llull_mesh.py` matches faces to Gmsh surfaces by area and
+  `facesNear` point (`server/src/fea/faceRefs.ts`); the mesher request carries `parts[].faces` and `targets[].faceIndices`. `llull-mesh` (`solid.rs`) matches faces to Gmsh surfaces by area and
   centroid (1e-6, `AMBIGUOUS_FACE_MAP` when two match), resolves such a target to the mapped surfaces and returns `faceMap` (stored in the mesh artifact, shown in `MeshSummary.faceMap`).
   Fallbacks, all to today's nearest-surface resolution: no face query (Manifold), a point farther than 1e-3 of the diagonal from every face, a face with no Gmsh match, conformal bonding
   (fragmentation splits faces), STL parts. The point resolution still runs first, so `FEA_TARGET_UNRESOLVED` / `FEA_TARGET_AMBIGUOUS` are unchanged. **The Python side could not be run or
@@ -860,7 +860,7 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   lie in z = 0 with normal +-Z (CalculiX plane elements live in the global x-y plane; `FEA_PLANE_STRESS_NOT_XY`), meshed CPS3 / CPS6 / CPS4 / CPS8 oriented +Z,
   `*SOLID SECTION` with the thickness line; fixed / pinned write dofs 1-2. Pressure on a plane-stress part is refused (`FEA_LOAD_INVALID`: edge labels are not built;
   use a force). plane_strain is not in the 05 data model: not built.
-- **Meshing (`llull_shell.py`, geometry kind `midsurface`).** All mid faces of a part are fragmented together (`occ.fragment`) so shared edges are conformal, then
+- **Meshing (`llull-mesh` `shell.rs`, geometry kind `midsurface`).** All mid faces of a part are fragmented together (`occ.fragment`) so shared edges are conformal, then
   meshed in 2D: triangles (S3 / S6, CPS3 / CPS6) or, with `set_mesh_controls elementFamily=shell_quad`, all quadrilaterals by subdivision (S4 / S8, CPS4 / CPS8);
   every element is re-ordered so its corner normal follows the face normal. A `facesNear` point resolves to the nearest mid face, or to the nearest boundary curve
   when that curve is as near (a point on a side wall of the solid = the shell edge there); tolerance max(1e-3 x size, 0.75 t). Face targets carry a side label

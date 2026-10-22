@@ -1,0 +1,13 @@
+[package]
+name = "llull-gmsh"
+description = "Gmsh C API (gmshc.h, 4.x) loaded at run time from the shared libgmsh (GPL, its own OpenCASCADE inside) behind a safe wrapper for llull-mesh"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+libloading = "0.8"
+
+[lints]
+workspace = true

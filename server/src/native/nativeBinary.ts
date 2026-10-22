@@ -1,6 +1,7 @@
 /**
- * Locates the native binaries of the Rust workspace `solver/` (docs/decisions/RS1-native-compute.md): `llull-compute` (jobs) and
- * `llull-kernel` (native OCCT). Order: the per-binary override (`LLULL_COMPUTE`, `LLULL_KERNEL_BIN`), then `LLULL_NATIVE_DIR`
+ * Locates the native binaries of the Rust workspace `solver/` (docs/decisions/RS1-native-compute.md): `llull-compute` (jobs),
+ * `llull-kernel` (native OCCT) and `llull-mesh` (Gmsh FE mesher). Order: the per-binary override (`LLULL_COMPUTE`, `LLULL_KERNEL_BIN`,
+ * `LLULL_MESH_BIN`), then `LLULL_NATIVE_DIR`
  * (the desktop bundle), then a local build (`solver/target/compute` for llull-compute's `compute` profile, then `solver/target/release`),
  * else null — callers refuse with `NATIVE_TOOL_MISSING`.
  */
@@ -8,9 +9,13 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-export type NativeBinary = 'llull-compute' | 'llull-kernel';
+export type NativeBinary = 'llull-compute' | 'llull-kernel' | 'llull-mesh';
 
-const OVERRIDE_VARIABLE: Readonly<Record<NativeBinary, string>> = { 'llull-compute': 'LLULL_COMPUTE', 'llull-kernel': 'LLULL_KERNEL_BIN' };
+const OVERRIDE_VARIABLE: Readonly<Record<NativeBinary, string>> = {
+  'llull-compute': 'LLULL_COMPUTE',
+  'llull-kernel': 'LLULL_KERNEL_BIN',
+  'llull-mesh': 'LLULL_MESH_BIN',
+};
 
 /**
  * Repo root: the nearest ancestor holding `solver/Cargo.toml`, whether this module runs from `server/src/native` (source),

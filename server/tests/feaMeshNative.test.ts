@@ -1,6 +1,6 @@
 /**
- * Bridge op `mesh` (Gmsh) on boxes: STL geometry (Manifold kernel) and exact STEP (OCC kernel, when it loads). Skipped without the
- * `gmsh` Python module. Meshes are coarse to keep the suite fast.
+ * llull-mesh (Gmsh) on boxes: STL geometry (Manifold kernel) and exact STEP (OCC kernel, when it loads). Skipped without llull-mesh and a
+ * Gmsh library. Meshes are coarse to keep the suite fast.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -10,9 +10,9 @@ import { defaultContext } from '@core/commands/context';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { callBridge } from '../src/pythonExchange';
+import { callNativeMesher } from '../src/fea/nativeMesher';
 import { partGeometry } from '../src/fea/feaGeometry';
-import { BRIDGE, HAS_GMSH, PYTHON } from './feaTestSupport';
+import { HAS_GMSH, MESH_BIN } from './feaTestSupport';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 
 interface MeshReply {
@@ -51,7 +51,7 @@ beforeAll(async () => {
 }, 120_000);
 
 async function mesh(request: Record<string, unknown>): Promise<MeshReply> {
-  return (await callBridge(PYTHON, BRIDGE, { op: 'mesh', lengthScale: 1, ...request }, 120_000)) as unknown as MeshReply;
+  return (await callNativeMesher(MESH_BIN ?? '', { op: 'mesh', lengthScale: 1, ...request }, 120_000, process.env)) as unknown as MeshReply;
 }
 
 function request(kernel: GeometryKernel, order: 1 | 2, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -81,7 +81,7 @@ function expectFacesOnSet(reply: MeshReply, key: string): void {
   }
 }
 
-describe.skipIf(!HAS_GMSH)('bridge op mesh — STL geometry (Manifold)', () => {
+describe.skipIf(!HAS_GMSH)('llull-mesh — STL geometry (Manifold)', () => {
   it.each([1, 2] as const)('meshes a box with tet order %i and resolves faces and points', async (order) => {
     const reply = await mesh(request(manifold, order));
     expect(reply.ok, reply.error).toBe(true);
@@ -155,7 +155,7 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — STL geometry (Manifold)', () => {
   });
 });
 
-describe.skipIf(!HAS_GMSH)('bridge op mesh — exact STEP geometry (OCC)', () => {
+describe.skipIf(!HAS_GMSH)('llull-mesh — exact STEP geometry (OCC)', () => {
   it('meshes the STEP of a box with the same target resolution', async (context) => {
     if (occt === null) context.skip();
     const reply = await mesh(request(occt as GeometryKernel, 2));
@@ -168,7 +168,7 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — exact STEP geometry (OCC)', () =>
   });
 });
 
-describe.skipIf(!HAS_GMSH)('bridge op mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
+describe.skipIf(!HAS_GMSH)('llull-mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
   it('resolves a point on each of two equal-height boss tops to that boss face only', async (context) => {
     if (occt === null) context.skip();
     const kernel = occt as GeometryKernel;
@@ -226,7 +226,7 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — facesNear on trimmed faces (copla
   });
 });
 
-describe.skipIf(!HAS_GMSH)('bridge op mesh — conformal bonding of touching parts', () => {
+describe.skipIf(!HAS_GMSH)('llull-mesh — conformal bonding of touching parts', () => {
   let touching: CadDocument;
   const pair: string[] = [];
 

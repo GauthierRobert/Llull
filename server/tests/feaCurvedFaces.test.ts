@@ -77,7 +77,7 @@ describe('runFeaMesh faceted-geometry note', () => {
     const store = createFeArtifactStore(mkdtempSync(path.join(tmpdir(), 'llull-faceted-')));
     const host: FeaHost = { getDoc: () => doc, applyCommand: () => ({ summary: 'recorded.', affected: [analysisId], isError: false }) };
     const result = await runFeaMesh(analysisId, host, {
-      bridge: () => Promise.resolve({ ok: true, nodes: [[1, 0, 0, 0]], blocks: [], nodeSets: {}, faceSets: {}, targets: {} }),
+      mesher: () => Promise.resolve({ ok: true, nodes: [[1, 0, 0, 0]], blocks: [], nodeSets: {}, faceSets: {}, targets: {} }),
       store,
       hooks: caeHooks,
       kernel: () => kernel,

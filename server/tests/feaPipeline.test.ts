@@ -1,7 +1,7 @@
 /**
- * FE pipeline end to end through the `llull` CLI on a temp document: set-up plan -> fea_mesh (Gmsh via the Python bridge) -> fea_solve
+ * FE pipeline end to end through the `llull` CLI on a temp document: set-up plan -> fea_mesh (Gmsh via llull-mesh) -> fea_solve
  * (CalculiX) -> analysis_report. An axial steel bar must carry sigma_zz = F / A (1 %). Also fea_export, the stale-mesh refusal and the
- * missing-tool codes. Skipped without the `gmsh` Python module or `ccx`.
+ * missing-tool codes. Skipped without llull-mesh (with a Gmsh library) or `ccx`.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH, MESH_BIN } from './feaTestSupport';
 
 const AREA = 10 * 10; // mm^2
 const FORCE = 1000; // N
@@ -169,13 +169,25 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('FE pipeline (gmsh + ccx)', () => {
 });
 
 describe('FE transports without tools', () => {
-  it('answers FEA_TOOL_MISSING when Python is disabled (fea_mesh)', async () => {
+  it('answers FEA_TOOL_MISSING when llull-mesh is not installed (fea_mesh)', async () => {
     const out: string[] = [];
     const code = await runCli(['fea_mesh', `analysisId=${analysisId}`, '--doc', docPath, '--json'], {
       ...io(out),
-      env: { LLULL_PYTHON: 'off' },
+      env: { LLULL_MESH_BIN: path.join(tmpdir(), 'no-such-llull-mesh') },
     });
     expect(code).toBe(EXIT_COMMAND_ERROR);
     expect(out.join('')).toContain('FEA_TOOL_MISSING');
+    expect(out.join('')).toContain('llull-mesh not found');
+  });
+
+  it.skipIf(MESH_BIN === null)('answers FEA_TOOL_MISSING when llull-mesh finds no Gmsh library (fea_mesh)', async () => {
+    const out: string[] = [];
+    const code = await runCli(['fea_mesh', `analysisId=${analysisId}`, '--doc', docPath, '--json'], {
+      ...io(out),
+      env: { LLULL_MESH_BIN: MESH_BIN ?? '', LLULL_GMSH_LIB: path.join(tmpdir(), 'no-such-libgmsh.so') },
+    });
+    expect(code).toBe(EXIT_COMMAND_ERROR);
+    expect(out.join('')).toContain('FEA_TOOL_MISSING');
+    expect(out.join('')).toContain('no-such-libgmsh');
   });
 });

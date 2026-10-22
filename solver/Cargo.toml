@@ -2,6 +2,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "bins/*"]
+# llull-gmsh / llull-mesh load the Gmsh library at run time, so they build and test without it (the meshing tests skip).
 # The OCCT kernel links a shared OpenCascade built by solver/scripts/build-occt.mjs (slow first build); `npm run native:check`
 # skips it unless LLULL_NATIVE_KERNEL=1.
 default-members = [
@@ -18,8 +19,10 @@ default-members = [
   "crates/llull-panel",
   "crates/llull-explicit",
   "crates/llull-cloud",
+  "crates/llull-gmsh",
   "crates/llull-geomq",
   "bins/llull-compute",
+  "bins/llull-mesh",
 ]
 
 [workspace.package]

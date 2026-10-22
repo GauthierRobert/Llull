@@ -1,4 +1,4 @@
-/** M6 transports (no Gmsh / ccx here: fake bridge): fea_mesh sends midsurface geometry for shells, defeature specs for solids, refuses midsurface problems. */
+/** M6 transports (no Gmsh / ccx here: fake mesher): fea_mesh sends midsurface geometry for shells, defeature specs for solids, refuses midsurface problems. */
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,7 +8,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument } from '@core/model/types';
 import { createFeArtifactStore } from '../../../server/src/fea/artifactStore';
 import { caeHooks } from '../../../server/src/fea/caeHooks';
-import { runFeaMesh, type MeshBridgeResponse } from '../../../server/src/fea/feaMesh';
+import { runFeaMesh, type MesherResponse } from '../../../server/src/fea/feaMesh';
 import { must, plateDocument } from './shellFixtures';
 
 const directory = mkdtempSync(path.join(tmpdir(), 'llull-shellmesh-'));
@@ -20,7 +20,7 @@ async function meshWith(
   extra: Record<string, unknown> = {},
 ): Promise<{ request: Record<string, unknown>; summary: string; data: unknown }> {
   let request: Record<string, unknown> = {};
-  const bridge = (sent: Record<string, unknown>): Promise<MeshBridgeResponse> => {
+  const mesher = (sent: Record<string, unknown>): Promise<MesherResponse> => {
     request = sent;
     return Promise.resolve({
       ok: true,
@@ -37,7 +37,7 @@ async function meshWith(
   const host = { getDoc: () => doc, applyCommand: () => ({ summary: 'recorded', affected: [], isError: false }) };
   const store = createFeArtifactStore(mkdtempSync(path.join(directory, 's-')));
   const kernel = { evaluate: () => ({}), exportStep: () => 'ISO-10303-21;', tessellate: () => null } as unknown as GeometryKernel;
-  const result = await runFeaMesh(analysisId, host, { bridge, store, hooks: caeHooks, kernel: () => kernel });
+  const result = await runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: () => kernel });
   return { request, summary: result.summary, data: result.data };
 }
 
