@@ -66,7 +66,8 @@ directly and keeps every element on its B-rep face.
   recombine + subdivision; S3/S6/S4/S8 and CPS*; orientation by the face normal; facesNear / edgesNear / pressure side as before.
 - Host: `INSTALL_HINT.mesher`; `llull-mesh` that starts but cannot load its Netgen / OCCT libraries (Windows `STATUS_DLL_NOT_FOUND`, Linux /
   macOS loader messages) answers `FEA_TOOL_MISSING` (`librariesMissing`, server/src/fea/nativeMesher.ts). New analyses record
-  `mesh.mesher: 'netgen'`; `'gmsh'` stays a valid value so older documents load (their input hash is unchanged).
+  `mesh.mesher: 'netgen'`, the only value: `'gmsh'` is removed, with no backward compatibility for documents that recorded it (owner,
+  2026-10-22).
 - Desktop bundle (`desktop/scripts/prepare-native.mjs`): `llull-mesh` + `nglib` / `ngcore` (Windows next to the exe, else `netgen/lib`) +
   OCCT whenever the kernel or the mesher is bundled; `Netgen-NOTICE.txt` (source, sha256, relink / replace statement), LGPL text, authors,
   zlib licence; the smoke test requires `(Netgen 6.2.2604, OCCT 7.9.2)` with no build-machine search path. CI builds and caches Netgen in

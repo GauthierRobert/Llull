@@ -128,8 +128,8 @@ export interface FeaLoad {
 }
 
 export interface MeshControls {
-  /** The mesher that meshes the case: Netgen (llull-mesh). 'gmsh' is the mesher before NG1, kept so older documents load. */
-  readonly mesher: 'gmsh' | 'netgen';
+  /** The mesher that meshes the case: Netgen (llull-mesh). */
+  readonly mesher: 'netgen';
   readonly elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
   readonly order: 1 | 2;
   readonly globalSize: number;

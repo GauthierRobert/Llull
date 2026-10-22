@@ -8,8 +8,8 @@ import { X0_NODES, barDocument, barMesh } from '../deckFixtures';
 
 /**
  * Literals captured BEFORE the nonlinear lane existed (ENG-1): a linear case must keep these byte for byte. Recaptured once (NG1,
- * 2026-10-22) when new analyses started recording `mesh.mesher: 'netgen'` instead of 'gmsh': the input hashes changed, and in the deck only
- * the header lines that print them (with 'gmsh' the deck still hashes to the ENG-1 value fdac79a9…4a5dbc).
+ * 2026-10-22) when the mesher became Netgen (`mesh.mesher: 'netgen'`): the input hashes changed, and in the deck only the header lines
+ * that print them.
  */
 const LINEAR_FULL_HASH = 'e6f0f99dacb47011829b1de50de24ae7ebe75c0dbe476a36e285b5e3f0e09d1e';
 const LINEAR_MESH_HASH = '0b1fe5b054fd3325a3cbc04f988f441a0be1e4fb379ce1c7ff17cb611b7ab0d3';

@@ -1,5 +1,5 @@
 //! `llull-mesh` end to end: requests on stdin, the response line on stdout. STEP fixtures: solver/crates/llull-netgen/tests/fixtures
-//! (CadQuery boxes and a plate with a 6 mm hole, millimetres). The parity with the Gmsh mesher it replaced is measured on the server's
+//! (CadQuery boxes and a plate with a 6 mm hole, millimetres). The parity with the previous mesher is measured on the server's
 //! FE suites (docs/decisions/NG1-netgen-mesher.md).
 
 use serde_json::{json, Value};
@@ -233,20 +233,20 @@ fn meshes_a_midsurface_into_oriented_quad_shells() {
     assert_eq!(ids(&quadratic["nodeSets"]["E"]).into_iter().collect::<HashSet<_>>(), on_edge);
 }
 
-/// Element and node counts within 25 % of the Gmsh 4.15.2 mesher llull-mesh replaced (its counts for the same request, measured
-/// 2026-10-22; docs/decisions/NG1-netgen-mesher.md).
-fn assert_counts_near(response: &Value, gmsh_elements: usize, gmsh_nodes: usize) {
+/// Element and node counts within 25 % of the reference counts for the same request (the previous mesher, measured 2026-10-22;
+/// docs/decisions/NG1-netgen-mesher.md).
+fn assert_counts_near(response: &Value, reference_elements: usize, reference_nodes: usize) {
     assert_eq!(response["ok"], true, "{response}");
     let elements: usize = response["blocks"].as_array().unwrap().iter().map(|b| b["elements"].as_array().unwrap().len()).sum();
     let nodes = response["nodes"].as_array().unwrap().len();
-    for (count, reference) in [(elements, gmsh_elements), (nodes, gmsh_nodes)] {
+    for (count, reference) in [(elements, reference_elements), (nodes, reference_nodes)] {
         let ratio = count as f64 / reference as f64;
-        assert!((0.75..=1.25).contains(&ratio), "{count} vs Gmsh {reference} ({ratio:.2})");
+        assert!((0.75..=1.25).contains(&ratio), "{count} vs reference {reference} ({ratio:.2})");
     }
 }
 
 #[test]
-fn counts_stay_near_the_gmsh_reference_for_a_curved_solid_and_a_quad_shell() {
+fn counts_stay_near_the_reference_for_a_curved_solid_and_a_quad_shell() {
     let plate = json!({
         "op": "mesh", "lengthScale": 1.0,
         "parts": [{ "entityId": "p", "geometry": step("plate_hole.step") }],

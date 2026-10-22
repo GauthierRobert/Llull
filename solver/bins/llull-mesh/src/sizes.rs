@@ -9,7 +9,7 @@ use crate::raw::Refinement;
 use llull_netgen::{MeshParams, Shape, Sizes};
 use serde_json::Value;
 
-/// Netgen's maxh for a volume mesh, in global sizes: Netgen fills a volume with fewer tetrahedra than the reference mesher (Gmsh) at
+/// Netgen's maxh for a volume mesh, in global sizes: Netgen fills a volume with fewer tetrahedra than the reference mesher at
 /// the same nominal size; 0.9 puts the element counts of the server FE suites' meshes of 3000+ elements within 25 % of the reference
 /// (docs/decisions/NG1-netgen-mesher.md). Surface (shell) meshes already match at 1.
 const VOLUME_SIZE_FACTOR: f64 = 0.9;

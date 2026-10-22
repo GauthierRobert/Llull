@@ -159,7 +159,7 @@ export interface FeaLoad {
   referencePoint?: Vec3;
 }
 export interface MeshControls {
-  mesher: 'gmsh' | 'netgen'; elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
+  mesher: 'netgen'; elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
   order: 1 | 2; globalSize: number; minSize?: number;
   refinements: { target: FeaTarget; size: number }[];
   optimize: 'default' | 'netgen' | 'high_order' | 'none';

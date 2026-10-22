@@ -13,7 +13,7 @@
  * parts averages two different stress states in the CalculiX nodal output. sigma_y on y = 0 is the hoop stress.
  *
  * Since NG1 the mesher is Netgen 6.2.2604: the two suite runs mesh 52k (h 0.04) and 74k (h 0.02) nodes and pass the same judges. The
- * convergence record below was measured with the mesher before it (Gmsh 4.15.2) + CalculiX 2.21, order 2, global size 0.2 mm, thickness h = ring refinement size on the circle (nodes, node radius r,
+ * convergence record below was measured with the previous mesher + CalculiX 2.21, order 2, global size 0.2 mm, thickness h = ring refinement size on the circle (nodes, node radius r,
  * raw sigma_y there against 50 (a/r)^2, moved to 1.005 against 49.5037, disc node nearest (0.5, 0) against -50):
  * h 0.04: 47k, 1.0593, 44.93 vs 44.56, 49.92 (+0.8 %), -49.55 | h 0.02: 75k, 1.0298, 47.52 vs 47.15, 49.89 (+0.8 %), -49.55 |
  * h 0.01: 179k, 1.0149, 48.90 vs 48.54, 49.87 (+0.7 %), -49.55. The remaining +0.4 MPa is the finite plate (the free edges add about
