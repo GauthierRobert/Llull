@@ -15,6 +15,7 @@ import { isVec3 } from '../lib/vec3';
 import { featureError, featureKeyText } from './featureRecipe';
 import { loopsProblem, surfaceDataProblem } from './surfaceWire';
 import { faceOpParamsOf, faceOpProblem } from './faceOpRecipe';
+import { deformKeyText, deformProblem } from './deform/recipe';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId', 'patternSourceId']);
 
@@ -60,6 +61,8 @@ function keyText(recipe: ShapeRecipe): string {
       return featureKeyText(recipe, recipeKey(recipe.source));
     case 'faceSlab':
       return `faceSlab(${recipe.surface.type}:${recipe.surface.data.join(',')}|${recipe.loops.join(',')}|${recipe.from},${recipe.to}|${recipe.direction.join(',')}|${recipe.tolerance})`;
+    case 'deform':
+      return deformKeyText(recipe, recipeKey(recipe.source));
     case 'faceOp':
       return `faceOp(${recipeKey(recipe.source)},${JSON.stringify(faceOpParamsOf(recipe))})`;
   }
@@ -218,6 +221,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return child(node['source']);
     case 'faceOp':
       return faceOpProblem(node) ?? child(node['source']);
+    case 'deform':
+      return deformProblem(node) ?? child(node['source']);
     case 'scale':
       if (!isFiniteNumber(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
       return child(node['source']);

@@ -4,6 +4,7 @@ import { feaPlans } from './feaPlans';
 import { compositePlans } from './compositePlans';
 import { describePlans } from './describePlans';
 import { plmPlans } from './plmPlans';
+import { deformPlans } from './deformPlans';
 import { setSignaturePort } from '@core/commands/signaturePort';
 import { afterAll, beforeAll } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -20,7 +21,7 @@ beforeAll(() =>
 );
 afterAll(() => setSignaturePort(null));
 
-describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans, ...plmPlans }));
+describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans, ...plmPlans, ...deformPlans }));
 
 describe('loops_polar_pattern parametric regeneration', () => {
   const cylinderCount = (doc: CadDocument): number => Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;

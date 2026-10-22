@@ -12,6 +12,7 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -44,6 +45,8 @@
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <gp_Ax1.hxx>
+#include <gp_GTrsf.hxx>
+#include <gp_Mat.hxx>
 #include <gp_Trsf.hxx>
 
 #include "llull-kernel-occt/cpp/naming.hxx"
@@ -227,6 +230,20 @@ std::unique_ptr<Shape> scaled(const Shape &shape, double factor) {
   gp_Trsf transform;
   transform.SetScale(gp_Pnt(0, 0, 0), factor);
   return transformed_named(shape, transform);
+}
+
+std::unique_ptr<Shape> gtransformed(const Shape &shape, rust::Slice<const double> matrix, rust::Slice<const double> translation) {
+  if (matrix.size() != 9 || translation.size() != 3) return nullptr;
+  const gp_Mat linear(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5], matrix[6], matrix[7], matrix[8]);
+  if (std::abs(linear.Determinant()) < 1e-12) return nullptr;
+  gp_GTrsf map;
+  map.SetVectorialPart(linear);
+  map.SetTranslationPart(gp_XYZ(translation[0], translation[1], translation[2]));
+  BRepBuilderAPI_GTransform transformer(shape.shape, map, Standard_True);
+  if (!transformer.IsDone()) return nullptr;
+  const std::vector<Named> inputs{naming::named(shape)};
+  const TopoDS_Shape result = transformer.Shape();
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "gtransform"));
 }
 
 namespace {

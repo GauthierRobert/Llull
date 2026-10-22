@@ -14,6 +14,7 @@ import type { ExchangeWriteRequest } from '@core/geometry/kernelExchange';
 import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
+import { affineWorld } from '@core/geometry/deform/laws';
 import { recipeKey } from '@core/geometry/shapeRecipe';
 import { clearTangentContact } from '@core/geometry/tangentGuard';
 import { nativeLeaf, type WireOptions } from './kernelLeaves';
@@ -153,6 +154,19 @@ export interface FeatureLowering {
   };
 }
 
+/** Wire-only recipe node: a general affine map p -> M p + t (matrix by rows), what the sidecar builds a lowered affine `deform` node with. */
+interface GTransformWire {
+  readonly op: 'gtransform';
+  readonly source: ShapeRecipe;
+  readonly matrix: number[];
+  readonly translation: number[];
+}
+
+/** The one place a wire-only node travels in the `ShapeRecipe` position of the request tree (the sidecar, not core, reads it). */
+function wireNode(node: GTransformWire): ShapeRecipe {
+  return node as unknown as ShapeRecipe;
+}
+
 export type FeatureLowerings = ReadonlyMap<FeatureRecipe, FeatureLowering>;
 
 const NO_LOWERINGS: FeatureLowerings = new Map();
@@ -177,6 +191,12 @@ export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = N
     case 'brep':
     case 'faceSlab':
       return recipe;
+    case 'deform': {
+      // an affine law is one GTransform; every other law stays a deform node, which the sidecar answers NATIVE_UNSUPPORTED (exact warp: later milestone)
+      const map = affineWorld(recipe);
+      if (map === null) return { ...recipe, source: child(recipe.source) };
+      return wireNode({ op: 'gtransform', source: child(recipe.source), matrix: map.matrix.flat(), translation: [...map.translation] });
+    }
     case 'feature': {
       const lowering = features.get(recipe);
       if (lowering === undefined) return { ...recipe, source: child(recipe.source) };

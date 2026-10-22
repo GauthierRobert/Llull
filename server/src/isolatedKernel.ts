@@ -6,11 +6,13 @@
  */
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import { debugWarn } from './debugLog';
+import type { DeformLaw } from '@core/model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { BlendReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
+import { unsupportedOp } from '@core/geometry/operandRecipe';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
 import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './kernelWorkerProtocol';
 
@@ -248,11 +250,23 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     ]),
   ) as unknown as FaceQueryPort;
 
+  const info = (): KernelInfo => {
+    describedAs ??= call('info', []) as KernelInfo | null;
+    return describedAs ?? { capabilities: [] };
+  };
+
+  const supportsDeform = (law: DeformLaw): boolean => law.kind === 'affine' && info().capabilities.includes('gtransform');
+
   return {
     name: 'occt',
     faceQuery,
     supports: () => true,
-    evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
+    supportsDeform,
+    // a law the sidecar cannot build is answered here, without the round trip and its warning
+    evaluate: (recipe) =>
+      unsupportedOp({ supports: () => true, supportsDeform }, recipe) === 'deform' || call('evaluate', [recipe]) === null
+        ? null
+        : handleOf(recipe),
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
@@ -265,10 +279,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
     blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
-    info: () => {
-      describedAs ??= call('info', []) as KernelInfo | null;
-      return describedAs ?? { capabilities: [] };
-    },
+    info,
     crashCount: () => crashes,
     forceFailure: (hook) => void call(hook, []),
     start: () => {

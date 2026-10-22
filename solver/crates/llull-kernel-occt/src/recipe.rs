@@ -2,7 +2,7 @@
 //! recipe walk of `packages/core/src/geometry/shapeKernel.ts`. Sub-recipes are cached by the sha256 of their canonical JSON (serde_json
 //! maps are sorted), so an unchanged prefix of the feature tree is built once.
 //!
-//! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `brep` (a document blob loaded with [`Evaluator::load_blob`]), `fillet`,
+//! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `gtransform` (a general affine map, the host lowers `deform` nodes with an affine law to it), `brep` (a document blob loaded with [`Evaluator::load_blob`]), `fillet`,
 //! `chamfer`, `blend`, `shell` and `featureCut` (a `feature` node the host lowered, see [`nodes`]); solid kinds box, cylinder, sphere,
 //! cone, torus, wedge, extrusion and revolution (polygon or exact curve chain), triangle mesh (thread groove tools included), loft,
 //! sweep and subdivision. Anything else is [`EvalError::Unsupported`]: the host answers that recipe as refused.
@@ -18,8 +18,8 @@ use std::rc::Rc;
 mod floor;
 mod nodes;
 
-pub const RECIPE_OPS: [&str; 12] =
-    ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut", "faceSlab", "faceOp"];
+pub const RECIPE_OPS: [&str; 13] =
+    ["solid", "boolean", "place", "scale", "gtransform", "brep", "fillet", "chamfer", "blend", "shell", "featureCut", "faceSlab", "faceOp"];
 pub const SOLID_KINDS: [&str; 12] =
     ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh", "loft", "sweep", "subdivision"];
 
@@ -64,6 +64,13 @@ fn vec3(value: &Value, field: &str) -> Option<[f64; 3]> {
         [x, y, z] => Some([x.as_f64()?, y.as_f64()?, z.as_f64()?]),
         _ => None,
     }
+}
+
+/// `count` finite numbers of the array `field`, else None.
+fn finite_list(value: &Value, field: &str, count: usize) -> Option<Vec<f64>> {
+    let items: Vec<f64> =
+        value.get(field)?.as_array()?.iter().map(|item| item.as_f64().filter(|number| number.is_finite())).collect::<Option<_>>()?;
+    (items.len() == count).then_some(items)
 }
 
 fn polygon2(value: &Value, field: &str) -> Option<Vec<[f64; 2]>> {
@@ -362,6 +369,13 @@ impl Evaluator {
                 }
                 shape_of(crate::scaled(&source, factor))
             }
+            "gtransform" => {
+                let Some(source) = self.child(recipe, "source")? else { return refused() };
+                let matrix = finite_list(recipe, "matrix", 9);
+                let translation = finite_list(recipe, "translation", 3);
+                let (Some(matrix), Some(translation)) = (matrix, translation) else { return refused() };
+                shape_of(crate::gtransformed(&source, matrix.try_into().unwrap_or([0.0; 9]), translation.try_into().unwrap_or([0.0; 3])))
+            }
             "fillet" => self.round(recipe, false),
             "chamfer" => self.round(recipe, true),
             "blend" => self.blend(recipe),
@@ -445,6 +459,44 @@ mod tests {
         let scaled = json!({ "op": "scale", "factor": 2, "source": { "op": "place", "source": cut, "position": [5, 0, 0], "rotation": [0.3, 0, 0] } });
         assert!((volume(evaluator.evaluate(&scaled)) - 32.0).abs() < 1e-6);
         assert_eq!(evaluator.build_count(), builds + 2, "the cut is reused, only place and scale are built");
+    }
+
+    #[test]
+    fn a_general_affine_map_scales_a_sphere_into_a_spheroid_and_mirrors_a_box() {
+        let mut evaluator = Evaluator::new(16);
+        let pi = std::f64::consts::PI;
+        let sphere = leaf(entity("sphere", json!({ "radius": 10 })));
+        let spheroid = json!({ "op": "gtransform", "source": sphere, "matrix": [1, 0, 0, 0, 1, 0, 0, 0, 2], "translation": [0, 0, 0] });
+        let shape = evaluator.evaluate(&spheroid).unwrap().unwrap();
+        // the geometry is exact (rational B-spline poles mapped): every vertex lies on the ellipsoid x²/100 + y²/100 + z²/400 = 1 ...
+        let mesh = crate::tessellate(&shape, 0.05, 0.1).unwrap();
+        let worst = mesh
+            .positions
+            .chunks(3)
+            .map(|p| (p[0] * p[0] / 100.0 + p[1] * p[1] / 100.0 + p[2] * p[2] / 400.0 - 1.0).abs())
+            .fold(0.0, f64::max);
+        assert!(worst < 1e-9, "surface residual {worst}");
+        // ... the mass properties are the default Gauss rule on B-spline faces (4e-4 relative volume, 0.4 % area on this sphere)
+        let mass = crate::mass_properties(&shape).unwrap();
+        assert!((mass.volume - 8.0 / 3.0 * pi * 1000.0).abs() < 1e-3 * mass.volume, "prolate spheroid volume {}", mass.volume);
+        assert!((mass.area - 2147.84353279).abs() < 1e-2 * mass.area, "prolate spheroid area {}", mass.area);
+        let cube = leaf(entity("box", json!({ "size": [10, 20, 30] })));
+        let mirrored = json!({ "op": "gtransform", "source": cube, "matrix": [-1, 0, 0, 0, 1, 0, 0, 0, 1], "translation": [5, 0, 0] });
+        let shape = evaluator.evaluate(&mirrored).unwrap().unwrap();
+        assert!((crate::mass_properties(&shape).unwrap().volume - 6000.0).abs() < 1e-6);
+        assert!(crate::analyze(&shape).unwrap().valid, "a mirrored solid stays a valid, outward solid");
+    }
+
+    #[test]
+    fn a_singular_or_malformed_affine_map_is_refused() {
+        let mut evaluator = Evaluator::new(8);
+        let cube = leaf(entity("box", json!({ "size": [1, 1, 1] })));
+        let flat = json!({ "op": "gtransform", "source": cube, "matrix": [1, 0, 0, 0, 0, 0, 0, 0, 1], "translation": [0, 0, 0] });
+        assert_eq!(evaluator.evaluate(&flat).map(|shape| shape.is_none()), Ok(true));
+        let short = json!({ "op": "gtransform", "source": cube, "matrix": [1, 0, 0], "translation": [0, 0, 0] });
+        assert_eq!(evaluator.evaluate(&short).map(|shape| shape.is_none()), Ok(true));
+        let law = json!({ "op": "deform", "source": cube, "law": { "kind": "twist" } });
+        assert!(matches!(evaluator.evaluate(&law), Err(EvalError::Unsupported(_))), "non-affine deform nodes are the later exact warp");
     }
 
     #[test]

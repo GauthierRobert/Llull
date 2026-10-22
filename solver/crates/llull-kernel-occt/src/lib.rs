@@ -72,6 +72,7 @@ mod ffi {
 
         fn placed(shape: &Shape, rotation: &[f64], position: &[f64], anchor_shift: &[f64]) -> Result<UniquePtr<Shape>>;
         fn scaled(shape: &Shape, factor: f64) -> Result<UniquePtr<Shape>>;
+        fn gtransformed(shape: &Shape, matrix: &[f64], translation: &[f64]) -> Result<UniquePtr<Shape>>;
         fn boolean_op(a: &Shape, b: &Shape, operation: i32, unify: bool) -> Result<UniquePtr<Shape>>;
         fn prefixed(shape: &Shape, prefix: &str) -> Result<UniquePtr<Shape>>;
 
@@ -171,6 +172,11 @@ pub fn placed(shape: &Shape, rotation: [f64; 3], position: [f64; 3], anchor_shif
 /// Uniform scale about the world origin.
 pub fn scaled(shape: &Shape, factor: f64) -> Built {
     built(ffi::scaled(inner(shape)?, factor))
+}
+
+/// General affine map p -> M p + t (`matrix`: 9 numbers by rows): BRepBuilderAPI_GTransform, curved faces become B-splines (01 DEF).
+pub fn gtransformed(shape: &Shape, matrix: [f64; 9], translation: [f64; 3]) -> Built {
+    built(ffi::gtransformed(inner(shape)?, &matrix, &translation))
 }
 
 /// `a op b`, then (when `unify`) ShapeUpgrade_UnifySameDomain (face merging keeps indices stable).

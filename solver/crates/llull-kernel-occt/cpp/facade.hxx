@@ -64,6 +64,8 @@ std::unique_ptr<Shape> make_sewn_solid(rust::Slice<const double> positions, rust
 std::unique_ptr<Shape> placed(const Shape &shape, rust::Slice<const double> rotation, rust::Slice<const double> position,
                               rust::Slice<const double> anchor_shift);
 std::unique_ptr<Shape> scaled(const Shape &shape, double factor);
+// General affine map p -> M p + t (matrix: 9 numbers by rows, translation: 3) via BRepBuilderAPI_GTransform (01 DEF); null when the map is singular.
+std::unique_ptr<Shape> gtransformed(const Shape &shape, rust::Slice<const double> matrix, rust::Slice<const double> translation);
 std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operation, bool unify);
 // The same shape with every face name prefixed "<prefix>:" (a leaf entity id).
 std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);

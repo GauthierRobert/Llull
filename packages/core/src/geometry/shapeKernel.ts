@@ -12,6 +12,7 @@
 
 import type { BooleanOp, EdgeRadius, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { FaceOpParams } from '../model/faceOps';
+import type { DeformLawKind } from '../model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
@@ -39,6 +40,10 @@ export interface KernelOps<S> {
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
   /** Face draft / push-pull / split (SC-F1); absent = `faceOp` nodes are unsupported. */
   readonly faceOp?: (source: S, params: FaceOpParams) => S | null;
+  /** Space deformation (01 DEF): the shape moved by `node`'s law; absent = `deform` nodes are unsupported. Null when this kernel cannot build that law. */
+  readonly deform?: (source: S, node: Extract<ShapeRecipe, { op: 'deform' }>) => S | null;
+  /** Law kinds `deform` builds exactly (absent: every kind). */
+  readonly deformLaws?: ReadonlySet<DeformLawKind>;
   /** Grows whenever the native module may have been left degraded (cached failures are then retried). */
   failureEpoch?(): number;
   solid(entity: Entity): S | null;
@@ -166,6 +171,10 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'scale': {
       const source = child(recipe.source);
       return source === null ? null : ops.scale(source, recipe.factor);
+    }
+    case 'deform': {
+      const source = child(recipe.source);
+      return source === null || ops.deform === undefined ? null : ops.deform(source, recipe);
     }
     case 'brep':
       return ops.brep?.(recipe.blob) ?? null;
@@ -411,7 +420,14 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
             }),
         }),
     supports: (op) =>
-      op === 'brep' ? ops.brep !== undefined : op === 'faceOp' ? ops.faceOp !== undefined : !(ops.unsupported?.has(op) ?? false),
+      op === 'brep'
+        ? ops.brep !== undefined
+        : op === 'faceOp'
+          ? ops.faceOp !== undefined
+          : op === 'deform'
+            ? ops.deform !== undefined
+            : !(ops.unsupported?.has(op) ?? false),
+    supportsDeform: (law) => ops.deform !== undefined && (ops.deformLaws?.has(law.kind) ?? true),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
       call(() => {

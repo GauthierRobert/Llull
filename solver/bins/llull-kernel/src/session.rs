@@ -73,7 +73,7 @@ fn bounds_json(values: &[f64]) -> Value {
 
 fn info() -> Value {
     let capabilities: Vec<&str> =
-        ["analyze", "massProperties", "exportStep", "bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge"]
+        ["analyze", "massProperties", "exportStep", "bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "gtransform"]
             .into_iter()
             .chain(QUERY_CAPABILITIES)
             .chain(exchange::capabilities())
@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
         let capabilities = described["result"]["capabilities"].as_array().unwrap();
-        for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge"] {
+        for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "gtransform"] {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }
     }

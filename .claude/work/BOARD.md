@@ -57,8 +57,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-7b** 07 MSH left after M0 + M2 (done 2026-10-22, §13): M1 repair modes / fill holes / decimate / remesh / smooth /
   cut / deviation, M3 native `llull-meshops` + content-addressed asset store (import steps store base64 until then), M4 sculpt, M5
   segment + mesh_to_brep, M6 quad remesh / fits. _Lane 1 + 4 + native_ _deps: —_
-- `[TODO]` **DES-1** 01 DEF M0–M1: deformation law library, `scale_nonuniform` (exact), twist / taper / stretch / bend on the mesh kernel,
-  `analyze_deformation`, `check_deformation`: `docs/design/01-body-deformation/`. _Lane 1_ _deps: —_
+- `[TODO]` **DES-1b** 01 DEF left after M0–M1 (done 2026-10-22, §13): M2 exact OCCT warp (`deform.cxx`, capability `deform`; closes
+  VC-06/08/11 and the 360° ring), M3 lattice / point / flow, M4 flow on surface + overlays, M5 curve-to-curve + morph; native B-spline
+  Gauss-integration accuracy (VC-11 −4.4e-4). _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-3** 03 WRP M0–M3: face charts to core, fonts + 3D text, wrap / project / unwrap, emboss / deboss / scribe on developable
   faces, `check_wrap`: `docs/design/03-wrap-emboss/` (decision D-WRP-1 binary blobs first). _Lane 1_ _deps: —_
 - `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /

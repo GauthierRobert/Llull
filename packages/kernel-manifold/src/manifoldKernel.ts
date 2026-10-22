@@ -13,6 +13,7 @@ import type { MeshData, Vec3 } from '@core/model/types';
 import type { BooleanOp } from '@core/model/types';
 import type { ShapeAnalysis, ShapeDistance } from '@core/geometry/kernel';
 import { buildMeshBvh, bvhMinDistance } from '@core/geometry/meshBvh';
+import { warpMesh } from '@core/geometry/deform/meshWarp';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument, is2D } from '@core/model/types';
 import { isCurve3D, isSheet } from '@core/model/curveKinds';
@@ -98,7 +99,7 @@ function weldedManifold(
   m: ManifoldModule,
   positions: ReadonlyArray<number>,
   indices: ReadonlyArray<number> | undefined,
-  entity: Entity,
+  entity: Entity | null,
 ): ManifoldShape | null {
   const corners = indices ?? soupIndices(positions);
   const vertexOf = new Map<string, number>();
@@ -122,7 +123,7 @@ function weldedManifold(
     const mesh = new m.Mesh({ numProp: 3, vertProperties: new Float32Array(vertProperties), triVerts: new Uint32Array(outwardTriVerts) });
     const prim = m.Manifold.ofMesh(mesh);
     // Tessellated primitives are already world-space; a mesh entity still honours its transform.
-    if (entity.kind !== 'mesh') return prim;
+    if (entity?.kind !== 'mesh') return prim;
     try {
       return applyTransform(prim, entity.position, entity.rotation);
     } finally {
@@ -290,6 +291,12 @@ function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
     shell: () => null,
     place: (shape, position, rotation) => withOwned(() => applyTransform(shape, position, rotation)),
     scale: (shape, factor) => (factor > 0 ? withOwned(() => shape.scale(factor)) : null),
+    deform: (shape, node) =>
+      withOwned(() => {
+        const source = manifoldToMeshData(shape);
+        const warped = source === null ? null : warpMesh(source, node, { tolerance: node.output.tolerance });
+        return warped?.ok === true ? weldedManifold(mod, warped.mesh.positions, warped.mesh.indices, null) : null;
+      }),
     tessellate: (shape) => withOwned(() => manifoldToMeshData(shape)),
     topology: () => null,
     exportStep: () => null,

@@ -31,6 +31,7 @@ import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
 import { surfaceCommands } from './surface/catalog';
 import { meshCommands } from './mesh/catalog';
+import { deformCommands } from './deform/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -56,6 +57,7 @@ registerCommands('core', [
   ...materialCommands,
   ...surfaceCommands,
   ...meshCommands,
+  ...deformCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

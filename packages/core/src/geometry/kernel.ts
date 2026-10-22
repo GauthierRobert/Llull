@@ -7,6 +7,7 @@
  */
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { DeformLaw } from '../model/deform';
 
 import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
 import type { BlendReport, ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
@@ -119,6 +120,9 @@ export interface GeometryKernel {
 
   /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */
   supports(op: ShapeRecipe['op']): boolean;
+
+  /** Whether this kernel builds `deform` nodes of that law exactly (01 DEF); absent = it follows `supports('deform')`. */
+  supportsDeform?(law: DeformLaw): boolean;
 
   /** Build (or reuse, by `recipeKey`) the kernel shape of a recipe. */
   evaluate(recipe: ShapeRecipe): ShapeHandle | null;

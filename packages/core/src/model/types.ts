@@ -30,6 +30,7 @@ import type { HelixDefinition } from '../lib/helix/types';
 import type { SweepDesign } from './sweepOrientation';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
+import type { DeformParams } from './deform';
 import type { SketchPlaneFields } from './sketchPlanes';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -831,5 +832,7 @@ export type ShapeRecipe =
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
   | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
   | FaceSlabRecipe
+  /** Space deformation of `source` (01 DEF): every point p maps to frame⁻¹(law(frame(p))); the mesh path stays within `output.tolerance`. */
+  | ({ readonly op: 'deform'; readonly source: ShapeRecipe } & DeformParams)
   /** Draft, push-pull or split of faces of `source` on its exact B-rep (SC-F1, `model/faceOps`); exact kernels only. */
   | ({ readonly op: 'faceOp'; readonly source: ShapeRecipe } & FaceOpParams);

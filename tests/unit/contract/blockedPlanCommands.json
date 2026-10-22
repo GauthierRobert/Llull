@@ -2,40 +2,16 @@
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
     "docs/design/01-body-deformation/validation/plans/target_bad_plan_codes.json": [
-      "bend_body",
-      "deform_lattice",
-      "scale_nonuniform",
-      "twist_body"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_bend_cylinder_torus.json": [
-      "analyze_deformation",
-      "bend_body",
-      "check_deformation"
+      "deform_lattice"
     ],
     "docs/design/01-body-deformation/validation/plans/target_ffd_barrel.json": [
-      "analyze_deformation",
       "deform_lattice"
     ],
     "docs/design/01-body-deformation/validation/plans/target_flow_plate_on_cylinder.json": [
-      "check_deformation",
       "flow_on_surface"
     ],
     "docs/design/01-body-deformation/validation/plans/target_point_push.json": [
-      "analyze_deformation",
       "deform_by_point"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_scale_nonuniform_sphere.json": [
-      "check_deformation",
-      "scale_nonuniform"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_taper_cylinder_cone.json": [
-      "check_deformation",
-      "taper_body"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_twist_box.json": [
-      "analyze_deformation",
-      "check_deformation",
-      "twist_body"
     ],
     "docs/design/02-sweep-loft-guides/validation/plans/target_network_ruled.json": [
       "network_surface",

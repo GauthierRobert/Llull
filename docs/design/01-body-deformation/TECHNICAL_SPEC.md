@@ -493,3 +493,55 @@ Same numbering as FUNCTIONAL_SPEC §11 ([R1]–[R29]). OCCT headers read (7.9.2,
 `BRepCheck_Analyzer.hxx`, `BRepLib.hxx`; source `src/ModelingAlgorithms/TKTopAlgo/BRepBuilderAPI/BRepBuilderAPI_GTransform.cxx`
 (master) — https://github.com/Open-Cascade-SAS/OCCT (accessed 2026-10). llull internal: `.claude/rules/architecture.md`,
 `docs/aerospace/AGENT_FIRST.md`, `docs/aerospace/02-advanced-surfacing/TECHNICAL_SPEC.md` (§5.9 tolerances, §13 sidecar patterns).
+
+## 13. As built (DES-1: M0 + M1, 2026-10-22)
+
+Owner decisions applied: D1 core catalog, D2 one command per law, D3 `mesh` result with `brep` = deform node, D4 default falloff `smooth`, D6 no silent
+exact → mesh fallback, D7 2D entities refused (`DEF_TARGET_UNSUPPORTED`).
+
+**Built.** `model/deform.ts` (`DeformFrame/Region/Law/Output/Params`), recipe member `{ op: 'deform' }` (key text + `DEF_RECIPE_INVALID`-style validation in
+`geometry/deform/recipe.ts`), `geometry/deform/{frame,region,laws,bounds,meshWarp,predictedVolume,recipe}.ts`, `commands/deform/*` (seven tools in toolset `3d`:
+`scale_nonuniform`, `twist_body`, `taper_body`, `stretch_body`, `bend_body`, `analyze_deformation`, `check_deformation`). Laws: affine, twist, taper, stretch,
+bend (the point / lattice / flow laws are M3). Kernel plumbing: `KernelOps.deform` + `deformLaws`, `GeometryKernel.supportsDeform(law)` (also read by
+`unsupportedOp`, so an entity whose law a kernel cannot build falls back to its stored triangles). Manifold: `deform` op = the core mesh warp. Native: the host
+lowers an affine `deform` node to the sidecar op `gtransform` (`BRepBuilderAPI_GTransform`, `gp_GTrsf`; capability `gtransform`; `solver/.../facade.cxx`,
+`recipe.rs`, `session.rs`, `server/src/native/kernelProtocol.ts`); the proxy answers every other law null without a round trip.
+
+**Differences from the plan above.**
+- Mesh refinement is *measured*, not only bounded: an edge is split while the deformed curve leaves its chord by more than `tolerance` at 1/4, 1/2, 3/4
+  (`chordRule`); the §5.7 bound `√(8 tol / M2)` is still computed (`curvatureBound`, `maxEdgeLength`, matches `mesh_budget.json`: 6.77146 / 1.90693), with an extra
+  oblique-edge term (twist |θ'|, taper |s'|, bend 1/R), and used for the `DEF_BUDGET_EXCEEDED` estimate. Edges are cut at region ends where the law has a kink
+  (stretch, bend, linear ramp). Manifold's `refineToLength` / `warpBatch` are not used: one TS implementation serves Manifold, the no-kernel path and analysis.
+- Predicted volume (§5.10) is a cross-section integral ∫[d(z)A(z) + d'(z)My(z)]dz of the source triangles split at the region ends, not the Keast fan (exact for
+  affine / twist / stretch, 1e-6 for taper / bend).
+- Frame convention: stored `reference` is always the local x direction. `bend_body` reads the *user's* `frame.reference` as the direction toward the centre of
+  curvature (local y) and stores the matching x.
+- `check_deformation`: exact-path default `volumeDriftRel` is 1e-3 (spec 1e-4): the native kernel integrates B-spline faces with its default Gauss rule
+  (4.4e-4 relative volume, 0.4 % area on a GTransform-ed sphere r 10 → [1,1,2]; the surface is exact to 1e-15). New findings: `DEF_CHECK_NOT_CLOSED`.
+  New refusal codes: `DEF_TOLERANCE_INVALID`, `DEF_SOURCE_UNAVAILABLE`.
+- Not in M1 (left for later milestones): `keepSource`, `ids` (multi-body), `infinite` regions, `beyond: fixed` in the commands (the law library supports it),
+  `analyze_deformation` `stepIndex` / `compareTo`, `topology` before/after, `allowMeshFallback`, `preserveAnalytic` (refused), curves and sheets (M3), the OCCT warp
+  (M2: `mode: "exact"` on a non-affine law refuses with `DEF_EXACT_UNAVAILABLE`; `auto` takes the mesh path and the summary says so), `compareTo`.
+- Defaults: origin = bounding-box centre, so explicit `region` numbers are measured from the centre (the bend uses the start-face centre). The VC-DEF-10 `cli.run`
+  without a frame therefore needs `frame.origin` for the numbers 20..60 to mean body coordinates.
+
+**Measured (mesh path unless noted; `tests/unit/deform/*`, tolerance 0.005 unless noted).** VC-01 twist volume rel error ≤ 7e-5 (tol 0.001: 6e-5 / 5.5e-5 / 2.6e-5 /
+7.4e-5); VC-02 area 4203.96 vs 4204.109, 4207.04 vs 4207.299 (≤ 1e-4); VC-04 crease 0.15580650 / 0; VC-05 taper 5e-13 (linear, flat), 1.3e-5 (smooth); VC-07 bend
+volume +3.2e-5, fibres exact; VC-09 refused, min det J −0.25; VC-10 12000 / 10000 exact; VC-12 6000; VC-19 flagged `method: mesh`, chord error ≤ tolerance; VC-25 identical
+documents; VC-26 `reviewRequired`; VC-27 codes with paths + remediation; VC-30 parity ≤ 1e-9 for twist, twist_smooth, taper, taper_flat, bend, stretch, scale_nonuniform
+(point / flow / ffd rows are M3); VC-36 refused. Source tessellation limits primitives: cylinder → frustum / torus −1.1 % (24-gon, no kernel) / −0.64 % (Manifold),
+sphere scale −4.2 % / −2.2 % against the closed form — the *deformation* error against the tessellated source (`analyze_deformation volume.driftRel`) is < 2e-3.
+Native (CLI, `occt-7.9.2`): `target_scale_nonuniform_sphere` exact path, volume 8373.9165 (closed form 8377.5804, −4.4e-4, kernel Gauss), area 2156.18
+(closed form 2147.84, +0.39 %); cargo test: surface residual 1.1e-15, mirror valid and 6000. `target_twist_box` native: 36 956 triangles, 0.23 s,
+volume 9999.391; the pack's taper / bend torus plans use `mode: "exact"` and refuse until M2. Baselines on this build: twisted loft 9995.931 / 4122.903
+(exact), bent sweep 7853.98 / 3341.592 (method exact — the sweep now has an exact path).
+Performance (mesh path, default tolerance 1e-5 × diagonal): 90° twist of 10 × 10 × 100: 0.4–0.6 s, 37–39 k triangles; 360°: 2.7 s, 158 k.
+
+**Review follow-up (DES-1).** `bend_body` refuses 360° and more (`DEF_SELF_INTERSECTION`; the pack's `target_bend_cylinder_torus` ring needs `angleDeg` just
+under 360 and `mode: "exact"`, so it stays blocked until M2), and from a quarter turn on, when straight parts remain, checks the built result for crossings (up to
+60 000 triangles). The bend radius pre-check uses only the triangles that meet the bent region. `beyond: "fixed"` and a stepped falloff for twist / taper were removed
+(`DeformRegion.beyond` is `rigid`; falloff `none` is the stretch law only; the validator refuses the rest). `analyze_deformation` measures the approximation error on
+the STORED mesh (each vertex pulled back by the closed-form inverse `geometry/deform/inverse.ts`, edge middles mapped forward: `storedError.ts`) instead of re-warping.
+A kernel refusal keeps the core warp's own code (`DEF_BUDGET_EXCEEDED`, `DEF_FRAME_DEGENERATE`) so codes do not depend on the host.
+`scale_nonuniform` defaults the frame reference to the first world axis not parallel to the axis. `predictedVolume` no longer spreads typed arrays into `Math.min/max`
+(a 210 000-vertex test covers it).

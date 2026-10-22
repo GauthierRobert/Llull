@@ -92,6 +92,7 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
       return recipeAxes(recipe.source, (point) => place(scale3(point, recipe.factor)), scale * recipe.factor, depth + 1);
     case 'brep':
     case 'faceSlab':
+    case 'deform':
       return [];
     case 'feature': {
       const tool = lowerFeature(recipe, UNBOUNDED_REACH)?.tool;
