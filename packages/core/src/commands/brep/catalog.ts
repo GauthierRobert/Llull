@@ -8,12 +8,16 @@ import { blendUnion } from './blend';
 import { inspectFaces } from './faces';
 import { draftFaces, pushPullFace, replaceFace, splitFace } from './faceOps';
 import { splitBody } from './splitBody';
+import { probeFillet } from './probeFillet';
+import { checkBlends } from './checkBlends';
 
 export const brepCommands = commandCatalog(
   booleanOperation,
   blendUnion,
   filletEdge,
   chamferEdge,
+  probeFillet,
+  checkBlends,
   shellSolid,
   draftFaces,
   pushPullFace,

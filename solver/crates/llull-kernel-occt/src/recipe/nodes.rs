@@ -277,6 +277,26 @@ impl Evaluator {
         }
     }
 
+    /// BLD M0: why the `fillet` recipe fails (or that it builds): the source is evaluated (cached), the fillet is rebuilt for the OCCT contour and
+    /// vertex diagnostics (`queries::fillet_report`). `Value::Null` for any other recipe or a refused source.
+    pub fn blend_report(&mut self, recipe: &Value) -> Result<Value, EvalError> {
+        if recipe.get("op").and_then(Value::as_str) != Some("fillet") {
+            return Ok(Value::Null);
+        }
+        let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
+        let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
+        let laws = match recipe.get("radii").filter(|radii| !radii.is_null()) {
+            Some(radii) => radius_laws(radii, edges.len()),
+            None => number(recipe, "size").filter(|size| positive(*size)).map(|size| {
+                let end = number(recipe, "sizeEnd").unwrap_or(f64::NAN);
+                // one law, repeated per listed edge (an empty list = every edge: the facade reuses the single law)
+                [size, end, 0.0].repeat(edges.len().max(1))
+            }),
+        };
+        let Some(laws) = laws else { return Ok(Value::Null) };
+        crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
+    }
+
     /// `faceOp` (SC-F1, `packages/core/src/model/faceOps.ts`): draft, pushPull or splitFace on the source's unique faces.
     pub(super) fn face_op(&mut self, recipe: &Value) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };

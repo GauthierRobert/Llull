@@ -9,7 +9,7 @@
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 
 import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
-import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
+import type { BlendReport, ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
 export type { ShapeHandle };
@@ -143,6 +143,9 @@ export interface GeometryKernel {
 
   /** Minimum distance between two shapes, searched up to `maxDistance` (document units; farther pairs may report a larger value). */
   distance?(a: ShapeHandle, b: ShapeHandle, maxDistance: number): ShapeDistance | null;
+
+  /** Why the exact fillet `recipe` fails: OCCT contour statuses, faulty vertices, 4+ edge vertices (BLD M0); null for other recipes or kernels without diagnostics. */
+  blendReport?(recipe: ShapeRecipe): BlendReport | null;
 
   /** What this kernel is and which optional ports it has (`kernel_info`, TR-KRN-04). */
   info?(): KernelInfo;

@@ -26,6 +26,9 @@ mod ffi {
         fn project_on_face_json(shape: &Shape, face: i32, points: &[f64]) -> Result<String>;
         fn evaluate_face_json(shape: &Shape, face: i32, uv: &[f64]) -> Result<String>;
         fn face_samples_json(shape: &Shape, face: i32, uv: &[f64], nu: i32, nv: i32) -> Result<String>;
+        fn edge_samples_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
+        fn edge_continuity_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
+        fn fillet_report_json(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<String>;
         fn point_distances_json(shape: &Shape, points: &[f64]) -> Result<String>;
         fn shape_distance_json(a: &Shape, b: &Shape) -> Result<String>;
 
@@ -101,6 +104,23 @@ pub fn face_samples(shape: &Shape, face: f64, request: UvRequest<'_>) -> OcctRes
         UvRequest::Grid { .. } => return Ok(Value::Null),
     };
     parsed(ffi::face_samples_json(inner(shape)?, face, uv, nu, nv))
+}
+
+/// `edgeSamples`: `count` curve frames (point, tangent, curvature, torsion) along the unique edge `edge`; null for a bad index or count.
+pub fn edge_samples(shape: &Shape, edge: f64, count: f64) -> OcctResult<Value> {
+    let (Some(edge), Some(count)) = (index(edge), index(count)) else { return Ok(Value::Null) };
+    parsed(ffi::edge_samples_json(inner(shape)?, edge, count))
+}
+
+/// `edgeContinuity`: G0 gap, G1 normal angle and the normal curvatures of the two faces across the unique edge `edge`; null unless exactly two faces meet there.
+pub fn edge_continuity(shape: &Shape, edge: f64, count: f64) -> OcctResult<Value> {
+    let (Some(edge), Some(count)) = (index(edge), index(count)) else { return Ok(Value::Null) };
+    parsed(ffi::edge_continuity_json(inner(shape)?, edge, count))
+}
+
+/// Why a fillet of `edges` ([] = all) with the radius `laws` (layout of `features::fillet_laws`) fails or succeeds: contour statuses, faulty vertices, partial result.
+pub fn fillet_report(shape: &Shape, edges: &[u32], laws: &[f64]) -> OcctResult<Value> {
+    parsed(ffi::fillet_report_json(inner(shape)?, edges, laws))
 }
 
 /// Port `distance`: per point the distance to the boundary, negative inside a solid, and the nearest face (-1 on an edge / vertex).

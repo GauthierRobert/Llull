@@ -7,7 +7,7 @@
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import { debugWarn } from './debugLog';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
-import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
+import type { BlendReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
@@ -263,6 +263,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
+    blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
     info: () => {
       describedAs ??= call('info', []) as KernelInfo | null;

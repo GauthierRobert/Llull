@@ -101,7 +101,7 @@ function assemblyHandles(occurrences: readonly StepOccurrence<unknown>[]): unkno
 function requestRecipes(op: string, args: readonly unknown[]): ShapeRecipe[] {
   const ofHandle = (handle: unknown): ShapeRecipe[] =>
     typeof handle === 'object' && handle !== null && 'recipe' in handle ? [(handle as { recipe: ShapeRecipe }).recipe] : [];
-  if (op === 'evaluate') return args[0] === undefined ? [] : [args[0] as ShapeRecipe];
+  if (op === 'evaluate' || op === 'blendReport') return args[0] === undefined ? [] : [args[0] as ShapeRecipe];
   if (takesShapeFirst(op)) return ofHandle(args[0]);
   if (op === 'distance') return [...ofHandle(args[0]), ...ofHandle(args[1])];
   if (op === 'exportStep' && Array.isArray(args[0])) return args[0].flatMap(ofHandle);

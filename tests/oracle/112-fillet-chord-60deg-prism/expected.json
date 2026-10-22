@@ -1,0 +1,14 @@
+{
+  "id": "112-fillet-chord-60deg-prism",
+  "family": "fillet",
+  "description": "VC-BLD-05: chord-2 fillet (mode chord) on a 60 degree edge of an equilateral prism of side 10 and depth 10",
+  "source": "analytic",
+  "formula": "r = c / (2 cos(a/2)) = 2 / sqrt(3) = 1.154701; V = prism - r^2 (cot(a/2) - (pi - a)/2) L with a = pi/3; the rounded 60 degree corner moves the bbox minimum x to 2 - r = 0.845299",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 423.881325141,
+  "area": null,
+  "centroid": null,
+  "bbox": { "min": [0.845299461620748, 0, 0], "max": [10, 8.660254037844386, 10] },
+  "tolerance": { "volume": 0.000001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

@@ -17,7 +17,8 @@ import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
 import { FILLET_MODES, edgeLawSchema } from './filletSpec';
 import { filletEach } from './filletEach';
-import { OCC_KERNEL_HINT, modifyFailure, validateSolidTarget } from './modifyTarget';
+import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
+import { blendRefusal } from './blendRefusal';
 
 interface EdgeModification {
   readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
@@ -66,7 +67,7 @@ function modifyEdges(
   const mids = selection.edges.map((index) => topology?.edges[index]?.mid);
   const modified = recipe(source, selection.edges, mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : []);
   const result = evaluateRecipe(kernel, modified);
-  if (typeof result === 'string') return noop(doc, modifyFailure(command, kernel, modified, result));
+  if (typeof result === 'string') return blendRefusal(doc, command, id, kernel, modified, result, topology);
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
   const committed = commitKernelResult(
     doc,

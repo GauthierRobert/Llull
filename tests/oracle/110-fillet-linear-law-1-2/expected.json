@@ -1,0 +1,14 @@
+{
+  "id": "110-fillet-linear-law-1-2",
+  "family": "fillet",
+  "description": "VC-BLD-02: linear radius law 1 -> 2 (radiusEnd) on the 20-long top edge of a 20x10x5 block; volume gated on the normal-section value with the recorded OCCT construction band",
+  "source": "analytic",
+  "formula": "V = abc - (1 - pi/4) int r(s)^2 ds = 1000 - (1 - pi/4) 20 (7/3); OCCT Add(r1, r2, E) removes 8.9e-5 relative MORE than this (VC-BLD-30), hence the 2e-4 band; planar face areas 170 / 70 are exact (server/tests/nativeBlends.test.ts)",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 989.985247625,
+  "area": null,
+  "centroid": null,
+  "bbox": { "min": [-10, -5, -2.5], "max": [10, 5, 2.5] },
+  "tolerance": { "volume": 0.0002, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

@@ -63,6 +63,7 @@
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
 
+#include "llull-kernel-occt/cpp/blends.hxx"
 #include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/src/features.rs.h"
 
@@ -366,29 +367,7 @@ std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_
   const TopTools_IndexedMapOfShape unique = unique_sub_shapes(shape.shape, TopAbs_EDGE);
   if (edges.empty()) return nullptr;
   BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
-  size_t offset = 0;
-  for (uint32_t index : edges) {
-    if (static_cast<int>(index) >= unique.Extent() || offset + 3 > laws.size()) return nullptr;
-    const double start = laws[offset];
-    const double end = laws[offset + 1];
-    const size_t count = static_cast<size_t>(laws[offset + 2]);
-    if (offset + 3 + 2 * count > laws.size()) return nullptr;
-    const TopoDS_Edge edge = TopoDS::Edge(unique(static_cast<int>(index) + 1));
-    if (count == 0 && std::isnan(end)) {
-      maker.Add(start, edge);
-    } else if (count == 0) {
-      maker.Add(start, end, edge);
-    } else {
-      // Evolving radius: (relative parameter, radius) from the start through the control points to the end.
-      TColgp_Array1OfPnt2d law(1, static_cast<int>(count) + 2);
-      law.SetValue(1, gp_Pnt2d(0, start));
-      for (size_t k = 0; k < count; ++k)
-        law.SetValue(static_cast<int>(k) + 2, gp_Pnt2d(laws[offset + 3 + 2 * k], laws[offset + 4 + 2 * k]));
-      law.SetValue(static_cast<int>(count) + 2, gp_Pnt2d(1, std::isnan(end) ? start : end));
-      maker.Add(law, edge);
-    }
-    offset += 3 + 2 * count;
-  }
+  if (!add_fillet_laws(maker, unique, edges, laws)) return nullptr;
   maker.Build();
   if (!maker.IsDone()) return nullptr;
   const TopoDS_Shape result = valid_or_null(maker.Shape());

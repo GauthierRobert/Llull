@@ -141,6 +141,24 @@ export interface SurfaceSample {
   readonly degenerate: boolean;
 }
 
+/** Why an exact fillet recipe failed (or that it builds): the OCCT contour statuses, faulty vertices and 4+ edge vertices (BLD M0, `kernel.blendReport`). */
+export interface BlendReport {
+  readonly stage: 'contours' | 'corners' | 'validity' | 'none';
+  readonly contours: ReadonlyArray<{
+    readonly edges: readonly number[];
+    readonly status: 'ok' | 'error' | 'walking_failure' | 'startsol_failure' | 'twisted_surface';
+  }>;
+  /** OCCT `FaultyVertex`: the vertex and the edges of the solid meeting there. */
+  readonly vertices: ReadonlyArray<{ readonly point: Vec3; readonly edges: readonly number[] }>;
+  /** OCCT `HasResult` of a failed build: a partial result exists (never committed). */
+  readonly partial: boolean;
+  /** Vertices of selected edges where 4 or more edges of the solid meet (a documented OCCT limit, not necessarily a failure). */
+  readonly unsupportedVertices: ReadonlyArray<{ readonly point: Vec3; readonly edgeCount: number; readonly selectedEdgeCount: number }>;
+  readonly done: boolean;
+  readonly valid: boolean;
+  readonly message?: string;
+}
+
 interface EdgeCurveSample {
   readonly t: number;
   readonly s: number;

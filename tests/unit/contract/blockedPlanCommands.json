@@ -166,16 +166,11 @@
       "implicit_properties"
     ],
     "docs/design/06-variable-blends/validation/plans/target_corners_faces_chamfers.json": [
-      "check_blends",
       "fillet_faces",
-      "fillet_full_round",
-      "probe_fillet"
+      "fillet_full_round"
     ],
     "docs/design/06-variable-blends/validation/plans/target_error_codes.json": [
       "fillet_faces"
-    ],
-    "docs/design/06-variable-blends/validation/plans/target_laws_and_profiles.json": [
-      "check_blends"
     ],
     "docs/design/07-mesh-modeling/validation/plans/target_bad_plan_codes.json": [
       "decimate_mesh",

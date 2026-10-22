@@ -13,6 +13,8 @@ pub mod recipe;
 pub mod xde;
 
 #[cfg(test)]
+mod blend_tests;
+#[cfg(test)]
 mod naming_tests;
 
 pub use ffi::{AnalysisOut, MassOut, MeshOut};

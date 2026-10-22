@@ -52,8 +52,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 - `[TODO]` **DES-2b** 02 SWG left after M0–M3 (done 2026-10-22, §13): M4–M8 rails + `sweep_surface`, loft end conditions, ruled /
   network / developable, pipeShell fast path, CadQuery lowering, frames overlay; M1 leftovers in §13. _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-6** 06 BLD M0: coded OCCT fillet diagnostics, native `edgeSamples` / `edgeContinuity`, `probe_fillet`, `check_blends`,
-  oracle cases for variable laws: `docs/design/06-variable-blends/`. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-6b** 06 BLD left after M0 (done 2026-10-22, §13): M1+ blendInfo / laws / chord on curved faces / codegen, chamfer
+  variants, conic / G2 profiles, setback corners, vertex names, `fillet_faces`, `fillet_full_round`; VC-22, 25–28. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-7** 07 MSH M0 + M2: STL / OBJ / PLY / 3MF import, `analyze_mesh` / `check_mesh`, Manifold hull / Minkowski / offset /
   hollow, boolean routing for triangle meshes: `docs/design/07-mesh-modeling/`. _Lane 1 + 4_ _deps: —_
 - `[TODO]` **DES-1** 01 DEF M0–M1: deformation law library, `scale_nonuniform` (exact), twist / taper / stretch / bend on the mesh kernel,
@@ -61,7 +61,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-3** 03 WRP M0–M3: face charts to core, fonts + 3D text, wrap / project / unwrap, emboss / deboss / scribe on developable
   faces, `check_wrap`: `docs/design/03-wrap-emboss/` (decision D-WRP-1 binary blobs first). _Lane 1_ _deps: —_
 - `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /
-  inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: DES-6 (`edgeContinuity` for checks)_
+  inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: —_
 - `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,
   `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: DES-7 (mesh assets)_
 

@@ -27,6 +27,11 @@ rust::String face_geometry_json(const Shape &shape, int32_t face);
 rust::String project_on_face_json(const Shape &shape, int32_t face, rust::Slice<const double> points);
 rust::String evaluate_face_json(const Shape &shape, int32_t face, rust::Slice<const double> uv);
 rust::String face_samples_json(const Shape &shape, int32_t face, rust::Slice<const double> uv, int32_t nu, int32_t nv);
+// Edge queries (cpp/edge_queries.cxx): `count` (2..1001) samples of one unique edge; "null" for a degenerate / boundary edge.
+rust::String edge_samples_json(const Shape &shape, int32_t edge, int32_t count);
+rust::String edge_continuity_json(const Shape &shape, int32_t edge, int32_t count);
+// Failure report of a MakeFillet build (cpp/blends.cxx): `edges` ([] = all) and `laws` as for fillet_laws (one law then applies to every edge).
+rust::String fillet_report_json(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
 rust::String point_distances_json(const Shape &shape, rust::Slice<const double> points);
 rust::String shape_distance_json(const Shape &a, const Shape &b);
 

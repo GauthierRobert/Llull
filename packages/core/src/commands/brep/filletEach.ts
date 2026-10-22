@@ -15,7 +15,8 @@ import { selectEdges } from './edgeSelection';
 import { type EdgeLawInput, type FilletMode, chordToRadius, lawOf, lawProblem, sameLaw, scaleLaw, wedgeAngle } from './filletSpec';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { operandRecipe } from '../../geometry/operandRecipe';
-import { modifyFailure, validateSolidTarget } from './modifyTarget';
+import { validateSolidTarget } from './modifyTarget';
+import { blendRefusal } from './blendRefusal';
 import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';
 import { commandError } from '../noop';
 import { REPICK_EDGES } from './edgeReferences';
@@ -184,7 +185,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   if ('problem' in sized) return fail(`${sized.problem} on '${request.id}'`);
   const modified = recipeOfPlan(source, sized.planned, topology);
   const result = evaluateRecipe(kernel, modified);
-  if (typeof result === 'string') return noop(doc, modifyFailure('fillet_edge', kernel, modified, result));
+  if (typeof result === 'string') return blendRefusal(doc, 'fillet_edge', request.id, kernel, modified, result, topology);
   const list = sized.planned.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
   const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
   const committed = commitKernelResult(

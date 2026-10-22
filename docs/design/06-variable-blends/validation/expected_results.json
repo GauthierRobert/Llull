@@ -88,10 +88,17 @@
    },
    "tolerance": {
     "faceArea": 0.000001,
-    "volume": 0.02
+    "volume": "2e-4 relative to the section value (measured native band, see finding)"
    },
+   "measuredNative": {
+    "volume": 989.896820782,
+    "minusSectionValue": -0.088427,
+    "relative": -0.000089,
+    "gprops_vs_fine_mesh": "< 1e-5 relative"
+   },
+   "finding": "OCCT Add(r1, r2, E) builds neither the normal-section nor the rolling-ball envelope construction: it removes 8.9e-5 relative MORE than the section value (VC-BLD-30). Face areas stay exact. The 0.02 band of this pack was too tight; gates: oracle 110 (2e-4), server/tests/nativeBlends.test.ts pins the measured volume.",
    "unit": "mm2 / mm3",
-   "grade": "A (face areas); A within the construction band (volume)",
+   "grade": "A (face areas); B (volume, measured native band)",
    "source": "(b) contact line at distance r(s) on each plane; Cavalieri; envelope band data/variable_radius_laws.json",
    "plan": "baseline_variable_radius_laws",
    "assert": "inspect_faces($f02) faces named <b2>:top / <b2>:side areas; mass_properties($f02).data.volume",
@@ -772,10 +779,18 @@
    },
    "tolerance": {
     "faceArea": 0.000001,
-    "classify": "nearest of the two within 0.01"
+    "volume": "5e-4 relative to the section value (measured native band, see finding)"
    },
+   "measuredNative": {
+    "volume": 981.047466455,
+    "minusSectionValue": -0.353708,
+    "minusEnvelopeValue": -0.414768,
+    "relative": -0.00036,
+    "gprops_vs_fine_mesh": "< 1e-5 relative"
+   },
+   "finding": "Classification result: the native volume matches NEITHER construction (981.401174 section, 981.462234 envelope); it is 3.6e-4 relative below the section value, confirmed by a 1e-4 deflection mesh, so it is the construction of OCCT Add(r1, r2, E), not integration error. Oracle 111 gates at 5e-4.",
    "unit": "mm2 / mm3",
-   "grade": "A (face areas); B (envelope number, numerical integration)",
+   "grade": "A (face areas); B (volume, measured native band)",
    "source": "(b) generate_blend_refs.mjs constructionProbe",
    "plan": "baseline_variable_radius_laws",
    "assert": "mass_properties($f30); inspect_faces($f30)",

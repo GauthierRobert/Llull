@@ -24,7 +24,7 @@ pub const PANIC: &str = "NATIVE_PANIC";
 pub const NOT_CACHED: &str = "shape not cached";
 
 /// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
-pub const OPS: [&str; 6] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep"];
+pub const OPS: [&str; 7] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport"];
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
@@ -164,9 +164,20 @@ impl Session {
                 }))
             }),
             "exportStep" => self.export_with(first, "exportStep", export_step),
+            "blendReport" => self.blend_report(first),
             other => exchange::dispatch(self, other, args)
                 .or_else(|| queries::dispatch(self, other, args))
                 .unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
+        }
+    }
+
+    /// `blendReport`: the OCCT diagnostics of a `fillet` recipe handle `{ key, recipe }` (BLD M0); null for another recipe or a refused source.
+    fn blend_report(&mut self, handle: &Value) -> Reply {
+        let Some(recipe) = handle.get("recipe") else { return Reply::fail(BAD_REQUEST, "blendReport expects a { key, recipe } handle") };
+        match self.evaluator.blend_report(recipe) {
+            Ok(report) => Reply::ok(report),
+            Err(EvalError::Unsupported(reason)) => Reply::fail(UNSUPPORTED, reason),
+            Err(EvalError::Failure(error)) => Reply::fail(OCC_FAILURE, error),
         }
     }
 
@@ -299,6 +310,21 @@ mod tests {
         for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge"] {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }
+    }
+
+    #[test]
+    fn explains_a_fillet_with_blend_report() {
+        let mut session = Session::new();
+        let fillet = |size: f64| json!({ "op": "fillet", "source": box_recipe(4.0), "edges": [0], "size": size });
+        let ok = call(&mut session, "blendReport", json!([{ "key": "a", "recipe": fillet(1.0) }]));
+        assert_eq!(ok["result"]["stage"], json!("none"));
+        let too_big = call(&mut session, "blendReport", json!([{ "key": "b", "recipe": fillet(9.0) }]));
+        assert_eq!(too_big["result"]["stage"], json!("contours"));
+        assert_eq!(too_big["result"]["contours"][0]["status"], json!("startsol_failure"));
+        let other = call(&mut session, "blendReport", json!([{ "key": "c", "recipe": box_recipe(1.0) }]));
+        assert_eq!(other["result"], Value::Null);
+        assert!(call(&mut session, "blendReport", json!([{ "key": "c" }]))["error"].as_str().unwrap().starts_with(BAD_REQUEST));
+        assert!(native_ops().contains(&"blendReport"));
     }
 
     #[test]

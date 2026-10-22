@@ -2,8 +2,7 @@
 //! `exportStepAssembly`, `importShapes` and `loadBlob`. Arguments arrive as the worker protocol sends them (handles rewritten by
 //! `server/src/native/kernelProtocol.ts`); results have the `GeometryKernel` shapes (`@core/geometry/kernel`).
 //!
-//! `faceQuery.tessellateFace`, `edgeSamples`, `edgeContinuity` and `bspline` answer null (the retired opencascade.js
-//! build lacked the bindings, and no caller reads them yet).
+//! `faceQuery.tessellateFace` and `bspline` answer null (the retired opencascade.js build lacked the bindings, and no caller reads them yet).
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::{self, AssemblyPart, ImportOptions, PartUse, UvRequest};
@@ -120,6 +119,16 @@ fn face_query(session: &mut Session, method: &str, args: &[Value]) -> Reply {
         "evaluateFace" => {
             let Some(uv) = flat(arg(args, 2), 2) else { return bad("evaluateFace expects [[u, v], …]") };
             session.with_shape(handle, |shape| queries::evaluate_face(shape, face, &uv))
+        }
+        "edgeSamples" | "edgeContinuity" => {
+            let (edge, count) = (arg(args, 1).as_f64().unwrap_or(-1.0), arg(args, 2).as_f64().unwrap_or(-1.0));
+            session.with_shape(handle, |shape| {
+                if method == "edgeSamples" {
+                    queries::edge_samples(shape, edge, count)
+                } else {
+                    queries::edge_continuity(shape, edge, count)
+                }
+            })
         }
         "faceSamples" => face_samples(session, handle, face, arg(args, 2)),
         "distance" => {
@@ -256,6 +265,19 @@ mod tests {
         let bad = call(&mut session, "faceQuery.projectOnFace", json!([{ "key": "c" }, 1, [[5, 0]]]));
         assert!(error_of(&bad).starts_with("NATIVE_BAD_REQUEST"));
         assert!(error_of(&call(&mut session, "faceQuery.nope", json!([]))).starts_with("NATIVE_UNSUPPORTED"));
+    }
+
+    #[test]
+    fn answers_edge_samples_and_continuity() {
+        let mut session = Session::new();
+        let cube = json!({ "key": "c", "recipe": box_recipe(2.0, 0.0) });
+        let samples = call(&mut session, "faceQuery.edgeSamples", json!([cube, 0, 3]));
+        assert_eq!(samples["result"].as_array().map(Vec::len), Some(3));
+        let continuity = call(&mut session, "faceQuery.edgeContinuity", json!([{ "key": "c" }, 0, 2]));
+        let g1 = continuity["result"][0]["g1"].as_f64().unwrap_or(0.0);
+        assert!((g1 - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "a cube edge is a right angle");
+        assert_eq!(call(&mut session, "faceQuery.edgeSamples", json!([{ "key": "c" }, 0, 1]))["result"], Value::Null);
+        assert_eq!(call(&mut session, "faceQuery.edgeContinuity", json!([{ "key": "c" }, "x", 2]))["result"], Value::Null);
     }
 
     #[test]
