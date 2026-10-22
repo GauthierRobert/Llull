@@ -156,6 +156,7 @@ type Compare = {
   complianceStatus: {
     available: boolean;
     reason?: string;
+    message?: string;
     code?: string;
     analysisId?: string;
     unit?: string;

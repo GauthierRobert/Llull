@@ -132,9 +132,9 @@ describe('set_topology_settings V1: optimizer, projection, manufacturing', () =>
     expect(result.summary).toContain('projection beta 1 -> 8');
     const plain = study(settings(model, { filter: { kind: 'density' } }).document, model);
     expect(topologySettingsHash(changed.settings)).not.toBe(topologySettingsHash({ ...plain.settings, optimizer: 'mma' }));
-    expect(topologySettingsHash({ ...changed.settings, projection: undefined })).toBe(
-      topologySettingsHash({ ...plain.settings, optimizer: 'mma' }),
-    );
+    const withoutProjection = { ...changed.settings };
+    delete withoutProjection.projection;
+    expect(topologySettingsHash(withoutProjection)).toBe(topologySettingsHash({ ...plain.settings, optimizer: 'mma' }));
     const job = okJob(result.document, model.studyId);
     expect(job.settings.projection).toEqual({ beta: 8, eta: 0.5, betaStart: 1, betaEvery: 50 });
     const cleared = execute(result.document, 'set_topology_settings', { studyId: model.studyId, projection: null });
