@@ -70,7 +70,7 @@ Ids `AF-nn`. Each pack maps its own FR/TR to these where relevant and adds a VC 
 | Id | Pri | Requirement |
 | -- | --- | ----------- |
 | AF-40 | MUST | Long operations (meshing, solving, drape, large STEP import) report progress (`--progress`), respect `--timeout`, and are resumable or cheap to re-run (cache by content hash). |
-| AF-41 | MUST | Offline first: nothing in a gap needs network access on the desktop (L6, KI6). External tools (CalculiX, Gmsh, CadQuery) are bundled or reported as missing with an install hint and a stable code. |
+| AF-41 | MUST | Offline first: nothing in a gap needs network access on the desktop (L6, KI6). External tools (CalculiX, `llull-mesh` with Netgen, CadQuery) are bundled or reported as missing with an install hint and a stable code. |
 | AF-42 | SHOULD | `--dry-run` works for every mutating command of the gap, so an agent can try a change and read the result without writing the document. |
 
 ### 2.6 Status: AF-11 / AF-14 plumbing (implemented 2026-10-16)

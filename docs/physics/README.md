@@ -14,7 +14,7 @@ what they leave out.
 | ------------------ | ------------------------------ |
 | today's core | `Material { density, color, metalness, roughness, finish }` (`packages/core/src/model/types.ts`), `mass_properties`, kinematic joints and `motion_study` (`commands/motion/`, no forces), steel / purlin / runway code checks in `domain-aec` (beam theory, Eurocode) |
 | 08 MAT | Rich material record: E, Ec, G, ν, Ftu/Fty/Fcy/Fsu/Fbru/Fbry, elongation, CTE, k, cp, with basis, direction (L/LT/ST), thickness range, provenance, **temperature tables** (V1), unit grammar (`lib/quantity.ts`), private licensed libraries |
-| 05 FEA | Analysis cases (linear static, modal, linear buckling), Gmsh meshing + Verdict quality, bundled CalculiX, Nastran BDF, FRD/OP2 import, results as data, margins of safety, staleness, human disposition. **V2 hooks only**: linear tied contact, fatigue spectra export, beam idealization |
+| 05 FEA | Analysis cases (linear static, modal, linear buckling), Netgen meshing (`llull-mesh`) + Verdict quality, bundled CalculiX, Nastran BDF, FRD/OP2 import, results as data, margins of safety, staleness, human disposition. **V2 hooks only**: linear tied contact, fatigue spectra export, beam idealization |
 | 06 CMP | Lamina properties, CLT ABD, first-ply failure (max stress, Tsai-Hill, Tsai-Wu), drape. **V2**: hygrothermal CTE/CME loads, LaRC03, progressive failure |
 | 01 KRN / 07 FTR | Exact faces for loads and BCs, sheet-metal flat patterns (no springback) |
 

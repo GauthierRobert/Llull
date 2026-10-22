@@ -16,7 +16,7 @@ Rule of thumb used for every row below:
 
 - **GPU (Rust + wgpu)**: big, uniform, data-parallel work (voxel grids, millions of independent ray / distance tests, rasterising).
 - **Rust CPU (rayon)**: branchy work, search, spatial trees, per-node loops, and anything whose numbers must be bit-reproducible.
-- **Keep**: TypeScript where budgets are met; external tools (CalculiX, Gmsh, MuJoCo, CEA, JT converter) whose V&V we would lose.
+- **Keep**: TypeScript where budgets are met; external tools (CalculiX, Netgen (in `llull-mesh`; replaced Gmsh, [NG1](NG1-netgen-mesher.md)), MuJoCo, CEA, JT converter) whose V&V we would lose.
 
 ## 2. Architecture (applies to every row)
 
@@ -96,7 +96,7 @@ RS-6 4 w, RS-7 6 w, RS-8 16+ w.
 
 - TypeScript: plant 01, 03–08 (07 pipe stress: 12k DOF, bit-exact, budget met); physics 00–02, 08, 12–15, 18, 20; aerospace 02, 04
   tokenizer, 06, 07, 08, 09, 11; core tessellation, mass properties, bounds, triangulate, convergence; FRD parsing at today's sizes.
-- External tools: CalculiX, Gmsh, MuJoCo, CEA, the JT converter.
+- External tools: CalculiX, Netgen (meshing through `llull-mesh`; replaced Gmsh, NG1), MuJoCo, CEA, the JT converter.
 - Viewport: stays three.js / WebGL; three.js WebGPURenderer is a later option, not part of RS.
 - No Rust B-rep kernel (truck, Fornjot): no robust fillets, healing or STEP AP242 / XCAF.
 

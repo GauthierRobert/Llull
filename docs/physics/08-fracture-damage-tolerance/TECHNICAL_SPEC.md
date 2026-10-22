@@ -11,7 +11,7 @@ Gap id **FRC** · status: specification · written 2026-10-15 · functional spec
 | ---- | ----------- | ---- | ------------------ |
 | Fracture / crack code | None: `grep -ril "crack\|stress.intensity\|paris" packages/` finds only two unrelated civil earthworks files (`packages/domain-aec/src/civil/earthworks/earthworks{Math,Commands}.ts`) | — | Everything is new |
 | Material | `Material { name, density, color, metalness, roughness, finish? }`; 08 MAT adds records; PHY-02 adds `materialModels` | `packages/core/src/model/types.ts` (line 639) | No toughness or da/dN data |
-| FE | (aerospace 05) static linear analysis, Gmsh meshing, CalculiX, FRD reader, artifact store, `ctx.feaArtifacts`, idealizations `solid` / `plane_stress` / `shell` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §3 | No crack seam, no plane strain, no singular elements, no J / K extraction |
+| FE | (aerospace 05) static linear analysis, Netgen meshing (`llull-mesh`), CalculiX, FRD reader, artifact store, `ctx.feaArtifacts`, idealizations `solid` / `plane_stress` / `shell` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §3 | No crack seam, no plane strain, no singular elements, no J / K extraction |
 | CalculiX | `*CRACK PROPAGATION` (separate deck, S3-shell crack triangulation, K from uncracked stresses with shape factors F = 2/π, 2/π(1.04 + 1.1 s²), 1.12(1 − 0.02 s²), Richard K_eq, Paris-type law with threshold, critical and R corrections, 8 `*USER MATERIAL` constants); `*HCF`; plane-strain elements CPE6/CPE8 | CalculiX manual [R9] (commit fd588701) | No contour / J / interaction integral keyword in the manual: K from FE must be llull post-processing |
 | Fatigue | (PHY-07) load histories, rainflow, `durability` slice | `docs/physics/07-fatigue/TECHNICAL_SPEC.md` §3.2 | Growth reuses histories and counting |
 | Signatures | (09 PLM) `ctx.caller`, `ctx.signatures`, `record_signature` | `docs/aerospace/09-plm-configuration-traceability/TECHNICAL_SPEC.md` TR-PLM-07/16 | Used by the acceptance gate |
@@ -44,7 +44,7 @@ packages/core/src/model/durability.ts     (PHY-07) — PHY-08 adds cracks, crack
 **Laws.** L1 every change a command, results are queries; L2 `@phys` uses public APIs only, processes in `server/`;
 L3 pure; L4 `durability` slice only, FE fields in the 05 artifact store; L5 zod + toolset `durability`; L6 server spawns
 only (V1 ccx crack run); L8 ids `cr-<step>.<k>` (crack), `cg-<step>.<k>` (growth case), results recomputed; L9 no kernel
-for handbook cracks; V1 crack seam is a 05 mesh-time operation in Gmsh (shape boundary unchanged); L10 plugin.
+for handbook cracks; V1 crack seam is a 05 mesh-time operation in `llull-mesh` (shape boundary unchanged); L10 plugin.
 
 **Technical requirements**
 
@@ -191,8 +191,7 @@ for pure mode I and II; K_I = (E'/2) I^(1,I), K_II = (E'/2) I^(1,II), E' = E (pl
 J = (K_I² + K_II²)/E' [R10]. Evaluated at Gauss points of the 05 artifact (element stresses and displacement gradients
 re-computed from nodal displacements in `@phys`, not from averaged FRD stresses). Ring spread = (max − min)/mean over
 rings 2…n; > 5 % → `FRC_CONTOUR_SPREAD`. The crack seam (duplicate nodes on the crack faces) is made at mesh time in
-Gmsh by fragmenting the face with the crack line and duplicating its nodes (Gmsh `Crack` plugin, availability in the
-pinned wheel to verify, OQ-FRC-06); ring refinement uses the 05 `refinements` mechanism (size ≈ a/50 at the tip).
+`llull-mesh` by fragmenting the face with the crack line (OCCT) and duplicating its nodes (Netgen has no crack plugin, OQ-FRC-06); ring refinement uses the 05 `refinements` mechanism (size ≈ a/50 at the tip).
 
 ### 5.5 Integration (TR-FRC-30/31)
 
@@ -311,8 +310,8 @@ transport progress), AF-42 (`--dry-run`).
    confirmed by a human.
 4. **OQ-FRC-04** Walker convention (γ and the exponent grouping) to store per model; confirm with the data source.
 5. **OQ-FRC-05** Centre-crack secant validity limit: llull proposes 2a/W ≤ 0.7; find a source for the accuracy statement.
-6. **OQ-FRC-06** Gmsh crack seam: confirm the `Crack` plugin in the pinned gmsh 4.15.2 wheel, or implement node
-   duplication in `@phys` after meshing.
+6. **OQ-FRC-06** Crack seam: Netgen (NG1) has no equivalent of the Gmsh `Crack` plugin; implement node duplication in
+   `llull-mesh` or in `@phys` after meshing.
 7. **OQ-FRC-07** NAFEMS R0020 original values (paid): obtain the publication to confirm the 3.0 target and test 2.2.
 8. **OQ-FRC-08** AFGROW (commercial, LexTech) / NASGRO cross-runs as acceptance evidence: who runs them and with which
    licence?

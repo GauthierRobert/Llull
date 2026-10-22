@@ -27,7 +27,7 @@ finds no capability.
 
 | From | Used here |
 | ---- | --------- |
-| 05 FEA (`@cae`) | `AnalysisModel` / `AnalysisCase`, `FeaTarget` (`facesNear` …), idealizations, `MeshControls` (Gmsh, `hex_dominant`), probes, the artifact store and its trust model (`record_*` validated against `ctx.feaArtifacts`), `compute_margins` / `dispose_margin` (human gate), `check_analysis`, `FEA_*` codes |
+| 05 FEA (`@cae`) | `AnalysisModel` / `AnalysisCase`, `FeaTarget` (`facesNear` …), idealizations, `MeshControls` (Netgen, `hex_dominant`), probes, the artifact store and its trust model (`record_*` validated against `ctx.feaArtifacts`), `compute_margins` / `dispose_margin` (human gate), `check_analysis`, `FEA_*` codes |
 | 08 MAT | `MaterialRecord`, `Provenance`, `Basis`, private libraries |
 | PHY-02 | `MaterialModel` kinds referenced by name: `elastic_iso`, `johnson_cook` (A, B, n, C, ε̇0, m, Tm, Tr, valid ranges; optional failure D1–D5), requested addition `hydrodynamic_eos` (V1) |
 | PHY-05 | `nonlinear_static` (not required, shares the J–C law) |
@@ -487,7 +487,7 @@ whose linear term switches on fully for any negative trace (round-off included):
 stiffness hourglass form (LS-DYNA types 4 / 5) and its eigenvalue estimate were therefore not built.
 
 **Tet4 variant.** Constant strain only. Volumetric locking of tet4 in nearly incompressible plastic flow is a known limit. Hex8 is
-llull's own mesh for impact (structured_hex); tet4 reads the 05 Gmsh mesh.
+llull's own mesh for impact (structured_hex); tet4 reads the 05 Netgen mesh.
 
 **Contact (RS-8c).** Decided 2026-10-20 from [E2] Ch. 29 (rendered pages): penalty node-to-segment with Coulomb friction (§13.7).
 

@@ -2,6 +2,8 @@
 
 **Status:** recorded (install record + what it verified). **Owner authorisation:** the user authorised installing the full solver toolchain.
 
+> Superseded in part: the Gmsh rows and `LLULL_GMSH_PYTHON` below are replaced by Netgen in `llull-mesh` ([NG1](NG1-netgen-mesher.md)); the rest of the record stands.
+
 ## Decision
 
 Every external FE / kernel tool that the server suites skip without is installed per user, pinned, outside the repo, and pointed at through

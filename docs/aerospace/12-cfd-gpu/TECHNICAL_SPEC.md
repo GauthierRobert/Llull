@@ -8,7 +8,7 @@ local only, GPU first) are in FUNCTIONAL_SPEC, top of file.
 - **Aerodynamics at formula level** (`packages/domain-aero/src/aerodynamics/`, 10 AER): atmosphere, panel method, lifting line,
   frontal area, drag, skin friction. **Compressible 1D relations** (`packages/domain-aero/src/fluids/`, 11 FLD): isentropic, normal and
   oblique shocks, Prandtl-Meyer. No flow field exists anywhere.
-- **The external-solver template exists** in the FEA work (05): Gmsh through the Python bridge and CalculiX as a tracked child
+- **The external-solver template exists** in the FEA work (05): the native `llull-mesh` sidecar (Netgen) and CalculiX as tracked children
   (`server/src/fea/{transports,ccxProcess,feaSolve}.ts`); results stored by content hash (`server/src/fea/artifactStore`), then
   written into the document by validated record commands (`record_fe_mesh`, `record_fea_results`, 05 §4.1 trust model). The CLI runs
   these transports (`server/src/cli/exchange.ts`, `usage.ts`).

@@ -143,7 +143,7 @@ export interface BenchmarkRow {
   readonly pack: string; readonly caseId: string; readonly verdict: Verdict; readonly code?: string;
   readonly expected: ExpectedCase; readonly measured?: { readonly value: number; readonly unit: string };
   readonly relError?: number; readonly absError?: number; readonly durationMs: number;
-  readonly toolchain: Record<string, string>;      // llull, kernel, ccx, gmsh versions
+  readonly toolchain: Record<string, string>;      // llull, kernel, ccx, mesher (Netgen) versions
 }
 ```
 
@@ -246,7 +246,7 @@ energy rate (textbook), recorded likewise as a reviewer-confirmable default.
 levels k = 0..L-1, finest first: size_k = finest × ratio^k        (cap: element count ≤ 2e6, else VNV_LEVEL_TOO_LARGE)
 for k from coarsest to finest:                                     (coarse first: fail fast, cheap)
     controls_k = { ...case.mesh, globalSize: size_k, refinements scaled by ratio^k }
-    mesh_k   = 05 mesh op (Gmsh, NumThreads=1)       -> FeArtifactStore (cache by content hash)
+    mesh_k   = 05 mesh op (llull-mesh: Netgen, 1 thread) -> FeArtifactStore (cache by content hash)
     result_k = 05 solve (CalculiX)                    -> FeArtifactStore
     value_k  = extract(quantity, result_k)            (probe interpolation identical to 05 analysis_report)
     h_k      = (measure / elements_k)^(1/dimension)   measure = analysed volume (3D) or area (2D) from 05 MeshSummary
@@ -355,7 +355,7 @@ No pack needs a schema change. Proposal (not a requirement): new packs prefer `{
 | `VNV_INPUT_UNVERIFIED` | warning (not suppressible) | a level result carries `unverified` | study id, reasons | fix the 08 material provenance |
 | `VNV_LEVEL_FAILED` | error | a level failed to mesh or solve | level index, 05 code | read the 05 code; coarsen or fix the set-up |
 | `VNV_LEVEL_TOO_LARGE` | error | a level exceeds the element cap | level index | fewer levels or a coarser finest size |
-| `VNV_TOOL_MISSING` | error | Gmsh or CalculiX absent | tool | install hint (05 `FEA_TOOL_MISSING`) |
+| `VNV_TOOL_MISSING` | error | `llull-mesh` (Netgen) or CalculiX absent | tool | install hint (05 `FEA_TOOL_MISSING`) |
 | `VNV_ARTIFACT_NOT_FOUND` | error | record: a level hash not in the store | hash | run the transport; never hand-write studies |
 | `VNV_SUMMARY_MISMATCH` | error | record: value ≠ re-extracted value | level index | same |
 | `VNV_EXPECTED_INVALID` | error | case does not match the schema | path | fix the pack file |
@@ -400,7 +400,7 @@ No pack needs a schema change. Proposal (not a requirement): new packs prefer `{
 | Unit plugin (`tests/unit/physics/vnv/*.test.ts`) | every command happy + failure + `is pure`; judge fixtures; record validation with a fake artifact port; human gate; unverified propagation | 12, 14, 15, 16 |
 | Contract | `toToolSchemas()` snapshot gains the commands; toolset membership | — |
 | Golden | `validation/plans/*.plan.json` once commands exist | 01, 13 |
-| Integration (`server/tests`, needs Gmsh + ccx) | `run_convergence_study` on beamp and LE10; staleness | 10, 11, 13 |
+| Integration (`server/tests`, needs llull-mesh + ccx) | `run_convergence_study` on beamp and LE10; staleness | 10, 11, 13 |
 | Quality gate | `npm run quality:physics` over every pack | 07, all packs |
 | Production gate | agent scenario `physics-benchmarks` (V1) | 17 |
 

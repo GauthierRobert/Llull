@@ -65,7 +65,7 @@ Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-7** (medium, Rus
 mapping (point location of up to 200k mechanical nodes in the thermal mesh) to `llull-compute post`, using the shared BVH crate
 `llull-bvh` (TR-TMC-24). The TS mapping (`thermomech/mapping.ts`, built 2026-10-17, §14) stays the reference and the small-case
 path; the native result must match it (VC-TMC-10). Nothing in `packages/*` imports native code: the job runs in the `server/`
-solve path and its output is a hash-bound artifact. Gmsh and CalculiX are unchanged. Rust CPU, because the mapped values are
+solve path and its output is a hash-bound artifact. The mesher (`llull-mesh`, Netgen) and CalculiX are unchanged. Rust CPU, because the mapped values are
 written into the deck and must be bit-reproducible (RS1 §2 rule 3).
 
 ## 3. Data model
@@ -371,7 +371,7 @@ and the expression evaluator to `lib/expression.ts` (§11 Q3) so the plugin can 
 | `check_thermo_mechanical`, `thermal_distortion_report` (Jacobi plane fit), `dispose_fit_result` (human gate) | `thermomech/{check,distortion,plane,dispose}.ts` |
 | Staleness chain thermal → thermo_static (TR-TMC-10) | `hash/inputHash.ts`: the dependent case hashes the source case's results hash **and** its current input hash |
 
-FE benchmarks, real Gmsh + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adapted plans in `server/tests/fixtures/thermomech/`, run by
+FE benchmarks, real Gmsh 4.15.2 (the mesher before NG1) + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adapted plans in `server/tests/fixtures/thermomech/`, run by
 `npm run quality:physics`): VC-TMC-01.a/b/c (−251.997 / −359.996 / −629.994 MPa), 02 LE11 (−103.43 MPa vs −105, −1.5 %, OCC kernel, full
 FeenoX section revolved), 05.a/b/c sequential thick cylinder (−206.93 / 133.69 / −208.40 MPa, ≤ 1.4 %), 08.b/c/d thermal bow
 (`thermal_distortion_report` agrees with the probe), 60, 61, 63, and the fit plan (06.a–d). VC-TMC-50 is verified on its
@@ -384,7 +384,7 @@ key is closed by §14.
   and element blocks when the hashes differ; a missing mesh or a different discretisation is still `TMC_MESH_MISMATCH`.
 - **Table fields** read `{ kind: 'fe_table', rows }` from the artifact store under the artifact hash; the `fea_import_field` transport that
   writes it is built (2026-10-17, see §14).
-- **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in Gmsh. Initial temperatures are written
+- **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in Gmsh (seen before NG1). Initial temperatures are written
   per node (no set-name dependency). `TMC_THERMAL_CATEGORY_UNSET` is a warning (`add_fea_load` always sets a category).
 - **Human gate:** `dispose_fit_result` verifies through `ctx.humanSignature`; none is installed (09 PLM), so agents get `TMC_HUMAN_GATE`.
 
@@ -405,7 +405,7 @@ key is closed by §14.
 
 ## 14. PHY-04 closure (2026-10-17)
 
-Built on the 05 slice; every number below was measured with Gmsh 4.15.2 and CalculiX 2.21 (`npm --prefix server test -- feaThermomech`, recorded for
+Built on the 05 slice; every number below was measured with Gmsh 4.15.2 (the mesher before NG1) and CalculiX 2.21 (`npm --prefix server test -- feaThermomech`, recorded for
 `npm run quality:physics`).
 
 | Item | What | Where |
@@ -435,7 +435,7 @@ r < 1 mm) smeared the step over the elements straddling r = a, and CalculiX aver
 - Geometry from commands: the disc is a quarter `revolve_profile` (r 0..1 mm), the plate a 10 x 10 mm box minus a copy of the disc (`boolean` subtract), so the two parts touch exactly
   on the quarter cylinder. Disc: E = 100 GPa, nu = 0.3, thermal strain 0.001 per K; plate: same E and nu, thermal strain 0 (alpha_bulk = 0). Reference 0 degC, uniform field 1 degC.
   Symmetry (`ux = 0` on x = 0, `uy = 0` on y = 0, per part), one `uz` pin.
-- `set_mesh_controls bonding: 'conformal'` (05 §13): both parts are fragmented in one Gmsh model, so the interface nodes are shared (a bonded joint) while each part keeps
+- `set_mesh_controls bonding: 'conformal'` (05 §13): both parts are fragmented into one shape (OCCT general fuse) and meshed once, so the interface nodes are shared (a bonded joint) while each part keeps
   its element set and material. The temperature step is then the material step; no table field is needed.
 - A thin 3D plate is plane stress only away from the interface: within about one thickness h of it the free faces change the state (the hoop stress rises towards the
   plane-strain value; h = 0.05 mm: 59.8 MPa at r = 1.011, 62.9 at r = 1.0067 against 49.4 / 49.7). The exterior field is therefore read at the plate-only node on y = 0 nearest
@@ -516,12 +516,12 @@ assertions, the FRD readers by hand-built fixtures, and the FE runs (`server/tes
 - **Unverified (no solver on the build host).** (1) the pre-heating step: that the temperatures of a `*STATIC` + `*TEMPERATURE` step carry over as the initial
   state of the next `*COUPLED TEMPERATURE-DISPLACEMENT` step and that `*TEMPERATURE, OP=NEW` without data lines is accepted; (2) `*EXPANSION, TYPE=ORTHO` with an
   isotropic `*ELASTIC` and `*ORIENTATION` through `ORIENTATION=` on the solid section; (3) the bimetal and transient-bar numbers. The server tests assert them
-  when Gmsh, CalculiX and `llull-kernel` are present; a failure there is a defect of the written deck to fix, not a tolerance to widen.
+  when `llull-mesh`, CalculiX and `llull-kernel` are present; a failure there is a defect of the written deck to fix, not a tolerance to widen.
 
 **Still open:** a non-uniform initial temperature field for a transient; orthotropic stiffness (E1/E2/E3, `*ELASTIC, TYPE=ORTHO` from 06 laminates); amplitudes on
 mechanical loads; the `llull guide` section; a signing implementation (09 PLM).
 
-**SOLVER-VERIFY (2026-10-20, Gmsh 4.15.2 + CalculiX 2.21 conda-forge, Windows 11).** The "Unverified" list above, measured:
+**SOLVER-VERIFY (2026-10-20, Gmsh 4.15.2 (the mesher before NG1) + CalculiX 2.21 conda-forge, Windows 11).** The "Unverified" list above, measured:
 
 1. **Pre-heating step: the first build did not run.** ccx 2.21 refused `*TEMPERATURE, OP=NEW` in the coupled step ("a *TEMPERATURE card is detected but no thermal
    *INITIAL CONDITIONS are given") and, with that card removed, stopped with "in nonlinear calculations energy output requests, if any, must be specified in the first

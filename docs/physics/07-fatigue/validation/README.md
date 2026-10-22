@@ -32,7 +32,7 @@ implementation to compare with.
 
 ## Validation cases
 
-Gate column: **unit** = TS unit test, no external process; **integration** = needs 05 Gmsh + CalculiX; **golden** = plan
+Gate column: **unit** = TS unit test, no external process; **integration** = needs 05 `llull-mesh` + CalculiX; **golden** = plan
 snapshot. Grade from `expected_results.json`; only grade A cases are pass/fail gates.
 
 | VC | Proves | Setup | Expected | Tol. | Grade | Gate |

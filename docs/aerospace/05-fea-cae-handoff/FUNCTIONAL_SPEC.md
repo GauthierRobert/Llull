@@ -23,7 +23,7 @@ The gap closes in three steps:
 1. **Analysis set-up as document data.** Materials with elastic constants and allowables, part idealization,
    loads and BCs on exact B-rep faces, load cases, and mesh controls are all pure llull commands, so they replay,
    get parametrised and stay traceable.
-2. **An offline open toolchain on the desktop.** Gmsh in the bundled CPython meshes the part [R10] and a bundled
+2. **An offline open toolchain on the desktop.** Netgen in the native `llull-mesh` sidecar meshes the part [R11] and a bundled
    CalculiX process solves it [R30]. Results come back as numbers first (max values, probes, frequencies, margins of safety with named factors), with contours, deformed shapes and mode shapes as an optional view.
 3. **Standard hand-off.** The same model exports to a Nastran BDF and a CalculiX/Abaqus INP for an analysis
    department's own solver, and comes back as FRD/OP2/VTU results.
@@ -88,7 +88,7 @@ User stories:
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP (M1–M4)** | Elastic material data and allowables links. Analysis cases (linear static, modal, linear buckling). Solid and plane-stress idealization. Constraints and loads on exact faces/edges/points with `*Near` targeting. Gmsh tet4/tet10 and tri/quad (2D) meshing with size controls. Verdict quality report and gate. CalculiX INP export and bundled solve on desktop. FRD import. Results as data (max values with location, probes, frequencies); UI contours, deformed shape and mode shapes for review. MS table at FoS 1.5 (named default), `reviewRequired`, human disposition of negative/marginal rows, `check_analysis`. Stale-result tracking. Validation: NAFEMS LE1/LE10, analytic beams, CalculiX test decks. |
+| **MVP (M1–M4)** | Elastic material data and allowables links. Analysis cases (linear static, modal, linear buckling). Solid and plane-stress idealization. Constraints and loads on exact faces/edges/points with `*Near` targeting. Netgen tet4/tet10 and tri/quad (2D) meshing with size controls. Verdict quality report and gate. CalculiX INP export and bundled solve on desktop. FRD import. Results as data (max values with location, probes, frequencies); UI contours, deformed shape and mode shapes for review. MS table at FoS 1.5 (named default), `reviewRequired`, human disposition of negative/marginal rows, `check_analysis`. Stale-result tracking. Validation: NAFEMS LE1/LE10, analytic beams, CalculiX test decks. |
 | **V1 (M5–M6)** | Nastran BDF export (SOL 101/103/105). OP2 import through pyNastran. VTU export through meshio. Shell idealization with automatic midsurface for constant-thickness parts (face-pairs: planar plus coaxial cylindrical). Defeaturing of holes, fillets and chamfers by size. Distributed couplings (RBE3-style) for remote loads and moments. Analytic quick checks (beam, SS plate buckling, Kt). Netgen as an alternative mesher. |
 | **V2** | Beam idealization of stringers and frames (CBAR/CBEAM, B31/B32). Composite shells (PCOMP from gap 06 CMP). Contact and bolted joints (linear, tied). Variable-thickness midsurface. Submodelling. Fatigue and damage tolerance hooks (stress spectra export). Running a user-installed Nastran or MYSTRAN. |
 | **Out of scope** | Writing a new FE solver in TypeScript (llull hosts and drives solvers). Nonlinear plasticity or explicit dynamics workflows. CFD and aeroelasticity. Certification sign-off (llull computes, and humans approve). Thermal analysis (possible later through CalculiX `*HEAT TRANSFER`). |
@@ -105,7 +105,7 @@ User stories:
 | FR-FEA-06 | SHOULD | **Defeaturing** of the analysis geometry: remove holes, fillets and chamfers below a size or picked by point, using derived geometry only. | Small features drive the mesh size without changing the global stiffness | [R10] (`occ.defeature`) |
 | FR-FEA-07 | MUST | **Constraints** (`fixed`, `pinned`, `symmetry`, `displacement` per DOF) on faces, edges or points. Targets are given as `facesNear` / `edgesNear` / `pointsNear` and are re-resolved after parametric edits, as `fillet_edge` already does. | Topological naming (KI5): indices are not stable | L1 (KI5) |
 | FR-FEA-08 | MUST | **Loads**: force (as a total distributed over the target, or per node), pressure (positive is compressive), gravity/acceleration and moment. Each load belongs to a named **load case** tagged `limit` or `ultimate`. | 25.301/25.303 distinguish limit from ultimate loads | [R2], [R1] |
-| FR-FEA-09 | MUST | **Meshing** with Gmsh: tet4/tet10, and tri3/tri6/quad4/quad8 for plane stress and shells. Controls: global size, order, local size at targets. The mesh is deterministic and reproducible from geometry plus controls plus mesher version. Adequacy warnings flag fewer than 2 elements through the thickness or span. | Gmsh exposes these through its Python API. CalculiX simplebeam shows a single element is 10 % stiff | [R10], [R30] |
+| FR-FEA-09 | MUST | **Meshing** with Netgen (`llull-mesh`): tet4/tet10, and tri3/tri6/quad4/quad8 for plane stress and shells. Controls: global size, order, local size at targets. The mesh is deterministic and reproducible from geometry plus controls plus mesher version. Adequacy warnings flag fewer than 2 elements through the thickness or span. | Netgen (nglib) exposes these; second order by straight mid-edge nodes added by `llull-mesh`. CalculiX simplebeam shows a single element is 10 % stiff | [R11], [R30] |
 | FR-FEA-10 | MUST | A **mesh quality report** with Verdict metrics: aspect ratio, scaled Jacobian, skew, warpage and min angle, as histograms against the acceptable ranges. Export is blocked when any element is inverted (scaled Jacobian ≤ 0). | Bad elements give wrong stresses | [R12] |
 | FR-FEA-11 | MUST | Export a **CalculiX/Abaqus INP** deck: `*NODE`, `*ELEMENT`, `*NSET`/`*ELSET`, `*MATERIAL` + `*ELASTIC` + `*DENSITY`, `*SOLID SECTION`/`*SHELL SECTION`, `*BOUNDARY`, `*CLOAD`/`*DLOAD`, `*STEP` with `*STATIC`/`*FREQUENCY`/`*BUCKLE`, and `*NODE FILE`/`*EL FILE`. | The CalculiX input follows ABAQUS conventions | [R30] |
 | FR-FEA-12 | MUST (V1) | Export a **Nastran BDF**: executive and case control for SOL 101/103/105, and bulk cards GRID, CTETRA, CQUAD4, CTRIA3, CQUAD8, CTRIA6, PSOLID, PSHELL, MAT1, SPC1, FORCE, MOMENT, PLOAD4, GRAV and RBE3, plus the eigen-method cards EIGRL (SOL 103) and EIGRL or EIGB (SOL 105). | The stress-office hand-off format | [R14], [R31] |
@@ -124,8 +124,8 @@ User stories:
 | FR-FEA-24 | MUST | The **validation suite** (NAFEMS LE1/LE10, analytic cases, CalculiX reference decks) runs in CI and gates releases. | Credibility of the results | [R40]–[R45], [R30] |
 | FR-FEA-25 | MUST | **Units**: decks use a consistent system derived from the document unit (mm gives N-mm-t-s, m gives N-m-kg-s, in gives lbf-in-(lbf·s²/in)-s). The deck header names the system, and every conversion is tested. | FE codes have no units, so the user must keep them consistent | [R30] |
 | FR-FEA-26 | COULD | **Netgen** as an alternative tet mesher (LGPL). | Licence flexibility and robustness on some geometries | [R11] |
-| FR-FEA-27 | COULD | **Structured / hex-dominant meshing** for simple prismatic parts (Gmsh transfinite plus recombine). | Better accuracy per DOF on beams and plates | [R10] |
-| FR-FEA-28 | SHOULD | **Licence compliance** for the GPL tools (Gmsh, CalculiX). They are shipped as separate programs, with their licence texts and the corresponding source or a written offer, and listed in the About box. llull code does not link them. | GPL obligations | [R10], [R30] |
+| FR-FEA-27 | COULD | **Structured / hex-dominant meshing** for simple prismatic parts (structured sweep plus recombine). | Better accuracy per DOF on beams and plates | [R10] |
+| FR-FEA-28 | SHOULD | **Licence compliance** for the bundled tools. CalculiX (GPL) is shipped as a separate program, not linked; Netgen (LGPL-2.1) is shipped as shared libraries that `llull-mesh` links dynamically. Both come with their licence texts and the corresponding source or a written offer, and are listed in the About box. | GPL / LGPL obligations | [R11], [R30] |
 | FR-FEA-29 | COULD | Run a **user-installed Nastran or MYSTRAN** through a configured external command, then OP2 import. | Lets the stress office's solver close the loop | [R14] |
 | FR-FEA-30 | COULD (V2) | **Composite shell properties** (PCOMP / `*SHELL SECTION, COMPOSITE`) from gap 06 laminates. | Composite airframe structure | — |
 | FR-FEA-31 | MUST | **Named safety defaults** (AF-31): every factor of safety, allowable and threshold used by `compute_margins` is either given explicitly or taken from a sourced default that the result names, e.g. `"factors": {"ultimate": {"value": 1.5, "source": "14 CFR 25.303", "defaulted": true}}`. There is no default marginal band: if `marginalBand` is unset, `check_analysis` warns `FEA_MARGINAL_BAND_UNSET`. | No silent safety value | AF-31, [R1] |
@@ -182,7 +182,7 @@ every `unverified` input, every row that needs a human, and the sentence "comput
 ### 6.2 MCP agent (cloud)
 
 1. `build_project` with the same plan.
-2. `fea_mesh` and `fea_solve` are transport tools, available only when the deployment provides Gmsh/ccx. Otherwise they return
+2. `fea_mesh` and `fea_solve` are transport tools, available only when the deployment provides `llull-mesh` (Netgen) / ccx. Otherwise they return
    `FEA_TOOL_MISSING` with an install hint (AF-41).
 3. `check_analysis` and `compute_margins` (read-only) return the same JSON as the CLI. `fea_export` returns the deck text or writes it
    into the exchange directory.
@@ -205,7 +205,7 @@ The UI shows what the commands produced; it adds no capability of its own.
 | ---------- | ------------- | ----------- | ----------- | ----- |
 | Analysis set-up | `llull run plan.json`, `llull <command> …` | registry tools (toolset `analysis`) | tree + glyphs | pure commands, replayable |
 | Midsurface preview / defeature | `llull extract_midsurface … --json` | same | translucent overlay | OCC kernel needed, else `FEA_KERNEL_OCC_REQUIRED` |
-| Mesh (Gmsh) | `llull fea_mesh` | `fea_mesh` when the host has Python + gmsh | progress | external process |
+| Mesh (Netgen) | `llull fea_mesh` | `fea_mesh` when the host has `llull-mesh` | progress | external process |
 | Quality / readiness check | `llull check_analysis --json`, `llull analysis_report --json` | same | histogram panel | read-only, codes |
 | Solve (CalculiX) | `llull fea_solve` | `fea_solve` when the host has `ccx` | progress, log | desktop default. Server needs opt-in |
 | Results | `llull analysis_report`, `llull fea_result_field`, probes | same | contours (optional) | numbers first |
@@ -224,7 +224,7 @@ The UI shows what the commands produced; it adds no capability of its own.
 | A part is not constrained enough (rigid-body modes) | Pre-solve check: fewer than 6 independent restrained DOFs per connected part gives a warning, and a singular solver matrix gives a readable error from the log | FR-FEA-16 |
 | A point force on a single node | Warning about the stress singularity. Margins exclude the singular zone by default and list it separately | FR-FEA-18 |
 | Mixed units (document in inches) | The deck is written in the lbf-in system. The header says so and the report shows the units | FR-FEA-25 |
-| Gmsh or CalculiX is missing (web, cloud, or misconfigured desktop) | The tool explains how to enable it. The document is never left half-updated | FR-FEA-16 |
+| `llull-mesh` (or its Netgen / OCCT libraries) or CalculiX is missing (misconfigured desktop or host) | The tool explains how to enable it. The document is never left half-updated | FR-FEA-16 |
 | The solver times out or is cancelled | The child process is killed and no results are recorded. The log tail is shown | FR-FEA-16 |
 | The results artifact is missing on another machine | State `missing`. The UI offers a re-solve. Margins are refused | FR-FEA-22 |
 | Midsurface coverage < 98 % | Shell export is blocked unless the user accepts. Unpaired faces are highlighted | FR-FEA-05 |
@@ -260,7 +260,7 @@ column; tolerances there). `D` = `--doc case.llull.json --kernel occt --json`.
 | AC-9 | a 100×60×40 box shelled to 2 mm | `llull extract_midsurface entityId=$box maxThickness=3 D` | `data.areaMm2` = 23 224 ±0.1 %, `data.coverage` = 1 | VC-FEA-03 |
 | AC-10 | the same plan | run from CLI, MCP `build_project` and UI dispatch | same document hash and deck sha256 | VC-FEA-51 |
 | AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `analysis_report` | peak `s_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
-| AC-12 | the desktop installer | `npm --prefix desktop test` | GPL texts and source offers for Gmsh and CalculiX present | VC-FEA-52 |
+| AC-12 | the desktop installer | `npm --prefix desktop test` | CalculiX GPL text and source offer, Netgen LGPL text present | VC-FEA-52 |
 | AC-13 | any solved analysis | `llull compute_margins … D` | every row has `reviewRequired: true` and a `reviewReason`; `summary` contains "not approved" | VC-FEA-61 |
 | AC-14 | a negative-MS row | agent calls `llull dispose_margin analysisId=$an rowId=r4 decision=accepted justification="…" D` | exit 1, `data.code: "FEA_HUMAN_GATE"`, document unchanged; `check_analysis` still `fail` | VC-FEA-62, 63 |
 | AC-15 | a material whose E or allowable is gap 08 `unverified` (basis `typical`) | `compute_margins` and `check_analysis` | every affected row `unverified: true` with `unverifiedReasons[]`; `check_analysis` warning `FEA_MATERIAL_UNVERIFIED` | VC-FEA-64 |
@@ -299,13 +299,13 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 
 | Risk / assumption | Impact | Mitigation |
 | ----------------- | ------ | ---------- |
-| GPL licensing of Gmsh [R10] and CalculiX [R30] inside a desktop installer | Legal | Separate executables or processes with no linking. Ship the licences and source. Netgen (LGPL) [R11] as the alternative mesher. Needs a legal decision (TECHNICAL_SPEC §11). |
+| GPL licensing of CalculiX [R30] inside a desktop installer | Legal | Separate executable, no linking. Ship the licence and source. The mesher is Netgen (LGPL-2.1, linked dynamically) [R11] since NG1, replacing GPL Gmsh [R10]. Needs a legal decision (TECHNICAL_SPEC §11). |
 | A general midsurface is unsolved for arbitrary solids. Junctions and variable thickness are hard | Users trust bad shells | MVP limits it to constant-thickness face-pairs with a coverage report and visual check. Unpaired regions block shell export unless the user accepts them. |
-| Face mapping between the llull B-rep and Gmsh after the STEP round-trip | Loads land on the wrong faces | Match by centroid, area and normal with a tolerance. Ambiguity is an error and nothing is guessed (TR-FEA-32). |
+| Face mapping between the llull B-rep and the mesher's (Netgen) B-rep after the STEP round-trip | Loads land on the wrong faces | Match by centroid, area and normal with a tolerance. Ambiguity is an error and nothing is guessed (TR-FEA-32). |
 | Users read nodal-averaged FRD stresses at singularities (re-entrant corners, point loads) as real | Non-conservative or over-conservative MS | Report singularity warnings (point loads, sharp re-entrant edges). Element (integration point) stresses are available. Documentation. |
 | Nastran field formats differ across vendors | Rejected decks | Small-field fixed format, the conservative card subset, a pyNastran check, and an optional run in MYSTRAN. |
 | Large meshes bloat the document | Slow save and sync | The mesh and full results live in a content-addressed sidecar cache. The document stores the controls, hashes and summaries (TR-FEA-05). |
-| Assumption: the bundled CPython can carry the `gmsh` wheel (about 40 MB) [R10] | Installer size | Accepted, as for CadQuery (KI6). |
+| Assumption: the desktop bundle carries the Netgen shared libraries (nglib, ngcore) next to `llull-mesh` [R11] | Installer size | Accepted, as for the native OCCT kernel. |
 | Assumption: CalculiX can be built or obtained for Windows, macOS and Linux | Desktop availability | `desktop/scripts/prepare-ccx.mjs`. Open question on build provenance (§11 TS). |
 
 ## 11. References
@@ -316,7 +316,7 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 - [R4] EASA Easy Access Rules for Large Aeroplanes (CS-25) — EASA — https://www.easa.europa.eu/en/document-library/easy-access-rules/online-publications/easy-access-rules-large-aeroplanes-cs-25 (accessed 2026-10; catalogue only)
 - [R5] NASA NTRS 20150003482 (history of the 1.5 factor of safety) — NASA — https://ntrs.nasa.gov/api/citations/20150003482/downloads/20150003482.pdf (accessed 2026-10, search)
 - [R6] NASA-HDBK-5026 — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/Baseline/0/NASA-HDBK-5026-Final-8-12-2024.pdf (accessed 2026-10, search)
-- [R10] Gmsh 4.15.2 (PyPI wheel, LICENSE, API) — Geuzaine & Remacle — https://pypi.org/project/gmsh/4.15.2/ (accessed 2026-10)
+- [R10] Gmsh 4.15.2 (PyPI wheel, LICENSE, API), the mesher before NG1 — Geuzaine & Remacle — https://pypi.org/project/gmsh/4.15.2/ (accessed 2026-10)
 - [R11] Netgen — NGSolve — https://github.com/NGSolve/netgen (accessed 2026-10)
 - [R12] The Verdict Library Reference Manual SAND2007-2853 — Sandia — https://github.com/sandialabs/verdict (accessed 2026-10)
 - [R13] meshio — https://github.com/nschloe/meshio (accessed 2026-10)

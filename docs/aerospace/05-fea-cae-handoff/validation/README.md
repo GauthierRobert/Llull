@@ -45,10 +45,10 @@ them into a git-ignored cache and checks their hashes.
 Automated so far (2026-10-19, FEA-REST part 1; the table below keeps its original wording): VC-FEA-07 (`tests/unit/cae/verdict.test.ts`, against
 `mesh_quality_reference.json`), the closed forms of VC-FEA-10 / 11 / 12 / 13 / 14 (`tests/unit/cae/analyticCheck.test.ts`, against `fea_analytic_expected.json`),
 VC-FEA-62 / 63 (`tests/unit/cae/disposeMargin.test.ts`: check codes, the human gate), VC-FEA-09 as the `FEA_MESH_ADEQUACY` warning (`eigenChecks.test.ts`) and the modal /
-buckling readers on hand-built `.dat` fixtures. The real-solver legs (VC-FEA-11 / 12 against ccx, 41, 42) live in `server/tests/feaEigen.test.ts` and skip without `ccx` / Gmsh.
+buckling readers on hand-built `.dat` fixtures. The real-solver legs (VC-FEA-11 / 12 against ccx, 41, 42) live in `server/tests/feaEigen.test.ts` and skip without `ccx` / `llull-mesh`.
 
-Status: **P** = proposed (no implementation yet). Every case runs on the **desktop OCC kernel**, with the
-bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
+Status: **P** = proposed (no implementation yet). Every case runs on the **desktop OCC kernel**, with
+`llull-mesh` (Netgen) and CalculiX, unless the Gate column says otherwise.
 
 | VC | Proves | Setup | Expected | Tolerance | Source | Gate |
 | -- | ------ | ----- | -------- | --------- | ------ | ---- |
@@ -76,7 +76,7 @@ bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 | VC-FEA-22 | FR-FEA-25 | mm document, material density 0.0078 g/mm³, written to the deck. | `*DENSITY` / MAT1 RHO = 7.8e-9 (t/mm³). E = 2.1e11 Pa is written as 210000 (MPa). | 1e-12 rel | (b) [S30] | unit |
 | VC-FEA-23 | FR-FEA-03, 18 | `compute_margins` on (i) a gap 08 record without Ftu/Fty and no explicit allowable, and (ii) a record with Ftu and Fty `PropertyValue`s at basis `B` with provenance `{ sourceId: 'MAT:<id>', locator }`. | (i) Refused, with a summary naming the material. (ii) Each row carries `basis` and `provenance` unchanged. | exact | gap 08 | unit |
 | VC-FEA-24 | FR-FEA-26 | LE10 meshed with `mesher: 'netgen'` (tet10). | σyy(D) = −5.38 MPa. | 3 % | (a) | integration (optional) |
-| VC-FEA-25 | FR-FEA-27 | beamp with `elementFamily: 'hex_dominant'` (Gmsh transfinite + recombine). | Tip u_y = 0.0877714 mm (EB). | 2 % | (b) | integration |
+| VC-FEA-25 | FR-FEA-27 | beamp with `elementFamily: 'hex_dominant'` (structured sweep + recombine). | Tip u_y = 0.0877714 mm (EB). | 2 % | (b) | integration |
 | VC-FEA-26 | FR-FEA-29 | VC-FEA-15 BDF run in a user-configured Nastran-compatible solver, OP2 imported (as VC-FEA-18). | Tip u_y within 2 % of VC-FEA-10. TBD: needs a solver install (MYSTRAN licence not verified). | 2 % | TBD | manual / optional |
 | VC-FEA-27 | FR-FEA-30 | V2: a laminate from gap 06 exported as `*SHELL SECTION, COMPOSITE` / PCOMP. | TBD: reuse the gap 06 classical-laminate-theory expected values (ABD) for an equivalent plate-bending check. | TBD | gap 06 pack | deferred |
 | VC-FEA-30 | FR-FEA-04, 11, 24 | `plans/fea_nafems_le1.plan.json`: plane stress, quad8, h = 50. | σyy(D) = **92.7 MPa**. | 2 % | (a) [S40–S43] | quality gate |
@@ -96,7 +96,7 @@ bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 | VC-FEA-65 | FR-FEA-36 | The nine deliberately wrong set-ups listed in VC-FEA-65 of the JSON. | Each: exit 1, the listed `data.code`, non-empty `data.remediation`, `data.ids` or `data.path`. | exact | TECHNICAL_SPEC §7.1 | unit + CLI |
 | VC-FEA-50 | FR-FEA-22 | VC-FEA-10, then `set_parameter` length = 10. | Results marked `stale`. `compute_margins` refuses stale results with a summary naming the changed recipe. | exact | — | golden |
 | VC-FEA-51 | FR-FEA-23 | Run the same plan through UI dispatch, `llull --doc plan.json`, and MCP `build_project`. | Identical document hash and identical deck sha256. | exact | — | integration (server tests) |
-| VC-FEA-52 | FR-FEA-28 | Desktop package. | `ccx` and the gmsh module are present. `resources/licenses/{CalculiX,Gmsh}` contain the GPL text, plus a source offer or source archive. The About box lists them. | exact | [S10, S30] | desktop tests |
+| VC-FEA-52 | FR-FEA-28 | Desktop package. | `ccx` and `llull-mesh` with its Netgen libraries are present. `resources/licenses/{CalculiX,Netgen}` contain the GPL / LGPL text, plus a source offer or source archive. The About box lists them. | exact | [S11, S30] | desktop tests |
 | VC-FEA-53 | FR-FEA-09, 16; TR-FEA-80 | LE10, tet10, about 50k nodes, on the reference machine. | Mesh plus solve plus import in under 60 s. TBD: measure on the CI desktop runner and freeze. | — | TBD | production gate |
 
 ## CLI harness (AF-23)
@@ -122,7 +122,7 @@ are asserted too (0 on success, 1 with `data.code` on the refusal cases).
 
 - `npm test`: unit cases (02, 07, 08, 09, 16, 20, 21, 22) with no external process. FRD fixtures are
   downloaded by hash or skipped with an explicit `SKIPPED (fixture)` line.
-- `npm --prefix server test`: integration cases that need the Python bridge (Gmsh) and `ccx`. They are
+- `npm --prefix server test`: integration cases that need `llull-mesh` (Netgen) and `ccx`. They are
   skipped when `LLULL_CCX` is unset.
 - `npm run quality` gets a new `quality:fea` step that runs VC-FEA-30/31 and the analytic cases 10–14 on the OCC
   kernel and writes a table like `quality/drawings/README.md`.

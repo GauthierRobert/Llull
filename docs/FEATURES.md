@@ -387,7 +387,7 @@
 | `set_johnson_cook_failure` | Give a material of an explicit_dynamics case Johnson-Cook failure constants: eps_f = [D1 + D2 exp(D3 s)][1 + D4 ln(rate/rate0)][1 + D5 T*], s = mean stress / v… |  |
 | `set_margin_band` | Record the marginal band of an analysis: a row with 0 <= MS < band reads MARGINAL in compute_margins and check_analysis stops warning FEA_MARGINAL_BAND_UNSET. |  |
 | `set_material_orientation` | Set the material axes of a part of a thermo_static or coupled_temperature_displacement analysis whose material has an orthotropic CTE (cte / thermalStrain prop… |  |
-| `set_mesh_controls` | Set the tetrahedral mesh controls of an analysis (Gmsh): element order (1 = linear C3D4, 2 = quadratic C3D10, default 2; use 2 for stress), globalSize (target … |  |
+| `set_mesh_controls` | Set the tetrahedral mesh controls of an analysis (Netgen): element order (1 = linear C3D4, 2 = quadratic C3D10, default 2; use 2 for stress), globalSize (targe… |  |
 | `set_nonlinear_controls` | Set the global controls of a nonlinear_static analysis (CalculiX): nlgeom (REQUIRED, no default: true = large displacement / *STEP NLGEOM, false = small displa… |  |
 | `set_part_constitutive_set` | Choose the constitutive set (elastic + plastic / hyperelastic behaviour, from define_constitutive_set on the part material) that a part uses in a nonlinear_sta… |  |
 | `set_part_idealization` | Add a 3D solid to an analysis as a meshed part. |  |

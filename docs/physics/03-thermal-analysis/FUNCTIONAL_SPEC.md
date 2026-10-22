@@ -19,7 +19,7 @@ first. A thermal answer is also the input of thermal stress and thermal fits (PH
 "does this electronics box stay below 85 °C?" gets no answer from llull, and an agent has nothing to compare against.
 
 This gap closes it by reusing the whole 05 FEA pipeline: two new analysis types (`heat_steady`, `heat_transient`), thermal
-loads and boundary conditions on exact faces, the same Gmsh mesh and bundled CalculiX `*HEAT TRANSFER` procedure [R7],
+loads and boundary conditions on exact faces, the same Netgen mesh (`llull-mesh`) and bundled CalculiX `*HEAT TRANSFER` procedure [R7],
 temperatures and heat flows as **data** (extremes with location, probes, time histories, per-boundary heat flow, a heat
 balance), temperature-limit margins with human disposition, analytic quick checks, and a validation corpus built on
 NAFEMS T2/T3/T4 and closed-form solutions reproduced exactly by a generator.
@@ -71,7 +71,7 @@ User stories:
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP** | Analysis types `heat_steady`, `heat_transient` (05 `AnalysisCase`). Thermal BCs on exact faces / points: prescribed temperature, surface heat flux, volumetric heat generation, concentrated flux, film convection (constant h, sink T), radiation to ambient (constant ε, sink T). Initial temperature. Amplitudes (tables; sine/ramp sampled to tables). Time step control (fixed or automatic with DELTMX). Materials k, cp, ρ from 08 records with temperature tables / PHY-01 property models. Gmsh mesh + bundled CalculiX `*HEAT TRANSFER`. FRD/DAT import of NT, HFL, RFL. Results as data: T extremes with location, probes and time histories, per-BC heat flow, heat balance. Temperature limits with margins, `reviewRequired`, human disposition. `check_thermal`, `analysis_report`, `thermal_analytic_check`. Validation: NAFEMS T2/T3/T4, analytic cases, CalculiX `oneel8ra`. |
+| **MVP** | Analysis types `heat_steady`, `heat_transient` (05 `AnalysisCase`). Thermal BCs on exact faces / points: prescribed temperature, surface heat flux, volumetric heat generation, concentrated flux, film convection (constant h, sink T), radiation to ambient (constant ε, sink T). Initial temperature. Amplitudes (tables; sine/ramp sampled to tables). Time step control (fixed or automatic with DELTMX). Materials k, cp, ρ from 08 records with temperature tables / PHY-01 property models. Netgen mesh (`llull-mesh`) + bundled CalculiX `*HEAT TRANSFER`. FRD/DAT import of NT, HFL, RFL. Results as data: T extremes with location, probes and time histories, per-BC heat flow, heat balance. Temperature limits with margins, `reviewRequired`, human disposition. `check_thermal`, `analysis_report`, `thermal_analytic_check`. Validation: NAFEMS T2/T3/T4, analytic cases, CalculiX `oneel8ra`. |
 | **V1** | Cavity radiation (`RxCR`, cavities, environment temperature, closed cavities) and a read-only `compute_view_factors` query. Thermal contact conductance between parts (tied contact pair + `*GAP CONDUCTANCE`). Temperature-dependent film coefficient and emissivity tables. Orthotropic conductivity (`TYPE=ORTHO`, e.g. from 06 laminates). Thermal result export to VTU. `render_view` temperature field. |
 | **V2** | Phase change through an apparent-heat-capacity table generated from latent heat (CalculiX has no latent-heat card, [R7]). Forced convection with fluid network elements (`FxFC`). Nastran thermal deck (SOL 153/159) export. Orbital heat loads as a hand-off (solar / albedo / planet IR from a dedicated orbital-thermal tool). Thermal-electrical (Joule) heating, with PHY-15 resistivity. |
 | **Out of scope** | CFD and conjugate heat transfer with resolved flow (separate product line, `../README.md` "Not in this list"). Computing film coefficients from correlations as a certified value (llull may offer a cited correlation as a quick check, never as a silent default). Thermal-vacuum test correlation. Certification sign-off. |
@@ -142,7 +142,7 @@ temperature and where, heat balance residual, each limit margin, every assumed B
 
 ### 6.2 MCP (cloud)
 
-Same commands in the `analysis` toolset (05). `fea_mesh` / `fea_solve` exist only where the host bundles Gmsh and
+Same commands in the `analysis` toolset (05). `fea_mesh` / `fea_solve` exist only where the host bundles `llull-mesh` (Netgen) and
 CalculiX; otherwise `FEA_TOOL_MISSING` (05). Queries return the same JSON as the CLI.
 
 ### 6.3 Desktop UI (review and approval only)

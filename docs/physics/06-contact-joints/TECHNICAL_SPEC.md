@@ -10,7 +10,7 @@ Gap id **PHY-06** · prefix **CNT** · status: specification · written 2026-10-
 | ---- | ----------- | ---- | ------------------ |
 | Assemblies (today) | `create_component`, `insert_instance`; kinematic joints and `motion_study` without forces | `packages/core/src/commands/assembly/`, `commands/motion/` | No contact mechanics |
 | Interference check (today) | `motion_study` returns per-step AABB interference pairs between instances | `packages/core/src/commands/motion/motionStudy.ts` | Bounding-box overlap only, no contact mechanics |
-| Aerospace 05 FEA (baseline) | Analysis model, targets (`facesNear` …), Gmsh, INP writer, ccx, FRD/DAT readers, margins, `check_analysis`; **V2 hook only**: linear tied contact and bolted joints | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §4, §10 | This pack supersedes the V2 hook |
+| Aerospace 05 FEA (baseline) | Analysis model, targets (`facesNear` …), `llull-mesh` (Netgen), INP writer, ccx, FRD/DAT readers, margins, `check_analysis`; **V2 hook only**: linear tied contact and bolted joints | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §4, §10 | This pack supersedes the V2 hook |
 | Aerospace 08 MAT (baseline) | Fastener catalogue (`FastenerFamily`, `FastenerSize` dims), `FastenerStack { axis, layers, fastener, washers, nut, holeStepRef, checks }` in the `@aero` plugin; V2 `joint_capacity` | `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md` §3.3–3.4, §4.2 | No preload, separation or slip |
 | PHY-05 (baseline) | `nonlinear_static`, steps with load / displacement control, curve probes, increment parsing, `check_nonlinear` | `docs/physics/05-nonlinear-structural/TECHNICAL_SPEC.md` §3–§5 | No contact |
 | PHY-02 (baseline) | `ConstitutiveSet` per part; material cards through the `MaterialCardWriter` | `docs/physics/02-constitutive-models/TECHNICAL_SPEC.md` §2–§3 | — |
@@ -59,7 +59,7 @@ through `execute` of an 08 query (never by importing `@aero`, L10) — see §11 
 
 **Laws respected:** L1 (commands only; solving through 05 transports), L2, L3, L4 (contact results in the 05 artifact
 store, summaries in the document), L5, L8 (ids `cp-<step>.<k>`, `bp-…`; targets re-resolved by `facesNear`), L9 (section
-imprint uses the 05 `intersectPlane` mechanism through Gmsh `occ.fragment`, not a new kernel op), L10.
+imprint uses the 05 `intersectPlane` mechanism through an OCCT general fuse in `llull-mesh`, not a new kernel op), L10.
 
 ### 2.1 Technical requirements
 
@@ -67,7 +67,7 @@ imprint uses the 05 `intersectPlane` mechanism through Gmsh `occ.fragment`, not 
 | -- | --- | ----------- |
 | TR-CNT-01 | MUST | `AnalysisCase.contact?: ContactSettings` only on `nonlinear_static` cases (PHY-05); plugin `validate` enforces one `formulation` per case. |
 | TR-CNT-02 | MUST | Contact surfaces are element-face sets built from 05 `FeaTarget`s (physical groups); a nodal slave is used only for `node_to_surface` with linear elements. |
-| TR-CNT-03 | MUST | Pretension section: plane (point, normal) intersected with the bolt part in Gmsh (`occ.fragment`, as 05 `intersectPlane`), element faces on one side collected; the deck writer refuses a section adjacent to quadratic contact faces (ccx rule) with `CNT_PRETENSION_SECTION_INVALID`. |
+| TR-CNT-03 | MUST | Pretension section: plane (point, normal) intersected with the bolt part in `llull-mesh` (OCCT general fuse, as 05 `intersectPlane`), element faces on one side collected; the deck writer refuses a section adjacent to quadratic contact faces (ccx rule) with `CNT_PRETENSION_SECTION_INVALID`. |
 | TR-CNT-04 | MUST | Preload step order: (1) pretension force applied, external loads at 0; (2) reference DOF locked at its step-1 value (`*BOUNDARY, FIXED` on the reference node; the FIXED parameter is in the manual, its effect on a pretension node is verified in VC-CNT-50); (3) PHY-05 load steps. |
 | TR-CNT-10 | MUST | `contactReader.ts` parses `*CONTACT PRINT` tables and `*CONTACT FILE` frd blocks per increment; bolt force = reaction on the pretension reference node (`*NODE PRINT … RF`). Formats are taken from pinned `.dat.ref` fixtures, not prose. |
 | TR-CNT-20 | MUST | `checks/hertz.ts`, `lame.ts`, `nasa5020.ts` match the generator at 1e-9 relative. |
