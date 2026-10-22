@@ -29,5 +29,9 @@ export { compositesPlugin } from './composites/plugin';
 // fluids plugin
 export { fluidsPlugin } from './fluids/plugin';
 
-// CFD plugin
+// CFD plugin and the flow job the native `cfd_solve` transport runs (case.json + STL in, result.json -> artifact + summary out)
 export { cfdPlugin } from './cfd/plugin';
+export { buildFlowJob, type FlowDevice, type FlowJob } from './cfd/flowJob';
+export { flowResultArtifact, parseFlowResult } from './cfd/flowResult';
+export { cfdSummary } from './cfd/summary';
+export { caseOf as cfdCaseOf } from './cfd/caseDoc';

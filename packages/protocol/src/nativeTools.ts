@@ -1,7 +1,7 @@
 /**
  * Native-transport tool definitions (schema only): fatigue_field, fea_map_field, fea_render, topology_solve, explicit_run, mtest_run,
- * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list. Like the exchange / FE tools they are not registry commands;
- * the runners (llull-compute jobs, MFront, the cloud store) live in `server/src/native`, `server/src/mfront` and `server/src/scan`.
+ * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list, cfd_solve. Like the exchange / FE tools they are not registry
+ * commands; the runners (llull-compute jobs, MFront, the cloud store) live in `server/src/native`, `server/src/cfd`, `server/src/mfront` and `server/src/scan`.
  *
  * Schemas come from zod through the registry's own `toParamsSchema`; tools that wrap a command (fea_render, auto_route, stackup_monte_carlo,
  * vortex_lattice_solve) read that command's `paramsSchema` so both stay one schema. Each spec carries its toolset (no hand-kept name list).
@@ -13,7 +13,7 @@ import type { ParamsSchema } from '@core/commands/types';
 import type { ToolDefinition } from './tools';
 
 /** Toolsets that own native transports (a subset of `ToolsetName`, declared here so `toolsets.ts` can import this file without a cycle). */
-type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan';
+type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan' | 'flow';
 
 interface NativeToolSpec {
   readonly name: string;
@@ -264,6 +264,35 @@ const scanList = (): ToolDefinition => ({
   annotations: READ_ONLY,
 });
 
+const cfdSolve = (): ToolDefinition => ({
+  name: 'cfd_solve',
+  description:
+    'Solve a low-speed flow case (create_cfd_case, Mach < 0.3) with the native lattice-Boltzmann solver `llull-compute flow` (D3Q19 BGK + ' +
+    'Smagorinsky LES, half-way bounce-back walls, far-field / slip / ground faces): runs prepare_cfd_case and refuses on any fail row, exports ' +
+    'the unioned flow surface (metres, case frame), runs to steady state (time averaging once the drag settles, stop at 0.1 % change over two ' +
+    'flow-throughs or at maxSteps), stores the result bundle content-addressed and records its summary with record_cfd_results. device cpu ' +
+    '(default: the f64 reference, deterministic) | gpu (wgpu, f32) | auto; without a usable adapter the CPU runs with the warning CFD_GPU_UNAVAILABLE. ' +
+    'A run that hits maxSteps is still recorded with converged false and the warning CFD_NOT_CONVERGED. --progress prints one line per drag ' +
+    'sample. Errors: CFD_CASE_NOT_FOUND, the prepare fail codes (CFD_GEOMETRY_NOT_WATERTIGHT, CFD_BLOCKAGE_TOO_HIGH, ...), CFD_REGIME_MISMATCH ' +
+    '(compressible cases: the Euler solver is not built), CFD_MEMORY_EXCEEDED (with deviceMemoryBytes), CFD_UNSTABLE_PARAMS, CFD_SOLVER_MISSING ' +
+    '(no llull-compute), CFD_SOLVER_FAILED, CFD_TIMEOUT. Then: cfd_report caseId=ID, check_cfd.',
+  inputSchema: schemaOf(
+    z.object({
+      caseId: z.string().describe('Id of the flow case (create_cfd_case).'),
+      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 3600); a killed run is lost (no checkpoint).'),
+      device: deviceParam('cpu (default, deterministic f64 reference) | gpu (wgpu f32) | auto (GPU when a hardware adapter exists).'),
+      deviceMemoryBytes: z
+        .number()
+        .optional()
+        .describe('Device memory in bytes: the memory estimate is checked against it before anything is allocated (CFD_MEMORY_EXCEEDED).'),
+      maxSteps: z.number().int().optional().describe('Lattice step limit (default 200000); reached = recorded with converged false.'),
+      latticeMach: z.number().optional().describe('Inflow lattice Mach number setting the time step (default 0.1, at most 0.3).'),
+      les: z.boolean().optional().describe('Smagorinsky LES (default true, C_s 0.1); off for laminar validation cases.'),
+    }),
+  ),
+  annotations: {},
+});
+
 const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'fatigue_field', toolset: 'analysis', build: fatigueField },
   { name: 'fea_map_field', toolset: 'analysis', build: feaMapField },
@@ -276,6 +305,7 @@ const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'vortex_lattice_solve', toolset: 'aerodynamics', build: vortexLatticeSolve },
   { name: 'scan_import', toolset: 'scan', build: scanImport },
   { name: 'scan_list', toolset: 'scan', build: scanList },
+  { name: 'cfd_solve', toolset: 'flow', build: cfdSolve },
 ];
 
 /** Every native-transport tool, schema only (read the registry, so call after the plugins are installed). */
