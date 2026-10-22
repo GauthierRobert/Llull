@@ -14,6 +14,7 @@ import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
+import { isTriangleOnly, meshBoolean } from './meshBoolean';
 import { signedMeshVolume } from '../../geometry/meshVolume';
 import { tupleExtent } from '../../lib/extent';
 
@@ -66,6 +67,7 @@ function runBoolean(
   op: BooleanOp,
   a: string,
   tools: readonly string[],
+  engine: BooleanEngine,
   ctx: ExecutionContext | undefined,
 ): CommandResult {
   if (tools.includes(a)) return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
@@ -83,6 +85,8 @@ function runBoolean(
   if (instanced !== undefined)
     return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
+  const viaMesh = engine === 'mesh' || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
+  if (viaMesh) return meshBoolean(doc, opName, op, a, tools, (ctx ?? currentContext()).meshProcessing ?? null);
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
   const toolRecipe = balancedUnion(toolEntities.map((tool) => operandRecipe(kernel, tool)));
@@ -111,23 +115,29 @@ function runBoolean(
   );
 }
 
+type BooleanEngine = 'auto' | 'kernel' | 'mesh';
+
 const SOLID_OPERANDS_NOTE =
   'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.';
 
 /**
  * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
- * @invariant both a and b must be 3D solids; geometry kernel must be injected; subtract keeps a − b
+ * @invariant both a and b must be 3D solids; subtract keeps a − b
+ * @invariant kernel-optional: triangle-only operands (engine "auto", decided from the operands alone so replay is host-independent) or engine "mesh" use ctx.meshProcessing and need no kernel; the kernel path refuses without one
+ * @failure triangle-only operands without a mesh engine -> MESH_ENGINE_UNSUPPORTED
  * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]
  */
 export const booleanOperation = defineCommand({
   name: 'boolean',
-  annotations: { requiresKernel: true },
   description:
     'Combine two 3D solid entities with a CSG operation into a single mesh entity: ' +
     'op "union" merges them, "subtract" removes the volume of b from a (order matters: result = a minus b), ' +
     '"intersect" keeps only the volume shared by both. ' +
     'Both operand entities are consumed (removed) and replaced by the result mesh. ' +
-    'Requires a geometry kernel to be injected (available after app initialization). ' +
+    'The kernel path requires a geometry kernel to be injected (available after app initialization); the mesh path needs only a mesh engine. ' +
+    'Triangle-only operands (imported meshes, mesh results with no exact shape) are always combined by the mesh engine under engine "auto" (default; decided from the operands alone, so replay does not depend on the host): ' +
+    'the result stays a plain mesh with guaranteed-manifold output and no polyhedral B-rep; engine "kernel" forces the B-rep kernel, engine "mesh" forces the ' +
+    'mesh engine (refuses MESH_ENGINE_UNSUPPORTED without one; non-manifold operands refuse MESH_NON_MANIFOLD). ' +
     SOLID_OPERANDS_NOTE,
   params: z.object({
     op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
@@ -139,6 +149,13 @@ export const booleanOperation = defineCommand({
           'unioned as a balanced tree and applied in ONE boolean — use a list for patterned cuts (coolant channels, bolt holes) instead ' +
           'of hundreds of sequential booleans, which nest the recipe deeper each step and slow down quadratically.',
       ),
+    engine: z
+      .enum(['auto', 'kernel', 'mesh'])
+      .optional()
+      .describe(
+        '"auto" (default): the mesh engine for triangle-only operands, else the kernel. "kernel": always the B-rep kernel. "mesh": always the mesh engine (B-rep operands are tessellated).',
+      ),
   }),
-  run: (doc, { op, a, b }, ctx): CommandResult => runBoolean(doc, `boolean ${op}`, op, a, typeof b === 'string' ? [b] : b, ctx),
+  run: (doc, { op, a, b, engine }, ctx): CommandResult =>
+    runBoolean(doc, `boolean ${op}`, op, a, typeof b === 'string' ? [b] : b, engine ?? 'auto', ctx),
 });

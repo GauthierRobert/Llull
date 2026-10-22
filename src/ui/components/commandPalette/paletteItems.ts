@@ -40,6 +40,7 @@ const TOOLSET_GROUPS = {
   pmi: 'GD&T / PMI',
   plm: 'PLM / configuration',
   scan: 'Point clouds',
+  mesh: 'Mesh modelling',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

@@ -12,6 +12,8 @@ export const MAX_TEMPLATE_ENTITIES = 10_000;
 export const MAX_BATCH_IDS = 10_000;
 export const MAX_IMPORT_BODIES = 10_000;
 export const MAX_IMPORT_TRIANGLES = 2_000_000;
+/** Decompressed bytes of the archive parts an import inflates (3MF model XML): a zip bomb cannot allocate more. */
+export const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
 export const MAX_TRACE_FEATURES = 10_000;
 export const MAX_DISPLAY_PRECISION = 20;
 export const MAX_PROFILE_POINTS = 10_000;

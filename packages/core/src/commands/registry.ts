@@ -30,6 +30,7 @@ import { reviewCommands } from './review/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
 import { surfaceCommands } from './surface/catalog';
+import { meshCommands } from './mesh/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -54,6 +55,7 @@ registerCommands('core', [
   ...materialLabCommands,
   ...materialCommands,
   ...surfaceCommands,
+  ...meshCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

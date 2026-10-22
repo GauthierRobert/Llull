@@ -103,8 +103,11 @@ save('target_scan_cleanup_to_print.json', {
 save('target_hull_minkowski_offset.json', {
   id: 'MSH-HULL-MINK',
   status: 'DRAFT: needs the proposed commands in `unbuilt`',
-  unbuilt: ['convex_hull', 'minkowski_sum', 'offset_mesh', 'add_icosphere_mesh'],
-  notes: ['add_icosphere_mesh is a COULD helper (FR-MSH-04); import_mesh of an icosphere r 2 level 2 soup works today instead'],
+  unbuilt: [],
+  notes: [
+    'the ball and the sphere are imported fine icospheres (binary STL, generate_mesh_algorithms.mjs section 6): the display tessellation of add_sphere has 4 % less volume than the sphere, far outside the VC-MSH-15 bound',
+    'maxCells 100000 coarsens the level-set grid (edge about 0.5): the result reports data.toleranceMet false and data.errorBound = area x edge; the measured deviation is still inside area x 0.01',
+  ],
   validates: ['VC-MSH-11', 'VC-MSH-12', 'VC-MSH-13', 'VC-MSH-14', 'VC-MSH-15'],
   description: 'Closed-form cases: hull of points, cube (+) ball, cube (+) cube, cube (-) cube, offsets of a sphere and a cube.',
   expect: {
@@ -146,14 +149,22 @@ save('target_hull_minkowski_offset.json', {
     },
     { command: 'mass_properties', params: { entityId: '$hull' } },
     { command: 'add_box', params: { size: [10, 10, 10], anchor: 'min' }, as: 'cube' },
-    { command: 'add_icosphere_mesh', params: { radius: 2, level: 2 }, as: 'ball' },
+    { command: 'import_mesh_file', params: { format: 'stl', file: 'validation/data/icosphere_r2_l2_binary.stl', units: 'mm' }, as: 'ball' },
     { command: 'minkowski_sum', params: { a: '$cube', b: '$ball', op: 'sum', keepSources: true }, as: 'rounded' },
     { command: 'mass_properties', params: { entityId: '$rounded' } },
     { command: 'add_box', params: { size: [3, 3, 3], anchor: 'center' }, as: 'small' },
     { command: 'minkowski_sum', params: { a: '$cube', b: '$small', op: 'sum', keepSources: true }, as: 'grown' },
     { command: 'minkowski_sum', params: { a: '$cube', b: '$small', op: 'difference', keepSources: true }, as: 'eroded' },
-    { command: 'add_sphere', params: { radius: 10, position: [40, 0, 0] }, as: 'sphere' },
-    { command: 'offset_mesh', params: { id: '$sphere', distance: 1, method: 'level_set', tolerance: 0.01 }, as: 'grownSphere' },
+    {
+      command: 'import_mesh_file',
+      params: { format: 'stl', file: 'validation/data/icosphere_r10_l5_binary.stl', units: 'mm' },
+      as: 'sphere',
+    },
+    {
+      command: 'offset_mesh',
+      params: { id: '$sphere', distance: 1, method: 'level_set', tolerance: 0.01, maxCells: 100000 },
+      as: 'grownSphere',
+    },
     { command: 'mass_properties', params: { entityId: '$grownSphere' } },
   ],
 });

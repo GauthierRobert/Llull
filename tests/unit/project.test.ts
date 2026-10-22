@@ -648,7 +648,7 @@ describe('replay of a loop step that needs the kernel', () => {
           id: 'step-1',
           name: 'build_project',
           suppressed: false,
-          params: { actions: [{ repeat: { count: 1 }, actions: [{ command: 'boolean', params: { op: 'union' } }] }] },
+          params: { actions: [{ repeat: { count: 1 }, actions: [{ command: 'shell_solid', params: { id: 'a', thickness: 1 } }] }] },
         },
       ],
     };

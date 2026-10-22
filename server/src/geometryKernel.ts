@@ -7,7 +7,9 @@
 
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import type { KernelInfo } from '@core/geometry/kernelPorts';
+import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { createManifoldMeshEngine } from '@kernel-manifold/manifoldMeshEngine';
 import { errorMessage } from '@lib/errorMessage';
 import { positiveInteger } from './env';
 import { startNativeKernel } from './nativeKernel';
@@ -50,11 +52,21 @@ export interface KernelInstallOptions {
   readonly startNative?: typeof startNativeKernel;
 }
 
+/** The Manifold mesh engine serves mesh modelling (07 MSH) whichever B-rep kernel is installed; without it those ops refuse with MESH_ENGINE_UNSUPPORTED. */
+async function installMeshEngine(): Promise<void> {
+  try {
+    setMeshProcessingEngine(await createManifoldMeshEngine());
+  } catch (error) {
+    warnUnavailable('Manifold mesh engine unavailable; Minkowski, offset, hollow, wrap and mesh booleans will refuse', error);
+  }
+}
+
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
 export async function installGeometryKernel(options: KernelInstallOptions = {}): Promise<boolean> {
   const env = options.env ?? process.env;
   const startNative = options.startNative ?? startNativeKernel;
   warned = false;
+  await installMeshEngine();
   let fallbackReason: string | undefined;
   if (env['LLULL_KERNEL']?.trim().toLowerCase() !== 'manifold') {
     const native = startNative({ callTimeoutMs: occtCallTimeoutMs(env) }, env);

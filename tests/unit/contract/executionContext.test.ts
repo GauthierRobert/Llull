@@ -5,7 +5,7 @@ import { currentContext, defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
-import { triangleKernel } from '../../helpers/fakeKernel';
+import { shellKernel, triangleKernel } from '../../helpers/fakeKernel';
 import { expectNoOp } from '../../helpers/expectNoOp';
 
 function prefixedIds(tag: string): IdSource {
@@ -63,12 +63,12 @@ describe('ExecutionContext', () => {
     expect(created.kind).toBe('mesh');
   });
   it('no-ops a requiresKernel command with an explicit summary when no kernel is available', () => {
-    const { doc, a, b } = twoBoxes();
-    expectNoOp(execute(doc, 'boolean', { op: 'union', a, b }), doc, 'kernel not available');
+    const { doc, a } = twoBoxes();
+    expectNoOp(execute(doc, 'shell_solid', { id: a, thickness: 0.2 }), doc, 'kernel not available');
   });
   it('replay refuses to regenerate kernel-dependent history without a kernel', () => {
-    const { doc, a, b } = twoBoxes();
-    const unioned = execute(doc, 'boolean', { op: 'union', a, b }, contextWith({ kernel: triangleKernel() }));
+    const { doc, a } = twoBoxes();
+    const unioned = execute(doc, 'shell_solid', { id: a, thickness: 0.2 }, contextWith({ kernel: shellKernel() }));
     const replayed = execute(unioned.document, 'replay_history', {});
     expect(Object.keys(replayed.document.entities)).toEqual(Object.keys(unioned.document.entities));
   });

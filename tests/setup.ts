@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { installDefaultPlugins } from '@app/plugins';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { setGeometryQueryEngine } from '@core/geometry/geometryQueries';
+import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { setMaterialLibraryProvider } from '@core/commands/libraryPort';
 
@@ -10,4 +11,5 @@ installDefaultPlugins();
 setGeometryKernel(null);
 setPhysicsEngine(null);
 setGeometryQueryEngine(null);
+setMeshProcessingEngine(null);
 setMaterialLibraryProvider(null);

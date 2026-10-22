@@ -262,6 +262,43 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
   return firstProblem(pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves']));
 }
 
+const MESH_SOURCE_FORMATS: ReadonlySet<unknown> = new Set(['stl-ascii', 'stl-binary', 'obj', 'ply', '3mf', 'generated']);
+
+/** `meshSource` (positive unit scale, known format) and `faceGroups` (ranges inside the triangle count) of a mesh entity (07 MSH). */
+function meshProvenanceProblem(v: Record<string, unknown>, triangleCount: number): string | null {
+  const source = v['meshSource'];
+  if (source !== undefined) {
+    if (
+      !isRecord(source) ||
+      !MESH_SOURCE_FORMATS.has(source['format']) ||
+      !isPositiveNumber(source['unitScale']) ||
+      typeof source['verified'] !== 'boolean'
+    )
+      return 'meshSource must be { format, unitScale > 0, verified }';
+  }
+  const groups = v['faceGroups'];
+  if (groups === undefined) return null;
+  const valid =
+    Array.isArray(groups) &&
+    groups.every(
+      (group) =>
+        isRecord(group) &&
+        typeof group['id'] === 'string' &&
+        Array.isArray(group['faces']) &&
+        group['faces'].every(
+          (range) =>
+            Array.isArray(range) &&
+            range.length === 2 &&
+            Number.isInteger(range[0]) &&
+            Number.isInteger(range[1]) &&
+            (range[0] as number) >= 0 &&
+            (range[0] as number) <= (range[1] as number) &&
+            (range[1] as number) <= triangleCount,
+        ),
+    );
+  return valid ? null : 'faceGroups must be [{ id, faces: [[start, end], ...] }] with ranges inside the triangle count';
+}
+
 function meshProblem(v: Record<string, unknown>): string | null {
   const mesh = v['mesh'];
   if (!isRecord(mesh)) return 'mesh must be { positions, indices }';
@@ -279,6 +316,8 @@ function meshProblem(v: Record<string, unknown>): string | null {
     (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
   )
     return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
+  const provenance = meshProvenanceProblem(v, indices.length / 3);
+  if (provenance !== null) return provenance;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
   if (problem !== null) return `brep recipe invalid — ${problem}`;
   const slab = v['stepSlab'] === undefined ? null : validateShapeRecipe(v['stepSlab'], validateEntityValue);

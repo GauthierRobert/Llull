@@ -101,3 +101,8 @@ export function installKernelPerTest(kernel: GeometryKernel): void {
 export function triangleKernel(): FakeKernel {
   return fakeKernel({ solid: TRIANGLE, boolean: TETRA, fillet: TRIANGLE, chamfer: TRIANGLE });
 }
+
+/** A fake kernel whose solids are `TRIANGLE` and whose shells are a closed `TETRA` (`shell_solid` is a requiresKernel command that succeeds on it). */
+export function shellKernel(): FakeKernel {
+  return fakeKernel({ solid: TRIANGLE, shell: TETRA });
+}

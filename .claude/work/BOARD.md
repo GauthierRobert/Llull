@@ -54,8 +54,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   network / developable, pipeShell fast path, CadQuery lowering, frames overlay; M1 leftovers in §13. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-6b** 06 BLD left after M0 (done 2026-10-22, §13): M1+ blendInfo / laws / chord on curved faces / codegen, chamfer
   variants, conic / G2 profiles, setback corners, vertex names, `fillet_faces`, `fillet_full_round`; VC-22, 25–28. _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-7** 07 MSH M0 + M2: STL / OBJ / PLY / 3MF import, `analyze_mesh` / `check_mesh`, Manifold hull / Minkowski / offset /
-  hollow, boolean routing for triangle meshes: `docs/design/07-mesh-modeling/`. _Lane 1 + 4_ _deps: —_
+- `[TODO]` **DES-7b** 07 MSH left after M0 + M2 (done 2026-10-22, §13): M1 repair modes / fill holes / decimate / remesh / smooth /
+  cut / deviation, M3 native `llull-meshops` + content-addressed asset store (import steps store base64 until then), M4 sculpt, M5
+  segment + mesh_to_brep, M6 quad remesh / fits. _Lane 1 + 4 + native_ _deps: —_
 - `[TODO]` **DES-1** 01 DEF M0–M1: deformation law library, `scale_nonuniform` (exact), twist / taper / stretch / bend on the mesh kernel,
   `analyze_deformation`, `check_deformation`: `docs/design/01-body-deformation/`. _Lane 1_ _deps: —_
 - `[TODO]` **DES-3** 03 WRP M0–M3: face charts to core, fonts + 3D text, wrap / project / unwrap, emboss / deboss / scribe on developable
@@ -63,7 +64,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /
   inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: —_
 - `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,
-  `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: DES-7 (mesh assets)_
+  `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: — (mesh asset store = DES-7b M3, adopt when built)_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-6** Left after AERO-4/5 (each in its spec §13): CAx-IF composite conformance with a second CAD system / CAx-IF test files, JT (deferred by

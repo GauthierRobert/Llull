@@ -40,6 +40,7 @@ const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | '
   import_step: { key: 'stepBase64', encoding: 'base64' },
   import_step_exact: { key: 'stepBase64', encoding: 'base64' },
   import_iges: { key: 'igesBase64', encoding: 'base64' },
+  import_mesh_file: { key: 'base64', encoding: 'base64' },
   verify_exchange_file: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
@@ -64,6 +65,22 @@ export function withFileContent(name: string, params: unknown): unknown {
   if (target === undefined) throw new Error(`${name} takes no file= parameter.`);
   const { file, ...rest } = params;
   return { ...rest, [target.key]: fs.readFileSync(file).toString(target.encoding) };
+}
+
+/**
+ * A plan's actions with every `file` param of a file-taking command (`import_mesh_file`, ...) replaced by the file content, loop bodies included.
+ * @failure unreadable file -> Error naming it
+ */
+export function withPlanFileContent(actions: readonly unknown[]): unknown[] {
+  return actions.map((action) => {
+    if (!isRecord(action)) return action;
+    const command = action['command'];
+    if (typeof command === 'string' && takesFileParam(command)) return { ...action, params: withFileContent(command, action['params']) };
+    const next: Record<string, unknown> = { ...action };
+    if (isRecord(action['step'])) next['step'] = withPlanFileContent([action['step']])[0];
+    if (Array.isArray(action['actions'])) next['actions'] = withPlanFileContent(action['actions']);
+    return next;
+  });
 }
 
 interface LocalExchangeContext {

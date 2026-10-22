@@ -14,7 +14,7 @@ import { createStepObserver, type StepObserver } from './progress';
 import { resolveFileRefs } from './fileParams';
 import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
-import { exchangeTool, takesFileParam, withFileContent } from './exchange';
+import { exchangeTool, takesFileParam, withFileContent, withPlanFileContent } from './exchange';
 import type { CommandOutcome } from '@protocol/restProtocol';
 import { isHealthy } from '../restClient';
 import { withFailureStatus } from '@protocol/commandOutcome';
@@ -268,6 +268,7 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
     throw new UsageError(`${source}: a plan is an actions array or an object with "actions".`);
   const params = {
     ...base,
+    actions: asUsage(() => withPlanFileContent(base['actions'] as unknown[])),
     ...(booleanFlag(args, 'validate') ? { validate: true } : {}),
     ...(booleanFlag(args, 'continue') ? { onError: 'continue' } : {}),
   };

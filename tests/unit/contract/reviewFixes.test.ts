@@ -7,7 +7,7 @@ import { installPlugin } from '@core/plugins/host';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
 import { nextId, withIdSource } from '@lib/id';
-import { triangleKernel } from '../../helpers/fakeKernel';
+import { shellKernel } from '../../helpers/fakeKernel';
 import { xy } from '../../helpers/xy';
 
 function boxOf(doc: CadDocument): BoxEntity {
@@ -44,12 +44,12 @@ describe('S3: set_parameter regenerates through recipes and constraints', () => 
 describe('S4/S7: history operations refuse without a kernel instead of reporting success', () => {
   function unionHistory(): CadDocument {
     let doc = createEmptyDocument();
-    const ctx = { ...defaultContext(), kernel: triangleKernel() };
+    const ctx = { ...defaultContext(), kernel: shellKernel() };
     const a = execute(doc, 'add_box', { size: [2, 2, 2] }, ctx);
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] }, ctx);
     doc = b.document;
-    return execute(doc, 'boolean', { op: 'union', a: a.affected[0], b: b.affected[0] }, ctx).document;
+    return execute(doc, 'shell_solid', { id: a.affected[0], thickness: 0.2 }, ctx).document;
   }
   it('edit_step_params / set_step_suppressed / insert_step no-op with an explicit summary', () => {
     const doc = unionHistory();

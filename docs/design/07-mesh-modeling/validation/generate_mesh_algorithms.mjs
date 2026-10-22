@@ -410,3 +410,34 @@ function boundaryLoops(mesh) {
     tolerance: '1e-9 relative (ascii, 10 significant digits written) / exact on the float32 values (binary)',
   });
 }
+
+// ---------- 6. Binary STL inputs of the plans (not part of stl_fixtures.json) ----------
+// A fine icosphere for the offset / hollow / wrap cases (the display tessellation of an exact sphere is too coarse for the VC-MSH-15 bound)
+// and a small ball for the Minkowski case (plans/target_hull_minkowski_offset.json).
+{
+  const binaryStl = (m, header) => {
+    const buf = Buffer.alloc(84 + m.faces.length * 50);
+    buf.write(header, 0, 'ascii');
+    buf.writeUInt32LE(m.faces.length, 80);
+    let off = 84;
+    for (const [a, b, c] of m.faces) {
+      const n = cross(sub(m.positions[b], m.positions[a]), sub(m.positions[c], m.positions[a]));
+      const u = scale(n, 1 / norm(n));
+      for (const x of [...u, ...m.positions[a], ...m.positions[b], ...m.positions[c]]) {
+        buf.writeFloatLE(x, off);
+        off += 4;
+      }
+      off += 2;
+    }
+    return buf;
+  };
+  fs.writeFileSync(
+    path.join(here, 'data', 'icosphere_r10_l5_binary.stl'),
+    binaryStl(icosphere(10, 5), 'llull 07 MSH plan input icosphere r10 l5'),
+  );
+  fs.writeFileSync(
+    path.join(here, 'data', 'icosphere_r2_l2_binary.stl'),
+    binaryStl(icosphere(2, 2), 'llull 07 MSH plan input icosphere r2 l2'),
+  );
+  process.stdout.write('wrote data/icosphere_r10_l5_binary.stl, data/icosphere_r2_l2_binary.stl\n');
+}

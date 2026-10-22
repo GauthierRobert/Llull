@@ -174,37 +174,21 @@
     ],
     "docs/design/07-mesh-modeling/validation/plans/target_bad_plan_codes.json": [
       "decimate_mesh",
-      "import_mesh_file",
-      "minkowski_sum",
       "remesh_mesh"
     ],
     "docs/design/07-mesh-modeling/validation/plans/target_defect_repair.json": [
-      "analyze_mesh",
-      "fill_mesh_holes",
-      "repair_mesh"
-    ],
-    "docs/design/07-mesh-modeling/validation/plans/target_hull_minkowski_offset.json": [
-      "add_icosphere_mesh",
-      "convex_hull",
-      "minkowski_sum",
-      "offset_mesh"
+      "fill_mesh_holes"
     ],
     "docs/design/07-mesh-modeling/validation/plans/target_scan_cleanup_to_print.json": [
-      "analyze_mesh",
-      "check_mesh",
       "cut_mesh",
       "decimate_mesh",
       "fill_mesh_holes",
-      "hollow_mesh",
-      "import_mesh_file",
       "remesh_mesh",
-      "repair_mesh",
       "smooth_mesh"
     ],
     "docs/design/07-mesh-modeling/validation/plans/target_sculpt_quad_brep.json": [
       "add_grid_mesh",
       "fit_subdivision_to_mesh",
-      "import_mesh_file",
       "quad_remesh",
       "remesh_mesh",
       "sculpt_mesh"

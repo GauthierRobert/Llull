@@ -20,7 +20,7 @@ describe('docs/FEATURES.md', () => {
     for (const def of listCommands()) expect(generated.split(`| \`${def.name}\` |`).length - 1).toBe(1);
     expect(generated).toMatch(/^## 3d$/m);
     expect(generated).toMatch(/\| `mass_properties` \| .+ \| read-only \|/);
-    expect(generated).toMatch(/\| `boolean` \| .+ \| kernel \|/);
+    expect(generated).toMatch(/\| `shell_solid` \| .+ \| kernel \|/);
   });
 
   it('is up to date (regenerate with: npm run features)', () => {

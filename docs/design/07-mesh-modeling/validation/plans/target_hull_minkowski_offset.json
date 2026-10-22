@@ -1,14 +1,10 @@
 {
  "id": "MSH-HULL-MINK",
  "status": "DRAFT: needs the proposed commands in `unbuilt`",
- "unbuilt": [
-  "convex_hull",
-  "minkowski_sum",
-  "offset_mesh",
-  "add_icosphere_mesh"
- ],
+ "unbuilt": [],
  "notes": [
-  "add_icosphere_mesh is a COULD helper (FR-MSH-04); import_mesh of an icosphere r 2 level 2 soup works today instead"
+  "the ball and the sphere are imported fine icospheres (binary STL, generate_mesh_algorithms.mjs section 6): the display tessellation of add_sphere has 4 % less volume than the sphere, far outside the VC-MSH-15 bound",
+  "maxCells 100000 coarsens the level-set grid (edge about 0.5): the result reports data.toleranceMet false and data.errorBound = area x edge; the measured deviation is still inside area x 0.01"
  ],
  "validates": [
   "VC-MSH-11",
@@ -132,10 +128,11 @@
    "as": "cube"
   },
   {
-   "command": "add_icosphere_mesh",
+   "command": "import_mesh_file",
    "params": {
-    "radius": 2,
-    "level": 2
+    "format": "stl",
+    "file": "validation/data/icosphere_r2_l2_binary.stl",
+    "units": "mm"
    },
    "as": "ball"
   },
@@ -188,14 +185,11 @@
    "as": "eroded"
   },
   {
-   "command": "add_sphere",
+   "command": "import_mesh_file",
    "params": {
-    "radius": 10,
-    "position": [
-     40,
-     0,
-     0
-    ]
+    "format": "stl",
+    "file": "validation/data/icosphere_r10_l5_binary.stl",
+    "units": "mm"
    },
    "as": "sphere"
   },
@@ -205,7 +199,8 @@
     "id": "$sphere",
     "distance": 1,
     "method": "level_set",
-    "tolerance": 0.01
+    "tolerance": 0.01,
+    "maxCells": 100000
    },
    "as": "grownSphere"
   },

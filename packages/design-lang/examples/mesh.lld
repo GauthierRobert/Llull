@@ -1,0 +1,10 @@
+# Packaging hull: the convex envelope of a box and a side lug, inspected and checked as a printable mesh with the mesh toolset
+design packaging units=mm
+param w = 40
+param h = 20
+add_box body size=[w, 30, h] anchor=min position=[0, 0, 0]
+convex_hull hull points=[[0, 0, 0], [w, 0, 0], [0, 30, 0], [w, 30, 0], [0, 0, h], [w, 0, h], [0, 30, h], [w, 30, h], [w + 10, 15, 0], [w + 10, 15, h], [20, 15, 10]]
+check volume of=hull expect ~= w*30*h + 10*30*h/2 ± 0.01%
+check analyze_mesh id=hull path=faces expect == 16
+check analyze_mesh id=hull path=closed expect == true
+check check_mesh ids=[hull] purpose="print" path=status expect == "pass"

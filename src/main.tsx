@@ -11,7 +11,9 @@ import '@fontsource/dm-mono/latin-500.css';
 import '@ui/styles/index.css';
 import { installDefaultPlugins } from '@app/plugins';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { createManifoldMeshEngine } from '@kernel-manifold/manifoldMeshEngine';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
 
 // Renderer kernel: Manifold (WASM, in-process) runs the commands this renderer executes itself (local mode while
@@ -26,6 +28,11 @@ createManifoldKernel()
     console.error('Manifold kernel init failed', e);
     useKernelStatusStore.getState().setStatus('failed');
   });
+
+// Mesh modelling (07 MSH): the same WASM serves the mesh-engine port (hull, Minkowski, offset, wrap, mesh booleans); without it those ops refuse cleanly.
+createManifoldMeshEngine()
+  .then(setMeshProcessingEngine)
+  .catch((e: unknown) => console.error('Manifold mesh engine init failed', e));
 
 installDefaultPlugins();
 

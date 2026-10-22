@@ -22,6 +22,7 @@ import { toCounterClockwise } from '@lib/polygon';
 import { quantizedKey } from '@lib/quantize';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import { toDegrees } from '@lib/angle';
+import { loadManifoldModule } from './manifoldModule';
 
 // The subset of the Manifold WASM module we call (one cast at the boundary).
 interface ManifoldMesh {
@@ -68,14 +69,8 @@ interface ManifoldModule {
   setup(): void;
 }
 
-let _cachedModule: ManifoldModule | null = null;
-
 async function getManifoldModule(): Promise<ManifoldModule> {
-  if (_cachedModule) return _cachedModule;
-  const factory = (await import('manifold-3d')) as unknown as { default: (opts?: unknown) => Promise<ManifoldModule> };
-  const loaded = await factory.default();
-  loaded.setup();
-  return (_cachedModule = loaded);
+  return (await loadManifoldModule()) as ManifoldModule;
 }
 
 function applyTransform(

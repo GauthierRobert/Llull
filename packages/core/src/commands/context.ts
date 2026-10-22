@@ -8,6 +8,7 @@
 
 import { getGeometryKernel } from '../geometry/kernel';
 import { getGeometryQueryEngine } from '../geometry/geometryQueries';
+import { getMeshProcessingEngine } from '../geometry/mesh/engine';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
 import { getMaterialLibraryProvider } from './libraryPort';
 import { getSignaturePort } from './signaturePort';
@@ -42,6 +43,7 @@ export function defaultContext(): ExecutionContext {
     kernel,
     physics: getPhysicsEngine(),
     geometryQueries: getGeometryQueryEngine(),
+    meshProcessing: getMeshProcessingEngine(),
     libraries: getMaterialLibraryProvider(),
     ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     raster: getRasterPort(),

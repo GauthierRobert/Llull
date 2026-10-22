@@ -41,7 +41,7 @@ function capture(options: { stdin: string; tick?: number; tty?: boolean; fetchIm
 const PLAN = JSON.stringify([
   { command: 'add_box', params: { size: [20, 20, 20] }, as: 'body' },
   { command: 'add_cylinder', params: { radius: 4, height: 30 }, as: 'hole' },
-  { command: 'boolean', params: { op: 'subtract', a: '$body', b: '$hole' } },
+  { command: 'split_body', params: { id: '$body', plane: { origin: [0, 0, 0], normal: [1, 0, 0] } } },
 ]);
 
 let docPath = '';
@@ -59,7 +59,7 @@ describe('llull run — progress and timing', () => {
   it('streams one stderr line per step with --progress, announcing kernel commands first', async () => {
     const c = capture({ stdin: PLAN, tick: 1500 });
     expect(await runCli(['run', '-', '--progress', ...docFlag()], c.io)).toBe(EXIT_OK);
-    expect(c.err).toEqual(['[1/3] add_box … 1.5s', '[2/3] add_cylinder … 1.5s', '[3/3] boolean …', '[3/3] boolean … 1.5s']);
+    expect(c.err).toEqual(['[1/3] add_box … 1.5s', '[2/3] add_cylinder … 1.5s', '[3/3] split_body …', '[3/3] split_body … 1.5s']);
   });
 
   it('streams progress when stderr is a terminal, and stays silent when it is not', async () => {
@@ -88,7 +88,7 @@ describe('llull run — progress and timing', () => {
     const c = capture({ stdin: PLAN, tick: 12_000 });
     await runCli(['run', '-', ...docFlag()], c.io);
     expect(c.err).toHaveLength(3);
-    expect(c.err[2]).toBe('llull: warning: slow step [3/3] boolean took 12.0s');
+    expect(c.err[2]).toBe('llull: warning: slow step [3/3] split_body took 12.0s');
   });
 
   it('adds durationMs to every step in --json and shows slow steps in text mode', async () => {
@@ -99,7 +99,7 @@ describe('llull run — progress and timing', () => {
 
     const text = capture({ stdin: PLAN, tick: 2500 });
     await runCli(['run', '-', '--dry-run', ...docFlag()], text.io);
-    expect(text.out[0]).toMatch(/#2 ok {3}boolean \[2\.5s\]:/);
+    expect(text.out[0]).toMatch(/#2 ok {3}split_body \[2\.5s\]:/);
   });
 
   it('says --progress does nothing with --server', async () => {

@@ -1,6 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
+import type { FaceGroup, MeshSource } from './meshProvenance';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
@@ -168,6 +169,10 @@ export interface MeshSolidEntity extends BaseEntity {
   threadTool?: true;
   /** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current `mesh` by `faceColorTriangles`. */
   faceColors?: ReadonlyArray<FaceColor>;
+  /** Where the triangles came from and whether that source is pinned (07 MSH); absent on kernel results and on `import_mesh` bodies. */
+  meshSource?: MeshSource;
+  /** Named triangle ranges from an import (OBJ groups, 3MF objects), `[start, end)` over the triangle order of `mesh.indices`. */
+  faceGroups?: ReadonlyArray<FaceGroup>;
 }
 
 /**
