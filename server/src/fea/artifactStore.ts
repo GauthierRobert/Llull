@@ -24,6 +24,8 @@ type FeArtifact = FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopol
 export interface FeArtifactStore extends FeArtifactPort {
   /** Stores `artifact` and returns its hash (idempotent). */
   put(artifact: FeArtifact): string;
+  /** Any stored kind, the CFD result bundles included (`get` answers the FE kinds only, as the `FeArtifactPort` contract says). */
+  getAny(hash: string): FeArtifact | null;
   readonly directory: string;
 }
 
@@ -93,11 +95,15 @@ export function createFeArtifactStore(directory: string): FeArtifactCache {
       mkdirSync(directory, { recursive: true });
       writeAtomically(path.join(directory, `${key}.ref`), hash);
     },
-    get(hash) {
+    getAny(hash) {
       if (!HASH.test(hash)) return null;
       if (existsSync(fileOf(hash))) return read(hash);
       const named = aliasTarget(hash);
       return named === null ? null : read(named);
+    },
+    get(hash) {
+      const found = this.getAny(hash);
+      return found !== null && found.kind !== 'cfd_result' ? found : null;
     },
   };
 }

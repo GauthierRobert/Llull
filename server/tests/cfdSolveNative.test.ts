@@ -85,7 +85,7 @@ describe('cfd_solve with the real llull-compute', () => {
         return { hash: data.resultsHash, doc };
       };
       const first = await solveOnce();
-      const artifact = store.get(first.hash) as CfdResultArtifact | null;
+      const artifact = store.getAny(first.hash) as CfdResultArtifact | null;
       expect(artifact?.kind).toBe('cfd_result');
       expect(artifact?.deterministic).toBe(true);
       expect(artifact?.grid.solidCells).toBeGreaterThan(0);
@@ -100,7 +100,7 @@ describe('cfd_solve with the real llull-compute', () => {
       expect(Number.isFinite((report.data as { forces: { cd: number } }).forces.cd)).toBe(true);
       // Deterministic CPU twin: the second run's bundle equals the first apart from the wall time it records.
       const second = await solveOnce();
-      const timeless = (hash: string): string => canonicalJson({ ...(store.get(hash) as CfdResultArtifact), elapsedS: 0 });
+      const timeless = (hash: string): string => canonicalJson({ ...(store.getAny(hash) as CfdResultArtifact), elapsedS: 0 });
       expect(timeless(second.hash)).toBe(timeless(first.hash));
     },
     300_000,

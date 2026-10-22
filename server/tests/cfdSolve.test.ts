@@ -233,7 +233,7 @@ describe('cfd_solve with a fake job runner', () => {
     expect(lines).toEqual(['cfd_solve: step 40/200 drag 0.4700 N Cd 1.200 (transient, change 1.20e-2)']);
 
     const data = solved.data as { resultsHash: string; converged: boolean; forces: { cd: number }; record: unknown; warnings?: unknown };
-    const artifact = store.get(data.resultsHash) as CfdResultArtifact | null;
+    const artifact = store.getAny(data.resultsHash) as CfdResultArtifact | null;
     expect(artifact?.kind).toBe('cfd_result');
     expect(sha256Hex(canonicalJson(artifact))).toBe(data.resultsHash);
     expect(artifact?.slices).toEqual([{ name: 'slice-0.bin', base64: 'TExTTAA=' }]);

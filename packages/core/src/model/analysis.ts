@@ -11,7 +11,6 @@ import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
-import type { CfdResultArtifact } from './cfdResult';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -609,9 +608,7 @@ export interface FeTableArtifact {
 
 /** Read-only artifact store injected by the host (`ExecutionContext.feaArtifacts`). */
 export interface FeArtifactPort {
-  get(
-    hash: string,
-  ): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | CfdResultArtifact | null;
+  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | null;
 }
 
 /** How a signing key is trusted: registered, unknown / revoked, or a published RFC 8032 test key (refused outside test mode). */
