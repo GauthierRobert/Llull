@@ -1,22 +1,29 @@
-//! The SIMP loop of TECHNICAL_SPEC §5.1 / §5.2 on llull-voxfe.
+//! The SIMP loop of TECHNICAL_SPEC §5.1 / §5.2 (+ §15 V1) on llull-voxfe.
 //!
 //! Per iteration: element scales `s_e = (Emin + xPhys_e^p (E0 − Emin)) · g` (g = thickness in 2D, voxel edge in 3D) → one
-//! PCG solve per load case, warm-started from that case's previous displacements (zero on the first iteration, or the
-//! `Start::displacements` of a resumed run, which then continues bit for bit) → `c = Σ_lc w_lc Σ_e s_e u_eᵀk0u_e`,
-//! `dc_e = −p (E0 − Emin) xPhys_e^(p−1) g Σ_lc w_lc u_eᵀk0u_e`, `dv_e = 1` → filter → OC → `change = max|x_new − x|`.
-//! Stop when `change ≤ changeTol` (converged) or after `maxIterations`. Keep-in / keep-out voxels are pinned to 1 / 0 in
-//! both x and xPhys; their sensitivities are dropped before the density-filter chain rule. The volume constraint is
-//! `Σ xPhys ≤ volumeFraction · N_active` (keep-in counted).
+//! PCG solve per load case (forces `F_fixed + Σ_e xPhys_e f_e` when the case carries gravity), warm-started from that case's
+//! previous displacements (zero on the first iteration, or the `Start::displacements` of a resumed run, which then continues
+//! bit for bit) → `c = Σ_lc w_lc Σ_e s_e u_eᵀk0u_e`, `dc_e = −p (E0 − Emin) xPhys_e^(p−1) g Σ_lc w_lc u_eᵀk0u_e (+ 2 Σ_lc w_lc
+//! u_eᵀf_e)`, `dv_e = 1` → projection chain rule → filter → reduction to the design variables (extrusion) → OC or MMA →
+//! `change = max|ξ_new − ξ|`. Stop when `change ≤ changeTol` at the final projection β (converged), after `maxIterations`, or
+//! at the wall-clock `deadline_s` (checkpoint: every output is written so the run resumes bit for bit). Keep-in / keep-out
+//! voxels are pinned to 1 / 0 in both x and xPhys; their sensitivities are dropped before the chain rule. Objectives:
+//! `min_compliance` under `Σ xPhys ≤ volumeFraction · N_active` (keep-in counted), or `min_volume` under `c ≤ maxCompliance`
+//! (MMA only).
 
+use crate::design::DesignSpace;
 use crate::filter::{Filter, FilterKind};
+use crate::loads::{gravity_work, with_gravity};
+use crate::mma::{Bounds, Mma};
 use crate::oc::{self, Design, Limits};
+use crate::projection::Projection;
+use crate::solver::{choose_backend, Solver};
 use llull_gpu::reduce::{max_abs, sum};
 use llull_voxfe::ke::element_matrix;
-use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
-use llull_voxfe::pcg::{pcg, Jacobi};
 use llull_voxfe::MIN_LEN;
 use llull_voxfe::{Grid, Operator, SolverKind};
 use rayon::prelude::*;
+use std::time::Instant;
 
 /// What a voxel is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,12 +35,23 @@ pub enum Voxel {
     KeepOut,
 }
 
-/// One load case: nodal forces (DOF-length) and its objective weight.
+/// One load case: nodal forces (DOF-length), its objective weight and, optionally, gravity as the force per fully solid voxel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoadCase {
     pub name: String,
     pub weight: f64,
     pub forces: Vec<f64>,
+    pub gravity: Option<[f64; 3]>,
+}
+
+/// What the loop minimises.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Objective {
+    MinCompliance,
+    /// Minimise the volume fraction with `c ≤ max_compliance` (consistent units, like the compliance).
+    MinVolume {
+        max_compliance: f64,
+    },
 }
 
 /// A topology optimisation problem on a voxel grid.
@@ -51,6 +69,7 @@ pub struct Problem {
     /// Voxel edge length (scales the 3D element stiffness).
     pub voxel: f64,
     pub volume_fraction: f64,
+    pub objective: Objective,
 }
 
 /// Where the linear solves run.
@@ -60,6 +79,13 @@ pub enum Device {
     Gpu,
     /// GPU for grids of at least `AUTO_GPU_MIN_DOFS` DOFs on a hardware adapter, else the CPU twin.
     Auto,
+}
+
+/// The design update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Optimizer {
+    Oc,
+    Mma,
 }
 
 /// Loop settings (TECHNICAL_SPEC §5.6 named defaults in `Default`).
@@ -78,6 +104,15 @@ pub struct Settings {
     pub pcg_tolerance: f64,
     pub pcg_max_iterations: usize,
     pub device: Device,
+    pub optimizer: Optimizer,
+    /// Heaviside projection on the density filter (none = plain filter).
+    pub projection: Option<Projection>,
+    /// Grid axis (0 = i, 1 = j, 2 = k) the design is uniform along.
+    pub extrusion: Option<usize>,
+    /// Wall-clock budget; the loop checkpoints when it is reached.
+    pub deadline_s: Option<f64>,
+    /// Iterations an earlier run already did (continues β continuation and the MMA step count).
+    pub start_iteration: usize,
 }
 
 impl Default for Settings {
@@ -95,11 +130,16 @@ impl Default for Settings {
             pcg_tolerance: 1e-10,
             pcg_max_iterations: 10_000,
             device: Device::Cpu,
+            optimizer: Optimizer::Oc,
+            projection: None,
+            extrusion: None,
+            deadline_s: None,
+            start_iteration: 0,
         }
     }
 }
 
-/// One history row (per iteration, before the OC step: the compliance of the design that was analysed).
+/// One history row (per iteration, before the design update: the compliance of the design that was analysed).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HistoryRow {
     pub it: usize,
@@ -116,13 +156,41 @@ pub enum Engine {
     CpuFallback { reason: String },
 }
 
+/// How a run ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    Converged,
+    MaxIterations,
+    /// The wall-clock deadline was reached: outputs are a resumable checkpoint.
+    Checkpoint,
+}
+
+/// A constraint of the final design.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Constraint {
+    pub name: &'static str,
+    pub value: f64,
+    pub limit: f64,
+    pub satisfied: bool,
+}
+
+/// What a resumed run needs besides the design and displacements to continue bit for bit.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct OptimizerState {
+    /// MMA asymptotes and history (`Mma::state`) with its step count.
+    pub mma: Option<(Vec<f64>, usize)>,
+    pub projection_level: u32,
+    /// The compliance the MMA objective is normalised by (the first iteration's).
+    pub objective_scale: Option<f64>,
+}
+
 /// Result of a run.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Outcome {
     pub x: Vec<f64>,
     pub x_phys: Vec<f64>,
     pub iterations: usize,
-    pub converged: bool,
+    pub status: Status,
     pub history: Vec<HistoryRow>,
     /// Weighted compliance of the final xPhys (one more solve after the last update).
     pub compliance: f64,
@@ -137,6 +205,11 @@ pub struct Outcome {
     pub warnings: Vec<String>,
     /// Per load case, the displacements of the last loop iteration's solve: the warm start a resumed run continues from.
     pub displacements: Vec<Vec<f64>>,
+    pub objective_value: f64,
+    pub constraints: Vec<Constraint>,
+    /// The projection β of the final design.
+    pub beta: Option<f64>,
+    pub state: OptimizerState,
 }
 
 /// A failed run: stable code (`TOP_SOLVER_FAILED`, …) and message.
@@ -149,138 +222,6 @@ pub struct TopError {
 /// Smallest grid (DOFs) that `device: auto` sends to a hardware GPU.
 pub const AUTO_GPU_MIN_DOFS: usize = 500_000;
 
-/// Linear solves on the CPU twin or the GPU.
-enum Backend {
-    Cpu,
-    #[cfg(feature = "gpu")]
-    Gpu(Box<llull_voxfe::gpu::GpuOperator>),
-}
-
-fn choose_backend(device: Device, op: &Operator) -> (Backend, Engine) {
-    match device {
-        Device::Cpu => (Backend::Cpu, Engine::Cpu),
-        Device::Gpu | Device::Auto => gpu_backend(device, op),
-    }
-}
-
-#[cfg(feature = "gpu")]
-fn gpu_backend(device: Device, op: &Operator) -> (Backend, Engine) {
-    if device == Device::Auto && op.grid().dofs() < AUTO_GPU_MIN_DOFS {
-        return (Backend::Cpu, Engine::Cpu);
-    }
-    match llull_gpu::device::acquire("llull-topopt") {
-        Ok(gpu) if device == Device::Auto && gpu.software => (Backend::Cpu, Engine::Cpu),
-        Ok(gpu) => {
-            let adapter = gpu.adapter.clone();
-            (Backend::Gpu(Box::new(llull_voxfe::gpu::GpuOperator::new(gpu, op))), Engine::Gpu { adapter })
-        }
-        Err(_) if device == Device::Auto => (Backend::Cpu, Engine::Cpu),
-        Err(reason) => (Backend::Cpu, Engine::CpuFallback { reason }),
-    }
-}
-
-#[cfg(not(feature = "gpu"))]
-fn gpu_backend(device: Device, _op: &Operator) -> (Backend, Engine) {
-    match device {
-        Device::Auto => (Backend::Cpu, Engine::Cpu),
-        _ => (Backend::Cpu, Engine::CpuFallback { reason: "built without the gpu feature".to_string() }),
-    }
-}
-
-struct Solver<'a> {
-    settings: &'a Settings,
-    backend: Backend,
-    /// The CPU twin's multigrid hierarchy, built on the first CPU solve and updated in place when the scales change.
-    multigrid: Option<Multigrid<f32>>,
-    /// The hierarchy does not match the operator's current scales yet.
-    stale: bool,
-    /// Per load case, the displacements of its last solve: the start of its next solve (warm start; empty = zero).
-    warm: Vec<Vec<f64>>,
-    pcg_iterations: usize,
-    warnings: Vec<String>,
-}
-
-impl Solver<'_> {
-    fn set_scale(&mut self, op: &Operator) {
-        self.stale = true;
-        #[cfg(feature = "gpu")]
-        if let Backend::Gpu(gpu) = &self.backend {
-            gpu.set_scale(op.scale());
-        }
-        let _ = op;
-    }
-
-    /// Builds the multigrid hierarchy, or updates it to the operator's current scales, once per scale change (multigrid
-    /// solver only) and mirrors it to the GPU (whose PCG then uses the V-cycle instead of Jacobi).
-    fn refresh_multigrid(&mut self, op: &Operator) {
-        if self.settings.solver != SolverKind::Multigrid || !self.stale {
-            return;
-        }
-        match &mut self.multigrid {
-            Some(multigrid) => multigrid.update(op),
-            None => self.multigrid = Some(Multigrid::new(op, MultigridSettings::default())),
-        }
-        self.stale = false;
-        #[cfg(feature = "gpu")]
-        if let (Backend::Gpu(gpu), Some(multigrid)) = (&mut self.backend, &self.multigrid) {
-            gpu.set_multigrid(multigrid);
-        }
-    }
-
-    /// PCG on the CPU twin from `u` (masked by the solver).
-    fn cpu(&mut self, op: &Operator, b: &[f64], mut u: Vec<f64>) -> Result<Vec<f64>, TopError> {
-        let (tolerance, cap) = (self.settings.pcg_tolerance, self.settings.pcg_max_iterations);
-        let stats = match self.settings.solver {
-            SolverKind::Jacobi => pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap),
-            SolverKind::Multigrid => {
-                self.refresh_multigrid(op);
-                let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built by refresh_multigrid"));
-                pcg(op, multigrid, b, &mut u, tolerance, cap)
-            }
-        }
-        .map_err(|error| TopError { code: "TOP_SOLVER_FAILED", message: error.to_string() })?;
-        self.pcg_iterations += stats.iterations;
-        Ok(u)
-    }
-
-    /// Solves load case `case` (`K u = b`) from its previous displacements and keeps the result for the next solve.
-    fn solve(&mut self, op: &Operator, case: usize, b: &[f64]) -> Result<Vec<f64>, TopError> {
-        let u = self.solve_from(op, b, self.start(case, b.len()))?;
-        self.warm[case].clone_from(&u);
-        Ok(u)
-    }
-
-    fn start(&self, case: usize, len: usize) -> Vec<f64> {
-        match self.warm.get(case) {
-            Some(u) if u.len() == len => u.clone(),
-            _ => vec![0.0; len],
-        }
-    }
-
-    fn solve_from(&mut self, op: &Operator, b: &[f64], start: Vec<f64>) -> Result<Vec<f64>, TopError> {
-        self.refresh_multigrid(op);
-        match &self.backend {
-            Backend::Cpu => self.cpu(op, b, start),
-            #[cfg(feature = "gpu")]
-            Backend::Gpu(gpu) => {
-                let mut u = start.clone();
-                match llull_voxfe::gpu::refine(gpu, op, b, &mut u, self.settings.pcg_tolerance, 1e-4, self.settings.pcg_max_iterations) {
-                    Ok(stats) => {
-                        self.pcg_iterations += stats.inner;
-                        Ok(u)
-                    }
-                    Err(reason) => {
-                        if self.warnings.len() < 20 {
-                            self.warnings.push(format!("GPU solve failed ({reason}); solved by the CPU twin"));
-                        }
-                        self.cpu(op, b, start)
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings: &Settings, geometric: f64) -> Vec<f64> {
     let emin = settings.emin_ratio * problem.e0;
     x_phys
@@ -291,21 +232,40 @@ fn element_scales(x_phys: &[f64], voxels: &[Voxel], problem: &Problem, settings:
         .collect()
 }
 
-/// Weighted compliance, per-case compliances and Σ_lc w_lc u_eᵀk0u_e of the current scales.
-fn analyse(op: &Operator, solver: &mut Solver<'_>, problem: &Problem) -> Result<(f64, Vec<f64>, Vec<f64>), TopError> {
-    let mut energy = vec![0.0; problem.grid.elements()];
+struct Analysis {
+    compliance: f64,
+    per_case: Vec<f64>,
+    /// Σ_lc w_lc u_eᵀk0u_e.
+    energy: Vec<f64>,
+    /// Σ_lc w_lc u_eᵀf_e of the gravity cases (empty without gravity).
+    gravity: Vec<f64>,
+}
+
+/// Weighted compliance, per-case compliances and the element energies of the current scales (forces include gravity).
+fn analyse(op: &Operator, solver: &mut Solver<'_>, problem: &Problem, x_phys: &[f64], active: &[bool]) -> Result<Analysis, TopError> {
+    let n = problem.grid.elements();
+    let has_gravity = problem.load_cases.iter().any(|case| case.gravity.is_some());
+    let mut energy = vec![0.0; n];
+    let mut gravity = if has_gravity { vec![0.0; n] } else { Vec::new() };
     let mut per_case = Vec::with_capacity(problem.load_cases.len());
     let mut weighted = 0.0;
     for (index, case) in problem.load_cases.iter().enumerate() {
-        let u = solver.solve(op, index, &case.forces)?;
+        let u = match case.gravity {
+            Some(g) => solver.solve(op, index, &with_gravity(&problem.grid, &case.forces, x_phys, active, g))?,
+            None => solver.solve(op, index, &case.forces)?,
+        };
         let ce = op.element_energies(&u);
         let scaled: Vec<f64> = ce.par_iter().with_min_len(MIN_LEN).zip(op.scale()).map(|(c, s)| c * s).collect();
         let c = sum(&scaled);
         per_case.push(c);
         weighted += case.weight * c;
         energy.par_iter_mut().with_min_len(MIN_LEN).zip(&ce).for_each(|(e, c)| *e += case.weight * c);
+        if let Some(g) = case.gravity {
+            let work = gravity_work(&problem.grid, &u, active, g);
+            gravity.par_iter_mut().with_min_len(MIN_LEN).zip(&work).for_each(|(e, w)| *e += case.weight * w);
+        }
     }
-    Ok((weighted, per_case, energy))
+    Ok(Analysis { compliance: weighted, per_case, energy, gravity })
 }
 
 /// `value >= min`, false for NaN.
@@ -321,6 +281,9 @@ pub fn validate(problem: &Problem, settings: &Settings) -> Result<(), String> {
     }
     if problem.load_cases.is_empty() || problem.load_cases.iter().any(|c| c.forces.len() != g.dofs() || !at_least(c.weight, 0.0)) {
         return Err("need at least one load case with DOF-length forces and a weight ≥ 0".to_string());
+    }
+    if problem.load_cases.iter().any(|c| c.gravity.is_some_and(|g| g.iter().any(|v| !v.is_finite()))) {
+        return Err("gravity needs finite components".to_string());
     }
     let active = problem.voxels.iter().filter(|&&v| v != Voxel::Inactive).count();
     if active == 0 {
@@ -344,18 +307,57 @@ pub fn validate(problem: &Problem, settings: &Settings) -> Result<(), String> {
     if !at_least(settings.change_tol, 0.0) || settings.max_iterations == 0 || settings.pcg_max_iterations == 0 {
         return Err("changeTol < 0 or a zero iteration cap".to_string());
     }
+    if let Objective::MinVolume { max_compliance } = problem.objective {
+        if !(max_compliance.is_finite() && max_compliance > 0.0) {
+            return Err("objective minVolume needs maxCompliance > 0".to_string());
+        }
+        if settings.optimizer != Optimizer::Mma {
+            return Err("objective minVolume needs optimizer mma (OC handles the volume constraint only)".to_string());
+        }
+    }
+    if let Some(projection) = settings.projection {
+        if settings.filter != FilterKind::Density {
+            return Err("projection needs the density filter".to_string());
+        }
+        if !(projection.beta_start > 0.0 && projection.beta >= projection.beta_start && projection.beta.is_finite())
+            || !(projection.eta > 0.0 && projection.eta < 1.0)
+            || projection.beta_every == 0
+        {
+            return Err("projection needs 0 < betaStart ≤ beta, eta in (0, 1) and betaEvery ≥ 1".to_string());
+        }
+    }
+    if settings.extrusion.is_some_and(|axis| axis >= g.dim) {
+        return Err(format!("extrusion axis must be below the dimension {}", g.dim));
+    }
+    if settings.deadline_s.is_some_and(|d| !(d.is_finite() && d >= 0.0)) {
+        return Err("deadlineS must be a finite number ≥ 0".to_string());
+    }
     Ok(())
 }
 
-/// Where a run starts: design variables x (element-length; `None` = uniform volume fraction) and the warm start of the first
-/// solves (load cases × DOFs, an earlier run's [`Outcome::displacements`]; `None` = zero).
+/// Where a run starts: design variables x (element-length; `None` = uniform volume fraction), the warm start of the first
+/// solves (load cases × DOFs, an earlier run's [`Outcome::displacements`]; `None` = zero) and the optimiser state of the run
+/// being continued (`None` = fresh asymptotes / continuation).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Start<'a> {
     pub design: Option<&'a [f64]>,
     pub displacements: Option<&'a [f64]>,
+    pub state: Option<&'a OptimizerState>,
+}
+
+fn warm_starts(start: Start<'_>, dofs: usize, cases: usize) -> Result<Vec<Vec<f64>>, TopError> {
+    match start.displacements {
+        Some(values) if values.len() == dofs * cases => Ok(values.chunks_exact(dofs).map(<[f64]>::to_vec).collect()),
+        Some(values) => Err(TopError {
+            code: "NATIVE_JOB_INPUT",
+            message: format!("start displacements: {} values, expected {cases} load cases x {dofs} DOFs", values.len()),
+        }),
+        None => Ok(vec![Vec::new(); cases]),
+    }
 }
 
 /// Runs the SIMP loop from `start`. `progress` sees each history row as it is produced.
+#[allow(clippy::too_many_lines)]
 pub fn optimise(
     problem: &Problem,
     settings: &Settings,
@@ -363,23 +365,8 @@ pub fn optimise(
     progress: &mut dyn FnMut(&HistoryRow),
 ) -> Result<Outcome, TopError> {
     validate(problem, settings).map_err(|message| TopError { code: "NATIVE_JOB_INPUT", message })?;
-    let dofs = problem.grid.dofs();
-    let warm: Vec<Vec<f64>> = match start.displacements {
-        Some(values) if values.len() == dofs * problem.load_cases.len() => values.chunks_exact(dofs).map(<[f64]>::to_vec).collect(),
-        Some(values) => {
-            return Err(TopError {
-                code: "NATIVE_JOB_INPUT",
-                message: format!(
-                    "start displacements: {} values, expected {} load cases x {dofs} DOFs",
-                    values.len(),
-                    problem.load_cases.len()
-                ),
-            })
-        }
-        None => vec![Vec::new(); problem.load_cases.len()],
-    };
-    let start_design = start.design;
     let g = problem.grid;
+    let warm = warm_starts(start, g.dofs(), problem.load_cases.len())?;
     let n = g.elements();
     let voxels = &problem.voxels;
     let active: Vec<bool> = voxels.iter().map(|&v| v != Voxel::Inactive).collect();
@@ -392,23 +379,46 @@ pub fn optimise(
             Voxel::KeepOut | Voxel::Inactive => Design::Pinned(0.0),
         })
         .collect();
+    let pinned: Vec<f64> = design.iter().map(|d| if let Design::Pinned(p) = d { *p } else { 0.0 }).collect();
     let geometric = if g.dim == 3 { problem.voxel } else { problem.thickness };
     let filter = Filter::new(g, &active, settings.radius);
+    let space = match settings.extrusion {
+        Some(axis) => DesignSpace::extruded(g, &design, axis),
+        None => DesignSpace::identity(&design),
+    };
+    let free = space.free_variables();
     let pin = |values: Vec<f64>| -> Vec<f64> {
         values.into_iter().zip(&design).map(|(v, d)| if let Design::Pinned(p) = d { *p } else { v }).collect()
     };
-    let physical = |x: &[f64]| -> Vec<f64> {
+    let expand = |vars: &[f64]| -> Vec<f64> { pin(space.expand(vars, &pinned)) };
+    // the filtered density x̃ of a design; with an extrusion axis the filtered field is averaged along it (the filter stencil is
+    // truncated at the grid ends, so the plain convolution of a uniform column is not uniform)
+    let filtered = |x: &[f64]| -> Vec<f64> { space.uniform(&filter.density(x)) };
+    // design variables → xPhys (filter, projection at the given β, pins)
+    let physical = |vars: &[f64], beta: Option<f64>| -> Vec<f64> {
+        let x = expand(vars);
         match settings.filter {
-            FilterKind::Sensitivity => pin(x.to_vec()),
-            FilterKind::Density => pin(filter.density(x)),
+            FilterKind::Sensitivity => x,
+            FilterKind::Density => {
+                let tilde = filtered(&x);
+                match (settings.projection, beta) {
+                    (Some(projection), Some(beta)) => pin(projection.apply(beta, &tilde)),
+                    _ => pin(tilde),
+                }
+            }
         }
     };
-    let mut x: Vec<f64> = match start_design {
-        Some(start) => pin(start.iter().map(|v| v.clamp(0.0, 1.0)).collect()),
-        None => pin(vec![problem.volume_fraction; n]),
+    let initial = start.state.cloned().unwrap_or_default();
+    let mut level = initial.projection_level;
+    let beta_of = |level: u32| settings.projection.map(|p| p.beta_at(level));
+    let mut beta = beta_of(level);
+    let mut vars: Vec<f64> = match start.design {
+        Some(values) => space.reduce_mean(&pin(values.iter().map(|v| v.clamp(0.0, 1.0)).collect())),
+        None => space.reduce_mean(&pin(vec![problem.volume_fraction; n])),
     };
-    // top88 starts from xPhys = x; a resumed run recomputes xPhys from x exactly as the OC step did
-    let mut x_phys = if start_design.is_some() { physical(&x) } else { x.clone() };
+    let mut x = expand(&vars);
+    // top88 starts from xPhys = x; a resumed or projected run recomputes xPhys from x exactly as the update step does
+    let mut x_phys = if start.design.is_some() || settings.projection.is_some() { physical(&vars, beta) } else { x.clone() };
     let mut op = Operator::new(
         g,
         element_matrix(g.dim, problem.nu),
@@ -420,58 +430,166 @@ pub fn optimise(
     let emin = settings.emin_ratio * problem.e0;
     let target = problem.volume_fraction * active_count as f64;
     let limits = Limits { move_limit: settings.move_limit, tolerance: settings.oc_tolerance, target };
+    let mut mma = match settings.optimizer {
+        Optimizer::Oc => None,
+        Optimizer::Mma => Some(match &initial.mma {
+            Some((values, iteration)) => Mma::restore(free.len(), 1, values, *iteration).unwrap_or_else(|| Mma::new(free.len(), 1)),
+            None => Mma::new(free.len(), 1),
+        }),
+    };
+    let mut objective_scale = initial.objective_scale;
+    let started = Instant::now();
     let mut history = Vec::new();
-    let mut change = f64::INFINITY;
     let mut iterations = 0;
-    while change > settings.change_tol && iterations < settings.max_iterations {
+    let status = loop {
+        if iterations >= settings.max_iterations {
+            break Status::MaxIterations;
+        }
         iterations += 1;
         if iterations > 1 {
             op.set_scale(element_scales(&x_phys, voxels, problem, settings, geometric));
         }
         solver.set_scale(&op);
-        let (compliance, _, energy) = analyse(&op, &mut solver, problem)?;
+        let analysis = analyse(&op, &mut solver, problem, &x_phys, &active)?;
+        let compliance = analysis.compliance;
         let factor = -settings.penal * (problem.e0 - emin) * geometric;
+        let has_gravity = !analysis.gravity.is_empty();
         let mut dc: Vec<f64> = (0..n)
             .into_par_iter()
             .with_min_len(MIN_LEN)
-            .map(|e| if design[e] == Design::Free { factor * x_phys[e].powf(settings.penal - 1.0) * energy[e] } else { 0.0 })
+            .map(|e| {
+                if design[e] != Design::Free {
+                    return 0.0;
+                }
+                let stiffness = factor * x_phys[e].powf(settings.penal - 1.0) * analysis.energy[e];
+                if has_gravity {
+                    stiffness + 2.0 * analysis.gravity[e]
+                } else {
+                    stiffness
+                }
+            })
             .collect();
         let mut dv: Vec<f64> = design.iter().map(|d| if *d == Design::Free { 1.0 } else { 0.0 }).collect();
         match settings.filter {
             FilterKind::Sensitivity => dc = filter.sensitivity(&x, &dc),
             FilterKind::Density => {
-                dc = filter.density_adjoint(&dc);
-                dv = filter.density_adjoint(&dv);
+                if let (Some(projection), Some(beta)) = (settings.projection, beta) {
+                    let slope = projection.derivative(beta, &filtered(&x));
+                    dc = dc.iter().zip(&slope).map(|(d, s)| d * s).collect();
+                    dv = dv.iter().zip(&slope).map(|(d, s)| d * s).collect();
+                }
+                // chain rule of the column average (its own adjoint), then of the filter
+                dc = filter.density_adjoint(&space.uniform(&dc));
+                dv = filter.density_adjoint(&space.uniform(&dv));
             }
         }
-        let step = oc::update(&x, &dc, &dv, &design, limits, &physical);
-        let difference: Vec<f64> = step.x.iter().zip(&x).map(|(a, b)| a - b).collect();
-        change = max_abs(&difference);
-        x = step.x;
-        x_phys = step.x_phys;
+        let dc_v = space.reduce_sum(&dc);
+        let dv_v = space.reduce_sum(&dv);
+        let phys = |v: &[f64]| physical(v, beta);
+        let (next_vars, next_phys) = match &mut mma {
+            None => {
+                let step = oc::update(&vars, &dc_v, &dv_v, space.design(), limits, &phys);
+                (step.x, step.x_phys)
+            }
+            Some(mma) => {
+                let scale = *objective_scale.get_or_insert(compliance);
+                let pick = |values: &[f64]| -> Vec<f64> { free.iter().map(|&v| values[v]).collect() };
+                let (xf, dc_f, dv_f) = (pick(&vars), pick(&dc_v), pick(&dv_v));
+                let (df0, f, df) = match problem.objective {
+                    Objective::MinCompliance => (
+                        dc_f.iter().map(|d| d / scale).collect::<Vec<f64>>(),
+                        vec![sum(&x_phys) / target - 1.0],
+                        vec![dv_f.iter().map(|d| d / target).collect::<Vec<f64>>()],
+                    ),
+                    Objective::MinVolume { max_compliance } => (
+                        dv_f.iter().map(|d| d / active_count as f64).collect::<Vec<f64>>(),
+                        vec![compliance / max_compliance - 1.0],
+                        vec![dc_f.iter().map(|d| d / max_compliance).collect::<Vec<f64>>()],
+                    ),
+                };
+                let step = mma.step(&xf, &df0, &f, &df, Bounds { xmin: 0.0, xmax: 1.0, move_limit: settings.move_limit });
+                let mut next = vars.clone();
+                for (k, &v) in free.iter().enumerate() {
+                    next[v] = step[k];
+                }
+                let next_phys = phys(&next);
+                (next, next_phys)
+            }
+        };
+        let difference: Vec<f64> = next_vars.iter().zip(&vars).map(|(a, b)| a - b).collect();
+        let change = max_abs(&difference);
+        vars = next_vars;
+        x = expand(&vars);
+        x_phys = next_phys;
         let row = HistoryRow { it: iterations, compliance, volume: sum(&x_phys) / active_count as f64, change };
         progress(&row);
         history.push(row);
-    }
+        if settings.deadline_s.is_some_and(|deadline| started.elapsed().as_secs_f64() >= deadline) {
+            break Status::Checkpoint;
+        }
+        let at_final_beta = settings.projection.is_none_or(|p| p.is_final(level));
+        if change <= settings.change_tol {
+            if at_final_beta {
+                break Status::Converged;
+            }
+            level += 1;
+        } else if settings
+            .projection
+            .is_some_and(|p| !p.is_final(level) && (settings.start_iteration + iterations).is_multiple_of(p.beta_every))
+        {
+            level += 1;
+        } else {
+            continue;
+        }
+        // β continuation: the same design projects sharper from here on
+        beta = beta_of(level);
+        x_phys = physical(&vars, beta);
+    };
     // the warm start of the next iteration: what a resumed run needs to continue bit for bit
     let displacements = solver.warm.clone();
     op.set_scale(element_scales(&x_phys, voxels, problem, settings, geometric));
     solver.set_scale(&op);
-    let (compliance, per_load_case, _) = analyse(&op, &mut solver, problem)?;
+    let final_analysis = analyse(&op, &mut solver, problem, &x_phys, &active)?;
+    let compliance = final_analysis.compliance;
     let grey_terms: Vec<f64> = x_phys.iter().zip(&active).map(|(x, &a)| if a { 4.0 * x * (1.0 - x) } else { 0.0 }).collect();
+    let volume = sum(&x_phys) / active_count as f64;
+    let (objective_value, constraints) = match problem.objective {
+        Objective::MinCompliance => (
+            compliance,
+            vec![Constraint {
+                name: "volume",
+                value: volume,
+                limit: problem.volume_fraction,
+                satisfied: volume <= problem.volume_fraction + 1e-9,
+            }],
+        ),
+        Objective::MinVolume { max_compliance } => (
+            volume,
+            vec![Constraint {
+                name: "compliance",
+                value: compliance,
+                limit: max_compliance,
+                satisfied: compliance <= max_compliance * (1.0 + 1e-6),
+            }],
+        ),
+    };
     Ok(Outcome {
-        volume: sum(&x_phys) / active_count as f64,
+        volume,
         grey: sum(&grey_terms) / active_count as f64,
         x,
         x_phys,
         iterations,
-        converged: change <= settings.change_tol,
+        status,
         history,
         compliance,
-        per_load_case,
+        per_load_case: final_analysis.per_case,
         engine,
         pcg_iterations: solver.pcg_iterations,
         warnings: solver.warnings,
         displacements,
+        objective_value,
+        constraints,
+        beta,
+        state: OptimizerState { mma: mma.as_ref().map(Mma::state), projection_level: level, objective_scale },
     })
 }
