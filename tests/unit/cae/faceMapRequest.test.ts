@@ -82,7 +82,7 @@ describe('fea_mesh with the face map', () => {
       request = sent;
       return Promise.resolve({
         ok: true,
-        mesher: 'gmsh',
+        mesher: 'netgen',
         mesherVersion: '4',
         nodes: mesh.nodes,
         blocks: mesh.blocks,

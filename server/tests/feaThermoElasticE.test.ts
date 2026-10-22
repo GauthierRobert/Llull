@@ -1,8 +1,8 @@
 /**
- * thermo_static with a temperature-dependent Young's modulus through the real Gmsh + CalculiX: a bar restrained along x (lateral faces free),
+ * thermo_static with a temperature-dependent Young's modulus through the real Netgen (llull-mesh) + CalculiX: a bar restrained along x (lateral faces free),
  * uniform 400 degC from a 20 degC reference, E(T) as a table (200 GPa at 20 degC, 185 at 300, 170 at 500), nu 0.3, constant alpha 1.2e-5 1/K.
  * Uniaxial restrained expansion: sigma = -E(T_hot) alpha dT = -177.5 GPa x 1.2e-5 x 380 K = -809.4 MPa (E at 20 degC would give -912.0 MPa,
- * +12.7 %). Skipped without Gmsh or CalculiX.
+ * +12.7 %). Skipped without llull-mesh or CalculiX.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -10,10 +10,10 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 beforeAll(async () => {
   workspace = new Workspace();

@@ -1,5 +1,5 @@
 /**
- * Shell idealization (05 FEA-REST part 3) through the real Gmsh + CalculiX 2.21: the expansion mapping of the .frd (ccx writes the shell results on
+ * Shell idealization (05 FEA-REST part 3) through the real Netgen (llull-mesh) + CalculiX 2.21: the expansion mapping of the .frd (ccx writes the shell results on
  * the expanded 3D nodes; llull maps them back to the 2D mesh nodes), the pressure sign on shells, the composite shell section on S8R and the frame of
  * its fibre stresses, and the *HEADING binding marker in the .frd. Closed forms (box plate 100 x 20, cantilever along x, clamped at x = 0):
  * - isotropic t = 2, E 70 GPa, nu 0.3, tip force 10 N: the tip deflection lies between the plate (E / (1 - nu^2)) and the beam value P L^3 / (3 E I)
@@ -7,7 +7,7 @@
  * - pressure 0.001 MPa on the top face pushes the plate down, on the bottom face up (q L^4 / (8 E I) = 0.268 mm, beam);
  * - [90/0/0/90] CFRP (E1 140, E2 10, G12 5 GPa, nu12 0.3, ply 0.25), tip force 1 N: classical laminate theory with My = 0 (narrow strip) gives at
  *   x = 50 the top-fibre stresses sigma_x = 5.694, sigma_y = -0.226 MPa (90-degree outer ply, GLOBAL frame) and u_z = -2.371 mm.
- * Skipped without Gmsh or CalculiX.
+ * Skipped without llull-mesh or CalculiX.
  */
 
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 type Step = Record<string, unknown>;
 
@@ -152,7 +152,7 @@ function valueAt(mesh: FeMeshArtifact, results: FeResultsArtifact, field: string
 
 const EI = (70000 * WIDTH * 2 ** 3) / 12;
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('shell solves (gmsh + ccx 2.21)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('shell solves (netgen + ccx 2.21)', () => {
   it('maps the expanded .frd back to the 2D nodes: plate cantilever deflection and fibre signs, *HEADING binding in the .frd', async () => {
     const shell = new ShellCase('iso-tip');
     const { mesh, results, jobDirectory } = await shell.solve(isotropicPlate(2, [tipForce(2, -10)]));

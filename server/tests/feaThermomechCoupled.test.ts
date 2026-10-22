@@ -2,16 +2,16 @@
  * PHY-04 coupled temperature-displacement procedure (TR-TMC-22) through the real pipeline: thermal BCs (PHY-03) and mechanical BCs (05) in ONE
  * analysis, `*COUPLED TEMPERATURE-DISPLACEMENT, STEADY STATE` solved by CalculiX. The temperature field is solved, not set: the fully restrained
  * bar with the same temperature on both ends reproduces VC-TMC-01.a, the thick cylinder (bore 120 degC, outer 20 degC) VC-TMC-05.a-c.
- * Skipped without Gmsh or CalculiX.
+ * Skipped without llull-mesh or CalculiX.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {

@@ -3,7 +3,7 @@
  * TWO materials, both E = 100 GPa, nu = 0.3: the disc has thermal strain 0.001 per K (alpha_hot), the plate none (alpha_bulk = 0); the field is a
  * uniform dT = 1 K (reference 0, field 1), so the stress depends on the mismatch only. Geometry from llull commands: the disc is a quarter
  * revolution, the plate a box minus a copy of it (`boolean` subtract), so the parts touch exactly on the quarter cylinder; `set_mesh_controls
- * bonding: conformal` fragments them in ONE Gmsh model, the interface nodes are shared (a bonded joint; element sets and materials per part).
+ * bonding: conformal` fragments them into ONE shape meshed at once, the interface nodes are shared (a bonded joint; element sets and materials per part).
  * The step in alpha is resolved by the mesh topology, not smeared over an element as in a one-material nodal temperature step.
  *
  * Plane stress is the thin-plate limit: within about one thickness h of the interface the free faces break it (3D edge effect, the hoop stress
@@ -12,7 +12,8 @@
  * radius with its exact law sigma_theta ~ 1/r^2 (r_node/r)^2. Probes sit at the exact coordinates of nodes used by ONE part only: a node shared by both
  * parts averages two different stress states in the CalculiX nodal output. sigma_y on y = 0 is the hoop stress.
  *
- * Measured with Gmsh 4.15.2 + CalculiX 2.21, order 2, global size 0.2 mm, thickness h = ring refinement size on the circle (nodes, node radius r,
+ * Since NG1 the mesher is Netgen 6.2.2604: the two suite runs mesh 52k (h 0.04) and 74k (h 0.02) nodes and pass the same judges. The
+ * convergence record below was measured with the mesher before it (Gmsh 4.15.2) + CalculiX 2.21, order 2, global size 0.2 mm, thickness h = ring refinement size on the circle (nodes, node radius r,
  * raw sigma_y there against 50 (a/r)^2, moved to 1.005 against 49.5037, disc node nearest (0.5, 0) against -50):
  * h 0.04: 47k, 1.0593, 44.93 vs 44.56, 49.92 (+0.8 %), -49.55 | h 0.02: 75k, 1.0298, 47.52 vs 47.15, 49.89 (+0.8 %), -49.55 |
  * h 0.01: 179k, 1.0149, 48.90 vs 48.54, 49.87 (+0.7 %), -49.55. The remaining +0.4 MPa is the finite plate (the free edges add about
@@ -27,10 +28,10 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace, type Session } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 let occtReady = false;
 

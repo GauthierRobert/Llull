@@ -22,7 +22,7 @@ One registered command = one UI action + one CLI tool. Editing entities in a com
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
 Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + tool JSON Schema + validation) ·
 kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (the exact kernel) and Manifold WASM (in-process mesh kernel: renderer, tests, fallback) ·
-Rust workspace `solver/` (`llull-compute`, `llull-kernel`, `llull-mesh`: Gmsh FE mesher via its C API) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
+Rust workspace `solver/` (`llull-compute`, `llull-kernel`, `llull-mesh`: Netgen FE mesher, `llull-netgen` cxx facade) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
 Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
 agents: `llull` CLI only (`--app` drives the desktop app); no MCP server.
 Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.

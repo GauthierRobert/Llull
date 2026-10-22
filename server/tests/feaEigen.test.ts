@@ -1,9 +1,9 @@
 /**
- * Modal (*FREQUENCY) and linear buckling (*BUCKLE) through the real Gmsh + CalculiX, against closed forms of slender steel bars (E 210 GPa,
+ * Modal (*FREQUENCY) and linear buckling (*BUCKLE) through the real Netgen (llull-mesh) + CalculiX, against closed forms of slender steel bars (E 210 GPa,
  * nu 0.3, 7800 kg/m^3, square 10 mm section):
  * - cantilever 200 mm: f1 = (1.8751^2 / 2 pi) sqrt(E I / (rho A L^4)) = 209.5 Hz (measured 209.73, +0.1 %); the two bending planes are degenerate;
  * - fixed-free column 300 mm: P_cr = pi^2 E I / (4 L^2) = 4797.8 N, so under 1000 N the buckling factor is 4.798 (measured 4.8025, +0.1 %).
- * Skipped without Gmsh or CalculiX.
+ * Skipped without llull-mesh or CalculiX.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -12,10 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, Workspace, type Session } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 beforeAll(async () => {
   workspace = new Workspace();

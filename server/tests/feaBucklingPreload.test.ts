@@ -1,11 +1,11 @@
 /**
  * What CalculiX 2.21 does with the eigen decks of FEA-REST (05 §13), on slender steel bars (E 210 GPa, nu 0.3, 7800 kg/m^3, square 10 mm section),
- * through the real Gmsh + ccx (Manifold geometry, no native kernel needed):
+ * through the real Netgen (llull-mesh) + ccx (Manifold geometry, no native kernel needed):
  * - free-free modal (`*FREQUENCY n, -1`): six rigid-body modes, then the first free-free bending pair at (4.730^2 / 2 pi) sqrt(E I / (rho A L^4))
  *   = 1333 Hz for L = 200 mm (measured 1321.7, -0.8 %: shear and rotary inertia); TOTAL EFFECTIVE MASS = rho V;
  * - fixed-free column 300 mm, P_cr = pi^2 E I / (4 L^2) = 4797.8 N: under a 2000 N preload (set_buckling_preload) and a 1000 N reference the factor
  *   is 1.6008 = P_cr / 3000 N, i.e. it multiplies preload + reference (it would be 2.80 if the preload were held constant).
- * Skipped without Gmsh or CalculiX.
+ * Skipped without llull-mesh or CalculiX.
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 type Step = Record<string, unknown>;
 
@@ -105,7 +105,7 @@ const endForce = (name: string, fx: number, loadCase: string): Step => ({
   params: { analysisId: '$an', name, kind: 'force', vector: [fx, 0, 0], loadCase, target: { entityId: '$bar', facesNear: [[300, 5, 5]] } },
 });
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('eigen decks against CalculiX 2.21', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('eigen decks against CalculiX 2.21', () => {
   it('free-free modal (*FREQUENCY n, -1): six rigid-body modes, then the free-free bending pair; total effective mass = rho V', async () => {
     const { eigen, summary } = await report('free', bar(200, { analysisType: 'modal', modes: 10 }, [], false));
     expect(eigen['rigidBodyModes']).toBe(6);

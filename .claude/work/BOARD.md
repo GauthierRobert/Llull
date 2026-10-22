@@ -12,6 +12,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-22 — branch `feat/netgen-mesher` (stacked on PR #106): NG1 Netgen 6.2.2604 (LGPL-2.1, dynamic) replaces Gmsh in `llull-mesh`
+  (`docs/decisions/NG1-netgen-mesher.md`); `llull-gmsh` deleted. Server FE suites 112/113 (VC-TMC-05/50 pre-existing). Open: owner to
+  confirm llull's licence allows LGPL §6 reverse engineering of llull-mesh; merge PR #106 first.
 - 2026-10-21 — main: KRN-MSVC merged unverified in full (owner): llull-kernel built with MSVC, dlltool stand-in removed (RS-MSVC), PMI
   tolerance pairing by faces. Pending: full native server suite + `npm run check` + TR-FEA-32 on MSVC.
 - 2026-10-21 — merge of origin/main (SC parity, RS native wave) into `feat/eng-depth`: one implementation per capability (stack-up engine = main's Philox

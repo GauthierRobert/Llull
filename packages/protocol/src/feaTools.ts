@@ -1,5 +1,5 @@
 /**
- * FE pipeline tools (transport-level, hand-written schemas like the exchange tools): meshing (Gmsh) and solving (CalculiX) run on
+ * FE pipeline tools (transport-level, hand-written schemas like the exchange tools): meshing (Netgen) and solving (CalculiX) run on
  * the host behind the injected `FeaToolsPort` (server/); every document change still goes through registry commands
  * (`record_fe_mesh` / `record_fea_results`) via the injected `applyCommand`.
  *   fea_mesh    analysed solids -> tet mesh artifact -> record_fe_mesh
@@ -71,10 +71,10 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
     {
       name: 'fea_mesh',
       description:
-        'Mesh the solid parts of a finite-element analysis (Gmsh tetrahedra, set_mesh_controls): the parts are exported from the geometry ' +
+        'Mesh the solid parts of a finite-element analysis (Netgen tetrahedra, set_mesh_controls): the parts are exported from the geometry ' +
         'kernel (exact STEP with the OCC kernel, else a faceted STL), the constraint / load / refinement points are resolved to the ' +
         'nearest faces and nodes, and the mesh is stored as a content-addressed artifact and recorded with record_fe_mesh. ' +
-        'Run it after the set-up commands and before fea_solve; any set-up change makes the mesh stale. Needs the llull-mesh sidecar (Gmsh) on the server.',
+        'Run it after the set-up commands and before fea_solve; any set-up change makes the mesh stale. Needs the llull-mesh sidecar (Netgen) on the server.',
       inputSchema: { type: 'object', properties: { analysisId: ANALYSIS_ID }, required: ['analysisId'] },
       annotations: { idempotentHint: true },
     },
@@ -226,7 +226,7 @@ export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps:
   if (analysisId === undefined) return failure(`${toolName}: analysisId is required.`);
   if (deps.fea === undefined || deps.fea === null) {
     return failure(
-      `${toolName} FEA_TOOL_MISSING: the FE transports are not configured on this host (needs the llull server with llull-mesh (Gmsh) and ccx).`,
+      `${toolName} FEA_TOOL_MISSING: the FE transports are not configured on this host (needs the llull server with llull-mesh (Netgen) and ccx).`,
     );
   }
   if (toolName === 'fea_export' && args['format'] !== undefined && !(FEA_EXPORT_FORMATS as readonly unknown[]).includes(args['format']))

@@ -1,15 +1,16 @@
-//! The per-part result the meshers hand to the assembly (`assemble.rs`): mesh in Gmsh tags of one model + resolved targets.
+//! The per-part result the meshers hand to the assembly (`assemble.rs`): mesh in node tags of one Netgen mesh + resolved targets.
+//! Faces / edges / regions are B-rep face and edge numbers of the part's shape (STEP, midsurface) or facet regions (STL).
 
 use crate::common::Point;
 use serde_json::Value;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-/// One target resolved on one part, in Gmsh tags.
+/// One target resolved on one part.
 #[derive(Debug, Default)]
 pub struct Resolved {
-    /// Face regions (solids) / mid surfaces (shells).
+    /// Face regions (solids) / mid faces (shells).
     pub faces: BTreeSet<i32>,
-    /// Shells: pressure side per mid surface (1 = +normal side, 2 = below), in resolution order.
+    /// Shells: pressure side per mid face (1 = +normal side, 2 = below), in resolution order.
     pub labels: Vec<(i32, i32)>,
     pub edges: BTreeSet<i32>,
     pub residual: f64,
@@ -20,7 +21,7 @@ pub struct Resolved {
 /// Target key -> resolution, in target order.
 pub type ResolvedTargets = Vec<(String, Resolved)>;
 
-/// A local size reduction near resolved faces / curves / points.
+/// A local size reduction near resolved faces / edges / points (size in document units).
 pub struct Refinement {
     pub size: f64,
     pub surfaces: Vec<i32>,
@@ -30,7 +31,7 @@ pub struct Refinement {
 
 pub struct RawMesh {
     pub coords: HashMap<usize, Point>,
-    /// `(CalculiX element type, rows of Gmsh node tags)`.
+    /// `(CalculiX element type, rows of node tags)`.
     pub blocks: Vec<(String, Vec<Vec<usize>>)>,
     pub resolved: ResolvedTargets,
     pub region_nodes: HashMap<i32, HashSet<usize>>,
@@ -41,13 +42,4 @@ pub struct RawMesh {
     pub target_faces: Option<HashMap<String, Vec<(usize, i32)>>>,
     pub defeatured: Vec<i32>,
     pub face_map: Vec<Value>,
-}
-
-/// Every node of the current model on curve `(1, tag)` including its end points, for every curve.
-pub fn curve_nodes(gmsh: &llull_gmsh::Gmsh) -> crate::common::MeshResult<HashMap<i32, HashSet<usize>>> {
-    let mut out = HashMap::new();
-    for (_, curve) in gmsh.entities(1)? {
-        out.insert(curve, gmsh.nodes(1, curve, true)?.0.into_iter().collect());
-    }
-    Ok(out)
 }

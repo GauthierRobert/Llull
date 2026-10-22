@@ -6,10 +6,10 @@ import type { FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 
-export const INSTALL_HINT: Readonly<Record<'gmsh' | 'ccx', string>> = {
-  gmsh:
-    'Build llull-mesh (`cargo build --release -p llull-mesh` in solver/) and install the Gmsh 4.x library (`pip install gmsh` installs it; ' +
-    'LLULL_GMSH_LIB names the file, LLULL_MESH_BIN the binary).',
+export const INSTALL_HINT: Readonly<Record<'mesher' | 'ccx', string>> = {
+  mesher:
+    'Build Netgen and llull-mesh (`node solver/scripts/build-netgen.mjs`, then `cargo build --release -p llull-mesh` in solver/); ' +
+    'LLULL_MESH_BIN names the binary, and its Netgen / OCCT shared libraries must load (Windows: their bin/ folders on PATH).',
   ccx: 'Install CalculiX (`apt install calculix-ccx`, or conda `calculix`); LLULL_CCX names the executable.',
 };
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { callNativeMesher, parseMesherOutput } from '../src/fea/nativeMesher';
+import { callNativeMesher, librariesMissing, parseMesherOutput } from '../src/fea/nativeMesher';
 
 describe('parseMesherOutput', () => {
-  it('reads the last non-empty line, ignoring what Gmsh printed before it', () => {
+  it('reads the last non-empty line, ignoring what a library printed before it', () => {
     const stdout = 'Info : Reading STEP\n\n{"ok":true,"nodes":[[1,0,0,0]]}\n\n';
     expect(parseMesherOutput(stdout)).toEqual({ ok: true, nodes: [[1, 0, 0, 0]] });
   });
@@ -14,6 +14,22 @@ describe('parseMesherOutput', () => {
     expect(parseMesherOutput('Segmentation fault\n')).toBeNull();
     expect(parseMesherOutput('{"nodes":[]}\n')).toBeNull();
     expect(parseMesherOutput('[1,2]\n')).toBeNull();
+  });
+});
+
+describe('librariesMissing', () => {
+  it('recognises a mesher whose Netgen / OCCT libraries did not load', () => {
+    expect(librariesMissing(0xc0000135, '')).toBe(true);
+    expect(librariesMissing(-1073741515, '')).toBe(true);
+    expect(librariesMissing(127, 'llull-mesh: error while loading shared libraries: libnglib.so: cannot open shared object file')).toBe(
+      true,
+    );
+    expect(librariesMissing(null, 'dyld[123]: Library not loaded: @rpath/libnglib.dylib')).toBe(true);
+  });
+
+  it('is false for any other failure', () => {
+    expect(librariesMissing(1, 'thread main panicked')).toBe(false);
+    expect(librariesMissing(null, '')).toBe(false);
   });
 });
 

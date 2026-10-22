@@ -1,17 +1,17 @@
 /**
  * Contact conductance through the real pipeline (plan -> fea_mesh (two separate volumes) -> fea_solve (tied *CONTACT PAIR with *GAP CONDUCTANCE)
- * -> analysis_report), judged with the PHY-00 judge: VC-THM-11.a/b (two slabs, interface conductance 2000 W/(m^2*K)). Skipped without gmsh / ccx.
+ * -> analysis_report), judged with the PHY-00 judge: VC-THM-11.a/b (two slabs, interface conductance 2000 W/(m^2*K)). Skipped without llull-mesh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, editStep, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 const AREA_M2 = 0.1 * 0.1;
 /** The probes at 0.0099 / 0.0101 m sit in a linear field per slab: extrapolate the two interface temperatures to z = 0.01 m. */
 const EXTRAPOLATION = 0.01 / 0.0099;
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('thermal contact conductance (gmsh + ccx)', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('thermal contact conductance (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('contact');

@@ -59,7 +59,7 @@ export const extractMidsurface = defineCommand({
 
 /**
  * @affects doc.analysis.cases[analysisId].defeature[entityId] (set, replaced or removed; part of the mesh input hash: the mesh becomes stale)
- * @invariant the design entity is untouched: faces are removed from the mesher's copy only (Gmsh occ.defeature, STEP parts, at fea_mesh)
+ * @invariant the design entity is untouched: faces are removed from the mesher's copy only (OCCT defeaturing, STEP parts, at fea_mesh)
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; entity not a solid part of the case -> FEA_PART_NOT_IN_ANALYSIS; neither maxFeatureSize
  *   nor facesNear (without clear) -> FEA_PARAM_INVALID
  */
@@ -68,7 +68,7 @@ export const defeatureForAnalysis = defineCommand({
   description:
     'Remove small features from the analysed copy of a solid part before meshing (the design entity is untouched): maxFeatureSize removes ' +
     'cylinder / torus faces of radius <= that size (fillets, rounds, small holes), facesNear removes the faces nearest to the points. Runs in ' +
-    'the mesher at fea_mesh (Gmsh occ.defeature, exact STEP geometry: OCC kernel); a refusal there names the faces. clear: true removes the ' +
+    'the mesher at fea_mesh (OCCT defeaturing, exact STEP geometry: OCC kernel); a refusal there names the faces. clear: true removes the ' +
     'setting. Lengths in document units. The mesh becomes stale.',
   params: z.object({
     analysisId: analysisIdSchema,
@@ -102,7 +102,7 @@ export const defeatureForAnalysis = defineCommand({
     return changed(
       withCase(doc, { ...found, defeature: { ...rest, [entityId]: spec } }),
       `defeature_for_analysis: '${entityId}' of '${analysisId}' loses ${maxFeatureSize === undefined ? '' : `blends / holes of radius <= ${maxFeatureSize} ${doc.units}`}` +
-        `${maxFeatureSize !== undefined && spec.facesNear !== undefined ? ' and ' : ''}${spec.facesNear === undefined ? '' : `${spec.facesNear.length} picked face(s)`} at fea_mesh (Gmsh, STEP parts).`,
+        `${maxFeatureSize !== undefined && spec.facesNear !== undefined ? ' and ' : ''}${spec.facesNear === undefined ? '' : `${spec.facesNear.length} picked face(s)`} at fea_mesh (STEP parts).`,
       [analysisId],
     );
   },

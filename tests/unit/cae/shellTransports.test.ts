@@ -1,4 +1,4 @@
-/** M6 transports (no Gmsh / ccx here: fake mesher): fea_mesh sends midsurface geometry for shells, defeature specs for solids, refuses midsurface problems. */
+/** M6 transports (no llull-mesh / ccx here: fake mesher): fea_mesh sends midsurface geometry for shells, defeature specs for solids, refuses midsurface problems. */
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +24,7 @@ async function meshWith(
     request = sent;
     return Promise.resolve({
       ok: true,
-      mesher: 'gmsh',
+      mesher: 'netgen',
       mesherVersion: '4',
       nodes: [],
       blocks: [],

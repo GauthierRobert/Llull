@@ -1,6 +1,6 @@
 /**
  * Shared harness of the PHY-04 FE benchmark suites: run a plan through the `llull` CLI on a temp document, mesh and solve it with the real
- * Gmsh + CalculiX, read probes, and judge a measurement against the pack's `expected_results.json` (recorded for `quality:physics`).
+ * Netgen (llull-mesh) + CalculiX, read probes, and judge a measurement against the pack's `expected_results.json` (recorded for `quality:physics`).
  */
 
 import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';

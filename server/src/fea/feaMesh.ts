@@ -1,6 +1,6 @@
 /**
- * fea_mesh: the analysed solids -> mesher (llull-mesh: Gmsh) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
- * geometry, forwards the request and records the artifact; target resolution and meshing are the bridge's, summaries are @cae's.
+ * fea_mesh: the analysed solids -> mesher (llull-mesh: Netgen) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
+ * geometry, forwards the request and records the artifact; target resolution and meshing are the mesher's, summaries are @cae's.
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
@@ -31,9 +31,8 @@ export interface FeaMeshDeps {
 const isCode = (value: object): value is CaeCode => 'code' in value && 'message' in value;
 
 function mesherFailure(message: string): FeaToolResult {
-  const missing = /FEA_TOOL_MISSING|Gmsh library was not found/.test(message);
-  return missing
-    ? feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`)
+  return /FEA_TOOL_MISSING/.test(message)
+    ? feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.mesher}`)
     : feaFailure('fea_mesh', 'FEA_MESH_FAILED', message);
 }
 
@@ -62,7 +61,7 @@ function meshArtifact(
   return {
     kind: 'fe_mesh',
     unitSystem: request.unitSystem,
-    mesher: typeof response['mesher'] === 'string' ? response['mesher'] : 'gmsh',
+    mesher: typeof response['mesher'] === 'string' ? response['mesher'] : 'netgen',
     mesherVersion: typeof response['mesherVersion'] === 'string' ? response['mesherVersion'] : 'unknown',
     inputHash: request.inputHash,
     nodes: nodes as FeMeshArtifact['nodes'],
@@ -86,8 +85,8 @@ function faceIndicesOf(
 }
 
 /**
- * @failure unknown analysis / no part -> the @cae code; kernel cannot build a part -> FEA_KERNEL_REQUIRED; bridge error -> its code
- *   (FEA_TARGET_UNRESOLVED, FEA_TARGET_AMBIGUOUS, FEA_MESH_FAILED); no gmsh -> FEA_TOOL_MISSING
+ * @failure unknown analysis / no part -> the @cae code; kernel cannot build a part -> FEA_KERNEL_REQUIRED; mesher error -> its code
+ *   (FEA_TARGET_UNRESOLVED, FEA_TARGET_AMBIGUOUS, FEA_MESH_FAILED); no llull-mesh, or its libraries do not load -> FEA_TOOL_MISSING
  */
 export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMeshDeps): Promise<FeaToolResult> {
   const doc = host.getDoc();
@@ -147,7 +146,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   }
   if (!response.ok) {
     const message = response.error ?? 'unknown error';
-    if (response.code === 'FEA_TOOL_MISSING') return feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`);
+    if (response.code === 'FEA_TOOL_MISSING') return feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.mesher}`);
     return response.code === undefined ? mesherFailure(message) : feaFailure('fea_mesh', response.code, message, [analysisId]);
   }
   const faceted = parts

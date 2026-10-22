@@ -18,7 +18,7 @@ function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
   return (
     <p className="analysis__hint" data-testid="analysis-solve-hint">
       Solve with <code>llull fea_mesh analysisId={analysisId}</code> then <code>llull fea_solve analysisId={analysisId}</code> (needs the
-      server with CalculiX + Gmsh).
+      server with CalculiX + llull-mesh).
     </p>
   );
 }

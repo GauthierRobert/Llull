@@ -6,28 +6,26 @@
  *                                      `gpu` feature: raster and topopt use wgpu when an adapter exists and fall back to the bit-exact
  *                                      CPU twin otherwise (topology_solve device cpu is the default)
  *   build/native/llull-kernel[.exe]    native OCCT kernel sidecar (the exact kernel: LLULL_KERNEL=occt-native is the desktop default, KI7)
- *   build/native/llull-mesh[.exe]      FE mesher sidecar (fea_mesh): Gmsh through its C API, loaded at run time from
- *   build/native/gmsh/lib/             the shared Gmsh library (GPL-2.0-or-later, its own OpenCASCADE inside; Windows: the DLL sits next to
- *                                      the executables instead), taken from LLULL_GMSH_LIB or the `pip install gmsh` of the build Python
+ *   build/native/llull-mesh[.exe]      FE mesher sidecar (fea_mesh): Netgen, linked dynamically (docs/decisions/NG1-netgen-mesher.md)
+ *   build/native/netgen/lib/           shared Netgen libraries nglib + ngcore, LGPL-2.1 dynamic linking, built against the bundled OCCT by
+ *                                      solver/scripts/build-netgen.mjs (Windows: the DLLs sit next to the executables instead)
  *   build/native/occt/lib/             shared OCCT toolkits, LGPL-2.1 dynamic linking (Linux .so.<maj>.<min>, macOS .<maj>.<min>.dylib;
  *                                      Windows: the DLLs sit next to the executables instead, where the loader looks)
- *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, Gmsh licence + credits + source notice,
- *                                      fdlibm/V8 notice, Rust crate licences
+ *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, Netgen LGPL-2.1 + authors + zlib licence +
+ *                                      source/relink notice, fdlibm/V8 notice, Rust crate licences
  *   build/native/LLULL_NATIVE.json     what was bundled (versions, features, OCCT source sha256)
  *
  * Build each OS on that OS. Env:
  *   LLULL_NATIVE_PREBUILT_DIR   take llull-compute / llull-kernel (/ llull-mesh, bundled only when present) from this directory instead of
  *                               building them with cargo
  *   LLULL_NATIVE_GPU=0          build llull-compute without the `gpu` feature (CPU twin only)
- *   LLULL_NATIVE_KERNEL=0       bundle llull-compute only (no llull-kernel, no OCCT)
+ *   LLULL_NATIVE_KERNEL=0       bundle no llull-kernel
+ *   LLULL_NATIVE_MESH=0         bundle no llull-mesh / Netgen (fea_mesh then answers FEA_TOOL_MISSING); OCCT is bundled when either is
  *   LLULL_OCCT_DIR              OCCT install prefix (else solver/scripts/build-occt.mjs builds or reuses its default prefix)
- *   LLULL_NATIVE_MESH=0         bundle no llull-mesh / Gmsh (fea_mesh then answers FEA_TOOL_MISSING)
- *   LLULL_GMSH_LIB              the Gmsh shared library to bundle (else the one `pip install gmsh` put next to the build Python named by
- *                               LLULL_GMSH_PYTHON, default python3: its `gmsh.libpath`; build time only, the app runs no Python for meshing)
+ *   LLULL_NETGEN_DIR            Netgen install prefix (else solver/scripts/build-netgen.mjs builds or reuses its default prefix)
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  realpathSync,
   chmodSync,
   copyFileSync,
   cpSync,
@@ -56,7 +54,10 @@ const prebuiltDir = process.env.LLULL_NATIVE_PREBUILT_DIR;
 /** A prebuilt folder without llull-mesh bundles no mesher (older prebuilt flows keep working). */
 const withMesh = process.env.LLULL_NATIVE_MESH !== '0' && (!prebuiltDir || existsSync(path.join(prebuiltDir, `llull-mesh${exe}`)));
 
+const withOcct = withKernel || withMesh;
+
 const occt = await import(pathToFileURL(path.join(solver, 'scripts', 'build-occt.mjs')).href);
+const netgen = await import(pathToFileURL(path.join(solver, 'scripts', 'build-netgen.mjs')).href);
 
 function log(message) {
   console.warn(`[prepare-native] ${message}`);
@@ -68,14 +69,20 @@ function cargo(args, env) {
   if (run.status !== 0) throw new Error(`cargo ${args[0]} failed (${run.status ?? run.signal})`);
 }
 
-function binaries(occtPrefix) {
+function binaries(occtPrefix, netgenPrefix) {
   const prebuilt = prebuiltDir;
   if (prebuilt) return { compute: prebuilt, kernel: prebuilt, mesh: prebuilt };
   const rustTarget = { CARGO_TARGET_DIR: cargoTarget };
   cargo(['build', '--profile', 'compute', '-p', 'llull-compute', ...(withGpu ? ['--features', 'gpu'] : [])], rustTarget);
   if (withKernel)
     cargo(['build', '--release', '-p', 'llull-kernel'], { ...rustTarget, LLULL_OCCT_DIR: occtPrefix, LLULL_OCCT_RPATH_BUNDLE_ONLY: '1' });
-  if (withMesh) cargo(['build', '--release', '-p', 'llull-mesh'], rustTarget);
+  if (withMesh)
+    cargo(['build', '--release', '-p', 'llull-mesh'], {
+      ...rustTarget,
+      LLULL_OCCT_DIR: occtPrefix,
+      LLULL_NETGEN_DIR: netgenPrefix,
+      LLULL_OCCT_RPATH_BUNDLE_ONLY: '1',
+    });
   return { compute: path.join(cargoTarget, 'compute'), kernel: path.join(cargoTarget, 'release'), mesh: path.join(cargoTarget, 'release') };
 }
 
@@ -124,71 +131,45 @@ function occtNotice(prefix) {
   ].join('\n');
 }
 
-/** The Gmsh shared library to bundle: LLULL_GMSH_LIB, else the one the build Python's `gmsh` module loads (`pip install gmsh`). */
-function gmshLibrary() {
-  const configured = process.env.LLULL_GMSH_LIB;
-  if (configured) {
-    if (!existsSync(configured)) throw new Error(`LLULL_GMSH_LIB=${configured} does not exist`);
-    return path.resolve(configured);
-  }
-  const python = process.env.LLULL_GMSH_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
-  const probe = spawnSync(python, ['-c', 'import gmsh; print(gmsh.libpath or "")'], { encoding: 'utf8' });
-  const library = probe.status === 0 ? probe.stdout.trim() : '';
-  if (library === '' || !existsSync(library))
-    throw new Error(
-      `no Gmsh library to bundle: set LLULL_GMSH_LIB, or \`pip install gmsh\` for ${python} (LLULL_GMSH_PYTHON), or LLULL_NATIVE_MESH=0. ${probe.stderr ?? ''}`,
-    );
-  return library;
+/** nglib + ngcore as the loader asks for them (Windows DLLs from bin/, else the shared objects of lib/, symlinks resolved). */
+function netgenRuntimeFiles(prefix) {
+  const dir = netgen.netgenRuntimeDir(prefix);
+  const pattern = process.platform === 'win32' ? /^(nglib|ngcore)\.dll$/i : /^lib(nglib|ngcore)\.(so|dylib)(\.[\d.]+)?$/;
+  return readdirSync(dir)
+    .filter((name) => pattern.test(name))
+    .map((name) => path.join(dir, name));
 }
 
-/** The Gmsh licence files shipped with the SDK / wheel (`<prefix>/share/doc/gmsh` next to `<prefix>/lib`), when present. */
-function gmshLicenceFiles(library) {
-  const prefix = path.dirname(path.dirname(library));
-  const candidates = [path.join(prefix, 'share', 'doc', 'gmsh'), path.join(prefix, 'doc'), prefix, path.dirname(library)];
-  for (const dir of candidates) {
-    const files = ['LICENSE.txt', 'CREDITS.txt'].map((name) => path.join(dir, name));
-    if (existsSync(files[0])) return files.filter((file) => existsSync(file));
-  }
-  return [];
+function netgenTargetDir() {
+  return process.platform === 'win32' ? nativeDir : path.join(nativeDir, 'netgen', 'lib');
 }
 
-function gmshTargetDir() {
-  return process.platform === 'win32' ? nativeDir : path.join(nativeDir, 'gmsh', 'lib');
+function stageNetgen(prefix) {
+  const files = netgenRuntimeFiles(prefix);
+  if (files.length < 2) throw new Error(`nglib / ngcore missing in ${netgen.netgenRuntimeDir(prefix)}`);
+  mkdirSync(netgenTargetDir(), { recursive: true });
+  for (const file of files) copyFileSync(file, path.join(netgenTargetDir(), path.basename(file)));
+  for (const notice of ['LICENSE_LGPL_21.txt', 'AUTHORS.txt', 'zlib-LICENSE.txt'])
+    if (existsSync(path.join(prefix, notice))) cpSync(path.join(prefix, notice), path.join(nativeDir, 'licenses', `Netgen-${notice}`));
+  return files.length;
 }
 
-/** Linux: the system libraries libgmsh needs that this machine lacks (the bundle ships libgmsh only). */
-function gmshMissingDependencies(library) {
-  if (process.platform !== 'linux') return [];
-  const ldd = spawnSync('ldd', [library], { encoding: 'utf8' });
-  return (ldd.stdout ?? '')
-    .split('\n')
-    .filter((line) => line.includes('not found'))
-    .map((line) => line.trim());
-}
-
-function stageGmsh(library) {
-  const target = gmshTargetDir();
-  mkdirSync(target, { recursive: true });
-  copyFileSync(library, path.join(target, path.basename(library)));
-  const missing = gmshMissingDependencies(library);
-  if (missing.length > 0) throw new Error(`libgmsh needs system libraries this machine lacks: ${missing.join('; ')}`);
-  const licences = gmshLicenceFiles(library);
-  if (licences.length === 0) log(`WARNING: no Gmsh LICENSE.txt found near ${library}; only the notice is bundled`);
-  for (const file of licences) copyFileSync(file, path.join(nativeDir, 'licenses', `Gmsh-${path.basename(file)}`));
-  return path.basename(library);
-}
-
-function gmshNotice(version) {
+function netgenNotice(prefix) {
+  const stamp = JSON.parse(readFileSync(path.join(prefix, 'llull-netgen.json'), 'utf8'));
   return [
-    `Gmsh ${version}`,
-    'Copyright (C) 1997-2026 C. Geuzaine, J.-F. Remacle. Licensed under the GNU General Public License version 2 or later, with the',
-    'exceptions listed in Gmsh-LICENSE.txt; Gmsh-CREDITS.txt names the contributed code it includes (OpenCASCADE among it).',
+    `Netgen ${stamp.version} (nglib, ngcore)`,
+    'Copyright (C) Joachim Schoeberl and the Netgen authors (Netgen-AUTHORS.txt). Licensed under the GNU Lesser General Public License',
+    'version 2.1 (Netgen-LICENSE_LGPL_21.txt).',
     '',
-    'llull-mesh is a separate executable that loads the unmodified Gmsh shared library (gmsh/lib, Windows: next to llull-mesh.exe)',
-    'at run time through the Gmsh C API. You may replace that library with your own build of Gmsh 4.x (same C API).',
+    'llull-mesh links Netgen DYNAMICALLY; the unmodified Netgen shared libraries are in netgen/lib (Windows: nglib.dll and ngcore.dll',
+    'next to llull-mesh.exe). You may replace them with your own build of the same Netgen version against the bundled OCCT, and modify',
+    'and reverse-engineer llull-mesh as far as needed to debug such a replacement (LGPL-2.1 section 6).',
     '',
-    `Corresponding source: https://gmsh.info/src/gmsh-${version}-source.tgz (the binary is the upstream Gmsh SDK / PyPI wheel).`,
-    'The llull-mesh source is in the llull source tree (solver/bins/llull-mesh, solver/crates/llull-gmsh).',
+    `Corresponding source: ${stamp.source}`,
+    `sha256 ${stamp.sha256} (the upstream v${stamp.version} release tag).`,
+    `zlib ${stamp.zlib.version} is linked statically into nglib (zlib licence, Netgen-zlib-LICENSE.txt): ${stamp.zlib.source}, sha256 ${stamp.zlib.sha256}.`,
+    'Build recipe: solver/scripts/build-netgen.mjs in the llull source tree; the llull-mesh source is solver/bins/llull-mesh and',
+    'solver/crates/llull-netgen.',
     '',
   ].join('\n');
 }
@@ -276,16 +257,16 @@ function smokeTest() {
     versions.kernel = kernel;
   }
   if (withMesh) {
-    const env = { ...process.env, LD_LIBRARY_PATH: '' };
-    delete env.LLULL_GMSH_LIB;
-    const mesh = execFileSync(path.join(nativeDir, `llull-mesh${exe}`), ['--version'], { env })
+    // the bundled libraries only: no build-machine search path (Windows: the system folder; the DLLs load from next to the binary)
+    const windows = process.platform === 'win32' ? { PATH: path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32') } : {};
+    const mesh = execFileSync(path.join(nativeDir, `llull-mesh${exe}`), ['--version'], {
+      env: { ...process.env, LD_LIBRARY_PATH: '', ...windows },
+    })
       .toString()
       .trim();
     log(mesh);
-    // the bundled library, not one found on the build machine's search path
-    const library = /\(Gmsh \S+, (.*)\)$/.exec(mesh)?.[1];
-    if (library === undefined || !existsSync(library) || realpathSync(path.dirname(library)) !== realpathSync(gmshTargetDir()))
-      throw new Error(`bundled llull-mesh reports "${mesh}", expected the bundled Gmsh`);
+    if (!mesh.includes(`(Netgen ${netgen.NETGEN_VERSION}, OCCT ${occt.OCCT_VERSION}`))
+      throw new Error(`bundled llull-mesh reports "${mesh}", expected Netgen ${netgen.NETGEN_VERSION} and OCCT ${occt.OCCT_VERSION}`);
     versions.mesh = mesh;
   }
   return versions;
@@ -299,10 +280,9 @@ function sizeOf(dir) {
   }, 0);
 }
 
-// fail before building anything when there is no Gmsh to bundle
-const gmshSource = withMesh ? gmshLibrary() : null;
-const occtPrefix = withKernel ? await occt.buildOcct(occt.occtPrefix()) : null;
-const source = binaries(occtPrefix);
+const occtPrefix = withOcct ? await occt.buildOcct(occt.occtPrefix()) : null;
+const netgenPrefix = withMesh ? await netgen.buildNetgen(netgen.netgenPrefix(), occtPrefix) : null;
+const source = binaries(occtPrefix, netgenPrefix);
 rmSync(nativeDir, { recursive: true, force: true });
 mkdirSync(path.join(nativeDir, 'licenses'), { recursive: true });
 const sourceDir = { 'llull-compute': source.compute, 'llull-kernel': source.kernel, 'llull-mesh': source.mesh };
@@ -319,13 +299,12 @@ if (occtPrefix !== null) {
     cpSync(path.join(occtPrefix, notice), path.join(nativeDir, 'licenses', `OCCT-${notice}`));
   writeFileSync(path.join(nativeDir, 'licenses', 'OCCT-NOTICE.txt'), occtNotice(occtPrefix));
 }
-const gmshFile = gmshSource === null ? null : stageGmsh(gmshSource);
+const netgenLibraries = netgenPrefix === null ? 0 : stageNetgen(netgenPrefix);
+if (netgenPrefix !== null) writeFileSync(path.join(nativeDir, 'licenses', 'Netgen-NOTICE.txt'), netgenNotice(netgenPrefix));
 writeFileSync(path.join(nativeDir, 'licenses', 'fdlibm-V8-NOTICE.txt'), FDLIBM_NOTICE);
 const rust = rustLicences();
 writeFileSync(path.join(nativeDir, 'licenses', 'THIRD-PARTY-RUST.txt'), rust.text);
 const versions = smokeTest();
-const gmshVersion = withMesh ? (/\(Gmsh (\S+),/.exec(versions.mesh)?.[1] ?? 'unknown') : null;
-if (gmshVersion !== null) writeFileSync(path.join(nativeDir, 'licenses', 'Gmsh-NOTICE.txt'), gmshNotice(gmshVersion));
 writeFileSync(
   path.join(nativeDir, 'LLULL_NATIVE.json'),
   `${JSON.stringify(
@@ -335,10 +314,10 @@ writeFileSync(
       gpu: withGpu,
       occt:
         occtPrefix === null ? null : { version: occt.OCCT_VERSION, sha256: occt.SOURCE_SHA256, toolkits, linking: 'dynamic (LGPL-2.1)' },
-      gmsh:
-        gmshVersion === null
+      netgen:
+        netgenPrefix === null
           ? null
-          : { version: gmshVersion, library: gmshFile, linking: 'loaded at run time by llull-mesh (GPL-2.0-or-later)' },
+          : { version: netgen.NETGEN_VERSION, sha256: netgen.SOURCE_SHA256, libraries: netgenLibraries, linking: 'dynamic (LGPL-2.1)' },
       rustCrates: rust.count,
       prebuilt: Boolean(process.env.LLULL_NATIVE_PREBUILT_DIR),
     },
@@ -348,5 +327,5 @@ writeFileSync(
 );
 log(
   `staged ${nativeDir} (${(sizeOf(nativeDir) / 1024 / 1024).toFixed(1)} MB, ${toolkits} OCCT toolkits, ` +
-    `${gmshVersion === null ? 'no Gmsh' : `Gmsh ${gmshVersion}`}, ${rust.count} Rust crates)`,
+    `${netgenPrefix === null ? 'no Netgen' : `Netgen ${netgen.NETGEN_VERSION}`}, ${rust.count} Rust crates)`,
 );

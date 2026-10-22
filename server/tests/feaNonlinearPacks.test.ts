@@ -1,5 +1,5 @@
 /**
- * Replay of the PHY-05 draft plans (docs/physics/05-nonlinear-structural/validation/plans) with the real tools (gmsh + ccx; skipped without them).
+ * Replay of the PHY-05 draft plans (docs/physics/05-nonlinear-structural/validation/plans) with the real tools (netgen + ccx; skipped without them).
  * Two edits of the plan files, both forced by what is built today: elementFamily hex_dominant -> tet (set_mesh_controls knows tet only) and the
  * validity ranges the CalculiX card writer requires on every material model (MATL_VALIDITY_MISSING without them).
  *   VC-NLS-40.b  cantilever collapse tip load M_p / L = 500 N (3 %)
@@ -20,7 +20,7 @@ import { extractCurves, type CurveData } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
 import { REPO_ROOT } from './packCli';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 
 const PLANS = 'docs/physics/05-nonlinear-structural/validation/plans';
 const VALIDITY = {
@@ -97,7 +97,7 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe.skipIf(!HAS_GMSH || !HAS_CCX)('PHY-05 validation plans with ccx', () => {
+describe.skipIf(!HAS_MESHER || !HAS_CCX)('PHY-05 validation plans with ccx', () => {
   it('VC-NLS-40.b: the plastic cantilever collapses at M_p / L = 500 N', async () => {
     const { curve } = await replay('nls_cantilever_plastic_collapse');
     const peak = Math.max(...curve.load.map(Math.abs));

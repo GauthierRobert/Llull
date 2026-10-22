@@ -17,9 +17,9 @@ export function analysisLengthMetres(unitSystem: UnitSystem): number {
 
 const DEFAULT_GLOBAL_SIZE: Readonly<Record<DocumentUnit, number>> = { mm: 10, cm: 1, m: 0.01, in: 0.5, ft: 0.04 };
 
-/** Tetrahedra (Gmsh), quadratic, element size 10 mm expressed in document units. */
+/** Tetrahedra (Netgen), quadratic, element size 10 mm expressed in document units. */
 export const defaultMeshControls = (unit: DocumentUnit): MeshControls => ({
-  mesher: 'gmsh',
+  mesher: 'netgen',
   elementFamily: 'tet',
   order: 2,
   globalSize: DEFAULT_GLOBAL_SIZE[unit],

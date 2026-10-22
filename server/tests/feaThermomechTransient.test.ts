@@ -1,8 +1,8 @@
 /**
- * PHY-04 M4b through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report): the bonded two-material strip against
+ * PHY-04 M4b through the real pipeline (plan -> fea_mesh (Netgen) -> fea_solve (CalculiX) -> analysis_report): the bonded two-material strip against
  * Timoshenko's bimetal curvature (VC-TMC-04.a / .b, conformal mesh, the layers share their interface nodes) and the transient coupled step on
  * the restrained bar (the stress follows the temperature in time and ends at -E alpha dT, VC-TMC-01.a). Skipped with a logged reason without
- * Gmsh, CalculiX or the native kernel; the deck writers and the readers are proved without a solver in tests/unit/cae/thermomech/.
+ * llull-mesh, CalculiX or the native kernel; the deck writers and the readers are proved without a solver in tests/unit/cae/thermomech/.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,15 +10,15 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 /** The restrained bar is a plain box: Manifold geometry (STL) meshes it when the native kernel is absent; the conformal bimetal needs exact STEP. */
-const TRANSIENT_READY = HAS_GMSH && HAS_CCX;
+const TRANSIENT_READY = HAS_MESHER && HAS_CCX;
 if (!READY)
   console.warn(
-    `[PHY-04 M4b FE] skipped: ${[HAS_GMSH ? null : 'Gmsh (python module gmsh)', HAS_CCX ? null : 'CalculiX (ccx)', nativeKernelBinary === null ? 'llull-kernel' : null].filter((name) => name !== null).join(', ')} not available`,
+    `[PHY-04 M4b FE] skipped: ${[HAS_MESHER ? null : 'llull-mesh (Netgen)', HAS_CCX ? null : 'CalculiX (ccx)', nativeKernelBinary === null ? 'llull-kernel' : null].filter((name) => name !== null).join(', ')} not available`,
   );
 
 let workspace: Workspace;

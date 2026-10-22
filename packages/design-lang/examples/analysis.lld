@@ -20,7 +20,7 @@ add_fea_load load analysisId=case name=tip_force kind=force target.entityId=arm 
 # damage tolerance: a 2 mm edge crack at the root (Tada beta = 1.196 at a/b = 0.1), under the root bending stress 6 F L / (b h^2)
 define_crack crack name=root_crack geometry={"kind":"edge_through","a":{"value":2,"unit":"mm"},"b":{"value":20,"unit":"mm"},"t":{"value":30,"unit":"mm"},"form":"tada"}
 
-# set-up is complete: the only finding before fea_mesh is the missing mesh (meshing and solving need Gmsh + CalculiX)
+# set-up is complete: the only finding before fea_mesh is the missing mesh (meshing and solving need llull-mesh + CalculiX)
 check check_analysis analysisId=case path=items.length expect == 1
 check check_analysis analysisId=case path=items.0.code expect == "FEA_MESH_MISSING"
 check describe_analysis analysisId=case path=case.loadOrder.length expect == 1

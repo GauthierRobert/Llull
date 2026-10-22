@@ -140,7 +140,7 @@
     "nextStepNumber": 11,
     "analysis": {
       "cases": {
-        "#11": {"id":"#11","name":"modes","type":"modal","solver":"calculix","unitSystem":"N-mm-t-s","modes":4,"frequencyRangeHz":{"min":50,"max":5000},"factors":{"ultimate":1.5,"yield":1,"extra":[]},"parts":{"#1":{"kind":"solid"}},"constraints":{"#14":{"id":"#14","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}}},"constraintOrder":["#14"],"loads":{},"loadOrder":[],"mesh":{"mesher":"gmsh","elementFamily":"tet","order":2,"globalSize":4,"refinements":[],"optimize":"default"},"probes":{},"dispositions":{}}
+        "#11": {"id":"#11","name":"modes","type":"modal","solver":"calculix","unitSystem":"N-mm-t-s","modes":4,"frequencyRangeHz":{"min":50,"max":5000},"factors":{"ultimate":1.5,"yield":1,"extra":[]},"parts":{"#1":{"kind":"solid"}},"constraints":{"#14":{"id":"#14","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}}},"constraintOrder":["#14"],"loads":{},"loadOrder":[],"mesh":{"mesher":"netgen","elementFamily":"tet","order":2,"globalSize":4,"refinements":[],"optimize":"default"},"probes":{},"dispositions":{}}
       },
       "caseOrder": [
         "#11"

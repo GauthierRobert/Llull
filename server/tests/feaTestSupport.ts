@@ -1,5 +1,5 @@
 /**
- * Availability probes for the external FE tools (Gmsh through llull-mesh, CalculiX) so the FE suites skip instead of failing without them.
+ * Availability probes for the external FE tools (the Netgen mesher llull-mesh, CalculiX) so the FE suites skip instead of failing without them.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -9,8 +9,8 @@ const CCX = process.env['LLULL_CCX'] ?? 'ccx';
 
 /** The built llull-mesh, or null. */
 export const MESH_BIN = nativeBinaryPath('llull-mesh');
-/** llull-mesh is built and loads a Gmsh library. */
-export const HAS_GMSH = MESH_BIN !== null && /\(Gmsh /.test(spawnSync(MESH_BIN, ['--version'], { encoding: 'utf8' }).stdout ?? '');
+/** llull-mesh is built and runs (its Netgen / OCCT libraries load). */
+export const HAS_MESHER = MESH_BIN !== null && /\(Netgen /.test(spawnSync(MESH_BIN, ['--version'], { encoding: 'utf8' }).stdout ?? '');
 export const HAS_CCX = spawnSync(CCX, ['-v'], { stdio: 'ignore' }).error === undefined;
 
 /**
@@ -25,9 +25,7 @@ export const FEA_TOOL_ENV: Readonly<Record<string, string>> = {
     ),
   ),
   ...Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => /^LLULL_(MESH_BIN|GMSH_LIB)$/.test(entry[0]) && entry[1] !== undefined,
-    ),
+    Object.entries(process.env).filter((entry): entry is [string, string] => /^LLULL_MESH_BIN$/.test(entry[0]) && entry[1] !== undefined),
   ),
   LLULL_CCX: CCX,
 };

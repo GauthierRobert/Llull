@@ -82,7 +82,7 @@ describe('analysis data shapes', () => {
     const mesh: MeshSummary = {
       meshHash: 'm',
       inputHash: 'i',
-      mesher: 'gmsh',
+      mesher: 'netgen',
       mesherVersion: '4.15.2',
       nodes: 4,
       elements: { C3D4: 1 },
@@ -122,7 +122,7 @@ describe('analysis data shapes', () => {
     const artifact: FeMeshArtifact = {
       kind: 'fe_mesh',
       unitSystem: 'N-mm-t-s',
-      mesher: 'gmsh',
+      mesher: 'netgen',
       mesherVersion: '4.15.2',
       inputHash: 'i',
       nodes: [[1, 0, 0, 0]],

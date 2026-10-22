@@ -14,8 +14,8 @@ import { serverContext } from '../src/fea/context';
 const mesh: FeMeshArtifact = {
   kind: 'fe_mesh',
   unitSystem: 'N-mm-t-s',
-  mesher: 'gmsh',
-  mesherVersion: '4.15.2',
+  mesher: 'netgen',
+  mesherVersion: '6.2.2604',
   inputHash: 'abc',
   nodes: [
     [1, 0, 0, 0],

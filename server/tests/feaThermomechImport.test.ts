@@ -1,6 +1,6 @@
 /**
  * fea_import_field (PHY-04 TR-TMC-14) through the `llull` CLI and the @protocol tool layer: CSV `x,y,z,T` with declared units -> `fe_table` artifact in the
- * content-addressed store -> set_temperature_field kind table. Needs neither Gmsh nor CalculiX (the nearest-node match at deck time is
+ * content-addressed store -> set_temperature_field kind table. Needs neither llull-mesh nor CalculiX (the nearest-node match at deck time is
  * covered by the unit tests and by feaThermomechT1.test.ts).
  */
 

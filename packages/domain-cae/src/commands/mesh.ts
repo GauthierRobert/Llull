@@ -18,7 +18,7 @@ import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 export const setMeshControls = defineCommand({
   name: 'set_mesh_controls',
   description:
-    'Set the tetrahedral mesh controls of an analysis (Gmsh): element order (1 = linear C3D4, 2 = quadratic C3D10, default 2; use 2 for ' +
+    'Set the tetrahedral mesh controls of an analysis (Netgen): element order (1 = linear C3D4, 2 = quadratic C3D10, default 2; use 2 for ' +
     'stress), globalSize (target element edge length, document units, > 0), optional minSize and refinements (local size at points near ' +
     'faces / edges / vertices of a part, size <= globalSize). Only the given fields change. Lengths are in document units. Changing the ' +
     'mesh makes a recorded mesh and results stale (describe_analysis shows the state); the host re-runs fea_mesh.',
@@ -52,7 +52,7 @@ export const setMeshControls = defineCommand({
       .optional()
       .describe(
         'How touching parts of a multi-part analysis are meshed. "separate" (default): one independent volume per part, no shared nodes ' +
-          '(needed for contact). "conformal": all parts are fragmented in one Gmsh model so touching parts share their interface nodes ' +
+          '(needed for contact). "conformal": all parts are fragmented into one shape meshed at once so touching parts share their interface nodes ' +
           '(bonded / perfectly glued parts; each part keeps its own element set and material). Conformal needs exact STEP geometry ' +
           '(OCC kernel) and parts that only touch (do not overlap: subtract one from the other first); otherwise fea_mesh is refused.',
       ),
