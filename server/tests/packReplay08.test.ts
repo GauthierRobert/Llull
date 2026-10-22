@@ -62,7 +62,7 @@ describe('validation plans through llull run (build_project)', () => {
     expect(plan?.code, plan?.stdout.slice(0, 400)).toBe(0);
     const mass = stepData(plan, 'mass_properties');
     expect(relative(mass['massG'], massRow('VC-MAT-04/box_100x50x10_mm/aa7075_t6/density_typical')['mass_g'] as number)).toBeLessThan(1e-6);
-    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['density given without a source (unverified)'] });
+    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['density given without a source'] });
   });
 
   it('mass_ti_cylinder: 69.56719 g with the preferred 0.160 lb/in3 entry as densitySource; both densities are listed by get_material (VC-MAT-02, 04 c)', async () => {

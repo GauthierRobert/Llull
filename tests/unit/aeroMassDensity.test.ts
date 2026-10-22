@@ -81,7 +81,7 @@ describe('AERO-1 / 08 M1: one density resolver, unit-correct mass', () => {
       unit: 'g',
       massUnit: 'g',
       unverified: true,
-      unverifiedReasons: ['density given without a source (unverified)'],
+      unverifiedReasons: ['density given without a source'],
     });
     expect(data.densitySource).toContain("material 'steel' density (given without a source");
   });
@@ -95,7 +95,7 @@ describe('AERO-1 / 08 M1: one density resolver, unit-correct mass', () => {
     expect(doc.materials['steel']?.densityUnit).toBe('g/cm^3');
     const data = massOf(doc, id);
     expect(data.massG).toBeCloseTo(7.85, 9);
-    expect(data).toMatchObject({ unverified: true, unverifiedReasons: ['density given in g/cm^3 without a source (unverified)'] });
+    expect(data).toMatchObject({ unverified: true, unverifiedReasons: ['density given in g/cm^3 without a source'] });
     expect(JSON.stringify(data)).not.toContain('legacy');
   });
 

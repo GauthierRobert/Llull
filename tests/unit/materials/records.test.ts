@@ -376,7 +376,7 @@ describe('get_material and convert_quantity', () => {
         basis: 'unspecified',
         provenance: 'legacy',
         unverified: true,
-        unverifiedReasons: ['density given without a source (unverified)'],
+        unverifiedReasons: ['density given without a source'],
       },
       values: [],
     });
@@ -395,7 +395,7 @@ describe('get_material and convert_quantity', () => {
     const loaded = deserializeDocument(v2);
     const mass = dataOf(call(loaded, 'mass_properties', { entityId: id }));
     expect(Math.abs((mass['massG'] as number) / 7.85 - 1)).toBeLessThan(1e-12);
-    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['density given without a source (unverified)'] });
+    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['density given without a source'] });
     expect(dataOf(call(loaded, 'get_material', { material: 'steel' }))).toMatchObject({
       legacy: true,
       density: { basis: 'unspecified', provenance: 'legacy' },

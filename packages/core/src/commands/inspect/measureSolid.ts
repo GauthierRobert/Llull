@@ -429,7 +429,6 @@ export const massProperties = defineCommand({
       unverified: unverifiedReasons.length > 0,
       unverifiedReasons,
     };
-    const flag = data.unverified === true ? ` Unverified density (${unverifiedReasons.join('; ')}).` : '';
     const namedUnit = e.materialId !== undefined && doc.materials[e.materialId]?.densityUnit !== undefined;
     const densityWarning = densityPlausibilityWarning(
       doc,
@@ -440,7 +439,7 @@ export const massProperties = defineCommand({
     return report(
       doc,
       `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ = ${describeDensity(doc, meanDensity)} (${data.densitySource}), ` +
-        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}${densityNote}${centroidNote}${approval}`,
+        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${densityNote}${centroidNote}${approval}`,
       { ...data, ...(densityWarning === null ? {} : { densityWarnings: [densityWarning] }) },
     );
   },

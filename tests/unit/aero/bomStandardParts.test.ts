@@ -122,7 +122,7 @@ describe('bill_of_materials materials', () => {
     expect(steel?.['totalVolume']).toBeCloseTo(volume, 6);
     expect(steel?.['totalMass']).toBeCloseTo(volume * 0.00785, 6);
     expect(steel?.['totalMassKg']).toBeCloseTo((volume * 0.00785) / 1000, 9);
-    expect(steel?.['unverifiedReasons']).toEqual(['density given without a source (unverified)']);
+    expect(steel?.['unverifiedReasons']).toEqual(['density given without a source']);
     expect(String(steel?.['densitySource'])).toContain('steel');
     expect(result['unassignedSolidCount']).toBe(1);
     expect(execute(steelBlocks(), 'bill_of_materials', { includeMaterials: true }).summary).toContain('steel');
