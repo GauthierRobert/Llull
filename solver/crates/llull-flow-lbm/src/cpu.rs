@@ -11,6 +11,13 @@ use rayon::prelude::*;
 /// Cells per parallel task.
 const CELLS_PER_TASK: usize = 512;
 
+/// Bytes per cell of the CPU layout in precision `T`: two population copies, ρ, u, force, the averages, the flag and the body id
+/// (395 for f64, 199 for f32); reported in `result.json` so the host estimate is tied to the real buffers.
+pub const fn bytes_per_cell<T>() -> usize {
+    let s = std::mem::size_of::<T>();
+    2 * Q * s + s * (1 + 3 + 3 + 1 + 3) + 1 + 2
+}
+
 /// The lattice state on the CPU.
 pub struct CpuSolver<T: Real> {
     domain: Domain,

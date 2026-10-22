@@ -1,13 +1,13 @@
 //! Fixed-order reductions of per-cell data (RS1 §2 rule 3): cells are cut into [`CHUNK`]-sized chunks, each chunk is folded left
 //! to right in f64, then the chunk partials are folded left to right, so a result does not depend on the rayon thread count.
-//! The GPU solver reads its per-cell buffers back and reduces them here, so both paths share one reduction.
+//! The GPU solver reads its per-cell buffers back (widened to f64) and reduces them here, so both paths share one reduction.
 
 use rayon::prelude::*;
 
 pub use llull_gpu::reduce::CHUNK;
 
 /// Per-body sums of per-cell vectors: `body[cell]` names the body (any id ≥ `bodies` is skipped).
-pub fn sum_per_body(values: &[[f32; 3]], body: &[u16], bodies: usize) -> Vec<[f64; 3]> {
+pub fn sum_per_body(values: &[[f64; 3]], body: &[u16], bodies: usize) -> Vec<[f64; 3]> {
     assert_eq!(values.len(), body.len(), "one body id per cell");
     let partials: Vec<Vec<[f64; 3]>> = values
         .par_chunks(CHUNK)
@@ -16,8 +16,8 @@ pub fn sum_per_body(values: &[[f32; 3]], body: &[u16], bodies: usize) -> Vec<[f6
             let mut sums = vec![[0.0f64; 3]; bodies];
             for (value, owner) in chunk.iter().zip(owners) {
                 if let Some(sum) = sums.get_mut(usize::from(*owner)) {
-                    for axis in 0..3 {
-                        sum[axis] += f64::from(value[axis]);
+                    for (s, v) in sum.iter_mut().zip(value) {
+                        *s += v;
                     }
                 }
             }
@@ -27,8 +27,8 @@ pub fn sum_per_body(values: &[[f32; 3]], body: &[u16], bodies: usize) -> Vec<[f6
     let mut total = vec![[0.0f64; 3]; bodies];
     for partial in partials {
         for (sum, value) in total.iter_mut().zip(partial) {
-            for axis in 0..3 {
-                sum[axis] += value[axis];
+            for (s, v) in sum.iter_mut().zip(value) {
+                *s += v;
             }
         }
     }
@@ -36,12 +36,10 @@ pub fn sum_per_body(values: &[[f32; 3]], body: &[u16], bodies: usize) -> Vec<[f6
 }
 
 /// Sum of per-cell vectors in the fixed order.
-pub fn sum3(values: &[[f32; 3]]) -> [f64; 3] {
+pub fn sum3(values: &[[f64; 3]]) -> [f64; 3] {
     let partials: Vec<[f64; 3]> = values
         .par_chunks(CHUNK)
-        .map(|chunk| {
-            chunk.iter().fold([0.0f64; 3], |acc, v| [acc[0] + f64::from(v[0]), acc[1] + f64::from(v[1]), acc[2] + f64::from(v[2])])
-        })
+        .map(|chunk| chunk.iter().fold([0.0f64; 3], |acc, v| [acc[0] + v[0], acc[1] + v[1], acc[2] + v[2]]))
         .collect();
     partials.iter().fold([0.0f64; 3], |acc, v| [acc[0] + v[0], acc[1] + v[1], acc[2] + v[2]])
 }
@@ -64,8 +62,8 @@ pub fn extrema(values: &[f32], valid: &[bool]) -> Option<((f32, usize), (f32, us
 mod tests {
     use super::*;
 
-    fn cells(n: usize) -> (Vec<[f32; 3]>, Vec<u16>) {
-        let values = (0..n).map(|i| [((i * 7919) % 1009) as f32 * 1e-3 - 0.4, (i % 13) as f32 * 0.1, 1.0 / (i as f32 + 1.0)]).collect();
+    fn cells(n: usize) -> (Vec<[f64; 3]>, Vec<u16>) {
+        let values = (0..n).map(|i| [((i * 7919) % 1009) as f64 * 1e-3 - 0.4, (i % 13) as f64 * 0.1, 1.0 / (i as f64 + 1.0)]).collect();
         let body = (0..n)
             .map(|i| {
                 if i % 5 == 0 {
@@ -99,7 +97,7 @@ mod tests {
         let mut expected = 0.0f64;
         for (value, owner) in values.iter().zip(&body) {
             if *owner == 1 {
-                expected += f64::from(value[0]);
+                expected += value[0];
             }
         }
         assert!((one.0[1][0] - expected).abs() < 1e-9);

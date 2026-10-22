@@ -1,8 +1,9 @@
 //! The steady-state run (TECHNICAL_SPEC §5.3 "steady state") over a [`Backend`]: the drag is sampled every `sample_every`
 //! steps; its mean over one flow-through time (window W) is compared with the previous window; time averaging starts when
 //! the change falls below `start_averaging_tol` (named default 0.5 %); the run stops when it falls below `stop_tol` (0.1 %)
-//! after at least two windows of averaging, or at `max_steps` (`converged: false`). Forces and moments are reduced per body
-//! in a fixed order on the host, so a run is reproducible on one device.
+//! after at least two windows of averaging, or at `max_steps` (`converged: false`, the forces are then the mean of the last
+//! window of samples). Forces and moments are reduced per body in f64 and in a fixed order on the host, so a run is
+//! reproducible on one device.
 
 use crate::cpu::CpuSolver;
 use crate::domain::Domain;
@@ -10,6 +11,7 @@ use crate::real::Real;
 use llull_flow_core::reduce::{sum3, sum_per_body, CHUNK};
 use llull_flow_core::voxel::NO_BODY;
 use rayon::prelude::*;
+use std::collections::VecDeque;
 
 /// Time-averaged density and velocity per cell with the sample count.
 pub type Averages = (Vec<f32>, Vec<[f32; 3]>, u32);
@@ -19,8 +21,8 @@ pub trait Backend {
     /// Advances `steps` lattice steps.
     fn advance(&mut self, steps: u64) -> Result<(), String>;
     fn steps_done(&self) -> u64;
-    /// Per-cell momentum given to the bodies in the last step.
-    fn force(&mut self) -> Result<Vec<[f32; 3]>, String>;
+    /// Per-cell momentum given to the bodies in the last step, in f64 (the f64 twin loses nothing; f32 values are widened).
+    fn force(&mut self) -> Result<Vec<[f64; 3]>, String>;
     /// Adds the current density and velocity to the time averages.
     fn accumulate(&mut self) -> Result<(), String>;
     /// Time-averaged density and velocity (instantaneous when nothing was accumulated) and the sample count.
@@ -45,8 +47,8 @@ impl<T: Real> Backend for CpuSolver<T> {
     fn steps_done(&self) -> u64 {
         CpuSolver::steps_done(self)
     }
-    fn force(&mut self) -> Result<Vec<[f32; 3]>, String> {
-        Ok(CpuSolver::force(self).iter().map(|f| [f[0].to_f32(), f[1].to_f32(), f[2].to_f32()]).collect())
+    fn force(&mut self) -> Result<Vec<[f64; 3]>, String> {
+        Ok(CpuSolver::force(self).iter().map(|f| [f[0].to_f64(), f[1].to_f64(), f[2].to_f64()]).collect())
     }
     fn accumulate(&mut self) -> Result<(), String> {
         CpuSolver::accumulate(self);
@@ -102,7 +104,7 @@ pub struct RunOutcome {
     pub converged: bool,
     pub phase: Phase,
     pub history: Vec<HistoryRow>,
-    /// Time-averaged momentum exchange per body (over the averaging phase, else the last window).
+    /// Time-averaged momentum exchange per body (over the averaging phase, else the mean of the last window of samples).
     pub force_per_body: Vec<[f64; 3]>,
     /// Time-averaged moment about `moment_point` (all bodies).
     pub moment: [f64; 3],
@@ -114,7 +116,7 @@ pub struct RunOutcome {
 }
 
 /// Fixed-order moment `Σ (x_cell − p) × F_cell` over the cells with a linked body.
-pub fn moment_about(domain: &Domain, force: &[[f32; 3]], link_body: &[u16], point: [f64; 3]) -> [f64; 3] {
+pub fn moment_about(domain: &Domain, force: &[[f64; 3]], link_body: &[u16], point: [f64; 3]) -> [f64; 3] {
     let grid = &domain.grid;
     let partials: Vec<[f64; 3]> = force
         .par_chunks(CHUNK)
@@ -128,7 +130,6 @@ pub fn moment_about(domain: &Domain, force: &[[f32; 3]], link_body: &[u16], poin
                 }
                 let (i, j, k) = grid.coords(chunk * CHUNK + local);
                 let r = [i as f64 + 0.5 - point[0], j as f64 + 0.5 - point[1], k as f64 + 0.5 - point[2]];
-                let f = [f64::from(f[0]), f64::from(f[1]), f64::from(f[2])];
                 sum[0] += r[1] * f[2] - r[2] * f[1];
                 sum[1] += r[2] * f[0] - r[0] * f[2];
                 sum[2] += r[0] * f[1] - r[1] * f[0];
@@ -157,32 +158,31 @@ fn window_change(drags: &[f64], n: usize) -> f64 {
     (last - previous).abs() / last.abs().max(1e-300)
 }
 
-struct Accumulated {
+/// One drag sample's per-body momentum exchange and moment.
+#[derive(Debug, Clone)]
+struct Sample {
     per_body: Vec<[f64; 3]>,
     moment: [f64; 3],
-    samples: u64,
 }
 
-impl Accumulated {
-    fn add(&mut self, per_body: &[[f64; 3]], moment: [f64; 3]) {
-        for (sum, value) in self.per_body.iter_mut().zip(per_body) {
-            for axis in 0..3 {
-                sum[axis] += value[axis];
+/// Mean per-body force and moment of `samples` (zeros when there is none).
+fn mean_of<'a>(samples: impl Iterator<Item = &'a Sample>, bodies: usize) -> (Vec<[f64; 3]>, [f64; 3]) {
+    let mut per_body = vec![[0.0f64; 3]; bodies];
+    let mut moment = [0.0f64; 3];
+    let mut count = 0usize;
+    for sample in samples {
+        for (sum, value) in per_body.iter_mut().zip(&sample.per_body) {
+            for (s, v) in sum.iter_mut().zip(value) {
+                *s += v;
             }
         }
-        for (sum, value) in self.moment.iter_mut().zip(moment) {
-            *sum += value;
+        for (s, v) in moment.iter_mut().zip(sample.moment) {
+            *s += v;
         }
-        self.samples += 1;
+        count += 1;
     }
-
-    fn mean(&self) -> (Vec<[f64; 3]>, [f64; 3]) {
-        let n = self.samples.max(1) as f64;
-        (
-            self.per_body.iter().map(|v| [v[0] / n, v[1] / n, v[2] / n]).collect(),
-            [self.moment[0] / n, self.moment[1] / n, self.moment[2] / n],
-        )
-    }
+    let n = count.max(1) as f64;
+    (per_body.iter().map(|v| [v[0] / n, v[1] / n, v[2] / n]).collect(), [moment[0] / n, moment[1] / n, moment[2] / n])
 }
 
 /// Runs `backend` to steady state; `progress(row, max_steps)` is called at every drag sample.
@@ -201,36 +201,37 @@ pub fn run(
     let mut history: Vec<HistoryRow> = Vec::new();
     let mut phase = Phase::Transient;
     let mut averaging_since: Option<u64> = None;
-    let mut averaged = Accumulated { per_body: vec![[0.0; 3]; bodies], moment: [0.0; 3], samples: 0 };
-    let mut last_window = Accumulated { per_body: vec![[0.0; 3]; bodies], moment: [0.0; 3], samples: 0 };
+    let mut averaged: Vec<Sample> = Vec::new();
+    // The last `window` samples: their mean stands in for the average of a run that never settled.
+    let mut recent: VecDeque<Sample> = VecDeque::with_capacity(window + 1);
     let mut converged = false;
     let total = settings.max_steps;
     while backend.steps_done() < total {
         let remaining = total - backend.steps_done();
         backend.advance(sample_every.min(remaining))?;
         let force = backend.force()?;
-        let per_body = sum_per_body(&force, &link_body, bodies);
-        let moment = moment_about(domain, &force, &link_body, settings.moment_point);
+        let sample = Sample {
+            per_body: sum_per_body(&force, &link_body, bodies),
+            moment: moment_about(domain, &force, &link_body, settings.moment_point),
+        };
         let total_force = sum3(&force);
         let drag = total_force[0] * settings.drag_direction[0]
             + total_force[1] * settings.drag_direction[1]
             + total_force[2] * settings.drag_direction[2];
         drags.push(drag);
         let change = window_change(&drags, window);
-        if phase == Phase::Averaging {
-            backend.accumulate()?;
-            averaged.add(&per_body, moment);
-        } else if change.is_finite() && change < settings.start_averaging_tol {
+        if phase == Phase::Transient && change.is_finite() && change < settings.start_averaging_tol {
             phase = Phase::Averaging;
             averaging_since = Some(backend.steps_done());
+        }
+        if phase == Phase::Averaging {
             backend.accumulate()?;
-            averaged.add(&per_body, moment);
+            averaged.push(sample.clone());
         }
-        // The last window's mean stands in for the average of a run that never settled.
-        if drags.len().is_multiple_of(window) {
-            last_window = Accumulated { per_body: vec![[0.0; 3]; bodies], moment: [0.0; 3], samples: 0 };
+        if recent.len() == window {
+            recent.pop_front();
         }
-        last_window.add(&per_body, moment);
+        recent.push_back(sample);
         let row = HistoryRow { step: backend.steps_done(), force: total_force, drag, change, phase };
         history.push(row);
         progress(&row, total);
@@ -243,7 +244,7 @@ pub fn run(
         }
     }
     let (rho, vel, samples) = backend.averages()?;
-    let (force_per_body, moment) = if averaged.samples > 0 { averaged.mean() } else { last_window.mean() };
+    let (force_per_body, moment) = if averaged.is_empty() { mean_of(recent.iter(), bodies) } else { mean_of(averaged.iter(), bodies) };
     Ok(RunOutcome {
         steps: backend.steps_done(),
         converged,
@@ -269,5 +270,15 @@ mod tests {
         let change = window_change(&[1.0, 1.0, 2.0, 2.0], 2);
         assert!((change - 0.5).abs() < 1e-12);
         assert_eq!(window_change(&[0.0, 0.0, 0.0, 0.0], 2), 0.0);
+    }
+
+    #[test]
+    fn the_mean_of_samples_averages_every_component() {
+        let samples = [
+            Sample { per_body: vec![[1.0, 2.0, 3.0]], moment: [0.0, 1.0, 0.0] },
+            Sample { per_body: vec![[3.0, 2.0, 1.0]], moment: [0.0, 3.0, 0.0] },
+        ];
+        assert_eq!(mean_of(samples.iter(), 1), (vec![[2.0, 2.0, 2.0]], [0.0, 2.0, 0.0]));
+        assert_eq!(mean_of(samples[..0].iter(), 2), (vec![[0.0; 3]; 2], [0.0; 3]));
     }
 }

@@ -475,12 +475,14 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   `llull-compute --features gpu` includes the kernels (the desktop bundle does); without the feature a GPU request runs the CPU twin with the warning.
 - **Numerics (§5.3).** BGK collision with the Smagorinsky closure `τ_eff = ½(τ + √(τ² + 18√2 C_s² |Π_neq| / ρ))` (C_s 0.1, named default; LES off
   for the exact-solution tests), Guo forcing (uniform body force; the periodic channel of VC-CFD-20), **two population copies** (pull scheme, one
-  dispatch per step) instead of the AA pattern of §5.3 / §8 — simpler kernels, twice the population memory (172 B / cell); the AA pattern is
-  left for M5 when memory is measured. Boundaries by the neighbour's flag: half-way bounce-back (`SOLID`, `MOVING_WALL` adds the wall velocity
+  dispatch per step) instead of the AA pattern of §5.3 / §8 — simpler kernels, twice the population memory: **204 B / cell** in the GPU's f32
+  layout, **395 B / cell** in the f64 CPU twin (`result.json` `memory` reports both; the host estimate uses them, VC-CFD-50); the AA pattern
+  is left for M5 when memory is measured. Boundaries by the neighbour's flag: half-way bounce-back (`SOLID`, `MOVING_WALL` adds the wall velocity
   term), equilibrium inlet at the cell's own density, zero-gradient outlet at the reference pressure (`f_eq(1, u) + f_neq`), specular reflection on
   `SLIP_X/Y/Z` (free-slip side walls and the symmetry plane). Domain faces: `far_field` becomes an inlet where `direction · n < 0`, an outlet where
   `> 0`, a slip wall where tangential (so α, β rotate the free stream without a special inlet); `ground` is a no-slip wall without a body (no
-  force), `moving_ground` moves with the free stream. The lattice Mach of the inflow (named default 0.1) sets `dt`; τ below ½ + 1e-3 is
+  force), `moving_ground` slides with the in-plane free stream (the wall-normal component is dropped so the wall pumps no mass; Couette test
+  `tests/couette.rs`). The lattice Mach of the inflow (named default 0.1) sets `dt`; τ below ½ + 1e-3 is
   `CFD_UNSTABLE_PARAMS` without LES and a warning with it. Forces: momentum exchange `−c_q (f_x[q̄] + pulled_q)` per wall link, attributed to
   the body of the cell's first solid neighbour (a cell touching two bodies gives everything to the first: documented bias), reduced per body in a
   fixed order on the host for both backends; moments about the case moment point.
@@ -490,11 +492,14 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   accumulate at the sample steps (≤ a few thousand samples, so f32 sums stay accurate on the GPU).
 - **Precision.** The CPU twin runs in **f64** (`precision: "f64"`, `deterministic: true`, the recorded / reference path, like the topopt twin):
   the f32 forcing increments of a 64-cell Poiseuille channel fall below the population resolution (first measured as a 1e-3 error floor). The GPU
-  kernels are f32 (`deterministic: false`); `CpuSolver<f32>` mirrors them operation for operation for VC-CFD-26.
+  kernels are f32 (`deterministic: false`); `CpuSolver<f32>` mirrors them operation for operation for VC-CFD-26. `Backend::force` hands the
+  per-cell forces to the fixed-order reductions in f64 (the f64 twin loses nothing); the f64 reference and the GPU agree on the total force
+  to 4.9e-6 of |F| on the equivalence case (stated tolerance 1e-4, tested; the f32 twin sits at 9.4e-6 of the 1e-5 gate since the
+  edge-aware reflection pulls from neighbours).
 - **GPU (§5.6).** `llull_gpu::device::acquire` (best adapter, `LLULL_GPU=off` respected); dispatches are submitted in batches sized to about
   50 ms of GPU time (adaptive, 1…4096 steps per submit) so the OS watchdog never fires; buffers above the adapter's
   `max_storage_buffer_binding_size` are refused before allocation (`CFD_MEMORY_EXCEEDED`); the CPU path refuses above `settings.cellCap`
-  (default 5e7 cells). Chunking along z (§5.6) is not built. A `gpu` / `auto` request without a usable adapter runs the CPU twin and emits
+  (default 2e7 cells ≈ 8 GB of the f64 twin). Chunking along z (§5.6) is not built. A `gpu` / `auto` request without a usable adapter runs the CPU twin and emits
   `CFD_GPU_UNAVAILABLE` (VC-CFD-51).
 - **Job contract** (`llull_flow_lbm::job` module doc): `case.json` + `surface.stl` (binary, metres, case frame, triangles grouped per body with
   `bodies[].triangles = [start, count]`) in; `result.json` (forces and coefficients, per-body forces, peaks, probes, capped history, grid and
@@ -509,7 +514,11 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   code), refuses compressible cases with `CFD_REGIME_MISMATCH` (the Euler solver is M4, not built) and the memory estimate above
   `deviceMemoryBytes` with `CFD_MEMORY_EXCEEDED` before anything runs (VC-CFD-50); exports the welded, outward surface of the prepare stage
   (its `geometryHash`) as STL with per-body ranges (triangle centroid in the smallest containing body box, nearest box otherwise); the domain
-  is the sized box of the report (halved at y = 0 with `symmetryPlane: "xz"`, face `yMin` slip), one cell layer of faces added by the job;
+  is the sized box of the report, one cell layer of faces added by the job; a `symmetryPlane: "xz"` case is exported whole and solved as a
+  **half model** (face `yMin` `symmetry`: the first row of body cells beyond the plane stays as the mirror image the fluid bounces off, forces
+  and moments are doubled, the side force and the in-plane moments set to zero, the dropped half's surface fields sampled from their mirror
+  image; a mirror-symmetric voxelisation reproduces the whole model to 1e-13 — job test on a cube); `maxSteps` ≥ 1 and `latticeMach` ∈ (0, 0.3]
+  are bounded in the tool schema and refused with `CFD_PARAM_INVALID` before anything runs;
   probes, slice origins and the moment point are world metres converted to the case frame. `llull-compute flow` runs in a job folder (hard
   timeout, no checkpoint: a killed run is lost, `CFD_TIMEOUT`); outputs are hash-checked, `result.json` is zod-parsed and the solver's cd / cl / cs
   and dynamic pressure are cross-checked against its forces and the job reference before the `cfd_result` artifact is stored (content-addressed in
@@ -532,7 +541,9 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
 - **Validation.** Rust (`cargo test -p llull-flow-lbm`): VC-CFD-20 Poiseuille L2 errors 2.78e-3 / 6.95e-4 / 1.74e-4 at 16 / 32 / 64 cells,
   observed orders **2.000 / 2.000** (τ 0.8; at the "magic" τ = ½ + √(3/16) the discrete profile is exact to 5e-13); VC-CFD-22 Taylor-Green
   amplitude ratio **0.45229** vs 0.45404 (0.4 %, 64², ν k² t = 0.3948); VC-CFD-26 on an NVIDIA RTX 4080 Laptop (Vulkan): density 5.9e-7,
-  velocity 4.5e-6 of the field range, force 4.9e-7 of |F| (gates 1e-4 / 1e-5; skipped with a logged reason without an adapter); VC-CFD-21: the
+  velocity 5.0e-6 of the field range, force 9.4e-6 of |F| against the f32 twin and 4.9e-6 of |F| against the f64 reference (gates 1e-4 /
+  1e-5 / 1e-4; skipped with a logged reason without an adapter); Couette (`tests/couette.rs`): moving-wall profile linear to 1e-9, mass
+  conserved; half model (`tests/job.rs`): cube drag equal to the whole model to 1e-13; VC-CFD-21: the
   32-cells-per-diameter gate is the **ignored** test `tests/sphere.rs` (minutes on the CPU twin; run `cargo test --release -- --ignored`, device
   `auto`), CI runs a Re 20 smoke at 8 cells per diameter in a 4 D box (Cd 3.47 vs Schiller-Naumann 2.61: staircase sphere, 4.9 % blockage; gate
   0.5…1.8×). Job contract tests (`tests/job.rs`): outputs hashed, step limit recorded not converged, the three refusals. TypeScript:
@@ -544,3 +555,4 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   until M5 nests the grid); half-way bounce-back staircase walls (interpolated walls V1); τ is not raised automatically when a coarse grid puts it
   near ½ (only the < 0.501 rule applies; a candidate for raising `latticeMach` in M3); the transports `cfd_streamlines`, `cfd_slice`, `cfd_probe`,
   `cfd_stop` and the `gridStudy` option are not built (slices and probes come out of the solve itself); no VTK export; no overlay / Flow panel (M3).
+  The `job` module keeps its serde shapes in `job/spec.rs`.

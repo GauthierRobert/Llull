@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{result_json, run_job, sphere_job};
+use common::{cube_job_in, result_json, run_job, sphere_job};
 use llull_protocol::sha256_hex;
 use std::fs;
 
@@ -81,4 +81,38 @@ fn a_body_on_the_domain_boundary_and_unknown_fields_are_input_errors() {
     let job = sphere_job("job-unknown", 6, 20.0, [1.2, 2.5, 1.2], r#"{ "maxSteps": 10, "bogus": 1 }"#, "{}");
     let (_, result) = run_job(&job.dir);
     assert_eq!(result.unwrap_err().code, "NATIVE_JOB_INPUT");
+}
+
+#[test]
+fn a_symmetry_face_halves_the_model_and_reports_whole_body_forces() {
+    // Full box y in [-2, 2] (y = 0 on a cell boundary) against the half box y in [0, 2] closed by a symmetry face. A unit cube
+    // voxelises exactly mirror-symmetric (a UV sphere does not: its quad diagonals differ between the halves), so the half model
+    // must reproduce the whole one to round-off.
+    let settings = r#"{ "maxSteps": 80, "sampleEvery": 10, "les": false }"#;
+    let full = cube_job_in("job-full", 8, 20.0, [-2.0, -2.0, -2.0], [4.0, 2.0, 2.0], settings, "{}", "{}");
+    let half = cube_job_in("job-half", 8, 20.0, [-2.0, 0.0, -2.0], [4.0, 2.0, 2.0], settings, "{}", r#"{ "yMin": "symmetry" }"#);
+    run_job(&full.dir).1.unwrap();
+    run_job(&half.dir).1.unwrap();
+    let whole = result_json(&full.dir);
+    let mirrored = result_json(&half.dir);
+    assert_eq!(whole["halfModel"], false);
+    assert_eq!(mirrored["halfModel"], true);
+    assert!(mirrored["grid"]["solidCells"].as_u64().unwrap() < whole["grid"]["solidCells"].as_u64().unwrap());
+    let drag = |json: &serde_json::Value| json["forces"]["dragN"].as_f64().unwrap();
+    let relative = (drag(&mirrored) - drag(&whole)).abs() / drag(&whole).abs();
+    eprintln!("symmetry: half-model drag {:.6e} vs whole {:.6e} ({relative:.2e})", drag(&mirrored), drag(&whole));
+    assert!(relative < 1e-9, "half model drag {} vs {}", drag(&mirrored), drag(&whole));
+    let lift = |json: &serde_json::Value| json["forces"]["liftN"].as_f64().unwrap();
+    assert!((lift(&mirrored) - lift(&whole)).abs() < 1e-9 * drag(&whole).abs());
+    assert_eq!(mirrored["forces"]["sideN"], 0.0);
+    assert_eq!(mirrored["forces"]["cs"], 0.0);
+    assert_eq!(mirrored["forces"]["momentNm"][0], 0.0);
+    assert_eq!(mirrored["forces"]["momentNm"][2], 0.0);
+    assert_eq!(mirrored["perBody"][0]["forceN"][1], 0.0);
+    assert!(mirrored["notModelled"].as_array().unwrap().iter().any(|note| note.as_str().unwrap().starts_with("half model")));
+    let memory = &mirrored["memory"];
+    assert_eq!(memory["cpuBytesPerCell"], 395);
+    assert_eq!(memory["gpuBytesPerCell"], 204);
+    assert_eq!(memory["bytesPerCell"], 395);
+    assert_eq!(memory["bytes"].as_u64().unwrap(), 395 * mirrored["grid"]["cells"].as_u64().unwrap());
 }

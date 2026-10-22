@@ -139,7 +139,33 @@ pub fn step_cell<T: Real>(domain: &Domain, f_in: &[T], cell: usize, params: &Par
             }
             INLET => equilibrium(rho_x, params.u_in, q),
             OUTLET => equilibrium(T::of(1.0), u_x, q) + own[q] - equilibrium(rho_x, u_x, q),
-            _ => own[REFLECT[usize::from(flag - SLIP_X)][q]],
+            _ => {
+                // Half-way specular reflection: the particle arriving along c_q left the fluid cell found by walking back from the
+                // source through every slip face it crosses (an edge where two faces meet reflects twice), with the reflected velocity;
+                // a trace that ends in a non-fluid cell (a wall or inlet at the edge) falls back to this cell.
+                let mut offset = [-C[q][0], -C[q][1], -C[q][2]];
+                let mut direction = q;
+                let mut from = None;
+                for _ in 0..3 {
+                    let candidate = domain.grid.neighbour(i, j, k, offset, domain.periodic).map(|(a, b, d)| domain.grid.index(a, b, d));
+                    match candidate.map(|c| (c, domain.flags[c])) {
+                        Some((c, FLUID)) => {
+                            from = Some(c);
+                            break;
+                        }
+                        Some((_, f)) if (SLIP_X..=SLIP_X + 2).contains(&f) => {
+                            let a = usize::from(f - SLIP_X);
+                            offset[a] = 0;
+                            direction = REFLECT[a][direction];
+                        }
+                        _ => break,
+                    }
+                }
+                match from {
+                    Some(c) => f_in[c * Q + direction],
+                    None => own[REFLECT[usize::from(flag - SLIP_X)][q]],
+                }
+            }
         };
         pulled[q] = value;
     }

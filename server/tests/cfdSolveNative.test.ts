@@ -19,6 +19,7 @@ import { runCfdSolve } from '../src/cfd/flowSolve';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { LBM_BYTES_PER_CELL } from '@aero/cfd/memoryEstimate';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
@@ -92,6 +93,13 @@ describe('cfd_solve with the real llull-compute', () => {
       expect(artifact?.probes[0]?.speedMS).not.toBeNull();
       expect(artifact?.slices).toHaveLength(1);
       expect(artifact?.surfaceBase64.length).toBeGreaterThan(8);
+      // The host's bytes-per-cell figures are the solver's real layouts (finding 3 of the M2 review).
+      expect(artifact?.memory).toMatchObject({
+        gpuBytesPerCell: LBM_BYTES_PER_CELL.gpu,
+        cpuBytesPerCell: LBM_BYTES_PER_CELL.cpu,
+        bytesPerCell: LBM_BYTES_PER_CELL.cpu,
+      });
+      expect(artifact?.halfModel).toBe(false);
       expect(lines.length).toBeGreaterThan(0);
       expect(lines[0]).toMatch(/^cfd_solve: step \d+\/120 drag/);
       const report = execute(first.doc, 'cfd_report', { caseId: 're100' }, { ...defaultContext(), cfdResults: cfdResultPort(store) });

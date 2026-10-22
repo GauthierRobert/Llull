@@ -63,9 +63,7 @@ fn gpu_and_cpu_agree_on_fields_and_forces() {
         .map(|(a, b)| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt())
         .fold(0.0f32, f32::max)
         / speed_range;
-    let total = |force: Vec<[f32; 3]>| {
-        force.iter().fold([0.0f64; 3], |acc, f| [acc[0] + f64::from(f[0]), acc[1] + f64::from(f[1]), acc[2] + f64::from(f[2])])
-    };
+    let total = |force: Vec<[f64; 3]>| force.iter().fold([0.0f64; 3], |acc, f| [acc[0] + f[0], acc[1] + f[1], acc[2] + f[2]]);
     let cpu_force = total(Backend::force(&mut cpu).unwrap());
     let gpu_force = total(gpu.force().unwrap());
     let magnitude = (cpu_force[0].powi(2) + cpu_force[1].powi(2) + cpu_force[2].powi(2)).sqrt();
@@ -81,4 +79,18 @@ fn gpu_and_cpu_agree_on_fields_and_forces() {
     assert!(force_error < 1e-5, "forces differ by {force_error}");
     assert_eq!(gpu.info().device, "gpu");
     assert!(!gpu.info().deterministic);
+
+    // The f64 reference (the recorded CPU path) against the GPU's f32 run: the whole-run rounding difference of the force, stated
+    // in TECHNICAL_SPEC §13 M2 as 1e-4 of |F| (so Cd agrees to 1e-4 relative).
+    let mut reference = CpuSolver::<f64>::new(domain, params.cast::<f64>(), |_| (1.0f64, [0.05f64, 0.0, 0.0]));
+    reference.advance(250).unwrap();
+    let reference_force = total(Backend::force(&mut reference).unwrap());
+    let reference_magnitude = (reference_force[0].powi(2) + reference_force[1].powi(2) + reference_force[2].powi(2)).sqrt();
+    let reference_error = ((reference_force[0] - gpu_force[0]).powi(2)
+        + (reference_force[1] - gpu_force[1]).powi(2)
+        + (reference_force[2] - gpu_force[2]).powi(2))
+    .sqrt()
+        / reference_magnitude;
+    eprintln!("VC-CFD-26 f64 reference vs GPU: force {reference_error:.2e} of |F|");
+    assert!(reference_error < 1e-4, "f64 reference and GPU forces differ by {reference_error}");
 }

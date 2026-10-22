@@ -75,6 +75,20 @@ fn source_of(i: u32, j: u32, k: u32, q: u32) -> u32 {
   return u32(si) + p.nx * (u32(sj) + p.ny * u32(sk));
 }
 
+// Index of the cell at offset (ox, oy, oz) from (i, j, k), wrapped on periodic axes, or n when it leaves the grid.
+fn offset_of(i: u32, j: u32, k: u32, ox: i32, oy: i32, oz: i32) -> u32 {
+  var si = i32(i) + ox;
+  var sj = i32(j) + oy;
+  var sk = i32(k) + oz;
+  let nx = i32(p.nx);
+  let ny = i32(p.ny);
+  let nz = i32(p.nz);
+  if (si < 0 || si >= nx) { if (p.periodic_x == 0u) { return p.n; } si = (si + nx) % nx; }
+  if (sj < 0 || sj >= ny) { if (p.periodic_y == 0u) { return p.n; } sj = (sj + ny) % ny; }
+  if (sk < 0 || sk >= nz) { if (p.periodic_z == 0u) { return p.n; } sk = (sk + nz) % nz; }
+  return u32(si) + p.nx * (u32(sj) + p.ny * u32(sk));
+}
+
 @compute @workgroup_size(64)
 fn step(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
   let cell = (wid.y * p.groups_x + wid.x) * 64u + lid;
@@ -122,7 +136,30 @@ fn step(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
     } else if (flag == OUTLET) {
       value = feq(1.0, u_x, q) + own[q] - feq(rho_x, u_x, q);
     } else {
-      value = own[reflected(flag - SLIP_X, q)];
+      // Half-way specular reflection: walk back from the source through every slip face crossed (an edge reflects twice) to the
+      // fluid cell the particle left, with the reflected velocity; a trace ending in a non-fluid cell falls back to this cell.
+      var ox = -CX[q];
+      var oy = -CY[q];
+      var oz = -CZ[q];
+      var direction = q;
+      var origin = p.n;
+      for (var hop = 0u; hop < 3u; hop = hop + 1u) {
+        let candidate = offset_of(i, j, k, ox, oy, oz);
+        if (candidate >= p.n) { break; }
+        let f = flags[candidate];
+        if (f == FLUID) { origin = candidate; break; }
+        if (f < SLIP_X || f > SLIP_X + 2u) { break; }
+        let a = f - SLIP_X;
+        if (a == 0u) { ox = 0; }
+        if (a == 1u) { oy = 0; }
+        if (a == 2u) { oz = 0; }
+        direction = reflected(a, direction);
+      }
+      if (origin < p.n) {
+        value = f_in[direction * p.n + origin];
+      } else {
+        value = own[reflected(flag - SLIP_X, q)];
+      }
     }
     pulled[q] = value;
   }

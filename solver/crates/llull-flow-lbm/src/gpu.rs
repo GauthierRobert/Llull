@@ -21,7 +21,7 @@ const THREADS: usize = 64;
 const SLICE_TARGET: Duration = Duration::from_millis(50);
 const MAX_BATCH: u64 = 4096;
 
-/// Bytes per cell of the GPU state (two population copies, flags, body, ρ, u, force, averages).
+/// Bytes per cell of the GPU state (two population copies, flags, body, ρ, u, force, averages): 204, reported in `result.json`.
 pub const BYTES_PER_CELL: usize = (2 * Q + 1 + 1 + 1 + 3 + 3 + 1 + 3) * 4;
 
 /// The lattice state on the GPU.
@@ -240,12 +240,15 @@ impl Backend for GpuSolver {
         self.steps
     }
 
-    fn force(&mut self) -> Result<Vec<[f32; 3]>, String> {
+    fn force(&mut self) -> Result<Vec<[f64; 3]>, String> {
         let rho = self.rho()?;
         if let Some(cell) = rho.iter().position(|value| !(value.is_finite() && *value >= 0.0)) {
             return Err(format!("non-finite or negative density at cell {cell} after {} steps (GPU)", self.steps));
         }
-        read_f32(&self.gpu, &self.force, 3 * self.n).map(triples)
+        Ok(read_f32(&self.gpu, &self.force, 3 * self.n)?
+            .chunks_exact(3)
+            .map(|c| [f64::from(c[0]), f64::from(c[1]), f64::from(c[2])])
+            .collect())
     }
 
     fn accumulate(&mut self) -> Result<(), String> {

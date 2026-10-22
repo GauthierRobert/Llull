@@ -4,7 +4,8 @@
 //! 16-byte field name, f32 × nu × nv row-major in v then u; NaN where the sample falls in a solid or outside the grid).
 
 use crate::domain::Domain;
-use crate::job::{JobError, SliceField, SliceSpec};
+use crate::job::spec::{SliceField, SliceSpec};
+use crate::job::JobError;
 use crate::solver::{Phase, RunOutcome};
 use crate::units::Lattice;
 use llull_flow_core::reduce::extrema;
@@ -238,20 +239,56 @@ fn push_f32s(bytes: &mut Vec<u8>, values: impl IntoIterator<Item = f32>) {
     }
 }
 
-/// `surface.bin` with the requested fields among `p` (Pa), `cp`, `speed` (m/s); unknown names are skipped.
-pub fn surface_file(domain: &Domain, triangles: &[Triangle], fields: &Fields, names: &[String], dynamic_pressure: f64) -> Vec<u8> {
+/// A symmetry plane of a half model: the axis it is normal to, its coordinate, and whether the kept fluid lies below it
+/// (`high`: the plane is the box's max face, the dropped half is above).
+pub type Mirror = (usize, f64, bool);
+
+/// Triangles reflected across the symmetry planes when their centroid lies in the dropped half (which samples its mirror
+/// image); two vertices are swapped so the winding stays outward.
+fn mirrored(triangles: &[Triangle], mirrors: &[Mirror]) -> Vec<Triangle> {
+    triangles
+        .iter()
+        .map(|triangle| {
+            let mut out = *triangle;
+            for (axis, plane, high) in mirrors {
+                let centroid = out.centroid();
+                let beyond = if *high { centroid[*axis] > *plane } else { centroid[*axis] < *plane };
+                if beyond {
+                    let mut v = out.v;
+                    for vertex in &mut v {
+                        vertex[*axis] = 2.0 * plane - vertex[*axis];
+                    }
+                    out = Triangle { v: [v[0], v[2], v[1]] };
+                }
+            }
+            out
+        })
+        .collect()
+}
+
+/// `surface.bin` with the requested fields among `p` (Pa), `cp`, `speed` (m/s); unknown names are skipped. `mirrors` are the
+/// symmetry planes of a half model: triangles in the dropped half are sampled at their mirror image.
+pub fn surface_file(
+    domain: &Domain,
+    triangles: &[Triangle],
+    fields: &Fields,
+    names: &[String],
+    dynamic_pressure: f64,
+    mirrors: &[Mirror],
+) -> Vec<u8> {
     let known: Vec<&String> = names.iter().filter(|name| matches!(name.as_str(), "p" | "cp" | "speed")).collect();
+    let sampled = mirrored(triangles, mirrors);
     let mut bytes = b"LLSF".to_vec();
     bytes.extend_from_slice(&1u32.to_le_bytes());
     bytes.extend_from_slice(&(triangles.len() as u32).to_le_bytes());
     bytes.extend_from_slice(&(known.len() as u32).to_le_bytes());
-    let pressure = surface_values(&domain.grid, triangles, &fields.pressure_pa, &fields.valid);
+    let pressure = surface_values(&domain.grid, &sampled, &fields.pressure_pa, &fields.valid);
     for name in known {
         push_name(&mut bytes, name);
         match name.as_str() {
             "p" => push_f32s(&mut bytes, pressure.iter().copied()),
             "cp" => push_f32s(&mut bytes, pressure.iter().map(|p| p / dynamic_pressure as f32)),
-            _ => push_f32s(&mut bytes, surface_values(&domain.grid, triangles, &fields.speed_ms, &fields.valid)),
+            _ => push_f32s(&mut bytes, surface_values(&domain.grid, &sampled, &fields.speed_ms, &fields.valid)),
         }
     }
     bytes

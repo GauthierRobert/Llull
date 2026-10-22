@@ -14,6 +14,7 @@ import { buildFlowJob, type FlowJob } from '@aero/cfd/flowJob';
 import { flowResultArtifact, parseFlowResult } from '@aero/cfd/flowResult';
 import { cfdSummary } from '@aero/cfd/summary';
 import { toolsetOf } from '@protocol/toolsets';
+import { cfdPlugin } from '@aero/index';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { expectPure } from '../../../helpers/expectNoOp';
@@ -54,6 +55,8 @@ function fakeResult(job: FlowJob, overrides: Record<string, unknown> = {}): Reco
     device: 'cpu',
     deterministic: true,
     precision: 'f64',
+    halfModel: false,
+    memory: { bytesPerCell: 395, gpuBytesPerCell: 204, cpuBytesPerCell: 395, bytes: 2880 * 395 },
     grid: { nx: 20, ny: 12, nz: 12, cellM: 0.125, cells: 2880, fluidCells: 2800, solidCells: 33, oddRows: 0, originM: [-1, -0.75, -0.75] },
     lattice: {
       tau: 0.6,
@@ -284,5 +287,74 @@ describe('result.json parsing and the artifact', () => {
   it('files the record and report commands in the flow toolset', () => {
     expect(toolsetOf('record_cfd_results')).toBe('flow');
     expect(toolsetOf('cfd_report')).toBe('flow');
+  });
+});
+
+describe('record_cfd_results trust ladder (review follow-ups)', () => {
+  it('refuses a partial or malformed unverified summary instead of keeping it', () => {
+    const { hash, summary } = bundleOf(base);
+    const partial = { resultsHash: hash, caseHash: summary.caseHash };
+    const refused = execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: partial }, defaultContext());
+    expect(refused).toMatchObject({ rejected: true, error: { code: 'CFD_RESULT_MISSING' } });
+    expect(refused.summary).toContain('not a complete CfdResultSummary');
+    const invented = { ...summary, forces: { ...summary.forces, cd: 'huge' } };
+    expect(execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: invented }, defaultContext())).toMatchObject({
+      rejected: true,
+      error: { code: 'CFD_RESULT_MISSING' },
+    });
+    const extra = { ...summary, bonus: 1 };
+    expect(execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: extra }, defaultContext())).toMatchObject({
+      rejected: true,
+      error: { code: 'CFD_RESULT_MISSING' },
+    });
+    const foreign = { ...summary, caseId: 'c2' };
+    expect(execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: foreign }, defaultContext())).toMatchObject({
+      rejected: true,
+      error: { code: 'CFD_RESULT_MISSING' },
+    });
+    // The complete summary is kept, flagged, and survives the plugin's load validation.
+    const kept = ok(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary }, defaultContext());
+    expect(kept.document.cfd?.results['c1']).toEqual({ ...summary, verified: false });
+    expect(cfdPlugin.document?.validate(kept.document as unknown as Record<string, unknown>)).toEqual([]);
+    expect(ok(kept.document, 'cfd_report', { caseId: 'c1' }, defaultContext()).data).toMatchObject({ verified: false, trusted: false });
+  });
+
+  it('refuses a given summary with an extra key against the bundle (CFD_RESULT_HASH_MISMATCH names it)', () => {
+    const { hash, summary, ctx } = bundleOf(base);
+    const refused = execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: { ...summary, extraKey: true } }, ctx);
+    expect(refused).toMatchObject({ rejected: true, error: { code: 'CFD_RESULT_HASH_MISMATCH' } });
+    expect(refused.summary).toContain('extraKey');
+    const stripped = { ...summary } as Record<string, unknown>;
+    delete stripped['peaks'];
+    expect(execute(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary: stripped }, ctx)).toMatchObject({
+      rejected: true,
+      error: { code: 'CFD_RESULT_HASH_MISMATCH' },
+    });
+  });
+
+  it('reports the drag along the free-stream axis, not the case-frame x force', () => {
+    const { hash, summary, ctx } = bundleOf(base, {
+      forces: {
+        totalN: [0.3, 0.0, 0.4],
+        momentNm: [0, 0, 0],
+        dragN: 0.5,
+        liftN: 0.0,
+        sideN: 0.0,
+        cd: 0.5 / (0.5 * 0.7853981634),
+        cl: 0,
+        cs: 0,
+        cm: [0, 0, 0],
+        cdAM2: 1,
+        dynamicPressurePa: 0.5,
+        referenceAreaM2: 0.7853981634,
+        referenceLengthM: 1,
+        dragAxis: [0.6, 0, 0.8],
+        liftAxis: [-0.8, 0, 0.6],
+        sideAxis: [0, 1, 0],
+      },
+    });
+    const result = ok(base, 'record_cfd_results', { caseId: 'c1', resultsHash: hash, summary }, ctx);
+    expect(result.summary).toContain('drag 0.5 N');
+    expect(result.summary).not.toContain('drag 0.3');
   });
 });

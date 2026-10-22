@@ -125,6 +125,8 @@ function fakeRunner(options: FakeOptions = {}): ComputeRunner & { readonly calls
         ...(options.device === 'gpu' ? { adapter: 'Fake GPU (Vulkan, DiscreteGpu)' } : {}),
         deterministic: options.device !== 'gpu',
         precision: options.device === 'gpu' ? 'f32' : 'f64',
+        halfModel: false,
+        memory: { bytesPerCell: options.device === 'gpu' ? 204 : 395, gpuBytesPerCell: 204, cpuBytesPerCell: 395, bytes: 2880 * 395 },
         grid: {
           nx: 20,
           ny: 12,
@@ -322,6 +324,20 @@ describe('cfd_solve with a fake job runner', () => {
     expect(timedOut).toMatchObject({ isError: true, data: { code: 'CFD_TIMEOUT' } });
     expect(timedOut.summary).toContain('after 5 s');
     expect(host.current().cfd?.results['re100']).toBeUndefined();
+  });
+
+  it('refuses out-of-range maxSteps and latticeMach before anything runs', async () => {
+    const host = hostOf(sphereModel());
+    const runner = fakeRunner();
+    expect(await runCfdSolve('re100', { maxSteps: 0 }, host, { store, runner })).toMatchObject({
+      isError: true,
+      data: { code: 'CFD_PARAM_INVALID' },
+    });
+    expect(await runCfdSolve('re100', { latticeMach: 0.5 }, host, { store, runner })).toMatchObject({
+      isError: true,
+      data: { code: 'CFD_PARAM_INVALID' },
+    });
+    expect(runner.calls).toHaveLength(0);
   });
 
   it('is wired as the native tool cfd_solve', async () => {

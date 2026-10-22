@@ -1,5 +1,5 @@
 //! `llull-compute flow <job-folder>`: the job folder contract (12 CFD TECHNICAL_SPEC §6, as built in §13 M2; host side
-//! `server/src/cfd/flowJobFiles.ts`).
+//! `server/src/cfd/flowSolve.ts` runs it, `packages/domain-aero/src/cfd/flowJob.ts` writes the case). Shapes: [`spec`].
 //!
 //! # Input: `case.json` (camelCase, unknown fields rejected) + `surface.stl` (binary, metres, case frame)
 //!
@@ -9,26 +9,31 @@
 //!   "grid": { "cellM": 0.03125, "minM": [-5, -3, -3], "maxM": [10, 3, 3] },
 //!   "flow": { "speedMS": 1.0, "direction": [1, 0, 0], "densityKgM3": 1.0, "viscosityPaS": 0.01 },
 //!   "reference": { "areaM2": 0.7853981634, "lengthM": 1.0, "momentPointM": [0, 0, 0], "up": [0, 0, 1] },
-//!   "faces": { "xMin": "far_field", "xMax": "far_field", "yMin": "slip", "yMax": "slip", "zMin": "ground", "zMax": "slip" },
+//!   "faces": { "xMin": "far_field", "xMax": "far_field", "yMin": "symmetry", "yMax": "slip", "zMin": "ground", "zMax": "slip" },
 //!   "bodies": [{ "entityId": "ball", "triangles": [0, 8192] }],
 //!   "surface": "surface.stl",
 //!   "settings": { "latticeMach": 0.1, "les": true, "smagorinsky": 0.1, "maxSteps": 200000, "startAveragingTol": 0.005,
-//!                 "stopTol": 0.001, "sampleEvery": 0, "historyCap": 1000, "device": "cpu", "cellCap": 50000000 },
+//!                 "stopTol": 0.001, "sampleEvery": 0, "historyCap": 1000, "device": "cpu", "cellCap": 20000000 },
 //!   "outputs": { "probesM": [[2, 0, 0]], "slices": [{ "originM": [0, 0, 0], "normal": [0, 1, 0], "field": "speed" }],
 //!                "surfaceFields": ["p", "cp"] }
 //! }
 //! ```
 //!
 //! - `grid` is the fluid box in the case frame (x along the free stream at α = β = 0, z up); one layer of face cells is added
-//!   around it. The body must lie strictly inside the box. `direction` is the unit free-stream vector (α, β applied by the host).
+//!   around it. The body must lie strictly inside the box, except through a `symmetry` face. `direction` is the unit free-stream
+//!   vector (α, β applied by the host).
 //! - `faces`: `far_field` becomes an inlet where the free stream enters (`direction · n < 0`), an outlet where it leaves, a
-//!   free-slip wall where it is tangential; `slip` a free-slip wall (also a symmetry plane); `ground` a no-slip wall;
-//!   `moving_ground` a no-slip wall moving with the free stream.
+//!   free-slip wall where it is tangential; `slip` a free-slip wall; `symmetry` a free-slip plane the body may cross (the STL is
+//!   the whole body; only its first row of cells beyond the plane is kept, as the mirror image the fluid next to the plane bounces
+//!   off, and the result is mirrored: forces and moments doubled, the force along the plane normal and the moments about the
+//!   in-plane axes set to zero, surface fields of the dropped half sampled from their mirror image); `ground` a no-slip wall;
+//!   `moving_ground` a no-slip wall moving with the in-plane free stream.
 //! - `bodies` name the STL triangle ranges `[start, count]` of each entity (forces are summed per body); triangles outside
 //!   every range are walls without a body.
-//! - `settings`: `latticeMach` sets the time step (TECHNICAL_SPEC §5.3); τ below ½ + 1e-3 without LES is `CFD_UNSTABLE_PARAMS`;
-//!   `sampleEvery` 0 = one fiftieth of a flow-through; `device` `cpu | gpu | auto` (a GPU request without a usable adapter runs the
-//!   CPU twin with the warning `CFD_GPU_UNAVAILABLE`); `cellCap` refuses larger grids on the CPU (`CFD_MEMORY_EXCEEDED`).
+//! - `settings`: `latticeMach` sets the time step (TECHNICAL_SPEC §5.3); τ below ½ + 1e-3 is `CFD_UNSTABLE_PARAMS` without LES
+//!   and a warning with it; `sampleEvery` 0 = one fiftieth of a flow-through; `device` `cpu | gpu | auto` (a GPU request without
+//!   a usable adapter runs the CPU twin with the warning `CFD_GPU_UNAVAILABLE`); `cellCap` refuses larger grids on the CPU
+//!   (`CFD_MEMORY_EXCEEDED`; default 2e7 cells ≈ 8 GB of the f64 twin).
 //!
 //! # Events (stdout NDJSON, `llull-protocol`)
 //!
@@ -38,24 +43,24 @@
 //!
 //! # Outputs
 //!
-//! - `result.json`: [`ResultFile`] — status, forces and coefficients, per-body forces, peaks, probes, grid and lattice facts,
-//!   history (capped to `historyCap` rows, always ending with the last sample), device / adapter / deterministic, warnings.
+//! - `result.json`: [`spec::ResultFile`] — status, forces and coefficients (whole body), per-body forces, peaks, probes, grid,
+//!   memory layout (bytes per cell of this run, of the GPU and of the CPU layouts), lattice facts, history (capped to
+//!   `historyCap` rows, always ending with the last sample), device / adapter / deterministic / precision, warnings.
 //! - `surface.bin`: per-triangle surface fields (`LLSF` header, see `outputs.rs`); `slice-<k>.bin` per requested slice (`LLSL`).
 
-use crate::cpu::CpuSolver;
+pub mod spec;
+
+use crate::cpu::{bytes_per_cell, CpuSolver};
 use crate::domain::{Domain, MOVING_WALL, SLIP_X, SOLID};
 use crate::kernel::Params;
-use crate::outputs::{
-    coefficients, convert_fields, history_rows, peaks, probes, slice_file, surface_file, Coefficients, Fields, HistoryEntry, Peak, Probe,
-    WarningEntry,
-};
+use crate::outputs::{coefficients, convert_fields, history_rows, peaks, probes, slice_file, surface_file, Fields, Mirror, WarningEntry};
 use crate::solver::{run as run_steady, Backend, BackendInfo, Phase, RunOutcome, RunSettings};
-use crate::units::{Lattice, DEFAULT_LATTICE_MACH, MIN_TAU_MARGIN};
+use crate::units::{Lattice, MIN_TAU_MARGIN};
 use llull_flow_core::grid::Grid;
 use llull_flow_core::stl::{read_binary_stl, Triangle};
 use llull_flow_core::voxel::{voxelise, Voxelisation, NO_BODY};
 use llull_protocol::{emit, sha256_hex, Event, Output};
-use serde::{Deserialize, Serialize};
+use spec::{BodyForce, DeviceName, FaceKind, GridInfo, JobFile, LatticeInfo, MemoryInfo, ResultFile};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -74,228 +79,6 @@ fn input(message: impl Into<String>) -> JobError {
 
 fn io(message: impl Into<String>) -> JobError {
     JobError { code: "NATIVE_JOB_IO", message: message.into() }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct GridSpec {
-    pub cell_m: f64,
-    pub min_m: [f64; 3],
-    pub max_m: [f64; 3],
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FlowSpec {
-    #[serde(rename = "speedMS")]
-    pub speed_ms: f64,
-    pub direction: [f64; 3],
-    pub density_kg_m3: f64,
-    pub viscosity_pa_s: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ReferenceSpec {
-    pub area_m2: f64,
-    pub length_m: f64,
-    pub moment_point_m: [f64; 3],
-    #[serde(default = "up_z")]
-    pub up: [f64; 3],
-}
-
-fn up_z() -> [f64; 3] {
-    [0.0, 0.0, 1.0]
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FaceKind {
-    #[default]
-    FarField,
-    Slip,
-    Ground,
-    MovingGround,
-}
-
-#[derive(Debug, Clone, Copy, Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
-pub struct FacesSpec {
-    pub x_min: FaceKind,
-    pub x_max: FaceKind,
-    pub y_min: FaceKind,
-    pub y_max: FaceKind,
-    pub z_min: FaceKind,
-    pub z_max: FaceKind,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BodySpec {
-    pub entity_id: String,
-    /// `[start, count]` into the STL triangles.
-    pub triangles: [usize; 2],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DeviceName {
-    #[default]
-    Cpu,
-    Gpu,
-    Auto,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
-pub struct SettingsSpec {
-    pub lattice_mach: f64,
-    pub les: bool,
-    pub smagorinsky: f64,
-    pub max_steps: u64,
-    pub start_averaging_tol: f64,
-    pub stop_tol: f64,
-    /// 0 = one fiftieth of a flow-through.
-    pub sample_every: u64,
-    pub history_cap: usize,
-    pub device: DeviceName,
-    pub cell_cap: usize,
-}
-
-impl Default for SettingsSpec {
-    fn default() -> SettingsSpec {
-        SettingsSpec {
-            lattice_mach: DEFAULT_LATTICE_MACH,
-            les: true,
-            smagorinsky: 0.1,
-            max_steps: 200_000,
-            start_averaging_tol: 0.005,
-            stop_tol: 0.001,
-            sample_every: 0,
-            history_cap: 1000,
-            device: DeviceName::Cpu,
-            cell_cap: 50_000_000,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SliceField {
-    Speed,
-    P,
-    Ux,
-    Uy,
-    Uz,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SliceSpec {
-    pub origin_m: [f64; 3],
-    pub normal: [f64; 3],
-    pub field: SliceField,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
-pub struct OutputsSpec {
-    pub probes_m: Vec<[f64; 3]>,
-    pub slices: Vec<SliceSpec>,
-    pub surface_fields: Vec<String>,
-}
-
-/// The whole `case.json`.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct JobFile {
-    pub version: u32,
-    pub case_id: String,
-    pub grid: GridSpec,
-    pub flow: FlowSpec,
-    pub reference: ReferenceSpec,
-    #[serde(default)]
-    pub faces: FacesSpec,
-    #[serde(default)]
-    pub bodies: Vec<BodySpec>,
-    #[serde(default = "default_surface")]
-    pub surface: String,
-    #[serde(default)]
-    pub settings: SettingsSpec,
-    #[serde(default)]
-    pub outputs: OutputsSpec,
-}
-
-fn default_surface() -> String {
-    "surface.stl".to_string()
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GridInfo {
-    pub nx: usize,
-    pub ny: usize,
-    pub nz: usize,
-    pub cell_m: f64,
-    pub cells: usize,
-    pub fluid_cells: usize,
-    pub solid_cells: usize,
-    pub odd_rows: usize,
-    pub origin_m: [f64; 3],
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LatticeInfo {
-    pub tau: f64,
-    pub u_lattice: f64,
-    pub nu_lattice: f64,
-    pub dt_s: f64,
-    pub flow_through_steps: u64,
-    pub sample_every: u64,
-    pub les: bool,
-    pub smagorinsky: f64,
-    pub reynolds: f64,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BodyForce {
-    pub entity_id: String,
-    pub force_n: [f64; 3],
-}
-
-/// `result.json`.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResultFile {
-    pub version: u32,
-    pub case_id: String,
-    pub solver: &'static str,
-    pub status: &'static str,
-    pub converged: bool,
-    pub steps: u64,
-    pub averaged_steps: u64,
-    pub samples: u32,
-    pub time_s: f64,
-    pub elapsed_s: f64,
-    pub device: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub adapter: Option<String>,
-    pub deterministic: bool,
-    pub precision: &'static str,
-    pub grid: GridInfo,
-    pub lattice: LatticeInfo,
-    pub forces: Coefficients,
-    pub per_body: Vec<BodyForce>,
-    pub peaks: Vec<Peak>,
-    pub probes: Vec<Probe>,
-    pub history: Vec<HistoryEntry>,
-    pub settings: SettingsSpec,
-    pub surface: String,
-    pub slices: Vec<String>,
-    pub not_modelled: Vec<&'static str>,
-    pub warnings: Vec<WarningEntry>,
 }
 
 fn normalise(v: [f64; 3]) -> Option<[f64; 3]> {
@@ -328,7 +111,13 @@ fn validate(job: &JobFile) -> Result<[f64; 3], JobError> {
     normalise(job.flow.direction).ok_or_else(|| input("flow.direction must be a non-zero vector"))
 }
 
-/// Builds the domain: the fluid box plus one face layer, the voxelised body strictly inside.
+/// The symmetry faces as `(axis, high)`.
+fn symmetry_faces(job: &JobFile) -> Vec<(usize, bool)> {
+    job.faces.faces().iter().filter(|(_, _, kind)| *kind == FaceKind::Symmetry).map(|(axis, high, _)| (*axis, *high)).collect()
+}
+
+/// Builds the domain: the fluid box plus one face layer, the voxelised body strictly inside except through symmetry faces,
+/// whose layer loses its body cells (the mirror image stands there).
 fn build_domain(
     job: &JobFile,
     triangles: &[Triangle],
@@ -356,22 +145,24 @@ fn build_domain(
     }
     let voxels = voxelise(&grid, triangles, body_of_triangle);
     let n = [grid.nx, grid.ny, grid.nz];
-    for (cell, solid) in voxels.solid.iter().enumerate() {
+    let symmetric = symmetry_faces(job);
+    // Body cells in a face layer: an error, except in a symmetry layer, where they are the mirror image of the first fluid row's
+    // body cells and stay solid (a fluid cell next to the plane then bounces off them exactly as in the whole model).
+    for cell in 0..grid.cells() {
+        if !voxels.solid[cell] {
+            continue;
+        }
         let (i, j, k) = grid.coords(cell);
-        if *solid && [i, j, k].iter().zip(n).any(|(at, count)| *at == 0 || *at + 1 == count) {
-            return Err(input("the body reaches the domain boundary: enlarge grid.minM / grid.maxM"));
+        let at = [i, j, k];
+        for axis in 0..3 {
+            let (low, high) = (at[axis] == 0, at[axis] + 1 == n[axis]);
+            if (low || high) && !symmetric.contains(&(axis, high)) {
+                return Err(input("the body reaches the domain boundary: enlarge grid.minM / grid.maxM"));
+            }
         }
     }
     let mut domain = Domain::new(grid, [false; 3]);
-    let faces = [
-        (0, false, job.faces.x_min),
-        (0, true, job.faces.x_max),
-        (1, false, job.faces.y_min),
-        (1, true, job.faces.y_max),
-        (2, false, job.faces.z_min),
-        (2, true, job.faces.z_max),
-    ];
-    // Inflow / outflow faces first, then walls, then slip faces: the first flag set wins at edges.
+    // Inflow / outflow faces first, then walls, then slip / symmetry faces: the first flag set wins at edges.
     let flag_of = |axis: usize, high: bool, kind: FaceKind| -> u8 {
         match kind {
             FaceKind::FarField => {
@@ -384,7 +175,7 @@ fn build_domain(
                     SLIP_X + axis as u8
                 }
             }
-            FaceKind::Slip => SLIP_X + axis as u8,
+            FaceKind::Slip | FaceKind::Symmetry => SLIP_X + axis as u8,
             FaceKind::Ground => SOLID,
             FaceKind::MovingGround => MOVING_WALL,
         }
@@ -394,7 +185,8 @@ fn build_domain(
         SOLID | MOVING_WALL => 1,
         _ => 2,
     };
-    let mut ordered: Vec<(usize, bool, u8)> = faces.iter().map(|(axis, high, kind)| (*axis, *high, flag_of(*axis, *high, *kind))).collect();
+    let mut ordered: Vec<(usize, bool, u8)> =
+        job.faces.faces().iter().map(|(axis, high, kind)| (*axis, *high, flag_of(*axis, *high, *kind))).collect();
     ordered.sort_by_key(|(_, _, flag)| priority(*flag));
     for (axis, high, flag) in ordered {
         domain.set_face(axis, high, flag);
@@ -465,6 +257,12 @@ fn gpu_backend(
     Err("llull-compute was built without the gpu feature".to_string())
 }
 
+/// Bytes per cell of the GPU layout (every build, so the host can be told without an adapter).
+#[cfg(feature = "gpu")]
+const GPU_BYTES_PER_CELL: usize = crate::gpu::BYTES_PER_CELL;
+#[cfg(not(feature = "gpu"))]
+const GPU_BYTES_PER_CELL: usize = (2 * crate::lattice::Q + 1 + 1 + 1 + 3 + 3 + 1 + 3) * 4;
+
 fn progress_event(out: &mut impl Write, row: &crate::solver::HistoryRow, total: u64, lattice: &Lattice, dynamic_pressure_area: f64) {
     let drag_n = lattice.force_newton(row.drag);
     let mut detail = serde_json::Map::new();
@@ -478,6 +276,26 @@ fn progress_event(out: &mut impl Write, row: &crate::solver::HistoryRow, total: 
         if row.phase == Phase::Averaging { "averaging" } else { "transient" }
     );
     let _ = emit(out, &Event::Progress { step: row.step, total, message: &message, detail: Some(detail) });
+}
+
+/// Mirrors the half model across the plane normal to `axis`: forces and moments doubled, the force along the normal and the
+/// moments about the two in-plane axes set to zero (antisymmetric), every history row included.
+fn mirror_half_model(outcome: &mut RunOutcome, axis: usize) {
+    let mirror_force = |f: &mut [f64; 3]| {
+        for (component, value) in f.iter_mut().enumerate() {
+            *value = if component == axis { 0.0 } else { 2.0 * *value };
+        }
+    };
+    for force in &mut outcome.force_per_body {
+        mirror_force(force);
+    }
+    for (component, value) in outcome.moment.iter_mut().enumerate() {
+        *value = if component == axis { 2.0 * *value } else { 0.0 };
+    }
+    for row in &mut outcome.history {
+        mirror_force(&mut row.force);
+        row.drag *= 2.0;
+    }
 }
 
 /// Runs the job in `folder`, streaming events to `out`; returns the outputs with their hashes.
@@ -509,7 +327,8 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         tau: lattice.tau,
         smagorinsky: if settings.les { settings.smagorinsky } else { 0.0 },
         u_in,
-        u_wall: u_in,
+        // The moving ground (zMin) slides with the in-plane free stream: a wall-normal component would pump mass through it.
+        u_wall: [u_in[0], u_in[1], 0.0],
         body_force: [0.0; 3],
     };
     let initial = move |_cell: usize| (1.0f64, u_in);
@@ -539,10 +358,18 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
     };
     let dynamic_pressure = 0.5 * job.flow.density_kg_m3 * job.flow.speed_ms * job.flow.speed_ms;
     let q_area = dynamic_pressure * job.reference.area_m2;
-    let outcome: RunOutcome = run_steady(backend.as_mut(), &domain, &run_settings, &mut |row, total| {
-        progress_event(out, row, total, &lattice, q_area);
+    let symmetric = symmetry_faces(&job);
+    let half_model = !symmetric.is_empty();
+    let progress_scale = if half_model { 2.0f64.powi(symmetric.len() as i32) } else { 1.0 };
+    let mut outcome: RunOutcome = run_steady(backend.as_mut(), &domain, &run_settings, &mut |row, total| {
+        let mut whole = *row;
+        whole.drag *= progress_scale;
+        progress_event(out, &whole, total, &lattice, q_area);
     })
     .map_err(|message| JobError { code: "CFD_SOLVER_FAILED", message })?;
+    for (axis, _) in &symmetric {
+        mirror_half_model(&mut outcome, *axis);
+    }
 
     let info: BackendInfo = outcome.info.clone();
     let fields: Fields = convert_fields(&domain, &outcome, &lattice);
@@ -566,7 +393,10 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
     };
     let surface_fields: Vec<String> =
         if job.outputs.surface_fields.is_empty() { vec!["p".to_string(), "cp".to_string()] } else { job.outputs.surface_fields.clone() };
-    write("surface.bin", &surface_file(&domain, &triangles, &fields, &surface_fields, dynamic_pressure))?;
+    // Triangles of the dropped half sample their mirror image: the symmetry plane is the fluid box's face on that side.
+    let mirrors: Vec<Mirror> =
+        symmetric.iter().map(|(axis, high)| (*axis, if *high { job.grid.max_m[*axis] } else { job.grid.min_m[*axis] }, *high)).collect();
+    write("surface.bin", &surface_file(&domain, &triangles, &fields, &surface_fields, dynamic_pressure, &mirrors))?;
     let mut slice_names = Vec::new();
     for (k, slice) in job.outputs.slices.iter().enumerate() {
         let name = format!("slice-{k}.bin");
@@ -574,6 +404,12 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         slice_names.push(name);
     }
     let converged = outcome.converged;
+    let cells = domain.grid.cells();
+    let bytes_used = if info.device == "gpu" { GPU_BYTES_PER_CELL } else { bytes_per_cell::<f64>() };
+    let mut not_modelled = vec!["wall-resolved boundary layer (staircase half-way bounce-back walls)", "compressibility beyond O(Ma²)"];
+    if half_model {
+        not_modelled.push("half model: forces and moments doubled by the solver, side force and in-plane moments set to zero (symmetry)");
+    }
     let result = ResultFile {
         version: 1,
         case_id: job.case_id.clone(),
@@ -589,16 +425,23 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         adapter: info.adapter,
         deterministic: info.deterministic,
         precision: info.precision,
+        half_model,
         grid: GridInfo {
             nx: domain.grid.nx,
             ny: domain.grid.ny,
             nz: domain.grid.nz,
             cell_m: h,
-            cells: domain.grid.cells(),
+            cells,
             fluid_cells: domain.fluid_cells(),
             solid_cells: voxels.solid_cells,
             odd_rows: voxels.odd_rows,
             origin_m: domain.grid.origin,
+        },
+        memory: MemoryInfo {
+            bytes_per_cell: bytes_used,
+            gpu_bytes_per_cell: GPU_BYTES_PER_CELL,
+            cpu_bytes_per_cell: bytes_per_cell::<f64>(),
+            bytes: bytes_used * cells,
         },
         lattice: LatticeInfo {
             tau: lattice.tau,
@@ -619,7 +462,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         settings,
         surface: "surface.bin".to_string(),
         slices: slice_names,
-        not_modelled: vec!["wall-resolved boundary layer (staircase half-way bounce-back walls)", "compressibility beyond O(Ma²)"],
+        not_modelled,
         warnings,
     };
     let json = serde_json::to_vec_pretty(&result).map_err(|error| io(format!("result.json: {error}")))?;

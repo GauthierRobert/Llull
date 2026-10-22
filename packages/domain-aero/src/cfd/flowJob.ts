@@ -12,7 +12,7 @@ import { toCaseFrame, type CaseFrame } from './frame';
 import { prepareCaseWithStage, type CheckRow, type PrepareReport } from './prepare';
 import type { SurfaceStage } from './surfaceStage';
 
-export type FlowFaceKind = 'far_field' | 'slip' | 'ground' | 'moving_ground';
+export type FlowFaceKind = 'far_field' | 'slip' | 'symmetry' | 'ground' | 'moving_ground';
 export type FlowDevice = 'cpu' | 'gpu' | 'auto';
 type FlowSliceField = 'speed' | 'p' | 'ux' | 'uy' | 'uz';
 
@@ -272,6 +272,10 @@ export function buildFlowJob(
   const minM: Vec3 = [box.min[0], halved ? Math.max(box.min[1], 0) : box.min[1], box.min[2]];
   const ground: FlowFaceKind = cfdCase.ground.moving ? 'moving_ground' : 'ground';
   const notes: string[] = [];
+  if (halved)
+    notes.push(
+      'half model (symmetryPlane xz): the solver keeps y >= 0, doubles forces and moments and sets the side force and the in-plane moments to zero',
+    );
   const slices = cfdCase.outputs.slices.flatMap((slice) => {
     const field = SLICE_FIELDS[slice.field.toLowerCase()];
     if (field === undefined) {
@@ -317,7 +321,7 @@ export function buildFlowJob(
     faces: {
       xMin: 'far_field',
       xMax: 'far_field',
-      yMin: halved ? 'slip' : 'far_field',
+      yMin: halved ? 'symmetry' : 'far_field',
       yMax: 'far_field',
       zMin: cfdCase.ground.enabled ? ground : 'far_field',
       zMax: 'far_field',

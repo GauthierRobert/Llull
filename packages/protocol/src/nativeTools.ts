@@ -23,6 +23,9 @@ interface NativeToolSpec {
 
 const TIMEOUT_MIN_S = 1;
 const TIMEOUT_MAX_S = 86400;
+/** Bounds of the inflow lattice Mach number of `cfd_solve` (the job refuses outside (0, 0.3]). */
+const LATTICE_MACH_MIN = 1e-6;
+const LATTICE_MACH_MAX = 0.3;
 const EMPTY_SCHEMA: ParamsSchema = { type: 'object', properties: {}, required: [] };
 
 /** Wall-clock limit parameter: zod has no bounds in `ParamSpec`, so `minimum` / `maximum` are added after derivation. */
@@ -34,6 +37,11 @@ function schemaOf(shape: z.ZodObject): ParamsSchema {
   const timeout = schema.properties['timeoutS'];
   if (timeout !== undefined) timeout.minimum = TIMEOUT_MIN_S;
   if (timeout !== undefined) timeout.maximum = TIMEOUT_MAX_S;
+  const steps = schema.properties['maxSteps'];
+  if (steps !== undefined) steps.minimum = 1;
+  const mach = schema.properties['latticeMach'];
+  if (mach !== undefined) mach.minimum = LATTICE_MACH_MIN;
+  if (mach !== undefined) mach.maximum = LATTICE_MACH_MAX;
   return schema;
 }
 
@@ -285,8 +293,18 @@ const cfdSolve = (): ToolDefinition => ({
         .number()
         .optional()
         .describe('Device memory in bytes: the memory estimate is checked against it before anything is allocated (CFD_MEMORY_EXCEEDED).'),
-      maxSteps: z.number().int().optional().describe('Lattice step limit (default 200000); reached = recorded with converged false.'),
-      latticeMach: z.number().optional().describe('Inflow lattice Mach number setting the time step (default 0.1, at most 0.3).'),
+      maxSteps: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Lattice step limit, >= 1 (default 200000); reached = recorded with converged false.'),
+      latticeMach: z
+        .number()
+        .positive()
+        .max(0.3)
+        .optional()
+        .describe('Inflow lattice Mach number setting the time step, in (0, 0.3] (default 0.1).'),
       les: z.boolean().optional().describe('Smagorinsky LES (default true, C_s 0.1); off for laminar validation cases.'),
     }),
   ),

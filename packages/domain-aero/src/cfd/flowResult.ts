@@ -23,6 +23,13 @@ const resultSchema = z.object({
   adapter: z.string().optional(),
   deterministic: z.boolean(),
   precision: z.string(),
+  halfModel: z.boolean(),
+  memory: z.object({
+    bytesPerCell: z.number().int(),
+    gpuBytesPerCell: z.number().int(),
+    cpuBytesPerCell: z.number().int(),
+    bytes: z.number().int(),
+  }),
   grid: z.object({
     nx: z.number().int(),
     ny: z.number().int(),
@@ -140,6 +147,8 @@ export function flowResultArtifact(
     ...(result.adapter === undefined ? {} : { adapter: result.adapter }),
     deterministic: result.deterministic,
     precision: result.precision,
+    halfModel: result.halfModel,
+    memory: result.memory,
     grid: result.grid,
     lattice: result.lattice,
     flow: { speedMS: flow.speedMS, densityKgM3: flow.densityKgM3, dynamicPressurePa: q, direction: flow.direction },

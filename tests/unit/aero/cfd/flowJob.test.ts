@@ -104,13 +104,14 @@ describe('buildFlowJob', () => {
     expect(caseJson.flow.direction[0]).toBeCloseTo(Math.cos((10 * Math.PI) / 180), 12);
     expect(caseJson.flow.direction[2]).toBeCloseTo(Math.sin((10 * Math.PI) / 180), 12);
     expect(caseJson.grid.minM[1]).toBe(0);
-    expect(caseJson.faces.yMin).toBe('slip');
+    expect(caseJson.faces.yMin).toBe('symmetry');
+    expect(job.notes.some((note) => note.startsWith('half model'))).toBe(true);
     expect(caseJson.faces.zMin).toBe('moving_ground');
     expect(caseJson.settings).toMatchObject({ les: false, latticeMach: 0.05, device: 'cpu', maxSteps: 200_000 });
     // World (0, 3, 0) is 3 m along the flow axis (+y world): case-frame x = 3.
     expect(caseJson.outputs.probesM[0]?.[0]).toBeCloseTo(3, 12);
     expect(caseJson.outputs.slices).toEqual([]);
-    expect(job.notes[0]).toContain("slice field 'temperature'");
+    expect(job.notes.some((note) => note.includes("slice field 'temperature'"))).toBe(true);
     expect(caseJson.outputs.surfaceFields).toEqual(['p', 'cp']);
     expect(job.defaults.map((entry) => entry.path)).toContain('outputs.surfaceFields');
     expect(job.defaults.map((entry) => entry.path)).not.toContain('settings.les');

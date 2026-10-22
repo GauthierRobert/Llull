@@ -78,7 +78,7 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
   cfd_solve caseId=ID         native llull-compute lattice-Boltzmann flow solve of a low-speed case (create_cfd_case, Mach < 0.3), recorded
-                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 deviceMemoryBytes=N les=true];
+                              with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true];
                               --progress prints one line per drag sample; without llull-compute: CFD_SOLVER_MISSING; then: cfd_report caseId=ID
   mtest_run mtest=SCRIPT      OPTIONAL MFront / MTest (user-installed, never bundled: $LLULL_MTEST, $LLULL_MFRONT; needs LLULL_ALLOW_CODE_EXECUTION=1):
                               run an MTest script [mfront={name,source} timeoutS=120 probe=true]; absent tools -> MFRONT_TOOL_MISSING with the reason

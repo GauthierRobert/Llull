@@ -122,6 +122,10 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
   const doc = host.getDoc();
   const cfdCase = cfdCaseOf(doc, caseId);
   if (cfdCase === undefined) return failure('CFD_CASE_NOT_FOUND', `no flow case '${caseId}': create_cfd_case first`, [caseId]);
+  if (options.maxSteps !== undefined && !(Number.isInteger(options.maxSteps) && options.maxSteps >= 1))
+    return failure('CFD_PARAM_INVALID', `maxSteps must be an integer >= 1, got ${options.maxSteps}`, [caseId]);
+  if (options.latticeMach !== undefined && !(options.latticeMach > 0 && options.latticeMach <= 0.3))
+    return failure('CFD_PARAM_INVALID', `latticeMach must be in (0, 0.3], got ${options.latticeMach}`, [caseId]);
   const built = buildFlowJob(doc, cfdCase, defaultContext().kernel, {
     device: options.device,
     maxSteps: options.maxSteps,

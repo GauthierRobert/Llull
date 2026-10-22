@@ -55,6 +55,15 @@ export interface CfdResultArtifact {
   readonly adapter?: string;
   readonly deterministic: boolean;
   readonly precision: string;
+  /** A symmetry face halved the model: forces and moments are the whole body's (doubled; side force and in-plane moments zero). */
+  readonly halfModel: boolean;
+  /** Bytes per cell of the layout this run used and of both layouts (ties the host estimate to the real buffers). */
+  readonly memory: {
+    readonly bytesPerCell: number;
+    readonly gpuBytesPerCell: number;
+    readonly cpuBytesPerCell: number;
+    readonly bytes: number;
+  };
   readonly grid: {
     readonly nx: number;
     readonly ny: number;
