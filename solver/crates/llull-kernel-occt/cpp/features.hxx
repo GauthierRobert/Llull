@@ -47,6 +47,9 @@ std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Sli
 // flag adds the straight edge from the last pole back to the first. Null when OCC refuses; a throw (-> Err) when the data are inconsistent.
 std::unique_ptr<Shape> skinned_solid_bsplines(rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths, bool ruled);
 std::unique_ptr<Shape> pipe_solid(rust::Slice<const double> spine, const Shape &section);
+// MakePipe of `section` along the exact helix edge (capability helixEdge): origin xyz, axis xyz, x direction xyz, radius, end radius, turns,
+// pitch, left-hand flag, start angle (15 numbers). Null when OCC refuses; a throw (-> Err) for inconsistent data.
+std::unique_ptr<Shape> helix_pipe_solid(rust::Slice<const double> helix, const Shape &section);
 bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance);
@@ -59,6 +62,11 @@ std::unique_ptr<Shape> surface_face(int32_t kind, rust::Slice<const double> surf
 // The face lifted along its normal from offset `from` to `to` (> from): a sewn solid. `direction` is the lift direction at the first loop vertex.
 std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops, double from, double to,
                                  rust::Slice<const double> direction, double tolerance);
+
+// Closed solid of fitted lateral B-spline faces (surface_face kind-0 layouts concatenated, `lengths` = f64 count of each): the faces are sewn into
+// a shell whose two closed free boundaries get planar caps, then everything is sewn into a solid. Null when OCC refuses or the solid is invalid; a
+// throw (-> Err) when the sewing leaves free edges (SWG_KERNEL_SEW_OPEN) or the shell does not have exactly two closed boundaries.
+std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance);
 
 // `tag` names the tool faces (SC-N1: "hole<n>.<k>", "pocket<n>").
 // BRepFeat_MakeRevol cut of the closed polygon `profile` (xyz triples) revolved 2 pi about (origin, normal).

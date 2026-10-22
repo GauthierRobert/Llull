@@ -1,6 +1,6 @@
 import { idOrNext } from '../../lib/explicitId';
 import type { CurveSegment } from '../../model/curve';
-import type { CadDocument, SweepSection, SweepStation, Vec3 } from '../../model/types';
+import type { CadDocument, SweepEntity, SweepSection, SweepStation, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, untypedArray, z } from '../schema';
 import { failer } from '../noop';
@@ -13,6 +13,11 @@ import { MAX_PROFILE_POINTS } from '../limits';
 import { sketchPath } from './sketchCurves';
 import { type SectionSpec, sectionLoop, sectionSpecFields, specRing } from './sectionSpecs';
 import { alignRing } from '../../geometry/sectionRing';
+import { nurbsPath } from '../../geometry/nurbsChain';
+import type { HelixDefinition } from '../../lib/helix/types';
+import { add3 } from '../../lib/vec3';
+import { designedFields, lawField, refuseSweep, sweepDesign } from './sweepLaws';
+import { orientationField, sectionFrameField } from './sweepOrientation';
 import {
   catmullRomBeziers,
   chainIssue,
@@ -101,12 +106,20 @@ function resolvePath(
     return bentOrSmooth(points, closed, smooth, bendRadius);
   }
   const entity = doc.entities[pathId as string];
+  if (entity?.kind === 'nurbs_curve') return nurbsPath(entity);
   const world = sketchPath(doc, pathId as string);
   if (typeof world === 'string' || (entity?.kind !== 'polyline' && entity?.kind !== 'rectangle')) return world;
   const loop = entity.kind === 'rectangle' || entity.closed;
   const corners = world.map((segment) => segment.points[0] as Vec3);
   if (!loop) corners.push(world[world.length - 1]?.points[1] as Vec3);
   return bentOrSmooth(corners, loop, smooth, bendRadius);
+}
+
+/** The exact helix of a `nurbs_curve` path (`add_helix`), moved to the sweep's local frame; undefined for any other path or a rotated curve. */
+function pathHelix(doc: CadDocument, pathId: string | undefined, start: Vec3): HelixDefinition | undefined {
+  const curve = pathId === undefined ? undefined : doc.entities[pathId];
+  if (curve?.kind !== 'nurbs_curve' || curve.analytic === undefined || curve.rotation.some((angle) => angle !== 0)) return undefined;
+  return { ...curve.analytic, origin: sub3(add3(curve.position, curve.analytic.origin), start) };
 }
 
 /** Corner points joined by bends (or a smooth spline through them), open or closed. */
@@ -117,9 +130,10 @@ function bentOrSmooth(points: readonly Vec3[], closed: boolean, smooth: boolean,
 
 /**
  * @affects creates 1 sweep entity positioned at the path start
- * @invariant path is open, connected and tangent-continuous (G1); bends are wider than the section
- * @failure bad / ambiguous section or path, sharp corner, bend tighter than the section,
- *   duplicate explicit id -> no-op, affected:[]
+ * @invariant path is open, connected and tangent-continuous (G1); bends are wider than the (scaled) section; no law / orientation / blend param -> the entity of before
+ * @failure bad / ambiguous section or path -> SWG_PATH_INVALID; sharp corner -> SWG_PATH_NOT_G1; bend tighter than the section -> SWG_SELF_INTERSECTION_LOCAL;
+ *   bad law -> SWG_LAW_INVALID / SWG_LAW_NONPOSITIVE / SWG_LAW_EXCLUSIVE; closed path with a non-periodic twist -> SWG_CLOSED_TWIST_NOT_PERIODIC;
+ *   frame mode cannot follow the path -> SWG_FRAME_DEGENERATE; duplicate explicit id -> no-op, affected:[]
  */
 export const sweepProfile = defineCommand({
   name: 'sweep_profile',
@@ -135,6 +149,12 @@ export const sweepProfile = defineCommand({
     'polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y ' +
     'when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. ' +
     'Paths, bends and sketched sections stay exact for the exact kernel and STEP export. ' +
+    'Laws over the path arc-length fraction t (0..1): `twist` (radians; or `twistTurns`), `scale` or `area` (exclusive; area is the section area in ' +
+    'document units squared), `stretch` {x, y}, and for stations `stationBlend` (smooth | linear). Volume of a section centred on the path is the integral of its area ' +
+    'along the path whatever the twist. `orientation`: minimal (default, for pipes and anything round), fixed (the section keeps its plane, normal = direction, default +Z; ' +
+    'extrusion-like oblique sweeps), frenet (curvature normal; only on paths that bend everywhere), binormal (section y follows `direction`). ' +
+    'Refusals carry stable SWG_* codes (SWG_LAW_NONPOSITIVE, SWG_CLOSED_TWIST_NOT_PERIODIC on a closed path whose total twist is not a whole number of ' +
+    'turns, SWG_FRAME_DEGENERATE, SWG_SELF_INTERSECTION_LOCAL). Next: inspect_sweep for the frames, check_sweep_loft for the checks, mass_properties for the volume. ' +
     'Booleans with other solids work like any primitive (e.g. boolean op union to weld pipes to a flange).',
   params: z.object({
     path: untypedArray(
@@ -191,6 +211,25 @@ export const sweepProfile = defineCommand({
           'Replaces radius / innerRadius / section / sectionId.',
       )
       .optional(),
+    stationBlend: z
+      .enum(['smooth', 'linear'])
+      .describe(
+        'With stations: how rings blend along the path — smooth (smoothstep, default) or linear (a straight taper between two radii is then an exact frustum). Evaluated at every arc-length sample, not only at path joints.',
+      )
+      .optional(),
+    twist: lawField('Rotation of the section about the path tangent, in radians (total twist of a bar: end - start)'),
+    twistTurns: z
+      .number()
+      .describe('Shortcut for a linear twist of this many full turns over the whole path (1 = 360 degrees). Do not combine with twist.')
+      .optional(),
+    scale: lawField('Uniform scale factor (> 0) of the section'),
+    area: lawField('Section area (> 0, document units squared; the section scales by sqrt(area / start area))'),
+    stretch: z
+      .object({ x: lawField('Extra scale (> 0) of the section x axis'), y: lawField('Extra scale (> 0) of the section y axis') })
+      .describe('Anisotropic scale laws of the section x / y axes, multiplied with scale.')
+      .optional(),
+    orientation: orientationField,
+    sectionFrame: sectionFrameField,
     ...solidStyleFields(),
   }),
   run: (
@@ -206,6 +245,14 @@ export const sweepProfile = defineCommand({
       section: rawSection,
       sectionId,
       stations: rawStations,
+      stationBlend,
+      twist: twistInput,
+      twistTurns,
+      scale: scaleInput,
+      area: areaInput,
+      stretch,
+      orientation: orientationInput,
+      sectionFrame,
       layerId,
       color = DEFAULT_SOLID_COLOR,
       id: explicitId,
@@ -225,24 +272,68 @@ export const sweepProfile = defineCommand({
     const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
     if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
     const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed);
-    if (typeof path === 'string') return fail(path);
+    if (typeof path === 'string') return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', path, [], ['path']);
     const loop = isClosedChain(path);
     if (loop && stations !== undefined) return fail('stations need an open path');
     const issue = chainIssue(path, loop);
-    if (issue !== null) return fail(`path invalid — ${issue}`);
+    if (issue !== null) return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', `path invalid — ${issue}`, [], ['path']);
     const corner = firstCorner(path);
-    if (corner >= 0) return fail(`the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`);
-    if (loop && !closesSmoothly(path)) return fail('the closed path has a sharp corner where it closes; use a bendRadius or smooth: true');
-    const bend = Math.min(...path.map(minCurvatureRadius));
-    if (bend <= halfSize)
-      return fail(
-        `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${halfSize.toFixed(3)}); the solid would self-intersect`,
+    if (corner >= 0)
+      return refuseSweep(
+        doc,
+        'sweep_profile',
+        'SWG_PATH_NOT_G1',
+        `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
+        [],
+        ['path'],
+      );
+    if (loop && !closesSmoothly(path))
+      return refuseSweep(
+        doc,
+        'sweep_profile',
+        'SWG_PATH_NOT_G1',
+        'the closed path has a sharp corner where it closes; use a bendRadius or smooth: true',
+        [],
+        ['path'],
       );
     const start = path[0]?.points[0] as Vec3;
+    const helix = pathHelix(doc, pathId, start);
+    const designed = designedFields({
+      twistInput,
+      twistTurns,
+      scaleInput,
+      areaInput,
+      stretch,
+      orientationInput,
+      orientationContext: { start, helix, sectionFrame },
+      stationBlend,
+      stations,
+    });
+    if ('refusal' in designed)
+      return refuseSweep(doc, 'sweep_profile', designed.refusal.code, designed.refusal.message, [], [designed.refusal.path]);
     const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
     const id = idOrNext(explicitId, 'swp');
-    const geometry = stations === undefined ? { path: local, section } : { path: local, section, stations };
+    const geometry = {
+      path: local,
+      section,
+      ...(stations === undefined ? {} : { stations }),
+      ...(helix === undefined ? {} : { helix }),
+      ...designed.fields,
+    };
     const entity = newEntity('sweep', id, geometry, start, color, { layerId: existingLayerOrDefault(doc, layerId) });
+    const sweepEntity = entity as SweepEntity;
+    const design = sweepDesign(doc, sweepEntity, loop);
+    if ('document' in design) return design;
+    const bend = Math.min(...path.map(minCurvatureRadius));
+    if (sweepEntity.orientation?.mode !== 'axis_plane' && bend <= halfSize * design.maxScale)
+      return refuseSweep(
+        doc,
+        'sweep_profile',
+        'SWG_SELF_INTERSECTION_LOCAL',
+        `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${(halfSize * design.maxScale).toFixed(3)}); the solid would self-intersect`,
+        [],
+        ['radius'],
+      );
     const length = polylineLength(sampleChain(path, false));
     const shape =
       stations !== undefined

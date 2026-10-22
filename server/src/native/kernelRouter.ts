@@ -61,6 +61,8 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
   const wire = {
     bsplineSections: deps.native.capabilities.includes('bsplineSections'),
     nurbsSurface: deps.native.capabilities.includes('nurbsSurface'),
+    sheetSolid: deps.native.capabilities.includes('sheetSolid'),
+    helixEdge: deps.native.capabilities.includes('helixEdge'),
   };
 
   const sourceMesh: SourceMesher = async (source, features) => {

@@ -16,12 +16,17 @@ export const quad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Triangle[] => [
   [a, c, d],
 ];
 
-/** Wall quads between two rings, outward for a CCW ring pair (`flip` for an inward bore). */
-export function ringWalls(lower: readonly Vec3[], upper: readonly Vec3[], flip: boolean): Triangle[] {
+/**
+ * Wall quads between two rings, outward for a CCW ring pair (`flip` for an inward bore). With `parity` (the ring index) the split diagonal
+ * alternates with parity + quad index, so the volume error of skewed (twisted) quads cancels to first order.
+ */
+export function ringWalls(lower: readonly Vec3[], upper: readonly Vec3[], flip: boolean, parity?: number): Triangle[] {
   return lower.flatMap((_, j) => {
     const k = (j + 1) % lower.length;
     const [a, b, c, d] = [lower[j], lower[k], upper[k], upper[j]] as [Vec3, Vec3, Vec3, Vec3];
-    return flip ? quad(d, c, b, a) : quad(a, b, c, d);
+    const other = parity !== undefined && (parity + j) % 2 === 1;
+    if (flip) return other ? quad(c, b, a, d) : quad(d, c, b, a);
+    return other ? quad(b, c, d, a) : quad(a, b, c, d);
   });
 }
 

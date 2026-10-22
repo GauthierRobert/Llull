@@ -1,7 +1,10 @@
 /** add_coil (SC-F2): a round or rectangular section swept along a (optionally conical) helix; also the compression spring (closed ends, free length). */
 
-import type { MeshData, Vec3 } from '../../model/types';
+import type { MeshData, SweepEntity, Vec3 } from '../../model/types';
 import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
+import { curveChain } from '../../geometry/nurbsChain';
+import { helixCurve } from '../../lib/helix/helix';
+import type { HelixDefinition } from '../../lib/helix/types';
 import { screwMesh } from '../../geometry/threadTool';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
@@ -93,8 +96,58 @@ function resolveRise(
   return 'give at least two of pitch, turns, length';
 }
 
+/** The coil as a sweep along the exact helix: a round wire normal to it, or a flat wire in the plane through the axis (an exact screw sweep). */
+function exactCoil(
+  shape: CoilShape,
+  wire: { round: number } | { width: number; height: number },
+  id: string,
+  frame: Exclude<ReturnType<typeof axisFrame>, string>,
+  color: string,
+  name: string | undefined,
+): SweepEntity | string {
+  const start: Vec3 = [shape.radius, 0, shape.halfHeight];
+  const definition: HelixDefinition = {
+    type: 'helix',
+    origin: [-shape.radius, 0, 0],
+    axis: [0, 0, 1],
+    radius: shape.radius,
+    endRadius: shape.endRadius,
+    turns: shape.turns,
+    pitch: shape.pitch,
+    handedness: shape.left ? 'left' : 'right',
+    startAngle: 0,
+  };
+  const fitted = helixCurve(definition, 1e-6 * Math.max(shape.radius, shape.endRadius));
+  const path = curveChain(fitted.curve);
+  if (typeof path === 'string') return `the helix path cannot be built: ${path}`;
+  const geometry = {
+    path,
+    helix: definition,
+    ...('round' in wire
+      ? { section: { shape: 'circle' as const, radius: wire.round } }
+      : {
+          section: {
+            shape: 'profile' as const,
+            profile: [
+              [-wire.width / 2, -wire.height / 2],
+              [wire.width / 2, -wire.height / 2],
+              [wire.width / 2, wire.height / 2],
+              [-wire.width / 2, wire.height / 2],
+            ] as Array<[number, number]>,
+          },
+          orientation: {
+            mode: 'axis_plane' as const,
+            axisPoint: definition.origin,
+            direction: definition.axis,
+            sectionFrame: 'path' as const,
+          },
+        }),
+  };
+  return newEntity('sweep', id, geometry, frame.worldAt(start), color, { rotation: frame.rotation, name }) as SweepEntity;
+}
+
 /**
- * @affects creates 1 entity: a sweep (round wire) or a mesh (rectangular wire); position = world start of the wire centre line
+ * @affects creates 1 entity: a sweep (round wire, or a rectangular wire as an axis_plane screw sweep); with exactHelix false or closedEnds the old path and a mesh for a rectangular wire; position = world start of the wire centre line
  * @invariant section extent along the axis < pitch (turns never touch); section half width < the smallest coil radius; MIN_COIL_TURNS <= turns <= MAX_COIL_TURNS
  * @failure missing / non-positive dimensions, section as large as the pitch (self-intersecting coil), section wider than the coil radius, taper to a
  *   non-positive radius, zero axis -> no-op, affected:[]
@@ -107,7 +160,7 @@ export const addCoil = defineCommand({
     'radius of the helix at the start; endRadius (optional) makes a conical coil whose centre-line radius changes linearly to endRadius over ' +
     'the coil. pitch is the axial advance per turn, turns the number of coils (fractions allowed, 0.1 to 200). Section: sectionShape "circle" ' +
     '(default; sectionRadius or sectionDiameter) swept as a round tube (a sweep entity: volume = pi r^2 x centre-line length), or "rectangle" ' +
-    '(sectionWidth radial x sectionHeight along the axis, kept radial/axial all along: flat wire, a mesh solid, volume = width x height x ' +
+    '(sectionWidth radial x sectionHeight along the axis, kept radial/axial all along: flat wire, a sweep in the plane through the axis (a mesh with exactHelix false), volume = width x height x ' +
     '2 pi x mean radius x turns). The coil is refused when the section is as large as the pitch (sectionDiameter or sectionHeight >= pitch: ' +
     'neighbouring turns would overlap) or wider than the coil radius. Give at least two of pitch, turns and length (length = free length along the axis including the wire; pitch and turns win if all three are given). closedEnds=true (round wire, turns > 2) makes a compression spring: the first and last turn lie flat (pitch = wire diameter) and the middle turns take the pitch that keeps the length. handedness "right" (default) or "left". Returns the entity id and data ' +
     '{ height (= free length), turns, pitch (the middle-turn pitch with closedEnds), centreLineLength, sectionArea, analyticVolume } in document units.',
@@ -140,6 +193,12 @@ export const addCoil = defineCommand({
     handedness: z.enum(['right', 'left']).describe('"right" (default) or "left" helix.').optional(),
     position: positionField('Center of the coil base plane (start of the coil). '),
     axis: vec3('Direction [dx, dy, dz] (non-zero, normalized) the coil extends along from position. Defaults to [0, 0, 1].').optional(),
+    exactHelix: z
+      .boolean()
+      .describe(
+        'Default true: the wire is swept along the exact helix (add_helix geometry, within 1e-6 of the radius) and a rectangular wire is an exact screw sweep (orientation axis_plane) instead of a mesh. false (or closedEnds) keeps the older 16-points-per-turn Catmull-Rom approximation (up to 1.2 % of the radius off at the end turns) and the mesh flat wire.',
+      )
+      .optional(),
     color: colorField('#b87333'),
     name: z.string().describe('Optional entity name, e.g. "Heating coil".').optional(),
   }),
@@ -158,6 +217,7 @@ export const addCoil = defineCommand({
       sectionWidth,
       sectionHeight,
       handedness = 'right',
+      exactHelix = true,
       position = ORIGIN,
       axis,
       color = '#b87333',
@@ -198,7 +258,18 @@ export const addCoil = defineCommand({
     const centreLineLength = helixLength(shape);
     const analyticVolume = round ? sectionArea * centreLineLength : sectionArea * 2 * Math.PI * ((radius + endRadius) / 2) * turns;
     let entity;
-    if (round) {
+    if (exactHelix && !closedEnds) {
+      const exact = exactCoil(
+        shape,
+        round ? { round: halfWidth } : { width: 2 * halfWidth, height: 2 * halfHeight },
+        id,
+        frame,
+        color,
+        name,
+      );
+      if (typeof exact === 'string') return fail(exact);
+      entity = exact;
+    } else if (round) {
       const points = helixPoints(shape);
       const startLocal = points[0] as Vec3;
       const path = catmullRomBeziers(points, false).map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, startLocal)));

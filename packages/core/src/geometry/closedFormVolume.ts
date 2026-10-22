@@ -8,8 +8,8 @@ import { type Entity } from '../model/types';
 import { signedMeshVolume } from './meshVolume';
 import { entityBounds } from './bounds';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
-import { chainLength } from './curveSegments';
 import { sweepTriangles } from './sweep';
+import { sweepAnalyticVolume } from './sweepEval/volume';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
 
@@ -25,13 +25,10 @@ function closedMeshVolume(positions: number[]): number {
   return Math.abs(signedMeshVolume(positions, []));
 }
 
-/** Round sections: annulus area x path length (Pappus); other sections: tessellated volume. */
+/** Round sections: the closed form of sweepAnalyticVolume (annulus area x path length unless laws or orientation change it); else the tessellated volume. */
 function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): ClosedFormVolume {
-  const { section } = e;
-  if (section.shape === 'circle' && e.stations === undefined) {
-    const bore = section.innerRadius ?? 0;
-    return { volume: Math.PI * (section.radius ** 2 - bore ** 2) * chainLength(e.path), analytic: true };
-  }
+  const exact = sweepAnalyticVolume(e);
+  if (exact !== null) return { volume: exact, analytic: true };
   return { volume: closedMeshVolume(sweepTriangles(e).flat(2)), analytic: false };
 }
 

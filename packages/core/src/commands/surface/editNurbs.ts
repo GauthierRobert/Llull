@@ -1,6 +1,7 @@
 /** edit_nurbs: pole / weight edits and the shape-preserving knot insertion, degree elevation and reversal of a nurbs_curve. */
 
 import type { CommandResult } from '../types';
+import { withCurve } from '../../model/curveEntity';
 import { defineCommand, vec3, z } from '../schema';
 import { changed } from '../noop';
 import { elevateDegree, insertKnot, movePole, reverseCurve, setWeight } from '../../lib/nurbs/edit';
@@ -80,7 +81,7 @@ export const editNurbs = defineCommand({
     const preserving = operation === 'insert_knot' || operation === 'elevate_degree';
     const detail = preserving ? `; shape change ${shapeChange(entity.curve, result).toExponential(1)} ${doc.units}` : '';
     return changed(
-      replaceEntity(doc, { ...entity, curve: result }),
+      replaceEntity(doc, withCurve(entity, result)),
       `edit_nurbs ${id}: ${operation} -> degree ${result.degree}, ${result.poles.length} poles${detail}.`,
       [id],
     );

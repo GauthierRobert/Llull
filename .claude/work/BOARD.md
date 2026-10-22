@@ -50,8 +50,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Freeform design (spec = `docs/design/README.md`, order = its "Recommended order")
 
-- `[TODO]` **DES-2** 02 SWG M0–M3: sweep twist / scale / area laws, orientation modes, explicit station blend (VC-SWG-11 finding), exact
-  helix: `docs/design/02-sweep-loft-guides/`. _Lane 1 (+ native `sheetSolid`)_ _deps: —_
+- `[TODO]` **DES-2b** 02 SWG left after M0–M3 (done 2026-10-22, §13): M4–M8 rails + `sweep_surface`, loft end conditions, ruled /
+  network / developable, pipeShell fast path, CadQuery lowering, frames overlay; M1 leftovers in §13. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-6** 06 BLD M0: coded OCCT fillet diagnostics, native `edgeSamples` / `edgeContinuity`, `probe_fillet`, `check_blends`,
   oracle cases for variable laws: `docs/design/06-variable-blends/`. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-7** 07 MSH M0 + M2: STL / OBJ / PLY / 3MF import, `analyze_mesh` / `check_mesh`, Manifold hull / Minkowski / offset /

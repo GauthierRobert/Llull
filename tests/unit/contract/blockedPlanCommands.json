@@ -37,30 +37,12 @@
       "check_deformation",
       "twist_body"
     ],
-    "docs/design/02-sweep-loft-guides/validation/plans/bad_refusals.json": [
-      "add_helix"
-    ],
-    "docs/design/02-sweep-loft-guides/validation/plans/target_helix_spring_thread.json": [
-      "add_helix",
-      "check_sweep_loft",
-      "inspect_sweep"
-    ],
-    "docs/design/02-sweep-loft-guides/validation/plans/target_loft_conditions_alignment.json": [
-      "check_sweep_loft"
-    ],
     "docs/design/02-sweep-loft-guides/validation/plans/target_network_ruled.json": [
-      "check_sweep_loft",
       "network_surface",
       "ruled_surface"
     ],
     "docs/design/02-sweep-loft-guides/validation/plans/target_rails_and_surface_mode.json": [
-      "add_helix",
-      "check_sweep_loft",
       "sweep_surface"
-    ],
-    "docs/design/02-sweep-loft-guides/validation/plans/target_twist_scale_orientation.json": [
-      "check_sweep_loft",
-      "inspect_sweep"
     ],
     "docs/design/03-wrap-emboss/validation/plans/target_bad_inputs.json": [
       "emboss_on_face",

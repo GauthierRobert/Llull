@@ -1,5 +1,6 @@
 /** Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity, instance expansion). */
 
+import { withCurve } from '../model/curveEntity';
 import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
@@ -61,7 +62,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
         dims: `scaled ${e.surface.poles.length} x ${e.surface.poles[0]?.length ?? 0} poles`,
       };
     case 'nurbs_curve':
-      return { scaled: { ...e, curve: scaleCurve(e.curve, f) }, dims: `scaled ${e.curve.poles.length} poles` };
+      return { scaled: withCurve(e, scaleCurve(e.curve, f)), dims: `scaled ${e.curve.poles.length} poles` };
     case 'polyline':
     case 'spline':
       return { scaled: { ...e, points: e.points.map((p) => scale2(p, f)) }, dims: `scaled ${e.points.length} points` };

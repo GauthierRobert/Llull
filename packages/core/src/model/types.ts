@@ -25,6 +25,8 @@ export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './mate
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
+import type { HelixDefinition } from '../lib/helix/types';
+import type { SweepDesign } from './sweepOrientation';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { SketchPlaneFields } from './sketchPlanes';
@@ -250,7 +252,7 @@ export type SweepSection =
  * @invariant path is a connected chain of >= 1 segment, G1 at every joint, open (end != start)
  * @see sweep_profile
  */
-export interface SweepEntity extends BaseEntity {
+export interface SweepEntity extends BaseEntity, SweepDesign {
   readonly kind: 'sweep';
   path: ReadonlyArray<CurveSegment<Vec3>>;
   section: SweepSection;
@@ -364,6 +366,8 @@ export interface SplineEntity extends BaseEntity {
 export interface NurbsCurveEntity extends BaseEntity {
   readonly kind: 'nurbs_curve';
   curve: NurbsCurveData;
+  /** Design intent the poles approximate (`add_helix`); local to `position`. */
+  analytic?: HelixDefinition;
 }
 
 /**

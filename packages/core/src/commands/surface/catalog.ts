@@ -14,6 +14,8 @@ import { trimSurface } from './trimSurface';
 import { fillSurface } from './fillSurface';
 import { loftSurface } from './loftSurface';
 import { analyzeCurveCurvature, inspectNurbs } from './queryCurve';
+import { inspectSweep } from './inspectSweep';
+import { checkSweepLoft } from './checkSweepLoft';
 
 export const surfaceCommands = commandCatalog(
   createNurbsCurve,
@@ -36,4 +38,6 @@ export const surfaceCommands = commandCatalog(
   measureDeviation,
   checkSurfaceQuality,
   analyzeDraft,
+  inspectSweep,
+  checkSweepLoft,
 );

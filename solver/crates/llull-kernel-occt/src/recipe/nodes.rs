@@ -168,9 +168,17 @@ pub(super) fn face_slab(recipe: &Value) -> Evaluated {
     shape_of(features::face_slab(kind, &data, &loops, [from, to], direction, tolerance))
 }
 
-/// Sweep (`sweptSolid`): the spine must make a wire; a variable sweep skins its station rings, else MakePipe of the section.
+/// Sweep (`sweptSolid`): fitted lateral faces (capability `sheetSolid`, laws / frames MakePipe cannot do) are sewn and capped; else the spine
+/// must make a wire, and a variable sweep skins its station rings, else MakePipe of the section.
 pub(super) fn sweep(entity: &Value) -> Evaluated {
     let Some(native) = entity.get("native") else { return refused() };
+    if let Some(faces) = chains(native.get("faces")) {
+        let tolerance = native.get("tolerance").and_then(Value::as_f64).unwrap_or(1e-6);
+        if faces.is_empty() || !faces.iter().all(|face| surface_data_ok(0, face)) || !positive(tolerance) {
+            return refused();
+        }
+        return place_entity(shape_of(features::sheet_solid(&faces, tolerance))?, entity, [0.0; 3]);
+    }
     let Some(spine) = numbers(native.get("spine")) else { return refused() };
     if !features::chain_wire_ok(&spine).map_err(EvalError::Failure)? {
         return refused();
@@ -187,6 +195,11 @@ pub(super) fn sweep(entity: &Value) -> Evaluated {
         features::chain_face(&chain)
     };
     let Some(section) = section.map_err(EvalError::Failure)? else { return refused() };
+    if let Some(helix) = numbers(native.get("helix")) {
+        if let Some(exact) = shape_of(features::helix_pipe_solid(&helix, &section))? {
+            return place_entity(Some(exact), entity, [0.0; 3]);
+        }
+    }
     place_entity(shape_of(features::pipe_solid(&spine, &section))?, entity, [0.0; 3])
 }
 
@@ -525,6 +538,23 @@ mod tests {
         assert!((volume(evaluator.evaluate(&leaf(malformed))) - 8.0).abs() < 1e-6, "fallback to the chains");
         let sweep = json!({ "kind": "sweep", "native": { "spine": [0, 0, 0, 0, 0, 0, 2], "chain": square(0.0) } });
         assert!((volume(evaluator.evaluate(&leaf(sweep))) - 8.0).abs() < 1e-6);
+        // fitted lateral faces (capability sheetSolid): the four sides of a 2 x 2 x 2 prism are sewn and capped; a bad tolerance or malformed face is refused
+        let side = |a: [f64; 2], b: [f64; 2]| {
+            let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];
+            data.extend([a[0], a[1], 0.0, a[0], a[1], 2.0, b[0], b[1], 0.0, b[0], b[1], 2.0]);
+            data.extend([0.0, 1.0, 2.0, 2.0, 0.0, 1.0, 2.0, 2.0]);
+            data
+        };
+        let faces = vec![
+            side([-1.0, -1.0], [1.0, -1.0]),
+            side([1.0, -1.0], [1.0, 1.0]),
+            side([1.0, 1.0], [-1.0, 1.0]),
+            side([-1.0, 1.0], [-1.0, -1.0]),
+        ];
+        let fitted = json!({ "kind": "sweep", "native": { "faces": faces, "tolerance": 1e-6 } });
+        assert!((volume(evaluator.evaluate(&leaf(fitted))) - 8.0).abs() < 1e-9, "fitted faces");
+        let bad_tolerance = json!({ "kind": "sweep", "native": { "faces": [[1.0]], "tolerance": 1e-6 } });
+        assert!(evaluator.evaluate(&leaf(bad_tolerance)).unwrap().is_none(), "malformed face data is refused");
         let tetra = json!({ "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] });
         let faceted = json!({ "kind": "subdivision", "native": { "patches": [0.0], "triangles": tetra } });
         assert!((volume(evaluator.evaluate(&leaf(faceted))) - 1.0 / 6.0).abs() < 1e-9, "bad patches fall back to the triangles");

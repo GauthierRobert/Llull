@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument, type MeshSolidEntity, type SweepEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
+import { segmentPoint } from '@core/geometry/curveSegments';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { idOf, manifoldSuite, volumeOf } from '../helpers/featureSupport';
 
@@ -69,8 +70,8 @@ describe('add_coil: round wire', () => {
 describe('add_coil: rectangular (flat) wire', () => {
   const flat = { sectionShape: 'rectangle', sectionWidth: 2, sectionHeight: 1.5, radius: 10, pitch: 3, turns: 4 };
 
-  it('screws a radial x axial rectangle: volume = w h 2 pi R turns', () => {
-    const result = coil(flat);
+  it('exactHelix false keeps the mesh flat wire: a radial x axial rectangle, volume = w h 2 pi R turns', () => {
+    const result = coil({ ...flat, exactHelix: false });
     expect(result.affected).toHaveLength(1);
     const mesh = result.document.entities[idOf(result)] as MeshSolidEntity;
     expect(mesh.kind).toBe('mesh');
@@ -82,14 +83,49 @@ describe('add_coil: rectangular (flat) wire', () => {
     expect(Math.max(...ys)).toBeCloseTo(3 * 4 + 1.5, 6);
   });
 
-  it('keeps the width radial on a conical flat coil and honours the axis', () => {
-    const result = coil({ ...flat, endRadius: 6, axis: [0, 1, 0] });
+  it('exactHelix false: the width stays radial on a conical flat coil and honours the axis', () => {
+    const result = coil({ ...flat, endRadius: 6, axis: [0, 1, 0], exactHelix: false });
     const analytic = 2 * 1.5 * 2 * Math.PI * ((10 + 6) / 2) * 4;
     expect(Math.abs(volumeOf(result.document, idOf(result)) - analytic) / analytic).toBeLessThan(0.01);
     const mesh = result.document.entities[idOf(result)] as MeshSolidEntity;
     const rise = mesh.mesh.positions.filter((_, i) => i % 3 === 1);
     expect(Math.min(...rise)).toBeCloseTo(0, 6);
     expect(Math.max(...rise)).toBeCloseTo(13.5, 6);
+  });
+});
+
+describe('add_coil v2: exact helix (SWG M3)', () => {
+  const flat = { sectionShape: 'rectangle', sectionWidth: 2, sectionHeight: 1.5, radius: 10, pitch: 3, turns: 4 };
+
+  it('a flat wire is an axis_plane screw sweep along the exact helix, volume = w h 2 pi R turns', () => {
+    const result = coil(flat);
+    const entity = result.document.entities[idOf(result)] as SweepEntity;
+    expect(entity.kind).toBe('sweep');
+    expect(entity.orientation?.mode).toBe('axis_plane');
+    expect(entity.helix).toMatchObject({ type: 'helix', radius: 10, turns: 4, pitch: 3 });
+    const analytic = 2 * 1.5 * 2 * Math.PI * 10 * 4;
+    expect(Math.abs(measured(result) - analytic) / analytic).toBeLessThan(0.005);
+    const bounds = rotatedEntityBounds(entity);
+    expect(bounds.min[2]).toBeCloseTo(0, 1);
+    expect(bounds.max[2]).toBeCloseTo(3 * 4 + 1.5, 1);
+  });
+
+  it('a conical flat wire keeps its width radial and honours the axis', () => {
+    const result = coil({ ...flat, endRadius: 6, axis: [0, 1, 0] });
+    const analytic = 2 * 1.5 * 2 * Math.PI * ((10 + 6) / 2) * 4;
+    expect(Math.abs(measured(result) - analytic) / analytic).toBeLessThan(0.01);
+  });
+
+  it('a round wire follows the helix: every path point within 2e-6 of the radius (the 16-point Catmull-Rom path was 1.2 % off at its ends)', () => {
+    const result = coil({ radius: 20, pitch: 10, turns: 3, sectionRadius: 2 });
+    const entity = result.document.entities[idOf(result)] as SweepEntity;
+    let worst = 0;
+    for (const segment of entity.path)
+      for (let k = 0; k <= 8; k++) {
+        const p = segmentPoint(segment, k / 8);
+        worst = Math.max(worst, Math.abs(Math.hypot(entity.position[0] + p[0], entity.position[1] + p[1]) - 20));
+      }
+    expect(worst).toBeLessThan(2e-6 * 20);
   });
 });
 

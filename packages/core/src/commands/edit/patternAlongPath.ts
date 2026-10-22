@@ -13,7 +13,7 @@ import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from '../limits';
 import { add3, cross3, isVec3, scale3, ORIGIN } from '../../lib/vec3';
 import { composeEulerXYZ, eulerFromAxes } from '../../lib/eulerRotation';
 import { catmullRomBeziers, chainIssue, chainLength, isClosedChain } from '../../geometry/curveSegments';
-import { frameAtFraction } from '../../geometry/sweep';
+import { frameAtFraction } from '../../geometry/sweepEval/frames';
 import { sketchPath } from '../solids/sketchCurves';
 import { instanceEntity } from '../assembly/assemblies';
 import { arcPath, type ArcSpec } from './arcPath';

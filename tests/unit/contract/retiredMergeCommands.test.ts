@@ -27,7 +27,7 @@ describe('retired merged commands', () => {
       position: [11, 2, 4],
       section: { shape: 'circle', radius: 1 },
     });
-    expect(entity.path).toHaveLength(8 * 16);
+    expect(entity.path).toHaveLength(8 * 12);
     const last = entity.path[entity.path.length - 1]!.points.at(-1)!;
     expect(last[2]).toBeCloseTo(40);
     const direct = execute(createEmptyDocument(), 'add_coil', {

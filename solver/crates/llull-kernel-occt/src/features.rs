@@ -32,6 +32,7 @@ mod ffi {
         fn skinned_solid(chains: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn skinned_solid_bsplines(curves: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
+        fn helix_pipe_solid(helix: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
         fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Result<UniquePtr<Shape>>;
@@ -44,6 +45,8 @@ mod ffi {
             direction: &[f64],
             tolerance: f64,
         ) -> Result<UniquePtr<Shape>>;
+
+        fn sheet_solid(faces: &[f64], lengths: &[u32], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
         fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64], tag: &str) -> Result<UniquePtr<Shape>>;
         fn feature_prism_cut(
@@ -142,6 +145,12 @@ pub fn pipe_solid(spine: &[f64], section: &Shape) -> Built {
     built(ffi::pipe_solid(spine, inner(section)?))
 }
 
+/// BRepOffsetAPI_MakePipe of `section` along the exact helix edge (`helixEdge`): origin, axis, x direction, radius, end radius, turns, pitch,
+/// left-hand flag, start angle (15 numbers, see `cpp/features.hxx`).
+pub fn helix_pipe_solid(helix: &[f64], section: &Shape) -> Built {
+    built(ffi::helix_pipe_solid(helix, inner(section)?))
+}
+
 /// Sewn solid of bicubic B-spline patches (16 xyz poles each); `None` when any patch or the sewing fails.
 pub fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Built {
     built(ffi::bspline_patch_solid(poles, tolerance))
@@ -155,6 +164,14 @@ pub fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Built {
 /// Solid between the offsets `range` of such a face along `direction` (sewn base, offset face and ruled walls); `None` when OCC refuses.
 pub fn face_slab(kind: i32, surface: &[f64], loops: &[f64], range: [f64; 2], direction: [f64; 3], tolerance: f64) -> Built {
     built(ffi::face_slab(kind, surface, loops, range[0], range[1], &direction, tolerance))
+}
+
+/// Solid closed from fitted B-spline lateral faces (encoded as for [`surface_face`] kind 0): sewn shell, two planar caps, `None` when OCC refuses;
+/// `Err` when the sewing leaves free edges (`SWG_KERNEL_SEW_OPEN`).
+pub fn sheet_solid(faces: &[Vec<f64>], tolerance: f64) -> Built {
+    let lengths: Option<Vec<u32>> = faces.iter().map(|face| u32::try_from(face.len()).ok()).collect();
+    let Some(lengths) = lengths else { return Err("sheet solid: face too long".to_string()) };
+    built(ffi::sheet_solid(&faces.concat(), &lengths, tolerance))
 }
 
 /// `tag` names the faces the cut generates (SC-N1, `hole<n>.<k>`).
@@ -256,6 +273,59 @@ mod tests {
             let torus = 2.0 * pi * 10.0 * pi * area;
             assert!((volume(&pipe) - torus).abs() < 1e-6 * torus, "volume {} vs {torus}", volume(&pipe));
         }
+    }
+
+    /// Ruled side of a prism: the segment from (ax, ay) to (bx, by) lifted from z = 0 to z = height (degree 1 x 1, 2 x 2 poles).
+    fn prism_side(a: [f64; 2], b: [f64; 2], height: f64) -> Vec<f64> {
+        let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];
+        data.extend([a[0], a[1], 0.0, a[0], a[1], height, b[0], b[1], 0.0, b[0], b[1], height]);
+        data.extend([0.0, 1.0, 2.0, 2.0, 0.0, 1.0, 2.0, 2.0]);
+        data
+    }
+
+    /// SWG M2: lateral faces are sewn into a shell, the two closed boundaries get planar caps, the result is a valid solid of the exact volume.
+    #[test]
+    fn a_sheet_solid_closes_lateral_faces_with_two_caps() {
+        let sides = [
+            prism_side([0.0, 0.0], [2.0, 0.0], 3.0),
+            prism_side([2.0, 0.0], [2.0, 1.5], 3.0),
+            prism_side([2.0, 1.5], [0.0, 1.5], 3.0),
+            prism_side([0.0, 1.5], [0.0, 0.0], 3.0),
+        ];
+        let solid = sheet_solid(&sides, 1e-6).unwrap().unwrap();
+        assert!(is_valid(&solid).unwrap());
+        assert!((volume(&solid) - 9.0).abs() < 1e-9, "volume {}", volume(&solid));
+        assert!(sheet_solid(&sides[..3], 1e-6).is_err() || sheet_solid(&sides[..3], 1e-6).unwrap().is_none(), "an open prism is refused");
+        assert!(sheet_solid(&[], 1e-6).unwrap().is_none(), "no faces");
+        assert!(sheet_solid(&[vec![1.0, 2.0]], 1e-6).is_err() || sheet_solid(&[vec![1.0, 2.0]], 1e-6).unwrap().is_none(), "bad data");
+    }
+
+    /// SWG M3: MakePipe along the exact helix edge has the closed-form volume pi r^2 L to ~2e-6 (OCC's pipe surface is itself an approximation; the host
+    /// uses fitted faces where 1e-6 matters), also left-handed.
+    #[test]
+    fn a_pipe_along_an_exact_helix_has_the_closed_form_volume() {
+        let pi = std::f64::consts::PI;
+        let section = |center: [f64; 3], tangent: [f64; 3]| circle_section(center, tangent, 0.5, None).unwrap().unwrap();
+        // origin, axis, x direction, radius, end radius, turns, pitch, left, start angle
+        let cylinder = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 5.0, 5.0, 3.0, 2.0, 0.0, 0.0];
+        let lead = 2.0 / (2.0 * pi);
+        let tangent = {
+            let n = (25.0f64 + lead * lead).sqrt();
+            [0.0, 5.0 / n, lead / n]
+        };
+        let pipe = helix_pipe_solid(&cylinder, &section([5.0, 0.0, 0.0], tangent)).unwrap().unwrap();
+        let length = 3.0 * 2.0 * pi * (25.0f64 + lead * lead).sqrt();
+        assert!(
+            (volume(&pipe) - pi * 0.25 * length).abs() < 5e-6 * pi * 0.25 * length,
+            "volume {} vs {}",
+            volume(&pipe),
+            pi * 0.25 * length
+        );
+        let mut left = cylinder;
+        left[13] = 1.0;
+        let mirrored = helix_pipe_solid(&left, &section([5.0, 0.0, 0.0], [0.0, -tangent[1], tangent[2]])).unwrap().unwrap();
+        assert!((volume(&mirrored) - volume(&pipe)).abs() < 5e-6 * volume(&pipe));
+        assert!(helix_pipe_solid(&cylinder[..14], &section([5.0, 0.0, 0.0], tangent)).is_err(), "inconsistent data is an error");
     }
 
     /// Bilinear sheet over [0, 4] x [0, 3] (degree 1 x 1, one span, 2 x 2 poles).

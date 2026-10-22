@@ -436,3 +436,57 @@ end conditions; M6–M8 networks, ruled / developable and the fast path.**
 ## 12. References
 
 See FUNCTIONAL_SPEC §11 ([R1]–[R29]); same ids. Code references are paths in this repository at branch `docs/freeform-design-specs`.
+
+---
+
+## 13. As built (M0–M3, 2026-10-22)
+
+### 13.1 What was built
+
+| Milestone | Built | Where |
+| --- | --- | --- |
+| M0 | `lib/law` (constant / linear / s_curve / table / expression: value, validation, positivity, Gauss–Legendre integral); `geometry/sweepEval/{frames,sections,laws,evaluate,volume,inspect,realisation,symmetry}`; `geometry/sweep.ts` keeps `sweepTriangles`, `sweepSegmentRings`, `sweepFrames`, `frameAtFraction`, `stationRingAt` (a sweep without laws is sampled and framed exactly as before; the existing sweep, loft, coil and golden tests stay green); read-only `inspect_sweep` | `packages/core/src/{lib/law,geometry/sweepEval,commands/surface}` |
+| M1 | `sweep_profile`: `twist` / `twistTurns`, `scale` / `area` (exclusive), `stretch {x,y}`, `stationBlend` (smooth / linear, evaluated at refined arc-length samples: at least 64 frames, 24 per radian of twist), `orientation` minimal / frenet / fixed / binormal; codes `SWG_PATH_INVALID`, `SWG_PATH_NOT_G1`, `SWG_LAW_INVALID`, `SWG_LAW_NONPOSITIVE`, `SWG_LAW_EXCLUSIVE`, `SWG_CLOSED_TWIST_NOT_PERIODIC`, `SWG_FRAME_DEGENERATE`, `SWG_SELF_INTERSECTION_LOCAL`; `check_sweep_loft` (sweeps); persistence guards for every new field (schema stays v3); closed form of the volume for round sections (laws, `fixed` Cavalieri) | `commands/solids/{sweep,sweepLaws,sweepOrientation}.ts`, `commands/persistence/sweepGuard.ts` |
+| M2 | native op `sheet_solid` (capability `sheetSolid`): fitted lateral B-spline faces are sewn, the two closed free boundaries get planar caps, the shell becomes a valid solid (`SWG_KERNEL_SEW_OPEN` with the free-edge count otherwise); TS fit `geometry/sweepEval/fitted.ts` (one rational Bézier-form face per section edge, cubic pole paths in t, 64 up to 3 200 cells cut into faces of 100, deviation probed at cell mid-stations, `SWG_FIT_TOLERANCE`); `server/src/native/kernelLeaves.ts` sends `native.faces`; `mass_properties` asks the kernel for sweeps without a closed form | `solver/crates/llull-kernel-occt/{cpp/surfaces.cxx,src/features.rs,src/recipe/nodes.rs}` |
+| M3 | `add_helix` (helix, cone, spiral, pitch law, `taperDeg`; keeps its `HelixDefinition` in `nurbs_curve.analytic`; cubic Bézier spans of at most 30 degrees, halved until the probed deviation is within `tolerance`, default 1e-6 R); `lib/helix`; 3D `nurbs_curve` paths (degree 1..3, non-rational) for `sweep_profile pathId`; orientation `axis_plane` + `sectionFrame axial`; `SWG_SELF_INTERSECTION_GLOBAL`; `add_coil` `exactHelix` (default true; `closedEnds` keeps the old path); native `helix_pipe_solid` on the exact helix edge (capability `helixEdge`) for a bored helical tube | `commands/solids/{addHelix,coil}.ts`, `lib/helix`, `geometry/nurbsChain.ts`, `cpp/features.cxx` |
+
+Tool names added: `add_helix`, `inspect_sweep`, `check_sweep_loft`; `sweep_profile` and `add_coil` gained params. The plans `target_twist_scale_orientation.json`, `target_helix_spring_thread.json` and `bad_refusals.json` (steps 2, 4, 5, 7, 8, 9 are refused with the stated codes) run end to end with `llull run … --continue` on the native kernel; they left `blockedPlanCommands.json`. Both target plans are golden plans (`swg_*`).
+
+### 13.2 Measured validation values
+
+Native kernel (`kernel.massProperties` on the recipe; gate `server/tests/nativeKernelSweeps.test.ts` at 1e-6), mm³:
+
+| VC | Measured | Expected | Rel. error |
+| --- | --- | --- | --- |
+| 03 bar 90° / 360° / S-curve 180° | 10 000.00005 / 9 999.99980 / 9 999.99967 | 10 000 | 5e-9 / 2e-8 / 3e-8 |
+| 05 cone (scale 1 → 0.5) | 18 325.957146 | 18 325.9571459 | < 1e-9 |
+| 06 S-curve scale | inside the 1e-6 gate | 18 625.1564463 | < 1e-6 |
+| 07 `1 + 0.25 sin 2πt` | 32 397.67521 | 32 397.6742401 | 3e-8 |
+| 09 square on a quarter arc, scale 1 → 0.5 | 4 581.489297 | 4 581.48928649 | 2e-9 |
+| 10 area law 100 → 25 | 6 249.99996 | 6 250 | 6e-9 |
+| 11 linear stations r 10 → 5 | 18 323.812 | 18 325.9571 (frustum) | 1.2e-4 (the 24-point Catmull–Rom station rings are not circles; gate 5e-4) |
+| 12 tube r 2 on the helix R 20 p 10 ×3 | 4 752.386392 | 4 752.38644026 | 1e-8 |
+| 13 screw 4 × 3, pitch 10 / 5 | 4 523.893373 / 4 523.893373 | 4 523.89342117 | 1e-8 |
+| 14 conical helix wire r 1 | 1 489.419723 | 1 489.41972867 | 4e-9 |
+| 15 `fixed` at 45° / `minimal` | 22 214.41469 / 31 415.9265 (closed forms) | 22 214.4146908 / 31 415.9265359 | < 1e-9 |
+| `add_coil` v2 (3 turns R 20 p 10, wire r 2) | 4 752.386392 | VC-12 | 1e-8 |
+
+Other VCs (unit tests in `tests/unit/sweep/`): 03, 04, 09, 10, 13 on Manifold within 0.5 % (twisted skins alternate the quad diagonal: error 1e-4 instead of 1e-2; a 24-gon circle is 1.1 % under a true circle, so round sections use the closed form); 05, 06, 07 closed form to 1e-9; 08 `add_helix` fit deviation 9.9e-6 (target 2e-5; today's `add_coil` was 0.2323); 12 length 378.1829, ρ_min 20.12665, τ 0.0039538; 14 length 474.0970; 25 Frenet vs RMF 0.4984243 rad per turn (closed form for constant cylindrical helices through `inspect_sweep.totals.twistVsFrenetRad`, numeric elsewhere); 27 codes `SWG_SELF_INTERSECTION_LOCAL`, `SWG_CLOSED_TWIST_NOT_PERIODIC`, `SWG_FRAME_DEGENERATE`, `SWG_SELF_INTERSECTION_GLOBAL`, `SWG_LAW_NONPOSITIVE`, `SWG_LAW_INVALID`, and `SWG_FIT_TOLERANCE` via `add_helix tolerance`; 28 `check_sweep_loft` passes over both plans, every tolerance named, defaulted and sourced; 31 editing a law in history keeps the id and replays equal; 38 (today) round corner 14 696.6759.
+
+### 13.3 Decisions and deviations
+
+- `table` laws are shape-preserving cubic Hermite (Fritsch–Carlson), not the C2 spline of 5.1: a C2 spline undershot the pitch plateaus of the pack's spring (minimum 1.16 for 2) and made its wire overlap. Both pass through every point and honour `startSlope` / `endSlope`.
+- `fixed` takes its plane normal from `orientation.direction`, default world +Z (the pack's z = const plane); `SWG_FRAME_DEGENERATE` when the path is within 5 degrees of the plane.
+- `fitTolerance` default is 1e-7 x model size (at least 1e-9), not 1e-6: 1e-6 left a 5e-6 volume error on the tube. Sewing uses 1e-6 x model size (the edges of OCC's B-spline faces agree to about 1e-5 of their size). The fit is cut into faces of 100 cells because a surface holds at most 400 poles.
+- Helical paths use fitted faces too (MakePipe along the exact helix edge is only 1.7e-6 exact); `helix_pipe_solid` remains the fallback for a bored section, which fitted faces do not express.
+- The pack setup of VC-SWG-04 on the helix (10 mm square twisted 720 degrees on R 20 p 10: half diagonal 7.07 > half the turn distance 4.98) physically overlaps itself. Non-round sections in the twist-free frame are not judged (their orientation turns against the axis); the signed mesh volume is A L = 37 818.29. Round wires and `axis_plane` sections are checked exactly (`SWG_SELF_INTERSECTION_GLOBAL`).
+- `mass_properties` uses the kernel for a sweep only when it has no closed form (laws on non-round sections, frame modes, profiles); round sweeps keep the closed form (the exact helix length for `add_helix` paths).
+- Review fixes: `scale_entity` and `edit_nurbs` drop a curve's `analytic` helix (`withCurve`), so a later sweep never trusts a stale helix; `axis_plane` sweeps have no closed form (the kernel measures the Pappus volume); on a closed path scale / area / stretch must return to their start value (`SWG_LAW_INVALID`); a screw section reaching across the axis is `SWG_SELF_INTERSECTION_LOCAL` and its axial extent is measured over the twisted, scaled loops; `add_coil` refuses instead of storing an empty path; expression laws see one path length (the exact helix length when known); a station sweep with a blend whose fit fails keeps its blended rings; `check_sweep_loft` measures at most 8 fits when `ids` is omitted; `table` end slopes default to a one-sided shape-preserving estimate.
+- The `volumeConsistencyRel` check of 5.4 is not implemented: a signed mesh volume cannot see overlap (it equals the integral of A ds even for overlapping turns); it needs the kernel volume of a valid solid.
+
+### 13.4 Not done
+
+- No `ShapeRecipe` node `sheetSolid`: the faces travel in the sweep leaf payload `native.faces`; the Manifold fallback is the evaluator mesh (laws and frames included). Also left: `lawParameter: 'arc_length'`, `corners` (mitre / round), `fitTolerance` / `railTolerance` as `sweep_profile` params, `pathIds` chains, `surface` / `guide` orientation, rails, `sweep_surface`, lofts v2, `ruled_surface`, `network_surface`, `pipeShell`, CadQuery lowering, frames overlay (M4–M8).
+- Closed paths with laws or non-minimal frames, hollow round sections with laws and degenerate arcs stay mesh-only on the native kernel (`fitSweepFaces` answers `SWG_FIT_UNSUPPORTED`; `check_sweep_loft` reports a warning).
+- VC-SWG-25b (TS RMF vs OCC corrected Frenet on a non-round section) is unmeasured; helical sweeps no longer use the corrected-Frenet pipe, non-helical non-planar paths still do.
+- VC-SWG-27 anchor-less rail (M4); VC-SWG-30 unit audit and VC-SWG-33 performance budgets are not gated; VC-SWG-32 is checked per case, not as one table; `inspect_sweep` curvature uses the sampled path and its `integralAreaDs` is a chord sum (4.4e-5 low on a helix), the exact figure is `analyticVolume`.

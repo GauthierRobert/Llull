@@ -1,6 +1,6 @@
 /**
  * The one mass-property resolver (aerospace 01 KRN, TR-KRN-40a), read by `mass_properties` and by dynamics. Order per solid:
- *   1. exact: a 'mesh' entity that keeps its B-rep recipe, or a loft (the kernel skins its sections / ring curves), and a kernel with
+ *   1. exact: a 'mesh' entity that keeps its B-rep recipe, or a loft (the kernel skins its sections / ring curves) or a sweep without closed form (fitted faces, pipe), and a kernel with
  *      `massProperties` (OCC); for a 'mesh' entity only, a kernel with just `topology` gives an exact volume with mesh-integrated inertia
  *      scaled to it (`inertiaFromMesh`) — a loft's topology under a mesh kernel is only its display mesh;
  *   2. closed form: box / cylinder / sphere (closed-form inertia too); cone, torus, wedge, pyramid, extrusion, round sweep, revolution
@@ -18,6 +18,7 @@ import { combineMassProperties, meshMassProperties, type InertiaTensor, type Mas
 import { primitiveArea, primitiveMassProperties } from './primitiveMass';
 import { solidTriangles } from './solidTriangles';
 import { recipeOf } from './shapeRecipe';
+import { sweepAnalyticVolume } from './sweepEval/volume';
 import type { Triangle } from './triangles';
 
 type MassMethod = 'exact' | 'closed-form' | 'mesh';
@@ -69,11 +70,14 @@ function scaledToVolume(props: MassProperties, volume: number): MassProperties {
 }
 
 /** Kinds the exact kernel builds as a B-rep from their own definition (not from the display mesh): integrated by `massProperties` only. */
-const EXACT_LEAF_KINDS: ReadonlySet<Entity['kind']> = new Set(['loft']);
+/** A loft, or a sweep with no closed form (laws, a frame mode, a non-round section): the kernel builds and integrates the B-rep. */
+function isExactLeaf(e: Entity): boolean {
+  return e.kind === 'loft' || (e.kind === 'sweep' && sweepAnalyticVolume(e) === null);
+}
 
 /** Exact B-rep volume of a loft from the kernel's `massProperties` (OCC), or null (other kind, no kernel / port, kernel failure). */
 export function exactLeafVolume(e: Entity, kernel: GeometryKernel | null | undefined): number | null {
-  if (!EXACT_LEAF_KINDS.has(e.kind) || kernel?.massProperties === undefined) return null;
+  if (!isExactLeaf(e) || kernel?.massProperties === undefined) return null;
   const shape = kernel.evaluate(recipeOf(e));
   const volume = shape === null ? 0 : (kernel.massProperties(shape)?.volume ?? 0);
   return volume > 0 ? volume : null;
@@ -81,7 +85,7 @@ export function exactLeafVolume(e: Entity, kernel: GeometryKernel | null | undef
 
 function exactMass(e: Entity, density: number, kernel: GeometryKernel): ResolvedMass | null {
   const brepResult = e.kind === 'mesh' && e.brep !== undefined;
-  if (!brepResult && !(EXACT_LEAF_KINDS.has(e.kind) && kernel.massProperties !== undefined)) return null;
+  if (!brepResult && !(isExactLeaf(e) && kernel.massProperties !== undefined)) return null;
   const shape = kernel.evaluate(recipeOf(e));
   if (shape === null) return null;
   const exact = kernel.massProperties?.(shape) ?? null;

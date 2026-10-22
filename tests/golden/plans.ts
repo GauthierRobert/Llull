@@ -6,6 +6,7 @@
 import { pngDataUrl } from '../helpers/imageFixtures';
 import { xy, xyz } from '../helpers/xy';
 import { referenceEnginePlan } from './referenceEnginePlan';
+import { swgPlan } from '../helpers/swgPack';
 
 export interface GoldenAction {
   command?: string;
@@ -827,6 +828,9 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'laminate_mass', params: { part: '$part' } },
     { command: 'export_ply_flat_patterns_dxf', params: { part: '$part', plies: ['$c1'] } },
   ],
+  // SWG M1/M3 target plans of the validation pack (docs/design/02-sweep-loft-guides/validation/plans)
+  swg_twist_scale_orientation: swgPlan('target_twist_scale_orientation'),
+  swg_helix_spring_thread: swgPlan('target_helix_spring_thread'),
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */

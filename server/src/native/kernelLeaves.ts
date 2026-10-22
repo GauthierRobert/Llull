@@ -16,7 +16,11 @@ import { mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/g
 import { ringCurves } from '@core/geometry/sectionRing';
 import { hasClosingEdge, sectionChain } from '@core/geometry/sectionChain';
 import type { NurbsCurveData } from '@lib/nurbs/types';
-import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
+import { frameAtFraction, sweepStartAxes } from '@core/geometry/sweepEval/frames';
+import { stationRingAt } from '@core/geometry/sweepEval/sections';
+import { helixFrame } from '@lib/helix/helix';
+import { fitSweepFaces, fitToleranceOf, sewToleranceOf } from '@core/geometry/sweepEval/fitted';
+import { needsFittedFaces } from '@core/geometry/sweepEval/realisation';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { encodeLoops, encodeSurface } from '@core/geometry/surfaceWire';
 import { clamp } from '@lib/clamp';
@@ -55,7 +59,9 @@ function stationRings(entity: SweepEntity): number[][] {
   ].sort((a, b) => a - b);
   return fractions.map((t) => {
     const frame = frameAtFraction(entity.path, t);
-    const ring = stationRingAt(stations, t).map(([x, y]) => add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))));
+    const ring = stationRingAt(stations, t, entity.stationBlend).map(([x, y]) =>
+      add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
+    );
     return encodeChain(ringCurves(ring));
   });
 }
@@ -82,10 +88,44 @@ function sectionPayload(entity: SweepEntity): Record<string, unknown> {
   return { chain: orientedChain(curves, place, true) };
 }
 
-function sweepPayload(entity: SweepEntity): Record<string, unknown> {
+/** Fitted lateral faces for laws, frame modes and helices (MakePipe is an approximation there); null when they cannot be built. */
+function fittedPayload(entity: SweepEntity, wire: WireOptions): Record<string, unknown> | null {
+  if (wire.sheetSolid !== true) return null;
+  const fit = fitSweepFaces(entity, fitToleranceOf(entity));
+  return 'faces' in fit ? { faces: fit.faces, tolerance: sewToleranceOf(entity) } : null;
+}
+
+/** The exact helix as the sidecar reads it (capability `helixEdge`): constant-pitch helices only; a pitch law keeps the Bézier spine. */
+function helixPayload(entity: SweepEntity, wire: WireOptions): number[] | null {
+  const helix = entity.helix;
+  if (wire.helixEdge !== true || helix === undefined || helix.type !== 'helix' || typeof helix.pitch !== 'number') return null;
+  const { x } = helixFrame(helix.axis);
+  return [
+    ...helix.origin,
+    ...helix.axis,
+    ...x,
+    helix.radius,
+    helix.endRadius,
+    helix.turns,
+    helix.pitch,
+    helix.handedness === 'left' ? 1 : 0,
+    helix.startAngle,
+  ];
+}
+
+function sweepPayload(entity: SweepEntity, wire: WireOptions): Record<string, unknown> {
+  if (needsFittedFaces(entity)) {
+    const fitted = fittedPayload(entity, wire);
+    // a plain helix the faces cannot express (a bore) keeps the exact helix spine, a station sweep with only a blend keeps its rings; laws and
+    // frame modes have no pipe equivalent
+    const plain =
+      entity.orientation === undefined && [entity.twist, entity.scale, entity.area, entity.stretch].every((law) => law === undefined);
+    if (fitted !== null || !plain || (entity.helix === undefined && entity.stations === undefined)) return fitted ?? {};
+  }
   const spine = encodeChain(entity.path);
+  const helix = helixPayload(entity, wire);
   if (entity.stations !== undefined && entity.stations.length >= 2) return { spine, rings: stationRings(entity) };
-  return { spine, ...sectionPayload(entity) };
+  return { spine, ...(helix === null ? {} : { helix }), ...sectionPayload(entity) };
 }
 
 const NO_COMPONENTS = createEmptyDocument();
@@ -119,6 +159,10 @@ export interface WireOptions {
   readonly bsplineSections?: boolean;
   /** Capability `nurbsSurface`: a `nurbs_surface` sheet leaf carries its surface and trim loops (`native.surface`, `native.loops`). */
   readonly nurbsSurface?: boolean;
+  /** Capability `sheetSolid`: a sweep with laws or a non-default frame carries fitted lateral faces (`native.faces`) the sidecar sews and caps. */
+  readonly sheetSolid?: boolean;
+  /** Capability `helixEdge`: a sweep along an `add_helix` curve carries the exact helix (`native.helix`) the sidecar builds the spine from. */
+  readonly helixEdge?: boolean;
 }
 
 /**
@@ -166,7 +210,7 @@ export function nativeLeaf(entity: Entity, wire: WireOptions = {}): Entity {
       return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled, ...(bsplines === null ? {} : { bsplines }) });
     }
     case 'sweep':
-      return withPayload(entity, sweepPayload(entity));
+      return withPayload(entity, sweepPayload(entity, wire));
     case 'subdivision':
       return withPayload(entity, subdivisionPayload(entity));
     case 'nurbs_surface':

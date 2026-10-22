@@ -29,11 +29,15 @@
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
+#include <BRepLib.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomFill_BSplineCurves.hxx>
+#include <Geom2d_Line.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -54,6 +58,8 @@
 #include <TopoDS_Wire.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Ax2.hxx>
+#include <gp_Ax3.hxx>
+#include <gp_Dir2d.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
 
@@ -581,6 +587,52 @@ std::unique_ptr<Shape> pipe_solid(rust::Slice<const double> spine, const Shape &
   const bool holed = section.shape.ShapeType() == TopAbs_FACE && unique_sub_shapes(section.shape, TopAbs_WIRE).Extent() > 1;
   const TopoDS_Shape result =
       holed && BRep_Tool::IsClosed(wire) ? closed_holed_pipe(wire, TopoDS::Face(section.shape)) : pipe_of(wire, section.shape);
+  return result.IsNull() ? nullptr : wrap(result);
+}
+
+namespace {
+
+// The exact helix as one edge: a straight line in the (angle, height / slant) parameter plane of a cylinder or cone (CadQuery makeHelix). Layout of
+// `helix`: origin xyz, axis xyz, x direction xyz, radius, end radius, turns, pitch, left-hand flag (1), start angle. Null wire when OCC refuses.
+TopoDS_Wire helix_wire(rust::Slice<const double> helix) {
+  if (helix.size() != 15) throw std::invalid_argument("helix: expected 15 numbers");
+  const gp_Pnt origin(helix[0], helix[1], helix[2]);
+  const gp_Ax3 frame(origin, gp_Dir(helix[3], helix[4], helix[5]), gp_Dir(helix[6], helix[7], helix[8]));
+  const double radius = helix[9];
+  const double end_radius = helix[10];
+  const double turns = helix[11];
+  const double pitch = helix[12];
+  const bool left = helix[13] != 0.0;
+  const double start = helix[14];
+  if (!(radius > 0 && end_radius > 0 && turns > 0 && pitch > 0)) throw std::invalid_argument("helix: radii, turns and pitch must be > 0");
+  const double total = 2.0 * M_PI * turns;
+  const double rise = pitch / (2.0 * M_PI);
+  Handle(Geom_Surface) surface;
+  double advance = rise;
+  if (std::abs(end_radius - radius) <= 1e-12 * radius) {
+    surface = new Geom_CylindricalSurface(frame, radius);
+  } else {
+    const double angle = std::atan((end_radius - radius) / (pitch * turns));
+    surface = new Geom_ConicalSurface(frame, angle, radius);
+    advance = rise / std::cos(angle);
+  }
+  const double direction = left ? -1.0 : 1.0;
+  Handle(Geom2d_Line) line = new Geom2d_Line(gp_Pnt2d(start, 0.0), gp_Dir2d(direction, advance));
+  const double length = total * std::sqrt(1.0 + advance * advance);
+  BRepBuilderAPI_MakeEdge edge(line, surface, 0.0, length);
+  if (!edge.IsDone()) return TopoDS_Wire();
+  TopoDS_Edge spine = edge.Edge();
+  BRepLib::BuildCurves3d(spine, 1e-10, GeomAbs_C1, 14, std::max(60, static_cast<int>(std::ceil(turns * 32.0))));
+  BRepBuilderAPI_MakeWire wire(spine);
+  return wire.IsDone() ? wire.Wire() : TopoDS_Wire();
+}
+
+}  // namespace
+
+std::unique_ptr<Shape> helix_pipe_solid(rust::Slice<const double> helix, const Shape &section) {
+  const TopoDS_Wire wire = helix_wire(helix);
+  if (wire.IsNull()) return nullptr;
+  const TopoDS_Shape result = pipe_of(wire, section.shape);
   return result.IsNull() ? nullptr : wrap(result);
 }
 

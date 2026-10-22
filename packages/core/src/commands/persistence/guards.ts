@@ -12,6 +12,7 @@ import {
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
+import { helixProblem, sweepDesignProblem } from './sweepGuard';
 import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem, surfaceTrimsProblem } from './nurbsGuard';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { CURVE_KINDS, SHEET_KINDS } from '../../model/curveKinds';
@@ -46,8 +47,12 @@ function imageProblem(v: Record<string, unknown>): string | null {
   return null;
 }
 
-/** First structural problem of a saved sweep (path chain + section), or null. */
+/** First structural problem of a saved sweep (path chain + section + SWG fields), or null. */
 function sweepProblem(v: Record<string, unknown>): string | null {
+  return sweepGeometryProblem(v) ?? (Array.isArray(v['path']) ? sweepDesignProblem(v, v['path'] as CurveSegment<Vec3>[]) : null);
+}
+
+function sweepGeometryProblem(v: Record<string, unknown>): string | null {
   const path = v['path'];
   if (!Array.isArray(path) || path.length === 0 || !path.every((s) => isCurveSegment(s, 3)))
     return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
@@ -320,7 +325,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   revolution: revolutionProblem,
   sweep: sweepProblem,
   loft: loftProblem,
-  nurbs_curve: (v) => nurbsCurveProblem(v['curve'], 'curve'),
+  nurbs_curve: (v) => firstProblem(nurbsCurveProblem(v['curve'], 'curve'), helixProblem(v['analytic'], 'analytic')),
   nurbs_surface: (v) => firstProblem(nurbsSurfaceProblem(v['surface'], 'surface'), surfaceTrimsProblem(v['trims'], v['surface'])),
   subdivision: subdivisionProblem,
   image: imageProblem,

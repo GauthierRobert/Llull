@@ -29,6 +29,7 @@
 #include <Geom_OffsetSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
 #include <ShapeFix_Face.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <Standard_Failure.hxx>
@@ -37,6 +38,7 @@
 #include <TColgp_Array2OfPnt.hxx>
 #include <TColStd_Array2OfReal.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS_Compound.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Wire.hxx>
@@ -372,6 +374,62 @@ std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface
     fix.Perform();
     const TopoDS_Shape result = fix.Solid();
     // never hand back a broken or inside-out slab: the host falls back to the triangles
+    if (!BRepCheck_Analyzer(result, Standard_True).IsValid()) return nullptr;
+    GProp_GProps properties;
+    BRepGProp::VolumeProperties(result, properties);
+    if (!(properties.Mass() > 0)) return nullptr;
+    return wrap(result);
+  } catch (const Standard_Failure &) {
+    return nullptr;
+  }
+}
+
+std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance) {
+  try {
+    std::vector<TopoDS_Shape> sides;
+    size_t offset = 0;
+    for (uint32_t length : lengths) {
+      if (offset + length > faces.size()) throw std::invalid_argument("sheet solid: face lengths overrun");
+      const TopoDS_Face face = trimmed_face(make_surface(kBSpline, rust::Slice<const double>(faces.data() + offset, length)), {}, nullptr);
+      if (face.IsNull()) return nullptr;
+      sides.push_back(face);
+      offset += length;
+    }
+    if (sides.empty()) return nullptr;
+    // the lateral shell leaves exactly two closed free boundaries (the first and last section): each is closed by a planar cap
+    BRepBuilderAPI_Sewing lateral(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
+    for (const TopoDS_Shape &face : sides) lateral.Add(face);
+    lateral.Perform();
+    const TopoDS_Shape shell = lateral.SewedShape();
+    if (shell.IsNull()) return nullptr;
+    ShapeAnalysis_FreeBounds bounds(shell, tolerance, Standard_True, Standard_False);
+    int caps = 0;
+    std::vector<TopoDS_Shape> all = sides;
+    for (TopExp_Explorer wire(bounds.GetClosedWires(), TopAbs_WIRE); wire.More(); wire.Next(), ++caps) {
+      BRepBuilderAPI_MakeFace cap(TopoDS::Wire(wire.Current()), Standard_True);
+      if (!cap.IsDone()) return nullptr;
+      all.push_back(cap.Face());
+    }
+    if (caps != 2) throw std::invalid_argument("sheet solid: expected 2 closed section boundaries, found " + std::to_string(caps));
+    BRepBuilderAPI_Sewing sewing(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
+    for (const TopoDS_Shape &face : all) sewing.Add(face);
+    sewing.Perform();
+    if (sewing.NbFreeEdges() > 0)
+      throw std::invalid_argument("SWG_KERNEL_SEW_OPEN: sewing left " + std::to_string(sewing.NbFreeEdges()) + " free edge(s)");
+    const TopoDS_Shape sewn = sewing.SewedShape();
+    if (sewn.IsNull()) return nullptr;
+    BRepBuilderAPI_MakeSolid solid;
+    int shells = 0;
+    for (TopExp_Explorer it(sewn, TopAbs_SHELL); it.More(); it.Next()) {
+      solid.Add(TopoDS::Shell(it.Current()));
+      ++shells;
+    }
+    if (shells != 1) return nullptr;
+    solid.Build();
+    if (!solid.IsDone()) return nullptr;
+    ShapeFix_Solid fix(solid.Solid());
+    fix.Perform();
+    const TopoDS_Shape result = fix.Solid();
     if (!BRepCheck_Analyzer(result, Standard_True).IsValid()) return nullptr;
     GProp_GProps properties;
     BRepGProp::VolumeProperties(result, properties);
