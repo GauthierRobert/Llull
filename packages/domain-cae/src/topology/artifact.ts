@@ -5,6 +5,7 @@
 
 import type {
   FeTopologyArtifact,
+  TopologyConstraint,
   TopologyHistoryRow,
   TopologyResultSummary,
   TopologySolverInfo,
@@ -13,11 +14,11 @@ import type {
 import type { CadDocument } from '@core/model/types';
 import { base64ToUint8Array, uint8ArrayToBase64 } from '@lib/base64';
 import { caseOf } from '../shared/access';
-import { HISTORY_ROW_CAP } from './defaults';
+import { COMPLIANCE_UNIT, HISTORY_ROW_CAP } from './defaults';
 import { type TopologyJob } from './job';
 import { elasticOf } from './material';
 
-/** What the solver reports (`result.json` of `llull-compute topopt`). */
+/** What the solver reports (`result.json` of `llull-compute topopt`); the V1 facts are optional for outputs of earlier binaries. */
 export interface TopologySolveOutput {
   readonly compliance: number;
   readonly perLoadCase: Readonly<Record<string, number>>;
@@ -27,6 +28,9 @@ export interface TopologySolveOutput {
   readonly device: 'cpu' | 'gpu';
   readonly deterministic: boolean;
   readonly version: string;
+  readonly optimizer?: 'oc' | 'mma';
+  readonly constraints?: readonly TopologyConstraint[];
+  readonly projection?: { readonly beta: number; readonly eta: number };
 }
 
 /** Little-endian float32 bytes of `values` (the layout of `field.bin`). */
@@ -74,13 +78,14 @@ export function buildTopologyArtifact(
     status: output.status,
     history: output.history,
     solver: { job: jobKind, version: output.version, device: output.device, deterministic: output.deterministic },
+    ...(output.optimizer === undefined ? {} : { optimizer: output.optimizer }),
+    ...(output.constraints === undefined ? {} : { constraints: output.constraints }),
+    ...(output.projection === undefined ? {} : { projection: output.projection }),
   };
   return decodeField(artifact) === null
     ? `field.bin is not ${4 * job.grid.nx * job.grid.ny * job.grid.nz} bytes of float32 densities in [0, 1]`
     : artifact;
 }
-
-const FORCE_LENGTH_UNIT = { 'N-mm-t-s': 'N*mm', 'N-m-kg-s': 'N*m', 'lbf-in-slinch-s': 'lbf*in' } as const;
 
 /** At most HISTORY_ROW_CAP rows, evenly spread, always ending with the last iteration. */
 function cappedHistory(history: readonly TopologyHistoryRow[]): TopologyHistoryRow[] {
@@ -117,6 +122,11 @@ export function topologySummary(
   const voxelVolume = grid.voxel ** 2 * (grid.dimension === 2 ? grid.thickness : grid.voxel);
   const elastic = elasticOf(doc, study);
   const reasons = typeof elastic === 'string' ? [elastic] : elastic.unverifiedReasons;
+  const volumeFraction = sum / Math.max(1, grid.active);
+  // artifacts of earlier binaries carry no constraint report: the volume constraint is what they all ran under
+  const constraints = artifact.constraints ?? [
+    { name: 'volume', value: volumeFraction, limit: study.volumeFraction, satisfied: volumeFraction <= study.volumeFraction + 1e-9 },
+  ];
   return {
     fieldHash,
     inputHash: artifact.inputHash,
@@ -125,14 +135,18 @@ export function topologySummary(
     iterations: artifact.iterations,
     status: artifact.status,
     compliance: artifact.compliance,
-    complianceUnit: FORCE_LENGTH_UNIT[analysisCase.unitSystem],
+    complianceUnit: COMPLIANCE_UNIT[analysisCase.unitSystem],
     perLoadCase: artifact.perLoadCase,
-    volumeFraction: sum / Math.max(1, grid.active),
+    volumeFraction,
     grey: grey / Math.max(1, grid.active),
     thresholdedVolume: solid * voxelVolume,
     volumeUnit: `${doc.units}^3`,
     history: cappedHistory(artifact.history),
     solver: artifact.solver,
+    optimizer: artifact.optimizer ?? 'oc',
+    objective: { kind: study.objective.kind, value: study.objective.kind === 'min_volume' ? volumeFraction : artifact.compliance },
+    constraints,
+    ...(artifact.projection === undefined ? {} : { projection: artifact.projection }),
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,
     concept: true,

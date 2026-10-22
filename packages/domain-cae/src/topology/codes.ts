@@ -1,4 +1,4 @@
-/** Stable TOP_* codes (PHY-17 TECHNICAL_SPEC 7.1) with their one-line remediation. */
+/** Stable TOP_* codes (PHY-17 TECHNICAL_SPEC 7.1, 15) with their one-line remediation. */
 
 import { tableRejection } from '@core/commands/noop';
 
@@ -12,10 +12,15 @@ export const REMEDIATION: Readonly<Record<string, string>> = {
   TOP_KEEPIN_EXCEEDS_BUDGET: 'raise volumeFraction or shrink the keep-in regions',
   TOP_TARGET_UNMAPPED: 'refine `voxel` or move the target points onto the intended face / edge of the design domain',
   TOP_LOAD_OUTSIDE_DOMAIN: 'put the load on an entity of the design domain',
-  TOP_SETUP_INVALID: 'give the analysis supports and force loads (add_fea_constraint / add_fea_load) and consistent study parameters',
+  TOP_SETUP_INVALID: 'give the analysis supports and loads (add_fea_constraint / add_fea_load) and consistent study parameters',
+  TOP_OPTIMIZER_MISMATCH:
+    'the min_volume objective needs optimizer mma (set_topology_settings optimizer=mma); oc handles the volume constraint only',
+  TOP_MEMBER_SIZE_UNRESOLVED: 'use a voxel of at most half the minimum member size (re-create the study) or a larger minimum member size',
   TOP_FILTER_TOO_SMALL: 'use a filter radius of at least 1.5 voxels',
   TOP_NOT_CONVERGED: 'raise maxIterations (set_topology_settings) or relax changeTol, then re-run topology_solve',
-  TOP_GREY_HIGH: 'use the density filter and a larger penalty, or accept a fuzzier layout',
+  TOP_CONSTRAINT_VIOLATED: 'raise maxIterations or relax the limit (maxCompliance / volumeFraction), then re-run topology_solve',
+  TOP_GREY_HIGH:
+    'use the density filter with a projection (set_topology_settings projection) and a larger penalty, or accept a fuzzier layout',
   TOP_RESULT_MISSING: 'run topology_solve',
   TOP_RESULT_STALE: 'the study or the analysis changed after the solve: re-run topology_solve',
   TOP_ARTIFACT_NOT_FOUND: 'run the topology_solve transport on a machine with the artifact store; never hand-write results',
@@ -29,7 +34,7 @@ export const REMEDIATION: Readonly<Record<string, string>> = {
   TOP_RESULT_NOT_RELEASABLE: 'release the rebuilt part instead of the topology iso-surface',
   TOP_TOOL_MISSING: 'install the desktop bundle (llull-compute) or use a coarser 2D grid',
   TOP_SOLVER_FAILED: 'check supports and keep-out regions',
-  TOP_SOLVER_TIMEOUT: 'use a coarser voxel or resume with resumeFromLast',
+  TOP_SOLVER_TIMEOUT: 'the run is checkpointed: re-run topology_solve with resumeFromLast=true (or a larger timeoutS, or a coarser voxel)',
 };
 
 export const refuseTopology = tableRejection(REMEDIATION);

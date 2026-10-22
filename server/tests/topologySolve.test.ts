@@ -23,7 +23,7 @@ import { sha256Hex } from '@lib/sha256';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import type { ComputeRunner, JobRun } from '../src/native/computeJob';
 import { exchangeTool } from '../src/cli/exchange';
-import { runTopologySolve } from '../src/native/topologySolve';
+import { deadlineOf, runTopologySolve } from '../src/native/topologySolve';
 import { runNativeTool } from '../src/native/tools';
 import { mbbModel, studyOf, type Model } from '../../tests/unit/cae/topology/support';
 
@@ -61,6 +61,10 @@ interface FakeOptions {
   readonly design?: Float64Array;
   /** Written as `displacements.f64` (the warm start of a resumed run) when given. */
   readonly displacements?: Float64Array;
+  /** Written as `state.json` / `mma.f64` (the optimiser state of a resumed run) when given. */
+  readonly state?: Record<string, unknown>;
+  readonly mma?: Float64Array;
+  readonly status?: 'converged' | 'max_iterations' | 'checkpoint';
   readonly progress?: readonly Record<string, unknown>[];
 }
 
@@ -87,17 +91,21 @@ function fakeRunner(options: FakeOptions = {}): ComputeRunner & { readonly calls
       const result = Buffer.from(
         JSON.stringify({
           version: 1,
-          status: 'max_iterations',
+          status: options.status ?? 'max_iterations',
           iterations,
           compliance: 5,
           perLoadCase: { LC1: 5 },
           history: Array.from({ length: iterations }, (_, k) => ({ it: k + 1, compliance: 10 - k, volume: 0.5, change: 0.1 })),
           device: 'cpu',
           deterministic: true,
+          optimizer: options.mma === undefined ? 'oc' : 'mma',
+          constraints: [{ name: 'volume', value: 0.5, limit: 0.5, satisfied: true }],
         }),
       );
       const outputs: Record<string, Buffer> = { 'field.bin': field, 'design.f64': design, 'result.json': result };
       if (options.displacements !== undefined) outputs['displacements.f64'] = Buffer.from(options.displacements.buffer);
+      if (options.state !== undefined) outputs['state.json'] = Buffer.from(JSON.stringify(options.state));
+      if (options.mma !== undefined) outputs['mma.f64'] = Buffer.from(options.mma.buffer);
       for (const [name, bytes] of Object.entries(outputs)) writeFileSync(path.join(folder, name), bytes);
       return Promise.resolve<JobRun>({
         ok: true,
@@ -182,12 +190,73 @@ describe('topology_solve with a fake job runner', () => {
     expect(solved.affected).toContain(model.studyId);
   });
 
-  it('passes timeoutS (clamped) and device to the job', async () => {
+  it('passes timeoutS (clamped), the checkpoint deadline, the objective, the optimizer and device to the job', async () => {
     const model = mbbModel();
     const runner = fakeRunner();
     await runTopologySolve(model.studyId, { timeoutS: 5, device: 'auto' }, hostOf(model), { store, runner });
     expect(runner.calls[0]?.timeoutMs).toBe(5000);
-    expect(JSON.parse(runner.calls[0]?.files['job.json']?.toString() ?? '{}')).toMatchObject({ settings: { device: 'auto' } });
+    expect(JSON.parse(runner.calls[0]?.files['job.json']?.toString() ?? '{}')).toMatchObject({
+      objective: { kind: 'minCompliance' },
+      settings: { device: 'auto', optimizer: 'oc', deadlineS: 1, startIteration: 0 },
+    });
+    expect(deadlineOf(5)).toBe(1);
+    expect(deadlineOf(60)).toBe(54);
+    expect(deadlineOf(8)).toBe(3);
+    expect(deadlineOf(1800)).toBe(1620);
+    const light = execute(model.doc, 'set_topology_objective', {
+      studyId: model.studyId,
+      objective: { kind: 'min_volume', maxCompliance: 250 },
+    });
+    const projected = execute(light.document, 'set_topology_settings', {
+      studyId: model.studyId,
+      filter: { kind: 'density' },
+      projection: { beta: 8 },
+      manufacturing: { symmetry: [], extrusion: { axis: 'x' } },
+    });
+    const second = fakeRunner();
+    await runTopologySolve(model.studyId, { timeoutS: 1800 }, hostOf({ ...model, doc: projected.document }), { store, runner: second });
+    expect(JSON.parse(second.calls[0]?.files['job.json']?.toString() ?? '{}')).toMatchObject({
+      objective: { kind: 'minVolume', maxCompliance: 250 },
+      settings: { optimizer: 'mma', projection: { beta: 8, eta: 0.5, betaStart: 1, betaEvery: 50 }, extrusion: 'x', deadlineS: 1620 },
+    });
+  });
+
+  it('keeps a checkpointed run as TOP_SOLVER_TIMEOUT (resumable) and resumes it with its optimiser state', async () => {
+    const model = mbbModel({ optimizer: 'mma' });
+    const host = hostOf(model);
+    const design = Float64Array.from({ length: 1200 }, (_, i) => (i % 5) / 10);
+    const displacements = Float64Array.from({ length: 2 * 61 * 21 }, (_, i) => i / 1000);
+    const mma = Float64Array.from({ length: 4 * 1200 }, (_, i) => i / 7);
+    const state = { iteration: 7, projectionLevel: 0, objectiveScale: 12.5, mma: { file: 'mma.f64', iteration: 7, length: 4800 } };
+    const first = fakeRunner({ iterations: 7, status: 'checkpoint', design, displacements, state, mma });
+    const stopped = await runTopologySolve(model.studyId, { timeoutS: 30 }, host, { store, runner: first });
+    expect(stopped).toMatchObject({
+      isError: true,
+      data: { code: 'TOP_SOLVER_TIMEOUT', nativeCode: 'TOP_DEADLINE', resumable: true, iterations: 7 },
+    });
+    expect(stopped.summary).toContain('resumeFromLast=true');
+    expect(host.current()).toBe(model.doc);
+    const second = fakeRunner({ iterations: 3, state: { ...state, iteration: 10 }, mma });
+    const resumed = await runTopologySolve(model.studyId, { resumeFromLast: true }, host, { store, runner: second });
+    expect(resumed.isError).toBe(false);
+    const files = second.calls[0]?.files ?? {};
+    expect(JSON.parse(files['job.json']?.toString() ?? '{}')).toMatchObject({
+      startDesign: 'start.f64',
+      startDisplacements: 'start_u.f64',
+      startState: 'start_state.json',
+      settings: { maxIterations: 293, startIteration: 7, optimizer: 'mma' },
+    });
+    expect(f64At(files['start.f64'])).toEqual(Array.from(design));
+    expect(f64At(files['start_mma.f64'])).toEqual(Array.from(mma));
+    expect(JSON.parse(files['start_state.json']?.toString() ?? '{}')).toEqual({ ...state, mma: { ...state.mma, file: 'start_mma.f64' } });
+    const data = resumed.data as { fieldHash: string; resumedFromIteration: number; optimizer: string };
+    expect(data.resumedFromIteration).toBe(7);
+    expect(data.optimizer).toBe('mma');
+    const artifact = store.get(data.fieldHash) as FeTopologyArtifact | null;
+    expect(artifact?.iterations).toBe(10);
+    expect(artifact?.optimizer).toBe('mma');
+    expect(artifact?.constraints).toEqual([{ name: 'volume', value: 0.5, limit: 0.5, satisfied: true }]);
+    expect(studyOf(host.current(), model.analysisId, model.studyId).result).toMatchObject({ optimizer: 'mma', iterations: 10 });
   });
 
   it('maps native errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, timeout, input errors; the document stays unchanged', async () => {

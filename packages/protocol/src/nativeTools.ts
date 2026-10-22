@@ -98,21 +98,23 @@ const feaRender = (): ToolDefinition => ({
 const topologySolve = (): ToolDefinition => ({
   name: 'topology_solve',
   description:
-    'Solve a topology optimization study (create_topology_study, set_topology_regions): builds the voxel grid, maps the 05 loads and supports, ' +
-    'runs the native llull-compute SIMP optimiser (progress per iteration with --progress) and records the result with record_topology_result ' +
-    '(density field artifact, derived read-only iso-surface on layer layer-topology; numbers are recomputed from the artifact). Concept shape, ' +
-    'never a released design: rebuild with suggest_rebuild and finish with check_topology. Without llull-compute a 2D study up to 2000 voxels ' +
-    'runs the TypeScript reference; anything larger is TOP_TOOL_MISSING. resumeFromLast continues the last finished run of the study ' +
-    '(e.g. after raising maxIterations: the cap counts the iterations already done). Errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, TOP_SOLVER_TIMEOUT, TOP_RESULT_STALE.',
+    'Solve a topology optimization study (create_topology_study, set_topology_regions): builds the voxel grid, maps the 05 loads (force, pressure, ' +
+    'gravity) and supports, runs the native llull-compute SIMP optimiser (OC or MMA, projection, extrusion; progress per iteration with --progress) ' +
+    'and records the result with record_topology_result (density field artifact, derived read-only iso-surface on layer layer-topology; numbers ' +
+    'are recomputed from the artifact). Concept shape, never a released design: rebuild with suggest_rebuild and finish with check_topology. ' +
+    'Without llull-compute the tool is TOP_TOOL_MISSING (no TypeScript fallback). The job checkpoints itself about 90 % into timeoutS: a TOP_SOLVER_TIMEOUT ' +
+    'with resumable=true keeps the run, and resumeFromLast continues it (or a finished run, e.g. after raising maxIterations: the cap counts the ' +
+    'iterations already done) bit for bit. Errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, TOP_SOLVER_TIMEOUT, TOP_RESULT_STALE, TOP_OPTIMIZER_MISMATCH.',
   inputSchema: schemaOf(
     z.object({
       studyId: z.string().describe('Id of the topology study (affected[0] of create_topology_study).'),
-      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 1800).'),
+      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 1800); the job checkpoints about 90 % into it.'),
       resumeFromLast: z
         .boolean()
         .optional()
         .describe(
-          'Continue the last finished run of this study from its saved design (same inputs; settings such as maxIterations may change).',
+          'Continue the last run of this study (finished or checkpointed) from its saved design, warm start and optimizer state (same inputs; ' +
+            'settings such as maxIterations may change).',
         ),
       device: deviceParam('cpu (default, deterministic), gpu or auto (a GPU build of llull-compute; else TOP_GPU_FALLBACK).'),
     }),

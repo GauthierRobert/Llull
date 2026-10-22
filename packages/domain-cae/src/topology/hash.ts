@@ -21,7 +21,7 @@ function geometryHash(entity: Entity): string {
 
 /** Hash of the solver settings (values only: sources and `defaulted` flags are provenance, not input). */
 export function topologySettingsHash(settings: TopologySettings): string {
-  const { penal, eminRatio, move, changeTol, maxIterations, filter, threshold, optimizer } = settings;
+  const { penal, eminRatio, move, changeTol, maxIterations, filter, threshold, optimizer, projection } = settings;
   return sha256Hex(
     canonicalJson({
       penal: penal.value,
@@ -32,6 +32,17 @@ export function topologySettingsHash(settings: TopologySettings): string {
       filter: { kind: filter.kind, radius: filter.radius.value },
       threshold: threshold.value,
       optimizer,
+      // absent when the study does not project, so hashes of earlier studies are unchanged
+      ...(projection === undefined
+        ? {}
+        : {
+            projection: {
+              beta: projection.beta.value,
+              eta: projection.eta.value,
+              betaStart: projection.betaStart.value,
+              betaEvery: projection.betaEvery.value,
+            },
+          }),
     }),
   );
 }

@@ -286,18 +286,28 @@ describe('refusals of buildTopologyJob', () => {
       'TOP_TARGET_UNMAPPED',
     ],
     [
-      'a pressure load',
+      'a pressure load on a point target (no face)',
       {
         constraints: [left],
         loads: [
-          { kind: 'pressure', loadCase: 'LC1', category: 'limit', target: { entityId: 'E', facesNear: [[60, 10, 0]] }, magnitude: 1 },
+          { kind: 'pressure', loadCase: 'LC1', category: 'limit', target: { entityId: 'E', pointsNear: [[60, 10, 0]] }, magnitude: 1 },
         ],
       },
       'TOP_SETUP_INVALID',
     ],
     [
-      'a gravity load',
-      { constraints: [left], loads: [{ kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 0] }] },
+      'a gravity load that leaves the plane of a 2D study',
+      { constraints: [left], loads: [{ kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, 0, -9810] }] },
+      'TOP_SETUP_INVALID',
+    ],
+    [
+      'a moment load',
+      {
+        constraints: [left],
+        loads: [
+          { kind: 'moment', loadCase: 'LC1', category: 'limit', target: { entityId: 'E', facesNear: [[60, 10, 0]] }, vector: [0, 0, 5] },
+        ],
+      },
       'TOP_SETUP_INVALID',
     ],
     ['no support', { loads: [push] }, 'TOP_SETUP_INVALID'],
