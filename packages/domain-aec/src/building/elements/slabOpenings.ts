@@ -10,15 +10,49 @@ import { planAreaM2 } from '../../shared/planArea';
 import { getBuilding, isVec2List, toVec2, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../evaluate/evaluateElements';
-import { stairExtent, stairPoint } from '../geometry/stairGeometry';
+import { stairExtent, stairLanding, stairPoint } from '../geometry/stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
 import { pointsDiagonal } from '@lib/extent';
 
-/** Plan footprint of the whole stair (every flight and the landing: their bounding rectangle), grown by `margin` on every side. */
+/**
+ * Plan footprint of the whole stair (every flight and the landing), grown by `margin` on every side: their bounding rectangle, except an L
+ * (quarter turn), whose empty corner beside the first flight (before the landing, on the turn side) stays slab.
+ */
 function stairFootprint(stair: StairElement, margin: number): Vec2[] {
   const { minAlong, maxAlong, minAcross, maxAcross } = stairExtent(stair);
   const [a0, a1, c0, c1] = [minAlong - margin, maxAlong + margin, minAcross - margin, maxAcross + margin];
-  return [stairPoint(stair, a0, c0), stairPoint(stair, a1, c0), stairPoint(stair, a1, c1), stairPoint(stair, a0, c1)];
+  const rectangle: Vec2[] = [
+    [a0, c0],
+    [a1, c0],
+    [a1, c1],
+    [a0, c1],
+  ];
+  const landing = stair.shape === 'quarter_turn' ? stairLanding(stair) : null;
+  // the turn-side flight starts at the landing, or `width` before its far end when the landing is shorter than the stair is wide
+  const landingEnd = landing?.plan[1]?.[0] ?? Number.NaN;
+  const notchAlong = Math.min(landing?.plan[0]?.[0] ?? Number.NaN, landingEnd - stair.width) - margin;
+  const edge = stair.width / 2 + margin;
+  const outline: Vec2[] =
+    landing === null || !(notchAlong > a0) || !(edge < (stair.turn === 'right' ? -c0 : c1))
+      ? rectangle
+      : stair.turn === 'right'
+        ? [
+            [a0, -edge],
+            [notchAlong, -edge],
+            [notchAlong, c0],
+            [a1, c0],
+            [a1, c1],
+            [a0, c1],
+          ]
+        : [
+            [a0, c0],
+            [a1, c0],
+            [a1, c1],
+            [notchAlong, c1],
+            [notchAlong, edge],
+            [a0, edge],
+          ];
+  return outline.map(([along, across]) => stairPoint(stair, along, across));
 }
 
 function edges(polygon: ReadonlyArray<Vec2>): Array<[Vec2, Vec2]> {

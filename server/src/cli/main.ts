@@ -2,7 +2,7 @@
 import fs from 'fs';
 import { getCommand } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { CONVENTIONS_GUIDE, isToolsetName } from '@protocol/index';
+import { CONVENTIONS_GUIDE, TOOLSET_SEE_ALSO, isToolsetName } from '@protocol/index';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { booleanFlag, missingValueFlag, paramsSource, APP_SERVER, cliTarget, parseArgv, stringFlag, type ParsedArgv } from './argv';
@@ -299,7 +299,11 @@ function runNew(args: ParsedArgv, io: CliIo): number {
 function runList(args: ParsedArgv, io: CliIo): number {
   const toolset = stringFlag(args, 'toolset') ?? args.positionals[1];
   if (toolset !== undefined && !isToolsetName(toolset)) throw new UsageError(`unknown toolset "${toolset}"; see: llull toolsets`);
-  return printEntries(listCatalog(toolset), args, io);
+  const status = printEntries(listCatalog(toolset), args, io);
+  const seeAlso = toolset === undefined ? undefined : TOOLSET_SEE_ALSO[toolset];
+  if (seeAlso !== undefined && !booleanFlag(args, 'json'))
+    io.stdout(`See also (toolset ${seeAlso.toolset}): ${seeAlso.tools.join(', ')}. List them with: llull list ${seeAlso.toolset}`);
+  return status;
 }
 
 function runSearch(args: ParsedArgv, io: CliIo): number {

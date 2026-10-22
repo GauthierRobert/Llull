@@ -12,6 +12,7 @@ import {
   searchTools,
   toolsetOf,
   TOOLSET_NAMES,
+  TOOLSET_SEE_ALSO,
   TOOLSETS,
 } from '@protocol/index';
 import { CONVENTIONS_GUIDE } from '@protocol/conventions';
@@ -167,6 +168,15 @@ describe('TOOLSETS', () => {
       expect(toolsetOf(name)).toBe('piping');
     }
     expect(TOOLSETS.building).not.toContain('pipe_hydraulics');
+  });
+  it('see-also pointers name tools that live in the pointed toolset, not in the one that points (ENG-9)', () => {
+    expect(TOOLSET_SEE_ALSO['3d']?.tools).toContain('add_hole');
+    for (const [from, seeAlso] of Object.entries(TOOLSET_SEE_ALSO)) {
+      for (const name of seeAlso?.tools ?? []) {
+        expect(toolsetOf(name)).toBe(seeAlso?.toolset);
+        expect(toolsetOf(name)).not.toBe(from);
+      }
+    }
   });
 });
 

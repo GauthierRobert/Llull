@@ -4,6 +4,7 @@ import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { stairVolume } from '@aec/building/quantities/takeoffBasics';
 import { buildingErrors } from '@aec/building/validate';
+import { pointInPolygon } from '@lib/polygon';
 import { xy } from '../../helpers/xy';
 
 const run = (doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument => execute(doc, name, params).document;
@@ -254,6 +255,20 @@ describe('add_stair landings: well, clashes, exports, plan', () => {
       expect(value).toBeCloseTo([a0, a1, c0, c1][index] as number, 6),
     );
     expect(clashes(cut.document).some((clash) => clash.b === 'stair-1')).toBe(false);
+  });
+
+  it.each([
+    ['left', {}, [500, 1500]],
+    ['right', { turn: 'right' }, [500, -1500]],
+  ])('the well of a %s L stair leaves the empty corner beside the first flight as slab (ENG-9)', (_label, turn, corner) => {
+    const cut = execute(storeys({ shape: 'quarter_turn', ...turn }), 'add_slab_opening', { stairId: 'stair-1' });
+    const slab = cut.document.building?.elements['slab-2'];
+    const opening = (slab?.category === 'slab' ? slab.openings?.[0] : undefined) ?? [];
+    expect(opening).toHaveLength(6);
+    expect(pointInPolygon(corner as [number, number], opening)).toBe(false);
+    expect(pointInPolygon([2250, 0], opening)).toBe(true);
+    // 2950 x 2950 bounding square minus the 1750 x 1750 corner
+    expect(cut.summary).toContain('(5.64 m²)');
   });
 
   it('clashes: a column on the landing hits the stair, one beside it does not', () => {

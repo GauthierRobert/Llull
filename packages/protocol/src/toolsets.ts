@@ -50,6 +50,14 @@ const MANUFACTURING_CORE_TOOLS: readonly string[] = words(
   'add_hole add_tapped_hole add_external_thread add_pocket add_rib set_thread recognize_features holes_from_recognition check_machining hole_table',
 );
 
+/**
+ * Tools an agent browsing one toolset looks for but that belong to another (each tool stays in exactly one toolset): listings point to them.
+ * Holes, pockets and ribs are part features in most CAD tools, but here they are the 07 FTR `manufacturing` set (ENG-9).
+ */
+export const TOOLSET_SEE_ALSO: Partial<Record<ToolsetName, { readonly toolset: ToolsetName; readonly tools: readonly string[] }>> = {
+  '3d': { toolset: 'manufacturing', tools: words('add_hole add_tapped_hole add_external_thread add_pocket add_rib') },
+};
+
 /** Industrial piping commands: contributed by the `building` (industrial) plugin, exposed as their own small toolset. */
 const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_pipe_supports pipe_hydraulics');
 

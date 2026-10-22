@@ -90,6 +90,13 @@ describe('llull CLI — discovery', () => {
     const list = capture();
     expect(await runCli(['list', '2d'], list.io)).toBe(EXIT_OK);
     expect(list.out[0]).toMatch(/^draw_\w+ \[2d\]/m);
+    expect(list.out).toHaveLength(1);
+    const solids = capture();
+    await runCli(['list', '3d'], solids.io);
+    expect(solids.out[1]).toMatch(/^See also \(toolset manufacturing\): add_hole, .* llull list manufacturing$/);
+    const solidsJson = capture();
+    await runCli(['list', '3d', '--json'], solidsJson.io);
+    expect(solidsJson.out).toHaveLength(1);
 
     const json = capture();
     await runCli(['list', '--toolset', 'measure', '--json'], json.io);

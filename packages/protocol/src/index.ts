@@ -19,4 +19,4 @@ export { buildNativeToolDefinitions } from './nativeTools';
 export { buildAllTools, searchTools } from './discovery';
 
 export type { ToolsetName } from './toolsets';
-export { TOOLSET_NAMES, TOOLSETS, isToolsetName, toolsetOf } from './toolsets';
+export { TOOLSET_NAMES, TOOLSETS, TOOLSET_SEE_ALSO, isToolsetName, toolsetOf } from './toolsets';
