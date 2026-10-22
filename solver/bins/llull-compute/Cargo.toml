@@ -17,11 +17,12 @@ llull-stats = { path = "../../crates/llull-stats" }
 llull-panel = { path = "../../crates/llull-panel" }
 llull-explicit = { path = "../../crates/llull-explicit" }
 llull-geomq = { path = "../../crates/llull-geomq" }
+llull-flow-lbm = { path = "../../crates/llull-flow-lbm", default-features = false }
 
 [features]
-# wgpu paths: offscreen raster (`llull-compute raster` with engine "gpu") and the topopt GPU solves (settings.device "gpu" / "auto").
-# Off by default (keeps the release build short); without it the CPU twins answer and a GPU request reports a warning.
-gpu = ["llull-raster/gpu", "llull-topopt/gpu", "llull-cloud/gpu", "llull-explicit/gpu"]
+# wgpu paths: offscreen raster (`llull-compute raster` with engine "gpu"), the topopt GPU solves (settings.device "gpu" / "auto") and the
+# lattice-Boltzmann flow kernels. Off by default (keeps the release build short); without it the CPU twins answer and a GPU request reports a warning.
+gpu = ["llull-raster/gpu", "llull-topopt/gpu", "llull-cloud/gpu", "llull-explicit/gpu", "llull-flow-lbm/gpu"]
 
 [lints]
 workspace = true
