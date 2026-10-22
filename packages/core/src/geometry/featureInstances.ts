@@ -25,6 +25,7 @@ export function featureNodes(recipe: ShapeRecipe): FeatureRecipe[] {
     case 'place':
     case 'scale':
     case 'faceOp':
+    case 'emboss':
       return featureNodes(recipe.source);
     case 'solid':
     case 'brep':
@@ -137,6 +138,7 @@ export function editFeatureNode(recipe: ShapeRecipe, ordinal: number, edit: (nod
       case 'place':
       case 'scale':
       case 'faceOp':
+      case 'emboss':
         return { ...node, source: visit(node.source) };
       case 'solid':
       case 'brep':

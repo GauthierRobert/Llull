@@ -1,6 +1,6 @@
 /**
  * Stage the local backend for packaging into build/server: the server bundle (server/dist, incl.
- * the CLI at dist/cli.js), the Python bridge script, and production-only node_modules
+ * the CLI at dist/cli.js), the Python bridge script, the bundled fonts, and production-only node_modules
  * (`npm ci --omit=dev`, installed for the platform this runs on — build each OS on that OS).
  * Run after `npm run build:server`.
  */
@@ -24,6 +24,8 @@ cpSync(path.join(server, 'dist'), path.join(target, 'dist'), {
 });
 for (const file of ['package.json', 'package-lock.json']) cpSync(path.join(server, file), path.join(target, file));
 for (const file of ['llull_bridge.py', 'requirements.txt']) cpSync(path.join(server, 'python', file), path.join(target, 'python', file));
+// Bundled outline fonts (03 WRP, SIL OFL with their licence text): read by server/src/fontProvider.ts from ../fonts, offline.
+cpSync(path.join(server, 'fonts'), path.join(target, 'fonts'), { recursive: true });
 
 execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
   cwd: target,

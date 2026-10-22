@@ -96,6 +96,7 @@ export function fixtureKernel(fixture: RecognitionFixture): GeometryKernel {
       edgeContinuity: nothing,
       distance: nothing,
       bspline: nothing,
+      projectCurves: nothing,
     },
   });
 }

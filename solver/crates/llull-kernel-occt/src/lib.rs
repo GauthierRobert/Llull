@@ -16,6 +16,8 @@ pub mod xde;
 mod blend_tests;
 #[cfg(test)]
 mod naming_tests;
+#[cfg(test)]
+mod wrap_tests;
 
 pub use ffi::{AnalysisOut, MassOut, MeshOut};
 

@@ -12,6 +12,7 @@ import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { RasterPort } from '../model/raster';
+import type { FontProvider } from '../geometry/fontPort';
 import type { PointCloudPort } from '../model/pointCloud';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
@@ -215,6 +216,8 @@ export interface ExecutionContext {
   readonly libraries?: MaterialLibraryProvider | null;
   /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
   readonly raster?: RasterPort | null;
+  /** Fonts the host bundles (03 WRP, Fira Sans); null/absent = outline text needs `import_font`. */
+  readonly fonts?: FontProvider | null;
   /** Point-cloud assets of this machine (plant 10, TR-SCN-02); null/absent = scan queries refuse with SCN_ASSET_UNAVAILABLE. */
   readonly pointClouds?: PointCloudPort | null;
   /** Mints every id the command creates. */

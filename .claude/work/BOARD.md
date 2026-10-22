@@ -60,8 +60,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-1b** 01 DEF left after M0–M1 (done 2026-10-22, §13): M2 exact OCCT warp (`deform.cxx`, capability `deform`; closes
   VC-06/08/11 and the 360° ring), M3 lattice / point / flow, M4 flow on surface + overlays, M5 curve-to-curve + morph; native B-spline
   Gauss-integration accuracy (VC-11 −4.4e-4). _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-3** 03 WRP M0–M3: face charts to core, fonts + 3D text, wrap / project / unwrap, emboss / deboss / scribe on developable
-  faces, `check_wrap`: `docs/design/03-wrap-emboss/` (decision D-WRP-1 binary blobs first). _Lane 1_ _deps: —_
+- `[TODO]` **DES-3b** 03 WRP left after M0–M3 (done 2026-10-22, §13): M4 geodesic / parametric charts, emboss on doubly curved faces,
+  `split_face_by_curves`, `create_curve_on_face`, CFF fonts, kerning, multi-line, decal + knurl; M5 single-line fonts, text on curve,
+  `pattern_on_face`, modeled knurl; WRP golden plan (native). _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /
   inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: —_
 - `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,

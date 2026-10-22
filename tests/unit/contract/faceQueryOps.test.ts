@@ -26,6 +26,7 @@ const faceQuery = (overrides: Partial<FaceQueryOps<Native>> = {}): FaceQueryOps<
   edgeContinuity: nothing,
   distance: nothing,
   bspline: nothing,
+  projectCurves: nothing,
   ...overrides,
 });
 

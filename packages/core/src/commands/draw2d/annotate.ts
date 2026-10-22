@@ -11,6 +11,9 @@ import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
 import { existingLayerOrDefault } from '../solids/shared';
 import { MAX_DISPLAY_PRECISION } from '../limits';
+import { MAX_TEXT_CHARACTERS } from '../../lib/font/layout';
+import { isFontFailure, loadFont, resolveFont } from '../wrap/fontStore';
+import { wrapRejection } from '../wrap/codes';
 import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, formatDimensionValue } from '../../geometry/dimensionAnnotation';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
@@ -21,6 +24,8 @@ type TextAnchor = NonNullable<TextEntity['anchor']>;
  * @failure empty content -> no-op, affected:[]
  * @failure height <= 0 -> no-op, affected:[]
  * @failure missing or invalid position -> no-op, affected:[]
+ * @invariant with `font` the text is a closed profile (glyph outlines) and the font (a document record, or a bundled one embedded now) travels with the document
+ * @failure unknown font -> WRP_FONT_UNAVAILABLE; over 2000 characters with a font -> WRP_TEXT_TOO_LONG; characters the font lacks -> warning WRP_GLYPH_MISSING in data (the step succeeds)
  */
 export const addText = defineCommand({
   name: 'add_text',
@@ -31,7 +36,11 @@ export const addText = defineCommand({
     'Optional `rotation` is Euler angles [rx, ry, rz] in radians that orient the work plane (default [0,0,0]). ' +
     "Optional `anchor` controls horizontal alignment: 'left' (default) — position is left edge; " +
     "'center' — position is horizontal midpoint; 'right' — position is right edge. " +
-    'Optional `color` is a hex string (e.g. "#333333"). Optional `layer` is the target layer id.',
+    'Optional `color` is a hex string (e.g. "#333333"). Optional `layer` is the target layer id. ' +
+    'Optional `font` (a font id from import_font / list_fonts, or the family of a bundled font such as "Fira Sans") turns the text into a closed outline ' +
+    'profile that text_outline, extrude_profile, wrap_to_face and emboss_on_face accept; `height` is then the exact cap height. With a font, ' +
+    '`verticalAnchor` (baseline | cap_middle | cap_top), `letterSpacing` (document units after each glyph), `kerning` and `lineSpacing` (newline breaks lines) apply. ' +
+    'Without `font` the text stays an annotation. Characters the font lacks are reported in data.warnings (WRP_GLYPH_MISSING).',
   params: z.object({
     content: z.string().describe('The text string to display. Must not be empty.'),
     position: vec3('World-space anchor position [x, y, z] of the text. For 2D drafting use z=0.'),
@@ -48,13 +57,74 @@ export const addText = defineCommand({
       )
       .optional(),
     color: z.string().describe('Hex color string, e.g. "#333333". Defaults to "#333333".').optional(),
+    font: z
+      .string()
+      .describe(
+        'Font of the outline text: a font id (import_font, list_fonts) or a bundled family name such as "Fira Sans" (embedded in the document on first use).',
+      )
+      .optional(),
+    verticalAnchor: z
+      .enum(['baseline', 'cap_middle', 'cap_top'])
+      .describe(
+        'Font text only: baseline (default) puts position on the baseline, cap_middle at half the cap height, cap_top on the cap line.',
+      )
+      .optional(),
+    letterSpacing: z.number().describe('Font text only: extra distance in document units added after each glyph. Default 0.').optional(),
+    kerning: z.boolean().describe('Font text only: apply the font kern pairs. Default true.').optional(),
+    lineSpacing: z
+      .number()
+      .positive()
+      .describe('Font text only: line pitch as a multiple of the font line height (ascender - descender + line gap). Default 1.')
+      .optional(),
     layer: layerIdField(),
   }),
-  run: (doc, { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer }): CommandResult => {
+  run: (
+    doc,
+    {
+      content,
+      position,
+      height,
+      rotation = [0, 0, 0],
+      anchor = 'left',
+      color = '#333333',
+      layer,
+      font,
+      verticalAnchor,
+      letterSpacing,
+      kerning,
+      lineSpacing,
+    },
+    ctx,
+  ): CommandResult => {
     if (content.trim().length === 0) return noop(doc, 'add_text: content must be a non-empty string; entity not created.');
     if (height <= 0) return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
     if (position.length < 3) return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
     const id = nextId('text');
+    const reject = (code: string, message: string): CommandResult => wrapRejection(doc, 'add_text', code, message, [], ['font']);
+    let target = doc;
+    let fontId: string | undefined;
+    let missing: string[] = [];
+    if (font !== undefined) {
+      if ([...content].length > MAX_TEXT_CHARACTERS)
+        return wrapRejection(
+          doc,
+          'add_text',
+          'WRP_TEXT_TOO_LONG',
+          `${[...content].length} characters exceed ${MAX_TEXT_CHARACTERS}`,
+          [],
+          ['content'],
+        );
+      const resolved = resolveFont(doc, ctx, font);
+      if (isFontFailure(resolved)) return reject(resolved.code, resolved.message);
+      const loaded = loadFont(resolved.document, resolved.record.id);
+      if (isFontFailure(loaded)) return reject(loaded.code, loaded.message);
+      target = resolved.document;
+      fontId = resolved.record.id;
+      const unmapped = [...content].filter(
+        (character) => character.trim().length > 0 && loaded.font.glyphIndex(character.codePointAt(0) as number) === 0,
+      );
+      missing = [...new Set(unmapped)];
+    }
     const entity = {
       id,
       kind: 'text' as const,
@@ -65,12 +135,27 @@ export const addText = defineCommand({
       anchor: anchor as TextAnchor,
       layerId: existingLayerOrDefault(doc, layer),
       color,
+      ...(fontId === undefined ? {} : { font: fontId }),
+      ...(verticalAnchor === undefined ? {} : { verticalAnchor }),
+      ...(letterSpacing === undefined ? {} : { letterSpacing }),
+      ...(kerning === undefined ? {} : { kerning }),
+      ...(lineSpacing === undefined ? {} : { lineSpacing }),
     };
-    return commitEntity(
-      doc,
+    const warned =
+      missing.length === 0
+        ? ''
+        : ` Warning WRP_GLYPH_MISSING: the font has no glyph for ${missing.map((c) => JSON.stringify(c)).join(', ')}.`;
+    const committed = commitEntity(
+      target,
       entity,
-      `add_text: created text entity ${id} — "${content}" at [${position[0]}, ${position[1]}, ${position[2]}], height ${height}, anchor '${anchor}'.`,
+      `add_text: created text entity ${id} — "${content}" at [${position[0]}, ${position[1]}, ${position[2]}], height ${height}, anchor '${anchor}'${fontId === undefined ? '' : `, font ${fontId}`}.${warned}`,
     );
+    return fontId === undefined
+      ? committed
+      : {
+          ...committed,
+          data: { id, font: fontId, warnings: missing.length === 0 ? [] : [{ code: 'WRP_GLYPH_MISSING', characters: missing }] },
+        };
   },
 });
 

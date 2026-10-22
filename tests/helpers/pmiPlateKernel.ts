@@ -103,6 +103,7 @@ export function plateKernel(options: PlateOptions = { thickness: 12 }): Geometry
     edgeContinuity: () => null,
     distance: () => null,
     bspline: () => null,
+    projectCurves: () => null,
   };
   const base = fakeKernel({ solid: mesh, boolean: mesh, fillet: mesh, chamfer: mesh });
   const kernel = Object.assign(base, { topology, tessellate: () => plateMesh(options.thickness), options });

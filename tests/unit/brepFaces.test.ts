@@ -43,6 +43,7 @@ function withPort(overrides: Partial<FaceQueryPort> = {}): { kernel: GeometryKer
     edgeContinuity: nothing,
     distance: nothing,
     bspline: nothing,
+    projectCurves: nothing,
     ...overrides,
   };
   return { kernel: Object.assign(fakeKernel(), { faceQuery: port }), sampleRequests };

@@ -46,6 +46,19 @@ mod ffi {
             tolerance: f64,
         ) -> Result<UniquePtr<Shape>>;
 
+        #[allow(clippy::too_many_arguments)]
+        fn emboss_tools(
+            kind: i32,
+            surface: &[f64],
+            regions: &[f64],
+            from: f64,
+            to: f64,
+            direction: &[f64],
+            tolerance: f64,
+            faces_only: bool,
+        ) -> Result<UniquePtr<Shape>>;
+        fn split_shape(source: &Shape, tools: &Shape) -> Result<UniquePtr<Shape>>;
+
         fn sheet_solid(faces: &[f64], lengths: &[u32], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
         fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64], tag: &str) -> Result<UniquePtr<Shape>>;
@@ -164,6 +177,25 @@ pub fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Built {
 /// Solid between the offsets `range` of such a face along `direction` (sewn base, offset face and ruled walls); `None` when OCC refuses.
 pub fn face_slab(kind: i32, surface: &[f64], loops: &[f64], range: [f64; 2], direction: [f64; 3], tolerance: f64) -> Built {
     built(ffi::face_slab(kind, surface, loops, range[0], range[1], &direction, tolerance))
+}
+
+/// Tools of an emboss (03 WRP): a compound of one face-slab per region of `regions` (encoded as in `cpp/features.hxx`) between the offsets `range`, or with
+/// `faces_only` of the trimmed faces themselves; `None` when OCC refuses.
+pub fn emboss_tools(
+    kind: i32,
+    surface: &[f64],
+    regions: &[f64],
+    range: [f64; 2],
+    direction: [f64; 3],
+    tolerance: f64,
+    faces_only: bool,
+) -> Built {
+    built(ffi::emboss_tools(kind, surface, regions, range[0], range[1], &direction, tolerance, faces_only))
+}
+
+/// `source` divided by the faces of `tools` that lie on it (same volume); `None` when the splitter fails.
+pub fn split_shape(source: &Shape, tools: &Shape) -> Built {
+    built(ffi::split_shape(inner(source)?, inner(tools)?))
 }
 
 /// Solid closed from fitted B-spline lateral faces (encoded as for [`surface_face`] kind 0): sewn shell, two planar caps, `None` when OCC refuses;

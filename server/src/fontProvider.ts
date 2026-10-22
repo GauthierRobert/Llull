@@ -1,0 +1,59 @@
+/**
+ * `ctx.fonts` host adapter (03 WRP, D-WRP-3): the fonts llull ships, read from `server/fonts` (next to `python/`; in the desktop bundle
+ * `resources/server/fonts`, staged by `desktop/scripts/stage-server.mjs`). Offline by construction (AF-41): nothing is fetched. Every font is pinned
+ * by sha256; core re-checks the hash before it embeds the bytes in a document.
+ * Environment: LLULL_FONTS_DIR overrides the folder.
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { setFontProvider } from '@core/commands/fontPort';
+import type { BundledFont, FontProvider } from '@core/geometry/fontPort';
+
+interface BundledFile extends BundledFont {
+  readonly file: string;
+}
+
+/** Fira Sans Regular, SIL OFL 1.1 (licence text next to it: `OFL.txt`); source and hash are recorded in docs/design/03-wrap-emboss/validation/sources.md R24. */
+const BUNDLED: readonly BundledFile[] = [
+  {
+    id: 'fira-sans-regular',
+    file: 'FiraSans-Regular.ttf',
+    family: 'Fira Sans',
+    style: 'Regular',
+    licence: 'SIL OFL 1.1',
+    sha256: 'c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23',
+    source: 'google/fonts@45e3d5269e4a17d823f6d84470bc084dc5ae46f6 ofl/firasans/FiraSans-Regular.ttf',
+  },
+];
+
+/** The folder holding the bundled font files. */
+function fontsDirectory(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env['LLULL_FONTS_DIR'];
+  return override !== undefined && override !== '' ? path.resolve(override) : path.resolve(__dirname, '../fonts');
+}
+
+/** A provider over `directory`: only fonts whose file exists are listed. */
+export function createFontProvider(directory: string = fontsDirectory()): FontProvider {
+  const present = (): BundledFile[] => BUNDLED.filter((font) => fs.existsSync(path.join(directory, font.file)));
+  return {
+    list: () =>
+      present().map(({ id, family, style, licence, sha256, source }): BundledFont => ({ id, family, style, licence, sha256, source })),
+    bytes: (id) => {
+      const font = present().find((candidate) => candidate.id === id);
+      if (font === undefined) return null;
+      try {
+        return new Uint8Array(fs.readFileSync(path.join(directory, font.file)));
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+/** Installs the bundled fonts as the process `ctx.fonts`; returns whether any font file was found. */
+export function installFontProvider(env: NodeJS.ProcessEnv = process.env): boolean {
+  const provider = createFontProvider(fontsDirectory(env));
+  setFontProvider(provider.list().length === 0 ? null : provider);
+  return provider.list().length > 0;
+}

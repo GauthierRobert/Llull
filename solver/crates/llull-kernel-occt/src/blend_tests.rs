@@ -30,7 +30,7 @@ fn a_radius_too_large_is_a_coded_contour_or_corner_failure() {
     // all 12 edges of a 4 mm cube at r 3 cannot build (two fillets of one face would overlap)
     let report = fillet_report(&cube(4.0), &[], &[3.0, NAN, 0.0]).unwrap();
     assert_ne!(report["stage"], "none");
-    assert_eq!(report["partial"].is_boolean(), true);
+    assert!(report["partial"].is_boolean());
     let single = fillet_report(&cube(4.0), &[0], &[9.0, NAN, 0.0]).unwrap();
     assert_ne!(single["stage"], "none");
     assert!(

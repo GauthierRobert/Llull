@@ -126,7 +126,7 @@
  {
   "command": "inspect_faces",
   "params": {
-   "id": "$scribed"
+   "entityId": "$scribed"
   }
  },
  {

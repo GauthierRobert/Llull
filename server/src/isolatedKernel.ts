@@ -80,6 +80,7 @@ const FACE_QUERY_METHODS = [
   'edgeContinuity',
   'distance',
   'bspline',
+  'projectCurves',
 ] as const satisfies readonly (keyof FaceQueryPort)[];
 
 export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKernel {

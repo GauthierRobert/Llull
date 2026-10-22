@@ -126,6 +126,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     case 'brep':
     case 'faceSlab':
     case 'faceOp':
+    case 'emboss':
     case 'deform':
       return null;
     case 'fillet':

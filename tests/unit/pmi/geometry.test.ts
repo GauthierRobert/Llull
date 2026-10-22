@@ -52,6 +52,7 @@ function kernelOf(
     edgeContinuity: nothing,
     distance: nothing,
     bspline: nothing,
+    projectCurves: nothing,
   };
   const topo: ShapeTopology = {
     solids: 1,

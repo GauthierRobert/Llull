@@ -138,6 +138,58 @@ pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
     place_entity(shape_of(features::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
 }
 
+/// Flat number list of the `regions` of an `emboss` node (layout: `cpp/features.hxx`), or None when the JSON is not a list of regions of loops of
+/// lines and B-spline pcurves. The C++ side validates every count and join again.
+fn encode_regions(regions: Option<&Value>) -> Option<Vec<f64>> {
+    fn pair(value: Option<&Value>) -> Option<[f64; 2]> {
+        match numbers(value)?.as_slice() {
+            [u, v] => Some([*u, *v]),
+            _ => None,
+        }
+    }
+    let list = regions?.as_array()?;
+    let mut out = vec![list.len() as f64];
+    for region in list {
+        let mut loops = vec![(region.get("outer")?, 1.0)];
+        loops.extend(region.get("holes")?.as_array()?.iter().map(|hole| (hole, 0.0)));
+        out.push(loops.len() as f64);
+        for (lp, outer) in loops {
+            out.push(outer);
+            out.extend(pair(lp.get("start"))?);
+            let segments = lp.get("segments")?.as_array()?;
+            out.push(segments.len() as f64);
+            for segment in segments {
+                match segment.get("kind")?.as_str()? {
+                    "line" => {
+                        out.push(0.0);
+                        out.extend(pair(segment.get("to"))?);
+                    }
+                    "nurbs" => {
+                        out.push(1.0);
+                        let curve = segment.get("curve")?;
+                        let poles: Vec<[f64; 2]> =
+                            curve.get("poles")?.as_array()?.iter().map(|pole| pair(Some(pole))).collect::<Option<_>>()?;
+                        let weights = numbers(curve.get("weights"));
+                        let (knots, multiplicities) = (numbers(curve.get("knots"))?, numbers(curve.get("multiplicities"))?);
+                        out.extend([
+                            curve.get("degree")?.as_f64()?,
+                            poles.len() as f64,
+                            if weights.is_some() { 1.0 } else { 0.0 },
+                            knots.len() as f64,
+                        ]);
+                        out.extend(poles.iter().flatten());
+                        out.extend(weights.unwrap_or_default());
+                        out.extend(knots);
+                        out.extend(multiplicities);
+                    }
+                    _ => return None,
+                }
+            }
+        }
+    }
+    Some(out)
+}
+
 /// `faceSlab` (capability `faceSlab`): a trimmed face of a B-spline / plane / cylinder / cone (`surface.type` + `surface.data`, `loops`) lifted
 /// along its normal from offset `from` to `to` (a solid of constant thickness; `direction` = lift direction at the first loop vertex).
 pub(super) fn face_slab(recipe: &Value) -> Evaluated {
@@ -295,6 +347,45 @@ impl Evaluator {
         };
         let Some(laws) = laws else { return Ok(Value::Null) };
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
+    }
+
+    /// `emboss` (03 WRP, `packages/core/src/model/wrap.ts`): one face-slab per region fused with (emboss), cut from (deboss) or splitting (scribe) the source.
+    /// The regions are (u, v) loops of lines and B-spline pcurves on the plane / cylinder / cone `surface`; the lift direction is the outward normal.
+    pub(super) fn emboss(&mut self, recipe: &Value) -> Evaluated {
+        let Some(source) = self.child(recipe, "source")? else { return refused() };
+        let Some(surface) = recipe.get("surface") else { return refused() };
+        let kind = match surface.get("type").and_then(Value::as_str) {
+            Some("plane") => 1,
+            Some("cylinder") => 2,
+            Some("cone") => 3,
+            _ => return refused(),
+        };
+        let (Some(data), Some(direction), Some(depth)) = (numbers(surface.get("data")), vec3(recipe, "direction"), number(recipe, "depth"))
+        else {
+            return refused();
+        };
+        let tolerance = number(recipe, "tolerance").unwrap_or(1e-6);
+        let Some(regions) = encode_regions(recipe.get("regions")) else { return refused() };
+        if !surface_data_ok(kind, &data) || !positive(tolerance) || !depth.is_finite() || depth < 0.0 {
+            return refused();
+        }
+        let mode = recipe.get("mode").and_then(Value::as_str).unwrap_or("");
+        let (range, faces_only) = match mode {
+            "emboss" if depth > 0.0 => ([0.0, depth], false),
+            "deboss" if depth > 0.0 => ([-depth, 0.0], false),
+            "scribe" => ([0.0, 1.0], true),
+            _ => return refused(),
+        };
+        let Some(tools) =
+            features::emboss_tools(kind, &data, &regions, range, direction, tolerance, faces_only).map_err(EvalError::Failure)?
+        else {
+            return refused();
+        };
+        match mode {
+            "emboss" => shape_of(crate::boolean(BooleanOp::Union, &source, &tools, true)),
+            "deboss" => shape_of(crate::boolean(BooleanOp::Subtract, &source, &tools, true)),
+            _ => shape_of(features::split_shape(&source, &tools)),
+        }
     }
 
     /// `faceOp` (SC-F1, `packages/core/src/model/faceOps.ts`): draft, pushPull or splitFace on the source's unique faces.

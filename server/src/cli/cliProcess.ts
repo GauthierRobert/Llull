@@ -20,14 +20,22 @@ function readStdin(): Promise<string> {
 async function prepareKernel(): Promise<void> {
   const kernel = stringFlag(parseArgv(process.argv.slice(2)), 'kernel');
   if (kernel !== undefined) process.env['LLULL_KERNEL'] = kernel;
-  const [{ installGeometryKernel }, { installPhysicsEngine }, { installRasterPort }, { installGeometryQueryEngine }] = await Promise.all([
+  const [
+    { installGeometryKernel },
+    { installPhysicsEngine },
+    { installRasterPort },
+    { installGeometryQueryEngine },
+    { installFontProvider },
+  ] = await Promise.all([
     import('../geometryKernel'),
     import('../physicsEngine'),
     import('../native/rasterPort'),
     import('../native/geometryQueryEngine'),
+    import('../fontProvider'),
   ]);
   installRasterPort();
   installGeometryQueryEngine();
+  installFontProvider();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
 }
 

@@ -505,3 +505,32 @@ Total ≈ 22 eng-weeks. Cross-pack: **01 DEF** owns body deformation (no overlap
 Same numbering as FUNCTIONAL_SPEC §11 ([R1]–[R27]). llull internal: `.claude/rules/architecture.md`, `docs/aerospace/AGENT_FIRST.md`,
 `docs/decisions/LC1-local-only.md`, `docs/decisions/SV1-solver-toolchain-windows.md` (cited by `surfaces.cxx` for the
 `MakeThickSolid` crash that made `face_slab` build walls itself).
+
+## 13. As built (M0–M3, DES-3)
+
+Owner decisions applied: binary blobs (`font/ttf`, `font/otf`, sha256 of the raw bytes, no persistence bump); font engine in TypeScript (`packages/core/src/lib/font`);
+Fira Sans Regular bundled in `server/fonts/` (SIL OFL next to it, sha256 `c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23`, source
+google/fonts@45e3d5269e4a17d823f6d84470bc084dc5ae46f6), read host-side through the `ctx.fonts` port (`LLULL_FONTS_DIR` overrides); 2 % default length-strain limit.
+
+- M0: `geometry/surfaceChart.ts` (plane, cylinder, cone) promoted from composites, which now delegates to it.
+- M1: `import_font`, `list_fonts`, `text_outline`, `TextEntity.font` (+ `add_text` layout fields), `extrude_profile` of font text (prism/hole-tool boolean recipe, any kernel).
+  Deviation: the layout field is `advanceWidth` (document units), not `advanceWidthMm`. Glyph/point/recursion caps and bounds-checked reads give stable codes (`WRP_FONT_PARSE`).
+- M2: `unwrap_face`, `wrap_to_face`, `project_to_face` (`requireAll` added), `NurbsCurveEntity.onFace`. Projection is the sidecar's own sampling with
+  `IntCurvesFace_Intersector` (direction) / `BRepExtrema_DistShapeShape` (closest), bisected run boundaries and `GeomAPI_PointsToBSpline` fits, not `BRepProj_Projection`.
+  Cone charts are flat polar developments; cylinder/cone 3D curves are cubic interpolants (`fitBySampling`) with the measured deviation reported.
+- M3: `emboss_on_face` (emboss, deboss, scribe) on plane, cylinder, cone via recipe node `emboss` (capability `emboss`). Per-region face slabs are fused/cut through the
+  existing boolean with coincident faces (no overshoot: it lost accuracy); scribe is `BRepAlgoAPI_Splitter` + `ShapeUpgrade_UnifySameDomain`. Lift sign: slab direction is
+  the surface normal at the first loop vertex times the face orientation. `check_wrap` re-measures lengths and volumes. Pcurves are stored with `frame: 'native'`.
+- M4 methods (`geodesic`, `conformal`, ...) answer `WRP_METHOD_UNAVAILABLE`.
+- Plan fix: `target_cone_wrap_scribe.json` called `inspect_faces` with `id`; the parameter is `entityId`.
+
+Measured (native kernel): cylinder rect emboss +307.5 / deboss -292.5 mm3 (VC-10); text emboss area 104.8862, 5 loops, outline 171.2589, delta 107.5084 (VC-13/14);
+cone sector 2.809926 rad, wrapped lengths 20 and 25.13274 (VC-06/07), scribe +1 face; projected 33.92248 vs expected 33.92248 (rel 9e-8); bad inputs give the expected codes (VC-30).
+
+### 13.1 Review fixes
+
+- `cmap` glyph ids are clamped to `numGlyphs` (0 beyond); `textOutline` converts any `FontError` into `WRP_FONT_PARSE` (`outlineErrorCode`), so a hostile font is a coded no-op in `text_outline`, `extrude_profile`, `emboss_on_face`, `wrap_to_face`.
+- All-off-curve contours start at mid(last, first); mirrored composite components (det < 0) reverse their contours; `scanGlyphs` has a whole-font budget of 5e6 points.
+- Overlap uniting is per crossing cluster (union-find over box-prefiltered crossings); clean glyphs keep exact curves.
+- Replay seeds the embedded font records and bytes from the base document, so a replay needs no font provider. `import_font` records `blob` (the sha256) instead of `base64`: the bytes are stored once, in `blobs`.
+- Deboss depth limit: the profile's smallest distance to the axis (cylinder radius; cone: smallest v x sin(semi-angle)); none for a bore or a plane. Cone `angularSpanRad` is the azimuth span; `developedSectorRad` is the flat sector angle.

@@ -7,6 +7,9 @@ import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { FaceSlabRecipe } from './faceSlab';
+import type { Decal } from './decal';
+import type { TextLayout } from './fonts';
+import type { CurveOnFace, EmbossParams } from './wrap';
 import type { AssemblyPresentationFields, Joint } from './joints';
 
 export type { Joint, JointKind, JointMateRef } from './joints';
@@ -35,6 +38,7 @@ import type { SketchPlaneFields } from './sketchPlanes';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
+export type { Decal };
 
 export type EntityId = string;
 
@@ -99,28 +103,6 @@ export interface BaseEntity {
   patternSourceId?: string;
   /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
   decals?: ReadonlyArray<Decal>;
-}
-
-/**
- * Text decal projected onto its solid along `-normal` (paint: shown and exported to glTF, not a solid). All vectors are in the owning
- * entity's local frame (before its rotation / position).
- * @invariant width, height, depth > 0; normal non-zero; text non-empty
- */
-export interface Decal {
-  readonly id: string;
-  readonly text: string;
-  readonly center: Vec3;
-  /** Outward surface direction the decal faces (it projects along -normal). */
-  readonly normal: Vec3;
-  /** Rotation of the text about `normal`, radians (0 = text +x along the projected world X/Y). */
-  readonly angle: number;
-  readonly width: number;
-  readonly height: number;
-  /** Projection depth through the surface. */
-  readonly depth: number;
-  readonly color: string;
-  /** Optional opaque background behind the text. */
-  readonly background?: string;
 }
 
 export interface BoxEntity extends BaseEntity {
@@ -374,6 +356,8 @@ export interface NurbsCurveEntity extends BaseEntity {
   curve: NurbsCurveData;
   /** Design intent the poles approximate (`add_helix`); local to `position`. */
   analytic?: HelixDefinition;
+  /** Set by `wrap_to_face` / `project_to_face`: the face this curve lies on (03 WRP). */
+  onFace?: CurveOnFace;
 }
 
 /**
@@ -389,7 +373,7 @@ export interface NurbsSurfaceEntity extends BaseEntity {
 }
 
 /** Annotation anchored at `position`. */
-export interface TextEntity extends BaseEntity {
+export interface TextEntity extends BaseEntity, TextLayout {
   readonly kind: 'text';
   /** Non-empty. */
   content: string;
@@ -689,6 +673,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
   blobs?: Record<string, DocumentBlob>;
+  /** Fonts embedded for outline text (`import_font`, 03 WRP) by id; bytes are `blobs` entries. */
+  fonts?: Record<string, import('./fonts').FontRecord>;
   /** Absent until the first exact import with provenance (`import_step_exact`, `import_iges`; aerospace 04 XCH). */
   exchange?: import('./exchange').ExchangeModel;
   /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
@@ -706,11 +692,11 @@ export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode
 
 /**
  * Content-addressed payload referenced by `brep` recipe leaves.
- * @invariant `sha256` = sha256 of the UTF-8 text `bytes` decodes to, and equals its key in `CadDocument.blobs`; `size` = decoded byte length
+ * @invariant `sha256` = sha256 of the decoded bytes (UTF-8 text; raw for fonts) = its key in `CadDocument.blobs`; `size` = byte length
  */
 export interface DocumentBlob {
   readonly sha256: string;
-  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges';
+  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges' | 'font/ttf' | 'font/otf';
   /** Base64 of the payload text. */
   readonly bytes: string;
   readonly size: number;
@@ -835,4 +821,6 @@ export type ShapeRecipe =
   /** Space deformation of `source` (01 DEF): every point p maps to frame⁻¹(law(frame(p))); the mesh path stays within `output.tolerance`. */
   | ({ readonly op: 'deform'; readonly source: ShapeRecipe } & DeformParams)
   /** Draft, push-pull or split of faces of `source` on its exact B-rep (SC-F1, `model/faceOps`); exact kernels only. */
-  | ({ readonly op: 'faceOp'; readonly source: ShapeRecipe } & FaceOpParams);
+  | ({ readonly op: 'faceOp'; readonly source: ShapeRecipe } & FaceOpParams)
+  /** Emboss, deboss or scribe of regions on a plane / cylinder / cone face (03 WRP); exact kernels. */
+  | ({ readonly op: 'emboss'; readonly source: ShapeRecipe } & EmbossParams);

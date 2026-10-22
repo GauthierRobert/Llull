@@ -63,6 +63,15 @@ std::unique_ptr<Shape> surface_face(int32_t kind, rust::Slice<const double> surf
 std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops, double from, double to,
                                  rust::Slice<const double> direction, double tolerance);
 
+// Emboss / deboss / scribe tools (03 WRP, cpp/surfaces.cxx): a compound with one tool per region of `regions`. `regions`: region count, then per region its
+// loop count and per loop an outer flag, the start u v, a segment count and per segment a kind (0 line: end u v; 1 B-spline pcurve: degree, pole count,
+// rational flag, knot count, poles u v, weights (rational only), knots, multiplicities). A tool is the face-slab between offsets `from` and `to` of the
+// `kind` surface (as face_slab), or with `faces_only` the trimmed face itself. Null when OCC refuses; a throw (-> Err) for inconsistent data.
+std::unique_ptr<Shape> emboss_tools(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> regions, double from, double to,
+                                    rust::Slice<const double> direction, double tolerance, bool faces_only);
+// `source` divided by the faces of `tools` that lie on it (scribe): same volume, more faces; persistent names follow the history.
+std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools);
+
 // Closed solid of fitted lateral B-spline faces (surface_face kind-0 layouts concatenated, `lengths` = f64 count of each): the faces are sewn into
 // a shell whose two closed free boundaries get planar caps, then everything is sewn into a solid. Null when OCC refuses or the solid is invalid; a
 // throw (-> Err) when the sewing leaves free edges (SWG_KERNEL_SEW_OPEN) or the shell does not have exactly two closed boundaries.

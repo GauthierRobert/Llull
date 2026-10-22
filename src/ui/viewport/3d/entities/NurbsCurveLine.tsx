@@ -41,7 +41,7 @@ function CurveComb({ curve, enabled }: { curve: NurbsCurveEntity['curve']; enabl
 }
 
 export function NurbsCurveLine({
-  entity: { curve, position, rotation, color },
+  entity: { curve, position, rotation, color, onFace },
   selected,
 }: {
   entity: NurbsCurveEntity;
@@ -51,11 +51,20 @@ export function NurbsCurveLine({
   // `curve` is a new reference only when the curve changes (pure commands, L3).
   const rebased = useMemo(() => rebaseToAnchor(curveDisplayPoints(curve).flatMap(([x, y, z]) => [x, y, z])), [curve]);
   const geometry = useMemo(() => positionsGeometry(rebased.local), [rebased]);
-  const material = useMemo(() => new THREE.LineBasicMaterial({ color: selected ? SELECTION_COLOR : color }), [color, selected]);
+  const onSurface = onFace !== undefined;
+  // A curve lying on a face (wrap_to_face / project_to_face) is drawn after the solids and without writing depth, so it reads on the face instead of z-fighting with it.
+  const material = useMemo(
+    () => new THREE.LineBasicMaterial({ color: selected ? SELECTION_COLOR : color, depthWrite: !onSurface }),
+    [color, selected, onSurface],
+  );
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
   // Wrapper only: geometry and material are owned and disposed above.
-  const object = useMemo(() => new THREE.Line(geometry, material), [geometry, material]);
+  const object = useMemo(() => {
+    const line = new THREE.Line(geometry, material);
+    if (onSurface) line.renderOrder = 2;
+    return line;
+  }, [geometry, material, onSurface]);
   return (
     <group position={position} rotation={[rotation[0], rotation[1], rotation[2]]}>
       <primitive object={object} position={rebased.anchor} />

@@ -89,7 +89,8 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
     }
     case 'text': {
       const height = e.height * f;
-      return { scaled: { ...e, height }, dims: `new height ${height}` };
+      const letterSpacing = e.letterSpacing === undefined ? {} : { letterSpacing: e.letterSpacing * f };
+      return { scaled: { ...e, height, ...letterSpacing }, dims: `new height ${height}` };
     }
     case 'point':
       return { scaled: { ...e }, dims: 'point unchanged' };

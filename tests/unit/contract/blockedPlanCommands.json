@@ -20,37 +20,6 @@
     "docs/design/02-sweep-loft-guides/validation/plans/target_rails_and_surface_mode.json": [
       "sweep_surface"
     ],
-    "docs/design/03-wrap-emboss/validation/plans/target_bad_inputs.json": [
-      "emboss_on_face",
-      "import_font",
-      "wrap_to_face"
-    ],
-    "docs/design/03-wrap-emboss/validation/plans/target_cone_wrap_scribe.json": [
-      "check_wrap",
-      "emboss_on_face",
-      "unwrap_face",
-      "wrap_to_face"
-    ],
-    "docs/design/03-wrap-emboss/validation/plans/target_cylinder_rect_emboss_deboss.json": [
-      "check_wrap",
-      "emboss_on_face"
-    ],
-    "docs/design/03-wrap-emboss/validation/plans/target_cylinder_text_emboss.json": [
-      "check_wrap",
-      "emboss_on_face",
-      "import_font",
-      "text_outline"
-    ],
-    "docs/design/03-wrap-emboss/validation/plans/target_projection_vs_wrap.json": [
-      "check_wrap",
-      "project_to_face",
-      "wrap_to_face"
-    ],
-    "docs/design/03-wrap-emboss/validation/plans/target_sphere_geodesic_wrap.json": [
-      "check_wrap",
-      "emboss_on_face",
-      "wrap_to_face"
-    ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_brep_face_moves.json": [
       "delete_faces",
       "move_faces"

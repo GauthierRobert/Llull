@@ -13,6 +13,7 @@ import { getPhysicsEngine } from '../dynamics/physicsEngine';
 import { getMaterialLibraryProvider } from './libraryPort';
 import { getSignaturePort } from './signaturePort';
 import { getRasterPort } from './rasterPort';
+import { getFontProvider } from './fontPort';
 import { type ReplayCache, createReplayCache } from './history/replayCache';
 import { counterIdSource, withIdSource } from '../lib/id';
 import type { ExecutionContext } from './types';
@@ -47,6 +48,7 @@ export function defaultContext(): ExecutionContext {
     libraries: getMaterialLibraryProvider(),
     ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     raster: getRasterPort(),
+    fonts: getFontProvider(),
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,

@@ -27,6 +27,7 @@ import { sketchLoop } from './sketchCurves';
 import { exactCurves, extrusionResult } from './extrusionResult';
 import { thinExtrude, thinSchema } from './thinExtrude';
 import { mapSegment } from '../../geometry/curveSegments';
+import { extrudeText } from './textExtrusion';
 
 /**
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
@@ -52,6 +53,8 @@ export const extrudeProfile = defineCommand({
     'The solid spans from the position along +Z for depth units (depth must be > 0). ' +
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
     '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored. ' +
+    'A text entity created with a font (add_text font=...) is accepted as `id`: its glyph outlines, holes included, are extruded into one mesh solid ' +
+    '(any kernel; the text is kept). ' +
     'thin {thickness, side centre|inside|outside} extrudes only a wall instead of a solid prism: an open polyline (id, or inline profile with ' +
     'openPath true) becomes an offset band, a closed profile a ring (needs a geometry kernel; result is a mesh with an exact B-rep).',
   params: z.object({
@@ -121,6 +124,9 @@ export const extrudeProfile = defineCommand({
     if (depth <= 0) return noop(doc, `extrude_profile: depth must be > 0 (got ${depth}); entity ${label} unchanged.`);
     const sourceIds = ids ?? (id !== undefined ? [id] : []);
     if (sourceIds.length === 0) return noop(doc, 'extrude_profile: ids must not be empty.');
+    const only = sourceIds.length === 1 ? doc.entities[sourceIds[0] as string] : undefined;
+    if (only?.kind === 'text' && only.font !== undefined)
+      return extrudeText(doc, ctx, { text: only, depth, position, rotation, axis, color });
     if (sourceIds.length === 1) {
       const single = singleSourceIssue(doc, sourceIds[0] as string);
       if (single !== null) return noop(doc, `extrude_profile: ${single}`);
@@ -164,6 +170,8 @@ function singleSourceIssue(doc: CadDocument, id: string): string | null {
     return `${source.kind} "${id}" is not closed; cannot extrude an open profile (pass several pieces in ids to close a loop).`;
   if (source.kind === 'polyline' && source.points.length < 3)
     return `polyline "${id}" has fewer than 3 points; not a valid closed profile.`;
+  if (source.kind === 'text')
+    return `WRP_TEXT_NO_FONT — text "${id}" has no font, so it has no outline; set font (add_text font=...) first.`;
   if (!CLOSED_SHAPE_KINDS.has(source.kind))
     return `entity "${id}" (kind="${source.kind}") is not a closed 2D profile. Use a circle, rectangle, ellipse, closed polyline or closed spline, or several pieces in ids.`;
   return null;

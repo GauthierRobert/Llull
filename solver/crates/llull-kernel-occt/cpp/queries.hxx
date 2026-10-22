@@ -32,6 +32,10 @@ rust::String edge_samples_json(const Shape &shape, int32_t edge, int32_t count);
 rust::String edge_continuity_json(const Shape &shape, int32_t edge, int32_t count);
 // Failure report of a MakeFillet build (cpp/blends.cxx): `edges` ([] = all) and `laws` as for fillet_laws (one law then applies to every edge).
 rust::String fillet_report_json(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
+// Projection of curves onto faces (cpp/wrap.cxx): `curves` concatenated B-spline curves (degree, pole count, knot count, rational flag, xyz poles, weights, knots,
+// multiplicities), `lengths` the f64 count of each; `mode` 0 along `direction`, 1 closest point within `max_distance`. JSON { curves: [{ source, face, t0, t1, curve, pcurve }], coverage }.
+rust::String project_curves_json(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths,
+                                 int32_t mode, rust::Slice<const double> direction, double max_distance, double sample_step, double tolerance);
 rust::String point_distances_json(const Shape &shape, rust::Slice<const double> points);
 rust::String shape_distance_json(const Shape &a, const Shape &b);
 

@@ -29,6 +29,18 @@ mod ffi {
         fn edge_samples_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
         fn edge_continuity_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
         fn fillet_report_json(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<String>;
+        #[allow(clippy::too_many_arguments)]
+        fn project_curves_json(
+            shape: &Shape,
+            faces: &[u32],
+            curves: &[f64],
+            lengths: &[u32],
+            mode: i32,
+            direction: &[f64],
+            max_distance: f64,
+            sample_step: f64,
+            tolerance: f64,
+        ) -> Result<String>;
         fn point_distances_json(shape: &Shape, points: &[f64]) -> Result<String>;
         fn shape_distance_json(a: &Shape, b: &Shape) -> Result<String>;
 
@@ -121,6 +133,23 @@ pub fn edge_continuity(shape: &Shape, edge: f64, count: f64) -> OcctResult<Value
 /// Why a fillet of `edges` ([] = all) with the radius `laws` (layout of `features::fillet_laws`) fails or succeeds: contour statuses, faulty vertices, partial result.
 pub fn fillet_report(shape: &Shape, edges: &[u32], laws: &[f64]) -> OcctResult<Value> {
     parsed(ffi::fillet_report_json(inner(shape)?, edges, laws))
+}
+
+/// `projectCurves`: curves (encoded B-splines) projected onto `faces` along `direction` (mode 0) or to the closest point (mode 1, within `max_distance`); each run on a
+/// face comes back fitted in 3D and in (u, v) within `tolerance`, with the covered fraction of every source curve.
+#[allow(clippy::too_many_arguments)]
+pub fn project_curves(
+    shape: &Shape,
+    faces: &[u32],
+    curves: &[f64],
+    lengths: &[u32],
+    mode: i32,
+    direction: [f64; 3],
+    max_distance: f64,
+    sample_step: f64,
+    tolerance: f64,
+) -> OcctResult<Value> {
+    parsed(ffi::project_curves_json(inner(shape)?, faces, curves, lengths, mode, &direction, max_distance, sample_step, tolerance))
 }
 
 /// Port `distance`: per point the distance to the boundary, negative inside a solid, and the nearest face (-1 on an edge / vertex).

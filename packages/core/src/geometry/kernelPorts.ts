@@ -7,6 +7,8 @@
 import type { MeshData, Vec2, Vec3 } from '../model/types';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 import type { InertiaTensor } from './massProperties';
+import type { NurbsCurve2Data } from '../lib/nurbs/curve2d';
+import type { NurbsCurveData } from '../lib/nurbs/types';
 
 /** What the active kernel is (TR-KRN-04); the composition root may add `isolation` / `fallbackReason`. */
 export interface KernelInfo {
@@ -192,6 +194,36 @@ interface NurbsSurfaceData {
   readonly periodicV: boolean;
 }
 
+/**
+ * Curves to project onto faces (03 WRP): `faces` are unique face indices; the curves go along `direction` (the nearest face ahead of each sample wins) or, with
+ * `closest`, to their closest point within `maxDistance`. `sampleStep` (document units) sets the sampling, `tolerance` the fit of the returned curves.
+ */
+export interface CurveProjectionRequest {
+  readonly faces: readonly number[];
+  readonly curves: readonly NurbsCurveData[];
+  readonly direction?: Vec3;
+  readonly closest?: { readonly maxDistance: number };
+  readonly sampleStep: number;
+  readonly tolerance: number;
+}
+
+/** One run of a source curve on one face: the fitted 3D curve and its pcurve in the face's own (u, v) (OCC parametrisation). */
+interface ProjectedCurve {
+  readonly source: number;
+  readonly face: number;
+  /** Parameter range of the source curve that landed on the face. */
+  readonly t0: number;
+  readonly t1: number;
+  readonly curve: NurbsCurveData;
+  readonly pcurve: NurbsCurve2Data;
+}
+
+export interface CurveProjection {
+  readonly curves: readonly ProjectedCurve[];
+  /** Per source curve: the covered fraction of its parameter range (1 = every part landed on a face). */
+  readonly coverage: readonly number[];
+}
+
 /** Face-level queries for every pack (01 §5.9). A method the kernel cannot answer returns null. */
 export interface FaceQueryPort {
   faceDetails(shape: ShapeHandle, options?: { readonly samples?: number }): readonly FaceDetail[] | null;
@@ -213,4 +245,5 @@ export interface FaceQueryPort {
     points: readonly Vec3[],
   ): readonly { readonly distance: number; readonly signed: number; readonly face: number }[] | null;
   bspline(shape: ShapeHandle, face: number): NurbsSurfaceData | null;
+  projectCurves(shape: ShapeHandle, request: CurveProjectionRequest): CurveProjection | null;
 }

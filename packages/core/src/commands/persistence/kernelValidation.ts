@@ -51,6 +51,20 @@ function collectBrepLeaves(value: unknown, owner: string, out: Array<readonly [s
     if (key !== 'positions' && key !== 'indices') collectBrepLeaves(child, owner, out, tooDeep, depth + 1);
 }
 
+/** `fonts` (03 WRP): an object of records, each naming a stored `font/ttf` blob (a font without its bytes cannot outline text). */
+function fontProblems(fonts: unknown, blobs: unknown): string[] {
+  if (fonts === undefined) return [];
+  if (!isRecord(fonts)) return ['fonts must be an object keyed by font id'];
+  const errors: string[] = [];
+  for (const [id, record] of Object.entries(fonts)) {
+    const key = isRecord(record) ? record['blob'] : undefined;
+    const blob = typeof key === 'string' && isRecord(blobs) ? blobs[key] : undefined;
+    if (!isRecord(record) || typeof key !== 'string' || !isRecord(blob) || blob['mediaType'] !== 'font/ttf')
+      errors.push(`WRP_FONT_UNAVAILABLE: font '${id}' needs a font/ttf blob in the document blobs — re-run import_font`);
+  }
+  return errors;
+}
+
 /** Errors of `kernelSettings`, `blobs` and the `brep` leaves of `entities` / `components` in a raw document record. */
 export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
   const errors = kernelSettingsProblems(doc['kernelSettings']);
@@ -59,9 +73,12 @@ export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
   for (const [key, blob] of Object.entries(blobs ?? {})) {
     const problem = blobProblem(key, blob);
     if (problem === 'malformed')
-      errors.push(`blob '${key}' is malformed (needs sha256, mediaType model/x-occt-brep|model/step, base64 bytes, size)`);
+      errors.push(
+        `blob '${key}' is malformed (needs sha256, mediaType model/x-occt-brep|model/step|model/iges|font/ttf|font/otf, base64 bytes, size)`,
+      );
     else if (problem !== null) errors.push(`${problem}: blob '${key}' bytes do not match its sha256, mediaType or size`);
   }
+  errors.push(...fontProblems(doc['fonts'], blobs));
   const leaves: Array<readonly [string, string]> = [];
   const tooDeep = new Set<string>();
   for (const section of ['entities', 'components'] as const) {

@@ -121,7 +121,7 @@ write('target_cone_wrap_scribe.json', [
     },
     as: 'scribed',
   },
-  { command: 'inspect_faces', params: { id: '$scribed' } },
+  { command: 'inspect_faces', params: { entityId: '$scribed' } },
   { command: 'check_wrap', params: { ids: ['$onCone', '$scribed'] } },
 ]);
 

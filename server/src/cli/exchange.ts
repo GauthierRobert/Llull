@@ -35,12 +35,20 @@ export function exchangeTool(name: string): ToolDefinition | undefined {
   return exchangeToolDefinitions().find((tool) => tool.name === name);
 }
 
+/** `alias`: a second parameter name (kept in the params as provenance) that also names the file when the content parameter is absent. */
+interface FileTarget {
+  readonly key: string;
+  readonly encoding: 'base64' | 'utf8';
+  readonly alias?: string;
+}
+
 /** `file=` target per tool: the parameter it fills and how the file is read. */
-const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | 'utf8' }>> = {
+const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   import_step: { key: 'stepBase64', encoding: 'base64' },
   import_step_exact: { key: 'stepBase64', encoding: 'base64' },
   import_iges: { key: 'igesBase64', encoding: 'base64' },
   import_mesh_file: { key: 'base64', encoding: 'base64' },
+  import_font: { key: 'base64', encoding: 'base64', alias: 'path' },
   verify_exchange_file: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
@@ -60,11 +68,17 @@ export function takesFileParam(name: string): boolean {
  * @failure unreadable file -> Error; `file` on a tool without content -> Error
  */
 export function withFileContent(name: string, params: unknown): unknown {
-  if (!isRecord(params) || typeof params['file'] !== 'string') return params;
+  if (!isRecord(params)) return params;
   const target = FILE_PARAMS[name];
-  if (target === undefined) throw new Error(`${name} takes no file= parameter.`);
-  const { file, ...rest } = params;
-  return { ...rest, [target.key]: fs.readFileSync(file).toString(target.encoding) };
+  const alias = target?.alias;
+  if (typeof params['file'] === 'string') {
+    if (target === undefined) throw new Error(`${name} takes no file= parameter.`);
+    const { file, ...rest } = params;
+    return { ...rest, [target.key]: fs.readFileSync(file).toString(target.encoding) };
+  }
+  if (target !== undefined && alias !== undefined && typeof params[alias] === 'string' && params[target.key] === undefined)
+    return { ...params, [target.key]: fs.readFileSync(params[alias]).toString(target.encoding) };
+  return params;
 }
 
 /**

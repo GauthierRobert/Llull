@@ -4,12 +4,25 @@
 // - `face_slab`: the region of that face lifted along its normal from offset `from` to offset `to`: base face, face on Geom_OffsetSurface, one
 //   ruled wall (BRepFill::Face) per loop edge, sewn into a solid. BRepOffsetAPI_MakeThickSolid is deliberately not used (it crashes on the
 //   MinGW OCCT build, docs/decisions/SV1-solver-toolchain-windows.md).
+// - `emboss_tools` / `split_shape` (03 WRP): one such slab (or trimmed face) per region of a text / logo, loops made of lines and B-spline pcurves; the
+//   host fuses, cuts or splits the shape with them.
 #include "llull-kernel-occt/cpp/features.hxx"
 
 #include <cmath>
 #include <stdexcept>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
+#include <BRepTools_History.hxx>
+#include <BRep_Builder.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
+#include <TopTools_MapOfShape.hxx>
+#include <TColgp_Array1OfPnt2d.hxx>
+#include <TopTools_ListOfShape.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <gp_Vec2d.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -45,6 +58,7 @@
 #include <gp_Ax3.hxx>
 #include <gp_Pnt2d.hxx>
 
+#include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/src/features.rs.h"
 
 namespace llull {
@@ -141,10 +155,24 @@ Handle(Geom_Surface) make_surface(int kind, rust::Slice<const double> d) {
   }
 }
 
+// One piece of a loop in the surface's (u, v) plane: a pcurve (a segment or a B-spline) running from `from` to `to`.
+struct Segment {
+  Handle(Geom2d_Curve) curve;
+  gp_Pnt2d from;
+  gp_Pnt2d to;
+};
+
 struct Loop {
   bool outer;
-  std::vector<gp_Pnt2d> points;
+  std::vector<Segment> segments;
 };
+
+Segment line_segment(const gp_Pnt2d &a, const gp_Pnt2d &b) {
+  GCE2d_MakeSegment segment(a, b);
+  if (!segment.IsDone()) throw std::invalid_argument("loop: degenerate segment");
+  const Handle(Geom2d_Curve) curve(segment.Value());
+  return Segment{curve, a, b};
+}
 
 // loops: count, then per loop: point count, outer flag (1 / 0), u v pairs.
 std::vector<Loop> read_loops(rust::Slice<const double> d) {
@@ -161,45 +189,151 @@ std::vector<Loop> read_loops(rust::Slice<const double> d) {
     if (outer) ++outer_loops;
     offset += 2;
     if (offset + 2 * n > d.size()) throw std::invalid_argument("loops: bad point count");
-    Loop loop{outer, {}};
-    for (size_t i = 0; i < n; ++i) loop.points.emplace_back(d[offset + 2 * i], d[offset + 2 * i + 1]);
+    std::vector<gp_Pnt2d> points;
+    for (size_t i = 0; i < n; ++i) points.emplace_back(d[offset + 2 * i], d[offset + 2 * i + 1]);
     offset += 2 * n;
+    Loop loop{outer, {}};
+    for (size_t i = 0; i < n; ++i) {
+      const gp_Pnt2d &a = points[i];
+      const gp_Pnt2d &b = points[(i + 1) % n];
+      if (a.Distance(b) >= 1e-12) loop.segments.push_back(line_segment(a, b));
+    }
     loops.push_back(loop);
   }
   if (offset != d.size() || outer_loops != 1) throw std::invalid_argument("loops: exactly one outer loop and no trailing data");
   return loops;
 }
 
-// The closed polygon of `points` as pcurve edges on `surface` (shared vertices); `edges` receives them in loop order.
-TopoDS_Wire loop_wire(const Handle(Geom_Surface) & surface, const std::vector<gp_Pnt2d> &points, std::vector<TopoDS_Edge> &edges) {
+// Reads the numbers of a flat list in order, every access and count bounded (the list comes from a stored document).
+class Cursor {
+ public:
+  explicit Cursor(rust::Slice<const double> data) : data_(data) {}
+  double next() {
+    if (at_ >= data_.size()) throw std::invalid_argument("regions: the list ends early");
+    const double value = data_[at_++];
+    if (!std::isfinite(value)) throw std::invalid_argument("regions: a number is not finite");
+    return value;
+  }
+  int count(int minimum, int maximum) {
+    const double value = next();
+    if (!(value >= minimum && value <= maximum) || value != std::floor(value)) throw std::invalid_argument("regions: a count is not an integer in range");
+    return static_cast<int>(value);
+  }
+  bool flag() {
+    const double value = next();
+    if (value != 0.0 && value != 1.0) throw std::invalid_argument("regions: a flag must be 0 or 1");
+    return value == 1.0;
+  }
+  bool done() const { return at_ == data_.size(); }
+
+ private:
+  rust::Slice<const double> data_;
+  size_t at_ = 0;
+};
+
+constexpr double kJoin = 1e-7;
+
+// degree, pole count, rational flag, knot count, poles (u v), weights (rational only), knots, multiplicities.
+Handle(Geom2d_BSplineCurve) read_pcurve(Cursor &in) {
+  const int degree = in.count(1, 25);
+  const int pole_count = in.count(2, 2000);
+  const bool rational = in.flag();
+  const int knot_count = in.count(2, 2100);
+  TColgp_Array1OfPnt2d poles(1, pole_count);
+  for (int i = 1; i <= pole_count; ++i) {
+    const double u = in.next();
+    const double v = in.next();
+    poles.SetValue(i, gp_Pnt2d(u, v));
+  }
+  TColStd_Array1OfReal weights(1, pole_count);
+  for (int i = 1; i <= pole_count; ++i) {
+    const double weight = rational ? in.next() : 1.0;
+    if (!(weight > 0)) throw std::invalid_argument("regions: a weight must be > 0");
+    weights.SetValue(i, weight);
+  }
+  TColStd_Array1OfReal knots(1, knot_count);
+  for (int i = 1; i <= knot_count; ++i) {
+    knots.SetValue(i, in.next());
+    if (i > 1 && !(knots(i) > knots(i - 1))) throw std::invalid_argument("regions: knots must increase");
+  }
+  TColStd_Array1OfInteger multiplicities(1, knot_count);
+  long total = 0;
+  for (int i = 1; i <= knot_count; ++i) {
+    multiplicities.SetValue(i, in.count(1, degree + 1));
+    total += multiplicities(i);
+  }
+  if (total != pole_count + degree + 1) throw std::invalid_argument("regions: multiplicities do not fit the poles");
+  if (rational) return new Geom2d_BSplineCurve(poles, weights, knots, multiplicities, degree);
+  return new Geom2d_BSplineCurve(poles, knots, multiplicities, degree);
+}
+
+constexpr int kMaxRegions = 20000;
+constexpr size_t kMaxSegments = 400000;
+
+// regions: count, then per region its loop count and per loop: outer flag, start u v, segment count and per segment a kind (0 line: end u v;
+// 1 B-spline pcurve: see read_pcurve). Every loop closes on its start; every region has exactly one outer loop.
+std::vector<std::vector<Loop>> read_regions(rust::Slice<const double> d) {
+  Cursor in(d);
+  const int region_count = in.count(1, kMaxRegions);
+  std::vector<std::vector<Loop>> regions;
+  size_t budget = 0;
+  for (int r = 0; r < region_count; ++r) {
+    const int loop_count = in.count(1, 4096);
+    std::vector<Loop> region;
+    int outers = 0;
+    for (int l = 0; l < loop_count; ++l) {
+      Loop loop{in.flag(), {}};
+      outers += loop.outer ? 1 : 0;
+      const double start_u = in.next();
+      const double start_v = in.next();
+      const gp_Pnt2d start(start_u, start_v);
+      gp_Pnt2d cursor = start;
+      const int segment_count = in.count(1, 100000);
+      budget += static_cast<size_t>(segment_count);
+      if (budget > kMaxSegments) throw std::invalid_argument("regions: too many loop segments");
+      for (int s = 0; s < segment_count; ++s) {
+        const int kind = in.count(0, 1);
+        if (kind == 0) {
+          const double u = in.next();
+          const double v = in.next();
+          const gp_Pnt2d end(u, v);
+          if (cursor.Distance(end) >= 1e-12) loop.segments.push_back(line_segment(cursor, end));
+          cursor = end;
+        } else {
+          const Handle(Geom2d_BSplineCurve) curve = read_pcurve(in);
+          if (curve->StartPoint().Distance(cursor) > kJoin) throw std::invalid_argument("regions: a curve does not start where the loop is");
+          loop.segments.push_back(Segment{curve, curve->StartPoint(), curve->EndPoint()});
+          cursor = curve->EndPoint();
+        }
+      }
+      if (cursor.Distance(start) > kJoin || loop.segments.empty()) throw std::invalid_argument("regions: a loop must close on its start");
+      region.push_back(loop);
+    }
+    if (outers != 1) throw std::invalid_argument("regions: every region needs exactly one outer loop");
+    regions.push_back(region);
+  }
+  if (!in.done()) throw std::invalid_argument("regions: trailing data");
+  return regions;
+}
+
+// The closed loop as pcurve edges on `surface` (shared vertices); `edges` receives them in loop order.
+TopoDS_Wire loop_wire(const Handle(Geom_Surface) & surface, const Loop &loop, std::vector<TopoDS_Edge> &edges) {
   std::vector<TopoDS_Vertex> vertices;
   std::vector<gp_Pnt> locations;
-  for (const gp_Pnt2d &p : points) {
-    // a periodic seam (or a collapsed pole) maps several loop points to one 3D point: they share one vertex, so the edge between is closed
+  // a periodic seam (or a collapsed pole) maps several loop points to one 3D point: they share one vertex, so the edge between is closed
+  const auto vertex_at = [&](const gp_Pnt2d &p) -> TopoDS_Vertex {
     const gp_Pnt at = surface->Value(p.X(), p.Y());
-    size_t found = locations.size();
     for (size_t k = 0; k < locations.size(); ++k)
-      if (locations[k].Distance(at) < 1e-9) {
-        found = k;
-        break;
-      }
-    if (found == locations.size()) {
-      locations.push_back(at);
-      vertices.push_back(BRepBuilderAPI_MakeVertex(at));
-    } else {
-      locations.push_back(at);
-      vertices.push_back(vertices[found]);
-    }
-  }
+      if (locations[k].Distance(at) < 1e-9) return vertices[k];
+    locations.push_back(at);
+    vertices.push_back(BRepBuilderAPI_MakeVertex(at));
+    return vertices.back();
+  };
   BRepBuilderAPI_MakeWire wire;
-  const size_t n = points.size();
-  for (size_t i = 0; i < n; ++i) {
-    const size_t j = (i + 1) % n;
-    if (points[i].Distance(points[j]) < 1e-12) continue;
-    GCE2d_MakeSegment segment(points[i], points[j]);
-    if (!segment.IsDone()) throw std::invalid_argument("loop: degenerate segment");
-    const Handle(Geom2d_Curve) curve(segment.Value());
-    BRepBuilderAPI_MakeEdge edge(curve, surface, vertices[i], vertices[j], curve->FirstParameter(), curve->LastParameter());
+  for (const Segment &segment : loop.segments) {
+    const TopoDS_Vertex first = vertex_at(segment.from);
+    const TopoDS_Vertex last = vertex_at(segment.to);
+    BRepBuilderAPI_MakeEdge edge(segment.curve, surface, first, last, segment.curve->FirstParameter(), segment.curve->LastParameter());
     if (!edge.IsDone()) return TopoDS_Wire();
     BRepLib::BuildCurves3d(edge.Edge(), 1e-7);
     edges.push_back(edge.Edge());
@@ -225,7 +359,7 @@ TopoDS_Face trimmed_face(const Handle(Geom_Surface) & surface, const std::vector
     maker.Init(surface, Standard_True, 1e-7);
   } else {
     collected.emplace_back();
-    const TopoDS_Wire wire = loop_wire(surface, outer->points, collected.back());
+    const TopoDS_Wire wire = loop_wire(surface, *outer, collected.back());
     if (wire.IsNull()) return TopoDS_Face();
     maker.Init(surface, Standard_False, 1e-7);
     maker.Add(wire);
@@ -233,7 +367,7 @@ TopoDS_Face trimmed_face(const Handle(Geom_Surface) & surface, const std::vector
   for (const Loop &loop : loops) {
     if (&loop == outer) continue;
     collected.emplace_back();
-    const TopoDS_Wire wire = loop_wire(surface, loop.points, collected.back());
+    const TopoDS_Wire wire = loop_wire(surface, loop, collected.back());
     if (wire.IsNull()) return TopoDS_Face();
     maker.Add(wire);
   }
@@ -277,10 +411,115 @@ Lift lift(int kind, rust::Slice<const double> d, const Handle(Geom_Surface) & ba
 }
 
 std::vector<Loop> shifted(const std::vector<Loop> &loops, double v_shift) {
-  std::vector<Loop> out = loops;
-  for (Loop &loop : out)
-    for (gp_Pnt2d &p : loop.points) p.SetY(p.Y() + v_shift);
+  std::vector<Loop> out;
+  for (const Loop &loop : loops) {
+    Loop moved{loop.outer, {}};
+    for (const Segment &segment : loop.segments) {
+      Handle(Geom2d_Curve) curve = Handle(Geom2d_Curve)::DownCast(segment.curve->Copy());
+      curve->Translate(gp_Vec2d(0.0, v_shift));
+      moved.segments.push_back(Segment{curve, gp_Pnt2d(segment.from.X(), segment.from.Y() + v_shift), gp_Pnt2d(segment.to.X(), segment.to.Y() + v_shift)});
+    }
+    out.push_back(moved);
+  }
   return out;
+}
+
+// True when every segment of every loop stays at v > 0 (cone: the lift must not carry a loop through the apex); curves are probed along their length.
+bool above_apex(const std::vector<Loop> &loops) {
+  for (const Loop &loop : loops)
+    for (const Segment &segment : loop.segments) {
+      const double first = segment.curve->FirstParameter();
+      const double last = segment.curve->LastParameter();
+      for (int k = 0; k <= 8; ++k)
+        if (!(segment.curve->Value(first + (last - first) * k / 8.0).Y() > 0)) return false;
+    }
+  return true;
+}
+
+// The slab: the face of `kind` bounded by `boundary` lifted along its normal from offset `from` to `to` (null shape when OCC refuses).
+TopoDS_Shape build_slab(int32_t kind, rust::Slice<const double> surface, const std::vector<Loop> &given, double from, double to,
+                        rust::Slice<const double> direction, double tolerance) {
+  if (!(to > from) || direction.size() != 3) return TopoDS_Shape();
+  const Handle(Geom_Surface) base = make_surface(kind, surface);
+  std::vector<Loop> boundary = given;
+  if (boundary.empty() && kind == kBSpline) {
+    // the natural boundary of a sheet: its parameter rectangle (the walls need explicit edges)
+    double u0, u1, v0, v1;
+    base->Bounds(u0, u1, v0, v1);
+    const gp_Pnt2d corners[4] = {gp_Pnt2d(u0, v0), gp_Pnt2d(u1, v0), gp_Pnt2d(u1, v1), gp_Pnt2d(u0, v1)};
+    Loop rectangle{true, {}};
+    for (int k = 0; k < 4; ++k) rectangle.segments.push_back(line_segment(corners[k], corners[(k + 1) % 4]));
+    boundary.push_back(rectangle);
+  }
+  if (boundary.empty() || !boundary.front().outer || boundary.front().segments.empty()) return TopoDS_Shape();
+  // offsets run along the surface normal; the reference direction (the wanted lift direction at the first loop vertex) fixes its sign
+  const gp_Pnt2d &start = boundary.front().segments.front().from;
+  gp_Pnt at;
+  gp_Vec du, dv;
+  base->D1(start.X(), start.Y(), at, du, dv);
+  const gp_Vec normal = du.Crossed(dv);
+  // a singular point (a pole, an apex) has no normal: the sign of the lift would be arbitrary
+  if (normal.Magnitude() <= 1e-9 * (du.Magnitude() * dv.Magnitude()) || normal.Magnitude() < 1e-300) return TopoDS_Shape();
+  const double sign = normal.Dot(gp_Vec(direction[0], direction[1], direction[2])) >= 0 ? 1.0 : -1.0;
+  const Lift low = lift(kind, surface, base, sign * from);
+  const Lift high = lift(kind, surface, base, sign * to);
+  const std::vector<Loop> low_loops = shifted(boundary, low.v_shift);
+  const std::vector<Loop> high_loops = shifted(boundary, high.v_shift);
+  if (kind == kCone && (!above_apex(low_loops) || !above_apex(high_loops))) return TopoDS_Shape();  // the lift would carry a loop through (or past) the apex
+  std::vector<std::vector<TopoDS_Edge>> bottom_edges, top_edges;
+  const TopoDS_Face bottom = trimmed_face(low.surface, low_loops, &bottom_edges);
+  const TopoDS_Face top = trimmed_face(high.surface, high_loops, &top_edges);
+  if (bottom.IsNull() || top.IsNull()) return TopoDS_Shape();
+  BRepBuilderAPI_Sewing sewing(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
+  sewing.Add(bottom);
+  sewing.Add(top);
+  for (size_t k = 0; k < bottom_edges.size(); ++k) {
+    const std::vector<TopoDS_Edge> &lower = bottom_edges[k];
+    const std::vector<TopoDS_Edge> &upper = top_edges[k];
+    std::vector<bool> seam(lower.size(), false);
+    // a full-turn periodic face has two coincident boundary edges (u = 0 and u = period): their walls would overlap, so neither is built
+    for (size_t i = 0; i < lower.size(); ++i) {
+      if (seam[i]) continue;
+      BRepAdaptor_Curve ci(lower[i]);
+      const gp_Pnt mid_i = ci.Value(0.5 * (ci.FirstParameter() + ci.LastParameter()));
+      for (size_t j = i + 1; j < lower.size(); ++j) {
+        BRepAdaptor_Curve cj(lower[j]);
+        const gp_Pnt mid_j = cj.Value(0.5 * (cj.FirstParameter() + cj.LastParameter()));
+        if (mid_i.Distance(mid_j) < tolerance && ci.Value(ci.FirstParameter()).Distance(cj.Value(cj.LastParameter())) < tolerance) {
+          seam[i] = seam[j] = true;
+          break;
+        }
+      }
+    }
+    for (size_t i = 0; i < lower.size(); ++i) {
+      if (seam[i]) continue;
+      const TopoDS_Face wall = BRepFill::Face(lower[i], upper[i]);
+      if (wall.IsNull()) return TopoDS_Shape();
+      sewing.Add(wall);
+    }
+  }
+  sewing.Perform();
+  if (sewing.NbFreeEdges() > 0) return TopoDS_Shape();
+  const TopoDS_Shape sewn = sewing.SewedShape();
+  if (sewn.IsNull()) return TopoDS_Shape();
+  BRepBuilderAPI_MakeSolid solid;
+  int shells = 0;
+  for (TopExp_Explorer shell(sewn, TopAbs_SHELL); shell.More(); shell.Next()) {
+    solid.Add(TopoDS::Shell(shell.Current()));
+    ++shells;
+  }
+  if (shells != 1) return TopoDS_Shape();
+  solid.Build();
+  if (!solid.IsDone()) return TopoDS_Shape();
+  ShapeFix_Solid fix(solid.Solid());
+  fix.Perform();
+  const TopoDS_Shape result = fix.Solid();
+  // never hand back a broken or inside-out slab: the host falls back to the triangles
+  if (!BRepCheck_Analyzer(result, Standard_True).IsValid()) return TopoDS_Shape();
+  GProp_GProps properties;
+  BRepGProp::VolumeProperties(result, properties);
+  if (!(properties.Mass() > 0)) return TopoDS_Shape();
+  return result;
 }
 
 }  // namespace
@@ -297,88 +536,71 @@ std::unique_ptr<Shape> surface_face(int32_t kind, rust::Slice<const double> surf
 std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops, double from, double to,
                                  rust::Slice<const double> direction, double tolerance) {
   try {
-    if (!(to > from) || direction.size() != 3) return nullptr;
+    const TopoDS_Shape slab = build_slab(kind, surface, read_loops(loops), from, to, direction, tolerance);
+    return slab.IsNull() ? nullptr : wrap(slab);
+  } catch (const Standard_Failure &) {
+    return nullptr;
+  }
+}
+
+// One tool per region: the slab between offsets `from` and `to` (a solid), or with `faces_only` the trimmed face itself (scribe). A compound of them.
+std::unique_ptr<Shape> emboss_tools(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> regions, double from, double to,
+                                    rust::Slice<const double> direction, double tolerance, bool faces_only) {
+  try {
     const Handle(Geom_Surface) base = make_surface(kind, surface);
-    std::vector<Loop> boundary = read_loops(loops);
-    if (boundary.empty() && kind == kBSpline) {
-      // the natural boundary of a sheet: its parameter rectangle (the walls need explicit edges)
-      double u0, u1, v0, v1;
-      base->Bounds(u0, u1, v0, v1);
-      boundary.push_back(Loop{true, {gp_Pnt2d(u0, v0), gp_Pnt2d(u1, v0), gp_Pnt2d(u1, v1), gp_Pnt2d(u0, v1)}});
+    TopoDS_Compound compound;
+    BRep_Builder builder;
+    builder.MakeCompound(compound);
+    for (const std::vector<Loop> &region : read_regions(regions)) {
+      const TopoDS_Shape part = faces_only ? TopoDS_Shape(trimmed_face(base, region, nullptr)) : build_slab(kind, surface, region, from, to, direction, tolerance);
+      if (part.IsNull()) return nullptr;
+      builder.Add(compound, part);
     }
-    if (boundary.empty() || !boundary.front().outer) return nullptr;
-    // offsets run along the surface normal; the reference direction (the wanted lift direction at the first loop vertex) fixes its sign
-    const gp_Pnt2d &start = boundary.front().points.front();
-    gp_Pnt at;
-    gp_Vec du, dv;
-    base->D1(start.X(), start.Y(), at, du, dv);
-    const gp_Vec normal = du.Crossed(dv);
-    // a singular point (a pole, an apex) has no normal: the sign of the lift would be arbitrary
-    if (normal.Magnitude() <= 1e-9 * (du.Magnitude() * dv.Magnitude()) || normal.Magnitude() < 1e-300) return nullptr;
-    const double sign = normal.Dot(gp_Vec(direction[0], direction[1], direction[2])) >= 0 ? 1.0 : -1.0;
-    const Lift low = lift(kind, surface, base, sign * from);
-    const Lift high = lift(kind, surface, base, sign * to);
-    const std::vector<Loop> low_loops = shifted(boundary, low.v_shift);
-    const std::vector<Loop> high_loops = shifted(boundary, high.v_shift);
-    if (kind == kCone)
-      for (const std::vector<Loop> *loops_of : {&low_loops, &high_loops})
-        for (const Loop &loop : *loops_of)
-          for (const gp_Pnt2d &p : loop.points)
-            if (!(p.Y() > 0)) return nullptr;  // the lift would carry a loop through (or past) the apex
-    std::vector<std::vector<TopoDS_Edge>> bottom_edges, top_edges;
-    const TopoDS_Face bottom = trimmed_face(low.surface, low_loops, &bottom_edges);
-    const TopoDS_Face top = trimmed_face(high.surface, high_loops, &top_edges);
-    if (bottom.IsNull() || top.IsNull()) return nullptr;
-    BRepBuilderAPI_Sewing sewing(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
-    sewing.Add(bottom);
-    sewing.Add(top);
-    for (size_t k = 0; k < bottom_edges.size(); ++k) {
-      const std::vector<TopoDS_Edge> &lower = bottom_edges[k];
-      const std::vector<TopoDS_Edge> &upper = top_edges[k];
-      std::vector<bool> seam(lower.size(), false);
-      // a full-turn periodic face has two coincident boundary edges (u = 0 and u = period): their walls would overlap, so neither is built
-      for (size_t i = 0; i < lower.size(); ++i) {
-        if (seam[i]) continue;
-        BRepAdaptor_Curve ci(lower[i]);
-        const gp_Pnt mid_i = ci.Value(0.5 * (ci.FirstParameter() + ci.LastParameter()));
-        for (size_t j = i + 1; j < lower.size(); ++j) {
-          BRepAdaptor_Curve cj(lower[j]);
-          const gp_Pnt mid_j = cj.Value(0.5 * (cj.FirstParameter() + cj.LastParameter()));
-          if (mid_i.Distance(mid_j) < tolerance && ci.Value(ci.FirstParameter()).Distance(cj.Value(cj.LastParameter())) < tolerance) {
-            seam[i] = seam[j] = true;
-            break;
-          }
-        }
-      }
-      for (size_t i = 0; i < lower.size(); ++i) {
-        if (seam[i]) continue;
-        const TopoDS_Face wall = BRepFill::Face(lower[i], upper[i]);
-        if (wall.IsNull()) return nullptr;
-        sewing.Add(wall);
-      }
+    return wrap(compound);
+  } catch (const Standard_Failure &) {
+    return nullptr;
+  }
+}
+
+// `source` split by the faces of `tools` (BOPAlgo splitter): the faces they share with the source divide it, no material changes. Names follow the history.
+std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools) {
+  try {
+    TopTools_ListOfShape arguments, parts;
+    arguments.Append(source.shape);
+    for (TopoDS_Iterator part(tools.shape); part.More(); part.Next()) parts.Append(part.Value());
+    BRepAlgoAPI_Splitter splitter;
+    splitter.SetArguments(arguments);
+    splitter.SetTools(parts);
+    splitter.Build();
+    if (!splitter.IsDone() || splitter.HasErrors()) return nullptr;
+    TopoDS_Shape result = splitter.Shape();
+    int solids = 0;
+    TopoDS_Shape only;
+    for (TopExp_Explorer solid(result, TopAbs_SOLID); solid.More(); solid.Next()) {
+      only = solid.Current();
+      ++solids;
     }
-    sewing.Perform();
-    if (sewing.NbFreeEdges() > 0) return nullptr;
-    const TopoDS_Shape sewn = sewing.SewedShape();
-    if (sewn.IsNull()) return nullptr;
-    BRepBuilderAPI_MakeSolid solid;
-    int shells = 0;
-    for (TopExp_Explorer shell(sewn, TopAbs_SHELL); shell.More(); shell.Next()) {
-      solid.Add(TopoDS::Shell(shell.Current()));
-      ++shells;
+    if (solids == 1) result = only;
+    const std::vector<naming::Named> inputs{naming::named(source)};
+    std::vector<std::string> names = naming::inherit(result, inputs, splitter.History(), "scribe");
+    // A patch that crosses the seam of a periodic face is cut in two by the seam edge: put such halves back together, keeping the scribed outline itself
+    TopTools_MapOfShape keep;
+    for (TopExp_Explorer edge(tools.shape, TopAbs_EDGE); edge.More(); edge.Next()) {
+      const TopoDS_Shape &tool_edge = edge.Current();
+      const TopTools_ListOfShape &modified = splitter.Modified(tool_edge);
+      if (modified.IsEmpty() && !splitter.IsDeleted(tool_edge)) keep.Add(tool_edge);
+      for (TopTools_ListIteratorOfListOfShape it(modified); it.More(); it.Next()) keep.Add(it.Value());
     }
-    if (shells != 1) return nullptr;
-    solid.Build();
-    if (!solid.IsDone()) return nullptr;
-    ShapeFix_Solid fix(solid.Solid());
-    fix.Perform();
-    const TopoDS_Shape result = fix.Solid();
-    // never hand back a broken or inside-out slab: the host falls back to the triangles
-    if (!BRepCheck_Analyzer(result, Standard_True).IsValid()) return nullptr;
-    GProp_GProps properties;
-    BRepGProp::VolumeProperties(result, properties);
-    if (!(properties.Mass() > 0)) return nullptr;
-    return wrap(result);
+    try {
+      ShapeUpgrade_UnifySameDomain unifier(result, Standard_False, Standard_True, Standard_False);
+      unifier.KeepShapes(keep);
+      unifier.AllowInternalEdges(Standard_False);
+      unifier.Build();
+      const std::vector<naming::Named> split{naming::Named{result, names}};
+      return naming::wrap_named(unifier.Shape(), naming::inherit(unifier.Shape(), split, unifier.History(), "unify"));
+    } catch (const Standard_Failure &) {
+      return naming::wrap_named(result, std::move(names));
+    }
   } catch (const Standard_Failure &) {
     return nullptr;
   }

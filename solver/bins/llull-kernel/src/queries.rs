@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::rc::Rc;
 
 /// Ops this module answers.
-pub const QUERY_OPS: [&str; 17] = [
+pub const QUERY_OPS: [&str; 18] = [
     "topology",
     "distance",
     "exportStepAssembly",
@@ -28,6 +28,7 @@ pub const QUERY_OPS: [&str; 17] = [
     "faceQuery.faceSamples",
     "faceQuery.edgeSamples",
     "faceQuery.edgeContinuity",
+    "faceQuery.projectCurves",
     "faceQuery.distance",
     "faceQuery.bspline",
 ];
@@ -130,6 +131,7 @@ fn face_query(session: &mut Session, method: &str, args: &[Value]) -> Reply {
                 }
             })
         }
+        "projectCurves" => project_curves(session, handle, arg(args, 1)),
         "faceSamples" => face_samples(session, handle, face, arg(args, 2)),
         "distance" => {
             let Some(points) = flat(arg(args, 1), 3) else { return bad("faceQuery.distance expects [[x, y, z], …]") };
@@ -137,6 +139,58 @@ fn face_query(session: &mut Session, method: &str, args: &[Value]) -> Reply {
         }
         _ => Reply::ok(Value::Null),
     }
+}
+
+/// One curve of a `projectCurves` request (degree, poles, optional weights, knots, multiplicities) in the facade's flat layout, or None when malformed.
+fn encode_curve(curve: &Value) -> Option<Vec<f64>> {
+    let poles = flat(curve.get("poles")?, 3)?;
+    let weights = curve
+        .get("weights")
+        .filter(|value| !value.is_null())
+        .map(|value| value.as_array()?.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>());
+    let knots: Vec<f64> = curve.get("knots")?.as_array()?.iter().map(Value::as_f64).collect::<Option<_>>()?;
+    let multiplicities: Vec<f64> = curve.get("multiplicities")?.as_array()?.iter().map(Value::as_f64).collect::<Option<_>>()?;
+    let weights = match weights {
+        Some(Some(list)) => Some(list),
+        Some(None) => return None,
+        None => None,
+    };
+    let mut out =
+        vec![curve.get("degree")?.as_f64()?, (poles.len() / 3) as f64, knots.len() as f64, if weights.is_some() { 1.0 } else { 0.0 }];
+    out.extend(poles);
+    out.extend(weights.unwrap_or_default());
+    out.extend(knots);
+    out.extend(multiplicities);
+    Some(out)
+}
+
+/// `projectCurves(shape, { faces, curves, direction | closest: { maxDistance }, sampleStep, tolerance })`.
+fn project_curves(session: &mut Session, handle: &Value, request: &Value) -> Reply {
+    let faces: Option<Vec<u32>> = request
+        .get("faces")
+        .and_then(Value::as_array)
+        .and_then(|list| list.iter().map(|face| face.as_u64().and_then(|index| u32::try_from(index).ok())).collect());
+    let curves: Option<Vec<Vec<f64>>> =
+        request.get("curves").and_then(Value::as_array).and_then(|list| list.iter().map(encode_curve).collect());
+    let (Some(faces), Some(curves)) = (faces, curves) else { return bad("projectCurves expects { faces: [index], curves: [curve] }") };
+    let lengths: Option<Vec<u32>> = curves.iter().map(|curve| u32::try_from(curve.len()).ok()).collect();
+    let Some(lengths) = lengths else { return bad("projectCurves: a curve is too long") };
+    let closest = request.get("closest").and_then(|value| value.get("maxDistance")).and_then(Value::as_f64);
+    let direction = request.get("direction").and_then(vec3);
+    let (mode, direction, max_distance) = match (closest, direction) {
+        (Some(distance), _) if distance > 0.0 => (1, [0.0, 0.0, 1.0], distance),
+        (_, Some(direction)) => (0, direction, 0.0),
+        _ => return bad("projectCurves needs a direction or closest.maxDistance > 0"),
+    };
+    let (Some(step), Some(tolerance)) = (
+        request.get("sampleStep").and_then(Value::as_f64).filter(|value| *value > 0.0),
+        request.get("tolerance").and_then(Value::as_f64).filter(|value| *value > 0.0),
+    ) else {
+        return bad("projectCurves needs sampleStep > 0 and tolerance > 0");
+    };
+    session.with_shape(handle, |shape| {
+        queries::project_curves(shape, &faces, &curves.concat(), &lengths, mode, direction, max_distance, step, tolerance)
+    })
 }
 
 fn face_samples(session: &mut Session, handle: &Value, face: f64, request: &Value) -> Reply {

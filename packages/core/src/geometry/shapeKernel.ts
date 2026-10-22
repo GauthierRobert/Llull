@@ -17,6 +17,8 @@ import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTo
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { faceOpParamsOf } from './faceOpRecipe';
+import { embossParamsOf } from './embossRecipe';
+import type { EmbossParams } from '../model/wrap';
 import { lowerFeature, needsReach, throughReach } from './featureLowering';
 import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
@@ -40,6 +42,8 @@ export interface KernelOps<S> {
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
   /** Face draft / push-pull / split (SC-F1); absent = `faceOp` nodes are unsupported. */
   readonly faceOp?: (source: S, params: FaceOpParams) => S | null;
+  /** Emboss / deboss / scribe of (u, v) regions on a plane, cylinder or cone face (03 WRP); absent = `emboss` nodes are unsupported. */
+  readonly emboss?: (source: S, params: EmbossParams) => S | null;
   /** Space deformation (01 DEF): the shape moved by `node`'s law; absent = `deform` nodes are unsupported. Null when this kernel cannot build that law. */
   readonly deform?: (source: S, node: Extract<ShapeRecipe, { op: 'deform' }>) => S | null;
   /** Law kinds `deform` builds exactly (absent: every kind). */
@@ -178,6 +182,10 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'brep':
       return ops.brep?.(recipe.blob) ?? null;
+    case 'emboss': {
+      const source = child(recipe.source);
+      return source === null || ops.emboss === undefined ? null : ops.emboss(source, embossParamsOf(recipe));
+    }
     case 'faceSlab':
       return null;
     case 'feature': {
@@ -235,6 +243,7 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
     edgeContinuity: guard(ops.edgeContinuity),
     distance: guard(ops.distance),
     bspline: guard(ops.bspline),
+    projectCurves: guard(ops.projectCurves),
   };
 }
 
@@ -422,11 +431,13 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     supports: (op) =>
       op === 'brep'
         ? ops.brep !== undefined
-        : op === 'faceOp'
-          ? ops.faceOp !== undefined
-          : op === 'deform'
-            ? ops.deform !== undefined
-            : !(ops.unsupported?.has(op) ?? false),
+        : op === 'emboss'
+          ? ops.emboss !== undefined
+          : op === 'faceOp'
+            ? ops.faceOp !== undefined
+            : op === 'deform'
+              ? ops.deform !== undefined
+              : !(ops.unsupported?.has(op) ?? false),
     supportsDeform: (law) => ops.deform !== undefined && (ops.deformLaws?.has(law.kind) ?? true),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
