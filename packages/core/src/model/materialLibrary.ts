@@ -6,9 +6,10 @@
 
 import type { PropertyModel } from './propertyModel';
 
-/** Licence of a library or record (TR-MAT-30). */
+/** Licence of a library or record (TR-MAT-30). `open-data`: facts compiled from open-licensed and public sources, redistributable, per-value source (plant D4). */
 export const LICENCE_FLAGS = [
   'public-domain-us-gov',
+  'open-data',
   'licensed-no-redistribution',
   'company-proprietary',
   'vendor-catalogue',
