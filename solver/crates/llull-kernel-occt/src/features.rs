@@ -401,6 +401,11 @@ mod tests {
         let face = chain_face(&head).unwrap().unwrap();
         let solid = revolution_of_face(&face, [0.0, 1.0, 0.0], 2.0 * pi).unwrap().unwrap();
         assert!((volume(&solid) - expected).abs() < 1e-9 * expected, "volume {} vs {expected}", volume(&solid));
+        // the same head traversed the other way round (line up the axis, ellipse [(0, b), centre, (a, 0)], line back): same solid
+        let reversed = [0.0, 0.0, 0.0, 0.0, 0.0, b, 0.0, 3.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let face = chain_face(&reversed).unwrap().unwrap();
+        let solid = revolution_of_face(&face, [0.0, 1.0, 0.0], 2.0 * pi).unwrap().unwrap();
+        assert!((volume(&solid) - expected).abs() < 1e-9 * expected, "reversed volume {} vs {expected}", volume(&solid));
         // a sheared (non-perpendicular conjugate) pair builds; a collinear start / centre / end is refused
         assert!(chain_wire_ok(&[3.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0]).unwrap());
         assert!(!chain_wire_ok(&[3.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0]).unwrap());

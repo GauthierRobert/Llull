@@ -17,10 +17,12 @@ import {
   segmentSteps,
   segmentTangent,
 } from '@core/geometry/curveSegments';
-import { ellipseAxes, ellipseCurvature } from '@core/geometry/ellipseSegment';
+import { ellipseAxes, ellipseCurvature, ellipseIssue } from '@core/geometry/ellipseSegment';
 import { chainMoments } from '@core/geometry/chainMoments';
 import { closedFormVolume } from '@core/geometry/closedFormVolume';
 import { constantEdges } from '@core/geometry/sweepEval/sectionEdges';
+import { distanceToOutline, roundedOutline } from '@core/geometry/pocketOutline';
+import { frameAtFraction, pathSamplesAt } from '@core/geometry/sweepEval/frames';
 import { segmentOfCurve } from '@core/geometry/planeSegments';
 
 const line = (a: Vec2, b: Vec2): CurveSegment<Vec2> => ({ type: 'line', points: [a, b] });
@@ -243,5 +245,125 @@ describe('ellipse segment in exact consumers', () => {
     });
     const piece = segmentOfCurve(quarter(2, 1));
     expect(piece.kind === 'nurbs' ? piece.curve.degree : -1).toBe(2);
+  });
+});
+
+describe('ellipse segment on sweep paths and pockets', () => {
+  const path: CurveSegment<Vec3>[] = [
+    {
+      type: 'ellipse',
+      points: [
+        [2, 0, 0],
+        [0, 0, 0],
+        [0, 1, 0],
+      ],
+    },
+  ];
+
+  it('places path samples by arc length, not by parameter', () => {
+    const [middle] = pathSamplesAt(path, [0.5]);
+    const half = chainLength(path) / 2;
+    // arc length from the start to the sample point equals half the quarter length
+    let travelled = 0;
+    const steps = 4000;
+    let previous = segmentPoint(path[0] as CurveSegment<Vec3>, 0);
+    const stop = (middle?.point ?? [0, 0, 0]) as Vec3;
+    for (let s = 1; s <= steps; s++) {
+      const point = segmentPoint(path[0] as CurveSegment<Vec3>, s / steps);
+      if (Math.hypot(point[0] - stop[0], point[1] - stop[1]) < 1e-3 && travelled > 0) break;
+      travelled += Math.hypot(point[0] - previous[0], point[1] - previous[1]);
+      previous = point;
+    }
+    expect(travelled).toBeGreaterThan(half * 0.99);
+    expect(travelled).toBeLessThan(half * 1.01);
+    expect(middle?.point[0]).not.toBeCloseTo(segmentPoint(path[0] as CurveSegment<Vec3>, 0.5)[0], 3);
+  });
+
+  it('frames a path that continues tangentially after an ellipse quarter (end curvature)', () => {
+    const chain: CurveSegment<Vec3>[] = [
+      ...path,
+      {
+        type: 'line',
+        points: [
+          [0, 1, 0],
+          [-1, 1, 0],
+        ],
+      },
+    ];
+    const frame = frameAtFraction(chain, 0.5);
+    expect(frame.point.every(Number.isFinite)).toBe(true);
+    expect(frameAtFraction(chain, 0).point).toEqual([2, 0, 0]);
+  });
+
+  it('a revolved half-disc with an arc has the exact sphere volume', () => {
+    const curves: CurveSegment<Vec2>[] = [
+      {
+        type: 'arc',
+        points: [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+        ],
+      },
+      line([0, 1], [0, -1]),
+    ];
+    const made = execute(createEmptyDocument(), 'revolve_profile', {
+      profile: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+      ],
+    });
+    const base = made.document.entities[made.affected[0] as string];
+    if (base?.kind !== 'revolution') throw new Error('expected a revolution');
+    const volume = closedFormVolume({ ...base, profile: sampleProfile(curves), curves })?.volume ?? 0;
+    expect(Math.abs(volume - (4 / 3) * Math.PI) / ((4 / 3) * Math.PI)).toBeLessThan(1e-12);
+  });
+
+  it('measures the distance to ellipse and Bézier pieces of an outline by sampling', () => {
+    expect(distanceToOutline([quarter(2, 1)], [2, 0])).toBeCloseTo(0, 9);
+    expect(distanceToOutline([quarter(2, 1)], [0, 0])).toBeCloseTo(1, 2);
+    const bezier: CurveSegment<Vec2> = {
+      type: 'bezier',
+      points: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [3, 0],
+      ],
+    };
+    expect(distanceToOutline([bezier], [1.5, 2])).toBeCloseTo(2, 2);
+  });
+
+  it('keeps a rounded outline exact (flatten via mapSegment)', () => {
+    const outline = roundedOutline(
+      [
+        [0, 0],
+        [4, 0],
+        [4, 3],
+        [0, 3],
+      ],
+      0.5,
+    );
+    expect(typeof outline).toBe('object');
+    if (typeof outline === 'string') return;
+    expect(outline.curves.some((segment) => segment.type === 'arc')).toBe(true);
+  });
+
+  it('reports a collinear triple directly', () => {
+    expect(
+      ellipseIssue([
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ]),
+    ).toBe('has collinear start, centre and end');
+    expect(
+      ellipseIssue([
+        [2, 0],
+        [0, 0],
+        [0, 1],
+      ]),
+    ).toBeNull();
   });
 });

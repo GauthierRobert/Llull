@@ -58,12 +58,16 @@ export function ellipseVelocity(points: Triple, t: number): Vec3 {
   return scale3(add3(scale3(u, -Math.sin(angle)), scale3(v, Math.cos(angle))), Math.PI / 2);
 }
 
-/** @failure non-finite points, or start / centre / end collinear -> reason string */
+/** @failure start / centre / end collinear -> reason string (finiteness is checked by `chainIssue` first) */
 export function ellipseIssue(points: Triple): string | null {
-  if (!points.every((p) => p.every(Number.isFinite))) return 'has a non-finite point';
   const { u, v } = semiDiameters(points);
   const area = len3(cross3(u, v));
-  return area <= 1e-9 * len3(u) * len3(v) || area === 0 ? 'has collinear start, centre and end' : null;
+  return area <= 1e-9 * len3(u) * len3(v) ? 'has collinear start, centre and end' : null;
+}
+
+/** Arc length from t = 0 to `u` in [0, 1]. */
+export function ellipseLengthTo(points: Triple, u: number): number {
+  return u * integrateUnit((s) => len3(ellipseVelocity(points, u * s)));
 }
 
 /** Arc length (elliptic integral by Gauss-Legendre). */
