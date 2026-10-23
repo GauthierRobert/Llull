@@ -10,10 +10,11 @@
 import { getCommand } from '@core/commands/registry';
 import { toParamsSchema, z } from '@core/commands/schema';
 import type { ParamsSchema } from '@core/commands/types';
+import { DOCUMENT_UNITS } from '@core/model/types';
 import type { ToolDefinition } from './tools';
 
 /** Toolsets that own native transports (a subset of `ToolsetName`, declared here so `toolsets.ts` can import this file without a cycle). */
-type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan' | 'flow';
+type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan' | 'flow' | 'mesh';
 
 interface NativeToolSpec {
   readonly name: string;
@@ -274,6 +275,45 @@ const scanList = (): ToolDefinition => ({
   annotations: READ_ONLY,
 });
 
+const meshImport = (): ToolDefinition => ({
+  name: 'mesh_import',
+  description:
+    "Import a triangle mesh file (STL ascii / binary, OBJ, PLY, 3MF) into this machine's content-addressed mesh asset store: parse, convert the unit " +
+    'once into the document unit, weld, and store the canonical mesh. Prints the sourceSha256, the assetKey (sha256 of the canonical mesh) and the ' +
+    'counts (triangles, vertices, open and non-manifold edges, area, volume). The document is NOT changed: attach it with attach_mesh_asset ' +
+    'assetKey=<key> (the document then holds a display LOD and the key; every mesh command reads the full-resolution asset). STL, OBJ and PLY ' +
+    'carry no unit, so `units` is required for them. Unverified unless `sourceSha256` pins the file. Errors: MESH_IMPORT_UNITS_REQUIRED, ' +
+    'MESH_IMPORT_FORMAT_UNKNOWN, MESH_IMPORT_PARSE, MESH_IMPORT_EMPTY, MESH_IMPORT_SHA_MISMATCH. CLI shorthand: llull mesh import <file> --units mm.',
+  inputSchema: schemaOf(
+    z.object({
+      path: z.string().describe('Path of the mesh file on this machine.'),
+      units: z
+        .enum(DOCUMENT_UNITS)
+        .optional()
+        .describe('Unit of the file coordinates; required for STL, OBJ and PLY, overrides the 3MF unit.'),
+      format: z.enum(['stl', 'obj', 'ply', '3mf']).optional().describe('File format; default: sniffed from the content.'),
+      weldTolerance: z
+        .number()
+        .positive()
+        .optional()
+        .describe('Vertices closer than this (document units) are merged. Default 1e-6 x bounding-box diagonal.'),
+      sourceSha256: z
+        .string()
+        .optional()
+        .describe('sha256 (hex) you expect the file to have; a match marks the asset verified, a mismatch refuses.'),
+    }),
+  ),
+  annotations: READ_ONLY,
+});
+
+const meshAssets = (): ToolDefinition => ({
+  name: 'mesh_assets',
+  description:
+    "List the mesh assets in this machine's store (assetKey, triangles, vertices, bounds, source file). Read-only. CLI shorthand: llull mesh list.",
+  inputSchema: EMPTY_SCHEMA,
+  annotations: READ_ONLY,
+});
+
 const cfdSolve = (): ToolDefinition => ({
   name: 'cfd_solve',
   description:
@@ -326,6 +366,8 @@ const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'scan_import', toolset: 'scan', build: scanImport },
   { name: 'scan_list', toolset: 'scan', build: scanList },
   { name: 'cfd_solve', toolset: 'flow', build: cfdSolve },
+  { name: 'mesh_import', toolset: 'mesh', build: meshImport },
+  { name: 'mesh_assets', toolset: 'mesh', build: meshAssets },
 ];
 
 /** Every native-transport tool, schema only (read the registry, so call after the plugins are installed). */

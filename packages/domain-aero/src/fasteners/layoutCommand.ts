@@ -125,7 +125,7 @@ function pitchItems(doc: CadDocument, stacks: readonly FastenerStack[]): LayoutI
  */
 export const checkFastenerLayout = defineCommand({
   name: 'check_fastener_layout',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Check the placed fastener stacks (read-only; end every fastener job with it). Re-measures each stack along its axis and reports FAST_REGRIP_NEEDED when the ' +
     'thickness changed since insertion (re-run select_fastener and re-insert), FAST_LAYER_MISSING / FAST_LAYER_GAP / FAST_AXIS_MISS when the plates changed, ' +

@@ -1,0 +1,16 @@
+[package]
+name = "llull-meshops"
+description = "Triangle-mesh operations of llull-compute meshops (07 MSH M3): quadric decimation and umbrella smoothing, bit-identical to the TypeScript engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-jsmath = { path = "../llull-jsmath" }
+llull-protocol = { path = "../llull-protocol" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

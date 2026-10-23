@@ -1,12 +1,9 @@
 {
  "id": "MSH-SCULPT-BREP",
- "status": "DRAFT: needs sculpt_mesh, quad_remesh, fit_subdivision_to_mesh, analyze_mesh; add_subdivision_solid and export_step exist",
+ "status": "PARTIAL: steps 0-4 (add_grid_mesh, sculpt_mesh, import, remesh) run; steps 5-7 need quad_remesh and fit_subdivision_to_mesh (M6, not built)",
  "unbuilt": [
-  "sculpt_mesh",
   "quad_remesh",
-  "fit_subdivision_to_mesh",
-  "analyze_mesh",
-  "add_grid_mesh"
+  "fit_subdivision_to_mesh"
  ],
  "validates": [
   "VC-MSH-19",

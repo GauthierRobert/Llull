@@ -122,7 +122,7 @@ function resolveFriction(model: FrictionModel, wetted: number | undefined, reyno
  */
 export const aeroDrag = defineCommand({
   name: 'compute_aero_drag',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only aerodynamic drag force and the power to overcome it: D = ½ρV²·CdA, P = D·V. Give exactly one area source: `cdA` (m², ' +
     'e.g. a cyclist 0.21-0.27), `cd` + `referenceAreaM2`, or `cd` + `entityIds` (frontal area measured on the model, see frontal_area). ' +

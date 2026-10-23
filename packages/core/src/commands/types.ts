@@ -17,6 +17,7 @@ import type { RasterPort } from '../model/raster';
 import type { EntityPropertyReader } from '../model/entityProperties';
 import type { FontProvider } from '../geometry/fontPort';
 import type { PointCloudPort } from '../model/pointCloud';
+import type { MeshAssetPort } from '../geometry/mesh/assets';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -93,6 +94,11 @@ export interface CommandAnnotations {
    * refuses to regenerate a history containing it. Not emitted in tool schemas.
    */
   readonly requiresKernel?: boolean;
+  /**
+   * Reads the triangles of mesh entities (measures, analyses, exports, kernel input). `execute` runs it on the full-resolution mesh of
+   * asset-backed entities (07 MSH FR-MSH-02) and refuses with MESH_ASSET_LOD_ONLY when the asset cannot be read. Not emitted in tool schemas.
+   */
+  readonly readsMeshTriangles?: boolean;
 }
 
 /** A registered command: enough metadata to generate the UI affordance and the AI / CLI tool schema. */
@@ -229,6 +235,8 @@ export interface ExecutionContext {
   readonly fonts?: FontProvider | null;
   /** Point-cloud assets of this machine (plant 10, TR-SCN-02); null/absent = scan queries refuse with SCN_ASSET_UNAVAILABLE. */
   readonly pointClouds?: PointCloudPort | null;
+  /** Content-addressed mesh asset store of this machine (07 MSH FR-MSH-02); null/absent = big meshes refuse with MESH_ASSET_UNAVAILABLE. */
+  readonly meshAssets?: MeshAssetPort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

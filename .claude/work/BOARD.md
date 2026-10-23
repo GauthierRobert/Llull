@@ -65,9 +65,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   + `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
   profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on
   CPython/OCP; true straight laws (OCCT 7.9.2 `Add(Law_Function)` crashes → graded nodes). _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-7b** 07 MSH left after M0 + M2 (done 2026-10-22, §13): M1 repair modes / fill holes / decimate / remesh / smooth /
-  cut / deviation, M3 native `llull-meshops` + content-addressed asset store (import steps store base64 until then), M4 sculpt, M5
-  segment + mesh_to_brep, M6 quad remesh / fits. _Lane 1 + 4 + native_ _deps: —_
+- `[TODO]` **DES-7c** 07 MSH left after M0–M5 (done 2026-10-23, TECHNICAL_SPEC §13.5): M6 `quad_remesh` (QuadriFlow), `fit_subdivision_to_mesh`,
+  `fit_surface_to_mesh`, VC-22; native analyze / remesh / cut / fill / repair / sculpt + `--progress` events, async mesh engine port (backend blocks
+  today, capped by `LLULL_MESH_OP_TIMEOUT_S`), native decimate speed (16.6 s vs 10 s target on 1.3M tris); `sculpt_mesh` `along`; asset full-res reads
+  through groups / selection (`readsMeshTriangles` sees named ids only); `shrinkwrap_mesh` / `displace_mesh`. _Lane 1 + 4 + native_ _deps: —_
 - `[TODO]` **DES-1b** 01 DEF left after M0–M1 (done 2026-10-22, §13): M2 exact OCCT warp (`deform.cxx`, capability `deform`; closes
   VC-06/08/11 and the 360° ring), M3 lattice / point / flow, M4 flow on surface + overlays, M5 curve-to-curve + morph; native B-spline
   Gauss-integration accuracy (VC-11 −4.4e-4). _Lane 1 + native_ _deps: —_

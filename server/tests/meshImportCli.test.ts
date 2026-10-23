@@ -1,10 +1,11 @@
 /**
- * 07 MSH through the `llull` CLI: `file=PATH` fills `import_mesh_file`, plans resolve `file` in every action (loops included), and the host
- * installs the Manifold mesh engine next to the B-rep kernel.
+ * 07 MSH through the `llull` CLI: `file=PATH` stores the file in the mesh asset store and fills `import_mesh_file` with its `fileKey` (the
+ * document keeps 64 hex characters, not the file), plans resolve `file` in every action (loops included), and the host installs the Manifold
+ * mesh engine (with the native one in front when `llull-compute` is built) next to the B-rep kernel.
  */
 
 import { afterAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
@@ -12,6 +13,10 @@ import { getMeshProcessingEngine, setMeshProcessingEngine } from '@core/geometry
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { withPlanFileContent } from '../src/cli/exchange';
 import { installGeometryKernel } from '../src/geometryKernel';
+
+// The CLI stores imported files in the mesh asset store: keep the tests out of the user's ~/.llull.
+const CACHE = mkdtempSync(path.join(tmpdir(), 'llull-msh-cache-'));
+process.env['LLULL_MESH_CACHE'] = CACHE;
 
 const STL = path.join(
   import.meta.dirname,
@@ -72,7 +77,12 @@ describe('mesh import through the CLI', () => {
     expect(result.json.data.volume).toBeCloseTo(3658.71216465, 6);
     expect(result.json.data.unverified).toBe(true);
     expect(readFileSync(doc, 'utf8')).toContain('"kind":"mesh"');
-    expect(getMeshProcessingEngine()?.name).toBe('manifold');
+    expect(getMeshProcessingEngine()?.name).toContain('manifold');
+    const saved = readFileSync(doc, 'utf8');
+    expect(saved).toContain('"fileKey"');
+    expect(saved).not.toContain('base64');
+    const key = /"fileKey":"([0-9a-f]{64})"/.exec(saved)?.[1] as string;
+    expect(existsSync(path.join(CACHE, 'files', key))).toBe(true);
   });
 
   it('exits 1 with the stable code when units are missing', async () => {
@@ -108,9 +118,10 @@ describe('mesh import through the CLI', () => {
     expect(resolved[0]).toBe('not an action');
     expect(resolved[1]).toEqual(actions[1]);
     const step = resolved[2]?.['step'] as { params: Record<string, unknown> };
-    expect(typeof step.params['base64']).toBe('string');
+    expect(step.params['fileKey']).toMatch(/^[0-9a-f]{64}$/);
+    expect(step.params['base64']).toBeUndefined();
     expect(step.params['file']).toBeUndefined();
     const nested = (resolved[3]?.['actions'] as Array<{ params: Record<string, unknown> }>)[0];
-    expect(typeof nested?.params['base64']).toBe('string');
+    expect(nested?.params['fileKey']).toMatch(/^[0-9a-f]{64}$/);
   });
 });

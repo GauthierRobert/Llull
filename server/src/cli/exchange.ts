@@ -16,6 +16,7 @@ import {
 import type { ToolDefinition } from '@protocol/tools';
 import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import type { ExchangeOptions } from '../pythonExchange';
 import type { CommandOutcome } from '@protocol/restProtocol';
 
@@ -38,7 +39,7 @@ export function exchangeTool(name: string): ToolDefinition | undefined {
 /** `alias`: a second parameter name (kept in the params as provenance) that also names the file when the content parameter is absent. */
 interface FileTarget {
   readonly key: string;
-  readonly encoding: 'base64' | 'utf8';
+  readonly encoding: 'base64' | 'utf8' | 'meshFile';
   readonly alias?: string;
 }
 
@@ -47,7 +48,7 @@ const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   import_step: { key: 'stepBase64', encoding: 'base64' },
   import_step_exact: { key: 'stepBase64', encoding: 'base64' },
   import_iges: { key: 'igesBase64', encoding: 'base64' },
-  import_mesh_file: { key: 'base64', encoding: 'base64' },
+  import_mesh_file: { key: 'fileKey', encoding: 'meshFile' },
   import_font: { key: 'base64', encoding: 'base64', alias: 'path' },
   verify_exchange_file: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
@@ -56,6 +57,12 @@ const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   fea_import_results: { key: 'dataBase64', encoding: 'base64' },
   register_material_library: { key: 'libraryJson', encoding: 'utf8' },
 };
+
+/** The value `file=<path>` becomes: its content, or (mesh files) the key of the copy kept in this machine's mesh asset store. */
+function readTarget(file: string, target: FileTarget): string {
+  const bytes = fs.readFileSync(file);
+  return target.encoding === 'meshFile' ? defaultMeshAssetStore().putFile(bytes) : bytes.toString(target.encoding);
+}
 
 /** Whether `file=<path>` fills a content parameter of `name` (the exchange tools and the registry commands that read a file: `import_step_exact`, `import_iges`, `verify_exchange_file`). */
 export function takesFileParam(name: string): boolean {
@@ -74,10 +81,10 @@ export function withFileContent(name: string, params: unknown): unknown {
   if (typeof params['file'] === 'string') {
     if (target === undefined) throw new Error(`${name} takes no file= parameter.`);
     const { file, ...rest } = params;
-    return { ...rest, [target.key]: fs.readFileSync(file).toString(target.encoding) };
+    return { ...rest, [target.key]: readTarget(file, target) };
   }
   if (target !== undefined && alias !== undefined && typeof params[alias] === 'string' && params[target.key] === undefined)
-    return { ...params, [target.key]: fs.readFileSync(params[alias]).toString(target.encoding) };
+    return { ...params, [target.key]: readTarget(params[alias], target) };
   return params;
 }
 

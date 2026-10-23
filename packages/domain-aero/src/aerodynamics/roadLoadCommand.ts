@@ -19,7 +19,7 @@ const MAX_POWER_W = 1e7;
  */
 export const roadLoadPowerCommand = defineCommand({
   name: 'road_load_power',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only power <-> steady speed of any road vehicle (bicycle, e-bike, car, truck): aerodynamic drag ½ρ(CdA+Fw)V_A²V, rolling ' +
     'resistance Crr·m·g·cos θ·V, climbing m·g·sin θ·V, wind and drivetrain efficiency. Give exactly one of `speed` (+ speedUnit) or ' +

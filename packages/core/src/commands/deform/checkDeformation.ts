@@ -178,7 +178,7 @@ function findingsOf(id: string, entity: Entity, analysis: DeformAnalysis, unit: 
  */
 export const checkDeformation = defineCommand({
   name: 'check_deformation',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Pass / warn / fail verdict for deformed bodies, with coded findings an agent can act on. Checked: fold-over (min det J <= 1e-6, DEF_CHECK_FOLDOVER), ' +
     'self-intersection and open edges of the result (DEF_CHECK_SELF_INTERSECTION, DEF_CHECK_NOT_CLOSED), chordal deviation above the tolerance ' +

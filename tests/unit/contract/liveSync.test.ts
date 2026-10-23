@@ -70,3 +70,31 @@ describe('documentHash memoization', () => {
     expect(documentHash({ ...doc })).toBe(documentHash(doc));
   });
 });
+
+describe('commands that need the host mesh asset store (renderer re-run without it)', () => {
+  it('a command applied on the host with the store diverges in a renderer without it: the mismatch triggers the snapshot fallback', async () => {
+    const { defaultContext } = await import('@core/commands/context');
+    const key = 'a'.repeat(64);
+    const mesh = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+    const bounds = { min: [0, 0, 0] as [number, number, number], max: [1, 1, 0] as [number, number, number] };
+    const hostContext = {
+      ...defaultContext(),
+      meshAssets: {
+        manifest: () => ({ key, triangles: 1, vertices: 3, bounds }),
+        readMesh: () => mesh,
+        writeMesh: () => ({ key, triangles: 1, vertices: 3, bounds }),
+        readFile: () => null,
+      },
+    };
+    const host = execute(createEmptyDocument(), 'attach_mesh_asset', { assetKey: key }, hostContext);
+    expect(host.affected).toHaveLength(1);
+    const event: LiveCommandEvent = {
+      epoch: 'e',
+      seq: 1,
+      name: 'attach_mesh_asset',
+      params: { assetKey: key },
+      stateHash: documentHash(host.document),
+    };
+    expect(applyLiveCommand(createEmptyDocument(), 0, event)).toEqual({ ok: false, reason: 'mismatch' });
+  });
+});

@@ -22,7 +22,7 @@ export const cfdPrepare = defineCommand({
     'defaults) and the blockage, estimates cells, device memory and run time, and picks the solver from the Mach number. `data.checks` is a ' +
     'pass / warn / fail / not_run list with stable CFD_* codes; `data.status` is the worst of them. Nothing is changed or solved. Pass ' +
     '`deviceMemoryBytes` to also check the memory against a device.',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   params: z.object({
     caseId: z.string().describe('Id of the case (create_cfd_case).'),
     quality: z

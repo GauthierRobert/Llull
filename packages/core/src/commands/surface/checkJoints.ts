@@ -17,6 +17,7 @@ import type {
   SurfaceSide,
 } from '../../geometry/surfaceAnalysis/types';
 import { currentContext } from '../context';
+import { symmetricMeshDeviation } from '../mesh/meshDeviation';
 import { refuseSrf } from './shared';
 import { analysisTarget, isRefusal, sig, sigVec, type AnalysisTarget } from './surfaceShared';
 
@@ -87,7 +88,7 @@ function bestJoint(
  */
 export const checkContinuity = defineCommand({
   name: 'check_continuity',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only geometric continuity of joints, in numbers (not a picture). Each pair joins two nurbs_curve entities (the nearest pair of ends is ' +
     'compared) or two nurbs_surface entities (one boundary edge of each, `side` "u0" | "u1" | "v0" | "v1", detected when omitted; sampled ' +
@@ -244,7 +245,7 @@ const DEVIATION_SAMPLES = 25;
  */
 export const measureDeviation = defineCommand({
   name: 'measure_deviation',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only deviation of measured points, or of another entity, from a target shape. `id` is the TARGET: a nurbs_surface, a nurbs_curve or ' +
     'a 3D solid (its tessellation). The source is either `points` (a measured cloud, document units, world coordinates) or `referenceId` ' +
@@ -252,7 +253,7 @@ export const measureDeviation = defineCommand({
     'is projected on the target (Newton foot point on NURBS; closest triangle on a solid): returns max, mean, rms, the 95th percentile, the ' +
     'worst point and its foot, a 10-bin histogram, and for a surface target the distance signed along its normal. Reference: a sphere of ' +
     'radius 10 against points on radius 10.5 gives max = mean = rms = 0.5. With `tolerance`, `pass` is true when max <= tolerance. One-way: ' +
-    'swap the roles to measure the other direction.',
+    'swap the roles to measure the other direction, or set `symmetric` for two meshes / 3D solids (Hausdorff both ways).',
   params: z.object({
     id: z.string().describe('Id of the target: a nurbs_surface, a nurbs_curve or a 3D solid.'),
     points: z
@@ -270,8 +271,14 @@ export const measureDeviation = defineCommand({
       .describe('Samples per direction (surface) or along a curve for `referenceId`, integer 2..200. Default 25.')
       .optional(),
     tolerance: z.number().describe('Largest acceptable maximum deviation, document units (> 0). Adds a `pass` verdict.').optional(),
+    symmetric: z
+      .boolean()
+      .describe(
+        'true: measure BOTH ways between two meshes / 3D solids (`id` and `referenceId`, no `points`): forwardMax reference -> target, backwardMax target -> reference, hausdorff = the larger, with mean, rms, a 10-bin histogram and the worst point, from vertices and triangle centroids (`samples` is ignored; `tolerance` is checked against hausdorff). Default false (one-way).',
+      )
+      .optional(),
   }),
-  run: (doc, { id, points, referenceId, samples = DEVIATION_SAMPLES, tolerance }, ctx): CommandResult => {
+  run: (doc, { id, points, referenceId, samples = DEVIATION_SAMPLES, tolerance, symmetric }, ctx): CommandResult => {
     const invalid = (message: string, path: string): CommandResult =>
       refuseSrf(doc, 'measure_deviation', 'SRF_PARAM_INVALID', message, [id], [`params.${path}`]);
     if ((points === undefined) === (referenceId === undefined)) return invalid('give exactly one of `points` and `referenceId`', 'points');
@@ -279,6 +286,12 @@ export const measureDeviation = defineCommand({
     if (!(Number.isInteger(samples) && samples >= 2 && samples <= 200))
       return invalid(`samples must be an integer in 2..200 (got ${samples})`, 'samples');
     if (tolerance !== undefined && !(tolerance > 0)) return invalid('tolerance must be > 0', 'tolerance');
+    if (symmetric === true) {
+      if (referenceId === undefined || points !== undefined)
+        return invalid('symmetric needs referenceId (a mesh / 3D solid) and no points', 'referenceId');
+      const context = ctx ?? currentContext();
+      return symmetricMeshDeviation(doc, id, referenceId, tolerance, context.meshAssets, context.meshProcessing);
+    }
     const target = analysisTarget(doc, 'measure_deviation', id);
     if (isRefusal(target)) return target;
     if (target.shape.type === 'points') return invalid('the target cannot be a point cloud', 'id');

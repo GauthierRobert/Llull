@@ -1,18 +1,7 @@
 {
  "id": "MSH-SCAN-PRINT",
- "status": "DRAFT: needs the proposed commands in `unbuilt`",
- "unbuilt": [
-  "import_mesh_file",
-  "analyze_mesh",
-  "repair_mesh",
-  "fill_mesh_holes",
-  "smooth_mesh",
-  "decimate_mesh",
-  "remesh_mesh",
-  "hollow_mesh",
-  "cut_mesh",
-  "check_mesh"
- ],
+ "status": "RUNNABLE: every command is built (07 MSH M0, M1, M2)",
+ "unbuilt": [],
  "validates": [
   "VC-MSH-03",
   "VC-MSH-04",
@@ -98,24 +87,6 @@
    }
   },
   {
-   "command": "hollow_mesh",
-   "params": {
-    "id": "$scan",
-    "wallThickness": 1.2,
-    "resolution": 0.2,
-    "drainHoles": [
-     {
-      "near": [
-       0,
-       0,
-       -10
-      ],
-      "diameter": 3
-     }
-    ]
-   }
-  },
-  {
    "command": "cut_mesh",
    "params": {
     "id": "$scan",
@@ -133,6 +104,25 @@
     },
     "keep": "positive",
     "cap": true
+   }
+  },
+  {
+   "command": "hollow_mesh",
+   "params": {
+    "id": "$scan",
+    "wallThickness": 1.2,
+    "tolerance": 0.4,
+    "maxCells": 150000,
+    "drainHoles": [
+     {
+      "near": [
+       0,
+       0,
+       -8
+      ],
+      "diameter": 3
+     }
+    ]
    }
   },
   {

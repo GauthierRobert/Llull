@@ -53,7 +53,7 @@ export const analyzeMesh = defineCommand({
       .describe('Longest list returned (loops, shells, pairs, non-manifold edges); totals are always exact. Default 20.'),
   }),
   run: (doc, { id, weldTolerance, selfIntersections, maxListed }, ctx): CommandResult => {
-    const loaded = loadSolidMesh(doc, id, weldTolerance);
+    const loaded = loadSolidMesh(doc, id, weldTolerance, contextOf(ctx).meshAssets);
     if (isLoadFailure(loaded)) return meshRejection(doc, 'analyze_mesh', loaded.code, loaded.message, loaded.ids);
     const engine = resolveMeshEngine(contextOf(ctx).meshProcessing);
     const triangles = loaded.mesh.indices.length / 3;

@@ -1040,6 +1040,7 @@ dependencies = [
  "llull-explicit",
  "llull-flow-lbm",
  "llull-geomq",
+ "llull-meshops",
  "llull-panel",
  "llull-post",
  "llull-protocol",
@@ -1134,6 +1135,16 @@ dependencies = [
  "base64",
  "llull-bvh",
  "llull-netgen",
+ "serde_json",
+]
+
+[[package]]
+name = "llull-meshops"
+version = "0.1.0"
+dependencies = [
+ "llull-jsmath",
+ "llull-protocol",
+ "serde",
  "serde_json",
 ]
 

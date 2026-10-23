@@ -14,6 +14,7 @@ import { closedSolidMesh } from './solidMesh';
  */
 export const fieldFromSolid = defineCommand({
   name: 'field_from_solid',
+  annotations: { readsMeshTriangles: true },
   description:
     'Turn an existing CLOSED 3D solid (box, cylinder, extrusion, boolean result, imported mesh...) into an implicit FIELD whose negative side is the solid, so it can be shelled, offset, blended or filled with a lattice. ' +
     "The distance is exact to the solid's stored triangles; for curved or B-rep sources it is reported as a distance bound (data.tessellationExact false). Refused for 2D shapes, curves, sheets and meshes with free edges (IMP_SOLID_NOT_CLOSED). The solid itself is left untouched; hide it with create_implicit_body hideSource when the realised body replaces it.",

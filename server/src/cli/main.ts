@@ -373,6 +373,17 @@ function scanArgv(argv: readonly string[]): string[] {
   throw new UsageError('scan needs a verb: llull scan import <file> [sourceUnit=mm columns=xyz …] | llull scan list');
 }
 
+/** `llull mesh import FILE [k=v…]` = `llull exec mesh_import path=FILE [k=v…]`; `llull mesh list` = `llull exec mesh_assets`. */
+function meshArgv(argv: readonly string[]): string[] {
+  const at = argv.indexOf('mesh');
+  const [verb, file] = [argv[at + 1], argv[at + 2]];
+  const before = argv.slice(0, at);
+  if (verb === 'list') return ['exec', 'mesh_assets', ...before, ...argv.slice(at + 2)];
+  if (verb === 'import' && file !== undefined && !file.startsWith('--'))
+    return ['exec', 'mesh_import', `path=${file}`, ...before, ...argv.slice(at + 3)];
+  throw new UsageError('mesh needs a verb: llull mesh import <file> --units mm | llull mesh list');
+}
+
 async function runHistory(direction: 'undo' | 'redo', args: ParsedArgv, io: CliIo): Promise<number> {
   const backend = await backendOf(args, io);
   return finish(await (direction === 'undo' ? backend.undo() : backend.redo()), args, io);
@@ -436,6 +447,8 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         return await runPlmCli(args, io, () => backendOf(args, io));
       case 'scan':
         return await runExec(parseArgv(scanArgv(argv)), io);
+      case 'mesh':
+        return await runExec(parseArgv(meshArgv(argv)), io);
       case 'crashes':
         return crashesCli(args.positionals.slice(1), {
           stdout: io.stdout,

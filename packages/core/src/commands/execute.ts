@@ -12,6 +12,18 @@ import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
+import { runWithFullMeshes } from './meshAssetView';
+
+/** `def.run`, on full-resolution asset meshes when the command reads triangles (`annotations.readsMeshTriangles`). */
+function runCommand(
+  def: NonNullable<ReturnType<typeof getCommand>>,
+  doc: CadDocument,
+  params: unknown,
+  ctx: ExecutionContext,
+): CommandResult {
+  if (def.annotations?.readsMeshTriangles !== true) return def.run(doc, params, ctx);
+  return runWithFullMeshes(doc, def.name, params, ctx, def.annotations.readOnly === true, (view) => def.run(view, params, ctx));
+}
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
 /** Blob tables (immutable objects) already scanned per kernel: an unchanged table is not re-walked on every execute. */
@@ -56,7 +68,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
-    return runInContext(ctx, () => def.run(doc, params, ctx));
+    return runInContext(ctx, () => runCommand(def, doc, params, ctx));
   }
   const stepNumber = doc.nextStepNumber ?? 1;
   if (!Number.isSafeInteger(stepNumber) || stepNumber < 1)
@@ -72,7 +84,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     );
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
-  const { recordExtras, ...result } = runInContext(stepContext, () => def.run(doc, params, stepContext));
+  const { recordExtras, ...result } = runInContext(stepContext, () => runCommand(def, doc, params, stepContext));
   if (result.document === doc) return result;
   const recordedParams =
     recordExtras !== undefined && typeof params === 'object' && params !== null ? { ...params, ...recordExtras } : params;

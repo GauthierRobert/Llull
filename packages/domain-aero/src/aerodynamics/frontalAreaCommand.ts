@@ -13,7 +13,7 @@ import { flowParams, geometryArea } from './geometryArea';
  */
 export const frontalArea = defineCommand({
   name: 'frontal_area',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only frontal (projected) area of 3D solids seen along the flow direction — the reference area A of drag D = ½ρV²·Cd·A — plus the ' +
     'wetted (surface) area for skin friction and the body length along the flow. Overlapping parts count once (silhouette union by ' +

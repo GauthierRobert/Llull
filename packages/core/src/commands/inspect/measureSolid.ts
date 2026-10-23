@@ -56,7 +56,7 @@ interface MeasureBoundingBoxData {
  */
 export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +
@@ -256,7 +256,7 @@ const massIn = (massG: number, unit: MassUnit): number => (unit === 'g' ? massG 
  */
 export const massProperties = defineCommand({
   name: 'mass_properties',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Measure the volume, area, centroid, inertia and (when a density is known) the mass of a 3D solid, in the document unit. ' +
     'Use measure_bounding_box for the bounding box alone and geometric_validation_properties for the unit-density values a STEP file embeds. ' +

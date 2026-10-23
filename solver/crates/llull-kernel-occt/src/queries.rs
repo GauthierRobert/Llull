@@ -43,6 +43,14 @@ mod ffi {
             tolerance: f64,
         ) -> Result<String>;
         fn point_distances_json(shape: &Shape, points: &[f64]) -> Result<String>;
+        fn mesh_to_brep_json(
+            positions: &[f64],
+            indices: &[u32],
+            face_group: &[u32],
+            kinds: &[u8],
+            params: &[f64],
+            tolerance: f64,
+        ) -> Result<String>;
         fn shape_distance_json(a: &Shape, b: &Shape) -> Result<String>;
 
         fn new_step_assembly() -> UniquePtr<StepAssembly>;
@@ -266,3 +274,16 @@ pub fn import_step(text: &str, options: ImportOptions) -> OcctResult<Value> {
 #[cfg(test)]
 #[path = "queries_tests.rs"]
 mod tests;
+
+/// Prismatic B-rep of a segmented triangle mesh: `kinds` (0 plane, 1 cylinder, 2 cone, 3 sphere, 4 faceted) and 10 `params` per group, `face_group`
+/// the group of each triangle. `{ ok, error?, brep?, report }`.
+pub fn mesh_to_brep(
+    positions: &[f64],
+    indices: &[u32],
+    face_group: &[u32],
+    kinds: &[u8],
+    params: &[f64],
+    tolerance: f64,
+) -> OcctResult<Value> {
+    parsed(ffi::mesh_to_brep_json(positions, indices, face_group, kinds, params, tolerance))
+}

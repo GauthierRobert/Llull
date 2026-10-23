@@ -14,6 +14,7 @@ import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
  */
 export const stretchBody = defineCommand({
   name: 'stretch_body',
+  annotations: { readsMeshTriangles: true },
   description:
     'Stretch a 3D solid or mesh along an axis: inside the region the length is multiplied by factor (unitless, > 0; 1.5 lengthens by half, 0.5 halves); ' +
     'the part past region.end is translated rigidly, the part before region.start is unchanged, so features outside the region keep their shape. ' +

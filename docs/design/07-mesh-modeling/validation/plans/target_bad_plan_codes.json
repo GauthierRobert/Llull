@@ -1,13 +1,7 @@
 {
  "id": "MSH-CODES",
- "status": "DRAFT: each step must refuse with the named code (exit 1 on the CLI for a single call)",
- "unbuilt": [
-  "decimate_mesh",
-  "minkowski_sum",
-  "fill_mesh_holes",
-  "remesh_mesh",
-  "import_mesh_file"
- ],
+ "status": "RUNNABLE: each step refuses with the named code (exit 1 on the CLI for a single call); run with --continue",
+ "unbuilt": [],
  "validates": [
   "VC-MSH-26"
  ],
@@ -44,7 +38,8 @@
    "params": {
     "id": "$b",
     "targetTriangles": 2,
-    "maxDeviation": 1e-9
+    "maxDeviation": 1e-9,
+    "requireTarget": true
    }
   },
   {

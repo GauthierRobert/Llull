@@ -2,9 +2,9 @@
 
 import { DOCUMENT_UNITS, type BaseEntity, type Entity, type MeshSolidEntity } from '../../model/types';
 import type { FaceGroup } from '../../model/meshProvenance';
-import { MM_PER_UNIT } from '../../model/units';
 import { analyzeIndexedMesh } from '../../geometry/mesh/analysis';
-import { meshDiagonal, weldMesh } from '../../geometry/mesh/weld';
+import { MESH_INLINE_TRIANGLE_CAP } from '../../geometry/mesh/assets';
+import { fastMeasure } from '../../geometry/mesh/fastMeasure';
 import { base64ToUint8Array } from '../../lib/base64';
 import { isHexColor } from '../../lib/isHexColor';
 import { nextId } from '../../lib/id';
@@ -17,7 +17,8 @@ import { DEFAULT_MESH_COLOR } from '../exchange/importMesh';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_BYTES, MAX_IMPORT_TRIANGLES } from '../limits';
 import { newEntity } from '../entity/newEntity';
 import type { CommandResult } from '../types';
-import { WELD_TOLERANCE_FRACTION, meshRejection, namedDefault, withConventions } from './meshCommon';
+import { importUnitScale, scaleAndWeld } from './importPipeline';
+import { contextOf, isStoreFailure, meshRejection, namedDefault, storeMesh, withConventions } from './meshCommon';
 
 /**
  * @affects creates 1 mesh entity per body (STL solid blocks, OBJ file, PLY file, 3MF build items), welded and indexed, in body order
@@ -31,13 +32,27 @@ export const importMeshFile = defineCommand({
     'Import a triangle mesh file as mesh entities: STL (ascii or binary), OBJ (polygons are fan-triangulated; groups become faceGroups), PLY ' +
     '(ascii / binary) or 3MF (units from the file). Vertices closer than weldTolerance are welded and the report lists triangles, welded ' +
     'vertices, dropped attributes, open and non-manifold edges and shells. STL, OBJ and PLY carry no unit, so `units` is REQUIRED for them ' +
-    '(coordinates are converted once into the document unit). Give the file as `base64` (CLI: `file=PATH` fills it) or `text`. The result is ' +
+    '(coordinates are converted once into the document unit). Give the file as `fileKey` (the sha256 of a file kept in the mesh asset ' +
+    'store of this machine; the CLI stores `file=PATH` there so the document keeps 64 hex characters, not the file), `base64` or `text` (stored in the document ' +
+    `step: small files only). A result over ${MESH_INLINE_TRIANGLE_CAP} triangles is kept in the asset store with a display LOD. The result is ` +
     '`unverified` unless you pass the file sha256 as `sourceSha256` and it matches. Next: analyze_mesh, then check_mesh. Refusals carry ' +
     'error.code MESH_IMPORT_UNITS_REQUIRED, MESH_IMPORT_FORMAT_UNKNOWN, MESH_IMPORT_PARSE, MESH_IMPORT_EMPTY, MESH_IMPORT_SHA_MISMATCH, ' +
-    'MESH_IMPORT_TOO_LARGE.',
+    'MESH_IMPORT_TOO_LARGE, MESH_ASSET_MISSING, MESH_ASSET_UNAVAILABLE.',
   params: z.object({
-    base64: z.string().optional().describe('The file bytes, base64 encoded (STL, OBJ, PLY or 3MF). Give exactly one of base64 or text.'),
-    text: z.string().optional().describe('The file as text (ascii STL, OBJ, ascii PLY). Give exactly one of base64 or text.'),
+    fileKey: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional()
+      .describe(
+        'sha256 (64 hex) of a file kept in the mesh asset store (the CLI stores `file=PATH` and fills this). Give exactly one of fileKey, base64 or text.',
+      ),
+    base64: z
+      .string()
+      .optional()
+      .describe(
+        'The file bytes, base64 encoded (STL, OBJ, PLY or 3MF); recorded in the document step. Give exactly one of fileKey, base64 or text.',
+      ),
+    text: z.string().optional().describe('The file as text (ascii STL, OBJ, ascii PLY). Give exactly one of fileKey, base64 or text.'),
     format: z.enum(['stl', 'obj', 'ply', '3mf']).optional().describe('File format; default: sniffed from the content.'),
     units: z
       .enum(DOCUMENT_UNITS)
@@ -60,13 +75,25 @@ export const importMeshFile = defineCommand({
         'sha256 (hex) you expect the file bytes to have. A match marks the mesh verified; a mismatch refuses the import (MESH_IMPORT_SHA_MISMATCH).',
       ),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const reject = (code: string, message: string, paths: string[] = []): CommandResult =>
       meshRejection(doc, 'import_mesh_file', code, message, [], paths);
-    if ((params.base64 === undefined) === (params.text === undefined)) {
-      return reject('MESH_PARAM_INVALID', 'give exactly one of base64 or text', ['base64', 'text']);
+    if ([params.fileKey, params.base64, params.text].filter((v) => v !== undefined).length !== 1) {
+      return reject('MESH_PARAM_INVALID', 'give exactly one of fileKey, base64 or text', ['fileKey', 'base64', 'text']);
     }
-    const bytes = params.base64 !== undefined ? base64ToUint8Array(params.base64) : new TextEncoder().encode(params.text);
+    const assets = contextOf(ctx).meshAssets;
+    let bytes: Uint8Array | null;
+    if (params.fileKey !== undefined) {
+      if (assets === undefined || assets === null)
+        return reject('MESH_ASSET_UNAVAILABLE', 'no mesh asset store is installed here, so fileKey cannot be read', ['fileKey']);
+      bytes = assets.readFile(params.fileKey);
+      if (bytes === null)
+        return reject(
+          'MESH_ASSET_MISSING',
+          `file ${params.fileKey} is not in the mesh asset store of the process running this command. With --app / --server the llull CLI wrote the file to ITS store and the backend reads its own: both must use the same directory (LLULL_MESH_CACHE, default ~/.llull/cache/mesh).`,
+          ['fileKey'],
+        );
+    } else bytes = params.base64 !== undefined ? base64ToUint8Array(params.base64) : new TextEncoder().encode(params.text);
     if (bytes === null) return reject('MESH_PARAM_INVALID', 'base64 is not valid base64', ['base64']);
     const sha256 = sha256Hex(bytes);
     if (params.sourceSha256 !== undefined && params.sourceSha256.toLowerCase() !== sha256) {
@@ -81,10 +108,7 @@ export const importMeshFile = defineCommand({
     if (parsed.unitMetres === undefined && params.units === undefined) {
       return reject('MESH_IMPORT_UNITS_REQUIRED', `${parsed.format} files carry no unit: give units`, ['units']);
     }
-    const unitScale =
-      params.units !== undefined
-        ? MM_PER_UNIT[params.units] / MM_PER_UNIT[doc.units]
-        : ((parsed.unitMetres ?? 0.001) * 1000) / MM_PER_UNIT[doc.units];
+    const unitScale = importUnitScale(parsed.unitMetres, params.units, doc.units) ?? 1;
     const bodies = parsed.bodies.filter((body) => body.triangles.length > 0);
     if (bodies.length > MAX_IMPORT_BODIES) return reject('MESH_IMPORT_TOO_LARGE', `${bodies.length} bodies exceed ${MAX_IMPORT_BODIES}`);
     const total = bodies.reduce((sum, body) => sum + body.triangles.length / 3, 0);
@@ -97,17 +121,35 @@ export const importMeshFile = defineCommand({
     const format = parsed.format;
     let weldDefaulted = false;
     for (const [index, body] of bodies.entries()) {
-      const scaled = body.positions.map((value) => value * unitScale);
-      const tolerance = params.weldTolerance ?? WELD_TOLERANCE_FRACTION * meshDiagonal(scaled);
-      weldDefaulted ||= params.weldTolerance === undefined;
-      const welded = weldMesh({ positions: scaled, indices: body.triangles }, tolerance);
-      const analysis = analyzeIndexedMesh(welded.positions, welded.triangles, { selfIntersections: false, maxListed: 0 });
+      const body_ = scaleAndWeld(body.positions, body.triangles, unitScale, params.weldTolerance);
+      const { mesh: weldedMesh, tolerance } = body_;
+      weldDefaulted ||= body_.defaulted;
+      const welded = { positions: weldedMesh.positions, triangles: weldedMesh.indices, mergedVertices: body_.mergedVertices };
+      const big = welded.triangles.length / 3 > MESH_INLINE_TRIANGLE_CAP;
+      const analysis = big
+        ? (() => {
+            const fast = fastMeasure(weldedMesh);
+            return {
+              faces: fast.faces,
+              vertices: fast.vertices,
+              boundaryEdges: fast.boundaryEdges,
+              nonManifoldEdgeCount: fast.nonManifoldEdges,
+              shellCount: null,
+              closed: fast.closed,
+              volume: fast.volume,
+              area: fast.area,
+            };
+          })()
+        : analyzeIndexedMesh(welded.positions, welded.triangles, { selfIntersections: false, maxListed: 0 });
+      const stored = storeMesh(weldedMesh, assets);
+      if (isStoreFailure(stored)) return reject(stored.code, stored.message);
       const id = nextId('mesh');
       const label = params.name ?? body.name;
       const name = label === undefined ? undefined : bodies.length > 1 ? `${label} ${index + 1}` : label;
       const faceGroups: FaceGroup[] = body.groups.map((group) => ({ id: group.name, faces: [[group.start, group.end] as const] }));
       const geometry: Omit<MeshSolidEntity, keyof BaseEntity> = {
-        mesh: { positions: welded.positions, indices: welded.triangles },
+        mesh: stored.mesh,
+        ...(stored.asset !== undefined ? { asset: stored.asset } : {}),
         meshSource: {
           format,
           ...(params.fileName !== undefined ? { fileName: params.fileName } : {}),

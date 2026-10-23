@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { triangulateCap } from '@core/geometry/mesh/capTriangulate';
 
 export interface IndexedMesh {
   positions: number[];
@@ -164,3 +165,43 @@ export function docWithMeshes(...meshes: IndexedMesh[]): { doc: CadDocument; ids
 }
 
 export const relativeError = (actual: number, expected: number): number => Math.abs(actual - expected) / Math.abs(expected);
+
+/**
+ * Plate [0, length] x [0, width] x [0, thickness] with a through hole of `radius` at its centre, the hole wall a `segments`-gon with its vertices
+ * on the circle (VC-MSH-23): 6 planes and 1 cylinder. Outward-wound, closed. The B-rep volume is length x width x thickness - pi r^2 thickness.
+ */
+export function plateWithHole(length = 40, width = 30, thickness = 5, radius = 5, segments = 64): IndexedMesh {
+  const [cx, cy] = [length / 2, width / 2];
+  const rim: Array<[number, number]> = Array.from({ length: segments }, (_, k) => [
+    cx + radius * Math.cos((2 * Math.PI * k) / segments),
+    cy + radius * Math.sin((2 * Math.PI * k) / segments),
+  ]);
+  const corners: Array<[number, number]> = [
+    [0, 0],
+    [length, 0],
+    [length, width],
+    [0, width],
+  ];
+  const cap = triangulateCap(corners, [rim]);
+  const flat = [...corners, ...rim];
+  const positions: number[] = [];
+  for (const z of [0, thickness]) for (const [x, y] of flat) positions.push(x, y, z);
+  const n = flat.length;
+  const indices: number[] = [];
+  for (const [a, b, c] of cap.triangles) {
+    indices.push(n + a, n + b, n + c); // top, +Z
+    indices.push(a, c, b); // bottom, -Z
+  }
+  const sides: Array<[number, number]> = [
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 0],
+  ];
+  for (const [a, b] of sides) indices.push(a, b, n + b, a, n + b, n + a); // outward side quad
+  for (let k = 0; k < segments; k++) {
+    const [a, b] = [4 + k, 4 + ((k + 1) % segments)];
+    indices.push(n + a, n + b, a, n + b, b, a); // hole wall, normal toward the axis
+  }
+  return { positions, indices };
+}

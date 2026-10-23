@@ -57,7 +57,7 @@ const inches = (q: { value: number; unit: string }): number => (toTicks(q.value,
  */
 export const insertFastenerRow = defineCommand({
   name: 'insert_fastener_row',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Insert a straight row of identical fastener stacks (insert_fastener_stack at each position) along from -> to with either pitch {value, unit} or count. ' +
     'Rivet rows are checked against the minimum pitch 3 D and edge distance 2 D (AC 43.13-1B 4-57(c)); other families use minPitch / minEdgeDistance when given. ' +

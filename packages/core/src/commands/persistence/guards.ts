@@ -276,6 +276,7 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
   return firstProblem(pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves']));
 }
 
+const PRIMITIVE_TYPES: ReadonlySet<unknown> = new Set(['plane', 'cylinder', 'cone', 'sphere', 'freeform']);
 const MESH_SOURCE_FORMATS: ReadonlySet<unknown> = new Set(['stl-ascii', 'stl-binary', 'obj', 'ply', '3mf', 'generated']);
 
 /** `meshSource` (positive unit scale, known format) and `faceGroups` (ranges inside the triangle count) of a mesh entity (07 MSH). */
@@ -290,14 +291,33 @@ function meshProvenanceProblem(v: Record<string, unknown>, triangleCount: number
     )
       return 'meshSource must be { format, unitScale > 0, verified }';
   }
+  const asset = v['asset'];
+  if (asset !== undefined) {
+    const bounds = isRecord(asset) ? asset['bounds'] : undefined;
+    if (
+      !isRecord(asset) ||
+      typeof asset['key'] !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(asset['key']) ||
+      !Number.isInteger(asset['triangles']) ||
+      (asset['triangles'] as number) < 0 ||
+      !Number.isInteger(asset['vertices']) ||
+      (asset['vertices'] as number) < 0 ||
+      !isRecord(bounds) ||
+      !isVec3(bounds['min']) ||
+      !isVec3(bounds['max'])
+    )
+      return 'asset must be { key (64 hex), triangles, vertices, bounds: { min, max } }';
+  }
   const groups = v['faceGroups'];
   if (groups === undefined) return null;
+  const limit = isRecord(asset) && Number.isInteger(asset['triangles']) ? (asset['triangles'] as number) : triangleCount;
   const valid =
     Array.isArray(groups) &&
     groups.every(
       (group) =>
         isRecord(group) &&
         typeof group['id'] === 'string' &&
+        (group['fit'] === undefined || (isRecord(group['fit']) && PRIMITIVE_TYPES.has(group['fit']['type']))) &&
         Array.isArray(group['faces']) &&
         group['faces'].every(
           (range) =>
@@ -307,10 +327,12 @@ function meshProvenanceProblem(v: Record<string, unknown>, triangleCount: number
             Number.isInteger(range[1]) &&
             (range[0] as number) >= 0 &&
             (range[0] as number) <= (range[1] as number) &&
-            (range[1] as number) <= triangleCount,
+            (range[1] as number) <= limit,
         ),
     );
-  return valid ? null : 'faceGroups must be [{ id, faces: [[start, end], ...] }] with ranges inside the triangle count';
+  return valid
+    ? null
+    : 'faceGroups must be [{ id, faces: [[start, end], ...], fit? }] with ranges inside the triangle count and a known fit type';
 }
 
 function meshProblem(v: Record<string, unknown>): string | null {

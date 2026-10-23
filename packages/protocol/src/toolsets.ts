@@ -163,7 +163,14 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     return pluginToolNames('design');
   },
   /** Triangle-mesh modelling (07 MSH): file import, analyze / check, hull, Minkowski, offset, hollow, wrap, subdivision. */
-  mesh: words('import_mesh_file analyze_mesh check_mesh convex_hull minkowski_sum offset_mesh hollow_mesh repair_mesh subdivide_mesh'),
+  get mesh(): readonly string[] {
+    return [
+      ...words(
+        'import_mesh_file analyze_mesh check_mesh convex_hull minkowski_sum offset_mesh hollow_mesh repair_mesh subdivide_mesh fill_mesh_holes decimate_mesh remesh_mesh smooth_mesh cut_mesh segment_mesh mesh_to_brep sculpt_mesh add_grid_mesh add_icosphere_mesh attach_mesh_asset',
+      ),
+      ...nativeToolNames('mesh'),
+    ];
+  },
   /** Implicit / field modelling and lattices (05 IMP): contributed by the installed implicit plugin. */
   get implicit(): readonly string[] {
     return pluginToolNames('implicit');

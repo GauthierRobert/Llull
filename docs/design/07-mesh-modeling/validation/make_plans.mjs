@@ -59,19 +59,8 @@ save('baseline_mesh_today.json', {
 
 save('target_scan_cleanup_to_print.json', {
   id: 'MSH-SCAN-PRINT',
-  status: 'DRAFT: needs the proposed commands in `unbuilt`',
-  unbuilt: [
-    'import_mesh_file',
-    'analyze_mesh',
-    'repair_mesh',
-    'fill_mesh_holes',
-    'smooth_mesh',
-    'decimate_mesh',
-    'remesh_mesh',
-    'hollow_mesh',
-    'cut_mesh',
-    'check_mesh',
-  ],
+  status: 'RUNNABLE: every command is built (07 MSH M0, M1, M2)',
+  unbuilt: [],
   validates: ['VC-MSH-03', 'VC-MSH-04', 'VC-MSH-05', 'VC-MSH-07', 'VC-MSH-09', 'VC-MSH-10', 'VC-MSH-16', 'VC-MSH-17', 'VC-MSH-28'],
   description: 'Scanned or downloaded STL -> watertight, smooth, lighter, hollow, flat-bottomed print part, checked and exported as 3MF.',
   prerequisites: [
@@ -90,11 +79,11 @@ save('target_scan_cleanup_to_print.json', {
     { command: 'smooth_mesh', params: { id: '$scan', method: 'taubin', lambda: 0.6307, passBand: 0.1, iterations: 10 } },
     { command: 'remesh_mesh', params: { id: '$scan', targetEdgeLength: 1, iterations: 5, preserveFeatureAngleDeg: 40 } },
     { command: 'decimate_mesh', params: { id: '$scan', maxDeviation: 0.05, preserveBoundary: true } },
+    { command: 'cut_mesh', params: { id: '$scan', plane: { origin: [0, 0, -8], normal: [0, 0, 1] }, keep: 'positive', cap: true } },
     {
       command: 'hollow_mesh',
-      params: { id: '$scan', wallThickness: 1.2, resolution: 0.2, drainHoles: [{ near: [0, 0, -10], diameter: 3 }] },
+      params: { id: '$scan', wallThickness: 1.2, tolerance: 0.4, maxCells: 150000, drainHoles: [{ near: [0, 0, -8], diameter: 3 }] },
     },
-    { command: 'cut_mesh', params: { id: '$scan', plane: { origin: [0, 0, -8], normal: [0, 0, 1] }, keep: 'positive', cap: true } },
     { command: 'check_mesh', params: { ids: ['$scan'], purpose: 'print', minWallThickness: 0.8 } },
     { command: 'export_3mf', params: { entityIds: ['$scan'], name: 'print' } },
   ],
@@ -171,8 +160,8 @@ save('target_hull_minkowski_offset.json', {
 
 save('target_defect_repair.json', {
   id: 'MSH-REPAIR',
-  status: 'DRAFT: needs analyze_mesh, repair_mesh, fill_mesh_holes (import_mesh exists)',
-  unbuilt: ['analyze_mesh', 'repair_mesh', 'fill_mesh_holes'],
+  status: 'RUNNABLE: every command is built (07 MSH M0, M1)',
+  unbuilt: [],
   validates: ['VC-MSH-02', 'VC-MSH-04'],
   description:
     'The defect mesh of data/defect_mesh.json (2 duplicate faces, 3 flipped, 1 degenerate, a 3-edge hole, a tiny extra shell) is diagnosed with exact counts and repaired back to the 320-face closed icosphere.',
@@ -200,8 +189,9 @@ save('target_defect_repair.json', {
 
 save('target_sculpt_quad_brep.json', {
   id: 'MSH-SCULPT-BREP',
-  status: 'DRAFT: needs sculpt_mesh, quad_remesh, fit_subdivision_to_mesh, analyze_mesh; add_subdivision_solid and export_step exist',
-  unbuilt: ['sculpt_mesh', 'quad_remesh', 'fit_subdivision_to_mesh', 'analyze_mesh', 'add_grid_mesh'],
+  status:
+    'PARTIAL: steps 0-4 (add_grid_mesh, sculpt_mesh, import, remesh) run; steps 5-7 need quad_remesh and fit_subdivision_to_mesh (M6, not built)',
+  unbuilt: ['quad_remesh', 'fit_subdivision_to_mesh'],
   validates: ['VC-MSH-19', 'VC-MSH-21', 'VC-MSH-22'],
   description:
     'Sculpt a symmetric bump on a flat patch (closed-form displaced volume), then quad-remesh an organic mesh, fit a subdivision cage to it and hand it to the exact kernel as B-spline faces.',
@@ -250,8 +240,8 @@ save('target_sculpt_quad_brep.json', {
 
 save('target_bad_plan_codes.json', {
   id: 'MSH-CODES',
-  status: 'DRAFT: each step must refuse with the named code (exit 1 on the CLI for a single call)',
-  unbuilt: ['decimate_mesh', 'minkowski_sum', 'fill_mesh_holes', 'remesh_mesh', 'import_mesh_file'],
+  status: 'RUNNABLE: each step refuses with the named code (exit 1 on the CLI for a single call); run with --continue',
+  unbuilt: [],
   validates: ['VC-MSH-26'],
   expect: {
     stepIndexBase: 0,
@@ -266,7 +256,7 @@ save('target_bad_plan_codes.json', {
   actions: [
     { command: 'decimate_mesh', params: { id: 'nope', targetTriangles: 10 } },
     { command: 'add_box', params: { size: [10, 10, 10] }, as: 'b' },
-    { command: 'decimate_mesh', params: { id: '$b', targetTriangles: 2, maxDeviation: 1e-9 } },
+    { command: 'decimate_mesh', params: { id: '$b', targetTriangles: 2, maxDeviation: 1e-9, requireTarget: true } },
     { command: 'minkowski_sum', params: { a: '$b', b: 'open-sheet-id', op: 'sum' } },
     { command: 'remesh_mesh', params: { id: '$b', targetEdgeLength: -1 } },
     { command: 'import_mesh_file', params: { format: 'stl', file: 'validation/data/icosphere_r10_l1_ascii.stl' } },

@@ -13,6 +13,7 @@ import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
  */
 export const taperBody = defineCommand({
   name: 'taper_body',
+  annotations: { readsMeshTriangles: true },
   description:
     'Taper a 3D solid or mesh along an axis: each cross-section is scaled about the axis by 1 + (scaleEnd - 1) times a ramp that goes from 0 at region.start ' +
     'to 1 at region.end; past the end the body keeps scale scaleEnd. scaleEnd is unitless and > 0 (0.5 halves the end section, 2 doubles it). ' +

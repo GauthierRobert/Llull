@@ -11,6 +11,7 @@ import { createSignaturePort } from '../plm/signaturePort';
 import { objectsOf } from '../plm/vault/location';
 import { defaultFeArtifactStore } from './artifactStore';
 import { defaultPointCloudPort } from '../scan/pointCloudPort';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import { cfdResultPort } from '../cfd/resultPort';
 
 export function serverContext(
@@ -26,5 +27,6 @@ export function serverContext(
     objects: objectsOf(),
     ...(onStep !== undefined ? { onStep } : {}),
     pointClouds: defaultPointCloudPort(),
+    meshAssets: defaultMeshAssetStore(),
   };
 }

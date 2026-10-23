@@ -8,6 +8,7 @@
 //! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`.
 
 use crate::exchange::{self, EXCHANGE_OPS};
+use crate::meshbrep::{self, MESH_BREP_CAPABILITIES, MESH_BREP_OPS};
 use crate::queries::{self, QUERY_CAPABILITIES, QUERY_OPS};
 use base64::Engine;
 use llull_kernel_occt::lru::Lru;
@@ -28,7 +29,7 @@ pub const OPS: [&str; 7] = ["info", "evaluate", "tessellate", "massProperties", 
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
-    OPS.iter().chain(QUERY_OPS.iter()).chain(EXCHANGE_OPS.iter()).copied().collect()
+    OPS.iter().chain(QUERY_OPS.iter()).chain(EXCHANGE_OPS.iter()).chain(MESH_BREP_OPS.iter()).copied().collect()
 }
 
 /// Shapes kept alive by recipe (sub-recipes) and by host key (handles).
@@ -88,6 +89,7 @@ fn info() -> Value {
     .into_iter()
     .chain(QUERY_CAPABILITIES)
     .chain(exchange::capabilities())
+    .chain(MESH_BREP_CAPABILITIES)
     .collect();
     json!({
         "occtVersion": occt_version(),
@@ -177,6 +179,7 @@ impl Session {
             "exportStep" => self.export_with(first, "exportStep", export_step),
             "blendReport" => self.blend_report(first),
             other => exchange::dispatch(self, other, args)
+                .or_else(|| meshbrep::dispatch(other, args))
                 .or_else(|| queries::dispatch(self, other, args))
                 .unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
         }

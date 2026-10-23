@@ -217,7 +217,7 @@ export const checkMesh = defineCommand({
     const unverifiedIds: string[] = [];
     let provenance;
     for (const id of ids) {
-      const loaded = loadSolidMesh(doc, id, weldTolerance);
+      const loaded = loadSolidMesh(doc, id, weldTolerance, contextOf(ctx).meshAssets);
       if (isLoadFailure(loaded)) return meshRejection(doc, 'check_mesh', loaded.code, loaded.message, loaded.ids);
       const triangles = loaded.mesh.indices.length / 3;
       const outcome = engineOutcome(

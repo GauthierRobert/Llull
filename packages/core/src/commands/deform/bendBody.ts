@@ -17,6 +17,7 @@ const FULL_TURN = 2 * Math.PI;
  */
 export const bendBody = defineCommand({
   name: 'bend_body',
+  annotations: { readsMeshTriangles: true },
   description:
     'Bend a straight region of a 3D solid or mesh onto a circular arc (a bar becomes an arc, a cylinder a torus segment). Give exactly TWO of: radius ' +
     '(document units, of the neutral fibre), angleDeg (degrees, 0 < angle < 360, how far the region turns) and length (document units, the straight region length; ' +

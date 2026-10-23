@@ -10,6 +10,7 @@ import type { DeformLaw } from '@core/model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { BlendReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
+import type { MeshToBrepResult } from '@core/geometry/kernelMeshBrep';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import { unsupportedOp } from '@core/geometry/operandRecipe';
@@ -281,6 +282,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
     blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
+    meshToBrep: (request) => call('meshToBrep', [request]) as MeshToBrepResult | null,
     info,
     crashCount: () => crashes,
     forceFailure: (hook) => void call(hook, []),
