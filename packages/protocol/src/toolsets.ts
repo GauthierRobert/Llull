@@ -26,6 +26,7 @@ export const TOOLSET_NAMES = [
   'exchange',
   'building',
   'piping',
+  'plant',
   'civil',
   'design',
   'pmi',
@@ -134,6 +135,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       ...pluginToolNames('piping'),
       ...nativeToolNames('piping'),
     ];
+  },
+  /** Plant process equipment (03 EQP): contributed by the installed plant-equipment plugin. */
+  get plant(): readonly string[] {
+    return pluginToolNames('plant');
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {

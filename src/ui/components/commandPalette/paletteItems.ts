@@ -35,6 +35,7 @@ const TOOLSET_GROUPS = {
   exchange: 'Import / export',
   building: 'Building',
   piping: 'Piping',
+  plant: 'Plant equipment',
   civil: 'Civil / site',
   design: 'Design (.lld)',
   pmi: 'GD&T / PMI',

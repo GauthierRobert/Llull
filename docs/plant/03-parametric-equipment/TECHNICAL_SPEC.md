@@ -518,3 +518,40 @@ the tag registry and equipment list; 09 VIS adds LOD for the revolution bodies.
 - [R17] buildingSMART IFC4 ADD2 TC1 — https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/ (not fetched).
 - [R18] Zick L. P., Welding Journal Research Supplement, 1951 (cited only).
 - Full source grading: [validation/sources.md](validation/sources.md).
+
+## 13. As built (M1 geometry core, 2026-10-23)
+
+Code: `packages/domain-aec/src/plant/equipment/` (plugin `plant-equipment`, toolset `plant`, installed by `installDefaultPlugins()`); tests
+`tests/unit/plant/equipment/{headVolumes,headGeometry,vesselVolume}.test.ts` (read `validation/data/*.json` directly).
+
+| Module | Content |
+| ------ | ------- |
+| `model.ts` | `headSpecSchema` / `HeadSpec` (zod, one flat object: `type` + `ratio` / `standard` / `crownRadius` + `knuckleRadius` / `halfAngleDeg` / `thickness`), `SourceGrade`, refusal table (`EQP_PARAM_INVALID`, `EQP_HEAD_INVALID`, `EQP_HEAD_NOT_COVERED`, `EQP_LEVEL_OUT_OF_RANGE`) |
+| `data/headStandards.ts` | five torispherical rows (f, k) with sources and grade; asme_80_10 and asme_80_6 are grade B, so they report `unverified` |
+| `geometry/heads.ts` | `resolveHead` (EQP_HEAD_INVALID reasons with param paths), depth, Jones filled volume (ellipsoidal, spherical cap, conical, torispherical dish / knuckle / full), inside area (spheroid, cap, cone, crown + knuckle torus) |
+| `geometry/partialVolume.ts` | vertical (bottom head + cylinder + mirrored top head) and horizontal (circular segment x L + head volumes; conical heads by closed form) |
+| `geometry/headOffset.ts` | constant-thickness head metal volume: ellipsoidal by 64-point Gauss-Legendre of both curves; spherical and torispherical by closed forms of the offset arcs (same centres); conical by the offset cone; flat = disc |
+| `geometry/gaussLegendre.ts` | fixed-node quadrature (deterministic) |
+| `commands/vesselVolume.ts` | query `vessel_volume` |
+
+Differences from the plan above, all deliberate for M1:
+
+- `vessel_volume` takes the vessel geometry inline (`orientation`, `insideDiameter`, `tangentLength`, `heads{first, second}`, `levels?`) instead of
+  `equipment`: no equipment record exists before M2 (Q1 is open). M2 adds the `equipment` form and reuses these functions. Lengths are document
+  units, volumes are m3 (`toMetres`), `side: shell | tube` comes with exchangers (M4).
+- Types live in this package (`model.ts`), not in `@core/model/plantEquipment.ts` (plant README D2: core declares no domain data). No `doc.plant`
+  member was added; `EquipmentElement` is untouched. `NozzleRecord`, `SupportSpec`, `EquipmentTemplate` arrive with the commands that use them (knip).
+- `HeadSpec` torispherical is one object (`standard` or both radii), not two union members, so the JSON Schema stays a flat object for agents.
+  A named standard is applied to the inside diameter you give (ASME F&D proportions refer to the outside diameter in the standard).
+- Hemispherical resolves to a spherical cap of depth R; a conical head ignores `knuckleRadius` (not in `HeadSpec` yet); a flat head has depth 0.
+- Horizontal torispherical heads have no closed form (V1): totals work, a partial level is refused `EQP_HEAD_NOT_COVERED` (levels.<i>). Vertical
+  torispherical is complete (Jones, VC-EQP-01 rows J-VT-1..5).
+- The conical-head metal volume (offset cone, plate thickness normal to the surface) is a named method, not gated by a published value.
+- `headMetalVolume` is the "offset weights" building block (VC-EQP-09 head rows: 194.637 kg for SC-EQP-01 at rho 7850, thin-wall 191.459 kg is
+  reproduced as the documented bias); `equipment_weights` itself is M3.
+
+VCs: VC-EQP-01 (14 vertical Jones rows, 1e-9), VC-EQP-02 (7 MVP horizontal rows 1e-9; J-HT partial rows asserted refused, J-HT-3 full 1e-9),
+VC-EQP-03 (depths, six D = 1 m full volumes, scaling), VC-EQP-04 (H-SA-1..3 at 1e-9, H-SA-4 grade B at 1e-6, torispherical area vs numerical
+profile integral), VC-EQP-09 head rows (offset solid vs 1e5-segment trapezoid 1e-8, hemisphere closed form 1e-12). The scenario plans'
+`vessel_volume` calls use the `equipment` form and stay blocked until M2 (entry removed from `blockedPlanCommands.json` only because the
+command name now exists; the plans' `equipment` param is M2).
