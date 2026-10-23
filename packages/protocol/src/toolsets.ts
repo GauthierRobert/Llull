@@ -26,6 +26,8 @@ export const TOOLSET_NAMES = [
   'exchange',
   'building',
   'piping',
+  'plant_structures',
+  'plant_equipment',
   'civil',
   'design',
   'pmi',
@@ -41,6 +43,10 @@ const words = (list: string): readonly string[] => list.split(' ');
 
 const PMI_CORE_TOOLS = words(
   'set_pmi_standard add_datum_feature add_datum_target add_size_dimension add_location_dimension add_geometric_tolerance add_surface_texture add_pmi_note update_pmi delete_pmi create_saved_view update_saved_view delete_saved_view activate_saved_view list_pmi check_pmi accept_pmi_review analyze_stackup fastener_tolerance apply_pmi_set',
+);
+
+const REVIEW_CORE_TOOLS = words(
+  'allow_interference delete_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue export_bcf set_review_disposition define_colour_profile set_active_colour_profile delete_colour_profile colour_by_rule_report check_display',
 );
 
 const ANALYSIS_CORE_TOOLS = words(
@@ -89,9 +95,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'define_property_model delete_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model delete_material_model define_constitutive_set check_material_models',
   ),
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
-  review: words(
-    'allow_interference delete_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue export_bcf set_review_disposition',
-  ),
+  /** Core review + display commands plus the plant display plugin's service colour schemes (plant 09 VIS). */
+  get review(): readonly string[] {
+    return [...REVIEW_CORE_TOOLS, ...pluginToolNames('review')];
+  },
   exchange: words(
     'export_stl export_obj export_gltf export_3mf export_urdf mesh_to_solid export_step_ap242 export_iges import_iges verify_exchange_file export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
@@ -134,6 +141,14 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       ...pluginToolNames('piping'),
       ...nativeToolNames('piping'),
     ];
+  },
+  /** Plant structures and access (06 STA): access rules and `check_access`, contributed by the installed plantStructures plugin. */
+  get plant_structures(): readonly string[] {
+    return pluginToolNames('plant_structures');
+  },
+  /** Plant process equipment (03 EQP): contributed by the installed plant-equipment plugin. */
+  get plant_equipment(): readonly string[] {
+    return pluginToolNames('plant_equipment');
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {

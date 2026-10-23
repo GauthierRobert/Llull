@@ -1,0 +1,11 @@
+# Operator stair to a +3 m process deck, checked against ISO 14122 and OSHA 1910 (17 risers of 176 mm, 280 mm treads)
+design pump_deck_stair units=m
+param rise = 3
+add_level grade name="Grade" elevation=0 height=rise
+add_level deck name="Deck +3000" elevation=rise height=3
+add_slab deck_slab boundary=[[0,0],[6,0],[6,3],[0,3]] thickness=0.03 levelId=deck
+add_stair access start=[1,1] riserCount=17 treadDepth=0.28 width=1 levelId=grade
+check check_access rulesets=["iso_14122","osha_1910"] include=["stairs"] path=verdict expect == "pass"
+check check_access rulesets=["iso_14122","osha_1910"] include=["stairs"] path=checked.stairs expect == 1
+check check_access rulesets=["iso_14122"] edgeDropThresholdMm=500 include=["edges"] path=findings.0.code expect == "STA_EDGE_UNPROTECTED"
+check list_access_rules ruleset="osha_1910" grade="A" path=rules.0.id expect == "OSHA-LAD-RUNG-PITCH"

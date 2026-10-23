@@ -9,6 +9,7 @@ import type { DrawingSheet } from '../model/sheet';
 import type { FastenerRef } from '../model/features';
 import type { CommandDefinition, RetiredCommandRewrite } from '../commands/types';
 import type { DerivationGuard } from '../commands/derivation';
+import type { EntityPropertyProvider } from '../model/entityProperties';
 
 /** Clearance-hole size resolved from a standard-part reference (see `DocumentProjections.fastenerHole`). */
 export interface FastenerHoleSize {
@@ -80,6 +81,8 @@ export interface CadPlugin {
   readonly commands: ReadonlyArray<CommandDefinition<unknown>>;
   readonly guards?: ReadonlyArray<DerivationGuard>;
   readonly document?: DocumentExtension;
+  /** Domain properties of an entity for colour rules and reports (`ExecutionContext.properties`); pure, {} for entities it does not own. */
+  readonly entityProperties?: EntityPropertyProvider;
   /** Retired command name -> rewrite onto its replacement (saved steps are migrated on load). */
   readonly retiredCommands?: Readonly<Record<string, RetiredCommandRewrite>>;
 }

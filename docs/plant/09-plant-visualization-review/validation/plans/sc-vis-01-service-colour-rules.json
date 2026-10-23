@@ -5,7 +5,7 @@
     "VC-VIS-02",
     "VC-VIS-03"
   ],
-  "status": "PROPOSED. Steps 0-6 (add_pipe_run, industrial plugin) run today; apply_service_colour_scheme, colour_by_rule_report and check_display are unbuilt (TR-VIS-01..04).",
+  "status": "BUILT (VIS-M1, 2026-10-23): all commands exist; tests/unit/plant/display/serviceColour.test.ts runs this flow.",
   "description": "Seven pipe runs with free-text services. An agent maps each service to a scheme category; llull builds an ordered first-match colour profile and reports per line which category, field and letter colour it resolved, plus the unmatched line. Same model, second profile with ISO 14726 main colours: switching profiles changes no geometry.",
   "actions": [
     {
@@ -175,7 +175,8 @@
       "command": "colour_by_rule_report",
       "params": {
         "profileId": "services-asme",
-        "groupBy": "line"
+        "groupBy": "property",
+        "groupProperty": "line"
       }
     },
     {
@@ -198,7 +199,8 @@
       "command": "colour_by_rule_report",
       "params": {
         "profileId": "services-iso",
-        "groupBy": "line"
+        "groupBy": "property",
+        "groupProperty": "line"
       }
     },
     {
