@@ -109,7 +109,7 @@ export const probeFillet = defineCommand({
       .describe('0-based unique-edge indices from inspect_topology. Omit (with no edgesNear / edgeNames) to probe every roundable edge.')
       .optional(),
     edgesNear: z
-      .array(vec3('A point [x, y, z] on or near the edge (the roundable edge nearest to it is probed).'))
+      .array(vec3('A point [x, y, z] in document units on or near the edge (the roundable edge nearest to it is probed).'))
       .describe('Select edges by location, as in fillet_edge.')
       .optional(),
     edgeNames: z

@@ -16,9 +16,14 @@ import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
 import { FILLET_MODES, edgeLawSchema } from './filletSpec';
+import { profileSchema } from './filletProfile';
 import { filletEach } from './filletEach';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
+import { blendRejection } from './blendCodes';
+import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
+import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
+import type { ShapeHandle } from '../../geometry/kernelTypes';
 
 interface EdgeModification {
   readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
@@ -32,8 +37,23 @@ interface EdgeModification {
   readonly near?: readonly Vec3[];
   /** Persistent edge names recorded by an earlier run (SC-N1); win over `edges` / `near` when the kernel names its edges. */
   readonly names?: readonly string[] | undefined;
-  /** The modification node over the operand's exact recipe, the resolved edges and their mid points (empty when the kernel has no topology). */
-  readonly recipe: (source: ShapeRecipe, edges: readonly number[], near: readonly Vec3[]) => ShapeRecipe;
+  /**
+   * The modification node over the operand's exact recipe, the resolved edges and their mid points (empty when the kernel has no topology), or a
+   * coded problem (BLD_*) found while resolving what the node needs from the exact shape.
+   */
+  readonly recipe: (
+    source: ShapeRecipe,
+    edges: readonly number[],
+    near: readonly Vec3[],
+    exact: { readonly kernel: GeometryKernel; readonly shape: ShapeHandle; readonly topology: ShapeTopology | null },
+  ) => ShapeRecipe | RecipeProblem;
+}
+
+/** A refusal decided while building the recipe: stable code, message and the param path it is about. */
+interface RecipeProblem {
+  readonly code: 'BLD_ASYMMETRIC_SIDE_MISSING';
+  readonly message: string;
+  readonly path: string;
 }
 
 /**
@@ -65,7 +85,13 @@ function modifyEdges(
     return selection.error === undefined ? refused : { ...refused, error: selection.error };
   }
   const mids = selection.edges.map((index) => topology?.edges[index]?.mid);
-  const modified = recipe(source, selection.edges, mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : []);
+  const built = recipe(source, selection.edges, mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : [], {
+    kernel,
+    shape: sourceShape,
+    topology,
+  });
+  if ('code' in built) return blendRejection(doc, command, built.code, built.message, [id], [built.path]);
+  const modified = built;
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return blendRefusal(doc, command, id, kernel, modified, result, topology);
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
@@ -96,8 +122,16 @@ export const filletEdge = defineCommand({
     'still see true faces and edges. The source entity is consumed. ' +
     'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
     'robust to parametric edits); with neither, ALL edges are filleted. ' +
-    'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes? }] instead; ' +
-    'mode "chord" reads every size as the chord between the tangent points (planar faces, converted per edge to a radius). ' +
+    'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes?, interpolation?, law? }] instead. ' +
+    'A radius law runs from size at the start of the edge to sizeEnd at its end, through sizes control points ({ t in (0, 1) along the picked edge, size }): ' +
+    'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "linear" joins them with straight pieces; ' +
+    'or law { expression of t in [0, 1] (pi, cos, ...), samples } sampled at uniform t. On a CLOSED edge (a cylinder rim) the law must close on itself (r(0) = r(1), BLD_LAW_NOT_PERIODIC otherwise). ' +
+    'A bad value is BLD_LAW_INVALID with the param path; run check_blends afterwards to read the realised radius back. ' +
+    'profile { type: "conic", rho } or { type: "curvature", shape } changes the cross-section (conic: rho 0.4142 is the circle at 90 degrees; curvature: zero curvature at both contacts, G2 to planar faces); ' +
+    'size2 (+ side1Near | side1Name) makes the blend asymmetric: size and size2 are then the two LEGS (tangent distances from the edge on each face). ' +
+    'These are built for straight edges between planar faces that end on flat square faces, with one constant size per edge, and not at a vertex shared by two selected edges (BLD_PROFILE_FAILED says which condition fails); ' +
+    'rho / shape outside [0.05, 0.95] is BLD_RHO_RANGE / BLD_SHAPE_RANGE. ' +
+    'mode "chord" reads every size as the chord between the two tangent points of the round (planar faces: closed form; any other pair, e.g. a cylinder rim against its cap: the wedge angle sampled along the edge; BLD_CHORD_UNDEFINED where the faces are tangent). ' +
     `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}. ` +
     'With the mesh kernel it no-ops (unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -111,7 +145,7 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     edgesNear: z
-      .array(vec3('A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).'))
+      .array(vec3('A point [x, y, z] in document units near the edge to fillet (e.g. its mid point from inspect_topology).'))
       .describe(
         'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
@@ -132,8 +166,8 @@ export const filletEdge = defineCommand({
     radiusEnd: z
       .number()
       .describe(
-        'Variable fillet: radius at the END of each selected edge (> 0); the radius varies linearly ' +
-          'from radius at the edge start to radiusEnd. Omit for a constant radius.',
+        'Variable fillet: radius at the END of each selected edge (> 0), document units; the radius varies from radius at the edge start to radiusEnd ' +
+          '(the kernel smooth transition, flattened at both ends; use edges[] with interpolation "linear" for a straight one). Omit for a constant radius. Not allowed on a closed edge unless equal to radius (BLD_LAW_NOT_PERIODIC).',
       )
       .optional(),
     edges: z
@@ -144,20 +178,24 @@ export const filletEdge = defineCommand({
           'radius / radiusEnd / edgeIndices / edgesNear. Differing radii need a kernel that reads radius laws (native OCC); equal ones work everywhere exact.',
       )
       .optional(),
+    profile: profileSchema.optional(),
     mode: z
       .enum(FILLET_MODES)
       .describe(
         '"radius" (default): sizes are radii. "chord": sizes (radius, radiusEnd, edges[].size...) are the CHORD length between the two tangent ' +
           'points of the round on the faces at the edge; converted per edge to r = c / (2 cos(theta / 2)) for planar faces meeting at wedge angle theta ' +
-          '(a right-angle edge: r = c / sqrt 2). Needs an exact kernel and two planar faces at every edge.',
+          '(a right-angle edge: r = c / sqrt 2); other face pairs use the wedge angle sampled along the edge. Needs an exact kernel.',
       )
       .optional(),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius' }, ctx): CommandResult => {
-    if (edges !== undefined || mode === 'chord')
-      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames });
+  run: (
+    doc,
+    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile },
+    ctx,
+  ): CommandResult => {
+    if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined)
+      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
-    if (radiusEnd !== undefined && !(radiusEnd > 0)) return noop(doc, `fillet_edge: radiusEnd must be > 0 (got ${radiusEnd}).`);
     return modifyEdges(doc, ctx, {
       command: 'fillet_edge',
       pastTense: 'filleted',
@@ -181,8 +219,8 @@ export const filletEdge = defineCommand({
 
 /**
  * @affects removes source entity; creates 1 mesh entity with beveled edges
- * @invariant target must be a 3D solid; distance > 0; geometry kernel must be injected
- * @failure missing id, 2D kind, distance ≤ 0, kernel absent, or kernel null → no-op, affected:[]
+ * @invariant target must be a 3D solid; distance > 0; geometry kernel must be injected; distance2 / angleDeg (exactly one) need side1Near or side1Name
+ * @failure missing id, 2D kind, distance ≤ 0, kernel absent, or kernel null → no-op, affected:[]; BLD_CHAMFER_PARAMS, BLD_CHAMFER_ANGLE_RANGE, BLD_ASYMMETRIC_SIDE_MISSING → coded rejection
  */
 export const chamferEdge = defineCommand({
   name: 'chamfer_edge',
@@ -192,6 +230,9 @@ export const chamferEdge = defineCommand({
     'that keeps the exact construction (its brep recipe). The source entity is consumed. ' +
     'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
     'robust to parametric edits); with neither, ALL edges are chamfered. ' +
+    'distance alone is a symmetric chamfer (equal legs on both faces). Asymmetric: add distance2 (second leg, document units) OR angleDeg ' +
+    '(degrees, 0..90 exclusive, measured on the side1 face between that face and the chamfer; on a right-angle edge the second leg is distance * tan(angle)), together with side1Near (a point on the ' +
+    'face that carries distance) or side1Name (persistent face name); for each selected edge the one of its two faces nearest to the point is side 1. ' +
     `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; ` +
     'with the mesh kernel it no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -205,7 +246,7 @@ export const chamferEdge = defineCommand({
       )
       .optional(),
     edgesNear: z
-      .array(vec3('A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).'))
+      .array(vec3('A point [x, y, z] in document units near the edge to chamfer (e.g. its mid point from inspect_topology).'))
       .describe(
         'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
@@ -219,10 +260,70 @@ export const chamferEdge = defineCommand({
           'edge is rounded after an upstream edit; a name that is gone or split refuses the step (REF_LOST / REF_SPLIT). Wins over edgeIndices / edgesNear.',
       )
       .optional(),
-    distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
+    distance: z
+      .number()
+      .describe(
+        'Chamfer distance in document units. Must be > 0. With distance2 or angleDeg it is the leg on the side1 face; alone it is the leg on both faces.',
+      ),
+    distance2: z
+      .number()
+      .describe(
+        'Second leg in document units (> 0), on the face that is not side 1 (distance-distance chamfer). Needs side1Near or side1Name. Exclusive with angleDeg.',
+      )
+      .optional(),
+    angleDeg: z
+      .number()
+      .describe(
+        'Chamfer angle in degrees, strictly between 0 and 90, measured on the side1 face from that face to the chamfer (distance-angle chamfer). Needs side1Near or side1Name. Exclusive with distance2.',
+      )
+      .optional(),
+    side1Near: vec3(
+      'A point [x, y, z] in document units on the face that carries distance (side 1) when distance2 or angleDeg is given.',
+    ).optional(),
+    side1Name: z
+      .string()
+      .min(1)
+      .describe('Persistent face name of side 1 (inspect_topology lists face names on the native kernel); alternative to side1Near.')
+      .optional(),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], edgeNames, distance }, ctx): CommandResult =>
-    modifyEdges(doc, ctx, {
+  run: (
+    doc,
+    { id, edgeIndices = [], edgesNear = [], edgeNames, distance, distance2, angleDeg, side1Near, side1Name },
+    ctx,
+  ): CommandResult => {
+    const sided = distance2 !== undefined || angleDeg !== undefined;
+    if (distance2 !== undefined && angleDeg !== undefined)
+      return blendRejection(doc, 'chamfer_edge', 'BLD_CHAMFER_PARAMS', 'give distance2 or angleDeg, not both', [id], ['angleDeg']);
+    if (!sided && (side1Near !== undefined || side1Name !== undefined))
+      return blendRejection(
+        doc,
+        'chamfer_edge',
+        'BLD_CHAMFER_PARAMS',
+        'side1Near / side1Name apply only with distance2 or angleDeg',
+        [id],
+        ['side1Near'],
+      );
+    if (angleDeg !== undefined && !(angleDeg > 0 && angleDeg < 90))
+      return blendRejection(
+        doc,
+        'chamfer_edge',
+        'BLD_CHAMFER_ANGLE_RANGE',
+        `angleDeg must be strictly between 0 and 90 (got ${angleDeg})`,
+        [id],
+        ['angleDeg'],
+      );
+    if (distance2 !== undefined && !(distance2 > 0))
+      return blendRejection(doc, 'chamfer_edge', 'BLD_CHAMFER_PARAMS', `distance2 must be > 0 (got ${distance2})`, [id], ['distance2']);
+    if (sided && side1Near === undefined && side1Name === undefined)
+      return blendRejection(
+        doc,
+        'chamfer_edge',
+        'BLD_ASYMMETRIC_SIDE_MISSING',
+        'distance2 / angleDeg need to know which face carries distance',
+        [id],
+        ['side1Near'],
+      );
+    return modifyEdges(doc, ctx, {
       command: 'chamfer_edge',
       pastTense: 'chamfered',
       amountName: 'distance',
@@ -231,8 +332,25 @@ export const chamferEdge = defineCommand({
       edges: edgeIndices,
       near: edgesNear,
       names: edgeNames,
-      recipe: (source, edges, near) => ({ op: 'chamfer', source, edges: [...edges], size: distance, ...(near.length > 0 ? { near } : {}) }),
-    }),
+      recipe: (source, edges, near, exact) => {
+        const base = { op: 'chamfer' as const, source, edges: [...edges], size: distance, ...(near.length > 0 ? { near } : {}) };
+        if (!sided) return base;
+        const faces =
+          exact.topology === null
+            ? {
+                code: 'BLD_ASYMMETRIC_SIDE_MISSING' as const,
+                message: 'this kernel has no exact topology to tell the faces of an edge apart',
+              }
+            : sideFaces(exact.kernel, exact.shape, exact.topology, edges, { near: side1Near, name: side1Name });
+        if (isSideProblem(faces)) return { ...faces, path: side1Name === undefined ? 'side1Near' : 'side1Name' };
+        return {
+          ...base,
+          faces: [...faces],
+          ...(distance2 === undefined ? (angleDeg === undefined ? {} : { angleDeg }) : { size2: distance2 }),
+        };
+      },
+    });
+  },
 });
 
 /**

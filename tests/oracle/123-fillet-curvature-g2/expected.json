@@ -1,0 +1,32 @@
+{
+  "id": "123-fillet-curvature-g2",
+  "family": "fillet",
+  "description": "VC-BLD-09: curvature-continuous profile (shape 0.5, tangent distance 1) on the top edge of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "quartic Bezier A, A + k (T - A), T, B + k (T - B), B: removed area 0.1 d^2 at k = 0.5 and 90 degrees; V = 1000 - 20 (0.1)",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 998,
+  "area": null,
+  "centroid": null,
+  "bbox": {
+    "min": [
+      -10,
+      -5,
+      -2.5
+    ],
+    "max": [
+      10,
+      5,
+      2.5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.0000015,
+    "area": 0.001,
+    "centroid": 0.001,
+    "bbox": 0.001
+  }
+}

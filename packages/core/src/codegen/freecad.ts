@@ -117,6 +117,15 @@ def chamfer(shape, edges, distance, near=None):
     return shape.makeChamfer(float(distance), _select_edges(shape, edges, near))
 
 
+def fillet_laws(shape, edges, laws, near=None):
+    # Only a start -> end law is a FreeCAD call; control points and straight pieces are not (BLD_CODEGEN_UNSUPPORTED): refuse loudly, never a constant fillet.
+    first = laws[0]
+    if any(law != first or law[4] is not None for law in laws):
+        raise ValueError("BLD_CODEGEN_UNSUPPORTED: this fillet has radius laws FreeCAD cannot express; use the CadQuery or build123d export, or the STEP of the model")
+    end = first[0] if first[1] is None else first[1]
+    return shape.makeFillet(float(first[0]), float(end), _select_edges(shape, edges, near))
+
+
 def shell(shape, thickness):
     # llull shell: the solid minus its inward offset (a sealed cavity).
     return shape.cut(shape.makeOffsetShape(-float(thickness), 1e-4, join=0))

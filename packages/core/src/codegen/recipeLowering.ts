@@ -4,11 +4,12 @@
  * @failure a node no program op expresses (a rotated placement, a scale, a shell with open faces) -> null (caller falls back)
  */
 
-import type { Entity, Vec3 } from '../model/types';
+import type { EdgeRadius, Entity, Vec3 } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { MeshData } from '../model/types';
 import type { ShapeRecipe } from '../model/types';
-import type { Feature, FeatureBase, Term } from './program';
+import type { Feature, FeatureBase, FilletLaw, Term } from './program';
+import { lawNodes } from '../geometry/blend/law';
 import { type FeatureRecipe, lowerFeature, needsReach, throughReach } from '../geometry/featureLowering';
 import { floorEdgeIndices } from '../geometry/featureFillet';
 import { featureNotes } from './featureNotes';
@@ -49,20 +50,87 @@ function soupOf(kernel: GeometryKernel | null, recipe: ShapeRecipe): number[] | 
   return mesh === null ? undefined : meshSoup(mesh);
 }
 
-/** One fillet / chamfer / shell op applied in place to `variable`. */
+/** Lengths of the selected edges of `source` (document units), or null when the kernel has no exact topology. */
+function edgeLengths(kernel: GeometryKernel | null, source: ShapeRecipe, edges: readonly number[]): number[] | null {
+  const shape = kernel === null ? null : kernel.evaluate(source);
+  const topology = shape === null || kernel === null ? null : kernel.topology(shape);
+  const lengths = edges.map((index) => topology?.edges[index]?.length);
+  return lengths.every((length): length is number => length !== undefined) ? lengths : null;
+}
+
+/** The laws of a fillet with a varying radius, with the nodes a kernel interpolates; null when edge lengths are needed and unavailable. */
+function filletLaws(recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>, kernel: GeometryKernel | null): FilletLaw[] | null {
+  const laws: readonly EdgeRadius[] =
+    recipe.radii ?? recipe.edges.map(() => ({ size: recipe.size, ...(recipe.sizeEnd === undefined ? {} : { sizeEnd: recipe.sizeEnd }) }));
+  const needsLength = laws.some((law) => law.interpolation === 'linear');
+  const lengths = needsLength ? edgeLengths(kernel, recipe.source, recipe.edges) : laws.map(() => 1);
+  if (lengths === null) return null;
+  return laws.map((law, at) => ({
+    size: law.size,
+    ...(law.sizeEnd === undefined ? {} : { sizeEnd: law.sizeEnd }),
+    ...(law.sizes === undefined ? {} : { sizes: law.sizes }),
+    linear: law.interpolation === 'linear',
+    nodes: lawNodes(law, lengths[at] ?? 1),
+  }));
+}
+
+/** A fillet with a conic / curvature section or a second leg. */
+const profiledFillet = (recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>): boolean =>
+  (recipe.profile !== undefined && recipe.profile.type !== 'circular') || (recipe.radii ?? []).some((law) => law.size2 !== undefined);
+
+/** Whether a fillet / chamfer node is one the program ops cannot express (a sided chamfer, a profile or two-leg fillet: BLD_CODEGEN_UNSUPPORTED, the export carries the exact result). */
+export function blendNotExpressible(recipe: ShapeRecipe): boolean {
+  switch (recipe.op) {
+    case 'chamfer':
+      return recipe.faces !== undefined || blendNotExpressible(recipe.source);
+    case 'fillet':
+      return profiledFillet(recipe) || blendNotExpressible(recipe.source);
+    case 'faceBlend':
+    case 'fullRound':
+      return true;
+    case 'solid':
+    case 'brep':
+    case 'faceSlab':
+      return false;
+    case 'boolean':
+      return blendNotExpressible(recipe.a) || blendNotExpressible(recipe.b);
+    case 'blend':
+      return recipe.sources.some(blendNotExpressible);
+    default:
+      return blendNotExpressible(recipe.source);
+  }
+}
+
+/**
+ * One fillet / chamfer / shell op applied in place to `variable`.
+ * @failure a varying radius whose straight pieces need edge lengths the kernel cannot give, or a sided chamfer -> null
+ */
 export function modificationFeature(
   recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' | 'shell' }>,
   base: FeatureBase,
   kernel: GeometryKernel | null,
   mesh: number[] | undefined,
   size: Term = { value: recipe.op === 'shell' ? recipe.thickness : recipe.size },
-): Feature {
+): Feature | null {
   const fallback = mesh === undefined ? {} : { mesh };
   if (recipe.op === 'shell') return { ...base, op: 'shell', thickness: size, ...fallback };
+  if (recipe.op === 'chamfer' && recipe.faces !== undefined) return null;
+  if (recipe.op === 'fillet' && profiledFillet(recipe)) return null;
+  const varying = recipe.op === 'fillet' && (recipe.sizeEnd !== undefined || recipe.radii !== undefined);
+  const laws = varying ? filletLaws(recipe, kernel) : undefined;
+  if (laws === null) return null;
   const near =
     edgeMidPoints(kernel, recipe.source, recipe.edges) ??
     (recipe.near !== undefined && recipe.near.length > 0 ? [...recipe.near] : undefined);
-  return { ...base, op: recipe.op, edges: recipe.edges, size, ...(near === undefined ? {} : { near }), ...fallback };
+  return {
+    ...base,
+    op: recipe.op,
+    edges: recipe.edges,
+    size,
+    ...(laws === undefined ? {} : { laws }),
+    ...(near === undefined ? {} : { near }),
+    ...fallback,
+  };
 }
 
 /** A hole / pocket as notes + tool solids + one cut (+ the floor fillet of a pocket); null when the kernel cannot supply what lowering needs. */
@@ -124,6 +192,8 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     }
     case 'blend':
     case 'brep':
+    case 'faceBlend':
+    case 'fullRound':
     case 'faceSlab':
     case 'faceOp':
     case 'emboss':
@@ -132,13 +202,12 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     case 'fillet':
     case 'chamfer':
     case 'shell': {
-      if (recipe.op !== 'shell' && (recipe.sizeEnd !== undefined || recipe.radii !== undefined)) return null;
       if (recipe.op === 'shell' && recipe.openNear !== undefined && recipe.openNear.length > 0) return null;
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
       const base = lowering.base(source.variable);
       const feature = modificationFeature(recipe, base, lowering.kernel, soupOf(lowering.kernel, recipe));
-      return { features: [...source.features, feature], variable: source.variable };
+      return feature === null ? null : { features: [...source.features, feature], variable: source.variable };
     }
     case 'place': {
       if (recipe.rotation.some((angle) => angle !== 0)) return null;

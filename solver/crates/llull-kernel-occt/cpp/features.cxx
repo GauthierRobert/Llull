@@ -55,6 +55,7 @@
 #include <TColgp_Array1OfPnt2d.hxx>
 #include <gp_Pnt2d.hxx>
 #include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopTools_ListOfShape.hxx>
@@ -385,6 +386,43 @@ std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint3
   BRepFilletAPI_MakeChamfer maker(shape.shape);
   return round_edges(
       shape, edges, maker, [&](BRepFilletAPI_MakeChamfer &target, const TopoDS_Edge &edge) { target.Add(distance, edge); }, "chamfer");
+}
+
+std::unique_ptr<Shape> chamfer_sided(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first,
+                                     double second, bool angle) {
+  const TopTools_IndexedMapOfShape unique_edges = unique_sub_shapes(shape.shape, TopAbs_EDGE);
+  const TopTools_IndexedMapOfShape unique_faces = unique_sub_shapes(shape.shape, TopAbs_FACE);
+  if (edges.empty() || edges.size() != faces.size()) return nullptr;
+  BRepFilletAPI_MakeChamfer maker(shape.shape);
+  TopTools_IndexedDataMapOfShapeListOfShape owners;
+  TopExp::MapShapesAndAncestors(shape.shape, TopAbs_EDGE, TopAbs_FACE, owners);
+  for (size_t k = 0; k < edges.size(); ++k) {
+    if (static_cast<int>(edges[k]) >= unique_edges.Extent() || static_cast<int>(faces[k]) >= unique_faces.Extent()) return nullptr;
+    const TopoDS_Edge edge = TopoDS::Edge(unique_edges(static_cast<int>(edges[k]) + 1));
+    const TopoDS_Face face = TopoDS::Face(unique_faces(static_cast<int>(faces[k]) + 1));
+    if (!owners.Contains(edge)) return nullptr;
+    bool adjacent = false;
+    for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next()) adjacent = adjacent || it.Value().IsSame(face);
+    if (!adjacent) return nullptr;  // the first leg is measured on a face of the edge
+    try {
+      if (angle)
+        maker.AddDA(first, second, edge, face);
+      else
+        maker.Add(first, second, edge, face);
+    } catch (const Standard_Failure &) {
+      return nullptr;  // an edge or face the chamfer cannot take (seam, degenerate, not adjacent): refuse, never skip it
+    }
+  }
+  try {
+    maker.Build();
+  } catch (const Standard_Failure &) {
+    return nullptr;  // no edge the chamfer can take
+  }
+  if (!maker.IsDone()) return nullptr;
+  const TopoDS_Shape result = valid_or_null(maker.Shape());
+  if (result.IsNull()) return nullptr;
+  const std::vector<naming::Named> inputs{naming::named(shape)};
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "chamfer"));
 }
 
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {

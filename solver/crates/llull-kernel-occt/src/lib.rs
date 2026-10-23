@@ -12,6 +12,14 @@ pub mod queries;
 pub mod recipe;
 pub mod xde;
 
+/// Blend tests (fillet, chamfer, boolean tools) share OCCT builders that are not safe to run on several test threads at once (parallel runs
+/// made fillets fail now and then); the sidecar itself is single-threaded. Each such test holds this guard.
+#[cfg(test)]
+pub(crate) fn serial_blends() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[cfg(test)]
 mod blend_tests;
 #[cfg(test)]

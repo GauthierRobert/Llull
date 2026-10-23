@@ -1,0 +1,31 @@
+{
+  "actions": [
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 5,
+        "height": 10
+      },
+      "as": "a"
+    },
+    {
+      "command": "fillet_edge",
+      "params": {
+        "id": "$a",
+        "edges": [
+          {
+            "near": [
+              5,
+              0,
+              5
+            ],
+            "law": {
+              "expression": "1 + 0.5*cos(2*pi*t)",
+              "samples": 33
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

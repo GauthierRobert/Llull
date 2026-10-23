@@ -5,13 +5,15 @@
 
 import { hasFillet, blendSource, measureContact } from '../../geometry/blend/continuity';
 import type { GeometryKernel } from '../../geometry/kernel';
-import type { Entity } from '../../model/types';
+import type { Entity, ShapeRecipe } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
 import { currentContext } from '../context';
 import { noop, report, tableRejection } from '../noop';
 import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
 import { diagonalOf } from './shapeDiagonal';
+import { blendFaceContacts } from '../../geometry/blend/blendInfo';
+import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -64,6 +66,12 @@ interface BlendRow {
   readonly kind: 'edge';
   readonly sourceEdges: readonly string[];
   readonly contacts: readonly Contact[];
+  /** Realised radius along the blend (absent when the kernel cannot section the face). */
+  readonly radius?: RadiusReadback;
+  /** Whether the recipe's radius law was compared with the realised radius. */
+  readonly lawChecked?: boolean;
+  /** Section the recipe asked for: "circular", "conic" or "curvature" (a non-circular section has no radius readback). */
+  readonly profile: string;
 }
 
 interface EntityCheck {
@@ -81,6 +89,8 @@ const REMEDIATION = {
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
   BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
+  BLD_CHECK_RADIUS_LAW:
+    'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',
   BLD_CHECK_UNVERIFIED_PICK: 'use the native exact kernel (kernel_info), which keeps persistent names',
   BLD_CHECK_UNVERIFIED_CONTACT: 'rebuild the blend with a smaller radius, or inspect_topology / check_continuity the blend by hand',
   BLD_CHECK_TOLERANCE_DEFAULTED: 'pass g0, g1AngleRad and g2Rel explicitly to accept them',
@@ -127,6 +137,8 @@ function checkEntity(
       message: 'this kernel keeps no face names: the blend faces cannot be identified, so no contact was measured',
     });
   let unverified = 0;
+  const laws = lawIndex(kernel, recipe as ShapeRecipe);
+  const contactsOf = new Map(blendFaceContacts(topology, graph).map((entry) => [entry.face, entry]));
   for (const face of topology.faces) {
     const source = face.name === undefined ? null : blendSource(face.name);
     if (source === null || face.name === undefined) continue;
@@ -143,7 +155,30 @@ function checkEntity(
       contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(contact) });
       findings.push(...contactFindings(entityId, face.index, edge, contact, tolerances, requireG2, unit));
     });
-    blends.push({ entityId, face: face.index, name: face.name, kind: 'edge', sourceEdges: [source.edge], contacts });
+    const located = contactsOf.get(face.index);
+    const readback = located === undefined ? null : checkRadius(kernel, shape, located, laws.get(source.edge), samples);
+    for (const deviation of readback?.deviations ?? [])
+      findings.push({
+        code: 'BLD_CHECK_RADIUS_LAW',
+        severity: 'fail',
+        entityId,
+        face: face.index,
+        value: deviation.deviation,
+        limit: sig(RADIUS_LAW_TOLERANCE * deviation.expected),
+        unit,
+        remediation: REMEDIATION.BLD_CHECK_RADIUS_LAW,
+        message: `blend face ${face.index} has radius ${deviation.actual} ${unit} at t = ${deviation.t} where the law gives ${deviation.expected}`,
+      });
+    blends.push({
+      entityId,
+      face: face.index,
+      name: face.name,
+      kind: 'edge',
+      sourceEdges: [source.edge],
+      contacts,
+      profile: laws.get(source.edge)?.profile?.type ?? 'circular',
+      ...(readback?.radius == null ? {} : { radius: readback.radius, lawChecked: readback.lawChecked }),
+    });
     if (unverified > before || contacts.length === 0)
       findings.push({
         code: 'BLD_CHECK_UNVERIFIED_CONTACT',

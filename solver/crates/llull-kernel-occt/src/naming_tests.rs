@@ -70,6 +70,7 @@ fn a_cylinder_has_a_side_a_top_and_a_bottom() {
 
 #[test]
 fn a_fillet_keeps_the_faces_and_names_the_blend_after_its_edge() {
+    let _serial = crate::serial_blends();
     let base = leaf(entity("b", "box", json!({ "size": [4, 4, 4] })));
     let edge = edge_index(&topology(&base), "e(b:x+|b:z+)");
     let filleted = json!({ "op": "fillet", "source": base, "edges": [edge], "size": 0.5 });

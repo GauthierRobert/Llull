@@ -20,6 +20,13 @@ mod ffi {
         fn fillet_edges(shape: &Shape, edges: &[u32], radius: f64, radius_end: f64) -> Result<UniquePtr<Shape>>;
         fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<UniquePtr<Shape>>;
         fn chamfer_edges(shape: &Shape, edges: &[u32], distance: f64) -> Result<UniquePtr<Shape>>;
+        fn fillet_profile(shape: &Shape, specs: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn profile_reason(shape: &Shape, specs: &[f64]) -> Result<String>;
+        fn face_blend(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn face_blend_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
+        fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn full_round_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
+        fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, second: f64, angle: bool) -> Result<UniquePtr<Shape>>;
         fn blend_union(list: &ShapeList, radius: f64) -> Result<UniquePtr<Shape>>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
         fn shell_open(shape: &Shape, thickness: f64, open_near: &[f64]) -> Result<UniquePtr<Shape>>;
@@ -93,7 +100,7 @@ mod ffi {
 }
 
 /// Fillet of the unique edges `edges` (explorer order, `[]` = all); `radius_end` varies the radius linearly along each edge.
-/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), n, then n (t, size) pairs.
+/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), mode (0 smooth, 1 straight pieces), n, then n (t, size) pairs.
 pub fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Built {
     built(ffi::fillet_laws(inner(shape)?, edges, laws))
 }
@@ -105,6 +112,43 @@ pub fn fillet(shape: &Shape, edges: &[u32], radius: f64, radius_end: Option<f64>
 /// Symmetric chamfer of the unique edges `edges` (`[]` = all).
 pub fn chamfer(shape: &Shape, edges: &[u32], distance: f64) -> Built {
     built(ffi::chamfer_edges(inner(shape)?, edges, distance))
+}
+
+/// BLD M2 profile blends of straight edges between planar faces: `specs` holds 7 numbers per edge (unique edge index, kind 0 conic / 1 curvature /
+/// 2 circular with two legs, rho or shape factor, size, size2 (NaN = size is a radius), side face index or -1, reserved 0).
+pub fn fillet_profile(shape: &Shape, specs: &[f64]) -> Built {
+    built(ffi::fillet_profile(inner(shape)?, specs))
+}
+
+/// BLD M4 `fillet_faces`: `spec` = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape.
+pub fn face_blend(shape: &Shape, spec: &[f64]) -> Built {
+    built(ffi::face_blend(inner(shape)?, spec))
+}
+
+/// Why `face_blend` fails ("" when it builds; a leading `[BLD_CODE]` names the stable code).
+pub fn face_blend_reason(shape: &Shape, spec: &[f64]) -> OcctResult<String> {
+    occt(ffi::face_blend_reason(inner(shape)?, spec))
+}
+
+/// BLD M4 `fillet_full_round`: `spec` = unique indices of side 1, center, side 2.
+pub fn full_round(shape: &Shape, spec: &[f64]) -> Built {
+    built(ffi::full_round(inner(shape)?, spec))
+}
+
+/// Why `full_round` fails ("" when it builds).
+pub fn full_round_reason(shape: &Shape, spec: &[f64]) -> OcctResult<String> {
+    occt(ffi::full_round_reason(inner(shape)?, spec))
+}
+
+/// Why `fillet_profile` fails for `specs` ("" when it builds).
+pub fn profile_reason(shape: &Shape, specs: &[f64]) -> OcctResult<String> {
+    occt(ffi::profile_reason(inner(shape)?, specs))
+}
+
+/// Chamfer of the unique edges `edges` with the first leg on the unique face `faces[k]` of edge k: two distances, or with `angle` a distance
+/// and an angle in radians measured on that face.
+pub fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, second: f64, angle: bool) -> Built {
+    built(ffi::chamfer_sided(inner(shape)?, edges, faces, first, second, angle))
 }
 
 /// One fuse of `shapes` whose joint (section) edges are filleted by `radius`.
@@ -313,6 +357,7 @@ mod tests {
 
     #[test]
     fn a_filleted_edge_removes_the_corner_material() {
+        let _serial = crate::serial_blends();
         let rounded = fillet(&cube(), &[0], 0.5, None).unwrap().unwrap();
         let removed = 0.25 * (1.0 - std::f64::consts::PI / 4.0) * 2.0;
         assert!((volume(&rounded) - (8.0 - removed)).abs() < 1e-6);
@@ -321,6 +366,7 @@ mod tests {
 
     #[test]
     fn a_chamfered_edge_removes_a_prism() {
+        let _serial = crate::serial_blends();
         let cut = chamfer(&cube(), &[0], 0.5).unwrap().unwrap();
         assert!((volume(&cut) - (8.0 - 0.125 * 2.0)).abs() < 1e-6);
     }

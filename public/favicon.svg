@@ -1,1 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#1b1d22"/><path d="M16 5.5l9.5 5.2v10.6L16 26.5l-9.5-5.2V10.7z" fill="#4c8dff"/><path d="M6.5 10.7l9.5 5.2 9.5-5.2M16 15.9v10.6" fill="none" stroke="#1b1d22" stroke-width="1.8" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>llull</title>
+  <defs>
+    <clipPath id="sketch"><rect width="32" height="64"/></clipPath>
+    <clipPath id="solid"><rect x="32" width="32" height="64"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="8" fill="#f4f4f3"/>
+  <g transform="translate(0 3)">
+    <g clip-path="url(#sketch)" fill="none" stroke="#7c7f84" stroke-width="1.1" stroke-linejoin="miter">
+      <path d="M6 12h5v36H6zM15 12h5v36h-5zM24 26h5v14a3 3 0 0 0 6 0V26h5v14a8 8 0 0 1-16 0z"/>
+    </g>
+    <g clip-path="url(#solid)" stroke-linejoin="miter">
+      <path fill="#6b6e72" d="M35 26l3-3h5l-3 3zM29.879 42.121A3 3 0 0 0 34.121 42.121L37.121 39.121A3 3 0 0 1 32.879 39.121zM44 12l3-3h5l-3 3zM53 12l3-3h5l-3 3z"/>
+      <path fill="#36383b" d="M40 26l3-3V37A8 8 0 0 1 40.657 42.657L37.657 45.657A8 8 0 0 0 40 40zM49 12l3-3v36l-3 3zM58 12l3-3v36l-3 3z"/>
+      <path fill="#121314" d="M24 26h5v14a3 3 0 0 0 6 0V26h5v14a8 8 0 0 1-16 0zM44 12h5v36h-5zM53 12h5v36h-5z"/>
+    </g>
+    <path d="M32 1v56" stroke="#7c7f84" stroke-width="0.7" stroke-dasharray="5 1.4 1 1.4"/>
+    <g fill="#f4f4f3" stroke="#7c7f84" stroke-width="0.6">
+      <rect x="5.2" y="11.2" width="1.6" height="1.6"/>
+      <rect x="10.2" y="11.2" width="1.6" height="1.6"/>
+      <rect x="23.2" y="25.2" width="1.6" height="1.6"/>
+      <rect x="28.2" y="25.2" width="1.6" height="1.6"/>
+    </g>
+    <path d="M29.5 40h5M32 37.5v5" stroke="#7c7f84" stroke-width="0.6"/>
+    <g fill="none" stroke="#b3b5b8" stroke-width="0.5">
+      <path d="M6 50v6M58 50v6M4 54h56M5 55l2-2M57 55l2-2"/>
+    </g>
+  </g>
+</svg>

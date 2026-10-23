@@ -145,7 +145,7 @@ export interface SurfaceSample {
 
 /** Why an exact fillet recipe failed (or that it builds): the OCCT contour statuses, faulty vertices and 4+ edge vertices (BLD M0, `kernel.blendReport`). */
 export interface BlendReport {
-  readonly stage: 'contours' | 'corners' | 'validity' | 'none';
+  readonly stage: 'contours' | 'corners' | 'validity' | 'profile' | 'faceBlend' | 'fullRound' | 'none';
   readonly contours: ReadonlyArray<{
     readonly edges: readonly number[];
     readonly status: 'ok' | 'error' | 'walking_failure' | 'startsol_failure' | 'twisted_surface';
@@ -159,6 +159,18 @@ export interface BlendReport {
   readonly done: boolean;
   readonly valid: boolean;
   readonly message?: string;
+}
+
+/** One cross-section of a blend face (BLD M1): the contact points on both sides, the section mid point, and the circle through the three. */
+export interface BlendSection {
+  /** Uniform fraction of the first contact edge's parameter (0 = its start). */
+  readonly t: number;
+  readonly a: Vec3;
+  readonly mid: Vec3;
+  readonly b: Vec3;
+  /** Circumradius of the section (document units); null when the three points are collinear (a flat section). */
+  readonly radius: number | null;
+  readonly centre: Vec3 | null;
 }
 
 interface EdgeCurveSample {
@@ -240,6 +252,8 @@ export interface FaceQueryPort {
   ): readonly SurfaceSample[] | null;
   edgeSamples(shape: ShapeHandle, edge: number, count: number): readonly EdgeCurveSample[] | null;
   edgeContinuity(shape: ShapeHandle, edge: number, count: number): readonly EdgeContinuitySample[] | null;
+  /** BLD M1: `count` (2..1001) cross-sections of blend `face` between its contact edges `edgeA` and `edgeB` (unique indices), at uniform fractions of `edgeA`; null when the face lacks either edge. Absent on kernels without it. */
+  blendSections?(shape: ShapeHandle, face: number, edgeA: number, edgeB: number, count: number): readonly BlendSection[] | null;
   distance(
     shape: ShapeHandle,
     points: readonly Vec3[],

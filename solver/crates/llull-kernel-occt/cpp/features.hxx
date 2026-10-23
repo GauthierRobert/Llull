@@ -26,10 +26,23 @@ void shape_list_add(ShapeList &list, const Shape &shape);
 
 // Edge rounding: `edges` index the unique edges in explorer order ([] = all); `radius_end` NaN = constant radius.
 std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double radius, double radius_end);
-// Per-edge radius laws (SC-F3 `radii`): for edge k of `edges`, `laws` holds size, size_end (NaN = constant), n, then n (t, size) pairs
-// (t in (0, 1) along the edge, increasing).
+// Per-edge radius laws (SC-F3 `radii`): for edge k of `edges`, `laws` holds size, size_end (NaN = constant), mode (0 smooth, 1 straight
+// pieces), n, then n (t, size) pairs (t in (0, 1) along the contour, increasing).
 std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
+// Profile blends (cpp/blend_profile.cxx): per edge 7 numbers: unique edge index, kind (0 conic, 1 curvature, 2 circular with two legs), rho / shape
+// factor, size, size2 (NaN = size is a radius), side (unique face index carrying size, or -1), 0 (reserved). Null when the build fails; profile_reason says why ("" = builds).
+std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const double> specs);
+rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs);
+// Face blends (cpp/blend_faces.cxx): face_blend spec = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape;
+// full_round spec = unique indices of side 1, center, side 2. Null when the build fails; *_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
+std::unique_ptr<Shape> face_blend(const Shape &shape, rust::Slice<const double> spec);
+rust::String face_blend_reason(const Shape &shape, rust::Slice<const double> spec);
+std::unique_ptr<Shape> full_round(const Shape &shape, rust::Slice<const double> spec);
+rust::String full_round_reason(const Shape &shape, rust::Slice<const double> spec);
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance);
+// Chamfer with its first leg on a named face per edge (`faces[k]` = unique face index bounding `edges[k]`): two distances, or with `angle` a distance and an angle (radians) measured on that face.
+std::unique_ptr<Shape> chamfer_sided(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first,
+                                     double second, bool angle);
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius);
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness);
 std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Slice<const double> open_near);

@@ -141,14 +141,7 @@ plan(
 plan(
   'target_laws_and_profiles',
   'Radius laws (linear interpolation, periodic expression), conic and curvature-continuous profiles, asymmetric legs; closes with check_blends.',
-  [
-    'fillet_edge.edges[].interpolation',
-    'fillet_edge.edges[].law',
-    'fillet_edge.profile',
-    'fillet_edge.edges[].size2',
-    'fillet_edge.edges[].side1Near',
-    'check_blends',
-  ],
+  [],
   [
     block('b3'),
     {
@@ -204,16 +197,7 @@ plan(
 plan(
   'target_corners_faces_chamfers',
   'Setback corners, a 4-edge apex, face-face fillet across a chamfer, hold line, full round, chamfer variants, probe; closes with check_blends.',
-  [
-    'fillet_edge.corners',
-    'fillet_faces',
-    'fillet_full_round',
-    'chamfer_edge.distance2',
-    'chamfer_edge.angleDeg',
-    'chamfer_edge.side1Near',
-    'probe_fillet',
-    'check_blends',
-  ],
+  ['fillet_edge.corners'],
   [
     { command: 'add_box', params: { size: [10, 10, 10] }, as: 'c12' },
     { command: 'fillet_edge', params: { id: '$c12', radius: 1, corners: [{ all: true, type: 'setback', setback: 2 }] }, as: 'f12' },
@@ -305,7 +289,7 @@ plan(
 plan(
   'target_error_codes',
   'Deliberately wrong requests; run each step alone (llull run --continue --json). Every step must exit 1 with the listed code, ids/paths and a remediation.',
-  ['fillet_edge.profile', 'fillet_edge.edges[].law', 'fillet_edge.corners', 'fillet_faces', 'BLD_* codes'],
+  ['fillet_edge.corners', 'BLD_SETBACK_TOO_SHORT'],
   [
     block('e1'),
     { command: 'fillet_edge', params: { id: '$e1', edgesNear: [TOP_EDGE], radius: 6 }, expect: 'BLD_RADIUS_TOO_LARGE' },
@@ -780,6 +764,56 @@ const cases = [
     proves: ['FR-BLD-29'],
   },
 ];
+// Measured on the native kernel (DES-6b, OCCT 7.9.2): what each gated case actually gave and where it misses the pack tolerance.
+const MEASURED = {
+  'VC-BLD-03': {
+    measuredNative: {
+      linear: { topFaceArea: 170.0043, contactLineVsPolyline: 8.6e-7, volume: 989.990385, volumeVsSection: 0.005137 },
+      smooth: { topFaceArea: 168.749 },
+    },
+    finding:
+      'interpolation "linear" puts the contact line on the polyline to 9e-7 (radius readback r(0.5) = 2 to 1e-4); the planar face area reads 170.0043 (2.5e-5 relative) because the kink of the law makes the B-spline boundary hard for the face-area quadrature, so the 1e-6 face-area gate is NOT met for a law with a kink (a straight law without kink is exact: VC-BLD-17 170 / 70 to 1e-6). Default "smooth" interpolation overshoots between the control points (168.749).',
+  },
+  'VC-BLD-04': {
+    measuredNative: { volume: 778.233, minusReference: 0.0054 },
+    finding:
+      'periodic expression law (33 samples, smooth periodic interpolation): within the pack band 0.01 (0.0054 above the generalised Pappus value).',
+  },
+  'VC-BLD-06': {
+    measuredNative: { volume: 778.957, minusReference: -4e-4 },
+    finding: 'chord on a plane-cylinder rim from the sampled wedge angle: r = 1, within 1e-3.',
+  },
+  'VC-BLD-18': {
+    measuredNative: { symmetric: 995, asymmetric: 990.0, distanceAngle: 997.113249 },
+    finding: 'AddDA angle is measured on the side-1 face: second leg d tan(angle).',
+  },
+  'VC-BLD-07a': {
+    measuredNative: { volume: 993.646111 },
+    finding:
+      'conic profile by boolean cut of the corner spandrel prism (straight edges between planar faces): within 1e-3 of the closed form.',
+  },
+  'VC-BLD-09': {
+    measuredNative: { volume: 998.0, contactOrder: 'G2', contactCurvature: '< 1e-6' },
+    finding: 'quartic section: zero curvature at both contacts, measured G2 by check_blends.',
+  },
+  'VC-BLD-14': {
+    measuredNative: { volume: 991.415927 },
+    finding: 'fillet_faces across the chamfer: the spandrel of the virtual corner cut from the solid; the chamfer face is consumed.',
+  },
+  'VC-BLD-15': {
+    measuredNative: { minimumRadius: 1.707107, message: 'about 1.707107' },
+    finding: 'the smallest radius is found by bisection on "the arc stays in the material".',
+  },
+  'VC-BLD-16': {
+    measuredNative: { volume: 765.663706, cylinderArea: 125.663706, cylinderRadius: 2 },
+    finding: 'full round: clear above the axis, fuse the half-cylinder.',
+  },
+  'VC-BLD-17': {
+    measuredNative: { topFaceArea: 170, sideFaceArea: 70, tolerance: 1e-6 },
+    finding: 'hold line 1 -> 2: straight radius law on the shared edge (no kink), faces exact to 1e-6.',
+  },
+};
+for (const c of cases) if (MEASURED[c.vc] !== undefined) Object.assign(c, MEASURED[c.vc]);
 for (const c of cases) c.cli = { run: `llull run plans/${String(c.plan).split(' ')[0]}.json ${D}`, assert: c.assert };
 writeFileSync(
   join(here, 'expected_results.json'),

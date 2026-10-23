@@ -26,10 +26,7 @@ Manifold column of every mutating case refuses cleanly (VC-BLD-24).
 
 Regenerate: `cd docs/design/06-variable-blends/validation && node generate_blend_refs.mjs && node generate_plans.mjs`.
 
-Commands / params used by the target plans that **do not exist yet**: `fillet_faces`, `fillet_full_round`, `probe_fillet`,
-`check_blends`; `fillet_edge` params `profile`, `corners`, `edges[].interpolation`, `edges[].law`, `edges[].size2`,
-`edges[].side1Near`; `chamfer_edge` params `distance2`, `angleDeg`, `side1Near`; `fillet_edge` `mode: "chord"` on a non-planar
-face pair (exists, refused today); all `BLD_*` codes.
+Commands / params used by the target plans that **do not exist yet** (after DES-6b): `fillet_edge` `corners` (M3) and the code `BLD_SETBACK_TOO_SHORT`.
 
 ## 2. Real use cases
 
@@ -105,6 +102,8 @@ FR-26 (23) · FR-27 (27) · FR-28 (24) · FR-29 (33) · FR-30 (28). TR ↔ VC: T
 6. **Code facts that change the scope**: `fillet_edge` already reads start/end and control-point laws per edge (SC-F3) and chord
    sizing on planar faces; the native kernel builds them — but no oracle case covers them, OCCT's failure status is discarded,
    native `edgeContinuity` / `edgeSamples` answer null, and codegen drops variable fillets. M0 is about these.
+
+7. **Measured on the native kernel (DES-6b)**: OCCT's `Add(r1, r2, E)` law is not straight (a cubic with zero end slopes; `ChFiDS_FilSpine` source read, and `Add(Law_Function)` crashes in 7.9.2), which is why VC-BLD-02 / 30 differ from both constructions; `interpolation: "linear"` (graded nodes) gives a straight contact line (9e-7) but a face area 4.3e-3 off for a law with a kink (VC-BLD-03 linear: 170.0043); a straight law without a kink (VC-BLD-17) is exact to 1e-6. Conic / curvature / asymmetric blends (VC-BLD-07 to 09) and the face blends (VC-BLD-14 to 17) are built as booleans with the corner spandrel and pass at 1e-6 relative; VC-BLD-12 / 13 (setback) and 22 (vertex names) wait for M3. See TECHNICAL_SPEC §13.5 to 13.9.
 
 ## 5. How a future implementation runs this pack
 

@@ -13,7 +13,30 @@ export type BlendFailureCode =
   | 'BLD_TWISTED_SURFACE'
   | 'BLD_CORNER_UNSUPPORTED'
   | 'BLD_CORNER_FAILED'
-  | 'BLD_INVALID_RESULT';
+  | 'BLD_INVALID_RESULT'
+  | 'BLD_PROFILE_FAILED'
+  | 'BLD_FACE_FILLET_NO_SOLUTION'
+  | 'BLD_FACESETS_OVERLAP'
+  | 'BLD_FACE_BLEND_UNSUPPORTED'
+  | 'BLD_FULL_ROUND_NOT_OPPOSED'
+  | 'BLD_FULL_ROUND_NO_SOLUTION';
+
+const CODED_REASON = /^\[(BLD_[A-Z_]+)\]\s*([\s\S]*)$/;
+const REASON_CODES: ReadonlySet<string> = new Set([
+  'BLD_FACE_FILLET_NO_SOLUTION',
+  'BLD_FACESETS_OVERLAP',
+  'BLD_FACE_BLEND_UNSUPPORTED',
+  'BLD_FULL_ROUND_NOT_OPPOSED',
+  'BLD_FULL_ROUND_NO_SOLUTION',
+]);
+
+/** The stable code and text of a profile / face-blend reason ("[BLD_X] text"; no prefix = BLD_PROFILE_FAILED). */
+function codedReason(message: string | undefined): { readonly code: BlendFailureCode; readonly text: string } {
+  const found = message === undefined ? null : CODED_REASON.exec(message);
+  const named = found?.[1];
+  if (named !== undefined && REASON_CODES.has(named)) return { code: named as BlendFailureCode, text: found?.[2] ?? '' };
+  return { code: 'BLD_PROFILE_FAILED', text: message ?? 'the kernel gave no reason' };
+}
 
 export interface BlendFailure {
   readonly code: BlendFailureCode;
@@ -31,6 +54,10 @@ const list = (edges: readonly number[]): string => edges.join(', ');
 
 /** The failure `report` describes, or null when it describes a successful build. */
 export function diagnoseBlend(report: BlendReport): BlendFailure | null {
+  if (report.stage === 'profile' || report.stage === 'faceBlend' || report.stage === 'fullRound') {
+    const { code, text } = codedReason(report.message);
+    return { code, edges: [], message: code === 'BLD_PROFILE_FAILED' ? `the profile blend cannot be built: ${text}` : text };
+  }
   for (const contour of report.contours) {
     const { edges } = contour;
     switch (contour.status) {
@@ -82,6 +109,16 @@ const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
   BLD_CORNER_UNSUPPORTED: 'round fewer of the edges meeting at that vertex per step, or use a smaller radius there',
   BLD_CORNER_FAILED: 'try a different radius at that corner, or round fewer edges per step',
   BLD_INVALID_RESULT: 'use a smaller radius or fewer edges per step',
+  BLD_FACE_FILLET_NO_SOLUTION: 'use at least the radius the message names, or a smaller one if the legs leave the faces',
+  BLD_FACESETS_OVERLAP: 'give two different faces (inspect_faces lists them)',
+  BLD_FACE_BLEND_UNSUPPORTED:
+    'blend one planar face against another that end on flat square faces (this build), or round the real edge with fillet_edge',
+  BLD_FULL_ROUND_NOT_OPPOSED:
+    'give two parallel side faces facing away from each other and the center face square to both; or use fillet_faces',
+  BLD_FULL_ROUND_NO_SOLUTION:
+    'the center face must be exactly as wide as the gap between the sides; use fillet_faces for a different width',
+  BLD_PROFILE_FAILED:
+    'try the circular profile (probe_fillet), a smaller size, or an edge that is straight between two planar faces and ends on flat square faces',
 };
 
 export const remediationOf = (code: BlendFailureCode): string => REMEDIATION[code];

@@ -9,6 +9,8 @@ import { inspectFaces } from './faces';
 import { draftFaces, pushPullFace, replaceFace, splitFace } from './faceOps';
 import { splitBody } from './splitBody';
 import { probeFillet } from './probeFillet';
+import { filletFaces } from './filletFaces';
+import { filletFullRound } from './filletFullRound';
 import { checkBlends } from './checkBlends';
 
 export const brepCommands = commandCatalog(
@@ -17,6 +19,8 @@ export const brepCommands = commandCatalog(
   filletEdge,
   chamferEdge,
   probeFillet,
+  filletFaces,
+  filletFullRound,
   checkBlends,
   shellSolid,
   draftFaces,

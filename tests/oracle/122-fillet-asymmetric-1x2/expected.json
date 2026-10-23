@@ -1,0 +1,36 @@
+{
+  "id": "122-fillet-asymmetric-1x2",
+  "family": "fillet",
+  "description": "VC-BLD-08: asymmetric legs 1 (top face) x 2 (side face), circular section (elliptic quarter), on the top edge of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "V = abc - L (1 - pi/4) d1 d2 = 1000 - 20 (1 - pi/4) 2; centroid from the spandrel (the region of the d1 x d2 rectangle outside the quarter circle, centroid 0.22338 d from the corner): it tells which face carries the first leg",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 991.415926536,
+  "area": null,
+  "centroid": [
+    0,
+    -0.04135798,
+    -0.017777978
+  ],
+  "bbox": {
+    "min": [
+      -10,
+      -5,
+      -2.5
+    ],
+    "max": [
+      10,
+      5,
+      2.5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.0000015,
+    "area": 0.001,
+    "centroid": 0.00003,
+    "bbox": 0.001
+  }
+}

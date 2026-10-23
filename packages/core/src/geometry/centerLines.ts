@@ -84,6 +84,8 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
     case 'shell':
     case 'faceOp':
     case 'emboss':
+    case 'faceBlend':
+    case 'fullRound':
       return recipeAxes(recipe.source, place, scale, depth + 1);
     case 'place': {
       const frame = { position: recipe.position, rotation: recipe.rotation };

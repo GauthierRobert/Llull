@@ -234,6 +234,27 @@ def chamfer(solid, edges, distance, near=None):
     return _round("chamfer_edge", "distance", solid, edges, distance, near, _chamfer)
 
 
+def fillet_laws(solid, edges, laws, near=None):
+    """Round edges with one radius law each: law = (size, size_end | None, [(t, size)...], linear, nodes | None); nodes = (t, radius) pairs OCCT interpolates."""
+    entries = []
+    for index, law in zip(edges, laws):
+        entry = {"index": int(index), "size": _term(law[0])}
+        if law[1] is not None:
+            entry["sizeEnd"] = _term(law[1])
+        if law[2]:
+            entry["sizes"] = [{"t": float(t), "size": float(s)} for t, s in law[2]]
+        if law[3]:
+            entry["interpolation"] = "linear"
+        entries.append(entry)
+    feature = _record("fillet_edge", {"id": {"ref": solid.ref}, "edges": entries})
+    shape = _fillet_laws(solid.shape, [int(e) for e in edges], near, laws)
+    rounded = Solid(solid.ref, shape, solid.color, solid.name)
+    LLULL_LIVE.pop(solid.ref, None)
+    feature["ref"] = rounded.ref = "f%d" % len(LLULL_TRACE["features"])
+    LLULL_LIVE[rounded.ref] = rounded
+    return rounded
+
+
 def shell(solid, thickness):
     """Hollow inward: the solid minus its inward offset (a sealed cavity)."""
     feature = _record("shell_solid", {"id": {"ref": solid.ref}, "thickness": _term(thickness)})
@@ -349,6 +370,30 @@ def _fillet(shape, edges, near, radius):
     from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
 
     return _round_with(BRepFilletAPI_MakeFillet, shape, edges, near, radius)
+
+
+def _fillet_laws(shape, edges, near, laws):
+    from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
+    from OCP.TColgp import TColgp_Array1OfPnt2d
+    from OCP.gp import gp_Pnt2d
+
+    topods = _shape_of(shape).wrapped
+    builder = BRepFilletAPI_MakeFillet(topods)
+    for edge, law in zip(_select_edges(topods, edges, near), laws):
+        size, size_end, _points, _linear, nodes = law
+        if nodes:
+            array = TColgp_Array1OfPnt2d(1, len(nodes))
+            for position, (t, radius) in enumerate(nodes):
+                array.SetValue(position + 1, gp_Pnt2d(float(t), float(radius)))
+            builder.Add(array, edge)
+        elif size_end is not None:
+            builder.Add(float(size), float(size_end), edge)
+        else:
+            builder.Add(float(size), edge)
+    builder.Build()
+    if not builder.IsDone():
+        raise ValueError("llull: the kernel refused to round these edges")
+    return _wrap(builder.Shape())
 
 
 def _chamfer(shape, edges, near, distance):

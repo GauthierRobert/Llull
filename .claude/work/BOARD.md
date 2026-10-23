@@ -57,8 +57,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14): CadQuery / build123d / FreeCAD lowering of sweeps + lofts,
   frames overlay (UI), `ShapeRecipe` node `sheetSolid` (faces still in the leaf payload), `volumeConsistencyRel`, hollow round sections with laws,
   exact-curve `inspect_sweep` curvature, closed-loft drift distribution (single re-seam today), VC-SWG-32 table. _Lane 1 + 2_ _deps: —_
-- `[TODO]` **DES-6b** 06 BLD left after M0 (done 2026-10-22, §13): M1+ blendInfo / laws / chord on curved faces / codegen, chamfer
-  variants, conic / G2 profiles, setback corners, vertex names, `fillet_faces`, `fillet_full_round`; VC-22, 25–28. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 (done 2026-10-23, TECHNICAL_SPEC §13.5–13.9): M3 `corners` / setback
+  + `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
+  profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on
+  CPython/OCP; true straight laws (OCCT 7.9.2 `Add(Law_Function)` crashes → graded nodes). _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-7b** 07 MSH left after M0 + M2 (done 2026-10-22, §13): M1 repair modes / fill holes / decimate / remesh / smooth /
   cut / deviation, M3 native `llull-meshops` + content-addressed asset store (import steps store base64 until then), M4 sculpt, M5
   segment + mesh_to_brep, M6 quad remesh / fits. _Lane 1 + 4 + native_ _deps: —_

@@ -1,0 +1,32 @@
+{
+  "id": "126-fillet-linear-control-points",
+  "family": "fillet",
+  "description": "VC-BLD-03: control points 1 / 2 / 1 joined by straight pieces (interpolation linear) on the 20-long top edge of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "V = abc - (1 - pi/4) int r(s)^2 ds = 1000 - (1 - pi/4) 20 (7/3) (normal-section value); the straight-piece law builds within 5.2e-6 relative of it (measured +0.0051 mm3), gated at 1e-5",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 989.985247625,
+  "area": null,
+  "centroid": null,
+  "bbox": {
+    "min": [
+      -10,
+      -5,
+      -2.5
+    ],
+    "max": [
+      10,
+      5,
+      2.5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.00001,
+    "area": 0.001,
+    "centroid": 0.001,
+    "bbox": 0.001
+  }
+}

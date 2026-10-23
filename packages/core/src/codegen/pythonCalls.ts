@@ -3,7 +3,7 @@
  * (`box(size, position=…, rotation=…)`, …).
  */
 
-import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
+import type { Feature, FeatureProgram, FilletLaw, ShapeSpec, Term, Term2, Term3 } from './program';
 import {
   featureLinesWithHeadings,
   formatDegrees,
@@ -66,12 +66,24 @@ export function shapeCallOpen(shape: ShapeSpec): string {
   }
 }
 
-/** `v = fillet|chamfer(v, [edges], size[, near=[…]])` or `v = shell(v, thickness)`. */
+const pairList = (pairs: ReadonlyArray<readonly [number, number]>): string =>
+  `[${pairs.map(([a, b]) => `(${formatNumber(a)}, ${formatNumber(b)})`).join(', ')}]`;
+
+/** One radius law as `(size, size_end | None, [(t, size)…], linear, [(t, radius) nodes…] | None)`. */
+function lawTuple(law: FilletLaw): string {
+  const end = law.sizeEnd === undefined ? 'None' : formatNumber(law.sizeEnd);
+  const points = pairList((law.sizes ?? []).map((point): [number, number] => [point.t, point.size]));
+  return `(${formatNumber(law.size)}, ${end}, ${points}, ${law.linear ? 'True' : 'False'}, ${law.nodes === null ? 'None' : pairList(law.nodes)})`;
+}
+
+/** `v = fillet|chamfer(v, [edges], size[, near=[…]])`, `v = fillet_laws(v, [edges], [law, …][, near=[…]])` or `v = shell(v, thickness)`. */
 export function modifierLine(feature: Extract<Feature, { op: 'fillet' | 'chamfer' | 'shell' }>): string {
   const v = feature.variable;
   if (feature.op === 'shell') return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
   const near =
     feature.near === undefined ? '' : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
+  if (feature.laws !== undefined)
+    return `${v} = fillet_laws(${v}, [${feature.edges.map(formatNumber).join(', ')}], [${feature.laws.map(lawTuple).join(', ')}]${near})`;
   const size = formatTerm(feature.size);
   return `${v} = ${feature.op}(${v}, [${feature.edges.map(formatNumber).join(', ')}], ${size}${near})`;
 }

@@ -60,6 +60,12 @@ function sizeHint(kernel: GeometryKernel, recipe: FilletRecipe, failure: BlendFa
   return `; largest that builds: ${radii} (sizes scaled together; probe_fillet gives the limit per edge)`;
 }
 
+/** The param a refusal of `modified` is about: the radius (or edges of per-edge laws), or the center set of a full round. */
+function refusalPath(modified: ShapeRecipe): string {
+  if (modified.op === 'fullRound') return 'center';
+  return modified.op === 'fillet' && modified.radii !== undefined ? 'edges' : 'radius';
+}
+
 /**
  * The refusal of `command` for `modified`: a coded BLD_* rejection when the kernel can explain a fillet failure, else the generic no-op.
  * @failure no `blendReport`, a non-fillet recipe, or a report that finds nothing wrong -> the generic summary (`modifyFailure`)
@@ -74,12 +80,13 @@ export function blendRefusal(
   topology: ShapeTopology | null,
 ): CommandResult {
   const generic = (): CommandResult => ({ document: doc, summary: modifyFailure(command, kernel, modified, result), affected: [] });
-  if (result !== 'refused' || modified.op !== 'fillet' || kernel.blendReport === undefined) return generic();
+  const reported = modified.op === 'fillet' || modified.op === 'faceBlend' || modified.op === 'fullRound';
+  if (result !== 'refused' || !reported || kernel.blendReport === undefined) return generic();
   const report = kernel.blendReport(modified);
   const failure = report === null ? null : diagnoseBlend(report);
   if (failure === null) return generic();
   const where = failure.edges.length === 0 ? '' : ` [edges ${failure.edges.map((edge) => edgeText(edge, topology)).join(', ')}]`;
-  const hint = sizeHint(kernel, modified, failure, doc.units);
+  const hint = modified.op === 'fillet' ? sizeHint(kernel, modified, failure, doc.units) : '';
   const partial = report?.partial === true ? '; OCCT built a partial result, discarded' : '';
   return codedRejection(
     doc,
@@ -88,6 +95,6 @@ export function blendRefusal(
     `${failure.message}${where} on '${id}'${hint}${partial}`,
     remediationOf(failure.code),
     [id],
-    [modified.radii === undefined ? 'radius' : 'edges'],
+    [refusalPath(modified)],
   );
 }

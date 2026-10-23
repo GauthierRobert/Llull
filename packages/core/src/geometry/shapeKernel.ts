@@ -26,7 +26,7 @@ import { sha256Hex } from '../lib/sha256';
 
 /** `FaceQueryPort` over native shapes: every method takes the native shape where the port takes a handle. */
 export type FaceQueryOps<S> = {
-  [K in keyof FaceQueryPort]: FaceQueryPort[K] extends (shape: ShapeHandle, ...rest: infer R) => infer T
+  [K in keyof FaceQueryPort]: NonNullable<FaceQueryPort[K]> extends (shape: ShapeHandle, ...rest: infer R) => infer T
     ? (shape: S, ...rest: R) => T
     : never;
 };
@@ -130,6 +130,10 @@ export interface CachingKernel extends GeometryKernel {
 
 const lawsEqual = (a: EdgeRadius, b: EdgeRadius): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+/** A fillet with a conic / curvature section or a second leg: only a kernel that builds profile blends can (the in-process ops cannot, so they refuse). */
+const profiled = (recipe: { readonly profile?: { readonly type: string }; readonly radii?: readonly EdgeRadius[] }): boolean =>
+  (recipe.profile !== undefined && recipe.profile.type !== 'circular') || (recipe.radii ?? []).some((law) => law.size2 !== undefined);
+
 function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
   switch (recipe.op) {
     case 'solid':
@@ -144,12 +148,14 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'chamfer': {
       const source = child(recipe.source);
       if (source === null) return null;
-      if (recipe.op === 'chamfer') return ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.op === 'chamfer') return recipe.faces !== undefined ? null : ops.chamfer(source, recipe.edges, recipe.size);
+      if (profiled(recipe)) return null;
       if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
       const [first] = recipe.radii;
       const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
-      if (ops.filletEach !== undefined && !uniform) return ops.filletEach(source, recipe.edges, recipe.radii);
-      return uniform && first.sizes === undefined ? ops.fillet(source, recipe.edges, first.size, first.sizeEnd) : null;
+      const plain = uniform && first.sizes === undefined && first.interpolation !== 'linear';
+      if (plain) return ops.fillet(source, recipe.edges, first.size, first.sizeEnd);
+      return ops.filletEach === undefined ? null : ops.filletEach(source, recipe.edges, recipe.radii);
     }
     case 'blend': {
       const shapes: S[] = [];
@@ -187,6 +193,8 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       return source === null || ops.emboss === undefined ? null : ops.emboss(source, embossParamsOf(recipe));
     }
     case 'faceSlab':
+    case 'faceBlend':
+    case 'fullRound':
       return null;
     case 'feature': {
       const source = child(recipe.source);
@@ -241,6 +249,7 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
     faceSamples: guard(ops.faceSamples),
     edgeSamples: guard(ops.edgeSamples),
     edgeContinuity: guard(ops.edgeContinuity),
+    ...(ops.blendSections === undefined ? {} : { blendSections: guard(ops.blendSections) }),
     distance: guard(ops.distance),
     bspline: guard(ops.bspline),
     projectCurves: guard(ops.projectCurves),

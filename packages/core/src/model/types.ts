@@ -2,6 +2,7 @@
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
 import type { FaceGroup, MeshSource } from './meshProvenance';
+import type { BlendProfile, FaceBlendParams, FullRoundParams } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
@@ -760,12 +761,19 @@ export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
 /**
  * Radius law of one filleted edge: `size` at its start, `sizeEnd` at its end (linear between, constant when absent); `sizes` adds interior
- * control points (`t` in (0, 1) strictly increasing, radius `size` there) the radius passes through (BRepFilletAPI_MakeFillet radius law).
+ * control points (`t` in (0, 1) strictly increasing, relative position on the tangent chain, radius `size` there) the radius passes through
+ * (BRepFilletAPI_MakeFillet radius law). `interpolation` "linear" joins the points with straight pieces; absent / "smooth" is the kernel's
+ * smooth interpolation (default).
  */
 export interface EdgeRadius {
   readonly size: number;
   readonly sizeEnd?: number;
   readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+  readonly interpolation?: 'smooth' | 'linear';
+  /** Second leg (BLD M2): with it `size` is the leg on the face `sideFace` and `size2` the leg on the other face, document units. */
+  readonly size2?: number;
+  /** Unique face index of the source shape carrying `size` when `size2` is given. */
+  readonly sideFace?: number;
 }
 
 /**
@@ -782,6 +790,8 @@ export type ShapeRecipe =
    * generators can pick the same edges by position when the kernel's edge indices are unavailable; kernels ignore it.
    * `radii` (fillet only): one law per entry of `edges` (same length, edges non-empty); `size` is then the placeholder 0, so a kernel that
    * does not read `radii` refuses instead of rounding every edge with one radius.
+   * `faces` (chamfer only, BLD M1): per entry of `edges` the unique face index carrying the first leg `size`; with it, `size2` is the second leg
+   * (distance-distance) or `angleDeg` the angle in degrees (0, 90) measured on that face (distance-angle); exactly one of the two.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -791,7 +801,19 @@ export type ShapeRecipe =
       readonly sizeEnd?: number;
       readonly radii?: readonly EdgeRadius[];
       readonly near?: readonly Vec3[];
+      readonly faces?: readonly number[];
+      readonly size2?: number;
+      readonly angleDeg?: number;
+      /** Fillet only (BLD M2): conic / curvature section; absent or circular = the rolling ball. A non-circular profile needs constant sizes. */
+      readonly profile?: BlendProfile;
     }
+  /**
+   * A rolling-ball blend between two face sets that need not share an edge (BLD M4): `facesA` / `facesB` are unique face indices of the source,
+   * `radius` the ball radius in document units, `profile` the section (absent = circular). The faces between the contact lines are consumed.
+   */
+  | ({ readonly op: 'faceBlend'; readonly source: ShapeRecipe } & FaceBlendParams)
+  /** The full round of a rib top (BLD M4): a half-round tangent to `side1`, `side2` and `center`, which it consumes (unique face indices of the source). */
+  | ({ readonly op: 'fullRound'; readonly source: ShapeRecipe } & FullRoundParams)
   /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
   | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
   /** `openNear`: points, each picking the face of the source nearest to it to remove (an open pocket); absent = a sealed internal cavity. */

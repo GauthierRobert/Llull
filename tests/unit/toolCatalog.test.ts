@@ -89,7 +89,7 @@ describe('searchTools ranking regression table', () => {
     ['stress plot', 'render_fea_results', []],
     ['natural frequency', 'create_analysis', []],
     ['export step', 'export_step', []],
-    ['fillet', 'fillet_edge', ['fillet_2d']],
+    ['fillet', 'fillet_edge', []],
     ['wall', 'draw_walls', []],
     ['make a hole in a plate', 'add_hole', []],
     ['how heavy is it', 'mass_properties', []],
@@ -101,6 +101,10 @@ describe('searchTools ranking regression table', () => {
     const top = ranked(query);
     expect(top[0]).toBe(first);
     for (const name of alsoTop) expect(top).toContain(name);
+  });
+
+  it('keeps fillet_2d among the first six answers to "fillet" (the 3D blend family fillet_edge, probe_fillet, fillet_faces, fillet_full_round ranks around it)', () => {
+    expect(ranked('fillet', 6)).toContain('fillet_2d');
   });
 
   it('does not let "fill" match "fillet" tools', () => {

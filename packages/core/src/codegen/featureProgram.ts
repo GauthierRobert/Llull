@@ -16,7 +16,7 @@ import { expandInstance } from '../geometry/instanceExpansion';
 import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
-import { lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
+import { blendNotExpressible, lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
 import type { Axis, Feature, FeatureBase, FeatureProgram, ProgramOutput, ProgramParameter, ShapeSpec, Term, Term2, Term3 } from './program';
 
 const EPSILON = 1e-9;
@@ -191,6 +191,14 @@ function entityFeatures(
   };
 }
 
+/** The note for a solid exported as triangles; a blend the program cannot express names BLD_CODEGEN_UNSUPPORTED (the export carries the exact result, never a different fillet). */
+function meshNote(subject: string, entity: Entity): string {
+  const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
+  return blend
+    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
+    : `${subject} has no analytic form; exported as a triangle mesh.`;
+}
+
 function zero3(): Term3 {
   return [{ value: 0 }, { value: 0 }, { value: 0 }];
 }
@@ -308,7 +316,7 @@ function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: Lo
         ? [{ ...first, name: entity.name }]
         : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
     features.push(...named);
-    if (lowered.triangles) notes.push(`${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
+    if (lowered.triangles) notes.push(meshNote(`${entity.kind} '${entity.id}'`, entity));
   }
   return { units: doc.units, source: 'snapshot', parameters, features, outputs: outputsFor(doc, variables), notes };
 }
@@ -406,18 +414,14 @@ function lowerStep(
         // A kernel result edited in place (set_thread, ...) or an instance: rebuild its recipe(s) so feature notes (thread, drill point) survive.
         const lowered = entityFeatures(current, after, rawParams, ctx, namer, base, variables);
         features.push(...lowered.features);
-        if (lowered.triangles)
-          notes.push(
-            `step ${stepNumber} (${step.name}): ${current.kind} '${current.id}' has no analytic form; exported as a triangle mesh.`,
-          );
+        if (lowered.triangles) notes.push(meshNote(`step ${stepNumber} (${step.name}): ${current.kind} '${current.id}'`, current));
       } else features.push(solidFeature(current, after, rawParams, ctx, base(variable)));
     }
   }
   for (const entity of created) {
     const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
     features.push(...lowered.features);
-    if (lowered.triangles)
-      notes.push(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
+    if (lowered.triangles) notes.push(meshNote(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}'`, entity));
   }
   return features;
 }

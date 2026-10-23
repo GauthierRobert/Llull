@@ -16,38 +16,21 @@
   {
    "file": "plans/target_laws_and_profiles.json",
    "description": "Radius laws (linear interpolation, periodic expression), conic and curvature-continuous profiles, asymmetric legs; closes with check_blends.",
-   "unbuilt": [
-    "fillet_edge.edges[].interpolation",
-    "fillet_edge.edges[].law",
-    "fillet_edge.profile",
-    "fillet_edge.edges[].size2",
-    "fillet_edge.edges[].side1Near",
-    "check_blends"
-   ]
+   "unbuilt": []
   },
   {
    "file": "plans/target_corners_faces_chamfers.json",
    "description": "Setback corners, a 4-edge apex, face-face fillet across a chamfer, hold line, full round, chamfer variants, probe; closes with check_blends.",
    "unbuilt": [
-    "fillet_edge.corners",
-    "fillet_faces",
-    "fillet_full_round",
-    "chamfer_edge.distance2",
-    "chamfer_edge.angleDeg",
-    "chamfer_edge.side1Near",
-    "probe_fillet",
-    "check_blends"
+    "fillet_edge.corners"
    ]
   },
   {
    "file": "plans/target_error_codes.json",
    "description": "Deliberately wrong requests; run each step alone (llull run --continue --json). Every step must exit 1 with the listed code, ids/paths and a remediation.",
    "unbuilt": [
-    "fillet_edge.profile",
-    "fillet_edge.edges[].law",
     "fillet_edge.corners",
-    "fillet_faces",
-    "BLD_* codes"
+    "BLD_SETBACK_TOO_SHORT"
    ],
    "expectedCodesInOrder": [
     "BLD_RADIUS_TOO_LARGE",
@@ -135,6 +118,18 @@
     "TR-BLD-01",
     "TR-BLD-05"
    ],
+   "measuredNative": {
+    "linear": {
+     "topFaceArea": 170.0043,
+     "contactLineVsPolyline": 8.6e-7,
+     "volume": 989.990385,
+     "volumeVsSection": 0.005137
+    },
+    "smooth": {
+     "topFaceArea": 168.749
+    }
+   },
+   "finding": "interpolation \"linear\" puts the contact line on the polyline to 9e-7 (radius readback r(0.5) = 2 to 1e-4); the planar face area reads 170.0043 (2.5e-5 relative) because the kink of the law makes the B-spline boundary hard for the face-area quadrature, so the 1e-6 face-area gate is NOT met for a law with a kink (a straight law without kink is exact: VC-BLD-17 170 / 70 to 1e-6). Default \"smooth\" interpolation overshoots between the control points (168.749).",
    "cli": {
     "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
     "assert": "check_blends($f03).data.blends[0].radius.at[t=0.5]; inspect_faces($f03)"
@@ -156,6 +151,11 @@
     "TR-BLD-01",
     "TR-BLD-02"
    ],
+   "measuredNative": {
+    "volume": 778.233,
+    "minusReference": 0.0054
+   },
+   "finding": "periodic expression law (33 samples, smooth periodic interpolation): within the pack band 0.01 (0.0054 above the generalised Pappus value).",
    "cli": {
     "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f04).data.volume"
@@ -193,6 +193,11 @@
     "FR-BLD-04",
     "TR-BLD-10"
    ],
+   "measuredNative": {
+    "volume": 778.957,
+    "minusReference": -0.0004
+   },
+   "finding": "chord on a plane-cylinder rim from the sampled wedge angle: r = 1, within 1e-3.",
    "cli": {
     "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f06).data.volume"
@@ -212,6 +217,10 @@
     "FR-BLD-06",
     "TR-BLD-06"
    ],
+   "measuredNative": {
+    "volume": 993.646111
+   },
+   "finding": "conic profile by boolean cut of the corner spandrel prism (straight edges between planar faces): within 1e-3 of the closed form.",
    "cli": {
     "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f07_0).data.volume"
@@ -317,6 +326,12 @@
     "TR-BLD-04",
     "TR-BLD-06"
    ],
+   "measuredNative": {
+    "volume": 998,
+    "contactOrder": "G2",
+    "contactCurvature": "< 1e-6"
+   },
+   "finding": "quartic section: zero curvature at both contacts, measured G2 by check_blends.",
    "cli": {
     "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f09).data.volume; check_blends($f09).data.blends[0].contacts[*].order"
@@ -442,6 +457,10 @@
     "FR-BLD-13",
     "TR-BLD-08"
    ],
+   "measuredNative": {
+    "volume": 991.415927
+   },
+   "finding": "fillet_faces across the chamfer: the spandrel of the virtual corner cut from the solid; the chamfer face is consumed.",
    "cli": {
     "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f14); inspect_faces($f14)"
@@ -462,6 +481,11 @@
     "FR-BLD-19",
     "TR-BLD-15"
    ],
+   "measuredNative": {
+    "minimumRadius": 1.707107,
+    "message": "about 1.707107"
+   },
+   "finding": "the smallest radius is found by bisection on \"the arc stays in the material\".",
    "cli": {
     "run": "llull run plans/target_error_codes.json --doc t.llull.json --kernel occt --json",
     "assert": "error.code, error.paths includes params.radius, remediation names 1.70711"
@@ -489,6 +513,12 @@
     "FR-BLD-15",
     "TR-BLD-09"
    ],
+   "measuredNative": {
+    "volume": 765.663706,
+    "cylinderArea": 125.663706,
+    "cylinderRadius": 2
+   },
+   "finding": "full round: clear above the axis, fuse the half-cylinder.",
    "cli": {
     "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($f16); inspect_faces($f16)"
@@ -511,6 +541,12 @@
     "FR-BLD-14",
     "TR-BLD-10"
    ],
+   "measuredNative": {
+    "topFaceArea": 170,
+    "sideFaceArea": 70,
+    "tolerance": 0.000001
+   },
+   "finding": "hold line 1 -> 2: straight radius law on the shared edge (no kink), faces exact to 1e-6.",
    "cli": {
     "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
     "assert": "inspect_faces($f17)"
@@ -534,6 +570,12 @@
     "FR-BLD-18",
     "TR-BLD-11"
    ],
+   "measuredNative": {
+    "symmetric": 995,
+    "asymmetric": 990,
+    "distanceAngle": 997.113249
+   },
+   "finding": "AddDA angle is measured on the side-1 face: second leg d tan(angle).",
    "cli": {
     "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
     "assert": "mass_properties($k18*)"

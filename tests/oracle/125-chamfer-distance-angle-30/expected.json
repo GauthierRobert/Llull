@@ -1,0 +1,32 @@
+{
+  "id": "125-chamfer-distance-angle-30",
+  "family": "chamfer",
+  "description": "VC-BLD-18: chamfer distance 1 at 30 degrees on one edge of a 10-cube",
+  "source": "analytic",
+  "formula": "second leg d tan 30 = 0.57735; V = 1000 - d d2 L / 2",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 997.113248654,
+  "area": null,
+  "centroid": null,
+  "bbox": {
+    "min": [
+      -5,
+      -5,
+      -5
+    ],
+    "max": [
+      5,
+      5,
+      5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.0000015,
+    "area": 0.001,
+    "centroid": 0.001,
+    "bbox": 0.001
+  }
+}

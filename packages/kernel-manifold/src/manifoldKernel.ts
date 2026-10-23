@@ -282,7 +282,7 @@ function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
     name: 'manifold',
     info: () => ({ capabilities: ['analyze', 'distance'] }),
-    unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend', 'faceSlab']),
+    unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend', 'faceSlab', 'faceBlend', 'fullRound']),
     solid: (entity) => withOwned(() => entityToManifold(mod, entity)),
     boolean: (op: BooleanOp, a, b) => withOwned(() => a[COMBINE[op]](b)),
     fillet: () => null,

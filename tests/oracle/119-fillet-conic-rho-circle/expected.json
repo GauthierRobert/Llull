@@ -1,0 +1,32 @@
+{
+  "id": "119-fillet-conic-rho-circle",
+  "family": "fillet",
+  "description": "VC-BLD-07: conic profile rho 0.41421356237309515 sized by r = 1 on the 20-long top edge of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "V = abc - L Delta (1 - f(w)), w = rho / (1 - rho), Delta = r^2 / 2 (data/conic_sections.json); rho = sqrt 2 - 1 is the circle",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 995.707963268,
+  "area": null,
+  "centroid": null,
+  "bbox": {
+    "min": [
+      -10,
+      -5,
+      -2.5
+    ],
+    "max": [
+      10,
+      5,
+      2.5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.0000015,
+    "area": 0.001,
+    "centroid": 0.001,
+    "bbox": 0.001
+  }
+}

@@ -28,6 +28,7 @@ mod ffi {
         fn face_samples_json(shape: &Shape, face: i32, uv: &[f64], nu: i32, nv: i32) -> Result<String>;
         fn edge_samples_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
         fn edge_continuity_json(shape: &Shape, edge: i32, count: i32) -> Result<String>;
+        fn blend_sections_json(shape: &Shape, face: i32, edge_a: i32, edge_b: i32, count: i32) -> Result<String>;
         fn fillet_report_json(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<String>;
         #[allow(clippy::too_many_arguments)]
         fn project_curves_json(
@@ -128,6 +129,15 @@ pub fn edge_samples(shape: &Shape, edge: f64, count: f64) -> OcctResult<Value> {
 pub fn edge_continuity(shape: &Shape, edge: f64, count: f64) -> OcctResult<Value> {
     let (Some(edge), Some(count)) = (index(edge), index(count)) else { return Ok(Value::Null) };
     parsed(ffi::edge_continuity_json(inner(shape)?, edge, count))
+}
+
+/// `blendSections`: the cross-sections of blend face `face` between its contact edges `edge_a` and `edge_b` (unique indices) at `count` uniform fractions of `edge_a`:
+/// contact points, section mid point, circumradius and centre; null for a bad index, count or a face without both edges.
+pub fn blend_sections(shape: &Shape, face: f64, edge_a: f64, edge_b: f64, count: f64) -> OcctResult<Value> {
+    let (Some(face), Some(edge_a), Some(edge_b), Some(count)) = (index(face), index(edge_a), index(edge_b), index(count)) else {
+        return Ok(Value::Null);
+    };
+    parsed(ffi::blend_sections_json(inner(shape)?, face, edge_a, edge_b, count))
 }
 
 /// Why a fillet of `edges` ([] = all) with the radius `laws` (layout of `features::fillet_laws`) fails or succeeds: contour statuses, faulty vertices, partial result.

@@ -1,0 +1,35 @@
+{
+  "actions": [
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          10,
+          10,
+          10
+        ]
+      },
+      "as": "a"
+    },
+    {
+      "command": "chamfer_edge",
+      "params": {
+        "id": "$a",
+        "edgesNear": [
+          [
+            5,
+            5,
+            0
+          ]
+        ],
+        "distance": 1,
+        "distance2": 2,
+        "side1Near": [
+          5,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

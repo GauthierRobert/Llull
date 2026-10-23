@@ -32,13 +32,6 @@
     "docs/design/05-implicit-lattice/validation/plans/target_infill_solid_box.json": [
       "infill_solid"
     ],
-    "docs/design/06-variable-blends/validation/plans/target_corners_faces_chamfers.json": [
-      "fillet_faces",
-      "fillet_full_round"
-    ],
-    "docs/design/06-variable-blends/validation/plans/target_error_codes.json": [
-      "fillet_faces"
-    ],
     "docs/design/07-mesh-modeling/validation/plans/target_bad_plan_codes.json": [
       "decimate_mesh",
       "remesh_mesh"

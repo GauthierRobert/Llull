@@ -1,18 +1,32 @@
 /**
- * fillet_edge with per-edge radius laws and chord-length sizing (SC-F3): resolves each entry to a unique-edge index, converts chords to radii
- * from the planar faces at the edge, and builds one fillet node. Uniform laws keep the single-`size` recipe form every kernel reads; differing
- * laws use `radii` (a kernel that does not read it refuses).
+ * fillet_edge with per-edge radius laws and chord-length sizing (SC-F3, BLD M1): resolves each entry to a unique-edge index and a radius law
+ * (explicit, linear, or an expression sampled deterministically), checks closed edges for a periodic law, converts chords to radii from the
+ * faces at the edge (planar closed form, or sampled wedge angles on curved faces), and builds one fillet node. Uniform laws keep the
+ * single-`size` recipe form every kernel reads; differing laws use `radii` (a kernel that does not read it refuses).
  */
 
 import { round6 } from '../../lib/compactNumber';
 import type { CadDocument, EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
-import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
+import type { ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop } from '../noop';
 import { selectEdges } from './edgeSelection';
-import { type EdgeLawInput, type FilletMode, chordToRadius, lawOf, lawProblem, sameLaw, scaleLaw, wedgeAngle } from './filletSpec';
+import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
+import { chordsToRadii } from './filletChord';
+import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
+import { blendRejection } from './blendCodes';
+import {
+  type PlannedProfile,
+  type ProfileInput,
+  type ProfileRefusal,
+  isProfileRefusal,
+  prepareProfile,
+  profileText,
+  resolveProfile,
+} from './filletProfile';
+import type { BlendProfile } from '../../model/blendTypes';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { validateSolidTarget } from './modifyTarget';
@@ -31,14 +45,28 @@ export interface FilletRequest {
   readonly radiusEnd: number | undefined;
   /** Persistent names of the planned edges, in plan order, recorded by an earlier run (SC-N1). */
   readonly edgeNames?: readonly string[] | undefined;
+  readonly profile?: ProfileInput | undefined;
 }
 
 interface Planned {
   readonly edge: number;
   readonly law: EdgeRadius;
+  /** Where the face carrying the first leg is named (an entry with size2). */
+  readonly side?: { readonly near?: Vec3 | undefined; readonly name?: string | undefined } | undefined;
+  /** Position of the `edges` entry the plan came from (param paths); absent for the radius shorthand. */
+  readonly entry?: number;
 }
 
-type Resolution = { readonly planned: Planned[] } | { readonly problem: string };
+/** A refusal with a stable code: its message, the code, and the param path below the request (`edges[1].law.expression`, `radius`). */
+interface Refusal {
+  readonly code: LawProblem['code'] | 'BLD_CHORD_UNDEFINED';
+  readonly message: string;
+  readonly path: string;
+}
+
+type Resolution = { readonly planned: Planned[] } | { readonly problem: string } | { readonly refusal: Refusal };
+
+const SHORTHAND_PATHS: Readonly<Record<string, string>> = { size: 'radius', sizeEnd: 'radiusEnd' };
 
 /** Edge index of each `edges` entry (index, or the roundable edge nearest `near`) with its law. */
 function resolveEntries(topology: ShapeTopology | null, entries: readonly EdgeLawInput[]): Resolution {
@@ -46,15 +74,14 @@ function resolveEntries(topology: ShapeTopology | null, entries: readonly EdgeLa
   for (const [position, entry] of entries.entries()) {
     if ((entry.index === undefined) === (entry.near === undefined))
       return { problem: `edges[${position}] needs exactly one of index or near` };
-    const law = lawOf(entry);
-    const bad = lawProblem(law);
-    if (bad !== null) return { problem: `edges[${position}]: ${bad}` };
+    const law = resolveLaw(entry);
+    if (isLawProblem(law)) return { refusal: { ...law, path: `edges[${position}].${law.path}` } };
     const picked = selectEdges(topology, entry.index === undefined ? [] : [entry.index], entry.near === undefined ? [] : [entry.near]);
     const edge = 'problem' in picked ? undefined : picked.edges[0];
     if (edge === undefined) return { problem: `edges[${position}]: ${'problem' in picked ? picked.problem : 'no edge found'}` };
     if (planned.some((other) => other.edge === edge))
       return { problem: `edges[${position}] selects edge ${edge}, already given by another entry` };
-    planned.push({ edge, law });
+    planned.push({ edge, law, entry: position, side: { near: entry.side1Near, name: entry.side1Name } });
   }
   return { planned };
 }
@@ -63,9 +90,15 @@ function resolveEntries(topology: ShapeTopology | null, entries: readonly EdgeLa
 function resolveShorthand(topology: ShapeTopology | null, request: FilletRequest): Resolution {
   const { radius, radiusEnd } = request;
   if (radius === undefined) return { problem: 'give radius, or edges with one size per edge' };
-  const law: EdgeRadius = { size: radius, ...(radiusEnd === undefined ? {} : { sizeEnd: radiusEnd }) };
-  const bad = lawProblem(law);
-  if (bad !== null) return { problem: bad };
+  const law = resolveLaw({ size: radius, sizeEnd: radiusEnd });
+  if (isLawProblem(law))
+    return {
+      refusal: {
+        ...law,
+        message: law.message.replace(/^sizeEnd/, 'radiusEnd').replace(/^size /, 'radius '),
+        path: SHORTHAND_PATHS[law.path] ?? law.path,
+      },
+    };
   const picked = selectEdges(topology, request.edgeIndices, request.edgesNear);
   if ('problem' in picked) return { problem: picked.problem };
   const every =
@@ -75,39 +108,38 @@ function resolveShorthand(topology: ShapeTopology | null, request: FilletRequest
   return { planned: every.map((edge) => ({ edge, law })) };
 }
 
-/** Chord laws turned into radius laws from the wedge angle of the two planar faces at each edge. */
-function chordsToRadii(
-  kernel: GeometryKernel,
-  shape: ShapeHandle,
-  topology: ShapeTopology | null,
-  planned: readonly Planned[],
-): { readonly planned: Planned[] } | { readonly problem: string } {
-  const graph = kernel.faceQuery?.faceGraph(shape) ?? null;
-  if (topology === null || graph === null)
-    return { problem: 'mode "chord" needs the exact face adjacency of an exact kernel (the mesh kernel has none)' };
-  const converted: Planned[] = [];
-  for (const { edge, law } of planned) {
-    const faces = graph.edgeFaces[edge] ?? [];
-    const normals = faces.map((face) => topology.faces[face]?.normal);
-    const [a, b] = normals;
-    if (faces.length !== 2 || a === undefined || b === undefined)
+/** The first closed edge (a rim) whose law does not close on itself (r(0) = r(1)), as a refusal. */
+function openLawOnClosedEdge(topology: ShapeTopology | null, planned: readonly Planned[]): Refusal | null {
+  for (const { edge, law, entry } of planned) {
+    const shape = topology?.edges[edge];
+    const problem = shape !== undefined && closedEdge(shape) ? periodicProblem(law) : null;
+    if (problem !== null)
       return {
-        problem: `mode "chord" needs two planar faces at edge ${edge} (found ${faces.length} face(s), ${normals.filter(Boolean).length} planar)`,
+        ...problem,
+        message: `edge ${edge}: ${problem.message}`,
+        path: entry === undefined ? (SHORTHAND_PATHS[problem.path] ?? problem.path) : `edges[${entry}].${problem.path}`,
       };
-    const factor = chordToRadius(1, wedgeAngle(a, b));
-    if (!Number.isFinite(factor))
-      return { problem: `edge ${edge} joins faces that are tangent or folded flat (no corner to take a chord from)` };
-    converted.push({ edge, law: scaleLaw(law, factor) });
   }
-  return { planned: converted };
+  return null;
 }
 
-function recipeOfPlan(source: ShapeRecipe, planned: readonly Planned[], topology: ShapeTopology | null): ShapeRecipe {
+function recipeOfPlan(
+  source: ShapeRecipe,
+  planned: readonly Planned[],
+  topology: ShapeTopology | null,
+  profile: BlendProfile | undefined,
+): ShapeRecipe {
   const edges = planned.map((entry) => entry.edge);
   const mids = planned.map((entry) => topology?.edges[entry.edge]?.mid);
   const near = mids.every((mid): mid is Vec3 => mid !== undefined) ? { near: mids } : {};
   const [first] = planned;
-  const uniform = first !== undefined && planned.every((entry) => sameLaw(entry.law, first.law)) && first.law.sizes === undefined;
+  const uniform =
+    first !== undefined &&
+    planned.every((entry) => sameLaw(entry.law, first.law)) &&
+    first.law.sizes === undefined &&
+    first.law.interpolation !== 'linear' &&
+    first.law.size2 === undefined;
+  const profiled = profile === undefined ? {} : { profile };
   if (uniform)
     return {
       op: 'fillet',
@@ -116,12 +148,13 @@ function recipeOfPlan(source: ShapeRecipe, planned: readonly Planned[], topology
       size: first.law.size,
       ...(first.law.sizeEnd === undefined ? {} : { sizeEnd: first.law.sizeEnd }),
       ...near,
+      ...profiled,
     };
-  return { op: 'fillet', source, edges, size: 0, radii: planned.map((entry) => entry.law), ...near };
+  return { op: 'fillet', source, edges, size: 0, radii: planned.map((entry) => entry.law), ...near, ...profiled };
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${round6(law.size)}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
+  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : 'smooth'} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;
@@ -140,23 +173,21 @@ function byRecordedNames(
   if (resolved.indices.length !== request.edges.length) return request;
   return {
     ...request,
-    edges: request.edges.map(
-      (entry, at): EdgeLawInput => ({
-        size: entry.size,
-        index: resolved.indices[at] ?? 0,
-        ...(entry.sizeEnd === undefined ? {} : { sizeEnd: entry.sizeEnd }),
-        ...(entry.sizes === undefined ? {} : { sizes: entry.sizes }),
-      }),
-    ),
+    edges: request.edges.map((entry, at): EdgeLawInput => ({ ...entry, index: resolved.indices[at] ?? 0, near: undefined })),
   };
 }
 
 /**
- * @failure missing / non-solid target, no kernel, entry without exactly one of index/near, bad radius law, repeated or unroundable edge,
- *   chord mode without exact planar faces at an edge, kernel refusal -> unchanged doc
+ * @failure missing / non-solid target, no kernel, entry without exactly one of index/near, repeated or unroundable edge, chord mode without
+ *   face adjacency, kernel refusal -> unchanged doc; bad law -> BLD_LAW_INVALID; open law on a closed edge -> BLD_LAW_NOT_PERIODIC; tangent faces
+ *   in chord mode -> BLD_CHORD_UNDEFINED
  */
 export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, request: FilletRequest): CommandResult {
   const fail = (why: string): CommandResult => noop(doc, `fillet_edge: ${why}; document unchanged.`);
+  const refuse = (refusal: Refusal | ProfileRefusal): CommandResult =>
+    blendRejection(doc, 'fillet_edge', refusal.code, `${refusal.message} (${refusal.path})`, [request.id], [refusal.path]);
+  const profile = resolveProfile(request.profile);
+  if (isProfileRefusal(profile)) return refuse(profile);
   if (request.edges !== undefined && (request.edgeIndices.length > 0 || request.edgesNear.length > 0 || request.radius !== undefined))
     return fail('give either edges (one size per edge) or the radius / edgeIndices / edgesNear shorthand, not both');
   if (request.edges !== undefined && request.edges.length === 0) return fail('edges must not be empty');
@@ -173,6 +204,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   if ('problem' in named)
     return { ...fail(`${named.problem} on '${request.id}'`), error: commandError(named.code, REPICK_EDGES, [], ['edgeNames']) };
   const resolved = named.edges === undefined ? resolveShorthand(topology, named) : resolveEntries(topology, named.edges);
+  if ('refusal' in resolved) return refuse(resolved.refusal);
   if ('problem' in resolved) return fail(`${resolved.problem} on '${request.id}'`);
   const validated = selectEdges(
     topology,
@@ -181,12 +213,22 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   );
   if ('problem' in validated) return fail(`${validated.problem} on '${request.id}'`);
   if (resolved.planned.length === 0) return fail(`'${request.id}' has no roundable edge`);
+  const open = openLawOnClosedEdge(topology, resolved.planned);
+  if (open !== null) return refuse(open);
   const sized = request.mode === 'chord' ? chordsToRadii(kernel, shape, topology, resolved.planned) : resolved;
-  if ('problem' in sized) return fail(`${sized.problem} on '${request.id}'`);
-  const modified = recipeOfPlan(source, sized.planned, topology);
+  if ('problem' in sized) {
+    const message = `${sized.problem} on '${request.id}'`;
+    return 'code' in sized && sized.code !== undefined ? refuse({ code: sized.code, message, path: 'mode' }) : fail(message);
+  }
+  const profiled = profile.profile !== undefined || sized.planned.some((entry) => entry.law.size2 !== undefined);
+  const prepared = profiled ? prepareProfile(kernel, shape, topology, sized.planned as PlannedProfile[]) : null;
+  if (prepared !== null && isProfileRefusal(prepared)) return refuse(prepared);
+  const plan = prepared === null ? sized.planned : (prepared.planned as Planned[]);
+  const modified = recipeOfPlan(source, plan, topology, profile.profile);
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return blendRefusal(doc, 'fillet_edge', request.id, kernel, modified, result, topology);
-  const list = sized.planned.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
+  const list = plan.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
+  const section = profileText(profile.profile);
   const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
   const committed = commitKernelResult(
     doc,
@@ -194,7 +236,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     result,
     [entity],
     (newId, triangles) =>
-      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${sized.planned.length} edge(s) ${list}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
+      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
   const record =
     (request.edgeNames ?? []).length > 0

@@ -30,6 +30,8 @@ rust::String face_samples_json(const Shape &shape, int32_t face, rust::Slice<con
 // Edge queries (cpp/edge_queries.cxx): `count` (2..1001) samples of one unique edge; "null" for a degenerate / boundary edge.
 rust::String edge_samples_json(const Shape &shape, int32_t edge, int32_t count);
 rust::String edge_continuity_json(const Shape &shape, int32_t edge, int32_t count);
+// Blend face cross-sections (cpp/blend_sections.cxx): per uniform fraction of contact edge `edge_a` the radius of the circle through the contact points and the section mid point.
+rust::String blend_sections_json(const Shape &shape, int32_t face, int32_t edge_a, int32_t edge_b, int32_t count);
 // Failure report of a MakeFillet build (cpp/blends.cxx): `edges` ([] = all) and `laws` as for fillet_laws (one law then applies to every edge).
 rust::String fillet_report_json(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
 // Projection of curves onto faces (cpp/wrap.cxx): `curves` concatenated B-spline curves (degree, pole count, knot count, rational flag, xyz poles, weights, knots,

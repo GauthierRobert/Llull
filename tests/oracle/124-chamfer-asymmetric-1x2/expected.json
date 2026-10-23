@@ -1,0 +1,36 @@
+{
+  "id": "124-chamfer-asymmetric-1x2",
+  "family": "chamfer",
+  "description": "VC-BLD-18: chamfer 1 x 2 on one edge of a 10-cube (the first leg on the x+ face)",
+  "source": "analytic",
+  "formula": "V = a^3 - d1 d2 L / 2 = 1000 - 10; centroid = -V_removed c_removed / (V - V_removed) with the removed triangle (5,5) (5,4) (3,5): it tells which face carries distance (swapped sides give y -0.043771)",
+  "kernels": [
+    "occt"
+  ],
+  "bodies": 1,
+  "volume": 990,
+  "area": null,
+  "centroid": [
+    -0.043771044,
+    -0.047138047,
+    0
+  ],
+  "bbox": {
+    "min": [
+      -5,
+      -5,
+      -5
+    ],
+    "max": [
+      5,
+      5,
+      5
+    ]
+  },
+  "tolerance": {
+    "volume": 0.0000015,
+    "area": 0.001,
+    "centroid": 0.0001,
+    "bbox": 0.001
+  }
+}

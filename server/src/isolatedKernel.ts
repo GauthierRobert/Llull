@@ -78,6 +78,7 @@ const FACE_QUERY_METHODS = [
   'faceSamples',
   'edgeSamples',
   'edgeContinuity',
+  'blendSections',
   'distance',
   'bspline',
   'projectCurves',

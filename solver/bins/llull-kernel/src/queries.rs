@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::rc::Rc;
 
 /// Ops this module answers.
-pub const QUERY_OPS: [&str; 18] = [
+pub const QUERY_OPS: [&str; 19] = [
     "topology",
     "distance",
     "exportStepAssembly",
@@ -28,6 +28,7 @@ pub const QUERY_OPS: [&str; 18] = [
     "faceQuery.faceSamples",
     "faceQuery.edgeSamples",
     "faceQuery.edgeContinuity",
+    "faceQuery.blendSections",
     "faceQuery.projectCurves",
     "faceQuery.distance",
     "faceQuery.bspline",
@@ -130,6 +131,10 @@ fn face_query(session: &mut Session, method: &str, args: &[Value]) -> Reply {
                     queries::edge_continuity(shape, edge, count)
                 }
             })
+        }
+        "blendSections" => {
+            let numbers: Vec<f64> = (1..=4).map(|at| arg(args, at).as_f64().unwrap_or(-1.0)).collect();
+            session.with_shape(handle, |shape| queries::blend_sections(shape, numbers[0], numbers[1], numbers[2], numbers[3]))
         }
         "projectCurves" => project_curves(session, handle, arg(args, 1)),
         "faceSamples" => face_samples(session, handle, face, arg(args, 2)),
@@ -332,6 +337,17 @@ mod tests {
         assert!((g1 - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "a cube edge is a right angle");
         assert_eq!(call(&mut session, "faceQuery.edgeSamples", json!([{ "key": "c" }, 0, 1]))["result"], Value::Null);
         assert_eq!(call(&mut session, "faceQuery.edgeContinuity", json!([{ "key": "c" }, "x", 2]))["result"], Value::Null);
+    }
+
+    #[test]
+    fn answers_blend_sections_and_refuses_bad_arguments() {
+        let mut session = Session::new();
+        let cube = json!({ "key": "c", "recipe": box_recipe(2.0, 0.0) });
+        // A sharp cube has no blend face; face 0 and edges 0, 1 are not a tangent pair but the query still answers or refuses without failing.
+        let reply = call(&mut session, "faceQuery.blendSections", json!([cube, 0, 0, 1, 3]));
+        assert!(reply["error"].is_null(), "no OCCT failure: {reply}");
+        assert_eq!(call(&mut session, "faceQuery.blendSections", json!([{ "key": "c" }, "x", 0, 1, 3]))["result"], Value::Null);
+        assert_eq!(call(&mut session, "faceQuery.blendSections", json!([{ "key": "c" }, 0, 0, 1, 1]))["result"], Value::Null);
     }
 
     #[test]

@@ -8,6 +8,7 @@
 
 import { type Entity, type MeshSolidEntity, type ShapeRecipe, type Vec3, SOLID_KINDS } from '../model/types';
 import { SHEET_KINDS } from '../model/curveKinds';
+import { PROFILE_FACTOR_MAX, PROFILE_FACTOR_MIN } from '../model/blendTypes';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
@@ -47,7 +48,7 @@ function keyText(recipe: ShapeRecipe): string {
       return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
-      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`})`;
+      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`})`;
     case 'blend':
       return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius})`;
     case 'shell':
@@ -68,6 +69,10 @@ function keyText(recipe: ShapeRecipe): string {
       return embossKeyText(recipe, recipeKey(recipe.source));
     case 'faceOp':
       return `faceOp(${recipeKey(recipe.source)},${JSON.stringify(faceOpParamsOf(recipe))})`;
+    case 'faceBlend':
+      return `faceBlend(${recipeKey(recipe.source)},[${recipe.facesA.join(',')}],[${recipe.facesB.join(',')}],${recipe.radius}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`})`;
+    case 'fullRound':
+      return `fullRound(${recipeKey(recipe.source)},[${recipe.side1.join(',')}],[${recipe.center.join(',')}],[${recipe.side2.join(',')}])`;
   }
 }
 
@@ -169,6 +174,15 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
   for (const law of radii) {
     if (!isRecord(law) || !positiveNumber(law['size'])) return 'fillet: every radii entry needs size > 0';
     if (law['sizeEnd'] !== undefined && !positiveNumber(law['sizeEnd'])) return 'fillet: radii sizeEnd must be > 0';
+    if (law['interpolation'] !== undefined && law['interpolation'] !== 'smooth' && law['interpolation'] !== 'linear')
+      return 'fillet: radii interpolation must be "smooth" or "linear"';
+    if (law['size2'] !== undefined && !positiveNumber(law['size2'])) return 'fillet: radii size2 must be > 0';
+    const sideFace = law['sideFace'];
+    if (
+      (law['size2'] === undefined) !== (sideFace === undefined) ||
+      (sideFace !== undefined && !(Number.isInteger(sideFace) && (sideFace as number) >= 0))
+    )
+      return 'fillet: radii size2 and sideFace go together (sideFace a non-negative face index)';
     const sizes = law['sizes'];
     if (sizes === undefined) continue;
     if (!Array.isArray(sizes)) return 'fillet: radii sizes must be a list of { t, size }';
@@ -180,6 +194,52 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
       previous = t;
     }
   }
+  return null;
+}
+
+/** Why the `profile` of an untrusted fillet node is unusable (type circular / conic / curvature, rho / shape inside 0.05..0.95), or null. */
+function profileError(node: Record<string, unknown>): string | null {
+  const profile = node['profile'];
+  if (profile === undefined) return null;
+  if (node['op'] !== 'fillet') return 'chamfer: profile applies to fillets only';
+  if (!isRecord(profile)) return 'fillet: profile must be an object';
+  const factor = (value: unknown): boolean => isFiniteNumber(value) && value >= PROFILE_FACTOR_MIN && value <= PROFILE_FACTOR_MAX;
+  switch (profile['type']) {
+    case 'circular':
+      return null;
+    case 'conic':
+      return factor(profile['rho']) ? null : 'fillet: profile conic needs rho inside 0.05..0.95';
+    case 'curvature':
+      return factor(profile['shape']) ? null : 'fillet: profile curvature needs shape inside 0.05..0.95';
+    default:
+      return 'fillet: profile type must be circular, conic or curvature';
+  }
+}
+
+/** Why a face-set field of an untrusted face-blend node is unusable (a non-empty list of non-negative face indices), or null. */
+function faceSetError(node: Record<string, unknown>, fields: readonly string[]): string | null {
+  for (const field of fields) {
+    const set = node[field];
+    if (!Array.isArray(set) || set.length === 0 || !set.every((face) => Number.isInteger(face) && (face as number) >= 0))
+      return `${String(node['op'])}: ${field} must be a non-empty list of non-negative face indices`;
+  }
+  return null;
+}
+
+const radiusProblem = (node: Record<string, unknown>): string | null =>
+  positiveNumber(node['radius']) ? null : `${String(node['op'])}: radius must be > 0`;
+
+/** Why the sided-chamfer fields of an untrusted chamfer node are unusable (faces per edge with exactly one of size2 / angleDeg in (0, 90)), or null. */
+function sidedChamferError(node: Record<string, unknown>, edgeCount: number): string | null {
+  const { faces, size2, angleDeg } = node;
+  if (faces === undefined) return size2 === undefined && angleDeg === undefined ? null : 'chamfer: size2 / angleDeg need faces';
+  if (node['op'] !== 'chamfer') return 'fillet: faces apply to chamfers only';
+  if (!Array.isArray(faces) || faces.length !== edgeCount || !faces.every((face) => Number.isInteger(face) && (face as number) >= 0))
+    return 'chamfer: faces needs one non-negative face index per listed edge';
+  if ((size2 === undefined) === (angleDeg === undefined)) return 'chamfer: give exactly one of size2 or angleDeg with faces';
+  if (size2 !== undefined && !positiveNumber(size2)) return 'chamfer: size2 must be > 0';
+  if (angleDeg !== undefined && !(isFiniteNumber(angleDeg) && angleDeg > 0 && angleDeg < 90))
+    return 'chamfer: angleDeg must be inside (0, 90)';
   return null;
 }
 
@@ -196,7 +256,7 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       const edges = node['edges'];
       if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
         return `${String(node['op'])}: edges must be non-negative integers`;
-      const radiiProblem = radiiError(node, edges.length);
+      const radiiProblem = radiiError(node, edges.length) ?? sidedChamferError(node, edges.length) ?? profileError(node);
       if (radiiProblem !== null) return radiiProblem;
       if (node['radii'] === undefined && (!isFiniteNumber(node['size']) || node['size'] <= 0))
         return `${String(node['op'])}: size must be > 0`;
@@ -224,6 +284,12 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return child(node['source']);
     case 'faceOp':
       return faceOpProblem(node) ?? child(node['source']);
+    case 'faceBlend':
+      return (
+        faceSetError(node, ['facesA', 'facesB']) ?? radiusProblem(node) ?? profileError({ ...node, op: 'fillet' }) ?? child(node['source'])
+      );
+    case 'fullRound':
+      return faceSetError(node, ['side1', 'center', 'side2']) ?? child(node['source']);
     case 'emboss':
       return embossProblem(node) ?? child(node['source']);
     case 'deform':

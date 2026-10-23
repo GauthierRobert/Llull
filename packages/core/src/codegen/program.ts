@@ -52,6 +52,15 @@ export interface FeatureBase {
   readonly variable: string;
 }
 
+/** A radius law of one filleted edge as the generated code replays it: the document's law plus the nodes a kernel interpolates (null = plain radii). */
+export interface FilletLaw {
+  readonly size: number;
+  readonly sizeEnd?: number;
+  readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+  readonly linear: boolean;
+  readonly nodes: ReadonlyArray<readonly [number, number]> | null;
+}
+
 export type Feature =
   | (FeatureBase & {
       readonly op: 'solid';
@@ -72,6 +81,8 @@ export type Feature =
       readonly edges: readonly number[];
       readonly near?: ReadonlyArray<readonly [number, number, number]>;
       readonly size: Term;
+      /** Fillets only (BLD M1): one radius law per entry of `edges` (start -> end, control points, interpolation); `size` is then the first law's start. */
+      readonly laws?: ReadonlyArray<FilletLaw>;
       /** Result triangles (world soup) for targets without fillets (OpenSCAD). */
       readonly mesh?: readonly number[];
     })

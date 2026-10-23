@@ -343,8 +343,8 @@ pub(super) fn subdivision(entity: &Value) -> Evaluated {
     shape_of(crate::make_sewn_solid(&positions, &indices))
 }
 
-/// `radii` (one `EdgeRadius` per edge, `packages/core/src/model/types.ts`) flattened per edge as size, sizeEnd (NaN = constant), n, then
-/// n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
+/// `radii` (one `EdgeRadius` per edge, `packages/core/src/model/types.ts`) flattened per edge as size, sizeEnd (NaN = constant), mode (1 =
+/// `interpolation: "linear"`, else 0), n, then n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
 pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> {
     let laws = radii.as_array()?;
     if laws.len() != edge_count || edge_count == 0 {
@@ -358,7 +358,8 @@ pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> 
             return None;
         }
         let points = law.get("sizes").and_then(Value::as_array).cloned().unwrap_or_default();
-        flat.extend([size, end, points.len() as f64]);
+        let linear = law.get("interpolation").and_then(Value::as_str) == Some("linear");
+        flat.extend([size, end, if linear { 1.0 } else { 0.0 }, points.len() as f64]);
         let mut last_t = 0.0;
         for point in &points {
             let (t, radius) = (number(point, "t")?, number(point, "size")?);
@@ -372,11 +373,140 @@ pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> 
     Some(flat)
 }
 
+/// A `chamfer` node (BLD M1): symmetric `size` by default; with `faces` (one unique face index per edge, the face carrying the first leg) a second
+/// leg `size2` (distance-distance) or `angleDeg` (distance-angle, degrees measured on that face, 0 < angle < 90).
+fn chamfer_node(source: &Shape, edges: &[u32], size: f64, recipe: &Value) -> Evaluated {
+    let Some(faces) = recipe.get("faces").filter(|faces| !faces.is_null()) else {
+        return shape_of(features::chamfer(source, edges, size));
+    };
+    let (Some(faces), size2, angle) = (indices(Some(faces)), number(recipe, "size2"), number(recipe, "angleDeg")) else {
+        return refused();
+    };
+    if faces.len() != edges.len() {
+        return refused();
+    }
+    match (size2, angle) {
+        (Some(second), None) if positive(second) => shape_of(features::chamfer_sided(source, edges, &faces, size, second, false)),
+        (None, Some(degrees)) if degrees > 0.0 && degrees < 90.0 => {
+            shape_of(features::chamfer_sided(source, edges, &faces, size, degrees.to_radians(), true))
+        }
+        _ => refused(),
+    }
+}
+
+/// The blend report of a profile / face blend / full round: `stage` with the reason (a leading `[BLD_CODE]` names the stable code), or `none` when it
+/// builds (`reason` empty).
+fn blend_stage_report(stage: &str, reason: &str) -> Value {
+    let builds = reason.is_empty();
+    let mut report = serde_json::json!({
+        "contours": [], "vertices": [], "unsupportedVertices": [], "partial": false,
+        "stage": if builds { "none" } else { stage }, "done": builds, "valid": builds,
+    });
+    if !builds {
+        report["message"] = Value::String(reason.to_string());
+    }
+    report
+}
+
+/// BLD M2: the flat layout of `features::fillet_profile` for a fillet node with a conic / curvature `profile` or a `size2` leg (7 numbers per
+/// edge); `Ok(None)` for a circular, symmetric fillet, `Err` when the node is malformed (a size that varies, rho / shape outside 0.05..0.95).
+fn profile_specs(recipe: &Value, edges: &[u32]) -> Result<Option<Vec<f64>>, ()> {
+    let profile = recipe.get("profile").filter(|profile| !profile.is_null());
+    let name = profile.and_then(|profile| profile.get("type")).and_then(Value::as_str).unwrap_or("circular");
+    let laws: Vec<&Value> = match recipe.get("radii").filter(|radii| !radii.is_null()) {
+        Some(radii) => radii.as_array().ok_or(())?.iter().collect(),
+        None => vec![recipe; edges.len()],
+    };
+    let sided = laws.iter().any(|law| law.get("size2").is_some_and(|size2| !size2.is_null()));
+    if name == "circular" && !sided {
+        return Ok(None);
+    }
+    if laws.len() != edges.len() || edges.is_empty() {
+        return Err(());
+    }
+    let factor = |field: &str| profile.and_then(|profile| number(profile, field)).filter(|value| (0.05..=0.95).contains(value));
+    let (kind, param) = match name {
+        "conic" => (0.0, factor("rho").ok_or(())?),
+        "curvature" => (1.0, factor("shape").ok_or(())?),
+        "circular" => (2.0, 0.0),
+        _ => return Err(()),
+    };
+    let mut flat = Vec::new();
+    for (edge, law) in edges.iter().zip(laws) {
+        let size = number(law, "size").filter(|size| positive(*size)).ok_or(())?;
+        let varying = law.get("sizeEnd").is_some_and(|end| !end.is_null())
+            || law.get("sizes").and_then(Value::as_array).is_some_and(|sizes| !sizes.is_empty());
+        if varying {
+            return Err(());
+        }
+        let size2 = match law.get("size2").filter(|size2| !size2.is_null()) {
+            Some(value) => value.as_f64().filter(|size2| positive(*size2)).ok_or(())?,
+            None => f64::NAN,
+        };
+        let side = law.get("sideFace").and_then(Value::as_u64).map_or(-1.0, |face| face as f64);
+        if !size2.is_nan() && side < 0.0 {
+            return Err(());
+        }
+        flat.extend([f64::from(*edge), kind, param, size, size2, side, 0.0]);
+    }
+    Ok(Some(flat))
+}
+
+const FACE_SET_REASON: &str = "[BLD_FACE_BLEND_UNSUPPORTED] this build blends one planar face per set";
+
+/// The single unique face index of a face set, `None` when the set is empty or has several faces.
+fn one_face(recipe: &Value, field: &str) -> Option<f64> {
+    match indices(recipe.get(field))?.as_slice() {
+        [face] => Some(f64::from(*face)),
+        _ => None,
+    }
+}
+
+/// BLD M4 `faceBlend` node as the flat spec of `features::face_blend`: face A, face B, radius, section kind, rho / shape.
+fn face_blend_spec(recipe: &Value) -> Option<[f64; 5]> {
+    let radius = number(recipe, "radius").filter(|radius| positive(*radius))?;
+    let profile = recipe.get("profile").filter(|profile| !profile.is_null());
+    let factor = |field: &str| profile.and_then(|profile| number(profile, field)).filter(|value| (0.05..=0.95).contains(value));
+    let (kind, param) = match profile.and_then(|profile| profile.get("type")).and_then(Value::as_str).unwrap_or("circular") {
+        "circular" => (2.0, 0.0),
+        "conic" => (0.0, factor("rho")?),
+        "curvature" => (1.0, factor("shape")?),
+        _ => return None,
+    };
+    Some([one_face(recipe, "facesA")?, one_face(recipe, "facesB")?, radius, kind, param])
+}
+
+/// BLD M4 `fullRound` node as the flat spec of `features::full_round`: side 1, center, side 2.
+fn full_round_spec(recipe: &Value) -> Option<[f64; 3]> {
+    Some([one_face(recipe, "side1")?, one_face(recipe, "center")?, one_face(recipe, "side2")?])
+}
+
 impl Evaluator {
+    /// BLD M4 `faceBlend`: a rolling-ball blend between two planar faces (`features::face_blend`).
+    pub(super) fn face_blend(&mut self, recipe: &Value) -> Evaluated {
+        let Some(source) = self.child(recipe, "source")? else { return refused() };
+        let Some(spec) = face_blend_spec(recipe) else { return refused() };
+        shape_of(features::face_blend(&source, &spec))
+    }
+
+    /// BLD M4 `fullRound`: the half-round that consumes the center face between two parallel sides (`features::full_round`).
+    pub(super) fn full_round(&mut self, recipe: &Value) -> Evaluated {
+        let Some(source) = self.child(recipe, "source")? else { return refused() };
+        let Some(spec) = full_round_spec(recipe) else { return refused() };
+        shape_of(features::full_round(&source, &spec))
+    }
+
     /// `fillet` / `chamfer` (`roundEdges`): unique-edge indices in explorer order, `[]` = all.
     pub(super) fn round(&mut self, recipe: &Value, chamfer: bool) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
         let Some(edges) = indices(recipe.get("edges")) else { return refused() };
+        if !chamfer {
+            match profile_specs(recipe, &edges) {
+                Err(()) => return refused(),
+                Ok(Some(specs)) => return shape_of(features::fillet_profile(&source, &specs)),
+                Ok(None) => {}
+            }
+        }
         if let (false, Some(radii)) = (chamfer, recipe.get("radii").filter(|radii| !radii.is_null())) {
             let Some(laws) = radius_laws(radii, edges.len()) else { return refused() };
             return shape_of(features::fillet_laws(&source, &edges, &laws));
@@ -387,26 +517,53 @@ impl Evaluator {
             return refused();
         }
         if chamfer {
-            shape_of(features::chamfer(&source, &edges, size))
-        } else {
-            shape_of(features::fillet(&source, &edges, size, size_end))
+            return chamfer_node(&source, &edges, size, recipe);
         }
+        shape_of(features::fillet(&source, &edges, size, size_end))
     }
 
     /// BLD M0: why the `fillet` recipe fails (or that it builds): the source is evaluated (cached), the fillet is rebuilt for the OCCT contour and
     /// vertex diagnostics (`queries::fillet_report`). `Value::Null` for any other recipe or a refused source.
     pub fn blend_report(&mut self, recipe: &Value) -> Result<Value, EvalError> {
-        if recipe.get("op").and_then(Value::as_str) != Some("fillet") {
+        let op = recipe.get("op").and_then(Value::as_str);
+        if op == Some("faceBlend") || op == Some("fullRound") {
+            let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
+            let (stage, reason) = match (op, face_blend_spec(recipe), full_round_spec(recipe)) {
+                (Some("faceBlend"), Some(spec), _) => {
+                    ("faceBlend", features::face_blend_reason(&source, &spec).map_err(EvalError::Failure)?)
+                }
+                (Some("fullRound"), _, Some(spec)) => {
+                    ("fullRound", features::full_round_reason(&source, &spec).map_err(EvalError::Failure)?)
+                }
+                (Some("faceBlend"), None, _) => ("faceBlend", FACE_SET_REASON.to_string()),
+                _ => ("fullRound", FACE_SET_REASON.to_string()),
+            };
+            return Ok(blend_stage_report(stage, &reason));
+        }
+        if op != Some("fillet") {
             return Ok(Value::Null);
         }
         let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
         let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
+        match profile_specs(recipe, &edges) {
+            Err(()) => {
+                return Ok(blend_stage_report(
+                    "profile",
+                    "the profile blend parameters are malformed (a varying size, rho or shape outside 0.05..0.95, size2 without a side)",
+                ))
+            }
+            Ok(Some(specs)) => {
+                let reason = features::profile_reason(&source, &specs).map_err(EvalError::Failure)?;
+                return Ok(blend_stage_report("profile", &reason));
+            }
+            Ok(None) => {}
+        }
         let laws = match recipe.get("radii").filter(|radii| !radii.is_null()) {
             Some(radii) => radius_laws(radii, edges.len()),
             None => number(recipe, "size").filter(|size| positive(*size)).map(|size| {
                 let end = number(recipe, "sizeEnd").unwrap_or(f64::NAN);
                 // one law, repeated per listed edge (an empty list = every edge: the facade reuses the single law)
-                [size, end, 0.0].repeat(edges.len().max(1))
+                [size, end, 0.0, 0.0].repeat(edges.len().max(1))
             }),
         };
         let Some(laws) = laws else { return Ok(Value::Null) };
@@ -617,6 +774,7 @@ mod tests {
 
     #[test]
     fn a_pocket_floor_fillet_adds_the_concave_fillet_material() {
+        let _serial = crate::serial_blends();
         let mut evaluator = Evaluator::new(16);
         let source =
             json!({ "op": "solid", "entity": { "kind": "box", "size": [10, 10, 2], "position": [0, 0, 0], "rotation": [0, 0, 0] } });
