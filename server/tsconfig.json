@@ -26,6 +26,7 @@
     "../packages/domain-cae/src",
     "../packages/domain-aero/src",
     "../packages/domain-dynamics/src",
+    "../packages/domain-implicit/src",
     "../packages/design-lang/src",
     "../packages/plm/src",
     "../packages/kernel-manifold/src",

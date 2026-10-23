@@ -8,6 +8,7 @@
       "@cae/*": ["./packages/domain-cae/src/*"],
       "@aero/*": ["./packages/domain-aero/src/*"],
       "@dynamics/*": ["./packages/domain-dynamics/src/*"],
+      "@implicit/*": ["./packages/domain-implicit/src/*"],
       "@design/*": ["./packages/design-lang/src/*"],
       "@plm/*": ["./packages/plm/src/*"],
       "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],

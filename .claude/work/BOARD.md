@@ -67,8 +67,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   handles (`push_pull_face` / `replace_face` / `draft_faces`), control-net overlays, loop-cut factor drag, desktop-app pass on cage editing
   (pointer capture, gizmo + floating origin); M4 `edit_nurbs` ops + `subdivision_to_nurbs`; M5 open cages, bridge / bevel / delete / fill /
   weld / slide; M6 `/preview`, `move_faces`, `delete_faces`; `squash_steps`; `freeform` toolset view. _Lane 2 + 1 + native_ _deps: —_
-- `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,
-  `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: — (mesh asset store = DES-7b M3, adopt when built)_
+- `[TODO]` **DES-5b** 05 IMP left after M0–M3 (done 2026-10-23, §13): M4 native `llull-field` (Rust, tape format §13.3, parity §13.6) +
+  `llull-compute field` + `server/src/native/fieldEngine.ts` installer (closes pack plans refused at their written voxel by the TS 2^21 grid
+  budget); M5 scalar fields + graded laws, `infill_solid`, `edit_field` / `delete_field` / `regenerate_implicit_bodies`, `add_graph_lattice`,
+  `section_field`, more cells / maps, 3MF beam lattice, overhang + EDT wall checks, lattice mechanics; M6 3MF implicit export, dual contouring
+  (closes VC-15 mesh −1.1 %), Voronoi. _Lane 1 + native_ _deps: — (mesh asset store = DES-7b M3, adopt when built)_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-6** Left after AERO-4/5 (each in its spec §13): CAx-IF composite conformance with a second CAD system / CAx-IF test files, JT (deferred by

@@ -48,6 +48,7 @@ packages/domain-cae/src/  @cae   plugins `cae` (05 FEA set-up, decks, results, t
 packages/domain-aero/src/ @aero  plugins aerodynamics + surfacing (toolset aerodynamics) · sheetmetal + composites (toolset manufacturing) ·
                                  fasteners · fluids · cfd (toolset flow)
 packages/domain-dynamics/src/ @dynamics  plugin `dynamics` (toolset assembly): bodies, joints, gears, motors, propellers, cylinders, engine laws, simulate_motion, loads, mechanism checks (sim/ logic, commands/); docs/DYNAMICS.md
+packages/domain-implicit/src/ @implicit  plugin `implicit` (05 IMP, toolset implicit): field primitives, booleans + blends, TPMS / strut lattices, implicit bodies (derived meshes re-derived on load), properties + manufacturability checks; numerics in core `geometry/field`
 packages/design-lang/src/ @design  plugin `design`: `.lld` text designs (one recipe step, re-run on regeneration); removable — docs/DESIGN_LANGUAGE.md
 packages/plm/src/         @plm   plugin `plm` (09 PLM): managed item, revisions + release lock (guard), change control (ECR/ECO), effectivity,
                                  EBOM/MBOM + baselines, signatures, characteristics/FAI, QIF import, AP242 PDM export, LOTAR, local vault
@@ -84,7 +85,7 @@ npm install          # root + workspaces (server/, desktop/ separately: npm --pr
 npm --prefix desktop run build && npm --prefix desktop start   # run the desktop app (desktop/README.md)
 npm run dev          # Vite renderer dev server (HMR) for UI iteration only; verify in the desktop app
 npm run check        # typecheck + arch + deadcode + lint + format:check + native:check (solver/; skipped without cargo) + test — MUST pass before commit
-npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero,dynamics} + design-lang + plm
+npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero,dynamics,implicit} + design-lang + plm
 npm run claude:lint  # after editing .claude/
 npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)
 node server/bin/llull.cjs help # CLI (llull-cli skill)
@@ -96,6 +97,6 @@ npm --prefix server test ; npm --prefix desktop test
 1. Commands are pure (new doc, never mutate input; `is pure` test).
 2. New command = `defineCommand({ name, description, params: z.object(…), run })` + registration (core: feature
    `catalog.ts`; domain: plugin `commands`) + unit test (happy + failure).
-3. Coverage 90/85/90/90 on `packages/core/src/{commands,geometry,dynamics}/**` + `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/**`.
+3. Coverage 90/85/90/90 on `packages/core/src/{commands,geometry,dynamics}/**` + `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,domain-implicit,design-lang,plm}/src/**`.
 4. Command/tool `name` is `snake_case`.
 5. TS strict, no `any`, ≤500 code lines/file, `npm run check` green.

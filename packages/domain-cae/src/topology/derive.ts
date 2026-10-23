@@ -5,10 +5,9 @@
 
 import type { FeTopologyArtifact, SymmetryPlane } from '@core/model/topology';
 import type { MeshData, Vec3 } from '@core/model/types';
-import { elementAt } from '@lib/elementAt';
 import { pointInPolygon } from '@lib/polygon';
 import { quantizedKey } from '@lib/quantize';
-import { cross3 as cross, dot3 as dot, sub3 as sub } from '@lib/vec3';
+import { marchingTetrahedra } from '@lib/isosurface/tetra';
 import { triangulatePolygon } from '@lib/triangulate';
 import { marchingSquares, nodeGridOfVoxels, type Point } from './contours';
 
@@ -112,106 +111,27 @@ function extrudedContour(grid: FeTopologyArtifact['grid'], field: Float32Array, 
   return builder.mesh();
 }
 
-/** Corner offsets of the six Kuhn tetrahedra of a cube (paths from corner 000 to 111). */
-const KUHN: ReadonlyArray<readonly [Vec3, Vec3, Vec3, Vec3]> = [
-  [
-    [0, 0, 0],
-    [1, 0, 0],
-    [1, 1, 0],
-    [1, 1, 1],
-  ],
-  [
-    [0, 0, 0],
-    [1, 0, 0],
-    [1, 0, 1],
-    [1, 1, 1],
-  ],
-  [
-    [0, 0, 0],
-    [0, 1, 0],
-    [1, 1, 0],
-    [1, 1, 1],
-  ],
-  [
-    [0, 0, 0],
-    [0, 1, 0],
-    [0, 1, 1],
-    [1, 1, 1],
-  ],
-  [
-    [0, 0, 0],
-    [0, 0, 1],
-    [1, 0, 1],
-    [1, 1, 1],
-  ],
-  [
-    [0, 0, 0],
-    [0, 0, 1],
-    [0, 1, 1],
-    [1, 1, 1],
-  ],
-];
+/** Node values this close to the threshold are moved just below it: no vertex lands on a node, so no zero-area triangles (node values are multiples of 1/8, 0.5 is common). */
+const THRESHOLD_SNAP = 1e-3;
 
-interface Corner {
-  readonly at: Vec3;
-  readonly value: number;
-}
-
-const average = (points: readonly Vec3[]): Vec3 => [
-  points.reduce((sum, p) => sum + p[0], 0) / points.length,
-  points.reduce((sum, p) => sum + p[1], 0) / points.length,
-  points.reduce((sum, p) => sum + p[2], 0) / points.length,
-];
-
-function marchingTetrahedra(grid: FeTopologyArtifact['grid'], field: Float32Array, threshold: number): MeshData {
+/** Marching tetrahedra (lib/isosurface/tetra) on node values averaged from the adjacent voxels, padded with 0 so the surface closes. */
+function marchingTetrahedraOfVoxels(grid: FeTopologyArtifact['grid'], field: Float32Array, threshold: number): MeshData {
   const { nx, ny, nz } = grid;
-  const builder = new MeshBuilder();
   const voxel = (i: number, j: number, k: number): number =>
     i >= 0 && j >= 0 && k >= 0 && i < nx && j < ny && k < nz ? (field[i + nx * (j + ny * k)] ?? 0) : 0;
-  const nodeValue = (i: number, j: number, k: number): number => {
-    let sum = 0;
-    for (let dk = -1; dk <= 0; dk += 1)
-      for (let dj = -1; dj <= 0; dj += 1) for (let di = -1; di <= 0; di += 1) sum += voxel(i + di, j + dj, k + dk);
-    return sum / 8;
-  };
-  const place = ([i, j, k]: Vec3): Vec3 => [
-    (grid.origin[0] ?? 0) + i * grid.voxel,
-    (grid.origin[1] ?? 0) + j * grid.voxel,
-    (grid.origin[2] ?? 0) + k * grid.voxel,
-  ];
-  const rank = ([i, j, k]: Vec3): number => i + 1 + (nx + 3) * (j + 1 + (ny + 3) * (k + 1));
-  const cut = (a: Corner, b: Corner): Vec3 => {
-    const [low, high] = rank(a.at) < rank(b.at) ? [a, b] : [b, a];
-    const t = high.value === low.value ? 0.5 : (threshold - low.value) / (high.value - low.value);
-    const [p, q] = [place(low.at), place(high.at)];
-    return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
-  };
-  for (let k = -1; k <= nz; k += 1)
-    for (let j = -1; j <= ny; j += 1)
-      for (let i = -1; i <= nx; i += 1)
-        for (const tetrahedron of KUHN) {
-          const corners = tetrahedron.map(
-            ([di, dj, dk]): Corner => ({ at: [i + di, j + dj, k + dk], value: nodeValue(i + di, j + dj, k + dk) }),
-          );
-          const inside = corners.filter((corner) => corner.value >= threshold);
-          const outside = corners.filter((corner) => corner.value < threshold);
-          if (inside.length === 0 || outside.length === 0) continue;
-          const from = average(inside.map((corner) => place(corner.at)));
-          const to = average(outside.map((corner) => place(corner.at)));
-          const emit = (a: Vec3, b: Vec3, c: Vec3): void => {
-            const normal = cross(sub(b, a), sub(c, a));
-            builder.triangle(a, b, c, dot(normal, sub(to, from)) < 0);
-          };
-          if (inside.length === 2) {
-            const [a, b, c, d] = [elementAt(inside, 0), elementAt(inside, 1), elementAt(outside, 0), elementAt(outside, 1)];
-            emit(cut(a, c), cut(a, d), cut(b, d));
-            emit(cut(a, c), cut(b, d), cut(b, c));
-          } else {
-            const [apex, base] = inside.length === 1 ? [elementAt(inside, 0), outside] : [elementAt(outside, 0), inside];
-            emit(cut(apex, elementAt(base, 0)), cut(apex, elementAt(base, 1)), cut(apex, elementAt(base, 2)));
-          }
-        }
-  return builder.mesh();
+  const nodes: [number, number, number] = [nx + 3, ny + 3, nz + 3];
+  const values = new Float64Array(nodes[0] * nodes[1] * nodes[2]);
+  for (let k = 0; k < nodes[2]; k += 1)
+    for (let j = 0; j < nodes[1]; j += 1)
+      for (let i = 0; i < nodes[0]; i += 1) {
+        let sum = 0;
+        for (let dk = -1; dk <= 0; dk += 1)
+          for (let dj = -1; dj <= 0; dj += 1) for (let di = -1; di <= 0; di += 1) sum += voxel(i - 1 + di, j - 1 + dj, k - 1 + dk);
+        const value = sum / 8;
+        values[i + nodes[0] * (j + nodes[1] * k)] = Math.abs(value - threshold) < THRESHOLD_SNAP ? threshold - THRESHOLD_SNAP : value;
+      }
+  const origin: Vec3 = [(grid.origin[0] ?? 0) - grid.voxel, (grid.origin[1] ?? 0) - grid.voxel, (grid.origin[2] ?? 0) - grid.voxel];
+  return marchingTetrahedra({ nodes, origin, voxel: grid.voxel, values, threshold, insideAbove: true }) ?? { positions: [], indices: [] };
 }
 
 /**
@@ -227,5 +147,5 @@ export function deriveTopologyMesh(
   const symmetric = symmetrise(field, artifact.grid, planes);
   return artifact.grid.dimension === 2
     ? extrudedContour(artifact.grid, symmetric, threshold)
-    : marchingTetrahedra(artifact.grid, symmetric, threshold);
+    : marchingTetrahedraOfVoxels(artifact.grid, symmetric, threshold);
 }

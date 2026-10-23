@@ -33,66 +33,11 @@
     "docs/design/04-direct-freeform-editing/validation/plans/target_subd_to_nurbs.json": [
       "subdivision_to_nurbs"
     ],
-    "docs/design/05-implicit-lattice/validation/plans/target_cylindrical_gyroid_sleeve.json": [
-      "add_field_primitive",
-      "add_tpms_lattice",
-      "check_implicit",
-      "combine_fields",
-      "create_implicit_body",
-      "implicit_properties"
-    ],
-    "docs/design/05-implicit-lattice/validation/plans/target_errors.json": [
-      "add_field_primitive",
-      "add_strut_lattice",
-      "add_tpms_lattice",
-      "combine_fields",
-      "create_implicit_body"
-    ],
     "docs/design/05-implicit-lattice/validation/plans/target_graded_gyroid_column.json": [
-      "add_field_primitive",
-      "add_tpms_lattice",
-      "check_implicit",
-      "create_implicit_body",
-      "create_scalar_field",
-      "implicit_properties",
-      "lattice_properties"
+      "create_scalar_field"
     ],
     "docs/design/05-implicit-lattice/validation/plans/target_infill_solid_box.json": [
-      "check_implicit",
-      "implicit_properties",
       "infill_solid"
-    ],
-    "docs/design/05-implicit-lattice/validation/plans/target_octet_beam_lattice_3mf.json": [
-      "add_field_primitive",
-      "add_strut_lattice",
-      "create_implicit_body",
-      "implicit_properties",
-      "lattice_properties"
-    ],
-    "docs/design/05-implicit-lattice/validation/plans/target_sc_strut_lattice_cell.json": [
-      "add_field_primitive",
-      "add_strut_lattice",
-      "check_implicit",
-      "create_implicit_body",
-      "implicit_properties",
-      "lattice_properties"
-    ],
-    "docs/design/05-implicit-lattice/validation/plans/target_shell_gyroid_infill.json": [
-      "add_field_primitive",
-      "add_tpms_lattice",
-      "check_implicit",
-      "combine_fields",
-      "create_implicit_body",
-      "field_from_solid",
-      "implicit_properties",
-      "shell_field"
-    ],
-    "docs/design/05-implicit-lattice/validation/plans/target_smooth_union_corner.json": [
-      "add_field_primitive",
-      "combine_fields",
-      "create_implicit_body",
-      "evaluate_field",
-      "implicit_properties"
     ],
     "docs/design/06-variable-blends/validation/plans/target_corners_faces_chamfers.json": [
       "fillet_faces",

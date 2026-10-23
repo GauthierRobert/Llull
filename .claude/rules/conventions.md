@@ -25,7 +25,7 @@ If a comment restates the code, delete it. Prose belongs in `docs/` (the human l
 ## C4 — Imports & paths
 
 Aliases, never deep relatives across packages: `@core/*` `@lib/*` `@protocol/*` `@aec/*`
-`@cae/*` `@aero/*` `@design/*` `@plm/*` `@kernel-manifold/*` `@physics-mujoco/*` `@ui/*` `@app/*` `@server/*`. Inside `packages/core/src` use relative
+`@cae/*` `@aero/*` `@implicit/*` `@design/*` `@plm/*` `@kernel-manifold/*` `@physics-mujoco/*` `@ui/*` `@app/*` `@server/*`. Inside `packages/core/src` use relative
 imports. Aliases are defined once, in `tsconfig.base.json` (extended by `tsconfig.json` and
 `server/tsconfig.json`; Vite/Vitest read it through `workspaceAliases.ts`) — add a package there only.
 

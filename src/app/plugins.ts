@@ -13,6 +13,7 @@ import {
   surfacingPlugin,
 } from '@aero/index';
 import { dynamicsPlugin } from '@dynamics/index';
+import { implicitPlugin } from '@implicit/index';
 import { designPlugin } from '@design/index';
 import { plmPlugin } from '@plm/index';
 
@@ -36,4 +37,5 @@ export function installDefaultPlugins(): void {
   installPlugin(plmPlugin);
   installPlugin(explicitPlugin);
   installPlugin(scanPlugin);
+  installPlugin(implicitPlugin);
 }

@@ -257,6 +257,26 @@ describe('deriveTopologyMesh', () => {
     expect(new Set(mesh.indices).size).toBe(mesh.positions.length / 3);
   });
 
+  it('a block whose node values hit the threshold has no zero-area triangles and no coincident vertices', () => {
+    const field = fieldOf(6, 6, 6, (i, j, k) => i >= 2 && i <= 3 && j >= 2 && j <= 3 && k >= 2 && k <= 3);
+    const mesh = deriveTopologyMesh(artifactOf(6, 6, 6), field, 0.5, []);
+    const key = (v: number): string => [0, 1, 2].map((a) => (mesh.positions[3 * v + a] ?? 0).toFixed(9)).join(',');
+    expect(new Set(Array.from({ length: mesh.positions.length / 3 }, (_, v) => key(v))).size).toBe(mesh.positions.length / 3);
+    for (let tri = 0; tri < mesh.indices.length; tri += 3) {
+      const [a, b, c] = [mesh.indices[tri] ?? 0, mesh.indices[tri + 1] ?? 0, mesh.indices[tri + 2] ?? 0];
+      const p = (v: number, axis: number): number => mesh.positions[3 * v + axis] ?? 0;
+      const u = [0, 1, 2].map((axis) => p(b, axis) - p(a, axis));
+      const w = [0, 1, 2].map((axis) => p(c, axis) - p(a, axis));
+      const cross = Math.hypot(
+        (u[1] ?? 0) * (w[2] ?? 0) - (u[2] ?? 0) * (w[1] ?? 0),
+        (u[2] ?? 0) * (w[0] ?? 0) - (u[0] ?? 0) * (w[2] ?? 0),
+        (u[0] ?? 0) * (w[1] ?? 0) - (u[1] ?? 0) * (w[0] ?? 0),
+      );
+      expect(cross).toBeGreaterThan(1e-9);
+    }
+    expect(volumeAndClosure(mesh).closed).toBe(true);
+  });
+
   it('closes the surface of a field that fills the grid up to its border', () => {
     const flat = volumeAndClosure(deriveTopologyMesh(artifactOf(4, 4, 1, 'XY'), new Float32Array(16).fill(1), 0.5, []));
     expect(flat.closed).toBe(true);

@@ -1,0 +1,13 @@
+# Gyroid-filled block: a clipped TPMS lattice realised as a body, measured and checked with the implicit toolset
+design infill units=mm
+param cell = 10
+param side = 2*cell
+
+add_field_primitive block shape="box" size=[side, side, side] position=[cell, cell, cell]
+add_tpms_lattice gyro kind="gyroid" form="network" level=0 cellSize=cell origin=[0, 0, 0] region=block
+create_implicit_body body field=gyro voxel=1
+
+check lattice_properties id=gyro path=rhoMeasured expect ~= 0.5 ± 0.1%
+check evaluate_field field=block points=[[cell, cell, cell]] path=values.0 expect == -cell
+check implicit_properties id=body path=components expect == 1
+check check_implicit id=body path=status expect == "warn"

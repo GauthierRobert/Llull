@@ -632,3 +632,169 @@ Same numbering as FUNCTIONAL_SPEC §11 ([R1]–[R26]); additionally:
 - llull internal: `docs/decisions/RS1-native-compute.md`, `docs/decisions/LIM1-scale.md`, `docs/decisions/LC1-local-only.md`,
   `docs/decisions/KI5-shape-kernel-boundary.md`, `.claude/rules/architecture.md`, `packages/domain-cae/src/topology/derive.ts`,
   `node_modules/manifold-3d/manifold-encapsulated-types.d.ts` (3.5.4).
+
+---
+
+## 13. As built (DES-5: M0–M3, 2026-10-23)
+
+Delivered: M0 workspace, M1 core field numerics + shared mesher, M2 plugin MVP, M3 lattice MVP. Not delivered (next): M4 native `llull-field`, M5/M6 (§13.7).
+Decisions D1–D8 were taken as recommended: D1 plugin `@implicit` (`packages/domain-implicit`), numerics in core `geometry/field`; D2 one tape shared by TS and Rust; D3 derived meshes are
+not stored (recipe + `contentHash`; `DocumentExtension.restore` re-derives bodies in creation order against the entities restored so far, so bodies may be built on bodies; a mesh that realises with another hash, e.g. another engine, is kept and the record is rewritten; a body the engine refuses is dropped from `order`/`selection` and `afterLoad` reports `IMP_BODY_STALE`); D4 no Manifold `levelSet` mesher; D5 toolset `implicit` with `packages/design-lang/examples/implicit.lld`; D6 no printer table; D7 open (M6); D8 only gyroid / Schwarz P /
+diamond are enabled (no other TPMS equation is transcribed). D9 as proposed (blocking engine call).
+
+### 13.1 Files
+
+| Area | Files |
+| ---- | ----- |
+| Workspace (M0) | `packages/domain-implicit/{package.json,src/index.ts}`; `@implicit/*` in `tsconfig.base.json` (Vite/Vitest read it through `workspaceAliases.ts`) and `server/tsconfig.json`; coverage gate `packages/domain-implicit/src/**` and a chunk group in `vite.config.ts`; `.dependency-cruiser.cjs` layer comment (the `domain-[^/]+` rules already cover the package, including `hosts-use-plugins-through-their-index`); `package-lock.json` workspace entry; toolset `implicit` in `packages/protocol/src/toolsets.ts` (+ the palette label in `src/ui/components/commandPalette/paletteItems.ts`, required by its `satisfies Record<ToolsetName, string>`); `installPlugin(implicitPlugin)` in `src/app/plugins.ts`; `tests/setup.ts` resets the field engine |
+| Core numerics (M1) | `packages/core/src/geometry/field/{program,build,interpret,gradient,interval,strutSet,meshSdf,components,engineTypes,engine,tsEngine}.ts`; `ExecutionContext.fieldEngine` (`commands/types.ts`, `context.ts`) |
+| Mesher (M1) | `packages/core/src/lib/isosurface/{tetra,measures}.ts`; `packages/domain-cae/src/topology/derive.ts` now calls `marchingTetrahedra` (the private mesher is gone) |
+| Plugin (M2/M3) | `packages/domain-implicit/src/*.ts`: `model, codes, frame, primitives, tpms, tpmsControl, struts, solidMesh, compile, realise, nodeResult, measure, document` + commands `primitiveCommand, opCommands, solidCommand, latticeCommands, bodyCommand, evaluateCommand, propertiesQuery, latticeProperties, checkImplicit`, `catalog.ts`, `plugin.ts` |
+
+### 13.2 Commands (13, all pure `defineCommand`, none `requiresKernel`)
+
+`add_field_primitive`, `field_from_solid`, `combine_fields`, `offset_field`, `shell_field`, `transform_field`, `add_tpms_lattice`, `add_strut_lattice`, `create_implicit_body`, `evaluate_field`
+(Q), `implicit_properties` (Q), `lattice_properties` (Q), `check_implicit` (Q). All return `data` with `unit`, `distanceQuality`, `unverified`, `provenance`; refusals use the §7.1 codes
+(`IMP_PARAM_RANGE`, `IMP_PARAM_CONFLICT`, `IMP_FIELD_NOT_FOUND`, `IMP_ENTITY_NOT_FOUND`, `IMP_SOLID_NOT_CLOSED`, `IMP_TPMS_CONTROL_RANGE`, `IMP_STRUT_RADIUS_RANGE`, `IMP_MAP_SEAM`,
+`IMP_FIELD_UNBOUNDED`, `IMP_GRID_BUDGET`, `IMP_TRIANGLE_BUDGET`, `IMP_BODY_EMPTY`, `IMP_ENGINE_FAILED`, `IMP_DERIVED_READ_ONLY`); findings of `check_implicit` use
+`IMP_CHECK_MESH_NOT_MANIFOLD`, `IMP_CHECK_RESOLUTION_COARSE`, `IMP_CHECK_NO_PROCESS_LIMITS`, `IMP_CHECK_MIN_WALL`, `IMP_CHECK_MIN_STRUT`, `IMP_TRAPPED_VOID`, `IMP_DISCONNECTED`,
+`IMP_CHECK_INPUT_UNVERIFIED`; warnings `IMP_OFFSET_NOT_EXACT`, `IMP_BLEND_EXCEEDS_FEATURE`, `IMP_MECHANICS_UNVERIFIED`.
+
+### 13.3 Tape format (reference for the native crate `llull-field`)
+
+JSON shape (`FieldProgram`, `geometry/field/program.ts`), all numbers IEEE-754 binary64, little-endian when sent as binary:
+
+```
+{ version: 1, instructions: [{op, args:number[]}], output: number, constants: number[],
+  meshes: [{key, mesh:{positions:number[], indices:number[]}}],            // operands of mesh_sdf (closed, outward oriented)
+  strutSets: [{periodic:{cell:[3],origin:[3]}|null, nodes:[[3]], beams:[{a,b,ra,rb,cap:'sphere'|'butt'}]}],
+  bounds:{min:[3],max:[3]}|null, lipschitz:number, quality:'exact'|'bound'|'approximate', unit:string }
+```
+
+SSA: instruction `i` writes register `i` and reads only registers `< i`. `output` is the register holding f (negative inside). `args` are listed per op, `r` = register index, `c` = index
+into `constants`, `m` = index into `meshes`, `s` = index into `strutSets`, `r?` = register or `-1` (none). A conforming evaluator reproduces the TS values to 1e-12 relative.
+
+| op | args | value |
+| -- | ---- | ----- |
+| `const` | `c` | `constants[c]` |
+| `x` `y` `z` | none | the point coordinate |
+| `add` `sub` `mul` `div` | `r r` | IEEE `a+b`, `a-b`, `a*b`, `a/b` |
+| `neg` `abs` `sqrt` `square` `sin` `cos` `floor` | `r` | `-a`, `abs a`, `sqrt a` (NaN for a<0), `a*a`, `sin a`, `cos a`, `floor a` |
+| `fract` | `r` | `a - floor(a)` |
+| `min` `max` | `r r` | `Math.min`, `Math.max` |
+| `atan2` | `r r` | `atan2(args[0], args[1])` (y first) |
+| `clamp` | `r r r` | `min(max(v, lo), hi)` |
+| `select` | `r r r` | `a if c < 0 else b` (args `[c, a, b]`) |
+| `smin_quad` | `r r r` | `k <= 0 ? min(a,b) : min(a,b) - h*h*k/4`, `h = max(k - abs(a-b), 0)/k` |
+| `smin_exp` | `r r r` | `k <= 0 ? min(a,b) : m - k*ln(1 + exp(-abs(a-b)/k))`, `m = min(a,b)` |
+| `chamfer_min` | `r r r` | `min(min(a,b), (a + b - k) * sqrt(1/2))` |
+| `mesh_sdf` | `r r r m` | signed distance of `(x,y,z)` to mesh `m`: unsigned distance to the nearest triangle (closest point on triangle), negative iff the generalised winding number `w > 1/2` (Van Oosterom–Strackee per triangle; BVH nodes whose centroid is farther than `2 * half-diagonal` of their box use the dipole `N.(C-p)/dist^3`, `N` = sum of area-weighted normals, `C` = area-weighted centroid; `w = sum / (4 pi)`). BVH = `buildMeshBvh` (median split on the longest centroid axis, leaf size 8) |
+| `strut_set` | `r r r s r?` | signed distance to the beams of set `s` (below); with a radius register `>= 0`, every beam radius is replaced by it and caps are spherical |
+
+Beam distance (document units): local frame `(s, rho)` = (axial coordinate, radial distance) from the axis through nodes `a`,`b` (length `L`). `butt`: signed distance to the trapezoid
+`(0,0)-(0,ra)-(L,rb)-(L,0)` in the half plane (negative inside; magnitude = min of the distances to its three non-axis edges); `sphere`: `min(butt, |p-a|-ra, |p-b|-rb)`. A zero-length beam is a ball
+of radius `max(ra,rb)`. Periodic sets: `q = p - origin - floor((p-origin)/cell)*cell`; candidate beams = beams of the 27 neighbouring cells whose bounding box meets the cell box grown by
+the largest radius; the cell is cut into 4x4x4 buckets and a bucket keeps the beams whose box gap is `<= U + radius spread`, `U` = min over beams of the largest bucket-corner distance (this prefilter only
+removes beams that cannot be nearest). Result = min over the bucket's beams. Explicit sets (`periodic: null`) test all beams.
+
+Interval evaluation (`interval.ts`, sound enclosure over an axis-aligned box): `add/sub/mul` standard (`0*inf = 0`), `div` by an interval containing 0 gives `[-inf, inf]`, `sqrt` of a negative
+interval gives `[+inf,+inf]`, `sin/cos` exact by critical points (`[-1,1]` when the width is `>= 2 pi`), `atan2` `[-pi, pi]`, `fract` exact inside one integer cell else `[0,1]`, `select` picks a
+branch when the condition interval has one sign else the hull, `smin_quad`/`smin_exp` `[min(lo) - kmax/4 (or kmax ln 2), min(hi)]`, `chamfer_min` the interval `min` of `min(a,b)` and
+`(a+b-k)/sqrt 2`, `mesh_sdf`/`strut_set` = value at the box centre +- half the box diagonal (1-Lipschitz; with a radius register also widened by its interval).
+
+Gradient (`gradient.ts`): forward-mode duals; `smin_*`/`chamfer_min` also differentiate in `k`; `mesh_sdf`/`strut_set` use central differences of the operand with step `1e-6`.
+
+Compiler conventions (`domain-implicit/src/compile.ts`): frames are registers `(x,y,z)`; a placed shape uses `local = R^T (p - position) / scale` (R from the Euler XYZ image of the unit axes) and `f = scale * f_local`;
+primitive SDFs are the closed forms of §5.2 (cone: min distance to base edge and slanted edge, sign from `max(-z, side)`); TPMS use `F` and `|grad F|` in physical units (cell coordinates + per-axis scales
+as registers, a `1e-9` floor on `|grad F|`): normalised network `(F - level)/g`, normalised sheet `|F|/g - w/2`, raw sheet `|F| - t`, raw network `F - level`; strut lattices emit one
+`strut_set` on the lattice-local frame; clipping to a region is `max(f, f_region)`. Distance quality: primitive / solid / transform `exact`; any `min`/`max`/blend `bound`; offset/shell keep
+the source quality (warning `IMP_OFFSET_NOT_EXACT` when it is not `exact`); strut sets `bound` (L = 1); TPMS `approximate` (L = 2 normalised, `2 pi gradBound / a_min` raw).
+
+Engine contract (`engineTypes.ts`): grid `cells_i = max(1, ceil((max_i - min_i)/voxel - 1e-9))`, nodes `cells_i + 1`, node `(i,j,k)` at `min + (i,j,k)*voxel`, index `i + nx*(j + ny*k)`.
+
+- `mesh`: refuses when `nodes > limits.maxSamples` (`IMP_GRID_BUDGET`, before any sample), when the program is malformed (`IMP_ENGINE_FAILED`), when `triangles > maxTriangles`
+  (`IMP_TRIANGLE_BUDGET`, after extraction). Tiles of 8 cells are interval-evaluated; a tile whose interval is `< 0` (resp. `> 0`) fills its nodes with `-1e30` (resp. `+1e30`) unsampled; every node of a
+  tile that is not proved is evaluated; non-finite values become `+1e30` and are counted; a sampled value with `abs(v) < 1e-3 * voxel` is replaced by `+1e-3 * voxel` (no vertex lands exactly on a node: zero-area triangles and 3MF/STL welds that pinch the shell are avoided; the surface moves by < 1e-3 voxel). Extraction (`lib/isosurface/tetra.ts`): inside iff `value < 0`; cube corner bit0 = +x, bit1 = +y, bit2 = +z;
+  the six Kuhn tetrahedra are the corner lists `[0,1,3,7] [0,1,5,7] [0,2,3,7] [0,2,6,7] [0,4,5,7] [0,4,6,7]`; cubes in x-fastest order; a vertex on grid edge `(lo,hi)` (node ids, `lo<hi`) sits at
+  `t = (0 - v_lo)/(v_hi - v_lo)` (the two nodes always differ in sign class, so the denominator is non-zero) along it, is welded by the key `lo*nodeCount + hi` (exact below 94e6 nodes) and numbered in order of first use. A tetrahedron with two inside
+  nodes `a,b` and two outside nodes `c,d` (each pair in tetrahedron order) emits the triangles `[ac, ad, bd]` then `[ac, bd, bc]`; with one inside (or one outside) node it emits the three edges of
+  that apex in order. Winding: a triangle is flipped unless the normal computed from the **edge midpoints** (node units) has a non-negative dot product with `centroid(outside nodes) - centroid(inside nodes)`;
+  triangles with two equal vertex indices are dropped. `maxVertexResidual` = max `|f|` at the vertices; `closedManifold` = every directed edge once and its reverse once.
+- `measure` `volume`: the box is tiled exactly by `n_i` cells (centre `min_i + (c + 1/2) (max_i - min_i)/n_i`); `lowdiscrepancy` replaces the centres by `u_n,i = frac(1/2 + (n+1) alpha_i)`,
+  `alpha_i = phi3^-(i+1)`, `phi3 = 1.2207440846057596`, `n = 0..N-1` (`N` = cell count) scaled to the box; a sample counts whole when `f <= 0` (and `region <= 0` when given); volume =
+  count x box volume / N. `quantile`: sorted samples of `f` (or `|f|`) on the midpoint grid, the value at index `min(N-1, floor(p N))`. `components`: node is solid iff `f < 2e-3 * voxel` (closed set: bodies that only touch are one solid; the sampled values are already snapped as above); solids and voids both 14-connected (the edges of the Kuhn tetrahedra: neighbour offsets whose non-zero components share one sign), scan order x fastest; `volume = nodes * voxel^3`; `enclosed` = a void with no node on the grid boundary; the reported `point` is the member node nearest the member centroid.
+- Budgets of the TS engine: 2^21 grid nodes (measures: cells), 5 x 10^6 triangles.
+- `contentHash` of a body = `sha256(canonicalJson({program, grid: {min, max, voxel}, mesher: 'tetra', engineMajor: 1, engine: engine.name}))` where `grid` is the bounds padded by 2 voxels.
+
+### 13.4 Deviations from §3–§5 (and why)
+
+- `FieldInstruction` has no `k` member and `call` is not an op: smooth minima take the blend radius as a third register operand (a constant today, a field later without a format change).
+- `FieldEngine` answers carry `ok: true|false`; a refusal is `{ ok: false, code, message, samples?, limit? }`. `MeshOptions` is `{ mesher: 'tetra', maxTriangles }` (no `refineTolerance`, no dual contouring: V1/V2). The measure requests are `volume | quantile | components` (§5.8 area, EDT wall / pore and overhang are not engine measures yet).
+- The id of a body and of its mesh entity are the same (`imp-<step>.<k>`); `ImplicitBody` stores `name`/`color` (needed to rebuild the entity on load) and always the resolved `bounds`; `mesher` is the literal `'tetra'`.
+- `field_from_solid` reads the entity's stored triangles (a B-rep result already holds its kernel tessellation) instead of calling `ctx.kernel`, so it needs no kernel and has no `deflection`; `hideSource` lives on `create_implicit_body` (as the pack's plans use it) and moves the sources to the hidden layer `layer-implicit-hidden`.
+- Lattice laws are numbers (no field-valued `thickness` / `radius` / blend radius, no scalar fields): graded lattices wait for M5 `create_scalar_field`. TPMS `control` is `{kind:'thickness'|'level', value}` plus `relativeDensityTarget`; `relativeDensity` is inverted by the sample **quantile** of `F`, `|F|` or `|F|/|grad F|` over one cell (64^3 midpoint samples; the exact inverse of the sampled fraction) instead of a bisection. With `normalize: 'none'` the sheet `thickness` is the raw half-width `t` of `{|F| <= t}` in F units.
+- Cell maps: only `cylindrical` for TPMS (`cellsAround` integer else `IMP_MAP_SEAM`; replaces `origin`/`rotation`; radial size `radialCellSize`, axial size `cellSize[2]`); strut lattices have no map. Relative-density inversion with a map solves on the rectangular cell.
+- Strut radius rule: `2 * radius < shortest strut length of the cell` (cubic: the cell edge; bcc 0.866 a; octet 0.707 a), else `IMP_STRUT_RADIUS_RANGE`.
+- `implicit_properties.volume` = mesh volume for a body without `region`, else the field quadrature; `volumeQuadrature` is always given. `errorEstimate = |q(h) - q(1.25 h)| + 0.6 (h/rho_min)^2 V` (0.6 is the gate coefficient of §5.11, measured 0.50). Hard-threshold midpoint quadrature has an O(h) error for planar faces that cut cells (e.g. the shell/infill interface of the pack plan at a voxel that does not divide 18 mm, about 2 % at 0.6): the two-resolution estimate exposes it, and the value is exact when faces fall on cell boundaries.
+- `check_implicit` MVP: closedness, trapped voids, components (voxel >= the body voxel, ~2^20 nodes), `IMP_CHECK_RESOLUTION_COARSE` (recipe wall / strut < 2 voxels), `IMP_CHECK_MIN_WALL` / `MIN_STRUT` against caller limits using the **declared** sizes (shell thickness, sheet thickness, strut diameter; converted to mm), the non-suppressible `IMP_CHECK_NO_PROCESS_LIMITS` / `IMP_CHECK_INPUT_UNVERIFIED`, `purpose: release` -> `reviewRequired`. Not evaluated (listed in `data.notEvaluated` when asked): pore size, overhang, measured (EDT) wall thickness.
+- `lattice_properties` adds `resolution` (16..128 quadrature cells along the smallest cell axis, default 64); `poreDiameterMax` is not computed; `estimateMechanics` is a scaling-law stub: exponent 1 (octet) or 2 (other cells), `coefficient: null`, always `unverified` + `reviewRequired`.
+- Meshing error of a sharp, grid-aligned clip (box regions) is larger than the smooth-surface law: the SC cell r = 1 at voxel 0.1 is -1.1 % by mesh (second order: -4.4 % at 0.2) while its field quadrature is -0.07 %; the pack's 0.5 % gate for the mesh needs vertex refinement / dual contouring (V1/V2) or finer native voxels.
+
+- Guards: the mesh of a body is `IMP_DERIVED_READ_ONLY`; the source solids of a body (the `solid` nodes its field depends on) cannot be moved, modified or deleted while the body exists (`IMP_SOURCE_IN_USE`; a layer change is allowed). `check_implicit` reports every requested check it could not evaluate (limit without a declared size, pore size, refused components) in `data.notEvaluated` with the warning `IMP_CHECK_NOT_EVALUATED`, so the status is never `pass` for them.
+- `field_from_solid`: distance quality `exact` for planar solids (box, wedge, pyramid, B-rep-less mesh), `bound` for curved / B-rep sources (tessellation deflection is not recorded: `data.deflection` null with a note). `relativeDensity` with a cylindrical `map` is refused (`IMP_PARAM_CONFLICT`: it is solved on a rectangular cell); `lattice_properties` measures the unrotated, unmapped cell. The Lipschitz constant of approximate fields is an estimate (`data.lipschitzIsEstimate`).
+- Topology plugin: node values within 1e-3 of the threshold are moved to threshold - 1e-3 before meshing (node values are multiples of 1/8, so 0.5 is common); without it a block gave 120 of 144 zero-area triangles.
+- **Open gap (VC-15 / VC-49, tied to M6 dual contouring):** the 0.5 % mesh gate of the SC cell (-1.1 % at voxel 0.1) is not met by Kuhn marching tetrahedra at sharp box clips; sharp-feature meshing needs dual contouring (V2) or the native engine's finer voxel. The field quadrature meets it (-0.07 %).
+
+### 13.5 Validation results (TS engine)
+
+| VC | Result |
+| -- | ------ |
+| 01, 02 | sphere / torus / box / capsule at 12 points each: max abs error < 1e-9 (tests compare to `data/sdf_primitives.json`); `abs(grad f) - 1 < 1e-6`; quality `exact` |
+| 03, 04 | `data.blend.maxDeviation` 0.25 / 0.693147; numeric `min - smin` = 0.25 / ln 2 to 1e-12; gradient norm <= 1 |
+| 05 | smooth corner: tangent points and bisector point abs(f) < 1e-9; V = 1446.667 within 0.1 % (mesh at voxel 0.15; the plan's voxel 0.05 exceeds the TS budget) |
+| 06, 07, 09 | shells 2521.65 / 2044.13 mm3 within 0.2 % (voxel 0.2); offset +1.5 exact, `IMP_OFFSET_NOT_EXACT` on blends; scale 2 of R5 = R10 to 1e-12 |
+| 08 | `field_from_solid` of a 40 mm box equals the box SDF at 1000 points to 1e-9; open mesh / 2D shape refused |
+| 10, 11 | level-0 networks 0.5 +- 1e-4; network / raw sheet / normalised sheet fractions vs the 240^3 tables within 2e-3 (96-128 cells) |
+| 12 | `relativeDensity: 0.3`: measured 0.300 +- 0.005 (three forms); the mesh of a 2x2x2 block confirms |
+| 13 | normalised walls 1.00 +- 0.08 over 200 surface points; raw gradient ratio = 1.2247 (G), 1.7321 (P), 1.2247 (D) +- 0.02 over 1500 points |
+| 14 | specific surface reported = `data/tpms_surface.json` extrapolated values (G 3.0916, P 2.3526, D 3.8380); a mesh block agrees within 1.5 % |
+| 15, 49 | SC cell 82.934 mm3: quadrature -0.07 %, mesh -1.1 % at voxel 0.1 (see 13.4) |
+| 16, 17 | rho1 = 0.0942478 / 0.2176559 / 0.2665730 / 0.5331460; periodic rho within 0.5 % of the QMC reference; octet 2x2x2 block r 0.5: 911.84 within 0.5 % |
+| 19 | Maxwell: octet stretch, others bending (literature class; `M = b - 3j + 6` reported) |
+| 20, 21 | sphere R10 closed manifold, error <= 0.6 (h/R)^2 at h = 1, 0.5, 0.25; torus 5/2 <= 0.2 (h/r)^2 at h = 1, 0.5; F6 regressions (141^3 = 2.8e6 nodes, node-exact zero values) pass; topology tests unchanged |
+| 22 | shell + gyroid infill: V = 40672 within 0.2 % by quadrature at voxel 0.5 (aligned); mesh within 2 % |
+| 25, 40 | cylindrical seam continuous for 6 and 8 cells, `IMP_MAP_SEAM` for 6.5; `target_errors` returns the six expected outcomes in order |
+| 30 (counts) | octet 14/63/172 nodes and 36/240/756 beams, cubic 8/27/64 and 12/54/144 (exact for aligned blocks); the 3MF writer itself is M5 |
+| 33-36, 42, 43, 47 | trapped void 4/3 pi 8^3 within 1 %; two spheres -> `IMP_DISCONNECTED` (2); wall 0.3 at voxel 0.2 -> `IMP_CHECK_RESOLUTION_COARSE`; limits echoed, never defaulted; release -> `reviewRequired`; unpinned mesh -> `IMP_CHECK_INPUT_UNVERIFIED` + `unverified`; mechanics flagged |
+| 39, 46, 48 | `evaluate_field` caps 10 000 points and reports unit / quality; R1000 voxel 0.001 refused in < 100 ms; save/load keeps the mesh (hash equal) and the recipe adds < 20 kB |
+
+Not run on this engine: 18, 24, 26-29 (M5), 31, 32 (M6 / exporter changes), 37, 38 (V1), 41 (the schema snapshot covers the audit), 44, 45 (need the native engine).
+
+### 13.6 Contract for M4 (native `llull-field`)
+
+Implement §13.3 exactly; the TS engine is the oracle (`tests/unit/field/engine.test.ts`, `tests/unit/implicit/*`). Parity targets: program values 1e-12 relative, identical mesh (same vertex and
+triangle order) for the same program and grid, identical `contentHash`, same refusals and codes. Job folder = `job.json` (grid, request, program without meshes / strutSets) + little-endian f64 / u32
+binary files for `constants`, mesh positions / indices and strut nodes / beams, as `llull-geomq`.
+
+### 13.7 Left for later milestones
+
+M4 native crate + host installer + a field-engine line in `kernel_info`; M5 `create_scalar_field`, field-valued laws, `edit_field` / `delete_field` / `regenerate_implicit_bodies`, `infill_solid`, `add_graph_lattice`,
+`section_field`, more TPMS / cells, spherical and surface maps, refinement, 3MF beam lattice, `IMP_STEP_NOT_EXACT` in `export_step_ap242`, overhang and EDT wall / pore checks, the `llull guide` implicit
+section; M6 3MF implicit export, dual contouring, Voronoi, homogenisation, GPU preview. The pack plans `target_graded_gyroid_column.json` and `target_infill_solid_box.json` stop at their first M5 command and are
+the only entries of this pack left in `tests/unit/contract/blockedPlanCommands.json`.
+
+### 13.8 CLI runs of the pack plans (TS engine, `llull run <plan> --doc <scratch> --continue`, 2026-10-23)
+
+| Plan | As written | Voxel coarsened for the 2^21-node TS budget |
+| ---- | ---------- | ------------------------------------------- |
+| `baseline_sc_unit_cell_cylinders` | 6/6 ok, exact B-rep union 82.934 mm3 | n/a |
+| `target_errors` | 1/6 ok by design: `IMP_TPMS_CONTROL_RANGE`, `IMP_STRUT_RADIUS_RANGE`, `IMP_MAP_SEAM`, ok, `IMP_GRID_BUDGET`, `IMP_FIELD_NOT_FOUND` | n/a |
+| `target_smooth_union_corner` | 7/9: `create_implicit_body` voxel 0.05 = 33.6e6 nodes -> `IMP_GRID_BUDGET`, then the alias-dependent step fails | voxel 0.15: 9/9, mesh 1445.97 mm3, tangent points 0 |
+| `target_sc_strut_lattice_cell` | 7/7 (1.16e6 nodes at voxel 0.1): mesh 82.03, quadrature 82.92 mm3, 8 nodes / 12 beams, `check_implicit` WARN (`IMP_CHECK_NO_PROCESS_LIMITS`) | n/a |
+| `target_shell_gyroid_infill` | 7/11: voxel 0.2 = 8.6e6 nodes -> `IMP_GRID_BUDGET` | voxel 0.5: 11/11, 1.09e6 triangles closed manifold, mesh 40610.1 mm3 (-0.15 %), 1 solid, 1 enclosed void, `IMP_TRAPPED_VOID` (the sealed gyroid channels), `export_3mf` ok |
+| `target_cylindrical_gyroid_sleeve` | 5/8: voxel 0.2 = 19e6 nodes -> `IMP_GRID_BUDGET` | voxel 0.5: 8/8, closed manifold, density 0.297 of the sleeve region |
+| `target_octet_beam_lattice_3mf` | 4/7: voxel 0.05 = 66e6 nodes -> `IMP_GRID_BUDGET` | voxel 0.25: 6/7, 911.5 mm3 (VC-17: 911.84); `export_3mf beamLattice` is refused (`unknown param`, M5) |
+| `target_graded_gyroid_column` | 2/9: `create_scalar_field` unknown (M5) | n/a |
+| `target_infill_solid_box` | 2/5: `infill_solid` unknown (M5) | n/a |
+
+The pack's voxels need the native engine (M4): the TS engine refuses them before sampling, with the native hint in the remediation.

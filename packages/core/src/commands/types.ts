@@ -8,6 +8,7 @@ import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { MeshProcessingEngine } from '../geometry/mesh/engineTypes';
+import type { FieldEngine } from '../geometry/field/engineTypes';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
@@ -204,6 +205,8 @@ export interface ExecutionContext {
   readonly geometryQueries?: GeometryQueryEngine | null;
   /** Extra mesh-processing engine (Manifold, native; 07 MSH TR-MSH-02); null/absent = the built-in TypeScript engine alone (ops it lacks refuse with MESH_ENGINE_UNSUPPORTED). */
   readonly meshProcessing?: MeshProcessingEngine | null;
+  /** Implicit-field engine (tape evaluation, interval-pruned meshing, measures; 05 IMP TR-IMP-02); null/absent = the built-in TypeScript engine. */
+  readonly fieldEngine?: FieldEngine | null;
   /** Surface-analysis engine (curvature / continuity / deviation / draft, 02 SRF M4); null/absent = the default TS NURBS engine. */
   readonly surfaceAnalysis?: SurfaceAnalysisEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */

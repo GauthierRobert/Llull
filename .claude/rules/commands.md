@@ -25,7 +25,7 @@ Procedure: `add-command` skill. Human intro: `docs/ADD_A_TOOL.md`.
   `commands`. Never edit `registry.ts` for a new command.
 - Tests (`tests/unit/**`): happy path + failure path + `is pure`. Assert `affected`, `summary`,
   observable entities — not internals. Coverage gate 90/85/90/90 on
-  `packages/core/src/{commands,geometry,dynamics}/**` + `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/**`.
+  `packages/core/src/{commands,geometry,dynamics}/**` + `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,domain-implicit,design-lang,plm}/src/**`.
 - Tool-schema snapshot (`tests/unit/contract/__snapshots__`) and golden corpus
   (`tests/golden/__snapshots__`) diffs must be intended; never `-u` to make red go green.
 

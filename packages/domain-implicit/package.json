@@ -1,0 +1,10 @@
+{
+  "name": "@llull/domain-implicit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Implicit / field modelling and lattices plugin (05 IMP): field primitives, booleans and blends, TPMS and strut lattices, implicit bodies, queries and checks.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

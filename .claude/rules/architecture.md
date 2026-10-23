@@ -16,7 +16,7 @@ surface that bypasses a command.
 
 ## L2 — Dependency direction is one-way
 
-`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, design-lang, plm, kernel-*, physics-*}` → `packages/core`
+`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, domain-implicit, design-lang, plm, kernel-*, physics-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
 side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).

@@ -41,6 +41,7 @@ const TOOLSET_GROUPS = {
   plm: 'PLM / configuration',
   scan: 'Point clouds',
   mesh: 'Mesh modelling',
+  implicit: 'Implicit / lattices',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

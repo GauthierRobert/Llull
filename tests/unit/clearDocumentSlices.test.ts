@@ -9,6 +9,7 @@ type KeptKey = 'kernelSettings' | 'nextStepNumber';
 /** Exhaustive by type: adding an optional key to CadDocument fails compilation here until a probe value is listed. */
 const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   building: {},
+  implicit: {},
   civil: {},
   drawings: {},
   pmi: {},
