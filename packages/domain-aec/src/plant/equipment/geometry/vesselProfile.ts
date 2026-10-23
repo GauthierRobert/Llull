@@ -1,7 +1,8 @@
 /**
  * Revolve profiles of a vessel (plant 03 EQP §5.1): the meridian of each formed head and the closed wall-section band of shell + heads.
- * Head profiles come from ONE function, `headProfileCurves`; its ellipsoidal branch is where the exact `ellipse` curve segment (decision Q3)
- * replaces the cubic Bézier approximation. Volumes and weights never read these curves (closed forms, M1).
+ * Head profiles come from ONE function, `headProfileCurves`. The ellipsoidal INSIDE profile is one exact `ellipse` quarter (decision Q3); the
+ * constant-thickness OUTER offset of an ellipse is not an ellipse, so it stays a chain of Hermite Béziers through exact offset points and
+ * tangents. Volumes and weights never read these curves (closed forms, M1).
  */
 
 import type { CurveSegment } from '@core/model/curve';
@@ -22,7 +23,8 @@ const line = (from: Vec2, to: Vec2): Curves =>
 /** Point of the ellipse (semi-axes a, b) offset outward by t along the normal, at parameter u (0 = rim, pi/2 = apex). */
 function ellipseOffsetPoint(a: number, b: number, t: number, u: number): Vec2 {
   const norm = Math.hypot(a * Math.sin(u), b * Math.cos(u));
-  return [a * Math.cos(u) + (t * b * Math.cos(u)) / norm, b * Math.sin(u) + (t * a * Math.sin(u)) / norm];
+  const radial = a * Math.cos(u) + (t * b * Math.cos(u)) / norm;
+  return [Math.abs(radial) < TOLERANCE ? 0 : radial, b * Math.sin(u) + (t * a * Math.sin(u)) / norm];
 }
 
 /** The ellipse (offset 0) or its offset curve as 12 cubic Hermite pieces (Bézier form), exact end points, central-difference tangents: error far below 1e-5 R. */
@@ -61,7 +63,18 @@ export function headProfileCurves(shape: HeadShape, radius: number, offset: numb
         ? line([radius, 0], [0, 0])
         : [...line([radius + offset, 0], [radius + offset, offset]), ...line([radius + offset, offset], [0, offset])];
     case 'ellipsoidal':
-      return ellipseOffsetBeziers(radius, shape.depth, offset);
+      return offset < TOLERANCE
+        ? [
+            {
+              type: 'ellipse',
+              points: [
+                [radius, 0],
+                [0, 0],
+                [0, shape.depth],
+              ],
+            },
+          ]
+        : ellipseOffsetBeziers(radius, shape.depth, offset);
     case 'spherical': {
       const sphere = (radius * radius + shape.depth * shape.depth) / (2 * shape.depth);
       const centreHeight = shape.depth - sphere;
@@ -86,11 +99,7 @@ export function headProfileCurves(shape: HeadShape, radius: number, offset: numb
 }
 
 const mapCurve = (segment: CurveSegment<Vec2>, f: (point: Vec2) => Vec2): CurveSegment<Vec2> =>
-  segment.type === 'line'
-    ? { type: 'line', points: [f(segment.points[0]), f(segment.points[1])] }
-    : segment.type === 'arc'
-      ? { type: 'arc', points: [f(segment.points[0]), f(segment.points[1]), f(segment.points[2])] }
-      : { type: 'bezier', points: [f(segment.points[0]), f(segment.points[1]), f(segment.points[2]), f(segment.points[3])] };
+  ({ type: segment.type, points: segment.points.map(f) }) as unknown as CurveSegment<Vec2>;
 
 const mapCurves = (segments: Curves, f: (point: Vec2) => Vec2): Curves => segments.map((segment) => mapCurve(segment, f));
 

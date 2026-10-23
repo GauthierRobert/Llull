@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { chainIssue, segmentPoint } from '@core/geometry/curveSegments';
+import { chainIssue, sampleProfile, segmentPoint } from '@core/geometry/curveSegments';
+import { closedFormVolume } from '@core/geometry/closedFormVolume';
+import type { CurveSegment } from '@core/model/curve';
+import type { RevolutionEntity } from '@core/model/types';
 import type { Vec2 } from '@core/model/types';
 import { resolveHead } from '@aec/plant/equipment/geometry/heads';
 import type { HeadShape } from '@aec/plant/equipment/geometry/heads';
@@ -54,7 +57,7 @@ describe('headProfileCurves (the one place that builds head meridians)', () => {
   it('the offset curve of an ellipsoidal head stays t from the inside surface (normal distance)', () => {
     const shape = shapeOf({ type: 'ellipsoidal', ratio: 2 });
     const inside = headProfileCurves(shape, R, 0).flatMap((segment) =>
-      Array.from({ length: 400 }, (_unused, step) => segmentPoint(segment, step / 399)),
+      Array.from({ length: 4000 }, (_unused, step) => segmentPoint(segment, step / 3999)),
     );
     for (const segment of headProfileCurves(shape, R, 10)) {
       for (let step = 0; step <= 10; step++) {
@@ -80,5 +83,56 @@ describe('headProfileCurves (the one place that builds head meridians)', () => {
       [20, 5],
       [10, 5],
     ]);
+  });
+});
+
+describe('ellipsoidal heads use the exact ellipse segment (decision Q3)', () => {
+  const shape = shapeOf({ type: 'ellipsoidal', ratio: 2 });
+
+  it('the inside profile is ONE exact quarter ellipse, the constant-thickness outer offset stays a Bézier chain', () => {
+    const inside = headProfileCurves(shape, R, 0);
+    expect(inside).toEqual([
+      {
+        type: 'ellipse',
+        points: [
+          [R, 0],
+          [0, 0],
+          [0, shape.depth],
+        ],
+      },
+    ]);
+    const outside = headProfileCurves(shape, R, 10);
+    expect(outside.every((segment) => segment.type === 'bezier')).toBe(true);
+  });
+
+  it('the revolved inside head has the closed-form volume pi D^3 / 24 (core closed-form volume of the derived revolution)', () => {
+    const chain = [
+      {
+        type: 'line',
+        points: [
+          [0, 0],
+          [R, 0],
+        ],
+      },
+      ...headProfileCurves(shape, R, 0),
+      {
+        type: 'line',
+        points: [
+          [0, shape.depth],
+          [0, 0],
+        ],
+      },
+    ] as CurveSegment<Vec2>[];
+    expect(chainIssue(chain, true)).toBeNull();
+    const entity = {
+      kind: 'revolution',
+      profile: sampleProfile(chain),
+      curves: chain,
+      axis: [0, 0, 1],
+      angle: 2 * Math.PI,
+      segments: 64,
+    } as unknown as RevolutionEntity;
+    const volume = closedFormVolume(entity)?.volume ?? 0;
+    expect(Math.abs(volume / ((Math.PI * (2 * R) ** 3) / 24) - 1)).toBeLessThan(1e-9);
   });
 });
