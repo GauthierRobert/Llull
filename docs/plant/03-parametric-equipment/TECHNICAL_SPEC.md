@@ -497,6 +497,24 @@ the tag registry and equipment list; 09 VIS adds LOD for the revolution bodies.
 - **Q7 Nozzle flange before 01 PSC lands**: ship a minimal ASME B16.5 / EN 1092-1 flange OD table here, or only
   placeholders? (Proposal: placeholders only, to keep one catalogue owner.)
 
+### 11.1 Decisions (2026-10-23, owner delegated: "better for the app even if it takes more time")
+
+- **Q1 / README D6: extend `EquipmentElement`.** One equipment model: the building element gains `plant?: PlantEquipmentData`
+  (types in `plant/equipment/`, not core, D2). Its level is the support datum and load path; the plant hierarchy and tags are
+  08 DAT's overlay. A separate `doc.plant.equipment` model would need a second copy of clash, loads, schedules, IFC, plans,
+  openings and support layout (13 modules) and two equipment kinds; rejected.
+- **Q2 / README D3: both conventions, `north_cw` default.** `angleConvention: 'north_cw' | 'east_ccw'` on every command that
+  takes an angle (default `north_cw` as in §5.4); every result names the convention used. `add_nozzle` also takes a free
+  `{ position, direction }` location in the equipment frame (pumps, `add_equipment` blocks, D3), resolved to the same
+  `ConnectionPort`.
+- **Q3: exact ellipse in core.** Add an `ellipse` arc to `CurveSegment` (core model, Manifold tessellation, closed-form
+  volume, native OCC kernel `GC_MakeArcOfEllipse`), so 2:1 heads are exact B-rep. Own lane; heads use the Bézier profile
+  behind one function until it lands, then switch.
+- **Q7: flanges from 01 PSC.** PSC M1 is built: nozzle flanges come from `lookup_piping_component`; `EQP_FLANGE_PLACEHOLDER`
+  only when the catalogue has no row for the DN / rating / facing.
+- **Q5: yes, later** (M3 / V1): licensed tables enter through the 01 PSC import path, private, replacing grade-B rows.
+- Q4 and Q6 stay open (M4 pumps, M3 API 650).
+
 ## 12. References
 
 - [R1] Jones D., "Calculating Tank Volume" (2015) — http://www.webcalc.com.br/blog/Tank_Volume.PDF (via fluids; accessed 2026-10).

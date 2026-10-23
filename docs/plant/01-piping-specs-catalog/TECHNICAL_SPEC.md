@@ -489,6 +489,18 @@ M4 (`component_shape`, ports); 05 ISO consumes commodity codes and SKEY map; 07 
    pipe element's vertices? The `SpecBinding` and resolution API work for both.
 7. **B16.11 / olet data**: no open source found; is a company-supplied catalogue available for the owner's projects?
 
+Decided 2026-10-23 (owner delegated, plant README D4):
+
+- **Q1 bundling: ship.** `llull-open-piping` holds the grade-A and grade-B rows with source ids; grade < A is `unverified`
+  (`PSC_DATA_UNVERIFIED`, never suppressible). Licence flag `open-data` added to `LICENCE_FLAGS` (facts compiled from
+  open-licensed and public sources, redistributable); the provisional `company-proprietary` is replaced.
+- **Q3 stud length: computed by a named rule** (2 × flange thickness + gasket + 2 nut heights + 2 thread projections, rounded
+  up to the bolting increment), flagged `derived` with the formula; an imported bolting table overrides it.
+- **Q4 revisions: both.** Approving revision n+1 flags pipes on n with a warning; `assign_pipe_spec` (M3) is the sweep.
+- **Q5 no default dimensional standard.** A spec names its standard explicitly (AF-31: safety data is never defaulted).
+- **Q6 (02 §11.2) derived fittings**, deterministic joint ids; overrides in V1.
+- **Q7: import-only** (README D9).
+
 ## 12. References
 
 - [S1]–[S27], [P1]–[P10]: [`validation/sources.md`](validation/sources.md) (URLs, sha256, licences; accessed 2026-10).

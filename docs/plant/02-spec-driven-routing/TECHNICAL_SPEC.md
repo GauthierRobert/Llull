@@ -727,3 +727,6 @@ expansion, so 2·10⁶ expansions ≈ 4.5 s (inside the 5 s budget here; the ref
 
 - §11.3 weld gap: not reached (no joint stack yet).
 - §11.7 toolset size: `piping` holds 10 tools; no split needed yet.
+- §11.1 (2026-10-23, README D6): equipment stays a building `EquipmentElement` with `plant` data; routing reads it through
+  `PortSource`. §11.9 (README D3): `add_nozzle` takes the angle or the free `{ position, direction }` form; `PortRef.kind:
+  'nozzle'`, id `<tag>:<mark>`. §11.2: derived fittings (01 §11 Q6).

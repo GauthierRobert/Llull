@@ -99,11 +99,13 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
 - Plant packs `docs/plant/` (order = README "Dependencies and recommended order"; D1 fixed, D2 decided 2026-10-23). Wave 1 done 2026-10-23 (PSC M0–M1, EQP M1, STA M1, VIS-M1; as built = each pack's TECHNICAL_SPEC §13 / 09 §12.6).
-- `[TODO]` **PSC-M2** 01 PSC spec model, `*_pipe_spec`, `resolve_spec_component`, `resolve_branch`, `check_pipe_spec`. Owner: D4 bundling + a licence flag for open data (`LICENCE_FLAGS`). _deps: —_
-- `[TODO]` **EQP-M2** 03 EQP vessels + nozzles (`add_vessel`, `add_column`, `add_nozzle`, ports, `vessel_volume` by equipment). Owner first: Q1 data placement (D6), Q2 angle convention. _deps: —_
+- Decisions 2026-10-23 (owner delegated): README D3, D4, D6; 01 §11; 03 §11.1 (Q1 extend `EquipmentElement`, Q2 both conventions `north_cw` default, Q3 exact ellipse segment, Q7 PSC flanges).
+- `[WIP]` **PSC-M2** 01 PSC spec model, `*_pipe_spec`, `resolve_spec_component`, `resolve_branch`, `check_pipe_spec` + D4 licence flag `open-data`. Worktree `llull-psc`, branch `feat/plant-psc-m2`. _deps: —_
+- `[WIP]` **EQP-M2** 03 EQP vessels + nozzles (`add_vessel`, `add_column`, `add_nozzle` angle + free forms, ports, `equipment_ports`, `update_equipment_parameters`, `vessel_volume` by equipment). Worktree `llull-eqp`, branch `feat/plant-eqp-m2`. _deps: —_
+- `[WIP]` **EQP-Q3** exact `ellipse` `CurveSegment` (core model, Manifold, closed-form volume, native OCC). Worktree `llull-ell`, branch `feat/core-ellipse-segment`. _deps: —_
 - `[TODO]` **STA-M2/M3** 06 STA gratings, then `add_railing` (edge coverage by railings). _deps: —_
 - `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
-- `[TODO]` Wave 2: **RTE-V1** 02 `route_pipe`, fittings, `check_piping`. _deps: PSC-M2, EQP-M2_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[TODO]` Wave 2: **RTE M1–M3 then V1** 02 `route_pipe`, fittings, flanges, branches, `check_piping`, stretch on nozzle edits. _deps: PSC-M2, EQP-M2_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
