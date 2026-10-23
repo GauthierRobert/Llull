@@ -134,7 +134,7 @@ Out of scope:
 llull --doc unit.llull list_service_colour_schemes --json            # categories + grades
 llull --doc unit.llull apply_service_colour_scheme scheme=asme_a13_1 profileId=services \
       serviceMap=@service_map.json activate=true
-llull --doc unit.llull colour_by_rule_report profileId=services groupBy=line --json
+llull --doc unit.llull colour_by_rule_report profileId=services groupBy=property groupProperty=line --json
 
 # 2. Review set-up
 llull --doc unit.llull run review.json --validate && llull --doc unit.llull run review.json

@@ -175,7 +175,8 @@
       "command": "colour_by_rule_report",
       "params": {
         "profileId": "services-asme",
-        "groupBy": "line"
+        "groupBy": "property",
+        "groupProperty": "line"
       }
     },
     {
@@ -198,7 +199,8 @@
       "command": "colour_by_rule_report",
       "params": {
         "profileId": "services-iso",
-        "groupBy": "line"
+        "groupBy": "property",
+        "groupProperty": "line"
       }
     },
     {
