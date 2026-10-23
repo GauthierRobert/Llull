@@ -81,6 +81,7 @@ fn info() -> Value {
         "faceSlab",
         "sheetSolid",
         "helixEdge",
+        "pipeShell",
         "gtransform",
         "emboss",
     ]
@@ -317,7 +318,7 @@ mod tests {
         assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
         let capabilities = described["result"]["capabilities"].as_array().unwrap();
-        for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "gtransform", "emboss"] {
+        for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "pipeShell", "gtransform", "emboss"] {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }
     }

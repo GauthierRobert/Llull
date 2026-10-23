@@ -1,6 +1,7 @@
 /** Section loops of a sweep in section coordinates: constant sections and the station blend of variable ones. */
 
-import type { SweepSection, SweepStation, Vec2 } from '../../model/types';
+import type { Vec2 } from '../../model/types';
+import type { SweepSection, SweepStation } from '../../model/sweepOrientation';
 import { toCounterClockwise } from '../../lib/polygon';
 import { clamp01 } from '../../lib/clamp';
 import { sampleRing } from '../sectionRing';

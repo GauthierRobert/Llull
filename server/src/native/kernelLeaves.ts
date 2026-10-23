@@ -12,11 +12,14 @@ import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { revolutionAxisIndex } from '@core/geometry/revolution';
-import { mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
+import { isClosedChain, mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { ringCurves } from '@core/geometry/sectionRing';
 import { hasClosingEdge, sectionChain } from '@core/geometry/sectionChain';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { frameAtFraction, sweepStartAxes } from '@core/geometry/sweepEval/frames';
+import { pathLength } from '@core/geometry/sweepEval/evaluate';
+import { sweepSegmentRings } from '@core/geometry/sweep';
+import { sectionTransforms } from '@core/geometry/sweepEval/laws';
 import { stationRingAt } from '@core/geometry/sweepEval/sections';
 import { helixFrame } from '@lib/helix/helix';
 import { fitSweepFaces, fitToleranceOf, sewToleranceOf } from '@core/geometry/sweepEval/fitted';
@@ -24,6 +27,8 @@ import { needsFittedFaces } from '@core/geometry/sweepEval/realisation';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { encodeLoops, encodeSurface } from '@core/geometry/surfaceWire';
 import { clamp } from '@lib/clamp';
+import { extractSubSurface } from '@lib/nurbs/surfaceEdit';
+import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { signedArea } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
 
@@ -89,10 +94,50 @@ function sectionPayload(entity: SweepEntity): Record<string, unknown> {
 }
 
 /** Fitted lateral faces for laws, frame modes and helices (MakePipe is an approximation there); null when they cannot be built. */
-function fittedPayload(entity: SweepEntity, wire: WireOptions): Record<string, unknown> | null {
+function fittedPayload(
+  entity: SweepEntity,
+  wire: WireOptions,
+): { faces: number[][]; tolerance: number; caps: 0 | 2; probes: number[] } | null {
   if (wire.sheetSolid !== true) return null;
   const fit = fitSweepFaces(entity, fitToleranceOf(entity));
-  return 'faces' in fit ? { faces: fit.faces, tolerance: sewToleranceOf(entity) } : null;
+  return 'faces' in fit
+    ? { faces: fit.faces, tolerance: sewToleranceOf(entity), caps: isClosedChain(entity.path) ? 0 : 2, probes: fit.probes }
+    : null;
+}
+
+/** Trihedron modes MakePipeShell offers for the orientation modes the sweep evaluator shares with it. */
+const SHELL_MODES: Readonly<Record<string, number>> = { minimal: 0, frenet: 1, fixed: 2, binormal: 3 };
+
+/** Samples of the section scale (laws folded in) at 33 path fractions, as (fraction, scale) pairs for a homothetic law. */
+function scalePairs(entity: SweepEntity): number[] | null {
+  const ts = Array.from({ length: 33 }, (_, k) => k / 32);
+  const transforms = sectionTransforms(entity, ts, pathLength(entity));
+  return transforms.flatMap((transform, k) => [ts[k] as number, transform.sx]);
+}
+
+/**
+ * The MakePipeShell attempt of a sweep (capability `pipeShell`, TECHNICAL_SPEC 5.5): a constant section with a scale / area law and/or a frame mode
+ * OCC has an equivalent for. The sidecar uses its result only when it passes `probes` (points of the fitted faces), so a wrong equivalent (e.g. the
+ * corrected Frenet frame on a twisting path) falls back to the faces.
+ */
+function pipeShellPayload(entity: SweepEntity, faces: { tolerance: number; probes: number[] }): Record<string, unknown> | null {
+  const unsupported =
+    isClosedChain(entity.path) ||
+    [entity.stations, entity.rails, entity.helix, entity.twist, entity.stretch].some((field) => field !== undefined);
+  const mode = entity.orientation?.mode ?? 'minimal';
+  const lawed = entity.scale !== undefined || entity.area !== undefined;
+  if (unsupported || SHELL_MODES[mode] === undefined || !(lawed || mode !== 'minimal')) return null;
+  const orientation = entity.orientation;
+  const direction = orientation?.mode === 'fixed' || orientation?.mode === 'binormal' ? (orientation.direction ?? [0, 0, 1]) : [0, 0, 1];
+  return {
+    mode: SHELL_MODES[mode],
+    direction,
+    ...(lawed ? { law: scalePairs(entity) } : {}),
+    transition: 0,
+    tolerance: faces.tolerance,
+    probes: faces.probes,
+    check: faces.tolerance,
+  };
 }
 
 /** The exact helix as the sidecar reads it (capability `helixEdge`): constant-pitch helices only; a pitch law keeps the Bézier spine. */
@@ -113,14 +158,34 @@ function helixPayload(entity: SweepEntity, wire: WireOptions): number[] | null {
   ];
 }
 
+/**
+ * A mitred sweep (corners: miter): the spine with its sharp joints and the section, plus a MakePipeShell attempt with the right-corner transition
+ * (capability `pipeShell`) that must pass probe points of the evaluator's rings (the mitre rings lie on the exact boundary); MakePipe is the fallback.
+ */
+function miterPayload(entity: SweepEntity, wire: WireOptions): Record<string, unknown> {
+  const base = { spine: encodeChain(entity.path), ...sectionPayload(entity) };
+  if (wire.pipeShell !== true) return base;
+  const probes = sweepSegmentRings(entity).flatMap((ring) =>
+    [0, 0.25, 0.5, 0.75].flatMap((f) => [...(ring[Math.floor(f * ring.length)] as Vec3)]),
+  );
+  const tolerance = sewToleranceOf(entity);
+  return { ...base, pipeShell: { mode: 0, direction: [0, 0, 1], transition: 1, tolerance, probes, check: tolerance } };
+}
+
 function sweepPayload(entity: SweepEntity, wire: WireOptions): Record<string, unknown> {
+  if (entity.corners === 'miter') return miterPayload(entity, wire);
   if (needsFittedFaces(entity)) {
     const fitted = fittedPayload(entity, wire);
+    const shell = fitted !== null && wire.pipeShell === true ? pipeShellPayload(entity, fitted) : null;
     // a plain helix the faces cannot express (a bore) keeps the exact helix spine, a station sweep with only a blend keeps its rings; laws and
     // frame modes have no pipe equivalent
     const plain =
       entity.orientation === undefined && [entity.twist, entity.scale, entity.area, entity.stretch].every((law) => law === undefined);
-    if (fitted !== null || !plain || (entity.helix === undefined && entity.stations === undefined)) return fitted ?? {};
+    if (fitted !== null || !plain || (entity.helix === undefined && entity.stations === undefined)) {
+      if (fitted === null) return {};
+      const faces = { faces: fitted.faces, tolerance: fitted.tolerance, caps: fitted.caps };
+      return shell === null ? faces : { ...faces, spine: encodeChain(entity.path), ...sectionPayload(entity), pipeShell: shell };
+    }
   }
   const spine = encodeChain(entity.path);
   const helix = helixPayload(entity, wire);
@@ -163,6 +228,8 @@ export interface WireOptions {
   readonly sheetSolid?: boolean;
   /** Capability `helixEdge`: a sweep along an `add_helix` curve carries the exact helix (`native.helix`) the sidecar builds the spine from. */
   readonly helixEdge?: boolean;
+  /** Capability `pipeShell`: a sweep with a homothetic law or a frame mode also carries a MakePipeShell attempt (`native.pipeShell`), used only when it passes its probes. */
+  readonly pipeShell?: boolean;
 }
 
 /**
@@ -182,6 +249,25 @@ export function encodeBspline(curve: NurbsCurveData, closing: boolean): number[]
     ...curve.knots,
     ...curve.multiplicities,
   ];
+}
+
+/** A face cut at its u knots into single-span faces, like the faces of a fitted sweep: the sewing then joins edges of different faces (a whole section as one face closes on itself and is not sewn). */
+function spans(face: NurbsSurfaceData): NurbsSurfaceData[] {
+  const v: readonly [number, number] = [face.knotsV[0] as number, face.knotsV[face.knotsV.length - 1] as number];
+  if (face.knotsU.length < 3) return [face];
+  const pieces = face.knotsU.slice(1).map((end, k) => extractSubSurface(face, [face.knotsU[k] as number, end], v));
+  return pieces.every((piece): piece is NurbsSurfaceData => typeof piece !== 'string') ? pieces : [face];
+}
+
+/** Exact skin of an advanced loft (capability `sheetSolid`): the NURBS faces the sidecar sews and caps, with the sewing tolerance (1e-6 of the skin's size). */
+function loftFaces(entity: Extract<Entity, { kind: 'loft' }>, wire: WireOptions): Record<string, unknown> {
+  if (wire.sheetSolid !== true || entity.faces === undefined || entity.faces.length === 0) return {};
+  const faces = entity.faces.flatMap(spans);
+  const poles = faces.flatMap((face) => face.poles.flat());
+  const extent = [0, 1, 2].map(
+    (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
+  );
+  return { faces: faces.map(encodeSurface), tolerance: Math.max(1e-7, 1e-6 * Math.hypot(...extent)), caps: entity.caps ?? 2 };
 }
 
 /** The exact sections of a loft as B-spline wire data, or null when the loft has none (a loft of sketches keeps the chains only). */
@@ -207,7 +293,12 @@ export function nativeLeaf(entity: Entity, wire: WireOptions = {}): Entity {
     }
     case 'loft': {
       const bsplines = wire.bsplineSections === true ? loftBsplines(entity) : null;
-      return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled, ...(bsplines === null ? {} : { bsplines }) });
+      return withPayload(entity, {
+        chains: loftChains(entity),
+        ruled: entity.ruled,
+        ...(bsplines === null ? {} : { bsplines }),
+        ...loftFaces(entity, wire),
+      });
     }
     case 'sweep':
       return withPayload(entity, sweepPayload(entity, wire));

@@ -4,16 +4,15 @@ import type { SweepEntity, Vec2 } from '../../model/types';
 import { lawFunction, lawIssue } from '../../lib/law/evaluate';
 import type { LawIssue, ScalarLaw } from '../../lib/law/types';
 import { polygonArea } from '../../lib/polygon';
+import type { SweepFrame } from './frames';
+import { railTransforms, type RailIssue } from './rails';
+import type { SectionTransform } from './sectionTransform';
 
 /** What the laws of a sweep depend on (a SweepEntity satisfies it). */
-export type SweepLawShape = Pick<SweepEntity, 'section' | 'stations' | 'twist' | 'scale' | 'area' | 'stretch' | 'stationBlend'>;
-
-/** Section placement at one path fraction: scale along x / y (area, scale and stretch folded in) then rotation about the tangent. */
-export interface SectionTransform {
-  readonly twist: number;
-  readonly sx: number;
-  readonly sy: number;
-}
+export type SweepLawShape = Pick<
+  SweepEntity,
+  'section' | 'stations' | 'twist' | 'scale' | 'area' | 'stretch' | 'stationBlend' | 'rails' | 'guideMode' | 'maintainHeight' | 'anchors'
+>;
 
 /** True when the sweep carries a law or an explicit station blend (the evaluator then samples finer than the path frames). */
 export const hasSweepLaws = (shape: SweepLawShape): boolean =>
@@ -21,7 +20,8 @@ export const hasSweepLaws = (shape: SweepLawShape): boolean =>
   shape.scale !== undefined ||
   shape.area !== undefined ||
   shape.stretch !== undefined ||
-  shape.stationBlend !== undefined;
+  shape.stationBlend !== undefined ||
+  shape.rails !== undefined;
 
 /** Area of the constant section (outer minus bore). */
 export function baseSectionArea(shape: Pick<SweepEntity, 'section'>): number {
@@ -64,16 +64,6 @@ export function sectionTransforms(shape: SweepLawShape, fractions: readonly numb
   });
 }
 
-/** Section point under a transform. */
-export function transformPoint([x, y]: Vec2, { twist, sx, sy }: SectionTransform): Vec2 {
-  const px = x * sx;
-  const py = y * sy;
-  if (twist === 0) return [px, py];
-  const c = Math.cos(twist);
-  const s = Math.sin(twist);
-  return [px * c - py * s, px * s + py * c];
-}
-
 /** Total variation of the twist law in radians (drives the sampling density). */
 export function twistVariation(shape: Pick<SweepEntity, 'twist'>, length: number): number {
   if (shape.twist === undefined) return 0;
@@ -82,4 +72,14 @@ export function twistVariation(shape: Pick<SweepEntity, 'twist'>, length: number
   const samples = 512;
   for (let k = 0; k < samples; k++) total += Math.abs(f((k + 1) / samples, length) - f(k / samples, length));
   return total;
+}
+
+/** Placement of the section at every frame: the rails' anchor map when the sweep has rails, else its laws. */
+export function stationTransforms(
+  shape: SweepLawShape,
+  fractions: readonly number[],
+  length: number,
+  frames: readonly SweepFrame[],
+): SectionTransform[] | RailIssue {
+  return shape.rails === undefined ? sectionTransforms(shape, fractions, length) : railTransforms(shape, frames, fractions);
 }

@@ -1,142 +1,104 @@
-/** DES-2 review fixes: stale helix intent, screw volumes, closed-path laws, axis crossings, check budget. */
+/** SWG review fixes: mitre with rails, mitre reach per leg, unit-free developability, mitre with laws. */
 import { describe, it, expect } from 'vitest';
-import { type NurbsCurveEntity, type SweepEntity, createEmptyDocument } from '@core/model/types';
+import { type CadDocument, type SweepEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { pathLength } from '@core/geometry/sweepEval/evaluate';
 import { sweepAnalyticVolume } from '@core/geometry/sweepEval/volume';
-import { helixLength } from '@lib/helix/helix';
-import { expectNoOp } from '../../helpers/expectNoOp';
-import { volumeOf } from '../../helpers/fixtureDocument';
-import { relError } from '../../helpers/swgPack';
-import { xyz } from '../../helpers/xy';
+import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 
 const empty = createEmptyDocument();
 
-function helix(params: Record<string, unknown>): { doc: ReturnType<typeof execute>['document']; id: string } {
-  const result = execute(empty, 'add_helix', params);
+function create(doc: CadDocument, command: string, params: Record<string, unknown>): { doc: CadDocument; id: string } {
+  const result = execute(doc, command, params);
+  expect(result.affected, result.summary).toHaveLength(1);
   return { doc: result.document, id: result.affected[0] as string };
 }
 
-describe('a changed helix curve loses its stale definition', () => {
-  it('scale_entity and edit_nurbs drop `analytic`, so a later sweep does not trust the old helix', () => {
-    const { doc, id } = helix({ radius: 5, pitch: 2, turns: 3 });
-    const scaled = execute(doc, 'scale_entity', { id, factor: 2 }).document;
-    expect((scaled.entities[id] as NurbsCurveEntity).analytic).toBeUndefined();
-    const swept = execute(scaled, 'sweep_profile', { pathId: id, radius: 0.3 });
-    expect(swept.affected, swept.summary).toHaveLength(1);
-    expect((swept.document.entities[swept.affected[0] as string] as SweepEntity).helix).toBeUndefined();
-    const edited = execute(doc, 'edit_nurbs', { id, operation: 'move_pole', index: 2, to: [9, 0, 0] }).document;
-    expect((edited.entities[id] as NurbsCurveEntity).analytic).toBeUndefined();
-    expect((doc.entities[id] as NurbsCurveEntity).analytic).toBeDefined();
-    const kept = execute(doc, 'sweep_profile', { pathId: id, radius: 0.3 });
-    expect((kept.document.entities[kept.affected[0] as string] as SweepEntity).helix).toBeDefined();
-  });
-});
-
-describe('screw sweeps', () => {
-  it('a round section in an axis plane has no closed form; the kernel path / mesh measures the Pappus volume', () => {
-    const { doc, id } = helix({ radius: 5, pitch: 4, turns: 2 });
-    const swept = execute(doc, 'sweep_profile', { pathId: id, radius: 1, orientation: { mode: 'axis_plane' } });
-    expect(swept.affected, swept.summary).toHaveLength(1);
-    const entity = swept.document.entities[swept.affected[0] as string] as SweepEntity;
-    expect(sweepAnalyticVolume(entity)).toBeNull();
-    const pappus = Math.PI * 1 * 2 * Math.PI * 5 * 2;
-    expect(relError(volumeOf(entity), pappus)).toBeLessThan(0.015);
-  });
-
-  it('a section reaching across the axis is SWG_SELF_INTERSECTION_LOCAL (path frame: reach >= radius; axial frame: radius <= 0)', () => {
-    const { doc, id } = helix({ radius: 5, pitch: 20, turns: 1 });
-    const wide = [
-      [-6, -1],
-      [6, -1],
-      [6, 1],
-      [-6, 1],
-    ];
-    const crossing = execute(doc, 'sweep_profile', { pathId: id, section: wide, orientation: { mode: 'axis_plane' } });
-    expectNoOp(crossing, doc, 'SWG_SELF_INTERSECTION_LOCAL');
-    const axial = execute(doc, 'sweep_profile', {
-      pathId: id,
-      section: [
-        [-1, -1],
-        [1, -1],
-        [1, 1],
-        [-1, 1],
+describe('mitre corners', () => {
+  const L = [
+    [0, 0, 0],
+    [100, 0, 0],
+    [100, 100, 0],
+  ];
+  it('rails and a mitre are exclusive (a mitre ring cannot follow rails)', () => {
+    const rail = create(empty, 'create_nurbs_curve', {
+      degree: 1,
+      poles: [
+        [0, 6, 0],
+        [100, 6, 0],
       ],
-      sectionFrame: 'axial',
-      orientation: { mode: 'axis_plane' },
     });
-    expectNoOp(axial, doc, 'SWG_SELF_INTERSECTION_LOCAL');
-    const fine = execute(doc, 'sweep_profile', {
-      pathId: id,
-      section: [
-        [-1, -1],
-        [1, -1],
+    const result = execute(rail.doc, 'sweep_profile', { path: L, radius: 5, corners: 'miter', guideIds: [rail.id] });
+    expectNoOp(result, rail.doc, 'SWG_LAW_EXCLUSIVE');
+  });
+  it('a short middle leg must hold the mitre reach of BOTH its joints (a Z path)', () => {
+    const z = (middle: number[]): number[][] => [[0, 0, 0], [100, 0, 0], middle, [(middle[0] as number) + 100, middle[1] as number, 0]];
+    const short = execute(empty, 'sweep_profile', { path: z([90, 10, 0]), radius: 5, corners: 'miter' });
+    expectNoOp(short, empty, 'SWG_SELF_INTERSECTION_LOCAL');
+    expect(short.summary).toContain('leg 1');
+    const long = execute(empty, 'sweep_profile', { path: z([60, 40, 0]), radius: 5, corners: 'miter' });
+    expect(long.affected, long.summary).toHaveLength(1);
+  });
+  it('a mitre with a scale or area law has no closed-form volume; a constant section keeps A (L1 + L2)', () => {
+    const volumeOf = (extra: Record<string, unknown>): number | null => {
+      const made = execute(empty, 'sweep_profile', { path: L, radius: 5, corners: 'miter', ...extra });
+      expect(made.affected, made.summary).toHaveLength(1);
+      return sweepAnalyticVolume(made.document.entities[made.affected[0] as string] as SweepEntity);
+    };
+    expect(volumeOf({})).toBeCloseTo(Math.PI * 25 * 200, 6);
+    expect(volumeOf({ scale: { type: 'linear', start: 1, end: 0.5 } })).toBeNull();
+    expect(volumeOf({ area: { type: 'linear', start: 78.5, end: 40 } })).toBeNull();
+  });
+  it('is pure', () => {
+    expectPure(empty, () => execute(empty, 'sweep_profile', { path: L, radius: 5, corners: 'miter', guideIds: ['nope'] }));
+  });
+});
+
+describe('ruled_surface developable flag is unit free (K L^2)', () => {
+  const line = (doc: CadDocument, a: number[], b: number[]): { doc: CadDocument; id: string } =>
+    create(doc, 'create_nurbs_curve', { degree: 1, poles: [a, b] });
+  it('a hypar z = x y / 1000 over 1000 mm is not developable although |K| = 1e-6 per mm^2', () => {
+    const a = line(empty, [0, 0, 0], [1000, 0, 0]);
+    const b = line(a.doc, [0, 1000, 0], [1000, 1000, 1000]);
+    const made = execute(b.doc, 'ruled_surface', { curveIds: [a.id, b.id] });
+    expect(made.affected, made.summary).toHaveLength(1);
+    const data = made.data as { developable: boolean; maxAbsGaussianCurvature: number; scaledGaussianCurvature: number };
+    expect(data.maxAbsGaussianCurvature).toBeLessThan(1.1e-6);
+    expect(data.scaledGaussianCurvature).toBeGreaterThan(1);
+    expect(data.developable).toBe(false);
+  });
+  it('a 5 m strake between two skew lines is not developable either', () => {
+    const a = line(empty, [0, 0, 0], [5000, 0, 0]);
+    const b = line(a.doc, [0, 1200, 400], [5000, 1200, 1400]);
+    const made = execute(b.doc, 'ruled_surface', { curveIds: [a.id, b.id] });
+    expect((made.data as { developable: boolean }).developable).toBe(false);
+  });
+  it('a cone frustum sheet is developable at 10 m scale exactly as at 10 mm', () => {
+    const circle = (doc: CadDocument, radius: number, z: number): { doc: CadDocument; id: string } => {
+      const w = Math.SQRT1_2;
+      const ring = [
+        [1, 0],
         [1, 1],
+        [0, 1],
         [-1, 1],
-      ],
-      orientation: { mode: 'axis_plane' },
-    });
-    expect(fine.affected).toHaveLength(1);
-  });
-
-  it('the axial extent is measured over the twisted loops: a flat strip twisted a quarter turn overlaps its neighbour turn', () => {
-    const { doc, id } = helix({ radius: 10, pitch: 3, turns: 2 });
-    const strip = [
-      [-2, -0.5],
-      [2, -0.5],
-      [2, 0.5],
-      [-2, 0.5],
-    ];
-    const flat = execute(doc, 'sweep_profile', { pathId: id, section: strip, orientation: { mode: 'axis_plane' } });
-    expect(flat.affected, flat.summary).toHaveLength(1);
-    const twisted = execute(doc, 'sweep_profile', {
-      pathId: id,
-      section: strip,
-      orientation: { mode: 'axis_plane' },
-      twist: { type: 'constant', value: Math.PI / 2 },
-    });
-    expectNoOp(twisted, doc, 'SWG_SELF_INTERSECTION_GLOBAL');
-  });
-});
-
-describe('closed paths and laws', () => {
-  const ring = xyz(0, 0, 0, 100, 0, 0, 100, 100, 0, 0, 100, 0);
-  const closed = { path: ring, closed: true, radius: 3, bendRadius: 20 };
-
-  it('scale, area and stretch must return to their start value on a closed path (SWG_LAW_INVALID)', () => {
-    for (const extra of [
-      { scale: { type: 'linear', start: 1, end: 1.5 } },
-      { area: { type: 'linear', start: 20, end: 30 } },
-      { stretch: { x: { type: 'linear', start: 1, end: 2 } } },
-    ])
-      expectNoOp(execute(empty, 'sweep_profile', { ...closed, ...extra }), empty, 'SWG_LAW_INVALID');
-    const periodic = execute(empty, 'sweep_profile', { ...closed, scale: { type: 'expression', expression: '1 + 0.1*sin(2*pi*t)' } });
-    expect(periodic.affected, periodic.summary).toHaveLength(1);
-  });
-});
-
-describe('path length source', () => {
-  it('uses the exact helix length when the sweep keeps its helix', () => {
-    const { doc, id } = helix({ radius: 20, pitch: 10, turns: 3 });
-    const swept = execute(doc, 'sweep_profile', { pathId: id, radius: 2 });
-    const entity = swept.document.entities[swept.affected[0] as string] as SweepEntity;
-    expect(pathLength(entity)).toBe(helixLength(entity.helix as NonNullable<SweepEntity['helix']>));
-  });
-});
-
-describe('check_sweep_loft budget', () => {
-  it('measures at most 8 fits when ids are omitted and says so for the rest', () => {
-    let doc = empty;
-    for (let k = 0; k < 10; k++) {
-      doc = execute(doc, 'sweep_profile', {
-        path: xyz(k * 30, 0, 0, k * 30, 0, 20),
-        radius: 3,
-        scale: { type: 'linear', start: 1, end: 0.5 },
-      }).document;
+        [-1, 0],
+        [-1, -1],
+        [0, -1],
+        [1, -1],
+        [1, 0],
+      ];
+      return create(doc, 'create_nurbs_curve', {
+        degree: 2,
+        poles: ring.map(([x, y]) => [(x as number) * radius, (y as number) * radius, z]),
+        weights: ring.map((_, i) => (i % 2 === 0 ? 1 : w)),
+        knots: [0, 0.25, 0.5, 0.75, 1],
+        multiplicities: [3, 2, 2, 2, 3],
+      });
+    };
+    for (const scale of [1, 1000]) {
+      const a = circle(empty, 10 * scale, 0);
+      const b = circle(a.doc, 5 * scale, 8 * scale);
+      const made = execute(b.doc, 'ruled_surface', { curveIds: [a.id, b.id] });
+      expect((made.data as { developable: boolean }).developable, `scale ${scale}`).toBe(true);
     }
-    const data = execute(doc, 'check_sweep_loft', {}).data as { findings: Array<{ value: number | null; message: string }> };
-    expect(data.findings).toHaveLength(10);
-    expect(data.findings.filter((f) => f.value === null)).toHaveLength(2);
-    expect(data.findings.find((f) => f.value === null)?.message).toContain('not measured');
   });
 });

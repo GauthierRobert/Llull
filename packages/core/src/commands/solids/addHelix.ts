@@ -64,7 +64,11 @@ export const addHelix = defineCommand({
       .optional(),
     turns: z.number().describe('Number of turns, 0 < turns <= 200, fractions allowed.').optional(),
     height: z.number().describe('Total axial length of the helix, document units (> 0).').optional(),
-    pitchLaw: lawField('Axial advance per turn (> 0, document units); t is the fraction of the turns'),
+    pitchLaw: lawField('Axial advance per turn (> 0, document units)', {
+      parameter: 't in [0, 1] (the fraction of the turns)',
+      unit: 'document length units advanced per turn',
+      arcLength: false,
+    }),
     type: z.enum(['helix', 'spiral']).describe('"helix" (default) rises along the axis; "spiral" stays in the plane ⟂ axis.').optional(),
     handedness: z
       .enum(['right', 'left'])

@@ -63,6 +63,7 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
     nurbsSurface: deps.native.capabilities.includes('nurbsSurface'),
     sheetSolid: deps.native.capabilities.includes('sheetSolid'),
     helixEdge: deps.native.capabilities.includes('helixEdge'),
+    pipeShell: deps.native.capabilities.includes('pipeShell'),
   };
 
   const sourceMesh: SourceMesher = async (source, features) => {

@@ -1,6 +1,6 @@
 /**
- * Fitted B-spline faces of a sweep (TECHNICAL_SPEC D-SWG-1): one face per section edge, S(u, t) with the edge's own rational basis in u and a
- * cubic interpolation of every edge pole across stations in t. Corners stay B-rep edges; the kernel sews the faces and caps them.
+ * Fitted B-spline faces of a sweep (TECHNICAL_SPEC D-SWG-1): one face per section edge and run of the path (cut where its curvature jumps), S(u, t)
+ * with the edge's own rational basis in u and a cubic interpolation of every edge pole across stations in t. Corners stay B-rep edges; the kernel sews the faces and caps them.
  * @invariant poles are entity-local; adjacent faces share their corner pole paths bit for bit; the reported deviation is the largest distance
  *   between the fitted faces and the exact evaluator at cell mid-stations
  */
@@ -13,51 +13,96 @@ import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { interpolatePolePaths, STATION_DEGREE } from '../../lib/nurbs/sweepFit';
 import { chainLength, isClosedChain } from '../curveSegments';
 import { encodeSurface } from '../surfaceWire';
-import { framesAtSamples, pathSamplesAt, type SweepFrame } from './frames';
-import { sectionTransforms, transformPoint, twistVariation, type SectionTransform } from './laws';
+import { curvatureBreaks, framesAtSamples, pathSamplesAt, type FrameIssue, type SweepFrame } from './frames';
+import type { SweepShape } from './evaluate';
+import { stationTransforms, twistVariation } from './laws';
+import type { RailIssue } from './rails';
+import { transformPoint, type SectionTransform } from './sectionTransform';
 import { constantEdges, ringEdges, type SectionEdge } from './sectionEdges';
 import { stationRingAt } from './sections';
 
-/** Station counts tried in turn; above CHUNK_CELLS a path is cut into faces of CHUNK_CELLS cells (the pole count stays below MAX_SURFACE_POLES). */
+/** Station counts tried in turn (shared out over the runs between curvature breaks); a run longer than CHUNK_CELLS is cut into faces of near-equal width (the pole count stays below MAX_SURFACE_POLES). */
 const CELL_LADDER = [64, 100, 200, 400, 800, 1600, 3200];
 const CHUNK_CELLS = 100;
 const CELLS_PER_RADIAN = 24;
 /** Section parameters at which the deviation is measured. */
 const PROBES = [0.2, 0.5, 0.8];
 
+/** Section / station parameters of the probe points of a face. */
+const PROBE_U = [0.25, 0.5, 0.75];
+const PROBE_V = [0.1, 0.4, 0.7, 0.95];
+
+function faceProbes(face: NurbsSurfaceData): number[] {
+  return PROBE_U.flatMap((u) => PROBE_V.flatMap((v) => [...evaluateSurface(face, u, v)]));
+}
+
 export interface FittedSweep {
   /** Encoded B-spline surfaces (`encodeSurface`), one per section edge. */
   readonly faces: number[][];
   readonly cells: number;
+  /** Points (xyz triples) on the fitted faces: the check a faster exact builder (MakePipeShell) must pass. */
+  readonly probes: number[];
   /** Largest measured distance between the fitted faces and the exact evaluator (document units). */
   readonly deviation: number;
 }
 
 /** A sweep the fitted path cannot or may not realise (the host keeps the mesh). */
 export interface FitRefusal {
-  readonly code: 'SWG_FIT_TOLERANCE' | 'SWG_FRAME_DEGENERATE' | 'SWG_FIT_UNSUPPORTED';
+  readonly code: 'SWG_FIT_TOLERANCE' | FrameIssue['code'] | 'SWG_FIT_UNSUPPORTED' | RailIssue['code'];
   readonly message: string;
 }
 
-interface Station {
+export interface Station {
   readonly frame: SweepFrame;
   readonly transform: SectionTransform;
   readonly t: number;
 }
 
-function placed(station: Station, p: Vec2): Vec3 {
+export function placed(station: Station, p: Vec2): Vec3 {
   const [x, y] = transformPoint(p, station.transform);
   return add3(station.frame.origin ?? station.frame.point, add3(scale3(station.frame.normal, x), scale3(station.frame.binormal, y)));
 }
 
-/** Frames and transforms at `2 cells + 1` equally spaced fractions (the odd ones are the deviation probes), or a refusal. */
-function stationsOf(sweep: SweepEntity, cells: number): Station[] | FitRefusal {
-  const ts = Array.from({ length: 2 * cells + 1 }, (_, k) => k / (2 * cells));
-  const frames = framesAtSamples(pathSamplesAt(sweep.path, ts, sweep.helix), sweep.orientation);
-  if (!Array.isArray(frames)) return { code: 'SWG_FRAME_DEGENERATE', message: frames.message };
+/** The stations of one run of the fit: `2 cells + 1` equally spaced fractions between two breaks (the odd ones are the deviation probes). */
+export interface StationRun {
+  readonly stations: Station[];
+  readonly cells: number;
+  readonly from: number;
+  readonly to: number;
+}
+
+/** Smallest number of cells of a run (a cubic needs four). */
+const MIN_RUN_CELLS = 4;
+
+/**
+ * Runs of the fit: the path cut where its curvature jumps, `cells` shared out by length. Frames, laws and rails are evaluated once along the whole path,
+ * so each station is the same on both sides of a break.
+ */
+export function stationRuns(sweep: SweepShape, cells: number): StationRun[] | FitRefusal {
+  const breaks = [0, ...(sweep.helix === undefined ? curvatureBreaks(sweep.path) : []), 1];
+  const sizes = breaks.slice(1).map((end, k) => Math.max(MIN_RUN_CELLS, Math.ceil(cells * (end - (breaks[k] as number)))));
+  const ts: number[] = [];
+  sizes.forEach((n, r) => {
+    const [from, to] = [breaks[r] as number, breaks[r + 1] as number];
+    for (let k = r === 0 ? 0 : 1; k <= 2 * n; k++) ts.push(k === 2 * n ? to : from + ((to - from) * k) / (2 * n));
+  });
+  const frames = framesAtSamples(pathSamplesAt(sweep.path, ts, sweep.helix), sweep.orientation, isClosedChain(sweep.path));
+  if (!Array.isArray(frames)) return { code: frames.code, message: frames.message };
   const length = chainLength(sweep.path);
-  const transforms = sectionTransforms(sweep, ts, length);
-  return ts.map((t, k) => ({ t, frame: frames[k] as SweepFrame, transform: transforms[k] as SectionTransform }));
+  const transforms = stationTransforms(sweep, ts, length, frames);
+  if (!Array.isArray(transforms)) return { code: (transforms as RailIssue).code, message: (transforms as RailIssue).message };
+  const all = ts.map((t, k): Station => ({ t, frame: frames[k] as SweepFrame, transform: transforms[k] as SectionTransform }));
+  let offset = 0;
+  return sizes.map((n, r) => {
+    const run: StationRun = {
+      stations: all.slice(offset, offset + 2 * n + 1),
+      cells: n,
+      from: breaks[r] as number,
+      to: breaks[r + 1] as number,
+    };
+    offset += 2 * n;
+    return run;
+  });
 }
 
 /** Edges at fraction `t` (constant sections are the same everywhere). */
@@ -115,29 +160,41 @@ function chunkFace(
   return { face, deviation };
 }
 
+/** Chunks of a run: near-equal widths of at most CHUNK_CELLS cells. */
+function chunksOf(cells: number): Array<{ first: number; width: number }> {
+  const parts = Math.ceil(cells / CHUNK_CELLS);
+  const size = Math.ceil(cells / parts);
+  return Array.from({ length: parts }, (_, i) => ({ first: i * size, width: Math.min(size, cells - i * size) })).filter(
+    (chunk) => chunk.width > 0,
+  );
+}
+
 function fitOnce(
   sweep: SweepEntity,
   constant: SectionEdge[] | null,
   cells: number,
-): { faces: NurbsSurfaceData[]; deviation: number } | FitRefusal {
-  const stations = stationsOf(sweep, cells);
-  if (!Array.isArray(stations)) return stations;
-  const edgesByStation = Array.from({ length: cells + 1 }, (_, k) => edgesAt(sweep, constant, (stations[2 * k] as Station).t));
-  const edgeCount = (edgesByStation[0] as SectionEdge[]).length;
-  const width = Math.min(cells, CHUNK_CELLS);
+): { faces: NurbsSurfaceData[]; deviation: number; cells: number } | FitRefusal {
+  const runs = stationRuns(sweep, cells);
+  if (!Array.isArray(runs)) return runs;
   const faces: NurbsSurfaceData[] = [];
   let deviation = 0;
-  for (let e = 0; e < edgeCount; e++)
-    for (let first = 0; first < cells; first += width) {
-      const made = chunkFace(sweep, constant, stations, edgesByStation, e, first, width);
-      if (made === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'the station interpolation system is singular' };
-      faces.push(made.face);
-      deviation = Math.max(deviation, made.deviation);
-    }
-  return { faces, deviation };
+  let total = 0;
+  for (const run of runs) {
+    const edgesByStation = Array.from({ length: run.cells + 1 }, (_, k) => edgesAt(sweep, constant, (run.stations[2 * k] as Station).t));
+    const edgeCount = (edgesByStation[0] as SectionEdge[]).length;
+    for (let e = 0; e < edgeCount; e++)
+      for (const { first, width } of chunksOf(run.cells)) {
+        const made = chunkFace(sweep, constant, run.stations, edgesByStation, e, first, width);
+        if (made === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'the station interpolation system is singular' };
+        faces.push(made.face);
+        deviation = Math.max(deviation, made.deviation);
+      }
+    total += run.cells;
+  }
+  return { faces, deviation, cells: total };
 }
 
-function modelSize(sweep: SweepEntity): number {
+function modelSize(sweep: SweepShape): number {
   const section =
     sweep.section.shape === 'circle' ? sweep.section.radius : Math.max(...sweep.section.profile.map(([x, y]) => Math.hypot(x, y)));
   const poles = sweep.path.flatMap((segment) => segment.points);
@@ -148,23 +205,21 @@ function modelSize(sweep: SweepEntity): number {
 }
 
 /** Named default fit tolerance: 1e-7 of the model size (path poles plus section), at least 1e-9 document units: the volume then holds ~1e-6. */
-export function fitToleranceOf(sweep: SweepEntity): number {
-  return Math.max(1e-9, 1e-7 * modelSize(sweep));
+export function fitToleranceOf(sweep: SweepShape): number {
+  return sweep.fitTolerance ?? Math.max(1e-9, 1e-7 * modelSize(sweep));
 }
 
 /** Sewing tolerance of the exact faces: 1e-6 of the model size (the edges of OCC's B-spline faces agree to about 1e-5 of their size), at least 1e-7. */
-export function sewToleranceOf(sweep: SweepEntity): number {
+export function sewToleranceOf(sweep: SweepShape): number {
   return Math.max(1e-7, 1e-6 * modelSize(sweep));
 }
 
 /**
  * Fitted faces of `sweep` within `tolerance`, refining the station count (64 up to 3200 cells, cut into faces of 100 cells) until the probes agree.
- * @failure closed path, hollow circle, degenerate arc -> SWG_FIT_UNSUPPORTED; frame mode degenerate -> SWG_FRAME_DEGENERATE;
+ * @failure hollow circle, degenerate arc -> SWG_FIT_UNSUPPORTED; frame mode degenerate -> SWG_FRAME_DEGENERATE;
  *   tolerance not reached with 3200 cells -> SWG_FIT_TOLERANCE
  */
 export function fitSweepFaces(sweep: SweepEntity, tolerance: number): FittedSweep | FitRefusal {
-  if (isClosedChain(sweep.path))
-    return { code: 'SWG_FIT_UNSUPPORTED', message: 'laws and frame modes on a closed path are realised as a mesh' };
   const constant = sweep.stations === undefined ? constantEdges(sweep.section) : null;
   if (sweep.stations === undefined && constant === null)
     return { code: 'SWG_FIT_UNSUPPORTED', message: 'a hollow round section or a degenerate arc is realised as a mesh' };
@@ -174,7 +229,8 @@ export function fitSweepFaces(sweep: SweepEntity, tolerance: number): FittedSwee
     const fit = fitOnce(sweep, constant, cells);
     if ('code' in fit) return fit;
     last = fit.deviation;
-    if (fit.deviation <= tolerance) return { faces: fit.faces.map(encodeSurface), cells, deviation: fit.deviation };
+    if (fit.deviation <= tolerance)
+      return { faces: fit.faces.map(encodeSurface), cells: fit.cells, deviation: fit.deviation, probes: fit.faces.flatMap(faceProbes) };
   }
   return {
     code: 'SWG_FIT_TOLERANCE',

@@ -9,6 +9,8 @@ const PACK = resolve(import.meta.dirname, '../../docs/design/02-sweep-loft-guide
 interface PackCase {
   readonly vc: string;
   readonly values?: Record<string, number>;
+  readonly value?: unknown;
+  readonly [key: string]: unknown;
 }
 
 const cases: PackCase[] = (JSON.parse(readFileSync(resolve(PACK, 'expected_results.json'), 'utf8')) as { cases: PackCase[] }).cases;
@@ -18,6 +20,13 @@ export function swgValue(vc: string, key: string): number {
   const value = cases.find((c) => c.vc === vc)?.values?.[key];
   if (value === undefined) throw new Error(`no expected value ${vc}/${key}`);
   return value;
+}
+
+/** The raw case `vc` of expected_results.json (for cases whose reference is a `value` object, e.g. VC-SWG-34 `{ plane, cylinder }`). */
+export function swgCase(vc: string): PackCase {
+  const found = cases.find((c) => c.vc === vc);
+  if (found === undefined) throw new Error(`no expected case ${vc}`);
+  return found;
 }
 
 export interface PlanStep {

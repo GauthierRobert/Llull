@@ -24,6 +24,8 @@ const NEWTON_STEPS = 40;
 const CURVE_SAMPLES_PER_SPAN = 24;
 const SURFACE_SAMPLES_PER_SPAN = 6;
 const SURFACE_STARTS = 3;
+/** Most probe samples per direction: a patch with many spans is probed no finer (the Newton refinement does the rest). */
+const MAX_PROBE_SAMPLES = 48;
 
 /** Closest point of `curve` to `target` (the global minimum among the sampled basins). */
 export function closestOnCurve(curve: NurbsCurveData, target: Vec3): CurveProjection {
@@ -90,8 +92,8 @@ export interface SurfaceProbe {
 /** Samples `surface` on a grid with the same count in every knot span (6 per span, at least 6 in all). */
 export function surfaceProbe(surface: NurbsSurfaceData): SurfaceProbe {
   const [[uMin, uMax], [vMin, vMax]] = surfaceDomain(surface);
-  const countU = Math.max(6, (surface.knotsU.length - 1) * SURFACE_SAMPLES_PER_SPAN);
-  const countV = Math.max(6, (surface.knotsV.length - 1) * SURFACE_SAMPLES_PER_SPAN);
+  const countU = Math.min(MAX_PROBE_SAMPLES, Math.max(6, (surface.knotsU.length - 1) * SURFACE_SAMPLES_PER_SPAN));
+  const countV = Math.min(MAX_PROBE_SAMPLES, Math.max(6, (surface.knotsV.length - 1) * SURFACE_SAMPLES_PER_SPAN));
   const cells: Array<{ u: number; v: number; point: Vec3 }> = [];
   for (let i = 0; i <= countU; i++)
     for (let j = 0; j <= countV; j++) {

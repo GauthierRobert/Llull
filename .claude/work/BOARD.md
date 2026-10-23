@@ -50,8 +50,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Freeform design (spec = `docs/design/README.md`, order = its "Recommended order")
 
-- `[TODO]` **DES-2b** 02 SWG left after M0–M3 (done 2026-10-22, §13): M4–M8 rails + `sweep_surface`, loft end conditions, ruled /
-  network / developable, pipeShell fast path, CadQuery lowering, frames overlay; M1 leftovers in §13. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14): CadQuery / build123d / FreeCAD lowering of sweeps + lofts,
+  frames overlay (UI), `ShapeRecipe` node `sheetSolid` (faces still in the leaf payload), `volumeConsistencyRel`, hollow round sections with laws,
+  exact-curve `inspect_sweep` curvature, closed-loft drift distribution (single re-seam today), VC-SWG-32 table. _Lane 1 + 2_ _deps: —_
 - `[TODO]` **DES-6b** 06 BLD left after M0 (done 2026-10-22, §13): M1+ blendInfo / laws / chord on curved faces / codegen, chamfer
   variants, conic / G2 profiles, setback corners, vertex names, `fillet_faces`, `fillet_full_round`; VC-22, 25–28. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-7b** 07 MSH left after M0 + M2 (done 2026-10-22, §13): M1 repair modes / fill holes / decimate / remesh / smooth /

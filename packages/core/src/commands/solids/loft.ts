@@ -8,6 +8,7 @@ import { newEntity } from '../entity/newEntity';
 import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
 import { sketchLoop } from './sketchCurves';
 import { allNurbsCurves, exactLoft } from './loftExact';
+import { advancedLoft, loftAdvancedFields, needsAdvancedLoft, sectionCurvesOf } from './loftAdvanced';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
 import { ringNormal } from '../../geometry/skin';
@@ -107,11 +108,21 @@ export const loftSections = defineCommand({
       .describe('Inline sections in loft order (alternative to sectionIds).')
       .optional(),
     ruled: z.boolean().describe('true: straight lines between neighbouring sections; false (default): smooth blend.').optional(),
+    ...loftAdvancedFields,
     ...solidStyleFields(),
   }),
-  run: (doc, { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId }): CommandResult => {
+  run: (doc, params): CommandResult => {
+    const { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId } = params;
     const fail = failer(doc, 'loft_sections');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
+    if (needsAdvancedLoft(doc, params, sectionIds)) {
+      if ((sectionIds === undefined) === (sections === undefined)) return fail('give exactly one of sectionIds or sections');
+      const count = (sectionIds ?? sections ?? []).length;
+      if (count < 2 || count > MAX_LOFT_SECTIONS) return fail(`a loft needs 2..${MAX_LOFT_SECTIONS} sections (got ${count})`);
+      const curves = sectionCurvesOf(doc, sectionIds, sections);
+      if (typeof curves === 'string') return fail(curves);
+      return advancedLoft(doc, params, curves, { layerId, color, id: explicitId });
+    }
     if (sectionIds !== undefined && sections === undefined && allNurbsCurves(doc, sectionIds))
       return exactLoft(doc, sectionIds, ruled, { layerId, color, id: explicitId }, MAX_LOFT_SECTIONS);
     const placed = placedSections(doc, sectionIds, sections);

@@ -33,6 +33,19 @@ mod ffi {
         fn skinned_solid_bsplines(curves: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn helix_pipe_solid(helix: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
+        #[allow(clippy::too_many_arguments)]
+        fn pipe_shell_solid(
+            spine: &[f64],
+            section: &Shape,
+            mode: i32,
+            direction: &[f64],
+            law: &[f64],
+            transition: i32,
+            tolerance: f64,
+            probes: &[f64],
+            check: f64,
+            volume: f64,
+        ) -> Result<UniquePtr<Shape>>;
         fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
         fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Result<UniquePtr<Shape>>;
@@ -59,7 +72,7 @@ mod ffi {
         ) -> Result<UniquePtr<Shape>>;
         fn split_shape(source: &Shape, tools: &Shape) -> Result<UniquePtr<Shape>>;
 
-        fn sheet_solid(faces: &[f64], lengths: &[u32], tolerance: f64) -> Result<UniquePtr<Shape>>;
+        fn sheet_solid(faces: &[f64], lengths: &[u32], tolerance: f64, caps_expected: i32) -> Result<UniquePtr<Shape>>;
 
         fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64], tag: &str) -> Result<UniquePtr<Shape>>;
         fn feature_prism_cut(
@@ -164,6 +177,39 @@ pub fn helix_pipe_solid(helix: &[f64], section: &Shape) -> Built {
     built(ffi::helix_pipe_solid(helix, inner(section)?))
 }
 
+/// Settings of the MakePipeShell fast path (`cpp/features.hxx`).
+pub struct PipeShell<'a> {
+    /// 0 corrected Frenet, 1 Frenet, 2 fixed trihedron, 3 binormal, 4 discrete.
+    pub mode: i32,
+    pub direction: [f64; 3],
+    /// (fraction, scale) pairs of a homothetic law, empty for a constant section.
+    pub law: &'a [f64],
+    /// 0 transformed, 1 right corner, 2 round corner.
+    pub transition: i32,
+    pub tolerance: f64,
+    /// Points of the exact evaluator the result must pass within `check`.
+    pub probes: &'a [f64],
+    pub check: f64,
+    /// Volume the result must match within a relative 1e-4 (0 = unchecked).
+    pub volume: f64,
+}
+
+/// MakePipeShell of the section's outer wire along the encoded spine, accepted only when every probe lies within `check` of the result; `None` otherwise.
+pub fn pipe_shell_solid(spine: &[f64], section: &Shape, shell: &PipeShell) -> Built {
+    built(ffi::pipe_shell_solid(
+        spine,
+        inner(section)?,
+        shell.mode,
+        &shell.direction,
+        shell.law,
+        shell.transition,
+        shell.tolerance,
+        shell.probes,
+        shell.check,
+        shell.volume,
+    ))
+}
+
 /// Sewn solid of bicubic B-spline patches (16 xyz poles each); `None` when any patch or the sewing fails.
 pub fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Built {
     built(ffi::bspline_patch_solid(poles, tolerance))
@@ -201,9 +247,14 @@ pub fn split_shape(source: &Shape, tools: &Shape) -> Built {
 /// Solid closed from fitted B-spline lateral faces (encoded as for [`surface_face`] kind 0): sewn shell, two planar caps, `None` when OCC refuses;
 /// `Err` when the sewing leaves free edges (`SWG_KERNEL_SEW_OPEN`).
 pub fn sheet_solid(faces: &[Vec<f64>], tolerance: f64) -> Built {
+    sheet_solid_capped(faces, tolerance, 2)
+}
+
+/// [`sheet_solid`] with `caps` closed free boundaries expected: 2 (the first and last section), 1 (a loft closed to a point at one end), 0 (a closed loft).
+pub fn sheet_solid_capped(faces: &[Vec<f64>], tolerance: f64, caps: i32) -> Built {
     let lengths: Option<Vec<u32>> = faces.iter().map(|face| u32::try_from(face.len()).ok()).collect();
     let Some(lengths) = lengths else { return Err("sheet solid: face too long".to_string()) };
-    built(ffi::sheet_solid(&faces.concat(), &lengths, tolerance))
+    built(ffi::sheet_solid(&faces.concat(), &lengths, tolerance, caps))
 }
 
 /// `tag` names the faces the cut generates (SC-N1, `hole<n>.<k>`).
@@ -330,6 +381,109 @@ mod tests {
         assert!(sheet_solid(&sides[..3], 1e-6).is_err() || sheet_solid(&sides[..3], 1e-6).unwrap().is_none(), "an open prism is refused");
         assert!(sheet_solid(&[], 1e-6).unwrap().is_none(), "no faces");
         assert!(sheet_solid(&[vec![1.0, 2.0]], 1e-6).is_err() || sheet_solid(&[vec![1.0, 2.0]], 1e-6).unwrap().is_none(), "bad data");
+    }
+
+    /// SWG M8: a closed loft (no caps) and a loft closed to a point at one end (one cap) are sewn with the matching number of caps; a wrong count is refused.
+    #[test]
+    fn a_sheet_solid_takes_the_expected_number_of_caps() {
+        let sides = [
+            prism_side([0.0, 0.0], [2.0, 0.0], 3.0),
+            prism_side([2.0, 0.0], [2.0, 1.5], 3.0),
+            prism_side([2.0, 1.5], [0.0, 1.5], 3.0),
+            prism_side([0.0, 1.5], [0.0, 0.0], 3.0),
+        ];
+        assert!(sheet_solid_capped(&sides, 1e-6, 1).map(|shape| shape.is_none()).unwrap_or(true), "two open ends are not one cap");
+        assert!(sheet_solid_capped(&sides, 1e-6, 0).map(|shape| shape.is_none()).unwrap_or(true), "an open prism is not a closed loft");
+        let solid = sheet_solid_capped(&sides, 1e-6, 2).unwrap().unwrap();
+        assert!((volume(&solid) - 9.0).abs() < 1e-9);
+    }
+
+    /// SWG M8: MakePipeShell fast path: a constant round section along a straight spine is a cylinder; a probe off the result refuses it.
+    #[test]
+    fn a_pipe_shell_is_accepted_only_when_it_passes_its_probes() {
+        let pi = std::f64::consts::PI;
+        let section = circle_section([0.0, 0.0, 0.0], [0.0, 0.0, 1.0], 1.0, None).unwrap().unwrap();
+        let spine = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0];
+        let on_surface = [1.0, 0.0, 1.5, 0.0, -1.0, 2.5];
+        let shell = PipeShell {
+            mode: 0,
+            direction: [0.0, 0.0, 1.0],
+            law: &[],
+            transition: 0,
+            tolerance: 1e-6,
+            probes: &on_surface,
+            check: 1e-5,
+            volume: 0.0,
+        };
+        let cylinder = pipe_shell_solid(&spine, &section, &shell).unwrap().unwrap();
+        assert!((volume(&cylinder) - 3.0 * pi).abs() < 1e-6 * 3.0 * pi, "volume {}", volume(&cylinder));
+        let off_surface = [2.0, 0.0, 1.5];
+        let missed = PipeShell { probes: &off_surface, ..shell };
+        assert!(pipe_shell_solid(&spine, &section, &missed).unwrap().is_none(), "a probe 1 away from the result refuses it");
+        let tapered = PipeShell { law: &[0.0, 1.0, 1.0, 0.5], probes: &[], ..shell };
+        let cone = pipe_shell_solid(&spine, &section, &tapered).unwrap().expect("the homothetic law builds");
+        let frustum = pi * 3.0 * (1.0 + 0.5 + 0.25) / 3.0;
+        assert!((volume(&cone) - frustum).abs() < 1e-3 * frustum, "homothetic law volume {} vs {frustum}", volume(&cone));
+    }
+
+    /// SWG review: probes are measured to the BOUNDARY (a point inside a too fat pipe is not on it), and a pipe whose volume differs from the
+    /// expected one is refused. A linear taper on a line + arc + line spine runs on the length fraction (Law_Interpol), volume pi L 7/12.
+    #[test]
+    fn a_pipe_shell_probe_inside_the_solid_and_a_wrong_volume_are_refused() {
+        let pi = std::f64::consts::PI;
+        let section = circle_section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], 1.0, None).unwrap().unwrap();
+        let h = std::f64::consts::FRAC_1_SQRT_2;
+        let spine = [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            10.0,
+            0.0,
+            0.0, //
+            1.0,
+            10.0,
+            0.0,
+            0.0,
+            10.0 + 10.0 * h,
+            10.0 - 10.0 * h,
+            0.0,
+            20.0,
+            10.0,
+            0.0, //
+            0.0,
+            20.0,
+            10.0,
+            0.0,
+            20.0,
+            20.0,
+            0.0,
+        ];
+        let total = 20.0 + 5.0 * pi;
+        let exact = pi * total * (7.0 / 12.0);
+        let law: Vec<f64> = (0..=64).flat_map(|k| [k as f64 / 64.0, 1.0 - 0.5 * k as f64 / 64.0]).collect();
+        // a point of the tapered boundary at the middle of the first line (s = 5): radius 1 - 0.5 * 5 / total
+        let on_boundary = [5.0, 1.0 - 0.5 * 5.0 / total, 0.0];
+        let inside = [5.0, 0.0, 0.0];
+        let shell = PipeShell {
+            mode: 0,
+            direction: [0.0, 0.0, 1.0],
+            law: &law,
+            transition: 0,
+            tolerance: 1e-6,
+            probes: &on_boundary,
+            check: 1e-4,
+            volume: exact,
+        };
+        let taper = pipe_shell_solid(&spine, &section, &shell).unwrap().expect("the taper passes its boundary probe and its volume");
+        assert!((volume(&taper) - exact).abs() < 1e-5 * exact, "volume {} vs {exact}", volume(&taper));
+        let centre = PipeShell { probes: &inside, ..shell };
+        assert!(
+            pipe_shell_solid(&spine, &section, &centre).unwrap().is_none(),
+            "a probe on the axis is 0.9 inside the boundary, not on it"
+        );
+        let fat = PipeShell { volume: exact * 1.01, ..shell };
+        assert!(pipe_shell_solid(&spine, &section, &fat).unwrap().is_none(), "a pipe 1 % off the fitted volume is refused");
     }
 
     /// SWG M3: MakePipe along the exact helix edge has the closed-form volume pi r^2 L to ~2e-6 (OCC's pipe surface is itself an approximation; the host

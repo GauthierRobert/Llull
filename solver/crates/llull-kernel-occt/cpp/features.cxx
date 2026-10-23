@@ -18,13 +18,18 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepFeat_MakePrism.hxx>
 #include <BRepFeat_MakeRevol.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepOffsetAPI_MakeOffsetShape.hxx>
+#include <BRepBuilderAPI_TransitionMode.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
+#include <BRepOffsetAPI_MakePipeShell.hxx>
+#include <Law_Interpol.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
@@ -613,6 +618,73 @@ std::unique_ptr<Shape> helix_pipe_solid(rust::Slice<const double> helix, const S
   if (wire.IsNull()) return nullptr;
   const TopoDS_Shape result = pipe_of(wire, section.shape);
   return result.IsNull() ? nullptr : wrap(result);
+}
+
+// SWG M8 fast path: BRepOffsetAPI_MakePipeShell of the section's outer wire along the spine. `mode`: 0 corrected Frenet, 1 Frenet, 2 fixed trihedron
+// (section planes parallel; `direction` is the plane normal), 3 binormal (`direction`), 4 discrete trihedron. `law`: (fraction, scale) pairs of a
+// homothetic law (Law_Interpol), empty for a constant section. `transition`: 0 transformed, 1 right corner (mitre), 2 round corner. The result is only
+// returned when every probe point (xyz triples taken from the exact evaluator) lies within `check` of it: OCC's pipe shell is itself an approximation.
+std::unique_ptr<Shape> pipe_shell_solid(rust::Slice<const double> spine, const Shape &section, int32_t mode, rust::Slice<const double> direction,
+                                        rust::Slice<const double> law, int32_t transition, double tolerance, rust::Slice<const double> probes,
+                                        double check, double volume) {
+  try {
+    const TopoDS_Wire wire = chain_wire(spine);
+    if (wire.IsNull() || section.shape.ShapeType() != TopAbs_FACE) return nullptr;
+    const TopoDS_Face face = TopoDS::Face(section.shape);
+    if (unique_sub_shapes(face, TopAbs_WIRE).Extent() != 1) return nullptr;
+    const TopoDS_Wire profile = BRepTools::OuterWire(face);
+    BRepOffsetAPI_MakePipeShell shell(wire);
+    switch (mode) {
+      case 0:
+        shell.SetMode(Standard_False);
+        break;
+      case 1:
+        shell.SetMode(Standard_True);
+        break;
+      case 2:
+        shell.SetMode(gp_Ax2(gp_Pnt(0, 0, 0), direction_of(direction)));
+        break;
+      case 3:
+        shell.SetMode(direction_of(direction));
+        break;
+      case 4:
+        shell.SetDiscreteMode();
+        break;
+      default:
+        throw std::invalid_argument("pipe shell: unknown trihedron mode");
+    }
+    shell.SetTransitionMode(transition == 1 ? BRepBuilderAPI_RightCorner : transition == 2 ? BRepBuilderAPI_RoundCorner : BRepBuilderAPI_Transformed);
+    shell.SetTolerance(tolerance, tolerance, 1e-2);
+    if (law.size() >= 4 && law.size() % 2 == 0) {
+      const int count = static_cast<int>(law.size() / 2);
+      TColgp_Array1OfPnt2d pairs(1, count);
+      for (int k = 0; k < count; ++k) pairs.SetValue(k + 1, gp_Pnt2d(law[2 * k], law[2 * k + 1]));
+      Handle(Law_Interpol) scale = new Law_Interpol();
+      scale->Set(pairs, Standard_False);
+      shell.SetLaw(profile, scale, Standard_False, Standard_False);
+    } else {
+      shell.Add(profile, Standard_False, Standard_False);
+    }
+    shell.Build();
+    if (!shell.IsDone() || !shell.MakeSolid()) return nullptr;
+    const TopoDS_Shape solid = valid_or_null(shell.Shape());
+    if (solid.IsNull()) return nullptr;
+    // BRepExtrema from a point to a SOLID is 0 inside it, so the probes are measured to the faces: a pipe that is too fat misses them
+    const TopTools_IndexedMapOfShape faces = unique_sub_shapes(solid, TopAbs_FACE);
+    for (size_t k = 0; k + 2 < probes.size(); k += 3) {
+      double nearest = std::numeric_limits<double>::infinity();
+      for (int f = 1; f <= faces.Extent(); ++f)
+        nearest = std::min(nearest, nearest_distance(faces(f), gp_Pnt(probes[k], probes[k + 1], probes[k + 2])));
+      if (nearest > check) return nullptr;
+    }
+    GProp_GProps properties;
+    BRepGProp::VolumeProperties(solid, properties);
+    if (!(properties.Mass() > 0)) return nullptr;
+    if (volume > 0 && std::abs(properties.Mass() - volume) > 1e-4 * volume) return nullptr;
+    return wrap(solid);
+  } catch (const Standard_Failure &) {
+    return nullptr;
+  }
 }
 
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance) {

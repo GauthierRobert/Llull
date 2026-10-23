@@ -9,17 +9,17 @@ import type { LoftEntity, Vec3 } from '../model/types';
 import { add3 } from '../lib/vec3';
 import { catmullRomBeziers, segmentPoint } from './curveSegments';
 import { sampleRing } from './sectionRing';
-import { skinTriangles } from './skin';
+import { ringWalls, skinTriangles } from './skin';
 import type { Triangle } from './triangles';
 
 /** Interpolated rings per span of a smooth loft. */
 const LOFT_SPAN_STEPS = 8;
 
 /** Dense rings of a loft (local coordinates). */
-export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled'>): Vec3[][] {
+export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed'>): Vec3[][] {
   const sections = loft.rings.map(sampleRing);
   const first = sections[0];
-  if (loft.ruled || sections.length < 3 || first === undefined) return sections;
+  if (loft.ruled || loft.closed === true || sections.length < 3 || first === undefined) return sections;
   const columns = first.map((_, j) =>
     catmullRomBeziers(
       sections.map((ring) => ring[j] as Vec3),
@@ -35,6 +35,9 @@ export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled'>): Vec3[][] {
 }
 
 /** Closed, outward-wound triangles of a loft; `origin` is added to every vertex. */
-export function loftTriangles(loft: Pick<LoftEntity, 'rings' | 'ruled'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
-  return skinTriangles(loftRings(loft).map((ring) => ring.map((p) => add3(p, origin))));
+export function loftTriangles(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
+  const rings = loftRings(loft).map((ring) => ring.map((p) => add3(p, origin)));
+  if (loft.closed !== true) return skinTriangles(rings);
+  // a closed loft has no end caps: the last ring joins the first
+  return rings.flatMap((ring, i) => ringWalls(ring, rings[(i + 1) % rings.length] as Vec3[], false));
 }

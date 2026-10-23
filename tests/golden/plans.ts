@@ -843,6 +843,9 @@ export const plans: Record<string, GoldenAction[]> = {
   // SWG M1/M3 target plans of the validation pack (docs/design/02-sweep-loft-guides/validation/plans)
   swg_twist_scale_orientation: swgPlan('target_twist_scale_orientation'),
   swg_helix_spring_thread: swgPlan('target_helix_spring_thread'),
+  swg_rails_surface_mode: swgPlan('target_rails_and_surface_mode'),
+  swg_loft_conditions_alignment: swgPlan('target_loft_conditions_alignment'),
+  swg_network_ruled: swgPlan('target_network_ruled'),
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */

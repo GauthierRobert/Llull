@@ -50,6 +50,12 @@ std::unique_ptr<Shape> pipe_solid(rust::Slice<const double> spine, const Shape &
 // MakePipe of `section` along the exact helix edge (capability helixEdge): origin xyz, axis xyz, x direction xyz, radius, end radius, turns,
 // pitch, left-hand flag, start angle (15 numbers). Null when OCC refuses; a throw (-> Err) for inconsistent data.
 std::unique_ptr<Shape> helix_pipe_solid(rust::Slice<const double> helix, const Shape &section);
+// MakePipeShell fast path (capability pipeShell): trihedron mode, mode direction, homothetic law pairs, transition mode, tolerance, then probe points
+// (xyz triples on the exact evaluator) and the largest distance they may lie from the BOUNDARY of the result (a probe inside a too fat pipe is a miss),
+// then the expected volume (0 = unknown) the result must match within a relative 1e-4. Null when OCC refuses, a probe is missed or the volume differs.
+std::unique_ptr<Shape> pipe_shell_solid(rust::Slice<const double> spine, const Shape &section, int32_t mode, rust::Slice<const double> direction,
+                                        rust::Slice<const double> law, int32_t transition, double tolerance, rust::Slice<const double> probes,
+                                        double check, double volume);
 bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance);
@@ -75,7 +81,7 @@ std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools);
 // Closed solid of fitted lateral B-spline faces (surface_face kind-0 layouts concatenated, `lengths` = f64 count of each): the faces are sewn into
 // a shell whose two closed free boundaries get planar caps, then everything is sewn into a solid. Null when OCC refuses or the solid is invalid; a
 // throw (-> Err) when the sewing leaves free edges (SWG_KERNEL_SEW_OPEN) or the shell does not have exactly two closed boundaries.
-std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance);
+std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance, int32_t caps_expected);
 
 // `tag` names the tool faces (SC-N1: "hole<n>.<k>", "pocket<n>").
 // BRepFeat_MakeRevol cut of the closed polygon `profile` (xyz triples) revolved 2 pi about (origin, normal).

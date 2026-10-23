@@ -8,7 +8,8 @@ import type { Vec3 } from '../../model/vectors';
 import { distance3 } from '../vec3';
 import { basisFunctions, findSpan } from './basis';
 import { solveBanded } from './bandSolve';
-import { closestOnCurve, closestOnSurface, surfaceProbe } from './closest';
+import { closestOnSurface, surfaceProbe } from './closest';
+import { meetCurves } from './meet';
 import { curveDomain, evaluateCurve } from './evaluate';
 import { evaluateSurface, surfaceDomain } from './surface';
 import { interpolateGrid } from './surfaceFit';
@@ -39,26 +40,6 @@ const at = (curve: NurbsCurveData, t: number): Vec3 => {
   const [a, b] = curveDomain(curve);
   return evaluateCurve(curve, a + (b - a) * t);
 };
-
-/** Closest points between two curves by alternating projection from the best of a coarse sampling: [parameter on a, parameter on b, gap], all in 0..1. */
-function meet(a: NurbsCurveData, b: NurbsCurveData): [number, number, number] {
-  let best: [number, number, number] = [0, 0, Infinity];
-  const count = 40;
-  for (let i = 0; i <= count; i++) {
-    const point = at(a, i / count);
-    const hit = closestOnCurve(b, point);
-    const tb = (hit.t - curveDomain(b)[0]) / (curveDomain(b)[1] - curveDomain(b)[0]);
-    if (hit.distance < best[2]) best = [i / count, tb, hit.distance];
-  }
-  let [ta, tb] = [best[0], best[1]];
-  for (let step = 0; step < 30; step++) {
-    const onA = closestOnCurve(a, at(b, tb));
-    ta = (onA.t - curveDomain(a)[0]) / (curveDomain(a)[1] - curveDomain(a)[0]);
-    const onB = closestOnCurve(b, at(a, ta));
-    tb = (onB.t - curveDomain(b)[0]) / (curveDomain(b)[1] - curveDomain(b)[0]);
-  }
-  return [ta, tb, distance3(at(a, ta), at(b, tb))];
-}
 
 /** Piecewise-linear map through the node pairs (x[k] -> y[k]), clamped outside. */
 function piecewise(x: ReadonlyArray<number>, y: ReadonlyArray<number>): (t: number) => number {
@@ -157,7 +138,14 @@ export function gordonSurface(
   for (let i = 0; i < K; i++) {
     u.push([]);
     for (let j = 0; j < J; j++) {
-      const [ta, tb, g] = meet(sections[i] as NurbsCurveData, guides[j] as NurbsCurveData);
+      const [ta, tb, g, again] = meetCurves(sections[i] as NurbsCurveData, guides[j] as NurbsCurveData, tolerance);
+      if (again)
+        return {
+          code: 'SRF_LOFT_GUIDE_MISSES_SECTION',
+          message: `guide ${j} meets section ${i} more than once: the crossing is ambiguous`,
+          guide: j,
+          section: i,
+        };
       if (g > tolerance)
         return {
           code: 'SRF_LOFT_GUIDE_MISSES_SECTION',
@@ -220,22 +208,26 @@ export function gordonSurface(
     return { code: 'SRF_NURBS_INVALID', message: 'the guide / section nodes are too close together to blend' };
   const aValues = spread(closed ? [...uBar, (uBar[0] as number) + 1] : [0, ...uBar.filter((n) => n > 1e-9 && n < 1 - 1e-9), 1], 10);
   const bValues = spread([0, ...vNodes.filter((n) => n > 1e-9 && n < 1 - 1e-9), 1], 10);
-  const corner = (i: number, j: number): Vec3 => at(sections[i] as NurbsCurveData, (u[i] as number[])[j] as number);
-  const sectionAt = (i: number, a: number): Vec3 =>
-    at(sections[i] as NurbsCurveData, closed ? wrap01((phi[i] as (t: number) => number)(a)) : (phi[i] as (t: number) => number)(a));
-  const grid = aValues.map((a) => {
+  // everything the blend needs at one a (per row) or one b (per column) is evaluated once
+  const corners = u.map((row, i) => row.map((t) => at(sections[i] as NurbsCurveData, t)));
+  const sectionRows = aValues.map((a) =>
+    sections.map((section, i) => at(section, closed ? wrap01((phi[i] as (t: number) => number)(a)) : (phi[i] as (t: number) => number)(a))),
+  );
+  const guideColumns = bValues.map((b) => guides.map((guide, j) => at(guide, (psi[j] as (t: number) => number)(b))));
+  const leftWeights = bValues.map((b) => ell(b));
+  const grid = aValues.map((a, ai) => {
     const m = emm(a);
-    return bValues.map((b): Vec3 => {
-      const l = ell(b);
+    return bValues.map((_, bi): Vec3 => {
+      const l = leftWeights[bi] as number[];
       const p: [number, number, number] = [0, 0, 0];
       const add = (q: Vec3, w: number): void => {
         p[0] += w * q[0];
         p[1] += w * q[1];
         p[2] += w * q[2];
       };
-      for (let i = 0; i < K; i++) add(sectionAt(i, a), l[i] as number);
-      for (let j = 0; j < J; j++) add(at(guides[j] as NurbsCurveData, (psi[j] as (t: number) => number)(b)), m[j] as number);
-      for (let i = 0; i < K; i++) for (let j = 0; j < J; j++) add(corner(i, j), -(l[i] as number) * (m[j] as number));
+      for (let i = 0; i < K; i++) add((sectionRows[ai] as Vec3[])[i] as Vec3, l[i] as number);
+      for (let j = 0; j < J; j++) add((guideColumns[bi] as Vec3[])[j] as Vec3, m[j] as number);
+      for (let i = 0; i < K; i++) for (let j = 0; j < J; j++) add((corners[i] as Vec3[])[j] as Vec3, -(l[i] as number) * (m[j] as number));
       return p;
     });
   });

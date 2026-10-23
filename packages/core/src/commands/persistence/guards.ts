@@ -211,6 +211,16 @@ const noProblem = (): null => null;
 
 function loftProblem(v: Record<string, unknown>): string | null {
   const base = ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean');
+  const faces = v['faces'];
+  if (v['closed'] !== undefined && typeof v['closed'] !== 'boolean') return 'closed must be a boolean';
+  if (v['caps'] !== undefined && v['caps'] !== 0 && v['caps'] !== 1 && v['caps'] !== 2) return 'caps must be 0, 1 or 2';
+  if (base === null && faces !== undefined) {
+    if (!Array.isArray(faces) || faces.length < 1 || faces.length > 64) return 'faces must list 1..64 NURBS surfaces';
+    for (let i = 0; i < faces.length; i++) {
+      const problem = nurbsSurfaceProblem(faces[i], `faces.${i}`);
+      if (problem !== null) return problem;
+    }
+  }
   const sections = v['sections'];
   if (base !== null || sections === undefined) return base;
   if (!Array.isArray(sections) || sections.length !== (v['rings'] as unknown[]).length) return 'sections must list one curve per ring';

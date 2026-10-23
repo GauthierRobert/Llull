@@ -100,6 +100,7 @@ export const inspectSweep = defineCommand({
           fixed: 'fixed section plane',
           binormal: 'binormal direction',
           axis_plane: 'screw frame about an axis',
+          surface: 'reference-surface normal',
         }[orientation],
         reference: 'Wang et al. 2008 (RMF); Frenet-Serret',
         inputs: { id, samples: ts.length },

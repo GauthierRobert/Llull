@@ -1,11 +1,13 @@
 /** Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity, instance expansion). */
 
 import { withCurve } from '../model/curveEntity';
-import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
+import type { Entity, Vec2, Vec3 } from '../model/types';
+import type { SweepSection } from '../model/sweepOrientation';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
 import { scaleCurve } from './nurbsCurve';
 import { scaleSurface } from './nurbsSurface';
+import { scaledSweepDesign } from './sweepEval/scaleDesign';
 import { scaledDecals } from './decal';
 import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
@@ -138,6 +140,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
           ...e,
           path: e.path.map((segment) => mapSegment(segment, (p: Vec3) => scale3(p, f))),
           section: scaledSection(e.section, f),
+          ...scaledSweepDesign(e, f),
           ...(e.stations !== undefined
             ? { stations: e.stations.map((station) => ({ at: station.at, ring: station.ring.map((p) => scale2(p, f)) })) }
             : {}),
@@ -150,6 +153,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
           ...e,
           rings: e.rings.map((ring) => ring.map((p) => scale3(p, f))),
           ...(e.sections === undefined ? {} : { sections: e.sections.map((section) => scaleCurve(section, f)) }),
+          ...(e.faces === undefined ? {} : { faces: e.faces.map((face) => scaleSurface(face, f)) }),
         },
         dims: `scaled ${e.rings.length} section rings`,
       };

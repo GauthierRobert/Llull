@@ -1,14 +1,70 @@
 /** loft_surface: skinning through section curves, optionally through a guide network (Gordon surface). */
 
 import type { CommandResult } from '../types';
+import type { CadDocument } from '../../model/types';
+import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { defineCommand, z } from '../schema';
 import { gordonSurface } from '../../lib/nurbs/gordon';
 import { skinCurves } from '../../lib/nurbs/surfaceFit';
 import { maxCurveDeviation, sizeOfCurves, worldCurves } from './curveInputs';
+import { buildLoft } from '../../geometry/loftSkin/build';
+import type { LoftOptions } from '../../geometry/loftSkin/types';
+import { loftAdvancedFields, parseEnd } from '../solids/loftAdvanced';
 import { refuseSrf } from './shared';
+import { refuseSwg } from './swgRefusal';
 import { commitSurface, isRefusal, sig, surfaceStyleFields } from './surfaceShared';
 
 const MAX_SECTIONS = 60;
+
+type SheetParams = Parameters<typeof loftSurface.run>[1];
+
+/** Skin through the sections with end conditions, alignment, coupling or a closed ring: one nurbs_surface per face (a coupled loft has several). */
+function advancedSheet(doc: CadDocument, params: SheetParams, sections: NurbsCurveData[]): CommandResult {
+  const refuse = (code: string, message: string): CommandResult => refuseSwg(doc, 'loft_surface', code, message, [], ['params']);
+  const start = parseEnd(doc, params.startCondition, 'startCondition');
+  if (start !== undefined && 'code' in start) return refuse(start.code, start.message);
+  const end = parseEnd(doc, params.endCondition, 'endCondition');
+  if (end !== undefined && 'code' in end) return refuse(end.code, end.message);
+  const size = sizeOfCurves(sections);
+  const options: LoftOptions = {
+    ruled: params.degreeV === 1,
+    closed: params.closed === true,
+    solid: false,
+    alignment: params.seams !== undefined ? 'seams' : (params.alignment ?? 'none'),
+    seams: params.seams,
+    coupling: params.coupling,
+    vertexPairs: params.vertexPairs,
+    start,
+    end,
+    guideTolerance: 1e-4 * size,
+    fitTolerance: params.fitTolerance ?? 1e-6 * size,
+    endAngleTolerance: params.endAngleRad ?? 0.01,
+    faceTolerance: 1e-4 * size,
+  };
+  const built = buildLoft(sections, options);
+  if ('code' in built) return refuse(built.code, built.message);
+  let current = doc;
+  const ids: string[] = [];
+  for (const face of built.faces) {
+    const made = commitSurface(current, face, { ...params, position: [0, 0, 0] }, () => '');
+    current = made.document;
+    ids.push(...made.affected);
+  }
+  const { report } = built;
+  return {
+    document: current,
+    affected: ids,
+    summary: `loft_surface: created ${ids.length} sheet(s) ${ids.map((id) => `"${id}"`).join(', ')} through ${sections.length} sections (section deviation ${sig(report.sectionDeviation)} ${doc.units}${report.startAngleRad === null && report.endAngleRad === null ? '' : `, end angles ${sig(report.startAngleRad ?? 0)} / ${sig(report.endAngleRad ?? 0)} rad`}).`,
+    data: {
+      faces: report.faceCount,
+      sectionDeviation: sig(report.sectionDeviation),
+      startAngleRad: report.startAngleRad === null ? null : sig(report.startAngleRad),
+      endAngleRad: report.endAngleRad === null ? null : sig(report.endAngleRad),
+      fitDeviation: sig(report.fitDeviation),
+      unit: doc.units,
+    },
+  };
+}
 
 /**
  * @affects creates 1 nurbs_surface entity (world coordinates, position [0,0,0]) skinned through the sections
@@ -38,6 +94,15 @@ export const loftSurface = defineCommand({
         'Largest distance (document units) between a guide and a section still counted as meeting. Default 1e-4 x the size of the curves.',
       )
       .optional(),
+    startCondition: loftAdvancedFields.startCondition,
+    endCondition: loftAdvancedFields.endCondition,
+    alignment: loftAdvancedFields.alignment,
+    seams: loftAdvancedFields.seams,
+    coupling: loftAdvancedFields.coupling,
+    vertexPairs: loftAdvancedFields.vertexPairs,
+    closed: loftAdvancedFields.closed,
+    fitTolerance: loftAdvancedFields.fitTolerance,
+    endAngleRad: loftAdvancedFields.endAngleRad,
     ...surfaceStyleFields(),
   }),
   run: (doc, params): CommandResult => {
@@ -58,6 +123,11 @@ export const loftSurface = defineCommand({
     const guides = worldCurves(doc, 'loft_surface', guideIds, 'guideIds');
     if (isRefusal(guides)) return guides;
     const degreeV = Math.min(params.degreeV ?? 3, sections.length - 1);
+    const advanced =
+      [params.startCondition, params.endCondition, params.alignment, params.seams, params.coupling, params.vertexPairs].some(
+        (value) => value !== undefined,
+      ) || params.closed === true;
+    if (advanced && guides.length === 0) return advancedSheet(doc, params, sections);
     if (guides.length === 0) {
       const skin = skinCurves(sections, degreeV);
       if ('code' in skin) return refuseSrf(doc, 'loft_surface', skin.code, skin.message, [], ['params.sectionIds']);

@@ -606,7 +606,7 @@ std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools) {
   }
 }
 
-std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance) {
+std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<const uint32_t> lengths, double tolerance, int32_t caps_expected) {
   try {
     std::vector<TopoDS_Shape> sides;
     size_t offset = 0;
@@ -618,7 +618,7 @@ std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<
       offset += length;
     }
     if (sides.empty()) return nullptr;
-    // the lateral shell leaves exactly two closed free boundaries (the first and last section): each is closed by a planar cap
+    // the lateral shell leaves exactly `caps_expected` closed free boundaries (2: the first and last section; 1: a loft closed to a point at one end; 0: a closed loft): each is closed by a planar cap
     BRepBuilderAPI_Sewing lateral(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
     for (const TopoDS_Shape &face : sides) lateral.Add(face);
     lateral.Perform();
@@ -632,7 +632,8 @@ std::unique_ptr<Shape> sheet_solid(rust::Slice<const double> faces, rust::Slice<
       if (!cap.IsDone()) return nullptr;
       all.push_back(cap.Face());
     }
-    if (caps != 2) throw std::invalid_argument("sheet solid: expected 2 closed section boundaries, found " + std::to_string(caps));
+    if (caps != caps_expected)
+      throw std::invalid_argument("sheet solid: expected " + std::to_string(caps_expected) + " closed section boundaries, found " + std::to_string(caps));
     BRepBuilderAPI_Sewing sewing(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
     for (const TopoDS_Shape &face : all) sewing.Add(face);
     sewing.Perform();

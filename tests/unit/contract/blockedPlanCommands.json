@@ -13,13 +13,6 @@
     "docs/design/01-body-deformation/validation/plans/target_point_push.json": [
       "deform_by_point"
     ],
-    "docs/design/02-sweep-loft-guides/validation/plans/target_network_ruled.json": [
-      "network_surface",
-      "ruled_surface"
-    ],
-    "docs/design/02-sweep-loft-guides/validation/plans/target_rails_and_surface_mode.json": [
-      "sweep_surface"
-    ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_brep_face_moves.json": [
       "delete_faces",
       "move_faces"

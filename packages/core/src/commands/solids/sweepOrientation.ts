@@ -1,8 +1,9 @@
 /** Orientation param of `sweep_profile`: zod fields, parsing into the model, and the global overlap check of helical sweeps. */
 
 import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
+import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { SweepFrame } from '../../geometry/sweepEval/frames';
-import { transformPoint, type SectionTransform } from '../../geometry/sweepEval/laws';
+import { transformPoint, type SectionTransform } from '../../geometry/sweepEval/sectionTransform';
 import type { HelixDefinition } from '../../lib/helix/types';
 import { lawFunction } from '../../lib/law/evaluate';
 import { dot3, isVec3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
@@ -12,15 +13,29 @@ import { z } from '../schema';
 export const orientationField = z
   .object({
     mode: z
-      .enum(['minimal', 'frenet', 'fixed', 'binormal', 'axis_plane'])
+      .enum(['minimal', 'frenet', 'fixed', 'binormal', 'axis_plane', 'surface'])
       .describe(
-        'minimal (default): twist-free frame, for pipes and anything round; frenet: section follows the curvature normal, only on paths that bend everywhere; fixed: the section keeps its plane (normal = direction), oblique to the path; binormal: the section y axis tracks `direction`; axis_plane: the section lies in the plane through an axis (threads, springs and screws with a non-round section: x = radial, y = along the axis).',
+        'minimal (default): twist-free frame, for pipes and anything round; frenet: section follows the curvature normal, only on paths that bend everywhere; fixed: the section keeps its plane (normal = direction), oblique to the path; binormal: the section y axis tracks `direction`; axis_plane: the section lies in the plane through an axis (threads, springs and screws with a non-round section: x = radial, y = along the axis); surface: the section y axis follows the normal (S_u x S_v) of the sheet `surfaceId` at the foot of the path point (a band standing on a surface, a rib along a hull).',
       ),
     direction: z
       .array(z.number())
       .describe(
         '[x, y, z] reference direction: fixed = section plane normal (default [0, 0, 1]); binormal = the direction the section y axis follows (required); axis_plane = the axis direction (default: the axis of a helix path).',
       )
+      .optional(),
+    surfaceId: z
+      .string()
+      .describe('surface only: id of the reference nurbs_surface; the path should lie on it (within `tolerance`).')
+      .optional(),
+    tolerance: z
+      .number()
+      .describe(
+        'surface only: largest distance the path may stray from the reference surface, document units (> 0). Default 1e-4 x the size of the surface.',
+      )
+      .optional(),
+    flip: z
+      .boolean()
+      .describe('surface only: true puts the section y axis on the opposite side of the sheet (against its normal). Default false.')
       .optional(),
     axisPoint: z
       .array(z.number())
@@ -41,6 +56,9 @@ export interface OrientationInput {
   readonly mode: string;
   readonly direction?: number[] | undefined;
   readonly axisPoint?: number[] | undefined;
+  readonly surfaceId?: string | undefined;
+  readonly tolerance?: number | undefined;
+  readonly flip?: boolean | undefined;
 }
 
 /** What the orientation needs besides its own params: the path start (sweep-local origin), a helix path's axis, the section frame. */
@@ -48,6 +66,8 @@ export interface OrientationContext {
   readonly start: Vec3;
   readonly helix: HelixDefinition | undefined;
   readonly sectionFrame: 'path' | 'axial' | undefined;
+  /** The reference sheet `id` as a surface local to the sweep (path start at the origin), or why it is unusable. */
+  readonly surfaceOf?: (id: string) => NurbsSurfaceData | string;
 }
 
 /** The `orientation` param in the model's shape (axis points moved to sweep-local coordinates), or the reason it is unusable. */
@@ -69,6 +89,19 @@ export function parseOrientation(input: OrientationInput | undefined, context: O
       const point = axisPoint === undefined ? context.helix?.origin : sub3(axisPoint as Vec3, context.start);
       if (axis === undefined || point === undefined) return 'orientation axis_plane needs a direction and an axisPoint (or a helix path)';
       return { mode: 'axis_plane', axisPoint: point, direction: axis, sectionFrame: context.sectionFrame ?? 'path' };
+    }
+    case 'surface': {
+      if (input.surfaceId === undefined || context.surfaceOf === undefined) return 'orientation surface needs a surfaceId';
+      const surface = context.surfaceOf(input.surfaceId);
+      if (typeof surface === 'string') return surface;
+      const poles = surface.poles.flat();
+      const extent = [0, 1, 2].map(
+        (axis) => Math.max(...poles.map((p) => p[axis] as number)) - Math.min(...poles.map((p) => p[axis] as number)),
+      );
+      const tolerance = input.tolerance ?? 1e-4 * Math.hypot(...extent);
+      return tolerance > 0
+        ? { mode: 'surface', surface, sourceId: input.surfaceId, tolerance, ...(input.flip === true ? { flip: true } : {}) }
+        : 'orientation.tolerance must be > 0';
     }
     default:
       return direction === undefined ? 'orientation binormal needs a direction' : { mode: 'binormal', direction: direction as Vec3 };

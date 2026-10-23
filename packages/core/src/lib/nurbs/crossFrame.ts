@@ -6,6 +6,8 @@
 
 import type { Vec3 } from '../../model/vectors';
 import { cross3, dot3, len3, scale3 } from '../vec3';
+import { closestOnCurve } from './closest';
+import { evaluateCurve } from './evaluate';
 import { isoCurve, surfaceDomain } from './surface';
 import { normalCurvature, surfaceSample } from './surfaceCurvature';
 import type { NurbsSurfaceData } from './surfaceTypes';
@@ -65,4 +67,18 @@ export function crossFrameAt(surface: NurbsSurfaceData, side: PatchSide, t: numb
   across = scale3(across, 1 / (len3(across) || 1));
   const [a, b] = coefficients(sample.su, sample.sv, sample.e, sample.f, sample.g, across);
   return { point: sample.point, across, normal: sample.normal, curvature: normalCurvature(sample, a, b), degenerate: false };
+}
+
+/** The side of `surface` whose edge the curve lies on (mean distance of nine curve points to the edge), if within `tolerance`. */
+export function matchingSide(surface: NurbsSurfaceData, curve: NurbsCurveData, tolerance: number): PatchSide | null {
+  const [first, last] = [curve.knots[0] as number, curve.knots[curve.knots.length - 1] as number];
+  let best: { side: PatchSide; distance: number } | null = null;
+  for (const side of PATCH_SIDES) {
+    const edge = sideEdge(surface, side);
+    let worst = 0;
+    for (let k = 0; k <= 8; k++)
+      worst = Math.max(worst, closestOnCurve(edge.curve, evaluateCurve(curve, first + ((last - first) * k) / 8)).distance);
+    if (best === null || worst < best.distance) best = { side, distance: worst };
+  }
+  return best !== null && best.distance <= tolerance ? best.side : null;
 }

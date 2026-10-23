@@ -8,11 +8,13 @@ import type { CurveSegment } from '../../model/curve';
 import type { Vec3 } from '../../model/types';
 import type { SweepOrientation } from '../../model/sweepOrientation';
 import { helixSamplesAtFractions } from '../../lib/helix/helix';
+import { closestOnSurface, refineOnSurface, surfaceProbe, type SurfaceProjection } from '../../lib/nurbs/closest';
+import { surfaceSample } from '../../lib/nurbs/surfaceCurvature';
 import type { HelixDefinition } from '../../lib/helix/types';
 import { add3, cross3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { segmentLengths } from '../../lib/polyline';
 import { clamp01 } from '../../lib/clamp';
-import { chainLength, isClosedChain, segmentPoint, segmentSteps, segmentTangent } from '../curveSegments';
+import { chainLength, isClosedChain, minCurvatureRadius, segmentPoint, segmentSteps, segmentTangent } from '../curveSegments';
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -28,7 +30,7 @@ export interface SweepFrame {
 
 /** A frame mode that cannot be carried along the path; `t` is the arc-length fraction of the first bad sample. */
 export interface FrameIssue {
-  readonly code: 'SWG_FRAME_DEGENERATE';
+  readonly code: 'SWG_FRAME_DEGENERATE' | 'SWG_SURFACE_TOO_FAR';
   readonly message: string;
   readonly t: number;
 }
@@ -173,6 +175,49 @@ function axisPlaneFrames(
   return frames;
 }
 
+/** Surface frames: section y follows the reference sheet's normal at the foot of the path point (projected normal to the tangent), x = y × tangent. */
+function surfaceFrames(
+  samples: readonly PathSample[],
+  orientation: Extract<SweepOrientation, { mode: 'surface' }>,
+): SweepFrame[] | FrameIssue {
+  const { surface, tolerance } = orientation;
+  const probe = surfaceProbe(surface);
+  const fractions = frameFractions(samples.map((sample) => ({ ...sample, normal: sample.tangent, binormal: sample.tangent })));
+  const frames: SweepFrame[] = [];
+  let foot: SurfaceProjection | null = null;
+  for (let i = 0; i < samples.length; i++) {
+    const sample = samples[i] as PathSample;
+    let hit: SurfaceProjection =
+      foot === null ? closestOnSurface(surface, sample.point, probe) : refineOnSurface(surface, sample.point, foot.u, foot.v);
+    if (foot !== null && hit.distance > tolerance) hit = closestOnSurface(surface, sample.point, probe);
+    foot = hit;
+    if (hit.distance > tolerance)
+      return {
+        code: 'SWG_SURFACE_TOO_FAR',
+        message: `the path is ${hit.distance.toExponential(2)} from the reference surface at t=${(fractions[i] as number).toFixed(4)} (tolerance ${tolerance.toExponential(2)})`,
+        t: fractions[i] as number,
+      };
+    const n = surfaceSample(surface, hit.u, hit.v).normal;
+    const lateral = sub3(n, scale3(sample.tangent, dot3(n, sample.tangent)));
+    if (len3(lateral) < BINORMAL_MIN_SINE || len3(n) === 0)
+      return {
+        code: 'SWG_FRAME_DEGENERATE',
+        message: `the reference surface normal is along the path (or undefined) at t=${(fractions[i] as number).toFixed(4)}`,
+        t: fractions[i] as number,
+      };
+    const binormal = scale3(normalize3(lateral), orientation.flip === true ? -1 : 1);
+    const before = frames[frames.length - 1];
+    if (before !== undefined && dot3(binormal, before.binormal) < 0)
+      return {
+        code: 'SWG_FRAME_DEGENERATE',
+        message: `the reference surface normal reverses between samples at t=${(fractions[i] as number).toFixed(4)} (a fold or an unoriented sheet): split the path there`,
+        t: fractions[i] as number,
+      };
+    frames.push({ ...sample, normal: cross3(binormal, sample.tangent), binormal });
+  }
+  return frames;
+}
+
 /** Frames whose section axes are the same for every sample (`fixed`) or follow a reference direction (`binormal`). */
 function referenceFrames(
   samples: readonly PathSample[],
@@ -225,12 +270,33 @@ function samplesFrames(
   orientation: Exclude<SweepOrientation, { mode: 'minimal' }>,
 ): SweepFrame[] | FrameIssue {
   if (orientation.mode === 'frenet') return frenetFrames(samples);
+  if (orientation.mode === 'surface') return surfaceFrames(samples, orientation);
   return orientation.mode === 'axis_plane' ? axisPlaneFrames(samples, orientation) : referenceFrames(samples, orientation);
 }
 
-/** Frames of an orientation mode at explicit open-path samples (the exact-solid stations), or the reason the mode cannot follow them. */
-export function framesAtSamples(samples: readonly PathSample[], orientation: SweepOrientation | undefined): SweepFrame[] | FrameIssue {
-  if (orientation === undefined || orientation.mode === 'minimal') return rmfFrames(samples);
+/** The frames of a loop's samples (first and last sample at the same point) with the rotation-minimizing holonomy spread over the arc length, so the last meets the first. */
+function holonomyClosed(frames: SweepFrame[]): SweepFrame[] {
+  const first = frames[0] as SweepFrame;
+  const last = frames[frames.length - 1] as SweepFrame;
+  const twist = Math.atan2(dot3(cross3(first.normal, last.normal), first.tangent), dot3(first.normal, last.normal));
+  const fractions = frameFractions(frames);
+  return frames.map((frame, i) => {
+    const angle = -twist * (fractions[i] as number);
+    const normal = add3(scale3(frame.normal, Math.cos(angle)), scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)));
+    return { ...frame, normal, binormal: cross3(frame.tangent, normal) };
+  });
+}
+
+/**
+ * Frames of an orientation mode at explicit path samples (the exact-solid stations), or the reason the mode cannot follow them. `closed`: the first
+ * and last sample are the same point of a loop and the twist-free frame is closed on itself.
+ */
+export function framesAtSamples(
+  samples: readonly PathSample[],
+  orientation: SweepOrientation | undefined,
+  closed = false,
+): SweepFrame[] | FrameIssue {
+  if (orientation === undefined || orientation.mode === 'minimal') return closed ? holonomyClosed(rmfFrames(samples)) : rmfFrames(samples);
   return samplesFrames(samples, orientation);
 }
 
@@ -312,4 +378,33 @@ export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: numb
   const normal = normalize3(lerp(a.normal, b.normal));
   const tangent = normalize3(lerp(a.tangent, b.tangent));
   return { point: lerp(a.point, b.point), normal, binormal: cross3(tangent, normal) };
+}
+
+/** Curvature of a segment at its start (`end` false) or end. */
+function endCurvature(segment: CurveSegment<Vec3>, end: boolean): number {
+  if (segment.type === 'line') return 0;
+  if (segment.type === 'arc') return 1 / Math.max(minCurvatureRadius(segment), 1e-300);
+  const [p0, p1, p2, p3] = segment.points;
+  const [d1, d2] = end
+    ? [sub3(p3, p2), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 2)]
+    : [sub3(p1, p0), scale3(add3(sub3(p2, scale3(p1, 2)), p0), 2)];
+  const speed = len3(d1);
+  return speed > 1e-12 ? len3(cross3(d1, d2)) / (3 * speed ** 3) : 0;
+}
+
+/**
+ * Arc-length fractions (inside 0..1) of the joints of a chain where the curvature jumps: the pole paths of a swept section are only continuous
+ * in their first derivative there, so a fit must put a station on the joint and fit each side on its own.
+ */
+export function curvatureBreaks(path: ReadonlyArray<CurveSegment<Vec3>>): number[] {
+  const lengths = path.map(smoothLength);
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  const breaks: number[] = [];
+  let walked = 0;
+  for (let i = 0; i + 1 < path.length; i++) {
+    walked += lengths[i] as number;
+    const [before, after] = [endCurvature(path[i] as CurveSegment<Vec3>, true), endCurvature(path[i + 1] as CurveSegment<Vec3>, false)];
+    if (Math.abs(before - after) > 1e-6 * Math.max(before, after, 1e-12)) breaks.push(walked / total);
+  }
+  return breaks;
 }

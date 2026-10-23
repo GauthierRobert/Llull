@@ -13,7 +13,9 @@ import { orientedFrames } from './frames';
 /** Volume when it has a closed form, else null (stations, stretch, non-round sections, fixed sections on a non-monotone path). */
 export function sweepAnalyticVolume(sweep: SweepShape): number | null {
   const { section, orientation } = sweep;
-  if (section.shape !== 'circle' || sweep.stations !== undefined || sweep.stretch !== undefined) return null;
+  if (section.shape !== 'circle' || sweep.stations !== undefined || sweep.stretch !== undefined || sweep.rails !== undefined) return null;
+  // a mitre cuts the legs at the bisector: A (L1 + L2) holds for a constant section only
+  if (sweep.corners === 'miter' && (sweep.scale !== undefined || sweep.area !== undefined)) return null;
   // a screw section is not centred on the path (Pappus about the axis, not A L): the kernel measures it
   if (orientation?.mode === 'axis_plane') return null;
   const length = pathLength(sweep);

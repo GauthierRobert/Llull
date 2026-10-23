@@ -1,55 +1,24 @@
 /** check_sweep_loft: read-only report on sweeps — frame degeneracy, fold margin, laws — with named tolerances. */
 
-import type { SweepEntity } from '../../model/types';
+import type { LoftEntity, NurbsSurfaceEntity, SweepEntity } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report, tableRejection } from '../noop';
-import { roundSignificant } from '../../lib/significant';
 import { evaluateSweep } from '../../geometry/sweepEval/evaluate';
-import type { SectionTransform } from '../../geometry/sweepEval/laws';
+import type { SectionTransform } from '../../geometry/sweepEval/sectionTransform';
 import { sweepSamples } from '../../geometry/sweepEval/inspect';
 import { sweepRealisation } from '../../geometry/sweepEval/realisation';
 import { fitSweepFaces, fitToleranceOf } from '../../geometry/sweepEval/fitted';
 import { helixOverlap } from '../solids/sweepOrientation';
+import { REMEDIATION, sig, type Finding, type NamedTolerance } from './checkFindings';
+import { checkLoft, checkSheet } from './checkLoft';
 
-const sig = (value: number): number => roundSignificant(value, 10);
 const CHECK_SAMPLES = 256;
-
-type Severity = 'fail' | 'warn' | 'info';
-
-interface Finding {
-  readonly code: string;
-  readonly severity: Severity;
-  readonly entityId: string;
-  readonly at?: number;
-  readonly value: number | null;
-  readonly limit: number | null;
-  readonly unit: string;
-  readonly remediation: string;
-  readonly message: string;
-}
-
-const REMEDIATION: Readonly<Record<string, string>> = {
-  SWG_CHECK_SELF_INTERSECTION_LOCAL:
-    'use a smaller section or scale, or a larger bend radius, so that the fold margin stays above the limit',
-  SWG_CHECK_FRAME_DEGENERATE: 'rebuild the sweep with orientation minimal, or another direction',
-  SWG_CHECK_LAW_INVALID: 'fix the twist / scale / area laws so that they are finite, and scale / area positive',
-  SWG_CHECK_SELF_INTERSECTION_GLOBAL: 'use a larger pitch or a smaller section so neighbouring turns do not touch',
-  SWG_CHECK_FIT_APPROXIMATION:
-    'none for an info finding; a warning means the exact solid is not built (mesh only): loosen fitTolerance or simplify the sweep',
-};
 
 const refuse = tableRejection({
   SWG_ENTITY_NOT_FOUND: 'pass ids of sweeps, or omit ids to check every sweep',
   SWG_PARAM_INVALID: 'give positive tolerances',
 });
-
-interface NamedTolerance {
-  readonly value: number;
-  readonly unit: string;
-  readonly defaulted: boolean;
-  readonly source: string;
-}
 
 /** Section transforms of a sweep along its evaluated frames (null without laws). */
 function transformsOf(entity: SweepEntity): SectionTransform[] | null {
@@ -130,14 +99,15 @@ function checkSweep(
     fitBudget.left -= 1;
     const fit = fitSweepFaces(entity, tolerance);
     const fitted = 'faces' in fit;
+    const railMiss = !fitted && fit.code === 'SWG_FIT_TOLERANCE' && entity.rails !== undefined;
     findings.push({
-      code: 'SWG_CHECK_FIT_APPROXIMATION',
-      severity: fitted ? 'info' : 'warn',
+      code: railMiss ? 'SWG_CHECK_RAIL_DEVIATION' : 'SWG_CHECK_FIT_APPROXIMATION',
+      severity: fitted ? 'info' : railMiss ? 'fail' : 'warn',
       entityId: entity.id,
       value: fitted ? sig(fit.deviation) : null,
       limit: tolerance,
       unit,
-      remediation: REMEDIATION.SWG_CHECK_FIT_APPROXIMATION as string,
+      remediation: REMEDIATION[railMiss ? 'SWG_CHECK_RAIL_DEVIATION' : 'SWG_CHECK_FIT_APPROXIMATION'] as string,
       message: fitted
         ? `laws or a non-default frame: the exact solid is built from ${fit.faces.length} fitted face(s) of ${fit.cells} cells, deviation ${sig(fit.deviation)} ${unit}`
         : `${fit.code}: ${fit.message}; only the mesh is available`,
@@ -149,18 +119,25 @@ function checkSweep(
 /**
  * @affects none; data = { status, checked, findings [{ code, severity, entityId, at?, value, limit, unit, remediation, message }], tolerances, provenance }
  * @invariant status is "fail" when any finding fails, else "warn" when any warns, else "pass"
- * @failure unknown id / not a sweep -> SWG_ENTITY_NOT_FOUND; a non-positive tolerance -> SWG_PARAM_INVALID
+ * @failure unknown id / not a sweep, loft or sheet -> SWG_ENTITY_NOT_FOUND; a non-positive tolerance -> SWG_PARAM_INVALID
  */
 export const checkSweepLoft = defineCommand({
   name: 'check_sweep_loft',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only check of sweeps (every sweep when `ids` is omitted): the frame mode must be defined along the whole path (SWG_CHECK_FRAME_DEGENERATE), the laws finite and positive ' +
+    'Read-only check of sweeps and lofts (every sweep and loft when `ids` is omitted; list the ids of swept or lofted sheets to check them too): the frame mode must be defined along the whole path (SWG_CHECK_FRAME_DEGENERATE), the laws finite and positive ' +
     '(SWG_CHECK_LAW_INVALID), and the swept surface must not fold onto itself — at 256 samples the fold margin (path curvature radius / section extent toward the centre of curvature) must stay above ' +
     '`selfIntersectionMargin` (default 1.0; SWG_CHECK_SELF_INTERSECTION_LOCAL). Fitted-face sweeps add an info finding. Returns status pass | warn | fail and findings with code, severity, ' +
-    'location t, value, limit, unit and remediation; `tolerances` names every limit with `defaulted` and its `source`. End every twist / scale / orientation sweep with this check. Lofts are not checked yet.',
+    'location t, value, limit, unit and remediation; `tolerances` names every limit with `defaulted` and its `source`. Rail sweeps whose fitted faces miss the rails report SWG_CHECK_RAIL_DEVIATION. Lofts: SWG_CHECK_LOFT_TWIST (neighbouring section starts more than `endAngleRad` apart, including the closing pair of a closed loft: the rulings twist), SWG_CHECK_LOFT_CLOSURE_G1 (a closed loft kinks across its closing seam by more than `endAngleRad`), SWG_CHECK_SURFACE_DEGENERATE (a pinched or folded skin); sheets: SWG_CHECK_SURFACE_DEGENERATE. End every sweep, loft and swept sheet with this check.',
   params: z.object({
-    ids: z.array(z.string()).describe('Sweep entity ids to check. Default: every sweep in the document.').optional(),
+    ids: z
+      .array(z.string())
+      .describe('Entity ids to check: sweeps, lofts, nurbs_surface sheets. Default: every sweep and loft in the document.')
+      .optional(),
+    endAngleRad: z
+      .number()
+      .describe('Largest allowed seam twist between neighbouring loft sections, radians, > 0. Default 0.01 (OCCT TolAngular).')
+      .optional(),
     fitTolerance: z
       .number()
       .describe(
@@ -174,7 +151,9 @@ export const checkSweepLoft = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { ids, selfIntersectionMargin, fitTolerance }): CommandResult => {
+  run: (doc, { ids, selfIntersectionMargin, fitTolerance, endAngleRad }): CommandResult => {
+    if (endAngleRad !== undefined && !(endAngleRad > 0))
+      return refuse(doc, 'check_sweep_loft', 'SWG_PARAM_INVALID', `endAngleRad must be > 0 (got ${endAngleRad})`, [], ['endAngleRad']);
     if (fitTolerance !== undefined && !(fitTolerance > 0))
       return refuse(doc, 'check_sweep_loft', 'SWG_PARAM_INVALID', `fitTolerance must be > 0 (got ${fitTolerance})`, [], ['fitTolerance']);
     if (selfIntersectionMargin !== undefined && !(selfIntersectionMargin > 0))
@@ -186,15 +165,24 @@ export const checkSweepLoft = defineCommand({
         [],
         ['selfIntersectionMargin'],
       );
-    const targets: SweepEntity[] = [];
+    const targets: Array<SweepEntity | LoftEntity | NurbsSurfaceEntity> = [];
     for (const id of ids ?? Object.keys(doc.entities)) {
       const entity = doc.entities[id];
-      if (entity?.kind === 'sweep') targets.push(entity);
-      else if (ids !== undefined) return refuse(doc, 'check_sweep_loft', 'SWG_ENTITY_NOT_FOUND', `no sweep with id "${id}"`, [id], ['ids']);
+      if (entity?.kind === 'sweep' || entity?.kind === 'loft' || (ids !== undefined && entity?.kind === 'nurbs_surface'))
+        targets.push(entity);
+      else if (ids !== undefined)
+        return refuse(doc, 'check_sweep_loft', 'SWG_ENTITY_NOT_FOUND', `no sweep, loft or sheet with id "${id}"`, [id], ['ids']);
     }
     const margin = selfIntersectionMargin ?? 1;
     const fitBudget = { left: ids === undefined ? MAX_UNLISTED_FITS : Number.POSITIVE_INFINITY };
-    const findings = targets.flatMap((entity) => checkSweep(entity, margin, fitTolerance, doc.units, fitBudget));
+    const angle = endAngleRad ?? 0.01;
+    const findings = targets.flatMap((entity) =>
+      entity.kind === 'sweep'
+        ? checkSweep(entity, margin, fitTolerance, doc.units, fitBudget)
+        : entity.kind === 'loft'
+          ? checkLoft(entity, angle, doc.units)
+          : checkSheet(entity, doc.units),
+    );
     const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.some((f) => f.severity === 'warn') ? 'warn' : 'pass';
     const tolerances: Record<string, NamedTolerance> = {
       fitTolerance: {
@@ -203,6 +191,7 @@ export const checkSweepLoft = defineCommand({
         defaulted: fitTolerance === undefined,
         source: 'llull choice: 1e-7 x model size keeps the exact volume within ~1e-6 (TECHNICAL_SPEC 5.8 names 1e-6 x model size)',
       },
+      endAngleRad: { value: angle, unit: 'rad', defaulted: endAngleRad === undefined, source: 'OCCT TolAngular 1e-2 (TECHNICAL_SPEC 5.8)' },
       selfIntersectionMargin: {
         value: margin,
         unit: 'ratio',
@@ -213,7 +202,7 @@ export const checkSweepLoft = defineCommand({
     const fails = findings.filter((f) => f.severity === 'fail').length;
     return report(
       doc,
-      `check_sweep_loft: ${status} — ${targets.length} sweep(s) checked, ${fails} failing finding(s), ${findings.length - fails} other.`,
+      `check_sweep_loft: ${status} — ${targets.length} entit(ies) checked, ${fails} failing finding(s), ${findings.length - fails} other.`,
       {
         status,
         checked: targets.map((t) => t.id),

@@ -3,7 +3,8 @@
 import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
-import { baseSectionArea, transformPoint, type SectionTransform } from './laws';
+import { baseSectionArea } from './laws';
+import { mixTransforms, transformPoint, type SectionTransform } from './sectionTransform';
 import { evaluateSweep, type SweepEvaluation } from './evaluate';
 import { orientedFrames, sweepFrames, type SweepFrame } from './frames';
 import { sectionLoops, stationLoopAt } from './sections';
@@ -34,7 +35,6 @@ function locate(fractions: readonly number[], t: number): { i: number; u: number
   return { i, u: span > 0 ? Math.min(1, Math.max(0, (t - (fractions[i] as number)) / span)) : 0 };
 }
 
-const mix = (a: number, b: number, u: number): number => a + (b - a) * u;
 const mix3 = (a: Vec3, b: Vec3, u: number): Vec3 => add3(scale3(a, 1 - u), scale3(b, u));
 
 /** Curvature vector dT/ds around frame `i` (central difference of tangents over the chord). */
@@ -48,7 +48,7 @@ function curvatureVector(frames: readonly SweepFrame[], i: number): Vec3 {
 function transformAt(evaluation: SweepEvaluation, i: number, u: number): SectionTransform {
   const a = evaluation.transforms?.[i] ?? { twist: 0, sx: 1, sy: 1 };
   const b = evaluation.transforms?.[Math.min(i + 1, evaluation.frames.length - 1)] ?? a;
-  return { twist: mix(a.twist, b.twist, u), sx: mix(a.sx, b.sx, u), sy: mix(a.sy, b.sy, u) };
+  return mixTransforms(a, b, u);
 }
 
 /** The section loop at fraction `t`, before the laws. */

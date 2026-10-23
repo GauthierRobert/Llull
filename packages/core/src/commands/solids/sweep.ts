@@ -1,30 +1,33 @@
 import { idOrNext } from '../../lib/explicitId';
-import type { CurveSegment } from '../../model/curve';
-import type { CadDocument, SweepEntity, SweepSection, SweepStation, Vec3 } from '../../model/types';
+import type { CadDocument, SweepEntity, Vec3 } from '../../model/types';
+import type { SweepSection, SweepStation } from '../../model/sweepOrientation';
 import type { CommandResult } from '../types';
 import { defineCommand, untypedArray, z } from '../schema';
 import { failer } from '../noop';
-import { isVec3, sub3 } from '../../lib/vec3';
+import { dot3, sub3 } from '../../lib/vec3';
+import type { CurveSegment } from '../../model/curve';
+import { MITER_MAX_TURN, sharpJoints } from '../../geometry/sweepEval/miter';
 import { polygonArea } from '../../lib/polygon';
 import { polylineLength } from '../../lib/polyline';
 import { newEntity } from '../entity/newEntity';
 import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
-import { MAX_PROFILE_POINTS } from '../limits';
-import { sketchPath } from './sketchCurves';
 import { type SectionSpec, sectionLoop, sectionSpecFields, specRing } from './sectionSpecs';
 import { alignRing } from '../../geometry/sectionRing';
-import { nurbsPath } from '../../geometry/nurbsChain';
-import type { HelixDefinition } from '../../lib/helix/types';
-import { add3 } from '../../lib/vec3';
+import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { designedFields, lawField, refuseSweep, sweepDesign } from './sweepLaws';
 import { orientationField, sectionFrameField } from './sweepOrientation';
+import { localSurface, pathHelix, resolvePath } from './sweepPath';
+import { localRails, midlineSpine, railCurves, railDesign, railFields } from './sweepRails';
+import { sectionOutline } from '../../geometry/sweepEval/rails';
+import { pathLength } from '../../geometry/sweepEval/evaluate';
+import { fitSweepFaces } from '../../geometry/sweepEval/fitted';
+import { needsFittedFaces } from '../../geometry/sweepEval/realisation';
 import {
-  catmullRomBeziers,
   chainIssue,
+  chainLength,
+  segmentTangent,
   closesSmoothly,
-  filletClosedPolygon,
   isClosedChain,
-  filletPolyline,
   firstCorner,
   mapSegment,
   minCurvatureRadius,
@@ -62,6 +65,34 @@ function resolveSection(
   };
 }
 
+/** Refusal of a mitre path: only straight runs may meet at a sharp joint, the turn is below 150 degrees and the mitre reaches at the two ends of every leg fit inside it. */
+function miterRefusal(path: ReadonlyArray<CurveSegment<Vec3>>, reach: number): { code: string; message: string } | null {
+  const needs = new Map<number, number>();
+  for (const joint of sharpJoints(path)) {
+    const [a, b] = [path[joint] as CurveSegment<Vec3>, path[joint + 1] as CurveSegment<Vec3>];
+    if (a.type !== 'line' || b.type !== 'line')
+      return { code: 'SWG_PATH_NOT_G1', message: `joint ${joint} is sharp but a leg is not straight: a mitre joins straight runs only` };
+    const turn = Math.acos(Math.min(1, dot3(segmentTangent(a, 1), segmentTangent(b, 0))));
+    if (turn > MITER_MAX_TURN)
+      return {
+        code: 'SWG_PATH_NOT_G1',
+        message: `joint ${joint} turns ${((turn * 180) / Math.PI).toFixed(0)} degrees: more than 150 cannot be mitred`,
+      };
+    needs.set(joint, reach * Math.tan(turn / 2));
+  }
+  // a leg carries the mitre reach of the joint at each of its ends: together they must fit inside it (a short middle leg inverts the solid)
+  for (const [i, leg] of path.entries()) {
+    const [atStart, atEnd] = [needs.get(i - 1) ?? 0, needs.get(i) ?? 0];
+    const length = chainLength([leg]);
+    if (atStart + atEnd >= length)
+      return {
+        code: 'SWG_SELF_INTERSECTION_LOCAL',
+        message: `the mitres at the ends of leg ${i} reach ${(atStart + atEnd).toFixed(3)} along it, the leg is ${length.toFixed(3)} long`,
+      };
+  }
+  return null;
+}
+
 /** Station rings (aligned to their predecessor) and the largest half-size, or an error message. */
 function resolveStations(
   doc: CadDocument,
@@ -86,46 +117,6 @@ function resolveStations(
   const last = stations[stations.length - 1] as SweepStation;
   if (first.at !== 0 || last.at !== 1) return 'the first station must be at 0 and the last at 1';
   return { section: { shape: 'profile', profile: first.ring }, halfSize, stations };
-}
-
-/** World path from points (bends or smooth spline) or a 2D sketch entity, or an error message. */
-function resolvePath(
-  doc: Parameters<typeof sketchPath>[0],
-  path: ReadonlyArray<unknown> | undefined,
-  pathId: string | undefined,
-  smooth: boolean,
-  bendRadius: number,
-  closed: boolean,
-): CurveSegment<Vec3>[] | string {
-  if ((path === undefined) === (pathId === undefined)) return 'give exactly one of path or pathId';
-  if (path !== undefined) {
-    const bad = path.findIndex((point) => !isVec3(point));
-    if (bad >= 0) return `path point ${bad} must be a finite [x, y, z] triple`;
-    const points = path as Vec3[];
-    if (points.length < 2 || points.length > MAX_PROFILE_POINTS) return `path needs 2..${MAX_PROFILE_POINTS} points (got ${points.length})`;
-    return bentOrSmooth(points, closed, smooth, bendRadius);
-  }
-  const entity = doc.entities[pathId as string];
-  if (entity?.kind === 'nurbs_curve') return nurbsPath(entity);
-  const world = sketchPath(doc, pathId as string);
-  if (typeof world === 'string' || (entity?.kind !== 'polyline' && entity?.kind !== 'rectangle')) return world;
-  const loop = entity.kind === 'rectangle' || entity.closed;
-  const corners = world.map((segment) => segment.points[0] as Vec3);
-  if (!loop) corners.push(world[world.length - 1]?.points[1] as Vec3);
-  return bentOrSmooth(corners, loop, smooth, bendRadius);
-}
-
-/** The exact helix of a `nurbs_curve` path (`add_helix`), moved to the sweep's local frame; undefined for any other path or a rotated curve. */
-function pathHelix(doc: CadDocument, pathId: string | undefined, start: Vec3): HelixDefinition | undefined {
-  const curve = pathId === undefined ? undefined : doc.entities[pathId];
-  if (curve?.kind !== 'nurbs_curve' || curve.analytic === undefined || curve.rotation.some((angle) => angle !== 0)) return undefined;
-  return { ...curve.analytic, origin: sub3(add3(curve.position, curve.analytic.origin), start) };
-}
-
-/** Corner points joined by bends (or a smooth spline through them), open or closed. */
-function bentOrSmooth(points: readonly Vec3[], closed: boolean, smooth: boolean, bendRadius: number): CurveSegment<Vec3>[] | string {
-  if (smooth) return catmullRomBeziers(points, closed);
-  return closed ? filletClosedPolygon(points, bendRadius) : filletPolyline(points, bendRadius);
 }
 
 /**
@@ -153,6 +144,8 @@ export const sweepProfile = defineCommand({
     'document units squared), `stretch` {x, y}, and for stations `stationBlend` (smooth | linear). Volume of a section centred on the path is the integral of its area ' +
     'along the path whatever the twist. `orientation`: minimal (default, for pipes and anything round), fixed (the section keeps its plane, normal = direction, default +Z; ' +
     'extrusion-like oblique sweeps), frenet (curvature normal; only on paths that bend everywhere), binormal (section y follows `direction`). ' +
+    'Rails: `guideIds` (1 or 2 nurbs_curves) pull the section onto the rails at every station: `anchors` are the section points that follow each rail (default: the outline points nearest the rails at the start), `guideMode` scale | orient | stretch, `maintainHeight` for two rails; ' +
+    'two rails without a path use their midline as the spine (handles, grips, tapered hoses). `orientation` surface (+ `surfaceId`) keeps the section y axis along the sheet normal (bands and ribs standing on a surface). ' +
     'Refusals carry stable SWG_* codes (SWG_LAW_NONPOSITIVE, SWG_CLOSED_TWIST_NOT_PERIODIC on a closed path whose total twist is not a whole number of ' +
     'turns, SWG_FRAME_DEGENERATE, SWG_SELF_INTERSECTION_LOCAL). Next: inspect_sweep for the frames, check_sweep_loft for the checks, mass_properties for the volume. ' +
     'Booleans with other solids work like any primitive (e.g. boolean op union to weld pipes to a flange).',
@@ -161,6 +154,12 @@ export const sweepProfile = defineCommand({
       'World-space [x, y, z] points the section follows (>= 2). Without smooth, consecutive points are ' +
         'joined by straight runs and every corner gets a circular bend of bendRadius.',
     ).optional(),
+    pathIds: z
+      .array(z.string())
+      .describe(
+        'Ids (>= 2) of curves (3D nurbs_curve, open 2D sketch curves) joined end to end into one path, in order; a curve is reversed when its far end meets the chain. Joints must be tangent (G1) or the sweep is refused with SWG_PATH_NOT_G1. Alternative to path / pathId.',
+      )
+      .optional(),
     pathId: z
       .string()
       .describe(
@@ -218,6 +217,18 @@ export const sweepProfile = defineCommand({
       )
       .optional(),
     twist: lawField('Rotation of the section about the path tangent, in radians (total twist of a bar: end - start)'),
+    corners: z
+      .enum(['round', 'miter'])
+      .describe(
+        'Corners of a `path` of points: round (default) joins the straight runs with circular bends of bendRadius; miter keeps them sharp, the section ring lying in the bisector plane of each joint (square-cut duct and frame corners, volume A x total length). Mitre needs an open path of straight runs, turns below 150 degrees, legs longer than the section reach; not with smooth.',
+      )
+      .optional(),
+    lawParameter: z
+      .enum(['fraction', 'arc_length'])
+      .describe(
+        'What t of a `table` law is: fraction (default) = the arc-length fraction 0..1, or arc_length = the arc length in document units (the table must run from 0 to the path length). Linear / s_curve / constant laws and expressions are unaffected (expressions already see s and L).',
+      )
+      .optional(),
     twistTurns: z
       .number()
       .describe('Shortcut for a linear twist of this many full turns over the whole path (1 = 360 degrees). Do not combine with twist.')
@@ -230,6 +241,13 @@ export const sweepProfile = defineCommand({
       .optional(),
     orientation: orientationField,
     sectionFrame: sectionFrameField,
+    ...railFields,
+    fitTolerance: z
+      .number()
+      .describe(
+        'Largest distance (document units, > 0) between the exact fitted faces and the sweep evaluator. Default 1e-7 x the model size (at least 1e-9). Checked now: a tolerance the fit cannot reach is refused with SWG_FIT_TOLERANCE.',
+      )
+      .optional(),
     ...solidStyleFields(),
   }),
   run: (
@@ -237,6 +255,7 @@ export const sweepProfile = defineCommand({
     {
       path: rawPath,
       pathId,
+      pathIds,
       smooth = false,
       closed = false,
       bendRadius: rawBend,
@@ -253,6 +272,14 @@ export const sweepProfile = defineCommand({
       stretch,
       orientation: orientationInput,
       sectionFrame,
+      lawParameter,
+      corners,
+      fitTolerance,
+      guideIds,
+      guideMode,
+      maintainHeight,
+      anchors,
+      railTolerance,
       layerId,
       color = DEFAULT_SOLID_COLOR,
       id: explicitId,
@@ -271,13 +298,42 @@ export const sweepProfile = defineCommand({
     const stations: SweepStation[] | undefined = 'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
     const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
     if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
-    const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed);
+    const rails = guideIds === undefined ? null : railCurves(doc, 'sweep_profile', guideIds);
+    if (rails !== null && !Array.isArray(rails)) return rails;
+    if (
+      rails !== null &&
+      (stations !== undefined || [twistInput, twistTurns, scaleInput, areaInput, stretch].some((law) => law !== undefined))
+    )
+      return refuseSweep(
+        doc,
+        'sweep_profile',
+        'SWG_LAW_EXCLUSIVE',
+        'rails drive the section: give rails or twist / scale / area / stretch / stations, not both',
+        [],
+        ['guideIds'],
+      );
+    if (rails !== null && corners === 'miter')
+      return refuseSweep(
+        doc,
+        'sweep_profile',
+        'SWG_LAW_EXCLUSIVE',
+        'rails drive the section at every station, which a mitre ring cannot follow: give rails (guideIds) or corners: miter, not both',
+        [],
+        ['guideIds', 'corners'],
+      );
+    const spine =
+      rails !== null && rails.length === 2 && rawPath === undefined && pathId === undefined && pathIds === undefined
+        ? midlineSpine(rails[0] as NurbsCurveData, rails[1] as NurbsCurveData)
+        : null;
+    const path = spine ?? resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed, pathIds, corners === 'miter');
     if (typeof path === 'string') return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', path, [], ['path']);
     const loop = isClosedChain(path);
     if (loop && stations !== undefined) return fail('stations need an open path');
     const issue = chainIssue(path, loop);
     if (issue !== null) return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', `path invalid — ${issue}`, [], ['path']);
-    const corner = firstCorner(path);
+    const miter = corners === 'miter' ? miterRefusal(path, halfSize) : null;
+    if (miter !== null) return refuseSweep(doc, 'sweep_profile', miter.code, miter.message, [], ['corners']);
+    const corner = miter === null && corners === 'miter' ? -1 : firstCorner(path);
     if (corner >= 0)
       return refuseSweep(
         doc,
@@ -305,13 +361,25 @@ export const sweepProfile = defineCommand({
       areaInput,
       stretch,
       orientationInput,
-      orientationContext: { start, helix, sectionFrame },
+      orientationContext: { start, helix, sectionFrame, surfaceOf: (surfaceId) => localSurface(doc, surfaceId, start) },
       stationBlend,
       stations,
+      arcLength: lawParameter === 'arc_length' ? pathLength(helix === undefined ? { path } : { path, helix }) : undefined,
     });
     if ('refusal' in designed)
       return refuseSweep(doc, 'sweep_profile', designed.refusal.code, designed.refusal.message, [], [designed.refusal.path]);
     const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
+    let railFieldsOut: Partial<SweepEntity> = {};
+    if (rails !== null) {
+      const made = railDesign(
+        { path: local, orientation: designed.fields.orientation, outline: sectionOutline(section) },
+        localRails(rails, guideIds as string[], start),
+        { guideMode, maintainHeight, anchors, railTolerance },
+        rails,
+      );
+      if ('refusal' in made) return refuseSweep(doc, 'sweep_profile', made.refusal.code, made.refusal.message, [], [made.refusal.path]);
+      railFieldsOut = made.fields;
+    }
     const id = idOrNext(explicitId, 'swp');
     const geometry = {
       path: local,
@@ -319,11 +387,28 @@ export const sweepProfile = defineCommand({
       ...(stations === undefined ? {} : { stations }),
       ...(helix === undefined ? {} : { helix }),
       ...designed.fields,
+      ...railFieldsOut,
+      ...(fitTolerance === undefined ? {} : { fitTolerance }),
+      ...(corners === 'miter' ? { corners } : {}),
     };
     const entity = newEntity('sweep', id, geometry, start, color, { layerId: existingLayerOrDefault(doc, layerId) });
     const sweepEntity = entity as SweepEntity;
     const design = sweepDesign(doc, sweepEntity, loop);
     if ('document' in design) return design;
+    if (fitTolerance !== undefined) {
+      if (!(fitTolerance > 0))
+        return refuseSweep(
+          doc,
+          'sweep_profile',
+          'SWG_PARAM_INVALID',
+          `fitTolerance must be > 0 (got ${fitTolerance})`,
+          [],
+          ['fitTolerance'],
+        );
+      const fit = needsFittedFaces(sweepEntity) ? fitSweepFaces(sweepEntity, fitTolerance) : null;
+      if (fit !== null && 'code' in fit && fit.code === 'SWG_FIT_TOLERANCE')
+        return refuseSweep(doc, 'sweep_profile', 'SWG_FIT_TOLERANCE', fit.message, [], ['fitTolerance']);
+    }
     const bend = Math.min(...path.map(minCurvatureRadius));
     if (sweepEntity.orientation?.mode !== 'axis_plane' && bend <= halfSize * design.maxScale)
       return refuseSweep(

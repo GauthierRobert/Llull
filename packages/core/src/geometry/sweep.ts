@@ -4,7 +4,8 @@
  * (./sectionRing) along the arc length and are skinned by ./skin.
  */
 
-import type { SweepSection, Vec2, Vec3 } from '../model/types';
+import type { Vec2, Vec3 } from '../model/types';
+import type { SweepSection } from '../model/sweepOrientation';
 import { add3, cross3, dot3, scale3 } from '../lib/vec3';
 import { triangulatePolygon } from '../lib/triangulate';
 import { isClosedChain } from './curveSegments';
@@ -12,7 +13,7 @@ import { quad, ringWalls as walls, skinTriangles } from './skin';
 import type { Triangle } from './triangles';
 import { evaluateSweep, type SweepEvaluation, type SweepShape } from './sweepEval/evaluate';
 import type { SweepFrame } from './sweepEval/frames';
-import { transformPoint } from './sweepEval/laws';
+import { transformPoint } from './sweepEval/sectionTransform';
 import { sectionLoops, stationLoopAt } from './sweepEval/sections';
 
 export { frameAtFraction, sweepFrames } from './sweepEval/frames';

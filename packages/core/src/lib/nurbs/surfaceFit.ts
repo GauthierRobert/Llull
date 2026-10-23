@@ -31,7 +31,7 @@ function chordParameters(points: ReadonlyArray<Vec3>): number[] | null {
 }
 
 /** Mean of the per-row parameter lists (rows with zero length are skipped); uniform when none is usable. */
-function averagedParameters(lists: ReadonlyArray<ReadonlyArray<Vec3>>, count: number): number[] {
+export function averagedParameters(lists: ReadonlyArray<ReadonlyArray<Vec3>>, count: number): number[] {
   const usable = lists.map(chordParameters).filter((t): t is number[] => t !== null);
   if (usable.length === 0) return Array.from({ length: count }, (_, i) => i / (count - 1));
   return Array.from({ length: count }, (_, k) => usable.reduce((sum, t) => sum + (t[k] as number), 0) / usable.length);
@@ -168,7 +168,11 @@ export function compatibleCurves(curves: ReadonlyArray<NurbsCurveData>): NurbsCu
  * are interpolated at averaged chord parameters. Rational sections interpolate in homogeneous coordinates, so conics stay exact.
  * @failure fewer than 2 sections, degreeV outside 1..5 or above sections - 1 -> FitFailure
  */
-export function skinCurves(curves: ReadonlyArray<NurbsCurveData>, degreeV: number): NurbsSurfaceData | FitFailure {
+export function skinCurves(
+  curves: ReadonlyArray<NurbsCurveData>,
+  degreeV: number,
+  parameters?: ReadonlyArray<number>,
+): NurbsSurfaceData | FitFailure {
   const count = curves.length;
   if (count < 2) return { code: 'SRF_POINTS_INSUFFICIENT', message: 'a skin needs at least 2 sections' };
   if (!Number.isInteger(degreeV) || degreeV < 1 || degreeV > 5 || degreeV > count - 1)
@@ -180,10 +184,12 @@ export function skinCurves(curves: ReadonlyArray<NurbsCurveData>, degreeV: numbe
   if (typeof compatible === 'string') return { code: 'SRF_NURBS_INVALID', message: compatible };
   const first = compatible[0] as NurbsCurveData;
   const rational = first.weights !== undefined;
-  const vBar = averagedParameters(
-    first.poles.map((_, i) => compatible.map((curve) => curve.poles[i] as Vec3)),
-    count,
-  );
+  const vBar =
+    parameters ??
+    averagedParameters(
+      first.poles.map((_, i) => compatible.map((curve) => curve.poles[i] as Vec3)),
+      count,
+    );
   const fullV = knotsByAveraging(vBar, degreeV);
   const homogeneous = compatible.map((curve) => homogeneousPoles(curve));
   const width = rational ? 4 : 3;

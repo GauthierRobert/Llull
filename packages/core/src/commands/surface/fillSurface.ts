@@ -2,9 +2,7 @@
 
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { closestOnCurve } from '../../lib/nurbs/closest';
-import { PATCH_SIDES, crossFrameAt, sideEdge, type PatchSide } from '../../lib/nurbs/crossFrame';
-import { evaluateCurve } from '../../lib/nurbs/evaluate';
+import { crossFrameAt, matchingSide, sideEdge, type PatchSide } from '../../lib/nurbs/crossFrame';
 import { constrainPatch, fillLoop, type FillNeighbour } from '../../lib/nurbs/fillPatch';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { placedSurface } from '../../geometry/nurbsSurface';
@@ -15,20 +13,6 @@ import { refuseSrf } from './shared';
 import { commitSurface, isRefusal, sig, surfaceEntityOf, surfaceStyleFields } from './surfaceShared';
 
 const MAX_CURVES = 12;
-
-/** The side of `surface` whose edge the curve lies on (mean distance of nine curve points to the edge), if within `tolerance`. */
-function matchingSide(surface: Parameters<typeof sideEdge>[0], curve: NurbsCurveData, tolerance: number): PatchSide | null {
-  const [first, last] = [curve.knots[0] as number, curve.knots[curve.knots.length - 1] as number];
-  let best: { side: PatchSide; distance: number } | null = null;
-  for (const side of PATCH_SIDES) {
-    const edge = sideEdge(surface, side);
-    let worst = 0;
-    for (let k = 0; k <= 8; k++)
-      worst = Math.max(worst, closestOnCurve(edge.curve, evaluateCurve(curve, first + ((last - first) * k) / 8)).distance);
-    if (best === null || worst < best.distance) best = { side, distance: worst };
-  }
-  return best !== null && best.distance <= tolerance ? best.side : null;
-}
 
 /**
  * @affects creates 1 nurbs_surface entity bounded by the curves (world coordinates)

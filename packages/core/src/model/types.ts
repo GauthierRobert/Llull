@@ -31,7 +31,8 @@ import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { HelixDefinition } from '../lib/helix/types';
-import type { SweepDesign } from './sweepOrientation';
+import type { SweepDesign, SweepSection, SweepStation } from './sweepOrientation';
+import type { LoftSkin } from './loftSkin';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { FaceOpParams } from './faceOps';
 import type { DeformParams } from './deform';
@@ -220,21 +221,6 @@ export interface RevolutionEntity extends BaseEntity {
   curves?: ReadonlyArray<CurveSegment<Vec2>>;
 }
 
-/** Cross-section of a sweep, in the path's start normal plane (x: frame normal, y: binormal). */
-export type SweepSection =
-  | {
-      readonly shape: 'circle';
-      readonly radius: number;
-      /** Bore radius of a hollow tube; 0 < innerRadius < radius. */
-      readonly innerRadius?: number;
-    }
-  | {
-      readonly shape: 'profile';
-      /** Closed polygon (tessellation of `curves` when present), >= 3 points. */
-      readonly profile: ReadonlyArray<Vec2>;
-      readonly curves?: ReadonlyArray<CurveSegment<Vec2>>;
-    };
-
 /**
  * A cross-section swept along a tangent-continuous 3D path (pipes, rails, ducts, coils) with a rotation-minimizing frame. Path points are
  * local (relative to `position`, then `rotation`).
@@ -253,19 +239,13 @@ export interface SweepEntity extends BaseEntity, SweepDesign {
   stations?: ReadonlyArray<SweepStation>;
 }
 
-/** One cross-section of a variable sweep at path fraction `at` (0 = start, 1 = end). */
-export interface SweepStation {
-  readonly at: number;
-  readonly ring: ReadonlyArray<Vec2>;
-}
-
 /**
  * Solid skinned through ordered 3D section rings (local to `position`), each a closed Catmull-Rom curve through SECTION_RING_POINTS aligned
  * points; `ruled` joins neighbours with straight lines.
  * @invariant >= 2 rings, equal point counts, consistent winding
  * @see loft_sections
  */
-export interface LoftEntity extends BaseEntity {
+export interface LoftEntity extends BaseEntity, LoftSkin {
   readonly kind: 'loft';
   rings: ReadonlyArray<ReadonlyArray<Vec3>>;
   ruled: boolean;

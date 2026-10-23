@@ -473,7 +473,7 @@ const plans = {
       {
         sections: [
           { center: [350, 0, 0], rotation: [PI / 2, 0, 0], radius: 10 },
-          { center: [300, 50, 0], rotation: [PI / 2, 0, PI / 2], radius: 10 },
+          { center: [300, 50, 0], rotation: [0, PI / 2, 0], radius: 10 },
         ],
         centerlineId: '$centreline',
         sectionCount: 16,
@@ -497,6 +497,7 @@ const plans = {
             const y = k / 4;
             return [x, y, r6(Math.sin(PI * x) + y ** 3)];
           }),
+          parameterization: 'uniform',
         },
         `s${i}`,
       ),
@@ -509,6 +510,7 @@ const plans = {
             const x = k / 40;
             return [x, y, r6(Math.sin(PI * x) + y ** 3)];
           }),
+          parameterization: 'uniform',
         },
         `g${j}`,
       ),
