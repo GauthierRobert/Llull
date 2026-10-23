@@ -43,7 +43,7 @@ Gap: everything from §3 on. Nothing in `packages/` is changed by this pack.
 - **Pure commands** (L1, L3). Mutating commands return a new document; queries (`check_piping`,
   `piping_connectivity`, `piping_takeoff`, `line_heat_loss`) are `readOnly` and return `data`.
 - **Spec through a port.** Routing reads specs only through `SpecLookup` (§3.3), implemented by 01 PSC's plugin
-  over `doc.plant.specs`. A plan test can install the stub `validation/data/spec_stub_cs150.json`.
+  over `doc.plant.specs`. The plans import the PSC-format stand-ins `validation/data/catalog_stub_cs150.json` + `spec_cs150.json` (§13.6).
 - **Ports through a port.** `PortSource` collects ports from tie-in points (this gap), equipment nozzles (03 EQP)
   and run ends; routing never reads equipment geometry directly.
 - **Kernel optional** (L9). Routing, cut-back, graph and checks are plain vector maths. Display geometry is built
@@ -636,11 +636,14 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 - [R15] CADMATIC PCF export; SST CAEPIPE PCF data types — https://www.sstusa.com/docs/users_manual/data_types_from_caepipe.htm (accessed 2026-10) [S26]
 - [R16] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)
 
-## 13. As built (RS1 RS-7 plant slice, 2026-10-19)
+## 13. As built (RS1 RS-7 plant slice 2026-10-19; RTE-M1 2026-10-24)
 
-Built: the V2 auto-router (§2.A, §5.12) end to end, on the smallest slice of M0 / M1 it needs. Not built: `route_pipe`,
-fittings / joint-stack derivation, flanges, inline components, branches, `check_piping`, `piping_takeoff`, stretch, slope,
-insulation clashes, heat loss, `convert_pipe_run` (M1–V1 stay open; SC-RTE-08 step 4 `check_piping` is still blocked).
+Built: the V2 auto-router (§2.A, §5.12) end to end (2026-10-19), and **M1 (2026-10-24, §13.6)**: spec-driven `route_pipe`
+(compass legs, closing leg, spec elbows with deviation, joint stack and cut-back, flange sets at flanged ports), `piping_takeoff`,
+one derivation of parts and joints for every run (auto-routed runs included), per-part display geometry, `SpecLookup` over
+01 PSC and `PortSource` over tie-ins, equipment nozzles and run ends. Not built: inline components, reducers, branches,
+`check_piping`, `piping_connectivity`, stretch, slope, insulation clashes, heat loss, `convert_pipe_run`, `update_pipeline`,
+`edit_route` (M2–V1 stay open; the `check_piping` steps of SC-RTE-01, 02, 05, 08 are still blocked).
 
 ### 13.1 What exists
 
@@ -648,10 +651,10 @@ insulation clashes, heat loss, `convert_pipe_run` (M1–V1 stay open; SC-RTE-08 
 | ---- | ----- | ----- |
 | `CadDocument.plant` (`PlantModel { piping? }`) | `packages/core/src/model/plant.ts` | Types only. `PipingModel` = tie-ins, lines, runs (+ order lists); `clear_document` removes the slice |
 | Plugin `piping`, toolset `piping` | `packages/domain-aec/src/plant/piping/` (installed in `src/app/plugins.ts`) | Toolset getter = legacy `PIPING_TOOLS` + plugin commands + the `auto_route` transport |
-| `add_tie_in_point`, `create_pipeline` | `commands/tieIn.ts`, `commands/pipeline.ts` | §4 params subset; `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG`, `RTE_DUPLICATE_LINE_NUMBER`, `RTE_SPEC_NO_COMPONENT` (DN without a pipe row); line number from the §5.9 template (named in `data.template`) |
+| `add_tie_in_point`, `create_pipeline` | `commands/tieIn.ts`, `commands/pipeline.ts` | §4 params subset; `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG`, `RTE_DUPLICATE_LINE_NUMBER`; `create_pipeline` resolves the spec through `SpecLookup` (`RTE_SPEC_UNKNOWN`, `RTE_SPEC_NO_COMPONENT` for a DN without a pipe row); line number from the §5.9 template (named in `data.template`) |
 | `route_problem` (query) | `commands/autoRoute.ts`, `autoRoute/problem.ts` | `data = { problem, problemHash, defaults, elbowCentreToEnd, portOwners, unverified, tsMaxExpansions }`; `problemHash` = sha256 of the canonical problem JSON |
-| `auto_route_pipe` (mutating) | `commands/autoRoute.ts`, `autoRoute/search.ts`, `autoRoute/solution.ts` | TS A* under `TS_MAX_EXPANSIONS` = 200 000, or `solution` checked by `checkSolution` (§2.A list) and committed; `data` per SC-RTE-08 (`centrelineToPiLengthMm`, `bends`, `cost`, `optimal`, `expansions`, `engine`, `problemHash`) |
-| Run geometry | `derive.ts` | One derived read-only mesh per run (id = run id, layer `P-PIPE`, 16-segment tube per leg, mitred look as legacy pipes); omitted from saved files, re-derived on load; derivation guard |
+| `auto_route_pipe` (mutating) | `commands/autoRoute.ts`, `autoRoute/search.ts`, `autoRoute/solution.ts` | TS A* under `TS_MAX_EXPANSIONS` = 200 000, or `solution` checked by `checkSolution` (§2.A list) and committed; `data` per SC-RTE-08 (`centrelineToPiLengthMm`, `bends`, `cost`, `optimal`, `expansions`, `engine`, `problemHash`) plus `parts`, `totalPipeMm`, `unverified`, `unverifiedReasons`; since M1 the committed run must derive (else refused with the derivation code) and the elbow A and flange sets come from the spec |
+| Run geometry | `derive.ts`, `routeParts.ts`, `geometry.ts` | One derived read-only revolution entity per drawable part of every run (id `<runId>/<kind>-<k>`, §13.6); omitted from saved files, re-derived on load; derivation guard (replaces the single mitred mesh per run of the V2 slice) |
 | Native search | `solver/crates/llull-route` (`llull-compute route <folder>`) | Contract in `llull_route::job` (job.json `{ problemHash, problem, maxExpansions }` → result.json `{ status, pisUm, lengthUm, bends, cost, optimal, expansions, engine, version }`) |
 | Transport `auto_route` (CLI `llull auto_route lineId=… from=… to=…`) | `server/src/native/autoRoute.ts`, `tools.ts` | `route_problem` → job → `auto_route_pipe { …, solution }`; `NATIVE_TOOL_MISSING` without the binary |
 | Tests | `tests/unit/plant/piping/*.test.ts`, `server/tests/routeNativeParity.test.ts`, cargo tests of `llull-route` | VC-RTE-18 (SC-RTE-08 data), VC-RTE-25 (parity, validation, budget) |
@@ -708,12 +711,11 @@ expansion, so 2·10⁶ expansions ≈ 4.5 s (inside the 5 s budget here; the ref
 - **D1 (`pipeSizes.ts` ASME / EN mix): not needed by routing.** The router reads only the OD of the line DN (DN50–200 are equal
   in EN 10220 and B36.10M; DN65 / DN125 differ by ≤ 3.1 / 1.6 mm, which only shifts the clearance envelope). Walls are not
   used. The bug stays open for its own fix (README D1).
-- **Spec catalogue absent (01 PSC not built), provisional.** `create_pipeline` stores the spec name unresolved; every routing
-  result says `unverified: true`. Elbow A comes from the grade-A ASME B16.9 rows of `validation/data/b16_9_fitting_dimensions.json`
-  (DN 50, 80, 100, 150, 200; `sizes.ts`) or the `elbowCentreToEnd` param — never `1.5 × NPS`. FL ports need `flangeSetLength`
-  (`RTE_SPEC_NO_COMPONENT` otherwise). `SpecLookup` (§3.3) replaces both when 01 lands.
-- **Data model subset.** `PipingModel` has no `counters` / `entityIds` (ids come from `nextId`, one derived entity per run with
-  the run id); `PortRef` has only `tieIn`; `PipeRun` has no `inline` / `branches` / `legDn` / `legSlopes` yet; `PipeLine` has
+- **Spec catalogue absent (01 PSC not built): superseded by M1 (§13.6).** The V2 slice read the elbow A from a private table
+  (`sizes.ts`) or the `elbowCentreToEnd` / `flangeSetLength` params; both are removed. Every dimension now comes from the line's
+  spec through `SpecLookup`.
+- **Data model subset.** `PipingModel` has no `counters` (ids come from `nextId`); since M1 it has `entityIds` (§13.6) and `PortRef`
+  has `tieIn`, `nozzle` and `runEnd`; `PipeRun` has no `inline` / `branches` / `legDn` / `legSlopes` yet; `PipeLine` has
   no `runIds` (derivable). Tie-ins have no marker geometry yet. Runs record `autoRoute { problemHash, cost, bends,
   expansions, optimal, engine }`.
 - **CLI verb.** The transport is `llull auto_route …` (one tool name like the other native transports), not the two-word
@@ -725,8 +727,64 @@ expansion, so 2·10⁶ expansions ≈ 4.5 s (inside the 5 s budget here; the ref
 
 ### 13.5 Open questions answered
 
-- §11.3 weld gap: not reached (no joint stack yet).
-- §11.7 toolset size: `piping` holds 10 tools; no split needed yet.
+- §11.3 weld gap (M1): default 0 ("centre-to-end includes the root gap"), read from the connection rule, named in every `route_pipe`
+  result as `weldGap { valueMm, defaulted: true }`; a gap `w` is deducted from the piece at each butt-weld end.
+- §11.7 toolset size: `piping` holds 13 tools after M1; no split needed yet.
 - §11.1 (2026-10-23, README D6): equipment stays a building `EquipmentElement` with `plant` data; routing reads it through
   `PortSource`. §11.9 (README D3): `add_nozzle` takes the angle or the free `{ position, direction }` form; `PortRef.kind:
   'nozzle'`, id `<tag>:<mark>`. §11.2: derived fittings (01 §11 Q6).
+
+### 13.6 RTE-M1 as built (2026-10-24, plant 02 milestone M1 plus what SC-RTE-01 needs end to end)
+
+| Part | Where (`packages/domain-aec/src/plant/piping/`) | Notes |
+| ---- | ----------------------------------------------- | ----- |
+| `SpecLookup` | `specLookup.ts` | In-process adapter over 01 PSC `resolveComponent` over `doc.plant.spec` and the catalogues the spec names (`specCatalogs`). `pipe(dn)`, `component({ types, dn, rating?, facing? })`, `elbowAngles()`, `connection(a, b)`, `status()`. PSC `PSC_AMBIGUOUS_COMPONENT` → `RTE_SPEC_AMBIGUOUS`, every other miss → `RTE_SPEC_NO_COMPONENT`, no spec → `RTE_SPEC_UNKNOWN` (the PSC code stays in `detail`). Rows carry `unverified` (not every dimension grade A) |
+| `PortSource` | `ports.ts` | `resolvePortId(doc, id)` → `PortSpec` + `PortRef`: tie-in id, equipment nozzle `<tag>:<mark>` (through `equipmentPorts`, end type FL), run end `<runId>:start|end` (a BW pipe end that continues the pipe). `portOccupant` gives `RTE_PORT_IN_USE` for all three |
+| `route_pipe` | `commands/routePipe.ts`, `legs.ts` | §4 params without `dn`, `planLength`, `slope` (M2, M3). Compass or vector legs, `via` points, straight closing leg to a port on its axis, collinear merge, port direction within the tolerance (deviation reported) |
+| Elbows | `fittings.ts` | Nearest spec angle within the tolerance, catalogue centre-to-end, `deviationDeg` reported, 60° or a reversal → `RTE_NO_FITTING_FOR_ANGLE` (`error.detail.anglesDeg`) |
+| Joint stack | `jointStack.ts`, `routeParts.ts` | Occupied intervals per leg → pipe pieces with cut lengths; `RTE_SEGMENT_TOO_SHORT` (`error.detail.cutLengthMm`), fitting-to-fitting (no piece, warning), weld spacing warning with the named default `max(4 t, 50 mm)`. `Interval.kind: 'inline'` and `RTE_INLINE_DOES_NOT_FIT` exist for M2 and are unit-tested with the SC-RTE-02 numbers (527.5 / 354.5) |
+| Flange set | `flangeSet.ts` | At an FL port: weld-neck flange + gasket + bolt set from the spec; `RTE_RATING_MISMATCH`, `RTE_FACING_MISMATCH`, `RTE_SPEC_NO_COMPONENT` naming the missing dimension |
+| Derivation | `routeParts.ts` | `deriveRun(doc, run)` → `RoutedPart[]`, `Joint[]`, legs, turns, warnings, totals; ids `<runId>/<kind>-<k>` (k per kind, route order; the start flange set is numbered before the end one) and `<runId>/joint-<k>`. One derivation for `route_pipe` and `auto_route_pipe` runs |
+| Display | `geometry.ts`, `derive.ts` | One `revolution` entity per pipe piece, elbow, flange and gasket (bolt sets have none); layers `P-PIPE`, `P-FITT`, `P-FLNG`; ids kept in `plant.piping.entityIds`; guard, load-time re-derivation |
+| `piping_takeoff` | `takeoff.ts`, `commands/pipingTakeoff.ts` | `runId` / `lineId` / neither; counts by `typeKey` + `pipePieces`, `studs`, joint kinds; `parts`, `pipePieces` (cut lengths), `joints`, `totalPipeMm`, `centrelineLengthMm`, `legs`, `turns`, `warnings`, `unverified` + reasons |
+| Validation data | `docs/plant/02-spec-driven-routing/validation/data/catalog_stub_cs150.json`, `spec_cs150.json` | The PSC-format stand-in of `spec_stub_cs150.json`: catalogue `rte-validation-stub` (the plans' input dimensions) searched before `llull-open-piping`, and spec CS150 (draft). Plans SC-RTE-01, 02, 03, 04, 05, 07, 08 import both first |
+| Tests | `tests/unit/plant/piping/{legs,fittings,jointStack,specLookup,ports,routeParts,routePipe,takeoff,geometry,rteScenarioPlans}.test.ts`, golden `piping_pump_to_vessel` | SC-RTE-01: cuts 1269 / 2696 / 2696 / 1196 / 2769, total 10 626, centreline 11 739.044, 4 elbows, 2 weld-neck flanges, 2 gaskets, 2 bolt sets (16 studs), 10 butt welds, 2 flanged joints (VC-RTE-01..03, 17, 23) |
+
+Decisions (owner delegated: long-term quality over the cheap path; no backward compatibility):
+
+- **Dimensions only from the catalogue.** The stub catalogue gives the plans' inputs (elbow A 152, hub Y 76, gasket 3.0, 8 studs); it is
+  `unverified` except the quoted grade A flange dimensions, so every SC-RTE-01 result says so (AF-32). The bundled `llull-open-piping`
+  has A = 152.4 and no hub length or gasket thickness: a flanged port on a spec that resolves only to it is refused with
+  `RTE_SPEC_NO_COMPONENT` naming `lengthThroughHub` / `thickness`, never guessed. Dimension names read: `centreToEnd`, `lengthThroughHub`
+  (new, flange), `thickness` (gasket), `boltCount` (bolt set, else the flange row, named in the result), `outsideDiameter`, `wall`.
+- **Unknown spec is an error** (`create_pipeline` → `RTE_SPEC_UNKNOWN`), and so is a spec that names a catalogue that is not loaded:
+  routing would silently read the next catalogue's dimensions. `elbowCentreToEnd` / `flangeSetLength` params and `sizes.ts` are removed
+  (no compatibility); every test and plan that creates a line imports the stub catalogue and spec first.
+- **Elbow arc radius** `R = c / tan(θ / 2)` from the catalogue centre-to-end `c` and the actual turn, so the arc is tangent to both ports;
+  R = A for 90° (centreline formula of §5.2 unchanged), and a 45° elbow uses its tabulated B (64), not `R tan 22.5°`.
+- **Tolerance** = run `angleToleranceDeg`, else the spec's `elbowAngles.toleranceDeg`, else the named default 1° (when the spec declares
+  no `elbowAngles` the angles come from its elbow90 / elbow45 components). It also bounds the port-direction deviation of the first and last leg.
+- **Connection rules** are a small built-in table (`BW–BW` butt weld, `FL–FL` flanged; gap 0 named) because the PSC spec format has no
+  connection rules yet; any other end-type pair (e.g. a socket-weld tie-in) → `RTE_NO_CONNECTION_RULE`. A nozzle's end type is always FL.
+- **Weld gap** `w` is deducted from a pipe piece at each of its butt-weld ends (a piece between two welds loses `2 w`); default 0.
+- **Derivation failures** after the fact (a port, line or spec changed under a stored run) are refused by `piping_takeoff` with the
+  code, and `restore` leaves such a run without geometry instead of throwing. Failure paths name the merged leg: `legs.<n>`.
+- **Guard.** A spec or catalogue edit that leaves a routed run underivable is refused atomically (`pipingDerivationGuard`); a harmless
+  edit passes. A plugin has no post-command hook, so the display of a run is re-derived by its own commands, on load and on replay; a
+  spec edit that only changes a dimension leaves stale entities until then (`piping_takeoff` always derives afresh). `update_pipeline` (M2) will re-derive.
+- **`CommandError.detail`** (core, additive): machine-readable facts of a refusal (`detail.offset`, `detail.angleDeg`, `detail.cutLengthMm`)
+  as §7 and the SC-RTE-05 rows name them; `tableRejection` takes it as an optional last argument.
+- **`route_pipe` data stays compact** (a mutating step's `data` over 4000 characters is dropped from `build_project` reports): legs with
+  cut lengths, turns, counts, pipe pieces, totals, warnings, trust and `partIds`; parts and joints are in `piping_takeoff`.
+- **Display geometry is revolution entities**, not meshes: exact torus segment for the elbow (16-point section, 24 steps per quarter, the
+  Pappus volume of VC-RTE-23), solid cylinders for pipe pieces (display envelope, no bore), bored flange and gasket. Closed-form mass
+  properties and the kernel recipes of `revolution` apply.
+- **Ports.** Port id grammar: tie-in id, then `<runId>:start|end`, then `<tag>:<mark>`. A run end that is already connected to a port counts
+  as in use. `delete_pipe_run` refuses a run another run continues from (`RTE_HAS_BRANCHES`, delete the dependent first) and deletes all its entities.
+- **Counts keys** are the PSC component types (`elbow90LR`, `flangeWeldNeck`, `gasketSpiralWound`, `boltSet`) plus `pipePieces`, `studs`
+  and joints by kind (`buttWelds`, `flangedJoints`, `fittingToFitting`, ...); the plans' old names (`flangeWN`, `gasket`) were renamed.
+
+Not built in M1, still open: `insert_inline_component` / `move_inline_component`, reducers and `legDn`, `add_branch`, `check_piping`,
+`piping_connectivity`, `edit_route`, `convert_pipe_run`, `update_pipeline`, slope legs (`planLength`, `slope`, §5.6), orthogonal stretch
+(§5.7), insulation envelope, supports on runs, `RTE_FROM_TO_MISMATCH`. SC-RTE-02 steps 8+ (valve), SC-RTE-03, 04, 06, 07, 09 and the `check_piping`
+steps of SC-RTE-01, 05, 08 stay blocked; their plans say so (`unbuilt`, `blockedFrom`) and `rteScenarioPlans.test.ts` keeps those lists honest.

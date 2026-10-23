@@ -7,6 +7,7 @@ import { pngDataUrl } from '../helpers/imageFixtures';
 import { xy, xyz } from '../helpers/xy';
 import { referenceEnginePlan } from './referenceEnginePlan';
 import { swgPlan } from '../helpers/swgPack';
+import { rteJson } from '../unit/plant/piping/rteFixtures';
 
 export interface GoldenAction {
   command?: string;
@@ -479,6 +480,94 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_pipe_support', params: { pipeId: 'pipe-1', spacing: 4000 } },
     { command: 'add_cable_tray', params: { points: xyz(1000, 5000, 3000, 9000, 5000, 3000) } },
     { command: 'update_equipment', params: { elementId: 'equipment-1', location: [3500, 3000] } },
+  ],
+  // 02 RTE M1: SC-RTE-01, pump P-101 to feed drum V-101 by compass legs on spec CS150 (the pack's catalogue stub + spec, PSC format).
+  piping_pump_to_vessel: [
+    { command: 'set_units', params: { units: 'mm' } },
+    { command: 'import_piping_catalog', params: { catalog: rteJson('catalog_stub_cs150.json') } },
+    { command: 'import_pipe_spec', params: { spec: rteJson('spec_cs150.json') } },
+    {
+      command: 'add_equipment',
+      params: { name: 'Centrifugal pump', mark: 'P-101', location: [0, -300], size: [1200, 600, 800], weight: 650 },
+    },
+    {
+      command: 'add_nozzle',
+      params: {
+        equipment: 'P-101',
+        mark: 'N2',
+        dn: 100,
+        rating: 'CL150',
+        facing: 'RF',
+        location: { on: 'free', position: [0, 300, 1000], direction: [0, 0, 1] },
+        projection: 300,
+      },
+    },
+    {
+      command: 'add_vessel',
+      params: {
+        tag: 'V-101',
+        name: 'Feed drum',
+        orientation: 'vertical',
+        location: [7000, 3000],
+        insideDiameter: 1600,
+        tangentLength: 4000,
+        heads: { top: { type: 'ellipsoidal', ratio: 2 }, bottom: { type: 'ellipsoidal', ratio: 2 } },
+        shellThickness: 10,
+        headThickness: 10,
+        corrosionAllowance: 3,
+        support: { type: 'skirt', height: 1000, thickness: 10 },
+        design: {
+          pressure: { value: 1, unit: 'MPa' },
+          temperatureC: 150,
+          material: 'SA-516 Gr 70',
+          allowableStress: { value: 137.9, unit: 'MPa', source: 'user input' },
+          jointEfficiency: { shell: 1, heads: 1 },
+          materialDensityKgM3: 7850,
+        },
+      },
+    },
+    {
+      command: 'add_nozzle',
+      params: {
+        equipment: 'V-101',
+        mark: 'N1',
+        dn: 100,
+        rating: 'CL150',
+        facing: 'RF',
+        location: { on: 'shell', elevation: 3000, orientationDeg: 270 },
+        projection: 1000,
+      },
+    },
+    {
+      command: 'create_pipeline',
+      params: {
+        service: 'P',
+        sequence: '1001',
+        spec: 'CS150',
+        dn: 100,
+        from: 'P-101:N2',
+        to: 'V-101:N1',
+        designTempC: 60,
+        designPressureBarG: 10,
+      },
+      as: 'line',
+    },
+    {
+      command: 'route_pipe',
+      params: {
+        lineId: '$line',
+        from: { portId: 'P-101:N2' },
+        to: { portId: 'V-101:N1' },
+        legs: [
+          { direction: '+Z', length: 1500 },
+          { direction: '+Y', length: 3000 },
+          { direction: '+X', length: 3000 },
+          { direction: '+Z', length: 1500 },
+        ],
+      },
+      as: 'run',
+    },
+    { command: 'piping_takeoff', params: { runId: '$run' } },
   ],
   industrial_portal_frame: [
     { command: 'add_portal_frame_building', params: { span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 } },

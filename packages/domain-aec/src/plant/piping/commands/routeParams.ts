@@ -8,7 +8,13 @@ const endpoint = (
 ): z.ZodType<{ portId: string } | { point: [number, number, number]; direction: [number, number, number] }> =>
   z
     .union([
-      z.object({ portId: z.string().describe('Tie-in point id (add_tie_in_point).') }),
+      z.object({
+        portId: z
+          .string()
+          .describe(
+            'Port id: tie-in point id (add_tie_in_point), "<tag>:<mark>" of an equipment nozzle (add_nozzle) or "<runId>:start|end".',
+          ),
+      }),
       z.object({
         point: vec3('Open-end point [x, y, z].'),
         direction: vec3('Face direction at the open end, pointing toward the pipe (an axis direction).'),
@@ -57,14 +63,4 @@ export const routeParamsShape = {
     .array(z.object({ min: vec3('Box minimum corner [x, y, z].'), max: vec3('Box maximum corner [x, y, z].') }))
     .optional()
     .describe('Extra keep-out boxes (world, mm) the route must avoid.'),
-  elbowCentreToEnd: z
-    .number()
-    .positive()
-    .optional()
-    .describe('LR 90 elbow centre-to-end, mm (default: ASME B16.9 row for DN 50, 80, 100, 150, 200).'),
-  flangeSetLength: z
-    .number()
-    .min(0)
-    .optional()
-    .describe('Gasket + mating flange through hub, mm: required when a port is flanged (FL) until the spec catalogue lands.'),
 };

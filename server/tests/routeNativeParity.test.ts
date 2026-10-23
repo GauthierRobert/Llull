@@ -14,7 +14,8 @@ import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
+import { cs150Document } from '../../tests/unit/plant/piping/rteFixtures';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { createComputeRunner } from '../src/native/computeJob';
@@ -64,7 +65,7 @@ const must = (doc: CadDocument, name: string, params: Json): ReturnType<typeof e
 
 /** Two DN100 BW tie-ins and a line; `boxes` = [centre, size] obstacles. */
 function scenario(from: [Vec3, Vec3], to: [Vec3, Vec3], boxes: readonly [Vec3, Vec3][] = []): { doc: CadDocument; params: Json } {
-  let doc = createEmptyDocument();
+  let doc = cs150Document();
   for (const [position, size] of boxes) doc = must(doc, 'add_box', { position, size }).document;
   const a = must(doc, 'add_tie_in_point', { tag: 'A', position: from[0], direction: from[1], dn: 100, endType: 'BW' });
   const b = must(a.document, 'add_tie_in_point', { tag: 'B', position: to[0], direction: to[1], dn: 100, endType: 'BW' });

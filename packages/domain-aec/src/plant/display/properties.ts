@@ -10,7 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import { buildingElementOf } from '../../building/evaluate/integrity';
 import type { BuildingElement } from '../../building/types';
 import { getPiping } from '../piping/model';
-import { pipeOutsideDiameter } from '../piping/sizes';
+import { pipeOutsideDiameter } from '../piping/specLookup';
 
 type Bag = Record<string, PropertyValue>;
 
@@ -36,11 +36,11 @@ function elementProperties(element: BuildingElement): PropertyBag {
 
 function runProperties(doc: CadDocument, runId: string): PropertyBag {
   const piping = getPiping(doc);
-  const run = piping.runs[runId];
+  const run = piping.runs[runId.split('/')[0] as string];
   const line = run === undefined ? undefined : piping.lines[run.lineId];
   if (line === undefined) return {};
   const bag: Bag = { category: 'pipe', service: line.service, line: line.lineNumber, dn: line.dn, spec: line.spec };
-  set(bag, 'odMm', pipeOutsideDiameter(line.dn) ?? undefined);
+  set(bag, 'odMm', pipeOutsideDiameter(doc, line.spec, line.dn) ?? undefined);
   set(bag, 'insulationMm', line.insulation?.thicknessMm);
   set(bag, 'from', line.from);
   set(bag, 'to', line.to);

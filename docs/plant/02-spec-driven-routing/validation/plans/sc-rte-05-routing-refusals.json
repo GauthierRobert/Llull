@@ -1,10 +1,12 @@
 {
   "id": "SC-RTE-05",
-  "status": "PROPOSED - not runnable yet. Unbuilt: import_pipe_spec (01), add_nozzle (03), add_tie_in_point, create_pipeline, route_pipe, check_piping. Each case is its own plan (a refused step stops build_project); the driver runs them one by one.",
-  "unbuilt": ["import_pipe_spec", "add_nozzle", "add_tie_in_point", "create_pipeline", "route_pipe", "check_piping"],
+  "status": "PARTLY RUNNABLE (02 RTE M1): cases a, d, e, f, g run; b and c run their step 0 (route_pipe); their check_piping step 1 is 02 M2. Each case is its own plan (a refused step stops build_project); the driver runs prefix + case one by one.",
+  "unbuilt": ["check_piping"],
   "validates": ["VC-RTE-09", "VC-RTE-10", "VC-RTE-11"],
   "units": "mm",
   "prefix": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_tie_in_point",
       "params": { "tag": "TP-A", "position": [0, 0, 2000], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
@@ -120,18 +122,18 @@
         {
           "command": "add_nozzle",
           "params": {
-            "equipmentId": "$tank",
-            "tag": "N1",
-            "position": [2400, 0, 2000],
-            "direction": [-1, 0, 0],
+            "equipment": "T-1",
+            "mark": "N1",
             "dn": 80,
             "rating": "CL150",
             "facing": "RF",
-            "endType": "FL"
+            "location": { "on": "free", "position": [-600, 0, 2000], "direction": [-1, 0, 0] },
+            "projection": 300
           },
-          "as": "n80"
+          "as": "nozzle",
+          "note": "world face centre (2400, 0, 2000) facing -X; port T-1:N1"
         },
-        { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$a" }, "to": { "portId": "$n80" } } }
+        { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$a" }, "to": { "portId": "T-1:N1" } } }
       ],
       "expected": [
         { "step": 2, "path": "error.code", "value": "RTE_SIZE_MISMATCH" },
@@ -150,47 +152,38 @@
         {
           "command": "add_nozzle",
           "params": {
-            "equipmentId": "$tank",
-            "tag": "N1",
-            "position": [2400, 0, 2000],
-            "direction": [-1, 0, 0],
+            "equipment": "T-2",
+            "mark": "N1",
             "dn": 100,
             "rating": "CL300",
             "facing": "RF",
-            "endType": "FL"
+            "location": { "on": "free", "position": [-600, 0, 2000], "direction": [-1, 0, 0] },
+            "projection": 300
           },
-          "as": "n300"
+          "as": "nozzle",
+          "note": "world face centre (2400, 0, 2000) facing -X; port T-2:N1"
         },
-        { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$a" }, "to": { "portId": "$n300" } } }
+        { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$a" }, "to": { "portId": "T-2:N1" } } }
       ],
       "expected": [{ "step": 2, "path": "error.code", "value": "RTE_RATING_MISMATCH" }]
     },
     {
       "id": "SC-RTE-05g",
-      "what": "socket-weld nozzle end on a spec without a BW-SW connection rule",
+      "what": "a socket-weld port (SW end) on a spec without a BW-SW connection rule; nozzles are always flanged (add_nozzle), so the SW end is a tie-in point",
       "actions": [
         {
-          "command": "add_equipment",
-          "params": { "name": "Skid", "mark": "S-1", "location": [3000, 0], "size": [1000, 1000, 3000] },
-          "as": "skid"
-        },
-        {
-          "command": "add_nozzle",
-          "params": {
-            "equipmentId": "$skid",
-            "tag": "N1",
-            "position": [2400, 0, 2000],
-            "direction": [-1, 0, 0],
-            "dn": 100,
-            "rating": "CL150",
-            "endType": "SW"
-          },
+          "command": "add_tie_in_point",
+          "params": { "tag": "SW-1", "position": [2400, 0, 2000], "direction": [-1, 0, 0], "dn": 100, "endType": "SW" },
           "as": "nsw"
         },
         { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$a" }, "to": { "portId": "$nsw" } } }
       ],
-      "expected": [{ "step": 2, "path": "error.code", "value": "RTE_NO_CONNECTION_RULE" }]
+      "expected": [{ "step": 1, "path": "error.code", "value": "RTE_NO_CONNECTION_RULE" }]
     }
   ],
-  "nozzleNote": "add_nozzle is 03 EQP's command; its MVP form places shell nozzles by elevation + orientation angle and returns port id '<tag>:<mark>' (e.g. 'V-101:N1'). These plans use an explicit form { position, direction } for generic add_equipment blocks, requested from 03 (TECHNICAL_SPEC open question 9); with a 03 vessel the same port is given as { elevation, orientationDeg, projection }."
+  "nozzleNote": "add_nozzle (03 EQP, built) takes a free { position, direction } location in the equipment frame for pumps and plain add_equipment blocks (README D3) or a shell / head location for vessels; the port id is '<tag>:<mark>' (here P-101:N2 and V-101:N1). route_pipe takes that port id in { portId }.",
+  "harness": {
+    "inline": { "prefix[0].params.catalog": "../data/catalog_stub_cs150.json", "prefix[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  }
 }

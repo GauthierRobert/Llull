@@ -2,7 +2,8 @@
   "pack": "02 RTE",
   "generatedBy": "hand-written index; values derived in README 'Derivations' (D1-D9) or quoted from data/*.json; nothing produced by llull",
   "units": { "length": "mm", "angle": "deg", "heatLoss": "W/m" },
-  "specStub": "data/spec_stub_cs150.json",
+  "specStub": "data/spec_cs150.json",
+  "catalogStub": "data/catalog_stub_cs150.json",
   "cases": [
     {
       "id": "VC-RTE-01",

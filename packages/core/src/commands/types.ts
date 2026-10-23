@@ -63,6 +63,8 @@ export interface CommandError {
   readonly ids: readonly string[];
   readonly paths: readonly string[];
   readonly remediation: string;
+  /** Machine-readable facts of the refusal (offsets, angles, cut lengths ...); absent for most codes. */
+  readonly detail?: Readonly<Record<string, unknown>>;
 }
 
 /** Safety annotations; emitted as tool-schema annotations (readOnlyHint, destructiveHint, idempotentHint). */

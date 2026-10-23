@@ -1,0 +1,125 @@
+{
+  "format": "llull-piping-catalog",
+  "schemaVersion": 1,
+  "id": "rte-validation-stub",
+  "version": "1.0.0",
+  "title": "02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.",
+  "licence": "open-data",
+  "families": [
+    {
+      "id": "asme-b16.9-lr90-rte-stub",
+      "type": "elbow90",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "radius": "LR",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 2,
+          "centreToEnd": 76,
+          "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)" }
+        },
+        {
+          "nps": 3,
+          "centreToEnd": 114,
+          "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)" }
+        },
+        {
+          "nps": 4,
+          "centreToEnd": 152,
+          "provenance": {
+            "sourceId": "S8+S9",
+            "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"
+          }
+        },
+        {
+          "nps": 6,
+          "centreToEnd": 229,
+          "provenance": { "sourceId": "S8+S9+S10", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)" }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.9-lr45-rte-stub",
+      "type": "elbow45",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "radius": "LR",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 4,
+          "centreToEnd": 64,
+          "provenance": { "sourceId": "S8+S10", "citation": "02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)" }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.5-wn-rf-rte-stub",
+      "type": "flangeWeldNeck",
+      "standard": "ASME B16.5",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "facing": "RF",
+          "outsideDiameter": 228.6,
+          "thickness": 22.4,
+          "boltCircle": 190.5,
+          "boltCount": 8,
+          "boltDiameter": 15.875,
+          "raisedFaceDiameter": 157.2,
+          "lengthThroughHub": 76,
+          "verifiedDims": ["outsideDiameter", "thickness", "boltCircle", "boltCount", "boltDiameter", "raisedFaceDiameter"],
+          "provenance": {
+            "sourceId": "S2+S3+S4",
+            "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
+          }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.20-sw-rte-stub",
+      "type": "gasketSpiralWound",
+      "standard": "ASME B16.20",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "innerRingId": 106.4,
+          "centeringRingOd": 174.8,
+          "thickness": 3,
+          "verifiedDims": ["innerRingId", "centeringRingOd"],
+          "provenance": {
+            "sourceId": "S22+S23+S24",
+            "citation": "ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"
+          }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.5-bolting-rte-stub",
+      "type": "boltSet",
+      "standard": "ASME B16.5 bolting",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "facing": "RF",
+          "boltCount": 8,
+          "boltDiameter": 15.875,
+          "provenance": {
+            "sourceId": "S14+S15",
+            "citation": "ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"
+          }
+        }
+      ]
+    }
+  ]
+}

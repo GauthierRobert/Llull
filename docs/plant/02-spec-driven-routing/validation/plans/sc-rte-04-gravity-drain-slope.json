@@ -1,11 +1,18 @@
 {
   "id": "SC-RTE-04",
-  "status": "PROPOSED - not runnable yet. Unbuilt: import_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, check_piping, piping_takeoff.",
-  "unbuilt": ["import_pipe_spec", "add_tie_in_point", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
+  "status": "BLOCKED (02 RTE M3): slope legs (planLength / slope, section 5.6) and the adverse-slope check are not built; route_pipe M1 takes compass or vector legs with a length only. check_piping is 02 M2.",
+  "unbuilt": ["check_piping"],
+  "blockedFrom": 5,
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
   "validates": ["VC-RTE-08"],
   "description": "DN50 gravity drain from TP-D1 at (0,0,1000) running +X 8000 mm (plan length) at a 1 % fall, then down to a drain hub TP-D2 at grade (z 0). The elbow sees a 89.427 deg turn: inside the spec tolerance of 1 deg it is a standard 90 LR elbow. The same route with angleToleranceDeg 0.5 is refused.",
   "units": "mm",
   "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_tie_in_point",
       "params": { "tag": "TP-D1", "position": [0, 0, 1000], "direction": [1, 0, 0], "dn": 50, "endType": "BW" },
@@ -16,11 +23,7 @@
       "params": { "tag": "TP-D2", "position": [8000, 0, 0], "direction": [0, 0, 1], "dn": 50, "endType": "BW" },
       "as": "d2"
     },
-    {
-      "command": "create_pipeline",
-      "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50 },
-      "as": "line"
-    },
+    { "command": "create_pipeline", "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50 }, "as": "line" },
     {
       "command": "route_pipe",
       "params": {
@@ -47,27 +50,27 @@
     }
   ],
   "expected": [
-    { "step": 3, "path": "data.legs[0].dropMm", "value": 80, "abs": 1e-6, "source": "8000 x 0.01" },
-    { "step": 3, "path": "data.legs[0].lengthMm", "value": 8000.39999, "abs": 1e-4, "source": "sqrt(8000^2 + 80^2)" },
-    { "step": 3, "path": "data.legs[0].slopeDeg", "value": 0.572939, "abs": 1e-6, "source": "atan(0.01)" },
-    { "step": 3, "path": "data.turns[0].angleDeg", "value": 89.427061, "abs": 1e-6, "source": "acos(80 / 8000.4)" },
-    { "step": 3, "path": "data.turns[0].fitting", "value": "elbow90LR" },
-    { "step": 3, "path": "data.turns[0].deviationDeg", "value": 0.572939, "abs": 1e-6 },
+    { "step": 5, "path": "data.legs[0].dropMm", "value": 80, "abs": 0.000001, "source": "8000 x 0.01" },
+    { "step": 5, "path": "data.legs[0].lengthMm", "value": 8000.39999, "abs": 0.0001, "source": "sqrt(8000^2 + 80^2)" },
+    { "step": 5, "path": "data.legs[0].slopeDeg", "value": 0.572939, "abs": 0.000001, "source": "atan(0.01)" },
+    { "step": 5, "path": "data.turns[0].angleDeg", "value": 89.427061, "abs": 0.000001, "source": "acos(80 / 8000.4)" },
+    { "step": 5, "path": "data.turns[0].fitting", "value": "elbow90LR" },
+    { "step": 5, "path": "data.turns[0].deviationDeg", "value": 0.572939, "abs": 0.000001 },
     {
-      "step": 4,
+      "step": 6,
       "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
       "value": 0,
       "source": "fall is downstream, no adverse slope, no pocket; both ends on tie-ins"
     },
     {
-      "step": 5,
+      "step": 7,
       "path": "data.pipePieces[*].cutLengthMm",
       "value": [7924.39999, 844],
-      "abs": 1e-3,
+      "abs": 0.001,
       "source": "8000.4 - 76 ; (1000 - 80) - 76"
     },
     {
-      "step": 6,
+      "step": 8,
       "path": "error.code (plan aborted at step 6)",
       "value": "RTE_NO_FITTING_FOR_ANGLE",
       "source": "0.573 deg deviation > 0.5 deg tolerance"

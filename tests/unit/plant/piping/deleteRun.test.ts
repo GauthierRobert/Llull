@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import { expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { addTie, cs150Document, cs150Line } from './rteFixtures';
 
 /** Two DN100 tie-ins and one routed run between them. */
 function routed(): { doc: CadDocument; runId: string; params: Record<string, unknown> } {
-  let doc = createEmptyDocument();
+  let doc = cs150Document();
   const tie = (tag: string, position: [number, number, number], direction: [number, number, number]): string => {
     const result = ok(doc, 'add_tie_in_point', { tag, position, direction, dn: 100, endType: 'BW' });
     doc = result.document;
@@ -20,14 +21,19 @@ function routed(): { doc: CadDocument; runId: string; params: Record<string, unk
 }
 
 describe('delete_pipe_run', () => {
-  it('removes the run and its tube, keeps the line and tie-ins, and frees the ports for a re-route', () => {
+  it('removes the run and every derived part, keeps the line and tie-ins, and frees the ports for a re-route', () => {
     const s = routed();
-    expect(s.doc.entities[s.runId]).toBeDefined();
-    const deleted = ok({ ...s.doc, selection: [s.runId] }, 'delete_pipe_run', { runId: s.runId });
+    const parts = s.doc.plant?.piping?.entityIds[s.runId] ?? [];
+    expect(parts).toHaveLength(5);
+    for (const part of parts) expect(s.doc.entities[part]).toBeDefined();
+    const deleted = ok({ ...s.doc, selection: [parts[0] as string] }, 'delete_pipe_run', { runId: s.runId });
     expect(deleted.document.selection).toEqual([]);
     expect(deleted.affected).toEqual([s.runId]);
-    expect(deleted.document.entities[s.runId]).toBeUndefined();
-    expect(deleted.document.order).not.toContain(s.runId);
+    for (const part of parts) {
+      expect(deleted.document.entities[part]).toBeUndefined();
+      expect(deleted.document.order).not.toContain(part);
+    }
+    expect(deleted.document.plant?.piping?.entityIds).toEqual({});
     expect(deleted.document.plant?.piping?.runOrder).toEqual([]);
     expect(deleted.document.plant?.piping?.tieInOrder).toHaveLength(2);
     expect(deleted.document.plant?.piping?.lineOrder).toHaveLength(1);
@@ -51,5 +57,27 @@ describe('delete_pipe_run', () => {
     const replayed = execute(deleted, 'replay_history', {}).document;
     expect(replayed.plant?.piping?.runOrder).toEqual([]);
     expect(replayed.entities[s.runId]).toBeUndefined();
+    expect(replayed.plant?.piping?.entityIds).toEqual({});
+  });
+
+  it('refuses to delete a run another run continues from (RTE_HAS_BRANCHES), and deleting the dependent first works', () => {
+    const { doc: withLine, lineId } = cs150Line();
+    const { doc, id: tie } = addTie(withLine, 'T-1', [0, 0, 0], [1, 0, 0]);
+    const first = ok(doc, 'route_pipe', { lineId, from: { portId: tie }, legs: [{ direction: '+X', length: 2000 }] });
+    const firstId = first.affected[0] as string;
+    const second = ok(first.document, 'route_pipe', {
+      lineId,
+      from: { portId: `${firstId}:end` },
+      legs: [{ direction: '+X', length: 1000 }],
+    });
+    const secondId = second.affected[0] as string;
+    expect(second.document.plant?.piping?.runs[secondId]?.start).toMatchObject({
+      point: [2000, 0, 0],
+      ref: { kind: 'runEnd', runId: firstId, end: 'end' },
+    });
+    const refused = expectRefusal(second.document, 'delete_pipe_run', { runId: firstId }, 'RTE_HAS_BRANCHES', 'runId');
+    expect(refused.error?.ids).toEqual([firstId, secondId]);
+    const removed = ok(second.document, 'delete_pipe_run', { runId: secondId });
+    expect(ok(removed.document, 'delete_pipe_run', { runId: firstId }).document.plant?.piping?.runOrder).toEqual([]);
   });
 });

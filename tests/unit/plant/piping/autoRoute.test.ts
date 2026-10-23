@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { cs150Document, rteJson, withoutSpecs } from './rteFixtures';
 
 interface RouteData {
   runId: string;
@@ -25,7 +26,7 @@ interface ProblemData {
 
 /** SC-RTE-08: port AR-1 leaving +X at the origin, AR-2 at (3000, 2000, 1000) entered travelling +Z (port direction -Z), DN100 BW. */
 function scenario(): { doc: CadDocument; line: string; p1: string; p2: string } {
-  let doc = createEmptyDocument();
+  let doc = cs150Document();
   const tie = (tag: string, position: Vec3, direction: Vec3): string => {
     const result = ok(doc, 'add_tie_in_point', { tag, position, direction, dn: 100, endType: 'BW' });
     doc = result.document;
@@ -73,9 +74,13 @@ describe('auto_route_pipe in free space (SC-RTE-08, VC-RTE-18)', () => {
     const run = result.document.plant?.piping?.runs[routed.runId];
     expect(run?.start.ref).toEqual({ kind: 'tieIn', id: s.p1 });
     expect(run?.autoRoute?.engine).toBe('ts');
-    const entity = result.document.entities[routed.runId];
-    expect(entity?.kind).toBe('mesh');
-    expect(entity?.layerId).toBe('layer-P-PIPE');
+    // The run derives one read-only revolution per part (pipe pieces on P-PIPE, elbows on P-FITT), not a mesh of its own.
+    expect(result.document.entities[routed.runId]).toBeUndefined();
+    const ids = result.document.plant?.piping?.entityIds[routed.runId] ?? [];
+    expect(ids).toEqual(['pipe-1', 'elbow-1', 'pipe-2', 'elbow-2', 'pipe-3'].map((part) => `${routed.runId}/${part}`));
+    expect(result.document.entities[ids[0] as string]?.kind).toBe('revolution');
+    expect(result.document.entities[ids[0] as string]?.layerId).toBe('layer-P-PIPE');
+    expect(result.document.entities[ids[1] as string]?.layerId).toBe('layer-P-FITT');
     expect(result.affected).toEqual([routed.runId]);
   });
 
@@ -133,13 +138,16 @@ describe('route_problem', () => {
     ['RTE_AUTOROUTE_BUDGET', { grid: 0.01, gridMargin: 100000 }, 'gridMargin'],
     ['RTE_AUTOROUTE_NO_PATH', { gridMargin: 0, keepOutBoxes: [{ min: [90, 0, 0], max: [92, 0, 0] }] }, 'from'],
     ['RTE_AUTOROUTE_NO_PATH', { gridMargin: 0, keepOutBoxes: [{ min: [92, 0, 0], max: [90, 0, 0] }] }, 'from'],
-    ['RTE_SPEC_NO_COMPONENT', { elbowCentreToEnd: undefined, lineId: 'dn65' }, 'elbowCentreToEnd'],
+    ['RTE_SPEC_NO_COMPONENT', { lineId: 'no-elbow' }, 'lineId'],
   ])('refuses %s', (code, extra, path) => {
     const s = scenario();
     let doc = s.doc;
     let overrides: Record<string, unknown> = extra;
-    if (extra['lineId'] === 'dn65') {
-      const created = ok(doc, 'create_pipeline', { service: 'P', sequence: '8002', spec: 'CS150', dn: 65 });
+    if (extra['lineId'] === 'no-elbow') {
+      const spec = rteJson<{ components: Array<{ id: string }> }>('spec_cs150.json');
+      const components = spec.components.filter((component) => !component.id.startsWith('E'));
+      doc = apply(doc, 'import_pipe_spec', { spec: { ...spec, id: 'CS150-NOELBOW', components } });
+      const created = ok(doc, 'create_pipeline', { service: 'P', sequence: '8002', spec: 'CS150-NOELBOW', dn: 100 });
       doc = created.document;
       overrides = {
         lineId: created.affected[0],
@@ -150,15 +158,53 @@ describe('route_problem', () => {
     expectRefusal(doc, 'route_problem', params(s, overrides), code, path);
   });
 
-  it('refuses a port of another size (RTE_SIZE_MISMATCH) and a flanged port without flangeSetLength', () => {
+  it('refuses a port of another size (RTE_SIZE_MISMATCH); a flanged port takes its flange set from the spec', () => {
     const s = scenario();
     const small = ok(s.doc, 'add_tie_in_point', { tag: 'S', position: [0, 0, 500], direction: [1, 0, 0], dn: 50, endType: 'BW' });
     expectRefusal(small.document, 'route_problem', params(s, { from: { portId: small.affected[0] } }), 'RTE_SIZE_MISMATCH', 'from.portId');
     const flanged = ok(s.doc, 'add_tie_in_point', { tag: 'F', position: [0, 0, 500], direction: [1, 0, 0], dn: 100, endType: 'FL' });
     const flangedParams = params(s, { from: { portId: flanged.affected[0] } });
-    expectRefusal(flanged.document, 'route_problem', flangedParams, 'RTE_SPEC_NO_COMPONENT', 'flangeSetLength');
-    const routed = data<RouteData>(flanged.document, 'auto_route_pipe', { ...flangedParams, flangeSetLength: 79 });
-    expect(routed.bends).toBeGreaterThanOrEqual(2);
+    // Stub = elbow A 152 + gasket 3 + hub Y 76 = 231 mm, rounded up to the 50 mm lattice.
+    const problem = data<ProblemData & { flangeSetLengths: { from?: number; to?: number }; unverified: boolean }>(
+      flanged.document,
+      'route_problem',
+      flangedParams,
+    );
+    expect(problem.flangeSetLengths).toEqual({ from: 79 });
+    expect(problem.unverified).toBe(true);
+    const routed = ok(flanged.document, 'auto_route_pipe', flangedParams);
+    expect((routed.data as RouteData).bends).toBeGreaterThanOrEqual(2);
+    // The committed run carries the flange set: gasket, bolt set and flange next to the flanged tie-in.
+    const ids = routed.document.plant?.piping?.entityIds[routed.affected[0] as string] ?? [];
+    expect(ids.some((id) => id.includes('/flange-1'))).toBe(true);
+    const wrongRating = ok(s.doc, 'add_tie_in_point', {
+      tag: 'F3',
+      position: [0, 0, 500],
+      direction: [1, 0, 0],
+      dn: 100,
+      endType: 'FL',
+      rating: 'CL300',
+    });
+    expectRefusal(
+      wrongRating.document,
+      'route_problem',
+      params(s, { from: { portId: wrongRating.affected[0] } }),
+      'RTE_RATING_MISMATCH',
+      'from.portId',
+    );
+  });
+
+  it('refuses a line whose spec is gone, and a port the spec cannot join to a butt-weld pipe (nothing is committed that does not derive)', () => {
+    const s = scenario();
+    expectRefusal(withoutSpecs(s.doc), 'route_problem', params(s), 'RTE_SPEC_UNKNOWN', 'lineId');
+    const socket = ok(s.doc, 'add_tie_in_point', { tag: 'SW', position: [0, 0, 500], direction: [1, 0, 0], dn: 100, endType: 'SW' });
+    expectRefusal(
+      socket.document,
+      'auto_route_pipe',
+      params(s, { from: { portId: socket.affected[0] } }),
+      'RTE_NO_CONNECTION_RULE',
+      'start',
+    );
   });
 
   it('refuses a second run from a connected tie-in (RTE_PORT_IN_USE)', () => {
@@ -310,13 +356,7 @@ describe('auto_route_pipe search limits and preferences', () => {
   });
 
   it('runs horizontal pipe on a preferred rack elevation', () => {
-    const a = ok(createEmptyDocument(), 'add_tie_in_point', {
-      tag: 'A',
-      position: [0, 0, 0],
-      direction: [1, 0, 0],
-      dn: 100,
-      endType: 'BW',
-    });
+    const a = ok(cs150Document(), 'add_tie_in_point', { tag: 'A', position: [0, 0, 0], direction: [1, 0, 0], dn: 100, endType: 'BW' });
     const b = ok(a.document, 'add_tie_in_point', { tag: 'B', position: [6000, 2000, 0], direction: [-1, 0, 0], dn: 100, endType: 'BW' });
     const line = ok(b.document, 'create_pipeline', { service: 'P', sequence: '9', spec: 'CS150', dn: 100 });
     const base = { lineId: line.affected[0], from: { portId: a.affected[0] }, to: { portId: b.affected[0] }, bendCost: 100 };

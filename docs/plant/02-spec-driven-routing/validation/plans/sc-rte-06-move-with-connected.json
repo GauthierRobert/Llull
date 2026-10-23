@@ -1,11 +1,11 @@
 {
   "id": "SC-RTE-06",
-  "status": "PROPOSED - not runnable yet. Prefix = all actions of SC-RTE-01 (steps 0-5). Built today: update_equipment. Unbuilt: the plant plugin's reconciliation of runs after an equipment / nozzle move, piping_takeoff.",
-  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "piping_takeoff"],
+  "status": "BLOCKED (02 RTE M3): needs the orthogonal stretch on equipment / nozzle edits. Its prefix (SC-RTE-01 steps 0-7) and piping_takeoff run in M1.",
+  "unbuilt": [],
   "validates": ["VC-RTE-12"],
   "description": "Move the vessel V-101 (its nozzle follows, 03 EQP) and check the orthogonal stretch: a displacement is absorbed by the legs parallel to it, walking back from the moved port. +500 X is absorbed by the last leg (+X). +500 Y then crosses the +X and +Z legs (their PIs shift) and is absorbed by the +Y leg.",
   "units": "mm",
-  "prefixPlan": "sc-rte-01-pump-to-vessel.json#actions[0..5]",
+  "prefixPlan": "sc-rte-01-pump-to-vessel.json#actions[0..7]",
   "actions": [
     { "command": "update_equipment", "params": { "elementId": "$vessel", "location": [7500, 3000] } },
     { "command": "piping_takeoff", "params": { "runId": "$run" } },

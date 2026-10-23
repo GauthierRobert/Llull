@@ -9,8 +9,8 @@ gates, B / C do not), (b) derived from a cited closed form with the derivation s
 How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 
 - Unit tests read `data/*.json` directly.
-- `tests/unit/plant/scenarioPlans.test.ts` runs every `plans/*.json` through `build_project` (the path of
-  `llull run plan.json --json`) after loading `data/spec_stub_cs150.json` through 01 PSC's `import_pipe_spec`, then
+- `tests/unit/plant/piping/rteScenarioPlans.test.ts` runs the `plans/*.json` through `build_project` (the path of
+  `llull run plan.json --json`) after importing `data/catalog_stub_cs150.json` and `data/spec_cs150.json` (01 PSC formats; the plans inline both as `harness.inline`), then
   compares each `expected` row (`path`, `value`, `abs` / `rel`). Plans with `cases` run each case as its own plan.
 - The production-gate agent driver runs the same plans unattended (AF-23).
 
@@ -33,7 +33,9 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | `data/flanged_components.json`       | B16.5 CL150 WN length through hub, bolt holes, raised face; B16.10 gate valve F-F; gasket thickness input; B31.3 socket-weld gap                                  | A / B / C per row                      |
 | `data/insulation_heat_loss.json`     | ht 1.2.0 insulated-pipe example (73.120 W/m) + formula; own re-derivation                                                                                         | A                                      |
 | `data/routing_rules.json`            | Vendor behaviours and project rules with their status (standard / vendor / project default)                                                                       | A / B / C per row                      |
-| `data/spec_stub_cs150.json`          | Minimal spec CS150 (pipe, elbows, tees, reducer, olet, WN flanges, gaskets, bolt sets, gate valve, connection rules, branch table, insulation table) — plan input | inputs                                 |
+| `data/catalog_stub_cs150.json`       | Catalogue `rte-validation-stub` in the 01 PSC `llull-piping-catalog` format: the plans' INPUT dimensions (LR 90 A 152, 45 B 64, NPS 4 CL150 WN hub Y 76, gasket 3.0, 8 studs); searched before `llull-open-piping`; not a standard, rows unverified except the quoted grade A flange dimensions | inputs                                 |
+| `data/spec_cs150.json`               | Spec CS150 (draft) in the 01 PSC `llull-pipe-spec` format: pipe B36.10M Sch 40, LR 90 / 45 elbows, WN flange, spiral-wound gasket, bolt set, gate valve, elbow angles 90 / 45 ± 1° | inputs                                 |
+| `data/spec_stub_cs150.json`          | Original human-readable stub (not the PSC format; the two files above replace it for M1). Kept for the tee / reducer / olet rows, branch table, insulation table that 02 M2 / M3 fold into the PSC files | inputs                                 |
 | `expected_results.json`              | Index of every VC                                                                                                                                                 | —                                      |
 | `plans/sc-rte-0*.json`               | `build_project` scenarios with `expected` rows; `status` / `unbuilt` list what is missing today                                                                   | —                                      |
 

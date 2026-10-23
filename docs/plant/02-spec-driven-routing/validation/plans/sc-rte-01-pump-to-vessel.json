@@ -1,11 +1,13 @@
 {
   "id": "SC-RTE-01",
-  "status": "PROPOSED - not runnable yet. Built today: add_equipment. Unbuilt: add_nozzle (03 EQP), import_pipe_spec (01 PSC, run before the plan: `llull import_pipe_spec @../data/spec_stub_cs150.json`), create_pipeline, route_pipe, check_piping, piping_takeoff (this pack).",
-  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
+  "status": "RUNNABLE (02 RTE M1): steps 0-7 and 9 run; step 8 check_piping is 02 M2 (unbuilt), its rows stay unchecked until then.",
+  "unbuilt": ["check_piping"],
   "validates": ["VC-RTE-01", "VC-RTE-02", "VC-RTE-03", "VC-RTE-17"],
   "description": "Pump P-101 top discharge (DN100 CL150 RF flanged nozzle at z 1000, facing +Z) to vertical vessel V-101 side inlet N1 (DN100 CL150 RF, face at x 6000, facing -X). Spec CS150. Route by compass legs: up 1500, +Y 3000, +X 3000, up 1500, then +X into the nozzle (3000). Four LR 90 elbows, a weld-neck flange + gasket + bolt set at each nozzle.",
   "units": "mm",
   "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_equipment",
       "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 },
@@ -14,42 +16,55 @@
     {
       "command": "add_nozzle",
       "params": {
-        "equipmentId": "$pump",
-        "tag": "N2",
-        "position": [0, 0, 1000],
-        "direction": [0, 0, 1],
+        "equipment": "P-101",
+        "mark": "N2",
         "dn": 100,
         "rating": "CL150",
         "facing": "RF",
-        "endType": "FL"
+        "location": { "on": "free", "position": [0, 300, 1000], "direction": [0, 0, 1] },
+        "projection": 300
       },
-      "as": "pumpOut"
+      "as": "pumpOut",
+      "note": "free location in the equipment frame (origin = plan location of P-101): world face centre (0, 0, 1000) facing +Z; the port is P-101:N2"
     },
     {
-      "command": "add_equipment",
+      "command": "add_vessel",
       "params": {
+        "tag": "V-101",
         "name": "Feed drum",
-        "mark": "V-101",
+        "orientation": "vertical",
         "location": [7000, 3000],
-        "size": [1600, 1600, 5000],
-        "shape": "vertical_vessel",
-        "weight": 9000
+        "insideDiameter": 1600,
+        "tangentLength": 4000,
+        "heads": { "top": { "type": "ellipsoidal", "ratio": 2 }, "bottom": { "type": "ellipsoidal", "ratio": 2 } },
+        "shellThickness": 10,
+        "headThickness": 10,
+        "corrosionAllowance": 3,
+        "support": { "type": "skirt", "height": 1000, "thickness": 10 },
+        "design": {
+          "pressure": { "value": 1, "unit": "MPa" },
+          "temperatureC": 150,
+          "material": "SA-516 Gr 70",
+          "allowableStress": { "value": 137.9, "unit": "MPa", "source": "user input" },
+          "jointEfficiency": { "shell": 1, "heads": 1 },
+          "materialDensityKgM3": 7850
+        }
       },
       "as": "vessel"
     },
     {
       "command": "add_nozzle",
       "params": {
-        "equipmentId": "$vessel",
-        "tag": "N1",
-        "position": [6000, 3000, 4000],
-        "direction": [-1, 0, 0],
+        "equipment": "V-101",
+        "mark": "N1",
         "dn": 100,
         "rating": "CL150",
         "facing": "RF",
-        "endType": "FL"
+        "location": { "on": "shell", "elevation": 3000, "orientationDeg": 270 },
+        "projection": 1000
       },
-      "as": "vesselIn"
+      "as": "vesselIn",
+      "note": "shell nozzle, orientation 270 deg (west, north_cw) at 1000 mm from the axis: world face centre (6000, 3000, 4000) facing -X; skirt 1000 + elevation 3000 = z 4000; the port is V-101:N1"
     },
     {
       "command": "create_pipeline",
@@ -69,8 +84,8 @@
       "command": "route_pipe",
       "params": {
         "lineId": "$line",
-        "from": { "portId": "$pumpOut" },
-        "to": { "portId": "$vesselIn" },
+        "from": { "portId": "P-101:N2" },
+        "to": { "portId": "V-101:N1" },
         "legs": [
           { "direction": "+Z", "length": 1500 },
           { "direction": "+Y", "length": 3000 },
@@ -85,47 +100,18 @@
   ],
   "expected": [
     {
-      "step": 4,
+      "step": 6,
       "path": "data.lineNumber",
       "value": "100-P-1001-CS150",
       "source": "line-number template DN-service-sequence-spec (project default, named)"
     },
-    { "step": 5, "path": "data.legs.length", "value": 5, "source": "4 given legs + closing leg to the port" },
-    {
-      "step": 5,
-      "path": "data.closingLeg",
-      "value": { "direction": "+X", "length": 3000 },
-      "abs": 1e-6,
-      "source": "geometry: (6000,3000,4000) - (3000,3000,4000)"
-    },
-    {
-      "step": 6,
-      "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
-      "value": 0,
-      "source": "no open end, sizes / ratings / end types match"
-    },
-    {
-      "step": 6,
-      "path": "data.issues[?code=='RTE_SPEC_UNVERIFIED'].length",
-      "value": 1,
-      "source": "the stub spec has status stub (AF-32, VC-RTE-21)"
-    },
-    { "step": 6, "path": "data.status", "value": "warn" },
-    { "step": 7, "path": "data.unverified", "value": true },
+    { "step": 7, "path": "data.legs.length", "value": 5, "source": "4 given legs + closing leg to the port" },
     {
       "step": 7,
-      "path": "data.counts",
-      "value": {
-        "elbow90LR": 4,
-        "flangeWN": 2,
-        "gasket": 2,
-        "boltSet": 2,
-        "studs": 16,
-        "pipePieces": 5,
-        "buttWelds": 10,
-        "flangedJoints": 2
-      },
-      "source": "spec stub + topology (4 elbows x 2 welds + 2 flange welds)"
+      "path": "data.closingLeg",
+      "value": { "direction": "+X", "length": 3000 },
+      "abs": 0.000001,
+      "source": "geometry: (6000,3000,4000) - (3000,3000,4000)"
     },
     {
       "step": 7,
@@ -134,8 +120,52 @@
       "abs": 0.01,
       "source": "cut = leg - sum(centre-to-end or Y + gasket at each end); A 152, Y 76, gasket 3"
     },
-    { "step": 7, "path": "data.totalPipeMm", "value": 10626, "abs": 0.01, "source": "sum of cuts" },
-    { "step": 7, "path": "data.centrelineLengthMm", "value": 11739.044, "abs": 0.01, "source": "12000 - 4 x 2 x 152 + 4 x (pi/2) x 152" }
+    { "step": 7, "path": "data.centrelineLengthMm", "value": 11739.044, "abs": 0.01, "source": "12000 - 4 x 2 x 152 + 4 x (pi/2) x 152" },
+    {
+      "step": 8,
+      "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
+      "value": 0,
+      "source": "no open end, sizes / ratings / end types match (check_piping: 02 M2)"
+    },
+    {
+      "step": 8,
+      "path": "data.issues[?code=='RTE_SPEC_UNVERIFIED'].length",
+      "value": 1,
+      "source": "the spec CS150 is a draft with rows not grade A (AF-32, VC-RTE-21)"
+    },
+    { "step": 8, "path": "data.status", "value": "warn" },
+    { "step": 9, "path": "data.unverified", "value": true },
+    {
+      "step": 9,
+      "path": "data.counts",
+      "value": {
+        "pipePieces": 5,
+        "buttWelds": 10,
+        "socketWelds": 0,
+        "threadedJoints": 0,
+        "flangedJoints": 2,
+        "fittingToFitting": 0,
+        "gasketSpiralWound": 2,
+        "boltSet": 2,
+        "flangeWeldNeck": 2,
+        "elbow90LR": 4,
+        "studs": 16
+      },
+      "source": "spec CS150 + topology (4 elbows x 2 welds + 2 flange welds; 2 bolt sets x 8 studs)"
+    },
+    {
+      "step": 9,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [1269, 2696, 2696, 1196, 2769],
+      "abs": 0.01,
+      "source": "cut = leg - sum(centre-to-end or Y + gasket at each end); A 152, Y 76, gasket 3"
+    },
+    { "step": 9, "path": "data.totalPipeMm", "value": 10626, "abs": 0.01, "source": "sum of cuts" },
+    { "step": 9, "path": "data.centrelineLengthMm", "value": 11739.044, "abs": 0.01, "source": "12000 - 4 x 2 x 152 + 4 x (pi/2) x 152" }
   ],
-  "nozzleNote": "add_nozzle is 03 EQP's command; its MVP form places shell nozzles by elevation + orientation angle and returns port id '<tag>:<mark>' (e.g. 'V-101:N1'). These plans use an explicit form { position, direction } for generic add_equipment blocks, requested from 03 (TECHNICAL_SPEC open question 9); with a 03 vessel the same port is given as { elevation, orientationDeg, projection }."
+  "nozzleNote": "add_nozzle (03 EQP, built) takes a free { position, direction } location in the equipment frame for pumps and plain add_equipment blocks (README D3) or a shell / head location for vessels; the port id is '<tag>:<mark>' (here P-101:N2 and V-101:N1). route_pipe takes that port id in { portId }.",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  }
 }

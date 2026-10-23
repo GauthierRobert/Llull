@@ -23,10 +23,28 @@ function tableErrors(
   );
 }
 
-const endErrors = (path: string, end: unknown): string[] =>
-  isRecord(end) && isVec3(end['point']) && (end['direction'] === undefined || isVec3(end['direction']))
-    ? []
-    : [`${path} needs a finite point`];
+const isRef = (ref: unknown): boolean =>
+  isRecord(ref) &&
+  ((ref['kind'] === 'tieIn' && typeof ref['id'] === 'string') ||
+    (ref['kind'] === 'nozzle' && typeof ref['equipmentId'] === 'string' && typeof ref['nozzleId'] === 'string') ||
+    (ref['kind'] === 'runEnd' && typeof ref['runId'] === 'string' && (ref['end'] === 'start' || ref['end'] === 'end')));
+
+const endErrors = (path: string, end: unknown): string[] => {
+  if (!isRecord(end) || !isVec3(end['point']) || (end['direction'] !== undefined && !isVec3(end['direction'])))
+    return [`${path} needs a finite point`];
+  return end['ref'] === undefined || isRef(end['ref']) ? [] : [`${path}.ref must be a tieIn, nozzle or runEnd reference`];
+};
+
+const entityIdErrors = (raw: Record<string, unknown>): string[] => {
+  const ids = raw['entityIds'];
+  const runs = isRecord(raw['runs']) ? raw['runs'] : {};
+  if (!isRecord(ids)) return ['plant.piping.entityIds must be an object'];
+  return Object.entries(ids).flatMap(([runId, list]) =>
+    runId in runs && Array.isArray(list) && list.every((id) => typeof id === 'string')
+      ? []
+      : [`plant.piping.entityIds.${runId} must list entity ids of a run`],
+  );
+};
 
 export function pipingErrors(raw: unknown): string[] {
   if (!isRecord(raw)) return ['plant.piping must be an object'];
@@ -53,5 +71,6 @@ export function pipingErrors(raw: unknown): string[] {
       ...endErrors(`plant.piping.runs.${id}.end`, run['end']),
       ...(Array.isArray(run['pis']) && run['pis'].every(isVec3) ? [] : [`plant.piping.runs.${id}.pis must be [x, y, z] points`]),
     ]),
+    ...entityIdErrors(raw),
   ];
 }

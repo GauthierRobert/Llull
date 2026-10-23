@@ -6,13 +6,14 @@ import type { CommandError, CommandResult, ExecutionContext } from './types';
 /** Graceful rejection: the document is returned unchanged with nothing affected. */
 export const noop = (doc: CadDocument, summary: string): CommandResult => ({ document: doc, summary, affected: [] });
 
-/** A `CommandError`; `ids` / `paths` default to none. */
+/** A `CommandError`; `ids` / `paths` default to none, `detail` is omitted when absent. */
 export const commandError = (
   code: string,
   remediation: string,
   ids: readonly string[] = [],
   paths: readonly string[] = [],
-): CommandError => ({ code, ids, paths, remediation });
+  detail?: Readonly<Record<string, unknown>>,
+): CommandError => ({ code, ids, paths, remediation, ...(detail === undefined ? {} : { detail }) });
 
 /** `CMD_UNKNOWN`: no registered command has that name. */
 export const unknownCommandError = (paths: readonly string[] = []): CommandError =>
@@ -34,7 +35,8 @@ export const codedRejection = (
   remediation: string,
   ids: readonly string[] = [],
   paths: readonly string[] = [],
-): CommandResult => rejection(doc, `${command}: ${code} — ${message}; no-op.`, commandError(code, remediation, ids, paths));
+  detail?: Readonly<Record<string, unknown>>,
+): CommandResult => rejection(doc, `${command}: ${code} — ${message}; no-op.`, commandError(code, remediation, ids, paths, detail));
 
 /** A coded rejection whose remediation comes from a lookup table. */
 type TableRejection = (
@@ -44,6 +46,7 @@ type TableRejection = (
   message: string,
   ids?: readonly string[],
   paths?: readonly string[],
+  detail?: Readonly<Record<string, unknown>>,
 ) => CommandResult;
 
 /** `codedRejection` with the remediation registered for the code in `table`, else `fallback` (a text, or a lookup of the code in a parent table). */
@@ -52,8 +55,17 @@ export const tableRejection =
     table: Readonly<Record<string, string>>,
     fallback: string | ((code: string) => string) = 'see the command description',
   ): TableRejection =>
-  (doc, command, code, message, ids = [], paths = []) =>
-    codedRejection(doc, command, code, message, table[code] ?? (typeof fallback === 'string' ? fallback : fallback(code)), ids, paths);
+  (doc, command, code, message, ids = [], paths = [], detail) =>
+    codedRejection(
+      doc,
+      command,
+      code,
+      message,
+      table[code] ?? (typeof fallback === 'string' ? fallback : fallback(code)),
+      ids,
+      paths,
+      detail,
+    );
 
 /** Reporter for a command's rejections: `fail(why)` -> no-op "<command>: <why>; no-op.". */
 export const failer =

@@ -5,13 +5,14 @@
  */
 
 import { is3D, type CadDocument } from '@core/model/types';
-import type { PipeLine, PipingModel, PortRef } from '@aec/plant/types';
+import type { PipeLine, PipingModel, PortRef, PortSpec } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { sha256Hex } from '@lib/sha256';
-import { getPiping } from '../model';
-import { ELBOW_SOURCE, elbowCentreToEnd, pipeOutsideDiameter } from '../sizes';
-import { runPoints } from '../derive';
+import { getPiping, runPoints } from '../model';
+import { portOccupant, resolvePortId } from '../ports';
+import { resolveFlangeSet } from '../flangeSet';
+import { createSpecLookup, isMiss, pipeOutsideDiameter } from '../specLookup';
 import { AXIS_VECTORS, firstBlocking, type Int3, type ObstacleBox, type RouteProblem } from './lattice';
 
 export type Endpoint = { readonly portId: string } | { readonly point: Vec3; readonly direction: Vec3 };
@@ -28,8 +29,6 @@ export interface RouteRequest {
   readonly elevationPenalty?: number | undefined;
   readonly keepOut?: readonly string[] | undefined;
   readonly keepOutBoxes?: readonly { readonly min: Vec3; readonly max: Vec3 }[] | undefined;
-  readonly elbowCentreToEnd?: number | undefined;
-  readonly flangeSetLength?: number | undefined;
 }
 
 /** Named defaults (reported in `data.defaults` when used). */
@@ -51,8 +50,11 @@ export interface BuiltProblem {
   readonly info: {
     readonly defaults: Readonly<Record<string, number>>;
     readonly elbowCentreToEnd: { readonly value: number; readonly source: string };
+    /** Gasket + flange length through hub per flanged port (mm), absent for butt-weld / open ends. */
+    readonly flangeSetLengths: { readonly from?: number; readonly to?: number };
     readonly portOwners: readonly string[];
-    readonly unverified: true;
+    readonly unverified: boolean;
+    readonly unverifiedReasons: readonly string[];
   };
 }
 
@@ -96,32 +98,56 @@ function axisIndex(direction: Vec3): number | null {
 }
 
 interface PortEnd extends ResolvedEnd {
-  readonly flanged: boolean;
+  /** The port the end is connected to (absent for an open end): its end type decides the flange set. */
+  readonly port?: PortSpec;
 }
 
-function resolveEnd(piping: PipingModel, line: PipeLine, endpoint: Endpoint, path: 'from' | 'to'): PortEnd | ProblemRefusal {
-  if (!('portId' in endpoint)) return { point: endpoint.point, direction: endpoint.direction, flanged: false };
-  const tieIn = piping.tieIns[endpoint.portId];
-  if (tieIn === undefined) return refusal('RTE_UNKNOWN_PORT', `no tie-in point "${endpoint.portId}"`, [`${path}.portId`]);
-  const user = piping.runOrder.find((id) => {
-    const run = piping.runs[id];
-    return run?.start.ref?.id === tieIn.id || run?.end.ref?.id === tieIn.id;
-  });
+function resolveEnd(doc: CadDocument, line: PipeLine, endpoint: Endpoint, path: 'from' | 'to'): PortEnd | ProblemRefusal {
+  if (!('portId' in endpoint)) return { point: endpoint.point, direction: endpoint.direction };
+  const resolved = resolvePortId(doc, endpoint.portId);
+  if (!resolved.ok) return refusal('RTE_UNKNOWN_PORT', resolved.message, [`${path}.portId`]);
+  const { port } = resolved;
+  const user = portOccupant(doc, port.ref);
   if (user !== undefined)
-    return refusal('RTE_PORT_IN_USE', `tie-in ${tieIn.id} is already connected by run ${user}`, [`${path}.portId`], [tieIn.id, user]);
-  if (tieIn.port.dn !== line.dn)
+    return refusal('RTE_PORT_IN_USE', `port ${port.id} is already connected (${user})`, [`${path}.portId`], [port.id, user]);
+  if (port.spec.dn !== line.dn)
     return refusal(
       'RTE_SIZE_MISMATCH',
-      `tie-in ${tieIn.id} is DN${tieIn.port.dn}, line ${line.id} is DN${line.dn}`,
+      `port ${port.id} is DN${port.spec.dn}, line ${line.id} is DN${line.dn}`,
       [`${path}.portId`],
-      [tieIn.id, line.id],
+      [port.id, line.id],
     );
-  return {
-    point: tieIn.port.position,
-    direction: tieIn.port.direction,
-    ref: { kind: 'tieIn', id: tieIn.id },
-    flanged: tieIn.port.endType === 'FL',
-  };
+  return { point: port.spec.position, direction: port.spec.direction, ref: port.ref, port: port.spec };
+}
+
+interface StubParts {
+  readonly elbow: number;
+  readonly elbowSource: string;
+  readonly flangeLengths: { from?: number; to?: number };
+  readonly unverifiedReasons: string[];
+}
+
+/** Elbow centre-to-end A and flange-set lengths from the line's spec (never a formula): the stub of a port is A + its flange set. */
+function stubParts(doc: CadDocument, line: PipeLine, ends: { from: PortEnd; to: PortEnd }): StubParts | ProblemRefusal {
+  const lookup = createSpecLookup(doc, line.spec);
+  if (isMiss(lookup)) return refusal(lookup.miss, lookup.detail, ['lineId'], [line.id]);
+  const row = lookup.component({ types: ['elbow90'], dn: line.dn });
+  if (isMiss(row)) return refusal(row.miss, row.detail, ['lineId'], [line.id, ...row.ids]);
+  const elbow = row.dims['centreToEnd'];
+  if (elbow === undefined) return refusal('RTE_SPEC_NO_COMPONENT', `elbow row ${row.key} has no centreToEnd`, ['lineId'], [row.key]);
+  const reasons: string[] = [];
+  if (lookup.status() !== 'approved') reasons.push(`spec ${lookup.id} r${lookup.revision} is ${lookup.status()}, not approved`);
+  if (row.unverified) reasons.push(`elbow row ${row.key} is not grade A`);
+  const flangeLengths: { from?: number; to?: number } = {};
+  for (const side of ['from', 'to'] as const) {
+    const port = ends[side].port;
+    if (port?.endType !== 'FL') continue;
+    const set = resolveFlangeSet(lookup, port, line.dn);
+    if ('code' in set) return refusal(set.code, set.message, [`${side}.portId`], set.ids);
+    flangeLengths[side] = set.length;
+    for (const part of [set.flange, set.gasket, set.bolts]) if (part.unverified) reasons.push(`${part.key} is not grade A`);
+  }
+  return { elbow, elbowSource: `${row.key} (${row.source})`, flangeLengths, unverifiedReasons: reasons };
 }
 
 /** Inflated world boxes: 3D entities (not run meshes), legs of existing runs, explicit keep-out boxes. */
@@ -151,7 +177,7 @@ function collectObstacles(
     const run = piping.runs[runId];
     const other = run === undefined ? undefined : piping.lines[run.lineId];
     if (run === undefined || other === undefined) continue;
-    const otherRadius = (pipeOutsideDiameter(other.dn) ?? 0) / 2 + (other.insulation?.thicknessMm ?? 0);
+    const otherRadius = (pipeOutsideDiameter(doc, other.spec, other.dn) ?? 0) / 2 + (other.insulation?.thicknessMm ?? 0);
     const points = runPoints(run);
     for (let leg = 0; leg + 1 < points.length; leg++) {
       const [a, b] = [points[leg] as Vec3, points[leg + 1] as Vec3];
@@ -183,9 +209,9 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   const piping = getPiping(doc);
   const line = piping.lines[request.lineId];
   if (line === undefined) return refusal('RTE_UNKNOWN_LINE', `no pipe line "${request.lineId}"`, ['lineId']);
-  const from = resolveEnd(piping, line, request.from, 'from');
+  const from = resolveEnd(doc, line, request.from, 'from');
   if ('ok' in from) return from;
-  const to = resolveEnd(piping, line, request.to, 'to');
+  const to = resolveEnd(doc, line, request.to, 'to');
   if ('ok' in to) return to;
   const fromAxis = axisIndex(from.direction);
   const toAxis = axisIndex(to.direction);
@@ -200,21 +226,12 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   };
   const cellUm = um(pick('grid'));
   if (cellUm < 1) return refusal('RTE_AUTOROUTE_NO_PATH', 'the grid cell rounds to 0 µm', ['grid']);
-  const elbow = request.elbowCentreToEnd ?? elbowCentreToEnd(line.dn);
-  if (elbow === null)
-    return refusal('RTE_SPEC_NO_COMPONENT', `no LR 90 elbow row for DN${line.dn} (until 01 PSC): pass elbowCentreToEnd`, [
-      'elbowCentreToEnd',
-    ]);
-  const flangeless = !from.flanged && !to.flanged;
-  if (!flangeless && request.flangeSetLength === undefined)
-    return refusal(
-      'RTE_SPEC_NO_COMPONENT',
-      'a flanged port needs the flange-set length (gasket + flange through hub) until 01 PSC: pass flangeSetLength',
-      ['flangeSetLength'],
-    );
-  const stubUm = (flanged: boolean): number => Math.ceil(um(elbow + (flanged ? (request.flangeSetLength ?? 0) : 0)) / cellUm) * cellUm;
-  const fromStub = stubUm(from.flanged);
-  const toStub = stubUm(to.flanged);
+  const stubs = stubParts(doc, line, { from, to });
+  if ('ok' in stubs) return stubs;
+  const elbow = stubs.elbow;
+  const stubUm = (flangeLength: number | undefined): number => Math.ceil(um(elbow + (flangeLength ?? 0)) / cellUm) * cellUm;
+  const fromStub = stubUm(stubs.flangeLengths.from);
+  const toStub = stubUm(stubs.flangeLengths.to);
   const fromUm = toUm(from.point);
   const toPointUm = toUm(to.point);
   const originUm = plus(fromUm, fromAxis, fromStub);
@@ -232,7 +249,7 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
     min: goalCell.map((v) => Math.min(0, v) - margin) as unknown as Int3,
     max: goalCell.map((v) => Math.max(0, v) + margin) as unknown as Int3,
   };
-  const radius = (pipeOutsideDiameter(line.dn) ?? 0) / 2 + (line.insulation?.thicknessMm ?? 0) + pick('clearance');
+  const radius = (pipeOutsideDiameter(doc, line.spec, line.dn) ?? 0) / 2 + (line.insulation?.thicknessMm ?? 0) + pick('clearance');
   const collected = collectObstacles(doc, piping, radius, request);
   if ('ok' in collected) return collected;
   const states = bounds.max.reduce((total, max, dim) => total * (max - (bounds.min[dim] as number) + 1), 6);
@@ -284,9 +301,11 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
     to,
     info: {
       defaults,
-      elbowCentreToEnd: { value: elbow, source: request.elbowCentreToEnd === undefined ? ELBOW_SOURCE : 'param elbowCentreToEnd' },
+      elbowCentreToEnd: { value: elbow, source: stubs.elbowSource },
+      flangeSetLengths: stubs.flangeLengths,
       portOwners,
-      unverified: true,
+      unverified: stubs.unverifiedReasons.length > 0,
+      unverifiedReasons: stubs.unverifiedReasons,
     },
   };
 }

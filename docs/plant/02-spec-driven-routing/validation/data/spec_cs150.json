@@ -1,0 +1,52 @@
+{
+  "format": "llull-pipe-spec",
+  "schemaVersion": 1,
+  "id": "CS150",
+  "title": "Carbon steel, ASME Class 150 RF, NPS 2-6 (02 RTE validation spec; dimensions of the SC-RTE plans)",
+  "service": "SC-RTE validation plans",
+  "dimensionalStandard": "ASME",
+  "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
+  "corrosionAllowance": { "value": 3, "unit": "mm" },
+  "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
+  "sizeRange": { "fromNps": 2, "toNps": 6 },
+  "catalogs": ["rte-validation-stub", "llull-open-piping"],
+  "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
+  "components": [
+    { "id": "P-BW", "type": "pipe", "fromNps": 2, "toNps": 6, "schedule": "40", "ends": "BE", "catalogRef": "asme-b36.10m" },
+    {
+      "id": "E90-LR",
+      "type": "elbow90",
+      "fromNps": 2,
+      "toNps": 6,
+      "radius": "LR",
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "catalogRef": "asme-b16.9"
+    },
+    {
+      "id": "E45-LR",
+      "type": "elbow45",
+      "fromNps": 2,
+      "toNps": 6,
+      "radius": "LR",
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "catalogRef": "asme-b16.9"
+    },
+    { "id": "F-WN", "type": "flangeWeldNeck", "fromNps": 2, "toNps": 6, "facing": "RF", "class": 150, "catalogRef": "asme-b16.5" },
+    { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 2, "toNps": 6, "class": 150, "catalogRef": "asme-b16.20" },
+    { "id": "B-STUD", "type": "boltSet", "fromNps": 2, "toNps": 6, "class": 150, "facing": "RF", "catalogRef": "asme-b16.5-bolting" },
+    {
+      "id": "V-GATE",
+      "type": "valveGate",
+      "fromNps": 2,
+      "toNps": 6,
+      "ends": "FL",
+      "facing": "RF",
+      "class": 150,
+      "catalogRef": "asme-b16.10"
+    }
+  ],
+  "status": "draft",
+  "provenance": { "author": "02 RTE validation pack", "accessed": "2026-10-24" }
+}

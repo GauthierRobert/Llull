@@ -125,46 +125,32 @@
       "approve_pipe_spec"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
-      "check_piping",
-      "piping_takeoff",
-      "route_pipe"
+      "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-02-pump-discharge-gate-valve.json": [
       "check_piping",
-      "insert_inline_component",
-      "piping_takeoff",
-      "route_pipe"
+      "insert_inline_component"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-03-header-branches.json": [
       "add_branch",
       "check_piping",
-      "piping_connectivity",
-      "piping_takeoff",
-      "route_pipe"
+      "piping_connectivity"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-04-gravity-drain-slope.json": [
-      "check_piping",
-      "piping_takeoff",
-      "route_pipe"
+      "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-05-routing-refusals.json": [
-      "check_piping",
-      "route_pipe"
-    ],
-    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-06-move-with-connected.json": [
-      "piping_takeoff"
+      "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-07-insulated-hot-line.json": [
-      "line_heat_loss",
-      "route_pipe"
+      "line_heat_loss"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-08-auto-route-v2.json": [
       "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-09-legacy-pipe-run-conversion.json": [
       "check_piping",
-      "convert_pipe_run",
-      "piping_takeoff"
+      "convert_pipe_run"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": [
       "check_equipment",
@@ -334,8 +320,7 @@
       "define_plant_hierarchy",
       "insert_inline_component",
       "load_plant_class_library",
-      "plant_report",
-      "route_pipe"
+      "plant_report"
     ],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-03-data-errors.json": [
       "assign_plant_object",

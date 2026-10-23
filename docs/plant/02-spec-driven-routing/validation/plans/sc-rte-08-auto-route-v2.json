@@ -1,11 +1,17 @@
 {
   "id": "SC-RTE-08",
-  "status": "V2 built 2026-10-19 (TECHNICAL_SPEC section 13): steps 0-3 run and give the expected step-3 data (tests/unit/plant/piping/autoRoute.test.ts, server/tests/routeNativeParity.test.ts). Unbuilt: check_piping (step 4).",
+  "status": "V2 built 2026-10-19 (TECHNICAL_SPEC section 13), on the spec-driven derivation since 02 RTE M1: steps 0-5 run (imports, tie-ins, create_pipeline, auto_route_pipe) and give the expected step-5 data (tests/unit/plant/piping/autoRoute.test.ts, server/tests/routeNativeParity.test.ts). Unbuilt: check_piping (step 6).",
   "unbuilt": ["check_piping"],
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
   "validates": ["VC-RTE-18"],
   "description": "Obstacle-free auto route between a port leaving +X at the origin and a port at (3000, 2000, 1000) that the pipe must enter travelling +Z from below (port direction (0,0,-1)). Minimum bends = 2 (three axes need three directions, one bend joins two). Then a box obstacle blocks the straight first leg; the route must stay clash-free and its length can only grow.",
   "units": "mm",
   "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_tie_in_point",
       "params": { "tag": "AR-1", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
@@ -26,14 +32,14 @@
   ],
   "expected": [
     {
-      "step": 3,
+      "step": 5,
       "path": "data.centrelineToPiLengthMm",
       "value": 6000,
-      "abs": 1e-6,
+      "abs": 0.000001,
       "source": "Manhattan distance |3000| + |2000| + |1000|"
     },
-    { "step": 3, "path": "data.bends", "value": 2, "source": "lower bound 2 (3 axes), reached in free space" },
-    { "step": 3, "path": "data.optimal", "value": true },
-    { "step": 4, "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length", "value": 0 }
+    { "step": 5, "path": "data.bends", "value": 2, "source": "lower bound 2 (3 axes), reached in free space" },
+    { "step": 5, "path": "data.optimal", "value": true },
+    { "step": 6, "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length", "value": 0 }
   ]
 }

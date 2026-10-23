@@ -6,6 +6,7 @@ import { findRow, rowsOf } from '@aec/plant/display/serviceSchemes';
 import { paletteHex } from '@aec/plant/display/palette';
 import { TOOLSETS } from '@protocol/toolsets';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { cs150Document } from '../piping/rteFixtures';
 
 /** SC-VIS-01: seven runs with free-text services (the last one, nitrogen, is never mapped under A13.1). */
 const LINES: ReadonlyArray<readonly [string, string, number, number]> = [
@@ -310,7 +311,7 @@ describe('plant property provider', () => {
     expect(Object.keys(report.groups)).toEqual(['eq']);
     expect(report.outOfScope).toBe(1);
 
-    let piping = createEmptyDocument();
+    let piping = cs150Document();
     const tie = (tag: string, position: number[], direction: number[]): string => {
       const result = ok(piping, 'add_tie_in_point', { tag, position, direction, dn: 100, endType: 'BW' });
       piping = result.document;
@@ -326,7 +327,11 @@ describe('plant property provider', () => {
       name: 'svc',
       rules: [{ id: 'cw', when: { property: 'service', equals: 'cw' }, colour: '#0000ff', legend: 'cw' }],
     });
-    const runReport = data<Report>(profiled, 'colour_by_rule_report', { profileId: 'svc', groupBy: 'entity', entityIds: [runId] });
-    expect(runReport.groups[runId]).toMatchObject({ ruleId: 'cw', count: 1 });
+    // The run derives one entity per part (<runId>/<kind>-<k>); each resolves to its run's line and takes the service colour.
+    const parts = routed.document.plant?.piping?.entityIds[runId] ?? [];
+    expect(parts.length).toBeGreaterThan(0);
+    const runReport = data<Report>(profiled, 'colour_by_rule_report', { profileId: 'svc', groupBy: 'entity', entityIds: parts });
+    expect(Object.keys(runReport.groups).sort()).toEqual([...parts].sort());
+    for (const part of parts) expect(runReport.groups[part]).toMatchObject({ ruleId: 'cw', count: 1 });
   });
 });

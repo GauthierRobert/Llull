@@ -18,8 +18,8 @@ export const addTieInPoint = defineCommand({
   description:
     'Add a piping connection point (tie-in or battery limit) that runs start or end at: world position, outward face direction (pointing from ' +
     'the connection face toward the pipe), nominal size DN and end type. Lengths in document units (mm in plant documents). Returns the tie-in ' +
-    'id (affected[0]) to pass as { portId } to route_problem / auto_route_pipe. Refusals: RTE_INVALID_PORT, RTE_DUPLICATE_TAG. ' +
-    'Next: create_pipeline, then auto_route_pipe.',
+    'id (affected[0]) to pass as { portId } to route_pipe / route_problem / auto_route_pipe. Equipment nozzles (add_nozzle) are ports too: "<tag>:<mark>". ' +
+    'Refusals: RTE_INVALID_PORT, RTE_DUPLICATE_TAG. Next: create_pipeline, then route_pipe (compass legs) or auto_route_pipe.',
   params: z.object({
     tag: z.string().min(1).describe('Unique tag, e.g. "TP-1".'),
     position: vec3('World position [x, y, z] of the connection face centre.'),

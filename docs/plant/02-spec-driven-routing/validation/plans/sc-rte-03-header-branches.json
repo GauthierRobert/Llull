@@ -1,20 +1,18 @@
 {
   "id": "SC-RTE-03",
-  "status": "PROPOSED - not runnable yet. Unbuilt: import_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, add_branch, check_piping, piping_takeoff, piping_connectivity.",
-  "unbuilt": [
-    "import_pipe_spec",
-    "add_tie_in_point",
-    "create_pipeline",
-    "route_pipe",
-    "add_branch",
-    "check_piping",
-    "piping_takeoff",
-    "piping_connectivity"
-  ],
+  "status": "PARTLY RUNNABLE (02 RTE M1): steps 0-6 run (imports, tie-ins, create_pipeline, route_pipe of the header). Blocked until 02 M2: add_branch (tees / olets, branch table), piping_connectivity, check_piping and the piping_takeoff rows of the branches.",
+  "unbuilt": ["add_branch", "check_piping", "piping_connectivity"],
+  "blockedFrom": 7,
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
   "validates": ["VC-RTE-06", "VC-RTE-07"],
   "description": "DN150 header between two butt-weld tie-in points (x 0 and x 10000, z 3000). A DN100 branch at x 4000 going +Y 2000 to tie-in TP-3, and a DN50 branch at x 7000 going +Z 1000 left open on purpose. The spec branch table must pick a reducing tee 6x4 and a weldolet 6x2.",
   "units": "mm",
   "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_tie_in_point",
       "params": { "tag": "TP-1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 150, "endType": "BW" },
@@ -47,25 +45,29 @@
     { "command": "piping_takeoff", "params": { "lineId": "$line" } }
   ],
   "expected": [
-    { "step": 5, "path": "data.fitting", "value": "teeReducing", "source": "branch table (6,4)" },
-    { "step": 6, "path": "data.fitting", "value": "weldolet", "source": "branch table (6,2)" },
-    { "step": 7, "path": "data.openEnds.length", "value": 1, "source": "only the DN50 branch end is free" },
-    { "step": 8, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 1 },
-    { "step": 8, "path": "data.status", "value": "warn" },
+    { "step": 7, "path": "data.fitting", "value": "teeReducing", "source": "branch table (6,4)" },
+    { "step": 8, "path": "data.fitting", "value": "weldolet", "source": "branch table (6,2)" },
+    { "step": 9, "path": "data.openEnds.length", "value": 1, "source": "only the DN50 branch end is free" },
+    { "step": 10, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 1 },
+    { "step": 10, "path": "data.status", "value": "warn" },
     {
-      "step": 9,
+      "step": 11,
       "path": "data.counts",
       "value": { "teeReducing": 1, "weldolet": 1, "pipePieces": 4 },
       "source": "header cut by the tee only; the olet does not cut the header"
     },
     {
-      "step": 9,
+      "step": 11,
       "path": "data.pipePieces[?dn==150].cutLengthMm",
       "value": [3857, 5857],
       "abs": 0.01,
       "source": "4000 - 143 ; 6000 - 143 (C = 143)"
     },
-    { "step": 9, "path": "data.pipePieces[?dn==100].cutLengthMm", "value": [1870], "abs": 0.01, "source": "2000 - 130 (M = 130)" },
-    { "step": 9, "path": "data.pipePieces[?dn==50].cutLengthMm", "value": "TBD - 1000 minus the weldolet height from the 01 PSC catalogue" }
+    { "step": 11, "path": "data.pipePieces[?dn==100].cutLengthMm", "value": [1870], "abs": 0.01, "source": "2000 - 130 (M = 130)" },
+    {
+      "step": 11,
+      "path": "data.pipePieces[?dn==50].cutLengthMm",
+      "value": "TBD - 1000 minus the weldolet height from the 01 PSC catalogue"
+    }
   ]
 }

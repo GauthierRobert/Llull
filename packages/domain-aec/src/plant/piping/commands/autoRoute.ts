@@ -8,7 +8,8 @@ import { nextId } from '@lib/id';
 import { buildRouteProblem, type BuiltProblem, type RouteRequest } from '../autoRoute/problem';
 import { searchRoute } from '../autoRoute/search';
 import { checkSolution, solutionFromSearch, type RouteSolution } from '../autoRoute/solution';
-import { withRunEntity } from '../derive';
+import { withRunEntities } from '../derive';
+import { deriveRun } from '../routeParts';
 import { getPiping, refuse, withPiping } from '../model';
 import { routeParamsShape } from './routeParams';
 
@@ -30,10 +31,12 @@ export const routeProblem = defineCommand({
   description:
     'Build the canonical auto-routing problem of a pipe line between two ports without routing it: lattice (cell, origin, box), port stubs, ' +
     'integer-micrometre costs (bend cost, rack-elevation penalty) and every obstacle box inflated by pipe radius + insulation + clearance ' +
-    '(3D entities, legs of existing runs, keep-outs). data = { problem, problemHash, defaults, elbowCentreToEnd, portOwners, unverified }; ' +
-    'the native router (llull auto_route, llull-compute route) solves it and auto_route_pipe checks the solution against the same hash. ' +
-    'Refusals: RTE_UNITS_UNSUPPORTED (non-mm document), RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_PORT_DIRECTION, RTE_SPEC_NO_COMPONENT, ' +
-    'RTE_UNKNOWN_KEEPOUT, RTE_AUTOROUTE_NO_PATH.',
+    '(3D entities, legs of existing runs, keep-outs). The elbow centre-to-end and the flange sets of flanged ports come from the line spec (catalogue rows, ' +
+    'not formulas). Ports are tie-in ids, equipment nozzles "<tag>:<mark>" or run ends. data = { problem, problemHash, defaults, elbowCentreToEnd, ' +
+    'flangeSetLengths, portOwners, unverified, unverifiedReasons }; the native router (llull auto_route, llull-compute route) solves it and auto_route_pipe ' +
+    'checks the solution against the same hash. Refusals: RTE_UNITS_UNSUPPORTED (non-mm document), RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, ' +
+    'RTE_SIZE_MISMATCH, RTE_PORT_DIRECTION, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, RTE_SPEC_UNKNOWN, RTE_SPEC_NO_COMPONENT, RTE_UNKNOWN_KEEPOUT, ' +
+    'RTE_AUTOROUTE_NO_PATH. Next: auto_route_pipe (or llull auto_route for large boxes).',
   annotations: { readOnly: true },
   params: z.object(routeParamsShape),
   run: (doc, params): CommandResult => {
@@ -68,9 +71,9 @@ const solutionSchema = z
   .describe('A solution of route_problem (from llull auto_route); validated before it is committed.');
 
 /**
- * @affects creates 1 pipe run (plant.piping) + its derived, read-only tube mesh (id = run id, layer P-PIPE)
+ * @affects creates 1 pipe run (plant.piping) + its derived, read-only part entities (`<runId>/<kind>-<k>`, layers P-PIPE / P-FITT / P-FLNG)
  * @invariant a supplied solution is committed only when checkSolution accepts it against the problem rebuilt from this document
- * @failure problem refusals (route_problem); RTE_AUTOROUTE_SOLUTION_INVALID; RTE_AUTOROUTE_NO_PATH; RTE_AUTOROUTE_BUDGET
+ * @failure problem refusals (route_problem); RTE_AUTOROUTE_SOLUTION_INVALID; RTE_AUTOROUTE_NO_PATH; RTE_AUTOROUTE_BUDGET; a route whose parts do not derive
  */
 export const autoRoutePipe = defineCommand({
   name: 'auto_route_pipe',
@@ -79,9 +82,10 @@ export const autoRoutePipe = defineCommand({
     'length for the bend cost, clear of every 3D entity, existing run and keep-out by pipe radius + insulation + clearance, rack elevations ' +
     `preferred. Without solution it runs the in-process A* (cap ${TS_MAX_EXPANSIONS} expansions; above it refuses RTE_AUTOROUTE_BUDGET: ` +
     'run llull auto_route, the native router). With solution (from llull auto_route) it checks the problem hash, every leg and the length / ' +
-    'bends / cost before committing. data = { runId, pis, centrelineToPiLengthMm, bends, cost, optimal, expansions, engine, problemHash, unverified }. ' +
-    'Several lines: route them one after the other (each run becomes an obstacle for the next). Refusals: as route_problem plus ' +
-    'RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID.',
+    'bends / cost before committing. The run is an ordinary run: it derives the same parts as route_pipe (cut pipe pieces, spec elbows, flange sets) and ' +
+    'is refused if they do not derive. data = { runId, pis, centrelineToPiLengthMm, bends, cost, optimal, expansions, engine, problemHash, unverified, ' +
+    'unverifiedReasons, parts, totalPipeMm }. Several lines: route them one after the other (each run becomes an obstacle for the next). Refusals: as ' +
+    'route_problem plus RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID, and the derivation codes of route_pipe. Next: piping_takeoff.',
   params: z.object({
     ...routeParamsShape,
     maxExpansions: z.number().int().positive().optional().describe(`In-process search cap (default and maximum ${TS_MAX_EXPANSIONS}).`),
@@ -150,15 +154,16 @@ export const autoRoutePipe = defineCommand({
         engine: solution.engine,
       },
     };
-    const next = withRunEntity(
-      withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] }),
-      run,
-    );
+    const stored = withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] });
+    const derived = deriveRun(stored, run);
+    if (!derived.ok) return refuse(doc, 'auto_route_pipe', derived.code, derived.message, [...derived.ids], [...derived.paths]);
+    const next = withRunEntities(stored, id);
     return {
       ...changed(
         next,
         `auto_route_pipe: run ${id} on line ${result.line.lineNumber}: ${solution.bends} bend(s), ${solution.lengthMm} mm centreline-to-PI, ` +
-          `cost ${solution.cost} µm (${solution.engine}, ${solution.expansions} expansions${solution.optimal ? ', optimal' : ''}). Spec unverified.`,
+          `cost ${solution.cost} µm (${solution.engine}, ${solution.expansions} expansions${solution.optimal ? ', optimal' : ''}); ` +
+          `${derived.parts.length} part(s), ${derived.totalPipeMm.toFixed(3)} mm of pipe${derived.unverified ? `; unverified (${derived.unverifiedReasons.join('; ')})` : ''}.`,
         [id],
       ),
       data: {
@@ -171,7 +176,10 @@ export const autoRoutePipe = defineCommand({
         expansions: solution.expansions,
         engine: solution.engine,
         problemHash,
-        unverified: true,
+        unverified: derived.unverified,
+        unverifiedReasons: derived.unverifiedReasons,
+        parts: derived.parts.length,
+        totalPipeMm: derived.totalPipeMm,
       },
     };
   },
