@@ -11,6 +11,7 @@ import type { MeshProcessingEngine } from '../geometry/mesh/engineTypes';
 import type { FieldEngine } from '../geometry/field/engineTypes';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
+import type { CfdResultPort } from '../model/cfdResult';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { RasterPort } from '../model/raster';
 import type { FontProvider } from '../geometry/fontPort';
@@ -211,6 +212,8 @@ export interface ExecutionContext {
   readonly surfaceAnalysis?: SurfaceAnalysisEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
   readonly feaArtifacts?: FeArtifactPort | null;
+  /** Read-only CFD result store (host-provided, 12 CFD); null/absent = `record_cfd_results` refuses with CFD_RESULT_MISSING. */
+  readonly cfdResults?: CfdResultPort | null;
   /** The signature port (verification of human signatures, Ed25519; 05/08/09); null/absent = human-gate commands refuse. */
   readonly humanSignature?: HumanSignaturePort | null;
   /** The local vault's content-addressed objects (externalized release snapshots); null/absent = no vault. */

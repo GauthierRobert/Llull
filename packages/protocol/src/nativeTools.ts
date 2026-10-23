@@ -1,7 +1,7 @@
 /**
  * Native-transport tool definitions (schema only): fatigue_field, fea_map_field, fea_render, topology_solve, explicit_run, mtest_run,
- * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list. Like the exchange / FE tools they are not registry commands;
- * the runners (llull-compute jobs, MFront, the cloud store) live in `server/src/native`, `server/src/mfront` and `server/src/scan`.
+ * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list, cfd_solve. Like the exchange / FE tools they are not registry
+ * commands; the runners (llull-compute jobs, MFront, the cloud store) live in `server/src/native`, `server/src/cfd`, `server/src/mfront` and `server/src/scan`.
  *
  * Schemas come from zod through the registry's own `toParamsSchema`; tools that wrap a command (fea_render, auto_route, stackup_monte_carlo,
  * vortex_lattice_solve) read that command's `paramsSchema` so both stay one schema. Each spec carries its toolset (no hand-kept name list).
@@ -13,7 +13,7 @@ import type { ParamsSchema } from '@core/commands/types';
 import type { ToolDefinition } from './tools';
 
 /** Toolsets that own native transports (a subset of `ToolsetName`, declared here so `toolsets.ts` can import this file without a cycle). */
-type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan';
+type NativeToolset = 'analysis' | 'pmi' | 'aerodynamics' | 'piping' | 'scan' | 'flow';
 
 interface NativeToolSpec {
   readonly name: string;
@@ -23,6 +23,9 @@ interface NativeToolSpec {
 
 const TIMEOUT_MIN_S = 1;
 const TIMEOUT_MAX_S = 86400;
+/** Bounds of the inflow lattice Mach number of `cfd_solve` (the job refuses outside (0, 0.3]). */
+const LATTICE_MACH_MIN = 1e-6;
+const LATTICE_MACH_MAX = 0.3;
 const EMPTY_SCHEMA: ParamsSchema = { type: 'object', properties: {}, required: [] };
 
 /** Wall-clock limit parameter: zod has no bounds in `ParamSpec`, so `minimum` / `maximum` are added after derivation. */
@@ -34,6 +37,11 @@ function schemaOf(shape: z.ZodObject): ParamsSchema {
   const timeout = schema.properties['timeoutS'];
   if (timeout !== undefined) timeout.minimum = TIMEOUT_MIN_S;
   if (timeout !== undefined) timeout.maximum = TIMEOUT_MAX_S;
+  const steps = schema.properties['maxSteps'];
+  if (steps !== undefined) steps.minimum = 1;
+  const mach = schema.properties['latticeMach'];
+  if (mach !== undefined) mach.minimum = LATTICE_MACH_MIN;
+  if (mach !== undefined) mach.maximum = LATTICE_MACH_MAX;
   return schema;
 }
 
@@ -98,21 +106,23 @@ const feaRender = (): ToolDefinition => ({
 const topologySolve = (): ToolDefinition => ({
   name: 'topology_solve',
   description:
-    'Solve a topology optimization study (create_topology_study, set_topology_regions): builds the voxel grid, maps the 05 loads and supports, ' +
-    'runs the native llull-compute SIMP optimiser (progress per iteration with --progress) and records the result with record_topology_result ' +
-    '(density field artifact, derived read-only iso-surface on layer layer-topology; numbers are recomputed from the artifact). Concept shape, ' +
-    'never a released design: rebuild with suggest_rebuild and finish with check_topology. Without llull-compute a 2D study up to 2000 voxels ' +
-    'runs the TypeScript reference; anything larger is TOP_TOOL_MISSING. resumeFromLast continues the last finished run of the study ' +
-    '(e.g. after raising maxIterations: the cap counts the iterations already done). Errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, TOP_SOLVER_TIMEOUT, TOP_RESULT_STALE.',
+    'Solve a topology optimization study (create_topology_study, set_topology_regions): builds the voxel grid, maps the 05 loads (force, pressure, ' +
+    'gravity) and supports, runs the native llull-compute SIMP optimiser (OC or MMA, projection, extrusion; progress per iteration with --progress) ' +
+    'and records the result with record_topology_result (density field artifact, derived read-only iso-surface on layer layer-topology; numbers ' +
+    'are recomputed from the artifact). Concept shape, never a released design: rebuild with suggest_rebuild and finish with check_topology. ' +
+    'Without llull-compute the tool is TOP_TOOL_MISSING (no TypeScript fallback). The job checkpoints itself about 90 % into timeoutS: a TOP_SOLVER_TIMEOUT ' +
+    'with resumable=true keeps the run, and resumeFromLast continues it (or a finished run, e.g. after raising maxIterations: the cap counts the ' +
+    'iterations already done) bit for bit. Errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, TOP_SOLVER_TIMEOUT, TOP_RESULT_STALE, TOP_OPTIMIZER_MISMATCH.',
   inputSchema: schemaOf(
     z.object({
       studyId: z.string().describe('Id of the topology study (affected[0] of create_topology_study).'),
-      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 1800).'),
+      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 1800); the job checkpoints about 90 % into it.'),
       resumeFromLast: z
         .boolean()
         .optional()
         .describe(
-          'Continue the last finished run of this study from its saved design (same inputs; settings such as maxIterations may change).',
+          'Continue the last run of this study (finished or checkpointed) from its saved design, warm start and optimizer state (same inputs; ' +
+            'settings such as maxIterations may change).',
         ),
       device: deviceParam('cpu (default, deterministic), gpu or auto (a GPU build of llull-compute; else TOP_GPU_FALLBACK).'),
     }),
@@ -264,6 +274,45 @@ const scanList = (): ToolDefinition => ({
   annotations: READ_ONLY,
 });
 
+const cfdSolve = (): ToolDefinition => ({
+  name: 'cfd_solve',
+  description:
+    'Solve a low-speed flow case (create_cfd_case, Mach < 0.3) with the native lattice-Boltzmann solver `llull-compute flow` (D3Q19 BGK + ' +
+    'Smagorinsky LES, half-way bounce-back walls, far-field / slip / ground faces): runs prepare_cfd_case and refuses on any fail row, exports ' +
+    'the unioned flow surface (metres, case frame), runs to steady state (time averaging once the drag settles, stop at 0.1 % change over two ' +
+    'flow-throughs or at maxSteps), stores the result bundle content-addressed and records its summary with record_cfd_results. device cpu ' +
+    '(default: the f64 reference, deterministic) | gpu (wgpu, f32) | auto; without a usable adapter the CPU runs with the warning CFD_GPU_UNAVAILABLE. ' +
+    'A run that hits maxSteps is still recorded with converged false and the warning CFD_NOT_CONVERGED. --progress prints one line per drag ' +
+    'sample. Errors: CFD_CASE_NOT_FOUND, the prepare fail codes (CFD_GEOMETRY_NOT_WATERTIGHT, CFD_BLOCKAGE_TOO_HIGH, ...), CFD_REGIME_MISMATCH ' +
+    '(compressible cases: the Euler solver is not built), CFD_MEMORY_EXCEEDED (with deviceMemoryBytes), CFD_UNSTABLE_PARAMS, CFD_SOLVER_MISSING ' +
+    '(no llull-compute), CFD_SOLVER_FAILED, CFD_TIMEOUT. Then: cfd_report caseId=ID, check_cfd.',
+  inputSchema: schemaOf(
+    z.object({
+      caseId: z.string().describe('Id of the flow case (create_cfd_case).'),
+      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 3600); a killed run is lost (no checkpoint).'),
+      device: deviceParam('cpu (default, deterministic f64 reference) | gpu (wgpu f32) | auto (GPU when a hardware adapter exists).'),
+      deviceMemoryBytes: z
+        .number()
+        .optional()
+        .describe('Device memory in bytes: the memory estimate is checked against it before anything is allocated (CFD_MEMORY_EXCEEDED).'),
+      maxSteps: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Lattice step limit, >= 1 (default 200000); reached = recorded with converged false.'),
+      latticeMach: z
+        .number()
+        .positive()
+        .max(0.3)
+        .optional()
+        .describe('Inflow lattice Mach number setting the time step, in (0, 0.3] (default 0.1).'),
+      les: z.boolean().optional().describe('Smagorinsky LES (default true, C_s 0.1); off for laminar validation cases.'),
+    }),
+  ),
+  annotations: {},
+});
+
 const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'fatigue_field', toolset: 'analysis', build: fatigueField },
   { name: 'fea_map_field', toolset: 'analysis', build: feaMapField },
@@ -276,6 +325,7 @@ const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'vortex_lattice_solve', toolset: 'aerodynamics', build: vortexLatticeSolve },
   { name: 'scan_import', toolset: 'scan', build: scanImport },
   { name: 'scan_list', toolset: 'scan', build: scanList },
+  { name: 'cfd_solve', toolset: 'flow', build: cfdSolve },
 ];
 
 /** Every native-transport tool, schema only (read the registry, so call after the plugins are installed). */

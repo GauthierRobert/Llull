@@ -11,6 +11,7 @@ import { createSignaturePort } from '../plm/signaturePort';
 import { objectsOf } from '../plm/vault/location';
 import { defaultFeArtifactStore } from './artifactStore';
 import { defaultPointCloudPort } from '../scan/pointCloudPort';
+import { cfdResultPort } from '../cfd/resultPort';
 
 export function serverContext(
   onStep?: (event: PlanStepEvent) => void,
@@ -19,6 +20,7 @@ export function serverContext(
   return {
     ...defaultContext(),
     feaArtifacts: defaultFeArtifactStore(),
+    cfdResults: cfdResultPort(defaultFeArtifactStore()),
     humanSignature,
     libraries: createLibraryProvider(),
     objects: objectsOf(),

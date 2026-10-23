@@ -10,7 +10,7 @@ import { cross3, len3, sub3 } from '@lib/vec3';
 import type { DeckContext } from './context';
 
 /** Corner positions (0-based) of the four tetrahedron faces in CalculiX numbering (S1 = 1-2-3, S2 = 1-4-2, S3 = 2-4-3, S4 = 3-4-1). */
-const TET_FACES: readonly (readonly [number, number, number])[] = [
+export const TET_FACES: readonly (readonly [number, number, number])[] = [
   [0, 1, 2],
   [0, 3, 1],
   [1, 3, 2],

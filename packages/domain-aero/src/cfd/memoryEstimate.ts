@@ -9,8 +9,14 @@ import type { Vec3 } from '@core/model/types';
 import type { Box } from './domainSizing';
 
 export const CELLS_PER_REFERENCE_LENGTH: Readonly<Record<CfdQuality, number>> = { draft: 64, standard: 128, fine: 256 };
-/** Stored bytes per cell (float32): LBM D3Q19 with the in-place AA scheme, Euler SSP-RK3 with local time stepping. */
-export const BYTES_PER_CELL: Readonly<Record<CfdSolver, number>> = { lbm: 96, euler: 144 };
+/**
+ * Stored bytes per cell of the solver layouts. LBM (as built, TECHNICAL_SPEC §13 M2): two D3Q19 population copies, flags, body, density,
+ * velocity, force and the averages — 204 B in the GPU's f32 layout, 395 B in the CPU twin's f64 layout; the job reports both in
+ * `result.json` (`memory`), which the native server test ties to these numbers. Euler (not built): the §8 SSP-RK3 figure.
+ */
+export const LBM_BYTES_PER_CELL = { gpu: 204, cpu: 395 } as const;
+/** The device the memory check targets: the GPU layout for LBM. */
+export const BYTES_PER_CELL: Readonly<Record<CfdSolver, number>> = { lbm: LBM_BYTES_PER_CELL.gpu, euler: 144 };
 /** Share of the device memory a case may use (20 % reserve for the OS and the renderer). */
 export const MEMORY_BUDGET_FRACTION = 0.8;
 
@@ -42,6 +48,8 @@ export interface Estimate {
   readonly levels: number;
   readonly bytesPerCell: number;
   readonly bytes: number;
+  /** The CPU twin (f64) needs more per cell; null for solvers without a CPU layout figure. */
+  readonly cpuBytes: number | null;
   readonly deviceMemoryBytes: number | null;
   /** Null without a device memory figure. */
   readonly fitsDevice: boolean | null;
@@ -136,12 +144,13 @@ export function estimateCase(input: EstimateInput): Estimate {
     levels: input.solver === 'lbm' ? LBM_LEVELS : octreeLevels(input, h) + 1,
     bytesPerCell: BYTES_PER_CELL[input.solver],
     bytes,
+    cpuBytes: input.solver === 'lbm' ? cells * LBM_BYTES_PER_CELL.cpu : null,
     deviceMemoryBytes: input.deviceMemoryBytes ?? null,
     fitsDevice: fits,
     largestFittingCellsPerReferenceLength: budget !== null && fits === false ? largestFitting(input, n, budget) : null,
     timeEstimateS,
     basis: [
-      `bytes per cell ${BYTES_PER_CELL[input.solver]} (TECHNICAL_SPEC §8), ${MEMORY_BUDGET_FRACTION * 100} % of the device memory usable`,
+      `bytes per cell ${BYTES_PER_CELL[input.solver]} (${input.solver === 'lbm' ? `GPU f32 layout; CPU f64 twin ${LBM_BYTES_PER_CELL.cpu}` : 'TECHNICAL_SPEC §8'}), ${MEMORY_BUDGET_FRACTION * 100} % of the device memory usable`,
       input.solver === 'lbm'
         ? `grid: ${LBM_LEVELS} levels of nested boxes (factor 2), boxes ${LBM_BOX_MARGIN_LENGTHS} body lengths apart (named defaults); ${LBM_FLOW_THROUGHS} flow-throughs at lattice Mach 0.1, target ${LBM_MCUPS} Mcell-updates/s (not measured: VC-CFD-54)`
         : `grid: octree with a ${EULER_SURFACE_BAND}-layer band on the surface (named default); ${EULER_ITERATIONS} iterations at ${EULER_MCUPS} Mcell-updates/s (assumed, not measured: VC-CFD-54)`,

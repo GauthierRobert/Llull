@@ -12,7 +12,7 @@ Gap id **TOP** · status: specification · written 2026-10-15 · functional spec
 | Rebuild vocabulary              | `draw_polyline` (closed loops), `extrude_profile` (inline `profile`, `id`/`ids`, `depth`), `boolean`, `fillet_edge`, `move_entities`, `set_parameter` with `=expr` regeneration          | `commands/draw2d/basic.ts`, `commands/solids/profile.ts`, `commands/brep/boolean.ts`, `commands/brep/*`, `commands/edit/batch.ts`, `commands/parametric/parameters.ts` | Enough to rebuild 2.5D parts from contours                               |
 | Mass / volume                   | `mass_properties` (volume, mass with density)                                                                                                                                            | `commands/inspect/measureSolid.ts`                                                                                                                                     | Used for mass saving reports                                             |
 | 05 FEA (aerospace, built first) | `AnalysisCase` (parts, constraints, loads on `facesNear` targets, `MeshControls`), artifact store, `FeaMaterialView` (E, ν from 08), transports `fea_mesh` / `fea_solve`, staleness hash | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §3–§5                                                                                                            | No design variables, no optimiser                                        |
-| Python bridge                   | One short-lived CPython process per request, timeout, at most 2 concurrent runs (CadQuery; 05 meshes in the native `llull-mesh`)                                                                         | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py`                                                                                                        | No numpy/scipy op for SIMP                                               |
+| Python bridge                   | One short-lived CPython process per request, timeout, at most 2 concurrent runs (CadQuery; 05 meshes in the native `llull-mesh`)                                                         | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py`                                                                                                        | No numpy/scipy op for SIMP                                               |
 | CalculiX optimisation           | `*DESIGN VARIABLES, TYPE=COORDINATE` (surface nodes) or `ORIENTATION`; `*DESIGN RESPONSE`, `*SENSITIVITY`, `*FEASIBLE DIRECTION`, `*FILTER`, `*GEOMETRIC CONSTRAINT`                     | CalculiX manual [R7]                                                                                                                                                   | Shape / orientation sensitivities only; no density topology optimisation |
 
 `grep -ri "simp\b\|topolog.*optim\|density filter"` over `packages/`, `server/` finds nothing relevant today.
@@ -563,4 +563,111 @@ GPU memory in 3D). `job.json` `dofCap` overrides. Next: measure on a desktop GPU
 
 **Compliance ratio and width samples (as built, TR-TOP-10 / TR-TOP-09).** `compare_to_topology` finds the first `static` 05 analysis that has the rebuilt solid as a part and reads it through `trustedRecord` (the 05 staleness hashes and artifact re-verification: only a `solved`, non-stale, artifact-verified result counts). The external work F^T u is rebuilt from the artifacts, because 05 records neither strain energy nor external work: the `fe_results` DISP field of each load case of the optimum, times the nodal forces of the case's `force` loads (the vector split over the nodes of the mesh node set `L_<loadId>`, `distribution: 'total'` | `'per_node'`, as the deck writer does). The weighted sum uses the study's load case weights (the optimum's own weighting); both values go to N\*mm (`N-mm-t-s` 1, `N-m-kg-s` 1000, `lbf-in-slinch-s` 112.98) and `complianceRatio = F^T u(rebuild) / c(optimum)`. It is checked against `complianceRatioTarget` (default `COMPLIANCE_RATIO_TARGET` = 1.15, named, to calibrate; >= 1 else TOP_SETUP_INVALID): above it is TOP_REBUILD_DEVIATION (status fail), within it with the IoU met is pass. With no usable result `complianceRatio` is null, `complianceStatus { available: false, code: 'TOP_REBUILD_NOT_ANALYSED', reason, message }` with `reason` one of `no_analysis | not_solved | stale | unverified | unsupported | optimum_zero` and the status is warn. `unsupported` = a load of the case that is not a nodal `force` (pressure, gravity, moment), a force without mesh nodes, a node without displacement, or a load case of the optimum missing in the rebuild analysis. `check_topology` raises the same two items per `rebuildEntityIds` entry (target fixed at the default). `suggest_rebuild.widthSamples`: an exact Euclidean distance transform (Felzenszwalb-Huttenlocher) of the section nodes at the threshold; local maxima at least one node from the void are the medial-axis candidates, thinned so none lies in a wider sample's inscribed disc (at most 200); `width` = 2 x the exact distance to the contour (document units, plus `widthMm`), widest first.
 
-**Open**: compliance ratio of rebuilds loaded by pressure / gravity / moments (needs element face loads from the mesh), MMA, `min_volume` objective, `massG`, the per-device DOF cap (`TOPOLOGY_VOXEL_CAP` is provisional).
+**Open** (after §15): compliance ratio of rebuilds loaded by moments and of face / body loads on non-tetrahedral meshes, `massG`, the per-device DOF
+cap (`TOPOLOGY_VOXEL_CAP` is provisional; VC-TOP-34 on a desktop GPU not measured).
+
+## 15. As built: V1 (TOP-V1, 2026-10-22)
+
+§10 M4 without the PHY-18 shape optimisation (that needs PHY-18 M2) and without unstructured SIMP (§11.5: voxels stay). Native in
+`solver/crates/llull-topopt` (`mma.rs`, `projection.rs`, `design.rs`, `loads.rs`, `solver.rs`; the loop in `simp.rs`, the contract in
+`job.rs`), TypeScript in the plugin `topology` (`objectiveCommand.ts`, `loads.ts`, `rules.ts`, `studyCommands.ts`, `job.ts`,
+`rebuildCompliance.ts`) and the transport (`server/src/native/topologySolve.ts`, `topologyJobFiles.ts`).
+
+### 15.1 MMA (FR-TOP-22; §11.1 decided: own port)
+
+Svanberg's method of moving asymptotes written from the 1987 paper with the asymptote / bound rules of his 2002 / 2007 notes (asyinit 0.5,
+asyincr 1.2, asydecr 0.7, albefa 0.1, raa0 1e-5, asymptote floor 0.01 (xmax − xmin), relaxation cost c = 1000, d = 1; no GCMMA inner loop);
+no GPL code. The separable subproblem is solved exactly through its dual (1987 §4): `x(λ)` closed form per variable, the concave dual maximised by
+projected Newton with an Armijo line search on `λ ≥ 0` (exact Hessian from the primal curvature; a scaled gradient step where it is singular),
+to a projected-gradient tolerance of 1e-11 relative. The move limit is the study's `move` (0.2 of the range). Every sum over the variables is a
+fixed-order reduction: bit-identical for any thread count. The state (`low`, `upp`, `xold1`, `xold2`, step count) is written as `mma.f64` and
+named by `state.json`, so a run resumes bit for bit (tested with projection on). Validation: MBB 60×20 sensitivity filter, MMA final
+compliance **203.130** in 84 iterations against OC's 203.183 in 94 (0.03 % apart; the test allows 5 %), volume 0.49999811; the
+Rust unit tests check the KKT point of a two-constraint problem (x* = (1, 0.5)) and the VC-TOP-03 separable optimum to 1e-6. **Known
+property**: plain MMA homes in on a *free\* stationary point (no active constraint, e.g. an unconstrained quadratic) only to the asymptote floor
+(a two-cycle 0.01 (xmax − xmin) wide) — the reason GCMMA exists; it does not arise with an active volume / compliance constraint.
+
+### 15.2 `min_volume` (TopologyObjective V1) and the constraint report
+
+`set_topology_objective { studyId, objective }` (new command) and `create_topology_study.objective` take `{ kind: 'min_volume', maxCompliance,
+loadCaseWeights? }`; `maxCompliance` is in the analysis compliance unit (`COMPLIANCE_UNIT`, stored as `unit`). Both switch
+`settings.optimizer` to `mma` (said in the summary); `set_topology_settings optimizer=oc` on such a study and a job built with OC are
+`TOP_OPTIMIZER_MISMATCH` (OC handles the volume constraint only). Native: `objective { kind: minVolume, maxCompliance }`, f0 = Σ xPhys /
+N_active, constraint `c / maxCompliance − 1 ≤ 0`; for `minCompliance` under MMA f0 = c / c₁ (the first iteration's compliance, kept in
+`state.json` as `objectiveScale`) and `Σ xPhys / target − 1 ≤ 0`. `result.json` reports `objective { kind, value }` and `constraints [{ name,
+value, limit, satisfied }]`; the artifact and the summary carry `optimizer`, `objective`, `constraints` (artifacts of earlier binaries get the
+volume constraint derived from the field), `check_topology` fails with **`TOP_CONSTRAINT_VIOLATED`** on an unsatisfied one. Validation: MBB
+30×10 density filter, `maxCompliance` = 1.5 × the OC optimum → volume fraction 0.393 at compliance 373.24131 against the limit 373.24186,
+converged in 45 iterations.
+
+### 15.3 Loads: pressure and gravity (§14 open item)
+
+`job.ts` → `loads.ts`: a `pressure` maps like a force to the boundary nodes of its planar face group; its total `magnitude × face area`
+(`mapTarget` now returns `faceArea`, the sum of the planar group's triangle areas, converted to the analysis length unit²) acts along the inward
+normal, spread equally over those nodes (total preserved, tested: 2 MPa on the 20 mm² MBB edge = 40 N over 21 nodes); a face parallel to a 2D
+plane is refused as before, a face whose normal leaves the plane is `TOP_SETUP_INVALID`. `gravity` needs the domain material's density
+(`densityOf`, `densityToAnalysis`; none → `TOP_SETUP_INVALID`) and becomes the **force a fully solid voxel weighs** per load case,
+`ρ · a · V_voxel` in the grid axes (`loadCases[].gravity`; several gravity loads of one case add up; an out-of-plane component on a 2D grid is
+refused). Native (`loads.rs`): `F(x) = F_fixed + Σ_e xPhys_e f_e`, `f_e = g / nodes_per_element` at each node of the voxel, gathered per node in
+a fixed order; the compliance sensitivity gains `+2 Σ_lc w_lc u_eᵀ f_e` (from `dc = 2 Uᵀ ∂F/∂x − Uᵀ ∂K/∂x U`; the load is design dependent, the
+term is exact, not dropped). The stiffness still scales with xPhys^p while the load scales with xPhys, so low densities carry a parasitic load
+(Bruyneel & Duysinx 2005): the volume constraint may be inactive and sensitivities positive. **OC assumes non-positive sensitivities**: it now
+ends its bisection when no multiplier reaches the target (`LAMBDA_FLOOR`, the constraint is inactive) instead of looping, and the settings
+description advises `optimizer: mma` with gravity (tested: a self-weighted plate converges under MMA; `c(2g) = 4 c(g)` for one design). Moments
+stay unsupported (`TOP_SETUP_INVALID`). **Compliance ratio** (`rebuildCompliance.ts`): F^T u of a pressure is `−p · A · (n_out · ū)` over the
+tetrahedron faces of the mesh face set `L_<loadId>` (outward normal = away from the opposite corner, so no face-numbering convention is relied
+on), of gravity `ρ · V_e · (a · ū_e)` over the solid's linear tetrahedra; both exact for linear shape functions and built for **C3D4 only** (a
+C3D10 would need midside weights: face load 1/3 per midside, body load −1/20 corners / 1/5 midsides); C3D10, other element types and moments
+stay `TOP_REBUILD_NOT_ANALYSED` (`unsupported`). The material **density enters `inputHash`** when the case has a gravity load (the solve reads
+it then): a density change makes such a result stale and stops `resumeFromLast`; hashes of studies without gravity are unchanged.
+
+### 15.4 Heaviside projection (TopologySettings.projection)
+
+`set_topology_settings projection: { beta?, eta?, betaStart?, betaEvery? } | null` (density filter only, else `TOP_SETUP_INVALID`), named
+defaults β 1 → 16 doubling every 50 iterations or when the design converged at the current β (Wang, Lazarov & Sigmund 2011 practice), η 0.5
+(Guest 2004). `xPhys = (tanh(βη) + tanh(β(x̃ − η))) / (tanh(βη) + tanh(β(1 − η)))`, chain rule `β(1 − tanh²) / (…)` before the filter adjoint;
+a run counts as converged only at the final β; the continuation level is in `state.json` (`projectionLevel`) and the iteration count the
+schedule runs on is `startIteration` + the run's, so a resumed run continues the schedule. `result.json` / artifact / summary carry
+`projection { beta, eta }`; the projection is in `settingsHash` only when set (earlier hashes unchanged). Validation: MBB 60×20 density filter,
+grey **0.268 → 0.0094** (β 16, levels every 40 iterations), compliance 218.8 → 190.2 (sharper layout, same volume), 300 iterations.
+
+### 15.5 Manufacturing V1 (FR-TOP-13): extrusion and minimum member size
+
+`set_topology_settings manufacturing: { symmetry, extrusion?: { axis: 'x' | 'y' | 'z' }, minMemberSize? }`; `topology_report.rules` states each
+one (and the projection and a min_volume objective), `topology_report.optimizer` / `.projection` are read directly. **Extrusion**: a world axis
+(the normal of a 2D plane is refused), mapped to the grid axis for the job; native `design.rs`: one design variable per column of free voxels
+along the axis (a variable reduction: ξ → x by expansion, gradients summed over the column, pinned voxels keep their value), and with the density
+filter the filtered field is averaged along the column (the filter stencil is truncated at the grid ends, so the convolution of a uniform column
+is not uniform) — an orthogonal projector, applied again in the chain rule. Without an extrusion axis the design space is the identity and
+every per-voxel operation is a plain copy, so the OC path is bit-identical to RS-2 (VC-TOP-10 / 11 unchanged: 203.19245763987374,
+218.80322106805878). A resumed extruded run rebuilds its variables from the first voxel of each column (`variables_of`; the mean of k equal
+f64 values is not always that value), so it continues bit for bit. Tested: a 12×6×4 cantilever extruded along z gives a field exactly uniform
+in k, the MBB extruded along y is uniform in j, and an extruded checkpoint resumed equals the whole run byte for byte.
+**Minimum member size** (document units): the llull rule `rmin ≥ size / 2`; the job runs with the effective radius `max(radius, size / 2)`
+(`settings.minMemberRule { minMemberSize, radiusVoxels, raised }`, the rule text in the report); a size below `MIN_MEMBER_VOXELS` = 2 voxels is
+**`TOP_MEMBER_SIZE_UNRESOLVED`** at `set_topology_settings` (the grid cannot resolve it). `manufacturing` was already in `inputHash`; optional
+keys are omitted when absent, so earlier hashes are unchanged.
+
+### 15.6 `deadlineS` checkpoint
+
+`settings.deadlineS` in `job.json`: after the iteration that crosses the wall-clock budget the loop stops with `status: "checkpoint"`, the
+warning `TOP_DEADLINE`, and every output written (`field.bin`, `design.f64`, `displacements.f64`, `state.json` + `mma.f64`): resuming with
+`startDesign` + `startDisplacements` + `startState` + `startIteration` continues bit for bit. Order inside an iteration: the convergence test
+first (a converging iteration at the final β reports `converged`, deadline or not), then the β-continuation bump with its xPhys recompute, then
+the deadline — so a checkpoint carries the level and xPhys the uninterrupted run would have; and the deadline is only looked at below the
+iteration cap, so a checkpoint never coincides with `maxIterations` (the resume always has ≥ 1 iteration left). Tested: a run stopped after 1
+iteration and resumed equals the 30-iteration run byte for byte (OC; MMA + projection likewise through the state), and so do a checkpoint on a
+β-bump iteration (`betaEvery: 1`), on a converging intermediate-β iteration, and an extruded run. The transport passes `deadlineS = max(0,
+min(⌊0.9 timeoutS⌋, timeoutS − 5))` — 0 below the 5 s margin, i.e. one iteration then the checkpoint, so the kill can never precede the
+checkpoint's writes — and keeps the hard kill at `timeoutS`; a checkpoint keeps the resume state (`<LLULL_FEA_CACHE>/topology-resume/`,
+now with `.state.json` and `.mma.f64`) and answers **`TOP_SOLVER_TIMEOUT` with `data.resumable: true`, `data.iterations`, `nativeCode:
+TOP_DEADLINE`**; `resumeFromLast` continues it (iterations and history accumulate, the cap counts the iterations done). A kill before the
+checkpoint (the final solve and the writes take longer than the margin) is still the lost-run timeout. Tested with the fake runner and with the
+real binary (a 300-iteration MBB run stopped at a 3 s deadline and resumed equals the uninterrupted run's field and compliance).
+
+### 15.7 Not built / left
+
+PHY-18 shape optimisation (M4 line of §10; depends on PHY-18 M2), unstructured SIMP on the 05 tet mesh (§11.5), VC-TOP-34 on a desktop GPU (the
+machine of this build was not measured: the cap stays provisional), displacement constraints for `min_volume` (compliance only), `massG`, a
+`TOP_GREY_HIGH` remediation that suggests the projection is in place. `docs/FEATURES.md` and the tool-schema snapshot were regenerated for
+`set_topology_objective` and the new parameters.

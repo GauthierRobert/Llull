@@ -1,6 +1,6 @@
 /** zod building blocks of the topology commands. */
 
-import type { TopologyRegion } from '@core/model/topology';
+import type { TopologyObjective, TopologyRegion } from '@core/model/topology';
 import { vec3, z } from '@core/commands/schema';
 import { feaTargetSchema, toTarget } from '../shared/target';
 
@@ -35,4 +35,40 @@ export type RegionInput = z.output<typeof regionSchema>;
 export function toRegion(input: RegionInput): TopologyRegion {
   if (input.kind === 'target') return { kind: 'target', target: toTarget(input.target), depthVoxels: input.depthVoxels ?? 1 };
   return input;
+}
+
+const loadCaseWeightsSchema = z
+  .record(z.string(), z.number())
+  .optional()
+  .describe('Weight of each load case name in the weighted compliance; a case not listed weighs 1.');
+
+export const objectiveSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('min_compliance').describe('Minimise the weighted compliance (maximise stiffness) within the volume fraction.'),
+    loadCaseWeights: loadCaseWeightsSchema,
+  }),
+  z.object({
+    kind: z
+      .literal('min_volume')
+      .describe('Minimise the material while the weighted compliance stays at or below maxCompliance (needs optimizer mma).'),
+    maxCompliance: z
+      .number()
+      .describe('Largest allowed weighted compliance, in the force x length unit of the analysis unit system (N-mm-t-s: N*mm), > 0.'),
+    loadCaseWeights: loadCaseWeightsSchema,
+  }),
+]);
+
+export type ObjectiveInput = z.output<typeof objectiveSchema>;
+
+/** The weight of `objective.loadCaseWeights` that is not > 0, if any. */
+export function badWeight(objective: ObjectiveInput): [string, number] | undefined {
+  return Object.entries(objective.loadCaseWeights ?? {}).find(([, weight]) => !(weight > 0) || !Number.isFinite(weight));
+}
+
+/** `TopologyObjective` from validated input; `unit` is the compliance unit of the analysis (force x length). */
+export function toObjective(input: ObjectiveInput, unit: string): TopologyObjective {
+  const loadCaseWeights = input.loadCaseWeights ?? {};
+  return input.kind === 'min_volume'
+    ? { kind: 'min_volume', maxCompliance: input.maxCompliance, unit, loadCaseWeights }
+    : { kind: 'min_compliance', loadCaseWeights };
 }

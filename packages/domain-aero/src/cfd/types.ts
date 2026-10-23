@@ -65,7 +65,7 @@ export interface CfdCase {
   readonly outputs: { readonly surfaceFields: readonly string[]; readonly slices: readonly CfdSlice[]; readonly probes: readonly Vec3[] };
 }
 
-interface CfdProvenance {
+export interface CfdProvenance {
   /** llull-compute semver + git hash. */
   readonly solverVersion: string;
   readonly device: { readonly backend: 'vulkan' | 'metal' | 'dx12' | 'cpu'; readonly name: string; readonly driver: string };
@@ -75,7 +75,7 @@ interface CfdProvenance {
   readonly defaults: readonly { readonly path: string; readonly value: unknown; readonly source: string }[];
 }
 
-interface CfdResultSummary {
+export interface CfdResultSummary {
   readonly caseId: string;
   /** sha256 of the result bundle in the store. */
   readonly resultsHash: string;

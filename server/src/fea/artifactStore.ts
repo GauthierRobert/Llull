@@ -14,15 +14,18 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact, FeTableArtifact } from '@core/model/analysis';
 import type { FeTopologyArtifact } from '@core/model/topology';
 import type { FeExplicitArtifact } from '@core/model/explicit';
+import type { CfdResultArtifact } from '@core/model/cfdResult';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { isRecord } from '@lib/isRecord';
 
-type FeArtifact = FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact;
+type FeArtifact = FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | CfdResultArtifact;
 
 export interface FeArtifactStore extends FeArtifactPort {
   /** Stores `artifact` and returns its hash (idempotent). */
   put(artifact: FeArtifact): string;
+  /** Any stored kind, the CFD result bundles included (`get` answers the FE kinds only, as the `FeArtifactPort` contract says). */
+  getAny(hash: string): FeArtifact | null;
   readonly directory: string;
 }
 
@@ -48,7 +51,8 @@ function isArtifact(value: unknown): value is FeArtifact {
       value['kind'] === 'fe_results' ||
       value['kind'] === 'fe_table' ||
       value['kind'] === 'fe_topology' ||
-      value['kind'] === 'fe_explicit')
+      value['kind'] === 'fe_explicit' ||
+      value['kind'] === 'cfd_result')
   );
 }
 
@@ -91,11 +95,15 @@ export function createFeArtifactStore(directory: string): FeArtifactCache {
       mkdirSync(directory, { recursive: true });
       writeAtomically(path.join(directory, `${key}.ref`), hash);
     },
-    get(hash) {
+    getAny(hash) {
       if (!HASH.test(hash)) return null;
       if (existsSync(fileOf(hash))) return read(hash);
       const named = aliasTarget(hash);
       return named === null ? null : read(named);
+    },
+    get(hash) {
+      const found = this.getAny(hash);
+      return found !== null && found.kind !== 'cfd_result' ? found : null;
     },
   };
 }

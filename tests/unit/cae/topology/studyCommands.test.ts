@@ -204,7 +204,6 @@ describe('set_topology_settings', () => {
     ['filter radius -1', { filter: { radius: -1 } }],
     ['threshold 1', { threshold: 1 }],
     ['greyLimit 0', { greyLimit: 0 }],
-    ['optimizer mma', { optimizer: 'mma' }],
     ['no value', {}],
     ['an unchanged value', { penal: 3 }],
   ])('refuses %s', (name, params) => {

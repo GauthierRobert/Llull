@@ -31,6 +31,10 @@ pub struct Limits {
     pub target: f64,
 }
 
+/// Below this multiplier the volume constraint counts as inactive: every element has moved by its own sign (positive
+/// sensitivities, e.g. self-weight) and the bisection would otherwise never close on `l1 = 0`.
+const LAMBDA_FLOOR: f64 = 1e-40;
+
 /// Bisection for `Σ physical(x_new) ≤ target` (`physical` maps a design to xPhys, including filter and pinned values).
 pub fn update(
     x: &[f64],
@@ -61,7 +65,7 @@ pub fn update(
         } else {
             l2 = lmid;
         }
-        if (l2 - l1) / (l1 + l2) <= tolerance {
+        if (l2 - l1) / (l1 + l2) <= tolerance || l2 < LAMBDA_FLOOR {
             return Step { x: x_new, x_phys, lambda: lmid };
         }
     }
@@ -101,6 +105,23 @@ mod tests {
         for (value, expected) in x.iter().zip([0.2, 0.4, 0.6, 0.8]) {
             assert!((value - expected).abs() / expected < 6e-4, "{x:?}");
         }
+    }
+
+    /// Positive sensitivities everywhere (self-weight): no multiplier reaches the volume target, every element moves down by
+    /// `move` and the bisection ends instead of closing on λ = 0 forever.
+    #[test]
+    fn positive_sensitivities_end_the_bisection_with_an_inactive_constraint() {
+        let x = [0.5, 0.6];
+        let step = update(
+            &x,
+            &[1.0, 2.0],
+            &[1.0; 2],
+            &[Design::Free; 2],
+            Limits { move_limit: 0.2, tolerance: 1e-3, target: 1.5 },
+            &|x: &[f64]| x.to_vec(),
+        );
+        assert!((step.x[0] - 0.3).abs() < 1e-15 && (step.x[1] - 0.4).abs() < 1e-15, "{:?}", step.x);
+        assert!(step.lambda < 1e-39);
     }
 
     #[test]

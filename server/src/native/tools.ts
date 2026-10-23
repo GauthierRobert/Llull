@@ -10,6 +10,7 @@
  *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
  *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
  *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
+ *   cfd_solve      flow case -> llull-compute flow (lattice Boltzmann) -> cfd_result artifact -> record_cfd_results (12 CFD M2, `../cfd/flowSolve.ts`)
  */
 
 import type { FeaHost } from '@protocol/index';
@@ -28,6 +29,7 @@ import { runVortexLatticeTool } from './vortexLattice';
 import { runExplicitRun, type ExplicitRunOptions } from './explicitRun';
 import { defaultScanDeps, isScanTool, runScanTool } from '../scan/scanTools';
 import { MTEST_TOOL, runMtestTool } from '../mfront/mtestTool';
+import { runCfdSolve, type CfdSolveOptions } from '../cfd/flowSolve';
 
 const NAMES: ReadonlySet<string> = new Set([
   'fatigue_field',
@@ -38,6 +40,7 @@ const NAMES: ReadonlySet<string> = new Set([
   'vortex_lattice_solve',
   'auto_route',
   'explicit_run',
+  'cfd_solve',
   MTEST_TOOL,
 ]);
 
@@ -66,6 +69,24 @@ export async function runNativeTool(
   if (name === 'stackup_monte_carlo') return { ...(await runStackupTool(params, host, deps)), changed: false };
   if (name === 'vortex_lattice_solve') return { ...(await runVortexLatticeTool(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
+  if (name === 'cfd_solve') {
+    const caseId = nonEmptyString(args['caseId']);
+    if (caseId === undefined) return failure('cfd_solve: caseId is required.');
+    const device = args['device'];
+    const finite = (key: string): number | undefined =>
+      typeof args[key] === 'number' && Number.isFinite(args[key]) ? args[key] : undefined;
+    const options: CfdSolveOptions = {
+      ...(finite('timeoutS') !== undefined ? { timeoutS: finite('timeoutS') as number } : {}),
+      ...(finite('deviceMemoryBytes') !== undefined ? { deviceMemoryBytes: finite('deviceMemoryBytes') as number } : {}),
+      ...(finite('maxSteps') !== undefined ? { maxSteps: finite('maxSteps') as number } : {}),
+      ...(finite('latticeMach') !== undefined ? { latticeMach: finite('latticeMach') as number } : {}),
+      ...(typeof args['les'] === 'boolean' ? { les: args['les'] } : {}),
+      ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}),
+    };
+    const before = host.getDoc();
+    const result = await runCfdSolve(caseId, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   if (name === 'topology_solve') {
     const studyId = nonEmptyString(args['studyId']);
     if (studyId === undefined) return failure('topology_solve: studyId is required.');
