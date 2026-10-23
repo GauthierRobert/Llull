@@ -7,11 +7,14 @@ import type { CurveSegment } from '../model/curve';
 import type { Vec2, Vec3 } from '../model/types';
 import { add3, cross3, distance3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { angleFromCosine, positiveSweep } from '../lib/angle';
+import { ellipseIssue, ellipseLength, ellipseMinRadius, ellipsePoint, ellipseVelocity } from './ellipseSegment';
 
 type Point = Vec2 | Vec3;
 
 /** Path samples per full turn of an arc. */
 const ARC_STEPS_PER_TURN = 32;
+/** Samples per ellipse quarter. */
+const ELLIPSE_STEPS = 16;
 /** Samples per cubic Bézier. */
 const BEZIER_STEPS = 16;
 /** Joints whose tangents differ by more than this (radians) are corners. */
@@ -66,6 +69,7 @@ function bezierPoint(p: readonly Vec3[], t: number): Vec3 {
 export function segmentPoint(segment: CurveSegment<Point>, t: number): Vec3 {
   const pts = segment.points.map(lift);
   if (segment.type === 'bezier') return bezierPoint(pts, t);
+  if (segment.type === 'ellipse') return ellipsePoint(segment.points, t);
   if (segment.type === 'arc') {
     const g = arcGeometry(segment.points[0], segment.points[1], segment.points[2]);
     if (g !== null) return arcPoint(g, t);
@@ -84,6 +88,7 @@ export function segmentTangent(segment: CurveSegment<Point>, t: number): Vec3 {
       return normalize3(add3(scale3(g.u, -Math.sin(angle)), scale3(g.v, Math.cos(angle))));
     }
   }
+  if (segment.type === 'ellipse') return normalize3(ellipseVelocity(segment.points, t));
   if (segment.type === 'bezier') {
     const [p0, p1, p2, p3] = pts as [Vec3, Vec3, Vec3, Vec3];
     const s = 1 - t;
@@ -100,6 +105,7 @@ export function segmentTangent(segment: CurveSegment<Point>, t: number): Vec3 {
 export function segmentSteps(segment: CurveSegment<Point>): number {
   if (segment.type === 'line') return 1;
   if (segment.type === 'bezier') return BEZIER_STEPS;
+  if (segment.type === 'ellipse') return ELLIPSE_STEPS;
   const g = arcGeometry(segment.points[0], segment.points[1], segment.points[2]);
   return g === null ? 1 : Math.max(4, Math.ceil((g.sweep / (2 * Math.PI)) * ARC_STEPS_PER_TURN - 1e-9));
 }
@@ -139,6 +145,8 @@ export function mapSegment<P, Q>(segment: CurveSegment<P>, f: (point: P, index: 
       return { type: 'line', points: [f(a, 0), f(b, 1)] };
     case 'arc':
       return { type: 'arc', points: [f(a, 0), f(b, 1), f(segment.points[2], 2)] };
+    case 'ellipse':
+      return { type: 'ellipse', points: [f(a, 0), f(b, 1), f(segment.points[2], 2)] };
     case 'bezier': {
       const [, , c, d] = segment.points;
       return { type: 'bezier', points: [f(a, 0), f(b, 1), f(c, 2), f(d, 3)] };
@@ -162,6 +170,8 @@ export function chainIssue(segments: ReadonlyArray<CurveSegment<Point>>, closed:
     if (!segment.points.every((p) => p.every(Number.isFinite))) return `segment ${i} has a non-finite point`;
     if (distance3(start(segment), end(segment)) < JOINT_TOLERANCE) return `segment ${i} has zero length`;
     if (segment.type === 'arc' && arcGeometry(...segment.points) === null) return `arc ${i} has collinear points`;
+    const ellipse = segment.type === 'ellipse' ? ellipseIssue(segment.points) : null;
+    if (ellipse !== null) return `ellipse ${i} ${ellipse}`;
     const next = segments[i + 1];
     if (next !== undefined && distance3(end(segment), start(next)) > JOINT_TOLERANCE)
       return `segment ${i + 1} does not start where segment ${i} ends`;
@@ -294,13 +304,14 @@ export function closesSmoothly(segments: ReadonlyArray<CurveSegment<Point>>): bo
   return angleFromCosine(dot3(a, b)) <= G1_TOLERANCE;
 }
 
-/** Arc length of a chain: exact for lines and arcs, 64-chord estimate for Béziers. */
+/** Arc length of a chain: exact for lines and arcs, Gauss-Legendre for ellipse quarters, 64-chord estimate for Béziers. */
 export function chainLength(segments: ReadonlyArray<CurveSegment<Point>>): number {
   return segments.reduce((total, segment) => {
     if (segment.type === 'arc') {
       const g = arcGeometry(...segment.points);
       if (g !== null) return total + g.radius * g.sweep;
     }
+    if (segment.type === 'ellipse') return total + ellipseLength(segment.points);
     const steps = segment.type === 'bezier' ? 64 : 1;
     let length = 0;
     for (let s = 1; s <= steps; s++) length += distance3(segmentPoint(segment, (s - 1) / steps), segmentPoint(segment, s / steps));
@@ -312,6 +323,7 @@ export function chainLength(segments: ReadonlyArray<CurveSegment<Point>>): numbe
 export function minCurvatureRadius(segment: CurveSegment<Point>): number {
   if (segment.type === 'line') return Infinity;
   if (segment.type === 'arc') return arcGeometry(...segment.points)?.radius ?? Infinity;
+  if (segment.type === 'ellipse') return ellipseMinRadius(segment.points);
   const [p0, p1, p2, p3] = segment.points.map(lift) as [Vec3, Vec3, Vec3, Vec3];
   let least = Infinity;
   for (let s = 0; s <= 64; s++) {

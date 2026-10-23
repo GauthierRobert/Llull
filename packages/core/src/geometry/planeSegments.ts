@@ -42,10 +42,22 @@ function arcThrough(start: Vec2, through: Vec2, end: Vec2): NurbsCurve2Data | nu
   return { ...reversed, poles: [...reversed.poles].reverse(), weights: [...(reversed.weights ?? [])].reverse() };
 }
 
+/** Ellipse quarter [start, centre, end] as a rational quadratic NURBS (affine image of the unit-circle quarter). */
+function ellipseQuarter2(start: Vec2, center: Vec2, end: Vec2): NurbsCurve2Data {
+  return {
+    degree: 2,
+    poles: [start, [start[0] + end[0] - center[0], start[1] + end[1] - center[1]], end],
+    weights: [1, Math.SQRT1_2, 1],
+    knots: [0, 1],
+    multiplicities: [3, 3],
+  };
+}
+
 /** A sketch curve piece (line, three-point arc, cubic Bezier) as a planar segment. @failure collinear arc points -> a line */
 export function segmentOfCurve(segment: CurveSegment<Vec2>): PlaneSegment {
   if (segment.type === 'line') return { kind: 'line', from: segment.points[0], to: segment.points[1] };
   if (segment.type === 'bezier') return { kind: 'nurbs', curve: bezier2(segment.points) };
+  if (segment.type === 'ellipse') return { kind: 'nurbs', curve: ellipseQuarter2(...segment.points) };
   const arc = arcThrough(...segment.points);
   return arc === null ? { kind: 'line', from: segment.points[0], to: segment.points[2] } : { kind: 'nurbs', curve: arc };
 }
