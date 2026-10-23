@@ -7,7 +7,7 @@ import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
 import { commandError, rejection, unknownCommandError } from './noop';
 import { derivationViolation } from './derivation';
-import { pluginGuards, reconcileExtensions } from '../plugins/host';
+import { applyReconcile, pluginGuards } from '../plugins/host';
 import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
@@ -66,10 +66,13 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     );
   feedBlobs(doc, ctx.kernel);
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;
-  if (!recordsStep || ctx.stepKey !== undefined) {
-    // Queries, history meta-commands, and executes nested inside a running step append nothing.
-    return runInContext(ctx, () => runCommand(def, doc, params, ctx));
-  }
+  if (!recordsStep) return runInContext(ctx, () => runCommand(def, doc, params, ctx)); // queries, history meta-commands, session commands
+  // An execute nested inside a running step appends no step of its own but is reconciled like any mutating result.
+  if (ctx.stepKey !== undefined)
+    return applyReconcile(
+      doc,
+      runInContext(ctx, () => runCommand(def, doc, params, ctx)),
+    );
   const stepNumber = doc.nextStepNumber ?? 1;
   if (!Number.isSafeInteger(stepNumber) || stepNumber < 1)
     return rejection(
@@ -86,15 +89,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const { recordExtras, ...ran } = runInContext(stepContext, () => runCommand(def, doc, params, stepContext));
   if (ran.document === doc) return ran;
-  const reconciled = reconcileExtensions(doc, ran.document);
-  const result =
-    reconciled.document === ran.document
-      ? ran
-      : {
-          ...ran,
-          document: reconciled.document,
-          summary: `${ran.summary}${reconciled.notes.length > 0 ? ` ${reconciled.notes.join(' ')}` : ''}`,
-        };
+  const result = applyReconcile(doc, ran);
   const recordedParams =
     recordExtras !== undefined && typeof params === 'object' && params !== null ? { ...params, ...recordExtras } : params;
   const step: FeatureStep = {

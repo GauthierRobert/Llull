@@ -24,10 +24,15 @@ interface RunState {
 
 /** The entities of `run` in route order, or why it does not derive (unknown spec, missing or moved port, short leg ...). */
 function runState(doc: CadDocument, run: PipeRun): RunState {
-  const line = getPiping(doc).lines[run.lineId];
-  const derived = deriveRun(doc, run);
-  if (!derived.ok) return { entities: [], broken: { code: derived.code, reason: derived.message } };
-  return { entities: line === undefined ? [] : derived.parts.flatMap((part) => partEntity(part, line) ?? []) };
+  try {
+    const line = getPiping(doc).lines[run.lineId];
+    const derived = deriveRun(doc, run);
+    if (!derived.ok) return { entities: [], broken: { code: derived.code, reason: derived.message } };
+    return { entities: line === undefined ? [] : derived.parts.flatMap((part) => partEntity(part, line) ?? []) };
+  } catch {
+    // Unvalidated raw data (restore) or a corrupt slice: the run is broken, never a throw.
+    return { entities: [], broken: { code: 'RTE_SPEC_UNKNOWN', reason: 'the spec, catalogues or ports of the run could not be read' } };
+  }
 }
 
 const sameBroken = (a: PipeRun['broken'], b: PipeRun['broken']): boolean => a?.code === b?.code && a?.reason === b?.reason;
@@ -93,6 +98,17 @@ export function withoutRun(doc: CadDocument, runId: string): CadDocument {
 
 const rawPiping = (raw: Record<string, unknown>): unknown => (isRecord(raw['plant']) ? raw['plant']['piping'] : undefined);
 
+/** The equipment element and its level are the very same objects in both documents: its nozzle ports cannot have changed. */
+function sameEquipment(previous: CadDocument, next: CadDocument, equipmentId: string): boolean {
+  const a = previous.building?.elements[equipmentId];
+  const b = next.building?.elements[equipmentId];
+  if (a === undefined || a !== b || !('levelId' in a)) return false;
+  return previous.building?.levels[a.levelId] === next.building?.levels[a.levelId];
+}
+
+const portMoved = (previous: CadDocument, next: CadDocument, ref: Parameters<typeof portOfRef>[1]): boolean =>
+  JSON.stringify(portOfRef(previous, ref)) !== JSON.stringify(portOfRef(next, ref));
+
 /** Runs whose derivation depends on something this command changed: the spec / catalogues, their line, a tie-in or the port of a nozzle. */
 function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
   const piping = getPiping(next);
@@ -101,33 +117,35 @@ function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
   const buildingChanged = next.building !== previous.building;
   return piping.runOrder.filter((id) => {
     const run = piping.runs[id];
-    // A run the command itself created or changed was derived by that command.
-    if (run === undefined || run !== before.runs[id]) return false;
+    if (run === undefined) return false;
     if (specsChanged || piping.lines[run.lineId] !== before.lines[run.lineId]) return true;
     return [run.start.ref, run.end.ref].some((ref) => {
       if (ref === undefined) return false;
       if (ref.kind === 'tieIn') return piping.tieIns[ref.id] !== before.tieIns[ref.id];
-      return ref.kind === 'nozzle' && buildingChanged && JSON.stringify(portOfRef(previous, ref)) !== JSON.stringify(portOfRef(next, ref));
+      return ref.kind === 'nozzle' && buildingChanged && !sameEquipment(previous, next, ref.equipmentId) && portMoved(previous, next, ref);
     });
   });
 }
 
 /** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */
-function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[] } {
-  if (getPiping(next).runOrder.length === 0) return { document: next, notes: [] };
+function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
+  if (getPiping(next).runOrder.length === 0) return { document: next, notes: [], affected: [] };
   const affected = affectedRuns(previous, next);
-  if (affected.length === 0) return { document: next, notes: [] };
+  if (affected.length === 0) return { document: next, notes: [], affected: [] };
   const document = affected.reduce(withRunEntities, next);
   const runs = getPiping(document).runs;
-  const broken = affected.flatMap((id) => {
+  const was = getPiping(next).runs;
+  const newlyBroken = affected.flatMap((id) => {
     const mark = runs[id]?.broken;
-    return mark === undefined ? [] : [`${id} (${mark.code}: ${mark.reason})`];
+    return mark === undefined || mark.code === was[id]?.broken?.code ? [] : [`${id} (${mark.code}: ${mark.reason})`];
   });
+  const ids = (doc: CadDocument): string[] => affected.flatMap((id) => getPiping(doc).entityIds[id] ?? []);
   return {
     document,
     notes: [
-      `piping: re-derived ${affected.length} run(s)${broken.length === 0 ? '' : `; now broken, parts removed: ${broken.join('; ')}`}.`,
+      `piping: re-derived ${affected.length} run(s)${newlyBroken.length === 0 ? '' : `; now broken, parts removed: ${newlyBroken.join('; ')}`}.`,
     ],
+    affected: [...new Set([...affected, ...ids(next), ...ids(document)])],
   };
 }
 
@@ -153,15 +171,7 @@ export const pipingDocument: DocumentExtension = {
     const runs: Record<string, PipeRun> = {};
     for (const runId of piping.runOrder) {
       const run = piping.runs[runId] as PipeRun;
-      let state: RunState;
-      try {
-        state = runState(raw as unknown as CadDocument, run);
-      } catch {
-        state = {
-          entities: [],
-          broken: { code: 'RTE_SPEC_UNKNOWN', reason: 'the spec, catalogues or ports of the run could not be read' },
-        };
-      }
+      const state = runState(raw as unknown as CadDocument, run);
       entityIds[runId] = state.entities.map((entity) => entity.id);
       runs[runId] = marked(run, state.broken);
       for (const entity of state.entities) {

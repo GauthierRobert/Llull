@@ -10,11 +10,18 @@ import type { CadDocument, RevolutionEntity } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { pipingDocument } from '@aec/plant/piping/derive';
 import { apply, data, ok } from '../../../helpers/commandAssertions';
-import { addTie, cs150Line, rteJson, routedPumpToVessel } from './rteFixtures';
+import { addTie, cs150Line, pumpToVessel, rteJson, routedPumpToVessel, SC01_LEGS } from './rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
 const equipmentId = (doc: CadDocument, mark: string): string =>
   Object.values(doc.building?.elements ?? {}).find((element) => element.category === 'equipment' && element.mark === mark)?.id as string;
+
+/** SC-RTE-01 scene with its line, and the route_pipe params (no run yet). */
+function pumpToVesselWithLine(): { doc: CadDocument; params: Record<string, unknown> } {
+  const doc = apply(pumpToVessel(), 'create_pipeline', { service: 'P', sequence: '1001', spec: 'CS150', dn: 100 });
+  const lineId = piping(doc).lineOrder[0];
+  return { doc, params: { lineId, from: { portId: 'P-101:N2' }, to: { portId: 'V-101:N1' }, legs: SC01_LEGS } };
+}
 
 interface Takeoff {
   runs: string[];
@@ -150,7 +157,7 @@ describe('reconcile after a spec, catalogue, line or tie-in edit', () => {
 
   it('does nothing without runs, and ignores runs a command created itself', () => {
     const { doc } = cs150Line();
-    expect(pipingDocument.reconcile?.(doc, doc)).toEqual({ document: doc, notes: [] });
+    expect(pipingDocument.reconcile?.(doc, doc)).toEqual({ document: doc, notes: [], affected: [] });
     const s = routedPumpToVessel();
     expect(pipingDocument.reconcile?.(s.doc, s.doc)?.notes).toEqual([]);
   });
@@ -174,5 +181,85 @@ describe('property provider of part entities', () => {
     expect(flange).not.toHaveProperty('odMm');
     // An id with a run prefix that the run does not list is not its part.
     expect(plantEntityProperties(s.doc, `${run}/pipe-99`)).toEqual({});
+  });
+});
+
+describe('reconcile is the same live, nested and on replay (L8)', () => {
+  const edits = (doc: CadDocument): CadDocument => {
+    const catalog = rteJson<{ families: Array<{ type: string; sizes: Array<Record<string, unknown>> }> }>('catalog_stub_cs150.json');
+    for (const family of catalog.families)
+      if (family.type === 'elbow90') for (const size of family.sizes) if (size['nps'] === 4) size['centreToEnd'] = 150;
+    let next = apply(doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', dn: 150 });
+    next = apply(next, 'update_equipment', { elementId: equipmentId(next, 'P-101'), location: [100, -300] });
+    return apply(next, 'import_piping_catalog', { catalog, replace: true });
+  };
+
+  it('replay_history after route_pipe + update_nozzle + update_equipment + a catalogue edit gives the live plant slice and entities', () => {
+    const live = edits(routedPumpToVessel().doc);
+    const replayed = execute(live, 'replay_history', {}).document;
+    expect(replayed.plant).toEqual(live.plant);
+    expect(replayed.entities).toEqual(live.entities);
+    expect((piping(live).runs[Object.keys(piping(live).runs)[0] as string] as PipeRun).broken).toBeDefined();
+  });
+
+  it('a load shows the same state as the live document', () => {
+    const live = edits(routedPumpToVessel().doc);
+    const loaded = deserializeDocument(serializeDocument(live));
+    expect(loaded.plant).toEqual(live.plant);
+  });
+
+  it('a composite step (build_project loop) that creates a run and then moves its equipment ends re-derived, like a load', () => {
+    const base = pumpToVesselWithLine();
+    const result = ok(base.doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: 1 },
+          actions: [
+            { command: 'route_pipe', params: base.params },
+            { command: 'update_nozzle', params: { equipment: 'V-101', mark: 'N1', rating: 'CL300' } },
+          ],
+        },
+      ],
+    });
+    const runId = piping(result.document).runOrder[0] as string;
+    expect((piping(result.document).runs[runId] as PipeRun).broken?.code).toBe('RTE_RATING_MISMATCH');
+    expect(piping(result.document).entityIds[runId]).toEqual([]);
+    const loaded = deserializeDocument(serializeDocument(result.document));
+    expect(loaded.plant).toEqual(result.document.plant);
+    const replayed = execute(result.document, 'replay_history', {}).document;
+    expect(replayed.plant).toEqual(result.document.plant);
+  });
+
+  it('reports the ids it re-derived in affected, and only newly broken runs in the note', () => {
+    const s = routedPumpToVessel();
+    const resized = ok(s.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', dn: 150 });
+    expect(resized.affected).toEqual(expect.arrayContaining([s.runId, ...(piping(s.doc).entityIds[s.runId] as string[])]));
+    expect(resized.summary).toContain('now broken');
+    const again = ok(resized.document, 'update_nozzle', { equipment: 'V-101', mark: 'N1', dn: 200 });
+    expect(again.summary).toContain('piping: re-derived 1 run(s).');
+    expect(again.summary).not.toContain('now broken');
+  });
+
+  it('a turned port (same position, new direction) breaks the run; a throw while deriving breaks it instead of throwing', () => {
+    const { doc: withLine, lineId } = cs150Line();
+    const a = addTie(withLine, 'A', [0, 0, 0], [1, 0, 0]);
+    const routed = apply(a.doc, 'route_pipe', { lineId, from: { portId: a.id }, legs: [{ direction: '+X', length: 2000 }] });
+    const runId = piping(routed).runOrder[0] as string;
+    const model = piping(routed);
+    const tie = model.tieIns[a.id] as NonNullable<(typeof model.tieIns)[string]>;
+    const turned: CadDocument = {
+      ...routed,
+      plant: {
+        ...routed.plant,
+        piping: { ...model, tieIns: { ...model.tieIns, [a.id]: { ...tie, port: { ...tie.port, direction: [0, 1, 0] } } } },
+      },
+    };
+    const result = pipingDocument.reconcile?.(routed, turned);
+    const mark = result === undefined ? undefined : piping(result.document).runs[runId]?.broken;
+    expect(mark?.code).toBe('RTE_STRETCH_FAILED');
+    expect(mark?.reason).toContain('turned');
+    const corrupt = { ...routed, plant: { ...routed.plant, spec: 5 } } as unknown as CadDocument;
+    const survived = pipingDocument.reconcile?.(routed, corrupt);
+    expect(survived === undefined ? undefined : piping(survived.document).runs[runId]?.broken?.code).toBe('RTE_SPEC_UNKNOWN');
   });
 });

@@ -769,15 +769,21 @@ Decisions (owner delegated: long-term quality over the cheap path; no backward c
 - **Weld gap** `w` is deducted from a pipe piece at each of its butt-weld ends (a piece between two welds loses `2 w`); default 0.
 - **Derivation failures** after the fact (a port, line or spec changed under a stored run): `piping_takeoff` with `runId` refuses with the
   code, without it skips the run and lists it; `restore` marks such a run broken without geometry instead of throwing. Failure paths name the merged leg: `legs.<n>`.
-- **Reconcile (L8: derived entities always equal what a load re-derives).** Core gains an optional `DocumentExtension.reconcile(previous, next)`,
-  called by `execute` on every recorded command result after the command and before the guards; its notes are appended to the summary. The
-  piping extension re-derives a run when the spec, a catalogue, the run's line, a tie-in it connects, or the port of a nozzle it connects (equipment
-  edits, `update_nozzle`, deletion) changed, and does nothing (same document object) for any other command. A run that no longer derives is
-  marked `broken { code, reason }` (stored, spec §3.1) and its entities are dropped: a port that moved away from the routed end gives
-  `RTE_STRETCH_FAILED` (stretch is M3), a gone port `RTE_UNKNOWN_PORT`, a resized / re-rated nozzle `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH`; a later
-  edit that makes it derivable again clears the mark and redraws it. `restore` applies the same rule on load, so a load shows the same state.
-  `piping_takeoff` without `runId` skips broken runs and lists them in `data.brokenRuns`. The guard still refuses atomically a spec or catalogue
-  edit that would leave a derivable run underivable; benign edits are re-derived, not refused.
+- **Reconcile (L8: derived entities always equal what a load re-derives).** Core gains an optional `DocumentExtension.reconcile(previous, next)`
+  returning `{ document, notes, affected }`, applied by ONE helper, `applyReconcile(before, result)` (`plugins/host.ts`), to every mutating result:
+  `execute` at top level and nested inside a running step (build_project loops, composite commands), and history replay after each replayed step
+  (`runReplayStep`), always after the command and before the guards. Notes are appended to the summary and the re-derived ids to `affected` (and so
+  to the recorded step). It is skipped for queries, session / meta-history commands, rejections and no-ops, and costs nothing when no extension
+  depends on the change (same document object). The piping extension re-derives a run when the spec, a catalogue, the run's line, a tie-in it
+  connects, or the port of a nozzle it connects changed (a building edit is first short-circuited when the equipment element and its level are the same
+  objects); runs a command created itself are not skipped, their ports are compared like any other. A run that no longer derives is marked
+  `broken { code, reason }` (stored, spec §3.1) and its entities are dropped: a port that moved or was turned away from the routed end gives
+  `RTE_STRETCH_FAILED` (position, or direction beyond 1e-4°; stretch is M3), a gone port `RTE_UNKNOWN_PORT`, a resized / re-rated nozzle
+  `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH`; a later edit that makes it derivable again clears the mark and redraws it. Live reconcile and `restore` share
+  one guarded run-state function (a throw on corrupt data breaks the run, never the command), so a load shows the same state. The note lists only
+  runs whose broken code changed. `piping_takeoff` without `runId` skips broken runs and lists them in `data.brokenRuns`. The guard still refuses
+  atomically a spec or catalogue edit that would leave a derivable run underivable; benign edits are re-derived, not refused. Contract test:
+  `tests/unit/contract/reconcile.test.ts` (stub extension); piping: `tests/unit/plant/piping/reconcile.test.ts` (live = replay = load).
 - **`CommandError.detail`** (core, additive): machine-readable facts of a refusal (`detail.offset`, `detail.angleDeg`, `detail.cutLengthMm`)
   as §7 and the SC-RTE-05 rows name them; `tableRejection` takes it as an optional last argument.
 - **`route_pipe` data stays compact** (a mutating step's `data` over 4000 characters is dropped from `build_project` reports): legs with

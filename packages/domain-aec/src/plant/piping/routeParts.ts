@@ -12,7 +12,7 @@ import { add3, len3, scale3, sub3 } from '@lib/vec3';
 import { centrelineLength, chooseElbow, turnAngleDeg, type ElbowChoice } from './fittings';
 import { resolveFlangeSet, type FlangeSet } from './flangeSet';
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
-import { directionLabel, epsilonFor, unitVector, type Compass } from './legs';
+import { angleBetweenDeg, directionLabel, epsilonFor, unitVector, type Compass } from './legs';
 import { getPiping, runPoints } from './model';
 import { portIdOf, portOfRef } from './ports';
 import { createSpecLookup, isMiss, type CatalogueRow, type SpecLookup } from './specLookup';
@@ -113,6 +113,14 @@ function setupEnd(doc: CadDocument, lookup: SpecLookup, line: PipeLine, end: Run
       [portId],
       [side],
       { moved },
+    );
+  if (end.direction !== undefined && angleBetweenDeg(unitVector(end.direction), unitVector(port.direction)) > 1e-4)
+    return fail(
+      'RTE_STRETCH_FAILED',
+      `port ${portId} now faces ${port.direction.map((v) => +v.toFixed(6)).join(', ')} but the run ${side} was routed along ${end.direction.map((v) => +v.toFixed(6)).join(', ')} (the equipment was turned)`,
+      [portId],
+      [side],
+      { portDirection: port.direction, routedDirection: end.direction },
     );
   if (weld === null) return fail('RTE_NO_CONNECTION_RULE', `spec ${lookup.id} has no BW-BW connection rule`, [lookup.id], [side]);
   if (port.endType === 'BW') return { length: 0, gap: weld.gapMm, set: null, port, portId };

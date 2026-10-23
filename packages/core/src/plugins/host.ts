@@ -5,7 +5,7 @@
 
 import type { CadPlugin, DocumentExtension, DocumentProjections } from './plugin';
 import type { DerivationGuard } from '../commands/derivation';
-import type { RetiredCommandRewrite } from '../commands/types';
+import type { CommandResult, RetiredCommandRewrite } from '../commands/types';
 import type { CadDocument } from '../model/types';
 import type { EntityPropertyProvider } from '../model/entityProperties';
 
@@ -37,17 +37,40 @@ export function pluginGuards(): DerivationGuard[] {
   return installed.flatMap((plugin) => plugin.guards ?? []);
 }
 
-/** `next` after every extension's `reconcile`, and the notes they report (empty when no installed domain depends on the change). */
-export function reconcileExtensions(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[] } {
+/** `next` after every extension's `reconcile`, with the notes and affected ids they report (empty when no installed domain depends on the change). */
+function reconcileExtensions(
+  previous: CadDocument,
+  next: CadDocument,
+): { document: CadDocument; notes: string[]; affected: string[] } {
   let document = next;
   const notes: string[] = [];
+  const affected: string[] = [];
   for (const extension of documentExtensions()) {
     if (extension.reconcile === undefined) continue;
     const result = extension.reconcile(previous, document);
     document = result.document;
     notes.push(...result.notes);
+    affected.push(...result.affected);
   }
-  return { document, notes };
+  return { document, notes, affected };
+}
+
+/**
+ * The ONE place a mutating command result is reconciled (execute, nested execute and history replay all call it): the result with every extension's
+ * re-derivation applied, notes appended to the summary and re-derived ids appended to `affected`. A result that changed nothing is returned as is.
+ * @invariant returns `result` itself when the command changed nothing, was rejected, or no domain depends on the change
+ */
+export function applyReconcile(before: CadDocument, result: CommandResult): CommandResult {
+  if (result.document === before || result.rejected === true) return result;
+  const reconciled = reconcileExtensions(before, result.document);
+  if (reconciled.document === result.document) return result;
+  const extra = reconciled.affected.filter((id) => !result.affected.includes(id));
+  return {
+    ...result,
+    document: reconciled.document,
+    summary: reconciled.notes.length > 0 ? `${result.summary} ${reconciled.notes.join(' ')}` : result.summary,
+    affected: extra.length > 0 ? [...result.affected, ...new Set(extra)] : result.affected,
+  };
 }
 
 export function pluginRetiredCommands(): Record<string, RetiredCommandRewrite> {

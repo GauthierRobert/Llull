@@ -6,6 +6,7 @@
 import type { CadDocument, FeatureStep } from '../../model/types';
 import { stepIdSource, stepKeyOf } from '../../lib/id';
 import { runInContext } from '../context';
+import { applyReconcile } from '../../plugins/host';
 import type { ExecutionContext } from '../types';
 import type { CommandDefinition, CommandResult } from '../types';
 import { buildParamEnv, extendIdMap, remapIds, resolveStepParams } from './regenerate';
@@ -65,6 +66,7 @@ export function runReplayStep(
       const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
       result = runInContext(stepContext, () => cmd.run(doc, recorded, stepContext));
     } else result = cmd.run(doc, recorded, context);
+    result = applyReconcile(doc, result);
     extendIdMap(idMap, step.affected, result.affected);
     return result;
   } catch {
