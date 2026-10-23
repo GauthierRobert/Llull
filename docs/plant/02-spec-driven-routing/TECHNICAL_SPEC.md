@@ -652,7 +652,7 @@ one derivation of parts and joints for every run (auto-routed runs included), pe
 | `CadDocument.plant` (`PlantModel { piping? }`) | `packages/core/src/model/plant.ts` | Types only. `PipingModel` = tie-ins, lines, runs (+ order lists); `clear_document` removes the slice |
 | Plugin `piping`, toolset `piping` | `packages/domain-aec/src/plant/piping/` (installed in `src/app/plugins.ts`) | Toolset getter = legacy `PIPING_TOOLS` + plugin commands + the `auto_route` transport |
 | `add_tie_in_point`, `create_pipeline` | `commands/tieIn.ts`, `commands/pipeline.ts` | §4 params subset; `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG`, `RTE_DUPLICATE_LINE_NUMBER`; `create_pipeline` resolves the spec through `SpecLookup` (`RTE_SPEC_UNKNOWN`, `RTE_SPEC_NO_COMPONENT` for a DN without a pipe row); line number from the §5.9 template (named in `data.template`) |
-| `route_problem` (query) | `commands/autoRoute.ts`, `autoRoute/problem.ts` | `data = { problem, problemHash, defaults, elbowCentreToEnd, portOwners, unverified, tsMaxExpansions }`; `problemHash` = sha256 of the canonical problem JSON |
+| `route_problem` (query) | `commands/autoRoute.ts`, `autoRoute/problem.ts` | `data = { problem, problemHash, defaults, elbowCentreToEnd, flangeSetLengths, portOwners, unverified, unverifiedReasons, tsMaxExpansions }` (since M1 the elbow A and flange sets come from the line spec); `problemHash` = sha256 of the canonical problem JSON |
 | `auto_route_pipe` (mutating) | `commands/autoRoute.ts`, `autoRoute/search.ts`, `autoRoute/solution.ts` | TS A* under `TS_MAX_EXPANSIONS` = 200 000, or `solution` checked by `checkSolution` (§2.A list) and committed; `data` per SC-RTE-08 (`centrelineToPiLengthMm`, `bends`, `cost`, `optimal`, `expansions`, `engine`, `problemHash`) plus `parts`, `totalPipeMm`, `unverified`, `unverifiedReasons`; since M1 the committed run must derive (else refused with the derivation code) and the elbow A and flange sets come from the spec |
 | Run geometry | `derive.ts`, `routeParts.ts`, `geometry.ts` | One derived read-only revolution entity per drawable part of every run (id `<runId>/<kind>-<k>`, §13.6); omitted from saved files, re-derived on load; derivation guard (replaces the single mitred mesh per run of the V2 slice) |
 | Native search | `solver/crates/llull-route` (`llull-compute route <folder>`) | Contract in `llull_route::job` (job.json `{ problemHash, problem, maxExpansions }` → result.json `{ status, pisUm, lengthUm, bends, cost, optimal, expansions, engine, version }`) |
@@ -664,7 +664,7 @@ one derivation of parts and joints for every run (auto-routed runs included), pe
 - **Lattice and units.** Every length of the problem is an integer number of µm (`round(mm × 1000)`; inflated boxes rounded
   outward). Lattice points = `originUm + cell × cellUm`; origin = end of the `from` stub. A problem whose two stub ends are not
   on one lattice is refused (`RTE_AUTOROUTE_NO_PATH`, path `grid`). Ports must face an axis (`RTE_PORT_DIRECTION`).
-- **Stubs and minimum legs.** Stub = LR 90 elbow centre-to-end A (+ `flangeSetLength` on an FL port), rounded up to whole
+- **Stubs and minimum legs.** Stub = LR 90 elbow centre-to-end A (+ gasket + hub length of the spec flange set on an FL port, M1), rounded up to whole
   cells. A turn moves `minLegCells = ceil(2A / cell)` cells along the new axis in one step, so every leg that starts with a
   bend holds two elbows; straight moves are one cell. Reversals are never generated. This replaces "force a straight stub" of
   §5.12 with an exact graph: the search is optimal over routes whose legs fit their elbows.
@@ -762,16 +762,22 @@ Decisions (owner delegated: long-term quality over the cheap path; no backward c
   (no compatibility); every test and plan that creates a line imports the stub catalogue and spec first.
 - **Elbow arc radius** `R = c / tan(θ / 2)` from the catalogue centre-to-end `c` and the actual turn, so the arc is tangent to both ports;
   R = A for 90° (centreline formula of §5.2 unchanged), and a 45° elbow uses its tabulated B (64), not `R tan 22.5°`.
-- **Tolerance** = run `angleToleranceDeg`, else the spec's `elbowAngles.toleranceDeg`, else the named default 1° (when the spec declares
+- **Tolerance** = run `angleToleranceDeg`, else the spec's `elbowAngles.toleranceDeg`, else the named default 1° (the override is bounded at 22.5°; when the spec declares
   no `elbowAngles` the angles come from its elbow90 / elbow45 components). It also bounds the port-direction deviation of the first and last leg.
 - **Connection rules** are a small built-in table (`BW–BW` butt weld, `FL–FL` flanged; gap 0 named) because the PSC spec format has no
   connection rules yet; any other end-type pair (e.g. a socket-weld tie-in) → `RTE_NO_CONNECTION_RULE`. A nozzle's end type is always FL.
 - **Weld gap** `w` is deducted from a pipe piece at each of its butt-weld ends (a piece between two welds loses `2 w`); default 0.
-- **Derivation failures** after the fact (a port, line or spec changed under a stored run) are refused by `piping_takeoff` with the
-  code, and `restore` leaves such a run without geometry instead of throwing. Failure paths name the merged leg: `legs.<n>`.
-- **Guard.** A spec or catalogue edit that leaves a routed run underivable is refused atomically (`pipingDerivationGuard`); a harmless
-  edit passes. A plugin has no post-command hook, so the display of a run is re-derived by its own commands, on load and on replay; a
-  spec edit that only changes a dimension leaves stale entities until then (`piping_takeoff` always derives afresh). `update_pipeline` (M2) will re-derive.
+- **Derivation failures** after the fact (a port, line or spec changed under a stored run): `piping_takeoff` with `runId` refuses with the
+  code, without it skips the run and lists it; `restore` marks such a run broken without geometry instead of throwing. Failure paths name the merged leg: `legs.<n>`.
+- **Reconcile (L8: derived entities always equal what a load re-derives).** Core gains an optional `DocumentExtension.reconcile(previous, next)`,
+  called by `execute` on every recorded command result after the command and before the guards; its notes are appended to the summary. The
+  piping extension re-derives a run when the spec, a catalogue, the run's line, a tie-in it connects, or the port of a nozzle it connects (equipment
+  edits, `update_nozzle`, deletion) changed, and does nothing (same document object) for any other command. A run that no longer derives is
+  marked `broken { code, reason }` (stored, spec §3.1) and its entities are dropped: a port that moved away from the routed end gives
+  `RTE_STRETCH_FAILED` (stretch is M3), a gone port `RTE_UNKNOWN_PORT`, a resized / re-rated nozzle `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH`; a later
+  edit that makes it derivable again clears the mark and redraws it. `restore` applies the same rule on load, so a load shows the same state.
+  `piping_takeoff` without `runId` skips broken runs and lists them in `data.brokenRuns`. The guard still refuses atomically a spec or catalogue
+  edit that would leave a derivable run underivable; benign edits are re-derived, not refused.
 - **`CommandError.detail`** (core, additive): machine-readable facts of a refusal (`detail.offset`, `detail.angleDeg`, `detail.cutLengthMm`)
   as §7 and the SC-RTE-05 rows name them; `tableRejection` takes it as an optional last argument.
 - **`route_pipe` data stays compact** (a mutating step's `data` over 4000 characters is dropped from `build_project` reports): legs with

@@ -7,7 +7,7 @@ import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
 import { commandError, rejection, unknownCommandError } from './noop';
 import { derivationViolation } from './derivation';
-import { pluginGuards } from '../plugins/host';
+import { pluginGuards, reconcileExtensions } from '../plugins/host';
 import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
@@ -84,8 +84,17 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     );
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
-  const { recordExtras, ...result } = runInContext(stepContext, () => runCommand(def, doc, params, stepContext));
-  if (result.document === doc) return result;
+  const { recordExtras, ...ran } = runInContext(stepContext, () => runCommand(def, doc, params, stepContext));
+  if (ran.document === doc) return ran;
+  const reconciled = reconcileExtensions(doc, ran.document);
+  const result =
+    reconciled.document === ran.document
+      ? ran
+      : {
+          ...ran,
+          document: reconciled.document,
+          summary: `${ran.summary}${reconciled.notes.length > 0 ? ` ${reconciled.notes.join(' ')}` : ''}`,
+        };
   const recordedParams =
     recordExtras !== undefined && typeof params === 'object' && params !== null ? { ...params, ...recordExtras } : params;
   const step: FeatureStep = {

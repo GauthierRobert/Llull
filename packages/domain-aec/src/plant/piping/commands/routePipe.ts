@@ -6,7 +6,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, PipeRun, PortRef } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { withRunEntities } from '../derive';
-import { buildPath, COMPASS_NAMES, type PathEnd } from '../legs';
+import { buildPath, COMPASS_NAMES, unitVector, type PathEnd } from '../legs';
 import { getPiping, refuse, withPiping } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
 import { deriveRun } from '../routeParts';
@@ -30,7 +30,10 @@ interface ResolvedEndpoint {
 
 function resolveEndpoint(doc: CadDocument, line: PipeLine, endpoint: Endpoint, side: 'from' | 'to'): ResolvedEndpoint | CommandResult {
   if (!('portId' in endpoint)) {
-    return { end: { point: endpoint.point, ...(endpoint.direction === undefined ? {} : { direction: endpoint.direction }) } };
+    if (endpoint.direction === undefined) return { end: { point: endpoint.point } };
+    const length = Math.hypot(...endpoint.direction);
+    if (!(length > 1e-12)) return refuse(doc, 'route_pipe', 'RTE_INVALID_PORT', `the ${side} direction is zero`, [], [`${side}.direction`]);
+    return { end: { point: endpoint.point, direction: unitVector(endpoint.direction) } };
   }
   const resolved = resolvePortId(doc, endpoint.portId);
   if (!resolved.ok) return refuse(doc, 'route_pipe', 'RTE_UNKNOWN_PORT', resolved.message, [], [`${side}.portId`]);
@@ -76,12 +79,13 @@ export const routePipe = defineCommand({
     'from add_nozzle / equipment_ports, or "<runId>:start|end" to continue a run) or an open { point, direction? }. legs: [{ direction ' +
     '"+X"|"-X"|"+Y"|"-Y"|"+Z"|"-Z" or [dx,dy,dz], length }] from the start; the first leg must leave along the start port direction (within ' +
     'the tolerance). via: extra points of intersection after the legs. When `to` is a port, a straight closing leg to it is added if the last point ' +
-    'is on its axis (the last leg may omit length to run straight to it). Returns the run id (affected[0]); data = { runId, legs, closingLeg, ' +
-    'pis, legs (cutLengthsMm), turns (angle, nominal, deviationDeg, centreToEnd), counts, pipePieces (cutLengthMm per piece), totalPipeMm, ' +
-    'centrelineLengthMm, warnings (RTE_WELD_SPACING, RTE_FITTING_TO_FITTING), partIds, angleTolerance, weldGap, unverified }; parts and joints are ' +
-    'listed by piping_takeoff. A spec that is not ' +
+    'is on its axis (the last leg may omit length to run straight to it). Open-end directions are normalised (zero is refused). Returns the run id ' +
+    '(affected[0]); data = { runId, lineId, lineNumber, pis, closingLeg, mergedPoints, portDeviationDeg, legs (index, direction, lengthMm, ' +
+    'cutLengthsMm), turns (turnDeg, nominalDeg, deviationDeg, centreToEnd), counts, pipePieces (id, leg, cutLengthMm), totalPipeMm, ' +
+    'centrelineLengthMm, studs, warnings (RTE_WELD_SPACING, RTE_FITTING_TO_FITTING), unverified, unverifiedReasons, partIds, spec, angleTolerance, ' +
+    'weldGap, weldSpacing, pipe }; parts and joints are listed by piping_takeoff. A spec that is not ' +
     'approved or has non-grade-A rows reports unverified. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, ' +
-    'RTE_SIZE_MISMATCH, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, RTE_NO_CONNECTION_RULE, RTE_PORT_DIRECTION, RTE_CLOSING_LEG_IMPOSSIBLE ' +
+    'RTE_INVALID_PORT (zero open-end direction), RTE_SIZE_MISMATCH, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, RTE_NO_CONNECTION_RULE, RTE_PORT_DIRECTION, RTE_CLOSING_LEG_IMPOSSIBLE ' +
     '(detail.offset), RTE_ZERO_LEG, RTE_NO_FITTING_FOR_ANGLE (detail.anglesDeg), RTE_SEGMENT_TOO_SHORT (detail.cutLengthMm), ' +
     'RTE_SPEC_UNKNOWN, RTE_SPEC_NO_COMPONENT, RTE_SPEC_AMBIGUOUS. Next: piping_takeoff for the cut list; delete_pipe_run to redo.',
   params: z.object({
@@ -106,8 +110,9 @@ export const routePipe = defineCommand({
     angleToleranceDeg: z
       .number()
       .positive()
+      .max(22.5)
       .optional()
-      .describe('Overrides the spec tolerance for port directions and elbow angles, degrees (named in the result).'),
+      .describe('Overrides the spec tolerance for port directions and elbow angles, degrees, 22.5 at most (named in the result).'),
   }),
   run: (doc, params): CommandResult => {
     if (doc.units !== 'mm')

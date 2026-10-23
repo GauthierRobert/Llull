@@ -105,6 +105,15 @@ function setupEnd(doc: CadDocument, lookup: SpecLookup, line: PipeLine, end: Run
   if (port === null) return fail('RTE_UNKNOWN_PORT', `the ${side} port ${portId} no longer exists`, [portId], [side]);
   if (port.dn !== line.dn)
     return fail('RTE_SIZE_MISMATCH', `port ${portId} is DN${port.dn}, line ${line.id} is DN${line.dn}`, [portId, line.id], [side]);
+  const moved = sub3(port.position, end.point);
+  if (len3(moved) > epsilonFor(port.position, end.point))
+    return fail(
+      'RTE_STRETCH_FAILED',
+      `port ${portId} is ${moved.map((v) => +v.toFixed(3)).join(', ')} mm from where the run ${side} was routed (the equipment or tie-in moved)`,
+      [portId],
+      [side],
+      { moved },
+    );
   if (weld === null) return fail('RTE_NO_CONNECTION_RULE', `spec ${lookup.id} has no BW-BW connection rule`, [lookup.id], [side]);
   if (port.endType === 'BW') return { length: 0, gap: weld.gapMm, set: null, port, portId };
   if (port.endType !== 'FL' || lookup.connection('FL', 'FL') === null)

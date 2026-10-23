@@ -51,7 +51,9 @@ describe('route_pipe: SC-RTE-01 pump P-101 to vessel V-101', () => {
     expect(run?.end).toMatchObject({ point: [6000, 3000, 4000], ref: { kind: 'nozzle', nozzleId: 'N1' } });
     expect(run?.pis).toEqual(route.pis);
     // Intent only: no parts or joints in the stored model.
-    expect(Object.keys(run ?? {}).sort()).toEqual(['end', 'id', 'lineId', 'pis', 'start']);
+    expect(run).not.toHaveProperty('parts');
+    expect(run).not.toHaveProperty('joints');
+    expect(run).not.toHaveProperty('broken');
   });
 
   it('cut lengths 1269 / 2696 / 2696 / 1196 / 2769, total 10 626, centreline 11 739.044 (VC-RTE-01, VC-RTE-03)', () => {
@@ -256,6 +258,50 @@ describe('route_pipe: butt-weld ports, open ends, tolerance', () => {
     const close = data<RouteData>(doc, 'route_pipe', { ...open, legs: legs(340) });
     expect(close.warnings.map((warning) => warning.code)).toEqual(['RTE_WELD_SPACING']);
     expect(close.pipePieces.map((piece) => piece.cutLengthMm)).toEqual([848, 36, 848]);
+  });
+});
+
+describe('route_pipe open-end directions', () => {
+  const legs = [{ direction: '+Z', length: 1500 }];
+  it.each([[[0, 0, 2]], [[0, 0, 0.5]]])('normalises %j before the port-direction rule and stores a unit vector', (direction) => {
+    const { doc, lineId } = cs150Line();
+    const result = ok(doc, 'route_pipe', { lineId, from: { point: [0, 0, 0], direction }, legs });
+    const run = result.document.plant?.piping?.runs[(result.data as RouteData).runId];
+    expect(run?.start.direction).toEqual([0, 0, 1]);
+    expect((result.data as RouteData).portDeviationDeg.start).toBe(0);
+    const to = ok(doc, 'route_pipe', {
+      lineId,
+      from: { point: [0, 0, 0] },
+      to: { point: [0, 0, 1500], direction: direction.map((v) => 0 - v) },
+      legs,
+    });
+    expect(to.document.plant?.piping?.runs[(to.data as RouteData).runId]?.end.direction).toEqual([0, 0, -1]);
+  });
+
+  it('refuses a zero direction at from.direction / to.direction (RTE_INVALID_PORT)', () => {
+    const { doc, lineId } = cs150Line();
+    expectRefusal(
+      doc,
+      'route_pipe',
+      { lineId, from: { point: [0, 0, 0], direction: [0, 0, 0] }, legs },
+      'RTE_INVALID_PORT',
+      'from.direction',
+    );
+    expectRefusal(
+      doc,
+      'route_pipe',
+      { lineId, from: { point: [0, 0, 0] }, to: { point: [0, 0, 1500], direction: [0, 0, 0] }, legs },
+      'RTE_INVALID_PORT',
+      'to.direction',
+    );
+  });
+
+  it('bounds the tolerance override at 22.5 degrees (a larger one would accept any turn)', () => {
+    const { doc, lineId } = cs150Line();
+    const rejected = execute(doc, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs, angleToleranceDeg: 90 });
+    expect(rejected.document).toBe(doc);
+    expect(rejected.summary).toContain('angleToleranceDeg');
+    expect(ok(doc, 'route_pipe', { lineId, from: { point: [0, 0, 0] }, legs, angleToleranceDeg: 22.5 }).affected).toHaveLength(1);
   });
 });
 

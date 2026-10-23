@@ -69,6 +69,10 @@ export function pipingErrors(raw: unknown): string[] {
       ...(typeof run['lineId'] === 'string' && run['lineId'] in lines ? [] : [`plant.piping.runs.${id}.lineId must name a line`]),
       ...endErrors(`plant.piping.runs.${id}.start`, run['start']),
       ...endErrors(`plant.piping.runs.${id}.end`, run['end']),
+      ...(run['broken'] === undefined ||
+      (isRecord(run['broken']) && typeof run['broken']['code'] === 'string' && typeof run['broken']['reason'] === 'string')
+        ? []
+        : [`plant.piping.runs.${id}.broken must be { code, reason }`]),
       ...(Array.isArray(run['pis']) && run['pis'].every(isVec3) ? [] : [`plant.piping.runs.${id}.pis must be [x, y, z] points`]),
     ]),
     ...entityIdErrors(raw),

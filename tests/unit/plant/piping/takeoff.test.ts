@@ -145,7 +145,18 @@ describe('piping_takeoff scope and refusals', () => {
     const broken = withoutSpecs(s.doc);
     const result = expectRefusal(broken, 'piping_takeoff', { runId: s.first }, 'RTE_SPEC_UNKNOWN');
     expect(result.summary).toContain(s.first);
-    expect(execute(broken, 'piping_takeoff', {}).error?.ids).toContain(s.first);
+    // Without runId the broken run is skipped and listed; the run that still derives is counted.
+    const whole = data<Takeoff & { brokenRuns: Array<{ runId: string; code: string }> }>(
+      { ...broken, plant: { ...broken.plant, spec: broken.plant?.spec } } as CadDocument,
+      'piping_takeoff',
+      {},
+    );
+    expect(whole.runs).toEqual([]);
+    expect(whole.brokenRuns.map((run) => [run.runId, run.code])).toEqual([
+      [s.first, 'RTE_SPEC_UNKNOWN'],
+      [s.second, 'RTE_SPEC_UNKNOWN'],
+    ]);
+    expect(execute(broken, 'piping_takeoff', { lineId: s.line }).data).toMatchObject({ runs: [] });
   });
 });
 

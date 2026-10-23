@@ -156,7 +156,8 @@ export const autoRoutePipe = defineCommand({
     };
     const stored = withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] });
     const derived = deriveRun(stored, run);
-    if (!derived.ok) return refuse(doc, 'auto_route_pipe', derived.code, derived.message, [...derived.ids], [...derived.paths]);
+    if (!derived.ok)
+      return refuse(doc, 'auto_route_pipe', derived.code, derived.message, [...derived.ids], [...derived.paths], derived.detail);
     const next = withRunEntities(stored, id);
     return {
       ...changed(

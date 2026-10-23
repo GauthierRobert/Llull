@@ -83,6 +83,11 @@ export interface PipeRun {
   readonly pis: readonly Vec3[];
   /** Overrides the spec's elbow-angle tolerance (degrees) for this run; named in results. */
   readonly angleToleranceDeg?: number;
+  /**
+   * Set when the run no longer derives (a port was moved or removed, a nozzle was resized, ...): its display entities are dropped until a
+   * command makes it derivable again. `piping_takeoff` lists such runs; orthogonal stretch (02 M3) will build on it.
+   */
+  readonly broken?: { readonly code: string; readonly reason: string };
   readonly autoRoute?: AutoRouteRecord;
 }
 

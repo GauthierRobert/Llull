@@ -37,6 +37,19 @@ export function pluginGuards(): DerivationGuard[] {
   return installed.flatMap((plugin) => plugin.guards ?? []);
 }
 
+/** `next` after every extension's `reconcile`, and the notes they report (empty when no installed domain depends on the change). */
+export function reconcileExtensions(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[] } {
+  let document = next;
+  const notes: string[] = [];
+  for (const extension of documentExtensions()) {
+    if (extension.reconcile === undefined) continue;
+    const result = extension.reconcile(previous, document);
+    document = result.document;
+    notes.push(...result.notes);
+  }
+  return { document, notes };
+}
+
 export function pluginRetiredCommands(): Record<string, RetiredCommandRewrite> {
   return Object.assign({}, ...installed.map((plugin) => plugin.retiredCommands ?? {}));
 }

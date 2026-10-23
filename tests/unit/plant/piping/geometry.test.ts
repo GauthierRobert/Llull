@@ -7,9 +7,10 @@ import type { CadDocument } from '@core/model/types';
 import { data } from '../../../helpers/commandAssertions';
 import { partEntity } from '@aec/plant/piping/geometry';
 import { deriveRun } from '@aec/plant/piping/routeParts';
-import type { PipeLine, RoutedPart } from '@aec/plant/types';
+import type { PartPort, PipeLine, RoutedPart } from '@aec/plant/types';
 import { routedPumpToVessel } from './rteFixtures';
 
+const scaled = (v: Vec3): Vec3 => [0 - v[0], 0 - v[1], 0 - v[2]];
 const world = (entity: RevolutionEntity, local: Vec3): Vec3 => {
   const rotated = applyEulerXYZ(local, [0, 0, 0], entity.rotation);
   return [rotated[0] + entity.position[0], rotated[1] + entity.position[1], rotated[2] + entity.position[2]];
@@ -94,6 +95,29 @@ describe('part display entities (SC-RTE-01)', () => {
     const flange = entities.get(all.find((part) => part.id.endsWith('/flange-2'))?.id as string) as RevolutionEntity;
     near(flange.position, [5997, 3000, 4000]);
     near(world(flange, [0, 0, 76]), [5921, 3000, 4000]);
+  });
+
+  it('draws nothing for a part the model cannot place: no outside diameter, a straight "elbow", no weld end, no thickness', () => {
+    const { parts: all, line } = parts();
+    const pick = (kind: RoutedPart['kind']): RoutedPart => all.find((part) => part.kind === kind) as RoutedPart;
+    expect(partEntity({ ...pick('pipe'), dims: {} }, line)).toBeNull();
+    const elbow = pick('elbow');
+    const straight = {
+      ...elbow,
+      ports: [elbow.ports[0], { ...(elbow.ports[1] as PartPort), direction: scaled(elbow.ports[0]?.direction as Vec3) }],
+    };
+    expect(partEntity(straight as RoutedPart, line)).toBeNull();
+    expect(partEntity({ ...elbow, dims: {} }, line)).toBeNull();
+    const flange = pick('flange');
+    expect(partEntity({ ...flange, ports: flange.ports.filter((port) => port.endType === 'FL') }, line)).toBeNull();
+    expect(partEntity({ ...flange, dims: {} }, line)).toBeNull();
+    expect(partEntity({ ...pick('gasket'), dims: {} }, line)).toBeNull();
+    // Missing optional dimensions fall back to proportions of the pipe.
+    const bare = partEntity({ ...flange, dims: { pipeOutsideDiameter: 114.3 } }, line) as RevolutionEntity;
+    expect(Math.max(...bare.profile.map(([r]) => r))).toBeCloseTo(114.3, 9);
+    const ring = partEntity({ ...pick('gasket'), dims: { thickness: 3, pipeOutsideDiameter: 114.3 } }, line) as RevolutionEntity;
+    expect(ring.profile[0]?.[0]).toBeCloseTo(57.15, 9);
+    expect(ring.profile[1]?.[0]).toBeCloseTo(91.44, 9);
   });
 
   it('returns null for parts without geometry', () => {

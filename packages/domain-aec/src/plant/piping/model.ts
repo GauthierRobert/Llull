@@ -40,6 +40,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_ZERO_LEG: 'Remove the leg, or give every leg a direction and a positive length (only the last leg may omit it when `to` is a port).',
   RTE_CLOSING_LEG_IMPOSSIBLE:
     'Add legs until the remaining offset (detail.offset) is along the target port axis, then the closing leg is added automatically.',
+  RTE_STRETCH_FAILED:
+    'The port moved away from the routed end (equipment or tie-in edit): delete_pipe_run and route_pipe again; orthogonal stretch comes with 02 M3. The run is marked broken and its parts are not drawn.',
   RTE_SIZE_MISMATCH:
     'Route between ports of the line size (create a line of the port DN), or change the line DN; a reducer transition between sizes comes with 02 M2.',
   RTE_RATING_MISMATCH: 'Use a spec whose flange rating equals the port rating (CL150, PN16 ...), or fix the nozzle / tie-in rating.',

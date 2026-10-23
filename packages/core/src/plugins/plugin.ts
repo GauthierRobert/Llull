@@ -53,6 +53,12 @@ export interface DocumentExtension {
    */
   carry?(prev: CadDocument, next: CadDocument): CadDocument;
   /**
+   * Re-derives what the domain derived from slices a command just changed (e.g. plant pipe runs after a nozzle edit), so derived entities always
+   * equal what a load would re-derive (architecture L8). Called by `execute` on every recorded command result, after the command and before the guards.
+   * @invariant pure; returns `next` unchanged with no notes when nothing the domain derives from has changed (it must be cheap in that case)
+   */
+  reconcile?(previous: CadDocument, next: CadDocument): { readonly document: CadDocument; readonly notes: readonly string[] };
+  /**
    * Warnings about a loaded, validated document (e.g. a PLM integrity mismatch); `load_document` appends each to its summary.
    * @invariant a pure query: cannot modify the document
    */
