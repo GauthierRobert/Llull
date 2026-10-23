@@ -573,3 +573,36 @@ VC-EQP-03 (depths, six D = 1 m full volumes, scaling), VC-EQP-04 (H-SA-1..3 at 1
 profile integral), VC-EQP-09 head rows (offset solid vs 1e5-segment trapezoid 1e-8, hemisphere closed form 1e-12). The scenario plans'
 `vessel_volume` calls use the `equipment` form and stay blocked until M2 (entry removed from `blockedPlanCommands.json` only because the
 command name now exists; the plans' `equipment` param is M2).
+
+### 13.2 As built (M2 vessels and nozzles, 2026-10-23)
+
+Code: `packages/domain-aec/src/plant/equipment/` (same plugin `plant-equipment`, toolset `plant_equipment`); tests `tests/unit/plant/equipment/{vessel,nozzles,column,regeneration,legacyConsumers,headProfile,scenarioPlans}.test.ts`
+and the extended `vesselVolume.test.ts`; golden plan `plant_vertical_vessel` (SC-EQP-01 M2 actions, replay-equal); example `packages/design-lang/examples/plant_equipment.lld` (separator, 4 checks).
+
+| Module | Content |
+| ------ | ------- |
+| `plantData.ts` | `PlantEquipmentData` (`EquipmentElement.plant?`, Q1 / D6), `VesselTemplate`, `BlockTemplate`, resolved `SupportSpec`, `NozzleRecord` (hardware resolved at add time), `VesselDesignData`. Pure types |
+| `geometry/vesselFrame.ts` | head shapes in document units, datum (bottom tangent line / axis elevation), `headSurfaceHeight`, knuckle zone, `skirtRadii` |
+| `geometry/vesselProfile.ts` | **`headProfileCurves(shape, radius, offset)`** (the one function to switch when the core `ellipse` segment lands, Q3), `vesselBand` (closed wall section of shell + both heads, exact `curves` + tessellated `profile`), `ringSection` |
+| `geometry/ports.ts` | **`equipmentPorts(source: BuildingModel \| { building? }, element): ConnectionPort[]`**, `ConnectionPort`, `placeNozzle`, `toWorld` / `directionToWorld` |
+| `geometry/nozzleChecks.ts` | `nozzleProblem` (refusals) and `nozzleWarnings` (knuckle, overlap) |
+| `geometry/nozzleHardware.ts` | neck OD (EN 10220 series by DN), neck wall (B36.10 schedule 40 row, else 6 % OD, named), weld-neck flange OD / thickness from the 01 PSC catalogues (class: B16.5 incl. facing, PN: EN 1092-1), placeholder flagged otherwise |
+| `geometry/legacyFields.ts` | `size` / `shape` / `weight` write-back (closed forms: shell annulus, exact offset heads, skirt, legs, Jones liquid) |
+| `evaluate/evaluateVessel.ts`, `evaluate/evaluateNozzles.ts` | body = ONE revolution with exact `curves`, skirt / base ring, legs, saddle blocks, platform clips, one revolution per nozzle; hooked into `industrial/evaluate.ts` |
+| `commands/*` | `add_vessel`, `add_process_column`, `add_nozzle`, `update_nozzle`, `delete_nozzle`, `equipment_ports`, `update_equipment_parameters`, `vessel_volume` (equipment form added, inline form kept) |
+
+Differences from the plan above, all deliberate for M2:
+
+- **`add_process_column`, not `add_column`**: `add_column` is the structural column of the building toolset. It composes `add_vessel` through `execute` (one recorded step).
+- **Heads are stored `first` / `second`** (bottom / left, top / right) like `vessel_volume`; the commands take `heads { top, bottom }` or `{ left, right }`. `planRotationDeg` is not stored: it is `element.angle` (radians, counter-clockwise), converted with `angleConvention` (`north_cw`: positive turns clockwise; `east_ccw`: counter-clockwise). Stored nozzle angles are always `north_cw`; each result names the convention and reports the angle in it.
+- **Skirt**: its inside diameter is the shell OUTSIDE diameter and the wall grows outward (the convention of the validation pack, VC-EQP-09: skirt mass 754.642 kg). `legs.legWidth` (square section, default 5 % of the shell OD) replaces `section`; `weightOverride` is not built.
+- **Legacy fields**: vertical -> `vertical_vessel` `[D, D, top]` with D the widest of shell, skirt, base ring, legs; horizontal on the floor -> `horizontal_vessel`, raised on saddles -> `box` of the full height. Nozzles are NOT in the bounding box (they would make the plan circle meaningless); their reach is in the ports. `weight` = shell + heads + skirt + legs + operating liquid (saddle plates excluded, named in `notes`). `update_equipment` refuses a parametric vessel (use `update_equipment_parameters`).
+- **Head profiles**: the ellipsoidal inside curve and its outward offset (not an ellipse) are 12 cubic Hermite Béziers per quarter (error far below 1e-5 R, tested), the Pappus volume of the body matches the closed-form metal volume to 1e-4; torispherical, spherical and conical profiles are exact arcs / lines. Tessellation (core: 32 steps per turn on arcs) makes arc-headed bodies 0.1 to 0.3 % light on Manifold.
+- **Nozzle hardware** is resolved when the nozzle is added and stored in the record (`neckOutsideDiameter`, `neckWall`, `flange`), so evaluation needs no catalogue. EN 1092-1 PN16 rows have no thickness in the catalogue: the row OD is used, the thickness is 0.1 x neck OD, `unverified`. `EQP_FLANGE_PLACEHOLDER` is returned in `warnings` of `add_nozzle` / `update_nozzle` (the `check_equipment` finding is M3).
+- **Free locations** (`{ on: 'free', position, direction }`) work on `add_equipment` blocks: the block gets `plant { template: { kind: 'block' }, nozzles }`, keeps its legacy geometry and fields, and gains the nozzle solids. Marks are unique per equipment, port id `<tag>:<mark>`.
+- **`connectedPipes` / `EQP_PORT_CONNECTED`**: a pipe is "attached" to a port when its `from` or `to` equals the port id (the line-list reference). The 02 RTE `PortRef` kind `nozzle` is not built yet.
+- **Trays** are data only (no geometry, internals); platform clips are partial revolutions on the shell (`depth` / `height` default 100 mm).
+- **Saddles** are blocks under the shell (tangent at the bottom), not cradles.
+- **02 RTE alignment**: the RTE plans (`sc-rte-01`, `-02`, `-05`) call `add_nozzle` with `equipmentId`, `tag`, flat `position` / `direction` and `endType`; D3 fixed `equipment`, `mark` and `location { on: 'free', position, direction }`. The RTE lane has to move its plans to the D3 form.
+
+VCs: VC-EQP-12 (SC-EQP-01 N1, N2, N3, M1 and SC-EQP-02 N1, N2, N3, N4 positions 1e-6 / directions 1e-9; conventions; plan rotation; level elevation), VC-EQP-13 and 14 (geometry rows of SC-EQP-01 / 02 through the plan runner: totals, operating liquid, levels, ports; the code-check, weight-breakdown and data-sheet rows wait for M3 / M5), VC-EQP-19 (id, port ids, flange faces and 11.705574 m3 after `insideDiameter` 1800), VC-EQP-21 (20 trays 1500 / 12900, 30 trays refused), VC-EQP-09 body weights as the legacy `weight` (SC-EQP-01 operating 5262.0996 kg at 1e-9, SC-EQP-02 empty 6485.7311 kg). Codes raised: `EQP_NOT_FOUND`, `EQP_TAG_DUPLICATE`, `EQP_NOT_PARAMETRIC`, `EQP_PARAM_INVALID`, `EQP_HEAD_INVALID`, `EQP_SUPPORT_INVALID`, `EQP_TRAYS_DONT_FIT`, `EQP_NOZZLE_MARK_DUPLICATE`, `EQP_NOZZLE_NOT_FOUND`, `EQP_NOZZLE_OFF_BODY`, `EQP_NOZZLE_PROJECTION_TOO_SHORT`, `EQP_RATING_UNKNOWN`, `EQP_PORT_CONNECTED`, `EQP_LEVEL_OUT_OF_RANGE`, `EQP_HEAD_NOT_COVERED`; warnings `EQP_NOZZLE_IN_KNUCKLE`, `EQP_NOZZLE_OVERLAP`, `EQP_FLANGE_PLACEHOLDER`.

@@ -9,7 +9,7 @@ import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normali
 /**
  * @affects regenerates 1 equipment (same element id, mark kept unless renamed)
  * @invariant element id, GlobalId seed and schedule row identity survive the edit
- * @failure unknown element / tag, not equipment, ambiguous tag, duplicate mark, invalid values, unknown level -> no-op
+ * @failure unknown element / tag, not equipment, parametric plant vessel (use update_equipment_parameters), ambiguous tag, duplicate mark, invalid values, unknown level -> no-op
  */
 export const updateEquipment = defineCommand({
   name: 'update_equipment',
@@ -58,6 +58,11 @@ export const updateEquipment = defineCommand({
       return noop(doc, 'update_equipment failed: give elementId or currentMark.');
     }
     const equipment = target;
+    if (equipment.plant?.template.kind === 'vessel')
+      return noop(
+        doc,
+        `update_equipment failed: ${equipment.mark} is a parametric vessel; revise it with update_equipment_parameters (its size, shape and weight are derived).`,
+      );
     const newShape = shape ?? shapeOf(equipment);
     const dimensions = normaliseEquipmentSize(newShape, size ?? equipment.size);
     if (!dimensions) {

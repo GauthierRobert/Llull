@@ -1,4 +1,4 @@
-/** Plant equipment plugin (plant 03 EQP): parametric vessel geometry queries; toolset `plant_equipment`. M1 = head library + volumes (`vessel_volume`). */
+/** Plant equipment plugin (plant 03 EQP), toolset `plant_equipment`: M1 head library + volumes, M2 vessels, columns, nozzles, ports, parameter revision. */
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { equipmentCatalog } from './catalog';

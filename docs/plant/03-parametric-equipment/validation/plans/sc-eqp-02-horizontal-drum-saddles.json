@@ -1,6 +1,6 @@
 {
   "id": "SC-EQP-02",
-  "status": "PROPOSED - commands not built yet (add_vessel, add_nozzle, vessel_volume, vessel_thickness, equipment_weights, equipment_ports, check_equipment, update_equipment_parameters).",
+  "status": "M2 built: set_units, add_vessel, add_nozzle, vessel_volume, equipment_ports, update_equipment_parameters (run by tests/unit/plant/equipment/scenarioPlans.test.ts). PROPOSED, not built yet: vessel_thickness, equipment_weights, check_equipment.",
   "validates": [
     "VC-EQP-02",
     "VC-EQP-05",

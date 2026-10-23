@@ -156,13 +156,11 @@
       "import_pipe_spec"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
-      "add_nozzle",
       "check_piping",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-02-pump-discharge-gate-valve.json": [
-      "add_nozzle",
       "check_piping",
       "insert_inline_component",
       "piping_takeoff",
@@ -181,7 +179,6 @@
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-05-routing-refusals.json": [
-      "add_nozzle",
       "check_piping",
       "route_pipe"
     ],
@@ -201,28 +198,19 @@
       "piping_takeoff"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": [
-      "add_nozzle",
-      "add_vessel",
       "check_equipment",
       "equipment_datasheet",
-      "equipment_ports",
       "equipment_weights",
       "vessel_thickness"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-02-horizontal-drum-saddles.json": [
-      "add_nozzle",
-      "add_vessel",
       "check_equipment",
-      "equipment_ports",
       "equipment_weights",
-      "update_equipment_parameters",
       "vessel_thickness"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-03-bem-exchanger.json": [
       "add_heat_exchanger",
-      "add_nozzle",
-      "check_equipment",
-      "equipment_ports"
+      "check_equipment"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-04-api650-tank.json": [
       "add_storage_tank",
@@ -374,7 +362,6 @@
       "plant_report"
     ],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-02-inline-valves-v1.json": [
-      "add_nozzle",
       "check_plant_data",
       "define_plant_hierarchy",
       "insert_inline_component",
