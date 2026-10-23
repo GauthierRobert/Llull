@@ -511,3 +511,34 @@ Full list with grades in [validation/sources.md](validation/sources.md). All acc
 - [R12] API RP 2218 (catalogue); UL 1709 (UL code-authorities page)
 - [R13] AISC Engineering Journal, pipe-rack design article — https://ej.aisc.org/index.php/engj/article/download/991/990
 - [R14] Roark's Formulas for Stress and Strain (simply supported beam cases) — closed forms used in §5.4
+
+## 13. As built (M1, 2026-10-23)
+
+Built: M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges). Not built:
+every other command of §4 (`add_grating` … `check_reachability`, fireproofing) and the IFC export. M2..M8 stay open.
+
+### 13.1 What exists
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| Plugin `plantStructures`, toolset `plant_structures` | `packages/domain-aec/src/plant/structures/{plugin,catalog}.ts`, installed in `src/app/plugins.ts`, exported by `@aec/index` | D2 layout (`plant/structures/`, not `plantStructures/`). No document slice and no change to `plant/types.ts` or to core: M1 reads the building model only. `TOOLSET_NAMES` gains `plant_structures` (`@protocol/toolsets`) |
+| Rule table | `rules/accessRules.json` (copy of `validation/data/access_rules.json`, 38 rows) and `rules/ruleTable.ts` | A test asserts the copy equals the pack file. `RULE_TABLE_VERSION` `2026-10-18`. Grade A and B rows are loaded (`LOADED_RULES`), the 2 grade C rows are listed but never evaluated. Limits are read by row id; `breach()` uses a 1e-6 tolerance. `OSHA-LAD-FALLPROT-HEIGHT` carries a `flag` (2036 retrofit date under proposed repeal, status unknown; plant README D10) in every listing |
+| Codes | `codes.ts` | Only the codes M1 emits, each with its one-line remediation: `STA_STAIR_{BLONDEL,RISER,TREAD,ANGLE,WIDTH,FLIGHT_RISE}`, `STA_EDGE_UNPROTECTED`, `STA_EDGE_RULE_UNSET`, `STA_RULE_UNVERIFIED`, `STA_RULESET_UNKNOWN`, plus `STA_UNKNOWN_ELEMENT` (new, not in §7). Add the rest with their milestone |
+| `list_access_rules` | `access/listAccessRules.ts` | `{ ruleset?, grade? }`; default A and B rows; `grade: 'C'` lists the unloaded rows; `STA_RULESET_UNKNOWN` for another ruleset name |
+| `check_access` | `access/checkAccess.ts`, `stairChecks.ts`, `edgeChecks.ts`, `finding.ts` | Read-only. `{ rulesets (required), ids?, include?: ('stairs'\|'edges')[], edgeDropThresholdMm?, edgeDropSource? }`. Data: `verdict`, `findings[]`, `byId`, `edges[]`, `checked`, `skipped`, `ruleTableVersion`, `reviewRequired: true`, `unverifiedRulesUsed`, `notEvaluated` |
+
+### 13.2 Decisions
+
+- **Rulesets are an enum in `check_access`**: an unknown name is `CMD_INVALID_PARAMS` (VC-STA-13), not `STA_RULESET_UNKNOWN`. That code is used by `list_access_rules`, whose `ruleset` is a free string. V1 project rulesets will widen the enum.
+- **Stairs**: measures come from `riserHeight`, `treadDepth`, `width` of `StairElement` (document units to mm). Flight rise = the longest flight (`landingAt` splits the risers). Evaluated: ISO Blondel, width, flight rise (B); OSHA riser, tread, angle, width. Not evaluated, reported in `notEvaluated`: `ISO-STR-HEADROOM`, `OSHA-STR-LANDING`, `OSHA-STR-UNIFORM`.
+- **B rules**: a breach is severity `warn` and adds one `STA_RULE_UNVERIFIED` per rule listing every element concerned. `unverifiedRulesUsed` lists the B rows consulted, breached or not.
+- **Slab edges** (§5.8): the threshold is required (`STA_EDGE_RULE_UNSET` warn otherwise, edges skipped). Edges of the boundary and of the openings are tested; the drop is the largest of three samples (both ends and mid-edge, 100 mm outward; into the opening for opening edges) from the slab top to the highest other slab top at or below it, else the lowest level elevation. A surface within 1 mm of the slab top counts as a continuation. A drop above the threshold is protected only when walls of the slab level, whose top is at least `ISO-GRD-TOP` (1100 mm, grade A) above the slab top and whose centreline lies on the edge, cover at least 99 % of its length. Railings do not exist before M3; M3 must add them to this coverage test. The finding is `PROJECT-EDGE-DROP` (ruleset `project`, severity `fail`, clause = `edgeDropSource`). Opening edges around a stair well are reported like any other (no stair-footprint protection yet).
+
+### 13.3 Validation cases
+
+| VC | State |
+| -- | ----- |
+| VC-STA-04 rule part (3 stair cases) | passing, `tests/unit/plant/structures/checkAccess.test.ts` |
+| VC-STA-13 (fields, B warn + unverified, `reviewRequired`, invalid ruleset) | passing for stairs and edges; ladder and railing codes follow M3 / M4 |
+| VC-STA-02, 03, 05 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks need M3 / M4 |
+| VC-STA-01, 06..12, 14 | not started |

@@ -320,16 +320,13 @@
       "export_pcf"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": [
-      "add_ladder",
-      "check_access"
+      "add_ladder"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": [
-      "add_steel_stair",
-      "check_access"
+      "add_steel_stair"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [
       "add_circular_platform",
-      "check_access",
       "platform_takeoff"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": [
@@ -337,8 +334,7 @@
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-05-access-negative.json": [
       "add_ladder",
-      "add_railing",
-      "check_access"
+      "add_railing"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-06-grating-span.json": [
       "add_grating",
