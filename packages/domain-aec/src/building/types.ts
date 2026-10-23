@@ -6,6 +6,7 @@
  */
 
 import type { Vec2, Vec3 } from '@core/model/vectors';
+import type { SpecBinding } from '@aec/plant/catalog/types';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =
@@ -263,6 +264,8 @@ export interface PipeElement extends LevelElementBase {
   from?: string;
   /** Destination: equipment tag or battery-limit / tie-in id. */
   to?: string;
+  /** Spec binding (01 PSC): the spec revision and the OD / wall the pipe was resolved to. Absent on legacy pipes (the DN table applies). */
+  spec?: SpecBinding;
   /** Set when the run was committed from a point-cloud extraction (plant 10 `commit_asbuilt_extraction`): scan-derived geometry. */
   asBuilt?: { readonly extractionId: string; readonly unverified: boolean };
 }

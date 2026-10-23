@@ -1,6 +1,6 @@
 # Gap 01 PSC — Piping specifications and component catalogue: technical specification
 
-Status: written 2026-10-18, specification only. Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md).
+Status: written 2026-10-18; M0 + M1 built 2026-10-23 (§13). Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md).
 Validation: [`validation/README.md`](validation/README.md). Laws: `.claude/rules/architecture.md` (L1–L10).
 
 ## 1. Current state in llull (before this gap)
@@ -529,3 +529,56 @@ M4 (`component_shape`, ports); 05 ISO consumes commodity codes and SKEY map; 07 
 | TR-PSC-14 | Canonical JSON, sha256, `--param-file` CLI feature, round trip | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17 |
 | TR-PSC-15 | Lifecycle, revisions, approval gate via signature | FR-14, FR-15 | AF-32, AF-33, AF-34 | VC-16 |
 | TR-PSC-16 | Component shape recipes and ports (§5.8) | FR-19 | AF-22 | VC-19 |
+
+## 13. As built (M0 + M1, 2026-10-23)
+
+Branch `feat/plant-psc-m1`. Plugin `piping-catalog` (toolset `piping`), folder `packages/domain-aec/src/plant/catalog/`, installed by
+`src/app/plugins.ts` after the 02 RTE plugin `piping` (that plugin keeps the name `piping`; this one is `piping-catalog`, so the §2 name
+"plugin `piping`" is superseded). Toolset `piping` lists both plugins' tools.
+
+### 13.1 Decisions taken
+
+| Question                                 | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1 bundling (provisional, pending owner) | The grade A and B rows of `validation/data/*.json` ship as the default catalogue `llull-open-piping` 1.0.0, each value with `sourceId` + citation and `verified` = grade A. Anything not grade A is reported `unverified` (`PSC_DATA_UNVERIFIED`, never suppressible). Standards without a free source (B16.11, MSS SP-97 olets, EN 10253, B16.47, B16.9 caps and reducing tees) are import-only (D9): `list_piping_catalogs` names them in `importOnly`. |
+| Q2 types and slice                       | Types live in the plugin (`plant/catalog/types.ts`), not in core (D2, step 5B1). Imported catalogues are stored in `doc.plant.catalog` (`{ catalogs, catalogOrder }`, one optional member added to `plant/types.ts`); the bundled catalogue and the B16.5 rating table live in code and are never written to the document.                                                                                                                                |
+| `PipeElement.spec`                       | Added as `spec?: SpecBinding` on `PipeElement` (`building/types.ts`); `SpecBinding` is `{ specId, revision, nps, schedule?, odMm, wallMm, dimensionalStandard, verified }`. Nothing writes it before M3; `pipe_section_properties` already reads it. Old documents load unchanged.                                                                                                                                                                        |
+| Command names                            | As §4: `list_piping_catalogs`, `lookup_piping_component` (plural / component, not "lookup_piping_catalog").                                                                                                                                                                                                                                                                                                                                               |
+| Units                                    | Stored values are millimetres, counts or bar; a file declares `unit: mm \| in` per family (inches converted on import, rounded to 1e-6). `Dim.unit` is `mm \| count \| bar` (§3 sketched `mm \| in`). Bolt diameter is stored in mm and answered also as an inch fraction (`boltDiameterIn: "5/8"`).                                                                                                                                                      |
+| Dimension names                          | `outsideDiameter`, `wall`, `centreToEnd`, `centreToEndRun` (tee run), `length` (reducer), `thickness`, `boltCircle`, `boltCount`, `boltDiameter`, `boltHole` (EN: hole diameter, B16.5: derived), `raisedFaceDiameter`, `faceToFace`, `innerRingId`, `sealingElementOd`, `centeringRingOd`. Answers add flat keys `<dim>Mm` (the keys the plans read).                                                                                                    |
+| Row grade                                | `verified` per value; a row is verified when all its values are. B16.5 flange: thickness follows `gradeThickness`, bolt count / diameter `gradeBoltPattern`, OD / bolt circle / raised face `gradeOdBoltCircle` (so only NPS 4 Class 150 is a verified row). EN 1092-1: D, K verified for DN100 PN16 only; holes and counts never.                                                                                                                        |
+| Derived values                           | Computed in the lookup, flagged `derived` with the formula: pipe inside diameter, B16.5 bolt hole (bolt + 3.175 mm), missing B16.9 LR 90 / SR 90 centre-to-end (1.5 / 1.0 x NPS, LR verified = grade A rule, SR unverified).                                                                                                                                                                                                                              |
+| Pipe schedules                           | One family per standard (`asme-b36.10m`, `asme-b36.19m`); `"10"` and `"10S"` are different rows; a schedule given without `standard` resolves in the first family that has it and the answer carries a `note` naming the standard. A pipe lookup without schedule is `PSC_AMBIGUOUS_COMPONENT` (the message lists the schedules).                                                                                                                         |
+| Ratings                                  | `pt_rating` answers bar; `unit: psi` returns the tabulated psig (285 / 740) at or below 100 degF and otherwise converts at 0.0689475729 bar/psi, stating it (`method`, `conversion`). Only B16.5 group 1.1 is bundled; a rating-table import command is not part of M1.                                                                                                                                                                                   |
+| Export gate                              | `export_piping_catalog` is an `export_*` command, so it carries `confirmExportControlled` and the export gate (contract test `exportGateAll`).                                                                                                                                                                                                                                                                                                            |
+| Licence flag                             | `LICENCE_FLAGS` has no "open data" value; the bundled catalogue uses `company-proprietary` (llull's own compilation of facts from MIT-licensed and public tables). Flagged for the owner with Q1.                                                                                                                                                                                                                                                         |
+
+### 13.2 What exists
+
+| Item                                                           | Where                                                                                                                                                                      |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types, `SpecBinding`, slice                                    | `plant/catalog/types.ts`, `plant/catalog/store.ts`, `plant/catalog/document.ts` (load validation)                                                                          |
+| NPS / DN map (exact rationals, ISO 6708 pairing, EN 10220 ODs) | `plant/catalog/nominal.ts`                                                                                                                                                 |
+| Error codes + remediation (all §7 codes)                       | `plant/catalog/codes.ts`                                                                                                                                                   |
+| Bundled catalogue + generator + drift test                     | `plant/catalog/bundled.ts`, `plant/catalog/data/*.ts` (generated), `scripts/pipingCatalogGen.ts`, `npm run piping-catalog`, `tests/unit/plant/piping/catalogDrift.test.ts` |
+| File form, parse, canonical export                             | `plant/catalog/file.ts`                                                                                                                                                    |
+| Lookup, rules, ratings, section properties                     | `lookup.ts`, `rules.ts`, `ptRating.ts`, `sectionProperties.ts`                                                                                                             |
+| Commands                                                       | `plant/catalog/commands/{queries,importExport,check,engineering}.ts`                                                                                                       |
+
+Commands (all in toolset `piping`): `list_piping_catalogs` (Q), `lookup_piping_component` (Q), `import_piping_catalog` (M),
+`export_piping_catalog` (Q, export gate), `check_piping_catalog` (Q; rules `b169.lr90`, `b169.sr90`, `b165.hole`, `pipe.odMatch`,
+`monotonic`, `provenance`, `verified`), `pipe_section_properties` (Q), `pt_rating` (Q).
+
+### 13.3 Validation cases
+
+Covered by `tests/unit/plant/piping/{catalogLookup,sectionProperties,ptRating,catalogImport,catalogDrift,scenarioPlans}.test.ts`, reading the
+pack data directly: VC-PSC-01 (all 382 rows, 86 grade A), 02 (incl. bridge to `pipeWeightPerMetre`), 03, 04, 05 (import refusal + check
+failure at `families.0.sizes.0.centreToEnd`), 06 (all 24 bolt patterns), 07, 12, 13, 14 (EN flange part), 17 (catalogue round trip, sha256), 18. Plans: SC-PSC-01 fully, SC-PSC-05 steps 0 to 4, SC-PSC-03 step 1 to 3 (the harness skips steps whose command is not registered).
+
+### 13.4 Left
+
+M2 (specs, resolution, branch table, `check_pipe_spec`, `PSC_DIM_STANDARD_MIXED`), M3 (`add_pipe_run` / `assign_pipe_spec`, consumers read
+`spec.wallMm`, `approve_pipe_spec`; the interim `plant/piping/sizes.ts` and `industrial/piping/pipeSizes.ts` stay until then), M4 (`pipe_wall_check`,
+`resolve_joint`, `component_shape`, bolt sets, B16.11 and olet schemas), rating-table import, EN 10220 walls (the pack has ODs only),
+`PipingLibraryProvider` private libraries (`PSC_LIBRARY_UNRESOLVED` is defined, not yet raised), `--param-file` CLI feature, UI browser, guide
+section, VC-PSC-08 to 11, 14 (spec check), 15, 16, 19. Open for the owner: Q1 (bundling policy, licence flag), Q3 to Q7 unchanged.

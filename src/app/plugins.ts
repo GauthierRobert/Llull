@@ -1,7 +1,16 @@
 // Composition root of the default domain plugins (app, backend, CLI, test setup): the only place that knows the domains.
 
 import { installPlugin } from '@core/plugins/host';
-import { buildingPlugin, civilPlugin, industrialPlugin, pipingPlugin, plantEquipmentPlugin, scanPlugin, structuresPlugin } from '@aec/index';
+import {
+  buildingPlugin,
+  civilPlugin,
+  industrialPlugin,
+  pipingCatalogPlugin,
+  pipingPlugin,
+  plantEquipmentPlugin,
+  scanPlugin,
+  structuresPlugin,
+} from '@aec/index';
 import { caePlugin, explicitPlugin, topologyPlugin } from '@cae/index';
 import {
   aerodynamicsPlugin,
@@ -24,6 +33,7 @@ export function installDefaultPlugins(): void {
   installPlugin(industrialPlugin);
   installPlugin(civilPlugin);
   installPlugin(pipingPlugin);
+  installPlugin(pipingCatalogPlugin);
   installPlugin(structuresPlugin);
   installPlugin(plantEquipmentPlugin);
   installPlugin(caePlugin);

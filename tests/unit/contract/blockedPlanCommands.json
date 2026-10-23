@@ -142,10 +142,6 @@
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
     ],
-    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-01-catalog-lookup-mass.json": [
-      "lookup_piping_component",
-      "pipe_section_properties"
-    ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-02-spec-resolution.json": [
       "import_pipe_spec",
       "resolve_branch",
@@ -154,22 +150,17 @@
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": [
       "check_pipe_spec",
       "import_pipe_spec",
-      "pipe_wall_check",
-      "pt_rating"
+      "pipe_wall_check"
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": [
       "approve_pipe_spec",
       "check_pipe_spec",
-      "import_pipe_spec",
-      "pipe_section_properties"
+      "import_pipe_spec"
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-05-catalog-import-checks.json": [
       "check_pipe_spec",
-      "check_piping_catalog",
       "export_pipe_spec",
-      "import_pipe_spec",
-      "import_piping_catalog",
-      "lookup_piping_component"
+      "import_pipe_spec"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
       "add_nozzle",
