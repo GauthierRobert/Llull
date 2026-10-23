@@ -51,11 +51,13 @@ export function withRunEntities(doc: CadDocument, runId: string): CadDocument {
   const stale = new Set(piping.entityIds[runId] ?? []);
   const entities: Record<string, Entity> = {};
   for (const [id, entity] of Object.entries(doc.entities)) if (!stale.has(id)) entities[id] = entity;
-  const order = doc.order.filter((id) => !stale.has(id));
   const state: RunState = run === undefined ? { entities: [] } : runState(doc, run);
+  const kept = new Set(state.entities.map((entity) => entity.id));
+  // A part that survives keeps its position in the draw order; only new parts are appended (a replay must give the order of the live document).
+  const order = doc.order.filter((id) => !stale.has(id) || kept.has(id));
   for (const entity of state.entities) {
     entities[entity.id] = entity;
-    order.push(entity.id);
+    if (!stale.has(entity.id)) order.push(entity.id);
   }
   const { layers, layerOrder } = ensureLayerIds(
     doc.layers,
@@ -129,7 +131,8 @@ function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
 
 /** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */
 function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
-  if (getPiping(next).runOrder.length === 0) return { document: next, notes: [], affected: [] };
+  if ((next.plant === previous.plant && next.building === previous.building) || getPiping(next).runOrder.length === 0)
+    return { document: next, notes: [], affected: [] };
   const affected = affectedRuns(previous, next);
   if (affected.length === 0) return { document: next, notes: [], affected: [] };
   const document = affected.reduce(withRunEntities, next);

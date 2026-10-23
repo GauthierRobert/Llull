@@ -199,7 +199,17 @@ describe('reconcile is the same live, nested and on replay (L8)', () => {
     const replayed = execute(live, 'replay_history', {}).document;
     expect(replayed.plant).toEqual(live.plant);
     expect(replayed.entities).toEqual(live.entities);
+    expect(replayed.order).toEqual(live.order);
     expect((piping(live).runs[Object.keys(piping(live).runs)[0] as string] as PipeRun).broken).toBeDefined();
+  });
+
+  it('a re-derived run keeps the draw-order position of its surviving parts', () => {
+    const s = routedPumpToVessel();
+    const parts = piping(s.doc).entityIds[s.runId] as string[];
+    const box = apply(s.doc, 'add_box', { size: [1, 1, 1] });
+    const edited = apply(box, 'edit_pipe_spec', { specId: 'CS150', ops: [{ op: 'setHeader', fields: { title: 'again' } }] });
+    expect(edited.order).toEqual(box.order);
+    expect(box.order.slice(-1)[0]).not.toBe(parts[0]);
   });
 
   it('a load shows the same state as the live document', () => {
@@ -228,6 +238,7 @@ describe('reconcile is the same live, nested and on replay (L8)', () => {
     expect(loaded.plant).toEqual(result.document.plant);
     const replayed = execute(result.document, 'replay_history', {}).document;
     expect(replayed.plant).toEqual(result.document.plant);
+    expect(replayed.order).toEqual(result.document.order);
   });
 
   it('reports the ids it re-derived in affected, and only newly broken runs in the note', () => {

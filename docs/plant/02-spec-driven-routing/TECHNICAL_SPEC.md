@@ -782,7 +782,9 @@ Decisions (owner delegated: long-term quality over the cheap path; no backward c
   `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH`; a later edit that makes it derivable again clears the mark and redraws it. Live reconcile and `restore` share
   one guarded run-state function (a throw on corrupt data breaks the run, never the command), so a load shows the same state. The note lists only
   runs whose broken code changed. `piping_takeoff` without `runId` skips broken runs and lists them in `data.brokenRuns`. The guard still refuses
-  atomically a spec or catalogue edit that would leave a derivable run underivable; benign edits are re-derived, not refused. Contract test:
+  atomically a spec or catalogue edit that would leave a derivable run underivable; benign edits are re-derived, not refused. A composite command is reconciled nested and again
+  as a whole (idempotent; the second pass is cheap when nothing relevant changed, and surviving parts keep their draw-order position); the guard derives
+  runs again on a spec edit only. Contract test:
   `tests/unit/contract/reconcile.test.ts` (stub extension); piping: `tests/unit/plant/piping/reconcile.test.ts` (live = replay = load).
 - **`CommandError.detail`** (core, additive): machine-readable facts of a refusal (`detail.offset`, `detail.angleDeg`, `detail.cutLengthMm`)
   as §7 and the SC-RTE-05 rows name them; `tableRejection` takes it as an optional last argument.

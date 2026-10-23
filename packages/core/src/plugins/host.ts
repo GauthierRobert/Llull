@@ -38,10 +38,7 @@ export function pluginGuards(): DerivationGuard[] {
 }
 
 /** `next` after every extension's `reconcile`, with the notes and affected ids they report (empty when no installed domain depends on the change). */
-function reconcileExtensions(
-  previous: CadDocument,
-  next: CadDocument,
-): { document: CadDocument; notes: string[]; affected: string[] } {
+function reconcileExtensions(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
   let document = next;
   const notes: string[] = [];
   const affected: string[] = [];
