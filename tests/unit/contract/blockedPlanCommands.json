@@ -403,11 +403,6 @@
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-05-ifc-summary-bsi.json": [
       "ifc_summary"
     ],
-    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-01-service-colour-rules.json": [
-      "apply_service_colour_scheme",
-      "check_display",
-      "colour_by_rule_report"
-    ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
       "apply_viewpoint",
       "export_bcf_viewpoint",

@@ -28,6 +28,7 @@ import { persistenceCommands } from './persistence/catalog';
 import { drawingsCommands } from './drawings/catalog';
 import { pmiCommands } from './pmi/catalog';
 import { reviewCommands } from './review/catalog';
+import { displayCommands } from './display/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
 import { surfaceCommands } from './surface/catalog';
@@ -56,6 +57,7 @@ registerCommands('core', [
   ...drawingsCommands,
   ...pmiCommands,
   ...reviewCommands,
+  ...displayCommands,
   ...materialLabCommands,
   ...materialCommands,
   ...surfaceCommands,

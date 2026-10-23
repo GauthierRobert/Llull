@@ -50,6 +50,9 @@ export { pipingCatalogPlugin } from './plant/catalog/plugin';
 export { structuresPlugin } from './plant/structures/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';
 
+// plant: display plugin (service colour schemes, entity properties; plant 09 VIS)
+export { plantDisplayPlugin } from './plant/display/plugin';
+
 // scan: point-cloud plugin
 export { scanPlugin } from './scan/plugin';
 

@@ -15,6 +15,7 @@ import { exchangeProblems } from './exchangeValidation';
 import { dynamicsProblems } from './dynamicsValidation';
 import { prototypeProblems } from './prototypeValidation';
 import { reviewProblems } from './reviewValidation';
+import { displayProblems } from './displayValidation';
 import { kernelSliceProblems } from './kernelValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 import { materialLibraryProblems } from './materialRecordValidation';
@@ -261,6 +262,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   errors.push(...dynamicsProblems(v['dynamics']));
   errors.push(...prototypeProblems(v['prototype']));
   errors.push(...reviewProblems(v['review']));
+  errors.push(...displayProblems(v['display']));
   errors.push(...kernelSliceProblems(v));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
