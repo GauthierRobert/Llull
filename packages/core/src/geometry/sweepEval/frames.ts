@@ -15,6 +15,7 @@ import { add3, cross3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../..
 import { segmentLengths } from '../../lib/polyline';
 import { clamp01 } from '../../lib/clamp';
 import { chainLength, isClosedChain, minCurvatureRadius, segmentPoint, segmentSteps, segmentTangent } from '../curveSegments';
+import { ellipseCurvature } from '../ellipseSegment';
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -384,6 +385,7 @@ export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: numb
 function endCurvature(segment: CurveSegment<Vec3>, end: boolean): number {
   if (segment.type === 'line') return 0;
   if (segment.type === 'arc') return 1 / Math.max(minCurvatureRadius(segment), 1e-300);
+  if (segment.type === 'ellipse') return ellipseCurvature(segment.points, end ? 1 : 0);
   const [p0, p1, p2, p3] = segment.points;
   const [d1, d2] = end
     ? [sub3(p3, p2), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 2)]

@@ -510,6 +510,9 @@ the tag registry and equipment list; 09 VIS adds LOD for the revolution bodies.
 - **Q3: exact ellipse in core.** Add an `ellipse` arc to `CurveSegment` (core model, Manifold tessellation, closed-form
   volume, native OCC kernel `GC_MakeArcOfEllipse`), so 2:1 heads are exact B-rep. Own lane; heads use the Bézier profile
   behind one function until it lands, then switch.
+  Built: `CurveSegment` `{ type: 'ellipse', points: [start, centre, end] }` is an exact quarter ellipse (start - centre and end - centre are
+  conjugate semi-diameters); a 2:1 head of diameter D is `quarter [(D/2, 0), (0, 0), (0, D/4)]` (Pappus pi D^3 / 24 to 1e-12 in core, OCC
+  `GC_MakeArcOfEllipse` chain code 3 to 1e-15 measured); the head profile is switched by the 03 EQP integrator.
 - **Q7: flanges from 01 PSC.** PSC M1 is built: nozzle flanges come from `lookup_piping_component`; `EQP_FLANGE_PLACEHOLDER`
   only when the catalogue has no row for the DN / rating / facing.
 - **Q5: yes, later** (M3 / V1): licensed tables enter through the 01 PSC import path, private, replacing grade-B rows.

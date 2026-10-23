@@ -21,6 +21,8 @@ const lines = (points: readonly Vec2[]): CurveSegment<Vec2>[] =>
 function flatten(segment: CurveSegment<Vec3>): CurveSegment<Vec2> {
   if (segment.type === 'line') return { type: 'line', points: [flat(segment.points[0]), flat(segment.points[1])] };
   if (segment.type === 'arc') return { type: 'arc', points: [flat(segment.points[0]), flat(segment.points[1]), flat(segment.points[2])] };
+  if (segment.type === 'ellipse')
+    return { type: 'ellipse', points: [flat(segment.points[0]), flat(segment.points[1]), flat(segment.points[2])] };
   return { type: 'bezier', points: [flat(segment.points[0]), flat(segment.points[1]), flat(segment.points[2]), flat(segment.points[3])] };
 }
 
