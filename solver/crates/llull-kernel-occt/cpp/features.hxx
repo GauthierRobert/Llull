@@ -47,7 +47,7 @@ std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius);
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness);
 std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Slice<const double> open_near);
 
-// Exact curve chains: `chain` = per segment a type code (0 line, 1 arc, 2 cubic Bezier) then its 2 / 3 / 4 xyz points.
+// Exact curve chains: `chain` = per segment a type code (0 line, 1 arc, 2 cubic Bezier, 3 ellipse quarter) then its 2 / 3 / 4 / 3 xyz points.
 std::unique_ptr<Shape> chain_face(rust::Slice<const double> chain);
 std::unique_ptr<Shape> circle_section(rust::Slice<const double> center, rust::Slice<const double> normal, double radius,
                                       double inner_radius);

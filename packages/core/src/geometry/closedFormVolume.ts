@@ -8,6 +8,7 @@ import { type Entity } from '../model/types';
 import { signedMeshVolume } from './meshVolume';
 import { entityBounds } from './bounds';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
+import { chainMoments } from './chainMoments';
 import { sweepTriangles } from './sweep';
 import { sweepAnalyticVolume } from './sweepEval/volume';
 import { loftTriangles } from './loft';
@@ -32,7 +33,7 @@ function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): ClosedFormVolume {
   return { volume: closedMeshVolume(sweepTriangles(e).flat(2)), analytic: false };
 }
 
-/** Pappus: V = sweepAngle x |centroid x| x profile area; a profile crossing the axis falls back to the bounding-box volume. */
+/** Pappus: V = sweepAngle x ∬x dA (exact from `curves` when the profile has curved segments, else sweepAngle x |centroid x| x polygon area); a profile crossing the axis falls back to the bounding-box volume. */
 function revolutionVolume(e: Extract<Entity, { kind: 'revolution' }>): ClosedFormVolume {
   if (e.profile.some(([x]) => x < 0)) {
     const b = entityBounds(e);
@@ -41,6 +42,10 @@ function revolutionVolume(e: Extract<Entity, { kind: 'revolution' }>): ClosedFor
       analytic: false,
       approximation: 'bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0',
     };
+  }
+  if (e.curves !== undefined && e.curves.some((segment) => segment.type !== 'line')) {
+    const { momentX } = chainMoments(e.curves);
+    return { volume: (e.angle ?? 2 * Math.PI) * Math.abs(momentX), analytic: true };
   }
   const profileArea = polygonArea(e.profile);
   return {

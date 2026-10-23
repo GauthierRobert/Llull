@@ -49,6 +49,7 @@ fn arc(start: P2, through: P2, end: P2) -> Option<Curve> {
     Some(Curve::Arc { center, radius: ox.hypot(oy), start_angle, direction, sweep, ends: [start, end] })
 }
 
+/// Lines and circular arcs only: pocket outlines are polygons with rounded corners, so `bezier` and `ellipse` pieces (other callers' chains) are skipped.
 fn curves(outlines: &Value) -> Vec<Curve> {
     let mut result = Vec::new();
     for segment in outlines.as_array().into_iter().flatten().flat_map(|outline| outline.as_array().into_iter().flatten()) {

@@ -32,9 +32,9 @@ import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { signedArea } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
 
-const SEGMENT_CODES = { line: 0, arc: 1, bezier: 2 } as const;
+const SEGMENT_CODES = { line: 0, arc: 1, bezier: 2, ellipse: 3 } as const;
 
-/** Wire form of a chain: per segment its type code (0 line, 1 arc, 2 cubic Bézier), then its points' xyz. */
+/** Wire form of a chain: per segment its type code (0 line, 1 arc, 2 cubic Bézier, 3 ellipse quarter [start, centre, end]), then its points' xyz. */
 export function encodeChain(chain: ReadonlyArray<CurveSegment<Vec3>>): number[] {
   return chain.flatMap((segment) => [SEGMENT_CODES[segment.type], ...segment.points.flat()]);
 }

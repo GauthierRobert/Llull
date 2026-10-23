@@ -4,7 +4,7 @@
 //! The pure TypeScript geometry those builders read (oriented curve chains, Catmull-Rom ring curves, sweep frames, subdivision
 //! patches, feature lowering and hole profiles) is computed by the host, which sends it ready to build
 //! (`server/src/native/kernelLeaves.ts`, `kernelFeatures.ts`); this side runs the same OCCT algorithms on it.
-//! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier), then its 2 / 3 / 4 xyz points.
+//! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier, 3 ellipse quarter [start, centre, end]), then its 2 / 3 / 4 / 3 xyz points.
 
 use super::floor::floor_edge_indices;
 use super::{number, place_entity, positive, refused, shape_of, vec3, EvalError, Evaluated, Evaluator};
