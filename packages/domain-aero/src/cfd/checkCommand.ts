@@ -31,7 +31,7 @@ export const checkCfd = defineCommand({
     'Read-only pass / warn / fail list over the flow (CFD) cases: runs the prepare_cfd_case checks of every case (watertight, self-intersection, small ' +
     'features, blockage, memory when known, regime) and says whether its recorded result is stale (case or geometry changed since the solve). ' +
     'Use it as the one-call health check of the Flow setup (pass / warn / fail per case, plus result staleness); use prepare_cfd_case for the full report of one case (domain, blockage, grid, memory estimate).',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   params: z.object({ caseIds: z.array(z.string()).optional().describe('Cases to check; default every case of the document.') }),
   run: (doc, params, ctx): CommandResult => {
     const ids = params.caseIds ?? caseIds(doc);

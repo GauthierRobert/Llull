@@ -2,7 +2,7 @@
 //!
 //! The platform `f64::powf` / `log10` (glibc) differ from V8 in the last bit for several percent of the inputs, so a native port of a
 //! TypeScript formula would not be bit-identical. `pow`, `exp`, `log`, `log10` and `atan` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
-//! `hypot` is V8's Kahan-compensated `Math.hypot`; `round` is ECMAScript `Math.round`.
+//! `hypot` is V8's Kahan-compensated `Math.hypot`; `cbrt` is V8's `ieee754::cbrt` (FreeBSD s_cbrt.c); `round` is ECMAScript `Math.round`.
 //!
 //! fdlibm notice (kept as its licence requires): Copyright (C) 1993-2004 by Sun Microsystems, Inc. All rights reserved.
 //! Permission to use, copy, modify, and distribute this software is freely granted, provided that this notice is preserved.
@@ -63,6 +63,46 @@ pub fn round(x: f64) -> f64 {
     } else {
         floor
     }
+}
+
+/// V8 `Math.cbrt` (`base::ieee754::cbrt`, FreeBSD s_cbrt.c: polynomial to 23 bits, rounded away from zero, one Newton step to 53 bits).
+pub fn cbrt(x: f64) -> f64 {
+    const B1: u32 = 715_094_163;
+    const B2: u32 = 696_219_795;
+    const P0: f64 = 1.875_951_824_271_77;
+    const P1: f64 = -1.884_979_795_433_771_7;
+    const P2: f64 = 1.621_429_720_105_354_5;
+    const P3: f64 = -0.758_397_934_778_766;
+    const P4: f64 = 0.145_996_192_886_612_45;
+    let mut hx = high(x) as u32;
+    let lo = low(x);
+    let sign = hx & 0x8000_0000;
+    hx ^= sign;
+    if hx >= 0x7ff0_0000 {
+        return x + x;
+    }
+    let mut t: f64;
+    if hx < 0x0010_0000 {
+        if (hx | lo) == 0 {
+            return x;
+        }
+        t = f64::from_bits(u64::from(0x4350_0000u32) << 32);
+        t *= x;
+        let hi_t = (t.to_bits() >> 32) as u32;
+        let guess = sign | ((hi_t & 0x7fff_ffff) / 3 + B2);
+        t = f64::from_bits(u64::from(guess) << 32);
+    } else {
+        let guess = sign | (hx / 3 + B1);
+        t = f64::from_bits(u64::from(guess) << 32);
+    }
+    let mut r = (t * t) * (t / x);
+    t *= (P0 + r * (P1 + r * P2)) + ((r * r) * r) * (P3 + r * P4);
+    t = f64::from_bits((t.to_bits().wrapping_add(0x8000_0000)) & 0xffff_ffff_c000_0000);
+    let s = t * t;
+    r = x / s;
+    let w = t + t;
+    r = (r - t) / (w + r);
+    t + t * r
 }
 
 /// V8 `Math.hypot`: scaled by the largest magnitude, Kahan-compensated sum of squares.
@@ -591,6 +631,38 @@ pub fn atan(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cbrt_matches_v8_bit_for_bit() {
+        // Reference: node 24 Math.cbrt, bit patterns.
+        let cases: [(f64, u64); 18] = [
+            (5e-1, 0x3fe965fea53d6e3d),
+            (1.5e+0, 0x3ff250bfe1b082f5),
+            (2e+0, 0x3ff428a2f98d728b),
+            (3e+0, 0x3ff7137449123ef6),
+            (7.1e+0, 0x3ffec08049237535),
+            (1e+1, 0x40013c484138704f),
+            (2.7e+1, 0x4008000000000000),
+            (1e-3, 0x3fb999999999999a),
+            (1.23456789e+5, 0x4048e58dab7da808),
+            (1e-300, 0x2b2bff2ee48e0530),
+            (9.99999e+5, 0x4058ffff7430980c),
+            (9.999999e-1, 0x3fefffffee1ab38f),
+            (1.0000001e+0, 0x3ff0000008f2a62f),
+            (9.965293069957826e-1, 0x3feff682ff59be5d),
+            (8.058317981148171e-1, 0x3fedc736a1335b42),
+            (3.333333333333333e-1, 0x3fe63003fbb4c375),
+            (6.666666666666666e-1, 0x3febf45f04cef0b8),
+            (4.9406564584e-314, 0x2a40d4de8fb11dad),
+        ];
+        for (x, bits) in cases {
+            assert_eq!(cbrt(x).to_bits(), bits, "cbrt({x:e})");
+            assert_eq!(cbrt(-x).to_bits(), bits | (1 << 63), "cbrt(-{x:e})");
+        }
+        assert_eq!(cbrt(0.0), 0.0);
+        assert!(cbrt(f64::NAN).is_nan());
+        assert_eq!(cbrt(f64::INFINITY), f64::INFINITY);
+    }
 
     #[test]
     fn known_values() {

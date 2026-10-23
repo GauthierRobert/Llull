@@ -134,6 +134,7 @@ export const createTopologyStudy = defineCommand({
  */
 export const setTopologyRegions = defineCommand({
   name: 'set_topology_regions',
+  annotations: { readsMeshTriangles: true },
   description:
     'Set the regions of a topology study that must stay solid (keepIn: interfaces, bolt bosses, loaded faces) or must stay empty (keepOut: ' +
     'clearances, routing). Each list you give REPLACES the existing one; omit a list to keep it. A region is a box (world coordinates), another solid ' +

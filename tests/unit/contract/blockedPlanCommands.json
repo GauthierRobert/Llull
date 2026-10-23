@@ -32,26 +32,9 @@
     "docs/design/05-implicit-lattice/validation/plans/target_infill_solid_box.json": [
       "infill_solid"
     ],
-    "docs/design/07-mesh-modeling/validation/plans/target_bad_plan_codes.json": [
-      "decimate_mesh",
-      "remesh_mesh"
-    ],
-    "docs/design/07-mesh-modeling/validation/plans/target_defect_repair.json": [
-      "fill_mesh_holes"
-    ],
-    "docs/design/07-mesh-modeling/validation/plans/target_scan_cleanup_to_print.json": [
-      "cut_mesh",
-      "decimate_mesh",
-      "fill_mesh_holes",
-      "remesh_mesh",
-      "smooth_mesh"
-    ],
     "docs/design/07-mesh-modeling/validation/plans/target_sculpt_quad_brep.json": [
-      "add_grid_mesh",
       "fit_subdivision_to_mesh",
-      "quad_remesh",
-      "remesh_mesh",
-      "sculpt_mesh"
+      "quad_remesh"
     ],
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
       "add_imperfection"

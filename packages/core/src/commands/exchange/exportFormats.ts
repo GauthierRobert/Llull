@@ -1,6 +1,8 @@
 /** export_obj: read-only export of the world-space triangles (document returned unchanged, affected: []). */
 
 import type { CommandResult } from '../types';
+import { currentContext } from '../context';
+import { exportAssetRefusal } from '../mesh/meshCommon';
 import { exportRefusal, report } from '../noop';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
@@ -79,7 +81,9 @@ export const exportObj = defineCommand({
     if (refused !== null) return refused;
     // One comment line only: a newline in the label would inject arbitrary OBJ records.
     const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
-    const collected = collectExportParts(doc, entityIds);
+    const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets);
+    const unreadable = exportAssetRefusal(doc, 'export_obj', collected.unreadable);
+    if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
     const triangleCount = tris.length;
     const text = buildObjText(collected.parts, `# llull OBJ export — units: ${unitLabel}`);

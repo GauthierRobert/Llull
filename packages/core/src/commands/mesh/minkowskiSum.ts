@@ -10,10 +10,12 @@ import {
   engineOutcome,
   isCommandResult,
   isLoadFailure,
+  isStoreFailure,
   loadSolidMesh,
   measureMesh,
   meshRejection,
   outwardMesh,
+  storeMesh,
   withConventions,
 } from './meshCommon';
 
@@ -41,9 +43,10 @@ export const minkowskiSum = defineCommand({
   }),
   run: (doc, { a, b, op, keepSources }, ctx): CommandResult => {
     if (a === b) return meshRejection(doc, 'minkowski_sum', 'MESH_PARAM_INVALID', 'a and b must be different ids', [a], ['b']);
-    const first = loadSolidMesh(doc, a);
+    const assets = contextOf(ctx).meshAssets;
+    const first = loadSolidMesh(doc, a, undefined, assets);
     if (isLoadFailure(first)) return meshRejection(doc, 'minkowski_sum', first.code, first.message, first.ids);
-    const second = loadSolidMesh(doc, b);
+    const second = loadSolidMesh(doc, b, undefined, assets);
     if (isLoadFailure(second)) return meshRejection(doc, 'minkowski_sum', second.code, second.message, second.ids);
     const [measureA, measureB] = [measureMesh(first.mesh), measureMesh(second.mesh)];
     const open = !measureA.closed ? a : !measureB.closed ? b : null;
@@ -67,7 +70,9 @@ export const minkowskiSum = defineCommand({
       );
     }
     const unverified = first.unverified || second.unverified;
-    const committed = commitMesh(doc, first.entity as Entity, outcome.mesh, { keepSource: keepSources ?? false, unverified });
+    const stored = storeMesh(outcome.mesh, assets);
+    if (isStoreFailure(stored)) return meshRejection(doc, 'minkowski_sum', stored.code, stored.message, [a, b]);
+    const committed = commitMesh(doc, first.entity as Entity, stored, { keepSource: keepSources ?? false, unverified });
     const after = measureMesh(outcome.mesh);
     const data = withConventions(
       doc,

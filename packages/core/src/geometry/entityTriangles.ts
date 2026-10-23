@@ -1,4 +1,5 @@
 import { type CadDocument, type Entity, is3D } from '../model/types';
+import type { MeshAssetPort } from './mesh/assets';
 import { isSheet } from '../model/curveKinds';
 import { sheetTriangles } from './nurbsSurface';
 import { expandInstance } from './instanceExpansion';
@@ -33,12 +34,15 @@ export interface ExportPart {
 
 /**
  * The exportable 3D entities named by `requestedIds` (all of `doc.order` when undefined/empty), each with its world-space triangles.
- * Unknown ids are reported, 2D entities are counted and skipped.
+ * Unknown ids are reported, 2D entities are counted and skipped. An asset-backed mesh exports at full resolution (07 MSH FR-MSH-27); one
+ * whose asset cannot be read is listed in `unreadable` (with its code) and contributes no triangle.
  */
 export function collectExportParts(
   doc: CadDocument,
   requestedIds: readonly string[] | undefined,
-): { parts: ExportPart[]; skipped2D: number; unknownIds: string[] } {
+  assets?: MeshAssetPort | null,
+): { parts: ExportPart[]; skipped2D: number; unknownIds: string[]; unreadable: Array<{ id: string; code: string }> } {
+  const unreadable: Array<{ id: string; code: string }> = [];
   const unknownIds: string[] = [];
   let idsToProcess: readonly string[] = doc.order;
   if (requestedIds && requestedIds.length > 0)
@@ -56,9 +60,18 @@ export function collectExportParts(
       skipped2D++;
       continue;
     }
+    if (entity.kind === 'mesh' && entity.asset !== undefined) {
+      const full = assets?.readMesh(entity.asset.key) ?? null;
+      if (full === null) {
+        unreadable.push({ id, code: assets === undefined || assets === null ? 'MESH_ASSET_UNAVAILABLE' : 'MESH_ASSET_MISSING' });
+        continue;
+      }
+      parts.push({ id, name: entity.name, color: entity.color, tris: entityToTriangles({ ...entity, mesh: full }, doc) });
+      continue;
+    }
     parts.push({ id, name: entity.name, color: entity.color, tris: entityToTriangles(entity, doc) });
   }
-  return { parts, skipped2D, unknownIds };
+  return { parts, skipped2D, unknownIds, unreadable };
 }
 
 /** Flattened `collectExportParts`: every triangle of the selection in one list. */
@@ -80,4 +93,16 @@ export function exportSummary(
   if (skipped2D > 0) parts.push(`${skipped2D} non-solid entit${skipped2D !== 1 ? 'ies' : 'y'} (2D shapes, 3D curves) skipped.`);
   if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
   return parts.join(' ');
+}
+
+/** `doc` with every asset-backed mesh among `ids` carrying its full-resolution triangles instead of the display LOD (an unreadable one is left as is). */
+export function withFullResolution(doc: CadDocument, ids: readonly string[], assets: MeshAssetPort | null | undefined): CadDocument {
+  let entities = doc.entities;
+  for (const id of ids) {
+    const entity = doc.entities[id];
+    if (entity?.kind !== 'mesh' || entity.asset === undefined) continue;
+    const full = assets?.readMesh(entity.asset.key) ?? null;
+    if (full !== null) entities = { ...entities, [id]: { ...entity, mesh: full } };
+  }
+  return entities === doc.entities ? doc : { ...doc, entities };
 }

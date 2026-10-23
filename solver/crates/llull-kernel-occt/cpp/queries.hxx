@@ -39,6 +39,10 @@ rust::String fillet_report_json(const Shape &shape, rust::Slice<const uint32_t> 
 rust::String project_curves_json(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths,
                                  int32_t mode, rust::Slice<const double> direction, double max_distance, double sample_step, double tolerance);
 rust::String point_distances_json(const Shape &shape, rust::Slice<const double> points);
+// Prismatic B-rep of a segmented triangle mesh (cpp/mesh_brep.cxx): `kinds` one per group (0 plane, 1 cylinder, 2 cone, 3 sphere, 4 faceted), `params` 10 per
+// group, `face_group` the group of each triangle. JSON { ok, error?, brep?, report }.
+rust::String mesh_to_brep_json(rust::Slice<const double> positions, rust::Slice<const uint32_t> indices, rust::Slice<const uint32_t> face_group,
+                               rust::Slice<const uint8_t> kinds, rust::Slice<const double> params, double tolerance);
 rust::String shape_distance_json(const Shape &a, const Shape &b);
 
 // STEP assembly (occtStep.ts writeStepAssembly): parts are compounds, occurrences located references to them.

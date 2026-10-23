@@ -288,7 +288,7 @@ describe('repair_mesh mode wrap (VC-MSH-35)', () => {
   it('refuses unknown ids and a missing engine, and is pure', () => {
     const { doc, ids } = docWithMeshes(cuboid([0, 0, 0], [1, 1, 1]));
     expect(execute(doc, 'repair_mesh', { id: 'ghost', mode: 'wrap' }).error?.code).toBe('MESH_ENTITY_NOT_FOUND');
-    expect(execute(doc, 'repair_mesh', { id: ids[0], mode: 'weld' }).error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(execute(doc, 'repair_mesh', { id: ids[0], mode: 'polish' }).error?.code).toBe('CMD_INVALID_PARAMS');
     setMeshProcessingEngine(null);
     try {
       expectNoOp(execute(doc, 'repair_mesh', { id: ids[0], mode: 'wrap' }), doc);

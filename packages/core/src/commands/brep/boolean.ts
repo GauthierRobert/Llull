@@ -86,7 +86,10 @@ function runBoolean(
     return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
   const viaMesh = engine === 'mesh' || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
-  if (viaMesh) return meshBoolean(doc, opName, op, a, tools, (ctx ?? currentContext()).meshProcessing ?? null);
+  if (viaMesh) {
+    const context = ctx ?? currentContext();
+    return meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
+  }
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
   const toolRecipe = balancedUnion(toolEntities.map((tool) => operandRecipe(kernel, tool)));
@@ -129,6 +132,7 @@ const SOLID_OPERANDS_NOTE =
  */
 export const booleanOperation = defineCommand({
   name: 'boolean',
+  annotations: { readsMeshTriangles: true },
   description:
     'Combine two 3D solid entities with a CSG operation into a single mesh entity: ' +
     'op "union" merges them, "subtract" removes the volume of b from a (order matters: result = a minus b), ' +

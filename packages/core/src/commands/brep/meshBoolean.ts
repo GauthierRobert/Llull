@@ -1,6 +1,7 @@
 /** Mesh-engine path of `boolean` (07 MSH M2, FR-MSH-17): triangle operands are combined by the mesh engine and the result stays a plain mesh (no brep). */
 
 import type { BooleanOp, CadDocument, Entity } from '../../model/types';
+import type { MeshAssetPort } from '../../geometry/mesh/assets';
 import { resolveMeshEngine } from '../../geometry/mesh/engine';
 import type { MeshProcessingEngine } from '../../geometry/mesh/engineTypes';
 import {
@@ -9,10 +10,12 @@ import {
   engineOutcome,
   isCommandResult,
   isLoadFailure,
+  isStoreFailure,
   loadSolidMesh,
   measureMesh,
   meshRejection,
   outwardMesh,
+  storeMesh,
   withConventions,
 } from '../mesh/meshCommon';
 import type { CommandResult } from '../types';
@@ -33,11 +36,12 @@ export function meshBoolean(
   base: string,
   tools: readonly string[],
   extra: MeshProcessingEngine | null,
+  assets: MeshAssetPort | null | undefined = null,
 ): CommandResult {
   const ids = [base, ...tools];
   const loaded = [];
   for (const id of ids) {
-    const operand = loadSolidMesh(doc, id);
+    const operand = loadSolidMesh(doc, id, undefined, assets);
     if (isLoadFailure(operand)) return meshRejection(doc, opName, operand.code, operand.message, operand.ids);
     loaded.push(operand);
   }
@@ -68,7 +72,9 @@ export function meshBoolean(
     );
   }
   const unverified = loaded.some((operand) => operand.unverified);
-  const entity = newMeshEntity(mesh, { unverified, color: first.entity.color, layerId: first.entity.layerId });
+  const stored = storeMesh(mesh, assets);
+  if (isStoreFailure(stored)) return meshRejection(doc, opName, stored.code, stored.message, [...ids]);
+  const entity = newMeshEntity(stored, { unverified, color: first.entity.color, layerId: first.entity.layerId });
   const replaced = replaceWith(doc, new Set(ids), entity);
   const data = withConventions(
     doc,

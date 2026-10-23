@@ -59,7 +59,7 @@ const isRefusal = (value: unknown): value is CommandResult => typeof value === '
  */
 export const suggestRebuild = defineCommand({
   name: 'suggest_rebuild',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Closed 2D loops that outline the optimized layout of a solved topology study, ready for the rebuild: model the outer loop with ' +
     'extrude_profile (profile = its points, depth = thickness, position / rotation from `placement`), each hole loop with extrude_profile + boolean ' +
@@ -144,7 +144,7 @@ const target = (given: number | undefined, fallback: NamedValue): NamedValue =>
  */
 export const compareToTopology = defineCommand({
   name: 'compare_to_topology',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Compare a rebuilt solid with the optimum of a solved topology study: both are voxelised on the study grid; iou = shared voxels / union voxels of ' +
     'the rebuilt solid (inside the design domain) and the optimum (density at or above the threshold), volumeRatio = rebuilt / optimum volume. ' +

@@ -40,7 +40,7 @@ const brief = (outcome: SelectionOutcome): string => {
  */
 export const selectFastener = defineCommand({
   name: 'select_fastener',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Select the fastener for a stack (read-only): grip dash, part number, shim washers, length and thread protrusion. Give family and diameterDash ' +
     '(list_fastener_families), and the stack either as stack { value, unit } or as stackIds + axisPoint (+ axis) measured along the axis. Optional nut and ' +
@@ -71,7 +71,7 @@ export const selectFastener = defineCommand({
  */
 export const insertFastenerStack = defineCommand({
   name: 'insert_fastener_stack',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Insert one fastener stack through plates: runs the select_fastener rules, cuts the hole through every plate (exact boolean with the kernel), and places the bolt/pin/rivet, ' +
     'shim washers and nut as instances of one component per part number (created once; geometry from the catalogue dimensions, or flagged representative placeholders ' +

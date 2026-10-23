@@ -19,6 +19,7 @@ default-members = [
   "crates/llull-explicit",
   "crates/llull-cloud",
   "crates/llull-geomq",
+  "crates/llull-meshops",
   "crates/llull-flow-core",
   "crates/llull-flow-lbm",
   "bins/llull-compute",

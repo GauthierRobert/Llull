@@ -1,6 +1,8 @@
 /** export_3mf: read-only export of the 3D bodies as a 3MF package (document returned unchanged, output in `data`). */
 
 import type { CommandResult } from '../types';
+import { currentContext } from '../context';
+import { exportAssetRefusal } from '../mesh/meshCommon';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { exportRefusal, noop, report } from '../noop';
 import { uint8ArrayToBase64 } from '../../lib/base64';
@@ -35,7 +37,9 @@ export const export3mf = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_3mf', '3mf', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    const collected = collectExportParts(doc, params.entityIds);
+    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets);
+    const unreadable = exportAssetRefusal(doc, 'export_3mf', collected.unreadable);
+    if (unreadable !== null) return unreadable;
     const mm = toMm(doc, 1);
     const scale = (v: Vec3): Vec3 => [v[0] * mm, v[1] * mm, v[2] * mm];
     const bodies = collected.parts

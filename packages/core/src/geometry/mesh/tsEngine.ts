@@ -17,6 +17,7 @@ import {
 import { convexHull } from './hull';
 import { findSelfIntersections } from './selfIntersection';
 import { subdivideMesh } from './subdivide';
+import { EDIT_OPS, runEditOp } from './tsEngineEdit';
 import { weldMesh } from './weld';
 
 const TS_VERSION = 'llull-ts-1';
@@ -171,6 +172,16 @@ function run(input: MeshInput, op: MeshOp): MeshOpResult | MeshEngineFailure {
         ),
       };
     }
+    case 'repair':
+    case 'fill_holes':
+    case 'decimate':
+    case 'remesh':
+    case 'smooth':
+    case 'cut':
+    case 'deviation':
+    case 'segment':
+    case 'sculpt':
+      return runEditOp(input, op);
     default:
       return failure('MESH_ENGINE_UNSUPPORTED', `the TypeScript engine does not answer "${op.op}"`);
   }
@@ -182,6 +193,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['minkowski', MESH_TS_TRIANGLE_CAP],
   ['offset', MESH_TS_TRIANGLE_CAP],
   ['subdivide', MESH_TS_TRIANGLE_CAP],
+  ...EDIT_OPS.map((name): [MeshOpName, number] => [name, MESH_TS_TRIANGLE_CAP]),
 ]);
 
 export const tsMeshEngine: MeshProcessingEngine = { name: 'ts', capabilities: () => CAPABILITIES, run };

@@ -58,7 +58,7 @@ export const cloudToModelDeviation = defineCommand({
     'analytic primitives - pipe runs, cylinders, boxes, spheres; the sagitta r(1 - cos(pi/segments)) in "tessellated" mode). A straight pipe ' +
     'also gets its fitted axis offset ("the line is 25 mm low") and radius delta. Distances in document units. reviewRequired is always true. ' +
     'device "gpu" (RS-4): a picture of the per-point distances on the GPU (deterministic false); the numbers stay those of the Rust CPU path.',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
     entityIds: entityIdsParam,
@@ -163,7 +163,7 @@ export const checkAsbuiltClash = defineCommand({
     'clusters, and the sampling bound (spacing / 2). An as-built run committed from this cloud ignores its own surface points. ' +
     'reviewRequired is always true: a clear result from a scan is not proof of absence. device "gpu" (RS-4) prunes far points on the GPU ' +
     'with a conservative bound and re-checks the rest in f64 on the CPU: same result.',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
     entityIds: entityIdsParam,

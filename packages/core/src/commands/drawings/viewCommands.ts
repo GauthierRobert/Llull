@@ -17,6 +17,7 @@ const addedView = (doc: Parameters<typeof withSheet>[0], sheet: DrawingSheet, vi
  */
 export const createDrawingView = defineCommand({
   name: 'create_drawing_view',
+  annotations: { readsMeshTriangles: true },
   description:
     'Add an orthographic projection view (front, back, left, right, top, bottom or iso) of the 3D model to a drawing sheet. ' +
     'Visible edges are drawn thick, hidden edges dashed, circular features get centre lines. Position is automatic ' +
@@ -53,6 +54,7 @@ export const createDrawingView = defineCommand({
  */
 export const addSectionView = defineCommand({
   name: 'add_section_view',
+  annotations: { readsMeshTriangles: true },
   description:
     'Add a section view to a drawing sheet: the model is cut by a plane and seen from `direction` with the cut faces hatched ' +
     '(hidden lines omitted). `offset` is the world coordinate of the cutting plane on the axis the view looks along (x for left/right, ' +
@@ -107,6 +109,7 @@ export const addSectionView = defineCommand({
  */
 export const addDetailView = defineCommand({
   name: 'add_detail_view',
+  annotations: { readsMeshTriangles: true },
   description:
     'Add a detail view to a drawing sheet: a circle on a parent (projection or section) view is drawn magnified and clipped to the ' +
     'circle, labelled "DETAIL B (2:1)" with the next free letter; the circle and letter are drawn on the parent. `center` and ' +

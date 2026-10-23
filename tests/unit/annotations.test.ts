@@ -201,9 +201,14 @@ describe('annotations invariant', () => {
   it('every command with annotations has at least one flag set to true', () => {
     for (const cmd of listCommands()) {
       if (!cmd.annotations) continue;
-      const { readOnly, destructive, idempotent, metaHistory, requiresKernel } = cmd.annotations;
+      const { readOnly, destructive, idempotent, metaHistory, requiresKernel, readsMeshTriangles } = cmd.annotations;
       const atLeastOne =
-        readOnly === true || destructive === true || idempotent === true || metaHistory === true || requiresKernel === true;
+        readOnly === true ||
+        destructive === true ||
+        idempotent === true ||
+        metaHistory === true ||
+        requiresKernel === true ||
+        readsMeshTriangles === true;
       expect(atLeastOne, `${cmd.name} has an annotations object but no flag is true`).toBe(true);
     }
   });

@@ -10,6 +10,7 @@ import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { DeformLaw } from '../model/deform';
 
 import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
+import type { MeshToBrepRequest, MeshToBrepResult } from './kernelMeshBrep';
 import type { BlendReport, ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
@@ -165,6 +166,9 @@ export interface GeometryKernel {
 
   /** Read a STEP product tree (assembly structure, names, colours, healed solids) or an IGES file (04 XCH); null when unsupported. */
   importExchange?(format: 'step' | 'iges', text: string, options: ImportExchangeOptions): ImportExchangeResult | null;
+
+  /** Prismatic B-rep of a segmented closed triangle mesh (07 MSH FR-MSH-21): exact faces for analytic groups, sewn into a solid; null when unsupported or refused. */
+  meshToBrep?(request: MeshToBrepRequest): MeshToBrepResult | null;
 
   /** Make a document blob (`brep` recipe leaves, `BRepTools::Write` text keyed by sha256) available to `evaluate`. Idempotent. */
   loadBlob?(sha256: string, brep: string): void;

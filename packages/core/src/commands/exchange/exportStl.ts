@@ -3,6 +3,8 @@
 import type { Vec3 } from '../../model/types';
 import { exportRefusal, report } from '../noop';
 import type { CommandResult } from '../types';
+import { currentContext } from '../context';
+import { exportAssetRefusal } from '../mesh/meshCommon';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
@@ -137,7 +139,9 @@ export const exportStl = defineCommand({
     const refused = exportRefusal(doc, 'export_stl', 'stl', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
-    const collected = collectExportParts(doc, params.entityIds);
+    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets);
+    const unreadable = exportAssetRefusal(doc, 'export_stl', collected.unreadable);
+    if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
     const triangleCount = tris.length;
     const nonEmpty = collected.parts.filter((part) => part.tris.length > 0);

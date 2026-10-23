@@ -5,10 +5,12 @@
  */
 
 import type { CommandResult } from '../types';
+import { currentContext } from '../context';
+import { exportAssetRefusal } from '../mesh/meshCommon';
 import { exportRefusal, report } from '../noop';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { uint8ArrayToBase64 } from '../../lib/base64';
-import { collectExportParts, exportSummary } from '../../geometry/entityTriangles';
+import { collectExportParts, exportSummary, withFullResolution } from '../../geometry/entityTriangles';
 import type { CadDocument } from '../../model/types';
 import { entityIdsField } from './exportFormats';
 import { type GroupOf, buildGltfScene, collectDecalParts, collectSceneParts } from './gltfScene';
@@ -118,9 +120,12 @@ export const exportGltf = defineCommand({
     const { entityIds, binary = false } = params;
     const refused = exportRefusal(doc, 'export_gltf', 'gltf', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    const collected = collectExportParts(doc, entityIds);
+    const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets);
+    const unreadable = exportAssetRefusal(doc, 'export_gltf', collected.unreadable);
+    if (unreadable !== null) return unreadable;
     const ids = collected.parts.map((part) => part.id);
-    const scene = buildGltfScene(collectSceneParts(doc, ids), collectDecalParts(doc, ids), groupIndex(doc));
+    const sceneDoc = withFullResolution(doc, ids, (ctx ?? currentContext()).meshAssets);
+    const scene = buildGltfScene(collectSceneParts(sceneDoc, ids), collectDecalParts(sceneDoc, ids), groupIndex(sceneDoc));
     const tris = collected.parts.flatMap((part) => part.tris);
     const counts = { triangleCount: tris.length, nodeCount: scene.nodeCount, materialCount: scene.materialCount };
     const summary =

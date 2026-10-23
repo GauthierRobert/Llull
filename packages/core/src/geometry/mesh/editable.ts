@@ -1,0 +1,31 @@
+/** Shared preconditions and texts of the editing ops (decimate, remesh) for every mesh engine, so the TypeScript and native engines refuse alike. */
+
+import type { MeshData } from '../../model/types';
+import { fastMeasure } from './fastMeasure';
+import type { MeshEngineFailure, MeshProvenance } from './engineTypes';
+
+const failure = (code: string, message: string): MeshEngineFailure => ({ code, message });
+
+/** Refusal of ops that need a manifold, consistently wound mesh without degenerate faces; null when `mesh` qualifies. */
+export function editableProblem(mesh: MeshData, op: string): MeshEngineFailure | null {
+  const measure = fastMeasure(mesh);
+  if (measure.nonManifoldEdges > 0)
+    return failure('MESH_NON_MANIFOLD', `${op} needs a manifold mesh: ${measure.nonManifoldEdges} edge(s) have more than two faces`);
+  if (measure.degenerateFaces > 0)
+    return failure('MESH_DEGENERATE', `${op} needs a mesh without degenerate faces: ${measure.degenerateFaces} found`);
+  if (measure.inconsistentEdges > 0)
+    return failure('MESH_ORIENTATION_INCONSISTENT', `${op} needs a consistently wound mesh: ${measure.inconsistentEdges} edge(s) disagree`);
+  return null;
+}
+
+type Description = Pick<MeshProvenance, 'algorithm' | 'reference'>;
+
+export const DECIMATE_DESCRIPTION: Description = {
+  algorithm: 'quadric error metric edge collapse with link condition, fold-over test and probe-point deviation bound',
+  reference: 'Garland and Heckbert, Surface Simplification Using Quadric Error Metrics, SIGGRAPH 1997',
+};
+
+export const smoothDescription = (taubin: boolean): Description => ({
+  algorithm: taubin ? 'Taubin lambda|mu umbrella smoothing' : 'Laplacian umbrella smoothing',
+  reference: 'Taubin, A Signal Processing Approach to Fair Surface Design, SIGGRAPH 1995',
+});

@@ -7,11 +7,13 @@
 
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import type { KernelInfo } from '@core/geometry/kernelPorts';
-import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
+import { composeMeshEngines, setMeshProcessingEngine } from '@core/geometry/mesh/engine';
+import type { MeshProcessingEngine } from '@core/geometry/mesh/engineTypes';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createManifoldMeshEngine } from '@kernel-manifold/manifoldMeshEngine';
 import { errorMessage } from '@lib/errorMessage';
 import { positiveInteger } from './env';
+import { createNativeMeshEngine } from './native/meshProcessingEngine';
 import { startNativeKernel } from './nativeKernel';
 
 /** The installed kernel: `occt` is the native OCCT sidecar, `manifold` the in-process mesh kernel. */
@@ -52,13 +54,21 @@ export interface KernelInstallOptions {
   readonly startNative?: typeof startNativeKernel;
 }
 
-/** The Manifold mesh engine serves mesh modelling (07 MSH) whichever B-rep kernel is installed; without it those ops refuse with MESH_ENGINE_UNSUPPORTED. */
-async function installMeshEngine(): Promise<void> {
+/**
+ * The mesh engines of mesh modelling (07 MSH): the native `llull-compute meshops` (decimate / smooth at any size) when the binary is installed and
+ * the Manifold engine (Minkowski, offset, hollow, wrap, mesh booleans), whichever B-rep kernel is installed. A missing engine only makes the ops it
+ * serves refuse (MESH_ENGINE_UNSUPPORTED / MESH_ENGINE_CAP_EXCEEDED).
+ */
+async function installMeshEngine(env: NodeJS.ProcessEnv): Promise<void> {
+  const engines: MeshProcessingEngine[] = [];
+  const native = createNativeMeshEngine({ env });
+  if (native !== null) engines.push(native);
   try {
-    setMeshProcessingEngine(await createManifoldMeshEngine());
+    engines.push(await createManifoldMeshEngine());
   } catch (error) {
     warnUnavailable('Manifold mesh engine unavailable; Minkowski, offset, hollow, wrap and mesh booleans will refuse', error);
   }
+  setMeshProcessingEngine(engines.length === 0 ? null : composeMeshEngines(engines));
 }
 
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
@@ -66,7 +76,7 @@ export async function installGeometryKernel(options: KernelInstallOptions = {}):
   const env = options.env ?? process.env;
   const startNative = options.startNative ?? startNativeKernel;
   warned = false;
-  await installMeshEngine();
+  await installMeshEngine(env);
   let fallbackReason: string | undefined;
   if (env['LLULL_KERNEL']?.trim().toLowerCase() !== 'manifold') {
     const native = startNative({ callTimeoutMs: occtCallTimeoutMs(env) }, env);

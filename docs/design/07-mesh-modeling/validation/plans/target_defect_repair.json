@@ -1,11 +1,7 @@
 {
  "id": "MSH-REPAIR",
- "status": "DRAFT: needs analyze_mesh, repair_mesh, fill_mesh_holes (import_mesh exists)",
- "unbuilt": [
-  "analyze_mesh",
-  "repair_mesh",
-  "fill_mesh_holes"
- ],
+ "status": "RUNNABLE: every command is built (07 MSH M0, M1)",
+ "unbuilt": [],
  "validates": [
   "VC-MSH-02",
   "VC-MSH-04"

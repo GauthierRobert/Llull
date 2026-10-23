@@ -136,7 +136,7 @@ export const analyzeSurfaceCurvature = defineCommand({
  */
 export const analyzeDraft = defineCommand({
   name: 'analyze_draft',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Read-only draft analysis against a mould pull direction. `id` is a nurbs_surface (sampled on a `grid` x `grid` patch grid) or a 3D solid ' +
     '(every facet of its tessellation; the exact kernel is not needed). The draft angle of a face is asin(n . pull) in degrees, n the outward ' +

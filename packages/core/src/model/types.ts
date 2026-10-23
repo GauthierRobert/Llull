@@ -1,7 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
-import type { FaceGroup, MeshSource } from './meshProvenance';
+import type { FaceGroup, MeshAssetRef, MeshSource } from './meshProvenance';
 import type { BlendProfile, FaceBlendParams, FullRoundParams } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
@@ -160,6 +160,8 @@ export interface MeshSolidEntity extends BaseEntity {
   meshSource?: MeshSource;
   /** Named triangle ranges from an import (OBJ groups, 3MF objects), `[start, end)` over the triangle order of `mesh.indices`. */
   faceGroups?: ReadonlyArray<FaceGroup>;
+  /** Full-resolution triangles in the host's mesh asset store (07 MSH FR-MSH-02); `mesh` is then the display level of detail. */
+  asset?: MeshAssetRef;
 }
 
 /**

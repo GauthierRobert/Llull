@@ -33,22 +33,40 @@ export function weldMesh(mesh: MeshData, tolerance: number): WeldedMesh {
   const welded: number[] = [];
   const remap = new Int32Array(positions.length / 3).fill(-1);
   const cell = tolerance > 0 ? tolerance : 0;
-  const buckets = new Map<string, number[]>();
+  const limit = cell * cell;
+  // Buckets are keyed by a 32-bit hash of the cell (or of the exact coordinates); a collision only adds candidates, which are checked by distance.
+  const buckets = new Map<number, number[]>();
   const triangles: number[] = [];
   let referenced = 0;
-  const bucketKey = (i: number, j: number, k: number): string => `${i},${j},${k}`;
+  const hash = (a: number, b: number, c: number): number =>
+    (Math.imul(a, 0x9e3779b1) ^ Math.imul(b, 0x85ebca77) ^ Math.imul(c, 0xc2b2ae3d)) | 0;
+  const view = new DataView(new ArrayBuffer(8));
+  const bits = (value: number): number => {
+    view.setFloat64(0, value + 0); // + 0 turns -0 into 0, as the exact comparison below does
+    return view.getInt32(0) ^ view.getInt32(4);
+  };
+  const exactKey = (x: number, y: number, z: number): number => hash(bits(x), bits(y), bits(z));
+  const cellKey = (i: number, j: number, k: number): number => hash(i | 0, j | 0, k | 0);
   const lookup = (x: number, y: number, z: number): number => {
     if (cell === 0) {
-      const exact = buckets.get(`${x},${y},${z}`);
-      return exact?.[0] ?? -1;
+      let best = -1;
+      for (const candidate of buckets.get(exactKey(x, y, z)) ?? []) {
+        if (
+          welded[candidate * 3] === x &&
+          welded[candidate * 3 + 1] === y &&
+          welded[candidate * 3 + 2] === z &&
+          (best < 0 || candidate < best)
+        )
+          best = candidate;
+      }
+      return best;
     }
     const [ci, cj, ck] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
-    const limit = cell * cell;
     let best = -1;
     for (let di = -1; di <= 1; di++) {
       for (let dj = -1; dj <= 1; dj++) {
         for (let dk = -1; dk <= 1; dk++) {
-          for (const candidate of buckets.get(bucketKey(ci + di, cj + dj, ck + dk)) ?? []) {
+          for (const candidate of buckets.get(cellKey(ci + di, cj + dj, ck + dk)) ?? []) {
             const dx = (welded[candidate * 3] as number) - x;
             const dy = (welded[candidate * 3 + 1] as number) - y;
             const dz = (welded[candidate * 3 + 2] as number) - z;
@@ -62,7 +80,7 @@ export function weldMesh(mesh: MeshData, tolerance: number): WeldedMesh {
   const register = (x: number, y: number, z: number): number => {
     const index = welded.length / 3;
     welded.push(x, y, z);
-    const key = cell === 0 ? `${x},${y},${z}` : bucketKey(Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell));
+    const key = cell === 0 ? exactKey(x, y, z) : cellKey(Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell));
     const bucket = buckets.get(key);
     if (bucket === undefined) buckets.set(key, [index]);
     else bucket.push(index);

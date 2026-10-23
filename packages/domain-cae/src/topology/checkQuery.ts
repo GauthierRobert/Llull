@@ -25,7 +25,7 @@ const entry = (code: string, severity: Item['severity'], message: string, ids: r
  */
 export const checkTopology = defineCommand({
   name: 'check_topology',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Readiness and review check of a topology study; call it last. Items with stable codes: set-up problems (TOP_SETUP_INVALID, ' +
     'TOP_TARGET_UNMAPPED, TOP_LOAD_OUTSIDE_DOMAIN, TOP_REGION_OUTSIDE_DOMAIN, TOP_KEEPIN_EXCEEDS_BUDGET, TOP_GRID_TOO_LARGE), TOP_FILTER_TOO_SMALL, ' +

@@ -1,26 +1,30 @@
-/** offset_mesh, hollow_mesh, repair_mesh (mode wrap): level-set mesh operations (07 MSH M2, FR-MSH-07 / 14 / 15). The field mesher is an injected mesh engine (Manifold). */
+/** offset_mesh, hollow_mesh and the wrap rebuild of repair_mesh: level-set mesh operations (07 MSH M2, FR-MSH-07 / 14 / 15). The field mesher is an injected mesh engine (Manifold). */
 
 import { analyzeIndexedMesh } from '../../geometry/mesh/analysis';
 import { meshDiagonal } from '../../geometry/mesh/weld';
-import { defineCommand, z } from '../schema';
-import type { CommandResult } from '../types';
+import { type DrainTool, drainTool } from '../../geometry/mesh/drainHole';
+import type { MeshEngineFailure, MeshOpResult } from '../../geometry/mesh/engineTypes';
+import { SurfaceIndex } from '../../geometry/mesh/surfaceIndex';
+import { defineCommand, vec3, z } from '../schema';
+import type { CadDocument } from '../../model/types';
+import type { CommandResult, ExecutionContext } from '../types';
 import { type NamedDefault, namedDefault } from './meshCommon';
 import { type Measure, runMeshOp } from './runMeshOp';
 
 /** Vertex tolerance as a fraction of the bounding-box diagonal when the caller gives none (named default, TECHNICAL §5.12). */
 const TOLERANCE_FRACTION = 0.002;
 /** Level-set grid cells a call may use unless the caller raises it (the spec ceiling is 2e7). */
-const DEFAULT_MAX_CELLS = 40_000;
+export const DEFAULT_MAX_CELLS = 40_000;
 const MAX_CELLS_CEILING = 20_000_000;
 
-const toleranceParam = z
+export const toleranceParam = z
   .number()
   .positive()
   .optional()
   .describe(
     'Target distance (document units) between a result vertex and the exact surface: the level-set grid edge is set to it. When that needs more cells than maxCells the grid is coarsened to fit and the result reports the weaker bound it really has (data.toleranceMet false, data.errorBound). Default 0.002 x bounding-box diagonal (named default).',
   );
-const maxCellsParam = z
+export const maxCellsParam = z
   .number()
   .int()
   .positive()
@@ -29,7 +33,7 @@ const maxCellsParam = z
   .describe(
     `Level-set grid cell cap; a finer tolerance than the cap allows refuses with MESH_OFFSET_RESOLUTION. Default ${DEFAULT_MAX_CELLS}.`,
   );
-const keepSourceParam = z
+export const keepSourceParam = z
   .boolean()
   .optional()
   .describe(
@@ -112,16 +116,26 @@ export const hollowMesh = defineCommand({
     'Hollow a closed mesh (or 3D solid) into a shell of constant wall thickness with a sealed internal cavity (print preparation: saves resin / ' +
     'filament). The cavity is the parallel body at -wallThickness from a signed-distance field, so inward corners stay sharp and the cavity is a ' +
     'clean manifold; the outer surface is kept from the input. Reports data.materialVolume and data.cavityVolume (document units^3). Needs the ' +
-    'Manifold engine. A sealed cavity traps material in resin printing: add a drain hole before printing (drain holes are a later milestone). ' +
+    'Manifold engine. A sealed cavity traps material in resin printing: give `drainHoles` ({near, diameter}): each is a cylinder 3 x the wall long along the outward surface normal at the surface point nearest to `near`, subtracted so the cavity opens to the outside (data.drainHoles lists the points; data.cavityOpen). ' +
     'Refusals: MESH_NOT_CLOSED, MESH_PARAM_INVALID, MESH_OFFSET_RESOLUTION, MESH_ENGINE_UNSUPPORTED, MESH_BOOLEAN_FAILED.',
   params: z.object({
     id: z.string().describe('Id of the closed mesh (or other 3D solid) to hollow.'),
     wallThickness: z.number().positive().describe('Wall thickness in document units, measured inward from the outer surface.'),
+    drainHoles: z
+      .array(
+        z.object({
+          near: vec3('Point [x, y, z] (document units, world); the hole is centred on the surface point nearest to it.'),
+          diameter: z.number().positive().describe('Hole diameter in document units.'),
+        }),
+      )
+      .max(16)
+      .optional()
+      .describe('Drain holes that open the cavity to the outside (up to 16). Default none: the cavity stays sealed.'),
     tolerance: toleranceParam,
     maxCells: maxCellsParam,
     keepSource: keepSourceParam,
   }),
-  run: (doc, { id, wallThickness, tolerance: given, maxCells, keepSource }, ctx): CommandResult =>
+  run: (doc, { id, wallThickness, drainHoles, tolerance: given, maxCells, keepSource }, ctx): CommandResult =>
     runMeshOp(doc, ctx, {
       command: 'hollow_mesh',
       id,
@@ -143,6 +157,38 @@ export const hollowMesh = defineCommand({
         tolerance: toleranceOf(given, loaded.mesh.positions),
         maxCells: maxCells ?? DEFAULT_MAX_CELLS,
       }),
+      ...(drainHoles !== undefined && drainHoles.length > 0
+        ? {
+            post: (result, _loaded, input, engine): MeshOpResult | MeshEngineFailure => {
+              const index = new SurfaceIndex(input.positions, input.indices);
+              const tools = drainHoles.map((hole) => drainTool(input, index, hole.near, hole.diameter, wallThickness));
+              if (result.mesh === undefined || tools.some((tool) => tool === null))
+                return { code: 'MESH_PARAM_INVALID', message: 'a drain hole needs a surface to sit on' };
+              const found = tools as DrainTool[];
+              const cut = engine.run(
+                { mesh: result.mesh },
+                { op: 'boolean', kind: 'subtract', others: found.map((tool) => ({ mesh: tool.mesh })) },
+              );
+              if ('code' in cut) return cut;
+              return {
+                ...cut,
+                report: {
+                  ...result.report,
+                  drainHoles: found.map((tool, k) => ({
+                    near: drainHoles[k]?.near,
+                    at: tool.at,
+                    normal: tool.normal,
+                    diameter: drainHoles[k]?.diameter,
+                    distance: tool.distance,
+                  })),
+                  cavityOpen:
+                    cut.mesh !== undefined &&
+                    analyzeIndexedMesh(cut.mesh.positions, cut.mesh.indices, { selfIntersections: false, maxListed: 0 }).shellCount === 1,
+                },
+              };
+            },
+          }
+        : {}),
       defaults: (loaded) => defaultsFor(given, toleranceOf(given, loaded.mesh.positions), doc.units),
       fields: (before, after, result) => ({
         wallThickness,
@@ -157,56 +203,45 @@ export const hollowMesh = defineCommand({
 });
 
 /**
- * @affects rewrites the mesh `id` with a closed manifold envelope of its triangles (or adds one mesh with keepSource)
+ * Level-set rebuild of any triangle soup into a closed manifold envelope (repair_mesh mode wrap).
  * @invariant inner structures, internal faces and sub-tolerance gaps are destroyed (data.innerStructuresDestroyed); the result has 0 crossing triangles
- * @failure unknown id / non-solid / grid over maxCells / no Manifold engine -> no-op with a MESH_* code
  */
-export const repairMesh = defineCommand({
-  name: 'repair_mesh',
-  description:
-    'Repair a mesh. mode "wrap" rebuilds a closed, manifold, non-self-intersecting envelope of ANY triangle soup (overlapping bodies, inner ' +
-    'shells, open parts, duplicate or inverted faces, holes smaller than the tolerance) from a signed-distance field (generalized winding ' +
-    'number for inside / outside), at the stated vertex tolerance. Inner structures are destroyed and the result says so ' +
-    '(data.innerStructuresDestroyed). Needs the Manifold engine. Run analyze_mesh / check_mesh purpose=print first to see what is wrong. ' +
-    'Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_OFFSET_RESOLUTION, MESH_ENGINE_UNSUPPORTED.',
-  params: z.object({
-    id: z.string().describe('Id of the mesh (or other 3D solid) to repair.'),
-    mode: z
-      .enum(['wrap'])
-      .describe(
-        '"wrap": level-set rebuild (the only mode built so far; weld / clean / orient / stitch / close_holes come with the next milestone).',
-      ),
-    tolerance: toleranceParam,
-    maxCells: maxCellsParam,
-    keepSource: keepSourceParam,
-  }),
-  run: (doc, { id, mode, tolerance: given, maxCells, keepSource }, ctx): CommandResult =>
-    runMeshOp(doc, ctx, {
-      command: 'repair_mesh',
-      id,
-      keepSource: keepSource ?? false,
-      requireClosed: false,
-      op: (loaded) => ({ op: 'wrap', tolerance: toleranceOf(given, loaded.mesh.positions), maxCells: maxCells ?? DEFAULT_MAX_CELLS }),
-      defaults: (loaded) => defaultsFor(given, toleranceOf(given, loaded.mesh.positions), doc.units),
-      fields: (before, after, result) => {
-        const mesh = result.mesh;
-        const crossings =
-          mesh !== undefined && mesh.indices.length / 3 <= 100_000
-            ? analyzeIndexedMesh(mesh.positions, mesh.indices, { selfIntersections: true, maxListed: 0 }).selfIntersectionPairs
-            : null;
-        return {
-          mode,
-          innerStructuresDestroyed: true,
-          closedBefore: before.closed,
-          volumeBefore: before.volume,
-          volumeAfter: after.volume,
-          areaBefore: before.area,
-          selfIntersectionsAfter: crossings,
-          errorBound: after.area * ((result.report['worstVertexError'] as number | undefined) ?? 0),
-          ...result.report,
-        };
-      },
-      summary: (from, to, before, after, unit) =>
-        `repair_mesh '${from}' mode=wrap -> '${to}': ${after.closed ? 'closed' : 'OPEN'}, ${after.faces} triangles, volume ${volumeText(after, unit)} (input ${before.closed ? 'closed' : 'open'}); inner structures destroyed.`,
-    }),
-});
+export function wrapMesh(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  {
+    id,
+    tolerance: given,
+    maxCells,
+    keepSource,
+  }: { id: string; tolerance?: number | undefined; maxCells?: number | undefined; keepSource?: boolean | undefined },
+): CommandResult {
+  return runMeshOp(doc, ctx, {
+    command: 'repair_mesh',
+    id,
+    keepSource: keepSource ?? false,
+    requireClosed: false,
+    op: (loaded) => ({ op: 'wrap', tolerance: toleranceOf(given, loaded.mesh.positions), maxCells: maxCells ?? DEFAULT_MAX_CELLS }),
+    defaults: (loaded) => defaultsFor(given, toleranceOf(given, loaded.mesh.positions), doc.units),
+    fields: (before, after, result) => {
+      const mesh = result.mesh;
+      const crossings =
+        mesh !== undefined && mesh.indices.length / 3 <= 100_000
+          ? analyzeIndexedMesh(mesh.positions, mesh.indices, { selfIntersections: true, maxListed: 0 }).selfIntersectionPairs
+          : null;
+      return {
+        mode: 'wrap',
+        innerStructuresDestroyed: true,
+        closedBefore: before.closed,
+        volumeBefore: before.volume,
+        volumeAfter: after.volume,
+        areaBefore: before.area,
+        selfIntersectionsAfter: crossings,
+        errorBound: after.area * ((result.report['worstVertexError'] as number | undefined) ?? 0),
+        ...result.report,
+      };
+    },
+    summary: (from, to, before, after, unit) =>
+      `repair_mesh '${from}' mode=wrap -> '${to}': ${after.closed ? 'closed' : 'OPEN'}, ${after.faces} triangles, volume ${volumeText(after, unit)} (input ${before.closed ? 'closed' : 'open'}); inner structures destroyed.`,
+  });
+}

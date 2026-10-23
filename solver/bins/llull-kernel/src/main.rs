@@ -6,6 +6,7 @@
 //! at once: the host is gone, and a long or hung OCCT call must not outlive it.
 
 mod exchange;
+mod meshbrep;
 mod queries;
 mod session;
 

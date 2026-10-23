@@ -12,8 +12,10 @@ import {
   engineOutcome,
   isCommandResult,
   isLoadFailure,
+  isStoreFailure,
   loadSolidMesh,
   measureMesh,
+  storeMesh,
   meshRejection,
   withConventions,
 } from './meshCommon';
@@ -44,7 +46,7 @@ export const convexHull = defineCommand({
     let unverified = false;
     const sources: Entity[] = [];
     for (const id of ids ?? []) {
-      const loaded = loadSolidMesh(doc, id);
+      const loaded = loadSolidMesh(doc, id, undefined, contextOf(ctx).meshAssets);
       if (isLoadFailure(loaded)) return meshRejection(doc, 'convex_hull', loaded.code, loaded.message, loaded.ids);
       for (const value of loaded.mesh.positions) cloud.push(value);
       unverified ||= loaded.unverified;
@@ -54,7 +56,9 @@ export const convexHull = defineCommand({
     const outcome = engineOutcome(doc, 'convex_hull', engine.run(emptyMeshInput, { op: 'hull', points: cloud }), ids ?? []);
     if (isCommandResult(outcome)) return outcome;
     const mesh = outcome.mesh as MeshData;
-    const entity = newMeshEntity(mesh, {
+    const stored = storeMesh(mesh, contextOf(ctx).meshAssets);
+    if (isStoreFailure(stored)) return meshRejection(doc, 'convex_hull', stored.code, stored.message, ids ?? []);
+    const entity = newMeshEntity(stored, {
       unverified,
       ...(sources[0] !== undefined ? { color: sources[0].color, layerId: sources[0].layerId } : {}),
     });

@@ -1,7 +1,19 @@
 /** Shared plumbing of the mesh commands (07 MSH): entity -> welded world mesh, coded refusals, result entities, the `data` conventions (units, unverified, provenance, defaults). */
 
-import { DEFAULT_LAYER_ID, type CadDocument, type Entity, type MeshData, type MeshSolidEntity, is3D } from '../../model/types';
+import {
+  DEFAULT_LAYER_ID,
+  type CadDocument,
+  type Entity,
+  type MeshData,
+  type MeshSolidEntity,
+  type ShapeRecipe,
+  is3D,
+} from '../../model/types';
 import { entityToTriangles } from '../../geometry/entityTriangles';
+import { type MeshAssetPort, MESH_INLINE_TRIANGLE_CAP, MESH_LOD_TRIANGLES, placeMesh } from '../../geometry/mesh/assets';
+import { fastMeasure } from '../../geometry/mesh/fastMeasure';
+import { lodMesh } from '../../geometry/mesh/lod';
+import type { MeshAssetRef } from '../../model/meshProvenance';
 import { analyzeIndexedMesh } from '../../geometry/mesh/analysis';
 import type { MeshEngineFailure, MeshOpResult, MeshProvenance } from '../../geometry/mesh/engineTypes';
 import { meshDiagonal, weldMesh } from '../../geometry/mesh/weld';
@@ -25,13 +37,30 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_IMPORT_PARSE: 'Fix the file at the reported line or byte offset.',
   MESH_IMPORT_EMPTY: 'The file holds no triangles; check that it is the right file.',
   MESH_IMPORT_SHA_MISMATCH: 'The file is not the one pinned: re-export it, or pass the sha256 of the file you intend to use.',
-  MESH_IMPORT_TOO_LARGE: 'Split the file, or decimate it before import (the asset store is a later milestone).',
+  MESH_IMPORT_TOO_LARGE:
+    'Import it through a host with the mesh asset store (llull mesh import FILE, then import_mesh_file fileKey), or split / decimate the file.',
+  MESH_ASSET_MISSING: 'This machine does not hold the asset: re-import the source file (its sha256 is in meshSource).',
+  MESH_ASSET_UNAVAILABLE:
+    'No mesh asset store is installed here (run through the llull CLI or the desktop backend), or reduce the mesh below the inline cap.',
   MESH_ENGINE_UNSUPPORTED: 'Run in the desktop app or the `llull` CLI host, which install the Manifold mesh engine.',
   MESH_ENGINE_CAP_EXCEEDED:
     'The input is above the TypeScript engine cap: use a host with the Manifold or native engine, or reduce the mesh.',
   MESH_OFFSET_RESOLUTION: 'Raise tolerance (or maxCells): the level-set grid would exceed the cell cap.',
   MESH_HULL_DEGENERATE: 'Give at least 4 points that are not coplanar.',
   MESH_BOOLEAN_FAILED: 'Run check_mesh purpose=boolean on the operands.',
+  MESH_ORIENTATION_INCONSISTENT: 'Faces disagree on winding: run repair_mesh mode=orient first.',
+  MESH_DEGENERATE: 'The mesh has degenerate faces: run repair_mesh mode=clean first.',
+  MESH_HOLE_NOT_FOUND: 'Run analyze_mesh to list the boundary loops (0-based), or pass holes "all".',
+  MESH_HOLE_TOO_LARGE: 'Raise maxBoundaryEdges, or use repair_mesh mode=wrap.',
+  MESH_HOLE_NON_SIMPLE: 'The loop touches itself: run repair_mesh mode=stitch, then fill again.',
+  MESH_HOLE_NO_TRIANGULATION: 'No valid triangulation of the loop exists: split it with repair_mesh mode=stitch, or use mode=wrap.',
+  MESH_TARGET_UNREACHABLE: 'Raise maxDeviation, lower the target, or set preserveBoundary false.',
+  MESH_REMESH_EDGE_TOO_LARGE: 'Lower the target edge length (at most 0.25 x the bounding-box diagonal).',
+  MESH_BREP_SEW_FAILED: 'Use mode=faceted, repair_mesh first, or raise fitTolerance.',
+  MESH_SCULPT_STAMP_OFF_SURFACE: 'Move the stamp centre within `radius` of the surface (analyze_mesh gives the bounds), or raise radius.',
+  MESH_SEGMENT_NO_GROUPS: 'The mesh has no face to segment: check it with analyze_mesh.',
+  MESH_KERNEL_UNSUPPORTED: 'Run on the native OCC kernel (the llull CLI / desktop app default); Manifold has no exact B-rep builder.',
+  MESH_CUT_MISSES: 'Move the plane so that the mesh has vertices on both sides.',
 };
 
 export const meshRejection = tableRejection(MESH_REMEDIATION);
@@ -68,11 +97,42 @@ export const WELD_TOLERANCE_FRACTION = 1e-6;
  * Welded world-space triangles of any 3D solid.
  * @failure unknown id / 2D, curve, sheet or empty entity -> LoadFailure
  */
-export function loadSolidMesh(doc: CadDocument, id: string, weldTolerance?: number): SolidMesh | LoadFailure {
+export function loadSolidMesh(
+  doc: CadDocument,
+  id: string,
+  weldTolerance?: number,
+  assets?: MeshAssetPort | null,
+): SolidMesh | LoadFailure {
   const entity = doc.entities[id];
   if (entity === undefined) return { code: 'MESH_ENTITY_NOT_FOUND', message: `entity '${id}' not found`, ids: [id] };
   if (!is3D(entity) || entity.kind === 'instance') {
     return { code: 'MESH_NOT_A_MESH', message: `entity '${id}' (${entity.kind}) is not a 3D solid with triangles`, ids: [id] };
+  }
+  if (entity.kind === 'mesh' && entity.asset !== undefined) {
+    if (assets === undefined || assets === null)
+      return {
+        code: 'MESH_ASSET_UNAVAILABLE',
+        message: `entity '${id}' is backed by mesh asset ${entity.asset.key.slice(0, 12)}... but no asset store is installed`,
+        ids: [id],
+      };
+    const full = assets.readMesh(entity.asset.key);
+    if (full === null)
+      return {
+        code: 'MESH_ASSET_MISSING',
+        message: `mesh asset ${entity.asset.key} of entity '${id}' is not in this machine's store`,
+        ids: [id],
+      };
+    const placedRaw = placeMesh(full, entity.position, entity.rotation);
+    const welded =
+      weldTolerance === undefined ? null : weldMesh({ positions: placedRaw.positions, indices: placedRaw.indices }, weldTolerance);
+    const placed = welded === null ? placedRaw : { positions: welded.positions, indices: welded.triangles };
+    return {
+      entity,
+      mesh: placed,
+      unverified: isUnverified(entity),
+      weldTolerance: weldTolerance ?? WELD_TOLERANCE_FRACTION * meshDiagonal(placed.positions),
+      weldDefaulted: weldTolerance === undefined,
+    };
   }
   const positions = entityToTriangles(entity, doc).flatMap((triangle) => triangle.flat());
   if (positions.length === 0) return { code: 'MESH_NOT_A_MESH', message: `entity '${id}' (${entity.kind}) has no triangles`, ids: [id] };
@@ -90,8 +150,12 @@ export function loadSolidMesh(doc: CadDocument, id: string, weldTolerance?: numb
 
 export const isLoadFailure = (value: SolidMesh | LoadFailure): value is LoadFailure => 'code' in value;
 
+/** Triangles above which `measureMesh` uses the typed-array measure instead of the full analysis. */
+const FAST_MEASURE_TRIANGLES = 50_000;
+
 /** Area, volume (outward-wound closed meshes) and closedness of an indexed mesh. */
 export function measureMesh(mesh: MeshData): { area: number; volume: number | null; closed: boolean; faces: number; vertices: number } {
+  if (mesh.indices.length / 3 > FAST_MEASURE_TRIANGLES) return fastMeasure(mesh);
   const analysis = analyzeIndexedMesh(mesh.positions, mesh.indices, { selfIntersections: false, maxListed: 0 });
   return { area: analysis.area, volume: analysis.volume, closed: analysis.closed, faces: analysis.faces, vertices: analysis.vertices };
 }
@@ -139,12 +203,40 @@ export function withConventions(
 /** The context a command runs in (its own `ctx` or the process defaults). */
 export const contextOf = (ctx: ExecutionContext | undefined): ExecutionContext => ctx ?? currentContext();
 
+export interface StoredMesh {
+  /** Inline triangles: the whole mesh, or the display level of detail of an asset-backed one. */
+  readonly mesh: MeshData;
+  readonly asset?: MeshAssetRef;
+  /** Exact construction tree of a kernel result (mesh_to_brep); absent on plain meshes. */
+  readonly brep?: ShapeRecipe;
+}
+
+/**
+ * Where a result mesh lives: inline up to MESH_INLINE_TRIANGLE_CAP, else in the asset store with a display LOD.
+ * @failure above the cap without a store -> MESH_ASSET_UNAVAILABLE
+ */
+export function storeMesh(mesh: MeshData, assets: MeshAssetPort | null | undefined): StoredMesh | LoadFailure {
+  const triangles = mesh.indices.length / 3;
+  if (triangles <= MESH_INLINE_TRIANGLE_CAP) return { mesh };
+  if (assets === undefined || assets === null)
+    return {
+      code: 'MESH_ASSET_UNAVAILABLE',
+      message: `the result has ${triangles} triangles (inline cap ${MESH_INLINE_TRIANGLE_CAP}) and no mesh asset store is installed`,
+      ids: [],
+    };
+  return { mesh: lodMesh(mesh, MESH_LOD_TRIANGLES), asset: assets.writeMesh(mesh) };
+}
+
+export const isStoreFailure = (value: StoredMesh | LoadFailure): value is LoadFailure => 'code' in value;
+
 /** A new world-space mesh entity (id `mesh-<step>.<k>`); `unverified` keeps the provenance flag of its inputs. */
-export function newMeshEntity(mesh: MeshData, options: { unverified: boolean; color?: string; layerId?: string }): MeshSolidEntity {
+export function newMeshEntity(stored: StoredMesh, options: { unverified: boolean; color?: string; layerId?: string }): MeshSolidEntity {
   return {
     id: nextId('mesh'),
     kind: 'mesh',
-    mesh,
+    mesh: stored.mesh,
+    ...(stored.asset !== undefined ? { asset: stored.asset } : {}),
+    ...(stored.brep !== undefined ? { brep: stored.brep } : {}),
     meshSource: { format: 'generated', unitScale: 1, verified: !options.unverified },
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -156,10 +248,10 @@ export function newMeshEntity(mesh: MeshData, options: { unverified: boolean; co
 /** Append a new mesh entity (see `newMeshEntity`). */
 export function addMeshEntity(
   doc: CadDocument,
-  mesh: MeshData,
+  stored: StoredMesh,
   options: { unverified: boolean; color?: string; layerId?: string },
 ): { document: CadDocument; id: string } {
-  const entity = newMeshEntity(mesh, options);
+  const entity = newMeshEntity(stored, options);
   return { document: withEntity(doc, entity), id: entity.id };
 }
 
@@ -172,15 +264,18 @@ export function addMeshEntity(
 export function commitMesh(
   doc: CadDocument,
   source: Entity,
-  mesh: MeshData,
+  stored: StoredMesh,
   options: { keepSource: boolean; unverified: boolean },
 ): { document: CadDocument; id: string } {
-  if (options.keepSource) return addMeshEntity(doc, mesh, { unverified: options.unverified, color: source.color, layerId: source.layerId });
+  if (options.keepSource)
+    return addMeshEntity(doc, stored, { unverified: options.unverified, color: source.color, layerId: source.layerId });
   const placed = source.position.some((v) => v !== 0) || source.rotation.some((v) => v !== 0);
   const entity: MeshSolidEntity = {
     id: source.id,
     kind: 'mesh',
-    mesh,
+    mesh: stored.mesh,
+    ...(stored.asset !== undefined ? { asset: stored.asset } : {}),
+    ...(stored.brep !== undefined ? { brep: stored.brep } : {}),
     meshSource: { format: 'generated', unitScale: 1, verified: !options.unverified },
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -213,3 +308,20 @@ export function engineOutcome(
 }
 
 export const isCommandResult = (value: MeshOpResult | CommandResult): value is CommandResult => 'document' in value;
+
+/** Refusal of an export that reaches an asset-backed mesh whose full-resolution asset cannot be read (never the LOD), or null. */
+export function exportAssetRefusal(
+  doc: CadDocument,
+  command: string,
+  unreadable: ReadonlyArray<{ id: string; code: string }>,
+): CommandResult | null {
+  const first = unreadable[0];
+  if (first === undefined) return null;
+  return meshRejection(
+    doc,
+    command,
+    first.code,
+    `the full-resolution mesh asset of ${unreadable.map((u) => `'${u.id}'`).join(', ')} cannot be read (an export never writes the display level of detail)`,
+    unreadable.map((u) => u.id),
+  );
+}

@@ -28,6 +28,7 @@ import { runStackupTool } from './stackupMonteCarlo';
 import { runVortexLatticeTool } from './vortexLattice';
 import { runExplicitRun, type ExplicitRunOptions } from './explicitRun';
 import { defaultScanDeps, isScanTool, runScanTool } from '../scan/scanTools';
+import { isMeshHostTool, runMeshHostTool } from '../meshAssets/meshTools';
 import { MTEST_TOOL, runMtestTool } from '../mfront/mtestTool';
 import { runCfdSolve, type CfdSolveOptions } from '../cfd/flowSolve';
 
@@ -63,6 +64,7 @@ export async function runNativeTool(
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
   if (isScanTool(name)) return runScanTool(name, params, defaultScanDeps(deps.env, host.onProgress));
+  if (isMeshHostTool(name)) return runMeshHostTool(name, params, host.getDoc().units);
   if (!isNativeTool(name)) return null;
   if (name === MTEST_TOOL) return runMtestTool(params);
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
