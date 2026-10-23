@@ -40,6 +40,7 @@
     "production": "npm run production:scripted && npm run production:ui",
     "llull": "node server/bin/llull.cjs",
     "features": "node scripts/features.mjs",
+    "piping-catalog": "node scripts/piping-catalog.mjs",
     "deadcode": "knip --include exports,types"
   },
   "dependencies": {
