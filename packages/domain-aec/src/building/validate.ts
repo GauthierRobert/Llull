@@ -9,6 +9,7 @@ import { arcThrough } from './geometry/curvedWallGeometry';
 import { parseWallLayers } from './elements/wallLayers';
 import { isVec2 } from './model';
 import { EQUIPMENT_SHAPES } from '../industrial/equipment/equipmentShape';
+import { plantDataErrors } from '../plant/equipment/validatePlant';
 
 /** Problems with the optional landing fields of a stair (landingAt, landingLength, shape, turn, flightGap). */
 function stairLandingErrors(key: string, stair: Record<string, unknown>): string[] {
@@ -222,6 +223,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   if (category === 'equipment' && shapeValue !== undefined && !(typeof shapeValue === 'string' && EQUIPMENT_SHAPES.includes(shapeValue))) {
     errors.push(`building element ${key}: shape must be one of ${EQUIPMENT_SHAPES.join(', ')}`);
   }
+  if (category === 'equipment') errors.push(...plantDataErrors(key, element['plant']));
   const role = element['role'];
   if (category === 'member' && !(typeof role === 'string' && Object.keys(MEMBER_LAYER).includes(role))) {
     errors.push(`building element ${key}: role must be one of ${Object.keys(MEMBER_LAYER).join(', ')}`);

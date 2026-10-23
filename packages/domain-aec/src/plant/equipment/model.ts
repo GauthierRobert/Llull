@@ -49,6 +49,19 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EQP_HEAD_NOT_COVERED:
     'This head type has no closed-form partial volume yet (horizontal torispherical, V1): give a level at 0 or the full diameter.',
   EQP_LEVEL_OUT_OF_RANGE: 'Give levels inside 0..totalHeight, measured from the lowest inside point (head apex or shell bottom).',
+  EQP_NOT_FOUND: 'List the tags with equipment_ports or building_schedule kind equipment, and pass a tag (e.g. "V-101") or an element id.',
+  EQP_TAG_DUPLICATE: 'Choose another tag; equipment tags are unique in the document.',
+  EQP_NOT_PARAMETRIC:
+    'Recreate it with add_vessel, or keep it as a block and add nozzles with location { on: "free", position, direction }.',
+  EQP_SUPPORT_INVALID:
+    'Skirt / legs belong to vertical vessels, saddles to horizontal ones; legs >= 3; saddle stations inside 0..tangentLength.',
+  EQP_TRAYS_DONT_FIT: 'Reduce trays.count or trays.spacing so that the last tray is at most tangentLength above the bottom tangent line.',
+  EQP_NOZZLE_MARK_DUPLICATE: 'Choose another mark; marks are unique per equipment.',
+  EQP_NOZZLE_NOT_FOUND: 'List the marks with equipment_ports.',
+  EQP_NOZZLE_OFF_BODY: 'Keep 0 <= elevation (or station) <= tangentLength and radialOffset < inside radius.',
+  EQP_NOZZLE_PROJECTION_TOO_SHORT: 'Increase projection: shell nozzles measure from the vessel axis, head nozzles from the tangent line.',
+  EQP_RATING_UNKNOWN: 'Use a rating such as CL150, CL300, CL600 or PN16, and a DN of the nominal-size table (15..600).',
+  EQP_PORT_CONNECTED: 'Re-route the connected pipe first, or pass force: true.',
 };
 
 export const refuse = tableRejection(REMEDIATION);

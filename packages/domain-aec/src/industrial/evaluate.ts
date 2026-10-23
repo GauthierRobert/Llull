@@ -18,6 +18,8 @@ import { circlePolygon } from '@lib/arc';
 import { findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, normalize3OrZero, sub3 } from '@lib/vec3';
 import { shapeOf } from './equipment/equipmentShape';
+import { evaluateNozzles } from '../plant/equipment/evaluate/evaluateNozzles';
+import { evaluateVessel } from '../plant/equipment/evaluate/evaluateVessel';
 
 // prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
@@ -110,9 +112,17 @@ const EQUIPMENT_COLOR = '#c27c2c';
 
 /**
  * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size` (vertical: axis +Z from the level; horizontal:
- * axis along local x at mid-height, bottom on the level)
+ * axis along local x at mid-height, bottom on the level); a parametric vessel (`plant.template.kind` vessel) -> exact revolutions + supports + nozzles;
+ * a legacy block carrying nozzles keeps its box / cylinder and gains the nozzle solids
  */
 export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
+  const template = equipment.plant?.template;
+  if (template?.kind === 'vessel') return evaluateVessel(equipment, level, template);
+  const body = evaluateLegacyEquipment(equipment, level);
+  return equipment.plant === undefined ? body : [...body, ...evaluateNozzles(equipment, level)];
+}
+
+function evaluateLegacyEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
   const [length, width, height] = equipment.size;
   const stub = { part: 'body', label: `${equipment.name} ${equipment.mark}` };
   const shape = shapeOf(equipment);

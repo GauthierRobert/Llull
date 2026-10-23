@@ -7,6 +7,7 @@
 
 import type { Vec2, Vec3 } from '@core/model/vectors';
 import type { SpecBinding } from '@aec/plant/catalog/types';
+import type { PlantEquipmentData } from '@aec/plant/equipment/plantData';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =
@@ -246,6 +247,8 @@ export interface EquipmentElement extends LevelElementBase {
   clearance: number;
   /** Operating weight in kg (0 when unknown). */
   weight: number;
+  /** Parametric plant data (03 EQP): when present, `size` / `shape` / `weight` are re-derived from it by the plant-equipment commands. */
+  plant?: PlantEquipmentData;
 }
 
 /** A pipe run through 3D points (z relative to the level). */
