@@ -12,6 +12,8 @@ import type { CheckResult } from '@design/checks';
 
 const dir = join(import.meta.dirname, '..', '..', '..', 'packages', 'design-lang', 'examples');
 const examples = readdirSync(dir).filter((name) => name.endsWith('.lld'));
+/** implicit.lld takes ~12 s alone and > 30 s while the full suite loads every core. */
+const EXAMPLE_TIMEOUT_MS = 90_000;
 
 beforeAll(async () => {
   setGeometryKernel(await createManifoldKernel());
@@ -23,18 +25,22 @@ describe('examples', () => {
     expect(examples.map((name) => name.replace(/\.lld$/, '')).sort()).toEqual(TOOLSET_NAMES.filter((t) => t !== 'design').sort());
   });
 
-  it.each(examples)('%s applies, its checks pass, check_design agrees, and it regenerates', (name) => {
-    const source = readFileSync(join(dir, name), 'utf8');
-    const applied = execute(createEmptyDocument(), 'apply_design', { source });
-    expect(applied.error, applied.summary).toBeUndefined();
-    const checks = (applied.data as { checks: CheckResult[] }).checks;
-    expect(checks.length).toBeGreaterThanOrEqual(3);
-    expect(checks.filter((c) => !c.pass)).toEqual([]);
-    expect(execute(applied.document, 'check_design', {}).error).toBeUndefined();
-    const replayed = execute(applied.document, 'replay_history', {});
-    expect(replayed.error, replayed.summary).toBeUndefined();
-    // Same entities (count): a plain import_dxf step re-mints its ids on replay too (its layer is carried, core history/carry.ts).
-    expect(replayed.document.order).toHaveLength(applied.document.order.length);
-    expect(execute(replayed.document, 'check_design', {}).error).toBeUndefined();
-  });
+  it.each(examples)(
+    '%s applies, its checks pass, check_design agrees, and it regenerates',
+    (name) => {
+      const source = readFileSync(join(dir, name), 'utf8');
+      const applied = execute(createEmptyDocument(), 'apply_design', { source });
+      expect(applied.error, applied.summary).toBeUndefined();
+      const checks = (applied.data as { checks: CheckResult[] }).checks;
+      expect(checks.length).toBeGreaterThanOrEqual(3);
+      expect(checks.filter((c) => !c.pass)).toEqual([]);
+      expect(execute(applied.document, 'check_design', {}).error).toBeUndefined();
+      const replayed = execute(applied.document, 'replay_history', {});
+      expect(replayed.error, replayed.summary).toBeUndefined();
+      // Same entities (count): a plain import_dxf step re-mints its ids on replay too (its layer is carried, core history/carry.ts).
+      expect(replayed.document.order).toHaveLength(applied.document.order.length);
+      expect(execute(replayed.document, 'check_design', {}).error).toBeUndefined();
+    },
+    EXAMPLE_TIMEOUT_MS,
+  );
 });
