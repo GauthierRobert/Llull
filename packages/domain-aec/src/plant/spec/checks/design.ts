@@ -43,7 +43,7 @@ export function designFindings({ spec }: CheckContext, design: DesignConditions)
       finding(
         spec.id,
         'design',
-        'PSC_CATALOG_ROW_MISSING',
+        'PSC_RATING_TABLE_UNKNOWN',
         'not_run',
         [spec.id],
         ['rating'],

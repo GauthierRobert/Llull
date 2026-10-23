@@ -85,11 +85,17 @@ const sizeQuery = (size: NominalSize): { nps?: string; dn?: string } => (size.sy
 const priorityOf = (component: SpecComponent): number => component.priority ?? DEFAULT_PRIORITY;
 const range = (spec: PipeSpec): string => `${sizeLabel(spec.sizeRange.from)} to ${sizeLabel(spec.sizeRange.to)}`;
 
-/** Families of `catalog` that a spec's `catalogRef` names for `type`: the family id starts with the alias, or the standard equals it. */
+const sameAlias = (id: string, reference: string): boolean => {
+  const family = id.toLowerCase();
+  const alias = reference.toLowerCase();
+  return family === alias || family.startsWith(`${alias}-`);
+};
+
+/** Families of `catalog` that a spec's `catalogRef` names for `type`: the family id equals the alias or starts with it followed by `-`, or the standard equals it. */
 function referencedFamilies(catalog: PipingCatalog, component: SpecComponent): ComponentFamily[] {
   const key = alnum(component.catalogRef);
   return catalog.families.filter(
-    (family) => family.type === component.type && (alnum(family.id).startsWith(key) || alnum(family.standard) === key),
+    (family) => family.type === component.type && (sameAlias(family.id, component.catalogRef) || alnum(family.standard) === key),
   );
 }
 
@@ -189,7 +195,9 @@ export function resolveChosen(
   const unverified = [
     ...Object.keys(dims).filter((name) => dims[name]?.verified !== true),
     ...(pipe !== undefined && !pipe.verified ? ['pipe.wall'] : []),
-  ].sort();
+  ];
+  if (synthetic !== null && dims['wall'] === undefined) unverified.push('wall');
+  unverified.sort();
   const unresolved =
     search.kind === 'none' && synthetic === null
       ? `no catalogue of the spec has a ${component.type} family for catalogRef "${component.catalogRef}" (import-only standard): dimensions unknown`

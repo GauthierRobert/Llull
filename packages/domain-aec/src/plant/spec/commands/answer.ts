@@ -60,7 +60,7 @@ export function componentData(spec: PipeSpec, resolved: ResolvedComponent): Reco
       dims: resolved.unverifiedDims,
       ...(resolved.unresolved === undefined ? {} : { reason: resolved.unresolved }),
     });
-  if (resolved.unresolved !== undefined) warnings.push({ code: 'PSC_CATALOG_ROW_MISSING', reason: resolved.unresolved });
+  if (resolved.unresolved !== undefined) warnings.push({ code: 'PSC_CATALOG_FAMILY_MISSING', reason: resolved.unresolved });
   return {
     specId: spec.id,
     revision: spec.revision,

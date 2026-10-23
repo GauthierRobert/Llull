@@ -36,7 +36,7 @@ describe('resolve_spec_component (VC-PSC-08)', () => {
   it('NPS 1 elbow: the socket-weld component, selected but unverified because B16.11 is import-only', () => {
     const row = resolve({ type: 'elbow90', nps: 1 });
     expect(row).toMatchObject({ componentId: 'E90-SW', ends: 'SW', class: 3000, verified: false });
-    expect((row['warnings'] as Array<{ code: string }>).map((w) => w.code)).toEqual(['PSC_DATA_UNVERIFIED', 'PSC_CATALOG_ROW_MISSING']);
+    expect((row['warnings'] as Array<{ code: string }>).map((w) => w.code)).toEqual(['PSC_DATA_UNVERIFIED', 'PSC_CATALOG_FAMILY_MISSING']);
     expect(row['dims']).toEqual({});
   });
 

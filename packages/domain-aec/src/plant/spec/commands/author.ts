@@ -6,10 +6,9 @@ import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../../building/model';
 import { refuse } from '../../catalog/codes';
-import { parseNps } from '../../catalog/nominal';
 import { applyEditOps, editOpSchema } from '../edit';
 import { canonicalSpecText, headerShape, parseSpecFile, specToFile, SPEC_FORMAT, SPEC_ID_PATTERN, type SpecIssue } from '../file';
-import { inRange } from '../size';
+import { inRange, querySize } from '../size';
 import { getSpecModel, latestSpec, withSpecModel } from '../store';
 import type { PipeSpec } from '../types';
 
@@ -162,7 +161,7 @@ function orphanedPipes(doc: CadDocument, edited: PipeSpec): string[] {
   return elementsOf(getBuilding(doc), 'pipe')
     .filter((pipe) => {
       const binding = pipe.spec;
-      const size = binding === undefined ? null : parseNps(binding.nps);
+      const size = binding === undefined ? null : (querySize({ nps: binding.nps }) ?? querySize({ dn: binding.nps }));
       return (
         binding?.specId === edited.id &&
         size !== null &&

@@ -72,7 +72,7 @@ describe('check_pipe_spec design conditions (VC-PSC-10)', () => {
   it('no usable rating table is reported as not_run, never silently passed', () => {
     const en = importedDoc(mixSpec());
     const checked = data<Checked>(en, 'check_pipe_spec', { specId: 'MIX-1', design: { pressureBar: 10, temperatureC: 20 } });
-    expect(checked.issues.find((issue) => issue.rule === 'design')).toMatchObject({ code: 'PSC_CATALOG_ROW_MISSING', status: 'not_run' });
+    expect(checked.issues.find((issue) => issue.rule === 'design')).toMatchObject({ code: 'PSC_RATING_TABLE_UNKNOWN', status: 'not_run' });
     expect(checked.design).toMatchObject({ checked: false });
     const noClass = importedDoc({ ...smallSpec(), rating: { system: 'ASME B16.5', materialGroup: '1.1' } });
     expect(

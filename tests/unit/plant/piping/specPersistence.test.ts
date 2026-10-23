@@ -127,7 +127,14 @@ describe('the plant.spec document slice', () => {
       pipeSpecErrors({ specs: { 'CS150-A1': revisions }, specOrder: order });
     expect(at([])[0]).toContain('non-empty array');
     expect(at([5])[0]).toContain('llull-pipe-spec');
-    expect(at([{ ...spec, revision: 2 }])[0]).toContain('revision 1');
+    expect(at([{ ...spec, revision: 0 }])[0]).toContain('revision');
+    expect(
+      at([
+        { ...spec, revision: 2 },
+        { ...spec, revision: 2 },
+      ])[0],
+    ).toContain('strictly ascending');
+    expect(at([{ ...spec, revision: 2 }])).toEqual([]);
     expect(at([{ ...spec, id: 'OTHER' }])[0]).toContain('id "CS150-A1"');
     expect(at([{ ...spec, status: 'nope' }])[0]).toContain('status');
     expect(at([{ ...spec, components: 5 }])[0]).toContain('components and catalogs');

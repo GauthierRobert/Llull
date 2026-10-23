@@ -123,14 +123,14 @@ export const exportPipeSpec = defineCommand({
     } else text = canonicalSpecText(spec);
     return report(
       doc,
-      `export_pipe_spec: ${spec.id} r${spec.revision} as ${format}: ${spec.components.length} component(s), ${text.length} bytes.`,
+      `export_pipe_spec: ${spec.id} r${spec.revision} as ${format}: ${spec.components.length} component(s), ${new TextEncoder().encode(text).length} bytes.`,
       {
         specId: spec.id,
         revision: spec.revision,
         format,
         text,
         sha256: sha256Hex(text),
-        bytes: text.length,
+        bytes: new TextEncoder().encode(text).length,
         components: spec.components.length,
         ...(table === undefined ? {} : { branchCsv: table }),
       },

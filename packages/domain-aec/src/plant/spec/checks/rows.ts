@@ -2,7 +2,7 @@
 
 import type { NominalSize } from '../../catalog/types';
 import { resolveChosen, type ResolvedComponent } from '../resolve';
-import { inRange } from '../size';
+import { inRange, sizeOrdinal, sizesInRange } from '../size';
 import type { SpecComponent } from '../types';
 import type { CheckContext } from './finding';
 
@@ -27,13 +27,19 @@ export function componentRows(context: CheckContext): readonly ComponentRows[] {
     const resolved: ResolvedComponent[] = [];
     const missing: NominalSize[] = [];
     let missingReason: string | undefined;
+    const branches = component.branchFrom && component.branchTo ? sizesInRange(component.branchFrom, component.branchTo) : [undefined];
     for (const size of covered) {
-      const outcome = resolveChosen(spec, catalogs, component, size, component.branchFrom, { type: component.type });
-      if (outcome.ok) resolved.push(outcome.resolved);
-      else if (!NOT_A_GAP.has(outcome.code)) {
-        missing.push(size);
-        missingReason ??= `${outcome.code}: ${outcome.message}`;
+      const usable = branches.filter((branch) => branch === undefined || sizeOrdinal(branch) <= sizeOrdinal(size));
+      let gap = false;
+      for (const branch of usable) {
+        const outcome = resolveChosen(spec, catalogs, component, size, branch, { type: component.type });
+        if (outcome.ok) resolved.push(outcome.resolved);
+        else if (!NOT_A_GAP.has(outcome.code)) {
+          gap = true;
+          missingReason ??= `${outcome.code}: ${outcome.message}`;
+        }
       }
+      if (gap) missing.push(size);
     }
     const unresolved = resolved.find((entry) => entry.unresolved !== undefined)?.unresolved;
     return {
