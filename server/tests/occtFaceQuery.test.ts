@@ -292,8 +292,8 @@ describeNative('occt face query: unsupported and out-of-range requests', () => {
   it('returns null (never throws) for unimplemented methods and bad indices', () => {
     const shape = shapeOf(BOX);
     expect(port().tessellateFace(shape, 0, 0.1)).toBeNull();
-    expect(port().edgeSamples(shape, 0, 4)).toBeNull();
-    expect(port().edgeContinuity(shape, 0, 4)).toBeNull();
+    expect(port().edgeSamples(shape, 99, 4)).toBeNull();
+    expect(port().edgeContinuity(shape, 99, 4)).toBeNull();
     expect(port().bspline(shape, 0)).toBeNull();
     expect(port().faceGeometry(shape, -1)).toBeNull();
     expect(port().faceGeometry(shape, 6)).toBeNull();
@@ -323,8 +323,8 @@ describeNative('face query through the isolated worker kernel', () => {
     expect(query.faceSamples(shape, 0, { nu: 1, nv: 1 })).toHaveLength(1);
     expect(query.distance(shape, [[0, 0, 0]])?.[0]?.signed).toBeCloseTo(-5, 8);
     expect(query.tessellateFace(shape, 0, 0.1)).toBeNull();
-    expect(query.edgeSamples(shape, 0, 2)).toBeNull();
-    expect(query.edgeContinuity(shape, 0, 2)).toBeNull();
+    expect(query.edgeSamples(shape, 99, 2)).toBeNull();
+    expect(query.edgeContinuity(shape, 99, 2)).toBeNull();
     expect(query.bspline(shape, 0)).toBeNull();
   }, 180_000);
 });

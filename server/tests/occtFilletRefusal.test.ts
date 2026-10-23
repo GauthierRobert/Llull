@@ -26,7 +26,7 @@ function runUntilFillet(actions: unknown[]): ReturnType<typeof execute> {
 describeNative('occt fillet results are checked before they are committed', () => {
   it('refuses an invalid blend against a tangent boss (no hang downstream)', () => {
     const result = runUntilFillet(plan('tangent-boss-fillet.json'));
-    expect(result.summary).toMatch(/could not round these edges into a valid solid/);
+    expect(result.summary).toMatch(/BLD_INVALID_RESULT/);
     expect(result.document.featureHistory).toHaveLength(0);
   });
 

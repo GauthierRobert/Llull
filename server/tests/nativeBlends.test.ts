@@ -41,8 +41,10 @@ describeNative('BLD M0: fillet diagnostics, probe_fillet, check_blends and the r
   const volume = (doc: Doc, id: string): number => (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
   const faces = (doc: Doc, id: string): Face[] => (execute(doc, 'inspect_topology', { id }).data as { faces: Face[] }).faces;
   const areaOf = (list: Face[], suffix: string): number => list.find((face) => face.name?.endsWith(suffix))?.area ?? Number.NaN;
-  const handleOf = (doc: Doc, id: string): ReturnType<IsolatedKernel['evaluate']> =>
-    kernel.evaluate((doc.entities[id] as MeshSolidEntity).brep as never);
+  const handleOf = (doc: Doc, id: string): ReturnType<IsolatedKernel['evaluate']> | null => {
+    const brep = (doc.entities[id] as MeshSolidEntity).brep;
+    return brep ? kernel.evaluate(brep) : null;
+  };
 
   it('VC-BLD-02: the linear law r 1 -> 2 keeps the planar contact areas exact (top 170, side 70) and records the construction volume', () => {
     const { doc, id } = block();
