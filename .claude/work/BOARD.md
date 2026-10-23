@@ -91,7 +91,12 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing) — both built_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
-- Plant packs `docs/plant/` (10 packs, specs only): first fix `pipeSizes.ts` ASME/EN mix (README D1), settle D2, then PSC + EQP M1.
+- Plant packs `docs/plant/` (order = README "Dependencies and recommended order"; D1 fixed, D2 decided 2026-10-23). Wave 1:
+- `[WIP]` **PSC-M1** 01 PSC M0 + M1 (types, codes, NPS/DN map, bundled open catalogue flagged per row, `*_piping_catalog`, `pipe_section_properties`, `pt_rating`): `docs/plant/01-piping-specs-catalog/`. _Lane 1, `plant/catalog/`_ _deps: —_
+- `[WIP]` **EQP-M1** 03 EQP M1 geometry core (heads, partial volumes, offset weights, graded tables, `vessel_volume`; VC-01..04): `docs/plant/03-parametric-equipment/`. _Lane 1, `plant/equipment/`_ _deps: —_
+- `[WIP]` **STA-M1** 06 STA M1 (plugin skeleton, codes, `access_rules.json` tables, `list_access_rules`, `check_access` on stairs and slab edges): `docs/plant/06-plant-structures-access/`. _Lane 1, `plant/structures/`_ _deps: —_
+- `[WIP]` **VIS-M1** 09 VIS M1 (display model, colour rules + profiles, `check_display`, property port, `apply_service_colour_scheme`): `docs/plant/09-plant-visualization-review/`. _Lane 1 + cad-reviewer (plugin port)_ _deps: —_
+- `[TODO]` Wave 2: **RTE-V1** 02 `route_pipe`, fittings, `check_piping`. _deps: PSC-M1 (then PSC M2), EQP-M1_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 

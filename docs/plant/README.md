@@ -1,7 +1,7 @@
 # Process plant design — gap analysis and specifications
 
 Status: specifications and validation packs written 2026-10-18. Built since: 02 RTE V2 auto-router with its minimal M0/M1
-slice (plugin `piping`, `doc.plant.piping`, native `llull-compute route`; 02 TECHNICAL_SPEC §13, 2026-10-19). The rest is not built.
+slice (plugin `piping`, `doc.plant.piping`, native `llull-compute route`; 02 TECHNICAL_SPEC §13, 2026-10-19). D1 fixed (a6499537), D2 decided by the owner 2026-10-23. The rest is not built.
 Target: the level of detail of AutoCAD Plant 3D / Autodesk Plant Design Suite, AVEVA E3D, Hexagon Smart 3D and
 CADMATIC: a complete process unit with vessels, columns, exchangers and pumps carrying nozzles; spec-driven piping
 with flanges, gaskets, bolts, valves and insulation; steel with platforms, caged ladders and handrails; pipe racks;
@@ -115,8 +115,8 @@ PID ~40 d, ISO ~30 d, STA ~12 wk, DAT ~6.5 wk, SCN ~16 wk total; PST and VIS in 
 
 | # | Finding / decision | Packs | Recommendation |
 | - | ------------------ | ----- | -------------- |
-| D1 | **Live bug**: `packages/domain-aec/src/industrial/piping/pipeSizes.ts` mixes EN 10220 ODs with ASME walls; ASME NPS 2½ (OD 73.0) and NPS 5 (OD 141.3) miss every row by > 1.5 mm and fall back to a 2.5 / 3.53 mm wall instead of 5.16 / 6.55 mm, feeding hydraulics, riser support loads and steel line loads. | 01 | Fix test-first now (`fix-bug`), independent of the plant work. |
-| D2 | **One plant home.** Packs propose `piping`, `plant-equipment`, `pid`, `piping-fabrication`, `plantStructures`, `plantData`, `scan` plugins and slices `doc.plant`, `doc.pid`, `doc.fabrication`, `doc.scan`. | all | One folder `packages/domain-aec/src/plant/<area>/`, one plugin per area, one additive core slice `doc.plant` with sub-records; settle before the first milestone. **Provisionally applied 2026-10-19** by 02 RTE (`doc.plant.piping`, plugin `piping`; 02 TECHNICAL_SPEC §13.4) pending the owner's decision. |
+| D1 | **Live bug**: `packages/domain-aec/src/industrial/piping/pipeSizes.ts` mixes EN 10220 ODs with ASME walls; ASME NPS 2½ (OD 73.0) and NPS 5 (OD 141.3) miss every row by > 1.5 mm and fall back to a 2.5 / 3.53 mm wall instead of 5.16 / 6.55 mm, feeding hydraulics, riser support loads and steel line loads. | 01 | **Fixed** (a6499537): ASME B36.10M ODs of NPS 2½ and NPS 5 matched beside EN 10220. |
+| D2 | **One plant home.** Packs propose `piping`, `plant-equipment`, `pid`, `piping-fabrication`, `plantStructures`, `plantData`, `scan` plugins and slices `doc.plant`, `doc.pid`, `doc.fabrication`, `doc.scan`. | all | One folder `packages/domain-aec/src/plant/<area>/`, one plugin per area, one additive core slice `doc.plant` with sub-records; settle before the first milestone. **Decided by the owner 2026-10-23** as recommended (first applied by 02 RTE: `doc.plant.piping`, plugin `piping`; 02 TECHNICAL_SPEC §13.4). The slice type lives in the plugin (`plant/types.ts`, `DocumentExtensions`), not in core; each area adds one optional sub-record. |
 | D3 | **Nozzle / port convention.** 03 places nozzles by elevation + orientation angle (`V-101:N1`); 02 also needs explicit `{ position, direction }` ports for pumps and plain blocks. | 02, 03 | Support both forms, resolve to one `Port` type; the default angle convention is 03's open question Q2. |
 | D4 | **Bundling transcribed tables** (ASME / EN dimensions from MIT / LGPL open data) as llull's default catalogue. | 01, 02, 03 | Owner / legal decision; until then rows carry provenance and `unverified` unless grade A. |
 | D5 | **Plan data binding** `$fromStep` in `build_project` (use one step's `data` in a later step). | 10 (also useful to 07, 08) | Small core addition to the project command; specify once in AGENT_FIRST AF-14. |
