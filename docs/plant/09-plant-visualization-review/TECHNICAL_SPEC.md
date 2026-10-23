@@ -678,7 +678,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d |
+| VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
 | VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d |
 | VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
@@ -797,11 +797,43 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-VIS-M1 (display / colour profiles), the rest of VIS-M2 (section boxes, markups, comments, status workflow,
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (section boxes, markups, comments, status workflow,
 `check_review`, `apply_viewpoint`, `get_viewpoint`, UI), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
 (`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
+
+### 12.6 As built — VIS-M1 display profiles and service colours, 2026-10-23
+
+Built: the generic display model, first-match colour rules, profiles, the colour report, `check_display`, the plugin property port and the
+service colour schemes (ASME A13.1, ISO 14726). No viewport rendering of a profile (VIS-M4 / M6); desktop-app verification does not apply yet.
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Display model | `CadDocument.display` (`colourProfiles`, `activeProfileId`), optional, no migration; load validation (`displayProblems`); `replay_history` carries it like `review` | `model/display.ts`, `commands/persistence/displayValidation.ts`, `commands/history/replay.ts` |
+| Property port (Q1) | `CadPlugin.entityProperties?: EntityPropertyProvider`; `plugins/host.ts` `entityPropertyProviders()`; `ExecutionContext.properties?: EntityPropertyReader` (default context = core keys merged under the providers'; a provider cannot override a core key). Core keys: `id`, `kind`, `is2D`, `layerId`, `layerName`, `name`, `tag` (multi), `materialId`, `componentId` | `model/entityProperties.ts`, `geometry/entityProperties.ts`, `plugins/{plugin,host}.ts`, `commands/{types,context}.ts` |
+| Colour rules | §5.1: validation (`profileProblems`: unique ids, predicate has a clause, `range` a <= b, regex <= 200 chars, no back-reference, no repeated quantified group, nesting <= 4, colours `#rrggbb`), compiled once, first match wins; case-insensitive string equality; multi-valued keys match on any value; a missing property never matches | `geometry/colourRules.ts` |
+| Core commands (metaHistory) | `define_colour_profile`, `set_active_colour_profile`, `delete_colour_profile`; queries `colour_by_rule_report` (groups by `line` / `entity` / `rule`, legend with counts, `unmatched`, `outOfScope`, `warnings`), `check_display` (`VIS_PROFILE_NOT_FOUND` error; `VIS_COLOUR_UNMATCHED`, `VIS_RULE_PROPERTY_UNKNOWN`, `VIS_SCHEME_REVIEW_REQUIRED` warnings) | `commands/display/*` (toolset `review`) |
+| Plant plugin `plant-display` (D2) | `list_service_colour_schemes`, `apply_service_colour_scheme` (one rule per mapped service in map order, `reviewRequired: true`, `unmapped` services listed, re-applying a `profileId` replaces it); tables with sources, grades and conflicts; palette `llull-ral-approx-v1` (approximate); provider for building pipes (`service`, `line`, `dn`, `odMm`, `material`, `from`, `to`), equipment (`mark`, `equipmentShape`) and plant piping runs (`service`, `line`, `dn`, `spec`, `odMm`, `insulationMm`) | `packages/domain-aec/src/plant/display/*` (toolset `review`) |
+
+Deviations from §2–§4 (law-driven or scoped to M1):
+
+- **Placement.** The generic model, rules and commands sit in core (`model/display.ts`, `geometry/colourRules.ts`, `commands/display/`), like the
+  existing `review` slice; the hazard tables, palette and provider sit in the plant plugin `plant/display/` (Q2 / D2), not in `industrial/display/`.
+  Core names no scheme. A rule that came from a scheme carries `scheme { id, rowId, category, names }` so reports show category and named colours.
+- **Colours.** A profile stores resolved `#rrggbb` only; `scheme:<id>/<category>` strings are resolved by `apply_service_colour_scheme`, not by core
+  (core cannot read scheme tables). `ColourProfile.defaultColour` replaces `defaultAppearance`; `materialClasses` is not in `DisplayModel` yet (VIS-M4 / M6).
+- **Toolsets.** No new toolset names: the display commands and `plant-display` are in `review` (`TOOLSETS.review` is now `REVIEW_CORE_TOOLS` + `pluginToolNames('review')`).
+- **Report scope.** An entity is "in scope" for a profile when its property bag has at least one key the profile's rules test; only in-scope entities are
+  grouped and can be `unmatched` (a box is not reported against a pipe-service profile). `groupBy: 'line'` groups by the `line` property.
+- **Not built:** `delete_colour_profile` has no `VIS_PROFILE_IN_USE` check (viewpoints do not reference profiles until VIS-M2 / M4);
+  `markerLetters` of `apply_service_colour_scheme` (VIS-M7 pipe markers); the profile result cache (`(profile, entities)`) waits for the renderer
+  that needs it; `approve_colour_profile` and `define_palette` stay V1; BS 1710 / DIN 2403 stay documentation. Predicates nest one `any` level in
+  the tool schema (the stored model nests four). Added code `VIS_RULE_PROPERTY_UNKNOWN` (warn): a rule tests a property no entity has.
+- **Ids.** `execute` refuses reserved ids (`CMD_RESERVED_ID`) for any `*Id` / `id` param before the command runs.
+
+Validation cases: VC-VIS-01 / 02 / 03 and SC-VIS-01 in `tests/unit/plant/display/serviceColour.test.ts` and `tests/unit/display/colourProfiles.test.ts`;
+the property port contract in `tests/unit/contract/entityPropertiesPort.test.ts`.
 
 ## 13. References
 

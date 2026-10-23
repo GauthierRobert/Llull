@@ -20,6 +20,7 @@ import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
+import type { DisplayModel } from './display';
 import type { CurveSegment } from './curve';
 import type { CompositesModel } from './composites';
 import type { DocumentExtensions } from './documentExtensions';
@@ -656,6 +657,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   prototype?: PrototypeModel;
   /** Absent until the first model-review command (`save_viewpoint`, `create_review_issue`; plant 09 VIS). */
   review?: ReviewModel;
+  /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
+  display?: DisplayModel;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */

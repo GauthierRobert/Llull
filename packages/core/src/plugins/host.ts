@@ -7,6 +7,7 @@ import type { CadPlugin, DocumentExtension, DocumentProjections } from './plugin
 import type { DerivationGuard } from '../commands/derivation';
 import type { RetiredCommandRewrite } from '../commands/types';
 import type { CadDocument } from '../model/types';
+import type { EntityPropertyProvider } from '../model/entityProperties';
 
 const installed: CadPlugin[] = [];
 const listeners: Array<(plugin: CadPlugin) => void> = [];
@@ -59,6 +60,11 @@ export function documentProjection<K extends keyof DocumentProjections>(key: K):
  */
 export function derivedEntityIds(doc: CadDocument): Set<string> {
   return new Set(documentExtensions().flatMap((extension) => [...extension.derivedEntityIds(doc)]));
+}
+
+/** The property providers of the installed plugins, in installation order. */
+export function entityPropertyProviders(): EntityPropertyProvider[] {
+  return installed.flatMap((plugin) => (plugin.entityProperties ? [plugin.entityProperties] : []));
 }
 
 /** Command names a toolset gets from installed plugins. */

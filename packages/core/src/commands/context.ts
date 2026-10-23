@@ -15,6 +15,8 @@ import { getMaterialLibraryProvider } from './libraryPort';
 import { getSignaturePort } from './signaturePort';
 import { getRasterPort } from './rasterPort';
 import { getFontProvider } from './fontPort';
+import { entityPropertyProviders } from '../plugins/host';
+import { entityPropertyBag } from '../geometry/entityProperties';
 import { type ReplayCache, createReplayCache } from './history/replayCache';
 import { counterIdSource, withIdSource } from '../lib/id';
 import type { ExecutionContext } from './types';
@@ -51,6 +53,7 @@ export function defaultContext(): ExecutionContext {
     ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     raster: getRasterPort(),
     fonts: getFontProvider(),
+    properties: (doc, entityId) => entityPropertyBag(doc, entityId, entityPropertyProviders()),
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,
