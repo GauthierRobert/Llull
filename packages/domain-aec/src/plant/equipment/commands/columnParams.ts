@@ -2,7 +2,7 @@
 
 import { z } from '@core/commands/schema';
 import type { PlatformClip, TraySpec } from '../plantData';
-import { toNorthClockwise, type AngleConvention } from './angles';
+import { fromNorthClockwise, toNorthClockwise, type AngleConvention } from './angles';
 
 export const traysSchema = z
   .object({
@@ -68,4 +68,11 @@ export function resolveClips(
     stored.push({ elevation: clip.elevation, fromDeg, toDeg, depth: clip.depth ?? defaults.depth, height: clip.height ?? defaults.height });
   }
   return stored;
+}
+
+/** A stored clip (north_cw, clockwise from -> to) as the caller reads it: east_ccw swaps the ends and mirrors the angles. */
+export function inConvention(clip: PlatformClip, convention: AngleConvention): PlatformClip {
+  return convention === 'north_cw'
+    ? clip
+    : { ...clip, fromDeg: fromNorthClockwise(clip.toDeg, convention), toDeg: fromNorthClockwise(clip.fromDeg, convention) };
 }

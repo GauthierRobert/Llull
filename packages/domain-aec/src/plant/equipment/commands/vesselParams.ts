@@ -268,6 +268,21 @@ export function buildVesselTemplate(input: VesselInput): { template: VesselTempl
   return { template, defaulted };
 }
 
+/** An operating liquid level above the vessel's inside height (vertical: above the bottom tangent line, horizontal: above the shell bottom). */
+export function liquidLevelIssue(template: VesselTemplate, design: VesselDesignData | undefined, pathPrefix = ''): VesselIssue | null {
+  const level = design?.operatingLiquid?.levelAboveBottomTangent;
+  const geometry = resolveVessel(template);
+  if (level === undefined || 'error' in geometry) return null;
+  const maximum = template.orientation === 'vertical' ? geometry.length + geometry.second.depth : 2 * geometry.radius;
+  return level <= maximum + 1e-9
+    ? null
+    : issue(
+        'EQP_LEVEL_OUT_OF_RANGE',
+        `operating liquid level ${level} is above the inside height reachable from the ${template.orientation === 'vertical' ? 'bottom tangent line' : 'shell bottom'} (${maximum})`,
+        `${pathPrefix}design.operatingLiquid.levelAboveBottomTangent`,
+      );
+}
+
 /** The input that would rebuild `template` (stored supports are fully resolved, so they round-trip without defaults). */
 export function vesselInputOf(template: VesselTemplate): VesselInput {
   const [firstName, secondName] = HEAD_NAMES[template.orientation];

@@ -18,12 +18,17 @@ export interface NozzleHardware {
   readonly defaulted: readonly string[];
 }
 
+/** ASME B16.5 / B16.47 pressure classes and the ISO 7005 / EN 1092 PN series that are accepted. */
+const ASME_CLASSES: readonly number[] = [150, 300, 400, 600, 900, 1500, 2500];
+const PN_SERIES: readonly number[] = [6, 10, 16, 25, 40, 63, 100, 160, 250, 320, 400];
+
 /** `{ class: 150 }` for `CL150`, `{ pn: 16 }` for `PN16`, null for anything else. */
 export function parseRating(rating: string): { readonly class?: number; readonly pn?: number } | null {
   const match = /^\s*(CL|CLASS|PN)\s*-?\s*(\d+)\s*$/i.exec(rating);
   if (match === null) return null;
   const value = Number(match[2]);
-  if (!(value > 0)) return null;
+  const series = (match[1] as string).toUpperCase() === 'PN' ? PN_SERIES : ASME_CLASSES;
+  if (!series.includes(value)) return null;
   return (match[1] as string).toUpperCase() === 'PN' ? { pn: value } : { class: value };
 }
 

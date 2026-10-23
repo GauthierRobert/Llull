@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument, RevolutionEntity } from '@core/model/types';
 import type { EquipmentElement } from '@aec/building/types';
+import { execute } from '@core/commands/registry';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { mmDocument, separatorParams } from './equipmentFixtures';
 
@@ -124,5 +125,25 @@ describe('add_process_column (VC-EQP-21)', () => {
       'EQP_TRAYS_DONT_FIT',
       'set.tangentLength',
     );
+  });
+});
+
+describe('add_process_column is pure', () => {
+  it('leaves its input document untouched', () => {
+    const doc = mmDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_process_column', { ...column, platformClips: [{ elevation: 3000, fromDeg: 0, toDeg: 90 }] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+describe('add_process_column: clips are reported in the caller convention', () => {
+  it('east_ccw reports the arc as it was given although it is stored north_cw', () => {
+    const report = data<ColumnData>(mmDocument(), 'add_process_column', {
+      ...column,
+      angleConvention: 'east_ccw',
+      platformClips: [{ elevation: 3000, fromDeg: 30, toDeg: 100 }],
+    });
+    expect(report.clips[0]).toMatchObject({ fromDeg: 30, toDeg: 100 });
   });
 });

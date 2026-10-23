@@ -66,7 +66,7 @@ function verticalSupports(element: EquipmentElement, level: BuildingLevel, templ
           { name: 'base-ring', label: `Base ring ${element.mark}` },
           origin,
           rotation,
-          ringSection(skirt.inner, skirt.outer + support.baseRingWidth, 0, support.thickness),
+          ringSection(skirt.outer, skirt.outer + support.baseRingWidth, 0, support.thickness),
           [0, 0, 1],
         ),
       );

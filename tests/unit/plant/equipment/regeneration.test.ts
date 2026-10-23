@@ -205,3 +205,30 @@ describe('recorded history', () => {
     ]);
   });
 });
+
+describe('update_equipment_parameters: further checks', () => {
+  it('reports the defaults it applied and re-checks the operating liquid and the platform clips', () => {
+    const doc = separatorDocument();
+    const withSkirt = ok(doc, 'update_equipment_parameters', { equipment: 'V-101', set: { support: { type: 'skirt', height: 2500 } } });
+    expect((withSkirt.data as { defaulted: string[] }).defaulted).toEqual(
+      expect.arrayContaining(['support.thickness', 'support.baseRingWidth']),
+    );
+    expectRefusal(
+      doc,
+      'update_equipment_parameters',
+      { equipment: 'V-101', set: { design: { operatingLiquid: { specificGravity: 1, levelAboveBottomTangent: 9000 } } } },
+      'EQP_LEVEL_OUT_OF_RANGE',
+      'set.design.operatingLiquid.levelAboveBottomTangent',
+    );
+    const params: Record<string, unknown> = { ...separatorParams, tag: 'C-1', platformClips: [{ elevation: 3500, fromDeg: 0, toDeg: 90 }] };
+    delete params['orientation'];
+    const column = apply(mmDocument(), 'add_process_column', params);
+    expectRefusal(
+      column,
+      'update_equipment_parameters',
+      { equipment: 'C-1', set: { tangentLength: 3000 } },
+      'EQP_PARAM_INVALID',
+      'set.tangentLength',
+    );
+  });
+});

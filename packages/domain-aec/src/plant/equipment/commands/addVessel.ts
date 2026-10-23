@@ -12,7 +12,15 @@ import { equipmentPorts } from '../geometry/ports';
 import { vesselDatum } from '../geometry/vesselFrame';
 import { angleConventionParam, planRotationRadians } from './angles';
 import { withLegacyFields } from './legacySync';
-import { buildVesselTemplate, designInputSchema, designOf, headsInputSchema, isVesselIssue, supportInputSchema } from './vesselParams';
+import {
+  buildVesselTemplate,
+  designInputSchema,
+  designOf,
+  headsInputSchema,
+  isVesselIssue,
+  liquidLevelIssue,
+  supportInputSchema,
+} from './vesselParams';
 
 /** Params shared by `add_vessel` and `add_process_column` (a column is a vertical vessel with trays). */
 export const vesselShape = {
@@ -70,13 +78,16 @@ export function createVessel(
     result: refuse(doc, command, code, message, ids, [path]),
   });
   const tag = params.tag.trim();
-  if (tag === '') return fail('EQP_PARAM_INVALID', 'tag must not be empty', 'tag');
+  if (tag === '' || /[:\s]/.test(tag))
+    return fail('EQP_PARAM_INVALID', "tag must not be empty nor contain whitespace or ':' (the port id is <tag>:<mark>)", 'tag');
   const twin = elementsOf(building, 'equipment').find((element) => element.mark === tag);
   if (twin !== undefined) return fail('EQP_TAG_DUPLICATE', `tag '${tag}' is already used by ${twin.id}`, 'tag', [twin.id]);
   if (!isVec2(params.location)) return fail('EQP_PARAM_INVALID', 'location must be [x, y] with finite numbers', 'location');
   const built = buildVesselTemplate(params);
   if (isVesselIssue(built)) return fail(built.code, built.message, built.path);
   const design = designOf(params.design);
+  const level = liquidLevelIssue(built.template, design);
+  if (level !== null) return fail(level.code, level.message, level.path);
   const plant: PlantEquipmentData = {
     schema: PLANT_EQUIPMENT_SCHEMA,
     template: built.template,

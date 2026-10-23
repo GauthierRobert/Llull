@@ -12,7 +12,15 @@ import { angleConventionParam, planRotationDegrees, planRotationRadians, type An
 import { trayOverflow } from './columnParams';
 import { connectedPipeIds, equipmentRefParam, findEquipment } from './equipmentRef';
 import { withLegacyFields } from './legacySync';
-import { buildVesselTemplate, designInputSchema, headsInputSchema, isVesselIssue, supportInputSchema, vesselInputOf } from './vesselParams';
+import {
+  buildVesselTemplate,
+  designInputSchema,
+  headsInputSchema,
+  isVesselIssue,
+  liquidLevelIssue,
+  supportInputSchema,
+  vesselInputOf,
+} from './vesselParams';
 
 const MOVED = 1e-6;
 const TEMPLATE_KEYS = [
@@ -107,12 +115,21 @@ export const updateEquipmentParameters = defineCommand({
         `the last tray (${overflow}) is above the new tangent length ${template.tangentLength}`,
         'set.tangentLength',
       );
+    const clipAbove = (template.platformClips ?? []).findIndex((clip) => clip.elevation > template.tangentLength);
+    if (clipAbove >= 0)
+      return fail(
+        'EQP_PARAM_INVALID',
+        `platform clip ${clipAbove + 1} (elevation ${template.platformClips?.[clipAbove]?.elevation}) is above the new tangent length ${template.tangentLength}`,
+        'set.tangentLength',
+      );
     for (const nozzle of plant.nozzles) {
       const problem = nozzleProblem(template, nozzle);
       if (problem !== null)
         return fail(problem.code, `nozzle ${nozzle.mark}: ${problem.message}`, `nozzles.${nozzle.mark}.${problem.path}`);
     }
     const design: VesselDesignData | undefined = set.design === undefined ? plant.design : { ...plant.design, ...set.design };
+    const levelIssue = liquidLevelIssue(template, design, 'set.');
+    if (levelIssue !== null) return fail(levelIssue.code, levelIssue.message, levelIssue.path);
     const draft: EquipmentElement = {
       ...element,
       ...(set.name === undefined ? {} : { name: set.name.trim() }),
@@ -145,6 +162,7 @@ export const updateEquipmentParameters = defineCommand({
         elementId: next.id,
         tag: next.mark,
         changed,
+        defaulted: built.defaulted,
         movedPorts,
         connectedPipes,
         portIds: plant.nozzles.map((nozzle) => `${next.mark}:${nozzle.mark}`),

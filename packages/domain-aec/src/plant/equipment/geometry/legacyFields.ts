@@ -11,6 +11,7 @@ import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { PlantEquipmentData, VesselDesignData, VesselTemplate } from '../plantData';
 import { headMetalVolume } from './headOffset';
 import { horizontalVolume, verticalVolume } from './partialVolume';
+import { headApexHeight } from './vesselProfile';
 import { resolveVessel, skirtRadii, type VesselGeometry } from './vesselFrame';
 
 export interface LegacyFields {
@@ -34,7 +35,7 @@ function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { r
       : support.type === 'legs'
         ? support.pitchDiameter / 2 + support.legWidth / 2
         : 0;
-  const top = geometry.datum + geometry.length + geometry.second.depth + geometry.headThickness;
+  const top = geometry.datum + geometry.length + headApexHeight(geometry.second, geometry.radius, geometry.headThickness);
   return { radius: Math.max(outer, supportRadius), top };
 }
 
@@ -45,7 +46,8 @@ function supportMetalVolume(template: VesselTemplate, geometry: VesselGeometry):
     return (
       annulus(skirtRadii(geometry, support.thickness).outer, outer) * support.height +
       (support.baseRingWidth > 0
-        ? annulus(skirtRadii(geometry, support.thickness).outer + support.baseRingWidth, outer) * support.thickness
+        ? annulus(skirtRadii(geometry, support.thickness).outer + support.baseRingWidth, skirtRadii(geometry, support.thickness).outer) *
+          support.thickness
         : 0)
     );
   if (support.type === 'legs') return support.count * support.legWidth * support.legWidth * support.height;
@@ -85,6 +87,7 @@ export function legacyFields(doc: Pick<CadDocument, 'units'>, plant: PlantEquipm
   const liquid = liquidVolume(template, geometry, plant.design);
   if (liquid === null)
     notes.push('operating liquid not added: no closed form at this level for a torispherical head of a horizontal vessel');
+  notes.push('nozzles are not part of the weight (M3)');
   if (template.support.type === 'saddles') notes.push('saddle plates are not part of the weight');
   const specificGravity = plant.design?.operatingLiquid?.specificGravity ?? 0;
   const weight = metal + (liquid ?? 0) * scale ** 3 * specificGravity * 1000;
@@ -92,7 +95,10 @@ export function legacyFields(doc: Pick<CadDocument, 'units'>, plant: PlantEquipm
     const { radius, top } = verticalExtent(template, geometry);
     return { size: [2 * radius, 2 * radius, top], shape: 'vertical_vessel', weight, notes };
   }
-  const total = geometry.length + geometry.first.depth + geometry.second.depth + 2 * geometry.headThickness;
+  const total =
+    geometry.length +
+    headApexHeight(geometry.first, geometry.radius, geometry.headThickness) +
+    headApexHeight(geometry.second, geometry.radius, geometry.headThickness);
   const raised = geometry.datum - outer > 1e-9;
   return raised
     ? { size: [total, 2 * outer, geometry.datum + outer], shape: 'box', weight, notes }

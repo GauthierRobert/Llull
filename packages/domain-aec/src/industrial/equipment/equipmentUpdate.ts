@@ -2,7 +2,7 @@ import type { EquipmentElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { elementsOf, getBuilding, isVec2, resolveLevel, toVec2, withElement } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { codedRejection, noop } from '@core/commands/noop';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normaliseEquipmentSize, shapeOf } from './equipmentShape';
 
@@ -59,9 +59,14 @@ export const updateEquipment = defineCommand({
     }
     const equipment = target;
     if (equipment.plant?.template.kind === 'vessel')
-      return noop(
+      return codedRejection(
         doc,
-        `update_equipment failed: ${equipment.mark} is a parametric vessel; revise it with update_equipment_parameters (its size, shape and weight are derived).`,
+        'update_equipment',
+        'EQP_NOT_PARAMETRIC',
+        `${equipment.mark} is a parametric vessel; revise it with update_equipment_parameters (its size, shape and weight are derived)`,
+        'Use update_equipment_parameters for a parametric vessel; update_equipment edits plain blocks.',
+        [equipment.id],
+        ['elementId'],
       );
     const newShape = shape ?? shapeOf(equipment);
     const dimensions = normaliseEquipmentSize(newShape, size ?? equipment.size);

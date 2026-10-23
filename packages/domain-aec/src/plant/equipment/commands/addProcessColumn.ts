@@ -7,7 +7,7 @@ import { getBuilding, withElement } from '../../../building/model';
 import { refuse } from '../model';
 import type { TraySpec } from '../plantData';
 import { vesselShape } from './addVessel';
-import { platformClipsSchema, resolveClips, trayOverflow, trayRows, traysSchema } from './columnParams';
+import { inConvention, platformClipsSchema, resolveClips, trayOverflow, trayRows, traysSchema } from './columnParams';
 
 /**
  * @affects creates 1 vertical vessel element exactly as add_vessel (composed through execute) and records its trays and platform clips;
@@ -70,7 +70,7 @@ export const addProcessColumn = defineCommand({
       withElement(getBuilding(added.document), next),
       [next.id],
       `add_process_column: ${next.mark} (${next.id}) vertical column, ${rows.length} tray(s)${rows.length > 0 ? ` from ${rows[0]?.elevation} to ${rows[rows.length - 1]?.elevation}` : ''}, ${clips.length} platform clip(s).`,
-      { ...data, trays: rows, clips },
+      { ...data, trays: rows, clips: clips.map((clip) => inConvention(clip, convention)) },
     );
   },
 });

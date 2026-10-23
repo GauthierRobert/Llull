@@ -100,6 +100,10 @@ const endOf = (segments: Curves): Vec2 => (segments[segments.length - 1] as Curv
 /** Arc sampling leaves axis points a few 1e-14 off the axis; a revolve profile must stay on the positive side (Pappus volume). */
 const onAxis = ([radial, axial]: Vec2): Vec2 => [radial < TOLERANCE ? 0 : radial, axial];
 
+/** Height of the head apex above its tangent line for the surface offset by `offset` (conical offsets move the apex by t / sin(half-angle)). */
+export const headApexHeight = (shape: HeadShape, radius: number, offset: number): number =>
+  endOf(headProfileCurves(shape, radius, offset))[1];
+
 export interface ProfileBand {
   /** Exact closed boundary (lines, arcs, Béziers). */
   readonly curves: Curves;

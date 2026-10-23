@@ -414,3 +414,47 @@ describe('equipment_ports', () => {
     expect(equipmentPorts({}, element)).toEqual([]);
   });
 });
+
+describe('is pure', () => {
+  const unchanged = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
+    const snapshot = JSON.stringify(doc);
+    execute(doc, name, params);
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  };
+  it('update_nozzle, delete_nozzle and the forced delete leave their input untouched', () => {
+    const doc = separatorDocument();
+    unchanged(doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1200 });
+    unchanged(doc, 'delete_nozzle', { equipment: 'V-101', mark: 'N1' });
+    const piped = apply(doc, 'add_pipe_run', {
+      points: [
+        [5000, 6000, 5200],
+        [5000, 7000, 5200],
+      ],
+      from: 'V-101:N1',
+    });
+    unchanged(piped, 'delete_nozzle', { equipment: 'V-101', mark: 'N1', force: true });
+  });
+});
+
+describe('add_nozzle: identifiers and ratings', () => {
+  const nozzle = { equipment: 'V-101', ...separatorNozzles[0] };
+  it.each([
+    ['a colon in the mark', { mark: 'N:1' }, 'EQP_PARAM_INVALID', 'mark'],
+    ['a space in the mark', { mark: 'N 1' }, 'EQP_PARAM_INVALID', 'mark'],
+    ['a class that is not an ASME class', { rating: 'CL200' }, 'EQP_RATING_UNKNOWN', 'rating'],
+    ['a PN that is not in the series', { rating: 'PN7' }, 'EQP_RATING_UNKNOWN', 'rating'],
+  ])('refuses %s', (_name, override, code, path) => {
+    expectRefusal(separatorDocument(false), 'add_nozzle', { ...nozzle, ...override }, code, path);
+  });
+
+  it('accepts every ASME class of the series (hardware placeholder where the catalogue has no row)', () => {
+    for (const rating of ['CL400', 'CL900', 'CL1500', 'CL2500']) ok(separatorDocument(false), 'add_nozzle', { ...nozzle, rating });
+  });
+
+  it('update_equipment refuses a parametric vessel with a coded refusal', () => {
+    const result = execute(separatorDocument(false), 'update_equipment', { currentMark: 'V-101', size: [1, 1, 1] });
+    expect(result.rejected).toBe(true);
+    expect(result.error?.code).toBe('EQP_NOT_PARAMETRIC');
+    expect(result.error?.paths).toContain('elementId');
+  });
+});

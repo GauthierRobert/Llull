@@ -80,7 +80,15 @@ export const addNozzle = defineCommand({
     const { element, building } = target;
     const plant = plantOf(element);
     const mark = params.mark.trim();
-    if (mark === '') return refuse(doc, 'add_nozzle', 'EQP_PARAM_INVALID', 'mark must not be empty', [element.id], ['mark']);
+    if (mark === '' || /[:\s]/.test(mark))
+      return refuse(
+        doc,
+        'add_nozzle',
+        'EQP_PARAM_INVALID',
+        "mark must not be empty nor contain whitespace or ':' (the port id is <tag>:<mark>)",
+        [element.id],
+        ['mark'],
+      );
     if (plant.nozzles.some((nozzle) => nozzle.mark === mark))
       return refuse(doc, 'add_nozzle', 'EQP_NOZZLE_MARK_DUPLICATE', `${element.mark} already has a nozzle ${mark}`, [element.id], ['mark']);
     const dn = resolveDn(params.dn, params.nps);

@@ -220,3 +220,40 @@ describe('add_vessel: refusals leave the document unchanged with a stable code a
     expect(legs.entityIds.filter((id) => id.includes(':leg-'))).toHaveLength(4);
   });
 });
+
+describe('add_vessel: details', () => {
+  it('a base ring starts at the skirt outer radius: its metal is not counted twice, in weight or in geometry', () => {
+    const plain = equipmentOf(apply(mmDocument(), 'add_vessel', separatorParams));
+    const ringed = apply(mmDocument(), 'add_vessel', {
+      ...separatorParams,
+      support: { type: 'skirt', height: 2000, thickness: 10, baseRingWidth: 100 },
+    });
+    const ring = ringed.entities['equipment-1:base-ring'] as RevolutionEntity;
+    expect(Math.min(...ring.profile.map((point) => point[0]))).toBe(770);
+    expect(Math.max(...ring.profile.map((point) => point[0]))).toBe(870);
+    const extraKg = Math.PI * (870 ** 2 - 770 ** 2) * 10 * 7850 * 1e-9;
+    expect(Math.abs(equipmentOf(ringed).weight - plain.weight - extraKg)).toBeLessThan(1e-6);
+    expect(equipmentOf(ringed).size[0]).toBe(1740);
+  });
+
+  it('a conical head moves the outer apex by t / sin(half-angle), not t; the weight names what it leaves out', () => {
+    const cone = { type: 'conical', halfAngleDeg: 60 };
+    const doc = ok(mmDocument(), 'add_vessel', { ...separatorParams, heads: { top: cone, bottom: cone } });
+    // depth 433.0127; outer radius 770, outer apex 433.0127 x 770 / 750
+    expect(equipmentOf(doc.document).size[2]).toBeCloseTo(6000 + (433.0127018922193 * 770) / 750, 6);
+    expect((doc.data as { notes: string[] }).notes).toContain('nozzles are not part of the weight (M3)');
+  });
+
+  it.each([
+    ['a colon in the tag', { tag: 'V:101' }, 'tag'],
+    ['a space in the tag', { tag: 'V 101' }, 'tag'],
+    [
+      'an operating liquid above the vessel',
+      { design: { operatingLiquid: { specificGravity: 1, levelAboveBottomTangent: 9000 } } },
+      'design.operatingLiquid.levelAboveBottomTangent',
+    ],
+  ])('refuses %s', (_name, override, path) => {
+    const code = path === 'tag' ? 'EQP_PARAM_INVALID' : 'EQP_LEVEL_OUT_OF_RANGE';
+    expectRefusal(mmDocument(), 'add_vessel', { ...separatorParams, ...override }, code, path);
+  });
+});
