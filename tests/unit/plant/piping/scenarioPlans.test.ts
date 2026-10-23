@@ -1,7 +1,7 @@
 /**
  * Plant 01 PSC: runs the validation pack's scenario plans (`validation/plans/*.json`) step by step through `execute` (the path of
- * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. Steps whose command is not registered yet
- * (M2+: specs, wall check) are skipped; their `unbuilt` entry says so.
+ * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. `harness.inline` fixture files are inlined into the
+ * named params first (the CLI `--param-file`). Steps whose command is not registered yet (M3+: wall check, spec pipe runs) are skipped.
  */
 
 import { readFileSync } from 'node:fs';
@@ -21,6 +21,7 @@ interface Expected {
 }
 interface Plan {
   id: string;
+  harness?: { inline?: Record<string, string> };
   actions: Array<{ command: string; params: Record<string, unknown> }>;
   expected: Expected[];
 }
@@ -42,6 +43,13 @@ function pick(root: unknown, expression: string): unknown {
 
 function runPlan(name: string): { plan: Plan; outcomes: Array<Record<string, unknown> | null> } {
   const plan = JSON.parse(readFileSync(path.join(PLANS, name), 'utf8')) as Plan;
+  for (const [target, file] of Object.entries(plan.harness?.inline ?? {})) {
+    const match = /^actions\[(\d+)\]\.params\.(\w+)$/.exec(target);
+    if (match !== null)
+      (plan.actions[Number(match[1])] as { params: Record<string, unknown> }).params[match[2] as string] = JSON.parse(
+        readFileSync(path.join(PLANS, file), 'utf8'),
+      );
+  }
   let doc: CadDocument = createEmptyDocument();
   const outcomes = plan.actions.map((action) => {
     if (getCommand(action.command) === undefined) return null;
@@ -60,18 +68,20 @@ function compare(actual: unknown, row: Expected): void {
   else expect(actual, row.path).toEqual(row.value);
 }
 
-describe.each(['sc-psc-01-catalog-lookup-mass.json', 'sc-psc-03-design-conditions.json', 'sc-psc-05-catalog-import-checks.json'])(
-  'scenario plan %s',
-  (file) => {
-    const { plan, outcomes } = runPlan(file);
+describe.each([
+  'sc-psc-01-catalog-lookup-mass.json',
+  'sc-psc-02-spec-resolution.json',
+  'sc-psc-03-design-conditions.json',
+  'sc-psc-05-catalog-import-checks.json',
+])('scenario plan %s', (file) => {
+  const { plan, outcomes } = runPlan(file);
 
-    it('runs every registered step and meets the expected rows of those steps', () => {
-      const built = plan.expected.filter((row) => outcomes[row.step] !== null && typeof row.value !== 'undefined');
-      expect(built.length).toBeGreaterThan(0);
-      for (const row of built) {
-        if (typeof row.value === 'string' && row.value.startsWith('equal to')) continue;
-        compare(pick(outcomes[row.step], row.path), row);
-      }
-    });
-  },
-);
+  it('runs every registered step and meets the expected rows of those steps', () => {
+    const built = plan.expected.filter((row) => outcomes[row.step] !== null && typeof row.value !== 'undefined');
+    expect(built.length).toBeGreaterThan(0);
+    for (const row of built) {
+      if (typeof row.value === 'string' && row.value.startsWith('equal to')) continue;
+      compare(pick(outcomes[row.step], row.path), row);
+    }
+  });
+});

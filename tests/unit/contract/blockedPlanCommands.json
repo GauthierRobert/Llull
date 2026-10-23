@@ -135,25 +135,11 @@
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
     ],
-    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-02-spec-resolution.json": [
-      "import_pipe_spec",
-      "resolve_branch",
-      "resolve_spec_component"
-    ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": [
-      "check_pipe_spec",
-      "import_pipe_spec",
       "pipe_wall_check"
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": [
-      "approve_pipe_spec",
-      "check_pipe_spec",
-      "import_pipe_spec"
-    ],
-    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-05-catalog-import-checks.json": [
-      "check_pipe_spec",
-      "export_pipe_spec",
-      "import_pipe_spec"
+      "approve_pipe_spec"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
       "add_nozzle",
@@ -271,7 +257,6 @@
       "add_field_weld",
       "export_pcf",
       "import_pcf",
-      "import_pipe_spec",
       "piping_bom"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-03-isometric-sheet.json": [

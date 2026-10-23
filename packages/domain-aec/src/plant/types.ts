@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import type { CatalogModel } from './catalog/types';
+import type { SpecModel } from './spec/types';
 
 /** Butt weld, flanged, socket weld, screwed, plain end, wafer, lug (02 RTE §3.1). */
 type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';
@@ -93,6 +94,8 @@ export interface PlantModel {
   readonly piping?: PipingModel;
   /** 01 PSC: user-imported piping catalogues (the bundled open catalogue lives in code). */
   readonly catalog?: CatalogModel;
+  /** 01 PSC M2: pipe specs (every revision) and their branch tables. */
+  readonly spec?: SpecModel;
 }
 
 declare module '@core/model/documentExtensions' {

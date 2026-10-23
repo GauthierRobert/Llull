@@ -5,7 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { bundledRatingTable, IMPORT_ONLY_STANDARDS, BUNDLED_CATALOG_ID } from '../bundled';
 import { refuse } from '../codes';
-import { inchFraction, resolveCatalogRow, type ResolvedRow } from '../lookup';
+import { flatKeys, resolveCatalogRow, type ResolvedRow } from '../lookup';
 import { allCatalogs, findCatalog } from '../store';
 import { BEND_RADII, COMPONENT_TYPES, END_TYPES, FACINGS, type ComponentFamily, type PipingCatalog } from '../types';
 
@@ -109,18 +109,6 @@ export const listPipingCatalogs = defineCommand({
     );
   },
 });
-
-/** Flat answer keys: `<dim>Mm` for lengths, `<dim>` for counts, `<dim>Bar`; bolt diameter also as the inch fraction. */
-function flatKeys(row: ResolvedRow): Record<string, unknown> {
-  const flat: Record<string, unknown> = {};
-  for (const [name, dim] of Object.entries(row.dims)) {
-    if (dim.unit === 'count') flat[name] = dim.value;
-    else flat[`${name}${dim.unit === 'mm' ? 'Mm' : 'Bar'}`] = dim.value;
-  }
-  const bolt = row.dims['boltDiameter'];
-  if (bolt !== undefined) flat['boltDiameterIn'] = inchFraction(bolt.value);
-  return flat;
-}
 
 function lookupData(row: ResolvedRow): Record<string, unknown> {
   return {

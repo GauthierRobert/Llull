@@ -229,8 +229,20 @@ export function resolveCatalogRow(catalog: PipingCatalog, query: LookupQuery): L
   };
 }
 
+/** Flat answer keys: `<dim>Mm` for lengths, `<dim>` for counts, `<dim>Bar`; bolt diameter also as the inch fraction. */
+export function flatKeys(row: { readonly dims: Readonly<Record<string, ResolvedDim>> }): Record<string, unknown> {
+  const flat: Record<string, unknown> = {};
+  for (const [name, dim] of Object.entries(row.dims)) {
+    if (dim.unit === 'count') flat[name] = dim.value;
+    else flat[`${name}${dim.unit === 'mm' ? 'Mm' : 'Bar'}`] = dim.value;
+  }
+  const bolt = row.dims['boltDiameter'];
+  if (bolt !== undefined) flat['boltDiameterIn'] = inchFraction(bolt.value);
+  return flat;
+}
+
 /** Inch fraction text of a length in mm that is a multiple of 1/32 in (`"5/8"`, `"1-1/4"`); null otherwise. */
-export function inchFraction(mm: number): string | null {
+function inchFraction(mm: number): string | null {
   const inches = mm / MM_PER_INCH;
   for (const denominator of [1, 2, 4, 8, 16, 32]) {
     const parts = inches * denominator;

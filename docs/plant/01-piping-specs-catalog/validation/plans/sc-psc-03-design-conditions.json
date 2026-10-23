@@ -2,7 +2,7 @@
   "id": "SC-PSC-03",
   "validates": ["VC-PSC-07", "VC-PSC-10", "VC-PSC-11"],
   "description": "Flange P-T rating with interpolation, spec design-condition check, and B31.3 pressure-design wall selection",
-  "unbuilt": ["pt_rating", "check_pipe_spec", "pipe_wall_check", "import_pipe_spec"],
+  "unbuilt": ["pipe_wall_check"],
   "harness": { "inline": { "actions[0].params.spec": "../data/sample_spec_cs150.json" } },
   "actions": [
     { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },

@@ -2,7 +2,7 @@
   "id": "SC-PSC-01",
   "validates": ["VC-PSC-01", "VC-PSC-02", "VC-PSC-03", "VC-PSC-06", "VC-PSC-12", "VC-PSC-13"],
   "description": "Read the bundled open catalogue: NPS 6 Sch 40 pipe, its plain-end and water-filled mass, LR 90 / 45 elbows, an NPS 4 Class 150 WN RF flange, its gasket and a Class 150 gate valve",
-  "unbuilt": ["lookup_piping_component", "pipe_section_properties"],
+  "unbuilt": [],
   "actions": [
     { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "pipe", "nps": 6, "schedule": "40" } },
     { "command": "pipe_section_properties", "params": { "nps": 6, "schedule": "40", "standard": "ASME B36.10M", "contentDensityKgM3": 1000 } },

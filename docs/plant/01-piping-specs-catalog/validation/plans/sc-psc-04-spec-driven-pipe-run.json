@@ -2,7 +2,7 @@
   "id": "SC-PSC-04",
   "validates": ["VC-PSC-15", "VC-PSC-16", "VC-PSC-02"],
   "description": "Route an NPS 2-1/2 line with the CS150-A1 spec: the outside diameter comes from ASME B36.10M (73.0 mm), not the legacy EN 10220 row (76.1 mm); a legacy pipe without spec keeps today's behaviour; the agent cannot approve the spec",
-  "unbuilt": ["import_pipe_spec", "add_pipe_run.spec/nps (new params)", "pipe_section_properties", "check_pipe_spec", "approve_pipe_spec"],
+  "unbuilt": ["add_pipe_run.spec/nps (new params)", "approve_pipe_spec"],
   "harness": { "inline": { "actions[1].params.spec": "../data/sample_spec_cs150.json" } },
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
