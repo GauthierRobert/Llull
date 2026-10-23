@@ -1,0 +1,8 @@
+# Horizontal drum D 2000 x T/T 6000 with 2:1 ellipsoidal heads: total and partial liquid volumes (Jones, 03 EQP SC-EQP-02)
+design drum_volume units=mm
+param D = 2000
+param L = 6000
+add_cylinder shell radius=D/2 height=L axis=[1, 0, 0]
+check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} path=totalVolumeM3 expect ~= pi*1*1*6 + 2*(2/3)*pi*1*1*0.5 ± 0.01%
+check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} levels=[D/2] path=levels.0.percent expect ~= 50 ± 0.01%
+check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} levels=[500] path=levels.0.liquidVolumeM3 expect ~= 4.012358 ± 0.01%

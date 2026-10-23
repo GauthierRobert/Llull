@@ -223,8 +223,7 @@
       "equipment_datasheet",
       "equipment_ports",
       "equipment_weights",
-      "vessel_thickness",
-      "vessel_volume"
+      "vessel_thickness"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-02-horizontal-drum-saddles.json": [
       "add_nozzle",
@@ -233,21 +232,18 @@
       "equipment_ports",
       "equipment_weights",
       "update_equipment_parameters",
-      "vessel_thickness",
-      "vessel_volume"
+      "vessel_thickness"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-03-bem-exchanger.json": [
       "add_heat_exchanger",
       "add_nozzle",
       "check_equipment",
-      "equipment_ports",
-      "vessel_volume"
+      "equipment_ports"
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-04-api650-tank.json": [
       "add_storage_tank",
       "check_equipment",
-      "tank_shell_thickness",
-      "vessel_volume"
+      "tank_shell_thickness"
     ],
     "docs/plant/04-pid-schematics/validation/plans/sc-pid-01-import-dexpi-reference.json": [
       "check_pid",

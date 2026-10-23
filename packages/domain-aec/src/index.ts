@@ -47,6 +47,7 @@ export {
 // plant: piping plugin
 export { pipingPlugin } from './plant/piping/plugin';
 export { structuresPlugin } from './plant/structures/plugin';
+export { plantEquipmentPlugin } from './plant/equipment/plugin';
 
 // scan: point-cloud plugin
 export { scanPlugin } from './scan/plugin';

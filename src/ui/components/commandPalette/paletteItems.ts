@@ -36,6 +36,7 @@ const TOOLSET_GROUPS = {
   building: 'Building',
   piping: 'Piping',
   plant_structures: 'Plant structures / access',
+  plant_equipment: 'Plant equipment',
   civil: 'Civil / site',
   design: 'Design (.lld)',
   pmi: 'GD&T / PMI',

@@ -27,6 +27,7 @@ export const TOOLSET_NAMES = [
   'building',
   'piping',
   'plant_structures',
+  'plant_equipment',
   'civil',
   'design',
   'pmi',
@@ -139,6 +140,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Plant structures and access (06 STA): access rules and `check_access`, contributed by the installed plantStructures plugin. */
   get plant_structures(): readonly string[] {
     return pluginToolNames('plant_structures');
+  },
+  /** Plant process equipment (03 EQP): contributed by the installed plant-equipment plugin. */
+  get plant_equipment(): readonly string[] {
+    return pluginToolNames('plant_equipment');
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {
