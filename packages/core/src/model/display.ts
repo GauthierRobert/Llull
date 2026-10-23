@@ -1,6 +1,6 @@
 /**
  * Display model of a document (`CadDocument.display`, plant 09 VIS §3.1): ordered first-match colour profiles keyed on entity properties.
- * Domain-free: schemes (hazard colours, service codes) are produced by plugins as ordinary profiles. Display only: a profile never changes
+ * Domain-free: schemes (colour schemes) are produced by plugins as ordinary profiles. Display only: a profile never changes
  * geometry. Material classes arrive with the renderer milestones (VIS-M4/M6).
  */
 
@@ -34,7 +34,7 @@ interface RuleScheme {
   readonly id: string;
   readonly rowId: string;
   readonly category: string;
-  /** Named colours of the row, reported as given: e.g. `{ fieldColour: 'green', letterColour: 'white' }` or `{ mainColour: 'green' }`. */
+  /** Named colours of the source row, reported as given (key -> colour name). */
   readonly names: Readonly<Record<string, string>>;
 }
 
@@ -56,7 +56,7 @@ export interface ColourProfile {
   readonly defaultColour: 'entity' | string;
   /** Named palette the hex values were drawn from (reports carry it with `approximate: true`). */
   readonly palette: string;
-  /** True for a hazard-scheme profile no qualified reviewer has approved yet. */
+  /** True while the profile awaits approval by a qualified reviewer (set by the plugin that built it). */
   readonly reviewRequired: boolean;
 }
 
@@ -67,4 +67,9 @@ export interface DisplayModel {
 
 export function createDisplayModel(): DisplayModel {
   return { colourProfiles: {} };
+}
+
+/** Own-key lookup: `toString` and other prototype names are never profiles. */
+export function findProfile(display: DisplayModel, id: string): ColourProfile | undefined {
+  return Object.hasOwn(display.colourProfiles, id) ? display.colourProfiles[id] : undefined;
 }

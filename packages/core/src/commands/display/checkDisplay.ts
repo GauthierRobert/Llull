@@ -1,5 +1,6 @@
 /** check_display (plant 09 VIS §4, TR-VIS-16): consistency of the colour profiles against the document; read-only. */
 
+import { findProfile } from '../../model/display';
 import { referencedProperties } from '../../geometry/colourRules';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -28,8 +29,8 @@ export const checkDisplay = defineCommand({
   description:
     'Check the document colour profiles. Reports VIS_PROFILE_NOT_FOUND (error: the active profile is missing), VIS_COLOUR_UNMATCHED (warn: entities that carry a property the ' +
     'active profile tests but matched no rule; data ids list them), VIS_RULE_PROPERTY_UNKNOWN (warn: a rule tests a property no entity of the document has), and ' +
-    'VIS_SCHEME_REVIEW_REQUIRED (warn: the active profile is a hazard / service scheme that no qualified reviewer approved). data { status: pass|warn|fail, issues[{ code, ' +
-    'severity, ids, paths, message, remediation }], counts }. Run it after apply_service_colour_scheme and before relying on colours. Read-only.',
+    'VIS_SCHEME_REVIEW_REQUIRED (warn: the active profile is flagged reviewRequired: no qualified reviewer approved it). data { status: pass|warn|fail, issues[{ code, ' +
+    'severity, ids, paths, message, remediation }], counts }. Run it after building a profile and before relying on its colours. Read-only.',
   annotations: { readOnly: true },
   params: z.object({}),
   run: (doc, _params, ctx): CommandResult => {
@@ -52,7 +53,7 @@ export const checkDisplay = defineCommand({
       }
     }
     const activeId = display.activeProfileId;
-    const active = activeId === undefined ? undefined : display.colourProfiles[activeId];
+    const active = activeId === undefined ? undefined : findProfile(display, activeId);
     if (activeId !== undefined && active === undefined)
       issues.push({
         code: 'VIS_PROFILE_NOT_FOUND',
@@ -74,7 +75,7 @@ export const checkDisplay = defineCommand({
           ids: unmatched,
           paths: [`display.colourProfiles.${active.id}`],
           message: `${unmatched.length} entit${unmatched.length === 1 ? 'y' : 'ies'} matched no rule of profile '${active.id}'`,
-          remediation: 'extend the profile (serviceMap / rules), or accept the default colour',
+          remediation: 'extend the profile rules, or accept the default colour',
         });
       if (active.reviewRequired)
         issues.push({
@@ -82,8 +83,8 @@ export const checkDisplay = defineCommand({
           severity: 'warn',
           ids: [],
           paths: [`display.colourProfiles.${active.id}`],
-          message: `profile '${active.id}' maps services to hazard colours and is not approved`,
-          remediation: 'a qualified reviewer approves the mapping before the colours are used on a deliverable',
+          message: `profile '${active.id}' is flagged reviewRequired and not approved`,
+          remediation: 'a qualified reviewer approves the profile before the colours are used on a deliverable',
         });
     }
     const status = issues.some((issue) => issue.severity === 'error') ? 'fail' : issues.length > 0 ? 'warn' : 'pass';

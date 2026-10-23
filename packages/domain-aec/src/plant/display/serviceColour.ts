@@ -6,7 +6,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report, tableRejection } from '@core/commands/noop';
-import { profileProblems } from '@core/geometry/colourRules';
+import { storeProfile } from '@core/geometry/colourRules';
 import { createDisplayModel, type ColourProfile, type ColourRule } from '@core/model/display';
 import { PALETTE_ID, paletteHex } from './palette';
 import { SCHEME_IDS, SCHEME_STANDARDS, findRow, legendOf, rowsOf, type SchemeId, type SchemeRow } from './serviceSchemes';
@@ -15,14 +15,16 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_SCHEME_UNKNOWN: `use one of ${SCHEME_IDS.join(', ')}; list_service_colour_schemes shows the tables`,
   VIS_SCHEME_CATEGORY_UNKNOWN: 'list_service_colour_schemes shows the categories of the scheme',
   VIS_RULE_INVALID: 'give a non-empty serviceMap of distinct service texts (case-insensitive) and a property name',
-  VIS_COLOUR_INVALID: 'the scheme row has no display colour in the palette',
 };
 
 const reject = tableRejection(REMEDIATION);
 
 const isSchemeId = (value: string): value is SchemeId => (SCHEME_IDS as readonly string[]).includes(value);
 
-const displayHex = (row: SchemeRow): string | undefined => paletteHex(row.names['fieldColour'] ?? row.names['mainColour'] ?? '');
+/** Neutral grey for a colour name the palette lacks (a test asserts every table row resolves, so this is a guard only). */
+const NO_PALETTE_COLOUR = '#808080';
+
+const displayHex = (row: SchemeRow): string => paletteHex(row.names['fieldColour'] ?? row.names['mainColour'] ?? '') ?? NO_PALETTE_COLOUR;
 
 /** @affects nothing — read-only; data.schemes [{ scheme, standard, palette, approximate, rows[] }] */
 export const listServiceColourSchemes = defineCommand({
@@ -43,7 +45,7 @@ export const listServiceColourSchemes = defineCommand({
       standard: SCHEME_STANDARDS[id],
       palette: PALETTE_ID,
       approximate: true,
-      rows: rowsOf(id).map((row) => ({ ...row, displayHex: displayHex(row) ?? null })),
+      rows: rowsOf(id).map((row) => ({ ...row, displayHex: displayHex(row) })),
     }));
     return report(
       doc,
@@ -83,7 +85,6 @@ export const applyServiceColourScheme = defineCommand({
     const fail = (code: string, message: string, ids: string[] = [], paths: string[] = []): CommandResult =>
       reject(doc, 'apply_service_colour_scheme', code, message, ids, paths);
     if (!isSchemeId(scheme)) return fail('VIS_SCHEME_UNKNOWN', `no scheme '${scheme}'`, [], ['scheme']);
-    if (profileId.length === 0) return fail('VIS_RULE_INVALID', 'profileId is empty', [], ['profileId']);
     const entries = Object.entries(serviceMap);
     if (entries.length === 0 || property.length === 0)
       return fail('VIS_RULE_INVALID', 'serviceMap is empty or property is blank', [], ['serviceMap']);
@@ -100,19 +101,19 @@ export const applyServiceColourScheme = defineCommand({
         [],
         unknown.map((entry) => `serviceMap.${entry.service}`),
       );
-    const rules: ColourRule[] = [];
-    for (const { service, row } of rows) {
-      const colour = row === undefined ? undefined : displayHex(row);
-      if (row === undefined || colour === undefined)
-        return fail('VIS_COLOUR_INVALID', `no display colour for '${service}'`, [], [`serviceMap.${service}`]);
-      rules.push({
-        id: `${row.id}:${service}`,
-        when: { property, equals: service },
-        appearance: { colour },
-        legend: `${service}: ${legendOf(row)}`,
-        scheme: { id: scheme, rowId: row.id, category: row.category, names: row.names },
-      });
-    }
+    const rules: ColourRule[] = rows.flatMap(({ service, row }) =>
+      row === undefined
+        ? []
+        : [
+            {
+              id: `${row.id}:${service}`,
+              when: { property, equals: service },
+              appearance: { colour: displayHex(row) },
+              legend: `${service}: ${legendOf(row)}`,
+              scheme: { id: scheme, rowId: row.id, category: row.category, names: row.names },
+            },
+          ],
+    );
     const profile: ColourProfile = {
       id: profileId,
       name: `${scheme} service colours`,
@@ -121,8 +122,8 @@ export const applyServiceColourScheme = defineCommand({
       palette: PALETTE_ID,
       reviewRequired: true,
     };
-    const problem = profileProblems(profile)[0];
-    if (problem !== undefined) return fail(problem.code, problem.message, [], [problem.path]);
+    const stored = storeProfile(doc.display ?? createDisplayModel(), profile, activate === true);
+    if ('code' in stored) return fail(stored.code, stored.message, [], [stored.path === 'id' ? 'profileId' : stored.path]);
     const read = ctx?.properties;
     const present = new Set<string>();
     for (const id of doc.order) {
@@ -131,17 +132,11 @@ export const applyServiceColourScheme = defineCommand({
     }
     const mapped = new Set(lowered);
     const unmapped = [...present].filter((text) => !mapped.has(text.toLowerCase())).sort();
-    const display = doc.display ?? createDisplayModel();
-    const next = {
-      ...display,
-      colourProfiles: { ...display.colourProfiles, [profileId]: profile },
-      ...(activate === true ? { activeProfileId: profileId } : {}),
-    };
     const summary =
       `Built colour profile '${profileId}' from ${scheme}: ${rules.length} service(s) mapped, ${unmapped.length} unmapped${unmapped.length > 0 ? ` (${unmapped.join(', ')})` : ''}; ` +
       `review required: a qualified reviewer must approve the mapping${activate === true ? '; activated' : ''}.`;
     return {
-      ...changed({ ...doc, display: next }, summary, []),
+      ...changed({ ...doc, display: stored }, summary, []),
       data: { profileId, mapped: rules.length, unmapped, reviewRequired: true },
     };
   },

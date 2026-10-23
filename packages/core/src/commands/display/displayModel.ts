@@ -9,11 +9,12 @@ import { tableRejection } from '../noop';
 import type { ExecutionContext } from '../types';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
-  VIS_PROFILE_NOT_FOUND: 'list the profiles with check_display, or create one with define_colour_profile / apply_service_colour_scheme',
+  VIS_PROFILE_NOT_FOUND: 'list the profiles with check_display, or create one with define_colour_profile',
   VIS_PROFILE_EXISTS: 'pass replace: true to overwrite the profile, or choose another id',
   VIS_RULE_INVALID:
     'fix the rule at the reported path: every rule needs a unique id and a predicate with a clause (regex <= 200 chars, range low <= high)',
-  VIS_COLOUR_INVALID: 'use #rrggbb (scheme colours are resolved by apply_service_colour_scheme)',
+  VIS_COLOUR_INVALID: 'use #rrggbb',
+  VIS_GROUP_PROPERTY_MISSING: 'pass groupProperty, e.g. "layerName", or use groupBy "rule" / "entity"',
 };
 
 export const displayRejection = tableRejection(REMEDIATION);

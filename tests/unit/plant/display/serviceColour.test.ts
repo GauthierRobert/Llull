@@ -114,7 +114,11 @@ describe('apply_service_colour_scheme (VC-VIS-01, VC-VIS-02, SC-VIS-01)', () => 
     expect(result.summary).toContain('review required');
     expect(result.document.entities).toBe(doc.entities);
 
-    const report = data<Report>(result.document, 'colour_by_rule_report', { profileId: 'services-asme', groupBy: 'line' });
+    const report = data<Report>(result.document, 'colour_by_rule_report', {
+      profileId: 'services-asme',
+      groupBy: 'property',
+      groupProperty: 'line',
+    });
     expect(report).toMatchObject({ palette: 'llull-ral-approx-v1', approximate: true, reviewRequired: true });
     const expected: Array<[string, string, string, string]> = [
       ['CW-101', 'water', 'green', 'white'],
@@ -143,7 +147,7 @@ describe('apply_service_colour_scheme (VC-VIS-01, VC-VIS-02, SC-VIS-01)', () => 
     });
     const both = apply(asme, 'apply_service_colour_scheme', { scheme: 'iso_14726', profileId: 'services-iso', serviceMap: ISO_MAP });
     expect(both.display?.activeProfileId).toBe('services-asme');
-    const report = data<Report>(both, 'colour_by_rule_report', { profileId: 'services-iso', groupBy: 'line' });
+    const report = data<Report>(both, 'colour_by_rule_report', { profileId: 'services-iso', groupBy: 'property', groupProperty: 'line' });
     const expected: Array<[string, string]> = [
       ['CW-101', 'green'],
       ['IA-102', 'grey'],
@@ -168,7 +172,9 @@ describe('apply_service_colour_scheme (VC-VIS-01, VC-VIS-02, SC-VIS-01)', () => 
       serviceMap: ASME_MAP,
       activate: true,
     });
-    const nitrogen = data<Report>(asme, 'colour_by_rule_report', { groupBy: 'line' }).groups['N2-107']?.['ids'] as string[];
+    const nitrogen = data<Report>(asme, 'colour_by_rule_report', { groupBy: 'property', groupProperty: 'line' }).groups['N2-107']?.[
+      'ids'
+    ] as string[];
     expect(nitrogen.length).toBeGreaterThan(0);
     const check = data<{ status: string; issues: Array<{ code: string; ids: string[]; severity: string }> }>(asme, 'check_display', {});
     expect(check.status).toBe('warn');
@@ -283,7 +289,7 @@ describe('plant property provider', () => {
       name: 'dn',
       rules: [{ id: 'big', when: { property: 'dn', range: [100, 150] }, colour: '#ff0000', legend: 'big' }],
     });
-    const report = data<Report>(profiled, 'colour_by_rule_report', { profileId: 'dn', groupBy: 'line' });
+    const report = data<Report>(profiled, 'colour_by_rule_report', { profileId: 'dn', groupBy: 'property', groupProperty: 'line' });
     const big = Object.entries(report.groups)
       .filter(([, group]) => group['ruleId'] === 'big')
       .map(([line]) => line);

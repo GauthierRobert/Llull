@@ -455,7 +455,7 @@
 | `allow_interference` | Declare that two parts are MEANT to overlap (a press fit, a thread, a weld, or an overlap by design), so check_assembly reports the pair as FPR_PAIR_ALLOWED (p… |  |
 | `apply_service_colour_scheme` | Build a colour profile that tints pipes by service from ASME A13.1 (scheme "asme_a13_1") or ISO 14726 ("iso_14726"): serviceMap maps each service text of the m… |  |
 | `check_display` | Check the document colour profiles. | read-only |
-| `colour_by_rule_report` | Report which colour rule colours which entity under a colour profile (default: the active one): data.groups keyed by entity id, by line (the `line` property) o… | read-only |
+| `colour_by_rule_report` | Report which colour rule colours which entity under a colour profile (default: the active one): data.groups keyed by rule (default), by entity id, or by the va… | read-only |
 | `create_review_issue` | Open a model-review issue (a BCF topic): title, type (e.g. |  |
 | `create_walkthrough` | Create a walkthrough: an ordered list of saved viewpoints (save_viewpoint) with the seconds spent moving from each key to the next (the last key's seconds are … |  |
 | `define_colour_profile` | Define a display colour profile: an ordered list of rules, each a predicate on entity properties and a colour; the FIRST matching rule colours the entity, othe… |  |

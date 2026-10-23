@@ -3,14 +3,13 @@
  * selects. Pure; no document access, no geometry.
  */
 
-import type { ColourProfile, ColourRule, PropertyValue, RulePredicate } from '../model/display';
+import type { ColourProfile, ColourRule, DisplayModel, PropertyValue, RulePredicate } from '../model/display';
 import type { PropertyBag } from '../model/entityProperties';
 import { isHexColor } from '../lib/isHexColor';
+import { isReservedKey } from '../lib/reservedKey';
 
 const MAX_REGEX_LENGTH = 200;
 const MAX_PREDICATE_DEPTH = 4;
-/** A group that is itself repeated, e.g. `(a+)+`: the classic catastrophic-backtracking shape. */
-const NESTED_QUANTIFIER = /\([^)]*[+*][^)]*\)[+*{]/;
 const BACK_REFERENCE = /\\[1-9]/;
 
 export interface ProfileProblem {
@@ -19,10 +18,34 @@ export interface ProfileProblem {
   readonly message: string;
 }
 
+/**
+ * True when a group is itself repeated (+, *, {n,}) and its body (nested groups included) holds a quantifier or an alternation: the
+ * catastrophic-backtracking shapes (a+)+, ((a+))+, (a|aa)+ and (a{2,})+. A paren-depth scan; escapes and classes are skipped.
+ */
+function hasRepeatedAmbiguousGroup(source: string): boolean {
+  const risky: boolean[] = [];
+  let inClass = false;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    if (c === '\\') i++;
+    else if (inClass) inClass = c !== ']';
+    else if (c === '[') inClass = true;
+    else if (c === '(') risky.push(false);
+    else if ((c === '|' || c === '+' || c === '*' || c === '{') && risky.length > 0) risky[risky.length - 1] = true;
+    else if (c === ')' && risky.length > 0) {
+      const wasRisky = risky.pop() === true;
+      const next = source[i + 1];
+      if (wasRisky && (next === '+' || next === '*' || next === '{')) return true;
+      if (wasRisky && risky.length > 0) risky[risky.length - 1] = true;
+    }
+  }
+  return false;
+}
+
 const isRegexSafe = (source: string): string | null => {
   if (source.length > MAX_REGEX_LENGTH) return `regex longer than ${MAX_REGEX_LENGTH} characters`;
   if (BACK_REFERENCE.test(source) || source.includes('\\k<')) return 'regex back-references are not allowed';
-  if (NESTED_QUANTIFIER.test(source)) return 'regex with a repeated group containing a quantifier is not allowed';
+  if (hasRepeatedAmbiguousGroup(source)) return 'regex with a repeated group containing a quantifier or alternation is not allowed';
   try {
     new RegExp(source, 'i');
   } catch {
@@ -163,4 +186,21 @@ export function referencedProperties(profile: ColourProfile): ReadonlySet<string
   const keys = new Set<string>();
   for (const rule of profile.rules) predicateKeys(rule.when, keys);
   return keys;
+}
+
+/**
+ * `display` with `profile` stored under its id (insertion order kept) and made active when `activate`; the one writer of profiles.
+ * @failure reserved / empty id, bad rule or colour -> the first ProfileProblem, nothing stored
+ */
+export function storeProfile(display: DisplayModel, profile: ColourProfile, activate: boolean): DisplayModel | ProfileProblem {
+  if (profile.id.length === 0 || isReservedKey(profile.id))
+    return {
+      code: 'VIS_RULE_INVALID',
+      path: 'id',
+      message: `'${profile.id}' is not a usable profile id (empty or a reserved JavaScript property name)`,
+    };
+  const problem = profileProblems(profile)[0];
+  if (problem !== undefined) return problem;
+  const colourProfiles = { ...display.colourProfiles, [profile.id]: profile };
+  return activate ? { colourProfiles, activeProfileId: profile.id } : { ...display, colourProfiles };
 }

@@ -1,7 +1,7 @@
 /** Colour profiles (plant 09 VIS §4): define, activate, delete. Display only and metaHistory: they never touch geometry or add a feature step. */
 
-import { profileProblems } from '../../geometry/colourRules';
-import type { ColourProfile, ColourRule, DisplayModel, RulePredicate } from '../../model/display';
+import { storeProfile } from '../../geometry/colourRules';
+import { findProfile, type ColourProfile, type ColourRule, type DisplayModel, type RulePredicate } from '../../model/display';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
@@ -13,7 +13,7 @@ const leafPredicate = z.object({
   property: z
     .string()
     .optional()
-    .describe('Property key the clauses test, e.g. "service", "line", "dn", "layerName", "kind", "tag", "category".'),
+    .describe('Property key the clauses test, e.g. "layerName", "kind", "name", "tag", or a key a domain plugin adds.'),
   equals: propertyValue
     .optional()
     .describe('Match when the property equals this value (strings compare case-insensitively; numbers exact).'),
@@ -68,11 +68,6 @@ function toRule(rule: z.infer<typeof ruleParam>): ColourRule {
   };
 }
 
-/** `display` with `profile` stored under its id (the profile list keeps insertion order). */
-export function withProfile(display: DisplayModel, profile: ColourProfile): DisplayModel {
-  return { ...display, colourProfiles: { ...display.colourProfiles, [profile.id]: profile } };
-}
-
 /**
  * @affects adds or replaces doc.display.colourProfiles[id] (affected: []); metaHistory
  * @invariant rule ids unique, regexes compile, colours #rrggbb; geometry untouched
@@ -82,21 +77,18 @@ export const defineColourProfile = defineCommand({
   name: 'define_colour_profile',
   description:
     'Define a display colour profile: an ordered list of rules, each a predicate on entity properties and a colour; the FIRST matching rule colours the entity, ' +
-    'otherwise defaultColour. Properties come from the entity itself (kind, layerId, layerName, name, tag, materialId, componentId) and from domain plugins ' +
-    '(pipes: service, line, dn, odMm, material; equipment: mark, category). Display only: geometry is never changed. Activate it with set_active_colour_profile, ' +
-    'inspect it with colour_by_rule_report and check_display. For hazard / service colours use apply_service_colour_scheme. ' +
+    'otherwise defaultColour. Properties come from the entity itself (id, kind, layerId, layerName, name, tag, materialId, componentId) and from installed domain plugins ' +
+    '(each plugin documents the keys it adds). Display only: geometry is never changed. Activate it with set_active_colour_profile, ' +
+    'inspect it with colour_by_rule_report and check_display. ' +
     'Errors: VIS_RULE_INVALID, VIS_COLOUR_INVALID, VIS_PROFILE_EXISTS (pass replace: true). Does not add a feature step.',
   annotations: { metaHistory: true },
   params: z.object({
-    id: z.string().describe('Profile id, e.g. "by-service".'),
+    id: z.string().describe('Profile id, e.g. "by-layer".'),
     name: z.string().describe('Profile name for legends.'),
     rules: z.array(ruleParam).min(1).max(256).describe('1..256 rules in priority order (first match wins).'),
     defaultColour: z.string().optional().describe('Colour of entities no rule matches: "entity" (their own colour, default) or #rrggbb.'),
     palette: z.string().optional().describe('Name of the palette the colours were drawn from (default "custom"); reports echo it.'),
-    reviewRequired: z
-      .boolean()
-      .optional()
-      .describe('true marks a hazard-scheme profile no qualified reviewer has approved. Default false.'),
+    reviewRequired: z.boolean().optional().describe('true flags the profile as awaiting approval by a qualified reviewer. Default false.'),
     replace: z.boolean().optional().describe('true: overwrite an existing profile with this id.'),
   }),
   run: (doc, params): CommandResult => {
@@ -104,7 +96,7 @@ export const defineColourProfile = defineCommand({
       displayRejection(doc, 'define_colour_profile', code, message, [], paths);
     if (params.id.length === 0) return fail('VIS_RULE_INVALID', 'profile id is empty', ['id']);
     const display = displayOf(doc);
-    if (display.colourProfiles[params.id] !== undefined && params.replace !== true)
+    if (findProfile(display, params.id) !== undefined && params.replace !== true)
       return fail('VIS_PROFILE_EXISTS', `profile '${params.id}' already exists`, ['id']);
     const profile: ColourProfile = {
       id: params.id,
@@ -114,13 +106,9 @@ export const defineColourProfile = defineCommand({
       palette: params.palette ?? 'custom',
       reviewRequired: params.reviewRequired ?? false,
     };
-    const problem = profileProblems(profile)[0];
-    if (problem !== undefined) return fail(problem.code, problem.message, [problem.path]);
-    const result = changed(
-      { ...doc, display: withProfile(display, profile) },
-      `Defined colour profile '${profile.id}' (${profile.rules.length} rule(s)).`,
-      [],
-    );
+    const stored = storeProfile(display, profile, false);
+    if ('code' in stored) return fail(stored.code, stored.message, [stored.path]);
+    const result = changed({ ...doc, display: stored }, `Defined colour profile '${profile.id}' (${profile.rules.length} rule(s)).`, []);
     return { ...result, data: { profileId: profile.id, ruleCount: profile.rules.length } };
   },
 });
@@ -138,7 +126,7 @@ export const setActiveColourProfile = defineCommand({
   params: z.object({ profileId: z.string().nullable().describe('Profile id, or null to deactivate.') }),
   run: (doc, { profileId }): CommandResult => {
     const display = displayOf(doc);
-    if (profileId !== null && display.colourProfiles[profileId] === undefined)
+    if (profileId !== null && findProfile(display, profileId) === undefined)
       return displayRejection(doc, 'set_active_colour_profile', 'VIS_PROFILE_NOT_FOUND', `no profile '${profileId}'`, [profileId]);
     const { colourProfiles } = display;
     const next: DisplayModel = profileId === null ? { colourProfiles } : { colourProfiles, activeProfileId: profileId };
@@ -158,7 +146,7 @@ export const deleteColourProfile = defineCommand({
   params: z.object({ profileId: z.string().describe('Profile id to delete.') }),
   run: (doc, { profileId }): CommandResult => {
     const display = displayOf(doc);
-    if (display.colourProfiles[profileId] === undefined)
+    if (findProfile(display, profileId) === undefined)
       return displayRejection(doc, 'delete_colour_profile', 'VIS_PROFILE_NOT_FOUND', `no profile '${profileId}'`, [profileId]);
     const colourProfiles = Object.fromEntries(Object.entries(display.colourProfiles).filter(([id]) => id !== profileId));
     const { activeProfileId } = display;
