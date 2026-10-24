@@ -16,6 +16,8 @@ import type { NativeDeps } from './fatigueField';
 
 const TOOL = 'auto_route';
 const DEFAULT_ATTEMPTS = 4;
+/** Wall-clock limit of a whole multi-line plan, seconds (each line also has its own `timeoutS`, cut to what is left). */
+export const DEFAULT_LINES_TIMEOUT_S = 600;
 
 type Json = Record<string, unknown>;
 type SingleRoute = (params: Json, options: LineOptions, host: FeaHost, deps: NativeDeps) => Promise<FeaToolResult>;
@@ -90,8 +92,14 @@ export async function runAutoRouteLines(
     return failure('RTE_AUTOROUTE_LINES_INVALID', 'every line needs its own string lineId');
   const common = isRecord(params['common']) ? params['common'] : {};
   const partial = params['partial'] === true;
-  const attempts =
-    typeof params['maxAttempts'] === 'number' ? Math.max(1, Math.min(12, Math.floor(params['maxAttempts']))) : DEFAULT_ATTEMPTS;
+  const given = params['maxAttempts'];
+  if (given !== undefined && !(typeof given === 'number' && Number.isInteger(given) && given >= 1 && given <= 12))
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'maxAttempts must be an integer from 1 to 12');
+  const attempts = given ?? DEFAULT_ATTEMPTS;
+  const window = params['transactionTimeoutS'];
+  if (window !== undefined && !(typeof window === 'number' && Number.isFinite(window) && window >= 1))
+    return failure('RTE_AUTOROUTE_LINES_INVALID', 'transactionTimeoutS must be a number of seconds, at least 1');
+  const deadline = Date.now() + 1000 * (window ?? DEFAULT_LINES_TIMEOUT_S);
   const base = host.getDoc();
   const lineById = new Map(lines.map((line) => [line['lineId'] as string, line]));
   const passes: Pass[] = [];
@@ -108,7 +116,18 @@ export async function runAutoRouteLines(
     const failed: Pass['failed'][number][] = [];
     for (const lineId of order) {
       const line = lineById.get(lineId) as Json;
-      const routed = await routeLine({ ...common, ...line }, options, scratch, deps);
+      const left = (deadline - Date.now()) / 1000;
+      if (left < 1)
+        return failure(
+          'NATIVE_TIMEOUT',
+          `the plan of ${lines.length} line(s) exceeded transactionTimeoutS (${window ?? DEFAULT_LINES_TIMEOUT_S} s); nothing was committed`,
+        );
+      const routed = await routeLine(
+        { ...common, ...line },
+        { ...options, timeoutS: Math.min(options.timeoutS ?? left, left) },
+        scratch,
+        deps,
+      );
       if (!routed.isError) {
         planned.push({ line, solution: solutionOf(isRecord(routed.data) ? routed.data : {}) });
         continue;
@@ -132,13 +151,19 @@ export async function runAutoRouteLines(
       `${missing} of ${lines.length} line(s) not routed after ${passes.length} pass(es): ` +
         best.failed.map((entry) => `${entry.lineId} ${entry.code}`).join('; '),
       best.failed.map((entry) => entry.lineId),
-      { passes: passes.map((pass) => ({ order: pass.order, routed: pass.planned.length, failed: pass.failed })) },
+      { notRouted: best.failed, passes: passes.map((pass) => ({ order: pass.order, routed: pass.planned.length, failed: pass.failed })) },
     );
+  const solutions = new Map(best.planned.map((entry) => [entry.line['lineId'] as string, entry.solution]));
   const committed = host.applyCommand('auto_route_lines', {
-    lines: best.planned.map((entry) => ({ ...entry.line, solution: entry.solution })),
+    // Request order, so run ids are minted by request position as in the in-process command; the routing order is the sequence.
+    lines: lines.map((line) => ({
+      ...line,
+      ...(solutions.has(line['lineId'] as string) ? { solution: solutions.get(line['lineId'] as string) } : {}),
+    })),
     common,
     order: 'given',
-    partial: false,
+    sequence: best.planned.map((entry) => entry.line['lineId']),
+    partial,
   });
   return {
     summary: `${TOOL}: ${lines.length} line(s) planned with llull-compute route in ${passes.length} pass(es). ${committed.summary}`,
@@ -146,7 +171,7 @@ export async function runAutoRouteLines(
     isError: committed.isError,
     data: {
       ...(isRecord(committed.data) ? committed.data : {}),
-      native: { passes: passes.length, routedInBestPass: best.planned.length, notRouted: best.failed.map((entry) => entry.lineId) },
+      native: { passes: passes.length, routedInBestPass: best.planned.length, notRouted: best.failed },
     },
   };
 }

@@ -86,7 +86,7 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               native llull-compute pipe auto-routing (plant 02 RTE V2), committed by auto_route_pipe after
                               validation  [timeoutS=60 maxExpansions=2000000 per first-move candidate]; without llull-compute: NATIVE_TOOL_MISSING
                               (auto_route_pipe alone runs the TypeScript search up to 200000 expansions per candidate)
-  auto_route lines='[{"lineId":..,"from":..,"to":..},..]' [common='{..}' partial=true maxAttempts=4]
+  auto_route lines='[{"lineId":..,"from":..,"to":..},..]' [common='{..}' partial=true maxAttempts=4 transactionTimeoutS=600]
                               several lines in one transaction (automatic order, each routed run an obstacle for the next, bounded retry,
                               all-or-nothing unless partial): planned on a scratch copy with one native search per line, committed once by
                               auto_route_lines; the small-grid in-process form is auto_route_lines, the order alone is route_lines_order

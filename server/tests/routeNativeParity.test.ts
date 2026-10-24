@@ -228,6 +228,7 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       const routed = routeData(await runAutoRoute({ lines, common }, { timeoutS: 60 }, host, nativeDeps()));
       expect(routed).toMatchObject({ complete: true, routed: 2, native: { passes: 2, routedInBestPass: 2 } });
       const piping = host.doc().plant?.piping;
+      expect(piping?.runOrder, 'run ids follow the request position, as in process').toEqual(reference?.runOrder);
       expect(piping?.runOrder.map((id) => piping.runs[id]?.lineId)).toEqual(reference?.runOrder.map((id) => reference.runs[id]?.lineId));
       expect(piping?.runOrder.map((id) => piping.runs[id]?.pis)).toEqual(reference?.runOrder.map((id) => reference.runs[id]?.pis));
       expect(piping?.runOrder.map((id) => piping.runs[id]?.autoRoute?.engine)).toEqual(['llull-route', 'llull-route']);
@@ -247,8 +248,15 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       const kept = routeData(
         await runAutoRoute({ lines, common, maxAttempts: 1, partial: true }, { timeoutS: 60 }, partialHost, nativeDeps()),
       );
-      expect(kept).toMatchObject({ routed: 1, failed: 0 });
+      expect(kept).toMatchObject({ routed: 1, failed: 1, complete: false });
       expect(partialHost.doc().plant?.piping?.runOrder).toHaveLength(1);
+      const inProcess = must(doc, 'auto_route_lines', { lines, common, maxAttempts: 1, partial: true }).document.plant?.piping?.runOrder;
+      expect(partialHost.doc().plant?.piping?.runOrder, 'ids do not shift when a line is left out').toEqual(inProcess);
+      expect((kept['native'] as Json)['notRouted']).toEqual([expect.objectContaining({ code: 'RTE_AUTOROUTE_NO_PATH' })]);
+      const bad = await runAutoRoute({ lines, common, maxAttempts: 99 }, { timeoutS: 60 }, hostOf(doc), nativeDeps());
+      expect(bad.summary).toContain('RTE_AUTOROUTE_LINES_INVALID');
+      const late = await runAutoRoute({ lines, common, transactionTimeoutS: 1 }, { timeoutS: 60 }, hostOf(doc), nativeDeps());
+      expect(late.isError === true ? late.summary : 'routed in time').toMatch(/NATIVE_TIMEOUT|routed in time/);
     },
   );
 
