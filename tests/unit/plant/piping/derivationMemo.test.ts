@@ -221,3 +221,28 @@ describe('derivation memo: what V1 part 1 reads is on the run or in the spec', (
     expect(ok(deriveRun({ ...routed, units: 'mm' }, stored))).toBe(base);
   });
 });
+
+describe('derivation memo: V1 part 2 adds no input', () => {
+  const line = cs150Line(100, '9101');
+  const tie = addTie(line.doc, 'N', [0, 0, 3000], [1, 0, 0]);
+  const routed = apply(tie.doc, 'route_pipe', { lineId: line.lineId, from: { portId: tie.id }, legs: [{ direction: '+X', length: 6000 }] });
+  const stored = piping(routed).runs[piping(routed).runOrder[0] as string] as PipeRun;
+  const base = ok(deriveRun(routed, stored));
+
+  it('heat tracing lives on the line (the lines slice is a key, no derivation reads it): a miss with an equal result', () => {
+    const traced = apply(routed, 'set_heat_tracing', { lineId: line.lineId, type: 'steam', tracers: 2 });
+    const again = ok(deriveRun(traced, piping(traced).runs[stored.id] as PipeRun));
+    expect(again).toEqual(base);
+  });
+
+  it('a pipe support on the run changes the building slice (a key, since nozzle ports live there) and no derivation result', () => {
+    const withBeam = apply(routed, 'add_steel_member', {
+      role: 'beam',
+      start: [3000, -1000, 2830],
+      end: [3000, 1000, 2830],
+      profile: 'IPE200',
+    });
+    const supported = apply(withBeam, 'add_pipe_support', { runId: stored.id, at: [[3000, 0, 3000]] });
+    expect(ok(deriveRun(supported, piping(supported).runs[stored.id] as PipeRun))).toEqual(base);
+  });
+});

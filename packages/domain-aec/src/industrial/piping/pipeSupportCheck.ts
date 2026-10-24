@@ -171,7 +171,7 @@ export const checkPipeSupports = defineCommand({
   name: 'check_pipe_supports',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled standard-wall steel ' +
+    'Read-only support-spacing check of every pipe (add_pipe_run) and every spec-driven run (route_pipe; its centreline is piping_takeoff.legs, it is listed under its run id and line number and counts as on the first building level) against the standard maximum span of water-filled standard-wall steel ' +
     'pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, ' +
     "DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it " +
     'rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed ' +
@@ -193,8 +193,11 @@ export const checkPipeSupports = defineCommand({
       .number()
       .optional()
       .describe('Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.'),
-    line: z.string().optional().describe('Only the pipe(s) with this line number, e.g. "L-101".'),
-    levelId: z.string().optional().describe('Only the pipes of this level id. Default: every level.'),
+    line: z.string().optional().describe('Only the pipe(s) and run(s) with this line number, e.g. "L-101" or "80-HO-4001-CS150-H50".'),
+    levelId: z
+      .string()
+      .optional()
+      .describe('Only the pipes of this level id (spec-driven runs belong to the first level). Default: every level.'),
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;

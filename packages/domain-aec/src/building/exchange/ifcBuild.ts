@@ -4,12 +4,14 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding, orderedElements } from '../model';
+import { getPiping } from '../../plant/piping/model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
 import { exportOther } from './ifcOtherExport';
 import { exportPipeSupport } from './ifcSupportExport';
+import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
 
 type LevelElement = Extract<BuildingElement, { levelId: string }>;
@@ -21,6 +23,8 @@ export interface IfcExport {
   readonly productCount: number;
   /** Building elements that produced at least one product (a pipe or hall member may yield several). */
   readonly elementCount: number;
+  /** Pipe products of the spec-driven runs (02 RTE): segments, fittings, valves, ports and systems. */
+  readonly piping: Omit<PipingIfc, 'products'>;
 }
 
 /** Every IFC product of one element placed on `level`, in export order (hosted openings follow their wall). */
@@ -132,6 +136,13 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       writer.add(`IFCRELAGGREGATES('${context.guid(`rel:spaces:${level.id}`)}',$,$,$,${storey},(${spaces.join(',')}))`);
     }
   }
+  const piping = exportPipingProducts(context, doc, buildingPlacement);
+  if (piping.products.length > 0) {
+    writer.add(
+      `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid('rel:contains:piping')}',$,$,$,(${piping.products.join(',')}),${buildingRef})`,
+    );
+    productCount += piping.productCount;
+  }
   if (storeys.length > 0) {
     writer.add(`IFCRELAGGREGATES('${context.guid('rel:building-storeys')}',$,$,$,${buildingRef},(${storeys.join(',')}))`);
   }
@@ -153,11 +164,20 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     'END-ISO-10303-21;',
     '',
   ].join('\n');
-  return { filename: `${name}.ifc`, ifc, entityCount: writer.count, productCount, elementCount };
+  const { products, ...pipingSummary } = piping;
+  void products;
+  return { filename: `${name}.ifc`, ifc, entityCount: writer.count, productCount, elementCount, piping: pipingSummary };
+}
+
+/** The summary sentence of the pipe products (empty without runs). */
+function pipingNote(piping: IfcExport['piping']): string {
+  return piping.productCount === 0 && piping.brokenRuns.length === 0
+    ? ''
+    : ` Pipe runs: ${piping.productCount} product(s), ${piping.portCount} port(s), ${piping.connectionCount} port connection(s), ${piping.systemCount} system(s)${piping.bodiless > 0 ? `; ${piping.bodiless} part(s) without a product (bolt sets, stub-ins)` : ''}${piping.brokenRuns.length > 0 ? `; broken runs not exported: ${piping.brokenRuns.join(', ')}` : ''}.`;
 }
 
 /**
- * @affects none; data = { filename, ifc, entityCount, productCount }
+ * @affects none; data = { filename, ifc, entityCount, productCount, piping }
  * @failure no levels -> no data
  */
 export const exportIfc = defineCommand({
@@ -166,7 +186,10 @@ export const exportIfc = defineCommand({
   description:
     'Export the building model as IFC4 (OpenBIM, ISO 16739) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks…: project / site ' +
     '/ building / storeys, walls with real openings (IfcOpeningElement) filled by doors and windows, slabs (floor / roof / base slab), ' +
-    'columns, beams, stairs, spaces and materials. GlobalIds are stable across exports. data.ifc holds the file text.',
+    'columns, beams, stairs, spaces and materials. Spec-driven pipe runs (route_pipe) are exported too: IfcPipeSegment for every pipe piece, IfcPipeFitting (BEND, JUNCTION, TRANSITION, CONNECTOR, OBSTRUCTION) for ' +
+    'elbows, tees, olets, reducers, flanges, gaskets and caps, IfcValve for valves, each with an IfcDistributionPort per connection nested in it (IfcRelNests) and IfcRelConnectsPorts between ports that meet, and one ' +
+    'IfcDistributionSystem per pipe line named by its line number; the pipe geometry is the same as the viewport and the STEP export draw. GlobalIds are stable across exports. data.ifc holds the file text; data.piping counts ' +
+    'the pipe products, ports, connections and systems and lists the runs that do not derive (not exported).',
   params: z.object({
     confirmExportControlled,
     timestamp: z
@@ -178,7 +201,8 @@ export const exportIfc = defineCommand({
     const refused = exportRefusal(doc, 'export_ifc', 'data', confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const building = getBuilding(doc);
-    if (building.levelOrder.length === 0) return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first).');
+    if (building.levelOrder.length === 0 && getPiping(doc).runOrder.length === 0)
+      return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first) and no pipe runs.');
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp = timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const result = buildIfc(doc, stamp);
@@ -188,7 +212,7 @@ export const exportIfc = defineCommand({
         : '';
     return report(
       doc,
-      `IFC4 ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${dateNote}`,
+      `IFC4 ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${pipingNote(result.piping)}${dateNote}`,
       result,
     );
   },

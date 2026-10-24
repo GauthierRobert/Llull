@@ -59,6 +59,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Give an eccentric reducer exactly one of flat ("top" for flat on top = +Z, "bottom" for flat on bottom = -Z; horizontal or sloped pipes) and flatDirection [dx, dy, dz] (the side of the pipe the flat is on, needed on vertical pipes); concentric reducers and valves have no flat side.',
   RTE_ECCENTRIC_OFFSET:
     'The smaller pipe of an eccentric reducer sits (OD big - OD small) / 2 off the axis of the bigger one, and the leg after the reducer must take that offset up along its own axis: turn the flat side to the direction of the next leg (flat / flatDirection), move the reducer to a leg followed by a turn along the flat, or cancel it with a second reducer (expander) on the same leg.',
+  RTE_NO_RUNS: 'Route the line first with route_pipe (or auto_route_pipe), or pass the id of a line that has a run.',
   RTE_TRACING_INVALID:
     'The first set_heat_tracing on a line needs type (electric | steam | hot_water | thermal_fluid) and tracers (1 to 6); later calls may change single fields.',
   RTE_HEAT_LOSS_INPUT:
