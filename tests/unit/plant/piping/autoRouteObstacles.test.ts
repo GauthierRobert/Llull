@@ -71,7 +71,9 @@ describe('obstacles of an existing run are its clash bodies', () => {
   it('an insulated header widens by the insulation (60 mm): the envelope replaces the solid it contains', () => {
     const { doc, runId } = headerDoc(true);
     const boxes = obstaclesOf(crossing(doc, 3000));
-    const mid = boxes.find((box) => box.id.startsWith(`${runId}/pipe-`) && (box.min[0] as number) < 5_000_000 && (box.max[0] as number) > 5_000_000);
+    const mid = boxes.find(
+      (box) => box.id.startsWith(`${runId}/pipe-`) && (box.min[0] as number) < 5_000_000 && (box.max[0] as number) > 5_000_000,
+    );
     expect(mid?.id).toMatch(/~ins$/);
     expect((mid?.max[1] as number) / 1000).toBeCloseTo(84.15 + 60 + REACH, 6);
     expect(boxes.filter((box) => box.id === mid?.id.replace('~ins', ''))).toEqual([]);
@@ -125,7 +127,13 @@ describe('obstacles of an existing run are its clash bodies', () => {
     const run = doc.plant?.piping?.runs[runId] as NonNullable<NonNullable<CadDocument['plant']>['piping']>['runs'][string];
     const broken: CadDocument = {
       ...doc,
-      plant: { ...doc.plant, piping: { ...(doc.plant?.piping as NonNullable<NonNullable<CadDocument['plant']>['piping']>), runs: { [runId]: { ...run, pis: [[5, 0, 3000]] } } } },
+      plant: {
+        ...doc.plant,
+        piping: {
+          ...(doc.plant?.piping as NonNullable<NonNullable<CadDocument['plant']>['piping']>),
+          runs: { [runId]: { ...run, pis: [[5, 0, 3000]] } },
+        },
+      },
     };
     const boxes = obstaclesOf(crossing(broken, 3000));
     expect(boxes.some((box) => box.id.startsWith(`${runId}#leg`))).toBe(true);

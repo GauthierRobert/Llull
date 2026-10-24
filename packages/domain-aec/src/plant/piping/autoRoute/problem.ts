@@ -151,6 +151,13 @@ function stubParts(doc: CadDocument, line: PipeLine, ends: { from: PortEnd; to: 
   return { elbow, elbowSource: `${row.key} (${row.source})`, flangeLengths, unverifiedReasons: reasons };
 }
 
+/**
+ * Hash of the geometry of a problem: obstacle ids are labels (run ids differ between a scratch plan and the committed transaction), so
+ * they are left out; two problems with the same lattice, costs and boxes accept the same solutions.
+ */
+const hashOf = (problem: RouteProblem): string =>
+  sha256Hex(JSON.stringify({ ...problem, obstacles: problem.obstacles.map(({ min, max }) => ({ min, max })) }));
+
 const strictlyInside = (p: Int3, box: ObstacleBox): boolean =>
   p.every((v, axis) => v > (box.min[axis] as number) && v < (box.max[axis] as number));
 
@@ -250,7 +257,7 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   return {
     ok: true,
     problem,
-    problemHash: sha256Hex(JSON.stringify(problem)),
+    problemHash: hashOf(problem),
     line,
     from,
     to,

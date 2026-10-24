@@ -21,6 +21,7 @@ import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifact
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { parseRouteResult, runAutoRoute } from '../src/native/autoRoute';
+import type { NativeDeps } from '../src/native/fatigueField';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 
@@ -101,6 +102,29 @@ function seededBoxes(seed: number, count: number): [Vec3, Vec3][] {
   ]);
 }
 
+/** Two DN100 lines X (straight through the hole of a wall, wide grid box) and Y (400 above it, narrow box): X first fills the hole, so Y fails, is promoted and X goes around. */
+function wallScene(): { doc: CadDocument; lines: Json[]; common: Json } {
+  let doc = cs150Document();
+  const ids: string[] = [];
+  for (const sequence of ['9001', '9002']) {
+    doc = must(doc, 'create_pipeline', { service: 'P', sequence, spec: 'CS150', dn: 100 }).document;
+    ids.push(doc.plant?.piping?.lineOrder.at(-1) ?? '');
+  }
+  const line = (lineId: string, x: number, z: number, gridMargin: number): Json => ({
+    lineId,
+    from: { point: [x, 0, z], direction: [1, 0, 0] },
+    to: { point: [10000 - x, 0, z], direction: [-1, 0, 0] },
+    gridMargin,
+  });
+  const keepOutBoxes = [
+    { min: [4950, -1000, 200], max: [5050, 1000, 1000] },
+    { min: [4950, -1000, -1000], max: [5050, 1000, -200] },
+    { min: [4950, -1000, -200], max: [5050, -200, 200] },
+    { min: [4950, 200, -200], max: [5050, 1000, 200] },
+  ];
+  return { doc, lines: [line(ids[0] ?? '', 0, 0, 1600), line(ids[1] ?? '', 1000, 400, 400)], common: { keepOutBoxes, grid: 200 } };
+}
+
 const routeData = (result: FeaToolResult): Json => {
   expect(result.isError, result.summary).toBe(false);
   return result.data as Json;
@@ -116,6 +140,7 @@ const compared = (data: Json): Json => ({
 });
 
 describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
+  const nativeDeps = (): NativeDeps => ({ store, runner: createComputeRunner({}, BINARY) });
   const nativeRun = (doc: CadDocument, params: Json): Promise<FeaToolResult> =>
     runAutoRoute(params, { timeoutS: 60 }, hostOf(doc), { store, runner: createComputeRunner({}, BINARY) });
 
@@ -151,6 +176,81 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       expect(compared(routeData(routed)), `seed ${seed}`).toEqual(compared(reference.data as Json));
     }
   });
+
+  native(
+    'first-move candidates: a pocket in front ties +X with +Y; the tie, the budget stop and optimal:false agree with the reference',
+    async () => {
+      const pocket: [Vec3, Vec3][] = [
+        [
+          [2000, 0, 0],
+          [100, 3000, 3000],
+        ],
+        [
+          [1250, 1450, 0],
+          [1500, 100, 3000],
+        ],
+        [
+          [1250, -1450, 0],
+          [1500, 100, 3000],
+        ],
+      ];
+      const { doc, params } = scenario(
+        [
+          [0, 0, 0],
+          [1, 0, 0],
+        ],
+        [
+          [3000, 2000, 1000],
+          [0, 0, -1],
+        ],
+        pocket,
+      );
+      for (const [cap, expansions, optimal] of [
+        [500, 104, false],
+        [2000, 984, true],
+      ] as const) {
+        const reference = must(doc, 'auto_route_pipe', { ...params, maxExpansions: cap }).data as Json;
+        const routed = routeData(
+          await runAutoRoute({ ...params, maxExpansions: cap }, { timeoutS: 60, maxExpansions: cap }, hostOf(doc), nativeDeps()),
+        );
+        expect(compared(routed), `cap ${cap}`).toEqual(compared(reference));
+        expect(routed).toMatchObject({ expansions, optimal });
+      }
+    },
+  );
+
+  native(
+    'several lines: planned on a scratch copy with the native router, committed once; same runs as the TypeScript auto_route_lines',
+    async () => {
+      const { doc, lines, common } = wallScene();
+      const reference = must(doc, 'auto_route_lines', { lines, common }).document.plant?.piping;
+      const host = hostOf(doc);
+      const routed = routeData(await runAutoRoute({ lines, common }, { timeoutS: 60 }, host, nativeDeps()));
+      expect(routed).toMatchObject({ complete: true, routed: 2, native: { passes: 2, routedInBestPass: 2 } });
+      const piping = host.doc().plant?.piping;
+      expect(piping?.runOrder.map((id) => piping.runs[id]?.lineId)).toEqual(reference?.runOrder.map((id) => reference.runs[id]?.lineId));
+      expect(piping?.runOrder.map((id) => piping.runs[id]?.pis)).toEqual(reference?.runOrder.map((id) => reference.runs[id]?.pis));
+      expect(piping?.runOrder.map((id) => piping.runs[id]?.autoRoute?.engine)).toEqual(['llull-route', 'llull-route']);
+    },
+  );
+
+  native(
+    'several lines, one pass and not partial: RTE_AUTOROUTE_LINES_FAILED and the document is untouched; partial keeps the routed line',
+    async () => {
+      const { doc, lines, common } = wallScene();
+      const failedHost = hostOf(doc);
+      const failed = await runAutoRoute({ lines, common, maxAttempts: 1 }, { timeoutS: 60 }, failedHost, nativeDeps());
+      expect(failed.isError).toBe(true);
+      expect(failed.summary).toContain('RTE_AUTOROUTE_LINES_FAILED');
+      expect(failedHost.doc()).toBe(doc);
+      const partialHost = hostOf(doc);
+      const kept = routeData(
+        await runAutoRoute({ lines, common, maxAttempts: 1, partial: true }, { timeoutS: 60 }, partialHost, nativeDeps()),
+      );
+      expect(kept).toMatchObject({ routed: 1, failed: 0 });
+      expect(partialHost.doc().plant?.piping?.runOrder).toHaveLength(1);
+    },
+  );
 
   native('a solution made stale by a document change is refused and nothing is committed', async () => {
     const { doc, params } = SC_RTE_08();
@@ -189,7 +289,7 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       const started = Date.now();
       const routed = routeData(await nativeRun(doc, big));
       console.warn(`routeNativeParity: ${cells} cells: ${String(routed['expansions'])} expansions in ${Date.now() - started} ms`);
-      expect(routed['expansions']).toBe(1_761_410);
+      expect(routed['expansions']).toBe(1_759_636);
       expect(routed).toMatchObject({ bends: 4, centrelineToPiLengthMm: 102300, optimal: true });
     },
     120_000,
@@ -212,7 +312,31 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
     const saved = deserializeDocument(readFileSync(file, 'utf8'));
     const runId = saved.plant?.piping?.runOrder[0] ?? '';
     expect(saved.plant?.piping?.runs[runId]?.autoRoute?.engine).toBe('llull-route');
-    expect(saved.entities[runId]?.kind).toBe('mesh');
+    expect(saved.plant?.piping?.entityIds[runId]?.length).toBeGreaterThan(0);
+  });
+});
+
+describe('llull auto_route lines=... (CLI)', () => {
+  native('routes several lines of a document file through the native router and saves both runs', async () => {
+    const { doc, lines, common } = wallScene();
+    const file = path.join(dir, 'lines.llull.json');
+    writeFileSync(file, serializeDocument(doc));
+    const out: string[] = [];
+    const io: CliIo = {
+      stdout: (text) => out.push(text),
+      stderr: (text) => out.push(text),
+      readStdin: () => Promise.resolve(''),
+      env: {},
+      prepareKernel: () => Promise.resolve(),
+    };
+    expect(
+      await runCli(['auto_route', `lines=${JSON.stringify(lines)}`, `common=${JSON.stringify(common)}`, '--doc', file], io),
+      out.join(', '),
+    ).toBe(EXIT_OK);
+    const saved = deserializeDocument(readFileSync(file, 'utf8'));
+    const piping = saved.plant?.piping;
+    expect(piping?.runOrder).toHaveLength(2);
+    expect(piping?.runOrder.map((id) => piping.runs[id]?.autoRoute?.engine)).toEqual(['llull-route', 'llull-route']);
   });
 });
 

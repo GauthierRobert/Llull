@@ -3,6 +3,7 @@
  * route` searches it (sparse 3D A*, NDJSON progress) and `auto_route_pipe { ..., solution }` validates the solution against the problem
  * rebuilt from the current document before committing it. The native code never writes the document; a missing binary refuses with
  * NATIVE_TOOL_MISSING (the in-process TypeScript search still runs through `auto_route_pipe` without `solution`, under its cap).
+ * With `lines` it routes several lines in one transaction (`./autoRouteLines`).
  */
 
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
@@ -11,6 +12,7 @@ import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type JobRun } from './computeJob';
 import { nativeInstallHint } from './nativeBinary';
 import type { NativeDeps } from './fatigueField';
+import { runAutoRouteLines } from './autoRouteLines';
 
 const TOOL = 'auto_route';
 export const DEFAULT_AUTO_ROUTE_TIMEOUT_S = 60;
@@ -104,6 +106,7 @@ export async function runAutoRoute(
   host: FeaHost,
   deps: NativeDeps,
 ): Promise<FeaToolResult> {
+  if (params['lines'] !== undefined) return runAutoRouteLines(params, options, host, deps, runAutoRoute);
   const forwarded = routeParams(params);
   const built = host.applyCommand('route_problem', forwarded);
   if (built.isError) return { ...built, summary: `${TOOL}: ${built.summary}` };

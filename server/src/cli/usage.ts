@@ -84,8 +84,12 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               run an MTest script [mfront={name,source} timeoutS=120 probe=true]; absent tools -> MFRONT_TOOL_MISSING with the reason
   auto_route lineId=ID from='{"portId":"tie-1.1"}' to='{"portId":"tie-2.1"}' [route_problem params]
                               native llull-compute pipe auto-routing (plant 02 RTE V2), committed by auto_route_pipe after
-                              validation  [timeoutS=60 maxExpansions=2000000]; without llull-compute: NATIVE_TOOL_MISSING
-                              (auto_route_pipe alone runs the TypeScript search up to 200000 expansions)
+                              validation  [timeoutS=60 maxExpansions=2000000 per first-move candidate]; without llull-compute: NATIVE_TOOL_MISSING
+                              (auto_route_pipe alone runs the TypeScript search up to 200000 expansions per candidate)
+  auto_route lines='[{"lineId":..,"from":..,"to":..},..]' [common='{..}' partial=true maxAttempts=4]
+                              several lines in one transaction (automatic order, each routed run an obstacle for the next, bounded retry,
+                              all-or-nothing unless partial): planned on a scratch copy with one native search per line, committed once by
+                              auto_route_lines; the small-grid in-process form is auto_route_lines, the order alone is route_lines_order
   stackup_monte_carlo [analyze_stackup params] samples=N   native llull-compute (stats, Philox4x32-10): Monte Carlo above the 2e6 TS cap, up to 2^40
                               samples, bit-identical on any thread count  [timeoutS=600 verify=true]; without llull-compute: NATIVE_TOOL_MISSING
   vortex_lattice_solve [analyze_vortex_lattice params]   native llull-compute: vortex lattice above the 1000-panel TS cap
