@@ -140,6 +140,34 @@ describe('auto_route_lines: automatic order and retry', () => {
     expect(refusal.summary).toContain('RTE_AUTOROUTE_NO_PATH');
   });
 
+  it('sequence: routes the listed lines in that order, skips the others, and mints ids by request position', () => {
+    const s = scene();
+    const result = ok(s.doc, 'auto_route_lines', { ...params(s), order: 'given', sequence: [s.y], partial: true });
+    const routed = result.data as LinesData;
+    expect(routed.lines.map((line) => [line.lineId, line.status])).toEqual([
+      [s.y, 'routed'],
+      [s.x, 'skipped'],
+    ]);
+    expect(result.affected).toHaveLength(1);
+    expect(result.affected[0]).toMatch(/.2$/);
+    expectRefusal(s.doc, 'auto_route_lines', { ...params(s), order: 'given', sequence: [s.y] }, 'RTE_AUTOROUTE_LINES_FAILED');
+    expectRefusal(s.doc, 'auto_route_lines', { ...params(s), sequence: [s.y] }, 'RTE_AUTOROUTE_LINES_INVALID', 'sequence');
+    expectRefusal(
+      s.doc,
+      'auto_route_lines',
+      { ...params(s), order: 'given', sequence: [s.y, s.y] },
+      'RTE_AUTOROUTE_LINES_INVALID',
+      'sequence',
+    );
+    expectRefusal(
+      s.doc,
+      'auto_route_lines',
+      { ...params(s), order: 'given', sequence: ['nope'] },
+      'RTE_AUTOROUTE_LINES_INVALID',
+      'sequence',
+    );
+  });
+
   it('refuses a line listed twice and solutions without order given', () => {
     const s = scene();
     expectRefusal(

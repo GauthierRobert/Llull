@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
+import { aabbs, portOwnership } from '@aec/plant/piping/autoRoute/obstacles';
 import { apply, data, ok } from '../../../helpers/commandAssertions';
 import { addTie, cs150Line } from './rteFixtures';
 import { operatorsDocument } from './smallBoreFixtures';
@@ -147,5 +148,55 @@ describe('obstacles of an existing run are its clash bodies', () => {
     const boxes = obstaclesOf(crossing(broken, 3000));
     expect(boxes.some((box) => box.id.startsWith(`${runId}#leg`))).toBe(true);
     expect(boxes.some((box) => box.id.startsWith(`${runId}/pipe-`))).toBe(false);
+  });
+});
+
+describe('port ownership and cuts', () => {
+  const box = (id: string, min: number[], max: number[]): { id: string; min: [number, number, number]; max: [number, number, number] } => ({
+    id,
+    min: min as [number, number, number],
+    max: max as [number, number, number],
+  });
+
+  it('a stub must clear a sibling piece that shares the id of the owner piece (two legs of an elbow)', () => {
+    const owner = box('run/elbow-1', [0, 0, 0], [10, 10, 10]);
+    const sibling = box('run/elbow-1', [20, 0, 0], [30, 10, 10]);
+    const other = box('wall', [40, 0, 0], [50, 10, 10]);
+    const split = portOwnership([owner, sibling, other], new Set(), [[5, 5, 5]]);
+    expect(split.ownerIds).toEqual(['run/elbow-1']);
+    expect(split.stubObstacles).toEqual([sibling, other]);
+  });
+
+  it('a keep-out never owns a port', () => {
+    const keep = box('keepOutBox#0', [0, 0, 0], [10, 10, 10]);
+    expect(portOwnership([keep], new Set(['keepOutBox#0']), [[5, 5, 5]])).toEqual({ ownerIds: [], stubObstacles: [keep] });
+  });
+
+  it('a tilted body is cut along its longest axis, whichever slot it is in', () => {
+    const angle = (10 * Math.PI) / 180;
+    const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+    const body = {
+      center: [0, 0, 0] as [number, number, number],
+      axes: [
+        [cos, sin, 0],
+        [-sin, cos, 0],
+        [0, 0, 1],
+      ] as never,
+      half: [1000, 50, 50] as [number, number, number],
+    };
+    const pieces = aabbs(body);
+    expect(pieces.length).toBeGreaterThan(8);
+    for (const piece of pieces) expect(piece.max[1] - piece.min[1]).toBeLessThan(100 + (2 * 1000 * sin) / pieces.length + 1e-9);
+    expect(
+      aabbs({
+        ...body,
+        axes: [
+          [0, 0, 1],
+          [-sin, cos, 0],
+          [cos, sin, 0],
+        ] as never,
+        half: [50, 50, 1000],
+      }).length,
+    ).toBe(pieces.length);
   });
 });

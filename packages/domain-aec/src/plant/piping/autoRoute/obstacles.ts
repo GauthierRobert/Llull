@@ -63,18 +63,20 @@ function aabb(box: OrientedBox): Corners {
 
 const axisAligned = (box: OrientedBox): boolean => box.axes.every((axis) => axis.some((v) => Math.abs(Math.abs(v) - 1) < AXIS_EPS));
 
-/** The oriented box as one or several axis-aligned boxes covering it: a tilted body is cut along its long (third) axis. */
-function aabbs(box: OrientedBox): Corners[] {
-  const length = 2 * box.half[2];
-  const section = Math.max(box.half[0], box.half[1]);
+/** The oriented box as one or several axis-aligned boxes covering it: a tilted body is cut along its longest axis (the one with the largest half size). */
+export function aabbs(box: OrientedBox): Corners[] {
+  const long = box.half[0] >= box.half[1] && box.half[0] >= box.half[2] ? 0 : box.half[1] >= box.half[2] ? 1 : 2;
+  const length = 2 * (box.half[long] as number);
+  const section = Math.max(...box.half.filter((_, k) => k !== long));
   const wanted = Math.ceil(length / (CUT_LENGTH_IN_SECTIONS * section || 1));
   const cuts = axisAligned(box) ? 1 : Math.min(MAX_CUTS, Math.max(1, wanted));
   if (cuts === 1) return [aabb(box)];
-  const axis = box.axes[2];
+  const axis = box.axes[long] as Vec3;
   return Array.from({ length: cuts }, (_, cut) => {
     const offset = -length / 2 + ((cut + 0.5) * length) / cuts;
     const center = box.center.map((v, dim) => v + (axis[dim] as number) * offset) as unknown as Vec3;
-    return aabb({ ...box, center, half: [box.half[0], box.half[1], length / (2 * cuts)] });
+    const half = box.half.map((v, k) => (k === long ? length / (2 * cuts) : v)) as unknown as Vec3;
+    return aabb({ ...box, center, half });
   });
 }
 
@@ -137,4 +139,21 @@ export function collectObstacles(doc: CadDocument, piping: PipingModel, radius: 
     obstacles.push(inflate(id, lower, upper, radius));
   });
   return { obstacles, keepOutIds: keepOut };
+}
+
+const strictlyInside = (p: readonly [number, number, number], box: ObstacleBox): boolean =>
+  p.every((v, axis) => v > (box.min[axis] as number) && v < (box.max[axis] as number));
+
+/**
+ * The boxes that own a port point (an obstacle whose inflated box strictly contains it, a keep-out never) and the rest, which the port stubs must
+ * clear. Owners are told apart from their siblings by position, not by id: the pieces of one part (two legs of an elbow, plate and hub of a flange,
+ * the cuts of a tilted body) share an id.
+ */
+export function portOwnership(
+  relevant: readonly ObstacleBox[],
+  keepOutIds: ReadonlySet<string>,
+  points: readonly (readonly [number, number, number])[],
+): { ownerIds: string[]; stubObstacles: ObstacleBox[] } {
+  const owns = (box: ObstacleBox): boolean => !keepOutIds.has(box.id) && points.some((point) => strictlyInside(point, box));
+  return { ownerIds: [...new Set(relevant.filter(owns).map((box) => box.id))], stubObstacles: relevant.filter((box) => !owns(box)) };
 }

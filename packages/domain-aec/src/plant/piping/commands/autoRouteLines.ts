@@ -118,7 +118,7 @@ export const autoRouteLines = defineCommand({
   description:
     'Route several pipe lines automatically in one transaction, in an automatic order, each routed run an obstacle for the next. order auto (default): ' +
     'DN descending, then straight-line distance descending, then request position; when a line cannot be routed because earlier lines are in the way, the first line ' +
-    'that fails is promoted to the front and the pass is repeated, up to maxAttempts passes (default 4, at most 12). order given: exactly the request order, one pass (the ' +
+    'that fails is promoted to the front and the pass is repeated, up to maxAttempts passes (default 4, at most 12). order given: exactly the request order (or only the lines of sequence, in that order; run ids still follow the request position), one pass (the ' +
     'native transport uses it with solutions, one per line, each validated against the problem of its turn). Default all-or-nothing: if any line cannot be routed in ' +
     'any tried order nothing changes and RTE_AUTOROUTE_LINES_FAILED names every line and why; partial: true keeps the lines that routed (the pass that routed most) and ' +
     'reports the others. Each line is routed as auto_route_pipe does (spec fittings, clash-body obstacles, rack elevations) and becomes an ordinary run. ' +
@@ -133,6 +133,12 @@ export const autoRouteLines = defineCommand({
       .optional()
       .describe('auto (default): the documented order with retries; given: the request order, one pass.'),
     partial: z.boolean().optional().describe('true: keep the lines that routed and report the rest; false (default): all or nothing.'),
+    sequence: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'With order given: the line ids to route, in this order (default every line in request order). Lines left out are skipped (reported, not routed); run ids still follow the request position.',
+      ),
     maxAttempts: z
       .number()
       .int()
@@ -169,6 +175,19 @@ export const autoRouteLines = defineCommand({
         [],
         [`lines.${solved}.solution`],
       );
+    const sequence = params.sequence;
+    if (sequence !== undefined) {
+      const bad = sequence.find((id, at) => !params.lines.some((line) => line.lineId === id) || sequence.indexOf(id) !== at);
+      if (mode !== 'given' || bad !== undefined)
+        return refuse(
+          doc,
+          'auto_route_lines',
+          'RTE_AUTOROUTE_LINES_INVALID',
+          mode !== 'given' ? 'sequence needs order "given"' : `sequence names "${bad}" twice or not in lines`,
+          [],
+          ['sequence'],
+        );
+    }
     const entries: LineEntry[] = params.lines.map((line) => ({
       request: requestOf(line, params.common),
       runId: nextId('run'),
@@ -179,6 +198,7 @@ export const autoRouteLines = defineCommand({
       order: mode,
       partial: params.partial === true,
       maxAttempts: params.maxAttempts ?? DEFAULT_ATTEMPTS,
+      sequence,
     });
     const { best } = transaction;
     const failed = best.outcomes.filter((outcome) => outcome.status !== 'routed');

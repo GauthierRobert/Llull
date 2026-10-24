@@ -100,6 +100,10 @@ export function runPass(doc: CadDocument, entries: readonly LineEntry[], order: 
       stopped = !continueAfterFailure;
     }
   }
+  // Lines left out of an explicit sequence are not tried.
+  entries.forEach((entry, index) => {
+    if (!order.includes(index)) outcomes.push({ lineId: entry.request.lineId, status: 'skipped' });
+  });
   return {
     order: order.map((index) => (entries[index] as LineEntry).request.lineId),
     outcomes,
@@ -112,6 +116,8 @@ export interface TransactionOptions {
   readonly order: 'auto' | 'given';
   readonly partial: boolean;
   readonly maxAttempts: number;
+  /** With order 'given': the line ids to route, in this order (default: every line, in the request order). Lines left out are skipped. */
+  readonly sequence?: readonly string[] | undefined;
 }
 
 export interface Transaction {
@@ -121,6 +127,9 @@ export interface Transaction {
   readonly best: Attempt;
   readonly complete: boolean;
 }
+
+const givenOrder = (requests: readonly RouteRequest[], sequence: readonly string[] | undefined): number[] =>
+  sequence === undefined ? requests.map((_, index) => index) : sequence.map((id) => requests.findIndex((request) => request.lineId === id));
 
 /**
  * Passes in the rule's order, reordering after failures (see the module comment).
@@ -133,7 +142,7 @@ export function routeTransaction(doc: CadDocument, entries: readonly LineEntry[]
   const tried = new Set<string>();
   const limit = options.order === 'given' ? 1 : options.maxAttempts;
   while (attempts.length < limit) {
-    const order = options.order === 'given' ? requests.map((_, index) => index) : routingOrder(doc, requests, promoted);
+    const order = options.order === 'given' ? givenOrder(requests, options.sequence) : routingOrder(doc, requests, promoted);
     const key = order.join(',');
     if (tried.has(key)) break;
     tried.add(key);

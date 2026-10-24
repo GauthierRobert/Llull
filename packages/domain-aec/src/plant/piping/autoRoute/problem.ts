@@ -12,8 +12,8 @@ import { getPiping } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
 import { resolveFlangeSet } from '../flangeSet';
 import { createSpecLookup, isMiss, pipeOutsideDiameter } from '../specLookup';
-import { AXIS_VECTORS, firstBlocking, type Int3, type ObstacleBox, type RouteProblem } from './lattice';
-import { collectObstacles } from './obstacles';
+import { AXIS_VECTORS, firstBlocking, type Int3, type RouteProblem } from './lattice';
+import { collectObstacles, portOwnership } from './obstacles';
 
 export type Endpoint = { readonly portId: string } | { readonly point: Vec3; readonly direction: Vec3 };
 
@@ -158,9 +158,6 @@ function stubParts(doc: CadDocument, line: PipeLine, ends: { from: PortEnd; to: 
 const hashOf = (problem: RouteProblem): string =>
   sha256Hex(JSON.stringify({ ...problem, obstacles: problem.obstacles.map(({ min, max }) => ({ min, max })) }));
 
-const strictlyInside = (p: Int3, box: ObstacleBox): boolean =>
-  p.every((v, axis) => v > (box.min[axis] as number) && v < (box.max[axis] as number));
-
 /**
  * @failure unknown line / port / keep-out, port in use, size mismatch, non-axis port, missing elbow or flange-set length, ports off a
  *   common lattice or a blocked port stub -> ProblemRefusal (RTE_* code, ids, param paths)
@@ -227,10 +224,7 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   const relevant = collected.obstacles.filter((box) =>
     box.min.every((min, dim) => min <= (hi[dim] as number) && (box.max[dim] as number) >= (lo[dim] as number)),
   );
-  const portOwners = relevant
-    .filter((box) => !collected.keepOutIds.has(box.id) && (strictlyInside(fromUm, box) || strictlyInside(toPointUm, box)))
-    .map((box) => box.id);
-  const stubObstacles = relevant.filter((box) => !portOwners.includes(box.id));
+  const { ownerIds: portOwners, stubObstacles } = portOwnership(relevant, collected.keepOutIds, [fromUm, toPointUm]);
   for (const [start, end, path] of [
     [fromUm, originUm, 'from'],
     [goalPointUm, toPointUm, 'to'],
