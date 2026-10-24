@@ -1,0 +1,46 @@
+{
+  "id": "SC-RTE-20",
+  "status": "RUNNABLE (02 RTE V1 part 2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-41"],
+  "description": "IFC export of the SC-RTE-19 line: two IfcPipeSegment, one IfcPipeFitting (BEND) built as an exact torus segment (a circle of radius 57.15 at 152 from the bend axis revolved 1.570796 rad), an IfcDistributionPort for each of the 6 part ports nested in its part (IfcRelNests), IfcRelConnectsPorts for the 2 joints and one IfcDistributionSystem named by the line number. No building level is needed.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "PCF-A", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "a"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "6001", "spec": "CS150", "dn": 100 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "legs": [
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 2000 }
+        ]
+      },
+      "as": "run"
+    },
+    { "command": "export_ifc", "params": {} }
+  ],
+  "expected": [
+    { "step": 5, "path": "data.piping.productCount", "value": 3, "source": "pipe, elbow, pipe" },
+    { "step": 5, "path": "data.piping.portCount", "value": 6, "source": "2 ports on each of the 3 parts" },
+    { "step": 5, "path": "data.piping.connectionCount", "value": 2, "source": "pipe-1 / elbow, elbow / pipe-2" },
+    { "step": 5, "path": "data.piping.systemCount", "value": 1, "source": "one line" },
+    { "step": 5, "path": "data.ifc", "contains": "IFCCIRCLEPROFILEDEF(.AREA.,$,#", "source": "round sections" },
+    { "step": 5, "path": "data.ifc", "contains": ",57.15)", "source": "OD 114.3 / 2" },
+    { "step": 5, "path": "data.ifc", "contains": ",1.570796);", "source": "pi / 2 rounded to 6 decimals" },
+    { "step": 5, "path": "data.ifc", "contains": ",2848.);", "source": "cut length of the first pipe piece" },
+    { "step": 5, "path": "data.ifc", "contains": ",1848.);", "source": "2000 - 152" }
+  ]
+}

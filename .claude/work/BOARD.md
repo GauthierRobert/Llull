@@ -13,6 +13,15 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-24 — main: 02 RTE-V1c merged (cad-reviewer APPROVE after 2 rounds): run level from elevation, orphan supports reported
+  and regenerated (live = load), `export_pipe_step` elbows as true tori (native OCCT server test), `convert_pipe_run replace` moves
+  supports (TECHNICAL_SPEC §13.11). Gates green: static, unit 16443, server 1605, coverage 97.3 / 89.3 / 98.9 / 98.9 (1 worker).
+  Next: RTE-V2.
+
+- 2026-10-24 — main: 02 RTE-V1 part 2 merged (cad-reviewer APPROVE, 1 round): supports on runs through one carrier lookup
+  (`pipeCarrier.ts`, every support consumer), re-snap + re-attach after plant edits, `set_heat_tracing`, `line_heat_loss`,
+  `export_pcf`, `export_ifc` with plant runs + ports, `export_pipe_step` (kernel) (TECHNICAL_SPEC §13.10, SC-RTE-16..21). Gates green
+  on the merge with DES-3b / DES-4b: static, unit 16365, server 1604, coverage 97.3 / 89.2 / 99.0 / 98.9 (1 worker). Next: RTE-V1c.
 - 2026-10-24 — main: 02 RTE-V1 part 1 merged (cad-reviewer APPROVE, 1 round + 2 non-blocking fixes): socket-weld / threaded
   engagement, eccentric reducers (flat side, centreline offset), trimmed elbows + pipe bends, valve operators + `RTE_VALVE_OPERATOR_CLASH`,
   clash bodies for valves / flanges / tees / olets / reducers, slope-preserving stretch (TECHNICAL_SPEC §13.9, SC-RTE-10..15).
@@ -95,9 +104,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
   (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
-  + draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
-  for the new entities. _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL_SPEC §14): desktop-app hands-on pass on face handles / pole
+  - draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
+    for the new entities. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
   selection + falloff drag, chip layout, bench (VC-18) + 200-face preview timing, true G1 patches, bevel across vertex chains, OCC reason in
   `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net`, M7. _Lane 2 + 1 + native_ _deps: —_
@@ -132,7 +141,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
 - `[DONE]` **RTE-V1a** 02 V1 part 1: socket / threaded engagement, eccentric reducers, trimmed elbows / bends, valve operators (+ operator clash), clash bodies for valves / flanges / tees, slope-preserving stretch (§13.9). Merged 2026-10-24. Open (§13.9): connection rules + socket gap in the PSC format, sourced SW / threaded / eccentric / operator rows in the bundled catalogue, couplings / unions / caps / swages, a move across a sloped leg's heading.
-- `[WIP]` **RTE-V1b** 02 V1 part 2: supports on runs (one carrier lookup across the ~10 building-pipe consumers, re-attach after stretch / edit), heat tracing data, `line_heat_loss`, PCF hand-off (05), IFC ports (08), exact solids via kernel. Worktree `llull-rte`, branch `feat/plant-rte-v1`. Then RTE-V2 (auto-route). _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` **RTE-V1b** 02 V1 part 2: supports on runs (one carrier lookup), heat tracing, `line_heat_loss`, `export_pcf` (05 extends it), IFC runs + ports (IFC4), `export_pipe_step` (§13.10). Merged 2026-10-24.
+- `[DONE]` **RTE-V1c** 02 V1 review follow-ups (§13.11): a run's level from its elevation, orphan supports (live = load, `RTE_SUPPORT_ORPHAN`), native OCCT `export_pipe_step` test (true torus elbows), `convert_pipe_run replace` retargets supports. Merged 2026-10-24. Open: UI support tool picks a run (`runId`, viewport lane).
+- `[WIP]` **RTE-V2** 02 V2 finish (§10, §13.4 "Not done in V2"): auto-routed runs on the full M1..V1 run model, parallel candidate searches (rayon) in `llull-route`, multi-line ordering, rack preference + keep-outs re-checked. Worktree `llull-rte`. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 

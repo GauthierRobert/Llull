@@ -16,6 +16,8 @@ import { SAME_SUPPORT_DISTANCE, endCarriers, pipeRunsOf, supportStations, suppor
 import { autoSupportArcs, isPlaceable } from './pipeSupportPlacement';
 import { spanWarnings, steelCrossingArcs } from './pipeSupportSnap';
 import { pipeSpanLimit } from './pipeSpans';
+import { isRunCarrier } from './pipeCarrier';
+import { getPiping } from '../../plant/piping/model';
 import { PLAN_TOLERANCE, REACH, attachmentFields, clean, isRiserPoint, resolveBearing } from './pipeSupportAttach';
 
 const SUPPORT_TYPES = ['shoe', 'hanger', 'guide', 'anchor'] as const;
@@ -31,8 +33,8 @@ const MAX_SUPPORTS_PER_RUN = 500;
 export const addPipeSupport = defineCommand({
   name: 'add_pipe_support',
   description:
-    'Place supports on an existing pipe (add_pipe_run) so its weight reaches the steel (check_steel_members) and its spans can be ' +
-    'verified (check_pipe_supports). Select the pipe with `pipeId` (element id) or `line` (line number, every pipe carrying it) and give ' +
+    'Place supports on an existing pipe (add_pipe_run) or on a spec-driven run (route_pipe: pass `runId`, the support follows the run centreline of piping_takeoff.legs) so its weight reaches the steel (check_steel_members) and its spans can be ' +
+    'verified (check_pipe_supports, which reads both pipe kinds). Select the pipe with `pipeId` (building pipe element id), `runId` (plant run id) or `line` (line number, every pipe and run carrying it) and give ' +
     'EITHER `at` (list of absolute [x, y, z] points, each snapped to the nearest point of the pipe centreline within `snapDistance`) OR ' +
     '`spacing` (auto-placed along the pipe at no more than that spacing, plus one support min(300 mm, spacing/4) from each free end and ' +
     'one near each bend; ends inside equipment or on another pipe are carried and get none; never on risers). `type`: "shoe" (pipe rests ' +
@@ -46,12 +48,25 @@ export const addPipeSupport = defineCommand({
     'whose section reaches the clamp elevation ± planTolerance, with its face within `maxReach` horizontally of the pipe surface). A ' +
     'position with no steel in reach is still created but UNATTACHED (memberId null): it carries nothing and the summary warns. Supports ' +
     'follow their pipe (moved, copied, deleted with it) and follow edits of their steel: deleting or moving a member or moving the pipe ' +
-    "re-attaches them to the nearest steel in reach, or leaves them unattached (the edit command's summary lists which). Marks PS1, " +
+    "re-attaches them to the nearest steel in reach, or leaves them unattached (the edit command's summary lists which). The supports of a plant run follow its " +
+    'stretch (equipment moved) and edit_route: each is re-snapped to the nearest point of the new centreline and re-attached to steel, and the edit summary lists the ones moved, re-attached or left in place; a run needs a building level (add_level) to hold them (the highest level whose elevation is at or below the lowest point of its centreline, else the lowest level), and a broken run is refused. A support whose pipe or run is later gone stays in place and is reported by check_pipe_supports as RTE_SUPPORT_ORPHAN. Marks PS1, ' +
     'PS2… data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength, standoff (riser bracket length) ' +
     '}.',
   params: z.object({
-    pipeId: z.string().optional().describe('Element id of the pipe, e.g. "pipe-3" (from add_pipe_run data.elementId). Or use `line`.'),
-    line: z.string().optional().describe('Line number of the pipe(s), e.g. "L-101" (the `line` given to add_pipe_run). Or use `pipeId`.'),
+    pipeId: z
+      .string()
+      .optional()
+      .describe('Element id of the building pipe, e.g. "pipe-3" (from add_pipe_run data.elementId). Or use `runId` or `line`.'),
+    runId: z
+      .string()
+      .optional()
+      .describe('Id of a spec-driven pipe run, e.g. "run-4" (affected[0] of route_pipe). Or use `pipeId` or `line`.'),
+    line: z
+      .string()
+      .optional()
+      .describe(
+        'Line number of the pipe(s) and run(s), e.g. "L-101" (the `line` given to add_pipe_run, or the lineNumber of create_pipeline). Or use `pipeId` / `runId`.',
+      ),
     at: z
       .array(z.array(z.number()))
       .optional()
@@ -112,9 +127,10 @@ export const addPipeSupport = defineCommand({
       .describe('Largest distance from an `at` point to the pipe centreline, document units, > 0. Default 500 mm.'),
   }),
   run: (doc, params): CommandResult => {
-    const { pipeId, line, at, spacing, memberId, type = 'shoe', snapToSteel = true } = params;
+    const { pipeId, runId, line, at, spacing, memberId, type = 'shoe', snapToSteel = true } = params;
     const fail = failedWith(doc, 'add_pipe_support');
-    if ((pipeId === undefined) === (line === undefined)) return fail('give exactly one of pipeId or line.');
+    if ([pipeId, runId, line].filter((value) => value !== undefined).length !== 1)
+      return fail('give exactly one of pipeId, runId or line.');
     if ((at === undefined) === (spacing === undefined)) return fail('give exactly one of at (list of points) or spacing.');
     const below = type !== 'hanger';
     const unit = fromMm(doc, 1);
@@ -129,11 +145,29 @@ export const addPipeSupport = defineCommand({
     const units = modelUnits(doc);
     const { building } = units;
     const runs = pipeRunsOf(units);
+    const isRun = (run: PipeRun): boolean => isRunCarrier(doc, building, run.element.id);
     const targets =
-      pipeId !== undefined ? runs.filter((run) => run.element.id === pipeId) : runs.filter((run) => run.element.line === line?.trim());
+      pipeId !== undefined
+        ? runs.filter((run) => run.element.id === pipeId && !isRun(run))
+        : runId !== undefined
+          ? runs.filter((run) => run.element.id === runId && isRun(run))
+          : runs.filter((run) => run.element.line === line?.trim());
     if (targets.length === 0) {
-      return fail(pipeId !== undefined ? `'${pipeId}' is not a pipe element (add_pipe_run).` : `no pipe carries line '${line ?? ''}'.`);
+      return fail(
+        pipeId !== undefined
+          ? `'${pipeId}' is not a pipe element (add_pipe_run; a spec-driven run is selected with runId).`
+          : runId !== undefined
+            ? `'${runId}' is not a pipe run (route_pipe).`
+            : `no pipe or run carries line '${line ?? ''}'.`,
+      );
     }
+    const broken = targets.find((run) => isRun(run) && getPiping(doc).runs[run.element.id]?.broken !== undefined);
+    if (broken)
+      return fail(
+        `run ${broken.element.id} is broken (${getPiping(doc).runs[broken.element.id]?.broken?.reason ?? ''}): repair it first (edit_route, or move the equipment back).`,
+      );
+    const homeless = targets.find((run) => building.levels[run.element.levelId] === undefined);
+    if (homeless) return fail(`${homeless.element.mark} has no building level to hold its supports (add_level first).`);
     if (spacing !== undefined) {
       const spacingMm = spacing / unit;
       const crowded = targets.find((run) => routeLength(run.points) / spacingMm > MAX_SUPPORTS_PER_RUN);
@@ -232,7 +266,9 @@ export const addPipeSupport = defineCommand({
       ),
     );
     const marks = created.map((support) => support.mark);
-    const pipeMarks = [...new Set(created.map((support) => building.elements[support.pipeId]?.mark))];
+    const pipeMarks = [
+      ...new Set(created.map((support) => runs.find((run) => run.element.id === support.pipeId)?.element.mark ?? support.pipeId)),
+    ];
     return {
       document,
       summary:

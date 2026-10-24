@@ -59,7 +59,30 @@ const isSlope = (value: unknown): boolean =>
   typeof value['fall'] === 'boolean' &&
   validSlope({ value: value['value'], unit: value['unit'] });
 
-/** Errors of the M3 members of a line (declared slope, insulation record) and of the project settings. */
+const TRACING_TYPES = ['electric', 'steam', 'hot_water', 'thermal_fluid'];
+
+/** Errors of the heat-tracing record of a line (V1). */
+function tracingErrors(path: string, tracing: unknown): string[] {
+  if (tracing === undefined) return [];
+  const allowances = isRecord(tracing) ? tracing['allowances'] : undefined;
+  const valid =
+    isRecord(tracing) &&
+    TRACING_TYPES.includes(String(tracing['type'])) &&
+    typeof tracing['tracers'] === 'number' &&
+    Number.isInteger(tracing['tracers']) &&
+    tracing['tracers'] >= 1 &&
+    (tracing['maintainTempC'] === undefined || typeof tracing['maintainTempC'] === 'number') &&
+    (allowances === undefined ||
+      (isRecord(allowances) &&
+        ['valveM', 'flangeM', 'supportM'].every((key) => typeof allowances[key] === 'number' && (allowances[key] as number) >= 0)));
+  return valid
+    ? []
+    : [
+        `${path}.tracing must be { type: electric | steam | hot_water | thermal_fluid, tracers >= 1 (integer), maintainTempC?, allowances?: { valveM, flangeM, supportM >= 0 } }`,
+      ];
+}
+
+/** Errors of the M3 / V1 members of a line (declared slope, insulation record, heat tracing) and of the project settings. */
 function lineErrors(id: string, line: Record<string, unknown>): string[] {
   const path = `plant.piping.lines.${id}`;
   const insulation = line['insulation'];
@@ -75,6 +98,7 @@ function lineErrors(id: string, line: Record<string, unknown>): string[] {
       (insulation['materialExplicit'] === undefined || typeof insulation['materialExplicit'] === 'boolean'))
       ? []
       : [`${path}.insulation must be { code, thicknessMm > 0, source: "spec" | "explicit", materialExplicit?: boolean }`]),
+    ...tracingErrors(path, line['tracing']),
   ];
 }
 

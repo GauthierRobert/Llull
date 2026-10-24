@@ -7,6 +7,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, getBuilding } from '../../building/model';
+import type { CarrierDoc } from '../../plant/piping/runCarrier';
 import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { yieldStrength } from './steelDesign';
@@ -44,6 +45,8 @@ export interface SteelBar {
 /** Document-unit → mm conversion and level elevations of a building. */
 export interface ModelUnits {
   readonly building: BuildingModel;
+  /** The document the units were read from (its plant runs are pipe carriers too: industrial/piping/pipeCarrier.ts). */
+  readonly source: CarrierDoc;
   /** Document units → mm. */
   readonly toMm: (value: number) => number;
   readonly elevationMm: (levelId: string) => number;
@@ -52,7 +55,12 @@ export interface ModelUnits {
 export function modelUnits(doc: CadDocument): ModelUnits {
   const building = getBuilding(doc);
   const unit = fromMm(doc, 1);
-  return { building, toMm: (value) => value / unit, elevationMm: (levelId) => (building.levels[levelId]?.elevation ?? 0) / unit };
+  return {
+    building,
+    source: doc,
+    toMm: (value) => value / unit,
+    elevationMm: (levelId) => (building.levels[levelId]?.elevation ?? 0) / unit,
+  };
 }
 
 const POINTER: Readonly<Partial<Record<MemberRole, string>>> = {

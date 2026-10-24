@@ -1,7 +1,7 @@
 /**
  * Plant 02 RTE: runs the validation pack's scenario plans (`validation/plans/sc-rte-*.json`) through `build_project` (the path of
  * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. `harness.inline` fixtures are inlined first. Steps
- * whose command is not registered yet (line_heat_loss: 02 V1) stay unchecked; the plan's `unbuilt` list must say exactly
+ * whose command is not registered yet stay unchecked; the plan's `unbuilt` list must say exactly
  * which commands those are (a stale list fails), and `blockedFrom` marks the first step whose rows depend on an unbuilt step.
  */
 
@@ -151,6 +151,14 @@ describe.each([
   'sc-rte-13-trimmed-elbow-and-bend.json',
   'sc-rte-14-valve-operator-clash.json',
   'sc-rte-15-slope-preserving-stretch.json',
+  'sc-rte-16-supports-on-a-run.json',
+  'sc-rte-17-supports-follow-stretch.json',
+  'sc-rte-18-heat-tracing-and-loss.json',
+  'sc-rte-19-pcf-small-line.json',
+  'sc-rte-20-ifc-ports-small-line.json',
+  'sc-rte-21-pipe-step-needs-kernel.json',
+  'sc-rte-22-level-from-elevation.json',
+  'sc-rte-23-convert-replace-moves-supports.json',
 ])('scenario plan %s', (file) => {
   const plan = load(file);
 

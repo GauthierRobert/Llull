@@ -93,9 +93,6 @@
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": [
       "approve_pipe_spec"
     ],
-    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-07-insulated-hot-line.json": [
-      "line_heat_loss"
-    ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": [
       "check_equipment",
       "equipment_datasheet",
@@ -145,7 +142,6 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": [
       "check_isometric",
       "cut_list",
-      "export_pcf",
       "import_pcf",
       "piping_bom",
       "split_spools",
@@ -155,7 +151,6 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": [
       "add_end_flange",
       "add_field_weld",
-      "export_pcf",
       "import_pcf",
       "piping_bom"
     ],
@@ -181,8 +176,7 @@
       "set_fabrication_rules"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": [
-      "export_isometric",
-      "export_pcf"
+      "export_isometric"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": [
       "add_ladder"

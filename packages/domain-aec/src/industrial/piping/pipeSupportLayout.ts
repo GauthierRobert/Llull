@@ -4,14 +4,20 @@
  */
 
 import type { PipeElement, PipeSupportElement } from '@aec/building/types';
+import type { PortRef } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/types';
 import { elementsOf } from '../../building/model';
 import type { ModelUnits } from '../steelDesign/steelMemberBars';
 import { RISER_SLOPE, arcLengths, nearestOnRoute, spanCoordinate } from './routeSupport';
 import { pipeSpanLimit } from './pipeSpans';
+import { getPiping } from '../../plant/piping/model';
+import { carrierPipes } from './pipeCarrier';
 
 export interface PipeRun {
+  /** The carrier: a building pipe, or a plant run in the shape of a pipe element (carrierPipe). */
   readonly element: PipeElement;
+  /** What carries each end when it is known from the plant run's port references (nozzle = equipment, branch / run end = pipe), else geometry decides. */
+  readonly ends?: readonly [EndCarrier | null, EndCarrier | null];
   /** Absolute centreline, mm. */
   readonly points: Vec3[];
   readonly diameterMm: number;
@@ -44,15 +50,20 @@ export function absolutePointMm(units: ModelUnits, levelId: string, point: Vec3)
   return [units.toMm(point[0]), units.toMm(point[1]), units.elevationMm(levelId) + units.toMm(point[2])];
 }
 
-/** Absolute mm route of a pipe element. */
+const endOf = (ref: PortRef | undefined): EndCarrier | null =>
+  ref?.kind === 'nozzle' ? 'equipment' : ref?.kind === 'branch' || ref?.kind === 'runEnd' ? 'pipe' : null;
+
+/** Absolute mm route of a pipe element (a building pipe, or a plant run in the shape of one: its ends are carried by its port references). */
 export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
   const points = element.points.map((point) => absolutePointMm(units, element.levelId, point));
-  return { element, points, diameterMm: units.toMm(element.diameter), lengthMm: arcLengths(points).at(-1) ?? 0 };
+  const base = { element, points, diameterMm: units.toMm(element.diameter), lengthMm: arcLengths(points).at(-1) ?? 0 };
+  const run = units.building.elements[element.id] === undefined ? getPiping(units.source).runs[element.id] : undefined;
+  return run === undefined ? base : { ...base, ends: [endOf(run.start.ref), endOf(run.end.ref)] };
 }
 
-/** Every pipe of the building, in model order. */
+/** Every pipe a support can rest on: the building pipes in model order, then the plant runs in run order. */
 export function pipeRunsOf(units: ModelUnits): PipeRun[] {
-  return elementsOf(units.building, 'pipe').map((pipe) => pipeRunOf(units, pipe));
+  return carrierPipes(units.source, units.building).map((pipe) => pipeRunOf(units, pipe));
 }
 
 /** Supports of pipe `pipeId`, in model order. */
@@ -64,7 +75,7 @@ export function supportsOfPipe(units: ModelUnits, pipeId: string): PipeSupportEl
 export function supportStations(units: ModelUnits, run: PipeRun, supports: ReadonlyArray<PipeSupportElement>): SupportStation[] {
   return supports
     .flatMap((support): SupportStation[] => {
-      const snap = nearestOnRoute(run.points, absolutePointMm(units, run.element.levelId, support.position));
+      const snap = nearestOnRoute(run.points, absolutePointMm(units, support.levelId, support.position));
       if (snap === null) return [];
       const member = support.memberId === null ? undefined : units.building.elements[support.memberId];
       return [
@@ -116,6 +127,7 @@ function insideEquipment(units: ModelUnits, point: Vec3): boolean {
  * passes within the larger outside diameter (a branch on a header).
  */
 export function endCarriers(units: ModelUnits, run: PipeRun, runs: ReadonlyArray<PipeRun>): [EndCarrier | null, EndCarrier | null] {
+  if (run.ends !== undefined) return [run.ends[0], run.ends[1]];
   const carrier = (point: Vec3 | undefined): EndCarrier | null => {
     if (point === undefined) return null;
     if (insideEquipment(units, point)) return 'equipment';

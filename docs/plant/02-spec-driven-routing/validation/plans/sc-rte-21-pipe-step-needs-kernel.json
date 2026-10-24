@@ -1,0 +1,42 @@
+{
+  "id": "SC-RTE-21",
+  "status": "RUNNABLE (02 RTE V1 part 2): the no-kernel contract. The exact path (scripted exact kernel) is in tests/unit/plant/piping/exportPipeStep.test.ts; the native OCCT kernel measurement (volumes, self-check) is server/tests/nativePipeStep.test.ts (README D24).",
+  "unbuilt": [],
+  "validates": ["VC-RTE-42"],
+  "description": "export_pipe_step writes the derived parts as exact STEP solids through ctx.kernel (requiresKernel): the plan harness has no kernel, so the command is refused by name and the document is untouched. With the mesh kernel it would be XCH_WRITER_UNAVAILABLE, never a faceted fallback.",
+  "units": "mm",
+  "harness": {
+    "inline": { "prefix[0].params.catalog": "../data/catalog_stub_cs150.json", "prefix[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "prefix": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "PCF-A", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "a"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "6001", "spec": "CS150", "dn": 100 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "legs": [
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 2000 }
+        ]
+      },
+      "as": "run"
+    }
+  ],
+  "cases": [
+    {
+      "id": "SC-RTE-21a",
+      "what": "no kernel installed",
+      "actions": [{ "command": "export_pipe_step", "params": {} }],
+      "expected": [{ "path": "error.code", "value": "CMD_KERNEL_UNAVAILABLE" }]
+    }
+  ]
+}

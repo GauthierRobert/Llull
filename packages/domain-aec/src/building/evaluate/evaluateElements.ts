@@ -7,6 +7,7 @@ import { curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { evaluateEquipment, evaluateFooting, evaluateMember, evaluatePanel, evaluatePipe, evaluateTray } from '../../industrial/evaluate';
 import { evaluatePlate, evaluateConnection } from '../../industrial/connections/evaluateConnections';
 import { evaluatePipeSupport } from '../../industrial/piping/evaluateSupports';
+import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
 import { reconcilePipeSupports } from '../../industrial/piping/pipeSupportAttach';
 import { BUILDING_LAYER_COLOR } from './entities';
 import { regenerateOwned } from '../../shared/derived';
@@ -64,8 +65,7 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
     case 'pipeSupport': {
-      const pipe = building.elements[leveled.pipeId];
-      return evaluatePipeSupport(context.doc, leveled, pipe?.category === 'pipe' ? pipe : undefined, level);
+      return evaluatePipeSupport(context.doc, leveled, carrierOfSupport(context.doc, building, leveled), level);
     }
     case 'connection': {
       const members: Record<string, SteelMemberElement | undefined> = {};

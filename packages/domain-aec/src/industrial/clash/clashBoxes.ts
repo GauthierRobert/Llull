@@ -12,6 +12,7 @@ import { atLevel } from '../evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometry/curvedWallGeometry';
 import { stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { supportShape } from '../piping/supportParts';
+import { carrierOfSupport } from '../piping/pipeCarrier';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export type OrientedBox = { readonly center: Vec3; readonly axes: readonly [Vec3, Vec3, Vec3]; readonly half: Vec3 };
@@ -84,8 +85,8 @@ export function elementBoxes(doc: CadDocument, building: BuildingModel, element:
     case 'tray':
       return level ? polylineBoxes(level, element.points, element.width / 2, element.height / 2) : [];
     case 'pipeSupport': {
-      const pipe = building.elements[element.pipeId];
-      if (!level || pipe?.category !== 'pipe') return [];
+      const pipe = carrierOfSupport(doc, building, element);
+      if (!level || pipe === undefined) return [];
       const { angle, parts } = supportShape(doc, element, pipe);
       const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
       return parts.map((part): OrientedBox => {

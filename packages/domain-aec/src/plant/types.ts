@@ -59,6 +59,25 @@ export interface LineInsulation {
   readonly row?: string;
 }
 
+/** Kind of heat tracing: electric trace cable, steam tracer, hot-water tracer or a thermal-fluid (glycol / oil) tracer. */
+export type TracingType = 'electric' | 'steam' | 'hot_water' | 'thermal_fluid';
+
+/** Extra tracer length per fitting, metres per item (loops at a valve, flange, support: 02 RTE FR-RTE-16). */
+export interface TracingAllowances {
+  readonly valveM: number;
+  readonly flangeM: number;
+  readonly supportM: number;
+}
+
+/** Heat tracing of a line (`set_heat_tracing`): data only, used by the tracing takeoff and as the maintain temperature of `line_heat_loss`. */
+export interface LineTracing {
+  readonly type: TracingType;
+  /** Tracers run along the pipe (1 .. 6). */
+  readonly tracers: number;
+  readonly maintainTempC?: number;
+  readonly allowances?: TracingAllowances;
+}
+
 export interface PipeLine {
   readonly id: string;
   /** Explicit or from the template `{dn}-{service}-{sequence}-{spec}[-{insulationCode}{thickness}]`; unique. */
@@ -71,6 +90,7 @@ export interface PipeLine {
   readonly designPressureBarG?: number;
   readonly designTempC?: number;
   readonly insulation?: LineInsulation;
+  readonly tracing?: LineTracing;
   /** Declared slope of the whole line (a gravity drain): `check_piping` reports legs that rise against it (RTE_ADVERSE_SLOPE) and low / high points (RTE_POCKET). */
   readonly slope?: Slope;
   readonly from?: string;

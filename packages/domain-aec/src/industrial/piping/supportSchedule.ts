@@ -3,16 +3,17 @@
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../building/model';
 import { round } from '../../shared/numeric';
+import { carrierOfSupport } from './pipeCarrier';
 
 export function supportSchedule(doc: CadDocument): { columns: string[]; rows: Array<Array<string | number>> } {
   const building = getBuilding(doc);
   const rows = elementsOf(building, 'pipeSupport').map((support) => {
-    const pipe = building.elements[support.pipeId];
+    const pipe = carrierOfSupport(doc, building, support);
     const member = support.memberId === null ? undefined : building.elements[support.memberId];
     const level = building.levels[support.levelId];
     return [
       support.mark,
-      pipe?.category === 'pipe' ? (pipe.line ?? '') : '',
+      pipe?.line ?? '',
       pipe?.mark ?? support.pipeId,
       support.type,
       member?.category === 'member' ? member.mark : '',

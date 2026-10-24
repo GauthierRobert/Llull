@@ -124,7 +124,10 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
   const errors: string[] = [];
   const pipeId = element['pipeId'];
   const pipe = typeof pipeId === 'string' ? elements[pipeId] : undefined;
-  if (!isRecord(pipe) || pipe['category'] !== 'pipe') errors.push(`building element ${key}: pipeId '${String(pipeId)}' is not a pipe`);
+  // An id that is no building element may name a plant run (V1) or nothing (a deleted pipe or run: V1c, a file stays loadable; check_pipe_supports reports RTE_SUPPORT_ORPHAN).
+  const names = typeof pipeId === 'string' && pipeId !== '';
+  if (!names || (pipe !== undefined && (!isRecord(pipe) || pipe['category'] !== 'pipe')))
+    errors.push(`building element ${key}: pipeId '${String(pipeId)}' is not a pipe`);
   if (!['shoe', 'hanger', 'guide', 'anchor'].includes(String(element['type']))) {
     errors.push(`building element ${key}: type must be shoe, hanger, guide or anchor`);
   }

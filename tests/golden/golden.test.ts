@@ -8,6 +8,7 @@ import { deformPlans } from './deformPlans';
 import { implicitPlans } from './implicitPlans';
 import { pipingPlans } from './pipingPlans';
 import { pipingPlansV1 } from './pipingPlansV1';
+import { pipingPlansV1b } from './pipingPlansV1b';
 import { setSignaturePort } from '@core/commands/signaturePort';
 import { afterAll, beforeAll } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -34,6 +35,7 @@ describe('golden replay corpus', () =>
     ...implicitPlans,
     ...pipingPlans,
     ...pipingPlansV1,
+    ...pipingPlansV1b,
   }));
 
 describe('loops_polar_pattern parametric regeneration', () => {

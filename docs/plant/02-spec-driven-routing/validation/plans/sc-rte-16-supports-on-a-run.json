@@ -1,0 +1,76 @@
+{
+  "id": "SC-RTE-16",
+  "status": "RUNNABLE (02 RTE V1 part 2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-37"],
+  "description": "Supports on a spec-driven run (add_pipe_support runId). The SC-RTE-07 hot line (DN80, z 3000, 6000 long, 50 mm insulation) crosses three IPE200 beams (axis z 2830, top 2930) at x 500, 3000 and 5500. spacing 3000 with snapToSteel puts a shoe on each beam; check_pipe_supports reads the run through the same carrier as a building pipe: three supports, largest span 2.5 m, and check_steel_members puts the pipe weight on the beams.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H2", "position": [6000, 0, 3000], "direction": [-1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "HO",
+        "sequence": "4001",
+        "spec": "CS150",
+        "dn": 80,
+        "designTempC": 180,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "line"
+    },
+    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$h1" }, "to": { "portId": "$h2" } }, "as": "run" },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [500, -1000, 2830], "end": [500, 1000, 2830], "profile": "IPE200" }
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [3000, -1000, 2830], "end": [3000, 1000, 2830], "profile": "IPE200" }
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [5500, -1000, 2830], "end": [5500, 1000, 2830], "profile": "IPE200" }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$run", "spacing": 3000 } },
+    { "command": "check_pipe_supports", "params": {} },
+    { "command": "check_steel_members", "params": {} }
+  ],
+  "expected": [
+    { "step": 9, "path": "data.elementIds.length", "value": 3, "source": "one shoe on each of the three beams the centreline crosses" },
+    { "step": 9, "path": "data.supports[*].pipeId", "value": ["$run", "$run", "$run"], "source": "the run is the carrier" },
+    { "step": 9, "path": "data.supports[*].position[0]", "value": [500, 3000, 5500], "abs": 0.000001, "source": "beam axes" },
+    {
+      "step": 9,
+      "path": "data.unattached.length",
+      "value": 0,
+      "source": "pipe underside 3000 - 44.45 = 2955.55, beam top 2930: 25.55 mm gap, inside the 500 mm reach"
+    },
+    { "step": 10, "path": "data.pipes[0].supports", "value": 3, "source": "three supports bear on steel" },
+    { "step": 10, "path": "data.pipes[0].largestSpanM", "value": 2.5, "abs": 1e-9, "source": "3000 - 500 = 5500 - 3000 = 2.5 m" },
+    { "step": 10, "path": "data.pipes[0].ok", "value": true, "source": "table span DN80 3.7 m; overhangs 0.5 m <= 0.5 x 3.7" },
+    { "step": 11, "path": "data.loads.lines[0].basis", "value": "supports", "source": "a pipe with supports is carried by them only" },
+    {
+      "step": 11,
+      "path": "data.loads.lines[0].carriedKn",
+      "value": 0.9450619,
+      "abs": 0.00001,
+      "source": "README D19: 16.0615 kg/m x 9.80665 = 0.157510 kN/m over 6 m (the tributary lengths of three supports with free ends sum to the run length)"
+    }
+  ]
+}

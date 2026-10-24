@@ -1,0 +1,91 @@
+{
+  "id": "SC-RTE-18",
+  "status": "RUNNABLE (02 RTE V1 part 2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-39"],
+  "description": "Heat tracing data and line_heat_loss on the SC-RTE-07 hot line (180 / 28 degC, 50 mm mineral wool k 0.0598535, h_o 22.697193, k_steel 56.045, inside film neglected). Two electric tracers maintain 150 degC with 0.25 m per support; the three shoes of SC-RTE-16 are on the run. Tracer length 2 x (6 + 3 x 0.25) = 13.5 m; heat loss 73.120 W/m at 180 degC and 58.688 W/m at the 150 degC the tracing maintains.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H2", "position": [6000, 0, 3000], "direction": [-1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "HO",
+        "sequence": "4001",
+        "spec": "CS150",
+        "dn": 80,
+        "designTempC": 180,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "line"
+    },
+    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$h1" }, "to": { "portId": "$h2" } }, "as": "run" },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [500, -1000, 2830], "end": [500, 1000, 2830], "profile": "IPE200" }
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [3000, -1000, 2830], "end": [3000, 1000, 2830], "profile": "IPE200" }
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [5500, -1000, 2830], "end": [5500, 1000, 2830], "profile": "IPE200" }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$run", "spacing": 3000 } },
+    {
+      "command": "set_heat_tracing",
+      "params": {
+        "lineId": "$line",
+        "type": "electric",
+        "tracers": 2,
+        "maintainTempC": 150,
+        "allowances": { "valveM": 1, "flangeM": 0.5, "supportM": 0.25 }
+      }
+    },
+    { "command": "piping_takeoff", "params": { "runId": "$run" } },
+    {
+      "command": "line_heat_loss",
+      "params": { "lineId": "$line", "fluidTempC": 180, "ambientTempC": 28, "outsideFilmWm2K": 22.697193, "steelConductivityWmK": 56.045 }
+    }
+  ],
+  "expected": [
+    { "step": 11, "path": "data.tracing[0].supports", "value": 3, "source": "three shoes on the run" },
+    {
+      "step": 11,
+      "path": "data.tracing[0].centrelineM",
+      "value": 6,
+      "abs": 1e-9,
+      "source": "one straight pipe piece between two butt-weld tie-ins"
+    },
+    { "step": 11, "path": "data.tracing[0].tracerLengthM", "value": 13.5, "abs": 1e-9, "source": "README D21: 2 x (6 + 3 x 0.25)" },
+    {
+      "step": 12,
+      "path": "data.heatLossWPerM",
+      "value": 73.12,
+      "abs": 0.001,
+      "source": "README D21: 152 / (3.7437e-4 + 2.004159 + 0.074241) = 152 / 2.078775; data/insulation_heat_loss.json 73.12000884"
+    },
+    { "step": 12, "path": "data.surfaceTempC", "value": 33.4285, "abs": 0.001, "source": "28 + 73.12 x 0.074241" },
+    { "step": 12, "path": "data.diametersMm.envelope", "value": 188.9, "abs": 1e-9, "source": "88.9 + 2 x 50" },
+    { "step": 12, "path": "data.totalHeatLossW", "value": 438.72, "abs": 0.01, "source": "73.12 W/m x 6 m" },
+    { "step": 12, "path": "data.tracing.heatLossAtMaintainWPerM", "value": 58.688, "abs": 0.001, "source": "(150 - 28) / 2.078775" },
+    { "step": 12, "path": "data.defaults[*].input", "value": ["insulationConductivityWmK", "insideFilmWm2K"], "source": "both are named" },
+    { "step": 12, "path": "data.reviewRequired", "value": true, "source": "AF-33" }
+  ]
+}

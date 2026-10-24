@@ -1,0 +1,131 @@
+{
+  "id": "SC-RTE-17",
+  "status": "RUNNABLE (02 RTE V1 part 2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-38"],
+  "description": "Supports follow their run. SC-RTE-01 (pump to vessel, DN100 at z 2500 on the +X leg at y 3000) with an IPE200 along Y at x 1500 (axis z 2300, top 2400) and a shoe under the +X leg at (1500, 3000, 2500). The vessel moves 500 in Y: the +Y leg absorbs it and the +X leg shifts to y 3500, so the shoe is re-snapped 500 mm onto it and keeps its beam; the editing command names the move in its summary.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 },
+      "as": "pump"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "P-101",
+        "mark": "N2",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "free", "position": [0, 300, 1000], "direction": [0, 0, 1] },
+        "projection": 300
+      },
+      "as": "pumpOut",
+      "note": "free location in the equipment frame (origin = plan location of P-101): world face centre (0, 0, 1000) facing +Z; the port is P-101:N2"
+    },
+    {
+      "command": "add_vessel",
+      "params": {
+        "tag": "V-101",
+        "name": "Feed drum",
+        "orientation": "vertical",
+        "location": [7000, 3000],
+        "insideDiameter": 1600,
+        "tangentLength": 4000,
+        "heads": { "top": { "type": "ellipsoidal", "ratio": 2 }, "bottom": { "type": "ellipsoidal", "ratio": 2 } },
+        "shellThickness": 10,
+        "headThickness": 10,
+        "corrosionAllowance": 3,
+        "support": { "type": "skirt", "height": 1000, "thickness": 10 },
+        "design": {
+          "pressure": { "value": 1, "unit": "MPa" },
+          "temperatureC": 150,
+          "material": "SA-516 Gr 70",
+          "allowableStress": { "value": 137.9, "unit": "MPa", "source": "user input" },
+          "jointEfficiency": { "shell": 1, "heads": 1 },
+          "materialDensityKgM3": 7850
+        }
+      },
+      "as": "vessel"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "V-101",
+        "mark": "N1",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 3000, "orientationDeg": 270 },
+        "projection": 1000
+      },
+      "as": "vesselIn",
+      "note": "shell nozzle, orientation 270 deg (west, north_cw) at 1000 mm from the axis: world face centre (6000, 3000, 4000) facing -X; skirt 1000 + elevation 3000 = z 4000; the port is V-101:N1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "P",
+        "sequence": "1001",
+        "spec": "CS150",
+        "dn": 100,
+        "from": "P-101:N2",
+        "to": "V-101:N1",
+        "designTempC": 60,
+        "designPressureBarG": 10
+      },
+      "as": "line"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "P-101:N2" },
+        "to": { "portId": "V-101:N1" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 3000 },
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 1500 }
+        ]
+      },
+      "as": "run"
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [1500, 2000, 2300], "end": [1500, 4000, 2300], "profile": "IPE200" }
+    },
+    { "command": "add_pipe_support", "params": { "runId": "$run", "at": [[1500, 3000, 2500]] } },
+    { "command": "building_schedule", "params": { "kind": "support" } },
+    { "command": "update_equipment_parameters", "params": { "equipment": "V-101", "set": { "location": [7000, 3500] } } },
+    { "command": "building_schedule", "params": { "kind": "support" } },
+    { "command": "check_pipe_supports", "params": {} }
+  ],
+  "expected": [
+    { "step": 9, "path": "data.unattached.length", "value": 0, "source": "pipe underside 2500 - 57.15 = 2442.85, beam top 2400: 42.85 mm" },
+    { "step": 10, "path": "data.rows[0][6]", "value": 3000, "abs": 0.000001, "source": "where the shoe was placed" },
+    { "step": 10, "path": "data.rows[0][10]", "value": "attached", "source": "bears on the IPE200" },
+    {
+      "step": 11,
+      "path": "summary",
+      "contains": "moved to stay on the run: PS1 500 mm",
+      "source": "README D20: the +X leg moves 3500 - 3000 = 500 in Y"
+    },
+    { "step": 12, "path": "data.rows[0][6]", "value": 3500, "abs": 0.000001, "source": "3000 + 500" },
+    {
+      "step": 12,
+      "path": "data.rows[0][10]",
+      "value": "attached",
+      "source": "the beam (x 1500, y 2000 - 4000) still lies under the shifted leg: kept"
+    },
+    { "step": 12, "path": "data.rows[0][5]", "value": 1500, "abs": 0.000001, "source": "x unchanged: the move is across the leg" }
+  ]
+}

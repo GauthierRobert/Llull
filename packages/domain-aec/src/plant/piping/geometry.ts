@@ -1,11 +1,11 @@
 /**
  * Display geometry of derived parts (02 RTE §5.11): one read-only revolution entity per part, id = the part id. Pipe piece = solid cylinder,
- * elbow = the 16-point pipe section revolved about the bend axis (24 steps per 90 degrees, exact torus segment), flange = revolved profile
+ * elbow = the pipe section revolved about the bend axis (24 steps per 90 degrees; display profile = 16-gon, `curves` = the true circle so the exact kernel builds a torus segment), flange = revolved profile
  * (plate, hub, neck, bore), gasket = ring. Bolt sets have no geometry (hardware count only). Layers P-PIPE, P-FITT, P-FLNG (valves and reducer bodies: geometryInline.ts, P-VALV).
  */
 
 import type { Entity, RevolutionEntity } from '@core/model/types';
-import type { Vec3 } from '@core/model/vectors';
+import type { Vec2, Vec3 } from '@core/model/vectors';
 import type { PartPort, PipeLine, RoutedPart } from '@aec/plant/types';
 import { circlePolygon } from '@lib/arc';
 import { eulerFromAxes } from '@lib/eulerRotation';
@@ -50,6 +50,7 @@ export function entityOf(
   profile: Section,
   angle: number,
   segments: number,
+  curves?: RevolutionEntity['curves'],
 ): RevolutionEntity {
   return {
     id: part.id,
@@ -64,6 +65,7 @@ export function entityOf(
     axis: [0, 0, 1],
     angle,
     segments,
+    ...(curves === undefined ? {} : { curves }),
   };
 }
 
@@ -115,9 +117,20 @@ function elbowEntity(part: RoutedPart, line: PipeLine): RevolutionEntity | null 
   const x = scale3(inward, -1);
   const z = unitVector(cross3(travel, inward));
   const section: Section = circlePolygon([radius, 0], od / 2, SECTION_POINTS).map(([r, a]) => [r, a]);
+  // The exact kernel reads the true circle (two half arcs: torus segment, end faces equal to the pipe's); the 16-gon is the display tessellation.
+  const [near, far, top, bottom]: [Vec2, Vec2, Vec2, Vec2] = [
+    [radius + od / 2, 0],
+    [radius - od / 2, 0],
+    [radius, od / 2],
+    [radius, -od / 2],
+  ];
+  const circle: RevolutionEntity['curves'] = [
+    { type: 'arc', points: [near, top, far] },
+    { type: 'arc', points: [far, bottom, near] },
+  ];
   const steps = Math.max(3, Math.ceil((ARC_STEPS_PER_QUARTER * turn) / 90));
   const rotation = eulerFromAxes(x, cross3(z, x), z);
-  return entityOf(part, line, FITTING_LAYER_ID, 'Elbow', { position: arcCentre, rotation }, section, (turn * Math.PI) / 180, steps);
+  return entityOf(part, line, FITTING_LAYER_ID, 'Elbow', { position: arcCentre, rotation }, section, (turn * Math.PI) / 180, steps, circle);
 }
 
 function flangeEntity(part: RoutedPart, line: PipeLine): RevolutionEntity | null {

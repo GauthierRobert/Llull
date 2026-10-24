@@ -1,7 +1,8 @@
 /**
  * Plant piping plugin (plant 02 RTE): tie-in ports, pipe lines and runs in `doc.plant.piping`, spec-driven `route_pipe` / `piping_takeoff` (derived
  * parts, joints and display entities), valves / reducers / branches, `check_piping`, `piping_connectivity`, the auto-router (`route_problem`,
- * `auto_route_pipe`; native search through the `auto_route` transport in server/), toolset `piping`.
+ * `auto_route_pipe`; native search through the `auto_route` transport in server/), V1 part 2: `set_heat_tracing`, `line_heat_loss`, `export_pcf`, `export_pipe_step`; supports on runs
+ * (add_pipe_support runId; the support carrier lookup is industrial/piping/pipeCarrier.ts), toolset `piping`.
  */
 
 import type { CadPlugin } from '@core/plugins/plugin';
@@ -12,6 +13,10 @@ import { autoRoutePipe, routeProblem } from './commands/autoRoute';
 import { convertPipeRun } from './commands/convertPipeRun';
 import { deletePipeRun } from './commands/deleteRun';
 import { editRoute } from './commands/editRoute';
+import { exportPcf } from './commands/exportPcf';
+import { exportPipeStep } from './commands/exportPipeStep';
+import { setHeatTracing } from './commands/heatTracing';
+import { lineHeatLoss } from './commands/lineHeatLoss';
 import { routePipe } from './commands/routePipe';
 import { addBranch } from './commands/addBranch';
 import { checkPiping } from './commands/checkPiping';
@@ -42,6 +47,10 @@ export const pipingPlugin: CadPlugin = {
     pipingTakeoff,
     pipingConnectivity,
     checkPiping,
+    setHeatTracing,
+    lineHeatLoss,
+    exportPcf,
+    exportPipeStep,
     routeProblem,
     autoRoutePipe,
     deletePipeRun,
