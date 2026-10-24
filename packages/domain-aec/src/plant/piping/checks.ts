@@ -15,6 +15,7 @@ import type { RunDerivation } from './deriveTypes';
 import { buildGraph, externalPorts, selectRuns, type RunGraph } from './graph';
 import { defaultMinWeldSpacing } from './jointStack';
 import { getPiping } from './model';
+import { operatorClashFindings } from './operatorChecks';
 import { invertFindings, slopeFindings } from './slopeChecks';
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -35,6 +36,8 @@ export interface CheckOptions {
   readonly maxHandwheelCentreHeight?: number | undefined;
   /** Minimum length of a pipe piece between welds, mm; absent = max(4 t, 50 mm) of the piece wall (named default). */
   readonly minWeldSpacing?: number | undefined;
+  /** Deepest penetration of a valve operator envelope into another body that is accepted, mm; absent = the `check_clashes` default ${DEFAULT_CLASH_TOLERANCE_MM}. */
+  readonly clashToleranceMm?: number | undefined;
   /** Only report these codes. */
   readonly include?: readonly string[] | undefined;
 }
@@ -55,11 +58,17 @@ export interface CheckResult {
   readonly partCount: number;
   readonly limits: {
     readonly handwheelCentreHeight: { readonly valueMm: number | null; readonly source: string };
+    readonly operatorClash: { readonly toleranceMm: number; readonly source: string };
     readonly weldSpacing: { readonly valueMm: number | null; readonly source: string; readonly defaulted: boolean };
   };
 }
 
+/** Penetration below which an operator clash is ignored when the check gives none: the default of `check_clashes`, mm. */
+const DEFAULT_CLASH_TOLERANCE_MM = 5;
+
 const REMEDIATION: Readonly<Record<string, string>> = {
+  RTE_VALVE_OPERATOR_CLASH:
+    'Turn the stem (move the valve / insert it again with another stemDirection), move the valve or the obstacle, or choose a valve whose operator fits (gear box, extension).',
   RTE_OPEN_END: 'Route to a port, add a cap / blind or a tie-in, or accept the open end.',
   RTE_DISCONNECTED_PORT: 'Route it (route_pipe) or leave it as a spare.',
   RTE_FITTING_TO_FITTING: 'Accept the zero-length piece or lengthen the leg.',
@@ -268,6 +277,16 @@ export function checkPipingModel(doc: CadDocument, options: CheckOptions = {}): 
     derived.set(runId, derivation);
     runIssues(out, doc, piping.runs[runId] as PipeRun, derivation, options);
   }
+  const clashTolerance = options.clashToleranceMm ?? DEFAULT_CLASH_TOLERANCE_MM;
+  for (const clash of operatorClashFindings(doc, derived, clashTolerance))
+    out.add(
+      'RTE_VALVE_OPERATOR_CLASH',
+      'warning',
+      [clash.valveId, clash.other],
+      `the ${clash.operatorKind} of valve ${clash.valveId} (${clash.operatorBody}) ${clash.kind === 'insulation' ? 'runs into the insulation of' : 'clashes with'} ${clash.other} by ${round(clash.depthMm)} mm`,
+      { ...clash, toleranceMm: clashTolerance },
+      [`runs.${clash.runId}.inline`],
+    );
   const graph = buildGraph(doc, graphRuns);
   for (const open of graph.openEnds)
     out.add(
@@ -317,6 +336,10 @@ export function checkPipingModel(doc: CadDocument, options: CheckOptions = {}): 
               source: 'not given: no built-in limit exists (no public code value); RTE_VALVE_OPERATOR_HEIGHT was not checked',
             }
           : { valueMm: options.maxHandwheelCentreHeight, source: 'check_piping maxHandwheelCentreHeight (project limit)' },
+      operatorClash: {
+        toleranceMm: clashTolerance,
+        source: options.clashToleranceMm === undefined ? 'check_clashes default (5 mm)' : 'check_piping clashToleranceMm',
+      },
       weldSpacing:
         weldOverride === undefined
           ? { valueMm: null, source: 'max(4 t, 50 mm) of the pipe wall t (BS 2633 4t / common 50 mm project default)', defaulted: true }

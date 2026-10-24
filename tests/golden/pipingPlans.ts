@@ -6,15 +6,15 @@
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { plans, type GoldenAction } from './plans';
 
-const IMPORTS: GoldenAction[] = [
+export const IMPORTS: GoldenAction[] = [
   { command: 'set_units', params: { units: 'mm' } },
   { command: 'import_piping_catalog', params: { catalog: rteJson('catalog_stub_cs150.json') } },
   { command: 'import_pipe_spec', params: { spec: rteJson('spec_cs150.json') } },
 ];
 
-const tie = (tag: string, position: number[], direction: number[], dn: number, as: string): GoldenAction => ({
+export const tie = (tag: string, position: number[], direction: number[], dn: number, as: string, endType = 'BW'): GoldenAction => ({
   command: 'add_tie_in_point',
-  params: { tag, position, direction, dn, endType: 'BW' },
+  params: { tag, position, direction, dn, endType },
   as,
 });
 

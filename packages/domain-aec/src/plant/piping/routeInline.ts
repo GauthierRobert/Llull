@@ -13,6 +13,7 @@ import { eccentricOffset, flatLabel, flatPerpendicular } from './eccentric';
 import { fail, isFailure, type DerivationFailure, type DerivedInline } from './deriveTypes';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { unitVector } from './legs';
+import { operatorBodies, operatorKind } from './operator';
 import { flangeParts, mintSet, type FlangeSetIds } from './routeEnds';
 import { at, joinOf, partOf, type Env, type Mint, type Slot } from './routeEnv';
 import { inlineInOrder, isReducer, isValve, startDn } from './runSizes';
@@ -119,6 +120,9 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
         gapMm: set?.gasketThickness ?? 0,
         accessories: [flange.gasket, flange.bolts],
       });
+      const bodies = operatorBodies(valve);
+      const kind = operatorKind(bodies);
+      const operator = kind === null ? null : { kind, bodies };
       const parts = sets === null ? [valve] : [...sets.before, valve, ...sets.after];
       const inline: DerivedInline = {
         id: comp.id,
@@ -134,6 +138,7 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
         valvePartId: valveId,
         stemDirection: stem,
         stemHeightMm: row.dims['stemHeight'] ?? null,
+        ...(operator === null ? {} : { operator }),
       };
       return {
         parts,

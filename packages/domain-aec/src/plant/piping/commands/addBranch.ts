@@ -34,7 +34,8 @@ export const addBranch = defineCommand({
   name: 'add_branch',
   description:
     'Take a branch off a routed pipe run (the header), spec-driven: the fitting is the branch-table cell of the header line spec for (header size at ' +
-    'that point, branch DN): equal tee, reducing tee, weldolet / sockolet / threadolet or a stub-in (reported in data.fitting with the table cell). A ' +
+    'that point, branch DN): equal tee, reducing tee, weldolet / sockolet / threadolet or a stub-in (reported in data.fitting with the table cell; a sockolet / ' +
+    'threadolet / socket-weld or threaded tee outlet takes the branch pipe socketDepth - 1.6 mm / threadEngagement deep, so its first cut is longer). A ' +
     'tee splits the header leg (header pieces shortened by the catalogue centre-to-end C); an olet sits on the header pipe, which stays whole; the ' +
     'branch pipe starts from the fitting outlet (tee M, olet A from the header centreline). at: { point: [x, y, z] } on the header centreline (within ' +
     '0.01 mm) or { leg, distance } (distance from the leg start, mm). The branch leaves perpendicular to the header (within the spec angle ' +

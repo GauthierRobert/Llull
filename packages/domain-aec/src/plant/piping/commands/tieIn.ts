@@ -25,7 +25,11 @@ export const addTieInPoint = defineCommand({
     position: vec3('World position [x, y, z] of the connection face centre.'),
     direction: vec3('Outward face direction [dx, dy, dz] (toward the pipe); normalised. Auto-routing needs an axis direction.'),
     dn: z.number().int().positive().describe('Nominal size DN (e.g. 100).'),
-    endType: z.enum(END_TYPES).describe('End type: BW butt weld, FL flanged, SW socket weld, SC screwed, PL plain, WAF wafer, LUG lug.'),
+    endType: z
+      .enum(END_TYPES)
+      .describe(
+        'End type: BW butt weld, FL flanged, SW socket weld, SC screwed, PL plain, WAF wafer, LUG lug. A SW or SC port joins a socket-weld (plain-end pipe) or threaded spec; the pipe goes in by the depth of the spec own socket / thread fittings of that size.',
+      ),
     rating: z.string().optional().describe("Pressure rating, e.g. 'CL150' or 'PN16'."),
     facing: z.enum(['RF', 'FF', 'RTJ']).optional().describe('Flange facing (flanged ends).'),
     kind: z.enum(['tie_in', 'battery_limit']).optional().describe("Point kind (default 'tie_in')."),

@@ -5,8 +5,9 @@
  *   by design, never clash
  */
 
-import type { Vec3 } from '@core/model/types';
-import { type OrientedBox, boxOverlap } from './clashBoxes';
+import type { CadDocument, Vec3 } from '@core/model/types';
+import { getBuilding } from '../../building/model';
+import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import type { ExternalBody } from './clashSources';
 
 export interface ExternalClash {
@@ -83,4 +84,18 @@ export function externalClashes(
     }
   }
   return [...found.values()].filter((clash) => clash.kind === 'hard' || !found.has(`hard:${clash.a}:${clash.b}`));
+}
+
+/**
+ * The clashes of the accessory bodies (valve operators) among `bodies` with every other body and every building solid, deeper than `tolerance`.
+ * @invariant empty when no body is an accessory (no building boxes are built then)
+ */
+export function accessoryClashes(doc: CadDocument, bodies: readonly ExternalBody[], tolerance: number): ExternalClash[] {
+  const accessories = new Set(bodies.filter((body) => body.accessoryOf !== undefined).map((body) => body.id));
+  if (accessories.size === 0) return [];
+  const building = getBuilding(doc);
+  const solids = Object.values(building.elements).flatMap((element) =>
+    elementBoxes(doc, building, element).map((box) => ({ elementId: element.id, box })),
+  );
+  return externalClashes(bodies, solids, tolerance).filter((clash) => accessories.has(clash.a) || accessories.has(clash.b));
 }

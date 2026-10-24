@@ -17,6 +17,8 @@ export interface ExternalBody {
   readonly group: string;
   /** Groups and building element ids this body is connected to by design (an attached run, the equipment its nozzle sits on): no clash with them. */
   readonly connectedTo: readonly string[];
+  /** Accessory bodies (a valve operator envelope): the id of the part they belong to, so a report can name it. */
+  readonly accessoryOf?: string;
 }
 
 export type ClashSource = (doc: CadDocument) => readonly ExternalBody[];

@@ -196,7 +196,8 @@ export const checkClashes = defineCommand({
     'that overlaps a column in its wall line, ' +
     'plus equipment maintenance-clearance violations. Steel-to-steel joints, a beam ending in the wall or column it frames into, run connections (a pipe end inside equipment, a pipe / tray ' +
     'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Spec-driven pipe runs (route_pipe) ' +
-    'take part with their pipe pieces and elbows (valves, flanges and tees are not modelled yet; boxes of the pipe outside diameter): a hit is a ' +
+    'take part with their pipe pieces, elbows, valves, flange plates and hubs, tees, olets and reducers (boxes of the circumscribing square of each round part) and with the operator ' +
+    'envelope of every valve whose catalogue row describes one (handwheel disc, gear box, actuator along the stem direction; id "<valve part>/wheel", "/gear", "/actuator"): a hit is a ' +
     'hard clash with the part id, e.g. "run-4/pipe-2"; the insulation of an insulated line (create_pipeline insulation, OD + 2 x thickness) is ' +
     'checked too and a hit that the bare pipe clears is kind "insulation"; a run is not checked against the runs attached to it or the equipment ' +
     'its nozzles sit on. Returns element ids, kind ("hard", "insulation" or "clearance") and penetration depth (document units; summary in mm).',
