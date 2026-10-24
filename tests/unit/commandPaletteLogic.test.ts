@@ -20,6 +20,11 @@ describe('fuzzyScore', () => {
     expect(substring).toBeGreaterThan(subsequence);
     expect(subsequence).toBeGreaterThan(0);
   });
+  it('ranks a whole-word hit above a word-prefix hit', () => {
+    expect(fuzzyScore('measure', 'add box', 'measure the volume')).toBeGreaterThan(
+      fuzzyScore('measure', 'add box', 'arc lengths measured'),
+    );
+  });
   it('requires every token, from the label or the keywords', () => {
     expect(fuzzyScore('add cyl', 'Add cylinder')).toBeGreaterThan(0);
     expect(fuzzyScore('volume', 'Measure volume')).toBeGreaterThan(0);

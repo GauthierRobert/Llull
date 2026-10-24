@@ -165,8 +165,7 @@ rust::String topology_json(const Shape &shape) {
   const std::vector<int> face_counts = adjacent_face_counts(faces, edges);
   const std::vector<std::string> face_names = naming::face_names(shape);
   const std::vector<std::string> edge_names = naming::edge_names(solid, face_names);
-  GProp_GProps volume;
-  BRepGProp::VolumeProperties(solid, volume, Standard_False, Standard_False, Standard_False);
+  const GProp_GProps volume = volume_props(shape, solid, false, nullptr);
   JsonWriter out;
   out.begin_object().key("solids").integer(distinct(solid, TopAbs_SOLID).Extent());
   out.key("faces").begin_array();

@@ -15,7 +15,8 @@ export function storedChordError(mesh: MeshData, node: Pick<DeformNode, 'law' | 
   const frame = resolveFrame(node.frame);
   if (frame === null) return null;
   const { law, region } = node;
-  if (law.kind === 'affine' || region === undefined) return 0;
+  if (law.kind === 'affine') return 0;
+  if (region === undefined) return null;
   const pulled = new Map<number, Vec3>();
   const source = (v: number): Vec3 => {
     const known = pulled.get(v);

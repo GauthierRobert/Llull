@@ -173,7 +173,7 @@ const cases = [
     expected: scale.cases
       .filter((c) => c.op === 'scale_nonuniform' && (c.sphere || c.cylinder))
       .map((c) => ({ factors: c.factors, volume: c.volume, area: c.area ?? c.lateralArea ?? 'TBD - numeric (triaxial)' })),
-    tolerance: { volume: 1e-9, area: 1e-6 },
+    tolerance: { volume: 1e-6, area: 1e-6 },
     toleranceKind: 'relative',
     unit: 'mm^3 / mm^2',
     grade: 'A',

@@ -11,7 +11,15 @@ import type { DeformLaw } from '../model/deform';
 
 import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
 import type { MeshToBrepRequest, MeshToBrepResult } from './kernelMeshBrep';
-import type { BlendReport, ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
+import type {
+  BlendReport,
+  DeformReport,
+  ExactMassProperties,
+  FaceQueryPort,
+  ImportShapesOptions,
+  ImportShapesResult,
+  KernelInfo,
+} from './kernelPorts';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
 export type { ShapeHandle };
@@ -151,6 +159,9 @@ export interface GeometryKernel {
 
   /** Why the exact fillet `recipe` fails: OCCT contour statuses, faulty vertices, 4+ edge vertices (BLD M0); null for other recipes or kernels without diagnostics. */
   blendReport?(recipe: ShapeRecipe): BlendReport | null;
+
+  /** How the exact `deform` recipe built (approximation error, faces split) or why it was refused (DEF_* code); null for other recipes or kernels without the exact warp. */
+  deformReport?(recipe: ShapeRecipe): DeformReport | null;
 
   /** What this kernel is and which optional ports it has (`kernel_info`, TR-KRN-04). */
   info?(): KernelInfo;

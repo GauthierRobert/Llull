@@ -46,13 +46,13 @@ export const outputParam = z
     mode: z
       .enum(['auto', 'exact', 'mesh'])
       .describe(
-        '"auto" (default): the exact kernel builds the result when it can evaluate this deformation (the native kernel does for affine maps), else the mesh path runs and the summary says so; "exact": refuse (DEF_EXACT_UNAVAILABLE) unless the exact kernel built it; "mesh": force the faceted mesh path.',
+        '"auto" (default): the exact kernel builds the result when it can evaluate this deformation (the native kernel does for every law: the faces become B-splines fitted within output.tolerance), else the mesh path runs and the summary says so; "exact": refuse (DEF_EXACT_UNAVAILABLE) unless the exact kernel built it; "mesh": force the faceted mesh path.',
       )
       .optional(),
     tolerance: z
       .number()
       .describe(
-        'Largest chordal deviation of the mesh path from the true deformed surface, document units, > 0. Default: 1e-5 times the body bounding-box diagonal, clamped to [1e-6, 0.01].',
+        'Largest deviation of the result from the true deformed surface, document units, > 0: the chordal deviation of the mesh path, or the fit error of the B-spline faces and edges on the exact path (a smaller value costs control points, not accuracy). Default: 1e-5 times the body bounding-box diagonal, clamped to [1e-6, 0.01].',
       )
       .optional(),
     preserveAnalytic: z
@@ -66,7 +66,31 @@ export const outputParam = z
 
 export const idParam = z
   .string()
-  .describe('Id of the 3D solid or mesh entity to deform (describe_scene lists ids). It is replaced by the deformed mesh entity.');
+  .describe(
+    'Id of the 3D solid or mesh entity to deform (describe_scene lists ids). It is replaced by the deformed mesh entity (keepSource keeps it).',
+  );
 
 export const NEXT_STEP =
   'Then call analyze_deformation (Jacobian, volume check, fibre lengths) and check_deformation (pass / warn / fail verdict) on the result.';
+
+export const idsParam = z
+  .array(z.string())
+  .min(1)
+  .max(100)
+  .describe(
+    'Ids of several 3D solids or meshes to deform with the same parameters (one feature step; every body gets its own frame and region defaults from its own bounds). Use this or id.',
+  )
+  .optional();
+
+export const keepSourceParam = z
+  .boolean()
+  .describe('true: keep the original entity(ies) next to the deformed one(s) instead of replacing them. Default false.')
+  .optional();
+
+/** The three body-selection parameters every deformation command shares: id or ids, and keepSource. */
+export const bodyParams = { id: idParam.optional(), ids: idsParam, keepSource: keepSourceParam };
+
+/** The distinct target ids of a call (id first, then ids), empty when none was given. */
+export function targetIds(id: string | undefined, ids: readonly string[] | undefined): string[] {
+  return [...new Set([...(id === undefined ? [] : [id]), ...(ids ?? [])])];
+}

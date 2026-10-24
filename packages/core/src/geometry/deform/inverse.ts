@@ -48,5 +48,11 @@ export function unmapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 
     }
     case 'bend':
       return unbend(law.radius, law.symmetric, region, q);
+    case 'lattice':
+    case 'point':
+    case 'flowCurve':
+    case 'flowSurface':
+    case 'rbf':
+      return null;
   }
 }

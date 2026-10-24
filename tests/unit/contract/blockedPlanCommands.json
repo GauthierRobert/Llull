@@ -1,18 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/design/01-body-deformation/validation/plans/target_bad_plan_codes.json": [
-      "deform_lattice"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_ffd_barrel.json": [
-      "deform_lattice"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_flow_plate_on_cylinder.json": [
-      "flow_on_surface"
-    ],
-    "docs/design/01-body-deformation/validation/plans/target_point_push.json": [
-      "deform_by_point"
-    ],
     "docs/design/04-direct-freeform-editing/validation/plans/target_brep_face_moves.json": [
       "delete_faces",
       "move_faces"

@@ -4,8 +4,9 @@ import type { Vec3 } from '../../model/types';
 import { dot3, normalize3 } from '../../lib/vec3';
 import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
-import { outputParam, idParam } from './schema';
-import { type DeformPlan, runDeform } from './run';
+import { outputParam, bodyParams, targetIds } from './schema';
+import type { DeformPlan } from './request';
+import { runDeform } from './run';
 import { type Refusal, resolveTargetFrame } from './target';
 
 const IDENTITY: Vec3 = [1, 1, 1];
@@ -39,7 +40,7 @@ export const scaleNonuniform = defineCommand({
     'The entity is replaced by a mesh entity that keeps the construction (brep recipe). Refuses a zero factor (DEF_SCALE_SINGULAR) and factors all equal to 1 (DEF_NO_EFFECT). ' +
     'For one factor on all axes use scale_entity. Then call analyze_deformation and check_deformation.',
   params: z.object({
-    id: idParam,
+    ...bodyParams,
     factors: vec3('Scale factors [sx, sy, sz], unitless, along the frame x, y, z axes. Negative mirrors that axis; 0 is refused.'),
     center: vec3('Fixed point of the scale, a world point in document units. Default: the body bounding-box centre.').optional(),
     frame: z
@@ -53,10 +54,11 @@ export const scaleNonuniform = defineCommand({
       .optional(),
     output: outputParam.optional(),
   }),
-  run: (doc, { id, factors, center, frame, output }, ctx): CommandResult =>
+  run: (doc, { id, ids, keepSource, factors, center, frame, output }, ctx): CommandResult =>
     runDeform(doc, ctx, {
       command: 'scale_nonuniform',
-      id,
+      ids: targetIds(id, ids),
+      keepSource,
       verb: 'scaled',
       output,
       plan: (target): DeformPlan | Refusal => {

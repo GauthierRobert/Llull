@@ -2,9 +2,10 @@
 
 import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
-import { idParam, outputParam } from './schema';
-import { type DeformPlan, runDeform } from './run';
-import { type Refusal, extentWithin, resolveRegion, resolveTargetFrame } from './target';
+import { bodyParams, outputParam, targetIds } from './schema';
+import type { DeformPlan } from './request';
+import { runDeform } from './run';
+import { type Refusal, defaultTolerance, extentWithin, resolveRegion, resolveTargetFrame } from './target';
 
 /** A full turn: a larger bend overlaps itself. */
 const FULL_TURN = 2 * Math.PI;
@@ -12,15 +13,15 @@ const FULL_TURN = 2 * Math.PI;
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node with a bend law
  * @invariant the neutral fibre (the frame origin plane y = 0) keeps its length; det J = (R − y)/R inside the region, the body past the region end
- *   follows rigidly; a cylinder bent on its own axis is a torus segment; kernel-optional: mesh path today
- * @failure not exactly two of radius / angleDeg / length|region -> DEF_BEND_UNDERDETERMINED / DEF_BEND_OVERDETERMINED; radius <= the inner-side distance -> DEF_BEND_RADIUS_TOO_SMALL; angle >= 360 or a tail that hits the body -> DEF_SELF_INTERSECTION; angle <= 0 -> DEF_NO_EFFECT
+ *   follows rigidly; a cylinder bent on its own axis is a torus segment, and a 360 degree bend of the whole body a closed torus (exact kernel only); kernel-optional: exact warp on the native kernel, mesh path otherwise
+ * @failure not exactly two of radius / angleDeg / length|region -> DEF_BEND_UNDERDETERMINED / DEF_BEND_OVERDETERMINED; radius <= the inner-side distance -> DEF_BEND_RADIUS_TOO_SMALL; angle > 360, 360 with a tail or on the mesh path, or a tail that hits the body -> DEF_SELF_INTERSECTION; angle <= 0 -> DEF_NO_EFFECT
  */
 export const bendBody = defineCommand({
   name: 'bend_body',
   annotations: { readsMeshTriangles: true },
   description:
     'Bend a straight region of a 3D solid or mesh onto a circular arc (a bar becomes an arc, a cylinder a torus segment). Give exactly TWO of: radius ' +
-    '(document units, of the neutral fibre), angleDeg (degrees, 0 < angle < 360, how far the region turns) and length (document units, the straight region length; ' +
+    '(document units, of the neutral fibre), angleDeg (degrees, 0 < angle <= 360, how far the region turns; exactly 360 on the whole body closes a ring and needs the native exact kernel) and length (document units, the straight region length; ' +
     'or region.start and region.end, which gives the same). The neutral fibre is the plane through frame.origin perpendicular to frame.reference: its length is ' +
     'kept (radius x angle = length); material toward the centre of curvature (frame.reference direction) is shortened by (R - y)/R and material away from it is lengthened. ' +
     'The bend axis is perpendicular to both the frame axis and frame.reference and passes through the point radius away from the origin along frame.reference; the bend direction is set by frame.reference ' +
@@ -28,15 +29,20 @@ export const bendBody = defineCommand({
     'bounding-box direction and the reference to the next longest. The part of the body past the region follows the bent end rigidly. symmetric true keeps the middle ' +
     'of the region in place and bends both halves away from it. Volume changes by Pappus: V x (1 - mean offset / R). ' +
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe). ' +
-    'Refuses radius <= the distance from the neutral fibre to the body on the centre side (DEF_BEND_RADIUS_TOO_SMALL), 360 degrees or more, or a straight part that would hit the bent body (DEF_SELF_INTERSECTION) ' +
+    'Refuses radius <= the distance from the neutral fibre to the body on the centre side (DEF_BEND_RADIUS_TOO_SMALL), more than 360 degrees, 360 with a straight part left or without the exact kernel, or a straight part that would hit the bent body (DEF_SELF_INTERSECTION) ' +
     'and not exactly two of radius / angleDeg / length (DEF_BEND_UNDERDETERMINED / DEF_BEND_OVERDETERMINED). Then call analyze_deformation (fibre lengths) and check_deformation.',
   params: z.object({
-    id: idParam,
+    ...bodyParams,
     radius: z
       .number()
       .describe('Bend radius of the neutral fibre, document units, > 0 (must exceed the body extent on the centre side).')
       .optional(),
-    angleDeg: z.number().describe('Angle the region turns, degrees, > 0 and less than 360.').optional(),
+    angleDeg: z
+      .number()
+      .describe(
+        'Angle the region turns, degrees, > 0 and at most 360 (360 only for the whole body, on the exact kernel: the two end faces are sewn into a ring).',
+      )
+      .optional(),
     length: z
       .number()
       .describe(
@@ -76,10 +82,11 @@ export const bendBody = defineCommand({
       .optional(),
     output: outputParam.optional(),
   }),
-  run: (doc, { id, radius, angleDeg, length, region, symmetric, frame, output }, ctx): CommandResult =>
+  run: (doc, { id, ids, keepSource, radius, angleDeg, length, region, symmetric, frame, output }, ctx): CommandResult =>
     runDeform(doc, ctx, {
       command: 'bend_body',
-      id,
+      ids: targetIds(id, ids),
+      keepSource,
       verb: 'bent',
       output,
       plan: (target): DeformPlan | Refusal => {
@@ -112,17 +119,25 @@ export const bendBody = defineCommand({
         const theta = angleDeg === undefined ? undefined : (angleDeg * Math.PI) / 180;
         const bendRadius = radius ?? (span as number) / (theta as number);
         const regionLength = span ?? bendRadius * (theta as number);
-        if (regionLength / bendRadius >= FULL_TURN - 1e-9)
-          return {
-            code: 'DEF_SELF_INTERSECTION',
-            message: `the bend turns ${((regionLength / bendRadius) * 180) / Math.PI} degrees (must be < 360): its ends overlap`,
-            paths: ['params'],
-          };
         const resolved = resolveTargetFrame(target, frame, 'start', 'y');
         if ('code' in resolved) return resolved;
         const start = region?.start ?? resolved.extent.min[2];
         const bendRegion = resolveRegion(resolved.extent, { start, end: start + regionLength, falloff: 'linear' }, 'linear');
         if ('code' in bendRegion) return bendRegion;
+        // a full turn of the whole body closes into a ring (its end faces coincide within the tolerance): the exact kernel sews it
+        const gap = Math.abs(regionLength - FULL_TURN * bendRadius);
+        const tolerance = output?.tolerance ?? defaultTolerance(target.diagonal);
+        const closedRing =
+          gap <= 2 * tolerance &&
+          bendRegion.start <= resolved.extent.min[2] + tolerance &&
+          bendRegion.end >= resolved.extent.max[2] - tolerance &&
+          !symmetric;
+        if (regionLength / bendRadius >= FULL_TURN - 1e-9 && !closedRing)
+          return {
+            code: 'DEF_SELF_INTERSECTION',
+            message: `the bend turns ${((regionLength / bendRadius) * 180) / Math.PI} degrees: a turn of more than 360 degrees, or a full turn with a straight part left, makes its ends overlap`,
+            paths: ['params'],
+          };
         const bentExtent = extentWithin(target, resolved.frame, bendRegion.start, bendRegion.end, resolved.extent);
         return {
           law: { kind: 'bend', radius: bendRadius, symmetric: symmetric === true },
@@ -130,8 +145,10 @@ export const bendBody = defineCommand({
           region: bendRegion,
           extent: bentExtent,
           checkOverlap:
+            !closedRing &&
             regionLength / bendRadius >= Math.PI / 2 &&
             (resolved.extent.min[2] < bendRegion.start || resolved.extent.max[2] > bendRegion.end),
+          ...(closedRing ? { ring: true } : {}),
           defaulted: resolved.defaulted,
         };
       },

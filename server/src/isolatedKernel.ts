@@ -8,7 +8,7 @@ import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from '
 import { debugWarn } from './debugLog';
 import type { DeformLaw } from '@core/model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
-import type { BlendReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
+import type { BlendReport, DeformReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
 import type { MeshToBrepResult } from '@core/geometry/kernelMeshBrep';
 import { errorMessage } from '@lib/errorMessage';
@@ -84,6 +84,19 @@ const FACE_QUERY_METHODS = [
   'bspline',
   'projectCurves',
 ] as const satisfies readonly (keyof FaceQueryPort)[];
+
+/** Law kinds the sidecar's exact warp (capability `deform`) builds; the others take the mesh path. */
+const NATIVE_WARP_LAWS: ReadonlySet<string> = new Set([
+  'twist',
+  'taper',
+  'stretch',
+  'bend',
+  'lattice',
+  'point',
+  'flowCurve',
+  'flowSurface',
+  'rbf',
+]);
 
 export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKernel {
   const { entry } = options;
@@ -258,7 +271,9 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     return describedAs ?? { capabilities: [] };
   };
 
-  const supportsDeform = (law: DeformLaw): boolean => law.kind === 'affine' && info().capabilities.includes('gtransform');
+  const supportsDeform = (law: DeformLaw): boolean =>
+    info().capabilities.includes(law.kind === 'affine' ? 'gtransform' : 'deform') &&
+    (law.kind === 'affine' || NATIVE_WARP_LAWS.has(law.kind));
 
   return {
     name: 'occt',
@@ -281,6 +296,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
     blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
+    deformReport: (recipe) => (recipe.op === 'deform' ? (call('deformReport', [recipe]) as DeformReport | null) : null),
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
     meshToBrep: (request) => call('meshToBrep', [request]) as MeshToBrepResult | null,
     info,

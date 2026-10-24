@@ -297,8 +297,11 @@ describe('kernel paths', () => {
     });
     setGeometryKernel(refusing);
     const { doc, id } = addBox();
-    const result = execute(doc, 'twist_body', { id, angleDeg: 30, output: { tolerance: 0.1 } });
+    const result = execute(doc, 'twist_body', { id, angleDeg: 30, output: { mode: 'exact', tolerance: 0.1 } });
     expectNoOp(result, doc, 'DEF_KERNEL_REFUSED');
+    const fallen = execute(doc, 'twist_body', { id, angleDeg: 30, output: { tolerance: 0.1 } });
+    expect(fallen.error, fallen.summary).toBeUndefined();
+    expect(fallen.summary).toContain('The exact warp refused (DEF_KERNEL_REFUSED)');
   });
 
   it('the registry lists the seven deformation tools, schema derived from zod', () => {

@@ -69,9 +69,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   `fit_surface_to_mesh`, VC-22; native analyze / remesh / cut / fill / repair / sculpt + `--progress` events, async mesh engine port (backend blocks
   today, capped by `LLULL_MESH_OP_TIMEOUT_S`), native decimate speed (16.6 s vs 10 s target on 1.3M tris); `sculpt_mesh` `along`; asset full-res reads
   through groups / selection (`readsMeshTriangles` sees named ids only); `shrinkwrap_mesh` / `displace_mesh`. _Lane 1 + 4 + native_ _deps: —_
-- `[TODO]` **DES-1b** 01 DEF left after M0–M1 (done 2026-10-22, §13): M2 exact OCCT warp (`deform.cxx`, capability `deform`; closes
-  VC-06/08/11 and the 360° ring), M3 lattice / point / flow, M4 flow on surface + overlays, M5 curve-to-curve + morph; native B-spline
-  Gauss-integration accuracy (VC-11 −4.4e-4). _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-1c** 01 DEF left after M0–M3 + M5 + `flow_on_surface` (done 2026-10-24, TECHNICAL_SPEC §14): `preserveAnalytic` (VC-23), M4 UI
+  overlays + curved-sheet base for `flow_on_surface`, B-spline lattices / oriented boxes, `baseCurve`, `infinite` regions, `allowMeshFallback`,
+  `compareTo` shapes, non-uniform fit grid (point push 5–8 s), native `faceQuery.bspline`, VC-22 STEP re-import, mass rule by face type
+  (`refined_mass` is provenance today, not through `blend_union`). _Lane 1 + 2 + native_ _deps: —_
 - `[TODO]` **DES-3b** 03 WRP left after M0–M3 (done 2026-10-22, §13): M4 geodesic / parametric charts, emboss on doubly curved faces,
   `split_face_by_curves`, `create_curve_on_face`, CFF fonts, kerning, multi-line, decal + knurl; M5 single-line fonts, text on curve,
   `pattern_on_face`, modeled knurl; WRP golden plan (native). _Lane 1 + native_ _deps: —_

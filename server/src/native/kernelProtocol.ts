@@ -276,7 +276,7 @@ export function nativeArgs(
   features: FeatureLowerings = NO_LOWERINGS,
   wire: WireOptions = {},
 ): readonly unknown[] {
-  if (op === 'evaluate' || op === 'blendReport') {
+  if (op === 'evaluate' || op === 'blendReport' || op === 'deformReport') {
     const recipe = args[0] as ShapeRecipe;
     return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe, features, wire) }];
   }

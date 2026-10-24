@@ -1,4 +1,4 @@
-// Palette ranking: every token must match (substring, else in-order subsequence); prefix / word-start hits rank higher.
+// Palette ranking: every token must match (substring, else in-order subsequence); prefix / whole-word / word-start hits rank higher.
 
 /** 0 = no match. */
 function scoreToken(token: string, text: string): number {
@@ -6,7 +6,9 @@ function scoreToken(token: string, text: string): number {
   if (index === 0) return 100;
   if (index > 0) {
     const previous = text[index - 1] ?? '';
-    return /[\s_\-/.(]/.test(previous) ? 80 : 50;
+    if (!/[\s_\-/.(]/.test(previous)) return 50;
+    const next = text[index + token.length] ?? '';
+    return /[a-z0-9]/.test(next) ? 80 : 90;
   }
   let cursor = 0;
   let gaps = 0;

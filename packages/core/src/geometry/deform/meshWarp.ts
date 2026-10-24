@@ -5,12 +5,12 @@
  * @invariant watertight in, watertight out: edges are split through a shared edge table, so neighbouring triangles agree on every new vertex
  */
 
-import type { DeformRegion } from '../../model/deform';
 import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { type DeformNode, warpOf } from './laws';
 import { localExtentOf, maxEdgeLength, splitHeights } from './bounds';
 import { toLocal } from './frame';
+import { edgeActive, featureEdgeLength } from './influence';
 import { meshDiagonal, weldMesh } from '../mesh/weld';
 
 /** Triangles above which the mesh path refuses (01 DEF §5.7). */
@@ -42,7 +42,7 @@ export interface WarpOptions {
   readonly maxTriangles?: number;
 }
 
-interface Soup {
+export interface Soup {
   positions: number[];
   indices: number[];
 }
@@ -59,7 +59,7 @@ const at = (positions: ReadonlyArray<number>, vertex: number): Vec3 => [
 const distance = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** One splitting pass: every edge `decide` accepts gets a vertex; triangles are re-cut (1, 2 or 3 split edges). Returns whether anything split. */
-function splitPass(soup: Soup, decide: EdgeSplit): boolean {
+export function splitPass(soup: Soup, decide: EdgeSplit): boolean {
   const { positions, indices } = soup;
   const vertexCount = positions.length / 3;
   const created = new Map<number, number>();
@@ -120,12 +120,11 @@ const CHORD_SAMPLES = [0.25, 0.5, 0.75];
 
 /**
  * Split an edge (at its middle) when the deformed curve leaves its chord by more than the tolerance at a quarter, half or three quarters of the
- * edge; edges outside the open region are rigid and stay. This measures the deviation the bound maxEdgeLength only estimates.
+ * edge; edges outside the zone the map acts in (the open region of an axis law, a lattice box, a push support) stay. This measures the deviation the bound maxEdgeLength only estimates.
  */
 function chordRule(
   positions: ReadonlyArray<number>,
-  heights: Float64Array,
-  region: DeformRegion,
+  active: (p: Vec3, q: Vec3) => boolean,
   tolerance: number,
   point: (p: Vec3) => Vec3,
 ): EdgeSplit {
@@ -138,10 +137,8 @@ function chordRule(
     return mapped;
   };
   return (low, high) => {
-    const [za, zb] = [heights[low] as number, heights[high] as number];
-    if (Math.max(za, zb) <= region.start || Math.min(za, zb) >= region.end) return null;
     const [p, q] = [at(positions, low), at(positions, high)];
-    if (distance(p, q) < tolerance / 64) return null;
+    if (!active(p, q) || distance(p, q) < tolerance / 64) return null;
     const [fp, fq] = [image(low), image(high)];
     for (const t of CHORD_SAMPLES) {
       const onEdge = point([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t]);
@@ -153,6 +150,15 @@ function chordRule(
       if (deviation > tolerance) return 0.5;
     }
     return null;
+  };
+}
+
+/** Splits the edges longer than `limit` that lie within one edge length of the influence zone of a local feature (a point push, a lattice cell): the chord test alone cannot see a bump that no edge of a big triangle crosses. */
+function featureRule(positions: ReadonlyArray<number>, limit: number, near: (p: Vec3, q: Vec3, margin: number) => boolean): EdgeSplit {
+  return (low, high) => {
+    const [p, q] = [at(positions, low), at(positions, high)];
+    const length = distance(p, q);
+    return length > limit && near(p, q, length) ? 0.5 : null;
   };
 }
 
@@ -231,9 +237,14 @@ export function warpMesh(source: MeshData, node: DeformNode, options: WarpOption
   for (const z of splitHeights(node)) {
     if (z > extent.min[2] + gap && z < extent.max[2] - gap) splitPass(soup, planeRule(heightsOf(soup, node), z, gap));
   }
-  if (node.region !== undefined) {
+  if (node.law.kind !== 'affine') {
+    const active = edgeActive(node, warp.frame);
+    const limit = featureEdgeLength(node);
     for (let pass = 0; pass < MAX_PASSES; pass++) {
-      if (!splitPass(soup, chordRule(soup.positions, heightsOf(soup, node), node.region, options.tolerance, warp.point))) break;
+      const chord = chordRule(soup.positions, active, options.tolerance, warp.point);
+      const feature = Number.isFinite(limit) ? featureRule(soup.positions, limit, active) : null;
+      const decide: EdgeSplit = (low, high) => (feature === null ? null : feature(low, high)) ?? chord(low, high);
+      if (!splitPass(soup, decide)) break;
       if (soup.indices.length / 3 > cap) return overBudget(soup.indices.length / 3);
     }
   }

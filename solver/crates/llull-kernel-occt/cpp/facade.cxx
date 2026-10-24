@@ -11,6 +11,7 @@
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -99,6 +100,12 @@ gp_Trsf placement(rust::Slice<const double> rotation, rust::Slice<const double> 
   return total;
 }
 
+// `shape` flagged for the adaptive mass rule when `flag`.
+std::unique_ptr<Shape> flagged(std::unique_ptr<Shape> shape, bool flag) {
+  if (shape != nullptr && flag) shape->refined_mass = true;
+  return shape;
+}
+
 TopoDS_Shape transformed_copy(const TopoDS_Shape &shape, const gp_Trsf &transform) {
   BRepBuilderAPI_Transform transformer(shape, transform, Standard_True);
   return transformer.Shape();
@@ -109,7 +116,7 @@ std::unique_ptr<Shape> transformed_named(const Shape &shape, const gp_Trsf &tran
   BRepBuilderAPI_Transform transformer(shape.shape, transform, Standard_True);
   const std::vector<Named> inputs{naming::named(shape)};
   const TopoDS_Shape result = transformer.Shape();
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "transform"));
+  return flagged(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "transform")), shape.refined_mass);
 }
 
 std::unique_ptr<Shape> with_roles(const TopoDS_Shape &shape, bool axial) {
@@ -127,6 +134,23 @@ void push_bounds(rust::Vec<double> &out, const Bnd_Box &box) {
   const gp_Pnt min = box.CornerMin();
   const gp_Pnt max = box.CornerMax();
   for (double value : {min.X(), min.Y(), min.Z(), max.X(), max.Y(), max.Z()}) out.push_back(value);
+}
+
+// A face the fixed Gauss rule integrates by sampling: anything but the elementary surfaces.
+bool has_freeform_face(const TopoDS_Shape &shape) {
+  for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
+    switch (BRepAdaptor_Surface(TopoDS::Face(faces.Current()), Standard_False).GetType()) {
+      case GeomAbs_Plane:
+      case GeomAbs_Cylinder:
+      case GeomAbs_Cone:
+      case GeomAbs_Sphere:
+      case GeomAbs_Torus:
+        break;
+      default:
+        return true;
+    }
+  }
+  return false;
 }
 
 bool is_closed_solid(const TopoDS_Shape &shape) {
@@ -243,7 +267,7 @@ std::unique_ptr<Shape> gtransformed(const Shape &shape, rust::Slice<const double
   if (!transformer.IsDone()) return nullptr;
   const std::vector<Named> inputs{naming::named(shape)};
   const TopoDS_Shape result = transformer.Shape();
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "gtransform"));
+  return flagged(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "gtransform")), true);
 }
 
 namespace {
@@ -285,19 +309,19 @@ std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operat
       unifier.Build();
       const TopoDS_Shape unified = unifier.Shape();
       const std::vector<Named> split{Named{result, names}};
-      return naming::wrap_named(unified, naming::inherit(unified, split, unifier.History(), "unify"));
+      return flagged(naming::wrap_named(unified, naming::inherit(unified, split, unifier.History(), "unify")), a.refined_mass || b.refined_mass);
     } catch (const Standard_Failure &) {
       // fall through: the boolean result itself
     }
   }
-  return naming::wrap_named(result, std::move(names));
+  return flagged(naming::wrap_named(result, std::move(names)), a.refined_mass || b.refined_mass);
 }
 
 std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix) {
   std::vector<std::string> names = naming::face_names(shape);
   const std::string head = std::string(prefix) + ":";
   for (std::string &name : names) name = head + name;
-  return naming::wrap_named(shape.shape, std::move(names));
+  return flagged(naming::wrap_named(shape.shape, std::move(names)), shape.refined_mass);
 }
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection) {
@@ -336,6 +360,35 @@ MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_
   return out;
 }
 
+// Relative accuracy asked of the adaptive rule, and the error estimate up to which its result is trusted.
+constexpr double kRefinedEps = 1e-9;
+constexpr double kRefinedDrift = 1e-5;
+
+GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error) {
+  // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
+  // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
+  GProp_GProps fixed_rule;
+  BRepGProp::VolumeProperties(piece, fixed_rule, only_closed, Standard_False, Standard_False);
+  // A fixed Gauss rule is wrong on a rational B-spline face with few spans (4.4e-4 relative volume, 0.4 % area on a sphere mapped to an ellipsoid
+  // by BRepBuilderAPI_GTransform, 01 DEF VC-DEF-11), while the adaptive rule is wrong on others (1.8e-5 on conic blend faces): so only a shape
+  // built by a deformation uses the adaptive rule, when its own error estimate is within 1e-5 (the fixed rule's error was 1.4e-6 on a pushed 100 mm slab).
+  if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
+  GProp_GProps adaptive;
+  const double error = BRepGProp::VolumeProperties(piece, adaptive, kRefinedEps, only_closed, Standard_False);
+  if (!(error <= kRefinedDrift)) return fixed_rule;
+  if (rel_error != nullptr) *rel_error = error;
+  return adaptive;
+}
+
+GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece) {
+  GProp_GProps fixed_rule;
+  BRepGProp::SurfaceProperties(piece, fixed_rule, Standard_False, Standard_False);
+  if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
+  GProp_GProps adaptive;
+  const double error = BRepGProp::SurfaceProperties(piece, adaptive, kRefinedEps, Standard_False);
+  return error <= kRefinedDrift ? adaptive : fixed_rule;
+}
+
 MassOut mass_properties(const Shape &shape) {
   // Part frame (TR-KRN-41): integrate about the bounding-box centre rounded to 1 mm, then shift the centroid back.
   const Bnd_Box box = bounds_of(shape.shape);
@@ -349,14 +402,12 @@ MassOut mass_properties(const Shape &shape) {
     shift.SetTranslation(gp_Vec(-origin[0], -origin[1], -origin[2]));
     local = transformed_copy(shape.shape, shift);
   }
-  GProp_GProps volume;
-  GProp_GProps surface;
   MassOut out;
-  // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
-  // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
-  BRepGProp::VolumeProperties(local, volume, Standard_True, Standard_False, Standard_False);
   out.rel_error = std::numeric_limits<double>::quiet_NaN();
-  BRepGProp::SurfaceProperties(local, surface, Standard_False, Standard_False);
+  double estimate = std::numeric_limits<double>::quiet_NaN();
+  const GProp_GProps volume = volume_props(shape, local, true, &estimate);
+  const GProp_GProps surface = surface_props(shape, local);
+  out.rel_error = estimate;
   const double signed_volume = volume.Mass();
   out.volume = std::fabs(signed_volume);
   out.area = surface.Mass();
@@ -382,17 +433,13 @@ AnalysisOut analyze(const Shape &shape) {
   TopExp::MapShapes(shape.shape, TopAbs_SOLID, solids);
   out.solids = solids.Extent();
   for (int i = 1; i <= solids.Extent(); ++i) {
-    GProp_GProps volume;
-    GProp_GProps area;
-    BRepGProp::VolumeProperties(solids(i), volume, Standard_False, Standard_False, Standard_False);
-    BRepGProp::SurfaceProperties(solids(i), area, Standard_False, Standard_False);
+    const GProp_GProps volume = volume_props(shape, solids(i), false, nullptr);
+    const GProp_GProps area = surface_props(shape, solids(i));
     out.lumps.push_back(std::fabs(volume.Mass()));
     out.lumps.push_back(area.Mass());
     push_bounds(out.lumps, bounds_of(solids(i)));
   }
-  GProp_GProps total;
-  BRepGProp::SurfaceProperties(shape.shape, total, Standard_False, Standard_False);
-  out.area = total.Mass();
+  out.area = surface_props(shape, shape.shape).Mass();
   return out;
 }
 
