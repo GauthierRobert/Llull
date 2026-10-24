@@ -508,6 +508,92 @@
       "grade": "closed form",
       "frs": ["FR-RTE-14"],
       "test": "tests/unit/plant/piping/slopeStretch.test.ts"
+    },
+    {
+      "id": "VC-RTE-37",
+      "plan": "plans/sc-rte-16-supports-on-a-run.json",
+      "command": "check_pipe_supports",
+      "expected": { "supports": 3, "largestSpanM": 2.5, "ok": true, "pedestalMm": 25.55, "carriedKn": 0.9450619 },
+      "tolerance": { "abs": 0.00001 },
+      "reference": "README D19",
+      "grade": "closed form",
+      "frs": ["FR-RTE-09", "FR-RTE-20"],
+      "test": "tests/unit/plant/piping/runSupports.test.ts"
+    },
+    {
+      "id": "VC-RTE-38",
+      "plan": "plans/sc-rte-17-supports-follow-stretch.json",
+      "command": "update_equipment_parameters",
+      "expected": { "supportY": { "before": 3000, "after": 3500 }, "movedMm": 500, "pedestalMm": 42.85, "attached": true },
+      "tolerance": { "abs": 0.000001 },
+      "reference": "README D20",
+      "grade": "closed form",
+      "frs": ["FR-RTE-14"],
+      "test": "tests/unit/plant/piping/runSupports.test.ts"
+    },
+    {
+      "id": "VC-RTE-39",
+      "plan": "plans/sc-rte-18-heat-tracing-and-loss.json",
+      "command": "line_heat_loss",
+      "expected": {
+        "heatLossWPerM": 73.12,
+        "surfaceTempC": 33.4285,
+        "totalHeatLossW": 438.72,
+        "heatLossAtMaintainWPerM": 58.688,
+        "tracerLengthM": 13.5
+      },
+      "tolerance": { "abs": 0.001 },
+      "reference": "README D21; data/insulation_heat_loss.json (ht 1.2.0, Bergman)",
+      "grade": "A (reference code example + closed form)",
+      "frs": ["FR-RTE-17", "FR-RTE-23"],
+      "test": "tests/unit/plant/piping/heatLoss.test.ts"
+    },
+    {
+      "id": "VC-RTE-40",
+      "plan": "plans/sc-rte-19-pcf-small-line.json",
+      "command": "export_pcf",
+      "expected": {
+        "componentCount": 3,
+        "countsByType": { "PIPE": 2, "ELBOW": 1 },
+        "pipe1End": [2848, 0, 0],
+        "elbowCentre": [3000, 0, 0],
+        "elbowEnd": [3000, 0, 152],
+        "pipe2End": [3000, 0, 2000]
+      },
+      "tolerance": "exact text",
+      "reference": "README D22; 05 iso-01-L101-dn100.pcf conventions",
+      "grade": "closed form (format: B)",
+      "frs": ["FR-RTE-25"],
+      "test": "tests/unit/plant/piping/pcf.test.ts"
+    },
+    {
+      "id": "VC-RTE-41",
+      "plan": "plans/sc-rte-20-ifc-ports-small-line.json",
+      "command": "export_ifc",
+      "expected": {
+        "productCount": 3,
+        "portCount": 6,
+        "connectionCount": 2,
+        "systemCount": 1,
+        "sectionRadiusMm": 57.15,
+        "bendAngleRad": 1.570796
+      },
+      "tolerance": "exact counts",
+      "reference": "README D23",
+      "grade": "closed form",
+      "frs": ["FR-RTE-25"],
+      "test": "tests/unit/plant/piping/ifcPiping.test.ts"
+    },
+    {
+      "id": "VC-RTE-42",
+      "plan": "plans/sc-rte-21-pipe-step-needs-kernel.json",
+      "command": "export_pipe_step",
+      "expected": { "withoutKernel": "CMD_KERNEL_UNAVAILABLE", "meshKernel": "XCH_WRITER_UNAVAILABLE", "products": 3 },
+      "tolerance": "exact",
+      "reference": "README D24",
+      "grade": "contract",
+      "frs": ["FR-RTE-20"],
+      "test": "tests/unit/plant/piping/exportPipeStep.test.ts"
     }
   ]
 }

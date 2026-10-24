@@ -1,0 +1,48 @@
+{
+  "id": "SC-RTE-19",
+  "status": "RUNNABLE (02 RTE V1 part 2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-40"],
+  "description": "PCF of one small line (the hand-off to 05 isometrics): a DN100 line from a butt-weld tie-in at the origin, +X 3000 then +Z 2000 to an open end. Three records: PIPE to 2848 (3000 - A 152), the ELBOW with its CENTRE-POINT at the point of intersection and the END-POINTs 152 each side of it, PIPE 1848 long to the open end. Reference file: tests/golden/__snapshots__/piping_pcf_small_line.pcf.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "PCF-A", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "a"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "6001", "spec": "CS150", "dn": 100 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "legs": [
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 2000 }
+        ]
+      },
+      "as": "run"
+    },
+    { "command": "export_pcf", "params": {} }
+  ],
+  "expected": [
+    { "step": 5, "path": "data.count", "value": 1, "source": "one PCF per line" },
+    { "step": 5, "path": "data.files[0].name", "value": "100-P-6001-CS150.pcf", "source": "line number template DN-service-sequence-spec" },
+    { "step": 5, "path": "data.files[0].componentCount", "value": 3, "source": "pipe, elbow, pipe" },
+    { "step": 5, "path": "data.files[0].countsByType", "value": { "PIPE": 2, "ELBOW": 1 }, "source": "README D22" },
+    { "step": 5, "path": "data.files[0].content", "contains": "END-POINT 2848.0 0.0 0.0 100 BW", "source": "3000 - 152 = 2848" },
+    { "step": 5, "path": "data.files[0].content", "contains": "CENTRE-POINT 3000.0 0.0 0.0", "source": "the point of intersection" },
+    { "step": 5, "path": "data.files[0].content", "contains": "END-POINT 3000.0 0.0 152.0 100 BW", "source": "0 + 152 up the riser" },
+    { "step": 5, "path": "data.files[0].content", "contains": "END-POINT 3000.0 0.0 2000.0 100 BW", "source": "open end of the last leg" },
+    { "step": 5, "path": "data.files[0].content", "contains": "SKEY ELBW", "source": "elbow, butt weld: a confirmed key" },
+    { "step": 5, "path": "data.files[0].missingSkey.length", "value": 0, "source": "pipes have no SKEY; the elbow has ELBW" },
+    { "step": 5, "path": "data.files[0].openEnds.length", "value": 1, "source": "the open end of the riser" }
+  ]
+}
