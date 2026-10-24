@@ -5,6 +5,7 @@
 
 import type { CadDocument, Entity, Layer } from '@core/model/types';
 import type { DocumentExtension } from '@core/plugins/plugin';
+import { isRecord } from '@lib/isRecord';
 
 /** Adds layers referenced by `layerIds` that the document lacks (name from id, colour by id). */
 export function ensureLayerIds(
@@ -60,7 +61,7 @@ export function regenerateOwned<T extends { readonly id: string; readonly entity
   return { parts: { entities, order, layers, layerOrder, selection }, owners };
 }
 
-/** Saved draw order first (ids still present), regenerated ids after; selection filtered likewise. */
+/** Saved draw order and saved entity key order first (ids still present), regenerated ids after; selection filtered likewise. */
 export function mergeRestored(
   raw: Record<string, unknown>,
   savedOrder: readonly string[],
@@ -70,7 +71,11 @@ export function mergeRestored(
   const placed = new Set(present);
   const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
   const selection = Array.isArray(raw['selection']) ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities) : [];
-  return { entities: regenerated.entities, order, selection };
+  const savedKeys = isRecord(raw['entities']) ? Object.keys(raw['entities']).filter((id) => id in regenerated.entities) : [];
+  const entities = Object.fromEntries(
+    [...new Set([...savedKeys, ...Object.keys(regenerated.entities)])].map((id) => [id, regenerated.entities[id]]),
+  );
+  return { entities: entities as CadDocument['entities'], order, selection };
 }
 
 export function ownerTag(entity: Entity | undefined, prefix: string): string | null {
