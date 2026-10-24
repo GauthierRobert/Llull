@@ -127,7 +127,8 @@
       "tolerance": { "abs": 0.000001, "cutAbs": 0.001 },
       "reference": "README D4",
       "grade": "closed form",
-      "frs": ["FR-RTE-05", "FR-RTE-10"]
+      "frs": ["FR-RTE-05", "FR-RTE-10"],
+      "test": "tests/unit/plant/piping/slope.test.ts, rteScenarioPlans.test.ts"
     },
     {
       "id": "VC-RTE-09",
@@ -166,18 +167,18 @@
     {
       "id": "VC-RTE-12",
       "plan": "plans/sc-rte-06-move-with-connected.json",
-      "command": "update_equipment + piping_takeoff",
+      "command": "update_equipment_parameters + piping_takeoff (the vessel is parametric)",
       "expected": { "afterPlusX500": [1269, 2696, 2696, 1196, 3269], "afterPlusY500": [1269, 3196, 2696, 1196, 3269], "elbow90LR": 4 },
       "tolerance": { "abs": 0.01 },
       "reference": "README D6, TECHNICAL 5.7",
       "grade": "closed form",
       "frs": ["FR-RTE-14"],
-      "test": "tests/unit/plant/piping/stretch.test.ts"
+      "test": "tests/unit/plant/piping/stretch.test.ts, rteScenarioPlans.test.ts, golden piping_move_with_connected"
     },
     {
       "id": "VC-RTE-13",
       "plan": "plans/sc-rte-07-insulated-hot-line.json",
-      "command": "create_pipeline + check_clashes",
+      "command": "create_pipeline (insulation fromSpec) + route_pipe + check_clashes",
       "expected": {
         "insulationThicknessMm": 50,
         "lineNumber": "80-HO-4001-CS150-H50",
@@ -185,10 +186,15 @@
         "insulationClashes": 1,
         "clashDepthMm": 24.45
       },
-      "tolerance": { "envelopeAbs": 1e-9, "depthAbs": 0.5 },
+      "tolerance": {
+        "envelopeAbs": 1e-9,
+        "depthAbs": 0.5,
+        "note": "the boxes are axis-aligned here, so the oriented-box depth is exact (24.45 within 1e-9); the 0.5 mm stays for non-axis-aligned pipes"
+      },
       "reference": "README D7; OD 88.9 (S5, S6)",
       "grade": "A + closed form",
-      "frs": ["FR-RTE-02", "FR-RTE-16", "FR-RTE-21"]
+      "frs": ["FR-RTE-02", "FR-RTE-16", "FR-RTE-21"],
+      "test": "tests/unit/plant/piping/insulation.test.ts, rteScenarioPlans.test.ts, golden piping_insulated_line"
     },
     {
       "id": "VC-RTE-14",
@@ -331,6 +337,55 @@
       "grade": "closed form",
       "frs": ["FR-RTE-07"],
       "test": "tests/unit/plant/piping/inlineComponents.test.ts"
+    },
+    {
+      "id": "VC-RTE-27",
+      "plan": "plans/sc-rte-04-gravity-drain-slope.json#SC-RTE-04c",
+      "command": "route_pipe (line slope) + check_piping",
+      "expected": {
+        "adverseSlopeIssues": 1,
+        "adverseLeg": 3,
+        "pocketIssues": 1,
+        "pocketKind": "low",
+        "pocketLegs": [1, 3],
+        "status": "warn"
+      },
+      "tolerance": "exact",
+      "reference": "README D11",
+      "grade": "closed form",
+      "frs": ["FR-RTE-10", "FR-RTE-13"],
+      "test": "tests/unit/plant/piping/slopeChecks.test.ts"
+    },
+    {
+      "id": "VC-RTE-28",
+      "plan": "tests/unit/plant/piping/editRoute.test.ts (SC-RTE-01 scene)",
+      "command": "edit_route move_pi / stretch_leg / insert_pi / delete_pi",
+      "expected": {
+        "movePiUp500CutsMm": [1769, 2696, 2696, 696, 2769],
+        "stretchLeg2To3500CutsMm": [1269, 2696, 3196, 1196, 2269],
+        "stretchLeg1Refused": "RTE_STRETCH_FAILED",
+        "jogInsertedValveRemap": "leg 1 @ 1800 -> leg 5 @ 500"
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D12",
+      "grade": "closed form",
+      "frs": ["FR-RTE-14"],
+      "test": "tests/unit/plant/piping/editRoute.test.ts"
+    },
+    {
+      "id": "VC-RTE-29",
+      "plan": "tests/unit/plant/piping/lineNumber.test.ts",
+      "command": "set_piping_settings + create_pipeline",
+      "expected": {
+        "defaultTemplate": "{dn}-{service}-{sequence}-{spec}[-{insulationCode}{insulationThickness}]",
+        "insulatedNumber": "80-HO-4001-CS150-H50",
+        "customTemplateNumber": "HO-4001-100"
+      },
+      "tolerance": "exact",
+      "reference": "TECHNICAL 5.9",
+      "grade": "closed form",
+      "frs": ["FR-RTE-02"],
+      "test": "tests/unit/plant/piping/lineNumber.test.ts"
     }
   ]
 }

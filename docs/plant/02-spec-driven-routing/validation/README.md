@@ -35,7 +35,7 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | `data/routing_rules.json`            | Vendor behaviours and project rules with their status (standard / vendor / project default)                                                                       | A / B / C per row                      |
 | `data/catalog_stub_cs150.json`       | Catalogue `rte-validation-stub` in the 01 PSC `llull-piping-catalog` format: the plans' INPUT dimensions (LR 90 A 152, 45 B 64, NPS 4 CL150 WN hub Y 76, gasket 3.0, 8 studs; M2: tees C = M, reducing tee 6×4 C 143 / M 130, concentric reducers 6×4 H 140 and 4×3 H 102, weldolet 6×2 outlet A 144); searched before `llull-open-piping`; not a standard, rows unverified except the quoted grade A flange dimensions | inputs                                 |
 | `data/spec_cs150.json`               | Spec CS150 (draft) in the 01 PSC `llull-pipe-spec` format: pipe B36.10M Sch 40, LR 90 / 45 elbows, WN flange, spiral-wound gasket, bolt set, gate valve, elbow angles 90 / 45 ± 1° | inputs                                 |
-| `data/spec_stub_cs150.json`          | Original human-readable stub (not the PSC format; the two files above replace it for M1). The tee / reducing tee / reducer / weldolet rows and the branch table now live in the PSC files (02 RTE M2, TECHNICAL_SPEC §13.7); kept for the insulation table that 02 M3 folds in | inputs                                 |
+| `data/spec_stub_cs150.json`          | Original human-readable stub (not the PSC format; the two files above replace it for M1). The tee / reducing tee / reducer / weldolet rows and the branch table now live in the PSC files (02 RTE M2, TECHNICAL_SPEC §13.7); its insulation table is now the `insulation` array of `spec_cs150.json` (02 RTE M3, same rows: code H, DN <= 100 / 100 C -> 30, DN <= 100 / 200 C -> 50, DN <= 150 / 200 C -> 60; illustrative project data, not from a standard) | inputs                                 |
 | `expected_results.json`              | Index of every VC                                                                                                                                                 | —                                      |
 | `plans/sc-rte-0*.json`               | `build_project` scenarios with `expected` rows; `status` / `unbuilt` list what is missing today                                                                   | —                                      |
 
@@ -82,6 +82,9 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | VC-RTE-23 | Display geometry: SC-RTE-01 elbow solid volume vs Pappus π (OD/2)² · R · π/2 = 2 449 885.6 mm³ (OD 114.3, R 152); 16-segment section gives ratio 0.97450                           | closed form (Pappus; regular-polygon area ratio (n/2π) sin(2π/n)) | ratio in [0.970, 1.001]                                                      | `mass_properties` on the elbow entity | FR-RTE-20             | AF-21, AF-22 |
 | VC-RTE-24 | Export hand-off: `piping_takeoff` counts of SC-RTE-01 equal the IFC `IfcPipeFitting` / `IfcPipeSegment` / `IfcDistributionPort` counts (08) and the PCF component records (05)     | TBD — measure with the 08 / 05 exporters once built               | exact                                                                        | 08 / 05 packs                         | FR-RTE-21, 25         | AF-10        |
 | VC-RTE-25 | Native vs reference (V2, [RS1](../../../decisions/RS1-native-compute.md) RS-7): on SC-RTE-08 and on obstacle problems small enough for the TS cap, `llull-compute route` and the TS A* return identical PIs, bends, integer-µm cost and `optimal`; the native solution passes `auto_route_pipe` validation; a solution with a stale `problemHash` or a leg through an obstacle is refused with `RTE_AUTOROUTE_SOLUTION_INVALID` and the document is unchanged; the 100 × 100 × 30 m / 50 mm problem finishes within 2·10⁶ expansions in ≤ 5 s (time: TBD — measure on the reference machine) | derived: same state, cost and total open-set order, integer costs (TECHNICAL §2.A, §5.12); budget from TECHNICAL §8 | exact (paths, cost, codes); time TBD — measure | `server/tests/routeNativeParity.test.ts`, `llull-route` cargo tests, SC-RTE-08 | FR-RTE-22 | AF-13, AF-40 |
+| VC-RTE-27 | Slope checks (M3): on a line declared 1 % fall whose profile is `+X plan 4000 at 1 %`, `-Z 500`, `+X 1000`, `+Z 600`, `check_piping` reports one `RTE_ADVERSE_SLOPE` (leg 3 rises; the flat +X leg is not adverse) and one `RTE_POCKET` (low point after leg 1, no drain) | closed form §D11 | exact (codes, counts) | `slopeChecks.test.ts`, SC-RTE-04c | FR-RTE-10, FR-RTE-13 | AF-04 |
+| VC-RTE-28 | `edit_route` (M3) on the SC-RTE-01 run: PI 0 up 500 -> cuts 1769 / 2696 / 2696 / 696 / 2769; leg 2 stretched to 3500 -> 1269 / 2696 / 3196 / 1196 / 2269; leg 1 stretched is refused (`RTE_STRETCH_FAILED`); a jog inserted in a leg carrying a valve re-indexes it (leg 1 @ 1800 -> leg 5 @ 500) | closed form §D12 | 0.01 mm | `editRoute.test.ts` | FR-RTE-14 | AF-13 |
+| VC-RTE-29 | Line-number template (M3): the default gives `80-HO-4001-CS150-H50`; after `set_piping_settings { lineNumberTemplate: "{service}-{sequence}-{dn}" }` the lines that followed the default are renumbered and new lines follow the new template (`HO-4001-100`) | TECHNICAL §5.9 | exact | `lineNumber.test.ts` | FR-RTE-02 | AF-31 |
 | VC-RTE-26 | Reducer in a run: DN150 line meets a DN100 port through a 6×4 concentric reducer (H 140) centred at 3000 on 6000 → cuts 2930 / 2930, one reducer, 4 welds | closed form §D10 | 0.01 mm | golden `piping_reducer_run`, `inlineComponents.test.ts` | FR-RTE-07 | AF-21 |
 
 ## Derivations used as expectations
@@ -109,12 +112,21 @@ Common inputs (stub CS150): NPS 4 LR 90 A = 152, WN CL150 Y = 76, gasket g = 3.0
   Δ = (0,500,0): legs 4 (+X), 3 (+Z), 2 (+X) are perpendicular (their PIs move +500 Y), leg 1 (+Y) absorbs it:
   3500 − 304 = 3196.
 - **D7 (SC-RTE-07).** NPS 3 OD 88.9, insulation 50: envelope 188.9 (radius 94.45). Pipe centre z 3000; IPE200
-  (depth 200) with its axis at z 2830 (axis assumed at the centroid; to confirm against `add_steel_member`): top 2930. Bare pipe bottom 2955.55 → clear by 25.55; insulation bottom 2905.55 → penetration 24.45.
+  (depth 200) with its axis at z 2830 (axis at the section centroid, confirmed against `add_steel_member` in 02 M3: the member box is `b/2 x h/2` about the axis, section depth vertical for roll 0): top 2930. Bare pipe bottom 2955.55 → clear by 25.55; insulation bottom 2905.55 → penetration 24.45.
 - **D8 (SC-RTE-08).** Free space, start leaving +X at the origin, end entering travelling +Z at (3000, 2000,
   1000): every path has length ≥ |Δx| + |Δy| + |Δz| = 6000; three non-zero axis displacements need three
   directions, so ≥ 2 bends; the path +X 3000, +Y 2000, +Z 1000 reaches both bounds.
 - **D10 (reducer, VC-RTE-26).** DN150 line from RA (0,0,0) +X to RB DN100 (6000,0,0): 6×4 concentric reducer, H = 140, centred at
   3000: occupies 2930–3070; cuts 2930 − 0 = 2930 (DN150) and 6000 − 3070 = 2930 (DN100); welds: tie-in, 2 at the reducer, tie-in = 4.
+- **D11 (SC-RTE-04c, VC-RTE-27).** Line declared 1 % fall. Legs: 0 sloped (+X, plan 4000, falls 40 mm), 1 -Z 500 (falls), 2 +X 1000 (z constant), 3 +Z 600 (rises).
+  Vertical signs along the flow: -, -, 0, +. Adverse = a leg of a graded line that rises: leg 3 only (leg 2 is flat). Pocket = two consecutive non-flat legs of opposite sign
+  (flats between them ignored): (leg 1 -, leg 3 +) is one low point, relieved only by a branch leaving down (dz <= -0.707) from legs 1 to 3; none was added, so one `RTE_POCKET`.
+- **D12 (edit_route, VC-RTE-28).** SC-RTE-01 legs +Z 1500, +Y 3000, +X 3000, +Z 1500, +X 3000, both ends on nozzles. Move PI 0 (0,0,2500) by (0,0,500): leg 0 absorbs it (2000),
+  the lift is perpendicular to the +Y and +X legs (their PIs rise 500), the last +Z leg absorbs it again (1000): cuts 2000 - 152 - 79 = 1769, 2696, 2696, 1000 - 304 = 696, 2769.
+  Stretch leg 2 to 3500 (+500 X): PI 3 and PI 4 move +500 X (the +Z leg is perpendicular to X), the last +X leg absorbs it (2500 from PI 4 to the nozzle face): leg 2 cut 3500 - 304 = 3196,
+  last cut 2500 - 152 - (76 + 3) = 2269. Stretch leg 1 (+Y) to 3500: the net Y between the two nozzles is fixed at 3000 and no later leg is parallel to Y: refused.
+  Jog: DN100 run A -> +X 2000 -> +Y 2000 (open end), valve at 1800 on the +Y leg; four points (2000,800,0), (2000,800,500), (2000,1300,500), (2000,1300,0) split the leg into
+  +Y 800, +Z 500, +Y 500, -Z 500, +Y 700: the valve (200 from the old leg end) keeps its distance from the end: 700 - 200 = 500 on leg 5.
 - **D9 (SC-RTE-09).** Legacy points (1000,3000,1500) → (5000,3000,1500) → (5000,6000,1500) → (5000,6000,4000):
   legs 4000, 3000, 2500; open ends (gap 0): 4000 − 152 = 3848; 3000 − 304 = 2696; 2500 − 152 = 2348.
 
@@ -126,5 +138,5 @@ All derivations were recomputed with a scratch Python script (closed forms only;
 - The weldolet outlet (144 mm from the header centreline) is a declared stub input, not a sourced MSS SP-97 value; the SC-RTE-03 DN50 cut 856 is derived from it. The reducer length 140 is grade B.
 - The WN flange Y values differ by 1.3-1.6 mm between sources (raised face included or not); they are stub
   inputs, not gates.
-- The beam-axis convention in SC-RTE-07 must be confirmed against `add_steel_member` before the plan is run.
+- The beam-axis convention of SC-RTE-07 was confirmed against `add_steel_member` (02 M3): clash depth 24.45 mm. The clash bodies are circumscribing square boxes of the round pipe; valves, flanges and tees are not bodies yet (V1).
 - Handwheel height, insulation thickness and branch-table cells are project data with no public standard value.
