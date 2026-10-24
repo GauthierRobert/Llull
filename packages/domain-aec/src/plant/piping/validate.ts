@@ -106,7 +106,8 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
         Number.isInteger(item['leg']) &&
         isPositive(item['centreDistance']) &&
         (item['dn2'] === undefined || isPositive(item['dn2'])) &&
-        (item['stemDirection'] === undefined || isVec3(item['stemDirection']));
+        (item['stemDirection'] === undefined || isVec3(item['stemDirection'])) &&
+        (item['flatDirection'] === undefined || isVec3(item['flatDirection']));
       if (!ok) errors.push(`${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance`);
     });
   const slopes = run['legSlopes'];

@@ -85,7 +85,7 @@ export const routePipe = defineCommand({
     if (to !== undefined && !isResolved(to)) return to;
     // The run ends at the size of its last reducer (the line size without one): the end port must have it.
     const reducers = (params.inline ?? [])
-      .filter((item) => item.type === 'reducerConcentric' && item.dn2 !== undefined)
+      .filter((item) => item.type.startsWith('reducer') && item.dn2 !== undefined)
       .sort((a, b) =>
         byRoute({ leg: a.at.leg, centreDistance: a.at.centreDistance }, { leg: b.at.leg, centreDistance: b.at.centreDistance }),
       );

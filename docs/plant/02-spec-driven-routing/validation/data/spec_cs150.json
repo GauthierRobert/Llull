@@ -57,6 +57,17 @@
       "branchToNps": 4
     },
     {
+      "id": "RED-E",
+      "type": "reducerEccentric",
+      "fromNps": 3,
+      "toNps": 6,
+      "catalogRef": "asme-b16.9-reducer-eccentric",
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "branchFromNps": 2,
+      "branchToNps": 4
+    },
+    {
       "id": "W-BW",
       "type": "weldolet",
       "fromNps": 2,

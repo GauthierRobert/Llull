@@ -9,7 +9,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { Joint, PipeRun, RoutedPart } from '@aec/plant/types';
-import { len3, scale3, sub3 } from '@lib/vec3';
+import { add3, len3, scale3, sub3 } from '@lib/vec3';
 import {
   fail,
   isFailure,
@@ -26,6 +26,7 @@ import { centrelineLength, chooseElbow, turnAngleDeg, withTangentLength, type El
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
+import { legShifts } from './legShifts';
 import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
 import { flangeParts, mintSet, setupEnd } from './routeEnds';
@@ -166,18 +167,22 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   const counters: Record<string, number> = {};
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
-  const inlineSlots = layoutInline(env, lengths, mint);
+  const inlineSlots = layoutInline(env, lengths, dirs, mint);
   if (isFailure(inlineSlots)) return inlineSlots;
   const endIds = end.set === null ? null : mintSet(mint);
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
+  const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
+  if (isFailure(shifts)) return shifts;
+  const warnings: DerivationWarning[] = [...shifts.warnings];
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
+  /** Length of a leg from its true start (an eccentric reducer before it moved the corner along its axis). */
+  const trueLengths = lengths.map((length, leg) => length - (shifts.start[leg] as number));
 
   const parts: RoutedPart[] = [];
   const joints: Joint[] = [];
-  const warnings: DerivationWarning[] = [];
   const legs: DerivedLeg[] = [];
   const inline: DerivedInline[] = [];
   const addJoint = (joint: Omit<Joint, 'id'>): void => {
@@ -203,6 +208,10 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     const u = dirs[leg] as Vec3;
     const origin = points[leg] as Vec3;
     const length = lengths[leg] as number;
+    const shift = shifts.start[leg] as number;
+    // Eccentric reducers move the axis sideways from their centre on: positions are measured from `axis`, the stored line plus that sideways offset.
+    let sideways: Vec3 = [0, 0, 0];
+    const axis = (): Vec3 => add3(origin, sideways);
     const mids = slotsByLeg.get(leg) ?? [];
     const startSide = leg === 0 ? start : null;
     const endSide = leg === legCount - 1 ? end : null;
@@ -218,8 +227,8 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
           }
         : {
             id: `${run.id}/elbow-${leg}`,
-            start: 0,
-            end: (elbows[leg - 1] as ElbowChoice).centreToEnd,
+            start: shift,
+            end: shift + (elbows[leg - 1] as ElbowChoice).centreToEnd,
             gap: (elbowJoins[leg - 1] as Join).gapMm,
             kind: 'fitting',
             join: elbowJoins[leg - 1] as Join,
@@ -282,23 +291,24 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
             'pipe',
             info.row,
             [
-              { position: at(origin, u, piece.start), direction: scale3(u, -1), dn: dnHere, endType: pipeStartEnd },
-              { position: at(origin, u, piece.end), direction: u, dn: dnHere, endType: pipeEndEnd },
+              { position: at(axis(), u, piece.start), direction: scale3(u, -1), dn: dnHere, endType: pipeStartEnd },
+              { position: at(axis(), u, piece.end), direction: u, dn: dnHere, endType: pipeEndEnd },
             ],
             { cutLength: piece.cut, leg, dims: { outsideDiameter: info.od, wall: info.wall } },
           ),
         );
         // A stub-in is set on the header by one branch weld (made with the header): no butt weld to the first piece.
         if (!(startSide?.weldless === true && a.id === head.id))
-          addJoint({ ...jointOf(a, weld), parts: [after, pieceId], position: at(origin, u, a.end) });
-        addJoint({ ...jointOf(b, weld), parts: [pieceId, before], position: at(origin, u, b.start) });
-      } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(origin, u, a.end), gapMm: 0 });
+          addJoint({ ...jointOf(a, weld), parts: [after, pieceId], position: at(axis(), u, a.end) });
+        addJoint({ ...jointOf(b, weld), parts: [pieceId, before], position: at(axis(), u, b.start) });
+      } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(axis(), u, a.end), gapMm: 0 });
       const slot = slotById.get(b.id);
       if (slot !== undefined) {
-        const built = slot.build(origin, u);
+        const built = slot.build(axis(), u);
         parts.push(...built.parts);
         built.joints.forEach(addJoint);
         if (built.inline !== undefined) inline.push(built.inline);
+        if (slot.offset !== undefined) sideways = add3(sideways, slot.offset);
       }
     }
     for (const w of stack.warnings) warnings.push(warningOf(w, run.id, leg));
@@ -321,18 +331,18 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     legs.push({
       index: leg,
       direction: directionLabel(u),
-      lengthMm: length,
-      start: origin,
-      end: points[leg + 1] as Vec3,
+      lengthMm: length - shift,
+      start: at(origin, u, shift),
+      end: add3(points[leg + 1] as Vec3, shifts.offset[leg] as Vec3),
       cutLengthsMm: cuts,
-      ...(isSloped(u) ? slopeFields(u, length) : {}),
+      ...(isSloped(u) ? slopeFields(u, length - shift) : {}),
     });
     if (leg < legCount - 1) {
       const index = leg + 1;
       const choice = elbows[leg] as ElbowChoice;
       const turn = turns[leg] as DerivedTurn;
       const next = dirs[index] as Vec3;
-      const pi = points[index] as Vec3;
+      const pi = add3(points[index] as Vec3, shifts.offset[leg] as Vec3);
       const c = choice.centreToEnd;
       const dn = dnAfter(run, line.dn, leg, Number.POSITIVE_INFINITY);
       const info = env.pipeAt(dn);
@@ -376,7 +386,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     inline,
     branches: fits.map((fit) => derivedBranch(env, fit)),
     warnings,
-    centrelineLengthMm: centrelineLength(lengths, elbows),
+    centrelineLengthMm: centrelineLength(trueLengths, elbows),
     totalPipeMm: pieces.reduce((sum, part) => sum + (part.cutLength ?? 0), 0),
     spec: { id: lookup.id, revision: lookup.revision, status: lookup.status() },
     unverified: reasons.length > 0,

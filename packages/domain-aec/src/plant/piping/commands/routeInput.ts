@@ -9,6 +9,7 @@ import { nextId } from '@lib/id';
 import { COMPASS_NAMES, unitVector, type PathEnd } from '../legs';
 import { refuse } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
+import { resolveFlat } from '../eccentric';
 import { defaultStem, INLINE_TYPES } from '../routeInline';
 import { isValve } from '../runSizes';
 
@@ -69,7 +70,9 @@ export const viaInput = z
 export const inlineFields = {
   type: z
     .enum(INLINE_TYPES)
-    .describe('Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug) or reducerConcentric.'),
+    .describe(
+      'Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug), reducerConcentric or reducerEccentric (needs flat or flatDirection).',
+    ),
   tag: z.string().min(1).optional().describe('Instrument / equipment tag, e.g. "XV-1001".'),
   dn2: z
     .number()
@@ -79,6 +82,15 @@ export const inlineFields = {
     .describe('Reducers only: the outlet size DN the run continues at (the inlet is the run size at that point). Valves: omit.'),
   stemDirection: vec3(
     'Valves: direction from the valve centre toward the handwheel [dx, dy, dz]; normalised. Default: up (+Z), or +X on a vertical pipe.',
+  ).optional(),
+  flat: z
+    .enum(['top', 'bottom'])
+    .optional()
+    .describe(
+      'Eccentric reducers only: the flat side, "top" (flat on top, FOT: +Z) or "bottom" (FOB: -Z), on a horizontal or sloped pipe. The outer surfaces of the two pipes line up on the flat side, so the smaller pipe axis moves toward it by (OD big - OD small) / 2. Give this or flatDirection.',
+    ),
+  flatDirection: vec3(
+    'Eccentric reducers only: direction from the pipe axis toward the flat side [dx, dy, dz] (any side, needed on a vertical pipe); projected perpendicular to the pipe and normalised. Give this or flat.',
   ).optional(),
 };
 
@@ -97,7 +109,14 @@ export const inlineAt = z.object({
 export function buildInline(
   doc: CadDocument,
   command: string,
-  fields: { type: (typeof INLINE_TYPES)[number]; tag?: string | undefined; dn2?: number | undefined; stemDirection?: Vec3 | undefined },
+  fields: {
+    type: (typeof INLINE_TYPES)[number];
+    tag?: string | undefined;
+    dn2?: number | undefined;
+    stemDirection?: Vec3 | undefined;
+    flat?: 'top' | 'bottom' | undefined;
+    flatDirection?: Vec3 | undefined;
+  },
   at: { leg: number; centreDistance: number },
   legDirection: Vec3,
   path: string,
@@ -110,6 +129,18 @@ export function buildInline(
   if (fields.stemDirection !== undefined && !(Math.hypot(...fields.stemDirection) > 1e-12))
     return refuse(doc, command, 'RTE_INVALID_PORT', 'the stem direction is zero', [], [`${path}.stemDirection`]);
   const stem = valve ? (fields.stemDirection === undefined ? defaultStem(legDirection) : unitVector(fields.stemDirection)) : undefined;
+  const eccentric = fields.type === 'reducerEccentric';
+  if (!eccentric && (fields.flat !== undefined || fields.flatDirection !== undefined))
+    return refuse(
+      doc,
+      command,
+      'RTE_ECCENTRIC_INVALID',
+      `${fields.type} has no flat side: flat / flatDirection are for reducerEccentric`,
+      [],
+      [`${path}.flat`],
+    );
+  const flat = eccentric ? resolveFlat(fields.flat, fields.flatDirection, legDirection) : undefined;
+  if (typeof flat === 'string') return refuse(doc, command, 'RTE_ECCENTRIC_INVALID', flat, [], [`${path}.flat`]);
   return {
     id: nextId(valve ? 'valve' : 'reducer'),
     type: fields.type,
@@ -118,6 +149,7 @@ export function buildInline(
     centreDistance: at.centreDistance,
     ...(fields.dn2 === undefined ? {} : { dn2: fields.dn2 }),
     ...(stem === undefined ? {} : { stemDirection: stem }),
+    ...(flat === undefined ? {} : { flatDirection: flat }),
   };
 }
 

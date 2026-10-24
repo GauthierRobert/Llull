@@ -100,7 +100,7 @@ interface AutoRouteRecord {
 export interface InlineComponent {
   /** Step-scoped id (`valve-8.1`). */
   readonly id: string;
-  /** Catalogue component type: `valveGate`, `valveGlobe`, ..., `reducerConcentric`. */
+  /** Catalogue component type: `valveGate`, `valveGlobe`, ..., `reducerConcentric`, `reducerEccentric`. */
   readonly type: string;
   readonly tag?: string;
   /** Leg index in the run (legs = [start, ...pis, end]). */
@@ -111,6 +111,8 @@ export interface InlineComponent {
   readonly dn2?: number;
   /** Valves: unit vector from the valve centre toward the handwheel. */
   readonly stemDirection?: Vec3;
+  /** Eccentric reducers: unit vector from the axis toward the flat side (the side where the outer surfaces of the two pipes line up). */
+  readonly flatDirection?: Vec3;
 }
 
 /** A branch off a header run: the branch run `branchRunId` starts at the point `distance` along leg `leg` of the header centreline. */
@@ -204,6 +206,8 @@ export interface RoutedPart {
   readonly tag?: string;
   /** Valves: unit vector from the centre toward the handwheel. */
   readonly stemDirection?: Vec3;
+  /** Eccentric reducers: unit vector from the axis toward the flat side. */
+  readonly flatDirection?: Vec3;
   /** Olets and stub-ins: the header pipe piece they sit on (their first port is welded to it, not to another port). */
   readonly onPart?: string;
   /** Bolt sets: stud count. */

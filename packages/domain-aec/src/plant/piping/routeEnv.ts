@@ -76,6 +76,8 @@ export interface Slot {
   readonly after: string;
   /** Size of the run after the slot (reducers change it). */
   readonly dnOut: number;
+  /** Eccentric reducers: how far the axis downstream of the slot is from the axis upstream of it (perpendicular to the leg), mm. */
+  readonly offset?: Vec3;
   build(origin: Vec3, direction: Vec3): SlotBuild;
 }
 

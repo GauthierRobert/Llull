@@ -15,7 +15,7 @@ import type { RunDerivation } from './deriveTypes';
 import { buildGraph, externalPorts, selectRuns, type RunGraph } from './graph';
 import { defaultMinWeldSpacing } from './jointStack';
 import { getPiping } from './model';
-import { slopeFindings } from './slopeChecks';
+import { invertFindings, slopeFindings } from './slopeChecks';
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -63,6 +63,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_OPEN_END: 'Route to a port, add a cap / blind or a tie-in, or accept the open end.',
   RTE_DISCONNECTED_PORT: 'Route it (route_pipe) or leave it as a spare.',
   RTE_FITTING_TO_FITTING: 'Accept the zero-length piece or lengthen the leg.',
+  RTE_ECCENTRIC_OFFSET:
+    'Turn the flat side toward the direction of the next leg (insert_inline_component flat / flatDirection) or accept the residual: the angle tolerance of the run decides.',
   RTE_WELD_SPACING: 'Lengthen the leg or accept per the project weld-spacing rule (minWeldSpacing).',
   RTE_FROM_TO_MISMATCH: 'Update the line from / to text or the route so both name the equipment the line reaches.',
   RTE_VALVE_OPERATOR_HEIGHT:
@@ -142,10 +144,10 @@ function weldSpacingIssues(out: Collector, run: PipeRun, derivation: RunDerivati
 
 function runIssues(out: Collector, doc: CadDocument, run: PipeRun, derivation: RunDerivation, options: CheckOptions): void {
   weldSpacingIssues(out, run, derivation, options.minWeldSpacing);
-  for (const finding of slopeFindings(getPiping(doc), run))
+  for (const finding of [...slopeFindings(getPiping(doc), run), ...invertFindings(getPiping(doc), run, derivation.inline)])
     out.add(finding.code, 'warning', finding.ids, finding.message, finding.detail, finding.paths);
   for (const warning of derivation.warnings)
-    if (warning.code === 'RTE_FITTING_TO_FITTING')
+    if (warning.code === 'RTE_FITTING_TO_FITTING' || warning.code === 'RTE_ECCENTRIC_OFFSET')
       out.add(warning.code, 'warning', [...warning.ids, run.id], warning.message, warning.detail, [
         `runs.${run.id}.legs.${String(warning.detail['leg'])}`,
       ]);

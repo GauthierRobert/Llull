@@ -6,9 +6,10 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import type { EndType, InlineComponent, Joint, PartPort } from '@aec/plant/types';
-import { dot3, scale3, sub3 } from '@lib/vec3';
+import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import type { ComponentType } from '../catalog/types';
 import { fittingEnd, type Join } from './connections';
+import { eccentricOffset, flatLabel, flatPerpendicular } from './eccentric';
 import { fail, isFailure, type DerivationFailure, type DerivedInline } from './deriveTypes';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { unitVector } from './legs';
@@ -17,7 +18,7 @@ import { at, joinOf, partOf, type Env, type Mint, type Slot } from './routeEnv';
 import { inlineInOrder, isReducer, isValve, startDn } from './runSizes';
 import { isMiss } from './specLookup';
 
-/** Catalogue types `insert_inline_component` accepts (eccentric reducers, strainers and the like come with 02 V1). */
+/** Catalogue types `insert_inline_component` accepts (strainers and the like are not modelled). */
 export const INLINE_TYPES = [
   'valveGate',
   'valveGlobe',
@@ -26,6 +27,7 @@ export const INLINE_TYPES = [
   'valveButterfly',
   'valvePlug',
   'reducerConcentric',
+  'reducerEccentric',
 ] as const satisfies readonly ComponentType[];
 
 /** Unit stem direction used when none is given: perpendicular to the pipe, up (+Z), or +X on a vertical pipe. */
@@ -41,6 +43,8 @@ interface Located {
   readonly comp: InlineComponent;
   readonly dnIn: number;
   readonly dnOut: number;
+  /** Unit direction of the leg the component sits on. */
+  readonly direction: Vec3;
 }
 
 function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | DerivationFailure {
@@ -141,7 +145,7 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
   };
 }
 
-function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot | DerivationFailure {
+function reducerSlot(env: Env, { comp, dnIn, dnOut, direction }: Located, mint: Mint): Slot | DerivationFailure {
   const { lookup, run } = env;
   if (comp.dn2 === undefined || comp.dn2 === dnIn)
     return fail(
@@ -150,7 +154,8 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
       [comp.id],
       ['inline.dn2'],
     );
-  const row = lookup.component({ types: ['reducerConcentric'], dn: Math.max(dnIn, dnOut), dn2: Math.min(dnIn, dnOut) });
+  const eccentric = comp.type === 'reducerEccentric';
+  const row = lookup.component({ types: [comp.type as ComponentType], dn: Math.max(dnIn, dnOut), dn2: Math.min(dnIn, dnOut) });
   if (isMiss(row)) return fail(row.miss, row.detail, [...row.ids, comp.id], ['inline'], { dn: dnIn, dn2: dnOut });
   const length = row.dims['length'];
   if (length === undefined || !(length > 0))
@@ -172,9 +177,21 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
       [comp.id, row.key],
       ['inline'],
     );
+  let flat: Vec3 | undefined;
+  if (eccentric) {
+    flat = (comp.flatDirection === undefined ? null : flatPerpendicular(comp.flatDirection, direction)) ?? undefined;
+    if (flat === undefined)
+      return fail(
+        'RTE_ECCENTRIC_INVALID',
+        `eccentric reducer ${comp.id} has no usable flat side on a leg of direction [${direction.map((v) => +v.toFixed(4)).join(', ')}]: its flatDirection is ${comp.flatDirection === undefined ? 'missing' : 'along the pipe'}`,
+        [comp.id],
+        ['inline.flat'],
+      );
+  }
+  const offset: Vec3 = flat === undefined ? [0, 0, 0] : eccentricOffset(flat, pipeIn.od, pipeOut.od);
   const id = mint('reducer');
   const reach = length / 2;
-  const port = (position: Vec3, direction: Vec3, dn: number): PartPort => ({ position, direction, dn, endType: end });
+  const port = (position: Vec3, towards: Vec3, dn: number): PartPort => ({ position, direction: towards, dn, endType: end });
   return {
     interval: {
       id: comp.id,
@@ -188,16 +205,23 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
     before: id,
     after: id,
     dnOut,
+    ...(eccentric ? { offset } : {}),
     build: (origin, u) => {
       const centre = at(origin, u, comp.centreDistance);
-      const faces: readonly [Vec3, Vec3] = [at(centre, u, -reach), at(centre, u, reach)];
+      const faces: readonly [Vec3, Vec3] = [at(centre, u, -reach), add3(at(centre, u, reach), offset)];
       const part = partOf(run.id, id, 'reducer', row, [port(faces[0], scale3(u, -1), dnIn), port(faces[1], u, dnOut)], {
         centre,
         componentId: comp.id,
         dn: dnIn,
         dn2: dnOut,
         ...(comp.tag === undefined ? {} : { tag: comp.tag }),
-        dims: { ...row.dims, outsideDiameter: pipeIn.od, outsideDiameterOut: pipeOut.od },
+        ...(flat === undefined ? {} : { flatDirection: flat }),
+        dims: {
+          ...row.dims,
+          outsideDiameter: pipeIn.od,
+          outsideDiameterOut: pipeOut.od,
+          ...(flat === undefined ? {} : { offset: len3(offset) }),
+        },
       });
       const inline: DerivedInline = {
         id: comp.id,
@@ -213,6 +237,17 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
         partIds: [id],
         valvePartId: id,
         stemHeightMm: null,
+        ...(flat === undefined
+          ? {}
+          : {
+              flat: {
+                direction: flat,
+                label: flatLabel(flat),
+                offset,
+                offsetMm: len3(offset),
+                invertStepMm: offset[2] + (pipeIn.od - pipeOut.od) / 2,
+              },
+            }),
       };
       return { parts: [part], joints: [], inline };
     },
@@ -224,7 +259,7 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
  * @failure leg or centre outside the run -> RTE_INLINE_DOES_NOT_FIT; type not placeable -> RTE_SPEC_NO_COMPONENT; no spec row / dimension /
  *   connection rule, reducer size problems -> that code
  */
-export function layoutInline(env: Env, legLengths: readonly number[], mint: Mint): Slot[] | DerivationFailure {
+export function layoutInline(env: Env, legLengths: readonly number[], dirs: readonly Vec3[], mint: Mint): Slot[] | DerivationFailure {
   const slots: Slot[] = [];
   let dn = startDn(env.run, env.line.dn);
   for (const comp of inlineInOrder(env.run)) {
@@ -237,10 +272,14 @@ export function layoutInline(env: Env, legLengths: readonly number[], mint: Mint
         ['inline'],
         { leg: comp.leg, centreDistance: comp.centreDistance },
       );
-    const located: Located = { comp, dnIn: dn, dnOut: isReducer(comp) && comp.dn2 !== undefined ? comp.dn2 : dn };
+    const located: Located = {
+      comp,
+      dnIn: dn,
+      dnOut: isReducer(comp) && comp.dn2 !== undefined ? comp.dn2 : dn,
+      direction: dirs[comp.leg] as Vec3,
+    };
     const slot = isValve(comp) ? valveSlot(env, located, mint) : isReducer(comp) ? reducerSlot(env, located, mint) : null;
-    if (slot === null)
-      return noComponent(`${comp.type} cannot be placed inline (valves and concentric reducers: ${INLINE_TYPES.join(', ')})`, comp);
+    if (slot === null) return noComponent(`${comp.type} cannot be placed inline (${INLINE_TYPES.join(', ')})`, comp);
     if (isFailure(slot)) return slot;
     slots.push(slot);
     dn = located.dnOut;
