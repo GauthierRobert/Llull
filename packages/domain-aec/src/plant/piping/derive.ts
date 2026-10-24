@@ -21,7 +21,8 @@ import { lineNumberTemplate, renderLineNumber } from './lineNumber';
 import { rereadRequest, resolveInsulation } from './insulation';
 import { createSpecLookup, isMiss } from './specLookup';
 import { stretchRun, type StretchDone } from './stretch';
-import { pipingErrors } from './validate';
+import { pipingErrors, supportCarrierErrors } from './validate';
+import { reconcileRunSupports } from './supportReconcile';
 
 interface RunState {
   readonly entities: Entity[];
@@ -202,8 +203,23 @@ function refreshSpecInsulation(previous: CadDocument, next: CadDocument): { docu
     : { document: { ...next, plant: { ...next.plant, piping: { ...piping, lines } } }, notes, lineIds };
 }
 
-/** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */
+/**
+ * Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive; then
+ * the pipe supports of the runs that changed follow them (supportReconcile.ts).
+ */
 function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
+  const runs = reconcileStale(previous, next);
+  const supports = reconcileRunSupports(previous, runs.document);
+  return supports.notes.length === 0 && supports.document === runs.document
+    ? runs
+    : {
+        document: supports.document,
+        notes: [...runs.notes, ...supports.notes],
+        affected: [...new Set([...runs.affected, ...supports.affected])],
+      };
+}
+
+function reconcileStale(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
   const refreshed = refreshSpecInsulation(previous, next);
   if (refreshed.document !== next || refreshed.notes.length > 0) {
     const rest = reconcileRuns(previous, refreshed.document);
@@ -251,9 +267,9 @@ function reconcileRuns(previous: CadDocument, next: CadDocument): { document: Ca
 export const pipingDocument: DocumentExtension = {
   validate: (raw) => {
     const plant = raw['plant'];
-    if (plant === undefined) return [];
+    if (plant === undefined) return supportCarrierErrors(raw);
     if (!isRecord(plant)) return ['plant must be an object'];
-    return plant['piping'] === undefined ? [] : pipingErrors(plant['piping']);
+    return [...(plant['piping'] === undefined ? [] : pipingErrors(plant['piping'])), ...supportCarrierErrors(raw)];
   },
   derivedEntityIds: (doc) => new Set(Object.values(getPiping(doc).entityIds).flat()),
   reconcile,

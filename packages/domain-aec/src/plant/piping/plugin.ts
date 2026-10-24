@@ -12,6 +12,8 @@ import { autoRoutePipe, routeProblem } from './commands/autoRoute';
 import { convertPipeRun } from './commands/convertPipeRun';
 import { deletePipeRun } from './commands/deleteRun';
 import { editRoute } from './commands/editRoute';
+import { setHeatTracing } from './commands/heatTracing';
+import { lineHeatLoss } from './commands/lineHeatLoss';
 import { routePipe } from './commands/routePipe';
 import { addBranch } from './commands/addBranch';
 import { checkPiping } from './commands/checkPiping';
@@ -42,6 +44,8 @@ export const pipingPlugin: CadPlugin = {
     pipingTakeoff,
     pipingConnectivity,
     checkPiping,
+    setHeatTracing,
+    lineHeatLoss,
     routeProblem,
     autoRoutePipe,
     deletePipeRun,

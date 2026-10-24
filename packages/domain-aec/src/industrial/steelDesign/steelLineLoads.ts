@@ -13,6 +13,7 @@ import { addPointLoad, type BeamLoads } from './steelBeamLoads';
 import type { ColumnNode } from './steelFraming';
 import { pipeWeightPerMetre } from '../piping/pipeWeight';
 import { carriedByEnds, pipeRunOf, weightSupportsOf } from '../piping/pipeSupportLayout';
+import { runPipes } from '../piping/pipeCarrier';
 import { applySupportedPipe, tributaryLengths } from './steelSupportLoads';
 
 interface LineLoadParams {
@@ -107,9 +108,11 @@ function runOf(units: ModelUnits, element: PipeElement | CableTrayElement, param
 }
 
 function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
-  return orderedElements(units.building).flatMap((element) =>
+  const elements = orderedElements(units.building).flatMap((element) =>
     element.category === 'pipe' || element.category === 'tray' ? [runOf(units, element, params)] : [],
   );
+  // Spec-driven plant runs weigh on the steel like building pipes (02 RTE V1 part 2): same carrier, same rules.
+  return [...elements, ...runPipes(units.source, units.building.levelOrder[0] ?? '').map((pipe) => runOf(units, pipe, params))];
 }
 
 /** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */

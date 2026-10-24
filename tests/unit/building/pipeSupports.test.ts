@@ -184,7 +184,7 @@ describe('line selector and failures', () => {
     expect(supportsOf(result.document)[0]?.pipeId).toBe('pipe-2');
   });
   it.each([
-    ['neither pipeId nor line', { at: [[0, 0, 0]] }, 'give exactly one of pipeId or line'],
+    ['neither pipeId nor line', { at: [[0, 0, 0]] }, 'give exactly one of pipeId, runId or line'],
     ['both pipeId and line', { pipeId: 'pipe-1', line: 'L-1', at: [[0, 0, 0]] }, 'exactly one of pipeId'],
     ['neither at nor spacing', { pipeId: 'pipe-1' }, 'exactly one of at (list of points) or spacing'],
     ['both at and spacing', { pipeId: 'pipe-1', at: [[0, 0, 0]], spacing: 1000 }, 'exactly one of at'],
@@ -193,7 +193,7 @@ describe('line selector and failures', () => {
     ['negative planTolerance', { ...SHOE_AT, planTolerance: -1 }, 'planTolerance >= 0'],
     ['unknown pipe', { pipeId: 'pipe-9', at: [[0, 0, 0]] }, "'pipe-9' is not a pipe element"],
     ['element that is not a pipe', { pipeId: 'member-1', at: [[0, 0, 0]] }, 'is not a pipe element'],
-    ['unknown line', { line: 'L-9', at: [[0, 0, 0]] }, "no pipe carries line 'L-9'"],
+    ['unknown line', { line: 'L-9', at: [[0, 0, 0]] }, "no pipe or run carries line 'L-9'"],
     ['point far from the pipe', { pipeId: 'pipe-1', at: [[3000, 3500, 3027.15]] }, 'from the pipe(s)'],
     ['point that is not 3D', { pipeId: 'pipe-1', at: [[3000, 2000]] }, 'is not [x, y, z]'],
     ['empty point list', { pipeId: 'pipe-1', at: [] }, 'no support could be placed'],

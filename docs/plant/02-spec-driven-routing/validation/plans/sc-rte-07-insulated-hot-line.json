@@ -1,8 +1,7 @@
 {
   "id": "SC-RTE-07",
-  "status": "RUNNABLE up to step 7 (02 RTE M3): insulation from the spec table, the envelope in route_pipe, the insulation clash in check_clashes. Step 8 line_heat_loss is 02 V1 (TECHNICAL_SPEC section 10): the command is not built, the row stays and the harness skips it (unbuilt + blockedFrom).",
-  "unbuilt": ["line_heat_loss"],
-  "blockedFrom": 8,
+  "status": "RUNNABLE (02 RTE M3 + V1 part 2): insulation from the spec table, the envelope in route_pipe, the insulation clash in check_clashes (step 7) and line_heat_loss (step 8, built in V1 part 2).",
+  "unbuilt": [],
   "harness": {
     "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
     "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
@@ -87,13 +86,13 @@
       "path": "data.heatLossWPerM",
       "value": 73.12,
       "rel": 0.0001,
-      "source": "data/insulation_heat_loss.json (ht 1.2.0 example + own closed form); V1"
+      "source": "data/insulation_heat_loss.json (ht 1.2.0 example + own closed form): R_s 3.7437e-4 + R_ins 2.004159 + R_o 0.074241 = 2.078775 K m/W, 152 / 2.078775 = 73.1200"
     },
     {
       "step": 8,
       "path": "data.reviewRequired",
       "value": true,
-      "source": "AF-33: energy / personnel-protection decisions need a qualified reviewer; V1"
+      "source": "AF-33: energy / personnel-protection decisions need a qualified reviewer"
     }
   ]
 }

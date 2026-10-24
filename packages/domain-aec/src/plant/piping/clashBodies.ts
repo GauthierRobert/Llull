@@ -20,6 +20,7 @@ import type { ExternalBody } from '../../industrial/clash/clashSources';
 import { sweepFrame } from '../../shared/mesh';
 import { getPiping } from './model';
 import { operatorBodies } from './operator';
+import { supportsByRun } from './runSupports';
 import { deriveRun } from './routeParts';
 import { attachedRunIds, refRunId } from './runLinks';
 
@@ -104,23 +105,28 @@ function pieces(part: RoutedPart): Piece[] {
   }
 }
 
-/** Groups (runs) and equipment a run is connected to by design: its clashes with them are intentional. */
-function connectionsOf(piping: PipingModel, run: PipeRun): string[] {
+/** Groups (runs), equipment and pipe supports a run is connected to by design: its clashes with them are intentional. */
+function connectionsOf(piping: PipingModel, run: PipeRun, supports: readonly string[]): string[] {
   const runs = [...attachedRunIds(piping, run.id), refRunId(run.start.ref), refRunId(run.end.ref)];
   const equipment = [run.start.ref, run.end.ref].flatMap((ref) => (ref?.kind === 'nozzle' ? [ref.equipmentId] : []));
-  return [...runs.filter((id): id is string => id !== undefined), ...equipment];
+  return [...runs.filter((id): id is string => id !== undefined), ...equipment, ...supports];
 }
 
 export function pipingClashBodies(doc: CadDocument): ExternalBody[] {
   const piping = getPiping(doc);
   if (doc.units !== 'mm' || piping.runOrder.length === 0) return [];
   const bodies: ExternalBody[] = [];
+  const supports = supportsByRun(doc);
   for (const runId of piping.runOrder) {
     const run = piping.runs[runId];
     const line = run === undefined ? undefined : piping.lines[run.lineId];
     const derived = run === undefined ? undefined : deriveRun(doc, run);
     if (run === undefined || line === undefined || derived === undefined || !derived.ok) continue;
-    const connectedTo = connectionsOf(piping, run);
+    const connectedTo = connectionsOf(
+      piping,
+      run,
+      (supports[run.id] ?? []).map((support) => support.id),
+    );
     const insulation = line.insulation?.thicknessMm ?? 0;
     for (const part of derived.parts) {
       for (const piece of pieces(part)) {

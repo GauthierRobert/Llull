@@ -11,14 +11,15 @@ import { fromMm } from '@core/model/units';
 import { type PlanSource, annotationText, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { pipeAngle } from '../../industrial/piping/supportParts';
+import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
 
 /** Side of a support symbol, mm (diameter for the hanger circle). */
 const SYMBOL_SIZE = 300;
 const LABEL_HEIGHT = 150;
 
 export function supportPrimitives(doc: PlanSource, building: BuildingModel, support: PipeSupportElement): DrawingPrimitive[] {
-  const pipe = building.elements[support.pipeId];
-  const angle = pipe?.category === 'pipe' ? pipeAngle(pipe, support.position) : 0;
+  const pipe = carrierOfSupport(doc, building, support);
+  const angle = pipe === undefined ? 0 : pipeAngle(pipe, support.position);
   const half = fromMm(doc, SYMBOL_SIZE) / 2;
   const centre: Vec2 = [support.position[0], support.position[1]];
   const at = (along: number, across: number): Vec2 => planPoint(centre, angle, [along, across]);

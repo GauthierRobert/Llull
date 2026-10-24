@@ -98,6 +98,65 @@ export function insulationTakeoff(piping: PipingModel, runs: readonly TakeoffRun
   });
 }
 
+export interface TracingRow {
+  readonly lineId: string;
+  readonly lineNumber: string;
+  readonly type: string;
+  readonly tracers: number;
+  readonly centrelineM: number;
+  readonly valves: number;
+  readonly flanges: number;
+  readonly supports: number;
+  /** Allowances in metres per item; null when the line gave none (nothing was added for fittings). */
+  readonly allowances: { readonly valveM: number; readonly flangeM: number; readonly supportM: number } | null;
+  /** tracers x (centreline + valves x valveM + flanges x flangeM + supports x supportM), metres. */
+  readonly tracerLengthM: number;
+}
+
+/**
+ * Tracer length per traced line (set_heat_tracing): tracers x (centreline + the allowance of each valve, flange and pipe support on its runs).
+ * @param supportCounts number of pipe supports carried by each run id
+ */
+export function tracingTakeoff(
+  piping: PipingModel,
+  runs: readonly TakeoffRun[],
+  supportCounts: Readonly<Record<string, number>>,
+): TracingRow[] {
+  const rows = new Map<string, { centreline: number; valves: number; flanges: number; supports: number }>();
+  for (const { runId, derivation } of runs) {
+    const lineId = piping.runs[runId]?.lineId;
+    if (lineId === undefined || piping.lines[lineId]?.tracing === undefined) continue;
+    const row = rows.get(lineId) ?? { centreline: 0, valves: 0, flanges: 0, supports: 0 };
+    row.centreline += derivation.centrelineLengthMm;
+    row.valves += derivation.parts.filter((part) => part.kind === 'valve').length;
+    row.flanges += derivation.parts.filter((part) => part.kind === 'flange').length;
+    row.supports += supportCounts[runId] ?? 0;
+    rows.set(lineId, row);
+  }
+  return [...rows.entries()].flatMap(([lineId, row]) => {
+    const line = piping.lines[lineId];
+    const tracing = line?.tracing;
+    if (line === undefined || tracing === undefined) return [];
+    const allowance = tracing.allowances;
+    const extra =
+      allowance === undefined ? 0 : row.valves * allowance.valveM + row.flanges * allowance.flangeM + row.supports * allowance.supportM;
+    return [
+      {
+        lineId,
+        lineNumber: line.lineNumber,
+        type: tracing.type,
+        tracers: tracing.tracers,
+        centrelineM: round(row.centreline / 1000),
+        valves: row.valves,
+        flanges: row.flanges,
+        supports: row.supports,
+        allowances: allowance ?? null,
+        tracerLengthM: round(tracing.tracers * (row.centreline / 1000 + extra)),
+      },
+    ];
+  });
+}
+
 const bump = (counts: Record<string, number>, key: string, by = 1): void => {
   counts[key] = (counts[key] ?? 0) + by;
 };

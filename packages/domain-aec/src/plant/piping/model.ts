@@ -44,7 +44,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_STRETCH_FAILED:
     'The legs cannot follow the move orthogonally (the part no leg is parallel to is named, or a leg / component would vanish): move the equipment back, re-route the run with edit_route (its ends then follow their ports), or delete_pipe_run and route_pipe again. A broken run is kept as routed and its parts are not drawn.',
   RTE_PIPE_HAS_SUPPORTS:
-    'Keep the legacy pipe (omit replace), or delete its pipe supports first (delete_building_element); supports on spec-driven runs come with 02 V1.',
+    'Keep the legacy pipe (omit replace), or delete its pipe supports first (delete_building_element), convert with replace, then place supports on the new run with add_pipe_support runId.',
   RTE_SLOPE_INVALID:
     'Give planLength (horizontal length, > 0) and slope { value > 0 and at most 45 degrees (100 %), unit percent | ratio | deg, fall } on a leg with a horizontal direction; omit length.',
   RTE_EDIT_INVALID:
@@ -59,6 +59,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Give an eccentric reducer exactly one of flat ("top" for flat on top = +Z, "bottom" for flat on bottom = -Z; horizontal or sloped pipes) and flatDirection [dx, dy, dz] (the side of the pipe the flat is on, needed on vertical pipes); concentric reducers and valves have no flat side.',
   RTE_ECCENTRIC_OFFSET:
     'The smaller pipe of an eccentric reducer sits (OD big - OD small) / 2 off the axis of the bigger one, and the leg after the reducer must take that offset up along its own axis: turn the flat side to the direction of the next leg (flat / flatDirection), move the reducer to a leg followed by a turn along the flat, or cancel it with a second reducer (expander) on the same leg.',
+  RTE_TRACING_INVALID:
+    'The first set_heat_tracing on a line needs type (electric | steam | hot_water | thermal_fluid) and tracers (1 to 6); later calls may change single fields.',
+  RTE_HEAT_LOSS_INPUT:
+    'Give film coefficients and conductivities > 0, and a line whose spec pipe row has an outside diameter and a wall thinner than the radius (list_pipe_specs, edit_pipe_spec).',
   RTE_UNKNOWN_PIPE:
     'Pass the building element id of a legacy pipe (affected[0] of add_pipe_run, e.g. "pipe-3"; building_schedule kind "pipe" lists them).',
   RTE_UNKNOWN_COMPONENT:

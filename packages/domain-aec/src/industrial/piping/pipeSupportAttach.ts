@@ -10,6 +10,8 @@ import { elementsOf } from '../../building/model';
 import { collectSteelBars, modelUnits, type SteelBar } from '../steelDesign/steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
 import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';
+import { carrierOfSupport } from './pipeCarrier';
+import type { CarrierDoc } from '../../plant/piping/runCarrier';
 import { bearingOf, findBearingMember, findRiserBearingMember, riserBearingOf, type BearingLimits } from './pipeSupportMember';
 
 /** Default vertical reach, mm: pedestal below the pipe / hanger rod above it / riser bracket length. */
@@ -81,6 +83,8 @@ interface SupportChange {
 
 interface SupportReconciliation {
   readonly building: BuildingModel;
+  /** Supports whose pipe (building pipe or plant run) no longer exists: left as they are, not re-checked, named so the command can report them. */
+  readonly orphaned: SupportChange[];
   /** Supports now bearing on another member than before (or on one after being unattached). */
   readonly reattached: SupportChange[];
   /** Supports that lost their member and found no steel in reach. */
@@ -95,14 +99,14 @@ const memberMark = (building: BuildingModel, id: string | null): string | null =
 };
 
 /** Everything the reach test of `support` depends on, as a comparable string. */
-function attachmentSignature(building: BuildingModel, support: PipeSupportElement): string {
+function attachmentSignature(source: CarrierDoc, building: BuildingModel, support: PipeSupportElement): string {
   const elevation = (levelId: string): number => building.levels[levelId]?.elevation ?? 0;
-  const pipe = building.elements[support.pipeId];
+  const pipe = carrierOfSupport(source, building, support);
   const member = support.memberId === null ? undefined : building.elements[support.memberId];
   return JSON.stringify([
     support.position,
     elevation(support.levelId),
-    pipe?.category === 'pipe' ? [pipe.diameter, pipe.points] : null,
+    pipe === undefined ? null : [pipe.diameter, pipe.points],
     member?.category === 'member' ? [member.start, member.end, member.profile, member.role, elevation(member.levelId)] : null,
   ]);
 }
@@ -112,26 +116,37 @@ function attachmentSignature(building: BuildingModel, support: PipeSupportElemen
  * `alsoIds`), or whose member no longer exists: the current member is kept while it is still in reach, else the nearest member in reach,
  * else the support is unattached. Reach limits are the defaults, widened to the support's current pedestal / rod / bracket.
  */
-export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, alsoIds: ReadonlyArray<string> = []): SupportReconciliation {
+export function reconcilePipeSupports(
+  doc: CadDocument,
+  next: BuildingModel,
+  alsoIds: ReadonlyArray<string> = [],
+  nextPlant: CadDocument['plant'] = doc.plant,
+): SupportReconciliation {
   const previous = doc.building;
-  const unchanged: SupportReconciliation = { building: next, reattached: [], detached: [], kept: [] };
+  const unchanged: SupportReconciliation = { building: next, orphaned: [], reattached: [], detached: [], kept: [] };
   if (!previous) return unchanged;
+  const { plant: ignored, ...rest } = doc;
+  void ignored;
+  const nextDoc: CadDocument = { ...rest, building: next, ...(nextPlant === undefined ? {} : { plant: nextPlant }) };
   const candidates = elementsOf(next, 'pipeSupport').filter((support) => {
     const before = previous.elements[support.id];
     const dangling = support.memberId !== null && memberMark(next, support.memberId) === null;
-    const changed = before?.category === 'pipeSupport' && attachmentSignature(previous, before) !== attachmentSignature(next, support);
+    const changed =
+      before?.category === 'pipeSupport' && attachmentSignature(doc, previous, before) !== attachmentSignature(nextDoc, next, support);
     return dangling || changed || alsoIds.includes(support.id);
   });
   if (candidates.length === 0) return unchanged;
-  const nextDoc: CadDocument = { ...doc, building: next };
   const units = modelUnits(nextDoc);
   const bars = collectSteelBars(nextDoc);
   const unit = fromMm(doc, 1);
   let building = next;
-  const [reattached, detached, kept]: [SupportChange[], SupportChange[], string[]] = [[], [], []];
+  const [reattached, detached, kept, orphaned]: [SupportChange[], SupportChange[], string[], SupportChange[]] = [[], [], [], []];
   for (const support of candidates) {
-    const pipe = next.elements[support.pipeId];
-    if (pipe?.category !== 'pipe') continue;
+    const pipe = carrierOfSupport(nextDoc, next, support);
+    if (pipe === undefined) {
+      orphaned.push({ id: support.id, mark: support.mark, from: support.pipeId, to: null });
+      continue;
+    }
     const run = pipeRunOf(units, pipe);
     const point = absolutePointMm(units, support.levelId, support.position);
     const riser = isRiserPoint(run.points, point);
@@ -165,14 +180,18 @@ export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, als
     } else if (bearing.memberId !== support.memberId) reattached.push(change);
     else kept.push(support.mark);
   }
-  return { building, reattached, detached, kept };
+  return { building, orphaned, reattached, detached, kept };
 }
 
 /** One sentence for a command summary (empty when no support was re-checked). */
 export function reconciliationNote(result: SupportReconciliation): string {
-  const { reattached, detached, kept } = result;
-  if (reattached.length + detached.length + kept.length === 0) return '';
+  const { reattached, detached, kept, orphaned } = result;
+  if (reattached.length + detached.length + kept.length + orphaned.length === 0) return '';
   const parts = [
+    ...orphaned.map(
+      (change) =>
+        `${change.mark} left in place: its pipe ${change.from ?? '?'} no longer exists (not re-checked; delete it or re-add the pipe)`,
+    ),
     ...(kept.length > 0 ? [`${kept.length} kept (${kept.join(', ')})`] : []),
     ...reattached.map((change) => `${change.mark} re-attached ${change.from ?? 'unattached'} -> ${change.to ?? '?'}`),
     ...detached.map((change) => `${change.mark} DETACHED from ${change.from ?? '?'} (no steel in reach: now unattached, carries nothing)`),

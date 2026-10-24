@@ -14,7 +14,7 @@ export interface PlanDrawing {
 export const DIMENSION_LAYER = 'A-ANNO-DIMS';
 
 /** The document slices a plan depends on. */
-export type PlanSource = Pick<CadDocument, 'building' | 'units'>;
+export type PlanSource = Pick<CadDocument, 'building' | 'units' | 'plant'>;
 
 export function layerName(category: BimCategory): string {
   return CATEGORY_LAYER[category].name;
