@@ -82,10 +82,10 @@ describe('auto_route_lines: automatic order and retry', () => {
       [s.y, 'routed', runY, 'ts'],
       [s.x, 'routed', runX, 'ts'],
     ]);
-    // Y (8000 apart, 400 up) went through the hole: 8000 + 2 x 400; X went around the wall edge at 1000 + 107.15: 10000 + 2 x 1107.15 at least.
+    // Y (8000 apart, 400 up) went through the hole: 8000 + 2 x 400; X went around the wall edge: 1000 + 107.15 clears on the next 200 mm lattice line, y or z 1200: 10000 + 2 x 1200.
     const length = (lineId: string): number => routed.lines.find((line) => line.lineId === lineId)?.centrelineToPiLengthMm ?? 0;
     expect(length(s.y)).toBeCloseTo(8800, 6);
-    expect(length(s.x)).toBeGreaterThanOrEqual(12214.3);
+    expect(length(s.x)).toBeCloseTo(12400, 6);
     expect(result.summary).toContain('routed 2 of 2 line(s)');
     expect(result.summary).toContain('pass 2 of 2');
   });

@@ -1,0 +1,68 @@
+{
+  "id": "SC-RTE-24",
+  "status": "RUNNABLE (02 RTE V2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-46"],
+  "description": "The obstacles of the auto-router are the clash bodies of the V1 run model, insulation included. A hot DN150 header (180 degC, spec insulation H = 60 mm) runs along x at y 0, z 3000. A DN100 line must cross it from (5000, -3000, 3000) to (5000, 3000, 3000): it jogs over or under the header (equal cost; the search order takes under). The header body is the insulation envelope, half section 84.15 + 60 = 144.15 mm; the new pipe adds 57.15 + clearance 150, so its centreline must clear z 3000 by 351.3 mm: on the 50 mm lattice that is 400 (350 falls 1.3 mm short). Without the insulation 291.3 mm would do (350, 6700 mm).",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "HO",
+        "sequence": "4001",
+        "spec": "CS150",
+        "dn": 150,
+        "designTempC": 180,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "header"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 150, "endType": "BW" },
+      "as": "a"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-2", "position": [10000, 0, 3000], "direction": [-1, 0, 0], "dn": 150, "endType": "BW" },
+      "as": "b"
+    },
+    { "command": "route_pipe", "params": { "lineId": "$header", "from": { "portId": "$a" }, "to": { "portId": "$b" } } },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "9001", "spec": "CS150", "dn": 100 }, "as": "cross" },
+    {
+      "command": "auto_route_pipe",
+      "params": {
+        "lineId": "$cross",
+        "from": { "point": [5000, -3000, 3000], "direction": [0, 1, 0] },
+        "to": { "point": [5000, 3000, 3000], "direction": [0, -1, 0] },
+        "grid": 50,
+        "bendCost": 1000,
+        "clearance": 150
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 7,
+      "path": "data.centrelineToPiLengthMm",
+      "value": 6800,
+      "abs": 0.000001,
+      "source": "6000 along y + 2 x 400 jog (351.3 mm rounded up on the 50 mm lattice)"
+    },
+    { "step": 7, "path": "data.bends", "value": 4, "source": "up, across, down needs 4 bends; going round the header end is 5000 mm away" },
+    {
+      "step": 7,
+      "path": "data.pis[1][2]",
+      "value": 2600,
+      "abs": 0.000001,
+      "source": "3000 - 400: over and under cost the same; the open set pops the smaller k first (section 5.12 order f, h, i, j, k, axis), so under"
+    }
+  ]
+}

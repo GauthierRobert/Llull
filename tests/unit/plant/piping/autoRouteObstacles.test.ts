@@ -87,6 +87,15 @@ describe('obstacles of an existing run are its clash bodies', () => {
     expect(tight.pis).toBeDefined();
   });
 
+  it('the insulation decides the jog (hand calculation, clearance 150): bare header 291.3 mm -> 350, insulated 351.3 mm -> 400 on the 50 mm lattice', () => {
+    const length = (insulated: boolean): number => {
+      const { doc, params } = crossing(headerDoc(insulated).doc, 3000);
+      return (ok(doc, 'auto_route_pipe', { ...params, clearance: 150 }).data as { centrelineToPiLengthMm: number }).centrelineToPiLengthMm;
+    };
+    expect(length(false)).toBe(6700);
+    expect(length(true)).toBe(6800);
+  });
+
   it('a valve operator is an obstacle: the actuator cylinder (radius 125, up to z 900) blocks a pipe passing at z 600', () => {
     let doc = apply(operatorsDocument(), 'create_pipeline', { service: 'P', sequence: '7001', spec: 'CS150OP', dn: 100 });
     const lineId = doc.plant?.piping?.lineOrder[0] as string;
