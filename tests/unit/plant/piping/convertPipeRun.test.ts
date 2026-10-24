@@ -6,7 +6,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
+import { execute } from '@core/commands/registry';
+import type { PipeSupportElement } from '@aec/building/types';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { expectPure } from '../../../helpers/expectNoOp';
 import { cs150Document } from './rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
@@ -273,23 +276,109 @@ describe('convert_pipe_run reports what straightening moved', () => {
   });
 });
 
-describe('convert_pipe_run replace with supports on the legacy pipe', () => {
-  it('is refused with the supports named (they cannot move to the run yet); without replace the conversion works and the pipe keeps them', () => {
+describe('convert_pipe_run replace moves the supports of the legacy pipe onto the run (V1c)', () => {
+  /**
+   * Hand derivation (SC-RTE-22): DN100 legacy pipe (0,0,1500) -> (2000,10,1500) -> (4000,0,1500). The vertex bends 2 x atan(10 / 2000) = 0.5729 deg, within
+   * the CS150 tolerance of 1 deg, so it merges: the run is the straight line y = 0 and the merged vertex was 10 mm off it (straightenedMaxOffsetMm 10).
+   * A support at (1000, 5): the legacy leg is at y = 5 there, the new line at y = 0 -> moves 5 mm. At the vertex (2000, 10) -> 10 mm. At (3000, 5) -> 5 mm.
+   * One outside diameter of DN100 is 114.3 mm: all three are within it.
+   */
+  const KINKED = [
+    [0, 0, 1500],
+    [2000, 10, 1500],
+    [4000, 0, 1500],
+  ];
+  const AT = [
+    [1000, 5, 1500],
+    [2000, 10, 1500],
+    [3000, 5, 1500],
+  ];
+  const scene = (): { doc: CadDocument; pipeId: string; supportIds: string[] } => {
+    const s = legacy(KINKED);
+    const placed = ok(s.doc, 'add_pipe_support', { pipeId: s.pipeId, at: AT, type: 'shoe' });
+    return { doc: placed.document, pipeId: s.pipeId, supportIds: supportsIn(placed.document).map((support) => support.id) };
+  };
+  const supportsIn = (doc: CadDocument): PipeSupportElement[] =>
+    Object.values(doc.building?.elements ?? {}).filter((element): element is PipeSupportElement => element.category === 'pipeSupport');
+
+  interface SupportFacts {
+    count: number;
+    ids: string[];
+    maxOffsetMm: number;
+    moved: Array<{ id: string; mark: string; offsetMm: number }>;
+    kept: string[];
+  }
+
+  it('snaps each support to the straightened centreline (5, 10, 5 mm), names them, and deletes only the legacy pipe', () => {
+    const { doc, pipeId, supportIds } = scene();
+    expect(supportIds).toHaveLength(3);
+    const result = ok(doc, 'convert_pipe_run', { pipeId, spec: 'CS150', replace: true });
+    const facts = result.data as { runId: string; straightenedMaxOffsetMm: number; supports: SupportFacts };
+    expect(result.document.building?.elements[pipeId]).toBeUndefined();
+    expect(facts.straightenedMaxOffsetMm).toBeCloseTo(10, 6);
+    expect(facts.supports.count).toBe(3);
+    expect(facts.supports.ids).toEqual(supportIds);
+    expect(facts.supports.moved.map((entry) => entry.offsetMm)).toEqual([
+      expect.closeTo(5, 6),
+      expect.closeTo(10, 6),
+      expect.closeTo(5, 6),
+    ]);
+    expect(facts.supports.maxOffsetMm).toBeCloseTo(10, 6);
+    const after = supportsIn(result.document);
+    expect(after.map((support) => support.pipeId)).toEqual([facts.runId, facts.runId, facts.runId]);
+    expect(after.map((support) => support.position[1])).toEqual([expect.closeTo(0, 6), expect.closeTo(0, 6), expect.closeTo(0, 6)]);
+    expect(after.map((support) => support.position[0])).toEqual([
+      expect.closeTo(1000, 6),
+      expect.closeTo(2000, 6),
+      expect.closeTo(3000, 6),
+    ]);
+    expect(result.summary).toContain('pipe supports moved onto the run');
+    expect(result.affected).toEqual(expect.arrayContaining(supportIds));
+    expect(result.document.order).toEqual(expect.arrayContaining(after.flatMap((support) => support.entityIds)));
+    // The support is now a support of the run, so check_pipe_supports lists it under the run and finds no orphan.
+    const check = data<{ orphans: unknown[]; pipes: Array<{ id: string }> }>(result.document, 'check_pipe_supports', {});
+    expect(check.orphans).toEqual([]);
+    expect(check.pipes.map((pipe) => pipe.id)).toEqual([facts.runId]);
+  });
+
+  it('refuses with RTE_SUPPORT_OFF_RUN when a support is farther than one outside diameter (114.3 mm) from the new centreline; nothing changes', () => {
+    const { doc, pipeId, supportIds } = scene();
+    const first = supportsIn(doc).find((support) => support.id === supportIds[0]) as PipeSupportElement;
+    const building = doc.building as NonNullable<CadDocument['building']>;
+    const far: CadDocument = {
+      ...doc,
+      building: { ...building, elements: { ...building.elements, [first.id]: { ...first, position: [1000, 200, 1500] } } },
+    };
+    const result = expectRefusal(far, 'convert_pipe_run', { pipeId, spec: 'CS150', replace: true }, 'RTE_SUPPORT_OFF_RUN', 'replace');
+    expect(result.error?.ids).toEqual([pipeId, first.id]);
+    expect(result.summary).toContain('114.3');
+    // 114.3 mm is the limit: 100 mm off is fine (the support is moved 100 mm).
+    const near: CadDocument = {
+      ...doc,
+      building: { ...building, elements: { ...building.elements, [first.id]: { ...first, position: [1000, 100, 1500] } } },
+    };
+    const converted = ok(near, 'convert_pipe_run', { pipeId, spec: 'CS150', replace: true });
+    expect((converted.data as { supports: SupportFacts }).supports.moved[0]?.offsetMm).toBeCloseTo(100, 6);
+  });
+
+  it('without replace the pipe keeps its supports and nothing moves', () => {
+    const { doc, pipeId, supportIds } = scene();
+    const result = ok(doc, 'convert_pipe_run', { pipeId, spec: 'CS150' });
+    expect(result.document.building?.elements[pipeId]).toBeDefined();
+    expect(supportsIn(result.document).map((support) => support.pipeId)).toEqual([pipeId, pipeId, pipeId]);
+    expect((result.data as { supports: SupportFacts }).supports).toMatchObject({ count: 0, ids: [], moved: [] });
+    expect(supportIds).toHaveLength(3);
+  });
+
+  it('a pipe without supports converts as before (supports.count 0)', () => {
     const s = legacy();
-    const supported = apply(s.doc, 'add_pipe_support', { pipeId: s.pipeId, at: [[3000, 3000, 1500]], type: 'shoe' });
-    const supports = Object.values(supported.building?.elements ?? {}).filter((element) => element.category === 'pipeSupport');
-    expect(supports).toHaveLength(1);
-    const result = expectRefusal(
-      supported,
-      'convert_pipe_run',
-      { pipeId: s.pipeId, spec: 'CS150', replace: true },
-      'RTE_PIPE_HAS_SUPPORTS',
-      'replace',
-    );
-    expect(result.error?.ids).toEqual([s.pipeId, supports[0]?.id]);
-    expect(result.summary).toContain(String((supports[0] as { mark: string }).mark));
-    const kept = ok(supported, 'convert_pipe_run', { pipeId: s.pipeId, spec: 'CS150' });
-    expect(kept.document.building?.elements[s.pipeId]).toBeDefined();
-    expect(Object.values(kept.document.building?.elements ?? {}).filter((element) => element.category === 'pipeSupport')).toHaveLength(1);
+    const result = ok(s.doc, 'convert_pipe_run', { pipeId: s.pipeId, spec: 'CS150', replace: true });
+    expect((result.data as { supports: SupportFacts }).supports.count).toBe(0);
+    expect(result.summary).not.toContain('pipe supports moved');
+  });
+
+  it('is pure', () => {
+    const { doc, pipeId } = scene();
+    expectPure(doc, () => execute(doc, 'convert_pipe_run', { pipeId, spec: 'CS150', replace: true }));
   });
 });

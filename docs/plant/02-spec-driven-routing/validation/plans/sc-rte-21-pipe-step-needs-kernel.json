@@ -1,6 +1,6 @@
 {
   "id": "SC-RTE-21",
-  "status": "RUNNABLE (02 RTE V1 part 2): the no-kernel contract. The exact path (scripted exact kernel) is in tests/unit/plant/piping/exportPipeStep.test.ts; a measurement with the native OCCT kernel is open (README Known limits).",
+  "status": "RUNNABLE (02 RTE V1 part 2): the no-kernel contract. The exact path (scripted exact kernel) is in tests/unit/plant/piping/exportPipeStep.test.ts; the native OCCT kernel measurement (volumes, self-check) is server/tests/nativePipeStep.test.ts (README D24).",
   "unbuilt": [],
   "validates": ["VC-RTE-42"],
   "description": "export_pipe_step writes the derived parts as exact STEP solids through ctx.kernel (requiresKernel): the plan harness has no kernel, so the command is refused by name and the document is untouched. With the mesh kernel it would be XCH_WRITER_UNAVAILABLE, never a faceted fallback.",

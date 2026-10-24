@@ -157,6 +157,8 @@ describe.each([
   'sc-rte-19-pcf-small-line.json',
   'sc-rte-20-ifc-ports-small-line.json',
   'sc-rte-21-pipe-step-needs-kernel.json',
+  'sc-rte-22-level-from-elevation.json',
+  'sc-rte-23-convert-replace-moves-supports.json',
 ])('scenario plan %s', (file) => {
   const plan = load(file);
 

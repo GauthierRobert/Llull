@@ -1,0 +1,52 @@
+{
+  "id": "SC-RTE-22",
+  "status": "RUNNABLE (02 RTE V1c): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-43"],
+  "description": "The level of a run comes from its elevation. Two levels (Ground 0, Upper 3000) and two DN80 runs: one at z 1000 from x 0 to 4000 (highest level at or below 1000 is Ground) and one at z 3000 from x 0 to 6000 (3000 <= 3000: Upper). check_pipe_supports lists both without a filter, only the 4 m run with the Ground level and only the 6 m run with the Upper level (before V1c both runs counted as the first level).",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    { "command": "add_level", "params": { "name": "Ground", "elevation": 0, "height": 3000 }, "as": "ground" },
+    { "command": "add_level", "params": { "name": "Upper", "elevation": 3000, "height": 3000 }, "as": "upper" },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-L1", "position": [0, 0, 1000], "direction": [1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "l1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-L2", "position": [4000, 0, 1000], "direction": [-1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "l2"
+    },
+    { "command": "create_pipeline", "params": { "service": "HO", "sequence": "4001", "spec": "CS150", "dn": 80 }, "as": "lineLow" },
+    { "command": "route_pipe", "params": { "lineId": "$lineLow", "from": { "portId": "$l1" }, "to": { "portId": "$l2" } } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-U1", "position": [0, 500, 3000], "direction": [1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "u1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-U2", "position": [6000, 500, 3000], "direction": [-1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "u2"
+    },
+    { "command": "create_pipeline", "params": { "service": "HO", "sequence": "4002", "spec": "CS150", "dn": 80 }, "as": "lineHigh" },
+    { "command": "route_pipe", "params": { "lineId": "$lineHigh", "from": { "portId": "$u1" }, "to": { "portId": "$u2" } } },
+    { "command": "check_pipe_supports", "params": {} },
+    { "command": "check_pipe_supports", "params": { "levelId": "$ground" } },
+    { "command": "check_pipe_supports", "params": { "levelId": "$upper" } }
+  ],
+  "expected": [
+    { "step": 12, "path": "data.pipes.length", "value": 2, "source": "both runs without a filter" },
+    { "step": 13, "path": "data.pipes.length", "value": 1, "source": "only the z 1000 run is on Ground" },
+    { "step": 13, "path": "data.pipes[0].lengthM", "value": 4, "abs": 0.000001, "source": "x 0 to 4000" },
+    { "step": 14, "path": "data.pipes.length", "value": 1, "source": "only the z 3000 run is on Upper (3000 <= 3000)" },
+    { "step": 14, "path": "data.pipes[0].lengthM", "value": 6, "abs": 0.000001, "source": "x 0 to 6000" }
+  ]
+}

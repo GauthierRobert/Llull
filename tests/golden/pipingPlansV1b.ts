@@ -1,5 +1,5 @@
 /**
- * Golden plans of 02 RTE V1 part 2: supports on a spec-driven run, heat tracing, and supports that follow a stretch (SC-RTE-16, 17, 18). Replay re-mints
+ * Golden plans of 02 RTE V1 part 2: supports on a spec-driven run, heat tracing, and supports that follow a stretch (SC-RTE-16, 17, 18; V1c: SC-RTE-23). Replay re-mints
  * identical ids (L8); the run entities, the support entities and their attachment are re-derived on load. (The PCF goldens are the reference files
  * `__snapshots__/piping_pcf_*.pcf`, checked in tests/unit/plant/piping/pcf.test.ts.)
  */
@@ -55,6 +55,38 @@ export const pipingPlansV1b: Record<string, GoldenAction[]> = {
     { command: 'add_steel_member', params: { role: 'beam', start: [1500, 2000, 2300], end: [1500, 4000, 2300], profile: 'IPE200' } },
     { command: 'add_pipe_support', params: { runId: '$run', at: [[1500, 3000, 2500]] } },
     { command: 'update_equipment_parameters', params: { equipment: 'V-101', set: { location: [7000, 3500] } } },
+    { command: 'check_pipe_supports', params: {} },
+  ],
+  // SC-RTE-23: a kinked legacy pipe with three shoes is converted with replace; the shoes move 5 / 10 / 5 mm onto the straightened run.
+  piping_convert_replace_supports: [
+    ...IMPORTS,
+    {
+      command: 'add_pipe_run',
+      params: {
+        points: [
+          [0, 0, 1500],
+          [2000, 10, 1500],
+          [4000, 0, 1500],
+        ],
+        dn: 100,
+        line: 'L-1',
+        service: 'cooling water',
+      },
+      as: 'legacy',
+    },
+    {
+      command: 'add_pipe_support',
+      params: {
+        pipeId: '$legacy',
+        at: [
+          [1000, 5, 1500],
+          [2000, 10, 1500],
+          [3000, 5, 1500],
+        ],
+        type: 'shoe',
+      },
+    },
+    { command: 'convert_pipe_run', params: { pipeId: '$legacy', spec: 'CS150', replace: true }, as: 'run' },
     { command: 'check_pipe_supports', params: {} },
   ],
 };
