@@ -13,6 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-24 — main: 02 RTE-V1 part 2 merged (cad-reviewer APPROVE, 1 round): supports on runs through one carrier lookup
+  (`pipeCarrier.ts`, every support consumer), re-snap + re-attach after plant edits, `set_heat_tracing`, `line_heat_loss`,
+  `export_pcf`, `export_ifc` with plant runs + ports, `export_pipe_step` (kernel) (TECHNICAL_SPEC §13.10, SC-RTE-16..21). Gates green
+  on the merge with DES-3b / DES-4b: static, unit 16365, server 1604, coverage 97.3 / 89.2 / 99.0 / 98.9 (1 worker). Next: RTE-V1c.
 - 2026-10-24 — main: 02 RTE-V1 part 1 merged (cad-reviewer APPROVE, 1 round + 2 non-blocking fixes): socket-weld / threaded
   engagement, eccentric reducers (flat side, centreline offset), trimmed elbows + pipe bends, valve operators + `RTE_VALVE_OPERATOR_CLASH`,
   clash bodies for valves / flanges / tees / olets / reducers, slope-preserving stretch (TECHNICAL_SPEC §13.9, SC-RTE-10..15).
@@ -133,7 +137,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
 - `[DONE]` **RTE-V1a** 02 V1 part 1: socket / threaded engagement, eccentric reducers, trimmed elbows / bends, valve operators (+ operator clash), clash bodies for valves / flanges / tees, slope-preserving stretch (§13.9). Merged 2026-10-24. Open (§13.9): connection rules + socket gap in the PSC format, sourced SW / threaded / eccentric / operator rows in the bundled catalogue, couplings / unions / caps / swages, a move across a sloped leg's heading.
-- `[WIP]` **RTE-V1b** 02 V1 part 2: supports on runs (one carrier lookup across the ~10 building-pipe consumers, re-attach after stretch / edit), heat tracing data, `line_heat_loss`, PCF hand-off (05), IFC ports (08), exact solids via kernel. Worktree `llull-rte`, branch `feat/plant-rte-v1`. Then RTE-V2 (auto-route). _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` **RTE-V1b** 02 V1 part 2: supports on runs (one carrier lookup), heat tracing, `line_heat_loss`, `export_pcf` (05 extends it), IFC runs + ports (IFC4), `export_pipe_step` (§13.10). Merged 2026-10-24.
+- `[WIP]` **RTE-V1c** 02 V1 review follow-ups: a run's level from its elevation in `check_pipe_supports`, one rule for a support whose run is gone (live = load), native OCCT server test of `export_pipe_step`, `convert_pipe_run replace` retargets supports to the new run. Open: UI support tool picks a run (`runId`, viewport lane). Worktree `llull-rte`, branch `feat/plant-rte-v1c`. Then RTE-V2 (auto-route). _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
