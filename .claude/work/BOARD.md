@@ -13,6 +13,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-24 — main: 02 RTE-V1c merged (cad-reviewer APPROVE after 2 rounds): run level from elevation, orphan supports reported
+  and regenerated (live = load), `export_pipe_step` elbows as true tori (native OCCT server test), `convert_pipe_run replace` moves
+  supports (TECHNICAL_SPEC §13.11). Gates green: static, unit 16443, server 1605, coverage 97.3 / 89.3 / 98.9 / 98.9 (1 worker).
+  Next: RTE-V2.
+
 - 2026-10-24 — main: 02 RTE-V1 part 2 merged (cad-reviewer APPROVE, 1 round): supports on runs through one carrier lookup
   (`pipeCarrier.ts`, every support consumer), re-snap + re-attach after plant edits, `set_heat_tracing`, `line_heat_loss`,
   `export_pcf`, `export_ifc` with plant runs + ports, `export_pipe_step` (kernel) (TECHNICAL_SPEC §13.10, SC-RTE-16..21). Gates green
@@ -138,7 +143,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
 - `[DONE]` **RTE-V1a** 02 V1 part 1: socket / threaded engagement, eccentric reducers, trimmed elbows / bends, valve operators (+ operator clash), clash bodies for valves / flanges / tees, slope-preserving stretch (§13.9). Merged 2026-10-24. Open (§13.9): connection rules + socket gap in the PSC format, sourced SW / threaded / eccentric / operator rows in the bundled catalogue, couplings / unions / caps / swages, a move across a sloped leg's heading.
 - `[DONE]` **RTE-V1b** 02 V1 part 2: supports on runs (one carrier lookup), heat tracing, `line_heat_loss`, `export_pcf` (05 extends it), IFC runs + ports (IFC4), `export_pipe_step` (§13.10). Merged 2026-10-24.
-- `[WIP]` **RTE-V1c** 02 V1 review follow-ups: a run's level from its elevation in `check_pipe_supports`, one rule for a support whose run is gone (live = load), native OCCT server test of `export_pipe_step`, `convert_pipe_run replace` retargets supports to the new run. Open: UI support tool picks a run (`runId`, viewport lane). Worktree `llull-rte`, branch `feat/plant-rte-v1c`. Then RTE-V2 (auto-route). _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` **RTE-V1c** 02 V1 review follow-ups (§13.11): a run's level from its elevation, orphan supports (live = load, `RTE_SUPPORT_ORPHAN`), native OCCT `export_pipe_step` test (true torus elbows), `convert_pipe_run replace` retargets supports. Merged 2026-10-24. Open: UI support tool picks a run (`runId`, viewport lane).
+- `[WIP]` **RTE-V2** 02 V2 finish (§10, §13.4 "Not done in V2"): auto-routed runs on the full M1..V1 run model, parallel candidate searches (rayon) in `llull-route`, multi-line ordering, rack preference + keep-outs re-checked. Worktree `llull-rte`. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
