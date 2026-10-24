@@ -32,7 +32,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_SPEC_NO_COMPONENT:
     'Add the missing component or dimension to the spec or its catalogue (import_piping_catalog, edit_pipe_spec), or change the size / rating. detail names the row.',
   RTE_SPEC_AMBIGUOUS: 'Give one of the matching spec components a lower priority (edit_pipe_spec).',
-  RTE_NO_CONNECTION_RULE: 'The spec joins only BW-BW and FL-FL ends in this version: use a port of end type BW or FL, or change the spec.',
+  RTE_NO_CONNECTION_RULE:
+    'The spec joins BW-BW (butt weld), SW to plain-end pipe (socket weld), SC-SC (threaded) and FL-FL ends: use a port or fitting whose end type the pipe of the spec takes (BE pipe: BW; PE pipe: SW; THD pipe: SC), or change the spec.',
   RTE_NO_FITTING_FOR_ANGLE:
     'Turn by an angle the spec lists (data.anglesDeg, 90 / 45) within the tolerance, or pass angleToleranceDeg; a reversal needs two turns.',
   RTE_SEGMENT_TOO_SHORT:

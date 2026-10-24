@@ -5,6 +5,8 @@
  *   0 < cut < minWeldSpacing is a warning (named default max(4 t, 50 mm)); intervals are never reordered by the caller
  */
 
+import type { Join } from './connections';
+
 export interface Interval {
   /** Id of the part (or `port:start` / `port:end`) that occupies the interval. */
   readonly id: string;
@@ -15,6 +17,8 @@ export interface Interval {
   readonly gap: number;
   /** Why the interval exists: decides the refusal code on overlap. */
   readonly kind: 'fitting' | 'inline' | 'branch';
+  /** How the pipe meets this interval (absent = butt weld with `gap`); a socket / threaded join has a negative gap: the pipe goes inside. */
+  readonly join?: Join;
 }
 
 export interface Piece {
@@ -75,14 +79,16 @@ export function stackLeg(
     const start = a.end + a.gap;
     const end = b.start - b.gap;
     const cut = end - start;
-    if (cut < -eps) {
+    // A socket / threaded join has a negative gap, so a piece can be positive while the two fittings overlap: judge the fittings by their faces too.
+    const clearance = Math.min(cut, b.start - a.end);
+    if (clearance < -eps) {
       const branch = a.kind === 'branch' || b.kind === 'branch';
       const inline = a.kind === 'inline' || b.kind === 'inline';
       return {
         ok: false,
         code: branch ? 'RTE_BRANCH_ON_FITTING' : inline ? 'RTE_INLINE_DOES_NOT_FIT' : 'RTE_SEGMENT_TOO_SHORT',
-        message: `between ${a.id} and ${b.id} the pipe piece would be ${+cut.toFixed(4)} mm long on a ${+legLength.toFixed(4)} mm leg`,
-        detail: { cutLengthMm: cut, from: a.id, to: b.id, legLengthMm: legLength },
+        message: `between ${a.id} and ${b.id} the pipe piece would be ${+clearance.toFixed(4)} mm long on a ${+legLength.toFixed(4)} mm leg`,
+        detail: { cutLengthMm: clearance, from: a.id, to: b.id, legLengthMm: legLength },
       };
     }
     if (cut <= eps) {

@@ -221,8 +221,10 @@ export interface Joint {
   readonly kind: 'buttWeld' | 'branchWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
   readonly parts: readonly [string, string];
   readonly position: Vec3;
-  /** Weld root gap (butt weld) or gasket thickness (flanged), mm. */
+  /** Weld root gap (butt weld), socket root gap (socket weld) or gasket thickness (flanged), mm. */
   readonly gapMm: number;
+  /** Socket-weld and threaded joints: how far the pipe goes into the fitting, mm (the pipe piece cut length includes it). */
+  readonly engagementMm?: number;
   /** Flanged joints: the gasket and bolt set that belong to it. */
   readonly accessories?: readonly string[];
 }

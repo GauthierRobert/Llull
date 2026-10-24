@@ -183,7 +183,7 @@ export function buildGraph(doc: CadDocument, runs: readonly GraphRun[]): RunGrap
     edges.push({ from: a, to: b, kind, position, ...(jointKind === undefined ? {} : { jointKind }) });
   };
 
-  // Joints bridge a weld gap: a port within the gap of the joint position is connected through it.
+  // Joints bridge a weld gap (and the engagement of a socket / threaded joint): a port within that reach of the joint position is connected through it.
   const byOwner = new Map<string, PortRecord[]>();
   for (const record of records) if (!record.external) byOwner.set(record.owner, [...(byOwner.get(record.owner) ?? []), record]);
   for (const { derivation } of runs)
@@ -191,7 +191,8 @@ export function buildGraph(doc: CadDocument, runs: readonly GraphRun[]): RunGrap
       const [a, b] = joint.parts;
       for (const owner of [a, b])
         for (const record of byOwner.get(owner) ?? [])
-          if (len3(sub3(record.port.position, joint.position)) <= joint.gapMm + TOLERANCE) connected.add(portKey(record));
+          if (len3(sub3(record.port.position, joint.position)) <= joint.gapMm + (joint.engagementMm ?? 0) + TOLERANCE)
+            connected.add(portKey(record));
       if (parts.has(a) && parts.has(b)) link(a, b, 'joint', joint.position, joint.kind);
       else for (const external of [a, b].filter((id) => externals.has(id))) attached.add(external);
       for (const accessory of joint.accessories ?? []) link(accessory, a, 'joint', joint.position, joint.kind);

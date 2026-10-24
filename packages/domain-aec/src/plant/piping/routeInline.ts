@@ -5,14 +5,15 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import type { InlineComponent, Joint, PartPort } from '@aec/plant/types';
+import type { EndType, InlineComponent, Joint, PartPort } from '@aec/plant/types';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import type { ComponentType } from '../catalog/types';
+import { fittingEnd, type Join } from './connections';
 import { fail, isFailure, type DerivationFailure, type DerivedInline } from './deriveTypes';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { unitVector } from './legs';
 import { flangeParts, mintSet, type FlangeSetIds } from './routeEnds';
-import { at, bwPort, partOf, type Env, type Mint, type Slot } from './routeEnv';
+import { at, joinOf, partOf, type Env, type Mint, type Slot } from './routeEnv';
 import { inlineInOrder, isReducer, isValve, startDn } from './runSizes';
 import { isMiss } from './specLookup';
 
@@ -52,11 +53,11 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
   const pipe = env.pipeAt(dnIn);
   if (isFailure(pipe)) return pipe;
   const flanged = row.ends.includes('FL');
-  const end = flanged ? 'FL' : row.ends.includes('BW') ? 'BW' : (row.ends[0] ?? 'BW');
-  if (lookup.connection(end, end) === null)
+  const end: EndType = flanged ? 'FL' : row.ends.includes('BW') ? 'BW' : (row.ends[0] ?? 'BW');
+  if (flanged && lookup.connection('FL', 'FL') === null)
     return fail(
       'RTE_NO_CONNECTION_RULE',
-      `spec ${lookup.id} has no ${end}-${end} connection rule for valve ${comp.id} (${row.key})`,
+      `spec ${lookup.id} has no FL-FL connection rule for valve ${comp.id} (${row.key})`,
       [comp.id],
       ['inline'],
       { endType: end },
@@ -66,23 +67,23 @@ function valveSlot(env: Env, { comp, dnIn }: Located, mint: Mint): Slot | Deriva
     ...(row.facing === undefined ? {} : { facing: row.facing }),
   };
   let set: FlangeSet | null = null;
+  let join: Join;
   if (flanged) {
-    const resolved = resolveFlangeSet(lookup, face, dnIn);
+    const resolved = resolveFlangeSet(lookup, face, dnIn, pipe.row.pipeEnd ?? 'BW');
     if ('code' in resolved) return fail(resolved.code, resolved.message, [...resolved.ids, comp.id], ['inline'], resolved.detail);
     set = resolved;
+    join = resolved.join;
+  } else {
+    const welded = joinOf(env, end, dnIn, row.dims, row.key, [comp.id, row.key], ['inline']);
+    if (isFailure(welded)) return welded;
+    join = welded;
   }
   const up = set === null ? null : mintSet(mint);
   const valveId = mint('valve');
   const down = set === null ? null : mintSet(mint);
   const reach = length / 2 + (set?.length ?? 0);
   return {
-    interval: {
-      id: comp.id,
-      start: comp.centreDistance - reach,
-      end: comp.centreDistance + reach,
-      gap: env.weld?.gapMm ?? 0,
-      kind: 'inline',
-    },
+    interval: { id: comp.id, start: comp.centreDistance - reach, end: comp.centreDistance + reach, gap: join.gapMm, kind: 'inline', join },
     leg: comp.leg,
     before: up?.flange ?? valveId,
     after: down?.flange ?? valveId,
@@ -157,15 +158,31 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
   const [pipeIn, pipeOut] = [env.pipeAt(dnIn), env.pipeAt(dnOut)];
   if (isFailure(pipeIn)) return pipeIn;
   if (isFailure(pipeOut)) return pipeOut;
+  const end = fittingEnd(row);
+  const [joinIn, joinOut] = [
+    joinOf(env, end, dnIn, row.dims, row.key, [comp.id, row.key], ['inline']),
+    joinOf(env, end, dnOut, row.dims, row.key, [comp.id, row.key], ['inline']),
+  ];
+  if (isFailure(joinIn)) return joinIn;
+  if (isFailure(joinOut)) return joinOut;
+  if (joinIn.joint !== joinOut.joint || joinIn.gapMm !== joinOut.gapMm)
+    return fail(
+      'RTE_NO_CONNECTION_RULE',
+      `reducer ${comp.id} (${row.key}) would join the DN${dnIn} pipe by ${joinIn.joint} and the DN${dnOut} pipe by ${joinOut.joint}: both sizes of the spec's pipe must take the same joint`,
+      [comp.id, row.key],
+      ['inline'],
+    );
   const id = mint('reducer');
   const reach = length / 2;
+  const port = (position: Vec3, direction: Vec3, dn: number): PartPort => ({ position, direction, dn, endType: end });
   return {
     interval: {
       id: comp.id,
       start: comp.centreDistance - reach,
       end: comp.centreDistance + reach,
-      gap: env.weld?.gapMm ?? 0,
+      gap: joinIn.gapMm,
       kind: 'inline',
+      join: joinIn,
     },
     leg: comp.leg,
     before: id,
@@ -174,7 +191,7 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
     build: (origin, u) => {
       const centre = at(origin, u, comp.centreDistance);
       const faces: readonly [Vec3, Vec3] = [at(centre, u, -reach), at(centre, u, reach)];
-      const part = partOf(run.id, id, 'reducer', row, [bwPort(faces[0], scale3(u, -1), dnIn), bwPort(faces[1], u, dnOut)], {
+      const part = partOf(run.id, id, 'reducer', row, [port(faces[0], scale3(u, -1), dnIn), port(faces[1], u, dnOut)], {
         centre,
         componentId: comp.id,
         dn: dnIn,

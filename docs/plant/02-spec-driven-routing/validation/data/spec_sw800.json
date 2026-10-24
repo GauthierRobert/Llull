@@ -1,0 +1,37 @@
+{
+  "format": "llull-pipe-spec",
+  "schemaVersion": 1,
+  "id": "SW800",
+  "title": "Small-bore socket-weld spec, NPS 1-2 (02 RTE V1 validation spec; dimensions of the SC-RTE-10 plan)",
+  "service": "SC-RTE V1 small-bore validation plans",
+  "dimensionalStandard": "ASME",
+  "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
+  "corrosionAllowance": { "value": 3, "unit": "mm" },
+  "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
+  "sizeRange": { "fromNps": 1, "toNps": 2 },
+  "catalogs": ["rte-validation-stub-small-bore", "llull-open-piping"],
+  "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
+  "components": [
+    { "id": "P-PE", "type": "pipe", "fromNps": 1, "toNps": 2, "schedule": "80", "ends": "PE", "catalogRef": "asme-b36.10m" },
+    { "id": "E90-SW", "type": "elbow90", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+    { "id": "E45-SW", "type": "elbow45", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+    { "id": "T-SW", "type": "tee", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+    { "id": "V-GATE-SW", "type": "valveGate", "fromNps": 1, "toNps": 1, "ends": "SW", "class": 800, "catalogRef": "asme-b16.34-sw" },
+    {
+      "id": "SOCK",
+      "type": "sockolet",
+      "fromNps": 2,
+      "toNps": 2,
+      "branchFromNps": 1,
+      "branchToNps": 1,
+      "ends": "SW",
+      "catalogRef": "mss-sp-97-sockolet"
+    },
+    { "id": "F-SW", "type": "flangeSocketWeld", "fromNps": 1, "toNps": 1, "facing": "RF", "class": 150, "catalogRef": "asme-b16.5-so" },
+    { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 1, "toNps": 1, "class": 150, "catalogRef": "asme-b16.20" },
+    { "id": "B-STUD", "type": "boltSet", "fromNps": 1, "toNps": 1, "class": 150, "facing": "RF", "catalogRef": "asme-b16.5-bolting" }
+  ],
+  "status": "draft",
+  "provenance": { "author": "02 RTE V1 validation pack", "accessed": "2026-10-24" },
+  "branchTable": { "system": "NPS", "cells": { "1": { "1": "T" }, "2": { "1": "S" } } }
+}

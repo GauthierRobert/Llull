@@ -25,6 +25,8 @@ export interface CatalogueRow {
   /** `elbow90` + `LR` for takeoff keys. */
   readonly radius?: string;
   readonly ends: readonly EndType[];
+  /** Pipe rows: the end type the spec's pipe component gives (BE = BW, PE = PL, THD = SC); absent when the component declares none (butt weld). */
+  readonly pipeEnd?: EndType;
   readonly dims: Readonly<Record<string, number>>;
   /** Not every dimension is grade A, or the catalogue has no row (AF-32). */
   readonly unverified: boolean;
@@ -145,6 +147,7 @@ function rowOf(spec: PipeSpec, outcome: Extract<ResolveOutcome, { ok: true }>, d
     ...(facing === undefined ? {} : { facing }),
     ...(row?.radius === undefined ? {} : { radius: row.radius }),
     ends: (row?.ends ?? (resolved.component.ends === undefined ? [] : [resolved.component.ends])).map((end) => END_OF[end]),
+    ...(resolved.component.type === 'pipe' && resolved.component.ends !== undefined ? { pipeEnd: END_OF[resolved.component.ends] } : {}),
     dims,
     unverified: !resolved.verified,
     source:
@@ -159,9 +162,18 @@ function missOf(outcome: Extract<ResolveOutcome, { ok: false }>, notes: string):
   return miss(kind, `${outcome.code}: ${outcome.message}${notes}`, outcome.ids, outcome.paths);
 }
 
+/** Named default of the socket-weld root gap, mm (ASME B31.3 328.5.2 / B16.11 practice: 1/16 in, [S18]). */
+const SOCKET_GAP_MM = 1.6;
+
+/**
+ * The built-in connection table (the PSC spec format has no connection rules yet), looked up in either order: butt weld, flange, socket weld (SW
+ * socket on a plain-end pipe) and threaded (both ends screwed).
+ */
 const CONNECTIONS: ReadonlyArray<readonly [EndType, EndType, ConnectionRule]> = [
   ['BW', 'BW', { joint: 'buttWeld', gapMm: 0, requires: [] }],
   ['FL', 'FL', { joint: 'flanged', gapMm: 0, requires: ['gasketSpiralWound', 'boltSet'] }],
+  ['SW', 'PL', { joint: 'socketWeld', gapMm: SOCKET_GAP_MM, requires: [] }],
+  ['SC', 'SC', { joint: 'threaded', gapMm: 0, requires: [] }],
 ];
 
 function elbowRule(spec: PipeSpec): ElbowRule {
@@ -252,7 +264,7 @@ export function createSpecLookup(doc: Pick<CadDocument, 'plant'>, specId: string
     },
     insulation: (code, dn, tempC) => insulationOf(spec, code, dn, tempC),
     elbowAngles: () => elbowRule(spec),
-    connection: (a, b) => CONNECTIONS.find(([x, y]) => x === a && y === b)?.[2] ?? null,
+    connection: (a, b) => CONNECTIONS.find(([x, y]) => (x === a && y === b) || (x === b && y === a))?.[2] ?? null,
   };
 }
 

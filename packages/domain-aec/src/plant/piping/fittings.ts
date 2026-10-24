@@ -86,11 +86,23 @@ export function chooseElbow(
   };
 }
 
+/**
+ * The elbow whose bend ends `tangentMm` from the centre instead of at the catalogue end (a socket-weld elbow bends up to the socket bottom, not the
+ * mouth): the arc radius follows, the catalogue centre-to-end (the face the pipe meets) stays.
+ */
+export const withTangentLength = (choice: ElbowChoice, tangentMm: number): ElbowChoice => ({
+  ...choice,
+  radius: Math.round((tangentMm / Math.tan((choice.turnDeg * Math.PI) / 360)) * 1e9) / 1e9,
+});
+
 /** Centreline arc length of an elbow: R x turn (radians). */
 export const arcLength = (radius: number, turnDeg: number): number => radius * ((turnDeg * Math.PI) / 180);
 
-/** Run centreline length: sum of the legs minus 2 c per elbow plus its arc (02 RTE §5.2). */
+/** Run centreline length: sum of the legs minus 2 t per elbow (t = R tan(turn / 2), the tangent length: c for a butt-weld elbow) plus its arc (02 RTE §5.2). */
 export function centrelineLength(legLengths: readonly number[], elbows: readonly ElbowChoice[]): number {
   const straight = legLengths.reduce((sum, length) => sum + length, 0);
-  return elbows.reduce((sum, elbow) => sum - 2 * elbow.centreToEnd + arcLength(elbow.radius, elbow.turnDeg), straight);
+  return elbows.reduce(
+    (sum, elbow) => sum - 2 * elbow.radius * Math.tan((elbow.turnDeg * Math.PI) / 360) + arcLength(elbow.radius, elbow.turnDeg),
+    straight,
+  );
 }

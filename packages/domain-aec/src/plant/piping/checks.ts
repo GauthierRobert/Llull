@@ -119,6 +119,8 @@ function weldSpacingIssues(out: Collector, run: PipeRun, derivation: RunDerivati
   for (const part of derivation.parts) {
     const cut = part.cutLength;
     if (part.kind !== 'pipe' || cut === undefined || !(cut > 1e-6 * Math.max(1, cut))) continue;
+    // The spacing rule is about butt welds: a piece with socket / threaded ends only has none to keep apart.
+    if (!part.ports.some((port) => port.endType === 'BW')) continue;
     const wall = part.dims['wall'] ?? 0;
     const minimum = override ?? defaultMinWeldSpacing(wall);
     if (cut >= minimum) continue;

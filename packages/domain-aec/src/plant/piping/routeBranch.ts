@@ -9,11 +9,12 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
 import { dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { fittingEnd, type Join } from './connections';
 import { DerivationMemo } from './derivationMemo';
 import { fail, isFailure, type DerivationFailure, type DerivedBranch } from './deriveTypes';
 import { unitVector } from './legs';
 import { getPiping, runPoints } from './model';
-import { at, bwPort, makeEnv, partOf, type EndSetup, type Env, type Slot } from './routeEnv';
+import { at, joinOf, makeEnv, partOf, type EndSetup, type Env, type Slot } from './routeEnv';
 import { dnAfter, startDn } from './runSizes';
 import { isMiss, type CatalogueRow } from './specLookup';
 
@@ -40,6 +41,10 @@ export interface BranchFit {
   /** Tee: centre-to-end on the run, each side of the branch point. */
   readonly runHalf: number | null;
   readonly outletEnd: EndType;
+  /** Tee: how the header pipe meets the two run ends (null for an olet / stub-in, set on the header by the branch weld). */
+  readonly join: Join | null;
+  /** How the branch pipe meets the outlet (tee M end, olet outlet); null for a stub-in (the branch pipe is welded to the header). */
+  readonly outletJoin: Join | null;
   readonly reviewRequired: boolean;
 }
 
@@ -137,16 +142,6 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
     };
     const partId = `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
     const typeKey = choice.row === null ? 'stubIn' : `${choice.row.type}${choice.row.radius ?? ''}`;
-    const outlet = (end: EndType): DerivationFailure | null =>
-      lookup.connection(end, 'BW') === null
-        ? fail(
-            'RTE_NO_CONNECTION_RULE',
-            `spec ${lookup.id} has no rule joining the ${end} outlet of ${typeKey} (${point.id}) to a butt-weld branch pipe`,
-            [point.id],
-            ['branches'],
-            { outletEnd: end },
-          )
-        : null;
     if (choice.row === null) {
       fits.push({
         ...base,
@@ -156,16 +151,31 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
         branchStartSource: 'header outside radius (stub-in)',
         runHalf: null,
         outletEnd: 'BW',
+        join: null,
+        outletJoin: null,
       });
       continue;
     }
-    const outletEnd = choice.row.ends[0] ?? 'BW';
-    const refused = outlet(outletEnd);
-    if (refused !== null) return refused;
+    const outletEnd = fittingEnd(choice.row);
+    const ids = [point.id, choice.row.key];
+    const outletJoin = joinOf(env, outletEnd, branchDn, choice.row.dims, choice.row.key, ids, ['branches']);
+    if (isFailure(outletJoin)) return outletJoin;
+    const join = kind === 'tee' ? joinOf(env, outletEnd, headerDn, choice.row.dims, choice.row.key, ids, ['branches']) : null;
+    if (join !== null && isFailure(join)) return join;
     const sizes = kind === 'tee' ? teeDimensions(choice.row) : oletOutlet(choice.row, headerPipe.od);
     if (typeof sizes === 'string') return fail('RTE_SPEC_NO_COMPONENT', sizes, [choice.row.key, point.id], ['branches']);
     const [runHalf, start]: [number | null, Dimension] = 'run' in sizes ? [sizes.run, sizes.branch] : [null, sizes];
-    fits.push({ ...base, typeKey, partId, branchStart: start.value, branchStartSource: start.source, runHalf, outletEnd });
+    fits.push({
+      ...base,
+      typeKey,
+      partId,
+      branchStart: start.value,
+      branchStartSource: start.source,
+      runHalf,
+      outletEnd,
+      join,
+      outletJoin,
+    });
   }
   return overlap(run.id, fits) ?? fits;
 }
@@ -208,8 +218,9 @@ export function teeSlot(env: Env, fit: BranchFit): Slot {
       id: fit.point.id,
       start: fit.point.distance - half,
       end: fit.point.distance + half,
-      gap: env.weld?.gapMm ?? 0,
+      gap: fit.join?.gapMm ?? 0,
       kind: 'branch',
+      ...(fit.join === null ? {} : { join: fit.join }),
     },
     leg: fit.point.leg,
     before: fit.partId,
@@ -217,13 +228,9 @@ export function teeSlot(env: Env, fit: BranchFit): Slot {
     dnOut: fit.headerDn,
     build: (origin, u) => {
       const centre = at(origin, u, fit.point.distance);
-      const branchPort: PartPort = {
-        position: at(centre, fit.direction, fit.branchStart),
-        direction: fit.direction,
-        dn: fit.branchDn,
-        endType: 'BW',
-      };
-      const ports = [bwPort(at(centre, u, -half), scale3(u, -1), fit.headerDn), bwPort(at(centre, u, half), u, fit.headerDn), branchPort];
+      const port = (position: Vec3, direction: Vec3, dn: number): PartPort => ({ position, direction, dn, endType: fit.outletEnd });
+      const branchPort = port(at(centre, fit.direction, fit.branchStart), fit.direction, fit.branchDn);
+      const ports = [port(at(centre, u, -half), scale3(u, -1), fit.headerDn), port(at(centre, u, half), u, fit.headerDn), branchPort];
       const part = partOf(env.run.id, fit.partId, 'tee', fit.row as CatalogueRow, ports, {
         centre,
         componentId: fit.point.id,
@@ -319,8 +326,9 @@ export function branchStartSetup(
   const fit = fits.find((candidate) => candidate.point.id === ref.branchId) as BranchFit;
   return {
     length: fit.branchStart,
-    gap: fit.kind === 'stubIn' ? 0 : (env.weld?.gapMm ?? 0),
+    gap: fit.outletJoin?.gapMm ?? 0,
     set: null,
+    ...(fit.outletJoin === null ? {} : { join: fit.outletJoin }),
     port,
     portId,
     fittingId: fit.partId,

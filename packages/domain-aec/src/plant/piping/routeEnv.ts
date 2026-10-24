@@ -5,8 +5,9 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
-import type { Joint, PartPort, PipeLine, PipeRun, PortSpec, RoutedPart } from '@aec/plant/types';
-import { fail, type DerivationFailure, type DerivedInline, type RunDerivation } from './deriveTypes';
+import type { EndType, Joint, PartPort, PipeLine, PipeRun, PortSpec, RoutedPart } from '@aec/plant/types';
+import { isJoinFailure, joinFrom, type Join } from './connections';
+import { fail, isFailure, type DerivationFailure, type DerivedInline, type RunDerivation } from './deriveTypes';
 import type { FlangeSet } from './flangeSet';
 import type { Interval } from './jointStack';
 import { getPiping } from './model';
@@ -35,6 +36,8 @@ export interface EndSetup {
   readonly length: number;
   readonly gap: number;
   readonly set: FlangeSet | null;
+  /** How the pipe meets the end (butt weld, socket weld, threaded); absent = the BW rule of the spec. */
+  readonly join?: Join;
   readonly port: PortSpec | null;
   readonly portId: string | null;
   /** Branch start: the header fitting part the first pipe piece welds to. */
@@ -81,6 +84,26 @@ export interface SlotBuild {
   /** Joints inside the slot (flanged faces); the welds to the neighbouring pieces are made by the leg walk. */
   readonly joints: ReadonlyArray<Omit<Joint, 'id'>>;
   readonly inline?: DerivedInline;
+}
+
+/**
+ * The join of a fitting end `end` of row `row` (dimensions `dims`) to the spec's pipe of size `dn`.
+ * @failure no pipe row -> that failure; no connection rule for the pair, or the row lacks socketDepth / threadEngagement -> RTE_NO_CONNECTION_RULE /
+ *   RTE_SPEC_NO_COMPONENT naming the row (`ids`)
+ */
+export function joinOf(
+  env: Env,
+  end: EndType,
+  dn: number,
+  dims: Readonly<Record<string, number>>,
+  rowKey: string,
+  ids: readonly string[],
+  paths: readonly string[],
+): Join | DerivationFailure {
+  const pipe = env.pipeAt(dn);
+  if (isFailure(pipe)) return pipe;
+  const join = joinFrom(env.lookup, end, pipe.row.pipeEnd ?? 'BW', dims, rowKey);
+  return isJoinFailure(join) ? fail(join.code, join.message, ids, paths, join.detail) : join;
 }
 
 /** Ids minted in route order, one counter per part kind (`<runId>/<kind>-<k>`). */
