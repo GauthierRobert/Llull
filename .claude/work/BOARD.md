@@ -13,6 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-24 — main: 02 RTE-M2 merged (cad-reviewer APPROVE after 4 rounds): inline valves + reducers, branches (tee / reducing tee /
+  weldolet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline`, `delete_pipe_run` cascade; frozen
+  derivation memo keyed on the slices it reads (200-branch header ≈ 0.1 s). Gates green: static, unit 15715, server 1571 (1 worker).
+  Next: 02 RTE-M3.
 - 2026-10-24 — main: 02 RTE-M1 merged (cad-reviewer APPROVE after 3 rounds): `route_pipe` (legs, spec elbows, cut lengths, flange sets),
   `piping_takeoff`, broken runs, core `DocumentExtension.reconcile` (live, nested, replay); fix: derived-model restore keeps the saved
   entity key order. Gates green: static, unit 15499, server 1571 (1 worker). Next: 02 RTE-M2.
@@ -116,7 +120,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **STA-M2/M3** 06 STA gratings, then `add_railing` (edge coverage by railings). _deps: —_
 - `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
-- `[WIP]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline`. Worktree `llull-rte`, branch `feat/plant-rte-m2`. Then **RTE-M3**, **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
+- `[WIP]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route` (remap inline + branch leg indices), slope + adverse slope, insulation envelope in `check_clashes`, line-number template, supports on runs. Worktree `llull-rte`, branch `feat/plant-rte-m3`. Then **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
