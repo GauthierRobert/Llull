@@ -21,7 +21,7 @@ export const NATIVE_MAX_EXPANSIONS = 2_000_000;
 /** Ceiling of `maxExpansions`, per first-move candidate (memory guard: ~7.4e6 expansions took 37 s and a few hundred MB on the development laptop). */
 export const NATIVE_EXPANSIONS_CEILING = 20_000_000;
 /** Ceiling of the expansions of all (up to 5) candidates of one search together: each candidate gets at most this / candidates, so memory stays bounded. */
-export const NATIVE_TOTAL_EXPANSIONS_CEILING = 20_000_000;
+const NATIVE_TOTAL_EXPANSIONS_CEILING = 20_000_000;
 
 /** Params of the transport itself; everything else is forwarded to route_problem / auto_route_pipe. */
 const TRANSPORT_KEYS: ReadonlySet<string> = new Set(['timeoutS', 'maxExpansions', 'solution', 'transactionTimeoutS']);

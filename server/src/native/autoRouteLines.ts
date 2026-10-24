@@ -17,7 +17,7 @@ import type { NativeDeps } from './fatigueField';
 const TOOL = 'auto_route';
 const DEFAULT_ATTEMPTS = 4;
 /** Wall-clock limit of a whole multi-line plan, seconds (each line also has its own `timeoutS`, cut to what is left). */
-export const DEFAULT_LINES_TIMEOUT_S = 600;
+const DEFAULT_LINES_TIMEOUT_S = 600;
 
 type Json = Record<string, unknown>;
 type SingleRoute = (params: Json, options: LineOptions, host: FeaHost, deps: NativeDeps) => Promise<FeaToolResult>;
