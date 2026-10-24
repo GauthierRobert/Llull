@@ -13,7 +13,8 @@ import { SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from '@ui/components/sidebar
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { TOOLSET_NAMES, type ToolsetName, toolsetOf } from '@protocol/toolsets';
 import { fuzzyScore } from './fuzzyMatch';
-import { humanizeName } from './paramForm';
+import { commandLabel } from './paramForm';
+import { startCageEditing, startFaceEditing, toggleControlNet } from '@ui/actions/freeformActions';
 
 /** Registry commands are grouped by their toolset, so a search result says what area it belongs to. */
 const TOOLSET_GROUPS = {
@@ -127,6 +128,34 @@ const STATIC_ACTIONS: ReadonlyArray<ActionRow> = [
     () => useThemeStore.getState().toggleTheme(),
     'appearance mode color',
   ],
+  [
+    'edit-faces',
+    'Edit',
+    'Edit faces (drag handles)',
+    'Push / pull, flush or draft a face of the selected solid by dragging',
+    'cube',
+    startFaceEditing,
+    'direct push pull replace draft move faces freeform',
+  ],
+  [
+    'edit-cage',
+    'Edit',
+    'Edit subdivision cage',
+    'Move, extrude, inset and loop-cut the cage of the selected subdivision solid',
+    'cube',
+    startCageEditing,
+    'direct subdivision cage freeform loop cut',
+    'Tab',
+  ],
+  [
+    'toggle-control-net',
+    'View',
+    'Show / hide control net',
+    'Poles of the selected NURBS curve or surface; drag one to reshape',
+    'eye',
+    toggleControlNet,
+    'poles control polygon nurbs freeform edit_nurbs',
+  ],
   ['undo', 'Edit', 'Undo', 'Revert the last change', 'undo', () => store().undo(), '', 'Ctrl Z'],
   ['redo', 'Edit', 'Redo', 'Re-apply the last undone change', 'redo', () => store().redo(), '', 'Ctrl Y'],
   ['duplicate', 'Edit', 'Duplicate selection', 'Copy the selected entities', 'copy', duplicateSelection, '', 'Ctrl D'],
@@ -214,7 +243,7 @@ function commandItem(command: CommandDefinition<unknown>): PaletteCommand {
     kind: 'command',
     id: `command:${command.name}`,
     group: commandGroup(command.name),
-    label: `${humanizeName(command.name)}${needsInput ? '…' : ''}`,
+    label: `${commandLabel(command.name)}${needsInput ? '…' : ''}`,
     hint: command.description,
     keywords: `${command.name} ${command.annotations?.readOnly === true ? 'query inspect ' : ''}${command.description}`,
     icon: command.annotations?.readOnly === true ? 'info' : 'zap',

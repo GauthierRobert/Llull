@@ -1,4 +1,6 @@
 // Gizmo adapter: TransformControls on a proxy at the selection centroid translates / rotates / scales the picked cage elements.
+// Floating origin: the proxy sits at the LOCAL origin of a group placed at the selection centroid, so every value the controls read and write
+// (position delta, rotation, scale) is a small offset and large document coordinates cannot lose precision; the world pivot is the group position.
 // Same pattern as TransformGizmo: the proxy is driven mid-drag (the preview follows through the gesture), and on release ONE
 // command is dispatched (commitGesture -> edit_subdivision_cage) -- nothing is mutated here.
 
@@ -6,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from '
 import { TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
-import type { SubdivisionEntity } from '@core/model/types';
+import type { SubdivisionEntity, Vec3 } from '@core/model/types';
 import { useToolStore } from '@ui/store';
 import { type CageSelection, selectionCentroidWorld } from './cageSelection';
 import { quaternionAxisAngle } from './dragMath';
@@ -31,12 +33,14 @@ export function CageGizmo({ cage, selection, onDraggingChanged }: CageGizmoProps
   const targetRef = useRef<THREE.Group | null>(null);
   const controlsRef = useRef<TransformControlsImpl>(null);
   const dragging = useRef(false);
+  const centroidRef = useRef<Vec3>([0, 0, 0]);
+  centroidRef.current = centroid ?? centroidRef.current;
   const start = useRef({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion() });
 
   const resetTarget = useCallback((): void => {
     const target = targetRef.current;
     if (target === null || centroid === null) return;
-    target.position.set(centroid[0], centroid[1], centroid[2]);
+    target.position.set(0, 0, 0);
     target.quaternion.identity();
     target.scale.set(1, 1, 1);
     target.updateMatrixWorld(true);
@@ -49,17 +53,17 @@ export function CageGizmo({ cage, selection, onDraggingChanged }: CageGizmoProps
   const onChange = useCallback((): void => {
     const target = targetRef.current;
     if (target === null || !dragging.current) return;
-    const pivot = start.current.position;
+    const pivot = centroidRef.current;
     if (mode === 'translate') {
-      const delta = target.position.clone().sub(pivot);
+      const delta = target.position.clone().sub(start.current.position);
       updateGesture({ kind: 'translate', delta: [delta.x, delta.y, delta.z] });
     } else if (mode === 'rotate') {
       const delta = target.quaternion.clone().multiply(start.current.quaternion.clone().invert());
       const { axis, angleDeg } = quaternionAxisAngle(delta);
-      updateGesture({ kind: 'rotate', axis, angleDeg, pivot: [pivot.x, pivot.y, pivot.z] });
+      updateGesture({ kind: 'rotate', axis, angleDeg, pivot });
     } else {
       const factor = (target.scale.x + target.scale.y + target.scale.z) / 3;
-      updateGesture({ kind: 'scale', factor, pivot: [pivot.x, pivot.y, pivot.z] });
+      updateGesture({ kind: 'scale', factor, pivot });
     }
   }, [mode]);
 
@@ -94,7 +98,9 @@ export function CageGizmo({ cage, selection, onDraggingChanged }: CageGizmoProps
   if (centroid === null) return null;
   return (
     <>
-      <group ref={targetRef} position={[centroid[0], centroid[1], centroid[2]]} />
+      <group position={[centroid[0], centroid[1], centroid[2]]}>
+        <group ref={targetRef} />
+      </group>
       <TransformControls ref={controlsRef} object={targetRef as unknown as MutableRefObject<THREE.Object3D>} mode={mode} size={0.8} />
     </>
   );

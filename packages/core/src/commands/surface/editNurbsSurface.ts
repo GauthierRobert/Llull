@@ -64,7 +64,9 @@ export const editNurbsSurface = defineCommand({
       })
       .describe('move_poles: select the block of poles i0..i1, j0..j1.')
       .optional(),
-    delta: vec3('move_poles: translation [x, y, z] in document units added to each selected pole.').optional(),
+    delta: vec3(
+      'move_poles: translation [x, y, z] added to each selected pole, in the entity-local frame (before the entity rotation), document units.',
+    ).optional(),
     falloff: z
       .object({
         radiusU: z.number().min(0).describe('Falloff radius along u in pole-index units (0 = no spread along u).'),

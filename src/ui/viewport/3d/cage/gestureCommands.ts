@@ -22,7 +22,12 @@ export type CageGesture =
   | { readonly kind: 'scale'; readonly factor: number; readonly pivot: Vec3 }
   | { readonly kind: 'extrude'; readonly distance: number }
   | { readonly kind: 'inset'; readonly thickness: number }
-  | { readonly kind: 'loop_cut'; readonly edge: string; readonly cuts: number };
+  | {
+      readonly kind: 'loop_cut';
+      readonly edge: string;
+      readonly cuts: number;
+      /** Dragged position along the crossed edges (cuts 1 only). */ readonly factor?: number;
+    };
 
 export interface CageCommand {
   readonly name: 'edit_subdivision_cage' | 'extrude_cage_faces' | 'inset_cage_faces' | 'loop_cut_cage';
@@ -67,7 +72,11 @@ export function gestureCommand(
   falloff: FalloffSettings,
 ): CageCommand | null {
   if (gesture.kind === 'loop_cut') {
-    return { name: 'loop_cut_cage', params: { id: entityId, edge: gesture.edge, cuts: gesture.cuts } };
+    const { factor } = gesture;
+    return {
+      name: 'loop_cut_cage',
+      params: { id: entityId, edge: gesture.edge, cuts: gesture.cuts, ...(factor !== undefined && gesture.cuts === 1 ? { factor } : {}) },
+    };
   }
   if (isIdleGesture(gesture) || isSelectionEmpty(selection)) return null;
   if (gesture.kind === 'extrude' || gesture.kind === 'inset') {

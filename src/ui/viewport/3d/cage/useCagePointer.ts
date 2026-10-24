@@ -23,7 +23,9 @@ import {
   selectionCentroidWorld,
 } from './cageSelection';
 import { type AxisLock, type DragStart, type WorldRay, crossedThreshold, dragGesture, insetThickness, unitsPerPixel } from './dragMath';
-import { commitGesture, updateGesture } from './gestureActions';
+import { cancelGesture, commitGesture, updateGesture } from './gestureActions';
+import { capturePointer, releasePointer } from '../pointerCapture';
+import { type LoopCutEdge, cancelsOnCaptureLoss, loopCutEdge, loopCutFactor } from './loopCutDrag';
 import { loopEdgeIds, withoutOccluded } from './cagePickFilter';
 import { createFrameScheduler } from './frameScheduler';
 
@@ -33,6 +35,7 @@ const MIN_INSET_PX = 2;
 
 type Press =
   | { kind: 'drag'; start: DragStart; pointer: { x: number; y: number }; active: boolean }
+  | { kind: 'loopcut'; edgeId: string; edge: LoopCutEdge; pointer: { x: number; y: number }; active: boolean }
   | { kind: 'background'; pointer: { x: number; y: number }; additive: boolean };
 
 interface Modal {
@@ -56,6 +59,16 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
     const lastPointer = { x: 0, y: 0 };
     let axisLock: AxisLock = null;
     let press: Press | null = null;
+    // The pointer captured for the drag in flight: move / up keep arriving outside the canvas, and a lost capture cancels the drag.
+    let captured: { target: EventTarget | null; id: number } | null = null;
+    const holdPointer = (event: PointerEvent): void => {
+      captured = { target: event.target, id: event.pointerId };
+      capturePointer(event.target, event.pointerId);
+    };
+    const dropPointer = (): void => {
+      if (captured !== null) releasePointer(captured.target, captured.id);
+      captured = null;
+    };
     let modal: Modal | null = null;
     const hoverFrame = createFrameScheduler(
       (cb) => window.requestAnimationFrame(cb),
@@ -101,8 +114,13 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
       const pick = pickAt(cage, ray);
       if (edit.tool === 'loop_cut') {
         if (pick.edge === null) return;
-        updateGesture({ kind: 'loop_cut', edge: pick.edge.id, cuts: edit.cuts });
-        commitGesture();
+        updateGesture({ kind: 'loop_cut', edge: pick.edge.id, cuts: edit.cuts, ...(edit.cuts === 1 ? { factor: 0.5 } : {}) });
+        const edgeEnds = loopCutEdge(cage, pick.edge.id);
+        if (edit.cuts === 1 && edgeEnds !== null) {
+          // one loop: hold the press, the pointer slides it along the edge, the release commits
+          press = { kind: 'loopcut', edgeId: pick.edge.id, edge: edgeEnds, pointer, active: false };
+          holdPointer(event);
+        } else commitGesture();
         consume();
         return;
       }
@@ -111,8 +129,10 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
         edit.setSelection(hasElement(edit.selection, face) ? edit.selection : selectElement(EMPTY_CAGE_SELECTION, face, false));
         const origin = selectionCentroidWorld(cage, { ...EMPTY_CAGE_SELECTION, faces: [face.id] });
         const axis = faceNormalWorld(cage, face.id);
-        if (origin !== null && axis !== null)
+        if (origin !== null && axis !== null) {
           press = { kind: 'drag', start: { kind: 'extrude', ray, origin, axis }, pointer, active: false };
+          holdPointer(event);
+        }
         consume();
         return;
       }
@@ -130,6 +150,7 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
       if (origin !== null) {
         const start: DragStart = { kind: 'translate', ray, origin, axis: [forward.x, forward.y, forward.z] };
         press = { kind: 'drag', start, pointer, active: false };
+        holdPointer(event);
       }
       consume();
     };
@@ -146,6 +167,13 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
           kind: 'inset',
           thickness: insetThickness(modal.startThickness, event.clientX - modal.startX, modal.perPixel, minimum),
         });
+        return;
+      }
+      if (press?.kind === 'loopcut') {
+        if (!press.active && !crossedThreshold(press.pointer, lastPointer)) return;
+        press.active = true;
+        const factor = loopCutFactor(press.edge, worldRay(event.clientX, event.clientY));
+        if (factor !== null) updateGesture({ kind: 'loop_cut', edge: press.edgeId, cuts: 1, factor });
         return;
       }
       if (press?.kind === 'drag') {
@@ -176,7 +204,12 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
       const held = press;
       press = null;
       axisLock = null;
+      dropPointer();
       if (held === null || event.button !== 0) return;
+      if (held.kind === 'loopcut') {
+        commitGesture();
+        return;
+      }
       if (held.kind === 'background') {
         if (!held.additive && !crossedThreshold(held.pointer, { x: event.clientX, y: event.clientY }))
           useDirectEditStore.getState().setSelection(EMPTY_CAGE_SELECTION);
@@ -205,6 +238,16 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
       event.stopPropagation();
     };
 
+    // The system took the pointer away (or the capture was lost mid-drag): the gesture ends with no command.
+    const onCaptureLost = (): void => {
+      const held = press;
+      if (captured === null || held === null || held.kind === 'background') return;
+      press = null;
+      captured = null;
+      // a loop-cut press sets its gesture (factor 0.5, ghost) on pointerdown, so it is dropped even before the pointer moved
+      if (cancelsOnCaptureLoss(held)) cancelGesture();
+    };
+
     const onKey = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
       if ((key === 'x' || key === 'y' || key === 'z') && press?.kind === 'drag' && press.active) axisLock = key;
@@ -215,6 +258,7 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
         if (previous.gesture !== null) {
           press = null;
           modal = null;
+          dropPointer();
         }
         return;
       }
@@ -228,6 +272,8 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
     host.addEventListener('pointerdown', onPointerDown, true);
     host.addEventListener('click', onClick, true);
     host.addEventListener('dblclick', onDoubleClick, true);
+    host.addEventListener('lostpointercapture', onCaptureLost, true);
+    window.addEventListener('pointercancel', onCaptureLost);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('keydown', onKey);
@@ -235,6 +281,8 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
       host.removeEventListener('pointerdown', onPointerDown, true);
       host.removeEventListener('click', onClick, true);
       host.removeEventListener('dblclick', onDoubleClick, true);
+      host.removeEventListener('lostpointercapture', onCaptureLost, true);
+      window.removeEventListener('pointercancel', onCaptureLost);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('keydown', onKey);

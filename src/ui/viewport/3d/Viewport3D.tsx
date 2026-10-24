@@ -44,6 +44,11 @@ import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
 import { FeatureStartBar } from './manipulators/FeatureStartBar';
 import { CageEditLayer } from './cage/CageEditLayer';
+import { FaceEditLayer } from './faceEdit/FaceEditLayer';
+import { FaceEditBar } from './faceEdit/FaceEditBar';
+import { NurbsNetLayer } from './nurbsNet/NurbsNetLayer';
+import { NurbsNetBar } from './nurbsNet/NurbsNetBar';
+import { RemotePreviewLayer } from './preview/RemotePreviewLayer';
 import { CageEditBar } from './cage/CageEditBar';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
@@ -134,6 +139,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />
         <CageEditLayer onDraggingChanged={onDraggingChanged} />
+        <FaceEditLayer />
+        <NurbsNetLayer />
+        <RemotePreviewLayer />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
@@ -189,6 +197,8 @@ export function Viewport3D(): React.ReactElement {
       <ScreenAnchorOverlay />
       <FeatureStartBar />
       <CageEditBar />
+      <FaceEditBar />
+      <NurbsNetBar />
       <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />

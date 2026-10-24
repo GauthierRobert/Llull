@@ -99,3 +99,21 @@
 .cage-bar__hint {
   color: var(--fg-subtle);
 }
+
+/* ---- Face handles and control-net chips (04 DIR M1, VC-37) -------------------- */
+
+.feature-start__chip[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.feature-start__note {
+  align-self: center;
+  padding-right: 10px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.feature-start__note--error {
+  color: var(--danger);
+}

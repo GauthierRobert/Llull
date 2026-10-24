@@ -14,11 +14,12 @@ import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { type GizmoMode, useStore, useViewportStore } from '@ui/store';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
-import { toRenderPosition } from './floatingOrigin';
+import { gizmoFramePosition } from './gizmoSpace';
 import { type Snap3DType, type SnapPoint3D, collectSnapCandidates3D, snap3d } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
 import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
 import { useDirectEditStore } from '@ui/store/directEditStore';
+import { useFaceEditStore } from '@ui/store/faceEditStore';
 
 // 'dragging-changed' is not in Object3DEventMap.
 type DraggingDispatcher = {
@@ -49,9 +50,9 @@ export function TransformGizmo({
   const entity = useSoleSelectedEntity();
   const selectedId = entity?.id;
   const dispatch = useStore((s) => s.dispatch);
-  const renderOrigin = useStore((s) => s.renderOrigin);
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
   const editingCage = useDirectEditStore((s) => s.entityId !== null && s.entityId === selectedId);
+  const editingFaces = useFaceEditStore((s) => s.active);
   const onLockedLayer = useStore((s) => entity !== undefined && s.document.layers[entity.layerId]?.locked === true);
 
   const targetRef = useRef<THREE.Group | null>(null);
@@ -92,11 +93,11 @@ export function TransformGizmo({
   useEffect(() => {
     const target = targetRef.current;
     if (!entity || !target) return;
-    target.position.set(...toRenderPosition(entity.position, renderOrigin));
+    target.position.set(...gizmoFramePosition(entity.position));
     target.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
     target.scale.set(1, 1, 1);
     target.updateMatrixWorld(true);
-  }, [entity, renderOrigin]);
+  }, [entity]);
 
   // No setState / invalidate unless a snapping translate drag is running.
   useFrame(() => {
@@ -109,11 +110,11 @@ export function TransformGizmo({
 
     const target = targetRef.current;
     if (!target) return;
-    // target is in RENDER space (floating origin); snapping works in world space.
+    // the target lives in the offset group, i.e. in document coordinates (gizmoSpace.ts).
     const result = snap3d(
-      target.position.x + renderOrigin[0],
-      target.position.y + renderOrigin[1],
-      target.position.z + renderOrigin[2],
+      target.position.x,
+      target.position.y,
+      target.position.z,
       snapCandidatesRef.current,
       SNAP3D_TOLERANCE,
       SNAP3D_GRID_STEP,
@@ -121,10 +122,7 @@ export function TransformGizmo({
 
     activeSnapRef.current = result.snapped ? { x: result.x, y: result.y, z: result.z, type: result.type } : null;
 
-    showIndicator({
-      position: [result.x - renderOrigin[0], result.y - renderOrigin[1], result.z - renderOrigin[2]],
-      type: result.snapped ? result.type : 'none',
-    });
+    showIndicator({ position: gizmoFramePosition([result.x, result.y, result.z]), type: result.snapped ? result.type : 'none' });
   });
 
   const handleDraggingChanged = useCallback(
@@ -153,7 +151,7 @@ export function TransformGizmo({
       if (mode === 'translate') {
         const snap = activeSnapRef.current;
         if (snap && snap3dEnabled) {
-          target.position.set(...toRenderPosition([snap.x, snap.y, snap.z], renderOrigin));
+          target.position.set(...gizmoFramePosition([snap.x, snap.y, snap.z]));
           snapApplied = true;
         }
       }
@@ -170,7 +168,7 @@ export function TransformGizmo({
       }
       if (mode === 'scale') target.scale.set(1, 1, 1);
     },
-    [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, renderOrigin, showIndicator],
+    [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, showIndicator],
   );
 
   useEffect(() => {
@@ -181,9 +179,9 @@ export function TransformGizmo({
   }, [handleDraggingChanged]);
 
   // Generated building geometry is edited through its element (Building panel), not the gizmo.
-  if (!entity || editingCage || onLockedLayer || entity.tags?.includes('bim') === true) return null;
+  if (!entity || editingCage || editingFaces || onLockedLayer || entity.tags?.includes('bim') === true) return null;
 
-  const [x, y, z] = toRenderPosition(entity.position, renderOrigin);
+  const [x, y, z] = gizmoFramePosition(entity.position);
 
   return (
     <>

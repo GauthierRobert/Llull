@@ -18,8 +18,9 @@ export function useCagePreview(): void {
     );
     const unsubscribe = useDirectEditStore.subscribe((state, previous) => {
       if (state.gesture === previous.gesture) return;
-      // Loop cuts have no drag: their hover preview is drawn from the topology, and the commit is a click.
-      if (state.gesture === null || state.gesture.kind === 'loop_cut' || state.entityId === null) return;
+      // A loop cut without a dragged factor has no ghost: its hover line is drawn from the topology and the commit is a click.
+      if (state.gesture === null || (state.gesture.kind === 'loop_cut' && state.gesture.factor === undefined) || state.entityId === null)
+        return;
       const { entityId, gesture, selection, falloff } = state;
       frames.schedule(() => {
         if (useDirectEditStore.getState().gesture !== gesture) return;

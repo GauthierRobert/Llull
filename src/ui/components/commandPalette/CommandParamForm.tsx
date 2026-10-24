@@ -8,7 +8,8 @@ import { usePreviewStore } from '@ui/store/previewStore';
 import { isPreviewable } from '@ui/preview/previewable';
 import { usePreviewController } from '@ui/preview/usePreviewController';
 import { Icon } from '@ui/components/Icon';
-import { fieldsFromSchema, humanizeName, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
+import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
+import { visibleFields } from './fieldVisibility';
 import type { FormField, FormValues } from './paramForm';
 
 interface CommandParamFormProps {
@@ -128,10 +129,14 @@ export function CommandParamForm({
   statusMessage = null,
   preview = false,
 }: CommandParamFormProps): React.ReactElement {
-  const fields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
+  const allFields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
   const [values, setValues] = useState<FormValues>(() =>
-    initialParams === undefined ? initialValues(fields, useStore.getState().document.selection) : valuesFromParams(fields, initialParams),
+    initialParams === undefined
+      ? initialValues(allFields, useStore.getState().document.selection)
+      : valuesFromParams(allFields, initialParams),
   );
+  // Only the fields that apply to the chosen operation are shown, parsed and submitted (fieldVisibility).
+  const fields = useMemo(() => visibleFields(command.name, allFields, values), [command.name, allFields, values]);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
   const previewing = preview && isPreviewable(command, fields);
@@ -160,7 +165,7 @@ export function CommandParamForm({
   return (
     <form
       className="palette-form"
-      aria-label={`${humanizeName(command.name)} parameters`}
+      aria-label={`${commandLabel(command.name)} parameters`}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -181,7 +186,7 @@ export function CommandParamForm({
           <Icon name="arrowLeft" size={14} />
         </button>
         <div className="palette-form__heading">
-          <h3 className="palette-form__title">{humanizeName(command.name)}</h3>
+          <h3 className="palette-form__title">{commandLabel(command.name)}</h3>
           <p className="palette-form__desc" title={command.description}>
             {command.description}
           </p>
