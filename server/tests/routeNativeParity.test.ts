@@ -50,7 +50,7 @@ function hostOf(start: CadDocument, beforeCommit?: (doc: CadDocument) => CadDocu
     doc: () => doc,
     getDoc: () => doc,
     applyCommand: (name, params) => {
-      if (name === 'auto_route_pipe' && beforeCommit !== undefined) doc = beforeCommit(doc);
+      if ((name === 'auto_route_pipe' || name === 'auto_route_lines') && beforeCommit !== undefined) doc = beforeCommit(doc);
       const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
       if (result.rejected !== true) doc = result.document;
       return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
@@ -248,17 +248,47 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       const kept = routeData(
         await runAutoRoute({ lines, common, maxAttempts: 1, partial: true }, { timeoutS: 60 }, partialHost, nativeDeps()),
       );
-      expect(kept).toMatchObject({ routed: 1, failed: 1, complete: false });
+      expect(kept).toMatchObject({ routed: 1, failed: 0, complete: true });
       expect(partialHost.doc().plant?.piping?.runOrder).toHaveLength(1);
       const inProcess = must(doc, 'auto_route_lines', { lines, common, maxAttempts: 1, partial: true }).document.plant?.piping?.runOrder;
       expect(partialHost.doc().plant?.piping?.runOrder, 'ids do not shift when a line is left out').toEqual(inProcess);
       expect((kept['native'] as Json)['notRouted']).toEqual([expect.objectContaining({ code: 'RTE_AUTOROUTE_NO_PATH' })]);
       const bad = await runAutoRoute({ lines, common, maxAttempts: 99 }, { timeoutS: 60 }, hostOf(doc), nativeDeps());
       expect(bad.summary).toContain('RTE_AUTOROUTE_LINES_INVALID');
-      const late = await runAutoRoute({ lines, common, transactionTimeoutS: 1 }, { timeoutS: 60 }, hostOf(doc), nativeDeps());
-      expect(late.isError === true ? late.summary : 'routed in time').toMatch(/NATIVE_TIMEOUT|routed in time/);
     },
   );
+
+  native('several lines: a document changed during the plan is refused as a whole, even with partial (nothing committed)', async () => {
+    const { doc, lines, common } = wallScene();
+    const changed = (current: CadDocument): CadDocument =>
+      must(current, 'add_box', { position: [2000, 0, 0], size: [200, 200, 200] }).document;
+    for (const partial of [false, true]) {
+      const host = hostOf(doc, changed);
+      const result = await runAutoRoute({ lines, common, partial }, { timeoutS: 60 }, host, nativeDeps());
+      expect(result.isError, `partial ${partial}`).toBe(true);
+      expect(result.summary).toContain('RTE_AUTOROUTE_LINES_FAILED');
+      expect(host.doc().plant?.piping?.runOrder).toEqual([]);
+    }
+  });
+
+  native('several lines: the whole plan has a deadline; past it NATIVE_TIMEOUT and the document is untouched', async () => {
+    const { doc, lines, common } = wallScene();
+    const real = createComputeRunner({}, BINARY);
+    // Each native job takes 2.2 s more than it did: the 2 s transaction window is gone before the second line.
+    const slow: NativeDeps['runner'] = {
+      ...real,
+      run: async (...args: Parameters<typeof real.run>) => {
+        const finished = await real.run(...args);
+        await new Promise((resolve) => setTimeout(resolve, 2200));
+        return finished;
+      },
+    };
+    const host = hostOf(doc);
+    const result = await runAutoRoute({ lines, common, transactionTimeoutS: 2 }, { timeoutS: 60 }, host, { store, runner: slow });
+    expect(result.isError).toBe(true);
+    expect(result.summary).toContain('NATIVE_TIMEOUT');
+    expect(host.doc()).toBe(doc);
+  });
 
   native('a solution made stale by a document change is refused and nothing is committed', async () => {
     const { doc, params } = SC_RTE_08();

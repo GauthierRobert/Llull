@@ -119,7 +119,7 @@ export const autoRouteLines = defineCommand({
     'Route several pipe lines automatically in one transaction, in an automatic order, each routed run an obstacle for the next. order auto (default): ' +
     'DN descending, then straight-line distance descending, then request position; when a line cannot be routed because earlier lines are in the way, the first line ' +
     'that fails is promoted to the front and the pass is repeated, up to maxAttempts passes (default 4, at most 12). order given: exactly the request order (or only the lines of sequence, in that order; run ids still follow the request position), one pass (the ' +
-    'native transport uses it with solutions, one per line, each validated against the problem of its turn). Default all-or-nothing: if any line cannot be routed in ' +
+    'native transport uses it with solutions, one per line, each validated against the problem of its turn). With sequence the lines left out are skipped by request and do not count: all-or-nothing is about the sequenced lines. Default all-or-nothing: if any line cannot be routed in ' +
     'any tried order nothing changes and RTE_AUTOROUTE_LINES_FAILED names every line and why; partial: true keeps the lines that routed (the pass that routed most) and ' +
     'reports the others. Each line is routed as auto_route_pipe does (spec fittings, clash-body obstacles, rack elevations) and becomes an ordinary run. ' +
     'data = { order (routing order of the committed pass), attempts: [{ order, routed, lines }], lines: [{ lineId, status routed|failed|skipped, runId, bends, ' +
@@ -201,7 +201,9 @@ export const autoRouteLines = defineCommand({
       sequence,
     });
     const { best } = transaction;
-    const failed = best.outcomes.filter((outcome) => outcome.status !== 'routed');
+    // Lines left out of the sequence are skipped by request: neither routed nor failed.
+    const asked = sequence ?? params.lines.map((line) => line.lineId);
+    const failed = best.outcomes.filter((outcome) => outcome.status !== 'routed' && asked.includes(outcome.lineId));
     const data = {
       order: best.order,
       attempts: transaction.attempts.map(attemptData),
@@ -220,7 +222,7 @@ export const autoRouteLines = defineCommand({
         doc,
         'auto_route_lines',
         'RTE_AUTOROUTE_LINES_FAILED',
-        `${failed.length} of ${entries.length} line(s) not routed after ${transaction.attempts.length} pass(es): ${failed.map(detail).join('; ')}`,
+        `${failed.length} of ${asked.length} line(s) not routed after ${transaction.attempts.length} pass(es): ${failed.map(detail).join('; ')}`,
         failed.map((outcome) => outcome.lineId),
         [path],
         data,
@@ -231,7 +233,7 @@ export const autoRouteLines = defineCommand({
     return {
       ...changed(
         best.document,
-        `auto_route_lines: routed ${best.routed} of ${entries.length} line(s) in order ${best.order.join(', ')} (${passNote})` +
+        `auto_route_lines: routed ${best.routed} of ${asked.length} line(s) in order ${best.order.join(', ')} (${passNote})` +
           (failed.length > 0 ? `; not routed: ${failed.map(detail).join('; ')}` : '') +
           `: ${best.outcomes.flatMap((o) => (o.solution === undefined ? [] : [`${o.runId} ${o.solution.bends} bend(s) ${o.solution.lengthMm} mm`])).join(', ')}.`,
         affected,

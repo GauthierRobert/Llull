@@ -15,6 +15,8 @@ import { isRecord } from '@lib/isRecord';
 import type { NativeDeps } from './fatigueField';
 
 const TOOL = 'auto_route';
+/** Wall-clock limit of one native line, seconds. */
+export const DEFAULT_AUTO_ROUTE_TIMEOUT_S = 60;
 const DEFAULT_ATTEMPTS = 4;
 /** Wall-clock limit of a whole multi-line plan, seconds (each line also has its own `timeoutS`, cut to what is left). */
 const DEFAULT_LINES_TIMEOUT_S = 600;
@@ -124,7 +126,7 @@ export async function runAutoRouteLines(
         );
       const routed = await routeLine(
         { ...common, ...line },
-        { ...options, timeoutS: Math.min(options.timeoutS ?? left, left) },
+        { ...options, timeoutS: Math.min(options.timeoutS ?? DEFAULT_AUTO_ROUTE_TIMEOUT_S, left) },
         scratch,
         deps,
       );
@@ -163,7 +165,8 @@ export async function runAutoRouteLines(
     common,
     order: 'given',
     sequence: best.planned.map((entry) => entry.line['lineId']),
-    partial,
+    // Always all-or-nothing over the planned lines: a document that changed during the plan is refused as a whole.
+    partial: false,
   });
   return {
     summary: `${TOOL}: ${lines.length} line(s) planned with llull-compute route in ${passes.length} pass(es). ${committed.summary}`,

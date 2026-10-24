@@ -150,7 +150,18 @@ describe('auto_route_lines: automatic order and retry', () => {
     ]);
     expect(result.affected).toHaveLength(1);
     expect(result.affected[0]).toMatch(/.2$/);
-    expectRefusal(s.doc, 'auto_route_lines', { ...params(s), order: 'given', sequence: [s.y] }, 'RTE_AUTOROUTE_LINES_FAILED');
+    // Lines left out of the sequence do not count: without partial the sequenced line alone is the whole transaction.
+    const alone = ok(s.doc, 'auto_route_lines', { ...params(s), order: 'given', sequence: [s.y] }).data as LinesData;
+    expect(alone).toMatchObject({ routed: 1, failed: 0, complete: true });
+    expect(alone.lines.map((line) => line.status)).toEqual(['routed', 'skipped']);
+    // A sequenced line that fails is a failure again.
+    expectRefusal(
+      s.doc,
+      'auto_route_lines',
+      { ...params(s), order: 'given', sequence: [s.x, s.y] },
+      'RTE_AUTOROUTE_LINES_FAILED',
+      'lines.1',
+    );
     expectRefusal(s.doc, 'auto_route_lines', { ...params(s), sequence: [s.y] }, 'RTE_AUTOROUTE_LINES_INVALID', 'sequence');
     expectRefusal(
       s.doc,

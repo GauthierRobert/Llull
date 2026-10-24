@@ -141,6 +141,8 @@ export function routeTransaction(doc: CadDocument, entries: readonly LineEntry[]
   const promoted: string[] = [];
   const tried = new Set<string>();
   const limit = options.order === 'given' ? 1 : options.maxAttempts;
+  // Lines left out of an explicit sequence are not part of the transaction: completeness is about the lines asked for.
+  const wanted = options.order === 'given' && options.sequence !== undefined ? options.sequence.length : entries.length;
   while (attempts.length < limit) {
     const order = options.order === 'given' ? givenOrder(requests, options.sequence) : routingOrder(doc, requests, promoted);
     const key = order.join(',');
@@ -148,12 +150,12 @@ export function routeTransaction(doc: CadDocument, entries: readonly LineEntry[]
     tried.add(key);
     const pass = runPass(doc, entries, order, options.partial);
     attempts.push(pass);
-    if (pass.routed === entries.length) break;
+    if (pass.routed === wanted) break;
     const firstFailure = pass.outcomes.findIndex((outcome) => outcome.status === 'failed');
     const failed = pass.outcomes[firstFailure];
     if (failed === undefined || !pass.outcomes.slice(0, firstFailure).some((outcome) => outcome.status === 'routed')) break;
     promoted.unshift(failed.lineId);
   }
   const best = attempts.reduce((top, pass) => (pass.routed > top.routed ? pass : top), attempts[0] as Attempt);
-  return { attempts, best, complete: best.routed === entries.length };
+  return { attempts, best, complete: best.routed === wanted };
 }

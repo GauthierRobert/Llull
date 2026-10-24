@@ -12,10 +12,10 @@ import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type JobRun } from './computeJob';
 import { nativeInstallHint } from './nativeBinary';
 import type { NativeDeps } from './fatigueField';
-import { runAutoRouteLines } from './autoRouteLines';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, runAutoRouteLines } from './autoRouteLines';
 
 const TOOL = 'auto_route';
-export const DEFAULT_AUTO_ROUTE_TIMEOUT_S = 60;
+export { DEFAULT_AUTO_ROUTE_TIMEOUT_S };
 /** 02 RTE §8 native budget (expansions); `maxExpansions` may raise it. */
 export const NATIVE_MAX_EXPANSIONS = 2_000_000;
 /** Ceiling of `maxExpansions`, per first-move candidate (memory guard: ~7.4e6 expansions took 37 s and a few hundred MB on the development laptop). */
@@ -148,7 +148,7 @@ export async function runAutoRoute(
   if (result.status === 'budget')
     return failure(
       'RTE_AUTOROUTE_BUDGET',
-      `no route within ${result.expansions} expansions; raise maxExpansions or use a coarser grid`,
+      `no route within ${result.expansions} expansions; each first-move candidate had min(${maxExpansions}, ${NATIVE_TOTAL_EXPANSIONS_CEILING} / candidates): raise maxExpansions (ceiling ${NATIVE_EXPANSIONS_CEILING}) or use a coarser grid`,
       lineId,
     );
   const solution = {
