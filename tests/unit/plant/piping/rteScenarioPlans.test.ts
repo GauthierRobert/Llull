@@ -141,6 +141,7 @@ describe.each([
   'sc-rte-03-header-branches.json',
   'sc-rte-04-gravity-drain-slope.json',
   'sc-rte-05-routing-refusals.json',
+  'sc-rte-06-move-with-connected.json',
   'sc-rte-07-insulated-hot-line.json',
   'sc-rte-08-auto-route-v2.json',
   'sc-rte-09-legacy-pipe-run-conversion.json',

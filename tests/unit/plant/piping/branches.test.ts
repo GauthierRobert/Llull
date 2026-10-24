@@ -571,7 +571,7 @@ describe('a branch hangs on its header: the header broken breaks the branch (and
   const base = routedPumpToVesselWithTee();
 
   it('moving the vessel nozzle breaks the header with RTE_STRETCH_FAILED and the tee branch with the header code, parts removed', () => {
-    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1200 });
+    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 4200 });
     const header = piping(broken).runs[base.runId] as PipeRun;
     const branch = piping(broken).runs[base.branchRunId] as PipeRun;
     expect(header.broken?.code).toBe('RTE_STRETCH_FAILED');
@@ -588,7 +588,7 @@ describe('a branch hangs on its header: the header broken breaks the branch (and
   });
 
   it('putting the nozzle back re-derives the header and the branch with their entities', () => {
-    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1200 });
+    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 4200 });
     const back = apply(broken, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1000 });
     for (const id of [base.runId, base.branchRunId]) {
       expect((piping(back).runs[id] as PipeRun).broken).toBeUndefined();

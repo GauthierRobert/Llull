@@ -67,6 +67,56 @@ export const pipingPlans: Record<string, GoldenAction[]> = {
     },
     { command: 'piping_takeoff', params: { runId: '$run' } },
   ],
+  // SC-RTE-04: DN50 gravity drain, 1 % fall over 8000 mm plan length, then down to the hub (slope, standard elbow at 89.427 deg, no adverse slope).
+  piping_gravity_drain: [
+    ...IMPORTS,
+    tie('TP-D1', [0, 0, 1000], [1, 0, 0], 50, 'd1'),
+    tie('TP-D2', [8000, 0, 0], [0, 0, 1], 50, 'd2'),
+    { command: 'create_pipeline', params: { service: 'D', sequence: '3001', spec: 'CS150', dn: 50 }, as: 'line' },
+    {
+      command: 'route_pipe',
+      params: {
+        lineId: '$line',
+        from: { portId: '$d1' },
+        to: { portId: '$d2' },
+        legs: [{ direction: '+X', planLength: 8000, slope: { value: 1, unit: 'percent', fall: true } }],
+      },
+      as: 'run',
+    },
+    { command: 'check_piping', params: { lineIds: ['$line'] } },
+    { command: 'piping_takeoff', params: { runId: '$run' } },
+  ],
+  // SC-RTE-06: the vessel moves +500 X then +500 Y; the run is stretched orthogonally (replay re-derives the same entities).
+  piping_move_with_connected: [
+    ...(plans['piping_pump_to_vessel'] as GoldenAction[]).slice(0, -1),
+    { command: 'update_equipment_parameters', params: { equipment: 'V-101', set: { location: [7500, 3000] } } },
+    { command: 'update_equipment_parameters', params: { equipment: 'V-101', set: { location: [7500, 3500] } } },
+    { command: 'edit_route', params: { runId: '$run', op: 'stretch_leg', index: 2, length: 3500 } },
+    { command: 'piping_takeoff', params: { runId: '$run' } },
+  ],
+  // SC-RTE-07 (up to the clash check): DN80 hot line, insulation H from the spec table (50 mm), a beam that clears the bare pipe but not the insulation.
+  piping_insulated_line: [
+    ...IMPORTS,
+    tie('TP-H1', [0, 0, 3000], [1, 0, 0], 80, 'h1'),
+    tie('TP-H2', [6000, 0, 3000], [-1, 0, 0], 80, 'h2'),
+    {
+      command: 'create_pipeline',
+      params: {
+        service: 'HO',
+        sequence: '4001',
+        spec: 'CS150',
+        dn: 80,
+        designTempC: 180,
+        insulation: { code: 'H', thickness: 'fromSpec' },
+      },
+      as: 'line',
+    },
+    { command: 'route_pipe', params: { lineId: '$line', from: { portId: '$h1' }, to: { portId: '$h2' } }, as: 'run' },
+    { command: 'add_steel_member', params: { role: 'beam', start: [3000, -1000, 2830], end: [3000, 1000, 2830], profile: 'IPE200' } },
+    { command: 'check_clashes', params: {} },
+    { command: 'set_piping_settings', params: { lineNumberTemplate: '{service}-{sequence}-{dn}' } },
+    { command: 'piping_takeoff', params: { runId: '$run' } },
+  ],
   // SC-RTE-09: a legacy add_pipe_run polyline becomes a spec-driven run (the legacy pipe is replaced).
   piping_legacy_conversion: [
     ...IMPORTS,

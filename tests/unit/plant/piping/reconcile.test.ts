@@ -57,12 +57,12 @@ describe('reconcile after an equipment / nozzle edit', () => {
     expect(back.summary).toContain('piping: re-derived 1 run(s).');
   });
 
-  it('moving the equipment moves the port away from the routed end: RTE_STRETCH_FAILED (stretch is 02 M3), moving back repairs it', () => {
+  it('a move the legs cannot follow breaks the run with RTE_STRETCH_FAILED (leg 2 would vanish), moving back repairs it', () => {
     const vessel = equipmentId(s.doc, 'P-101');
-    const moved = ok(s.doc, 'update_equipment', { elementId: vessel, location: [100, -300] });
+    const moved = ok(s.doc, 'update_equipment', { elementId: vessel, location: [3500, -300] });
     const broken = (piping(moved.document).runs[s.runId] as PipeRun).broken;
     expect(broken?.code).toBe('RTE_STRETCH_FAILED');
-    expect(broken?.reason).toContain('P-101:N2');
+    expect(broken?.reason).toContain('leg 2');
     expect(moved.summary).toContain('RTE_STRETCH_FAILED');
     const back = apply(moved.document, 'update_equipment', { elementId: vessel, location: [0, -300] });
     expect((piping(back).runs[s.runId] as PipeRun).broken).toBeUndefined();
@@ -134,7 +134,7 @@ describe('reconcile after a spec, catalogue, line or tie-in edit', () => {
       ...routed,
       plant: {
         ...routed.plant,
-        piping: { ...model, tieIns: { ...model.tieIns, [a.id]: { ...tie, port: { ...tie.port, position: [10, 0, 0] } } } },
+        piping: { ...model, tieIns: { ...model.tieIns, [a.id]: { ...tie, port: { ...tie.port, position: [3000, 0, 0] } } } },
       },
     };
     const tieResult = pipingDocument.reconcile?.(routed, movedTie);

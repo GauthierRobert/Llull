@@ -41,7 +41,13 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_CLOSING_LEG_IMPOSSIBLE:
     'Add legs until the remaining offset (detail.offset) is along the target port axis, then the closing leg is added automatically.',
   RTE_STRETCH_FAILED:
-    'The port moved away from the routed end (equipment or tie-in edit): delete_pipe_run and route_pipe again; orthogonal stretch comes with 02 M3. The run is marked broken and its parts are not drawn.',
+    'The legs cannot follow the move orthogonally (the part no leg is parallel to is named, or a leg / component would vanish): move the equipment back, re-route the run with edit_route (its ends then follow their ports), or delete_pipe_run and route_pipe again. A broken run is kept as routed and its parts are not drawn.',
+  RTE_SLOPE_INVALID:
+    'Give planLength (horizontal length, > 0) and slope { value > 0 and at most 45 degrees (100 %), unit percent | ratio | deg, fall } on a leg with a horizontal direction; omit length.',
+  RTE_EDIT_INVALID:
+    'Check the op parameters: move_pi needs delta or point, stretch_leg a length, insert_pi points, delete_pi an index and count within run.pis; move an inline component or branch off a leg the edit removes first.',
+  RTE_TEMPLATE_INVALID:
+    'Use only {dn} {service} {sequence} {spec} {insulationCode} {insulationThickness}, each at most once, keep {sequence}, and write optional parts as [...] without nesting.',
   RTE_SIZE_MISMATCH:
     'Route between ports of the line size (create a line of the port DN), or put a reducer in the run: pass inline [{ type: "reducerConcentric", dn2 }] to route_pipe, or insert_inline_component a reducer whose dn2 is the size the end port has.',
   RTE_RATING_MISMATCH: 'Use a spec whose flange rating equals the port rating (CL150, PN16 ...), or fix the nozzle / tie-in rating.',

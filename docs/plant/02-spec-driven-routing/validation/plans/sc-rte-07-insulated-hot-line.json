@@ -1,14 +1,14 @@
 {
   "id": "SC-RTE-07",
-  "status": "BLOCKED (02 RTE M3 / V1): insulation from the spec table and the insulated clash envelope (M3), line_heat_loss (V1). Steps 0-3 (imports, tie-ins) run in M1; create_pipeline with insulation \"fromSpec\" (insulation table in the spec) and route_pipe follow.",
+  "status": "RUNNABLE up to step 7 (02 RTE M3): insulation from the spec table, the envelope in route_pipe, the insulation clash in check_clashes. Step 8 line_heat_loss is 02 V1 (TECHNICAL_SPEC section 10): the command is not built, the row stays and the harness skips it (unbuilt + blockedFrom).",
   "unbuilt": ["line_heat_loss"],
-  "blockedFrom": 4,
+  "blockedFrom": 8,
   "harness": {
     "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
     "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
   },
   "validates": ["VC-RTE-13", "VC-RTE-14"],
-  "description": "DN80 hot line (design 180 C) with insulation code H taken from the spec thickness table (DN <= 100, T <= 200 C -> 50 mm mineral wool). A steel beam is placed so that it clears the bare pipe (OD 88.9) but not the insulation (OD 188.9). Heat loss per metre is compared with the ht 1.2.0 reference example (same inputs).",
+  "description": "DN80 hot line (design 180 C) with insulation code H taken from the spec thickness table (DN <= 100, T <= 200 C -> 50 mm mineral wool). A steel beam is placed so that it clears the bare pipe (OD 88.9) but not the insulation (OD 188.9). Heat loss per metre is compared with the ht 1.2.0 reference example (same inputs, V1).",
   "units": "mm",
   "actions": [
     { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
@@ -57,30 +57,43 @@
     {
       "step": 4,
       "path": "data.insulation",
-      "value": { "code": "H", "thicknessMm": 50, "source": "spec CS150 insulation table row dnMax 100 / tempMax 200" }
+      "value": { "code": "H", "thicknessMm": 50, "material": "mineral wool", "source": "spec", "row": "H dn<=100 T<=200C" },
+      "source": "spec CS150 insulation table: code H, dnMax 100, tempMaxC 200 -> 50 mm (80 <= 100, 180 <= 200; the tighter row 100 C does not cover 180 C, the 150 / 200 row is looser)"
     },
     { "step": 4, "path": "data.lineNumber", "value": "80-HO-4001-CS150-H50" },
+    { "step": 4, "path": "data.envelopeDiameterMm", "value": 188.9, "abs": 1e-9, "source": "88.9 + 2 x 50" },
     { "step": 5, "path": "data.envelopeDiameterMm", "value": 188.9, "abs": 1e-9, "source": "88.9 + 2 x 50" },
     {
       "step": 7,
       "path": "data.clashes[?kind=='insulation'].length",
       "value": 1,
-      "depthMm": 24.45,
+      "source": "one beam against one insulated line: the closest pipe piece"
+    },
+    {
+      "step": 7,
+      "path": "data.clashes[?kind=='insulation'].depth",
+      "value": [24.45],
       "abs": 0.5,
-      "source": "beam axis assumed at the section centroid: top = 2830 + 100 (IPE200 half depth) = 2930; insulation bottom 3000 - 94.45 = 2905.55 < 2930 < bare-pipe bottom 3000 - 44.45 = 2955.55, so the beam clears the bare pipe (25.55 mm) but penetrates the insulation by 24.45 mm"
+      "source": "beam axis at the section centroid: top = 2830 + 100 (IPE200 half depth) = 2930; insulation bottom 3000 - 94.45 = 2905.55 < 2930 < bare-pipe bottom 3000 - 44.45 = 2955.55, so the beam clears the bare pipe (25.55 mm) but penetrates the insulation by 24.45 mm"
+    },
+    {
+      "step": 7,
+      "path": "data.clashes[?kind=='hard'].length",
+      "value": 0,
+      "source": "the beam top 2930 is below the bare pipe bottom 2955.55"
     },
     {
       "step": 8,
       "path": "data.heatLossWPerM",
       "value": 73.12,
       "rel": 0.0001,
-      "source": "data/insulation_heat_loss.json (ht 1.2.0 example + own closed form)"
+      "source": "data/insulation_heat_loss.json (ht 1.2.0 example + own closed form); V1"
     },
     {
       "step": 8,
       "path": "data.reviewRequired",
       "value": true,
-      "source": "AF-33: energy / personnel-protection decisions need a qualified reviewer"
+      "source": "AF-33: energy / personnel-protection decisions need a qualified reviewer; V1"
     }
   ]
 }

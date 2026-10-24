@@ -40,6 +40,23 @@ export type PortRef =
   | { readonly kind: 'runEnd'; readonly runId: string; readonly end: 'start' | 'end' }
   | { readonly kind: 'branch'; readonly runId: string; readonly branchId: string };
 
+/** A declared slope: `value` in `unit` (percent of the plan length, ratio = drop / run, or degrees), `fall` = the pipe descends along the flow. */
+export interface Slope {
+  readonly value: number;
+  readonly unit: 'percent' | 'ratio' | 'deg';
+  readonly fall: boolean;
+}
+
+/** Insulation of a line: thickness from the spec's insulation table (`source: 'spec'`, the table row is named) or given explicitly. */
+export interface LineInsulation {
+  readonly code: string;
+  readonly thicknessMm: number;
+  readonly material?: string;
+  readonly source: 'spec' | 'explicit';
+  /** `spec` source: which table row gave the thickness (`H dn<=100 T<=200C`). */
+  readonly row?: string;
+}
+
 export interface PipeLine {
   readonly id: string;
   /** Explicit or from the template `{dn}-{service}-{sequence}-{spec}[-{insulationCode}{thickness}]`; unique. */
@@ -51,7 +68,9 @@ export interface PipeLine {
   readonly dn: number;
   readonly designPressureBarG?: number;
   readonly designTempC?: number;
-  readonly insulation?: { readonly code: string; readonly thicknessMm: number };
+  readonly insulation?: LineInsulation;
+  /** Declared slope of the whole line (a gravity drain): `check_piping` reports legs that rise against it (RTE_ADVERSE_SLOPE) and low / high points (RTE_POCKET). */
+  readonly slope?: Slope;
   readonly from?: string;
   readonly to?: string;
 }
@@ -114,17 +133,27 @@ export interface PipeRun {
   readonly end: RunEnd;
   /** Interior points of intersection; legs = [start, ...pis, end]. */
   readonly pis: readonly Vec3[];
+  /** Slope declared per leg (index = leg, null = none); absent = no leg declared one. Kept in step with `pis` by `edit_route`. */
+  readonly legSlopes?: ReadonlyArray<Slope | null>;
   /** Overrides the spec's elbow-angle tolerance (degrees) for this run; named in results. */
   readonly angleToleranceDeg?: number;
   /**
    * Set when the run no longer derives (a port was moved or removed, a nozzle was resized, ...): its display entities are dropped until a
-   * command makes it derivable again. `piping_takeoff` lists such runs; orthogonal stretch (02 M3) will build on it.
+   * command makes it derivable again. `piping_takeoff` lists such runs. A moved port is first followed by orthogonal stretch (02 M3);
+   * `RTE_STRETCH_FAILED` is the mark when the stretch is not possible.
    */
   readonly broken?: { readonly code: string; readonly reason: string };
   readonly autoRoute?: AutoRouteRecord;
 }
 
+/** Project settings of the piping plugin (`set_piping_settings`). */
+export interface PipingSettings {
+  /** Line-number template, e.g. `{dn}-{service}-{sequence}-{spec}[-{insulationCode}{insulationThickness}]`; absent = the default (02 RTE §5.9). */
+  readonly lineNumberTemplate?: string;
+}
+
 export interface PipingModel {
+  readonly settings?: PipingSettings;
   readonly tieIns: Readonly<Record<string, TieInPoint>>;
   readonly tieInOrder: readonly string[];
   readonly lines: Readonly<Record<string, PipeLine>>;

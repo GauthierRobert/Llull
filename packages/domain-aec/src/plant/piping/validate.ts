@@ -1,6 +1,8 @@
 /** Value errors of a raw `plant.piping` record (persistence refuses a file whose errors are non-empty). */
 
 import { isRecord } from '@lib/isRecord';
+import { templateProblem } from './lineNumber';
+import { validSlope } from './slope';
 
 const isVec3 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'number' && Number.isFinite(v));
@@ -50,6 +52,41 @@ const entityIdErrors = (raw: Record<string, unknown>): string[] => {
   );
 };
 
+const isSlope = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value['value'] === 'number' &&
+  (value['unit'] === 'percent' || value['unit'] === 'ratio' || value['unit'] === 'deg') &&
+  typeof value['fall'] === 'boolean' &&
+  validSlope({ value: value['value'], unit: value['unit'] });
+
+/** Errors of the M3 members of a line (declared slope, insulation record) and of the project settings. */
+function lineErrors(id: string, line: Record<string, unknown>): string[] {
+  const path = `plant.piping.lines.${id}`;
+  const insulation = line['insulation'];
+  return [
+    ...(line['slope'] === undefined || isSlope(line['slope'])
+      ? []
+      : [`${path}.slope must be { value > 0 (at most 45 degrees), unit, fall }`]),
+    ...(insulation === undefined ||
+    (isRecord(insulation) &&
+      typeof insulation['code'] === 'string' &&
+      isPositive(insulation['thicknessMm']) &&
+      (insulation['source'] === 'spec' || insulation['source'] === 'explicit'))
+      ? []
+      : [`${path}.insulation must be { code, thicknessMm > 0, source: "spec" | "explicit" }`]),
+  ];
+}
+
+function settingsErrors(raw: Record<string, unknown>): string[] {
+  const settings = raw['settings'];
+  if (settings === undefined) return [];
+  if (!isRecord(settings)) return ['plant.piping.settings must be an object'];
+  const template = settings['lineNumberTemplate'];
+  if (template === undefined) return [];
+  const problem = typeof template === 'string' ? templateProblem(template) : 'must be a string';
+  return problem === null ? [] : [`plant.piping.settings.lineNumberTemplate: ${problem}`];
+}
+
 const isPositive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
 /** Errors of the M2 members of a run: its own size, the inline components and the branch points. */
@@ -71,6 +108,15 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
         (item['stemDirection'] === undefined || isVec3(item['stemDirection']));
       if (!ok) errors.push(`${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance`);
     });
+  const slopes = run['legSlopes'];
+  const pis = run['pis'];
+  if (
+    slopes !== undefined &&
+    (!Array.isArray(slopes) ||
+      !slopes.every((slope: unknown) => slope === null || isSlope(slope)) ||
+      (Array.isArray(pis) && slopes.length !== pis.length + 1))
+  )
+    errors.push(`${path}.legSlopes must list one slope or null per leg (pis + 1 entries)`);
   const branches = run['branches'];
   if (branches !== undefined && !Array.isArray(branches)) errors.push(`${path}.branches must be a list`);
   else
@@ -122,9 +168,10 @@ export function pipingErrors(raw: unknown): string[] {
     }),
     ...tableErrors(raw, 'lines', 'lineOrder', (id, line) =>
       typeof line['lineNumber'] === 'string' && typeof line['spec'] === 'string' && typeof line['dn'] === 'number' && line['dn'] > 0
-        ? []
+        ? lineErrors(id, line)
         : [`plant.piping.lines.${id} needs a lineNumber, a spec and a positive dn`],
     ),
+    ...settingsErrors(raw),
     ...tableErrors(raw, 'runs', 'runOrder', (id, run) => [
       ...(typeof run['lineId'] === 'string' && run['lineId'] in lines ? [] : [`plant.piping.runs.${id}.lineId must name a line`]),
       ...endErrors(`plant.piping.runs.${id}.start`, run['start'], true),

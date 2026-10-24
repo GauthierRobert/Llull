@@ -132,6 +132,17 @@ const branchTableSchema = z
   .object({ system: z.enum(['NPS', 'DN']).optional(), cells: z.record(z.string(), z.record(z.string(), z.enum(BRANCH_FITTINGS))) })
   .catchall(z.unknown());
 
+const insulationRowSchema = z
+  .object({
+    code: z.string().min(1).describe('Insulation code written in the line number, e.g. "H".'),
+    dnMax: z.number().positive().describe('The row applies to lines up to this DN.'),
+    tempMaxC: z.number().describe('... and up to this design temperature, degC.'),
+    thicknessMm: z.number().positive().describe('Insulation thickness, mm.'),
+    material: z.string().min(1).describe('Insulation material, e.g. "mineral wool".'),
+    conductivityWmK: z.number().positive().optional(),
+  })
+  .strict();
+
 const fileSchema = z
   .object({
     format: z.literal(SPEC_FORMAT),
@@ -141,6 +152,7 @@ const fileSchema = z
     ...headerShape,
     components: z.array(componentSchema),
     branchTable: branchTableSchema.optional(),
+    insulation: z.array(insulationRowSchema).optional(),
     status: z.enum(SPEC_STATUSES).optional(),
     approval: z.object({ signer: z.string(), signatureId: z.string(), at: z.string() }).strict().optional(),
   })
@@ -304,6 +316,7 @@ export function parseSpecFile(raw: unknown): { readonly spec: PipeSpec } | { rea
       catalogs: data.catalogs,
       components: components as SpecComponent[],
       ...(table === undefined || table === null ? {} : { branchTable: table }),
+      ...(data.insulation === undefined ? {} : { insulation: data.insulation }),
       ...(data.elbowAngles === undefined ? {} : { elbowAngles: data.elbowAngles }),
       status: data.status ?? 'draft',
       ...(data.approval === undefined ? {} : { approval: data.approval }),
@@ -362,6 +375,7 @@ export function specToFile(spec: PipeSpec): Record<string, unknown> {
     catalogs: spec.catalogs,
     components: spec.components.map(componentToFile),
     ...(spec.branchTable === undefined ? {} : { branchTable: spec.branchTable }),
+    ...(spec.insulation === undefined ? {} : { insulation: spec.insulation }),
     ...(spec.elbowAngles === undefined ? {} : { elbowAngles: spec.elbowAngles }),
     status: spec.status,
     ...(spec.approval === undefined ? {} : { approval: spec.approval }),

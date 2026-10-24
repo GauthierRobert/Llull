@@ -21,6 +21,10 @@ export interface DerivedLeg {
   readonly end: Vec3;
   /** Cut lengths of the pipe pieces on this leg, in order. */
   readonly cutLengthsMm: readonly number[];
+  /** Sloped legs only (neither horizontal nor vertical): horizontal length, drop along the flow (positive = descends) and the angle below horizontal. */
+  readonly planLengthMm?: number;
+  readonly dropMm?: number;
+  readonly slopeDeg?: number;
 }
 
 export interface DerivedTurn {
@@ -34,6 +38,8 @@ export interface DerivedTurn {
   readonly centreToEnd: number;
   readonly radius: number;
   readonly catalogueKey: string;
+  /** Takeoff key of the elbow (`elbow90LR`). */
+  readonly typeKey: string;
 }
 
 export interface DerivationWarning {

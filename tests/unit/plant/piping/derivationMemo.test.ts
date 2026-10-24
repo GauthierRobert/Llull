@@ -40,6 +40,13 @@ describe('derivation memo keys', () => {
     ['line order', (d: CadDocument): CadDocument => ({ ...d, plant: { ...d.plant, piping: { ...piping(d), lineOrder: [] } } })],
     ['tie-in order', (d: CadDocument): CadDocument => ({ ...d, plant: { ...d.plant, piping: { ...piping(d), tieInOrder: [] } } })],
     ['entity-id table', (d: CadDocument): CadDocument => ({ ...d, plant: { ...d.plant, piping: { ...piping(d), entityIds: {} } } })],
+    [
+      'project settings (line-number template; M3)',
+      (d: CadDocument): CadDocument => ({
+        ...d,
+        plant: { ...d.plant, piping: { ...piping(d), settings: { lineNumberTemplate: '{sequence}' } } },
+      }),
+    ],
   ])('editing %s (not read by a derivation) is a hit on the same result', (_name, edit) => {
     expect(deriveRun(edit(s.doc), run)).toBe(first);
   });
@@ -52,6 +59,31 @@ describe('derivation memo keys', () => {
     const sameValueRun = { ...run };
     expect(deriveRun(s.doc, sameValueRun)).not.toBe(first);
     expect(deriveRun(s.doc, sameValueRun)).toEqual(first);
+  });
+
+  it('the M3 members that no derivation reads (line insulation, declared slope) change the lines slice: a miss with an equal result', () => {
+    const lines = piping(s.doc).lines;
+    const line = lines[s.line] as NonNullable<(typeof lines)[string]>;
+    const doc: CadDocument = {
+      ...s.doc,
+      plant: {
+        ...s.doc.plant,
+        piping: {
+          ...piping(s.doc),
+          lines: {
+            ...lines,
+            [s.line]: {
+              ...line,
+              insulation: { code: 'H', thicknessMm: 50, source: 'explicit' },
+              slope: { value: 1, unit: 'percent', fall: true },
+            },
+          },
+        },
+      },
+    };
+    const again = deriveRun(doc, run);
+    expect(again).not.toBe(first);
+    expect(again).toEqual(first);
   });
 
   it('editing the catalogue shows in the result: a 160 mm elbow centre-to-end leaves the first piece 1261 (1500 - 79 - 160)', () => {

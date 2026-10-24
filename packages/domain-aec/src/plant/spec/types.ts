@@ -57,6 +57,19 @@ export interface SpecComponent {
   readonly extra?: Readonly<Record<string, ExtraValue>>;
 }
 
+/** One row of the insulation thickness table (02 RTE §5.10): the thickness for lines of this code up to `dnMax` and `tempMaxC`. */
+export interface InsulationRow {
+  /** Insulation code written in the line number (`H` hot, `C` cold ...). */
+  readonly code: string;
+  /** The row applies to lines of nominal size DN up to this. */
+  readonly dnMax: number;
+  /** ... and design temperature up to this, degC. */
+  readonly tempMaxC: number;
+  readonly thicknessMm: number;
+  readonly material: string;
+  readonly conductivityWmK?: number | undefined;
+}
+
 export interface BranchTable {
   /** Size system of the cell keys (the system of the spec's size range). */
   readonly system: NominalSystem;
@@ -104,6 +117,8 @@ export interface PipeSpec {
   readonly catalogs: readonly string[];
   readonly components: readonly SpecComponent[];
   readonly branchTable?: BranchTable;
+  /** Insulation thickness table: a line asks for its thickness by code, size and design temperature (`create_pipeline` insulation "fromSpec"). */
+  readonly insulation?: readonly InsulationRow[];
   readonly elbowAngles?: ElbowAngles;
   readonly status: SpecStatus;
   readonly approval?: SpecApproval;

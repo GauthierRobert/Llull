@@ -1,33 +1,129 @@
 {
   "id": "SC-RTE-06",
-  "status": "BLOCKED (02 RTE M3): needs the orthogonal stretch on equipment / nozzle edits. Its prefix (SC-RTE-01 steps 0-7) and piping_takeoff run in M1.",
+  "status": "RUNNABLE (02 RTE M3): the orthogonal stretch on a nozzle move (section 5.7). Steps 0-7 are the SC-RTE-01 scene and route; steps 8-11 move the vessel and read the cut list.",
   "unbuilt": [],
   "validates": ["VC-RTE-12"],
-  "description": "Move the vessel V-101 (its nozzle follows, 03 EQP) and check the orthogonal stretch: a displacement is absorbed by the legs parallel to it, walking back from the moved port. +500 X is absorbed by the last leg (+X). +500 Y then crosses the +X and +Z legs (their PIs shift) and is absorbed by the +Y leg.",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "description": "Move the vessel V-101 (its nozzle follows, 03 EQP) and check the orthogonal stretch: a displacement is absorbed by the legs parallel to it, walking back from the moved port. +500 X is absorbed by the last leg (+X). +500 Y then crosses the +X and +Z legs (their PIs shift) and is absorbed by the +Y leg. The vessel is a parametric one, moved with update_equipment_parameters.",
   "units": "mm",
-  "prefixPlan": "sc-rte-01-pump-to-vessel.json#actions[0..7]",
   "actions": [
-    { "command": "update_equipment", "params": { "elementId": "$vessel", "location": [7500, 3000] } },
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 },
+      "as": "pump"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "P-101",
+        "mark": "N2",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "free", "position": [0, 300, 1000], "direction": [0, 0, 1] },
+        "projection": 300
+      },
+      "as": "pumpOut",
+      "note": "free location in the equipment frame (origin = plan location of P-101): world face centre (0, 0, 1000) facing +Z; the port is P-101:N2"
+    },
+    {
+      "command": "add_vessel",
+      "params": {
+        "tag": "V-101",
+        "name": "Feed drum",
+        "orientation": "vertical",
+        "location": [7000, 3000],
+        "insideDiameter": 1600,
+        "tangentLength": 4000,
+        "heads": { "top": { "type": "ellipsoidal", "ratio": 2 }, "bottom": { "type": "ellipsoidal", "ratio": 2 } },
+        "shellThickness": 10,
+        "headThickness": 10,
+        "corrosionAllowance": 3,
+        "support": { "type": "skirt", "height": 1000, "thickness": 10 },
+        "design": {
+          "pressure": { "value": 1, "unit": "MPa" },
+          "temperatureC": 150,
+          "material": "SA-516 Gr 70",
+          "allowableStress": { "value": 137.9, "unit": "MPa", "source": "user input" },
+          "jointEfficiency": { "shell": 1, "heads": 1 },
+          "materialDensityKgM3": 7850
+        }
+      },
+      "as": "vessel"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "V-101",
+        "mark": "N1",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "shell", "elevation": 3000, "orientationDeg": 270 },
+        "projection": 1000
+      },
+      "as": "vesselIn",
+      "note": "shell nozzle, orientation 270 deg (west, north_cw) at 1000 mm from the axis: world face centre (6000, 3000, 4000) facing -X; skirt 1000 + elevation 3000 = z 4000; the port is V-101:N1"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "P",
+        "sequence": "1001",
+        "spec": "CS150",
+        "dn": 100,
+        "from": "P-101:N2",
+        "to": "V-101:N1",
+        "designTempC": 60,
+        "designPressureBarG": 10
+      },
+      "as": "line"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "P-101:N2" },
+        "to": { "portId": "V-101:N1" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 3000 },
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 1500 }
+        ]
+      },
+      "as": "run"
+    },
+    { "command": "update_equipment_parameters", "params": { "equipment": "V-101", "set": { "location": [7500, 3000] } } },
     { "command": "piping_takeoff", "params": { "runId": "$run" } },
-    { "command": "update_equipment", "params": { "elementId": "$vessel", "location": [7500, 3500] } },
+    { "command": "update_equipment_parameters", "params": { "equipment": "V-101", "set": { "location": [7500, 3500] } } },
     { "command": "piping_takeoff", "params": { "runId": "$run" } }
   ],
   "expected": [
-    { "step": 0, "path": "summary", "contains": "re-routed 1 run" },
+    { "step": 8, "path": "summary", "contains": "re-routed 1 run" },
     {
-      "step": 1,
+      "step": 9,
       "path": "data.pipePieces[*].cutLengthMm",
       "value": [1269, 2696, 2696, 1196, 3269],
       "abs": 0.01,
-      "source": "last leg 3000 + 500"
+      "source": "last leg 3000 + 500 - 152 - 76 - 3 = 3269; the +500 X is absorbed by leg 4 (+X) alone"
     },
+    { "step": 9, "path": "data.legs[4].lengthMm", "value": 3500, "abs": 0.000001, "source": "3000 + 500" },
+    { "step": 10, "path": "summary", "contains": "re-routed 1 run" },
     {
-      "step": 3,
+      "step": 11,
       "path": "data.pipePieces[*].cutLengthMm",
       "value": [1269, 3196, 2696, 1196, 3269],
       "abs": 0.01,
-      "source": "+Y leg 3000 + 500 - 2 x 152; PI2, PI3, PI4 move +500 Y"
+      "source": "+Y leg 3000 + 500 - 2 x 152 = 3196; PI2, PI3, PI4 move +500 Y (legs 2, 3, 4 are perpendicular to Y); every other piece unchanged"
     },
-    { "step": 3, "path": "data.counts.elbow90LR", "value": 4, "source": "topology unchanged" }
+    { "step": 11, "path": "data.legs[1].lengthMm", "value": 3500, "abs": 0.000001, "source": "3000 + 500" },
+    { "step": 11, "path": "data.counts.elbow90LR", "value": 4, "source": "topology unchanged" },
+    { "step": 11, "path": "data.totalPipeMm", "value": 11626, "abs": 0.01, "source": "1269 + 3196 + 2696 + 1196 + 3269" }
   ]
 }

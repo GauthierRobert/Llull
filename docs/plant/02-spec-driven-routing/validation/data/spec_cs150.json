@@ -83,5 +83,10 @@
   ],
   "status": "draft",
   "provenance": { "author": "02 RTE validation pack", "accessed": "2026-10-24" },
-  "branchTable": { "system": "NPS", "cells": { "4": { "4": "T" }, "6": { "2": "W", "4": "RT", "6": "T" } } }
+  "branchTable": { "system": "NPS", "cells": { "4": { "4": "T" }, "6": { "2": "W", "4": "RT", "6": "T" } } },
+  "insulation": [
+    { "code": "H", "dnMax": 100, "tempMaxC": 100, "thicknessMm": 30, "material": "mineral wool", "conductivityWmK": 0.0598535265 },
+    { "code": "H", "dnMax": 100, "tempMaxC": 200, "thicknessMm": 50, "material": "mineral wool", "conductivityWmK": 0.0598535265 },
+    { "code": "H", "dnMax": 150, "tempMaxC": 200, "thicknessMm": 60, "material": "mineral wool", "conductivityWmK": 0.0598535265 }
+  ]
 }

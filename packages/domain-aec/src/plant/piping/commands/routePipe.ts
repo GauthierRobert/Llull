@@ -5,6 +5,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { InlineComponent, PipeRun } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { withRunEntities } from '../derive';
+import { envelopeDiameter } from '../insulation';
 import { buildPath, unitVector } from '../legs';
 import { getPiping, refuse, withPiping } from '../model';
 import { deriveRun } from '../routeParts';
@@ -30,15 +31,20 @@ export const routePipe = defineCommand({
     'document must be in mm). from/to: { portId } (tie-in id from add_tie_in_point, "<tag>:<mark>" of an equipment nozzle such as "V-101:N1" ' +
     'from add_nozzle / equipment_ports, or "<runId>:start|end" to continue a run) or an open { point, direction? }. legs: [{ direction ' +
     '"+X"|"-X"|"+Y"|"-Y"|"+Z"|"-Z" or [dx,dy,dz], length }] from the start; the first leg must leave along the start port direction (within ' +
-    'the tolerance). via: extra points of intersection after the legs. When `to` is a port, a straight closing leg to it is added if the last point ' +
+    'the tolerance). A SLOPED leg gives planLength (its horizontal length) and slope { value, unit percent|ratio|deg, fall } instead of length, along a ' +
+    'horizontal direction: it falls (or rises) by planLength x s, so a 1 % fall over 8000 is 80 mm lower and 8000.39999 long; the elbow after it turns by ' +
+    'the real angle (89.427 degrees into a vertical leg) and is the standard 90 elbow within the spec tolerance; a sloped first / last leg is judged on its ' +
+    'plan direction against the port; the declared slope is stored per leg (check_piping RTE_ADVERSE_SLOPE / RTE_POCKET) and sloped legs report planLengthMm, ' +
+    'dropMm (positive = descends along the flow) and slopeDeg in data.legs. via: extra points of intersection after the legs. When `to` is a port, a straight closing leg to it is added if the last point ' +
     'is on its axis (the last leg may omit length to run straight to it). inline: [{ type (valve or reducerConcentric), at: { leg, centreDistance }, ' +
     'dn2 (reducers), tag, stemDirection }] places valves and reducers while routing (leg = index in data.legs, the closing leg included); a reducer is how ' +
     'the run meets a `to` port of another size. Add them later with insert_inline_component. Open-end directions are normalised (zero is refused). ' +
     'Returns the run id (affected[0]); data = { runId, lineId, lineNumber, pis, closingLeg, mergedPoints, portDeviationDeg, legs (index, direction, lengthMm, ' +
-    'cutLengthsMm), turns (turnDeg, nominalDeg, deviationDeg, centreToEnd), counts, pipePieces (id, leg, cutLengthMm), totalPipeMm, ' +
+    'cutLengthsMm, planLengthMm / dropMm / slopeDeg on sloped legs), turns (turnDeg, nominalDeg, deviationDeg, centreToEnd, fitting), insulation, ' +
+    'envelopeDiameterMm (OD + 2 x the line insulation, null without), counts, pipePieces (id, leg, cutLengthMm), totalPipeMm, ' +
     'centrelineLengthMm, studs, warnings (RTE_WELD_SPACING, RTE_FITTING_TO_FITTING), unverified, unverifiedReasons, partIds, inlineIds, dn (start, end), spec, ' +
     'angleTolerance, weldGap, weldSpacing, pipe }; parts and joints are listed by piping_takeoff. A spec that is not ' +
-    'approved or has non-grade-A rows reports unverified. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, ' +
+    'approved or has non-grade-A rows reports unverified. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SLOPE_INVALID (slope on a vertical leg, no planLength, over 100 %), ' +
     'RTE_INVALID_PORT (zero open-end direction), RTE_SIZE_MISMATCH (also a reducer without dn2), RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, ' +
     'RTE_NO_CONNECTION_RULE, RTE_PORT_DIRECTION, RTE_CLOSING_LEG_IMPOSSIBLE (detail.offset), RTE_ZERO_LEG, RTE_NO_FITTING_FOR_ANGLE ' +
     '(detail.anglesDeg), RTE_SEGMENT_TOO_SHORT (detail.cutLengthMm), RTE_INLINE_DOES_NOT_FIT, RTE_SPEC_UNKNOWN, RTE_SPEC_NO_COMPONENT, ' +
@@ -127,6 +133,7 @@ export const routePipe = defineCommand({
         ...(to?.ref === undefined ? {} : { ref: to.ref }),
       },
       pis: path.points.slice(1, -1),
+      ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
       ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
       ...(inline.length === 0 ? {} : { inline }),
     };
@@ -158,6 +165,7 @@ export const routePipe = defineCommand({
           direction: leg.direction,
           lengthMm: leg.lengthMm,
           cutLengthsMm: leg.cutLengthsMm,
+          ...(leg.dropMm === undefined ? {} : { planLengthMm: leg.planLengthMm, dropMm: leg.dropMm, slopeDeg: leg.slopeDeg }),
         })),
         turns: takeoff.turns.map((turn) => ({
           index: turn.index,
@@ -165,6 +173,7 @@ export const routePipe = defineCommand({
           nominalDeg: turn.nominalDeg,
           deviationDeg: turn.deviationDeg,
           centreToEnd: turn.centreToEnd,
+          fitting: turn.typeKey,
         })),
         counts: takeoff.counts,
         pipePieces: takeoff.pipePieces.map((piece) => ({ id: piece.id, leg: piece.leg, cutLengthMm: piece.cutLengthMm })),
@@ -174,6 +183,8 @@ export const routePipe = defineCommand({
         warnings: takeoff.warnings,
         unverified: takeoff.unverified,
         unverifiedReasons: takeoff.unverifiedReasons,
+        insulation: line.insulation ?? null,
+        envelopeDiameterMm: line.insulation === undefined ? null : envelopeDiameter(derived.pipe.outsideDiameterMm, line.insulation),
         partIds: derived.parts.map((part) => part.id),
         inlineIds: inline.map((item) => item.id),
         dn: derived.dn,

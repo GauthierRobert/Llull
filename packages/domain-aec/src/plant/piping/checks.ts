@@ -15,6 +15,7 @@ import type { RunDerivation } from './deriveTypes';
 import { buildGraph, externalPorts, selectRuns, type RunGraph } from './graph';
 import { defaultMinWeldSpacing } from './jointStack';
 import { getPiping } from './model';
+import { slopeFindings } from './slopeChecks';
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -67,6 +68,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_VALVE_OPERATOR_HEIGHT:
     'Rotate the stem (move_inline_component / re-insert), move the valve, add a platform (06 STA) or a chain wheel.',
   RTE_STUB_IN_REVIEW: 'Have the stub-in reinforcement checked (ASME B31.3 304.3, 07 pipe stress) or use an olet / tee in the branch table.',
+  RTE_ADVERSE_SLOPE:
+    'Re-route the leg so it falls along the flow (edit_route move_pi / stretch_leg), or correct the declared slope of the line or leg.',
+  RTE_POCKET:
+    'Add a drain at a low point or a vent at a high point (add_branch downward / upward on an adjacent leg), or re-route the profile to fall continuously.',
   RTE_SPEC_UNVERIFIED: 'A reviewer approves the spec (01 PSC) and the catalogue rows are verified to grade A.',
   RTE_DUPLICATE_LINE_NUMBER: 'Give the lines different sequence numbers.',
   RTE_SIZE_MISMATCH: 'Add a reducer, or fix the nozzle / tie-in size.',
@@ -134,6 +139,8 @@ function weldSpacingIssues(out: Collector, run: PipeRun, derivation: RunDerivati
 
 function runIssues(out: Collector, doc: CadDocument, run: PipeRun, derivation: RunDerivation, options: CheckOptions): void {
   weldSpacingIssues(out, run, derivation, options.minWeldSpacing);
+  for (const finding of slopeFindings(getPiping(doc), run))
+    out.add(finding.code, 'warning', finding.ids, finding.message, finding.detail, finding.paths);
   for (const warning of derivation.warnings)
     if (warning.code === 'RTE_FITTING_TO_FITTING')
       out.add(warning.code, 'warning', [...warning.ids, run.id], warning.message, warning.detail, [

@@ -1,0 +1,485 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "position": [0,-300,400],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#c27c2c",
+        "name": "Centrifugal pump P-101",
+        "tags": ["bim","equipment","element:#3"],
+        "kind": "box",
+        "size": [1200,600,800]
+      },
+      "#4": {
+        "id": "#4",
+        "position": [0,0,700],
+        "rotation": [0,0,-1.57079633],
+        "layerId": "#2",
+        "color": "#8f6a2f",
+        "name": "Nozzle P-101:N2 DN100 CL150",
+        "tags": ["bim","equipment","element:#3"],
+        "kind": "revolution",
+        "profile": [[51.13,0],[57.15,0],[57.15,277.6],[114.3,277.6],[114.3,300],[51.13,300]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 32
+      },
+      "#5": {
+        "id": "#5",
+        "position": [7500,3500,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#c27c2c",
+        "name": "Feed drum V-101",
+        "tags": ["bim","equipment","element:#6"],
+        "kind": "revolution",
+        "profile": [[0,590],[6.58581655,590.013486],[13.1711955,590.053936],[19.7557034,590.121335],[26.3389067,590.21567],[32.9203718,590.336926],[39.4996655,590.485091],[46.076354,590.66015],[52.6500039,590.86209],[59.2201818,591.090897],[65.7864541,591.346556],[72.3483873,591.629054],[78.9055479,591.938378],[85.4575025,592.274514],[92.0038174,592.637447],[98.5440594,593.027164],[105.077795,593.443651],[111.604587,593.886889],[118.124006,594.356843],[124.635624,594.853469],[131.139017,595.376728],[137.633759,595.926579],[144.119422,596.50298],[150.595583,597.10589],[157.061815,597.735268],[163.517691,598.391074],[169.962787,599.073265],[176.396676,599.781802],[182.818933,600.516643],[189.229131,601.277747],[195.626845,602.065072],[202.01165,602.878579],[208.383118,603.718225],[214.740823,604.583965],[221.084348,605.475735],[227.413282,606.393468],[233.727214,607.337096],[240.025734,608.306552],[246.30843,609.301769],[252.574893,610.32268],[258.824712,611.369217],[265.057475,612.441313],[271.272773,613.538901],[277.470194,614.661914],[283.649327,615.810284],[289.809763,616.983944],[295.95109,618.182827],[302.072898,619.406865],[308.174776,620.655991],[314.256313,621.930134],[320.317114,623.229203],[326.35679,624.553107],[332.374952,625.901755],[338.371213,627.275054],[344.345184,628.672914],[350.296477,630.095242],[356.224702,631.541947],[362.129473,633.012937],[368.0104,634.508121],[373.867096,636.027406],[379.699171,637.570701],[385.506237,639.137915],[391.287907,640.728955],[397.043791,642.343731],[402.773501,643.982149],[408.476651,645.644114],[414.152872,647.329514],[419.801806,649.038235],[425.423092,650.770164],[431.016372,652.525187],[436.581286,654.303192],[442.117474,656.104064],[447.624577,657.92769],[453.102235,659.773957],[458.550089,661.642751],[463.967779,663.533959],[469.354946,665.447467],[474.71123,667.383162],[480.036272,669.34093],[485.329712,671.320659],[490.591191,673.322233],[495.820352,675.345536],[501.016863,677.390436],[506.180397,679.456801],[511.31063,681.5445],[516.407237,683.653401],[521.469892,685.783373],[526.49827,687.934284],[531.492046,690.106002],[536.450895,692.298396],[541.374492,694.511333],[546.262511,696.744684],[551.114627,698.998315],[555.930516,701.272095],[560.709851,703.565893],[565.452308,705.879577],[570.157561,708.213016],[574.825291,710.566072],[579.455203,712.938601],[584.047009,715.330456],[588.600422,717.741494],[593.115154,720.171567],[597.590918,722.620531],[602.027426,725.088241],[606.424391,727.57455],[610.781525,730.079314],[615.098541,732.602387],[619.375151,735.143624],[623.611067,737.702879],[627.806003,740.280006],[631.959671,742.874861],[636.071782,745.487298],[640.142051,748.117172],[644.170196,750.764333],[648.155963,753.428627],[652.099102,756.109899],[655.999363,758.807993],[659.856494,761.522754],[663.670247,764.254026],[667.44037,767.001655],[671.166614,769.765484],[674.848727,772.545359],[678.486461,775.341125],[682.079563,778.152625],[685.627785,780.979704],[689.130876,783.822208],[692.588586,786.67998],[696.000664,789.552866],[699.36686,792.440711],[702.686933,795.343359],[705.960664,798.260651],[709.187834,801.192419],[712.368225,804.138497],[715.501616,807.09872],[718.587789,810.072921],[721.626526,813.060933],[724.617607,816.062589],[727.560814,819.077725],[730.455927,822.106173],[733.302728,825.147767],[736.100998,828.202341],[738.850518,831.269728],[741.551068,834.349763],[744.202431,837.442278],[746.804388,840.547107],[749.356724,843.664094],[751.859242,846.793063],[754.31175,849.933823],[756.714051,853.086179],[759.065951,856.24994],[761.367256,859.424913],[763.617772,862.610906],[765.817303,865.807724],[767.965656,869.015177],[770.062635,872.233071],[772.108047,875.461213],[774.101697,878.699411],[776.04339,881.947472],[777.932932,885.205204],[779.770129,888.472413],[781.554785,891.748907],[783.286695,895.034501],[784.965678,898.328971],[786.591576,901.632067],[788.164233,904.943538],[789.683493,908.263134],[791.149199,911.590603],[792.561193,914.925696],[793.919319,918.268163],[795.223421,921.617751],[796.473342,924.974212],[797.668925,928.337294],[798.810013,931.706747],[799.89645,935.082321],[800.928078,938.463765],[801.904742,941.850828],[802.826284,945.24326],[803.692528,948.640784],[804.503359,952.043082],[805.258711,955.449838],[805.958518,958.860737],[806.602716,962.275464],[807.191239,965.693704],[807.724022,969.115142],[808.201,972.539462],[808.622108,975.96635],[808.987279,979.395491],[809.29645,982.82657],[809.549554,986.259271],[809.746526,989.69328],[809.887301,993.128281],[809.971814,996.563959],[810,1000],[810,5000],[809.971814,5003.43604],[809.887301,5006.87172],[809.746526,5010.30672],[809.549554,5013.74073],[809.29645,5017.17343],[808.987279,5020.60451],[808.622108,5024.03365],[808.201,5027.46054],[807.724022,5030.88486],[807.191239,5034.3063],[806.602716,5037.72454],[805.958518,5041.13926],[805.258711,5044.55016],[804.503359,5047.95692],[803.692528,5051.35922],[802.826284,5054.75674],[801.904742,5058.14917],[800.928078,5061.53624],[799.89645,5064.91768],[798.810013,5068.29325],[797.668925,5071.66271],[796.473342,5075.02579],[795.223421,5078.38225],[793.919319,5081.73184],[792.561193,5085.0743],[791.149199,5088.4094],[789.683493,5091.73687],[788.164233,5095.05646],[786.591576,5098.36793],[784.965678,5101.67103],[783.286695,5104.9655],[781.554785,5108.25109],[779.770129,5111.52759],[777.932932,5114.7948],[776.04339,5118.05253],[774.101697,5121.30059],[772.108047,5124.53879],[770.062635,5127.76693],[767.965656,5130.98482],[765.817303,5134.19228],[763.617772,5137.38909],[761.367256,5140.57509],[759.065951,5143.75006],[756.714051,5146.91382],[754.31175,5150.06618],[751.859242,5153.20694],[749.356724,5156.33591],[746.804388,5159.45289],[744.202431,5162.55772],[741.551068,5165.65024],[738.850518,5168.73027],[736.100998,5171.79766],[733.302728,5174.85223],[730.455927,5177.89383],[727.560814,5180.92227],[724.617607,5183.93741],[721.626526,5186.93907],[718.587789,5189.92708],[715.501616,5192.90128],[712.368225,5195.8615],[709.187834,5198.80758],[705.960664,5201.73935],[702.686933,5204.65664],[699.36686,5207.55929],[696.000664,5210.44713],[692.588586,5213.32002],[689.130876,5216.17779],[685.627785,5219.0203],[682.079563,5221.84738],[678.486461,5224.65888],[674.848727,5227.45464],[671.166614,5230.23452],[667.44037,5232.99835],[663.670247,5235.74597],[659.856494,5238.47725],[655.999363,5241.19201],[652.099102,5243.8901],[648.155963,5246.57137],[644.170196,5249.23567],[640.142051,5251.88283],[636.071782,5254.5127],[631.959671,5257.12514],[627.806003,5259.71999],[623.611067,5262.29712],[619.375151,5264.85638],[615.098541,5267.39761],[610.781525,5269.92069],[606.424391,5272.42545],[602.027426,5274.91176],[597.590918,5277.37947],[593.115154,5279.82843],[588.600422,5282.25851],[584.047009,5284.66954],[579.455203,5287.0614],[574.825291,5289.43393],[570.157561,5291.78698],[565.452308,5294.12042],[560.709851,5296.43411],[555.930516,5298.7279],[551.114627,5301.00169],[546.262511,5303.25532],[541.374492,5305.48867],[536.450895,5307.7016],[531.492046,5309.894],[526.49827,5312.06572],[521.469892,5314.21663],[516.407237,5316.3466],[511.31063,5318.4555],[506.180397,5320.5432],[501.016863,5322.60956],[495.820352,5324.65446],[490.591191,5326.67777],[485.329712,5328.67934],[480.036272,5330.65907],[474.71123,5332.61684],[469.354946,5334.55253],[463.967779,5336.46604],[458.550089,5338.35725],[453.102235,5340.22604],[447.624577,5342.07231],[442.117474,5343.89594],[436.581286,5345.69681],[431.016372,5347.47481],[425.423092,5349.22984],[419.801806,5350.96177],[414.152872,5352.67049],[408.476651,5354.35589],[402.773501,5356.01785],[397.043791,5357.65627],[391.287907,5359.27104],[385.506237,5360.86208],[379.699171,5362.4293],[373.867096,5363.97259],[368.0104,5365.49188],[362.129473,5366.98706],[356.224702,5368.45805],[350.296477,5369.90476],[344.345184,5371.32709],[338.371213,5372.72495],[332.374952,5374.09825],[326.35679,5375.44689],[320.317114,5376.7708],[314.256313,5378.06987],[308.174776,5379.34401],[302.072898,5380.59313],[295.95109,5381.81717],[289.809763,5383.01606],[283.649327,5384.18972],[277.470194,5385.33809],[271.272773,5386.4611],[265.057475,5387.55869],[258.824712,5388.63078],[252.574893,5389.67732],[246.30843,5390.69823],[240.025734,5391.69345],[233.727214,5392.6629],[227.413282,5393.60653],[221.084348,5394.52427],[214.740823,5395.41603],[208.383118,5396.28177],[202.01165,5397.12142],[195.626845,5397.93493],[189.229131,5398.72225],[182.818933,5399.48336],[176.396676,5400.2182],[169.962787,5400.92673],[163.517691,5401.60893],[157.061815,5402.26473],[150.595583,5402.89411],[144.119422,5403.49702],[137.633759,5404.07342],[131.139017,5404.62327],[124.635624,5405.14653],[118.124006,5405.64316],[111.604587,5406.11311],[105.077795,5406.55635],[98.5440594,5406.97284],[92.0038174,5407.36255],[85.4575025,5407.72549],[78.9055479,5408.06162],[72.3483873,5408.37095],[65.7864541,5408.65344],[59.2201818,5408.9091],[52.6500039,5409.13791],[46.076354,5409.33985],[39.4996655,5409.51491],[32.9203718,5409.66307],[26.3389067,5409.78433],[19.7557034,5409.87867],[13.1711955,5409.94606],[6.58581655,5409.98651],[0,5410],[0,5400],[78.4137123,5398.07389],[156.072258,5392.31411],[232.227742,5382.77613],[306.146746,5369.55181],[377.117389,5352.76851],[444.456186,5332.58784],[507.514627,5309.20418],[565.685425,5282.84271],[618.408363,5253.75731],[665.17569,5222.22809],[705.537011,5188.55869],[739.103626,5153.07337],[765.552269,5116.11387],[784.628224,5078.03613],[796.147781,5039.20686],[800,5000],[800,1000],[796.147781,960.793144],[784.628224,921.963871],[765.552269,883.886129],[739.103626,846.926627],[705.537011,811.441305],[665.17569,777.771907],[618.408363,746.242686],[565.685425,717.157288],[507.514627,690.795819],[444.456186,667.412155],[377.117389,647.231494],[306.146746,630.448187],[232.227742,617.223866],[156.072258,607.685888],[78.4137123,601.926109],[0,600]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 64,
+        "curves": [{"type":"bezier","points":[[0,590],[35.1247512,590],[70.2493277,591.151023],[105.077795,593.443651]]},{"type":"bezier","points":[[105.077795,593.443651],[139.906262,595.736278],[174.438273,599.170478],[208.383118,603.718225]]},{"type":"bezier","points":[[208.383118,603.718225],[242.327962,608.265972],[275.685304,613.927202],[308.174776,620.655991]]},{"type":"bezier","points":[[308.174776,620.655991],[340.664248,627.384781],[372.285533,635.181031],[402.773501,643.982149]]},{"type":"bezier","points":[[402.773501,643.982149],[433.261469,652.783267],[462.615839,662.589112],[490.591191,673.322233]]},{"type":"bezier","points":[[490.591191,673.322233],[518.566542,684.055355],[545.162664,695.715567],[570.157561,708.213016]]},{"type":"bezier","points":[[570.157561,708.213016],[595.152458,720.710464],[618.546046,734.044941],[640.142051,748.117172]]},{"type":"bezier","points":[[640.142051,748.117172],[661.738055,762.189402],[681.536612,776.999263],[699.36686,792.440711]]},{"type":"bezier","points":[[699.36686,792.440711],[717.197108,807.882158],[733.059429,823.955474],[746.804388,840.547107]]},{"type":"bezier","points":[[746.804388,840.547107],[760.549346,857.13874],[772.177071,874.249853],[781.554785,891.748907]]},{"type":"bezier","points":[[781.554785,891.748907],[790.9325,909.247961],[798.058662,927.136417],[802.826284,945.24326]]},{"type":"bezier","points":[[802.826284,945.24326],[807.593906,963.350103],[810,981.674043],[810,1000]]},{"type":"line","points":[[810,1000],[810,5000]]},{"type":"bezier","points":[[810,5000],[810,5018.32596],[807.593906,5036.6499],[802.826284,5054.75674]]},{"type":"bezier","points":[[802.826284,5054.75674],[798.058662,5072.86358],[790.9325,5090.75204],[781.554785,5108.25109]]},{"type":"bezier","points":[[781.554785,5108.25109],[772.177071,5125.75015],[760.549346,5142.86126],[746.804388,5159.45289]]},{"type":"bezier","points":[[746.804388,5159.45289],[733.059429,5176.04453],[717.197108,5192.11784],[699.36686,5207.55929]]},{"type":"bezier","points":[[699.36686,5207.55929],[681.536612,5223.00074],[661.738055,5237.8106],[640.142051,5251.88283]]},{"type":"bezier","points":[[640.142051,5251.88283],[618.546046,5265.95506],[595.152458,5279.28954],[570.157561,5291.78698]]},{"type":"bezier","points":[[570.157561,5291.78698],[545.162664,5304.28443],[518.566542,5315.94465],[490.591191,5326.67777]]},{"type":"bezier","points":[[490.591191,5326.67777],[462.615839,5337.41089],[433.261469,5347.21673],[402.773501,5356.01785]]},{"type":"bezier","points":[[402.773501,5356.01785],[372.285533,5364.81897],[340.664248,5372.61522],[308.174776,5379.34401]]},{"type":"bezier","points":[[308.174776,5379.34401],[275.685304,5386.0728],[242.327962,5391.73403],[208.383118,5396.28177]]},{"type":"bezier","points":[[208.383118,5396.28177],[174.438273,5400.82952],[139.906262,5404.26372],[105.077795,5406.55635]]},{"type":"bezier","points":[[105.077795,5406.55635],[70.2493277,5408.84898],[35.1247512,5410],[0,5410]]},{"type":"line","points":[[0,5410],[0,5400]]},{"type":"ellipse","points":[[0,5400],[0,5000],[800,5000]]},{"type":"line","points":[[800,5000],[800,1000]]},{"type":"ellipse","points":[[800,1000],[0,1000],[0,600]]},{"type":"line","points":[[0,600],[0,590]]}]
+      },
+      "#7": {
+        "id": "#7",
+        "position": [7500,3500,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#c27c2c",
+        "name": "Skirt V-101",
+        "tags": ["bim","equipment","element:#6"],
+        "kind": "revolution",
+        "profile": [[810,0],[820,0],[820,1000],[810,1000]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 64,
+        "curves": [{"type":"line","points":[[810,0],[820,0]]},{"type":"line","points":[[820,0],[820,1000]]},{"type":"line","points":[[820,1000],[810,1000]]},{"type":"line","points":[[810,1000],[810,0]]}]
+      },
+      "#8": {
+        "id": "#8",
+        "position": [6695,3500,4000],
+        "rotation": [1.57079633,-1.57079633,0],
+        "layerId": "#2",
+        "color": "#8f6a2f",
+        "name": "Nozzle V-101:N1 DN100 CL150",
+        "tags": ["bim","equipment","element:#6"],
+        "kind": "revolution",
+        "profile": [[51.13,0],[57.15,0],[57.15,172.6],[114.3,172.6],[114.3,195],[51.13,195]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 32
+      },
+      "#9": {
+        "id": "#9",
+        "kind": "revolution",
+        "position": [0,0,1000],
+        "rotation": [0,0,-1.57079633],
+        "layerId": "#10",
+        "color": "#8f98a3",
+        "name": "Gasket #9 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:gasket"],
+        "profile": [[53.2,0],[87.4,0],[87.4,3],[53.2,3]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#13": {
+        "id": "#13",
+        "kind": "revolution",
+        "position": [0,0,1003],
+        "rotation": [0,0,-1.57079633],
+        "layerId": "#10",
+        "color": "#8f98a3",
+        "name": "Flange #13 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:flange"],
+        "profile": [[45.72,0],[114.3,0],[114.3,22.4],[71.4375,22.4],[57.15,76],[45.72,76]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#14": {
+        "id": "#14",
+        "kind": "revolution",
+        "position": [0,0,1079],
+        "rotation": [0,0,-1.57079633],
+        "layerId": "#15",
+        "color": "#2f9c8f",
+        "name": "Pipe #14 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,1269],[0,1269]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#16": {
+        "id": "#16",
+        "kind": "revolution",
+        "position": [0,152,2348],
+        "rotation": [1.57079633,-1.57079633,0],
+        "layerId": "#17",
+        "color": "#d9a441",
+        "name": "Elbow #16 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:elbow"],
+        "profile": [[209.15,0],[204.799715,21.8703582],[192.411153,40.4111525],[173.870358,52.7997153],[152,57.15],[130.129642,52.7997153],[111.588847,40.4111525],[99.2002847,21.8703582],[94.85,6.99885646e-15],[99.2002847,-21.8703582],[111.588847,-40.4111525],[130.129642,-52.7997153],[152,-57.15],[173.870358,-52.7997153],[192.411153,-40.4111525],[204.799715,-21.8703582]],
+        "axis": [0,0,1],
+        "angle": 1.57079633,
+        "segments": 24
+      },
+      "#18": {
+        "id": "#18",
+        "kind": "revolution",
+        "position": [0,152,2500],
+        "rotation": [-1.57079633,0,-3.14159265],
+        "layerId": "#15",
+        "color": "#2f9c8f",
+        "name": "Pipe #18 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,3196],[0,3196]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#19": {
+        "id": "#19",
+        "kind": "revolution",
+        "position": [152,3348,2500],
+        "rotation": [-3.14159265,0,3.14159265],
+        "layerId": "#17",
+        "color": "#d9a441",
+        "name": "Elbow #19 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:elbow"],
+        "profile": [[209.15,0],[204.799715,21.8703582],[192.411153,40.4111525],[173.870358,52.7997153],[152,57.15],[130.129642,52.7997153],[111.588847,40.4111525],[99.2002847,21.8703582],[94.85,6.99885646e-15],[99.2002847,-21.8703582],[111.588847,-40.4111525],[130.129642,-52.7997153],[152,-57.15],[173.870358,-52.7997153],[192.411153,-40.4111525],[204.799715,-21.8703582]],
+        "axis": [0,0,1],
+        "angle": 1.57079633,
+        "segments": 24
+      },
+      "#20": {
+        "id": "#20",
+        "kind": "revolution",
+        "position": [152,3500,2500],
+        "rotation": [1.57079633,1.57079633,0],
+        "layerId": "#15",
+        "color": "#2f9c8f",
+        "name": "Pipe #20 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,3196],[0,3196]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#21": {
+        "id": "#21",
+        "kind": "revolution",
+        "position": [3348,3500,2652],
+        "rotation": [1.57079633,0,-1.57079633],
+        "layerId": "#17",
+        "color": "#d9a441",
+        "name": "Elbow #21 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:elbow"],
+        "profile": [[209.15,0],[204.799715,21.8703582],[192.411153,40.4111525],[173.870358,52.7997153],[152,57.15],[130.129642,52.7997153],[111.588847,40.4111525],[99.2002847,21.8703582],[94.85,6.99885646e-15],[99.2002847,-21.8703582],[111.588847,-40.4111525],[130.129642,-52.7997153],[152,-57.15],[173.870358,-52.7997153],[192.411153,-40.4111525],[204.799715,-21.8703582]],
+        "axis": [0,0,1],
+        "angle": 1.57079633,
+        "segments": 24
+      },
+      "#22": {
+        "id": "#22",
+        "kind": "revolution",
+        "position": [3500,3500,2652],
+        "rotation": [0,0,-1.57079633],
+        "layerId": "#15",
+        "color": "#2f9c8f",
+        "name": "Pipe #22 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,1196],[0,1196]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#23": {
+        "id": "#23",
+        "kind": "revolution",
+        "position": [3652,3500,3848],
+        "rotation": [-1.57079633,0,-3.14159265],
+        "layerId": "#17",
+        "color": "#d9a441",
+        "name": "Elbow #23 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:elbow"],
+        "profile": [[209.15,0],[204.799715,21.8703582],[192.411153,40.4111525],[173.870358,52.7997153],[152,57.15],[130.129642,52.7997153],[111.588847,40.4111525],[99.2002847,21.8703582],[94.85,6.99885646e-15],[99.2002847,-21.8703582],[111.588847,-40.4111525],[130.129642,-52.7997153],[152,-57.15],[173.870358,-52.7997153],[192.411153,-40.4111525],[204.799715,-21.8703582]],
+        "axis": [0,0,1],
+        "angle": 1.57079633,
+        "segments": 24
+      },
+      "#24": {
+        "id": "#24",
+        "kind": "revolution",
+        "position": [3652,3500,4000],
+        "rotation": [1.57079633,1.57079633,0],
+        "layerId": "#15",
+        "color": "#2f9c8f",
+        "name": "Pipe #24 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,2769],[0,2769]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#25": {
+        "id": "#25",
+        "kind": "revolution",
+        "position": [6497,3500,4000],
+        "rotation": [1.57079633,-1.57079633,0],
+        "layerId": "#10",
+        "color": "#8f98a3",
+        "name": "Flange #25 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:flange"],
+        "profile": [[45.72,0],[114.3,0],[114.3,22.4],[71.4375,22.4],[57.15,76],[45.72,76]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      },
+      "#26": {
+        "id": "#26",
+        "kind": "revolution",
+        "position": [6497,3500,4000],
+        "rotation": [1.57079633,1.57079633,0],
+        "layerId": "#10",
+        "color": "#8f98a3",
+        "name": "Gasket #26 100-P-1001-CS150",
+        "tags": ["piping:#11","piping-run:#12","piping-part:gasket"],
+        "profile": [[53.2,0],[87.4,0],[87.4,3],[53.2,3]],
+        "axis": [0,0,1],
+        "angle": 6.28318531,
+        "segments": 24
+      }
+    },
+    "order": [
+      "#9",
+      "#13",
+      "#14",
+      "#16",
+      "#18",
+      "#19",
+      "#20",
+      "#21",
+      "#22",
+      "#23",
+      "#24",
+      "#25",
+      "#26",
+      "#1",
+      "#4",
+      "#5",
+      "#7",
+      "#8"
+    ],
+    "layers": {
+      "#27": {
+        "id": "#27",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      },
+      "#2": {
+        "id": "#2",
+        "name": "Q-EQPM",
+        "visible": true,
+        "locked": false,
+        "color": "#c27c2c"
+      },
+      "#10": {
+        "id": "#10",
+        "name": "P-FLNG",
+        "visible": true,
+        "locked": false,
+        "color": "#8f98a3"
+      },
+      "#15": {
+        "id": "#15",
+        "name": "P-PIPE",
+        "visible": true,
+        "locked": false,
+        "color": "#2f9c8f"
+      },
+      "#17": {
+        "id": "#17",
+        "name": "P-FITT",
+        "visible": true,
+        "locked": false,
+        "color": "#d9a441"
+      }
+    },
+    "layerOrder": [
+      "#27",
+      "#2",
+      "#10",
+      "#15",
+      "#17"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#28",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#29",
+        "name": "import_piping_catalog",
+        "params": {"catalog":{"format":"#30","schemaVersion":1,"id":"#31","version":"1.0.0","title":"02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.","licence":"open-data","families":[{"id":"asme-b16.9-lr90-rte-stub","type":"elbow90","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"nps":2,"centreToEnd":76,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)"}},{"nps":3,"centreToEnd":114,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)"}},{"nps":4,"centreToEnd":152,"provenance":{"sourceId":"S8+S9","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"}},{"nps":6,"centreToEnd":229,"provenance":{"sourceId":"S8+S9+S10","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)"}}]},{"id":"asme-b16.9-lr45-rte-stub","type":"elbow45","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"nps":4,"centreToEnd":64,"provenance":{"sourceId":"S8+S10","citation":"02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)"}}]},{"id":"asme-b16.5-wn-rf-rte-stub","type":"flangeWeldNeck","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","outsideDiameter":228.6,"thickness":22.4,"boltCircle":190.5,"boltCount":8,"boltDiameter":15.875,"raisedFaceDiameter":157.2,"lengthThroughHub":76,"verifiedDims":["outsideDiameter","thickness","boltCircle","boltCount","boltDiameter","raisedFaceDiameter"],"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}}]},{"id":"asme-b16.20-sw-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"innerRingId":106.4,"centeringRingOd":174.8,"thickness":3,"verifiedDims":["innerRingId","centeringRingOd"],"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}}]},{"id":"asme-b16.5-bolting-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","boltCount":8,"boltDiameter":15.875,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}}]},{"id":"asme-b16.9-tee-rte-stub","type":"tee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":2,"centreToEndRun":64,"centreToEndBranch":64,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}},{"nps":4,"centreToEndRun":105,"centreToEndBranch":105,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}},{"nps":6,"centreToEndRun":143,"centreToEndBranch":143,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}}]},{"id":"asme-b16.9-reducing-tee-rte-stub","type":"reducingTee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":6,"smallNps":4,"centreToEndRun":143,"centreToEndBranch":130,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}}]},{"id":"#32","type":"reducerConcentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":4,"smallNps":3,"length":102,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"}},{"nps":6,"smallNps":4,"length":140,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"}}]},{"id":"mss-sp-97-weldolet-rte-stub","type":"weldolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":6,"smallNps":2,"centreToOutlet":144,"provenance":{"sourceId":"RTE","citation":"02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"}}]}]}},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#33",
+        "name": "import_pipe_spec",
+        "params": {"spec":{"format":"llull-pipe-spec","schemaVersion":1,"id":"CS150","title":"Carbon steel, ASME Class 150 RF, NPS 2-6 (02 RTE validation spec; dimensions of the SC-RTE plans)","service":"SC-RTE validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"fromNps":2,"toNps":6},"catalogs":["#31","llull-open-piping"],"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"components":[{"id":"P-BW","type":"pipe","fromNps":2,"toNps":6,"schedule":"40","ends":"BE","catalogRef":"asme-b36.10m"},{"id":"E90-LR","type":"elbow90","fromNps":2,"toNps":6,"radius":"LR","ends":"BW","scheduleFromPipe":true,"catalogRef":"asme-b16.9"},{"id":"E45-LR","type":"elbow45","fromNps":2,"toNps":6,"radius":"LR","ends":"BW","scheduleFromPipe":true,"catalogRef":"asme-b16.9"},{"id":"T-BW","type":"tee","fromNps":2,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RT-BW","type":"reducingTee","fromNps":2,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true,"branchFromNps":2,"branchToNps":4},{"id":"RED-C","type":"reducerConcentric","fromNps":3,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true,"branchFromNps":2,"branchToNps":4},{"id":"W-BW","type":"weldolet","fromNps":2,"toNps":6,"branchFromNps":2,"branchToNps":2,"ends":"BW","scheduleFromPipe":true,"catalogRef":"mss-sp-97"},{"id":"F-WN","type":"flangeWeldNeck","fromNps":2,"toNps":6,"facing":"RF","class":150,"catalogRef":"asme-b16.5"},{"id":"G-SW","type":"gasketSpiralWound","fromNps":2,"toNps":6,"class":150,"catalogRef":"asme-b16.20"},{"id":"B-STUD","type":"boltSet","fromNps":2,"toNps":6,"class":150,"facing":"RF","catalogRef":"asme-b16.5-bolting"},{"id":"V-GATE","type":"valveGate","fromNps":2,"toNps":6,"ends":"FL","facing":"RF","class":150,"catalogRef":"asme-b16.10"}],"status":"draft","provenance":{"author":"02 RTE validation pack","accessed":"2026-10-24"},"branchTable":{"system":"NPS","cells":{"4":{"4":"T"},"6":{"2":"W","4":"RT","6":"T"}}},"insulation":[{"code":"H","dnMax":100,"tempMaxC":100,"thicknessMm":30,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":100,"tempMaxC":200,"thicknessMm":50,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":150,"tempMaxC":200,"thicknessMm":60,"material":"mineral wool","conductivityWmK":0.0598535265}]}},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#34",
+        "name": "add_equipment",
+        "params": {"name":"Centrifugal pump","mark":"P-101","location":[0,-300],"size":[1200,600,800],"weight":650},
+        "suppressed": false,
+        "affected": ["#3","#1"]
+      },
+      {
+        "id": "#35",
+        "name": "add_nozzle",
+        "params": {"equipment":"P-101","mark":"N2","dn":100,"rating":"CL150","facing":"RF","location":{"on":"free","position":[0,300,1000],"direction":[0,0,1]},"projection":300},
+        "suppressed": false,
+        "affected": ["#3","#1","#4"]
+      },
+      {
+        "id": "#36",
+        "name": "add_vessel",
+        "params": {"tag":"V-101","name":"Feed drum","orientation":"vertical","location":[7000,3000],"insideDiameter":1600,"tangentLength":4000,"heads":{"top":{"type":"ellipsoidal","ratio":2},"bottom":{"type":"ellipsoidal","ratio":2}},"shellThickness":10,"headThickness":10,"corrosionAllowance":3,"support":{"type":"skirt","height":1000,"thickness":10},"design":{"pressure":{"value":1,"unit":"MPa"},"temperatureC":150,"material":"SA-516 Gr 70","allowableStress":{"value":137.9,"unit":"MPa","source":"user input"},"jointEfficiency":{"shell":1,"heads":1},"materialDensityKgM3":7850}},
+        "suppressed": false,
+        "affected": ["#6","#5","#7"]
+      },
+      {
+        "id": "#37",
+        "name": "add_nozzle",
+        "params": {"equipment":"V-101","mark":"N1","dn":100,"rating":"CL150","facing":"RF","location":{"on":"shell","elevation":3000,"orientationDeg":270},"projection":1000},
+        "suppressed": false,
+        "affected": ["#6","#5","#7","#8"]
+      },
+      {
+        "id": "#38",
+        "name": "create_pipeline",
+        "params": {"service":"P","sequence":"1001","spec":"CS150","dn":100,"from":"P-101:N2","to":"V-101:N1","designTempC":60,"designPressureBarG":10},
+        "suppressed": false,
+        "affected": ["#11"]
+      },
+      {
+        "id": "#39",
+        "name": "route_pipe",
+        "params": {"lineId":"#11","from":{"portId":"P-101:N2"},"to":{"portId":"V-101:N1"},"legs":[{"direction":"+Z","length":1500},{"direction":"+Y","length":3000},{"direction":"+X","length":3000},{"direction":"+Z","length":1500}]},
+        "suppressed": false,
+        "affected": ["#12"]
+      },
+      {
+        "id": "#40",
+        "name": "update_equipment_parameters",
+        "params": {"equipment":"V-101","set":{"location":[7500,3000]}},
+        "suppressed": false,
+        "affected": ["#6","#5","#7","#8","#12","#9","#13","#14","#16","#18","#19","#20","#21","#22","#23","#24","#25","#26"]
+      },
+      {
+        "id": "#41",
+        "name": "update_equipment_parameters",
+        "params": {"equipment":"V-101","set":{"location":[7500,3500]}},
+        "suppressed": false,
+        "affected": ["#6","#5","#7","#8","#12","#9","#13","#14","#16","#18","#19","#20","#21","#22","#23","#24","#25","#26"]
+      },
+      {
+        "id": "#42",
+        "name": "edit_route",
+        "params": {"runId":"#12","op":"stretch_leg","index":2,"length":3500},
+        "suppressed": false,
+        "affected": ["#12"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 13,
+    "plant": {
+      "catalog": {
+        "catalogs": {"#31":{"format":"#30","schemaVersion":1,"id":"#31","version":"1.0.0","title":"02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.","licence":"open-data","families":[{"id":"asme-b16.9-lr90-rte-stub","type":"elbow90","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"dims":{"centreToEnd":{"value":76,"unit":"mm","verified":false,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)"}}}},{"size":{"system":"NPS","key":"3","value":3},"dims":{"centreToEnd":{"value":114,"unit":"mm","verified":false,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)"}}}},{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEnd":{"value":152,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S9","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"}}}},{"size":{"system":"NPS","key":"6","value":6},"dims":{"centreToEnd":{"value":229,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S9+S10","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)"}}}}]},{"id":"asme-b16.9-lr45-rte-stub","type":"elbow45","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEnd":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S10","citation":"02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)"}}}}]},{"id":"asme-b16.5-wn-rf-rte-stub","type":"flangeWeldNeck","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"outsideDiameter":{"value":228.6,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"thickness":{"value":22.4,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltCircle":{"value":190.5,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltCount":{"value":8,"unit":"count","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"raisedFaceDiameter":{"value":157.2,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"lengthThroughHub":{"value":76,"unit":"mm","verified":false,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}}}}]},{"id":"asme-b16.20-sw-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"dims":{"innerRingId":{"value":106.4,"unit":"mm","verified":true,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}},"centeringRingOd":{"value":174.8,"unit":"mm","verified":true,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}},"thickness":{"value":3,"unit":"mm","verified":false,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}}}}]},{"id":"asme-b16.5-bolting-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"boltCount":{"value":8,"unit":"count","verified":false,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":false,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}}}}]},{"id":"asme-b16.9-tee-rte-stub","type":"tee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"dims":{"centreToEndRun":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}},"centreToEndBranch":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}}}},{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEndRun":{"value":105,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}},"centreToEndBranch":{"value":105,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}}}},{"size":{"system":"NPS","key":"6","value":6},"dims":{"centreToEndRun":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}},"centreToEndBranch":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}}}}]},{"id":"asme-b16.9-reducing-tee-rte-stub","type":"reducingTee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"4","value":4},"dims":{"centreToEndRun":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}},"centreToEndBranch":{"value":130,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}}}}]},{"id":"#32","type":"reducerConcentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"smallSize":{"system":"NPS","key":"3","value":3},"dims":{"length":{"value":102,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"}}}},{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"4","value":4},"dims":{"length":{"value":140,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"}}}}]},{"id":"mss-sp-97-weldolet-rte-stub","type":"weldolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"2","value":2},"dims":{"centreToOutlet":{"value":144,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"}}}}]}]}},
+        "catalogOrder": ["#31"]
+      },
+      "spec": {
+        "specs": {"CS150":[{"format":"llull-pipe-spec","schemaVersion":1,"id":"CS150","revision":1,"title":"Carbon steel, ASME Class 150 RF, NPS 2-6 (02 RTE validation spec; dimensions of the SC-RTE plans)","service":"SC-RTE validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6}},"catalogs":["#31","llull-open-piping"],"components":[{"id":"P-BW","type":"pipe","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b36.10m","ends":"BE","schedule":"40"},{"id":"E90-LR","type":"elbow90","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","radius":"LR","scheduleFromPipe":true},{"id":"E45-LR","type":"elbow45","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","radius":"LR","scheduleFromPipe":true},{"id":"T-BW","type":"tee","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RT-BW","type":"reducingTee","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"4","value":4},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RED-C","type":"reducerConcentric","from":{"system":"NPS","key":"3","value":3},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"4","value":4},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"W-BW","type":"weldolet","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"2","value":2},"catalogRef":"mss-sp-97","ends":"BW","scheduleFromPipe":true},{"id":"F-WN","type":"flangeWeldNeck","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.5","facing":"RF","class":150},{"id":"G-SW","type":"gasketSpiralWound","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.20","class":150},{"id":"B-STUD","type":"boltSet","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.5-bolting","facing":"RF","class":150},{"id":"V-GATE","type":"valveGate","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.10","ends":"FL","facing":"RF","class":150}],"branchTable":{"system":"NPS","cells":{"4":{"4":"T"},"6":{"2":"W","4":"RT","6":"T"}}},"insulation":[{"code":"H","dnMax":100,"tempMaxC":100,"thicknessMm":30,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":100,"tempMaxC":200,"thicknessMm":50,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":150,"tempMaxC":200,"thicknessMm":60,"material":"mineral wool","conductivityWmK":0.0598535265}],"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"status":"draft","provenance":{"accessed":"2026-10-24","author":"02 RTE validation pack"}}]},
+        "specOrder": ["CS150"]
+      },
+      "piping": {
+        "tieIns": {},
+        "tieInOrder": [],
+        "lines": {"#11":{"id":"#11","lineNumber":"100-P-1001-CS150","service":"P","sequence":"1001","spec":"CS150","dn":100,"designPressureBarG":10,"designTempC":60,"from":"P-101:N2","to":"V-101:N1"}},
+        "lineOrder": ["#11"],
+        "runs": {"#12":{"id":"#12","lineId":"#11","start":{"point":[0,0,1000],"direction":[0,0,1],"ref":{"kind":"nozzle","equipmentId":"#3","nozzleId":"N2"}},"end":{"point":[6500,3500,4000],"direction":[-1,0,0],"ref":{"kind":"nozzle","equipmentId":"#6","nozzleId":"N1"}},"pis":[[0,0,2500],[0,3500,2500],[3500,3500,2500],[3500,3500,4000]]}},
+        "runOrder": ["#12"],
+        "entityIds": {"#12":["#9","#13","#14","#16","#18","#19","#20","#21","#22","#23","#24","#25","#26"]}
+      }
+    },
+    "building": {
+      "project": {
+        "name": "Untitled project",
+        "client": "",
+        "address": "",
+        "author": "",
+        "drawingNumber": "A-101",
+        "revision": "0",
+        "date": ""
+      },
+      "levels": {
+        "#43": {"id":"#43","name":"Level 0","elevation":0,"height":3000}
+      },
+      "levelOrder": [
+        "#43"
+      ],
+      "activeLevelId": "#43",
+      "elements": {
+        "#3": {"id":"#3","category":"equipment","mark":"P-101","entityIds":["#1","#4"],"levelId":"#43","name":"Centrifugal pump","location":[0,-300],"angle":0,"size":[1200,600,800],"clearance":800,"weight":650,"plant":{"schema":"llull-plant-equipment/1","template":{"kind":"block"},"nozzles":[{"mark":"N2","dn":100,"rating":"CL150","facing":"RF","location":{"on":"free","position":[0,300,1000],"direction":[0,0,1]},"projection":300,"neckOutsideDiameter":114.3,"neckWall":6.02,"flange":{"outsideDiameter":228.6,"thickness":22.4,"placeholder":false,"unverified":false,"catalogRef":"llull-open-piping@1.0.0/asme-b16.5-wn-rf","source":"ASME B16.5"}}]}},
+        "#6": {"id":"#6","category":"equipment","mark":"V-101","entityIds":["#5","#7","#8"],"levelId":"#43","name":"Feed drum","location":[7500,3500],"angle":0,"size":[1640,1640,5410],"clearance":800,"weight":2432.63574,"plant":{"schema":"llull-plant-equipment/1","template":{"kind":"vessel","orientation":"vertical","insideDiameter":1600,"tangentLength":4000,"heads":{"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}},"shellThickness":10,"headThickness":10,"corrosionAllowance":3,"support":{"type":"skirt","height":1000,"thickness":10,"baseRingWidth":0}},"design":{"pressure":{"value":1,"unit":"MPa"},"temperatureC":150,"material":"SA-516 Gr 70","allowableStress":{"value":137.9,"unit":"MPa","source":"user input"},"jointEfficiency":{"shell":1,"heads":1},"materialDensityKgM3":7850},"nozzles":[{"mark":"N1","dn":100,"rating":"CL150","facing":"RF","location":{"on":"shell","elevation":3000,"orientationDeg":270},"projection":1000,"neckOutsideDiameter":114.3,"neckWall":6.02,"flange":{"outsideDiameter":228.6,"thickness":22.4,"placeholder":false,"unverified":false,"catalogRef":"llull-open-piping@1.0.0/asme-b16.5-wn-rf","source":"ASME B16.5"}}]},"shape":"vertical_vessel"}
+      },
+      "elementOrder": [
+        "#3",
+        "#6"
+      ],
+      "uid": "#44",
+      "counters": {
+        "level": 1,
+        "equipment": 2
+      }
+    }
+  }
+}

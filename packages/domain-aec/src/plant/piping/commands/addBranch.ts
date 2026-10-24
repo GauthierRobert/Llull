@@ -38,7 +38,7 @@ export const addBranch = defineCommand({
     'tee splits the header leg (header pieces shortened by the catalogue centre-to-end C); an olet sits on the header pipe, which stays whole; the ' +
     'branch pipe starts from the fitting outlet (tee M, olet A from the header centreline). at: { point: [x, y, z] } on the header centreline (within ' +
     '0.01 mm) or { leg, distance } (distance from the leg start, mm). The branch leaves perpendicular to the header (within the spec angle ' +
-    'tolerance): give legs [{ direction, length }] and optionally via, and/or `to` (a free port of size dn, or an open point; with `to` and no legs the ' +
+    'tolerance): give legs [{ direction, length }] (a leg may be sloped: planLength + slope as in route_pipe, e.g. a drain falling away from the header) and optionally via, and/or `to` (a free port of size dn, or an open point; with `to` and no legs the ' +
     'branch runs straight to it). The branch is a new run of the same line (or of lineId) at size dn; its first piece is cut after the fitting. Returns the ' +
     'branch run id (affected[0]) and the branch point id (affected[1]); data = { branchRunId, branchId, headerRunId, fitting (tee, reducingTee, weldolet ' +
     '..., stubIn), fittingCode (T, RT, W, S, TH, SI, SIR), partId, headerDn, branchDn, leg, distance, position, direction, branchStartMm, ' +
@@ -155,6 +155,7 @@ export const addBranch = defineCommand({
         ...(target?.ref === undefined ? {} : { ref: target.ref }),
       },
       pis: path.points.slice(1, -1),
+      ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
       ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
     };
     const nextHeader: PipeRun = { ...header, branches: [...(header.branches ?? []), point] };

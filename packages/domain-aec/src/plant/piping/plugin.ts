@@ -11,14 +11,21 @@ import { createPipeline } from './commands/pipeline';
 import { autoRoutePipe, routeProblem } from './commands/autoRoute';
 import { convertPipeRun } from './commands/convertPipeRun';
 import { deletePipeRun } from './commands/deleteRun';
+import { editRoute } from './commands/editRoute';
 import { routePipe } from './commands/routePipe';
 import { addBranch } from './commands/addBranch';
 import { checkPiping } from './commands/checkPiping';
 import { insertInlineComponent, moveInlineComponent, removeInlineComponent } from './commands/inlineComponents';
 import { pipingConnectivity } from './commands/pipingConnectivity';
+import { setPipingSettings } from './commands/pipingSettings';
 import { pipingTakeoff } from './commands/pipingTakeoff';
 import { updatePipeline } from './commands/updatePipeline';
 import { pipingDerivationGuard, pipingDocument } from './derive';
+import { pipingClashBodies } from './clashBodies';
+import { registerClashSource } from '../../industrial/clash/clashSources';
+
+// check_clashes sees the pipe runs and their insulation through this source (the clash code does not import the piping plugin).
+registerClashSource(pipingClashBodies);
 
 export const pipingPlugin: CadPlugin = {
   name: 'piping',
@@ -26,8 +33,10 @@ export const pipingPlugin: CadPlugin = {
   commands: commandCatalog(
     addTieInPoint,
     createPipeline,
+    setPipingSettings,
     updatePipeline,
     routePipe,
+    editRoute,
     insertInlineComponent,
     moveInlineComponent,
     removeInlineComponent,

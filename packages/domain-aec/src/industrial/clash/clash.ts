@@ -13,6 +13,8 @@ import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
+import { externalClashes } from './clashPlant';
+import { externalBodies } from './clashSources';
 import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
 import { columnsInOpening } from '../../building/geometry/openingColumns';
 
@@ -40,7 +42,8 @@ function relevant(a: BimCategory, b: BimCategory): boolean {
 export interface Clash {
   readonly a: string;
   readonly b: string;
-  readonly kind: 'hard' | 'clearance';
+  /** `insulation`: a pipe's insulation envelope (OD + 2 x thickness) penetrates a body that its bare pipe clears. */
+  readonly kind: 'hard' | 'clearance' | 'insulation';
   /** Penetration depth in document units. */
   readonly depth: number;
 }
@@ -141,6 +144,7 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
       if (depth > tolerance) record({ a: low.elementId, b: high.elementId, kind: 'hard', depth });
     }
   }
+  for (const clash of externalClashes(externalBodies(doc), solids, tolerance)) record(clash);
   const inScope = (levelId: string): boolean => levelIds === null || levelIds.has(levelId);
   const penetrations = [
     ...slabPenetrations(building, inScope, tolerance),
@@ -174,7 +178,8 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
       }
     }
   }
-  return [...found.values()].sort((x, y) => (x.kind === y.kind ? y.depth - x.depth : x.kind === 'hard' ? -1 : 1));
+  const rank = { hard: 0, insulation: 1, clearance: 2 } as const;
+  return [...found.values()].sort((x, y) => (x.kind === y.kind ? y.depth - x.depth : rank[x.kind] - rank[y.kind]));
 }
 
 /**
@@ -190,8 +195,11 @@ export const checkClashes = defineCommand({
     'a stair whose headroom (2 m above its treads) runs into a slab without a well (add_slab_opening stairId), a door / window opening ' +
     'that overlaps a column in its wall line, ' +
     'plus equipment maintenance-clearance violations. Steel-to-steel joints, a beam ending in the wall or column it frames into, run connections (a pipe end inside equipment, a pipe / tray ' +
-    'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind ' +
-    'and penetration depth (document units; summary in mm).',
+    'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Spec-driven pipe runs (route_pipe) ' +
+    'take part with their pipe pieces and elbows (valves, flanges and tees are not modelled yet; boxes of the pipe outside diameter): a hit is a ' +
+    'hard clash with the part id, e.g. "run-4/pipe-2"; the insulation of an insulated line (create_pipeline insulation, OD + 2 x thickness) is ' +
+    'checked too and a hit that the bare pipe clears is kind "insulation"; a run is not checked against the runs attached to it or the equipment ' +
+    'its nozzles sit on. Returns element ids, kind ("hard", "insulation" or "clearance") and penetration depth (document units; summary in mm).',
   params: z.object({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
     tolerance: z.number().optional().describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),
@@ -207,12 +215,12 @@ export const checkClashes = defineCommand({
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
       return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;
     };
-    const hard = clashes.filter((clash) => clash.kind === 'hard').length;
+    const count = (kind: Clash['kind']): number => clashes.filter((clash) => clash.kind === kind).length;
     return report(
       doc,
       clashes.length === 0
         ? 'No clashes found.'
-        : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${briefList(clashes, describe, 10, '; ')}.`,
+        : `${count('hard')} hard clash(es), ${count('insulation') === 0 ? '' : `${count('insulation')} insulation clash(es), `}${count('clearance')} clearance violation(s): ${briefList(clashes, describe, 10, '; ')}.`,
       { clashes },
     );
   },

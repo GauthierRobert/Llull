@@ -3,7 +3,7 @@ import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { getPiping, refuse } from '../model';
 import { deriveRun } from '../routeParts';
-import { takeoffOf, type TakeoffRun } from '../takeoff';
+import { insulationTakeoff, takeoffOf, type TakeoffRun } from '../takeoff';
 
 /**
  * @affects none (query: returns the same document; results in `data`)
@@ -17,7 +17,7 @@ export const pipingTakeoff = defineCommand({
     'Query: bill of materials and cut list of routed pipe, derived from the stored runs and their spec: part counts by key (elbow90LR, flangeWeldNeck, ' +
     'gasketSpiralWound, boltSet, valveGate, reducerConcentric, tee, reducingTee, weldolet, stubIn ...), pipePieces (cutLengthMm per straight piece, leg index), joints (buttWeld, branchWeld = the set-on weld of an olet or stub-in to the header, flanged, fittingToFitting, with ' +
     'position and gap), counts also hold buttWelds, branchWelds, socketWelds, threadedJoints, flangedJoints and fittingToFitting, studs, totalPipeMm, centrelineLengthMm (legs - 2 x centre-to-end + arcs), legs and turns (angle, nominal angle, ' +
-    'deviationDeg, centreToEnd), inline (valves and reducers: faces, part ids, size), branches (tee / olet / stub-in per branch point), warnings and unverified (spec not approved or catalogue rows not grade A, with reasons). Lengths in mm. Give runId ' +
+    'deviationDeg, centreToEnd), inline (valves and reducers: faces, part ids, size), branches (tee / olet / stub-in per branch point), insulation (per insulated line: code, thickness, material, pipeLengthMm of the straight pieces and the outer area of the insulation round them in m2; fittings are not counted), warnings and unverified (spec not approved or catalogue rows not grade A, with reasons). Lengths in mm. Give runId ' +
     'or lineId; with neither, every run is counted. A run that no longer derives (its equipment or tie-in moved or was removed, the spec lost a part: ' +
     'marked broken) is skipped and listed in data.brokenRuns [{ runId, code, message }]; asked for by runId it is refused with its RTE_* code. Refusals: ' +
     'RTE_UNKNOWN_RUN, RTE_UNKNOWN_LINE. Does not modify the document. Next: check_piping for the issues; route_pipe / insert_inline_component / add_branch to change the route.',
@@ -62,7 +62,7 @@ export const pipingTakeoff = defineCommand({
       doc,
       `piping_takeoff: ${runs.length} run(s)${brokenRuns.length === 0 ? '' : ` (${brokenRuns.length} broken skipped: ${brokenRuns.map((run) => `${run.runId} ${run.code}`).join(', ')})`}, ${takeoff.pipePieces.length} pipe piece(s) totalling ${takeoff.totalPipeMm} mm, centreline ${takeoff.centrelineLengthMm} mm, ` +
         `${takeoff.joints.length} joint(s), ${takeoff.studs} stud(s)${takeoff.unverified ? `; unverified: ${takeoff.unverifiedReasons.join('; ')}` : ''}.`,
-      { runs: runs.map((run) => run.runId), brokenRuns, ...takeoff },
+      { runs: runs.map((run) => run.runId), brokenRuns, ...takeoff, insulation: insulationTakeoff(piping, runs) },
     );
   },
 });

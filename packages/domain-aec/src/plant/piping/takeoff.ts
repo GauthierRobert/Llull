@@ -3,7 +3,7 @@
  * legs, turns and studs. Pure aggregation over `RunDerivation`s; nothing is stored.
  */
 
-import type { Joint, RoutedPart } from '@aec/plant/types';
+import type { Joint, PipingModel, RoutedPart } from '@aec/plant/types';
 import type { DerivationWarning, DerivedBranch, DerivedInline, DerivedLeg, DerivedTurn, RunDerivation } from './deriveTypes';
 
 export interface TakeoffRun {
@@ -47,6 +47,51 @@ export interface Takeoff {
   readonly warnings: readonly DerivationWarning[];
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
+}
+
+export interface InsulationRow {
+  readonly lineId: string;
+  readonly lineNumber: string;
+  readonly code: string;
+  readonly thicknessMm: number;
+  readonly material: string | null;
+  readonly source: 'spec' | 'explicit';
+  /** Sum of the cut lengths of the straight pipe pieces of the line's runs (fittings are not counted), mm. */
+  readonly pipeLengthMm: number;
+  /** Outer surface of the insulation round those pieces: sum of pi x (OD + 2 t) x cut length, m2. */
+  readonly outerAreaM2: number;
+}
+
+/** Insulation quantities per insulated line over the pipe pieces of `runs` (02 RTE FR-RTE-16); fittings, valves and flanges are not counted. */
+export function insulationTakeoff(piping: PipingModel, runs: readonly TakeoffRun[]): InsulationRow[] {
+  const rows = new Map<string, { length: number; area: number }>();
+  for (const { runId, derivation } of runs) {
+    const lineId = piping.runs[runId]?.lineId;
+    const insulation = lineId === undefined ? undefined : piping.lines[lineId]?.insulation;
+    if (lineId === undefined || insulation === undefined) continue;
+    const row = rows.get(lineId) ?? { length: 0, area: 0 };
+    for (const part of derivation.parts) {
+      if (part.kind !== 'pipe' || part.cutLength === undefined) continue;
+      const od = part.dims['outsideDiameter'] ?? 0;
+      row.length += part.cutLength;
+      row.area += (Math.PI * (od + 2 * insulation.thicknessMm) * part.cutLength) / 1e6;
+    }
+    rows.set(lineId, row);
+  }
+  return [...rows.entries()].map(([lineId, row]) => {
+    const line = piping.lines[lineId];
+    const insulation = line?.insulation;
+    return {
+      lineId,
+      lineNumber: line?.lineNumber ?? lineId,
+      code: insulation?.code ?? '',
+      thicknessMm: insulation?.thicknessMm ?? 0,
+      material: insulation?.material ?? null,
+      source: insulation?.source ?? 'explicit',
+      pipeLengthMm: round(row.length),
+      outerAreaM2: round(row.area),
+    };
+  });
 }
 
 const bump = (counts: Record<string, number>, key: string, by = 1): void => {

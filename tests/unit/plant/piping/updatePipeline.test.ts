@@ -42,7 +42,7 @@ describe('update_pipeline on a line without runs', () => {
   it('insulation adds its suffix to a template number (-H50) and null removes it; from / to set and clear; design conditions are stored', () => {
     const insulated = apply(s.doc, 'update_pipeline', {
       lineId: s.lineId,
-      insulation: { code: 'H', thicknessMm: 50 },
+      insulation: { code: 'H', thickness: 50 },
       from: 'E-1',
       to: 'E-2',
       designPressureBarG: 10,
@@ -50,7 +50,7 @@ describe('update_pipeline on a line without runs', () => {
     });
     expect(piping(insulated).lines[s.lineId]).toMatchObject({
       lineNumber: '100-P-1001-CS150-H50',
-      insulation: { code: 'H', thicknessMm: 50 },
+      insulation: { code: 'H', thicknessMm: 50, source: 'explicit' },
       from: 'E-1',
       to: 'E-2',
       designPressureBarG: 10,

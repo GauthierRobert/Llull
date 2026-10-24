@@ -53,7 +53,7 @@ describe('create_pipeline', () => {
       sequence: '4001',
       spec: 'CS150',
       dn: 80,
-      insulation: { code: 'H', thicknessMm: 50 },
+      insulation: { code: 'H', thickness: 50 },
       designTempC: 180,
       from: 'E-201',
     });

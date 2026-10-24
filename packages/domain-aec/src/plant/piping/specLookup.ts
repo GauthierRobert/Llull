@@ -74,6 +74,15 @@ export interface BranchChoice {
   readonly row: CatalogueRow | null;
 }
 
+/** The insulation a spec's table gives for a line. */
+export interface InsulationChoice {
+  readonly thicknessMm: number;
+  readonly material: string;
+  readonly conductivityWmK: number | null;
+  /** The table row, named in results (`H dn<=100 T<=200C`). */
+  readonly row: string;
+}
+
 export interface SpecLookup {
   readonly id: string;
   readonly revision: number;
@@ -82,6 +91,8 @@ export interface SpecLookup {
   component(query: PartQuery): CatalogueRow | SpecMiss;
   /** The branch-table fitting for `headerDn` x `branchDn` (PSC `resolveBranch`); a cell-less pair is `RTE_BRANCH_NO_TABLE_ROW`. */
   branch(headerDn: number, branchDn: number): BranchChoice | SpecMiss;
+  /** Thickness for insulation `code` on a line of `dn` at `tempC` (02 RTE §5.10): the tightest row (smallest dnMax, then tempMaxC) that covers both. */
+  insulation(code: string, dn: number, tempC: number): InsulationChoice | SpecMiss;
   elbowAngles(): ElbowRule;
   connection(a: EndType, b: EndType): ConnectionRule | null;
 }
@@ -164,6 +175,32 @@ function elbowRule(spec: PipeSpec): ElbowRule {
   };
 }
 
+function insulationOf(spec: PipeSpec, code: string, dn: number, tempC: number): InsulationChoice | SpecMiss {
+  const rows = (spec.insulation ?? []).filter((row) => row.code === code);
+  if (rows.length === 0)
+    return miss(
+      'RTE_SPEC_NO_COMPONENT',
+      `spec ${spec.id} has no insulation table row for code "${code}"${spec.insulation === undefined ? ' (the spec has no insulation table)' : ` (codes: ${[...new Set(spec.insulation.map((row) => row.code))].join(', ')})`}`,
+      [spec.id],
+      ['insulation'],
+    );
+  const fits = rows.filter((row) => dn <= row.dnMax && tempC <= row.tempMaxC).sort((a, b) => a.dnMax - b.dnMax || a.tempMaxC - b.tempMaxC);
+  const best = fits[0];
+  if (best === undefined)
+    return miss(
+      'RTE_SPEC_NO_COMPONENT',
+      `spec ${spec.id} insulation "${code}" has no row for DN${dn} at ${tempC} degC (rows: ${rows.map((row) => `dn<=${row.dnMax} T<=${row.tempMaxC}C`).join(', ')})`,
+      [spec.id],
+      ['insulation'],
+    );
+  return {
+    thicknessMm: best.thicknessMm,
+    material: best.material,
+    conductivityWmK: best.conductivityWmK ?? null,
+    row: `${best.code} dn<=${best.dnMax} T<=${best.tempMaxC}C`,
+  };
+}
+
 /**
  * The lookup of spec `specId` (newest revision) in `doc`, or the miss that says why routing cannot read it.
  * @failure no such spec, or a catalogue the spec names is not loaded -> RTE_SPEC_UNKNOWN (a missing catalogue would silently change dimensions)
@@ -213,6 +250,7 @@ export function createSpecLookup(doc: Pick<CadDocument, 'plant'>, specId: string
       const { fitting, fittingName, component } = outcome.resolved;
       return { fitting, fittingName, row: component === null ? null : rowOf(spec, { ok: true, resolved: component }, headerDn, branchDn) };
     },
+    insulation: (code, dn, tempC) => insulationOf(spec, code, dn, tempC),
     elbowAngles: () => elbowRule(spec),
     connection: (a, b) => CONNECTIONS.find(([x, y]) => x === a && y === b)?.[2] ?? null,
   };

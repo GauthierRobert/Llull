@@ -17,6 +17,7 @@ import { getPiping } from './model';
 import { portOfRef } from './ports';
 import { withDependents } from './runLinks';
 import { deriveRun } from './routeParts';
+import { stretchRun, type StretchDone } from './stretch';
 import { pipingErrors } from './validate';
 
 interface RunState {
@@ -24,12 +25,19 @@ interface RunState {
   readonly broken?: { readonly code: string; readonly reason: string };
 }
 
+/** Why a run does not derive; a moved port is explained by the stretch that was tried (live and load give the same reason). */
+function brokenReason(doc: CadDocument, run: PipeRun, failure: { readonly code: string; readonly message: string }): string {
+  if (failure.code !== 'RTE_STRETCH_FAILED') return failure.message;
+  const attempt = stretchRun(doc, run);
+  return attempt.kind === 'failed' ? `${failure.message}; ${attempt.reason}` : failure.message;
+}
+
 /** The entities of `run` in route order, or why it does not derive (unknown spec, missing or moved port, short leg ...). */
 function runState(doc: CadDocument, run: PipeRun): RunState {
   try {
     const line = getPiping(doc).lines[run.lineId];
     const derived = deriveRun(doc, run);
-    if (!derived.ok) return { entities: [], broken: { code: derived.code, reason: derived.message } };
+    if (!derived.ok) return { entities: [], broken: { code: derived.code, reason: brokenReason(doc, run, derived) } };
     return { entities: line === undefined ? [] : derived.parts.flatMap((part) => partEntities(part, line)) };
   } catch {
     // Unvalidated raw data (restore) or a corrupt slice: the run is broken, never a throw.
@@ -134,13 +142,36 @@ function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
   return piping.runOrder.filter((id) => reached.has(id));
 }
 
+const mm = (v: readonly number[]): string => v.map((x) => +x.toFixed(3)).join(', ');
+
+function describeStretch(done: StretchDone): string {
+  const moved = [
+    done.startMoveMm === null ? '' : `start moved ${mm(done.startMoveMm)}`,
+    done.endMoveMm === null ? '' : `end moved ${mm(done.endMoveMm)}`,
+  ];
+  const legs = done.legChanges.map(
+    (change) => `leg ${change.leg} (${change.direction}) ${change.changeMm > 0 ? '+' : ''}${+change.changeMm.toFixed(3)} mm`,
+  );
+  return `${done.run.id} (${moved.filter((text) => text !== '').join(', ')}; ${legs.join(', ')})`;
+}
+
 /** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */
 function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
   if ((next.plant === previous.plant && next.building === previous.building) || getPiping(next).runOrder.length === 0)
     return { document: next, notes: [], affected: [] };
   const affected = affectedRuns(previous, next);
   if (affected.length === 0) return { document: next, notes: [], affected: [] };
-  const document = affected.reduce(withRunEntities, next);
+  // Runs whose connected ports moved follow them first (orthogonal stretch, in run order so a branch sees its stretched header).
+  let working = next;
+  const stretched: StretchDone[] = [];
+  for (const id of affected) {
+    const run = getPiping(working).runs[id];
+    const outcome = run === undefined ? undefined : stretchRun(working, run);
+    if (outcome?.kind !== 'stretched') continue;
+    working = outcome.document;
+    stretched.push(outcome);
+  }
+  const document = affected.reduce(withRunEntities, working);
   const runs = getPiping(document).runs;
   const was = getPiping(next).runs;
   const newlyBroken = affected.flatMap((id) => {
@@ -151,7 +182,7 @@ function reconcile(previous: CadDocument, next: CadDocument): { document: CadDoc
   return {
     document,
     notes: [
-      `piping: re-derived ${affected.length} run(s)${newlyBroken.length === 0 ? '' : `; now broken, parts removed: ${newlyBroken.join('; ')}`}.`,
+      `piping: re-derived ${affected.length} run(s)${stretched.length === 0 ? '' : `; re-routed ${stretched.length} run(s) by orthogonal stretch: ${stretched.map(describeStretch).join('; ')}`}${newlyBroken.length === 0 ? '' : `; now broken, parts removed: ${newlyBroken.join('; ')}`}.`,
     ],
     affected: [...new Set([...affected, ...ids(next), ...ids(document)])],
   };

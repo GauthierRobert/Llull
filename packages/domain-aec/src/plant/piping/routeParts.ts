@@ -25,6 +25,7 @@ import { centrelineLength, chooseElbow, turnAngleDeg, type ElbowChoice } from '.
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
+import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
 import { flangeParts, mintSet, setupEnd } from './routeEnds';
 import { at, makeEnv, partOf, type Env, type Mint, type Slot } from './routeEnv';
@@ -33,6 +34,13 @@ import { dnAfter, endDn, startDn } from './runSizes';
 import { isMiss, type SpecLookup } from './specLookup';
 
 const BRANCH_KINDS: ReadonlySet<string> = new Set(['olet', 'stubIn']);
+
+/** Plan length, drop and slope angle of a sloped leg, rounded to micrometres / micro-degrees (float noise out of the answers). */
+function slopeFields(u: Vec3, length: number): Pick<DerivedLeg, 'planLengthMm' | 'dropMm' | 'slopeDeg'> {
+  const fall = legFall(u, length);
+  const round = (value: number): number => Math.round(value * 1e6) / 1e6;
+  return { planLengthMm: round(fall.planLengthMm), dropMm: round(fall.dropMm), slopeDeg: round(fall.slopeDeg) };
+}
 
 /** Warning record of a stack warning on leg `leg`. */
 function warningOf(warning: StackWarning, runId: string, leg: number): DerivationWarning {
@@ -77,6 +85,7 @@ function chooseTurns(
       centreToEnd: choice.centreToEnd,
       radius: choice.radius,
       catalogueKey: choice.row.key,
+      typeKey: `${choice.row.type}${choice.row.radius ?? ''}`,
     });
   }
   return { elbows, turns };
@@ -294,6 +303,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
       start: origin,
       end: points[leg + 1] as Vec3,
       cutLengthsMm: cuts,
+      ...(isSloped(u) ? slopeFields(u, length) : {}),
     });
     if (leg < legCount - 1) {
       const index = leg + 1;

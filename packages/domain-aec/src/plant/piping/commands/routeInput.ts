@@ -22,6 +22,16 @@ export const portOrPoint = z.union([
 
 export type Endpoint = z.infer<typeof portOrPoint>;
 
+/** A declared slope (`route_pipe` legs, `create_pipeline`, `update_pipeline`). */
+export const slopeInput = z.object({
+  value: z
+    .number()
+    .positive()
+    .describe('Slope size, > 0: percent of the plan length (1 = 1 %), a ratio (0.01) or degrees, per unit. At most 45 degrees (100 %).'),
+  unit: z.enum(['percent', 'ratio', 'deg']).describe('"percent" (1 = 1 %), "ratio" (drop / plan length, 0.01) or "deg".'),
+  fall: z.boolean().describe('true = the pipe descends along the flow (a drain); false = it rises along the flow.'),
+});
+
 export const legsInput = z
   .array(
     z.object({
@@ -32,6 +42,19 @@ export const legsInput = z
         .number()
         .optional()
         .describe('Length along the direction, document units, > 0. May be omitted on the last leg when `to` is a port.'),
+      planLength: z
+        .number()
+        .optional()
+        .describe(
+          'Sloped leg: the HORIZONTAL length, document units, > 0 (give it with slope and without length). The leg runs along the horizontal direction ' +
+            'and falls / rises by slope: drop = planLength x s, length = planLength x sqrt(1 + s^2) (1 % over 8000: drop 80, length 8000.39999).',
+        ),
+      slope: slopeInput
+        .optional()
+        .describe(
+          'Slope of this leg (needs planLength; the direction must be horizontal, a compass +X..-Y or a horizontal vector). The following elbow ' +
+            'turns by the real angle (89.427 degrees for a 1 % leg into a vertical one), which is a standard 90 elbow within the spec tolerance.',
+        ),
     }),
   )
   .optional()
