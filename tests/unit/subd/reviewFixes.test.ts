@@ -191,11 +191,13 @@ describe('check_subdivision honesty (review 7)', () => {
   it('compares the exact seam gap and angle with named tolerances', () => {
     const { doc, id } = add({ levels: 3 });
     const ctx = (gap: number, angle: number): Parameters<typeof execute>[3] => ({ ...defaultContext(), kernel: kernelWith(gap, angle) });
-    expect(codes(run(doc, 'check_subdivision', { id }, ctx(1e-7, 0.02)))).not.toContain('DIR_CHECK_PATCH_SEAM_GAP');
-    expect(codes(run(doc, 'check_subdivision', { id }, ctx(1e-2, 0.02)))).toContain('DIR_CHECK_PATCH_SEAM_GAP');
-    expect(codes(run(doc, 'check_subdivision', { id }, ctx(1e-7, 0.2)))).toContain('DIR_CHECK_PATCH_SEAM_ANGLE');
+    expect(codes(run(doc, 'check_subdivision', { id, exactSeams: true }, ctx(1e-7, 0.02)))).not.toContain('DIR_CHECK_PATCH_SEAM_GAP');
+    expect(codes(run(doc, 'check_subdivision', { id, exactSeams: true }, ctx(1e-2, 0.02)))).toContain('DIR_CHECK_PATCH_SEAM_GAP');
+    expect(codes(run(doc, 'check_subdivision', { id, exactSeams: true }, ctx(1e-7, 0.2)))).toContain('DIR_CHECK_PATCH_SEAM_ANGLE');
     expect(
-      codes(run(doc, 'check_subdivision', { id, tolerances: { patchSeamAngleRad: 0.5, patchSeamGap: 1 } }, ctx(1e-2, 0.2))),
+      codes(
+        run(doc, 'check_subdivision', { id, exactSeams: true, tolerances: { patchSeamAngleRad: 0.5, patchSeamGap: 1 } }, ctx(1e-2, 0.2)),
+      ),
     ).not.toContain('DIR_CHECK_PATCH_SEAM_ANGLE');
   });
 });

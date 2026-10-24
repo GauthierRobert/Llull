@@ -23,11 +23,11 @@ fn chains(value: Option<&Value>) -> Option<Vec<Vec<f64>>> {
     value?.as_array()?.iter().map(|chain| numbers(Some(chain))).collect()
 }
 
-fn indices(value: Option<&Value>) -> Option<Vec<u32>> {
+pub(super) fn indices(value: Option<&Value>) -> Option<Vec<u32>> {
     value?.as_array()?.iter().map(|index| index.as_u64().and_then(|value| u32::try_from(value).ok())).collect()
 }
 
-fn vec3_of(value: Option<&Value>) -> Option<[f64; 3]> {
+pub(super) fn vec3_of(value: Option<&Value>) -> Option<[f64; 3]> {
     match numbers(value)?.as_slice() {
         [x, y, z] => Some([*x, *y, *z]),
         _ => None,
@@ -431,38 +431,6 @@ impl Evaluator {
         };
         let Some(laws) = laws else { return Ok(Value::Null) };
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
-    }
-
-    /// `faceOp` (SC-F1, `packages/core/src/model/faceOps.ts`): draft, pushPull or splitFace on the source's unique faces.
-    pub(super) fn face_op(&mut self, recipe: &Value) -> Evaluated {
-        let Some(source) = self.child(recipe, "source")? else { return refused() };
-        let Some(faces) = indices(recipe.get("faces")).filter(|faces| !faces.is_empty()) else { return refused() };
-        let plane = |field: &str| {
-            let plane = recipe.get(field)?;
-            Some((vec3_of(plane.get("origin"))?, vec3_of(plane.get("normal"))?))
-        };
-        match recipe.get("kind").and_then(Value::as_str) {
-            Some("draft") => {
-                let (Some(pull), Some((origin, normal))) = (vec3(recipe, "pull"), plane("neutral")) else { return refused() };
-                let angle = number(recipe, "angle").unwrap_or(f64::NAN);
-                if !angle.is_finite() || angle == 0.0 {
-                    return refused();
-                }
-                shape_of(features::draft(&source, &faces, angle, pull, origin, normal))
-            }
-            Some("pushPull") => {
-                let distance = number(recipe, "distance").unwrap_or(f64::NAN);
-                match faces.as_slice() {
-                    [face] if distance.is_finite() && distance != 0.0 => shape_of(features::push_pull(&source, *face, distance)),
-                    _ => refused(),
-                }
-            }
-            Some("splitFace") => match plane("plane") {
-                Some((origin, normal)) => shape_of(features::split_faces(&source, &faces, origin, normal)),
-                None => refused(),
-            },
-            other => Err(EvalError::Unsupported(format!("faceOp kind '{}'", other.unwrap_or("")))),
-        }
     }
 
     /// `blend` (`blendedUnion`).

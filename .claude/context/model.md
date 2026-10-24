@@ -48,7 +48,7 @@ RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments; curves?  // 
 SweepEntity      'sweep'      path: CurveSegment<Vec3>[] (local, open, G1); section: {shape:'circle'; radius; innerRadius?} | {shape:'profile'; profile; curves?}; stations?: {at; ring: Vec2[]}[]  // variable section
 LoftEntity       'loft'       rings: Vec3[][] (local, aligned; SECTION_RING_POINTS each, or the dense fallback of the exact sections); ruled; sections?: NurbsCurveData[] (loft v3, exact, unresampled: the kernel skins these)
 NurbsCurveEntity 'nurbs_curve' curve: NurbsCurveData {degree 1..25; poles: Vec3[] (local); weights?; knots; multiplicities}  // 3D curve, no volume; isCurve3D(e) (model/curveKinds)
-SubdivisionEntity 'subdivision' vertices: Vec3[] (local cage); faces: number[][] (CCW from outside, closed); creases: [a, b][]; levels 0..4  // Catmull-Clark
+SubdivisionEntity 'subdivision' vertices: Vec3[] (local cage); faces: number[][] (CCW from outside; closed unless `boundary` is set); creases: [a, b][]; levels 0..4; edgeSharpness?/vertexSharpness?/creaseMethod?; boundary?: 'edge_and_corner' | 'edge_only' (present only while the cage is open: boundary edges are infinitely sharp); symmetry?; elementIds  // Catmull-Clark
 // 2D (geometry LOCAL to the work plane placed by position/rotation; default z=0, normal +Z)
 LineEntity       'line'       start: Vec2; end: Vec2
 PolylineEntity   'polyline'   points: Vec2[]; closed

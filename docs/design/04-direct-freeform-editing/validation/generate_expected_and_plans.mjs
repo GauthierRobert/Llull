@@ -163,7 +163,7 @@ save('plans/target_grip_cage_tools.json', [
   { command: 'extrude_cage_faces', params: { id: 'grip', faces: ['f-1.2', 'f-1.3', 'f-1.4', 'f-1.5'], distance: 8 } },
   { command: 'inset_cage_faces', params: { id: 'grip', faces: ['f-1.2', 'f-1.3', 'f-1.4', 'f-1.5'], thickness: 2, depth: -1 } },
   { command: 'loop_cut_cage', params: { id: 'grip', edge: [cornerTop, cornerBottom], cuts: 2 } },
-  { command: 'set_cage_crease', params: { id: 'grip', edges: { loopFrom: [cornerTop, cornerBottom] }, sharpness: 2 } },
+  { command: 'set_cage_crease', params: { id: 'grip', edges: { loopFrom: [0, 1] }, sharpness: 2 } },
   {
     command: 'edit_subdivision_cage',
     params: {
@@ -249,6 +249,7 @@ save('plans/target_subd_to_nurbs.json', [
   { command: 'subdivision_to_nurbs', params: { id: 'c', output: 'sheets', faces: 'unpacked', extraordinary: 'G0', keep: true } },
   { command: 'subdivision_to_nurbs', params: { id: 'c', output: 'solid', faces: 'packed', extraordinary: 'G1', keep: true } },
   { command: 'mass_properties', params: { entityId: 'c' } },
+  { command: 'mass_properties', params: { entityId: 'c', surfaceModel: 'limit_patches' } },
 ]);
 
 // ---------- 3. expected_results.json ----------

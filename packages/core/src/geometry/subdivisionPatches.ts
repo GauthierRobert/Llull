@@ -23,6 +23,13 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
   const { vertices, faces } = cage;
   const at = (v: number): Vec3 => vertices[v] as Vec3;
   const sharp = new Set(cage.creases.map(([a, b]) => edgeKey(a, b)));
+  // a boundary edge (one face) is a crease of the limit surface
+  const sides = new Map<string, number>();
+  for (const face of faces)
+    face.forEach((a, i) =>
+      sides.set(edgeKey(a, face[(i + 1) % 4] as number), (sides.get(edgeKey(a, face[(i + 1) % 4] as number)) ?? 0) + 1),
+    );
+  for (const [key, count] of sides) if (count === 1) sharp.add(key);
   const valence = vertices.map(() => 0);
   const creaseNeighbours = vertices.map((): number[] => []);
   const seen = new Set<string>();

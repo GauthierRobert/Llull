@@ -6,7 +6,7 @@ import { recipeOf } from '../../geometry/shapeRecipe';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../../model/units';
-import { childVolume, solidVolume } from './solidVolume';
+import { childVolume, limitPatchEntity, solidVolume } from './solidVolume';
 import { commandError, noop, report } from '../noop';
 import {
   densityPlausibilityWarning,
@@ -111,6 +111,8 @@ interface MassPropertiesData extends Partial<MassDetail> {
   volume: number;
   volumeUnit: string;
   method?: ResolvedMass['method'];
+  /** Subdivision solids: the surface the volume measures (04 DIR §5.8). */
+  surfaceModel?: 'level_mesh' | 'limit_patches';
   frame?: 'document' | 'entity';
   provenance?: MassProvenance;
   reviewRequired?: ReviewRequired;
@@ -321,6 +323,12 @@ export const massProperties = defineCommand({
       'Optional point [x, y, z] in document length units, expressed in the chosen frame, about which data.inertia.atOrigin is taken ' +
         '(parallel-axis theorem). Default: the frame origin [0, 0, 0].',
     ).optional(),
+    surfaceModel: z
+      .enum(['level_mesh', 'limit_patches'])
+      .describe(
+        "subdivision solids only: which surface the volume (and mass) measures. Default 'level_mesh': the refined `levels` mesh (what the viewport shows, identical with and without a kernel). 'limit_patches': the exact limit-surface patch solid when the native kernel is installed (volume, centroid, inertia and method all exact, from that solid); without the kernel it falls back to the level mesh. data.surfaceModel says which model was used.",
+      )
+      .optional(),
     purpose: z
       .enum(['general', 'weight-and-balance'])
       .describe(
@@ -329,7 +337,11 @@ export const massProperties = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { entityId, density, massUnit = 'g', frame = 'document', about, purpose = 'general' }, ctx): CommandResult => {
+  run: (
+    doc,
+    { entityId, density, massUnit = 'g', frame = 'document', about, purpose = 'general', surfaceModel: requestedModel },
+    ctx,
+  ): CommandResult => {
     const failed = (failure: MassFailure): CommandResult => ({
       ...noop(doc, `mass_properties: ${failure.error}`),
       ...(failure.code === undefined ? {} : { error: commandError(failure.code, failure.remediation ?? '', failure.ids ?? []) }),
@@ -352,9 +364,14 @@ export const massProperties = defineCommand({
     }
     const volumeUnit = `${doc.units}³`;
     let total: MassTotal | MassFailure;
+    let surfaceModel: 'level_mesh' | 'limit_patches' | undefined;
+    let target: Entity = e;
     if (e.kind === 'instance') total = instanceMass(doc, e, undefined, fallback, ctx);
     else {
-      const measured = solidVolume(doc, e, ctx);
+      const patches = requestedModel === 'limit_patches' ? limitPatchEntity(e, ctx) : null;
+      target = patches ?? e;
+      if (e.kind === 'subdivision') surfaceModel = patches === null ? 'level_mesh' : 'limit_patches';
+      const measured = solidVolume(doc, target, ctx);
       if ('error' in measured) return noop(doc, `mass_properties: ${measured.error}`);
       const mass = partMass(doc, measured.volume, e.materialId, fallback, entityId);
       total = 'error' in mass ? mass : { ...measured, ...mass };
@@ -367,24 +384,25 @@ export const massProperties = defineCommand({
       const resolvedDensity = weighted ? resolveDensity(doc, solid.materialId, fallback) : null;
       return resolvedDensity?.available === true ? resolvedDensity.gPerDocUnit3 : 1;
     };
-    const resolved = resolveMassProperties(doc, e, densityOf, context);
+    const resolved = resolveMassProperties(doc, target, densityOf, context);
     const method = resolved?.method ?? total.method;
     const unverifiedReasons = [...total.unverifiedReasons];
-    const warnings = resolved === null ? [] : precisionWarnings(doc, e, resolved);
+    const warnings = resolved === null ? [] : precisionWarnings(doc, target, resolved);
     const imported = importedBodyStatus(doc, e);
     const review = reviewRequired(
       purpose,
       union(unverifiedReasons, [...(resolved === null ? [] : methodReasons(resolved)), ...(imported?.reasons ?? [])]),
       warnings,
     );
-    const detail: MassDetail | null = resolved === null ? null : massDetail(doc, e, resolved, frame, about, weighted);
+    const detail: MassDetail | null = resolved === null ? null : massDetail(doc, target, resolved, frame, about, weighted);
     const densitySource = sources.length === 1 ? (sources[0] ?? '') : sources.length === 0 ? 'none' : 'several (see densitySources)';
     const volumeData: MassPropertiesData = {
       volume,
       volumeUnit,
       ...(method === undefined ? {} : { method }),
+      ...(surfaceModel === undefined ? {} : { surfaceModel }),
       ...(detail ?? {}),
-      ...(resolved === null ? {} : { frame, provenance: massProvenance(e, resolved, context, densitySource) }),
+      ...(resolved === null ? {} : { frame, provenance: massProvenance(target, resolved, context, densitySource) }),
       reviewRequired: review,
       ...(imported === undefined ? {} : { importUnverified: imported }),
       ...(warnings.length > 0 ? { warnings } : {}),

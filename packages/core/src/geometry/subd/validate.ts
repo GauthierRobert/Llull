@@ -24,6 +24,8 @@ export function subdivisionFieldsProblem(entity: Record<string, unknown>): strin
   }
   if (creaseMethod !== undefined && creaseMethod !== 'uniform' && creaseMethod !== 'chaikin')
     return "creaseMethod must be 'uniform' or 'chaikin'";
+  if (entity['boundary'] !== undefined && entity['boundary'] !== 'edge_and_corner' && entity['boundary'] !== 'edge_only')
+    return "boundary must be 'edge_and_corner' or 'edge_only'";
   if (!isRecord(elementIds)) return 'elementIds { vertices, faces } is required';
   const faceCount = Array.isArray(faces) ? faces.length : 0;
   if (!isStringList(elementIds['vertices'], vertexCount) || !isStringList(elementIds['faces'], faceCount))

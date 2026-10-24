@@ -568,3 +568,96 @@ the commit will mint, and returns `{ ok, summary, error, entity, displayLevels, 
 entity frame), `pickCage(entity, ray, tolerance)` (face under the ray, vertex / edge within the tolerance, with ids), `nearestCageElements(entity, point)`; loops and rings use `select_cage_elements`
 (`loopFrom` / `ringFrom`) or `edgeLoop` / `walkRing` from `geometry/subd/loops.ts`. Send element ids in commit params (indices are accepted and recorded). `data` of every cage command carries `vertexIds` /
 `faceIds` parallel to `vertices` / faces.
+
+## 14. As built (core and native part of M4, M5, M6, DES-4b, 2026-10-24)
+
+Scope: M4 (`edit_nurbs` `move_poles` / `drag_point`, `edit_nurbs_surface`, `subdivision_to_nurbs`), M5 (open cages, `delete_cage_faces`, `fill_cage_hole`, `bridge_cage_faces`,
+`bevel_cage_edges`, `weld_cage_vertices`, `slide_cage_edges`), M6 (`POST /preview`, `move_faces`, `delete_faces`, `squash_steps`, toolset `freeform`). Not built: every UI piece (drag handles,
+net overlays, loop-cut drag, pointer capture: the next agent), the bench of section 8, and the V2 items of M7 (radial symmetry, `fit_cage_vertices`, preserve-shape loop cut, Stam evaluation,
+`face_to_subdivision`).
+
+### 14.1 Decisions where the text left a choice
+
+- **Open cages** (`SubdivisionEntity.boundary?: 'edge_and_corner' | 'edge_only'`, present only while the cage is open). A boundary edge (one face) is infinitely sharp; `edge_and_corner`
+  (also the behaviour of any open cage that reaches `subdivide` without the field, e.g. the viewport) pins the boundary vertices of a single face, `edge_only` leaves them as crease points
+  (limit (4v + a + b) / 6: 1/6, 1/6 at the corner of a unit square). Refinement (`subdivideOnce`), the limit masks (`prepare`), the Bézier patches and `cageProblem` handle it; `pinchedVertex` walks an
+  open fan in both directions. An open cage has no volume (`mass_properties` answers "no solid volume", `check_subdivision` reports `open`, `boundaryLoops`, genus (2c - chi - b) / 2 and
+  `meshVolume: null`). Every topology command that ends closed drops `boundary` again (`finishedCage`). Persisted data is checked on load (`geometry/subd/validate.ts`, `cageProblem` with `boundary`).
+  The viewport mesh (`src/ui/.../solidMeshes.tsx`) does not pass `boundary`, which is fine for `edge_and_corner`; `edge_only` needs the field passed (UI agent).
+- **Bevel** supports a set of edges that share no vertex (`DIR_BEVEL_ADJACENT` otherwise); both ends may have any valence (valence 3: the old vertex is replaced by the two strip ends; valence >= 4 or
+  an open end: a patch polygon keeps it). `segments` lays straight intermediate loops (flat chamfer, not an arc); `sharp` is the sharpness of the two long strip edges. A bevel across a vertex chain
+  (rim loops) is a later extension.
+- **Bridge** takes side A / B as `facesA` / `facesB` (one edge-connected region with one boundary loop, removed) or `loopA` / `loopB` (an edge of a hole). The pairing rotation minimises the summed
+  distance, B walked against A, `twist` shifts it; `otherId` merges a second cage (placed by its own transform; its element ids are renamed on a clash, its symmetry is dropped) and removes that entity.
+- **Slide** takes `edges` (`{ loopFrom }` or a list: the loop through the first edge); positive `factor` moves to the LEFT of the first edge's direction seen from outside. Plane symmetry is kept by
+  `symmetrize`. **Weld** merges into the lowest index (optionally the cluster centre), with `tolerance` clusters (single linkage) or one cluster. **Fill** `quads` adds a centre vertex (even loops).
+- **`subdivision_to_nurbs`**: sheets from the once-refined cage (`quadCagePatches`: exact limit surface around regular vertices, Loop-Schaefer geometry patches next to extraordinary vertices and creases; seams
+  are gap free, every patch of an extraordinary star already shares the exact limit tangent plane AT the vertex). `faces: "packed"` merges maximal rectangles of regular quads (`geometry/subd/packedGrids.ts`:
+  greedy growth along i then j over the 4x4 rings, uniform cubic converted to a clamped NURBS by Boehm insertion at both ends). **`extraordinary: "G1"` is not Peters' construction**: the tangent
+  break along the edges next to an extraordinary vertex shrinks by about 0.43 per refinement level, so G1 refines further until the measured break is below `tangentToleranceDeg` (default 0.5 degrees, at most
+  4096 patches); the report says what was reached (`data.g1ToleranceMet`, and warning `DIR_CONVERT_G1_TOLERANCE_NOT_MET` in `data.warnings` and the summary when the 4096-patch budget ends first). `output: "solid"` is kernel-optional (refused without an exact kernel with face queries: `DIR_CONVERT_KERNEL`, and for an open cage: `DIR_CAGE_OPEN`) and always the G0 patches the native
+  `subdivision` leaf sews (a request for G1 is reported as `extraordinary: "G0"`); `data.evEdges[] { patches, valence, g0, g1Deg }`, `maxEvG0`, `maxEvG1Deg`, `starPoints[]`, `maxDeviation` (same (u, v)
+  distance to the limit surface at `samples x samples` cell centres per patch, default 2; samples the evaluator can only approximate are skipped and counted).
+- **`mass_properties` `surfaceModel`** (decision: D3's "limit patches by default" is NOT taken). `level_mesh` stays the default, so a mass is the same with and without the native kernel (VC-04..06 hold
+  on the CLI and in the app); `limit_patches` is opt-in and measures the exact patch solid: volume, centroid, inertia, `method: "exact"` and `surfaceModel` all come from that one solid (the entity is
+  measured as its kernel result), and without an exact kernel the answer falls back to the level mesh and says `level_mesh`.
+- **`move_faces` semantics.** `offset`: a plane moves along its outward normal (positive adds material); a cylinder, cone, sphere or torus face moves AWAY from its axis / centre, so +1 on a bore widens
+  it (VC-23 asks for radius 3 -> 4) and +1 on a boss thickens it. It is `BRepOffset_MakeOffset` of the whole solid with a zero global offset, `SetOffsetOnFace` for each picked face and the INTERSECTION join (`GeomAbs_Intersection`),
+  so drafted and obtuse neighbours, adjacent picked faces (two box faces +1 give 11 x 11 x 10, no notch) and a sphere work; OCC answers a shell that is made a solid and checked. (With the arc join, or
+  with every other face pinned at 0, OCC threw or answered a null shape; the intersection join is the one that works.) `translate` / `rotate`: ONE planar face goes through push-pull (the normal component of the vector; an in-plane
+  vector alone is refused) or, for rotation, `BRepOffsetAPI_DraftAngle` about the line where the old and the rotated plane meet (the draft sign is the one whose result has a face on the new plane; dihedral
+  below about 86 degrees); any other pick is a FEATURE: `BRepAlgoAPI_Defeaturing` removes it, the volume removed / added (defeatured minus original, original minus defeatured) is moved rigidly by the
+  motion and cut / fused back (a hole, a boss; pick all faces of the feature). The spec's half-space construction was not used: defeaturing a planar face of a box fails (parallel neighbours never meet).
+  Names: surviving faces keep their persistent names, a moved feature keeps the names of its faces (the removed / added tool is transformed with its history, then cut / fused), so a later step can address the moved
+  hole wall by name and the history replays (test `occtFaceMoves`).
+- **`delete_faces`**: `BRepAlgoAPI_Defeaturing`; a picked face that OCC reports as not deleted is a refusal (it used to succeed silently with the box unchanged). Both commands report the exact
+  `volumeBefore` / `volumeAfter` and record the picked face names. `DIR_FACE_MOVE_TOPOLOGY` is checked before the kernel call for a cylinder / sphere whose radius + distance <= 0; the OCC reason of
+  `DIR_FACE_MOVE_FAILED` / `DIR_DEFEATURE_FAILED` is not carried over the kernel port (the answer is "refused").
+- **`squash_steps { fromStepId, toStepId, label? }`** (metaHistory): the range becomes ONE `build_project` step (id of the first step) holding the same commands. It is accepted only when replaying the new
+  history reproduces the current document exactly (entities, order, every definition: canonical JSON of the document without history), so replay equality and step-scoped ids are guaranteed by
+  construction; a range that creates entities or cage elements (their ids come from the step number) is refused with the history unchanged, as is a suppressed step in the range, a failing replay or a
+  kernel step without a kernel.
+- **`POST /preview { name, params }`** (`server/src/previewRoutes.ts`, answer built by `@protocol/preview` `previewOf`): runs the command through `runCommandOutcome` on the live document value (commands are pure;
+  nothing is written, logged, broadcast or audited) and answers `{ ok, summary, entities[] { id, kind, color, positions (unindexed world triangles, 1e-6), triangleCount, truncated }, replacedIds
+  (consumed or changed live ids), data?, error? }`; more than 150 000 triangles in total are listed without geometry. The command runs synchronously on the one backend thread, so previews cannot overlap and
+  the "one in flight per client" rule needs no code; the shared REST limiter bounds the rate. Cancellation is the client dropping the connection. It uses the mutation guard (same auth as `/command`).
+- **Toolsets**: `freeform` is a real toolset (every tool stays in exactly one): the whole cage family, `edit_nurbs`, `edit_nurbs_surface`, `inspect_nurbs`, `check_surface_quality`, `move_faces`,
+  `delete_faces` left `3d` for it; `3d` points to it (`TOOLSET_SEE_ALSO` is now a list). `squash_steps` is in `parametric`. The palette group label for `freeform` is the one line added under `src/ui`
+  (`paletteItems.ts`: the exhaustive `Record<ToolsetName, string>` would not compile without it).
+- New codes: `DIR_CAGE_EMPTY`, `DIR_NOT_BOUNDARY`, `DIR_FILL_ODD`, `DIR_WELD_NONMANIFOLD`, `DIR_SLIDE_RANGE`, `DIR_SLIDE_LOOP_INVALID`, `DIR_BEVEL_TOO_WIDE`, `DIR_BEVEL_WIDTH_RANGE`, `DIR_BEVEL_ADJACENT`,
+  `DIR_BEVEL_BOUNDARY`, `DIR_BRIDGE_COUNT_MISMATCH`, `DIR_BRIDGE_REGION`, `DIR_BRIDGE_SAME`, `DIR_CONVERT_DEGENERATE`, `DIR_CONVERT_KERNEL`, `DIR_CONVERT_FAILED`, `DIR_POINT_OUTSIDE_DOMAIN`,
+  `DIR_POLE_RANGE`, `DIR_OPERATION_PARAMS`, `DIR_TRIMS_BLOCK`, `DIR_FACE_MOVE_PARAMS`, `DIR_FACE_MOVE_FAILED`, `DIR_FACE_MOVE_TOPOLOGY`, `DIR_DEFEATURE_FAILED`.
+
+### 14.2 Measured (VC results, tolerance in brackets)
+
+| VC | Result |
+| -- | ------ |
+| 08 | regular 8 x 6 torus -> 192 bicubic patches: max deviation 1.8e-15 [1e-9], 3072 samples; packed: ONE B-spline surface for all 192 quads; a block equals the limit point of every lattice vertex to 1e-12 |
+| 09 | cube: 24 unpacked patches [24]; EV seam gap 0 [0]; tangent break at the 8 valence-3 stars 2.616 deg; max deviation 5.87e-3 (2 x 2 samples; 6.24e-3 with 3 x 3) on a cage of edge 2; G1 with tolerance 2 / 1 / 0.5 / 0.25 deg gives 96 / 384 / 384 / 1536 patches, break 1.149 / 0.496 / 0.496 / 0.211 deg, deviation 2.3e-3 / 9.4e-4 / 9.4e-4 / 3.9e-4 |
+| 12 | curve drag at u = 0.4 by (0, 1, 0): residual 3.3e-16 [1e-12]; poles 0, 5, 6 untouched; rational curve (weight 3 on pole 2): exact to 1e-12 |
+| 13 | surface drag at (0.3, 0.6) by (0, 0, 1): residual 0 [1e-12]; rational patch exact to 1e-12 |
+| 14 | `insert_knot` shape change 1.0e-15 [1e-12 expected 0]; `elevate_degree` is reported the same way; linear U / V falloff weight 0.5 at half the radius |
+| 22 | 3 x 3 x 1 box, centre faces bridged: V 32 E 64 F 32 Euler 0 genus 1; creased volume 8 (1e-12) |
+| 23 | plate with a bore, offset +1: 3717.256661 -> 3497.345175 [3497.34517543, rel 1e-6]; -1 narrows it to radius 2 (volume 4000 - 40 pi) |
+| 24 | translate the top face +2: 1200 [1200]; rotate the +x face 10 deg about its bottom edge: 1088.16349 [1088.16349035, rel 1e-6]; -10 deg: 911.8365 |
+| 25 | fillet r 1 deleted: 997.8539816 -> 1000 [rel 1e-6]; a bore wall deleted: 4000; a boss wall + top deleted: 4037.699 -> 4000 |
+| 26 | `/preview`: the live document (JSON) is identical after the call, no stream frame, no undo entry; the committed `push_pull_face` handle is the UI part (open) |
+| 29 | cube, native kernel: default (`level_mesh`) 2.6646247897 [2.66462478968, 1e-9 rel]; opt-in `limit_patches` 2.6176023467 (0.11 % below the extrapolated limit volume 2.62041: the geometry patches cut the 8 corners slightly) |
+| 33 | slide the mid loop by 0.5: loop at z = +-0.5, creased volume 8 [1e-12]; non-manifold weld of opposite corners: `DIR_WELD_NONMANIFOLD` |
+| 34 | bevel top-front edge, width 0.25: V 10 E 15 F 7, creased volume 7.75 [1e-12] |
+| 35 | delete the top face: 1 boundary loop, Euler 1, no volume; fill n-gon: Euler 2, creased volume 8 [1e-12] |
+
+Plans on the native CLI (`node server/bin/llull.cjs --doc <scratch> run validation/plans/<p>.json --continue`, run from the pack folder), all steps ok: `target_creased_cube_topology` 17/17,
+`target_grip_cage_tools` 11/11, `target_nurbs_point_drag` 7/7, `target_subd_to_nurbs` 7/7 (a `limit_patches` mass step was added for VC-29), `target_brep_face_moves` 17/17.
+`target_grip_cage_tools` step 6 uses `loopFrom [0, 1]` (the generator now says so). Timing: `subdivision_to_nurbs` sheets take 83 ms for a 218-vertex cage (2 x 2 samples; 336 ms at 3 x 3, the
+evaluator refines deeply near extraordinary vertices) against the 300 ms budget for 400 vertices (a 602-vertex cage took 630 ms at 3 x 3 and was not re-measured at 2 x 2); `check_subdivision` on the
+70-vertex grip cage took 5.6 s with the native kernel because it sewed the exact patch solid and measured every seam (budget 1 s). Decision: that exact seam check is opt-in (`exactSeams: true`; sewing the
+~1500 patch faces and 8 continuity samples per seam is not cacheable below seconds), the default check stays on the cage and the level meshes. Re-measured through the CLI process (start-up included): default
+0.81 s, `exactSeams: true` 6.3 s; the cost stays visible in the parameter description; the face moves on the 7-face plate take a few tens of ms each (the server
+test of 7 cases runs in 0.6 s). Not benchmarked: the 200-face kernel preview, `tests/bench`.
+
+### 14.3 Left
+
+UI (next agent): drag handles for `push_pull_face` / `replace_face` / `draft_faces`, net overlays for poles (VC-37), loop-cut drag, pointer capture, the remote preview client (`/preview`, debounce, abort),
+the `edge_only` boundary in the viewport mesh, palette entries for the new commands. Overall: the bench (VC-18), `fit_cage_vertices`, preserve-shape loop cut, Stam evaluation, `face_to_subdivision`,
+a true G1 patch construction, a multi-edge bevel across a vertex chain, the OCC reason in `DIR_FACE_MOVE_FAILED`, a faster exact seam check, `move_faces` of closed spherical faces, `render_view overlay=cage|net`.

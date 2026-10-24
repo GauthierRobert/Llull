@@ -1,0 +1,9 @@
+# Closed subdivision bowl: a box cage loses its top face (open surface) and the hole is filled again, leaving a closed genus-0 solid with a volume
+design freeform_bowl units=mm
+add_subdivision_solid cage box={"size":[20,20,20]} levels=2 id="bowl"
+delete_cage_faces cut id="bowl" faces=[0]
+fill_cage_hole closed id="bowl" edge=[0,1] mode="ngon"
+check check_subdivision id="bowl" path=euler expect == 2
+check check_subdivision id="bowl" path=genus expect == 0
+check check_subdivision id="bowl" path=open expect == false
+check check_subdivision id="bowl" path=meshVolume expect >= 1000

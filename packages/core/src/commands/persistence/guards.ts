@@ -122,7 +122,14 @@ function subdivisionProblem(v: Record<string, unknown>): string | null {
     return `levels must be an integer 0..${MAX_SUBDIVISION_LEVELS}`;
   return (
     subdivisionFieldsProblem(v) ??
-    cageProblem({ vertices, faces, creases, edgeSharpness: v['edgeSharpness'], vertexSharpness: v['vertexSharpness'] } as Cage)
+    cageProblem({
+      vertices,
+      faces,
+      creases,
+      edgeSharpness: v['edgeSharpness'],
+      vertexSharpness: v['vertexSharpness'],
+      boundary: v['boundary'],
+    } as Cage)
   );
 }
 

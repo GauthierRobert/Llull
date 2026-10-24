@@ -8,7 +8,9 @@ import { replaceEntity } from '../entity/entityOps';
 import { cageProblem } from '../../geometry/subdivision';
 import type { CageState } from '../../geometry/subd/cageState';
 import { withCageState } from '../../geometry/subd/cageState';
+import { isOpenCage } from '../../geometry/subd/boundary';
 import { pairVertices, symmetricTopologyProblem } from '../../geometry/subd/symmetry';
+import { buildTopology } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
 import { MAX_CAGE_VERTICES, cageData, cageText } from './shared';
 
@@ -32,9 +34,16 @@ export function finishedCage(
     if (pairing.unpaired.length > 0 || symmetricTopologyProblem(state.faces, symmetry).length > 0)
       return reject('DIR_SYMMETRY_BROKEN', 'the result would not be mirror-symmetric');
   }
-  const updated = withCageState(entity, state, symmetry);
-  const problem = cageProblem(updated);
-  return problem === null ? updated : reject('DIR_CAGE_INVALID', `the result is not a valid cage: ${problem}`);
+  const rebuilt = withCageState(entity, state, symmetry);
+  const problem = cageProblem(rebuilt);
+  if (problem !== null) return reject('DIR_CAGE_INVALID', `the result is not a valid cage: ${problem}`);
+  // `boundary` is present only while the cage is open
+  if (rebuilt.boundary === undefined || !isOpenCage(buildTopology(state.vertices.length, state.faces))) {
+    const { boundary, ...closed } = rebuilt;
+    void boundary;
+    return closed;
+  }
+  return rebuilt;
 }
 
 export const isCommandResult = (value: SubdivisionEntity | CommandResult): value is CommandResult => 'summary' in value;

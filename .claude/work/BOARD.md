@@ -97,10 +97,11 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
   + draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
   for the new entities. _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-4b** 04 DIR left after MVP (done 2026-10-23, §13: M0, M2, M3 commands + M1 cage UI and M3 UI tools): M1 B-rep drag
-  handles (`push_pull_face` / `replace_face` / `draft_faces`), control-net overlays, loop-cut factor drag, desktop-app pass on cage editing
-  (pointer capture, gizmo + floating origin); M4 `edit_nurbs` ops + `subdivision_to_nurbs`; M5 open cages, bridge / bevel / delete / fill /
-  weld / slide; M6 `/preview`, `move_faces`, `delete_faces`; `squash_steps`; `freeform` toolset view. _Lane 2 + 1 + native_ _deps: —_
+- `[DOING]` **DES-4b** 04 DIR left after MVP (core M4–M6 done 2026-10-24, TECHNICAL_SPEC §14: `subdivision_to_nurbs`, NURBS point drag, open cages +
+  bridge / bevel / delete / fill / weld / slide, `move_faces` / `delete_faces`, `/preview`, `squash_steps`, `freeform` toolset). Left (UI): M1 B-rep drag
+  handles (`push_pull_face` / `replace_face` / `draft_faces`), pole / control-net overlays (VC-37), loop-cut factor drag + pointer capture, gizmo +
+  floating origin, `/preview` client (debounce, abort), `boundary` in the viewport mesh, palette entries. Then DES-4c: bench (VC-18), true G1 patches,
+  bevel across vertex chains, OCC reason in `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net`, M7. _Lane 2 + 1 + native_ _deps: —_
 - `[TODO]` **DES-5b** 05 IMP left after M0–M3 (done 2026-10-23, §13): M4 native `llull-field` (Rust, tape format §13.3, parity §13.6) +
   `llull-compute field` + `server/src/native/fieldEngine.ts` installer (closes pack plans refused at their written voxel by the TS 2^21 grid
   budget); M5 scalar fields + graded laws, `infill_solid`, `edit_field` / `delete_field` / `regenerate_implicit_bodies`, `add_graph_lattice`,

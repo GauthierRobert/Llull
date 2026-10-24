@@ -70,6 +70,8 @@ mod ffi {
         fn draft_faces(shape: &Shape, faces: &[u32], angle: f64, pull: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
         fn push_pull(shape: &Shape, face: u32, distance: f64) -> Result<UniquePtr<Shape>>;
         fn split_faces(shape: &Shape, faces: &[u32], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn move_faces(shape: &Shape, faces: &[u32], mode: i32, a: &[f64], b: &[f64], value: f64) -> Result<UniquePtr<Shape>>;
+        fn delete_faces(shape: &Shape, faces: &[u32]) -> Result<UniquePtr<Shape>>;
         fn is_valid_shape(shape: &Shape) -> Result<bool>;
         fn unified_shape(shape: &Shape) -> Result<UniquePtr<Shape>>;
     }
@@ -279,6 +281,16 @@ pub fn push_pull(shape: &Shape, face: u32, distance: f64) -> Built {
 /// Split `faces` along the plane (`origin`, `normal`); the body stays one solid.
 pub fn split_faces(shape: &Shape, faces: &[u32], origin: [f64; 3], normal: [f64; 3]) -> Built {
     built(ffi::split_faces(inner(shape)?, faces, &origin, &normal))
+}
+
+/// Move `faces` (04 DIR M6): `mode` 0 offset by `value`, 1 translate by `a`, 2 rotate about the axis (`a` origin, `b` direction) by `value` radians.
+pub fn move_faces(shape: &Shape, faces: &[u32], mode: i32, a: &[f64], b: &[f64], value: f64) -> Built {
+    built(ffi::move_faces(inner(shape)?, faces, mode, a, b, value))
+}
+
+/// Delete `faces` by defeaturing (the neighbours extend to close the gap).
+pub fn delete_faces(shape: &Shape, faces: &[u32]) -> Built {
+    built(ffi::delete_faces(inner(shape)?, faces))
 }
 
 pub fn is_valid(shape: &Shape) -> OcctResult<bool> {

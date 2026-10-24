@@ -12,6 +12,30 @@ const isFaceList = (value: unknown): value is number[] =>
 
 const isPlane = (value: unknown): boolean => isRecord(value) && isVec3(value['origin']) && nonZero(value['normal']);
 
+/** Why `move` is not a valid `moveFaces` motion, or null. */
+function moveProblem(move: unknown): string | null {
+  if (!isRecord(move)) return 'faceOp moveFaces: move must be { type, ... }';
+  switch (move['type']) {
+    case 'translate':
+      return nonZero(move['vector']) ? null : 'faceOp moveFaces translate: vector must be a non-zero [x, y, z]';
+    case 'rotate': {
+      const axis = move['axis'];
+      const angle = move['angle'];
+      if (!isRecord(axis) || !isVec3(axis['origin']) || !nonZero(axis['direction']))
+        return 'faceOp moveFaces rotate: axis must be { origin, direction }';
+      return isFiniteNumber(angle) && angle !== 0 && Math.abs(angle) < Math.PI
+        ? null
+        : 'faceOp moveFaces rotate: angle must be finite, non-zero and below 180 degrees';
+    }
+    case 'offset':
+      return isFiniteNumber(move['distance']) && move['distance'] !== 0
+        ? null
+        : 'faceOp moveFaces offset: distance must be finite and non-zero';
+    default:
+      return `faceOp moveFaces: unknown move type '${String(move['type'])}'`;
+  }
+}
+
 /** Why `node` is not a valid face operation, or null. */
 export function faceOpProblem(node: Readonly<Record<string, unknown>>): string | null {
   const faces = node['faces'];
@@ -31,6 +55,10 @@ export function faceOpProblem(node: Readonly<Record<string, unknown>>): string |
     }
     case 'splitFace':
       return isPlane(node['plane']) ? null : 'faceOp splitFace: plane must be { origin, normal }';
+    case 'moveFaces':
+      return moveProblem(node['move']);
+    case 'deleteFaces':
+      return null;
     default:
       return `faceOp: unknown kind '${String(node['kind'])}'`;
   }
@@ -45,5 +73,9 @@ export function faceOpParamsOf(node: FaceOpParams): FaceOpParams {
       return { kind: 'pushPull', faces: node.faces, distance: node.distance };
     case 'splitFace':
       return { kind: 'splitFace', faces: node.faces, plane: node.plane };
+    case 'moveFaces':
+      return { kind: 'moveFaces', faces: node.faces, move: node.move };
+    case 'deleteFaces':
+      return { kind: 'deleteFaces', faces: node.faces };
   }
 }

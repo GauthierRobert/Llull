@@ -93,7 +93,7 @@ function runCommand(name: string, params: unknown, source?: LiveCommandSource, c
 }
 
 /** A command threw inside `execute` (a command's own failure summary is not a crash): a rate-limited crash report (SC-D3). */
-function reportCommandCrash(thrown: unknown, name: string, params: unknown, prior: CadDocument): void {
+export function reportCommandCrash(thrown: unknown, name: string, params: unknown, prior: CadDocument): void {
   const report = reportServerCrash('command-threw', thrown, { name, params, document: prior });
   if (report !== null) console.error(`[llull-server] command ${name} threw; crash report: ${report}`);
 }

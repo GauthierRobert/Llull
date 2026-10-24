@@ -115,6 +115,11 @@ std::unique_ptr<Shape> draft_faces(const Shape &shape, rust::Slice<const uint32_
 std::unique_ptr<Shape> push_pull(const Shape &shape, uint32_t face, double distance);
 std::unique_ptr<Shape> split_faces(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> origin,
                                    rust::Slice<const double> normal);
+// Face moves and deletion (04 DIR M6, face_moves.cxx): mode 0 offset (`value` along the surface normal), 1 translate (`a` = vector), 2 rotate (`a` = axis
+// origin, `b` = axis direction, `value` = radians); delete = BRepAlgoAPI_Defeaturing. Null when OCC refuses or the result is not one valid solid.
+std::unique_ptr<Shape> move_faces(const Shape &shape, rust::Slice<const uint32_t> faces, int32_t mode, rust::Slice<const double> a,
+                                  rust::Slice<const double> b, double value);
+std::unique_ptr<Shape> delete_faces(const Shape &shape, rust::Slice<const uint32_t> faces);
 // BRepCheck_Analyzer validity.
 bool is_valid_shape(const Shape &shape);
 // Post-boolean ShapeUpgrade_UnifySameDomain (the shape itself when it fails).

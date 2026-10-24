@@ -6,6 +6,7 @@
  */
 
 import type { SubdivisionEntity, Vec3 } from '../model/types';
+import type { CageBoundary } from '../model/subdivisionCage';
 import { add3, centroid3, lerp3, scale3 } from '../lib/vec3';
 import type { Triangle } from './triangles';
 import { edgeKey } from './subd/edgeKey';
@@ -30,11 +31,13 @@ export interface Cage extends SharpnessSource {
   readonly vertices: ReadonlyArray<Vec3>;
   readonly faces: ReadonlyArray<ReadonlyArray<number>>;
   readonly creaseMethod?: CreaseMethod | undefined;
+  /** Present: the cage may be open; its boundary edges are infinitely sharp. Absent: closed. Refinement treats a boundary edge as sharp either way (edge_and_corner). */
+  readonly boundary?: CageBoundary | undefined;
 }
 
 /**
- * First vertex whose faces do not form one fan (closed manifold assumed edge-wise): walking from
- * any face around the vertex, across the edge entering it, must visit all of its faces.
+ * First vertex whose faces do not form one fan: walking from any face around the vertex, across the edge entering it, must visit all of its
+ * faces (an open cage's fan may end at boundary edges: it is then walked in both directions).
  */
 function pinchedVertex(faces: ReadonlyArray<ReadonlyArray<number>>, count: number): number | null {
   /** Face holding the directed edge a→b. */
@@ -49,28 +52,48 @@ function pinchedVertex(faces: ReadonlyArray<ReadonlyArray<number>>, count: numbe
   for (let v = 0; v < count; v++) {
     const start = around[v]?.[0];
     if (start === undefined) continue;
+    const total = (around[v] as number[]).length;
     let face = start;
-    let visited = 0;
-    do {
+    let visited = 1;
+    let reachedBoundary = false;
+    for (;;) {
       const loop = faces[face] as ReadonlyArray<number>;
       const previous = loop[(loop.indexOf(v) - 1 + loop.length) % loop.length] as number;
-      face = faceOf.get(`${v}>${previous}`) as number;
+      const next = faceOf.get(`${v}>${previous}`);
+      if (next === undefined) {
+        reachedBoundary = true;
+        break;
+      }
+      if (next === start || visited > total) break;
+      face = next;
       visited++;
-    } while (face !== start && visited <= (around[v] as number[]).length);
-    if (visited !== (around[v] as number[]).length) return v;
+    }
+    if (reachedBoundary) {
+      face = start;
+      for (;;) {
+        const loop = faces[face] as ReadonlyArray<number>;
+        const after = loop[(loop.indexOf(v) + 1) % loop.length] as number;
+        const next = faceOf.get(`${after}>${v}`);
+        if (next === undefined || visited > total) break;
+        face = next;
+        visited++;
+      }
+    }
+    if (visited !== total) return v;
   }
   return null;
 }
 
 /**
- * Why `cage` is not a closed, consistently wound 2-manifold (null when it is): every directed
- * edge must appear once and its reverse once, faces need 3+ distinct in-range vertices, and every
- * crease must be a cage edge.
+ * Why `cage` is not a consistently wound 2-manifold (null when it is): every directed edge must appear once and, unless the cage is open
+ * (`boundary` set), its reverse once; faces need 3+ distinct in-range vertices, and every crease must be a cage edge.
  */
 export function cageProblem(cage: Cage): string | null {
   const count = cage.vertices.length;
-  if (count < 4) return `a closed cage needs at least 4 vertices (got ${count})`;
-  if (cage.faces.length < 4) return `a closed cage needs at least 4 faces (got ${cage.faces.length})`;
+  const open = cage.boundary !== undefined;
+  if (count < (open ? 3 : 4)) return `a ${open ? 'cage' : 'closed cage'} needs at least ${open ? 3 : 4} vertices (got ${count})`;
+  if (cage.faces.length < (open ? 1 : 4))
+    return `a ${open ? 'cage' : 'closed cage'} needs at least ${open ? 1 : 4} faces (got ${cage.faces.length})`;
   const directed = new Set<string>();
   for (const [f, face] of cage.faces.entries()) {
     if (face.length < 3) return `face ${f} has ${face.length} vertices (needs 3+)`;
@@ -85,7 +108,7 @@ export function cageProblem(cage: Cage): string | null {
   }
   for (const key of directed) {
     const [a, b] = key.split('>');
-    if (!directed.has(`${b}>${a}`)) return `edge ${a}-${b} borders only one face; the cage must be closed`;
+    if (!open && !directed.has(`${b}>${a}`)) return `edge ${a}-${b} borders only one face; the cage must be closed`;
   }
   const used = new Set(cage.faces.flat());
   for (let v = 0; v < count; v++) if (!used.has(v)) return `vertex ${v} is not used by any face`;
@@ -93,7 +116,7 @@ export function cageProblem(cage: Cage): string | null {
   if (pinched !== null) return `vertex ${pinched} joins separate fans of faces (a pinch); give each sheet its own vertex`;
   const infinite = new Set<string>();
   for (const [a, b] of cage.creases) {
-    if (!directed.has(`${a}>${b}`)) return `crease ${a}-${b} is not an edge of the cage`;
+    if (!directed.has(`${a}>${b}`) && !directed.has(`${b}>${a}`)) return `crease ${a}-${b} is not an edge of the cage`;
     if (infinite.has(edgeKey(a, b))) return `crease ${a}-${b} is listed twice`;
     infinite.add(edgeKey(a, b));
   }
@@ -130,6 +153,7 @@ function subdivideOnce(cage: Cage): Cage {
   const sharpness = edgeSharpnessMap(cage);
   const cornerSharpness = vertexSharpnessArray(cage, vertices.length);
   const edges = new Map<string, EdgeInfo>();
+  const faceCount = vertices.map(() => 0);
   faces.forEach((face, f) =>
     face.forEach((a, i) => {
       const b = face[(i + 1) % face.length] as number;
@@ -137,8 +161,13 @@ function subdivideOnce(cage: Cage): Cage {
       const edge = edges.get(key) ?? { a, b, faces: [], sharpness: sharpness.get(key) ?? 0 };
       edge.faces.push(f);
       edges.set(key, edge);
+      faceCount[a] = (faceCount[a] as number) + 1;
     }),
   );
+  // edge_and_corner (the default for any open cage): a boundary vertex of a single face is a corner
+  if (cage.boundary !== 'edge_only') faceCount.forEach((n, v) => n === 1 && (cornerSharpness[v] = SHARP_MAX));
+  // a boundary edge (one face) is infinitely sharp
+  for (const [key, edge] of edges) if (edge.faces.length === 1) edges.set(key, { ...edge, sharpness: SHARP_MAX });
   const facePoints = faces.map((face) => centroid3(face.map((v) => vertices[v] as Vec3)));
   const edgeList = [...edges.values()];
   const edgeIndex = new Map(edgeList.map((edge, i) => [edgeKey(edge.a, edge.b), i]));
@@ -218,6 +247,7 @@ function subdivideOnce(cage: Cage): Cage {
     ...(edgeSharpness.length > 0 ? { edgeSharpness } : {}),
     ...(cornerEntries.length > 0 ? { vertexSharpness: cornerEntries } : {}),
     ...(cage.creaseMethod !== undefined ? { creaseMethod: cage.creaseMethod } : {}),
+    ...(cage.boundary !== undefined ? { boundary: cage.boundary } : {}),
   };
 }
 

@@ -7,7 +7,7 @@ import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
-import type { CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
+import type { CageBoundary, CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
 import type { FaceSlabRecipe } from './faceSlab';
 import type { Decal } from './decal';
 import type { TextLayout } from './fonts';
@@ -262,9 +262,9 @@ export interface LoftEntity extends BaseEntity, LoftSkin {
 }
 
 /**
- * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by Catmull-Clark subdivision; cage edges
+ * Freeform solid: a polygon control cage (local to `position`; closed unless `boundary` is set) refined `levels` times by Catmull-Clark subdivision; cage edges
  * listed in `creases` stay infinitely sharp, `edgeSharpness` / `vertexSharpness` hold semi-sharp values.
- * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels; an edge is in `creases` (infinite) or in
+ * @invariant 2-manifold cage (closed, or open with boundary edges when `boundary` is set), faces wound counter-clockwise seen from outside, 0..4 levels; an edge is in `creases` (infinite) or in
  *   `edgeSharpness` (0 < s < 10), never both; `elementIds` are parallel to `vertices` / `faces` and survive topology edits
  * @see add_subdivision_solid, edit_subdivision_cage, set_cage_crease, set_cage_symmetry
  */
@@ -277,6 +277,8 @@ export interface SubdivisionEntity extends BaseEntity {
   edgeSharpness?: ReadonlyArray<CageEdgeSharpness>;
   vertexSharpness?: ReadonlyArray<CageVertexSharpness>;
   creaseMethod?: 'uniform' | 'chaikin';
+  /** Present = open cages are accepted: boundary edges are infinitely sharp and the corner rule is this mode. Absent = closed cage. */
+  boundary?: CageBoundary;
   symmetry?: CageSymmetry;
   elementIds: CageElementIds;
 }

@@ -44,6 +44,7 @@ const TOOLSET_GROUPS = {
   scan: 'Point clouds',
   mesh: 'Mesh modelling',
   implicit: 'Implicit / lattices',
+  freeform: 'Freeform / direct editing',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

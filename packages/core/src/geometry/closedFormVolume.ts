@@ -13,6 +13,8 @@ import { sweepTriangles } from './sweep';
 import { sweepAnalyticVolume } from './sweepEval/volume';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
+import { isOpenCage } from './subd/boundary';
+import { buildTopology } from './subd/topology';
 
 export interface ClosedFormVolume {
   readonly volume: number;
@@ -81,7 +83,9 @@ export function closedFormVolume(e: Entity): ClosedFormVolume | null {
     case 'loft':
       return { volume: closedMeshVolume(loftTriangles(e).flat(2)), analytic: false };
     case 'subdivision':
-      return { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)), analytic: false };
+      return isOpenCage(buildTopology(e.vertices.length, e.faces))
+        ? null
+        : { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)), analytic: false };
     default:
       return null;
   }
