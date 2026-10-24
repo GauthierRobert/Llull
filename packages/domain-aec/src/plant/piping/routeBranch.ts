@@ -9,6 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
 import { dot3, len3, scale3, sub3 } from '@lib/vec3';
+import { DerivationMemo } from './derivationMemo';
 import { fail, isFailure, type DerivationFailure, type DerivedBranch } from './deriveTypes';
 import { unitVector } from './legs';
 import { getPiping, runPoints } from './model';
@@ -258,18 +259,14 @@ export function oletPart(env: Env, fit: BranchFit, onPart: string): { part: Rout
   return { part, joint: { kind: 'branchWeld', parts: [fit.partId, onPart], position: base, gapMm: 0 } };
 }
 
-const layouts = new WeakMap<CadDocument, Map<PipeRun, BranchFit[] | DerivationFailure>>();
+const layouts = new DerivationMemo<BranchFit[] | DerivationFailure>();
 
-/** The branch fittings of a header run, computed once per document and run however many branch runs ask (a header with k branches is laid out once, not k times). */
+/** The branch fittings of a header run (frozen), computed once per run and document slices however many branch runs ask (a header with k branches is laid out once, not k times). */
 function headerLayout(doc: CadDocument, header: PipeRun): BranchFit[] | DerivationFailure {
-  const known = layouts.get(doc)?.get(header);
+  const known = layouts.get(doc, header);
   if (known !== undefined) return known;
   const env = makeEnv(doc, header);
-  const result = isFailure(env) ? env : layoutBranches(env);
-  const memo = layouts.get(doc) ?? new Map<PipeRun, BranchFit[] | DerivationFailure>();
-  memo.set(header, result);
-  layouts.set(doc, memo);
-  return result;
+  return layouts.set(doc, header, isFailure(env) ? env : layoutBranches(env));
 }
 
 /** The `DerivedBranch` record of a fit. */

@@ -20,6 +20,7 @@ import {
   type DerivedTurn,
   type RunDerivation,
 } from './deriveTypes';
+import { DerivationMemo } from './derivationMemo';
 import { centrelineLength, chooseElbow, turnAngleDeg, type ElbowChoice } from './fittings';
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
@@ -91,17 +92,11 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
 }
 
 type Derived = RunDerivation | DerivationFailure;
-/** Derivations per document and run object: a header is derived once however many branches hang on it (immutable documents make this exact). */
-const derivations = new WeakMap<CadDocument, Map<PipeRun, Derived>>();
+/** Frozen derivations per run object and the document slices a derivation reads: a header is derived once however many branches hang on it. */
+const derivations = new DerivationMemo<Derived>();
 
 function derivedOnce(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {
-  const known = derivations.get(doc)?.get(run);
-  if (known !== undefined) return known;
-  const result = derive(doc, run, path);
-  const memo = derivations.get(doc) ?? new Map<PipeRun, Derived>();
-  memo.set(run, result);
-  derivations.set(doc, memo);
-  return result;
+  return derivations.get(doc, run) ?? derivations.set(doc, run, derive(doc, run, path));
 }
 
 function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {

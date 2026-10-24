@@ -310,3 +310,34 @@ describe('piping_connectivity (VC-RTE-07)', () => {
     expectRefusal(s.doc, 'piping_connectivity', { from: 'P-101:N2' }, 'RTE_UNKNOWN_PORT', 'from');
   });
 });
+
+describe('query results do not alias the derivation memo', () => {
+  it('mutating a piping_takeoff answer (or failing to: it is frozen) leaves the next answer and the checks unchanged', () => {
+    const s = routedPumpToVessel();
+    const first = data<{ legs: Array<{ cutLengthsMm: number[]; start: number[] }>; joints: Array<{ position: number[] }> }>(
+      s.doc,
+      'piping_takeoff',
+      { runId: s.runId },
+    );
+    const original = JSON.stringify(first);
+    for (const attempt of [
+      () => (first.legs[0] as { cutLengthsMm: number[] }).cutLengthsMm.splice(0, 1, -1),
+      () => ((first.joints[0] as { position: number[] }).position[0] = 12345),
+      () => ((first.legs[0] as { start: number[] }).start[0] = 99),
+    ])
+      try {
+        attempt();
+      } catch {
+        // frozen: the write is refused, which is the point
+      }
+    const again = data(s.doc, 'piping_takeoff', { runId: s.runId });
+    expect(JSON.stringify(again)).toBe(original);
+    expect(codes(check(s.doc, { lineIds: [s.line] }))).toEqual(['RTE_SPEC_UNVERIFIED']);
+  });
+
+  it('the answer of an inline insert shares nothing writable either', () => {
+    const v = valveScene();
+    const faces = v.insert['facePositions'] as number[][];
+    expect(Object.isFrozen(faces) && Object.isFrozen(faces[0])).toBe(true);
+  });
+});

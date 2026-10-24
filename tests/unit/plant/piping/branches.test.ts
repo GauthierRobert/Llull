@@ -671,40 +671,67 @@ describe('branch cycles', () => {
   });
 });
 
-describe('performance budgets (plant 02 RTE section 8): a header with many branches', () => {
-  it('derives, checks and graphs a header with 200 weldolet branches without re-deriving the header per branch (bound 20 s)', () => {
-    const line = cs150Line(150, '9001');
-    const a = addTie(line.doc, 'PA', [0, 0, 3000], [1, 0, 0], { dn: 150 });
-    const b = addTie(a.doc, 'PB', [40000, 0, 3000], [-1, 0, 0], { dn: 150 });
-    const routed = apply(b.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } });
-    const model = piping(routed);
-    const headerId = model.runOrder[0] as string;
-    const header = model.runs[headerId] as PipeRun;
-    const count = 200;
-    const runs: Record<string, PipeRun> = { ...model.runs };
-    const branches = Array.from({ length: count }, (_, i) => {
-      const x = 200 + 150 * i;
-      runs[`rb-${i}`] = {
-        id: `rb-${i}`,
-        lineId: line.lineId,
-        dn: 50,
-        start: { point: [x, 0, 3000], direction: [0, 0, 1], ref: { kind: 'branch', runId: headerId, branchId: `bp-${i}` } },
-        end: { point: [x, 0, 4000] },
-        pis: [],
-      };
-      return { id: `bp-${i}`, leg: 0, distance: x, branchRunId: `rb-${i}` };
-    });
-    runs[headerId] = { ...header, branches };
-    const doc: CadDocument = {
-      ...routed,
-      plant: { ...routed.plant, piping: { ...model, runs, runOrder: [...model.runOrder, ...branches.map((point) => point.branchRunId)] } },
+/** A DN150 header (40 m) with `count` weldolet branches 150 mm apart, as stored data (no entities): the shape of a manifold. */
+function manyBranches(count: number): { doc: CadDocument; headerId: string; lineId: string } {
+  const line = cs150Line(150, '9001');
+  const a = addTie(line.doc, 'PA', [0, 0, 3000], [1, 0, 0], { dn: 150 });
+  const b = addTie(a.doc, 'PB', [40000, 0, 3000], [-1, 0, 0], { dn: 150 });
+  const routed = apply(b.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } });
+  const model = piping(routed);
+  const headerId = model.runOrder[0] as string;
+  const runs: Record<string, PipeRun> = { ...model.runs };
+  const branches = Array.from({ length: count }, (_, i) => {
+    const x = 200 + 150 * i;
+    runs[`rb-${i}`] = {
+      id: `rb-${i}`,
+      lineId: line.lineId,
+      dn: 50,
+      start: { point: [x, 0, 3000], direction: [0, 0, 1], ref: { kind: 'branch', runId: headerId, branchId: `bp-${i}` } },
+      end: { point: [x, 0, 4000] },
+      pis: [],
     };
-    const start = performance.now();
-    const result = data<{ runIds: string[]; partCount: number; counts: { errors: number } }>(doc, 'check_piping', {});
-    const ms = performance.now() - start;
-    expect(result.runIds).toHaveLength(count + 1);
-    expect(result.counts.errors).toBe(0);
-    expect(result.partCount).toBeGreaterThan(count * 2);
+    return { id: `bp-${i}`, leg: 0, distance: x, branchRunId: `rb-${i}` };
+  });
+  runs[headerId] = { ...(model.runs[headerId] as PipeRun), branches };
+  const doc: CadDocument = {
+    ...routed,
+    plant: { ...routed.plant, piping: { ...model, runs, runOrder: [...model.runOrder, ...branches.map((point) => point.branchRunId)] } },
+  };
+  return { doc, headerId, lineId: line.lineId };
+}
+
+const timed = <T>(run: () => T): { value: T; ms: number } => {
+  const start = performance.now();
+  const value = run();
+  return { value, ms: performance.now() - start };
+};
+
+describe('performance budgets (plant 02 RTE section 8): a header with many branches', () => {
+  const big = manyBranches(200);
+
+  it('derives, checks and graphs a header with 200 weldolet branches without re-deriving the header per branch (bound 20 s)', () => {
+    const { value, ms } = timed(() =>
+      data<{ runIds: string[]; partCount: number; counts: { errors: number } }>(big.doc, 'check_piping', {}),
+    );
+    expect(value.runIds).toHaveLength(201);
+    expect(value.counts.errors).toBe(0);
+    expect(value.partCount).toBeGreaterThan(400);
     expect(ms).toBeLessThan(20_000);
+  });
+
+  it('adds a branch to the 200-branch header and updates its line (derive + rebuild 201 runs each time) within 20 s apiece', () => {
+    const added = timed(() =>
+      ok(big.doc, 'add_branch', {
+        runId: big.headerId,
+        at: { point: [35000, 0, 3000] },
+        dn: 50,
+        legs: [{ direction: '+Z', length: 1000 }],
+      }),
+    );
+    expect(added.value.rejected).toBeUndefined();
+    expect(added.ms).toBeLessThan(20_000);
+    const updated = timed(() => ok(big.doc, 'update_pipeline', { lineId: big.lineId, service: 'CW' }));
+    expect(updated.value.rejected).toBeUndefined();
+    expect(updated.ms).toBeLessThan(20_000);
   });
 });
