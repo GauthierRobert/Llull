@@ -5,6 +5,8 @@ import { sheetTriangles } from './nurbsSurface';
 import { expandInstance } from './instanceExpansion';
 import { solidTriangles } from './solidTriangles';
 import type { Triangle } from './triangles';
+import { isZeroRotation } from '../lib/eulerRotation';
+import type { Vec3 } from '../model/vectors';
 
 /** World-space triangles of one entity; instances are expanded through their component (`doc`). 2D shapes return []. */
 export function entityToTriangles(e: Entity, doc: Pick<CadDocument, 'components'>): Triangle[] {
@@ -29,7 +31,36 @@ export interface ExportPart {
   readonly name: string | undefined;
   /** Entity hex color, e.g. "#c8553d". */
   readonly color: string;
+  /** World-space triangles, built on first read (a multi-million-triangle body costs gigabytes as `Triangle` objects, so exports that do not need them never read it). */
   readonly tris: Triangle[];
+  /** Number of triangles, known without building them for an indexed mesh. */
+  readonly triangleCount: number;
+  /** A mesh entity without rotation: its indexed arrays and the offset to world space, for writers that stream instead of reading `tris`. */
+  readonly indexed?: { readonly positions: ReadonlyArray<number>; readonly indices: ReadonlyArray<number>; readonly offset: Vec3 };
+}
+
+/** The indexed arrays of a rotation-free mesh entity (its vertices plus `position` are world space), else undefined. */
+function indexedOf(entity: Entity, mesh: { positions: ReadonlyArray<number>; indices: ReadonlyArray<number> }): ExportPart['indexed'] {
+  if (entity.kind !== 'mesh' || !isZeroRotation(entity.rotation) || mesh.indices.length === 0) return undefined;
+  return { positions: mesh.positions, indices: mesh.indices, offset: entity.position };
+}
+
+/** A part whose triangles are built by `make` on first read (`count`: their number when known beforehand). */
+function lazyPart(id: string, entity: Entity, make: () => Triangle[], count?: number, indexed?: ExportPart['indexed']): ExportPart {
+  let built: Triangle[] | undefined;
+  return {
+    ...(indexed === undefined ? {} : { indexed }),
+    id,
+    name: entity.name,
+    color: entity.color,
+    get tris(): Triangle[] {
+      built ??= make();
+      return built;
+    },
+    get triangleCount(): number {
+      return count ?? this.tris.length;
+    },
+  };
 }
 
 /**
@@ -66,10 +97,20 @@ export function collectExportParts(
         unreadable.push({ id, code: assets === undefined || assets === null ? 'MESH_ASSET_UNAVAILABLE' : 'MESH_ASSET_MISSING' });
         continue;
       }
-      parts.push({ id, name: entity.name, color: entity.color, tris: entityToTriangles({ ...entity, mesh: full }, doc) });
+      parts.push(
+        lazyPart(id, entity, () => entityToTriangles({ ...entity, mesh: full }, doc), full.indices.length / 3, indexedOf(entity, full)),
+      );
       continue;
     }
-    parts.push({ id, name: entity.name, color: entity.color, tris: entityToTriangles(entity, doc) });
+    parts.push(
+      lazyPart(
+        id,
+        entity,
+        () => entityToTriangles(entity, doc),
+        undefined,
+        entity.kind === 'mesh' ? indexedOf(entity, entity.mesh) : undefined,
+      ),
+    );
   }
   return { parts, skipped2D, unknownIds, unreadable };
 }

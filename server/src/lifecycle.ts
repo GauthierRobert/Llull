@@ -6,6 +6,9 @@ import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
 import { installRasterPort } from './native/rasterPort';
 import { installFontProvider } from './fontProvider';
+import { setMeshAssetPort } from '@core/geometry/mesh/assets';
+import { installFieldEngine } from './native/fieldEngine';
+import { defaultMeshAssetStore } from './meshAssets/store';
 import { installGeometryQueryEngine } from './native/geometryQueryEngine';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { killAllChildren } from './childProcesses';
@@ -62,6 +65,8 @@ export async function startServer(app: Express, port: number, host: string): Pro
   installRasterPort();
   installFontProvider();
   installGeometryQueryEngine();
+  setMeshAssetPort(defaultMeshAssetStore());
+  installFieldEngine();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
   const server = app.listen(port, host);
   await new Promise<void>((resolve, reject) => {

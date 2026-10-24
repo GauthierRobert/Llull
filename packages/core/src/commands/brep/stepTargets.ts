@@ -4,6 +4,7 @@ import { type CadDocument, DEFAULT_LAYER_ID, type Entity, type InstanceEntity, i
 import { kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
 import { isCurve3D, isSheet } from '../../model/curveKinds';
 import { expandInstance } from '../../geometry/instanceExpansion';
+import { stepSkipReason } from '../../plugins/host';
 import type { StepLabel } from './stepLabels';
 
 /** A loose solid, or an instance with its label (`Name`, or `Name 1`, `Name 2` when several share one) and its solids baked in world space. */
@@ -81,7 +82,8 @@ export function stepTargets(
       const baked = instanceSolids(doc, entity, label, 0);
       if (baked.length === 0) skipped.push(`${id} (instance without solids)`);
       else entries.push({ kind: 'instance', instance: entity, label, baked });
-    } else if (is3D(entity)) entries.push({ kind: 'solid', entity });
+    } else if (is3D(entity) && stepSkipReason(doc, id) !== null) skipped.push(`${id} (${stepSkipReason(doc, id)})`);
+    else if (is3D(entity)) entries.push({ kind: 'solid', entity });
     else if (isSheet(entity)) sheets.push(entity);
     else if (entityIds !== undefined && entityIds.length > 0) skipped.push(`${id} (${isCurve3D(entity) ? '3D curve' : '2D'})`);
   }

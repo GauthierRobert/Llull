@@ -1,157 +1,157 @@
-/** lattice_properties: strut counts and lengths, relative density closed form and measured, Maxwell count, TPMS wall and surface facts (05 IMP 4.4, 5.4, 5.5). */
+/** lattice_properties: strut counts and lengths, relative density closed form and measured, Maxwell count, TPMS wall / pore / surface facts, mechanics (05 IMP 4.4, 5.4, 5.5, FR-IMP-31, 34). */
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { resolveFieldEngine } from '@core/geometry/field/engine';
-import type { Vec3 } from '@core/model/types';
+import type { FieldEngine } from '@core/geometry/field/engineTypes';
+import type { FieldProgram } from '@core/geometry/field/program';
+import type { CadDocument, Vec3 } from '@core/model/types';
 import { refuseImplicit } from './codes';
 import { compileField } from './compile';
+import { latticeCut } from './beamLattice';
+import { bareCell, cellPhaseMeasures, measuredSpecificSurface, nodalSurfaceProgram, strutFacts, tpmsFacts } from './latticeFacts';
+import { lawRange } from './lawRange';
+import { latticeMechanics } from './mechanics';
 import { quadratureVolume } from './measure';
-import { type FieldNode, type StrutsNode, type TpmsNode, fieldOf, withField } from './model';
-import { KNOWN_CLASS, strutBookkeeping, strutGeometry } from './struts';
+import { type CellMap, type FieldNode, type StrutsNode, type TpmsNode, fieldOf } from './model';
+import { KNOWN_CLASS, strutGeometry } from './struts';
 import { TPMS_FACTS } from './tpms';
-
-const TOLERANCE = 1e-6;
-const MAX_BLOCK = 40;
 
 type Box = { readonly min: Vec3; readonly max: Vec3 };
 
-/** Whole cells per axis when `box` is a block of the lattice (min on the lattice, extents whole cells), else null. */
-function wholeBlock(node: StrutsNode, box: Box): [number, number, number] | null {
-  const counts = [0, 1, 2].map((axis) => {
-    const cell = node.cellSize[axis] as number;
-    const extent = ((box.max[axis] as number) - (box.min[axis] as number)) / cell;
-    const offset = ((box.min[axis] as number) - (node.origin[axis] as number)) / cell;
-    const whole = Math.abs(extent - Math.round(extent)) < TOLERANCE && Math.abs(offset - Math.round(offset)) < TOLERANCE;
-    return whole ? Math.round(extent) : NaN;
+/** Radii (from the map's axis or centre) of region samples: a 24^3 grid over the region box, the points where the region field is <= 0. */
+function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine: FieldEngine): number[] {
+  const n = 24;
+  const points: number[] = [];
+  const spots: Vec3[] = [];
+  for (let k = 0; k < n; k += 1)
+    for (let j = 0; j < n; j += 1)
+      for (let i = 0; i < n; i += 1) {
+        const p: Vec3 = [0, 1, 2].map(
+          (axis) =>
+            (box.min[axis] as number) + ((([i, j, k][axis] as number) + 0.5) / n) * ((box.max[axis] as number) - (box.min[axis] as number)),
+        ) as unknown as Vec3;
+        spots.push(p);
+        points.push(...p);
+      }
+  const values = region === null ? null : engine.evaluate(region, Float64Array.from(points), false).values;
+  const length = map.kind === 'cylindrical' ? Math.hypot(...map.axis) : 1;
+  return spots.flatMap((p, index) => {
+    if (values !== null && (values[index] as number) > 0) return [];
+    const d = [p[0] - map.origin[0], p[1] - map.origin[1], p[2] - map.origin[2]];
+    if (map.kind === 'spherical') return [Math.hypot(...d)];
+    const along = ((d[0] as number) * map.axis[0] + (d[1] as number) * map.axis[1] + (d[2] as number) * map.axis[2]) / length;
+    return [Math.sqrt(Math.max(Math.hypot(...d) ** 2 - along ** 2, 0))];
   });
-  return counts.every((c) => c >= 1 && c <= MAX_BLOCK) && node.rotation.every((r) => r === 0) ? (counts as [number, number, number]) : null;
 }
 
-/** Nodes and beams (both ends inside the closed block) of an aligned block of `counts` cells, in cell units. */
-function blockCounts(node: StrutsNode, counts: readonly [number, number, number]): { nodes: number; beams: number } {
-  const { set } = strutGeometry(node.cell, [1, 1, 1], 1, undefined);
-  const inside = (p: Vec3): boolean => p.every((c, axis) => c > -TOLERANCE && c < (counts[axis] as number) + TOLERANCE);
-  const key = (p: Vec3): string => p.map((c) => Math.round(c * 1e6)).join(',');
-  const nodes = new Set<string>();
-  const beams = new Set<string>();
-  for (let i = 0; i <= counts[0]; i += 1)
-    for (let j = 0; j <= counts[1]; j += 1)
-      for (let k = 0; k <= counts[2]; k += 1)
-        for (const beam of set.beams) {
-          const [a, b] = [set.nodes[beam.a], set.nodes[beam.b]];
-          if (a === undefined || b === undefined) continue;
-          const [pa, pb]: [Vec3, Vec3] = [
-            [a[0] + i, a[1] + j, a[2] + k],
-            [b[0] + i, b[1] + j, b[2] + k],
-          ];
-          if (!inside(pa) || !inside(pb)) continue;
-          nodes.add(key(pa));
-          nodes.add(key(pb));
-          beams.add([key(pa), key(pb)].sort().join('|'));
-        }
-  return { nodes: nodes.size, beams: beams.size };
+/** Ratio of the longest to the shortest edge of a mapped cell over the radii the region spans (1 = undistorted cells), or null without a map / region. */
+function mapStretch(
+  node: TpmsNode,
+  box: Box | null,
+  region: FieldProgram | null,
+  engine: FieldEngine,
+): { min: number; max: number } | null {
+  const map = node.map;
+  if (map === undefined || box === null) return null;
+  const radii = regionRadii(map, box, region, engine).filter((r) => r > 1e-9);
+  if (radii.length === 0) return null;
+  const sizes = (rho: number): number[] =>
+    map.kind === 'cylindrical'
+      ? [(2 * Math.PI * rho) / map.cellsAround, node.cellSize[2], map.radialCellSize]
+      : [(2 * Math.PI * rho) / map.cellsAround, (Math.PI * rho) / map.cellsPolar, map.radialCellSize];
+  const aspects = [Math.min(...radii), Math.max(...radii)].map((rho) => Math.max(...sizes(rho)) / Math.min(...sizes(rho)));
+  return { min: Math.min(...aspects), max: Math.max(...aspects) };
 }
 
-function strutFacts(node: StrutsNode, box: Box | null): Record<string, unknown> {
-  const book = strutBookkeeping(node.cell);
-  const [ax, ay, az] = node.cellSize;
-  const cellVolume = ax * ay * az;
-  const lengths = strutGeometry(node.cell, node.cellSize, node.radius, undefined).lengths;
-  const lengthPerCell = lengths.reduce((a, b) => a + b, 0);
-  const block = box === null ? null : wholeBlock(node, box);
-  const cells = box === null ? null : ((box.max[0] - box.min[0]) * (box.max[1] - box.min[1]) * (box.max[2] - box.min[2])) / cellVolume;
-  const counted = block === null ? null : blockCounts(node, block);
-  const rho1 = (Math.PI * node.radius ** 2 * lengthPerCell) / cellVolume;
-  const longest = Math.max(...lengths);
-  const maxwell = book.beams - 3 * book.nodes + 6;
-  return {
-    cell: node.cell,
-    cellSize: node.cellSize,
-    cells: block === null ? cells : block[0] * block[1] * block[2],
-    cellsExact: block !== null,
-    beamsPerCell: book.beams,
-    nodesPerCell: book.nodes,
-    nodes: counted?.nodes ?? (cells === null ? null : book.nodes * cells),
-    beams: counted?.beams ?? (cells === null ? null : book.beams * cells),
-    countsExact: counted !== null,
-    totalLength: cells === null ? null : lengthPerCell * cells,
-    lengthPerCell,
-    radiusMin: node.radius,
-    radiusMax: Math.max(node.radius, node.nodeRadius ?? 0),
-    slendernessMax: longest / (2 * node.radius),
-    valence: { min: book.valenceMin, max: book.valenceMax },
-    rho1,
-    maxwell: {
-      b: book.beams,
-      j: book.nodes,
-      M: maxwell,
-      class: KNOWN_CLASS[node.cell],
-      basis: 'class from the literature (Deshpande, Ashby, Fleck 2001); M = b - 3j + 6 is a necessary condition only',
-    },
-  };
+interface Lattice {
+  readonly node: StrutsNode | TpmsNode;
+  readonly facts: Record<string, unknown>;
+  readonly mechanicsInput: { rho1: number | null; cellClass: 'stretch' | 'bending' | null; radius: number | null };
 }
 
-function tpmsFacts(node: TpmsNode): Record<string, unknown> {
-  const facts = TPMS_FACTS[node.kind];
-  const smallest = Math.min(...node.cellSize);
+function describeLattice(
+  doc: CadDocument,
+  node: StrutsNode | TpmsNode,
+  engine: FieldEngine,
+  box: Box | null,
+  resolution: number,
+  cellProgram: ReturnType<typeof compileField>,
+): Lattice | string {
+  if (node.op === 'struts') {
+    const radius = lawRange(engine, doc, node.radius, box);
+    if (radius === null) return `the graded strut radius '${String(node.radius)}' cannot be ranged: the lattice has no finite region`;
+    const facts = strutFacts(node, box, radius);
+    const cut = latticeCut(doc, node, engine);
+    facts['danglingStruts'] = typeof cut === 'string' ? null : cut.dangling;
+    facts['cutBeams'] =
+      typeof cut === 'string'
+        ? { available: false, reason: cut }
+        : { available: true, ...cut, note: 'dangling = beams with exactly one end inside the region; the region trims them' };
+    const mean = (radius.min + radius.max) / 2;
+    return {
+      node,
+      facts,
+      mechanicsInput: { rho1: (facts['rho1'] as number | null) ?? null, cellClass: KNOWN_CLASS[node.cell], radius: mean },
+    };
+  }
+  const value = lawRange(engine, doc, node.control.value, box);
+  if (value === null) return `the graded control '${String(node.control.value)}' cannot be ranged: the lattice has no finite region`;
+  const table = TPMS_FACTS[node.kind].specificSurface;
   const volume = node.cellSize[0] * node.cellSize[1] * node.cellSize[2];
-  const faces = node.form === 'sheet' ? 2 : 1;
-  const thickness =
-    node.form === 'network'
-      ? null
-      : node.normalize === 'gradient'
-        ? { min: node.control.value, max: node.control.value }
-        : {
-            min: (2 * node.control.value) / ((2 * Math.PI * facts.gradOnSurface[1]) / smallest),
-            max: (2 * node.control.value) / ((2 * Math.PI * facts.gradOnSurface[0]) / smallest),
-          };
-  return {
-    kind: node.kind,
-    form: node.form,
-    cellSize: node.cellSize,
-    control: node.control,
-    normalized: node.normalize === 'gradient',
-    relativeDensityTarget: node.relativeDensityTarget ?? null,
-    thicknessMin: thickness?.min ?? null,
-    thicknessMax: thickness?.max ?? null,
-    specificSurface: (faces * facts.specificSurface * smallest ** 2) / volume,
-    specificSurfaceNote:
-      'nodal-surface area per cell volume (a = 1: ' +
-      facts.specificSurface +
-      '), doubled for a sheet (two faces); first order in the wall thickness',
-    poreDiameterMax: null,
-    notComputed: ['poreDiameterMax'],
-  };
+  const measured = table === null ? measuredSpecificSurface(engine, nodalSurfaceProgram(node), node.cellSize, 48) : null;
+  const surface =
+    table !== null
+      ? { perVolume: (table * Math.min(...node.cellSize) ** 2) / volume, source: `reference table, a = 1: ${table}` }
+      : { perVolume: measured ?? NaN, source: 'measured: mesh area of the nodal surface of one cell at 48 voxels per edge' };
+  const phases = cellProgram.ok ? cellPhaseMeasures(engine, cellProgram.program, node, resolution) : null;
+  const facts = tpmsFacts(node, value, surface, phases);
+  return { node, facts, mechanicsInput: { rho1: null, cellClass: null, radius: null } };
 }
-
-const MECHANICS_SOURCE = 'Gibson & Ashby, Cellular Solids (2nd ed., 1997): scaling exponent only; no coefficient is fitted';
 
 /**
- * @affects none (read-only); data = per-cell and block bookkeeping, rho1 (closed form, no node overlap), rhoMeasured (low-discrepancy quadrature of one cell), Maxwell class
+ * @affects none (read-only); data = per-cell and block bookkeeping, rho1 (closed form, no node overlap), rhoMeasured (low-discrepancy quadrature of one cell), Maxwell class, TPMS wall / pore / surface, optional mechanics
  * @invariant counts are exact for a block of whole cells aligned with the lattice origin (nodes / beams with both ends inside the block), otherwise per-cell values times the cell count; mechanics are opt-in and always flagged unverified + reviewRequired
  * @invariant field-engine-optional: reads ctx.fieldEngine when present, else the built-in TS engine (no kernel is needed)
- * @failure unknown id or not a lattice field -> IMP_FIELD_NOT_FOUND
+ * @failure unknown id or not a lattice field -> IMP_FIELD_NOT_FOUND; a graded law over an unbounded lattice -> IMP_FIELD_UNBOUNDED
  */
 export const latticeProperties = defineCommand({
   name: 'lattice_properties',
   description:
-    'Describe a lattice field (from add_strut_lattice or add_tpms_lattice). Struts: cells, nodes, beams (exact for a region that is a block of whole cells on the lattice), total length, radius range, slenderness, node valence, ' +
-    'rho1 = pi r^2 L / cell volume (no node overlap), rhoMeasured (quadrature of one cell, includes overlap), and the Maxwell count b - 3j + 6 with the literature class (octet stretch-dominated, the others bending-dominated). ' +
-    'TPMS: wall thickness range, specific surface, control. estimateMechanics adds a Gibson-Ashby scaling law marked unverified and reviewRequired (never a design value).',
+    'Describe a lattice field (from add_strut_lattice or add_tpms_lattice). Struts: cells, nodes, beams (exact for a region that is a block of whole cells on the lattice), total length, radius range (graded laws are ranged over the region), slenderness, node valence, ' +
+    'rho1 = pi r^2 L / cell volume (no node overlap), rhoMeasured (quadrature of one cell, includes overlap), and the Maxwell count b - 3j + 6 with the class (octet stretch-dominated, the others bending-dominated). ' +
+    'TPMS: control range, wall thickness (declared and measured by the distance transform, +-resolution), largest pore diameter, specific surface (table for gyroid / P / diamond, measured mesh area for the others), cell stretch of a cylindrical / spherical map. ' +
+    'estimateMechanics adds the affine stretch-only stiffness of a strut cell (exact for the octet truss, an upper bound for bending-dominated cells) and the Gibson-Ashby law E/Es = C rho^n with the exponent of the class and the coefficient YOU give in scaling; ' +
+    'baseMaterial {youngModulusMpa, source} turns the ratio into MPa. Always unverified and reviewRequired: never a design value.',
   annotations: { readOnly: true },
   params: z.object({
     id: z.string().describe('Id of a lattice field (struts or tpms node).'),
-    estimateMechanics: z.boolean().optional().describe('Add the scaling-law estimate of the stiffness (opt-in; unverified, needs review).'),
+    estimateMechanics: z.boolean().optional().describe('Add the stiffness estimate (opt-in; unverified, needs review).'),
+    baseMaterial: z
+      .object({
+        youngModulusMpa: z.number().describe('Young modulus Es of the solid material in MPa (> 0).'),
+        source: z.string().describe('Where Es comes from (data sheet, coupon test, ...). Required.'),
+      })
+      .optional()
+      .describe('Solid material for the stiffness in MPa; without it only ratios E/Es are given.'),
+    scaling: z
+      .object({
+        exponent: z.number().describe('Exponent n of E/Es = C rho^n (1 stretch-dominated, 2 bending-dominated for strut lattices).'),
+        coefficient: z.number().describe('Coefficient C (from coupon tests or a cited source; llull ships no table).'),
+      })
+      .optional()
+      .describe(
+        'Your Gibson-Ashby scaling law; without a coefficient no E is computed. Required for TPMS lattices (no verified law is built in).',
+      ),
     resolution: z
       .number()
       .optional()
       .describe(
-        'Quadrature cells along the smallest cell axis for rhoMeasured (integer 16..128, default 64; the error falls roughly with 1/resolution, 128 takes seconds).',
+        'Samples along the smallest cell axis (integer 16..128, default 64) for rhoMeasured and the TPMS thickness analysis (nodes are capped by the engine: 2^21 for the TS engine); the error falls roughly with 1/resolution.',
       ),
   }),
-  run: (doc, { id, estimateMechanics, resolution = 64 }, ctx): CommandResult => {
+  run: (doc, { id, estimateMechanics, baseMaterial, scaling, resolution = 64 }, ctx): CommandResult => {
     const node: FieldNode | undefined = fieldOf(doc, id);
     if (node === undefined || (node.op !== 'struts' && node.op !== 'tpms'))
       return refuseImplicit(
@@ -166,54 +166,52 @@ export const latticeProperties = defineCommand({
     const compiled = compileField(doc, id);
     if (!compiled.ok) return refuseImplicit(doc, 'lattice_properties', compiled.code, compiled.message, compiled.ids);
     const box = compiled.program.bounds;
-    const bare: FieldNode =
-      node.op === 'tpms'
-        ? (({ region: clipped, map: wrapped, ...rest }) => (
-            void clipped,
-            void wrapped,
-            { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
-          ))(node)
-        : (({ region: clipped, ...rest }) => (void clipped, { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }))(node);
-    const cellProgram = compileField(withField(doc, bare), '__cell');
+    const cellProgram = bareCell(doc, node);
     const cellBox: Box = {
       min: node.origin,
       max: [node.origin[0] + node.cellSize[0], node.origin[1] + node.cellSize[1], node.origin[2] + node.cellSize[2]],
     };
-    const voxel = Math.min(...node.cellSize) / Math.min(128, Math.max(16, Math.round(resolution)));
+    const samples = Math.min(128, Math.max(16, Math.round(resolution)));
+    const voxel = Math.min(...node.cellSize) / samples;
     const measured = cellProgram.ok
       ? quadratureVolume(engine, cellProgram.program, null, cellBox, voxel)
       : { code: cellProgram.code, message: cellProgram.message };
     const rhoMeasured = 'code' in measured ? null : measured.volume / (node.cellSize[0] * node.cellSize[1] * node.cellSize[2]);
-    const facts = node.op === 'struts' ? strutFacts(node, box) : tpmsFacts(node);
+    const described = describeLattice(doc, node, engine, box, samples, cellProgram);
+    if (typeof described === 'string')
+      return refuseImplicit(doc, 'lattice_properties', 'IMP_FIELD_UNBOUNDED', described, [id], ['params.id']);
+    const regionCompiled = node.region === undefined ? null : compileField(doc, node.region);
+    const stretch = node.op === 'tpms' ? mapStretch(node, box, regionCompiled?.ok === true ? regionCompiled.program : null, engine) : null;
+    const rho = rhoMeasured ?? described.mechanicsInput.rho1;
     const mechanics =
-      estimateMechanics === true
-        ? node.op === 'struts'
-          ? {
-              law: 'E/Es = C rho^n',
-              exponent: KNOWN_CLASS[node.cell] === 'stretch' ? 1 : 2,
-              coefficient: null,
-              source: MECHANICS_SOURCE,
-              unverified: true,
-              reviewRequired: true,
-              warning: 'IMP_MECHANICS_UNVERIFIED',
-            }
-          : {
-              law: 'E/Es = C rho^n',
-              exponent: null,
-              coefficient: null,
-              source: 'no verified law for TPMS in this version: test coupons',
-              unverified: true,
-              reviewRequired: true,
-              warning: 'IMP_MECHANICS_UNVERIFIED',
-            }
+      estimateMechanics === true && rho !== null
+        ? latticeMechanics({
+            rho,
+            cellClass: described.mechanicsInput.cellClass,
+            strut:
+              node.op === 'struts' && described.mechanicsInput.radius !== null
+                ? {
+                    set: strutGeometry(node.cell, node.cellSize, described.mechanicsInput.radius, undefined).set,
+                    cell: node.cellSize,
+                    rho1:
+                      (Math.PI *
+                        described.mechanicsInput.radius ** 2 *
+                        strutGeometry(node.cell, node.cellSize, 1, undefined).lengths.reduce((a, b) => a + b, 0)) /
+                      (node.cellSize[0] * node.cellSize[1] * node.cellSize[2]),
+                  }
+                : null,
+            baseMaterial,
+            scaling,
+          })
         : undefined;
     const data = {
       id,
       op: node.op,
-      ...facts,
+      ...described.facts,
+      ...(stretch === null ? {} : { cellStretchMin: stretch.min, cellStretchMax: stretch.max }),
       rhoMeasured,
       rhoMeasuredNote:
-        'solid fraction of one unrotated rectangular cell (rotation and any cylindrical map ignored), low-discrepancy quadrature (struts) / midpoint (TPMS); includes node overlap',
+        'solid fraction of one unrotated rectangular cell (rotation and any cell map ignored), low-discrepancy quadrature (struts) / midpoint (TPMS); includes node overlap',
       ...(mechanics === undefined ? {} : { mechanics }),
       unit: doc.units,
       unverified: compiled.unverified || mechanics !== undefined,
@@ -221,7 +219,7 @@ export const latticeProperties = defineCommand({
     };
     return report(
       doc,
-      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' ? `, rho1 ${(facts['rho1'] as number).toPrecision(5)}, ${String(facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}.`,
+      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' && typeof described.facts['rho1'] === 'number' ? `, rho1 ${described.facts['rho1'].toPrecision(5)}, ${String(described.facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}.`,
       data,
     );
   },

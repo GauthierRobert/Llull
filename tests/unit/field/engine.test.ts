@@ -401,6 +401,21 @@ describe('tsFieldEngine', () => {
   });
 });
 
+describe('nodes request', () => {
+  it('returns the inside sign grid of a sphere, x fastest, clipped by a region', () => {
+    const grid = { min: [-2, -2, -2], max: [2, 2, 2], voxel: 1 } as const;
+    const all = tsFieldEngine.measure(sphereProgram(1.5), grid, null, { kind: 'nodes' });
+    if (!all.ok || all.kind !== 'nodes') throw new Error('nodes failed');
+    expect(all.nodes).toEqual([5, 5, 5]);
+    expect(all.inside).toHaveLength(125);
+    expect(all.inside[2 + 5 * (2 + 5 * 2)]).toBe(1);
+    expect(all.inside[0]).toBe(0);
+    const clipped = tsFieldEngine.measure(sphereProgram(1.5), grid, sphereProgram(0.5, [-2, 0, 0]), { kind: 'nodes' });
+    if (!clipped.ok || clipped.kind !== 'nodes') throw new Error('nodes failed');
+    expect(clipped.inside.reduce((a, v) => a + v, 0)).toBeLessThan(all.inside.reduce((a, v) => a + v, 0));
+  });
+});
+
 describe('components use the Kuhn 14-neighbourhood', () => {
   const twoPoints = (a: readonly number[], b: readonly number[]): { solids: readonly unknown[] } => {
     const builder = new FieldBuilder('mm');

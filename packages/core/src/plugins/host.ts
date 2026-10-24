@@ -5,7 +5,9 @@
 
 import type { CadPlugin, DocumentExtension, DocumentProjections } from './plugin';
 import type { DerivationGuard } from '../commands/derivation';
-import type { CommandResult, RetiredCommandRewrite } from '../commands/types';
+import type { CommandResult, ExecutionContext, RetiredCommandRewrite } from '../commands/types';
+import type { BeamLatticeAnswer } from '../model/beamLattice';
+import type { LevelSetAnswer } from '../geometry/field/levelSetExport';
 import type { CadDocument } from '../model/types';
 import type { EntityPropertyProvider } from '../model/entityProperties';
 
@@ -100,6 +102,33 @@ export function derivedEntityIds(doc: CadDocument): Set<string> {
 /** The property providers of the installed plugins, in installation order. */
 export function entityPropertyProviders(): EntityPropertyProvider[] {
   return installed.flatMap((plugin) => (plugin.entityProperties ? [plugin.entityProperties] : []));
+}
+
+/** The beam lattice of `entityId` from the first installed plugin that knows it (a string is the reason there is none), or null. */
+export function beamLatticeOf(doc: CadDocument, entityId: string, ctx: ExecutionContext | undefined): BeamLatticeAnswer {
+  for (const plugin of installed) {
+    const answer = plugin.beamLattice?.(doc, entityId, ctx);
+    if (answer !== undefined && answer !== null) return answer;
+  }
+  return null;
+}
+
+/** The level set of `entityId` from the first installed plugin that knows it (a string is the reason there is none), or null. */
+export function levelSetOf(doc: CadDocument, entityId: string, ctx: ExecutionContext | undefined): LevelSetAnswer {
+  for (const plugin of installed) {
+    const answer = plugin.levelSet?.(doc, entityId, ctx);
+    if (answer !== undefined && answer !== null) return answer;
+  }
+  return null;
+}
+
+/** The reason an installed plugin gives for not exporting `entityId` as an exact STEP solid, or null. */
+export function stepSkipReason(doc: CadDocument, entityId: string): string | null {
+  for (const plugin of installed) {
+    const reason = plugin.stepSkip?.(doc, entityId);
+    if (reason !== undefined && reason !== null) return reason;
+  }
+  return null;
 }
 
 /** Command names a toolset gets from installed plugins. */

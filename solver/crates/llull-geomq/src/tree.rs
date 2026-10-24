@@ -58,6 +58,31 @@ impl MeshTree {
         self.corners.len() / 9
     }
 
+    /// Number of nodes (0 for an empty mesh); node 0 is the root.
+    pub fn node_count(&self) -> usize {
+        self.left.len()
+    }
+
+    /// The two children of an inner node, or None for a leaf.
+    pub fn children(&self, node: usize) -> Option<(usize, usize)> {
+        (self.left[node] >= 0).then(|| (self.left[node] as usize, self.right[node] as usize))
+    }
+
+    /// Bounding box of a node: min x, y, z then max x, y, z.
+    pub fn node_bounds(&self, node: usize) -> &[f64] {
+        &self.boxes[node * 6..node * 6 + 6]
+    }
+
+    /// Triangle indices held by a leaf.
+    pub fn leaf_triangles(&self, node: usize) -> &[usize] {
+        &self.order[self.start[node]..self.start[node] + self.count[node]]
+    }
+
+    /// The nine corner coordinates of triangle `t`.
+    pub fn triangle_corners(&self, t: usize) -> &[f64] {
+        &self.corners[t * 9..t * 9 + 9]
+    }
+
     fn centroid(&self, t: usize, axis: usize) -> f64 {
         let c = &self.corners;
         (c[t * 9 + axis] + c[t * 9 + 3 + axis] + c[t * 9 + 6 + axis]) / 3.0

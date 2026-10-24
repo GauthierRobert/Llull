@@ -16,7 +16,7 @@ import {
   type PlaneSegment,
 } from '../../geometry/planeSegments';
 import { planeToWorld } from '../../geometry/workPlane';
-import { entityCurves } from '../solids/sketchCurves';
+import { entityCurves } from '../../geometry/entityCurves';
 import { isFontFailure, loadFont } from './fontStore';
 import { isOutlineFailure, outlineOfText, planeShift } from './textPath';
 

@@ -8,6 +8,7 @@
 import type { MeshData, Vec3 } from '../../model/types';
 import { isClosedManifold } from '../../lib/isosurface/measures';
 import { marchingTetrahedra } from '../../lib/isosurface/tetra';
+import { dualContour } from './dualContour';
 import { signComponents } from './components';
 import {
   type FieldEngine,
@@ -124,14 +125,21 @@ function mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): Ret
   if (total > MAX_SAMPLES)
     return refuse('IMP_GRID_BUDGET', `${total} grid samples exceed the ts engine limit of ${MAX_SAMPLES}`, total, MAX_SAMPLES);
   const sampled = sampleGrid(program, grid);
-  const extracted = marchingTetrahedra({
-    nodes: sampled.nodes,
-    origin: grid.min,
-    voxel: grid.voxel,
-    values: sampled.values,
-    threshold: 0,
-    insideAbove: false,
-  });
+  const prepared = prepareProgram(program);
+  const contoured =
+    options.mesher === 'dual_contouring'
+      ? dualContour(prepared, { nodes: sampled.nodes, origin: grid.min, voxel: grid.voxel, values: sampled.values }, options.maxTriangles)
+      : null;
+  const extracted =
+    contoured ??
+    marchingTetrahedra({
+      nodes: sampled.nodes,
+      origin: grid.min,
+      voxel: grid.voxel,
+      values: sampled.values,
+      threshold: 0,
+      insideAbove: false,
+    });
   if (extracted === null) return refuse('IMP_GRID_BUDGET', 'the grid has too many nodes for exact edge keys', total, MAX_SAMPLES);
   const triangles = extracted.indices.length / 3;
   if (triangles > options.maxTriangles)
@@ -141,7 +149,6 @@ function mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): Ret
       triangles,
       options.maxTriangles,
     );
-  const prepared = prepareProgram(program);
   const registers = new Float64Array(program.instructions.length);
   let residual = 0;
   for (let v = 0; v < extracted.positions.length; v += 3) {
@@ -164,6 +171,8 @@ function mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): Ret
     prunedFraction: total === 0 ? 0 : 1 - sampled.evaluated / total,
     maxVertexResidual: residual,
     nonFiniteSamples: sampled.nonFinite,
+    mesher: contoured === null ? 'tetra' : 'dual_contouring',
+    mesherFallback: options.mesher === 'dual_contouring' && contoured === null,
     provenance: provenance(grid.voxel),
   };
 }
@@ -203,16 +212,21 @@ function measure(
   const bad = programError(program) ?? (region === null ? null : programError(region));
   if (bad !== null) return refuse('IMP_ENGINE_FAILED', `invalid field program: ${bad}`);
   const cells = gridCells(grid);
-  const count = request.kind === 'components' ? (cells[0] + 1) * (cells[1] + 1) * (cells[2] + 1) : cells[0] * cells[1] * cells[2];
+  const count =
+    request.kind === 'components' || request.kind === 'nodes'
+      ? (cells[0] + 1) * (cells[1] + 1) * (cells[2] + 1)
+      : cells[0] * cells[1] * cells[2];
   if (count > MAX_SAMPLES)
     return refuse('IMP_GRID_BUDGET', `${count} samples exceed the ts engine limit of ${MAX_SAMPLES}`, count, MAX_SAMPLES);
-  if (request.kind === 'components') {
+  if (request.kind === 'components' || request.kind === 'nodes') {
     const sampled = sampleGrid(program, grid);
     const regional = region === null ? null : sampleGrid(region, grid);
     const inside = new Uint8Array(sampled.values.length);
     const closed = 2 * ZERO_SNAP * grid.voxel;
     for (let id = 0; id < inside.length; id += 1)
       inside[id] = (sampled.values[id] ?? OUTSIDE) < closed && (regional === null || (regional.values[id] ?? OUTSIDE) < closed) ? 1 : 0;
+    if (request.kind === 'nodes')
+      return { ok: true, kind: 'nodes', inside, nodes: sampled.nodes, samples: count, provenance: provenance(grid.voxel) };
     const parts = signComponents(inside, sampled.nodes, grid.voxel, grid.min);
     return { ok: true, kind: 'components', ...parts, samples: count, provenance: provenance(grid.voxel) };
   }

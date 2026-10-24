@@ -10,8 +10,17 @@ const CRC_TABLE = ((): Uint32Array => {
   return table;
 })();
 
-export function crc32(bytes: Uint8Array): number {
-  let c = 0xffffffff;
+/** Running CRC-32: start from `CRC32_INIT`, feed chunks through `crc32Update`, close with `crc32Final`. */
+export const CRC32_INIT = 0xffffffff;
+
+export function crc32Update(state: number, bytes: Uint8Array): number {
+  let c = state;
   for (const byte of bytes) c = (CRC_TABLE[(c ^ byte) & 0xff] as number) ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  return c;
+}
+
+export const crc32Final = (state: number): number => (state ^ 0xffffffff) >>> 0;
+
+export function crc32(bytes: Uint8Array): number {
+  return crc32Final(crc32Update(CRC32_INIT, bytes));
 }

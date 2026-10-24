@@ -124,7 +124,7 @@
         "#3": {"id":"#3","op":"boolean","kind":"intersect","operands":["#11","#13"]}
       },
       "bodies": {
-        "#1": {"id":"#1","field":"#3","voxel":2,"bounds":{"min":[-4,-4,0],"max":[16,16,10]},"mesher":"tetra","engine":"ts","name":"implicit #3","color":"#d9b26f","contentHash":"4944ff0110dcec4409a77bf0c3808049cb49263538ca49d74a890ccb63fb3a12","hiddenSources":[]}
+        "#1": {"id":"#1","field":"#3","voxel":2,"bounds":{"min":[-4,-4,0],"max":[16,16,10]},"mesher":"tetra","engine":"ts","name":"implicit #3","color":"#d9b26f","contentHash":"31ad0e75a752a8ba1594ba028ebdf373257580fad4a91b6536c294c5dc781395","hiddenSources":[]}
       }
     }
   }

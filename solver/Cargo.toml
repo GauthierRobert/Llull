@@ -19,6 +19,7 @@ default-members = [
   "crates/llull-explicit",
   "crates/llull-cloud",
   "crates/llull-geomq",
+  "crates/llull-field",
   "crates/llull-meshops",
   "crates/llull-flow-core",
   "crates/llull-flow-lbm",
@@ -70,6 +71,10 @@ opt-level = 3
 
 # Geometric query batches (RS-6): the parity tests run seeded meshes with thousands of triangles and view-factor cavities.
 [profile.dev.package.llull-geomq]
+opt-level = 3
+
+# Field engine (05 IMP M4): the parity tests mesh 60-100 cube grids and measure 10^5-10^6 samples.
+[profile.dev.package.llull-field]
 opt-level = 3
 
 [profile.dev.package.llull-bvh]

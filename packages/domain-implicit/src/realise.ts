@@ -4,8 +4,14 @@
  * @invariant the grid is the bounds padded by 2 voxels; the content hash covers the compiled program, grid, mesher and engine major version
  */
 
-import type { FieldEngine } from '@core/geometry/field/engineTypes';
-import type { FieldMeshResult, FieldRefusal } from '@core/geometry/field/engineTypes';
+import {
+  DEFAULT_DETERMINISM,
+  type FieldEngine,
+  type FieldGrid,
+  type FieldMeshResult,
+  type FieldRefusal,
+  type Mesher,
+} from '@core/geometry/field/engineTypes';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument, MeshData, Vec3 } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -22,6 +28,8 @@ export interface RealiseRequest {
   /** Bounds to realise (default: the program's support box). */
   readonly bounds: { readonly min: Vec3; readonly max: Vec3 } | null;
   readonly maxTriangles: number;
+  /** Default tetra. */
+  readonly mesher?: Mesher;
 }
 
 export interface Realised {
@@ -50,6 +58,28 @@ const failureOf = (refusal: FieldRefusal, field: string): RealiseFailure => ({
   ids: [field],
 });
 
+/** The grid of a body: the bounds padded by 2 voxels. */
+export function bodyGrid(bounds: { readonly min: Vec3; readonly max: Vec3 }, voxel: number): FieldGrid {
+  const pad = PAD_VOXELS * voxel;
+  return {
+    min: [bounds.min[0] - pad, bounds.min[1] - pad, bounds.min[2] - pad],
+    max: [bounds.max[0] + pad, bounds.max[1] + pad, bounds.max[2] + pad],
+    voxel,
+  };
+}
+
+/** sha256 of (compiled program, grid, mesher, engine major version, determinism class): the content hash of a body; engines of one class share it. */
+export function contentHashOf(
+  program: FieldProgram,
+  grid: FieldGrid,
+  engine: Pick<FieldEngine, 'determinism'>,
+  mesher: Mesher = 'tetra',
+): string {
+  return sha256Hex(
+    canonicalJson({ program, grid, mesher, engineMajor: ENGINE_MAJOR, determinism: engine.determinism ?? DEFAULT_DETERMINISM }),
+  );
+}
+
 /** Compile `request.field` of `doc` and mesh it on `engine`. */
 export function realiseField(doc: CadDocument, request: RealiseRequest, engine: FieldEngine): Realised | RealiseFailure {
   const compiled = compileField(doc, request.field);
@@ -63,13 +93,8 @@ export function realiseField(doc: CadDocument, request: RealiseRequest, engine: 
       message: `field '${request.field}' has no finite support (a bare lattice or plane) and no bounds were given`,
       ids: [request.field],
     };
-  const pad = PAD_VOXELS * request.voxel;
-  const grid = {
-    min: [bounds.min[0] - pad, bounds.min[1] - pad, bounds.min[2] - pad] as Vec3,
-    max: [bounds.max[0] + pad, bounds.max[1] + pad, bounds.max[2] + pad] as Vec3,
-    voxel: request.voxel,
-  };
-  const result = engine.mesh(program, grid, { mesher: 'tetra', maxTriangles: request.maxTriangles });
+  const grid = bodyGrid(bounds, request.voxel);
+  const result = engine.mesh(program, grid, { mesher: request.mesher ?? 'tetra', maxTriangles: request.maxTriangles });
   if (!result.ok) return failureOf(result, request.field);
   if (result.mesh.indices.length === 0)
     return { ok: false, code: 'IMP_BODY_EMPTY', message: `no sample of field '${request.field}' is inside the grid`, ids: [request.field] };
@@ -79,7 +104,7 @@ export function realiseField(doc: CadDocument, request: RealiseRequest, engine: 
     bounds,
     mesh: result.mesh,
     result,
-    contentHash: sha256Hex(canonicalJson({ program, grid, mesher: 'tetra', engineMajor: ENGINE_MAJOR, engine: engine.name })),
+    contentHash: contentHashOf(program, grid, engine, request.mesher ?? 'tetra'),
     warnings: compiled.warnings,
     unverified: compiled.unverified,
     minFeature: compiled.minFeature,

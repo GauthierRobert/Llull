@@ -10,7 +10,7 @@ import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
 import { existingLayerOrDefault } from '../solids/shared';
-import { entityCurves } from '../solids/sketchCurves';
+import { entityCurves } from '../../geometry/entityCurves';
 import { MAX_DISPLAY_PRECISION } from '../limits';
 import { MAX_TEXT_CHARACTERS } from '../../lib/font/layout';
 import { isFontFailure, loadFont, resolveFont } from '../wrap/fontStore';

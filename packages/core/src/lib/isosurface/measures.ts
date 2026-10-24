@@ -1,7 +1,5 @@
 /** Mesh checks used by the callers of the iso-surface mesher: divergence-theorem volume / area and the closed-manifold test. */
 
-import type { IsoMesh } from './tetra';
-
 export interface MeshMeasures {
   readonly volume: number;
   readonly area: number;
@@ -33,20 +31,36 @@ export function meshMeasures({
 /**
  * Edge-manifold test by vertex index: every directed edge occurs exactly once and so does its reverse.
  * @invariant exact while vertices^2 < 2^53; larger meshes answer false
+ * @invariant sorted typed array instead of a Map, so meshes of tens of millions of edges (above the 2^24 entries of a Map) are checked
  */
-export function isClosedManifold({ positions, indices }: IsoMesh): boolean {
+export function isClosedManifold({
+  positions,
+  indices,
+}: {
+  readonly positions: ArrayLike<number>;
+  readonly indices: ArrayLike<number>;
+}): boolean {
   const vertices = positions.length / 3;
   if (vertices * vertices >= Number.MAX_SAFE_INTEGER || indices.length % 3 !== 0) return false;
-  const counts = new Map<number, number>();
+  const keys = new Float64Array(indices.length);
   for (let t = 0; t < indices.length; t += 3)
-    for (let e = 0; e < 3; e += 1) {
-      const key = (indices[t + e] as number) * vertices + (indices[t + ((e + 1) % 3)] as number);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+    for (let e = 0; e < 3; e += 1) keys[t + e] = (indices[t + e] as number) * vertices + (indices[t + ((e + 1) % 3)] as number);
+  keys.sort();
+  const contains = (key: number): boolean => {
+    let [lo, hi] = [0, keys.length - 1];
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const value = keys[mid] as number;
+      if (value === key) return true;
+      if (value < key) lo = mid + 1;
+      else hi = mid - 1;
     }
-  for (const [key, count] of counts) {
-    if (count !== 1) return false;
-    const from = Math.floor(key / vertices);
-    if (counts.get((key % vertices) * vertices + from) !== 1) return false;
+    return false;
+  };
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i] as number;
+    if (i > 0 && keys[i - 1] === key) return false;
+    if (!contains((key % vertices) * vertices + Math.floor(key / vertices))) return false;
   }
   return true;
 }

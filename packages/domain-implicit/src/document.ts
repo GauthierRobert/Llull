@@ -6,15 +6,20 @@
 import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
 import { getFieldEngine, resolveFieldEngine } from '@core/geometry/field/engine';
-import type { CadDocument } from '@core/model/types';
+import { MESH_LOD_TRIANGLES, getMeshAssetPort } from '@core/geometry/mesh/assets';
+import { lodMesh } from '@core/geometry/mesh/lod';
+import type { CadDocument, MeshData } from '@core/model/types';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
-import { bodyEntity } from './bodyCommand';
-import { type ImplicitBody, implicitOf, inputsOf } from './model';
+import { bodyEntity, triangleBudget } from './bodyCommand';
+import { storeBodyMesh } from './bodyMesh';
+import { type ImplicitBody, entitySources, implicitOf, inputsOf } from './model';
 import { realiseField } from './realise';
 
-const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts']);
+const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts', 'graph', 'voronoi', 'scalar']);
+const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise']);
+const isLaw = (value: unknown): boolean => typeof value === 'number' || typeof value === 'string';
 const isVec3 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 3 && value.every((c) => typeof c === 'number' && Number.isFinite(c));
 
@@ -27,7 +32,7 @@ function sourcesOf(model: ReturnType<typeof implicitOf>, root: string): string[]
     seen.add(id);
     const node = model.fields[id];
     if (node === undefined) return;
-    if (node.op === 'solid') sources.add(node.entityId);
+    entitySources(node).forEach((entity) => sources.add(entity));
     inputsOf(node).forEach(visit);
   };
   visit(root);
@@ -88,15 +93,41 @@ function nodeError(key: string, node: unknown): string | null {
     primitive: isRecord(node['dims']) && isVec3(node['position']) && isVec3(node['rotation']),
     solid: typeof node['entityId'] === 'string',
     boolean: Array.isArray(node['operands']) && node['operands'].every((o) => typeof o === 'string'),
-    offset: typeof node['source'] === 'string' && typeof node['distance'] === 'number',
-    shell: typeof node['source'] === 'string' && typeof node['thickness'] === 'number',
+    offset: typeof node['source'] === 'string' && isLaw(node['distance']),
+    shell: typeof node['source'] === 'string' && isLaw(node['thickness']),
     transform:
       typeof node['source'] === 'string' && isVec3(node['position']) && isVec3(node['rotation']) && typeof node['scale'] === 'number',
     tpms: isVec3(node['cellSize']) && isVec3(node['origin']) && isRecord(node['control']),
-    struts: isVec3(node['cellSize']) && isVec3(node['origin']) && typeof node['radius'] === 'number',
+    struts: isVec3(node['cellSize']) && isVec3(node['origin']) && isLaw(node['radius']),
+    graph:
+      Array.isArray(node['sourceIds']) &&
+      node['sourceIds'].every((o) => typeof o === 'string') &&
+      typeof node['radiusStart'] === 'number' &&
+      typeof node['radiusEnd'] === 'number' &&
+      typeof node['chord'] === 'number' &&
+      typeof node['mergeTolerance'] === 'number',
+    voronoi:
+      isVec3(node['min']) &&
+      isVec3(node['max']) &&
+      typeof node['density'] === 'number' &&
+      node['density'] > 0 &&
+      typeof node['seed'] === 'number' &&
+      typeof node['radius'] === 'number',
+    scalar: typeof node['kind'] === 'string' && SCALAR_KINDS.has(node['kind']),
   };
   return checks[node['op']] === true ? null : `field '${key}' (${node['op']}) has malformed parameters`;
 }
+
+/** Whether a raw mesh asset reference is well formed (sha256 key, counts, bounds). */
+const assetErrors = (asset: unknown): boolean =>
+  isRecord(asset) &&
+  typeof asset['key'] === 'string' &&
+  /^[0-9a-f]{64}$/.test(asset['key']) &&
+  typeof asset['triangles'] === 'number' &&
+  typeof asset['vertices'] === 'number' &&
+  isRecord(asset['bounds']) &&
+  isVec3(asset['bounds']['min']) &&
+  isVec3(asset['bounds']['max']);
 
 /** Value errors in the raw `implicit` slice. */
 function implicitErrors(raw: Record<string, unknown>): string[] {
@@ -118,10 +149,22 @@ function implicitErrors(raw: Record<string, unknown>): string[] {
       typeof body['contentHash'] === 'string' &&
       typeof body['name'] === 'string' &&
       typeof body['engine'] === 'string' &&
-      typeof body['color'] === 'string';
+      (body['mesher'] === 'tetra' || body['mesher'] === 'dual_contouring') &&
+      typeof body['color'] === 'string' &&
+      (body['explicitBounds'] === undefined || typeof body['explicitBounds'] === 'boolean') &&
+      (body['asset'] === undefined || assetErrors(body['asset']));
     if (!valid) errors.push(`implicit body '${key}' is malformed`);
   }
   return errors;
+}
+
+/** A display mesh for a stored body this host cannot realise at its voxel: the same field at 2, 4, 8 and 16 times the voxel, or null. */
+function coarseDisplay(realiseAt: (voxel: number) => ReturnType<typeof realiseField>, voxel: number): MeshData | null {
+  for (const factor of [2, 4, 8, 16]) {
+    const coarse = realiseAt(voxel * factor);
+    if (coarse.ok) return coarse.mesh;
+  }
+  return null;
 }
 
 /**
@@ -136,22 +179,47 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
   const missing = Object.values(slice.bodies).filter((body) => !Object.hasOwn(entities, body.id));
   if (missing.length === 0) return raw;
   const engine = resolveFieldEngine(getFieldEngine());
+  const port = getMeshAssetPort();
   const restored: Record<string, unknown> = { ...entities };
   const bodies: Record<string, ImplicitBody> = { ...slice.bodies };
   const dropped = new Set<string>();
   for (const body of missing) {
-    const doc = { ...raw, units: typeof raw['units'] === 'string' ? raw['units'] : 'mm', entities: restored } as unknown as CadDocument;
-    const realised = realiseField(
-      doc,
-      { field: body.field, voxel: body.voxel, bounds: body.bounds, maxTriangles: engine.limits.maxTriangles },
-      engine,
-    );
-    if (!realised.ok) {
-      dropped.add(body.id);
+    const stored = body.asset === undefined ? null : (port?.readMesh(body.asset.key) ?? null);
+    if (body.asset !== undefined && stored !== null) {
+      restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(stored, MESH_LOD_TRIANGLES), body.asset);
       continue;
     }
-    restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, realised.mesh);
-    if (realised.contentHash !== body.contentHash) bodies[body.id] = { ...body, contentHash: realised.contentHash, engine: engine.name };
+    const doc = { ...raw, units: typeof raw['units'] === 'string' ? raw['units'] : 'mm', entities: restored } as unknown as CadDocument;
+    const realiseAt = (voxel: number): ReturnType<typeof realiseField> =>
+      realiseField(
+        doc,
+        {
+          field: body.field,
+          voxel,
+          bounds: body.explicitBounds === true ? body.bounds : null,
+          maxTriangles: triangleBudget(engine.limits, port),
+          mesher: body.mesher,
+        },
+        engine,
+      );
+    const realised = realiseAt(body.voxel);
+    if (!realised.ok) {
+      const display = body.asset === undefined ? null : coarseDisplay(realiseAt, body.voxel);
+      if (display === null || body.asset === undefined) dropped.add(body.id);
+      else restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(display, MESH_LOD_TRIANGLES), body.asset);
+      continue;
+    }
+    const again = storeBodyMesh(realised.mesh, port);
+    restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, again.mesh, again.asset);
+    const { asset: previousAsset, ...bare } = body;
+    void previousAsset;
+    if (realised.contentHash !== body.contentHash || again.asset?.key !== body.asset?.key)
+      bodies[body.id] = {
+        ...bare,
+        contentHash: realised.contentHash,
+        engine: realised.result.provenance.engine,
+        ...(again.asset === undefined ? {} : { asset: again.asset }),
+      };
   }
   const without = (value: unknown): unknown => (Array.isArray(value) ? value.filter((id) => !dropped.has(String(id))) : value);
   return { ...raw, entities: restored, implicit: { ...slice, bodies }, order: without(raw['order']), selection: without(raw['selection']) };
@@ -161,11 +229,22 @@ export const implicitDocument: DocumentExtension = {
   validate: implicitErrors,
   derivedEntityIds: (doc) => new Set(Object.keys(implicitOf(doc).bodies)),
   restore,
-  afterLoad: (doc) =>
-    Object.values(implicitOf(doc).bodies)
-      .filter((body) => !Object.hasOwn(doc.entities, body.id))
-      .map(
-        (body) =>
-          `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`,
-      ),
+  afterLoad: (doc) => {
+    const port = getMeshAssetPort();
+    const bodies = Object.values(implicitOf(doc).bodies);
+    return [
+      ...bodies
+        .filter((body) => !Object.hasOwn(doc.entities, body.id))
+        .map(
+          (body) =>
+            `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`,
+        ),
+      ...bodies
+        .filter((body) => body.asset !== undefined && Object.hasOwn(doc.entities, body.id) && port?.readMesh(body.asset.key) == null)
+        .map(
+          (body) =>
+            `IMP_ASSET_MISSING: implicit body '${body.id}' shows a coarse display mesh; its full mesh is not in this machine's mesh asset store (measurements and exports refuse until it is loaded)`,
+        ),
+    ];
+  },
 };

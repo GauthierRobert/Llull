@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type Entity, type ExtrusionEntity, type RevolutionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
-import { entityCurves } from '@core/commands/solids/sketchCurves';
+import { entityCurves } from '@core/geometry/entityCurves';
 import { segmentPoint } from '@core/geometry/curveSegments';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { docWith, createdEntity as created } from '../helpers/fixtureDocument';

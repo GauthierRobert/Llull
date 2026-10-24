@@ -1,6 +1,5 @@
 /**
- * The pack's own plans (docs/design/05-implicit-lattice/validation/plans) run step by step through `execute` (VC-IMP-05, 15, 22, 40 and the
- * M5 plans that name commands not built yet). Voxels are coarsened where the plan's value exceeds the TS engine's 2^21-sample budget; the
+ * The pack's own plans (docs/design/05-implicit-lattice/validation/plans) run step by step through `execute` (VC-IMP-05, 15, 22, 23, 24, 40). Voxels are coarsened where the plan's value exceeds the TS engine's 2^21-sample budget; the
  * native engine runs them as written.
  */
 import { readFileSync } from 'node:fs';
@@ -115,14 +114,30 @@ describe('target_errors (VC-IMP-40)', () => {
   });
 });
 
-describe('plans that name later-milestone commands (M5)', () => {
-  it.each([
-    ['target_graded_gyroid_column', 'create_scalar_field'],
-    ['target_infill_solid_box', 'infill_solid'],
-  ])('%s stops at %s, which is not built yet', (plan, command) => {
-    const { steps } = runPlan(plan);
-    const failed = steps.find((s) => s.result.rejected === true);
-    expect(failed?.command).toBe(command);
-    expect(failed?.result.summary).toContain('Unknown command');
-  });
+describe('target_graded_gyroid_column (VC-IMP-24)', () => {
+  it('has the quadrature density 0.40438 and a wall from 0.5 to 2.5 mm', () => {
+    const { steps } = runPlan('target_graded_gyroid_column', {
+      create_implicit_body: { voxel: 0.5 },
+      implicit_properties: { voxel: 0.25 },
+    });
+    expect(steps.filter((s) => s.result.error !== undefined).map((s) => `${s.command}: ${s.result.summary}`)).toEqual([]);
+    const density = data(stepOf(steps, 'implicit_properties'))['relativeDensity'] as number;
+    expect(Math.abs(density - 0.40438) / 0.40438).toBeLessThan(0.005);
+    const lattice = data(stepOf(steps, 'lattice_properties'));
+    expect(Math.abs((lattice['thicknessMin'] as number) - 0.5)).toBeLessThan(0.02);
+    expect(Math.abs((lattice['thicknessMax'] as number) - 2.5)).toBeLessThan(0.02);
+    expect(data(stepOf(steps, 'create_implicit_body'))['closedManifold']).toBe(true);
+  }, 120_000);
+});
+
+describe('target_infill_solid_box (VC-IMP-23)', () => {
+  it('lightens the 40 mm box to the analytic volume 40672 mm3', () => {
+    const { steps } = runPlan('target_infill_solid_box', { infill_solid: { voxel: 0.5 } });
+    expect(steps.filter((s) => s.result.error !== undefined).map((s) => `${s.command}: ${s.result.summary}`)).toEqual([]);
+    const properties = data(stepOf(steps, 'implicit_properties'));
+    expect(Math.abs((properties['volume'] as number) - 40672) / 40672).toBeLessThan(0.01);
+    expect(Math.abs((properties['volumeQuadrature'] as number) - 40672) / 40672).toBeLessThan(0.005);
+    const infill = data(stepOf(steps, 'infill_solid'));
+    expect(infill['lighterFraction']).toBeGreaterThan(0.3);
+  }, 180_000);
 });

@@ -3,9 +3,13 @@
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { resolveFieldEngine } from '@core/geometry/field/engine';
+import type { FieldEngine } from '@core/geometry/field/engineTypes';
+import type { MeshAssetPort } from '@core/geometry/mesh/assets';
 import type { CadDocument, MeshData, MeshSolidEntity } from '@core/model/types';
+import type { MeshAssetRef } from '@core/model/meshProvenance';
 import { nextId } from '@lib/id';
 import { meshMeasures } from '@lib/isosurface/measures';
+import { storeBodyMesh } from './bodyMesh';
 import { refuseImplicit } from './codes';
 import { type ImplicitBody, fieldOf, withBody } from './model';
 import { realiseField } from './realise';
@@ -15,7 +19,7 @@ const HIDDEN_LAYER_ID = 'layer-implicit-hidden';
 const BODY_COLOR = '#d9b26f';
 
 /** The derived, read-only mesh entity of a body (also rebuilt when a saved file is loaded). */
-export function bodyEntity(id: string, field: string, name: string, color: string, mesh: MeshData): MeshSolidEntity {
+export function bodyEntity(id: string, field: string, name: string, color: string, mesh: MeshData, asset?: MeshAssetRef): MeshSolidEntity {
   return {
     id,
     kind: 'mesh',
@@ -26,8 +30,13 @@ export function bodyEntity(id: string, field: string, name: string, color: strin
     name,
     tags: [`implicit:${field}`],
     mesh,
+    ...(asset === undefined ? {} : { asset }),
   };
 }
+
+/** Triangles a body may have: the store-backed budget when the host holds a mesh asset store, else the inline one. */
+export const triangleBudget = (limits: FieldEngine['limits'], assets: MeshAssetPort | null | undefined): number =>
+  assets === null || assets === undefined ? limits.maxTriangles : (limits.maxStoredTriangles ?? limits.maxTriangles);
 
 /** `doc` with the layer `id` present. */
 function withLayer(doc: CadDocument, id: string, name: string, visible: boolean): CadDocument {
@@ -46,7 +55,7 @@ export const createImplicitBody = defineCommand({
   description:
     'Realise an implicit FIELD as a closed triangle mesh solid (derived and read-only: change the field nodes and run this again). voxel is the grid spacing in document units: error is second order (volume error ~ 0.6 (voxel/smallest feature radius)^2). ' +
     "Bounds default to the field's support box (primitives, clipped lattices); a bare lattice or plane needs `bounds` or a region. " +
-    'Budgets are checked before sampling: a grid above the engine limit is refused with IMP_GRID_BUDGET (use a coarser voxel or the native engine), and a mesh above maxTriangles with IMP_TRIANGLE_BUDGET. ' +
+    'Budgets are checked before sampling: a grid above the engine limit is refused with IMP_GRID_BUDGET (use a coarser voxel or the native engine), and a mesh above maxTriangles (default 5000000; 20000000 with the native engine when the host keeps big meshes in its mesh asset store) with IMP_TRIANGLE_BUDGET. ' +
     'hideSource moves the listed solids (e.g. the part the field came from) to a hidden layer. Next: implicit_properties, lattice_properties, check_implicit, export_3mf / export_stl.',
   params: z.object({
     field: z.string().describe('Id of the field node to realise.'),
@@ -55,7 +64,16 @@ export const createImplicitBody = defineCommand({
       .object({ min: vec3('Lower corner [x, y, z] in document units.'), max: vec3('Upper corner [x, y, z] in document units.') })
       .optional()
       .describe('Box to realise. Default: the support box of the field. The grid is padded by 2 voxels so the surface closes.'),
-    maxTriangles: z.number().optional().describe('Refuse a mesh with more triangles than this. Default 5000000.'),
+    mesher: z
+      .enum(['tetra', 'dual_contouring'])
+      .optional()
+      .describe(
+        'tetra (default): marching tetrahedra, always closed and manifold, cuts sharp edges and corners by up to a voxel. dual_contouring: one vertex per surface cell placed by a quadratic error fit on exact edge crossings and gradients, so box corners, clipped edges and blend creases stay sharp (volume error far below the tetrahedra on faceted bodies); the TS engine meshes it (up to its grid limit); when the result is not closed and manifold the body falls back to tetra and data.mesherFallback says so.',
+      ),
+    maxTriangles: z
+      .number()
+      .optional()
+      .describe('Refuse a mesh with more triangles than this. Default 5000000 (more when the host stores big meshes as assets).'),
     hideSource: z
       .array(z.string())
       .optional()
@@ -75,25 +93,34 @@ export const createImplicitBody = defineCommand({
     const engine = resolveFieldEngine(ctx?.fieldEngine);
     const realised = realiseField(
       doc,
-      { field: p.field, voxel: p.voxel, bounds: p.bounds ?? null, maxTriangles: p.maxTriangles ?? engine.limits.maxTriangles },
+      {
+        field: p.field,
+        voxel: p.voxel,
+        bounds: p.bounds ?? null,
+        maxTriangles: p.maxTriangles ?? triangleBudget(engine.limits, ctx?.meshAssets),
+        mesher: p.mesher ?? 'tetra',
+      },
       engine,
     );
     if (!realised.ok) return fail(realised.code, realised.message, realised.ids);
     const id = nextId('imp');
     const name = p.name ?? `implicit ${p.field}`;
     const color = p.color ?? BODY_COLOR;
-    const entity = bodyEntity(id, p.field, name, color, realised.mesh);
+    const stored = storeBodyMesh(realised.mesh, ctx?.meshAssets);
+    const entity = bodyEntity(id, p.field, name, color, stored.mesh, stored.asset);
     const body: ImplicitBody = {
       id,
       field: p.field,
       voxel: p.voxel,
       bounds: realised.bounds,
-      mesher: 'tetra',
+      mesher: p.mesher ?? 'tetra',
       engine: realised.result.provenance.engine,
       name,
       color,
       contentHash: realised.contentHash,
       hiddenSources: hidden,
+      ...(p.bounds === undefined ? {} : { explicitBounds: true }),
+      ...(stored.asset === undefined ? {} : { asset: stored.asset }),
     };
     let next: CadDocument = withLayer(doc, IMPLICIT_LAYER_ID, 'implicit', true);
     if (hidden.length > 0) next = withLayer(next, HIDDEN_LAYER_ID, 'implicit sources (hidden)', false);
@@ -126,6 +153,8 @@ export const createImplicitBody = defineCommand({
             ? null
             : { value: errorEstimate, kind: 'estimated', formula: '0.6 (voxel / smallest feature radius)^2 * volume' },
         closedManifold: result.closedManifold,
+        mesher: result.mesher,
+        mesherFallback: result.mesherFallback,
         bounds: realised.bounds,
         voxel: p.voxel,
         contentHash: realised.contentHash,
@@ -134,7 +163,10 @@ export const createImplicitBody = defineCommand({
         hiddenSources: hidden,
         warnings: realised.warnings,
         provenance: {
-          method: 'marching tetrahedra (6 Kuhn tets per cube), interval-pruned',
+          method:
+            result.mesher === 'dual_contouring'
+              ? 'dual contouring (QEF vertex per cell, bisected edge crossings, exact gradients)'
+              : 'marching tetrahedra (6 Kuhn tets per cube), interval-pruned',
           ...result.provenance,
           samples: result.samples,
           evaluatedSamples: result.evaluatedSamples,

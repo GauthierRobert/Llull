@@ -10,7 +10,7 @@ import type { ParsedFont } from '../../lib/font/font';
 import { segmentOfCurve, sampleSegment } from '../../geometry/planeSegments';
 import { curveMapper } from '../../geometry/textOnCurve';
 import { outlineErrorCode, textOutline, type TextOutline } from '../../geometry/textOutline';
-import { entityCurves } from '../solids/sketchCurves';
+import { entityCurves } from '../../geometry/entityCurves';
 
 /** Points sampled on every piece of the curve the text follows. */
 const SAMPLES_PER_PIECE = 48;
