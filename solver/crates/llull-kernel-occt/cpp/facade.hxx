@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include <GProp_GProps.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS_Shape.hxx>
@@ -42,12 +43,20 @@ class Shape {
   TopoDS_Shape shape;
   // Persistent face names (SC-N1, naming.hxx), aligned with the distinct faces of `shape`; empty = unnamed.
   std::vector<std::string> names;
+  // Built by a deformation (gtransform, warp): its B-spline faces are integrated with the adaptive rule (mass_properties), and so are the shapes
+  // derived from it by placement, scaling, naming or a boolean.
+  bool refined_mass = false;
 };
 
 class StepWriter {
  public:
   STEPControl_Writer writer;
 };
+
+// Volume / surface properties of `piece` (the shape or one solid of it) by the rule `shape` asks for: the default Gauss rule, and for a deformed
+// shape the adaptive rule wherever the two differ (see mass_properties). `rel_error` (may be null) receives the adaptive estimate when it was used.
+GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error);
+GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece);
 
 void init_runtime();
 rust::String occt_version();

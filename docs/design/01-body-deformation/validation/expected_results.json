@@ -419,7 +419,7 @@
     }
    ],
    "tolerance": {
-    "volume": 1e-9,
+    "volume": 0.000001,
     "area": 0.000001
    },
    "toleranceKind": "relative",

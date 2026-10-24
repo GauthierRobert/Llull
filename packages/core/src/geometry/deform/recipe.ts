@@ -1,6 +1,6 @@
 /** Key text and structural validation of a `{ op: 'deform' }` recipe node (01 DEF §3), for `recipeKey` and `validateShapeRecipe`. */
 
-import { DEFORM_LAW_KINDS } from '../../model/deform';
+import { AXIS_LAW_KINDS, DEFORM_LAW_KINDS, type DeformLawKind } from '../../model/deform';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isRecord } from '../../lib/isRecord';
@@ -11,6 +11,65 @@ import type { DeformNode } from './laws';
 export function deformKeyText(node: DeformNode, sourceKey: string): string {
   const { law, frame, region, output } = node;
   return `deform(${sourceKey},${canonicalJson({ law, frame, region: region ?? null, output })})`;
+}
+
+const isIntegerIn = (value: unknown, low: number, high: number): boolean =>
+  Number.isInteger(value) && (value as number) >= low && (value as number) <= high;
+
+function latticeProblem(law: Record<string, unknown>): string | null {
+  const { box, degrees, offsets } = law;
+  if (
+    !isRecord(box) ||
+    !isVec3(box['min']) ||
+    !isVec3(box['max']) ||
+    !box['min'].every((low, a) => low < ((box['max'] as number[])[a] as number))
+  )
+    return 'lattice: box needs finite min < max on every axis';
+  if (!Array.isArray(degrees) || degrees.length !== 3 || !degrees.every((degree) => isIntegerIn(degree, 1, 8)))
+    return 'lattice: degrees must be 3 integers in 1..8';
+  if (!Array.isArray(offsets)) return 'lattice: offsets must be an array';
+  for (const entry of offsets) {
+    if (!isRecord(entry) || !isVec3(entry['delta']) || !Array.isArray(entry['index']) || entry['index'].length !== 3)
+      return 'lattice: an offset needs index [i, j, k] and a finite delta Vec3';
+    if (!entry['index'].every((at, a) => isIntegerIn(at, 0, (degrees as number[])[a] as number)))
+      return 'lattice: an offset index lies outside the control net';
+  }
+  return null;
+}
+
+function flowProblem(law: Record<string, unknown>): string | null {
+  const { stations, step } = law;
+  if (!isFiniteNumber(law['z0']) || !isPositiveNumber(law['ratio']) || !isPositiveNumber(step))
+    return 'flowCurve: z0 finite, ratio and step > 0';
+  return Array.isArray(stations) && stations.length >= 24 && stations.length % 12 === 0 && stations.every(isFiniteNumber)
+    ? null
+    : 'flowCurve: stations must be finite numbers, 12 per station, at least 2 stations';
+}
+
+function surfaceFlowProblem(law: Record<string, unknown>): string | null {
+  const { nx, ny, nodes } = law;
+  if (!isFiniteNumber(law['x0']) || !isFiniteNumber(law['y0']) || !isPositiveNumber(law['hx']) || !isPositiveNumber(law['hy']))
+    return 'flowSurface: x0, y0 finite and hx, hy > 0';
+  return isIntegerIn(nx, 2, 1000) &&
+    isIntegerIn(ny, 2, 1000) &&
+    Array.isArray(nodes) &&
+    nodes.length === 6 * (nx as number) * (ny as number) &&
+    nodes.every(isFiniteNumber)
+    ? null
+    : 'flowSurface: nodes must be 6 finite numbers for each of the nx by ny nodes';
+}
+
+function rbfProblem(law: Record<string, unknown>): string | null {
+  const { centres, weights, affine } = law;
+  const numbers = (value: unknown, length?: number): boolean =>
+    Array.isArray(value) && value.every(isFiniteNumber) && (length === undefined || value.length === length);
+  return numbers(centres) &&
+    (centres as unknown[]).length % 3 === 0 &&
+    (centres as unknown[]).length >= 3 &&
+    numbers(weights, (centres as unknown[]).length) &&
+    numbers(affine, 12)
+    ? null
+    : 'rbf: centres and weights must be finite numbers, three per centre (at least one), and affine twelve numbers';
 }
 
 const isRows = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isVec3);
@@ -33,6 +92,22 @@ function lawProblem(law: Record<string, unknown>): string | null {
       return isPositiveNumber(law['radius']) && typeof law['symmetric'] === 'boolean'
         ? null
         : 'bend: radius must be > 0 and symmetric a boolean';
+    case 'lattice':
+      return latticeProblem(law);
+    case 'point':
+      return isVec3(law['center']) &&
+        isVec3(law['direction']) &&
+        isFiniteNumber(law['distance']) &&
+        isPositiveNumber(law['radius']) &&
+        ['smooth_c2', 'cubic'].includes(String(law['falloff']))
+        ? null
+        : 'point: center and direction finite Vec3, distance finite, radius > 0, falloff smooth_c2 or cubic';
+    case 'flowCurve':
+      return flowProblem(law);
+    case 'flowSurface':
+      return surfaceFlowProblem(law);
+    case 'rbf':
+      return rbfProblem(law);
     default:
       return `unknown law kind '${String(law['kind'])}' (expected ${DEFORM_LAW_KINDS.join(', ')})`;
   }
@@ -57,7 +132,7 @@ export function deformProblem(node: Readonly<Record<string, unknown>>): string |
   const frame = node['frame'];
   if (!isRecord(frame) || !isVec3(frame['origin']) || !isVec3(frame['axis']) || !isVec3(frame['reference']))
     return 'deform: frame needs finite origin, axis and reference Vec3';
-  if (law['kind'] !== 'affine' || node['region'] !== undefined) {
+  if (AXIS_LAW_KINDS.includes(law['kind'] as DeformLawKind) || node['region'] !== undefined) {
     const regionFault = node['region'] === undefined ? 'region is required' : regionProblem(node['region'], law['kind']);
     if (regionFault !== null) return `deform: ${regionFault}`;
   }

@@ -5,6 +5,7 @@
 //! OCCT's `Standard_Failure` included, comes back as an `Err` (see the `trycatch` override in `facade.hxx`).
 //! [`recipe`] evaluates llull `ShapeRecipe` JSON on top of it.
 
+pub mod deform;
 pub mod features;
 pub mod lru;
 pub mod mesh;
@@ -22,6 +23,8 @@ pub(crate) fn serial_blends() -> std::sync::MutexGuard<'static, ()> {
 
 #[cfg(test)]
 mod blend_tests;
+#[cfg(test)]
+mod deform_tests;
 #[cfg(test)]
 mod naming_tests;
 #[cfg(test)]

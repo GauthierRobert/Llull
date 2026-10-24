@@ -6,6 +6,9 @@
 import type { DeformRegion } from '../../model/deform';
 import type { Vec3 } from '../../model/vectors';
 import { type DeformNode } from './laws';
+import { determinantBounds } from './lattice';
+import { localDeterminant } from './laws';
+import { determinantRange as pointRange } from './pointPush';
 import { type LocalFrame, toLocal } from './frame';
 import { rampAt } from './region';
 
@@ -98,6 +101,8 @@ export function splitHeights(node: Pick<DeformNode, 'law' | 'region'>): number[]
 export interface JacobianRange {
   readonly min: number;
   readonly max: number;
+  /** A guaranteed enclosure of det J over the body (lattice: Bernstein coefficients of det J), when the law has one. */
+  readonly bound?: { readonly min: number; readonly max: number; readonly method: string };
   /** Local point where the minimum is reached. */
   readonly minAt: Vec3;
 }
@@ -114,6 +119,27 @@ export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: 
     const det = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
     return { min: det, max: det, minAt: corner(extent.min[2]) };
   }
+  if (law.kind === 'lattice') {
+    const bounds = determinantBounds(law);
+    return {
+      min: bounds.sampledMin,
+      max: bounds.sampledMax,
+      minAt: bounds.sampledMinAt,
+      bound: { min: bounds.boundMin, max: bounds.boundMax, method: 'Bernstein coefficients of det J over the lattice box' },
+    };
+  }
+  if (law.kind === 'point') {
+    const reaches = [0, 1, 2].every(
+      (a) =>
+        (law.center[a] as number) + law.radius > (extent.min[a] as number) &&
+        (law.center[a] as number) - law.radius < (extent.max[a] as number),
+    );
+    if (!reaches) return { min: 1, max: 1, minAt: corner(extent.min[2]) };
+    const range = pointRange(law);
+    return { ...range, minAt: law.center, bound: { ...range, method: 'closed form: 1 -/+ |distance| max|phi prime| / radius' } };
+  }
+  if (law.kind === 'flowCurve' || law.kind === 'flowSurface') return sampledFlowRange(node, extent);
+  if (law.kind === 'rbf') return sampledFlowRange(node, extent, 13, 13);
   if (region === undefined || law.kind === 'twist') return { min: 1, max: 1, minAt: corner(extent.min[2]) };
   if (law.kind === 'taper') {
     const det = (z: number): number => {
@@ -132,6 +158,34 @@ export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: 
   const [low, high] = [(law.radius - extent.max[1]) / law.radius, (law.radius - extent.min[1]) / law.radius];
   const values = [...(inside ? [low, high] : []), ...(!inside || extendsOutside(region, extent) ? [1] : [])];
   return { min: Math.min(...values), max: Math.max(...values), minAt: corner(Math.max(extent.min[2], region.start), extent.max[1]) };
+}
+
+/** Placeholder region of a flow (its law ignores it). */
+const FLOW_REGION: DeformRegion = { start: -Infinity, end: Infinity, falloff: 'none', beyond: 'rigid' };
+
+/**
+ * det J of a map without a closed form (a flow, a fitted field) over a grid of the body extent: `along` steps in z, `across` samples in x and y (corners, edges,
+ * middles when 3).
+ */
+function sampledFlowRange(node: Pick<DeformNode, 'law' | 'region'>, extent: LocalExtent, across = 3, along = 48): JacobianRange {
+  let min = Infinity;
+  let max = -Infinity;
+  let minAt: Vec3 = extent.min;
+  const level = (axis: 0 | 1, k: number): number => extent.min[axis] + ((extent.max[axis] - extent.min[axis]) * k) / (across - 1);
+  for (let i = 0; i <= along; i++) {
+    const z = extent.min[2] + ((extent.max[2] - extent.min[2]) * i) / along;
+    for (let j = 0; j < across; j++)
+      for (let k = 0; k < across; k++) {
+        const point: Vec3 = [level(0, j), level(1, k), z];
+        const value = localDeterminant(node.law, node.region ?? FLOW_REGION, point);
+        if (value < min) {
+          min = value;
+          minAt = point;
+        }
+        max = Math.max(max, value);
+      }
+  }
+  return { min, max, minAt };
 }
 
 export interface RegionCrease {

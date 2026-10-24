@@ -1,6 +1,6 @@
 /**
  * Deformation laws (01 DEF §5.2, Barr 1984): maps from local frame coordinates q = (x, y, z) to q' and their Jacobian determinants, closed form.
- * @invariant twist det J = 1; taper det J = s² (s when flat); stretch det J = factor inside the region; bend det J = (R − y) / R inside the
+ * @invariant lattice, point and flow maps: see lattice.ts, pointPush.ts, flow.ts; twist det J = 1; taper det J = s² (s when flat); stretch det J = factor inside the region; bend det J = (R − y) / R inside the
  *   region and 1 elsewhere (rigid continuation past the end); affine det J = det M
  */
 
@@ -9,6 +9,11 @@ import type { ShapeRecipe } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { type LocalFrame, resolveFrame, toLocal, toWorld } from './frame';
 import { rampAt } from './region';
+import { flowDeterminant, flowMap } from './flow';
+import { flowSurfaceDeterminant, flowSurfaceMap } from './flowSurface';
+import { latticeDeterminant, latticeMap } from './lattice';
+import { rbfDeterminant, rbfMap } from './rbf';
+import { pointDeterminant, pointMap } from './pointPush';
 
 /** The `deform` member of `ShapeRecipe`. */
 export type DeformNode = Extract<ShapeRecipe, { op: 'deform' }>;
@@ -65,6 +70,16 @@ export function mapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 {
     }
     case 'bend':
       return bendMap(law.radius, law.symmetric, region, q);
+    case 'lattice':
+      return latticeMap(law, q);
+    case 'point':
+      return pointMap(law, q);
+    case 'flowCurve':
+      return flowMap(law, q);
+    case 'flowSurface':
+      return flowSurfaceMap(law, q);
+    case 'rbf':
+      return rbfMap(law, q);
   }
 }
 
@@ -83,6 +98,16 @@ export function localDeterminant(law: DeformLaw, region: DeformRegion, q: Vec3):
       return q[2] > region.start && q[2] <= region.end ? law.factor : 1;
     case 'bend':
       return q[2] > region.start && q[2] <= region.end ? (law.radius - q[1]) / law.radius : 1;
+    case 'lattice':
+      return latticeDeterminant(law, q);
+    case 'point':
+      return pointDeterminant(law, q);
+    case 'flowCurve':
+      return flowDeterminant(law, q);
+    case 'flowSurface':
+      return flowSurfaceDeterminant(law, q);
+    case 'rbf':
+      return rbfDeterminant(law, q);
   }
 }
 

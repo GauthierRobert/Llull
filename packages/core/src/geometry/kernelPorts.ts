@@ -161,6 +161,27 @@ export interface BlendReport {
   readonly message?: string;
 }
 
+/** How an exact `deform` node built, or why it was refused (01 DEF M2, `kernel.deformReport`). Lengths in document units. */
+export interface DeformReport {
+  readonly ok: boolean;
+  /** Stable DEF_* code of the refusal ('' when built). */
+  readonly code: string;
+  readonly message: string;
+  /** Largest deviation of a fitted face or edge from the deformed source geometry. */
+  readonly maxError: number;
+  readonly surfaceError: number;
+  readonly curveError: number;
+  /** Faces re-approximated, edges re-approximated, faces added by splitting at the places where the law is not analytic. */
+  readonly faces: number;
+  readonly edges: number;
+  readonly splitFaces: number;
+  /** A full-turn bend: the two coincident end caps were dropped and the ring sewn closed. */
+  readonly ring: boolean;
+  /** Smallest det J found on the surface of the body. */
+  readonly minDeterminant: number;
+  readonly volume: number;
+}
+
 /** One cross-section of a blend face (BLD M1): the contact points on both sides, the section mid point, and the circle through the three. */
 export interface BlendSection {
   /** Uniform fraction of the first contact edge's parameter (0 = its start). */

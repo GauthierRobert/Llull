@@ -17,13 +17,15 @@ use std::rc::Rc;
 
 mod floor;
 mod nodes;
+mod warp;
 
-pub const RECIPE_OPS: [&str; 16] = [
+pub const RECIPE_OPS: [&str; 17] = [
     "solid",
     "boolean",
     "place",
     "scale",
     "gtransform",
+    "deform",
     "brep",
     "fillet",
     "chamfer",
@@ -54,6 +56,8 @@ pub struct Evaluator {
     builds: u64,
     /// Document blobs (`BRepTools::Write` text by sha256 hex) that `brep` leaves read.
     blobs: HashMap<String, String>,
+    /// How each `deform` node last built (or why it was refused), by recipe key; bounded like the shape cache.
+    reports: Lru<Value>,
 }
 
 /// Lower-case hex sha256 of `bytes`.
@@ -310,7 +314,7 @@ fn boolean_op(name: &str) -> Option<BooleanOp> {
 
 impl Evaluator {
     pub fn new(capacity: usize) -> Self {
-        Self { cache: Lru::new(capacity), builds: 0, blobs: HashMap::new() }
+        Self { cache: Lru::new(capacity), builds: 0, blobs: HashMap::new(), reports: Lru::new(capacity) }
     }
 
     /// Keeps blob `sha256` for `brep` leaves (idempotent) and forgets refusals, which may have been "blob missing"; false when the
@@ -392,6 +396,7 @@ impl Evaluator {
                 let (Some(matrix), Some(translation)) = (matrix, translation) else { return refused() };
                 shape_of(crate::gtransformed(&source, matrix.try_into().unwrap_or([0.0; 9]), translation.try_into().unwrap_or([0.0; 3])))
             }
+            "deform" => self.deform(recipe),
             "fillet" => self.round(recipe, false),
             "chamfer" => self.round(recipe, true),
             "blend" => self.blend(recipe),

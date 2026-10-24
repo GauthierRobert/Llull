@@ -185,7 +185,7 @@ reference; each defaulted from the body bounds and reported), `region` (`start`,
 | `deform_by_point` (V1)       | M   | K?                                                     | `point`, `direction` (unit after normalising), `distance`, `radius`, `falloff: 'smooth_c2' \| 'cubic'`, `output`                                                                     | as above                                                               | displacement = distance at `point`, 0 at and beyond `radius`                                                  | `DEF_FOLDOVER` (with the limit), `DEF_REGION_MISSES_BODY`                                                                    |
 | `flow_along_curve` (V1)      | M   | K?                                                     | `baseCurve?` (default the frame axis segment through the body), `targetId` (`nurbs_curve`, sketch curve, or `{entityId, edgeNear}`), `stretch?`, `orientation`, `up?`, `output`      | as above                                                               | arc length along the base preserved unless `stretch`                                                          | `DEF_CURVE_NOT_FOUND`, `DEF_CURVE_INVALID` (not G1, zero length), `DEF_FOLDOVER` (body radius > target curvature radius)     |
 | `flow_on_surface` (V1)       | M   | K? (face target: exact only)                           | `base: {plane:{origin, normal, uDirection}} \| {sheetId}`, `target: {sheetId} \| {entityId, faceNear}`, `targetOrigin`, `targetUDirection`, `output`                                 | as above                                                               | (u, v) arc lengths along the base kept at the target origin; normal offset w kept                             | `DEF_FLOW_TARGET_INVALID`, `DEF_FLOW_OUTSIDE_BASE`, `DEF_FLOW_OVERLAP`, `DEF_TARGET_FACE_NEEDS_KERNEL`, `DEF_FOLDOVER`       |
-| `deform_curve_to_curve` (V2) | M   | K?                                                     | `pairs: [{ initialId, targetId? }]`, `fixedFacesNear?`, `stiffness` (0..1), `output`                                                                                                 | as above                                                               | every initial curve lands on its target within tolerance (residual reported)                                  | `DEF_CURVE_PAIR_INVALID`, `DEF_FOLDOVER`                                                                                     |
+| `deform_curve_to_curve` (V2) | M   | K?                                                     | `pairs: [{ initialId, targetId? }]`, `fixedPoints?` (world points held still), `stiffness` (0..1), `output`                                                                          | as above                                                               | every initial curve lands on its target within tolerance (residual reported)                                  | `DEF_CURVE_PAIR_INVALID`, `DEF_FOLDOVER`                                                                                     |
 | `morph_bodies` (V2)          | M   | –                                                      | `fromId`, `toId`, `t` (0..1)                                                                                                                                                         | 1 new entity                                                           | t = 0 ⇒ from, t = 1 ⇒ to                                                                                      | `DEF_MORPH_INCOMPATIBLE`                                                                                                     |
 | `analyze_deformation`        | Q   | – (reads the recipe; exact-only fields `null` on mesh) | `id`, `stepIndex?`, `samples?` (default 9³ per lattice cell / region slab), `compareTo?` (analytic reference shape: `torus`, `cone`, `cylinder`, `spheroid`)                         | —                                                                      | `data` shape §7.2                                                                                             | `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`                                                                                   |
 | `check_deformation`          | Q   | –                                                      | `ids?` (default every entity whose recipe has a `deform` node), `purpose: 'design' \| 'release'`, tolerances `approx`, `volumeDriftRel`, `creaseRad` (each optional ⇒ named default) | —                                                                      | `data {status, findings[], tolerances, unverified, reviewRequired, reviewReason?, provenance}`                | `DEF_ENTITY_NOT_FOUND`                                                                                                       |
@@ -508,13 +508,14 @@ lowers an affine `deform` node to the sidecar op `gtransform` (`BRepBuilderAPI_G
 `recipe.rs`, `session.rs`, `server/src/native/kernelProtocol.ts`); the proxy answers every other law null without a round trip.
 
 **Differences from the plan above.**
-- Mesh refinement is *measured*, not only bounded: an edge is split while the deformed curve leaves its chord by more than `tolerance` at 1/4, 1/2, 3/4
+
+- Mesh refinement is _measured_, not only bounded: an edge is split while the deformed curve leaves its chord by more than `tolerance` at 1/4, 1/2, 3/4
   (`chordRule`); the §5.7 bound `√(8 tol / M2)` is still computed (`curvatureBound`, `maxEdgeLength`, matches `mesh_budget.json`: 6.77146 / 1.90693), with an extra
   oblique-edge term (twist |θ'|, taper |s'|, bend 1/R), and used for the `DEF_BUDGET_EXCEEDED` estimate. Edges are cut at region ends where the law has a kink
   (stretch, bend, linear ramp). Manifold's `refineToLength` / `warpBatch` are not used: one TS implementation serves Manifold, the no-kernel path and analysis.
 - Predicted volume (§5.10) is a cross-section integral ∫[d(z)A(z) + d'(z)My(z)]dz of the source triangles split at the region ends, not the Keast fan (exact for
   affine / twist / stretch, 1e-6 for taper / bend).
-- Frame convention: stored `reference` is always the local x direction. `bend_body` reads the *user's* `frame.reference` as the direction toward the centre of
+- Frame convention: stored `reference` is always the local x direction. `bend_body` reads the _user's_ `frame.reference` as the direction toward the centre of
   curvature (local y) and stores the matching x.
 - `check_deformation`: exact-path default `volumeDriftRel` is 1e-3 (spec 1e-4): the native kernel integrates B-spline faces with its default Gauss rule
   (4.4e-4 relative volume, 0.4 % area on a GTransform-ed sphere r 10 → [1,1,2]; the surface is exact to 1e-15). New findings: `DEF_CHECK_NOT_CLOSED`.
@@ -528,9 +529,9 @@ lowers an affine `deform` node to the sidecar op `gtransform` (`BRepBuilderAPI_G
 **Measured (mesh path unless noted; `tests/unit/deform/*`, tolerance 0.005 unless noted).** VC-01 twist volume rel error ≤ 7e-5 (tol 0.001: 6e-5 / 5.5e-5 / 2.6e-5 /
 7.4e-5); VC-02 area 4203.96 vs 4204.109, 4207.04 vs 4207.299 (≤ 1e-4); VC-04 crease 0.15580650 / 0; VC-05 taper 5e-13 (linear, flat), 1.3e-5 (smooth); VC-07 bend
 volume +3.2e-5, fibres exact; VC-09 refused, min det J −0.25; VC-10 12000 / 10000 exact; VC-12 6000; VC-19 flagged `method: mesh`, chord error ≤ tolerance; VC-25 identical
-documents; VC-26 `reviewRequired`; VC-27 codes with paths + remediation; VC-30 parity ≤ 1e-9 for twist, twist_smooth, taper, taper_flat, bend, stretch, scale_nonuniform
+documents; VC-26 `reviewRequired`; VC-27 codes with paths + remediation; VC-30 parity ≤ 1e-9 for twist, twist*smooth, taper, taper_flat, bend, stretch, scale_nonuniform
 (point / flow / ffd rows are M3); VC-36 refused. Source tessellation limits primitives: cylinder → frustum / torus −1.1 % (24-gon, no kernel) / −0.64 % (Manifold),
-sphere scale −4.2 % / −2.2 % against the closed form — the *deformation* error against the tessellated source (`analyze_deformation volume.driftRel`) is < 2e-3.
+sphere scale −4.2 % / −2.2 % against the closed form — the \_deformation* error against the tessellated source (`analyze_deformation volume.driftRel`) is < 2e-3.
 Native (CLI, `occt-7.9.2`): `target_scale_nonuniform_sphere` exact path, volume 8373.9165 (closed form 8377.5804, −4.4e-4, kernel Gauss), area 2156.18
 (closed form 2147.84, +0.39 %); cargo test: surface residual 1.1e-15, mirror valid and 6000. `target_twist_box` native: 36 956 triangles, 0.23 s,
 volume 9999.391; the pack's taper / bend torus plans use `mode: "exact"` and refuse until M2. Baselines on this build: twisted loft 9995.931 / 4122.903
@@ -545,3 +546,54 @@ the STORED mesh (each vertex pulled back by the closed-form inverse `geometry/de
 A kernel refusal keeps the core warp's own code (`DEF_BUDGET_EXCEEDED`, `DEF_FRAME_DEGENERATE`) so codes do not depend on the host.
 `scale_nonuniform` defaults the frame reference to the first world axis not parallel to the axis. `predictedVolume` no longer spreads typed arrays into `Math.min/max`
 (a 210 000-vertex test covers it).
+
+## 14. As built (DES-1b: M2 to M5, 2026-10-24)
+
+**Done.** M2 exact OCCT warp, M3 lattice / point / flow along a curve, M4 flow on a surface, M5 curve to curve and morph. Not done: `preserveAnalytic`
+(VC-DEF-23, still `DEF_EXACT_UNAVAILABLE`), the UI overlays of M4 (`src/ui` untouched), B-spline lattices and oriented boxes (M5).
+
+**Commands added.** `deform_lattice`, `deform_by_point`, `flow_along_curve`, `flow_on_surface`, `deform_curve_to_curve`, `morph_bodies` (meshes are morphed through their placed, world-coordinate vertices; toolset `3d`). All
+deformation commands take `ids` (several bodies, one feature step) and `keepSource`. `bend_body` accepts up to 360 degrees; a bend that closes the whole body is a ring
+(exact kernel only). `analyze_deformation` gained `compareTo` (torus, cylinder, cone, spheroid) and topology before/after; `check_deformation` exact drift default is back at
+1e-4. Curves and sheets are deformed in core (`runSheet.ts`, `geometry/deform/curveWarp.ts`): an affine law maps the poles exactly, any other law refits by interpolation
+(curves: `approximatePoints`; sheets: tensor interpolation, doubled grid up to 65 x 65, cell middles checked by foot-point search with a stride cap); a trimmed sheet under a
+non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
+
+**Native warp.** `cpp/deform_laws.hxx` writes every law once over a first-order jet (value and derivative); `cpp/deform_fit.hxx` refits faces and edges; `cpp/deform.cxx`
+(split with `cpp/deform_topology.cxx`: face splitting, ring, sewing) drives `BRepBuilderAPI_ModifyShape` with a `BRepTools_Modification` subclass. Decisions, with evidence:
+
+- Each face is refit as a cubic C2 B-spline interpolating F(S) on a uniform (u, v) grid, refined per direction until the mid-cell error is under tolerance; edges use
+  `GeomAPI_Interpolate` with exact end tangents. `GeomConvert_ApproxSurface` was rejected (error estimate unreliable); `GeomAPI_PointsToBSplineSurface::Interpolate` gave garbage
+  above 128 nodes. The (u, v) parameterisation is kept; the modification must return the old pcurves and vertex parameters or closed edges collapse.
+- Faces are split at region ends and lattice box planes (`BRepAlgoAPI_Splitter`); the 360 degree ring drops the two caps and sews.
+- Refusals are coded: BRepCheck failure, non-positive volume or det J at or below 1e-6 on the surface (the determinant comes from the forward-mode jets of the law, exact and one-sided at a kink, not from
+  finite differences) report `DEF_FOLDOVER` / `DEF_APPROX_TOLERANCE`. A `ShapeFix_Shape` repair is recorded (`fixed`, `fixedTolerance` in the report) and refused when it raises the largest
+  sub-shape tolerance above four times the requested one. The native self-intersection test was dropped (false positives); the TS side checks the tessellation of the result for crossings
+  (up to 60 000 triangles) for the bend past a quarter turn with straight parts left AND for every flow along a curve, field (curve to curve) and flow on a surface, whose map can be regular
+  (det J > 0) while the body overlaps itself (a path winding past a full turn over the body: `DEF_SELF_INTERSECTION`).
+- Mode "auto" falls back to the faceted path when the exact warp is refused for any reason except a fold (`DEF_FOLDOVER`) or a ring: the summary names the code (`The exact warp refused (...)`) and
+  `data.exactRefused` carries it; mode "exact" and folds stay refused. A full-turn ring is built only when the kernel reports `ring: true`; a full-turn bend whose body has not exactly two equal planar
+  end faces (rounded or split ends) is refused natively with `DEF_SELF_INTERSECTION`. Absolute epsilons of the ring test scale with the tolerance.
+- Mass properties: shapes produced by a warp or general transform carry a `refined_mass` flag and are integrated with adaptive `BRepGProp` (eps 1e-9) when its error
+  estimate is under 1e-5; the flag follows the shape through placement, scaling, booleans, fillet / chamfer / blend, shell, offset features and unify. Other shapes keep the default Gauss rule (adaptive was 1.8e-5 off on conic blend faces, and a rule chosen by face type would change the NIST corpus). This closes the -4.4e-4 of VC-DEF-11 to -2.1e-7.
+- Flow tables (stations P, T, N, B; surface P, N grid with bicubic Catmull-Rom) are stored in the law so TS, mesh and native evaluate the same function. The `rbf` law
+  is a triharmonic spline (r^3 kernel: an |r| kernel kinks and broke the exact fit) plus an affine part; collinear centres get a ridge on the tail block, duplicate
+  constraints are merged, conflicting ones refused.
+- `flow_on_surface`: plane base only; the target is a sheet or a solid face (sampled 65 x 65 through `faceQuery`, since native `faceQuery.bspline` returns null).
+- `deform_curve_to_curve` takes `fixedPoints` instead of the spec's `fixedFacesNear`.
+
+**Deviations (tolerance changes).**
+
+- VC-DEF-11 volume: pack 1e-9, measured -2.1e-7 relative on the exact sphere to [1,1,2] (surface exact; limit is BRepGProp quadrature on a rational NURBS), tolerance set to 1e-6.
+- The pack's `ffd` golden vector extrapolates outside the lattice box; the spec says outside is unmoved, so the parity test skips outside points.
+- `check_deformation` exact `volumeDriftRel` 1e-3 returned to 1e-4 now that the native volume is refined.
+
+**Measured (native, CLI, release sidecar).** Plans: baselines 4/4 and 4/4; `target_twist_box` 6/6 (V 10000.001, drift 8.8e-8, det J 1); `target_taper_cylinder_cone` 6/6
+(V 1633.6282, closed form 1633.62818); `target_bend_cylinder_torus` 6/6 (ring V 24674.011, torus deviation 1.0e-6 mm, drift 1.4e-8); `target_scale_nonuniform_sphere` 5/5
+(8377.5786); `target_ffd_barrel` 5/5 (V 1.3666666, drift 1.6e-16); `target_point_push` 5/5 (V 500157.08, drift 1.5e-9, 5 s); `target_flow_plate_on_cylinder` 6/6 (V 2479.9987 vs 2480);
+`target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
+Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
+
+**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; `baseCurve`, `infinite` regions, `allowMeshFallback`; a curved sheet as the base of
+`flow_on_surface`; `compareTo` for more shapes; fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
+flow-surface and rbf exactness validated at moderate scale only.

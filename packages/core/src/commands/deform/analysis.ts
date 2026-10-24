@@ -13,9 +13,11 @@ import {
   regionCreases,
 } from '../../geometry/deform/bounds';
 import { type DeformNode, type Warp, warpOf } from '../../geometry/deform/laws';
+import { toWorld } from '../../geometry/deform/frame';
 import { storedChordError } from '../../geometry/deform/storedError';
-import { predictedVolume } from '../../geometry/deform/predictedVolume';
-import type { GeometryKernel } from '../../geometry/kernel';
+import { predictedVolumeOf } from '../../geometry/deform/predicted';
+import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
+import type { DeformReport } from '../../geometry/kernelPorts';
 import { orientOutward, signedMeshVolume } from '../../geometry/meshVolume';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { MESH_TS_TRIANGLE_CAP } from '../../geometry/mesh/engineTypes';
@@ -39,15 +41,60 @@ export interface DeformAnalysis {
     readonly method: 'exact' | 'mesh';
   };
   readonly approximationError: number | null;
+  /** How the exact kernel built the node (faces fitted / split, achieved error); null on the mesh path. */
+  readonly built: DeformReport | null;
+  /** Faces / edges / vertices of the exact result and of its source (exact path only). */
+  readonly topology: { readonly before: TopologyCounts; readonly after: TopologyCounts } | null;
   readonly creases: RegionCrease[];
   readonly fibres: BendFibres | null;
   readonly unverified: boolean;
   readonly sourceTriangles: number;
 }
 
+export interface TopologyCounts {
+  readonly faces: number;
+  readonly edges: number;
+  readonly vertices: number;
+}
+
 export interface AnalysisFailure {
   readonly code: 'DEF_SOURCE_UNAVAILABLE' | 'DEF_FRAME_DEGENERATE';
   readonly message: string;
+}
+
+/** Grid points per axis over the zone a local map acts in (the source vertices alone miss a bump or a lattice cell). */
+const GRID = 21;
+
+/** World points of a regular grid over the part of the body extent the law acts in (point push: its support sphere box; lattice: its box; flow: all). */
+function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp): number[] {
+  const { law } = node;
+  if (law.kind !== 'point' && law.kind !== 'lattice' && law.kind !== 'flowCurve' && law.kind !== 'flowSurface' && law.kind !== 'rbf')
+    return [];
+  const low: Vec3 = [0, 1, 2].map((a) =>
+    Math.max(
+      extent.min[a] as number,
+      law.kind === 'point' ? (law.center[a] as number) - law.radius : law.kind === 'lattice' ? (law.box.min[a] as number) : -Infinity,
+    ),
+  ) as unknown as Vec3;
+  const high: Vec3 = [0, 1, 2].map((a) =>
+    Math.min(
+      extent.max[a] as number,
+      law.kind === 'point' ? (law.center[a] as number) + law.radius : law.kind === 'lattice' ? (law.box.max[a] as number) : Infinity,
+    ),
+  ) as unknown as Vec3;
+  if (!([0, 1, 2] as const).every((a) => high[a] > low[a])) return [];
+  const out: number[] = [];
+  for (let i = 0; i < GRID; i++)
+    for (let j = 0; j < GRID; j++)
+      for (let k = 0; k < GRID; k++) {
+        const q: Vec3 = [
+          low[0] + ((high[0] - low[0]) * i) / (GRID - 1),
+          low[1] + ((high[1] - low[1]) * j) / (GRID - 1),
+          low[2] + ((high[2] - low[2]) * k) / (GRID - 1),
+        ];
+        out.push(...toWorld(warp.frame, q));
+      }
+  return out;
 }
 
 function sampleJacobian(positions: ReadonlyArray<number>, warp: Warp): { sampled: DeformAnalysis['sampled']; maxDisplacement: number } {
@@ -82,6 +129,17 @@ function exactShape(kernel: GeometryKernel | null, entity: Entity): ReturnType<G
   return shape !== null && kernel.topology(shape) !== null ? shape : null;
 }
 
+function countsOf(kernel: GeometryKernel | null, shape: ShapeHandle): TopologyCounts | null {
+  const topology = kernel?.topology(shape) ?? null;
+  return topology === null ? null : { faces: topology.faces.length, edges: topology.edges.length, vertices: topology.vertices };
+}
+
+function topologyOf(kernel: GeometryKernel | null, source: ShapeHandle, result: ShapeHandle): DeformAnalysis['topology'] {
+  const before = countsOf(kernel, source);
+  const after = countsOf(kernel, result);
+  return before === null || after === null ? null : { before, after };
+}
+
 const meshVolume = (positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number =>
   Math.abs(signedMeshVolume(positions, orientOutward(positions, indices)));
 
@@ -104,11 +162,11 @@ export function analyzeDeformed(
       message: 'the deformation source cannot be rebuilt without a geometry kernel (only solid leaves and deform chains can)',
     };
   const extent = localExtentOf(warp.frame, source.positions);
-  const sampling = sampleJacobian(source.positions, warp);
+  const sampling = sampleJacobian([...zonePoints(node, extent, warp), ...source.positions], warp);
   const shape = exactShape(kernel, entity);
   const sourceShape = kernel === null ? null : kernel.evaluate(node.source);
   const exactSource = sourceShape === null ? undefined : kernel?.massProperties?.(sourceShape)?.volume;
-  const volumes = predictedVolume(source, node);
+  const volumes = predictedVolumeOf(source, node);
   const exactMeasured = shape === null ? undefined : kernel?.massProperties?.(shape)?.volume;
   const measured = exactMeasured ?? (entity.kind === 'mesh' ? meshVolume(entity.mesh.positions, entity.mesh.indices) : 0);
   const sourceVolume = exactSource ?? volumes?.source ?? 0;
@@ -116,8 +174,13 @@ export function analyzeDeformed(
   const predicted = meanDeterminant * sourceVolume;
   const path = shape === null ? 'mesh' : 'exact';
   const stored = entity.kind === 'mesh' ? entity.mesh : null;
+  const built = path === 'exact' ? (kernel?.deformReport?.(node) ?? null) : null;
   const approximationError =
-    path === 'mesh' && stored !== null && stored.indices.length / 3 <= MESH_TS_TRIANGLE_CAP ? storedChordError(stored, node) : null;
+    built !== null
+      ? built.maxError
+      : path === 'mesh' && stored !== null && stored.indices.length / 3 <= MESH_TS_TRIANGLE_CAP
+        ? storedChordError(stored, node)
+        : null;
   return {
     node,
     path,
@@ -133,6 +196,8 @@ export function analyzeDeformed(
       method: exactMeasured === undefined ? 'mesh' : 'exact',
     },
     approximationError,
+    built,
+    topology: shape === null || sourceShape === null ? null : topologyOf(kernel, sourceShape, shape),
     creases: regionCreases(node, extent),
     fibres: bendFibres(node, extent),
     unverified: hasUnverifiedLeaf(node.source),

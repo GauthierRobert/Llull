@@ -29,8 +29,8 @@ interface Finding {
 
 /** Named default tolerances (01 DEF §5.9). */
 const CREASE_RAD = 0.01;
-/** The native kernel integrates B-spline faces with its default Gauss rule (4.4e-4 relative volume on a GTransform-ed sphere), so the exact default is 1e-3 (spec 1e-4). */
-const DRIFT_EXACT = 1e-3;
+/** Exact path: the adaptive mass rule of the native kernel reaches 1e-7 on the pack bodies (spec 1e-4). */
+const DRIFT_EXACT = 1e-4;
 const DRIFT_MESH = 5e-3;
 
 function finding(partial: Omit<Finding, 'ids'>, id: string): Finding {
@@ -162,7 +162,7 @@ function findingsOf(id: string, entity: Entity, analysis: DeformAnalysis, unit: 
           limit: 0,
           unit: 'triangles',
           message: 'the result is a faceted mesh, not an exact B-rep',
-          remediation: 'use the native kernel with mode "exact" (affine maps today)',
+          remediation: 'use the native kernel with mode "exact" (every law of the deformation commands has an exact path there)',
         },
         id,
       ),
@@ -208,7 +208,7 @@ export const checkDeformation = defineCommand({
       .number()
       .positive()
       .describe(
-        'Largest acceptable relative difference between the result and predicted volume, unitless. Default 1e-3 for an exact result (the kernel integrates curved B-spline faces to about 5e-4), 5e-3 for a mesh result.',
+        'Largest acceptable relative difference between the result and predicted volume, unitless. Default 1e-4 for an exact result, 5e-3 for a mesh result.',
       )
       .optional(),
     creaseRad: z.number().positive().describe('Largest acceptable crease angle at a linear region end, radians. Default 0.01.').optional(),

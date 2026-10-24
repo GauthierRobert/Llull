@@ -2,14 +2,15 @@
 
 import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
-import { frameParam, idParam, outputParam, regionParam } from './schema';
-import { type DeformPlan, runDeform } from './run';
+import { frameParam, bodyParams, outputParam, regionParam, targetIds } from './schema';
+import type { DeformPlan } from './request';
+import { runDeform } from './run';
 import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
 
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node with a twist law
- * @invariant det J = 1: volume unchanged, every cross-section keeps its shape and is rotated by angle × ramp(z); kernel-optional: mesh path
- *   on Manifold and without a kernel (the native kernel builds only affine maps today and takes the mesh path in "auto")
+ * @invariant det J = 1: volume unchanged, every cross-section keeps its shape and is rotated by angle × ramp(z); kernel-optional: exact warp
+ *   on the native kernel, mesh path on Manifold and without a kernel
  * @failure unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; angle 0 -> DEF_NO_EFFECT; bad frame / region -> DEF_FRAME_DEGENERATE / DEF_REGION_INVALID / DEF_REGION_MISSES_BODY
  */
 export const twistBody = defineCommand({
@@ -23,16 +24,17 @@ export const twistBody = defineCommand({
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe); the mesh is refined until the chordal deviation is within output.tolerance. ' +
     'Refuses angle 0 (DEF_NO_EFFECT) and regions that miss the body (DEF_REGION_MISSES_BODY). Then call analyze_deformation and check_deformation.',
   params: z.object({
-    id: idParam,
+    ...bodyParams,
     angleDeg: z.number().describe('Total rotation reached at region.end, degrees; any non-zero value (360 and more are allowed).'),
     frame: frameParam.optional(),
     region: regionParam.optional(),
     output: outputParam.optional(),
   }),
-  run: (doc, { id, angleDeg, frame, region, output }, ctx): CommandResult =>
+  run: (doc, { id, ids, keepSource, angleDeg, frame, region, output }, ctx): CommandResult =>
     runDeform(doc, ctx, {
       command: 'twist_body',
-      id,
+      ids: targetIds(id, ids),
+      keepSource,
       verb: 'twisted',
       output,
       plan: (target): DeformPlan | Refusal => {

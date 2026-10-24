@@ -340,11 +340,17 @@ TopoDS_Shape supporting_face(const TopoDS_Shape &source, const gp_Pnt &origin, c
 
 // Names of a BRepFeat cut: the source's faces through the maker's history; the tool's faces, generated from the edges of the
 // profile face, are "<tag>(e(profile)#k)", so two holes of one feature, or two features, never share a name.
+// A feature of a deformed body keeps its adaptive mass rule (facade.cxx `volume_props`).
+std::unique_ptr<Shape> keep_mass_rule(std::unique_ptr<Shape> out, const Shape &source) {
+  if (out != nullptr && source.refined_mass) out->refined_mass = true;
+  return out;
+}
+
 template <class Maker>
 std::unique_ptr<Shape> feature_named(Maker &maker, const Shape &source, const TopoDS_Shape &profile, const std::string &tag) {
   const TopoDS_Shape result = maker.Shape();
   const std::vector<naming::Named> inputs{naming::named(source), naming::Named{profile, {"profile"}}};
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), tag));
+  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), tag)), source);
 }
 
 }  // namespace
@@ -382,7 +388,7 @@ std::unique_ptr<Shape> round_edges(const Shape &source, rust::Slice<const uint32
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;
   const std::vector<naming::Named> inputs{naming::named(source)};
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), role));
+  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), role)), source);
 }
 
 }  // namespace
@@ -411,7 +417,7 @@ std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;
   const std::vector<naming::Named> inputs{naming::named(shape)};
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "blend"));
+  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "blend")), shape);
 }
 
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance) {
@@ -454,7 +460,7 @@ std::unique_ptr<Shape> chamfer_sided(const Shape &shape, rust::Slice<const uint3
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;
   const std::vector<naming::Named> inputs{naming::named(shape)};
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "chamfer"));
+  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "chamfer")), shape);
 }
 
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
@@ -504,7 +510,7 @@ std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
   cut.Build();
   if (!cut.IsDone()) return nullptr;
   const TopoDS_Shape result = cut.Shape();
-  return naming::wrap_named(result, naming::inherit(result, {source[0], cavity_named}, cut.History(), "inner"));
+  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, {source[0], cavity_named}, cut.History(), "inner")), shape);
 }
 
 std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Slice<const double> open_near) {
@@ -534,8 +540,8 @@ std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Sl
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;
   const std::vector<naming::Named> source{naming::named(shape)};
-  return naming::wrap_named(result,
-                            naming::inherit(result, source, naming::history_of(source, maker), "inner", naming::Images::Offset));
+  return keep_mass_rule(
+      naming::wrap_named(result, naming::inherit(result, source, naming::history_of(source, maker), "inner", naming::Images::Offset)), shape);
 }
 
 std::unique_ptr<Shape> chain_face(rust::Slice<const double> chain) {
@@ -810,9 +816,9 @@ std::unique_ptr<Shape> unified_shape(const Shape &shape) {
     unifier.Build();
     const std::vector<naming::Named> inputs{naming::named(shape)};
     const TopoDS_Shape result = unifier.Shape();
-    return naming::wrap_named(result, naming::inherit(result, inputs, unifier.History(), "unify"));
+    return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, unifier.History(), "unify")), shape);
   } catch (const Standard_Failure &) {
-    return naming::wrap_named(shape.shape, naming::face_names(shape));
+    return keep_mass_rule(naming::wrap_named(shape.shape, naming::face_names(shape)), shape);
   }
 }
 

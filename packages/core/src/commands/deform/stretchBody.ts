@@ -2,14 +2,15 @@
 
 import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
-import { idParam, outputParam } from './schema';
-import { type DeformPlan, runDeform } from './run';
+import { bodyParams, outputParam, targetIds } from './schema';
+import type { DeformPlan } from './request';
+import { runDeform } from './run';
 import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
 
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node (stretch law, or an affine law for preserveVolume)
  * @invariant det J = factor inside the region and 1 outside (the part past the region end is translated); preserveVolume is the whole-body
- *   affine map diag(1/√f, 1/√f, f) with det 1; kernel-optional: preserveVolume is exact on the native kernel, the region stretch takes the mesh path
+ *   affine map diag(1/√f, 1/√f, f) with det 1; kernel-optional: exact on the native kernel (preserveVolume as a GTransform, a region stretch as the exact warp), mesh path on Manifold and without a kernel
  * @failure unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; factor <= 0 -> DEF_STRETCH_FACTOR; factor 1 -> DEF_NO_EFFECT; preserveVolume with a region -> DEF_PRESERVE_VOLUME_REGION
  */
 export const stretchBody = defineCommand({
@@ -24,7 +25,7 @@ export const stretchBody = defineCommand({
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe). ' +
     'Refuses factor <= 0 (DEF_STRETCH_FACTOR) and factor 1 (DEF_NO_EFFECT). Then call analyze_deformation and check_deformation.',
   params: z.object({
-    id: idParam,
+    ...bodyParams,
     factor: z.number().describe('Length multiplier inside the region, unitless, > 0 (1 = no change).'),
     preserveVolume: z
       .boolean()
@@ -57,10 +58,11 @@ export const stretchBody = defineCommand({
       .optional(),
     output: outputParam.optional(),
   }),
-  run: (doc, { id, factor, preserveVolume, frame, region, output }, ctx): CommandResult =>
+  run: (doc, { id, ids, keepSource, factor, preserveVolume, frame, region, output }, ctx): CommandResult =>
     runDeform(doc, ctx, {
       command: 'stretch_body',
-      id,
+      ids: targetIds(id, ids),
+      keepSource,
       verb: 'stretched',
       output,
       plan: (target): DeformPlan | Refusal => {

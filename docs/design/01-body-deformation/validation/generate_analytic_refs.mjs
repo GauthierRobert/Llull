@@ -507,7 +507,13 @@ const ffdPts = latticeOf([0, 0, 0], [10, 10, 100], [2, 2, 3]).map((row, i) =>
 );
 vectors.ffd = {
   params: { min: [0, 0, 0], max: [10, 10, 100], degrees: [2, 2, 3], moved: [{ index: [1, 1, 2], delta: [4, 0, 0] }] },
-  points: P.map((p) => ({ in: p, out: round(ffd(p, { min: [0, 0, 0], max: [10, 10, 100], degrees: [2, 2, 3], points: ffdPts })) })),
+  // outside the lattice box the map is the identity (TECHNICAL_SPEC §5.3: the points outside are unmoved), not the extrapolated Bernstein polynomial
+  points: P.map((p) => ({
+    in: p,
+    out: p.every((c, a) => c >= [0, 0, 0][a] && c <= [10, 10, 100][a])
+      ? round(ffd(p, { min: [0, 0, 0], max: [10, 10, 100], degrees: [2, 2, 3], points: ffdPts }))
+      : round(p),
+  })),
 };
 save('point_vectors.json', { note: 'frame = world (origin 0, axis +z, reference +x); tolerance 1e-9 absolute', laws: vectors });
 

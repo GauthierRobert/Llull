@@ -11,7 +11,7 @@ import { operandRecipe, unsupportedOp } from '../geometry/operandRecipe';
 import type { ShapeRecipe } from '../model/types';
 import { newEntity } from './entity/newEntity';
 import { nextId } from '../lib/id';
-import { referenceLossSuffix, replaceEntities } from './entity/entityOps';
+import { referenceLossSuffix, replaceEntities, withEntities } from './entity/entityOps';
 import { changed } from './noop';
 import type { CommandResult } from './types';
 
@@ -84,7 +84,8 @@ function topologySuffix(kernel: GeometryKernel, shape: ShapeHandle): string {
 
 /**
  * Replace `operands` (the first one styles the result) by the kernel result's `mesh` entity. The
- * summary is `describe(newId, triangles)` plus the fallback / topology / lost-reference notes.
+ * summary is `describe(newId, triangles)` plus the fallback / topology / lost-reference notes. `keep` leaves the operands in the document
+ * (the result is added after them).
  */
 export function commitKernelResult(
   doc: CadDocument,
@@ -92,10 +93,12 @@ export function commitKernelResult(
   result: KernelResult,
   operands: readonly [Entity, ...Entity[]],
   describe: (newId: string, triangles: number) => string,
+  keep = false,
 ): CommandResult {
   const newId = nextId('mesh');
   const ids = operands.map((operand) => operand.id);
-  const document = replaceEntities(doc, ids, kernelResultEntity(newId, result, operands[0]));
+  const created = kernelResultEntity(newId, result, operands[0]);
+  const document = keep ? withEntities(doc, [created]) : replaceEntities(doc, ids, created);
   const notes = `${fallbackSuffix(kernel, operands)}${topologySuffix(kernel, result.shape)}`;
   const summary = `${describe(newId, result.mesh.indices.length / 3)}${notes}`;
   return changed(document, `${summary}${referenceLossSuffix(doc, document)}`, [newId]);

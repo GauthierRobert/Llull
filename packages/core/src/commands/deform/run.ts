@@ -5,7 +5,6 @@
  * @invariant no silent exact -> mesh fallback: `mode: "exact"` refuses unless the exact kernel built the result; the summary names the path taken
  */
 
-import type { DeformFrame, DeformLaw, DeformRegion } from '../../model/deform';
 import type { CadDocument, Entity, MeshData, Vec3 } from '../../model/types';
 import { JACOBIAN_FLOOR, type LocalExtent, jacobianRange } from '../../geometry/deform/bounds';
 import type { DeformNode } from '../../geometry/deform/laws';
@@ -16,43 +15,20 @@ import { signedMeshVolume } from '../../geometry/meshVolume';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
 import { nextId } from '../../lib/id';
 import { newEntity } from '../entity/newEntity';
-import { referenceLossSuffix, replaceEntities } from '../entity/entityOps';
+import { referenceLossSuffix, replaceEntities, withEntities } from '../entity/entityOps';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { changed } from '../noop';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defRejection } from './codes';
+import type { DeformRequest } from './request';
+import { deformSheet } from './runSheet';
 import { NEXT_STEP } from './schema';
 import { type DeformTarget, type Refusal, defaultTolerance, isRefusal, isTarget, loadTarget } from './target';
 
-/** What a command decided from the target: the map and where it acts. */
-export interface DeformPlan {
-  readonly law: DeformLaw;
-  readonly frame: DeformFrame;
-  readonly region?: DeformRegion;
-  /** Frame of the body in the plan's frame (for the Jacobian pre-check and the report). */
-  readonly extent: LocalExtent;
-  /** Look for the result crossing itself (a bend past a quarter turn with straight parts left). */
-  readonly checkOverlap?: boolean;
-  /** Names of frame fields taken from the body bounds. */
-  readonly defaulted: readonly string[];
-}
-
-export interface OutputInput {
-  readonly mode?: 'auto' | 'exact' | 'mesh' | undefined;
-  readonly tolerance?: number | undefined;
-  readonly preserveAnalytic?: boolean | undefined;
-}
-
-export interface DeformRequest {
-  readonly command: string;
-  readonly id: string;
-  readonly verb: string;
-  readonly output: OutputInput | undefined;
-  readonly plan: (target: DeformTarget) => DeformPlan | Refusal;
-}
-
 /** Largest result (triangles) the post-build overlap test runs on (its grid search degrades on very large meshes). */
 const OVERLAP_CHECK_LIMIT = 60_000;
+/** Laws whose result can cross itself while det J stays positive (a path curling back, a field pushing one part through another): the tessellation is checked. */
+const OVERLAP_LAWS: ReadonlySet<string> = new Set(['flowCurve', 'rbf', 'flowSurface']);
 
 /** Wire-friendly form of a point for `data`. */
 const list = (v: Vec3): number[] => [v[0], v[1], v[2]];
@@ -83,7 +59,15 @@ function build(target: DeformTarget, node: DeformNode, useKernel: boolean): Buil
   if (useKernel && kernel !== null) {
     const evaluated = evaluateRecipe(kernel, node);
     if (typeof evaluated === 'string') {
-      // the same refusal on every host: a failure the core mesh warp also reports (budget, frame) keeps its own code
+      // the kernel says why it refused (approximation above the tolerance, folded map, invalid result); else a failure the core mesh warp also
+      // reports (budget, frame) keeps its own code, the same on every host
+      const reported = kernel.deformReport?.(node);
+      if (reported !== undefined && reported !== null && !reported.ok && reported.code !== '')
+        return {
+          code: reported.code,
+          message: reported.message,
+          paths: reported.code === 'DEF_APPROX_TOLERANCE' ? ['params.output.tolerance'] : [],
+        };
       const diagnosis = warpMesh(target.mesh, node, { tolerance: node.output.tolerance });
       if (!diagnosis.ok) return { code: diagnosis.code, message: diagnosis.message, paths: [] };
       return {
@@ -126,12 +110,50 @@ function foldRefusal(node: DeformNode, extent: LocalExtent): Refusal | null {
       paths: ['params.radius'],
     };
   }
-  return { code: 'DEF_FOLDOVER', message: `the map folds the body (min det J ${range.min.toPrecision(6)} <= 0)`, paths: [] };
+  const where = `at local point [${range.minAt.map((value) => value.toPrecision(5)).join(', ')}]`;
+  if (law.kind === 'flowCurve')
+    return {
+      code: 'DEF_FOLDOVER',
+      message: `the body is wider than the radius of curvature of the path: min det J ${range.min.toPrecision(6)} ${where}; use a gentler curve, a thinner body, or a larger path radius`,
+      paths: ['params.targetId'],
+    };
+  if (law.kind === 'lattice')
+    return {
+      code: 'DEF_FOLDOVER',
+      message: `the lattice folds the body: min det J ${range.min.toPrecision(6)} ${where} (Bernstein bound ${range.bound?.min.toPrecision(6) ?? 'n/a'}); reduce the moves`,
+      paths: ['params.moves'],
+    };
+  return { code: 'DEF_FOLDOVER', message: `the map folds the body (min det J ${range.min.toPrecision(6)} <= 0) ${where}`, paths: [] };
 }
 
-/** Run a deformation request against the document. */
+/**
+ * Run a deformation request against the document: one body, or each body of `ids` in turn.
+ * @invariant all-or-nothing: the first refused body leaves the whole document unchanged and names that body
+ */
 export function runDeform(doc: CadDocument, ctx: ExecutionContext | undefined, request: DeformRequest): CommandResult {
-  const { command, id, verb, output } = request;
+  const { command, ids } = request;
+  if (ids.length === 0)
+    return defRejection(doc, command, 'DEF_ENTITY_NOT_FOUND', 'give id or ids: the body(ies) to deform', [], ['params.id']);
+  if (ids.length === 1) return deformOne(doc, ctx, request, ids[0] as string);
+  let current = doc;
+  const affected: string[] = [];
+  const parts: CommandResult[] = [];
+  for (const id of ids) {
+    const part = deformOne(current, ctx, request, id);
+    if (part.affected.length === 0)
+      return { ...part, document: doc, summary: `${part.summary} (body '${id}' of ${ids.length}; nothing was changed)` };
+    current = part.document;
+    affected.push(...part.affected);
+    parts.push(part);
+  }
+  const summary = `${command}: ${ids.length} bodies → ${affected.join(', ')}. ${parts.map((part) => part.summary.replace(`${command}: `, '')).join(' ')}`;
+  return { ...changed(current, summary, affected), data: { bodies: parts.map((part) => part.data) } };
+}
+
+function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request: DeformRequest, id: string): CommandResult {
+  const { command, verb, output, keepSource = false } = request;
+  const sheet = doc.entities[id];
+  if (sheet?.kind === 'nurbs_curve' || sheet?.kind === 'nurbs_surface') return deformSheet(doc, request, sheet);
   const target = loadTarget(doc, command, id, ctx);
   if (!isTarget(target)) return target;
   const reject = (refusal: Refusal): CommandResult => defRejection(doc, command, refusal.code, refusal.message, [id], refusal.paths);
@@ -161,32 +183,50 @@ export function runDeform(doc: CadDocument, ctx: ExecutionContext | undefined, r
   };
   const fold = foldRefusal(node, plan.extent);
   if (fold !== null) return reject(fold);
+  const { kernel } = target;
+  const useKernel = kernel !== null && mode !== 'mesh' && kernel.supports('deform') && kernel.supportsDeform?.(plan.law) !== false;
   const estimate = estimateWarp(target.mesh, node, tolerance);
-  if (estimate !== null && estimate.triangles > MAX_WARP_TRIANGLES)
+  if (estimate !== null && !useKernel && estimate.triangles > MAX_WARP_TRIANGLES)
     return reject({
       code: 'DEF_BUDGET_EXCEEDED',
       message: `refining to edges of ${estimate.edgeLength.toPrecision(3)} would need about ${Math.round(estimate.triangles)} triangles (limit ${MAX_WARP_TRIANGLES})`,
       paths: ['params.output.tolerance'],
     });
-  const { kernel } = target;
-  const useKernel = kernel !== null && mode !== 'mesh' && kernel.supports('deform') && kernel.supportsDeform?.(plan.law) !== false;
   if (mode === 'exact' && !useKernel)
     return reject({
       code: 'DEF_EXACT_UNAVAILABLE',
       message: kernel === null ? 'no geometry kernel is installed' : 'the installed kernel does not build this deformation exactly',
       paths: ['params.output.mode'],
     });
-  const built = build(target, node, useKernel);
+  const ringRefusal = (): CommandResult =>
+    reject({
+      code: 'DEF_SELF_INTERSECTION',
+      message:
+        'a full-turn bend closes into a ring whose two end faces coincide: only the exact kernel sews it closed (native kernel, mode "auto" or "exact"); the faceted path would overlap itself',
+      paths: ['params'],
+    });
+  if (plan.ring === true && !useKernel) return ringRefusal();
+  let built = build(target, node, useKernel);
+  let fallback: string | null = null;
+  if (isRefusal(built) && useKernel && mode === 'auto' && built.code !== 'DEF_FOLDOVER' && plan.ring !== true) {
+    // mode "auto": a refusal of the exact warp (approximation above the tolerance, modifier failure) is answered by the faceted path; folds are real and stay refused
+    const faceted = build(target, node, false);
+    if (!isRefusal(faceted)) {
+      fallback = built.code;
+      built = faceted;
+    }
+  }
   if (isRefusal(built)) return reject(built);
+  if (plan.ring === true && (!built.exact || kernel?.deformReport?.(node)?.ring !== true)) return ringRefusal();
   if (mode === 'exact' && !built.exact)
     return reject({ code: 'DEF_EXACT_UNAVAILABLE', message: 'the installed kernel is a mesh kernel', paths: ['params.output.mode'] });
-  if (plan.checkOverlap === true && built.mesh.indices.length / 3 <= OVERLAP_CHECK_LIMIT) {
+  if ((plan.checkOverlap === true || OVERLAP_LAWS.has(plan.law.kind)) && built.mesh.indices.length / 3 <= OVERLAP_CHECK_LIMIT) {
     const welded = weldMesh(built.mesh, 1e-7 * target.diagonal);
     const crossings = findSelfIntersections(welded.positions, welded.triangles, 1).count;
     if (crossings > 0)
       return reject({
         code: 'DEF_SELF_INTERSECTION',
-        message: `the bent body would cross itself (${crossings} triangle pair(s)): reduce the angle or shorten the straight part`,
+        message: `the deformed body would cross itself (${crossings} triangle pair(s)): reduce the bend or the move, or keep the path, curves or target surface farther from the body`,
         paths: ['params'],
       });
   }
@@ -195,17 +235,20 @@ export function runDeform(doc: CadDocument, ctx: ExecutionContext | undefined, r
   const why =
     built.exact || mode === 'mesh'
       ? ''
-      : kernel === null
-        ? ' No geometry kernel is installed, so the result is a faceted mesh.'
-        : !useKernel
-          ? ' The kernel does not build this law exactly, so the result is a faceted mesh (mode "exact" refuses instead).'
-          : ' The kernel is a mesh kernel, so the result is a faceted mesh.';
+      : fallback !== null
+        ? ` The exact warp refused (${fallback}), so the result is a faceted mesh (mode "exact" refuses instead).`
+        : kernel === null
+          ? ' No geometry kernel is installed, so the result is a faceted mesh.'
+          : !useKernel
+            ? ' The kernel does not build this law exactly, so the result is a faceted mesh (mode "exact" refuses instead).'
+            : ' The kernel is a mesh kernel, so the result is a faceted mesh.';
   const describe = (newId: string, triangles: number): string =>
     `${command}: ${verb} '${id}' (kind '${target.entity.kind}') → mesh '${newId}' (${triangles} triangles, ${path} path, volume ${volume.value.toPrecision(8)} ${doc.units}^3 ${volume.method}).${why} ` +
     `Frame origin [${list(plan.frame.origin).join(', ')}] axis [${list(plan.frame.axis).join(', ')}]${plan.defaulted.length > 0 ? ` (defaulted: ${plan.defaulted.join(', ')})` : ''}. ${NEXT_STEP}`;
   const data = (newId: string): Record<string, unknown> => ({
     id: newId,
     path,
+    ...(fallback === null ? {} : { exactRefused: fallback }),
     kernel: kernel?.name ?? null,
     law: plan.law,
     frame: {
@@ -221,14 +264,23 @@ export function runDeform(doc: CadDocument, ctx: ExecutionContext | undefined, r
     volume: { ...volume, unit: `${doc.units}^3` },
     edgeLength: built.edgeLength,
     chordError: built.chordError,
+    ...plan.report,
     unit: doc.units,
   });
   if (kernel !== null && built.shape !== null) {
-    const committed = commitKernelResult(doc, kernel, { recipe: node, shape: built.shape, mesh: built.mesh }, [target.entity], describe);
+    const committed = commitKernelResult(
+      doc,
+      kernel,
+      { recipe: node, shape: built.shape, mesh: built.mesh },
+      [target.entity],
+      describe,
+      keepSource,
+    );
     return { ...committed, data: data(committed.affected[0] ?? '') };
   }
   const newId = nextId('mesh');
-  const document = replaceEntities(doc, [id], meshEntityOf(newId, built, target.entity));
+  const created = meshEntityOf(newId, built, target.entity);
+  const document = keepSource ? withEntities(doc, [created]) : replaceEntities(doc, [id], created);
   const result = changed(document, `${describe(newId, built.mesh.indices.length / 3)}${referenceLossSuffix(doc, document)}`, [newId]);
   return { ...result, data: data(newId) };
 }

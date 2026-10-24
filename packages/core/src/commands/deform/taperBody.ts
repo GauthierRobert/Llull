@@ -2,13 +2,14 @@
 
 import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
-import { frameParam, idParam, outputParam, regionParam } from './schema';
-import { type DeformPlan, runDeform } from './run';
+import { frameParam, bodyParams, outputParam, regionParam, targetIds } from './schema';
+import type { DeformPlan } from './request';
+import { runDeform } from './run';
 import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
 
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node with a taper law
- * @invariant det J = s(z)² (s(z) when flat): sections stay similar; a cylinder tapered linearly is a cone frustum; kernel-optional (mesh path today)
+ * @invariant det J = s(z)² (s(z) when flat): sections stay similar; a cylinder tapered linearly is a cone frustum; kernel-optional: exact warp on the native kernel (a cylinder becomes a cone-shaped B-spline surface), mesh path on Manifold and without a kernel
  * @failure unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; scaleEnd <= 0 -> DEF_TAPER_DEGENERATE; scaleEnd 1 -> DEF_NO_EFFECT; bad frame / region -> DEF_FRAME_DEGENERATE / DEF_REGION_INVALID / DEF_REGION_MISSES_BODY
  */
 export const taperBody = defineCommand({
@@ -22,17 +23,18 @@ export const taperBody = defineCommand({
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe). ' +
     'Refuses scaleEnd <= 0 (DEF_TAPER_DEGENERATE) and scaleEnd 1 (DEF_NO_EFFECT). Then call analyze_deformation and check_deformation.',
   params: z.object({
-    id: idParam,
+    ...bodyParams,
     scaleEnd: z.number().describe('Section scale reached at region.end, unitless, > 0 (1 = no change).'),
     flat: z.boolean().describe('true: scale only along the frame x direction (flat taper); default false scales x and y.').optional(),
     frame: frameParam.optional(),
     region: regionParam.optional(),
     output: outputParam.optional(),
   }),
-  run: (doc, { id, scaleEnd, flat, frame, region, output }, ctx): CommandResult =>
+  run: (doc, { id, ids, keepSource, scaleEnd, flat, frame, region, output }, ctx): CommandResult =>
     runDeform(doc, ctx, {
       command: 'taper_body',
-      id,
+      ids: targetIds(id, ids),
+      keepSource,
       verb: 'tapered',
       output,
       plan: (target): DeformPlan | Refusal => {

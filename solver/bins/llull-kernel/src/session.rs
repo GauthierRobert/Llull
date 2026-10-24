@@ -25,7 +25,7 @@ pub const PANIC: &str = "NATIVE_PANIC";
 pub const NOT_CACHED: &str = "shape not cached";
 
 /// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
-pub const OPS: [&str; 7] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport"];
+pub const OPS: [&str; 8] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "blendReport", "deformReport"];
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
@@ -84,6 +84,7 @@ fn info() -> Value {
         "helixEdge",
         "pipeShell",
         "gtransform",
+        "deform",
         "emboss",
     ]
     .into_iter()
@@ -178,6 +179,7 @@ impl Session {
             }),
             "exportStep" => self.export_with(first, "exportStep", export_step),
             "blendReport" => self.blend_report(first),
+            "deformReport" => self.deform_report(first),
             other => exchange::dispatch(self, other, args)
                 .or_else(|| meshbrep::dispatch(other, args))
                 .or_else(|| queries::dispatch(self, other, args))
@@ -189,6 +191,16 @@ impl Session {
     fn blend_report(&mut self, handle: &Value) -> Reply {
         let Some(recipe) = handle.get("recipe") else { return Reply::fail(BAD_REQUEST, "blendReport expects a { key, recipe } handle") };
         match self.evaluator.blend_report(recipe) {
+            Ok(report) => Reply::ok(report),
+            Err(EvalError::Unsupported(reason)) => Reply::fail(UNSUPPORTED, reason),
+            Err(EvalError::Failure(error)) => Reply::fail(OCC_FAILURE, error),
+        }
+    }
+
+    /// `deformReport`: how the `deform` recipe handle `{ key, recipe }` built or why it was refused (01 DEF M2); null for another recipe.
+    fn deform_report(&mut self, handle: &Value) -> Reply {
+        let Some(recipe) = handle.get("recipe") else { return Reply::fail(BAD_REQUEST, "deformReport expects a { key, recipe } handle") };
+        match self.evaluator.deform_report(recipe) {
             Ok(report) => Reply::ok(report),
             Err(EvalError::Unsupported(reason)) => Reply::fail(UNSUPPORTED, reason),
             Err(EvalError::Failure(error)) => Reply::fail(OCC_FAILURE, error),
@@ -321,7 +333,9 @@ mod tests {
         assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
         let capabilities = described["result"]["capabilities"].as_array().unwrap();
-        for name in ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "pipeShell", "gtransform", "emboss"] {
+        for name in
+            ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "pipeShell", "gtransform", "deform", "emboss"]
+        {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }
     }
@@ -339,6 +353,28 @@ mod tests {
         assert_eq!(other["result"], Value::Null);
         assert!(call(&mut session, "blendReport", json!([{ "key": "c" }]))["error"].as_str().unwrap().starts_with(BAD_REQUEST));
         assert!(native_ops().contains(&"blendReport"));
+    }
+
+    #[test]
+    fn warps_a_box_and_reports_how_it_built() {
+        let mut session = Session::new();
+        let twist = |tolerance: f64| {
+            json!({
+                "op": "deform", "source": box_recipe(4.0),
+                "law": { "kind": "twist", "angleRad": 1.0 },
+                "frame": { "origin": [0, 0, 0], "axis": [0, 0, 1], "reference": [1, 0, 0] },
+                "region": { "start": -2, "end": 2, "falloff": "smooth", "beyond": "rigid" },
+                "output": { "mode": "exact", "tolerance": tolerance, "preserveAnalytic": false },
+            })
+        };
+        let built = call(&mut session, "deformReport", json!([{ "key": "a", "recipe": twist(0.001) }]));
+        assert_eq!(built["result"]["ok"], json!(true));
+        assert_eq!(built["result"]["faces"], json!(6));
+        let refused = call(&mut session, "deformReport", json!([{ "key": "b", "recipe": twist(-1.0) }]));
+        assert_eq!(refused["result"]["code"], json!("DEF_KERNEL_REFUSED"));
+        let other = call(&mut session, "deformReport", json!([{ "key": "c", "recipe": box_recipe(1.0) }]));
+        assert_eq!(other["result"], Value::Null);
+        assert!(native_ops().contains(&"deformReport"));
     }
 
     #[test]

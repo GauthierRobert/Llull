@@ -6,6 +6,7 @@
  * @invariant exact for affine, twist and stretch; converges for taper and bend (smooth integrand between the region ends)
  */
 
+import type { DeformRegion } from '../../model/deform';
 import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { type DeformNode, determinant, localDeterminant, warpOf } from './laws';
@@ -17,18 +18,27 @@ const SUBINTERVALS = 24;
 const GAUSS_NODES = [0.5 - Math.sqrt(0.15), 0.5, 0.5 + Math.sqrt(0.15)];
 const GAUSS_WEIGHTS = [5 / 18, 8 / 18, 5 / 18];
 
+/** Laws whose det J is linear in the cross-section coordinates (x, y) at every height z. */
+const SECTION_LAWS: ReadonlySet<string> = new Set(['twist', 'taper', 'stretch', 'bend', 'flowCurve']);
+
+/** Placeholder region of a law that has none (the law ignores it). */
+const WHOLE_AXIS: DeformRegion = { start: -Infinity, end: Infinity, falloff: 'none', beyond: 'rigid' };
+
 /** Cap on triangle × slice tests (keeps the check fast on large meshes). */
 const WORK_LIMIT = 4e7;
 
 interface Slice {
   readonly area: number;
+  /** ∫ y dA and ∫ x dA of the section. */
   readonly moment: number;
+  readonly momentX: number;
 }
 
 /** Area and ∫ y dA of the section of an outward-wound closed mesh by the plane z = ζ (local coordinates), by Green's theorem over oriented segments. */
 function sectionAt(local: Float64Array, indices: ReadonlyArray<number>, heights: Float64Array, spans: Float64Array, zeta: number): Slice {
   let area = 0;
   let moment = 0;
+  let momentX = 0;
   for (let t = 0; t < indices.length / 3; t++) {
     if ((spans[t * 2] as number) > zeta || (spans[t * 2 + 1] as number) <= zeta) continue;
     const corners = [indices[t * 3] as number, indices[t * 3 + 1] as number, indices[t * 3 + 2] as number];
@@ -62,8 +72,9 @@ function sectionAt(local: Float64Array, indices: ReadonlyArray<number>, heights:
     const cross = from[0] * to[1] - to[0] * from[1];
     area += cross / 2;
     moment += ((from[1] + to[1]) * cross) / 6;
+    momentX += ((from[0] + to[0]) * cross) / 6;
   }
-  return { area, moment };
+  return { area, moment, momentX };
 }
 
 export interface PredictedVolume {
@@ -83,8 +94,9 @@ export function predictedVolume(source: MeshData, node: Pick<DeformNode, 'law' |
   const indices = orientOutward(source.positions, source.indices);
   const volume = signedMeshVolume(source.positions, indices);
   if (node.law.kind === 'affine') return { source: volume, predicted: Math.abs(determinant(node.law.matrix)) * volume };
-  const region = node.region;
-  if (region === undefined) return null;
+  // a flow has no region: its det J is linear in x and y at every height, so the cross-section integral applies over the whole body
+  const region = node.region ?? (node.law.kind === 'flowCurve' ? WHOLE_AXIS : undefined);
+  if (region === undefined || !SECTION_LAWS.has(node.law.kind)) return null;
   const vertexCount = source.positions.length / 3;
   const local = new Float64Array(vertexCount * 3);
   const heights = new Float64Array(vertexCount);
@@ -110,7 +122,7 @@ export function predictedVolume(source: MeshData, node: Pick<DeformNode, 'law' |
     if (z < low) low = z;
     if (z > high) high = z;
   }
-  const breaks = [low, ...[region.start, region.end].filter((z) => z > low && z < high), high];
+  const breaks = [low, ...(node.region === undefined ? [] : [region.start, region.end].filter((z) => z > low && z < high)), high];
   const perPiece = Math.max(2, Math.min(SUBINTERVALS, Math.floor(WORK_LIMIT / (triangles * 3 * Math.max(1, breaks.length - 1)))));
   let predicted = 0;
   for (let piece = 0; piece + 1 < breaks.length; piece++) {
@@ -122,7 +134,8 @@ export function predictedVolume(source: MeshData, node: Pick<DeformNode, 'law' |
         const section = sectionAt(local, indices, heights, spans, zeta);
         const d0 = localDeterminant(node.law, region, [0, 0, zeta]);
         const slope = localDeterminant(node.law, region, [0, 1, zeta]) - d0;
-        predicted += (GAUSS_WEIGHTS[g] as number) * width * (d0 * section.area + slope * section.moment);
+        const slopeX = localDeterminant(node.law, region, [1, 0, zeta]) - d0;
+        predicted += (GAUSS_WEIGHTS[g] as number) * width * (d0 * section.area + slope * section.moment + slopeX * section.momentX);
       }
     }
   }
