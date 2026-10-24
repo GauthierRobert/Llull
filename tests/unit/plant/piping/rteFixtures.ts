@@ -117,3 +117,30 @@ export function withoutSpecs(doc: CadDocument): CadDocument {
   expect(spec).toBeDefined();
   return { ...doc, plant };
 }
+
+/** SC-RTE-02: SC-RTE-01 plus the NPS 4 CL150 gate valve XV-1001 centred 800 mm along the first (vertical) leg, stem toward -Y. */
+export function valveScene(): { doc: CadDocument; line: string; runId: string; valveId: string; insert: Record<string, unknown> } {
+  const base = routedPumpToVessel();
+  const params = { runId: base.runId, type: 'valveGate', tag: 'XV-1001', at: { leg: 0, centreDistance: 800 }, stemDirection: [0, -1, 0] };
+  const insert = data<Record<string, unknown>>(base.doc, 'insert_inline_component', params);
+  return {
+    doc: apply(base.doc, 'insert_inline_component', params),
+    line: base.line,
+    runId: base.runId,
+    valveId: insert['componentId'] as string,
+    insert,
+  };
+}
+
+/**
+ * SC-RTE-03: a DN150 header between two butt-weld tie-ins at z 3000 (x 0 -> 10000), routed; a third DN100 tie-in TP-3 at (4000, 2000, 3000) facing -Y
+ * for the branch. Returns the ids.
+ */
+export function headerScene(): { doc: CadDocument; lineId: string; headerId: string; tieA: string; tieB: string; tieC: string } {
+  const line = cs150Line(150, '2001');
+  const a = addTie(line.doc, 'TP-1', [0, 0, 3000], [1, 0, 0], { dn: 150 });
+  const b = addTie(a.doc, 'TP-2', [10000, 0, 3000], [-1, 0, 0], { dn: 150 });
+  const c = addTie(b.doc, 'TP-3', [4000, 2000, 3000], [0, -1, 0], { dn: 100 });
+  const doc = apply(c.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } });
+  return { doc, lineId: line.lineId, headerId: doc.plant?.piping?.runOrder[0] as string, tieA: a.id, tieB: b.id, tieC: c.id };
+}

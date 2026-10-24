@@ -5,7 +5,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, PipeRun } from '@aec/plant/types';
 import { add3, scale3, sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
-import type { RunDerivation } from '../deriveTypes';
+import type { DerivedBranch, RunDerivation } from '../deriveTypes';
 import { angleBetweenDeg, buildPath, legVector, unitVector } from '../legs';
 import { getPiping, locateOnRun, refuse, runPoints } from '../model';
 import { refuseDerivation, rederive, withRuns } from '../runUpdate';
@@ -85,15 +85,16 @@ export const addBranch = defineCommand({
     if (header === undefined) return refuse(doc, 'add_branch', 'RTE_UNKNOWN_RUN', `no pipe run "${params.runId}"`, [], ['runId']);
     const headerLine = piping.lines[header.lineId];
     const branchLine = params.lineId === undefined ? headerLine : piping.lines[params.lineId];
-    if (headerLine === undefined || branchLine === undefined)
+    if (headerLine === undefined)
       return refuse(
         doc,
         'add_branch',
         'RTE_UNKNOWN_LINE',
-        `no pipe line "${params.lineId ?? header.lineId}"`,
-        [],
-        [params.lineId === undefined ? 'runId' : 'lineId'],
+        `run ${header.id} names the missing line "${header.lineId}"`,
+        [header.id],
+        ['runId'],
       );
+    if (branchLine === undefined) return refuse(doc, 'add_branch', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
     const lookup = createSpecLookup(doc, headerLine.spec);
     if (isMiss(lookup)) return refuse(doc, 'add_branch', lookup.miss, lookup.detail, [headerLine.id, ...lookup.ids], ['runId']);
     const places = runPoints(header);
@@ -163,35 +164,35 @@ export const addBranch = defineCommand({
       result.derivations[header.id] as RunDerivation,
       result.derivations[branchRunId] as RunDerivation,
     ];
-    const fit = headerDerived.branches.find((candidate) => candidate.id === branchId);
+    const fit = headerDerived.branches.find((candidate) => candidate.id === branchId) as DerivedBranch;
     const warnings = [...headerDerived.warnings, ...branchDerived.warnings];
     const reasons = [...new Set([...headerDerived.unverifiedReasons, ...branchDerived.unverifiedReasons])];
     return {
       ...changed(
         result.document,
-        `add_branch: ${fit?.typeKey ?? 'branch'} (table cell ${fit?.fittingCode ?? '?'}) DN${fit?.headerDn ?? '?'} x DN${params.dn} on run ${header.id} leg ${where.leg} at ${+where.distance.toFixed(4)} mm; ` +
-          `branch run ${branchRunId} starts ${+(fit?.branchStartMm ?? 0).toFixed(4)} mm from the header axis (${fit?.branchStartSource ?? ''}); ` +
+        `add_branch: ${fit.typeKey} (table cell ${fit.fittingCode}) DN${fit.headerDn} x DN${params.dn} on run ${header.id} leg ${where.leg} at ${+where.distance.toFixed(4)} mm; ` +
+          `branch run ${branchRunId} starts ${+fit.branchStartMm.toFixed(4)} mm from the header axis (${fit.branchStartSource}); ` +
           `header pieces ${JSON.stringify(headerDerived.legs[where.leg]?.cutLengthsMm.map((cut) => +cut.toFixed(4)))}, branch pieces ${JSON.stringify(branchDerived.legs.flatMap((leg) => leg.cutLengthsMm.map((cut) => +cut.toFixed(4))))}; ` +
-          `${warnings.length} warning(s)${reasons.length > 0 ? `; unverified: ${reasons.join('; ')}` : ''}${fit?.reviewRequired === true ? '; RTE_STUB_IN_REVIEW: reinforcement needs a review' : ''}.`,
+          `${warnings.length} warning(s)${reasons.length > 0 ? `; unverified: ${reasons.join('; ')}` : ''}${fit.reviewRequired ? '; RTE_STUB_IN_REVIEW: reinforcement needs a review' : ''}.`,
         [branchRunId, branchId],
       ),
       data: {
         branchRunId,
         branchId,
         headerRunId: header.id,
-        fitting: fit?.typeKey,
-        fittingCode: fit?.fittingCode,
-        partId: fit?.partId,
-        headerDn: fit?.headerDn,
+        fitting: fit.typeKey,
+        fittingCode: fit.fittingCode,
+        partId: fit.partId,
+        headerDn: fit.headerDn,
         branchDn: params.dn,
         leg: where.leg,
         distance: where.distance,
         position,
         direction,
-        branchStartMm: fit?.branchStartMm,
-        branchStartSource: fit?.branchStartSource,
-        runCentreToEndMm: fit?.runCentreToEndMm,
-        reviewRequired: fit?.reviewRequired ?? false,
+        branchStartMm: fit.branchStartMm,
+        branchStartSource: fit.branchStartSource,
+        runCentreToEndMm: fit.runCentreToEndMm,
+        reviewRequired: fit.reviewRequired,
         pipePieces: [...pieceRows(header.id, headerDerived), ...pieceRows(branchRunId, branchDerived)],
         legs: branchDerived.legs.map((leg) => ({
           index: leg.index,

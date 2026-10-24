@@ -6,7 +6,7 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import type { BranchPoint, EndType, Joint, PartPort, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
+import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
 import { len3, scale3, sub3 } from '@lib/vec3';
 import { fail, isFailure, type DerivationFailure, type DerivedBranch } from './deriveTypes';
 import { unitVector } from './legs';
@@ -250,7 +250,8 @@ export const derivedBranch = (env: Env, fit: BranchFit): DerivedBranch => ({
 
 /**
  * The setup of a branch run's start: the first pipe piece welds to the header fitting, `branchStart` away from the header centreline.
- * @failure the header or its branch no longer derives -> that failure; the branch point is gone -> RTE_UNKNOWN_PORT
+ * @invariant called with a branch port that resolved (`portOfRef`): the header, its branch point and the branch run exist
+ * @failure the header (its spec, another of its branches) no longer derives -> that failure, prefixed with the header id
  */
 export function branchStartSetup(
   env: Env,
@@ -258,16 +259,12 @@ export function branchStartSetup(
   port: PortSpec,
   portId: string,
 ): EndSetup | DerivationFailure {
-  const header = getPiping(env.doc).runs[ref.runId];
-  if (header === undefined)
-    return fail('RTE_UNKNOWN_RUN', `the header run ${ref.runId} of branch ${ref.branchId} no longer exists`, [ref.runId], ['start']);
+  const header = getPiping(env.doc).runs[ref.runId] as PipeRun;
   const headerEnv = makeEnv(env.doc, header);
   if (isFailure(headerEnv)) return { ...headerEnv, message: `header ${header.id}: ${headerEnv.message}` };
   const fits = layoutBranches(headerEnv);
   if (isFailure(fits)) return { ...fits, message: `header ${header.id}: ${fits.message}` };
-  const fit = fits.find((candidate) => candidate.point.id === ref.branchId);
-  if (fit === undefined)
-    return fail('RTE_UNKNOWN_PORT', `header ${header.id} has no branch point ${ref.branchId}`, [ref.runId, ref.branchId], ['start']);
+  const fit = fits.find((candidate) => candidate.point.id === ref.branchId) as BranchFit;
   return {
     length: fit.branchStart,
     gap: fit.kind === 'stubIn' ? 0 : (env.weld?.gapMm ?? 0),

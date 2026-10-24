@@ -36,7 +36,7 @@ const endErrors = (path: string, end: unknown, branchAllowed: boolean): string[]
     return [`${path} needs a finite point`];
   return end['ref'] === undefined || isRef(end['ref'], branchAllowed)
     ? []
-    : [`${path}.ref must be a tieIn, nozzle, runEnd${branchAllowed ? ' or branch' : ''} reference`];
+    : [`${path}.ref must be a ${branchAllowed ? 'tieIn, nozzle, runEnd or branch' : 'tieIn, nozzle or runEnd'} reference`];
 };
 
 const entityIdErrors = (raw: Record<string, unknown>): string[] => {

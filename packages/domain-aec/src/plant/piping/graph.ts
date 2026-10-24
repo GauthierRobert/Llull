@@ -1,6 +1,6 @@
 /**
  * Connectivity graph of derived runs (02 RTE §5.8): nodes are parts and external ports (tie-ins, equipment nozzles), edges are joints,
- * attachments of a part port to an external port, and olets welded to their header piece. A part port is connected when another part port or an
+ * attachments of a part port to an external port (an olet is joined to its header piece by its weld joint). A part port is connected when another part port or an
  * external port lies at the same point with the opposite direction (or within a joint's gap), so the graph needs nothing but the derived parts.
  * Open ends are the part ports that connect to nothing; disagreements across a connection (size, rating, facing, end type) are listed.
  * @invariant pure; ports are matched on a 0.05 mm grid with a 0.01 mm tolerance and 1 degree between opposite directions
@@ -34,7 +34,7 @@ export interface ExternalPort {
 export interface GraphEdge {
   readonly from: string;
   readonly to: string;
-  readonly kind: 'joint' | 'attachment' | 'weld';
+  readonly kind: 'joint' | 'attachment';
   readonly jointKind?: Joint['kind'];
   readonly position: Vec3;
 }
@@ -205,13 +205,6 @@ export function buildGraph(doc: CadDocument, runs: readonly GraphRun[]): RunGrap
       if (record.owner < other.owner || other.external) mismatches.push(...mismatchesOf(record, other));
     }
   }
-  // Olets and stub-ins are welded to their header piece: their first port is connected through that weld.
-  for (const { part } of parts.values()) {
-    if (part.onPart === undefined || !parts.has(part.onPart)) continue;
-    connected.add(`${part.id}#0`);
-    link(part.id, part.onPart, 'weld', part.ports[0]?.position ?? [0, 0, 0]);
-  }
-
   const openEnds: OpenEnd[] = [];
   for (const { part, runId, lineId } of parts.values())
     part.ports.forEach((port, index) => {

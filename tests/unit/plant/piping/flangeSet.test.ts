@@ -96,9 +96,8 @@ describe('resolveFlangeSet', () => {
 
   it('a port with the spec rating and facing, or with neither stated, is accepted; another rating or facing is a mismatch', () => {
     const lookup = lookupOf(cs150Document());
-    expect(
-      set(resolveFlangeSet(lookup, { position: port.position, direction: port.direction, dn: 100, endType: 'FL' }, 100)).flange.rating,
-    ).toBe('CL150');
+    const bare: PortSpec = { position: port.position, direction: port.direction, dn: 100, endType: 'FL' };
+    expect(set(resolveFlangeSet(lookup, bare, 100)).flange.rating).toBe('CL150');
     expect(set(resolveFlangeSet(lookup, { ...port, rating: ' cl150 ' }, 100)).flange.key).toBe('CS150/F-WN/100');
     const rating = failure(resolveFlangeSet(lookup, { ...port, rating: 'CL300' }, 100));
     expect(rating.code).toBe('RTE_RATING_MISMATCH');
@@ -106,6 +105,7 @@ describe('resolveFlangeSet', () => {
     const facing = failure(resolveFlangeSet(lookup, { ...port, facing: 'FF' }, 100));
     expect(facing.code).toBe('RTE_FACING_MISMATCH');
     expect(facing.detail).toEqual({ portFacing: 'FF', specFacing: 'RF' });
-    expect(failure(resolveFlangeSet(lookup, { ...port, dn: 700 }, 700)).code).toBe('RTE_SPEC_NO_COMPONENT');
+    const large = { ...port, dn: 700 };
+    expect(failure(resolveFlangeSet(lookup, large, 700)).code).toBe('RTE_SPEC_NO_COMPONENT');
   });
 });

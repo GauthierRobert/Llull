@@ -154,15 +154,19 @@ function reducerSlot(env: Env, { comp, dnIn, dnOut }: Located, mint: Mint): Slot
   const length = row.dims['length'];
   if (length === undefined || !(length > 0))
     return noComponent(`reducer row ${row.key} has no length dimension (${row.source})`, comp, [row.key]);
-  if (env.weld === null)
-    return fail('RTE_NO_CONNECTION_RULE', `spec ${lookup.id} has no BW-BW connection rule`, [lookup.id, comp.id], ['inline']);
   const [pipeIn, pipeOut] = [env.pipeAt(dnIn), env.pipeAt(dnOut)];
   if (isFailure(pipeIn)) return pipeIn;
   if (isFailure(pipeOut)) return pipeOut;
   const id = mint('reducer');
   const reach = length / 2;
   return {
-    interval: { id: comp.id, start: comp.centreDistance - reach, end: comp.centreDistance + reach, gap: env.weld.gapMm, kind: 'inline' },
+    interval: {
+      id: comp.id,
+      start: comp.centreDistance - reach,
+      end: comp.centreDistance + reach,
+      gap: env.weld?.gapMm ?? 0,
+      kind: 'inline',
+    },
     leg: comp.leg,
     before: id,
     after: id,
