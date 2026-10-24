@@ -13,6 +13,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-24 — main: 02 RTE-M3 merged (cad-reviewer APPROVE after 3 rounds): orthogonal stretch on nozzle / equipment moves,
+  `edit_route` (move / stretch / insert / delete PI, remaps inline + branch + slope legs), sloped legs + adverse / pocket / flat checks,
+  insulation from the spec (`edit_pipe_spec` insulation rows) + envelope in `check_clashes` (new clash-source registry, core
+  `CadPlugin.onInstall`), `set_piping_settings` line-number template. Gates green: static, unit 15847, server 1571, coverage
+  97.3 / 89.2 / 99.0 / 99.0 (1 worker). Next: 02 RTE-V1.
 - 2026-10-24 — main: 02 RTE-M2 merged (cad-reviewer APPROVE after 4 rounds): inline valves + reducers, branches (tee / reducing tee /
   weldolet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline`, `delete_pipe_run` cascade; frozen
   derivation memo keyed on the slices it reads (200-branch header ≈ 0.1 s). Gates green: static, unit 15715, server 1571 (1 worker).
@@ -121,7 +126,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
-- `[WIP]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route` (remap inline + branch leg indices), slope + adverse slope, insulation envelope in `check_clashes`, line-number template, supports on runs. Worktree `llull-rte`, branch `feat/plant-rte-m3`. Then **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
+- `[WIP]` **RTE-V1** 02 socket / threaded engagement, eccentric reducers, trimmed elbows / bends, valve operators (+ operator clash), heat tracing data, `line_heat_loss`, supports on runs, slope-preserving stretch, clash bodies for valves / flanges / tees, PCF hand-off (05), IFC ports (08), exact solids via kernel. Worktree `llull-rte`, branch `feat/plant-rte-v1`. Then RTE-V2 (auto-route). _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
