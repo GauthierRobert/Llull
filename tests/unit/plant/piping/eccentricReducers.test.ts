@@ -8,6 +8,7 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel, RoutedPart } from '@aec/plant/types';
 import { deriveRun } from '@aec/plant/piping/routeParts';
+import { pipingErrors } from '@aec/plant/piping/validate';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { addTie, cs150Line } from './rteFixtures';
 
@@ -299,6 +300,30 @@ describe('branches and persistence', () => {
     const removed = apply(loaded, 'remove_inline_component', { runId: run.id, componentId: run.inline?.[0]?.id });
     const back = deriveRun(removed, piping(removed).runs[run.id] as PipeRun);
     expect(back.ok && back.legs.map((leg) => leg.lengthMm)).toEqual([4000, 1000]);
+  });
+
+  it('a file whose flatDirection is zero, or sits on a component that is not an eccentric reducer, is a validation error', () => {
+    const routed = riser(scene(), 'top');
+    const runId = (routed.data as Route).runId;
+    const corrupt = (patch: Record<string, unknown>): unknown => {
+      const raw = JSON.parse(JSON.stringify(piping(routed.document))) as {
+        runs: Record<string, { inline: Array<Record<string, unknown>> }>;
+      };
+      Object.assign(raw.runs[runId]?.inline[0] ?? {}, patch);
+      return raw;
+    };
+    expect(pipingErrors(corrupt({}))).toEqual([]);
+    for (const patch of [{ flatDirection: [0, 0, 0] }, { type: 'reducerConcentric' }])
+      expect(pipingErrors(corrupt(patch))).toEqual([expect.stringContaining(`plant.piping.runs.${runId}.inline.0 `)]);
+  });
+
+  it('a stored flatDirection along the pipe derives the RTE_ECCENTRIC_INVALID refusal', () => {
+    const routed = riser(scene(), 'top');
+    const run = piping(routed.document).runs[(routed.data as Route).runId] as PipeRun;
+    const inline = (run.inline ?? []).map((item) => ({ ...item, flatDirection: [1, 0, 0] as [number, number, number] }));
+    const derived = deriveRun(routed.document, { ...run, inline });
+    expect(derived.ok).toBe(false);
+    expect(!derived.ok && derived.code).toBe('RTE_ECCENTRIC_INVALID');
   });
 
   it('a branch downstream of an eccentric reducer on the same leg is refused (its port would sit off the stored axis); before it is fine', () => {

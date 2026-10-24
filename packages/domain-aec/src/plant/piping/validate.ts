@@ -90,6 +90,10 @@ function settingsErrors(raw: Record<string, unknown>): string[] {
 
 const isPositive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
+/** The stored flat side of an eccentric reducer: a non-zero vector, and on no other component. */
+const isFlatDirection = (value: unknown, type: unknown): boolean =>
+  type === 'reducerEccentric' && isVec3(value) && (value as number[]).some((v) => v !== 0);
+
 /** Errors of the M2 members of a run: its own size, the inline components and the branch points. */
 function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<string, unknown>): string[] {
   const path = `plant.piping.runs.${id}`;
@@ -109,8 +113,11 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
         isPositive(item['centreDistance']) &&
         (item['dn2'] === undefined || isPositive(item['dn2'])) &&
         (item['stemDirection'] === undefined || isVec3(item['stemDirection'])) &&
-        (item['flatDirection'] === undefined || isVec3(item['flatDirection']));
-      if (!ok) errors.push(`${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance`);
+        (item['flatDirection'] === undefined || isFlatDirection(item['flatDirection'], item['type']));
+      if (!ok)
+        errors.push(
+          `${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance (a flatDirection only on a reducerEccentric, non-zero)`,
+        );
     });
   const slopes = run['legSlopes'];
   const pis = run['pis'];
