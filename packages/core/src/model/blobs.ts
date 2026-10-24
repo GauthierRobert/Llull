@@ -9,10 +9,17 @@ import { base64ToText, base64ToUint8Array, textToBase64, uint8ArrayToBase64 } fr
 import { sha256Hex } from '../lib/sha256';
 import type { CadDocument, DocumentBlob } from './types';
 
-const BLOB_MEDIA_TYPES: ReadonlyArray<string> = ['model/x-occt-brep', 'model/step', 'model/iges', 'font/ttf', 'font/otf'];
+const BLOB_MEDIA_TYPES: ReadonlyArray<string> = [
+  'model/x-occt-brep',
+  'model/step',
+  'model/iges',
+  'font/ttf',
+  'font/otf',
+  'font/x-llull-stroke',
+];
 
 /** Media types whose payload is raw bytes, not UTF-8 text. */
-const BINARY_MEDIA_TYPES: ReadonlyArray<string> = ['font/ttf', 'font/otf'];
+const BINARY_MEDIA_TYPES: ReadonlyArray<string> = ['font/ttf', 'font/otf', 'font/x-llull-stroke'];
 
 export function makeBlob(mediaType: DocumentBlob['mediaType'], text: string): DocumentBlob {
   return { sha256: sha256Hex(text), mediaType, bytes: textToBase64(text), size: new TextEncoder().encode(text).length };

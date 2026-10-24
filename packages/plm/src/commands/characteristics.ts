@@ -23,6 +23,7 @@ function characteristicKind(item: PmiItem): SourceKind | null {
     case 'surface_texture':
       return 'gdt';
     case 'note':
+    case 'knurl':
       return 'note';
     default:
       return null;

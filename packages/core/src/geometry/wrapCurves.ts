@@ -12,7 +12,7 @@ import { interpolatePoints } from '../lib/nurbs/interpolate';
 import { joinCurves } from '../lib/nurbs/joinCurves';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import { mapSegment2, sampleSegment, type PlaneSegment } from './planeSegments';
-import type { FaceChart } from './wrapChart';
+import type { FaceChart } from './chartFrame';
 
 const lift2 = (curve: NurbsCurve2Data): NurbsCurveData => ({ ...curve, poles: curve.poles.map(([x, y]): Vec3 => [x, y, 0]) });
 const drop3 = (curve: NurbsCurveData): NurbsCurve2Data => ({ ...curve, poles: curve.poles.map(([x, y]): Vec2 => [x, y]) });
@@ -29,10 +29,14 @@ type Sampler = (s: number) => Vec3 | null;
 /**
  * A cubic curve through `sample(k / n)` for the smallest n (doubling from 8) whose deviation at three points between neighbours is within `tolerance`. The parameter is uniform, so
  * the curve and the sampler agree wherever both are evaluated at the same s.
- * @failure a sampler that answers null (a point on the cone apex), coincident samples, or no n within the cap reaching the tolerance -> error text
+ * @failure a sampler that answers null (a point on the cone apex, beyond a geodesic chart's reach), coincident samples, or no n within the cap reaching the tolerance -> error text
  */
-export function fitBySampling(sample: Sampler, tolerance: number): Mapped<{ curve: NurbsCurveData; deviation: number }> {
-  const apex = { error: 'a point of the curve falls on the apex of the cone' };
+export function fitBySampling(
+  sample: Sampler,
+  tolerance: number,
+  nullMeaning = 'a point of the curve falls on the apex of the cone',
+): Mapped<{ curve: NurbsCurveData; deviation: number }> {
+  const apex = { error: nullMeaning };
   for (let n = 8; n < MAX_FIT_POINTS; n *= 2) {
     const points: Vec3[] = [];
     for (let k = 0; k <= n; k++) {
@@ -84,11 +88,12 @@ function fitSpans(
   piece: PlaneSegment,
   map: (point: Vec2) => Vec3 | null,
   tolerance: number,
+  nullMeaning?: string,
 ): Mapped<{ curves: NurbsCurveData[]; deviation: number }> {
   const curves: NurbsCurveData[] = [];
   let deviation = 0;
   for (const at of spansOf(piece)) {
-    const fitted = fitBySampling((s) => map(at(s)), tolerance);
+    const fitted = fitBySampling((s) => map(at(s)), tolerance, nullMeaning);
     if (isMappingError(fitted)) return fitted;
     curves.push(fitted.curve);
     deviation = Math.max(deviation, fitted.deviation);
@@ -114,7 +119,17 @@ function fitPiece(
  * @failure a cone point on the apex, or a fit that does not reach the tolerance -> error text
  */
 export function mapPieces(chart: FaceChart, pieces: readonly PlaneSegment[], tolerance: number): Mapped<PlaneSegment[]> {
-  if (chart.affine) return pieces.map((piece) => mapSegment2(piece, (point) => chart.uvAt(point) as Vec2));
+  if (chart.affine) {
+    let outside = false;
+    const affine = pieces.map((piece) =>
+      mapSegment2(piece, (point) => {
+        const uv = chart.uvAt(point);
+        outside = outside || uv === null;
+        return uv ?? [0, 0];
+      }),
+    );
+    return outside ? { error: chart.nullMeaning } : affine;
+  }
   const mapped: PlaneSegment[] = [];
   for (const piece of pieces) {
     const reach = Math.max(...sampleSegment(piece, 9).map((p) => Math.hypot(p[0] - chart.anchorChart[0], p[1] - chart.anchorChart[1])));
@@ -125,6 +140,7 @@ export function mapPieces(chart: FaceChart, pieces: readonly PlaneSegment[], tol
         return uv === null ? null : [uv[0], uv[1], 0];
       },
       tolerance / chart.metricBound(reach),
+      chart.nullMeaning,
     );
     if (isMappingError(fitted)) return fitted;
     for (const curve of fitted.curves) mapped.push({ kind: 'nurbs', curve: drop3(curve) });

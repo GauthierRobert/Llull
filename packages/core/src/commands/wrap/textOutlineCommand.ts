@@ -3,7 +3,7 @@
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { flattenLoop, loopArea, loopBox, type OutlineLoop } from '../../lib/font/outline';
-import { outlineErrorCode, textOutline } from '../../geometry/textOutline';
+import { isOutlineFailure, outlineOfText } from './textPath';
 import type { Vec2 } from '../../model/vectors';
 import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';
@@ -63,8 +63,8 @@ export const textOutlineCommand = defineCommand({
       return reject('WRP_TEXT_NO_FONT', `entity '${params.id}' (${entity.kind}) is not a text with a font`, [params.id]);
     const loaded = loadFont(doc, entity.font);
     if (isFontFailure(loaded)) return reject(loaded.code, loaded.message, [params.id]);
-    const outline = textOutline(params.kerning === undefined ? entity : { ...entity, kerning: params.kerning }, loaded.font);
-    if ('error' in outline) return reject(outlineErrorCode(outline.error), outline.message, [params.id]);
+    const outline = outlineOfText(doc, entity, loaded.font, params.kerning === undefined ? {} : { kerning: params.kerning });
+    if (isOutlineFailure(outline)) return reject(outline.code, outline.message, [params.id]);
     const { layout } = outline;
     const mode = params.output ?? 'summary';
     const from = params.offset ?? 0;
@@ -97,9 +97,17 @@ export const textOutlineCommand = defineCommand({
       mode === 'loops'
         ? outline.regions.map((region) => ({ area: region.area, outer: polyline(region.outer), holes: region.holes.map(polyline) }))
         : undefined;
-    const method = outline.united
-      ? 'TrueType quadratic outlines, overlapping contours united on polygons'
-      : 'TrueType quadratic outlines, exact Green area';
+    const kind =
+      loaded.font.format === 'stroke'
+        ? 'single-line strokes'
+        : loaded.font.format === 'cff'
+          ? 'CFF cubic outlines'
+          : 'TrueType quadratic outlines';
+    const method = outline.bent
+      ? `${kind} bent along a curve (polygonal)`
+      : outline.united
+        ? `${kind}, overlapping contours united on polygons`
+        : `${kind}, exact Green area`;
     const data = wrapData(
       doc,
       {
@@ -114,7 +122,10 @@ export const textOutlineCommand = defineCommand({
         bbox: outline.bbox,
         height: entity.height,
         scale: layout.scale,
-        exact: !outline.united,
+        exact: !outline.united && !outline.bent,
+        singleLine: loaded.font.singleLine,
+        strokes: outline.strokes.length,
+        ...(outline.bent ? { onCurve: entity.onCurve } : {}),
         font: { family: loaded.record.family, sha256: loaded.record.blob },
         capHeight: { fontUnits: loaded.record.capHeight, source: loaded.record.capHeightSource },
         missingCharacters: layout.missing,

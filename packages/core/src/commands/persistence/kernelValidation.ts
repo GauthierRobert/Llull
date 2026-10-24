@@ -51,7 +51,7 @@ function collectBrepLeaves(value: unknown, owner: string, out: Array<readonly [s
     if (key !== 'positions' && key !== 'indices') collectBrepLeaves(child, owner, out, tooDeep, depth + 1);
 }
 
-/** `fonts` (03 WRP): an object of records, each naming a stored `font/ttf` blob (a font without its bytes cannot outline text). */
+/** `fonts` (03 WRP): an object of records, each naming a stored `font/ttf` or `font/otf` blob (a font without its bytes cannot outline text). */
 function fontProblems(fonts: unknown, blobs: unknown): string[] {
   if (fonts === undefined) return [];
   if (!isRecord(fonts)) return ['fonts must be an object keyed by font id'];
@@ -59,8 +59,15 @@ function fontProblems(fonts: unknown, blobs: unknown): string[] {
   for (const [id, record] of Object.entries(fonts)) {
     const key = isRecord(record) ? record['blob'] : undefined;
     const blob = typeof key === 'string' && isRecord(blobs) ? blobs[key] : undefined;
-    if (!isRecord(record) || typeof key !== 'string' || !isRecord(blob) || blob['mediaType'] !== 'font/ttf')
-      errors.push(`WRP_FONT_UNAVAILABLE: font '${id}' needs a font/ttf blob in the document blobs — re-run import_font`);
+    if (
+      !isRecord(record) ||
+      typeof key !== 'string' ||
+      !isRecord(blob) ||
+      !['font/ttf', 'font/otf', 'font/x-llull-stroke'].includes(String(blob['mediaType']))
+    )
+      errors.push(
+        `WRP_FONT_UNAVAILABLE: font '${id}' needs a font blob (font/ttf, font/otf or font/x-llull-stroke) in the document blobs — re-run import_font`,
+      );
   }
   return errors;
 }
@@ -74,7 +81,7 @@ export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
     const problem = blobProblem(key, blob);
     if (problem === 'malformed')
       errors.push(
-        `blob '${key}' is malformed (needs sha256, mediaType model/x-occt-brep|model/step|model/iges|font/ttf|font/otf, base64 bytes, size)`,
+        `blob '${key}' is malformed (needs sha256, mediaType model/x-occt-brep|model/step|model/iges|font/ttf|font/otf|font/x-llull-stroke, base64 bytes, size)`,
       );
     else if (problem !== null) errors.push(`${problem}: blob '${key}' bytes do not match its sha256, mediaType or size`);
   }

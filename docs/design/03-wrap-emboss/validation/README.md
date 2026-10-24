@@ -137,8 +137,7 @@ TR ↔ VC: TECHNICAL_SPEC §9.1; `expected_results.json` lists the TR ids per ca
 
 - `tests/unit/wrap/surfaceChart.test.ts` iterates `data/cylinder_wrap.json`, `cone_development.json`, `sphere_geodesic_wrap.json`,
   `pull_and_geodesic.json` (core math, no kernel).
-- `tests/unit/wrap/font.test.ts` loads the pinned font through a fixture script (`scripts/fetch-wrp-fixtures.mjs`, to be written:
-  download, verify sha256 `c29556a2…`, write `tests/fixtures/wrp/`; skipped offline with a notice) and compares with
+- `tests/unit/wrap/font.test.ts` loads the pinned Fira Sans Regular bundled in `server/fonts/` (sha256 `c29556a2…`) and compares with
   `font_firasans_glyphs.json` / `text_cases.json`; the restricted-licence fixture is the same file with OS/2 `fsType` patched to 2.
 - `tests/golden/` imports `plans/target_*.json` once the commands exist (id-normalised snapshots + replay equality).
 - `server/tests/nativeWrap.test.ts` checks volumes and lengths with the native kernel against the same JSON.

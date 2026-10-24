@@ -89,9 +89,10 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   overlays + curved-sheet base for `flow_on_surface`, B-spline lattices / oriented boxes, `baseCurve`, `infinite` regions, `allowMeshFallback`,
   `compareTo` shapes, non-uniform fit grid (point push 5–8 s), native `faceQuery.bspline`, VC-22 STEP re-import, mass rule by face type
   (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
-- `[TODO]` **DES-3b** 03 WRP left after M0–M3 (done 2026-10-22, §13): M4 geodesic / parametric charts, emboss on doubly curved faces,
-  `split_face_by_curves`, `create_curve_on_face`, CFF fonts, kerning, multi-line, decal + knurl; M5 single-line fonts, text on curve,
-  `pattern_on_face`, modeled knurl; WRP golden plan (native). _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
+  (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
+  + draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
+  for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4b** 04 DIR left after MVP (done 2026-10-23, §13: M0, M2, M3 commands + M1 cage UI and M3 UI tools): M1 B-rep drag
   handles (`push_pull_face` / `replace_face` / `draft_faces`), control-net overlays, loop-cut factor drag, desktop-app pass on cage editing
   (pointer capture, gizmo + floating origin); M4 `edit_nurbs` ops + `subdivision_to_nurbs`; M5 open cages, bridge / bevel / delete / fill /

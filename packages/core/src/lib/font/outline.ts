@@ -1,6 +1,6 @@
 /**
- * Closed outlines of line and quadratic-Bezier segments (TrueType): contour -> loop, exact Green area, exact arc length, bounding box, flattening and
- * affine placement. Coordinates are plain numbers in whatever unit the caller keeps (font units until `placeLoop`).
+ * Closed outlines of line, quadratic-Bezier (TrueType) and cubic-Bezier (CFF) segments: contour -> loop, Green area (closed form for quadratics, exact Gauss quadrature of
+ * the degree-5 integrand for cubics), arc length, bounding box, flattening and affine placement. Coordinates are plain numbers in whatever unit the caller keeps (font units until `placeLoop`).
  */
 
 import type { Vec2 } from '../../model/vectors';
@@ -8,7 +8,8 @@ import type { RawContour } from './glyf';
 
 export type OutlineSegment =
   | { readonly kind: 'line'; readonly from: Vec2; readonly to: Vec2 }
-  | { readonly kind: 'quad'; readonly from: Vec2; readonly control: Vec2; readonly to: Vec2 };
+  | { readonly kind: 'quad'; readonly from: Vec2; readonly control: Vec2; readonly to: Vec2 }
+  | { readonly kind: 'cubic'; readonly from: Vec2; readonly control1: Vec2; readonly control2: Vec2; readonly to: Vec2 };
 
 export type OutlineLoop = readonly OutlineSegment[];
 
@@ -51,14 +52,43 @@ export function contourLoop(contour: RawContour): OutlineLoop {
 
 const cross = (p: Vec2, q: Vec2): number => p[0] * q[1] - q[0] * p[1];
 
-/** Signed area of the loop (counter-clockwise > 0), exact: a quadratic segment adds (2/3)(P0 x C + C x P1) / 2 + (1/3)(P0 x P1) / 2. */
+/** 4-point Gauss-Legendre rule on [0, 1]: exact for polynomials up to degree 7 (the cubic area integrand is degree 5). */
+const GAUSS4: ReadonlyArray<readonly [number, number]> = [
+  [0.0694318442029737, 0.1739274225687269],
+  [0.3300094782075719, 0.3260725774312731],
+  [0.6699905217924281, 0.3260725774312731],
+  [0.9305681557970263, 0.1739274225687269],
+];
+
+type CubicSegment = { readonly from: Vec2; readonly control1: Vec2; readonly control2: Vec2; readonly to: Vec2 };
+
+const cubicPoint = (s: CubicSegment, t: number, axis: 0 | 1): number => {
+  const u = 1 - t;
+  return u * u * u * s.from[axis] + 3 * u * u * t * s.control1[axis] + 3 * u * t * t * s.control2[axis] + t * t * t * s.to[axis];
+};
+
+const cubicSlope = (s: CubicSegment, t: number, axis: 0 | 1): number => {
+  const u = 1 - t;
+  return (
+    3 *
+    (u * u * (s.control1[axis] - s.from[axis]) +
+      2 * u * t * (s.control2[axis] - s.control1[axis]) +
+      t * t * (s.to[axis] - s.control2[axis]))
+  );
+};
+
+/** Signed area of the loop (counter-clockwise > 0): a quadratic segment adds (2/3)(P0 x C + C x P1) / 2 + (1/3)(P0 x P1) / 2 (exact); a cubic is integrated exactly by Gauss quadrature. */
 export function loopArea(loop: OutlineLoop): number {
   let twice = 0;
-  for (const segment of loop)
-    twice +=
-      segment.kind === 'line'
-        ? cross(segment.from, segment.to)
-        : (2 / 3) * (cross(segment.from, segment.control) + cross(segment.control, segment.to)) + (1 / 3) * cross(segment.from, segment.to);
+  for (const segment of loop) {
+    if (segment.kind === 'line') twice += cross(segment.from, segment.to);
+    else if (segment.kind === 'quad')
+      twice +=
+        (2 / 3) * (cross(segment.from, segment.control) + cross(segment.control, segment.to)) + (1 / 3) * cross(segment.from, segment.to);
+    else
+      for (const [t, weight] of GAUSS4)
+        twice += weight * (cubicPoint(segment, t, 0) * cubicSlope(segment, t, 1) - cubicPoint(segment, t, 1) * cubicSlope(segment, t, 0));
+  }
   return twice / 2;
 }
 
@@ -82,18 +112,32 @@ function quadLength(from: Vec2, control: Vec2, to: Vec2): number {
   return 2 * (at(1) - at(0));
 }
 
-/** Arc length of the loop (exact for lines and quadratics). */
+/** Arc length of a cubic: 16 pieces of the 4-point Gauss rule on the speed (converged to better than 1e-12 for glyph-sized curves). */
+function cubicLength(segment: CubicSegment): number {
+  const pieces = 16;
+  let total = 0;
+  for (let piece = 0; piece < pieces; piece++)
+    for (const [t, weight] of GAUSS4) {
+      const at = (piece + t) / pieces;
+      total += (weight / pieces) * Math.hypot(cubicSlope(segment, at, 0), cubicSlope(segment, at, 1));
+    }
+  return total;
+}
+
+/** Arc length of the loop (closed form for lines and quadratics, quadrature for cubics). */
 export function loopLength(loop: OutlineLoop): number {
   let total = 0;
   for (const segment of loop)
     total +=
       segment.kind === 'line'
         ? Math.hypot(segment.to[0] - segment.from[0], segment.to[1] - segment.from[1])
-        : quadLength(segment.from, segment.control, segment.to);
+        : segment.kind === 'quad'
+          ? quadLength(segment.from, segment.control, segment.to)
+          : cubicLength(segment);
   return total;
 }
 
-/** Polyline of the loop: `perQuad` points on every quadratic, the segment ends of lines. Closed implicitly (the first point is not repeated). */
+/** Polyline of the loop: `perQuad` points on every curve (quadratic or cubic), the segment ends of lines. Closed implicitly (the first point is not repeated). */
 export function flattenLoop(loop: OutlineLoop, perQuad: number): Vec2[] {
   const points: Vec2[] = [];
   for (const segment of loop) {
@@ -107,6 +151,8 @@ export function flattenLoop(loop: OutlineLoop, perQuad: number): Vec2[] {
           s * s * segment.from[1] + 2 * s * t * segment.control[1] + t * t * segment.to[1],
         ]);
       }
+    else if (segment.kind === 'cubic')
+      for (let k = 1; k < perQuad; k++) points.push([cubicPoint(segment, k / perQuad, 0), cubicPoint(segment, k / perQuad, 1)]);
   }
   return points;
 }
@@ -116,7 +162,7 @@ export interface OutlineBox {
   readonly max: Vec2;
 }
 
-/** Axis-aligned box of the segment end points and quadratic extrema. */
+/** Axis-aligned box of the segment end points and curve extrema. */
 export function loopBox(loop: OutlineLoop): OutlineBox | null {
   const points: Vec2[] = [];
   for (const segment of loop) {
@@ -133,6 +179,22 @@ export function loopBox(loop: OutlineLoop): OutlineBox | null {
           ]);
         }
       }
+    else if (segment.kind === 'cubic')
+      for (const axis of [0, 1] as const) {
+        // the slope over 3 is a t^2 + b t + c in the differences of the control points
+        const d0 = segment.control1[axis] - segment.from[axis];
+        const d1 = segment.control2[axis] - segment.control1[axis];
+        const d2 = segment.to[axis] - segment.control2[axis];
+        const [a, b, c] = [d0 - 2 * d1 + d2, 2 * (d1 - d0), d0];
+        const roots: number[] = [];
+        if (Math.abs(a) < 1e-12) {
+          if (b !== 0) roots.push(-c / b);
+        } else {
+          const disc = b * b - 4 * a * c;
+          if (disc >= 0) roots.push((-b + Math.sqrt(disc)) / (2 * a), (-b - Math.sqrt(disc)) / (2 * a));
+        }
+        for (const t of roots) if (t > 0 && t < 1) points.push([cubicPoint(segment, t, 0), cubicPoint(segment, t, 1)]);
+      }
   }
   if (points.length === 0) return null;
   return {
@@ -141,11 +203,13 @@ export function loopBox(loop: OutlineLoop): OutlineBox | null {
   };
 }
 
-/** The loop with every point mapped by `map` (an affine map keeps quadratics exact). */
+/** The loop with every point mapped by `map` (an affine map keeps quadratics and cubics exact). */
 export function mapLoop(loop: OutlineLoop, map: (point: Vec2) => Vec2): OutlineLoop {
   return loop.map((segment) =>
     segment.kind === 'line'
       ? { kind: 'line', from: map(segment.from), to: map(segment.to) }
-      : { kind: 'quad', from: map(segment.from), control: map(segment.control), to: map(segment.to) },
+      : segment.kind === 'quad'
+        ? { kind: 'quad', from: map(segment.from), control: map(segment.control), to: map(segment.to) }
+        : { kind: 'cubic', from: map(segment.from), control1: map(segment.control1), control2: map(segment.control2), to: map(segment.to) },
   );
 }

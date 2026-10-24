@@ -4,7 +4,7 @@ import type { Vec2, Vec3 } from '../../model/vectors';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { sample2 } from '../../lib/nurbs/curve2d';
-import type { FaceChart } from '../../geometry/wrapChart';
+import type { FaceChart } from '../../geometry/chartFrame';
 import { buildFaceChart } from '../../geometry/wrapChart';
 import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';

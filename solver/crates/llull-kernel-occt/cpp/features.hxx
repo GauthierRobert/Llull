@@ -75,7 +75,7 @@ std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, doub
 
 // Exact face of a surface description trimmed by (u, v) polygon loops (cpp/surfaces.cxx). `kind`: 0 B-spline (degU, degV, nU, nV, knot counts, rational
 // flag, poles i-major, weights, knots and multiplicities of u then v), 1 plane (origin, xDir, yDir), 2 cylinder (origin, axis, xDir, radius),
-// 3 cone (apex, axis, xDir, semi-angle). `loops`: count, then per loop its point count, an outer flag and u v pairs; no outer loop keeps a
+// 3 cone (apex, axis, xDir, semi-angle), 4 sphere (centre, axis, xDir, radius; u azimuth, v latitude), 5 torus (centre, axis, xDir, major, minor radius). `loops`: count, then per loop its point count, an outer flag and u v pairs; no outer loop keeps a
 // B-spline's natural boundary. Null when OCC refuses; a throw (-> Err) for inconsistent data.
 std::unique_ptr<Shape> surface_face(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops);
 // The face lifted along its normal from offset `from` to `to` (> from): a sewn solid. `direction` is the lift direction at the first loop vertex.
@@ -88,7 +88,12 @@ std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface
 // `kind` surface (as face_slab), or with `faces_only` the trimmed face itself. Null when OCC refuses; a throw (-> Err) for inconsistent data.
 std::unique_ptr<Shape> emboss_tools(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> regions, double from, double to,
                                     rust::Slice<const double> direction, double tolerance, bool faces_only);
-// `source` divided by the faces of `tools` that lie on it (scribe): same volume, more faces; persistent names follow the history.
+// The curves of `chains` (chain count, then per chain: start u v, segment count, segments as in `regions`; open chains allowed) as a compound of edges on the
+// `kind` surface: the tools of split_face_by_curves. Null when OCC refuses; a throw (-> Err) for inconsistent data.
+std::unique_ptr<Shape> pcurve_edge_tools(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> chains);
+// The same on the surface of face `face_index` (distinct faces of `source`, first-seen order), the chains in that face's own (u, v): any face kind.
+std::unique_ptr<Shape> face_edge_tools(const Shape &source, uint32_t face_index, rust::Slice<const double> chains);
+// `source` divided by the faces (or edges) of `tools` that lie on it (scribe, split): same volume, more faces; persistent names follow the history.
 std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools);
 
 // Closed solid of fitted lateral B-spline faces (surface_face kind-0 layouts concatenated, `lengths` = f64 count of each): the faces are sewn into

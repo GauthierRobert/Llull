@@ -1,0 +1,126 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "drum"
+ },
+ {
+  "command": "add_decal",
+  "params": {
+   "id": "$drum",
+   "text": "LLULL",
+   "at": [
+    20,
+    0,
+    0
+   ],
+   "normal": [
+    1,
+    0,
+    0
+   ],
+   "height": 5,
+   "width": 30,
+   "mapping": "wrap"
+  }
+ },
+ {
+  "command": "add_decal",
+  "params": {
+   "id": "$drum",
+   "text": "LLULL",
+   "at": [
+    20,
+    0,
+    10
+   ],
+   "normal": [
+    1,
+    0,
+    0
+   ],
+   "height": 5,
+   "width": 30,
+   "mapping": "wrap",
+   "font": "Fira Sans"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 40,
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "rod"
+ },
+ {
+  "command": "add_knurl",
+  "params": {
+   "id": "$rod",
+   "face": {
+    "faceNear": [
+     110,
+     0,
+     0
+    ]
+   },
+   "pattern": "straight",
+   "pitch": 1
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 40,
+   "position": [
+    200,
+    0,
+    0
+   ]
+  },
+  "as": "grip"
+ },
+ {
+  "command": "add_knurl",
+  "params": {
+   "id": "$grip",
+   "face": {
+    "faceNear": [
+     210,
+     0,
+     0
+    ]
+   },
+   "pattern": "straight",
+   "pitch": 1,
+   "model": "geometry"
+  },
+  "as": "knurled"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$knurled"
+  }
+ }
+]

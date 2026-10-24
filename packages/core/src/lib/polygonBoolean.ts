@@ -32,9 +32,9 @@ function paramOn(a: Vec2, b: Vec2, p: Vec2): number | null {
   return Math.hypot(foot[0] - p[0], foot[1] - p[1]) <= SNAP ? Math.min(1, Math.max(0, t)) : null;
 }
 
-/** `edges` of `ring` cut at every crossing / touching point with `other` (degenerate pieces dropped). */
-function splitAgainst(ring: readonly Vec2[], other: readonly Vec2[]): Edge[] {
-  return edgesOf(ring).flatMap(({ a, b }) => {
+/** `edges` cut at every crossing / touching point with `other` (degenerate pieces dropped). */
+function splitEdges(edges: readonly Edge[], other: readonly Vec2[]): Edge[] {
+  return edges.flatMap(({ a, b }) => {
     const ts = new Set<number>([0, 1]);
     for (const [c, d] of edgesOf(other).map((e) => [e.a, e.b] as const)) {
       for (const end of [c, d]) {
@@ -54,6 +54,9 @@ function splitAgainst(ring: readonly Vec2[], other: readonly Vec2[]): Edge[] {
     });
   });
 }
+
+/** `edges` of `ring` cut at every crossing / touching point with `other`. */
+const splitAgainst = (ring: readonly Vec2[], other: readonly Vec2[]): Edge[] => splitEdges(edgesOf(ring), other);
 
 type Relation = 'inside' | 'outside' | 'same' | 'opposite';
 
@@ -186,4 +189,45 @@ export function clipToConvex(subject: readonly Vec2[], clip: readonly Vec2[]): V
     });
   }
   return output.length >= 3 ? output : [];
+}
+
+interface Box {
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minY: number;
+  readonly maxY: number;
+}
+
+const boxOf = (ring: readonly Vec2[]): Box => ({
+  minX: Math.min(...ring.map((p) => p[0])) - SNAP,
+  maxX: Math.max(...ring.map((p) => p[0])) + SNAP,
+  minY: Math.min(...ring.map((p) => p[1])) - SNAP,
+  maxY: Math.max(...ring.map((p) => p[1])) + SNAP,
+});
+
+const boxesTouch = (a: Box, b: Box): boolean => a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
+
+/**
+ * Boundary of the union of simple polygons, holes included: the rings of the directed edges no other polygon covers, outer rings counter-clockwise, holes (gaps enclosed by the polygons)
+ * clockwise. Unlike `unionPolygons` it keeps the gaps. Polygons are cut only against those whose box touches theirs.
+ * @invariant a wall two polygons share (opposite directions) belongs to neither boundary; a doubled edge (same direction) is kept once
+ */
+export function unionBoundary(polygons: readonly (readonly Vec2[])[]): { outers: Vec2[][]; holes: Vec2[][] } {
+  const rings = polygons.filter((polygon) => polygon.length >= 3).map((polygon) => toCounterClockwise(polygon));
+  const boxes = rings.map(boxOf);
+  const kept: Edge[] = [];
+  rings.forEach((ring, i) => {
+    const near = rings.flatMap((_, j) => (j !== i && boxesTouch(boxes[i] as Box, boxes[j] as Box) ? [j] : []));
+    let edges: Edge[] = edgesOf(ring);
+    for (const j of near) edges = splitEdges(edges, rings[j] as Vec2[]);
+    for (const edge of edges) {
+      const dropped = near.some((j) => {
+        const relation = relationOf(edge, rings[j] as Vec2[]);
+        return relation === 'inside' || relation === 'opposite' || (relation === 'same' && j < i);
+      });
+      if (!dropped) kept.push(edge);
+    }
+  });
+  const loops = chain(kept).map(simplified);
+  return { outers: loops.filter((loop) => signedArea(loop) > 1e-9), holes: loops.filter((loop) => signedArea(loop) < -1e-9) };
 }

@@ -7,7 +7,8 @@ import { defineCommand, z } from '../schema';
 import { newEntity } from '../entity/newEntity';
 import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';
-import { namedDefault, wrapData } from './conventions';
+import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
+import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { defaultFitTolerance, isRejection, openFace, resolveChart } from './faceSession';
 import { faceRefField, placementField } from './schemas';
 import { isSketchFailure, sketchOutline, type SketchOutline } from './sketchProfiles';
@@ -19,15 +20,20 @@ const MAX_PROBES = 48;
 
 /**
  * @affects creates one \`nurbs_curve\` per closed loop and per open chain of the given entities (a text: one per glyph contour), each with \`onFace\`
- * @invariant develop is an isometry: chart length = 3D length (data.curves[i].maxLengthStrain 0, data.distortion.areaRatio 1); plane curves are exact, cylinder
- *   and cone curves are fitted within fitTolerance (reported per curve); ids are step-scoped
- * @failure unknown ids / not a solid / no face / sphere or freeform face with develop / region leaving the face / wrap beyond one turn / anchor off the face -> coded no-op
+ * @invariant develop is an isometry: chart length = 3D length (data.curves[i].maxLengthStrain 0, data.distortion.areaRatio 1); geodesic and parametric charts on a sphere or
+ *   torus stretch, and the stretch is measured (data.distortion) and held to maxLengthStrain; plane curves are exact, the others are fitted within fitTolerance (reported
+ *   per curve); ids are step-scoped
+ * @failure unknown ids / not a solid / no face / sphere or torus face with develop / freeform face / region leaving the face / wrap beyond one turn / stretch above the limit /
+ *   anchor off the face -> coded no-op
  */
 export const wrapToFace = defineCommand({
   name: 'wrap_to_face',
   description:
-    'Wrap 2D sketch entities onto a face of a solid as curves lying on that face, keeping every length (method develop: the face is unrolled like paper). ' +
-    'Works on plane, cylinder and cone faces; a sphere or freeform face refuses with WRP_FACE_NOT_DEVELOPABLE. `entityIds` are sketch curves (line, arc, circle, ' +
+    'Wrap 2D sketch entities onto a face of a solid as curves lying on that face. Method develop (default) keeps every length (the face is unrolled like paper) and works on ' +
+    'plane, cylinder and cone faces; on a sphere or torus it refuses with WRP_FACE_NOT_DEVELOPABLE. Method geodesic wraps by the exponential map about the anchor (radial lengths ' +
+    'exact, circumferential ones stretch by sin(rho / R) / (rho / R) on a sphere); method parametric scales (u, v) by the arc-length rates at the anchor; both work on sphere and ' +
+    'torus faces and report data.distortion { maxLengthStrain, meanLengthStrain, areaRatio, worst } and refuse above maxLengthStrain (WRP_DISTORTION_EXCEEDED). Freeform faces ' +
+    'are not built (WRP_METHOD_UNAVAILABLE). `entityIds` are sketch curves (line, arc, circle, ' +
     'rectangle, polyline, spline ...) or text created with a font (each glyph contour becomes a curve). `placement` puts a sketch point on a face point ' +
     '(anchor), turns the sketch (angleDeg) and may mirror it; the chart x axis follows the circumference (cylinder: +azimuth about the axis) and y the axis. ' +
     'Each closed loop and open chain becomes one nurbs_curve entity with its pcurve (`onFace`). The result lists per curve length3d (document units), chartLength, ' +
@@ -38,6 +44,13 @@ export const wrapToFace = defineCommand({
     face: faceRefField,
     entityIds: z.array(z.string()).min(1).max(MAX_ENTITIES).describe('Ids of the 2D sketch entities (or font texts) to wrap.'),
     placement: placementField.optional(),
+    maxLengthStrain: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Largest accepted relative length change of a geodesic or parametric chart (1 = 100 %). Default 0.02 (named default); develop faces have none.',
+      ),
     fitTolerance: z
       .number()
       .positive()
@@ -74,6 +87,26 @@ export const wrapToFace = defineCommand({
     }
     const outside = checkOnFace(session, probePoints(resolved.chart, pieces, MAX_PROBES), params.entityIds);
     if (outside !== null) return wrapRejection(doc, 'wrap_to_face', outside.code, outside.message, [...outside.ids], ['entityIds']);
+    const limit = params.maxLengthStrain ?? DEFAULT_MAX_LENGTH_STRAIN;
+    const distortion = distortionOf(
+      resolved.chart,
+      outlines,
+      mapped.filter((curve) => curve.closed).map((curve) => ({ pieces: curve.pieces, hole: curve.role === 'hole' })),
+    );
+    if (distortion.maxLengthStrain > limit) {
+      const refused = wrapRejection(
+        doc,
+        'wrap_to_face',
+        'WRP_DISTORTION_EXCEEDED',
+        distortionMessage(distortion, limit, resolved.chart.method),
+        [params.id],
+        ['placement'],
+      );
+      return {
+        ...refused,
+        data: { distortion: distortionData(distortion, resolved.chart, resolved.method, limit, params.maxLengthStrain === undefined) },
+      };
+    }
     let next: CadDocument = doc;
     const records: Array<Record<string, unknown>> = [];
     const created: string[] = [];
@@ -118,13 +151,8 @@ export const wrapToFace = defineCommand({
       doc,
       {
         curves: records,
-        distortion: {
-          maxLengthStrain: 0,
-          meanLengthStrain: 0,
-          areaRatio: 1,
-          method: 'develop',
-          note: 'plane, cylinder and cone develop without stretch',
-        },
+        distortion: distortionData(distortion, resolved.chart, resolved.method, limit, params.maxLengthStrain === undefined),
+        method: resolved.chart.method,
         exact: records.every((record) => record['exact'] === true),
         faceKind: session.surface.type,
         face: session.face,
@@ -135,21 +163,28 @@ export const wrapToFace = defineCommand({
       {
         unverified,
         provenance: {
-          method: 'develop (length-preserving chart)',
+          method:
+            resolved.chart.method === 'develop'
+              ? 'develop (length-preserving chart)'
+              : `${resolved.chart.method} chart (stretch measured, see data.distortion)`,
           ...(fontOutline?.font != null ? { font: fontOutline.font } : {}),
           inputs: { id: params.id, face: session.face, entityIds: params.entityIds, placement: params.placement ?? { method: 'develop' } },
         },
-        defaults:
-          params.fitTolerance === undefined
+        defaults: [
+          ...(params.fitTolerance === undefined
             ? [namedDefault('fitTolerance', tolerance, doc.units, 'llull WRP default (D-WRP-4): 1e-6 x the solid diagonal')]
-            : [],
+            : []),
+          ...(params.maxLengthStrain === undefined && resolved.chart.method !== 'develop'
+            ? [namedDefault('maxLengthStrain', DEFAULT_MAX_LENGTH_STRAIN, '1', MAX_LENGTH_STRAIN_SOURCE)]
+            : []),
+        ],
       },
     );
     const lengths = records.map((record) => (record['length3d'] as number).toPrecision(8)).join(', ');
     const result: CommandResult = {
       document: next,
       affected: created,
-      summary: `wrap_to_face: wrapped ${params.entityIds.length} entit${params.entityIds.length === 1 ? 'y' : 'ies'} onto ${session.surface.type} face ${session.face} of '${params.id}' (develop, lengths kept): ${created.length} curve(s) ${created.join(', ')}, 3D lengths ${lengths} ${doc.units}${unverified ? '; unverified font' : ''}.${session.note}`,
+      summary: `wrap_to_face: wrapped ${params.entityIds.length} entit${params.entityIds.length === 1 ? 'y' : 'ies'} onto ${session.surface.type} face ${session.face} of '${params.id}' (${resolved.chart.method === 'develop' ? 'develop, lengths kept' : `${resolved.chart.method}, max stretch ${(100 * distortion.maxLengthStrain).toPrecision(4)} %`}): ${created.length} curve(s) ${created.join(', ')}, 3D lengths ${lengths} ${doc.units}${unverified ? '; unverified font' : ''}.${session.note}`,
       data,
       ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}),
     };

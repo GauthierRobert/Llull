@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Entity } from '@core/model/types';
 import { decalPatch } from '@core/geometry/decal';
 import { localTriangles } from '@core/geometry/solidTriangles';
-import { rasterizeText } from '@lib/blockFont';
+import { decalImage } from '@core/geometry/decalImage';
 
 interface DecalItem {
   readonly id: string;
@@ -24,7 +24,7 @@ export function DecalOverlay({ entity }: { entity: Entity }): React.ReactElement
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(patch.positions, 3));
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(patch.uvs, 2));
       geometry.computeVertexNormals();
-      const image = rasterizeText(decal.text, decal.color, decal.background);
+      const image = decalImage(decal);
       const texture = new THREE.DataTexture(new Uint8Array(image.rgba), image.width, image.height, THREE.RGBAFormat);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.magFilter = THREE.LinearFilter;

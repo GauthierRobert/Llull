@@ -4,7 +4,6 @@
  */
 
 import type { NurbsCurve2Data } from '../lib/nurbs/curve2d';
-import type { FaceSlabRecipe } from './faceSlab';
 import type { Vec2, Vec3 } from './vectors';
 
 export type { NurbsCurve2Data };
@@ -29,7 +28,18 @@ export interface CurveOnFace {
   readonly chartLength: number;
 }
 
-/** A closed loop of a region in the surface's (u, v) plane: `start`, then segments, the last ending at `start`. */
+/**
+ * Wire form of the surface an emboss lifts from: plane = origin, xDir, yDir; cylinder = origin, axis, xDir, radius; cone = apex, axis, xDir, semi-angle;
+ * sphere = centre, polar axis, xDir, radius (u = azimuth from xDir, v = latitude); torus = centre, axis, xDir, major radius, minor radius (u = azimuth about
+ * the axis, v = angle round the tube, 0 on the outer equator); face = the surface of face `face` of the source itself, in the kernel's own (u, v) (split only, any face kind,
+ * `data` empty). (u, v) of the loops are the parameters of that frame.
+ */
+export interface EmbossSurface {
+  readonly type: 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'face';
+  readonly data: readonly number[];
+}
+
+/** A loop of a region in the surface's (u, v) plane (closed: the last segment ends at `start`), or an open chain of a split. */
 export interface UvLoop {
   readonly start: Vec2;
   readonly segments: ReadonlyArray<
@@ -45,15 +55,17 @@ export interface UvRegion {
 /**
  * Parameters of the `emboss` recipe node (`{ op: 'emboss'; source: ShapeRecipe } & EmbossParams`): emboss / deboss / scribe of `regions` on face `face` (unique index of `source` at evaluation). Exact kernels only (capability `emboss`):
  * emboss lifts each region along the face normal from 0 to `depth` and fuses it, deboss cuts from `-depth` to 0, scribe splits the face along
- * the region loops and removes no material.
- * @invariant `surface` is the wire form of `faceSlab` (plane / cylinder / cone) and the loops are in its (u, v); `direction` is the outward
+ * the region loops and removes no material, split divides the face along the open or closed `chains` (no regions) and removes no material.
+ * @invariant `surface` is an `EmbossSurface` and the loops are in its (u, v); `direction` is the outward
  *   normal at the first loop vertex (the lift sign); `depth` > 0 except scribe (0)
  */
 export interface EmbossParams {
   readonly face: number;
-  readonly surface: FaceSlabRecipe['surface'];
+  readonly surface: EmbossSurface;
   readonly regions: ReadonlyArray<UvRegion>;
-  readonly mode: 'emboss' | 'deboss' | 'scribe';
+  /** Split only: the curves (in (u, v)) the face is divided along; absent otherwise. */
+  readonly chains?: ReadonlyArray<UvLoop>;
+  readonly mode: 'emboss' | 'deboss' | 'scribe' | 'split';
   readonly depth: number;
   readonly direction: Vec3;
   /** Sewing / fit tolerance, document units. */

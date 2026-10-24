@@ -127,7 +127,7 @@ describe('lib/font hostile input (VC-WRP-20, fuzz corpus)', () => {
     const tagged = (tag: string): Uint8Array => new Uint8Array([...tag].map((c) => c.charCodeAt(0)).concat(new Array<number>(40).fill(0)));
     expect(code(new TextEncoder().encode('this is not a font file at all'))).toBe('WRP_FONT_PARSE');
     expect(code(new Uint8Array(0))).toBe('WRP_FONT_PARSE');
-    expect(code(tagged('OTTO'))).toBe('WRP_FONT_FORMAT_UNSUPPORTED');
+    expect(code(tagged('OTTO'))).toBe('WRP_FONT_PARSE');
     expect(code(tagged('wOFF'))).toBe('WRP_FONT_FORMAT_UNSUPPORTED');
     expect(code(tagged('wOF2'))).toBe('WRP_FONT_FORMAT_UNSUPPORTED');
     expect(code(tagged('ttcf'))).toBe('WRP_FONT_FORMAT_UNSUPPORTED');

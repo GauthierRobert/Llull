@@ -1,0 +1,67 @@
+[
+ {
+  "step": 0,
+  "command": "set_units",
+  "summary": "Units set to mm, precision 3."
+ },
+ {
+  "step": 1,
+  "command": "revolve_profile",
+  "summary": "revolve_profile: created revolution \"rev-2.1\" — 6-point profile, axis=z, angle=6.2832 rad, segments=64; world AABB min [-20, -20, 0] max [20, 20, 80]."
+ },
+ {
+  "step": 2,
+  "command": "add_text",
+  "summary": "add_text: created text entity text-3.1 — \"LLULL\" at [0, 0, 0], height 8, anchor 'center', font font-3.2."
+ },
+ {
+  "step": 3,
+  "command": "emboss_on_face",
+  "summary": "emboss_on_face: emboss of 1 profile(s) (5 region(s), area 67.12718 mm^2, depth 0.6) on cylinder face 3 of 'rev-2.1' → mesh 'mesh-4.1' (724 triangles), volume +40.88045 mm^3. Source solid consumed, profiles kept. Exact B-rep kept: 49 faces, 127 edges (inspect_topology lists them)."
+ },
+ {
+  "step": 4,
+  "command": "add_text",
+  "summary": "add_text: created text entity text-5.1 — \"SN 0042\" at [0, 0, 0], height 4, anchor 'center', font font-5.2."
+ },
+ {
+  "step": 5,
+  "command": "emboss_on_face",
+  "summary": "emboss_on_face: engrave of 1 profile(s) (6 region(s), area 32.49231 mm^2, depth 0.3, tool 0.5) on cylinder face 3 of 'mesh-4.1' → mesh 'mesh-6.1' (3168 triangles), volume -9.674587 mm^3. Source solid consumed, profiles kept. Exact B-rep kept: 666 faces, 1956 edges (inspect_topology lists them)."
+ },
+ {
+  "step": 6,
+  "command": "draw_rectangle",
+  "summary": "Drew rectangle rect-7.1 2×2 at [-1, -1, 0]."
+ },
+ {
+  "step": 7,
+  "command": "pattern_on_face",
+  "summary": "pattern_on_face: deboss of 1 profile(s) (16 instances, 16 region(s), area 64 mm^2, depth 0.4) on cylinder face 3 of 'mesh-6.1' → mesh 'mesh-8.1' (3432 triangles), volume -25.344 mm^3. Source solid consumed, profiles kept. Exact B-rep kept: 746 faces, 2154 edges (inspect_topology lists them)."
+ },
+ {
+  "step": 8,
+  "command": "create_curve_on_face",
+  "summary": "create_curve_on_face: isoparametric curve 'curve-9.1' on cylinder face 3 of 'mesh-8.1', length 125.6635 mm (fit deviation 0.0000525 mm)."
+ },
+ {
+  "step": 9,
+  "command": "split_face_by_curves",
+  "summary": "split_face_by_curves: 1 curve(s) divide 'mesh-8.1' (746 → 747 faces, 2 new) → mesh 'mesh-10.1' (3522 triangles); volume unchanged. Source solid consumed, curves kept. Exact B-rep kept: 747 faces, 2156 edges (inspect_topology lists them)."
+ },
+ {
+  "step": 10,
+  "command": "add_knurl",
+  "summary": "add_knurl: 42 V-grooves (pitch 1.495996, depth 0.673198, land 0.1496 mm) on cylinder face 1 of 'mesh-10.1' → mesh 'mesh-11.2' (4318 triangles), volume -372.5416 mm^3; WRP_KNURL_PITCH_ADJUSTED: asked 1.5. Source solid consumed. Exact B-rep kept: 913 faces, 2572 edges (inspect_topology lists them)."
+ },
+ {
+  "step": 11,
+  "command": "mass_properties",
+  "summary": "Volume of mesh-11.2 = 76078.74 mm³ (exact B-rep) (no mass: some parts have no material density and no density param was given). Centroid (document frame) = 0.005 mm, -0.005 mm, 31.281 mm; principal moments = 13821920, 35339360, 35349620 mm⁵ (per unit density); method exact."
+ },
+ {
+  "step": 12,
+  "command": "check_wrap",
+  "summary": "check_wrap: warn — 2 result(s) checked (1 curve(s), 3 emboss volume(s))."
+ }
+]

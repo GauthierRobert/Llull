@@ -8,7 +8,7 @@
 
 import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
 import { decalPatch } from '../../geometry/decal';
-import { rasterizeText } from '../../lib/blockFont';
+import { decalImage } from '../../geometry/decalImage';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { dot3, vec3At } from '../../lib/vec3';
 import { parseHexRgb } from '../../lib/isHexColor';
@@ -140,7 +140,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
         entityId: entity.id,
         positions,
         uvs: patch.uvs,
-        image: rasterizeText(decal.text, decal.color, decal.background),
+        image: decalImage(decal),
       });
     }
   }

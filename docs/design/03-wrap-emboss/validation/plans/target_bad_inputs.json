@@ -157,7 +157,8 @@
  {
   "command": "import_font",
   "params": {
-   "path": "fixtures/wrp/not-a-font.txt"
+   "path": "not-a-font.txt",
+   "base64": "dGhpcyBpcyBub3QgYSBmb250IGZpbGU="
   }
  }
 ]

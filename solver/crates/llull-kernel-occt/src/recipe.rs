@@ -17,7 +17,10 @@ use std::rc::Rc;
 
 mod floor;
 mod nodes;
+#[cfg(test)]
+mod nodes_tests;
 mod warp;
+mod wrap_nodes;
 
 pub const RECIPE_OPS: [&str; 17] = [
     "solid",
@@ -402,7 +405,7 @@ impl Evaluator {
             "blend" => self.blend(recipe),
             "shell" => self.shell(recipe),
             "featureCut" => self.feature_cut(recipe),
-            "faceSlab" => nodes::face_slab(recipe),
+            "faceSlab" => wrap_nodes::face_slab(recipe),
             "faceOp" => self.face_op(recipe),
             "emboss" => self.emboss(recipe),
             "faceBlend" => self.face_blend(recipe),

@@ -50,8 +50,24 @@ export interface FakeWrapOptions {
   readonly noProjectOnFace?: boolean;
   /** No exact mass properties (the volume change is not measured). */
   readonly noMass?: boolean;
+  /** Make `boolean` refuse (a kernel that cannot cut the grooves of a knurl). */
+  readonly refuseBoolean?: boolean;
   /** Multiply the emboss volume change (an internal-consistency failure for check_wrap). */
   readonly embossSkew?: number;
+  /** Multiply the volume a subtract removes (a tool that reaches beyond the face). */
+  readonly subtractSkew?: number;
+  /** A split that duplicates the face instead of dividing it (the summed face area grows). */
+  readonly splitGrowsArea?: boolean;
+  /** A split that divides nothing (the result has the faces of the source). */
+  readonly noSplit?: boolean;
+  /** Multiply the volume of a split result (a split that moves material). */
+  readonly splitVolumeSkew?: number;
+  /** `analyze` reports the result as not a valid closed solid. */
+  readonly invalidResult?: boolean;
+  /** `distance` answers null (the kernel cannot measure against the faces). */
+  readonly noDistance?: boolean;
+  /** `faceGeometry` reports every face as a freeform surface. */
+  readonly freeform?: boolean;
 }
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
@@ -132,6 +148,19 @@ function sphereShape(entity: Extract<Entity, { kind: 'sphere' }>): FakeShape {
   return { id: entity.id, volume: (4 / 3) * Math.PI * entity.radius ** 3, faces: [face] };
 }
 
+function torusShape(entity: Extract<Entity, { kind: 'torus' }>): FakeShape {
+  const [px, py, pz] = entity.position;
+  const { ringRadius, tubeRadius } = entity;
+  const face: FakeFace = {
+    name: `${entity.id}:surface`,
+    surface: { type: 'torus', center: [px, py, pz], axis: [0, 0, 1], major: ringRadius, minor: tubeRadius },
+    area: 4 * Math.PI * Math.PI * ringRadius * tubeRadius,
+    sample: [px + ringRadius + tubeRadius, py, pz],
+    contains: () => true,
+  };
+  return { id: entity.id, volume: 2 * Math.PI * Math.PI * ringRadius * tubeRadius * tubeRadius, faces: [face] };
+}
+
 /** Closest point of the face's surface to `p` (analytic), its outward normal and (u, v) in the surface's own frame. */
 function projectOnSurface(face: FakeFace, p: Vec3): FaceProjection {
   const s = face.surface;
@@ -168,8 +197,26 @@ function projectOnSurface(face: FakeFace, p: Vec3): FaceProjection {
     return {
       point: [s.center[0] + normal[0] * s.radius, s.center[1] + normal[1] * s.radius, s.center[2] + normal[2] * s.radius],
       normal,
-      uv: [0, 0],
+      uv: [Math.atan2(normal[1], normal[0]), Math.asin(Math.max(-1, Math.min(1, normal[2])))],
       distance: Math.abs(length - s.radius),
+    };
+  }
+  if (s.type === 'torus') {
+    const rel: Vec3 = [p[0] - s.center[0], p[1] - s.center[1], p[2] - s.center[2]];
+    const ring = Math.hypot(rel[0], rel[1]) || 1;
+    const radial: Vec3 = [rel[0] / ring, rel[1] / ring, 0];
+    const tube: Vec3 = [rel[0] - radial[0] * s.major, rel[1] - radial[1] * s.major, rel[2]];
+    const length = Math.hypot(...tube) || 1;
+    const normal: Vec3 = [tube[0] / length, tube[1] / length, tube[2] / length];
+    return {
+      point: [
+        s.center[0] + radial[0] * s.major + normal[0] * s.minor,
+        s.center[1] + radial[1] * s.major + normal[1] * s.minor,
+        s.center[2] + normal[2] * s.minor,
+      ],
+      normal,
+      uv: [Math.atan2(rel[1], rel[0]), Math.atan2(rel[2], ring - s.major)],
+      distance: Math.abs(length - s.minor),
     };
   }
   return { point: p, normal: [0, 0, 1], uv: [0, 0], distance: 0 };
@@ -207,6 +254,28 @@ function cannedProjection(shape: FakeShape, request: CurveProjectionRequest, opt
   return { curves, coverage };
 }
 
+/**
+ * Volume of one V-groove tool of a knurl inside its cylinder (the tool is a triangular extrusion named '<id>.g<k>' that rises half its depth above the surface and runs half
+ * its depth past both ends), by midpoint quadrature: independent of the closed form the command compares against.
+ */
+function grooveVolume(entity: { id: string; profile: readonly (readonly [number, number])[]; depth: number }): number | null {
+  if (!entity.id.includes('.g') || entity.profile.length !== 3) return null;
+  const [apexPoint, left, right] = entity.profile as [readonly [number, number], readonly [number, number], readonly [number, number]];
+  const apex = Math.hypot(apexPoint[0], apexPoint[1]);
+  const top = Math.hypot((left[0] + right[0]) / 2, (left[1] + right[1]) / 2);
+  const toothDepth = (top - apex) / 1.5;
+  const radius = apex + toothDepth;
+  const half = Math.hypot(left[0] - right[0], left[1] - right[1]) / 2 / (top - apex);
+  const steps = 20000;
+  const limit = radius;
+  let area = 0;
+  for (let k = 0; k < steps; k++) {
+    const x = -limit + ((k + 0.5) * 2 * limit) / steps;
+    area += Math.max(0, Math.sqrt(Math.max(0, radius * radius - x * x)) - (apex + Math.abs(x) / half)) * ((2 * limit) / steps);
+  }
+  return area * (entity.depth - toothDepth);
+}
+
 export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
   const mesh: MeshData = TETRA;
   const topologyOf = (shape: FakeShape): ShapeTopology => ({
@@ -235,11 +304,35 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
           return boxShape(entity);
         case 'sphere':
           return sphereShape(entity);
+        case 'torus':
+          return torusShape(entity);
+        case 'extrusion': {
+          const groove = grooveVolume(entity);
+          if (groove !== null) return { id: entity.id, volume: groove, faces: [] };
+          const area =
+            Math.abs(
+              entity.profile.reduce(
+                (sum, p, k) =>
+                  sum +
+                  p[0] * (entity.profile[(k + 1) % entity.profile.length] as [number, number])[1] -
+                  (entity.profile[(k + 1) % entity.profile.length] as [number, number])[0] * p[1],
+                0,
+              ),
+            ) / 2;
+          return { id: entity.id, volume: area * entity.depth, faces: [] };
+        }
         default:
           return null;
       }
     },
-    boolean: () => null,
+    boolean: (op, a, b) =>
+      options.refuseBoolean === true
+        ? null
+        : op === 'union'
+          ? { ...a, volume: a.volume + b.volume }
+          : op === 'subtract'
+            ? { ...a, volume: a.volume - b.volume * (options.subtractSkew ?? 1) }
+            : null,
     fillet: () => null,
     blend: () => null,
     chamfer: () => null,
@@ -250,6 +343,19 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
     topology: topologyOf,
     exportStep: () => null,
     release: () => undefined,
+    ...(options.invalidResult === true
+      ? {
+          analyze: (shape: FakeShape) => ({
+            valid: false,
+            status: 'fake invalid',
+            closed: false,
+            volume: shape.volume,
+            area: 0,
+            freeFaces: 0,
+            lumps: [],
+          }),
+        }
+      : {}),
     ...(options.noMass === true
       ? {}
       : {
@@ -265,6 +371,20 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
       ? {}
       : {
           emboss: (source: FakeShape, params: EmbossParams): FakeShape | null => {
+            if (params.mode === 'split') {
+              if (options.noSplit === true) return source;
+              const whole = source.faces[params.face] as FakeFace;
+              const pieces = (params.chains ?? []).length + 1;
+              const share = { ...whole, area: options.splitGrowsArea === true ? whole.area : whole.area / pieces };
+              return {
+                ...source,
+                volume: source.volume * (options.splitVolumeSkew ?? 1),
+                faces: [
+                  ...source.faces.map((face, index) => (index === params.face ? share : face)),
+                  ...Array.from({ length: pieces - 1 }, (_, k) => ({ ...share, name: `${source.id}:split${source.faces.length}.${k}` })),
+                ],
+              };
+            }
             const closed = embossClosedForm(params);
             return closed === null
               ? null
@@ -281,7 +401,14 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                 surface: face.surface.type === 'other' ? 'other' : face.surface.type,
                 area: face.area,
                 centroid: face.sample,
-                samples: [],
+                samples: [face.sample],
+                ...(face.surface.type === 'plane' ? { normal: face.surface.normal } : {}),
+                ...(face.surface.type === 'cylinder'
+                  ? { axis: { origin: face.surface.origin, dir: face.surface.axis }, radius: face.surface.radius }
+                  : {}),
+                ...(face.surface.type === 'sphere'
+                  ? { axis: { origin: face.surface.center, dir: [0, 0, 1] as Vec3 }, radius: face.surface.radius }
+                  : {}),
               })),
             faceContains: (shape, face, point) => {
               const target = shape.faces[face];
@@ -304,12 +431,22 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                         [0, 0],
                         [2 * Math.PI, 44.72135955],
                       ]
-                    : [
-                        [-30, -30],
-                        [30, 30],
-                      ];
+                    : target.surface.type === 'sphere'
+                      ? [
+                          [0, -Math.PI / 2],
+                          [2 * Math.PI, Math.PI / 2],
+                        ]
+                      : target.surface.type === 'torus'
+                        ? [
+                            [0, 0],
+                            [2 * Math.PI, 2 * Math.PI],
+                          ]
+                        : [
+                            [-30, -30],
+                            [30, 30],
+                          ];
               return {
-                surface: target.surface,
+                surface: options.freeform === true ? ({ type: 'other', kind: 'bspline' } as SurfaceParams) : target.surface,
                 uvBounds:
                   options.infiniteBounds === true
                     ? [
@@ -344,6 +481,23 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                     normal: [Math.cos(s.semiAngle) * Math.cos(u), Math.cos(s.semiAngle) * Math.sin(u), Math.sin(s.semiAngle)] as Vec3,
                   };
                 }
+                if (s.type === 'sphere') {
+                  const point: Vec3 = [
+                    s.center[0] + s.radius * Math.cos(v) * Math.cos(u),
+                    s.center[1] + s.radius * Math.cos(v) * Math.sin(u),
+                    s.center[2] + s.radius * Math.sin(v),
+                  ];
+                  return { point, normal: [Math.cos(v) * Math.cos(u), Math.cos(v) * Math.sin(u), Math.sin(v)] as Vec3 };
+                }
+                if (s.type === 'torus') {
+                  const ring = s.major + s.minor * Math.cos(v);
+                  const point: Vec3 = [
+                    s.center[0] + ring * Math.cos(u),
+                    s.center[1] + ring * Math.sin(u),
+                    s.center[2] + s.minor * Math.sin(v),
+                  ];
+                  return { point, normal: [Math.cos(v) * Math.cos(u), Math.cos(v) * Math.sin(u), Math.sin(v)] as Vec3 };
+                }
                 const origin = s.type === 'plane' ? s.origin : ([0, 0, 0] as Vec3);
                 return {
                   point: [origin[0] + u, origin[1] + v, origin[2]] as Vec3,
@@ -356,11 +510,13 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
             edgeSamples: () => null,
             edgeContinuity: () => null,
             distance: (shape, points) =>
-              points.map((point) => {
-                const hits = shape.faces.map((face, index) => ({ index, distance: projectOnSurface(face, point).distance }));
-                const best = hits.reduce((a, b) => (b.distance < a.distance ? b : a));
-                return { distance: best.distance, signed: best.distance, face: options.edgePick === true ? -1 : best.index };
-              }),
+              options.noDistance === true
+                ? null
+                : points.map((point) => {
+                    const hits = shape.faces.map((face, index) => ({ index, distance: projectOnSurface(face, point).distance }));
+                    const best = hits.reduce((a, b) => (b.distance < a.distance ? b : a));
+                    return { distance: best.distance, signed: best.distance, face: options.edgePick === true ? -1 : best.index };
+                  }),
             bspline: () => null,
             projectCurves: (shape, request) => (options.noProjection === true ? null : cannedProjection(shape, request, options)),
           },

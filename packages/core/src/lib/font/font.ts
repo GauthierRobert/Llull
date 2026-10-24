@@ -1,13 +1,17 @@
 /**
  * A parsed TrueType font (03 WRP M1): metrics, embedding permission, names and lazy glyph access over the original bytes.
  * @invariant parsing validates every table once; `parseFont` never throws (errors come back as `{ ok: false, code }`) and reads only inside `bytes`
- * @failure not a font / truncated / out-of-range table -> WRP_FONT_PARSE; CFF, WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED; fsType restricted ->
+ * @failure not a font / truncated / out-of-range table -> WRP_FONT_PARSE; CFF2, WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED; fsType restricted ->
  *   WRP_FONT_EMBEDDING_RESTRICTED; over 4 MB -> WRP_FONT_TOO_LARGE
  */
 
+import { readCff } from './cff';
 import { buildCmap } from './cmap';
 import { glyphContours, type GlyphSource } from './glyf';
+import { buildGposKerning } from './gpos';
 import { buildKerning } from './kern';
+import { isStrokeFont, readStrokeFont } from './stroke';
+import type { Vec2 } from '../../model/vectors';
 import { contourLoop, loopBox, type OutlineLoop } from './outline';
 import { FontError, type FontErrorCode } from './reader';
 import {
@@ -28,6 +32,12 @@ export { MAX_FONT_BYTES };
 const MAX_FONT_POINTS = 5_000_000;
 
 export interface ParsedFont {
+  /** truetype: quadratic `glyf` outlines; cff: cubic Compact Font Format outlines; stroke: the open-stroke engraving format of llull (`singleLine`). */
+  readonly format: 'truetype' | 'cff' | 'stroke';
+  /** Glyphs are open strokes (no closed outlines): engraved, never filled. */
+  readonly singleLine: boolean;
+  /** Strokes of a glyph in font units, y up; empty for outline fonts. */
+  readonly strokes: (glyph: number) => readonly (readonly Vec2[])[];
   readonly unitsPerEm: number;
   readonly numGlyphs: number;
   readonly ascender: number;
@@ -35,13 +45,13 @@ export interface ParsedFont {
   readonly lineGap: number;
   /** Cap height in font units and where it came from (OS/2 sCapHeight, else the height of the outline of 'H'). */
   readonly capHeight: number;
-  readonly capHeightSource: 'os2' | 'glyph_H';
+  readonly capHeightSource: 'os2' | 'glyph_H' | 'declared';
   readonly embedding: Embedding;
   readonly names: FontNames;
   /** Glyph index of a code point; 0 (`.notdef`) when the font has none. */
   readonly glyphIndex: (codePoint: number) => number;
   readonly advance: (glyph: number) => number;
-  /** Pair kerning in font units (0 without a `kern` pair). */
+  /** Pair kerning in font units (GPOS `kern` feature, else the legacy `kern` table; 0 without a pair). */
   readonly kerning: (left: number, right: number) => number;
   /** Closed loops of a glyph in font units, y up (outer loops clockwise); empty for a blank glyph. */
   readonly outline: (glyph: number) => readonly OutlineLoop[];
@@ -53,26 +63,51 @@ export type FontParse =
   | { readonly ok: true; readonly font: ParsedFont }
   | { readonly ok: false; readonly code: FontErrorCode; readonly message: string };
 
+function buildStroke(bytes: Uint8Array): ParsedFont {
+  const font = readStrokeFont(bytes);
+  return {
+    format: 'stroke',
+    singleLine: true,
+    strokes: font.strokes,
+    unitsPerEm: font.unitsPerEm,
+    numGlyphs: font.glyphCount,
+    ascender: font.ascender,
+    descender: font.descender,
+    lineGap: font.lineGap,
+    capHeight: font.capHeight,
+    capHeightSource: 'declared',
+    embedding: 'installable',
+    names: font.names,
+    glyphIndex: font.glyphIndex,
+    advance: font.advance,
+    kerning: () => 0,
+    outline: () => [],
+    scanGlyphs: () => undefined,
+  };
+}
+
 function build(bytes: Uint8Array): ParsedFont {
   if (bytes.length > MAX_FONT_BYTES)
     throw new FontError('WRP_FONT_TOO_LARGE', `font: ${bytes.length} bytes exceed the ${MAX_FONT_BYTES}-byte limit`);
+  if (isStrokeFont(bytes)) return buildStroke(bytes);
   const tables = readDirectory(bytes);
   const header = readHeader(tables);
   const permissions = readPermissions(tables);
-  const source: GlyphSource = {
-    glyf: requireTable(tables, 'glyf'),
-    loca: requireTable(tables, 'loca'),
-    longLoca: header.longLoca,
-    numGlyphs: header.numGlyphs,
-  };
-  if (source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
+  const cff = tables.flavor === 'cff' ? readCff(requireTable(tables, 'CFF ')) : null;
+  const source: GlyphSource | null =
+    cff === null
+      ? { glyf: requireTable(tables, 'glyf'), loca: requireTable(tables, 'loca'), longLoca: header.longLoca, numGlyphs: header.numGlyphs }
+      : null;
+  if (source !== null && source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
     throw new FontError('WRP_FONT_PARSE', 'loca: shorter than its glyph count requires');
   const glyphIndex = buildCmap(requireTable(tables, 'cmap'), header.numGlyphs);
   const cache = new Map<number, readonly OutlineLoop[]>();
+  const loopsOf = (glyph: number): readonly OutlineLoop[] =>
+    cff !== null ? cff.outline(glyph) : glyphContours(source as GlyphSource, glyph).map(contourLoop);
   const outline = (glyph: number): readonly OutlineLoop[] => {
     let loops = cache.get(glyph);
     if (loops === undefined) {
-      loops = glyphContours(source, glyph).map(contourLoop);
+      loops = loopsOf(glyph);
       cache.set(glyph, loops);
     }
     return loops;
@@ -88,6 +123,9 @@ function build(bytes: Uint8Array): ParsedFont {
     capHeightSource = 'glyph_H';
   }
   return {
+    format: tables.flavor,
+    singleLine: false,
+    strokes: () => [],
     unitsPerEm: header.unitsPerEm,
     numGlyphs: header.numGlyphs,
     ascender: header.ascender,
@@ -99,12 +137,15 @@ function build(bytes: Uint8Array): ParsedFont {
     names: readNames(tables),
     glyphIndex,
     advance: (glyph) => advanceOf(tables, header, glyph),
-    kerning: buildKerning(tables.table('kern')),
+    kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
     outline,
     scanGlyphs: () => {
       let points = 0;
       for (let glyph = 0; glyph < header.numGlyphs; glyph++) {
-        points += glyphContours(source, glyph).reduce((sum, contour) => sum + contour.length, 0);
+        points +=
+          cff !== null
+            ? cff.outline(glyph).reduce((sum, loop) => sum + loop.length, 0)
+            : glyphContours(source as GlyphSource, glyph).reduce((sum, contour) => sum + contour.length, 0);
         if (points > MAX_FONT_POINTS) throw new FontError('WRP_FONT_PARSE', `glyf: more than ${MAX_FONT_POINTS} points in the whole font`);
       }
     },

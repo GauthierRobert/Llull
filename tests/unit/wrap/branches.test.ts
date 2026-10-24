@@ -53,7 +53,7 @@ describe('face picks and kernel answers', () => {
     withKernel({ noGeometry: true });
     expectRefusal(line.doc, 'wrap_to_face', { id: base.id, face: FACE, entityIds: [line.id] }, 'WRP_FACE_NOT_FOUND');
     withKernel({});
-    const torus = make(emptyDoc(), 'add_torus', { ringRadius: 10, tubeRadius: 2 });
+    const torus = make(emptyDoc(), 'add_wedge', { size: [10, 10, 10] });
     const small = rectangleOn(torus.doc, 1, 1);
     expectRefusal(
       small.doc,

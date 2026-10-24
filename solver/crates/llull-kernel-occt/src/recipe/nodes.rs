@@ -7,13 +7,15 @@
 //! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier, 3 ellipse quarter [start, centre, end]), then its 2 / 3 / 4 / 3 xyz points.
 
 use super::floor::floor_edge_indices;
+use super::wrap_nodes::{loops_ok, surface_data_ok};
 use super::{number, place_entity, positive, refused, shape_of, vec3, EvalError, Evaluated, Evaluator};
 use crate::features;
+use crate::features_surface;
 use crate::{BooleanOp, Shape};
 use serde_json::Value;
 use std::rc::Rc;
 
-fn numbers(value: Option<&Value>) -> Option<Vec<f64>> {
+pub(super) fn numbers(value: Option<&Value>) -> Option<Vec<f64>> {
     value?.as_array()?.iter().map(Value::as_f64).collect()
 }
 
@@ -79,63 +81,6 @@ pub(super) fn loft(entity: &Value) -> Evaluated {
     place_entity(shape_of(features::skinned_solid(&rings, ruled))?, entity, [0.0; 3])
 }
 
-/// Largest count a surface description may declare (mirrors `packages/core/src/geometry/surfaceWire.ts`).
-const MAX_COUNT: f64 = 100_000.0;
-
-/// An integer in `[minimum, MAX_COUNT]` stored as a double, or `None` (NaN, fractional, out of range).
-fn count_of(value: Option<&f64>, minimum: f64) -> Option<usize> {
-    let value = *value?;
-    (value >= minimum && value <= MAX_COUNT && value.fract() == 0.0).then_some(value as usize)
-}
-
-/// Whether `data` is a consistent description of the surface `kind` (0 B-spline, 1 plane, 2 cylinder, 3 cone): the layout the C++ reads.
-fn surface_data_ok(kind: i32, data: &[f64]) -> bool {
-    match kind {
-        1 => data.len() == 9,
-        2 | 3 => data.len() == 10 && data[9] > 0.0,
-        0 => {
-            let (Some(_), Some(_)) = (count_of(data.first(), 1.0), count_of(data.get(1), 1.0)) else { return false };
-            let (Some(count_u), Some(count_v)) = (count_of(data.get(2), 2.0), count_of(data.get(3), 2.0)) else { return false };
-            let (Some(knots_u), Some(knots_v)) = (count_of(data.get(4), 2.0), count_of(data.get(5), 2.0)) else { return false };
-            let rational = match data.get(6) {
-                Some(flag) if *flag == 0.0 => 0,
-                Some(flag) if *flag == 1.0 => 1,
-                _ => return false,
-            };
-            let poles = count_u * count_v;
-            let head = 7 + 3 * poles + rational * poles;
-            data.len() == head + 2 * (knots_u + knots_v)
-                && data[head + knots_u..head + 2 * knots_u]
-                    .iter()
-                    .chain(&data[head + 2 * knots_u + knots_v..])
-                    .all(|m| count_of(Some(m), 1.0).is_some())
-        }
-        _ => false,
-    }
-}
-
-/// Whether `loops` is empty (the natural boundary) or a list of exactly one outer loop plus holes, each with >= 3 points, and nothing else.
-fn loops_ok(loops: &[f64]) -> bool {
-    if loops.is_empty() {
-        return true;
-    }
-    let Some(count) = count_of(loops.first(), 1.0) else { return false };
-    let (mut offset, mut outer) = (1_usize, 0_usize);
-    for _ in 0..count {
-        let Some(points) = count_of(loops.get(offset), 3.0) else { return false };
-        match loops.get(offset + 1) {
-            Some(flag) if *flag == 1.0 => outer += 1,
-            Some(flag) if *flag == 0.0 => {}
-            _ => return false,
-        }
-        offset += 2 + 2 * points;
-        if offset > loops.len() {
-            return false;
-        }
-    }
-    offset == loops.len() && outer == 1
-}
-
 /// A surface sheet (`nurbs_surface` leaf, capability `nurbsSurface`): the host sends `native.surface` (encoded clamped B-spline patch) and
 /// `native.loops` (its (u, v) trim loops, absent = the natural boundary); the face is placed like any entity. Without the payload it is refused.
 pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
@@ -145,89 +90,7 @@ pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
     if !surface_data_ok(0, &surface) || !loops_ok(&loops) {
         return refused();
     }
-    place_entity(shape_of(features::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
-}
-
-/// Flat number list of the `regions` of an `emboss` node (layout: `cpp/features.hxx`), or None when the JSON is not a list of regions of loops of
-/// lines and B-spline pcurves. The C++ side validates every count and join again.
-fn encode_regions(regions: Option<&Value>) -> Option<Vec<f64>> {
-    fn pair(value: Option<&Value>) -> Option<[f64; 2]> {
-        match numbers(value)?.as_slice() {
-            [u, v] => Some([*u, *v]),
-            _ => None,
-        }
-    }
-    let list = regions?.as_array()?;
-    let mut out = vec![list.len() as f64];
-    for region in list {
-        let mut loops = vec![(region.get("outer")?, 1.0)];
-        loops.extend(region.get("holes")?.as_array()?.iter().map(|hole| (hole, 0.0)));
-        out.push(loops.len() as f64);
-        for (lp, outer) in loops {
-            out.push(outer);
-            out.extend(pair(lp.get("start"))?);
-            let segments = lp.get("segments")?.as_array()?;
-            out.push(segments.len() as f64);
-            for segment in segments {
-                match segment.get("kind")?.as_str()? {
-                    "line" => {
-                        out.push(0.0);
-                        out.extend(pair(segment.get("to"))?);
-                    }
-                    "nurbs" => {
-                        out.push(1.0);
-                        let curve = segment.get("curve")?;
-                        let poles: Vec<[f64; 2]> =
-                            curve.get("poles")?.as_array()?.iter().map(|pole| pair(Some(pole))).collect::<Option<_>>()?;
-                        let weights = numbers(curve.get("weights"));
-                        let (knots, multiplicities) = (numbers(curve.get("knots"))?, numbers(curve.get("multiplicities"))?);
-                        out.extend([
-                            curve.get("degree")?.as_f64()?,
-                            poles.len() as f64,
-                            if weights.is_some() { 1.0 } else { 0.0 },
-                            knots.len() as f64,
-                        ]);
-                        out.extend(poles.iter().flatten());
-                        out.extend(weights.unwrap_or_default());
-                        out.extend(knots);
-                        out.extend(multiplicities);
-                    }
-                    _ => return None,
-                }
-            }
-        }
-    }
-    Some(out)
-}
-
-/// `faceSlab` (capability `faceSlab`): a trimmed face of a B-spline / plane / cylinder / cone (`surface.type` + `surface.data`, `loops`) lifted
-/// along its normal from offset `from` to `to` (a solid of constant thickness; `direction` = lift direction at the first loop vertex).
-pub(super) fn face_slab(recipe: &Value) -> Evaluated {
-    let Some(surface) = recipe.get("surface") else { return refused() };
-    let kind = match surface.get("type").and_then(Value::as_str) {
-        Some("bspline") => 0,
-        Some("plane") => 1,
-        Some("cylinder") => 2,
-        Some("cone") => 3,
-        _ => return refused(),
-    };
-    let (Some(data), Some(loops), Some(from), Some(to), Some(direction)) = (
-        numbers(surface.get("data")),
-        numbers(recipe.get("loops")),
-        number(recipe, "from"),
-        number(recipe, "to"),
-        vec3(recipe, "direction"),
-    ) else {
-        return refused();
-    };
-    if !surface_data_ok(kind, &data) || !loops_ok(&loops) || !from.is_finite() || !to.is_finite() {
-        return refused();
-    }
-    let tolerance = number(recipe, "tolerance").unwrap_or(1e-6);
-    if to.partial_cmp(&from) != Some(std::cmp::Ordering::Greater) || !positive(tolerance) {
-        return refused();
-    }
-    shape_of(features::face_slab(kind, &data, &loops, [from, to], direction, tolerance))
+    place_entity(shape_of(features_surface::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
 }
 
 /// The MakePipeShell fast path of a sweep (capability `pipeShell`, `native.pipeShell`): the host sends the spine and section as for a pipe plus the
@@ -570,45 +433,6 @@ impl Evaluator {
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
     }
 
-    /// `emboss` (03 WRP, `packages/core/src/model/wrap.ts`): one face-slab per region fused with (emboss), cut from (deboss) or splitting (scribe) the source.
-    /// The regions are (u, v) loops of lines and B-spline pcurves on the plane / cylinder / cone `surface`; the lift direction is the outward normal.
-    pub(super) fn emboss(&mut self, recipe: &Value) -> Evaluated {
-        let Some(source) = self.child(recipe, "source")? else { return refused() };
-        let Some(surface) = recipe.get("surface") else { return refused() };
-        let kind = match surface.get("type").and_then(Value::as_str) {
-            Some("plane") => 1,
-            Some("cylinder") => 2,
-            Some("cone") => 3,
-            _ => return refused(),
-        };
-        let (Some(data), Some(direction), Some(depth)) = (numbers(surface.get("data")), vec3(recipe, "direction"), number(recipe, "depth"))
-        else {
-            return refused();
-        };
-        let tolerance = number(recipe, "tolerance").unwrap_or(1e-6);
-        let Some(regions) = encode_regions(recipe.get("regions")) else { return refused() };
-        if !surface_data_ok(kind, &data) || !positive(tolerance) || !depth.is_finite() || depth < 0.0 {
-            return refused();
-        }
-        let mode = recipe.get("mode").and_then(Value::as_str).unwrap_or("");
-        let (range, faces_only) = match mode {
-            "emboss" if depth > 0.0 => ([0.0, depth], false),
-            "deboss" if depth > 0.0 => ([-depth, 0.0], false),
-            "scribe" => ([0.0, 1.0], true),
-            _ => return refused(),
-        };
-        let Some(tools) =
-            features::emboss_tools(kind, &data, &regions, range, direction, tolerance, faces_only).map_err(EvalError::Failure)?
-        else {
-            return refused();
-        };
-        match mode {
-            "emboss" => shape_of(crate::boolean(BooleanOp::Union, &source, &tools, true)),
-            "deboss" => shape_of(crate::boolean(BooleanOp::Subtract, &source, &tools, true)),
-            _ => shape_of(features::split_shape(&source, &tools)),
-        }
-    }
-
     /// `faceOp` (SC-F1, `packages/core/src/model/faceOps.ts`): draft, pushPull or splitFace on the source's unique faces.
     pub(super) fn face_op(&mut self, recipe: &Value) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
@@ -740,166 +564,4 @@ fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalEr
     };
     let length = number(pocket, "length").unwrap_or(f64::NAN);
     features::feature_prism_cut(source, &chain, origin, normal, &probes, length, &format!("pocket{rank}")).map_err(EvalError::Failure)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn volume(evaluated: Evaluated) -> f64 {
-        crate::mass_properties(&evaluated.unwrap().unwrap()).unwrap().volume
-    }
-
-    fn cube_leaf(size: f64) -> Value {
-        json!({ "op": "solid", "entity": { "kind": "box", "size": [size, size, size], "position": [0, 0, 0], "rotation": [0, 0, 0] } })
-    }
-
-    #[test]
-    fn a_feature_cut_tries_brep_feat_then_the_lowered_tool() {
-        let mut evaluator = Evaluator::new(16);
-        let tool = cube_leaf(1.0);
-        let lowered = json!({ "op": "featureCut", "mode": "subtract", "source": cube_leaf(2.0), "tool": tool });
-        assert!((volume(evaluator.evaluate(&lowered)) - 7.0).abs() < 1e-9);
-        let refused = json!({ "op": "featureCut", "mode": "subtract", "source": cube_leaf(2.0), "tool": null });
-        assert!(evaluator.evaluate(&refused).unwrap().is_none());
-        let profile = [0.0, 0.0, 1.5, 0.25, 0.0, 1.5, 0.25, 0.0, -1.5, 0.0, 0.0, -1.5];
-        let drilled = json!({
-            "op": "featureCut", "mode": "subtract", "source": cube_leaf(2.0), "tool": tool,
-            "holes": { "profiles": [profile], "origins": [[0, 0, 0]], "normal": [0, 0, 1] },
-        });
-        let expected = 8.0 - std::f64::consts::PI * 0.0625 * 2.0;
-        assert!((volume(evaluator.evaluate(&drilled)) - expected).abs() < 1e-9, "the BRepFeat revolution, not the tool");
-    }
-
-    #[test]
-    fn a_pocket_floor_fillet_adds_the_concave_fillet_material() {
-        let _serial = crate::serial_blends();
-        let mut evaluator = Evaluator::new(16);
-        let source =
-            json!({ "op": "solid", "entity": { "kind": "box", "size": [10, 10, 2], "position": [0, 0, 0], "rotation": [0, 0, 0] } });
-        let tool = json!({ "op": "solid", "entity": { "kind": "cylinder", "radius": 2, "height": 2, "position": [0, 0, 1], "rotation": [0, 0, 0] } });
-        let half = |from: [f64; 2], through: [f64; 2], to: [f64; 2]| json!({ "type": "arc", "points": [from, through, to] });
-        let floor = |radius: f64| {
-            json!({
-                "radius": radius, "floorDepth": 1, "origin": [0, 0, 1], "normal": [0, 0, 1], "xDir": [1, 0, 0],
-                "outlines": [[half([2.0, 0.0], [0.0, 2.0], [-2.0, 0.0]), half([-2.0, 0.0], [0.0, -2.0], [2.0, 0.0])]],
-            })
-        };
-        let pocket = |floor: Value| json!({ "op": "featureCut", "mode": "subtract", "source": source, "tool": tool, "floorFillet": floor });
-        let (pi, r, big_r) = (std::f64::consts::PI, 0.5, 2.0);
-        let material = 2.0 * pi * (r * r * (big_r - r / 2.0) - pi * r * r / 4.0 * (big_r - r) - r.powi(3) / 3.0);
-        let expected = 200.0 - 4.0 * pi + material;
-        assert!((volume(evaluator.evaluate(&pocket(floor(r)))) - expected).abs() < 1e-6, "Pappus volume of the floor fillet");
-        let nowhere =
-            json!({ "radius": r, "floorDepth": 0.25, "origin": [0, 0, 1], "normal": [0, 0, 1], "xDir": [1, 0, 0], "outlines": [] });
-        assert!(evaluator.evaluate(&pocket(nowhere)).unwrap().is_none(), "no floor edge = refused");
-    }
-
-    #[test]
-    fn a_sheet_leaf_and_a_face_slab_build_from_their_payloads() {
-        let mut evaluator = Evaluator::new(16);
-        // bilinear sheet over [0, 4] x [0, 3] (u, v in [0, 1]), trimmed to the middle half in u, placed 1 up in z
-        let surface = [
-            1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 4.0, 0.0, 0.0, 4.0, 3.0, 0.0, 0.0, 1.0, 2.0, 2.0, 0.0, 1.0,
-            2.0, 2.0,
-        ];
-        let trim = [1.0, 4.0, 1.0, 0.25, 0.0, 0.75, 0.0, 0.75, 1.0, 0.25, 1.0];
-        let sheet = |native: Value| json!({ "op": "solid", "entity": { "id": "s", "kind": "nurbs_surface", "position": [0, 0, 1], "rotation": [0, 0, 0], "native": native } });
-        let area = |evaluated: Evaluated| crate::mass_properties(&evaluated.unwrap().unwrap()).unwrap();
-        let whole = area(evaluator.evaluate(&sheet(json!({ "surface": surface }))));
-        assert!((whole.area - 12.0).abs() < 1e-9 && (whole.bounds[2] - 1.0).abs() < 1e-3, "placed sheet area {}", whole.area);
-        let trimmed = area(evaluator.evaluate(&sheet(json!({ "surface": surface, "loops": trim }))));
-        assert!((trimmed.area - 6.0).abs() < 1e-9, "trimmed sheet area {}", trimmed.area);
-        assert!(evaluator.evaluate(&sheet(json!({}))).unwrap().is_none(), "a sheet without its payload is refused");
-        let slab = json!({
-            "op": "faceSlab", "surface": { "type": "bspline", "data": surface }, "loops": trim, "from": 0.5, "to": 1.0, "direction": [0, 0, 1],
-        });
-        assert!((volume(evaluator.evaluate(&slab)) - 3.0).abs() < 1e-6, "slab = trimmed area x thickness");
-        let backwards = json!({ "op": "faceSlab", "surface": { "type": "plane", "data": [0, 0, 0, 1, 0, 0, 0, 1, 0] }, "loops": trim, "from": 1, "to": 1, "direction": [0, 0, 1] });
-        assert!(evaluator.evaluate(&backwards).unwrap().is_none());
-    }
-
-    #[test]
-    fn malformed_payloads_are_refused_before_the_kernel_reads_them() {
-        let mut evaluator = Evaluator::new(16);
-        let plane = json!({ "type": "plane", "data": [0, 0, 0, 1, 0, 0, 0, 1, 0] });
-        let square = json!([1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1]);
-        let slab = |surface: Value, loops: Value| json!({ "op": "faceSlab", "surface": surface, "loops": loops, "from": 0, "to": 1, "direction": [0, 0, 1] });
-        assert!((volume(evaluator.evaluate(&slab(plane.clone(), square.clone()))) - 1.0).abs() < 1e-9);
-        let refused = [
-            slab(plane.clone(), json!([1, 1e19, 1, 0, 0])),
-            slab(plane.clone(), json!([1, 4, 1, 0, 0])),
-            slab(plane.clone(), json!([2, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1])),
-            slab(plane.clone(), json!([1, 4, 0, 0, 0, 1, 0, 1, 1, 0, 1])),
-            slab(plane.clone(), json!([])),
-            slab(json!({ "type": "plane", "data": [0, 0, 0] }), square.clone()),
-            slab(json!({ "type": "cylinder", "data": [0, 0, 0, 0, 0, 1, 1, 0, 0, -1] }), square.clone()),
-            slab(json!({ "type": "bspline", "data": [1, 1, 1e19, 2, 2, 2, 0] }), square.clone()),
-            slab(json!({ "type": "bspline", "data": [] }), square.clone()),
-            slab(json!({ "type": "torus", "data": [] }), square.clone()),
-        ];
-        for recipe in &refused {
-            assert!(evaluator.evaluate(recipe).unwrap().is_none(), "{recipe}");
-        }
-        let sheet = json!({ "op": "solid", "entity": { "id": "s", "kind": "nurbs_surface", "position": [0, 0, 0], "rotation": [0, 0, 0], "native": { "surface": [1, 1, 2, 2, 2, 2, 0], "loops": [] } } });
-        assert!(evaluator.evaluate(&sheet).unwrap().is_none());
-    }
-
-    #[test]
-    fn freeform_leaves_build_from_the_host_payload() {
-        let mut evaluator = Evaluator::new(16);
-        let leaf = |entity: Value| json!({ "op": "solid", "entity": entity });
-        let square = |z: f64| -> Vec<f64> {
-            let corners = [[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0]];
-            corners.windows(2).flat_map(|pair| [0.0, pair[0][0], pair[0][1], z, pair[1][0], pair[1][1], z]).collect()
-        };
-        let loft = json!({ "kind": "loft", "native": { "chains": [square(0.0), square(2.0)], "ruled": true } });
-        assert!((volume(evaluator.evaluate(&leaf(loft))) - 8.0).abs() < 1e-6);
-        // the same loft from B-spline sections (degree 1, five poles, closed square): volume 8; malformed B-spline data falls back to the chains
-        let bspline_square = |z: f64| -> Vec<f64> {
-            let corners = [[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0]];
-            let mut data = vec![1.0, 5.0, 5.0, 0.0, 0.0];
-            data.extend(corners.iter().flat_map(|corner| [corner[0], corner[1], z]));
-            data.extend([0.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0, 1.0, 1.0, 2.0]);
-            data
-        };
-        let exact = json!({ "kind": "loft", "native": { "bsplines": [bspline_square(0.0), bspline_square(2.0)], "chains": [square(0.0), square(2.0)], "ruled": true } });
-        assert!((volume(evaluator.evaluate(&leaf(exact))) - 8.0).abs() < 1e-6, "B-spline sections");
-        let malformed =
-            json!({ "kind": "loft", "native": { "bsplines": [[1.0, 5.0], [1.0]], "chains": [square(0.0), square(2.0)], "ruled": true } });
-        assert!((volume(evaluator.evaluate(&leaf(malformed))) - 8.0).abs() < 1e-6, "fallback to the chains");
-        let sweep = json!({ "kind": "sweep", "native": { "spine": [0, 0, 0, 0, 0, 0, 2], "chain": square(0.0) } });
-        assert!((volume(evaluator.evaluate(&leaf(sweep))) - 8.0).abs() < 1e-6);
-        // fitted lateral faces (capability sheetSolid): the four sides of a 2 x 2 x 2 prism are sewn and capped; a bad tolerance or malformed face is refused
-        let side = |a: [f64; 2], b: [f64; 2]| {
-            let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];
-            data.extend([a[0], a[1], 0.0, a[0], a[1], 2.0, b[0], b[1], 0.0, b[0], b[1], 2.0]);
-            data.extend([0.0, 1.0, 2.0, 2.0, 0.0, 1.0, 2.0, 2.0]);
-            data
-        };
-        let faces = vec![
-            side([-1.0, -1.0], [1.0, -1.0]),
-            side([1.0, -1.0], [1.0, 1.0]),
-            side([1.0, 1.0], [-1.0, 1.0]),
-            side([-1.0, 1.0], [-1.0, -1.0]),
-        ];
-        let fitted = json!({ "kind": "sweep", "native": { "faces": faces, "tolerance": 1e-6 } });
-        assert!((volume(evaluator.evaluate(&leaf(fitted))) - 8.0).abs() < 1e-9, "fitted faces");
-        let bad_tolerance = json!({ "kind": "sweep", "native": { "faces": [[1.0]], "tolerance": 1e-6 } });
-        assert!(evaluator.evaluate(&leaf(bad_tolerance)).unwrap().is_none(), "malformed face data is refused");
-        let tetra = json!({ "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] });
-        let faceted = json!({ "kind": "subdivision", "native": { "patches": [0.0], "triangles": tetra } });
-        assert!((volume(evaluator.evaluate(&leaf(faceted))) - 1.0 / 6.0).abs() < 1e-9, "bad patches fall back to the triangles");
-        let extrusion = json!({ "kind": "extrusion", "profile": [[1, 1], [-1, 1], [-1, -1], [1, -1]], "depth": 3, "chain": square(0.0) });
-        assert!((volume(evaluator.evaluate(&leaf(extrusion))) - 12.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn a_thread_tool_marks_every_recipe_built_on_it() {
-        let groove = json!({ "op": "solid", "entity": { "kind": "mesh", "threadTool": true } });
-        let union = json!({ "op": "boolean", "boolean": "union", "a": cube_leaf(1.0), "b": { "op": "place", "source": groove } });
-        assert!(thread_bearing(&union));
-        assert!(!thread_bearing(&json!({ "op": "blend", "sources": [cube_leaf(1.0), cube_leaf(2.0)] })));
-    }
 }

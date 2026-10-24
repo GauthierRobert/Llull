@@ -8,7 +8,7 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { Vec2, Vec3 } from '../../model/vectors';
 import { segmentEnd, segmentLength, segmentStart, type PlaneSegment } from '../../geometry/planeSegments';
 import { curve3d, extentOf, isMappingError, lengthOnFace, mapPieces, pcurveOf } from '../../geometry/wrapCurves';
-import type { FaceChart } from '../../geometry/wrapChart';
+import type { FaceChart } from '../../geometry/chartFrame';
 import type { UvLoop, UvRegion } from '../../model/wrap';
 import type { ChartRegion, SketchOutline } from './sketchProfiles';
 import type { FaceSession } from './faceSession';

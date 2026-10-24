@@ -77,7 +77,7 @@ describe('import_font / list_fonts (VC-WRP-19, 20)', () => {
     expectRefusal(
       doc,
       'import_font',
-      { base64: uint8ArrayToBase64(new TextEncoder().encode('OTTO and the rest of a CFF font file....')) },
+      { base64: uint8ArrayToBase64(new TextEncoder().encode('wOFF and the rest of a web font file......')) },
       'WRP_FONT_FORMAT_UNSUPPORTED',
     );
     expectRefusal(doc, 'import_font', { base64: uint8ArrayToBase64(withFsType(firaBytes(), 2)) }, 'WRP_FONT_EMBEDDING_RESTRICTED');

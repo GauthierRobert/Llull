@@ -1,7 +1,8 @@
 /**
- * Closed-form volume change of an emboss / deboss on a plane, cylinder or cone face (03 WRP, TECHNICAL_SPEC §5.3): a normal offset by t scales the face area by
- * 1 + t k (k = the circumferential curvature, 0 on a plane), so a region of area A lifted by d adds A d + k-integral d^2 / 2:
- *   plane A d · cylinder A d (1 ± d / 2r) · cone A d ± (d^2 / 2) cos(alpha) A_uv   (+ for material outside a convex face, - for a deboss; signs flip on a bore).
+ * Closed-form volume change of an emboss / deboss on a plane, cylinder, cone, sphere or torus face (03 WRP, TECHNICAL_SPEC §5.3): a normal offset by t scales the face area
+ * by 1 + t k (k = the circumferential curvature, 0 on a plane), so a region of area A lifted by d adds A d + k-integral d^2 / 2:
+ *   plane A d · cylinder A d (1 ± d / 2r) · cone A d ± (d^2 / 2) cos(alpha) A_uv   (+ for material outside a convex face, - for a deboss; signs flip on a bore)
+ *   sphere A (e + e^2 / R + e^3 / 3 R^2) · torus R (r e + e^2 / 2) A_uv + ((r + e)^3 - r^3) / 3 B   with e the signed offset along the surface normal and B = the integral of cos v over the region.
  * @invariant computed from the stored recipe only, independent of the kernel's mass integration, so it can check it (check_wrap)
  */
 
@@ -11,6 +12,7 @@ import { curveDomain } from '../lib/nurbs/evaluate';
 import { dot3, cross3, normalize3, scale3, add3 } from '../lib/vec3';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { EmbossParams, UvLoop } from '../model/wrap';
+import { integrateDu } from './uvIntegrals';
 
 export interface UvAreas {
   /** Area of the loop in the (u, v) plane (absolute). */
@@ -79,6 +81,23 @@ export interface EmbossClosedForm {
 }
 
 /** The closed form of a node, or null for a scribe-only node's volume (0 is returned) / an unreadable surface. */
+/** Integral over the regions of the area element F'(v) du dv, F given: minus the loop integral of F du, orientation-corrected (holes subtract). */
+function regionQuantity(regions: EmbossParams['regions'], antiderivative: (v: number) => number): number {
+  const loopQuantity = (loop: UvLoop): number => -(Math.sign(loopIntegrals(loop).area) || 1) * integrateDu(loop, antiderivative);
+  return regions.reduce(
+    (total, region) => total + loopQuantity(region.outer) - region.holes.reduce((sum, hole) => sum + loopQuantity(hole), 0),
+    0,
+  );
+}
+
+/** Unit normal Su x Sv of a sphere or torus wire at (u, v): outward from the sphere / the tube. */
+function curvedNormal(data: readonly number[], [u, v]: Vec2): Vec3 {
+  const axis = normalize3([data[3] as number, data[4] as number, data[5] as number]);
+  const x = normalize3([data[6] as number, data[7] as number, data[8] as number]);
+  const radial = add3(scale3(x, Math.cos(u)), scale3(cross3(axis, x), Math.sin(u)));
+  return add3(scale3(radial, Math.cos(v)), scale3(axis, Math.sin(v)));
+}
+
 export function embossClosedForm(
   node: Pick<EmbossParams, 'surface' | 'regions' | 'mode' | 'depth' | 'direction'>,
 ): EmbossClosedForm | null {
@@ -113,6 +132,19 @@ export function embossClosedForm(
     const convex = dot3(node.direction, normal) > 0;
     const area = Math.sin(alpha) * vWeighted;
     return { area, delta: volume(sign * (area * d + (convex ? 1 : -1) * sign * (d * d * 0.5) * Math.cos(alpha) * uv)), convex };
+  }
+  if ((type === 'sphere' && data.length === 10) || (type === 'torus' && data.length === 11)) {
+    const radius = type === 'sphere' ? (data[9] as number) : (data[10] as number);
+    const major = type === 'torus' ? (data[9] as number) : 0;
+    const cosInt = regionQuantity(node.regions, Math.sin);
+    const convex = dot3(node.direction, curvedNormal(data, firstLoop.start)) > 0;
+    const area = type === 'sphere' ? radius * radius * cosInt : radius * (major * uv + radius * cosInt);
+    const offsetVolume = (e: number): number =>
+      type === 'sphere'
+        ? area * (e + (e * e) / radius + (e * e * e) / (3 * radius * radius))
+        : major * (radius * e + (e * e) / 2) * uv + (((radius + e) ** 3 - radius ** 3) / 3) * cosInt;
+    const reach = (node.mode === 'deboss' ? -1 : 1) * (convex ? 1 : -1) * d;
+    return { area, delta: volume(sign * Math.abs(offsetVolume(reach))), convex };
   }
   return null;
 }

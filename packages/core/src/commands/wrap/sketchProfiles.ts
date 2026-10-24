@@ -4,7 +4,6 @@
  */
 
 import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
-import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { JOINT_TOLERANCE } from '../../geometry/curveSegments';
 import {
   mapSegment2,
@@ -16,10 +15,10 @@ import {
   segmentStart,
   type PlaneSegment,
 } from '../../geometry/planeSegments';
-import { outlineErrorCode, textOutline } from '../../geometry/textOutline';
 import { planeToWorld } from '../../geometry/workPlane';
 import { entityCurves } from '../solids/sketchCurves';
 import { isFontFailure, loadFont } from './fontStore';
+import { isOutlineFailure, outlineOfText, planeShift } from './textPath';
 
 export interface ChartRegion {
   readonly outer: readonly PlaneSegment[];
@@ -63,12 +62,6 @@ const closes = (chain: readonly PlaneSegment[]): boolean => {
   return Math.hypot(a[0] - b[0], a[1] - b[1]) <= JOINT_TOLERANCE;
 };
 
-/** The entity's plane coordinates: its local frame plus the entity position expressed in its own plane. */
-function planeShift(entity: Entity): Vec2 {
-  const [x, y] = inverseEulerXYZ(entity.position, entity.rotation);
-  return [x, y];
-}
-
 function worldMap(entity: Entity): (point: Vec2) => Vec3 {
   const [dx, dy] = planeShift(entity);
   return (point) => planeToWorld(entity.position, entity.rotation, [point[0] - dx, point[1] - dy]);
@@ -78,13 +71,17 @@ function textOutlineOf(doc: CadDocument, entity: Extract<Entity, { kind: 'text' 
   if (entity.font === undefined) return { code: 'WRP_TEXT_NO_FONT', message: `text '${entity.id}' has no font, so it has no outline` };
   const loaded = loadFont(doc, entity.font);
   if (isFontFailure(loaded)) return { code: loaded.code, message: loaded.message };
-  const outline = textOutline(entity, loaded.font);
-  if ('error' in outline) return { code: outlineErrorCode(outline.error), message: outline.message };
+  const outline = outlineOfText(doc, entity, loaded.font);
+  if (isOutlineFailure(outline)) return outline;
   const [dx, dy] = planeShift(entity);
   const shift = (point: Vec2): Vec2 => [point[0] + dx, point[1] + dy];
   const chain = (loop: readonly Parameters<typeof segmentOfOutline>[0][]): PlaneSegment[] =>
     loop.map((segment) => mapSegment2(segmentOfOutline(segment), shift));
   const regions: ChartRegion[] = outline.regions.map((region) => ({ outer: chain(region.outer), holes: region.holes.map(chain) }));
+  // a single-line font draws open strokes: they stay chains (wrap_to_face wraps them, emboss_on_face engraves them)
+  const strokes: PlaneSegment[][] = outline.strokes.map((stroke) =>
+    stroke.slice(1).map((to, k): PlaneSegment => ({ kind: 'line', from: shift(stroke[k] as Vec2), to: shift(to) })),
+  );
   if (
     regions.reduce((sum, region) => sum + region.outer.length + region.holes.reduce((n, hole) => n + hole.length, 0), 0) >
     MAX_OUTLINE_SEGMENTS
@@ -94,11 +91,11 @@ function textOutlineOf(doc: CadDocument, entity: Extract<Entity, { kind: 'text' 
     id: entity.id,
     kind: 'text',
     regions,
-    open: [],
+    open: strokes.filter((chain) => chain.length > 0),
     area: outline.area,
     unverified: !loaded.record.provenance.verified,
     font: { family: loaded.record.family, sha256: loaded.record.blob },
-    united: outline.united,
+    united: outline.united || outline.bent,
     missingCharacters: outline.layout.missing,
     toWorld: worldMap(entity),
   };

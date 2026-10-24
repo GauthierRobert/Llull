@@ -62,11 +62,13 @@ export function segmentOfCurve(segment: CurveSegment<Vec2>): PlaneSegment {
   return arc === null ? { kind: 'line', from: segment.points[0], to: segment.points[2] } : { kind: 'nurbs', curve: arc };
 }
 
-/** A font outline segment (line or quadratic) as a planar segment. */
+/** A font outline segment (line, quadratic or cubic) as a planar segment. */
 export function segmentOfOutline(segment: OutlineSegment): PlaneSegment {
   return segment.kind === 'line'
     ? { kind: 'line', from: segment.from, to: segment.to }
-    : { kind: 'nurbs', curve: bezier2([segment.from, segment.control, segment.to]) };
+    : segment.kind === 'quad'
+      ? { kind: 'nurbs', curve: bezier2([segment.from, segment.control, segment.to]) }
+      : { kind: 'nurbs', curve: bezier2([segment.from, segment.control1, segment.control2, segment.to]) };
 }
 
 /** The segment with every point mapped by the affine map `f`. */

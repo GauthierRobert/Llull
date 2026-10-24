@@ -35,8 +35,8 @@ export function embossNodes(recipe: ShapeRecipe): EmbossNode[] {
 
 /** The node's parameters without `op` and `source`. */
 export function embossParamsOf(node: EmbossNode): EmbossParams {
-  const { face, surface, regions, mode, depth, direction, tolerance } = node;
-  return { face, surface, regions, mode, depth, direction, tolerance };
+  const { face, surface, regions, chains, mode, depth, direction, tolerance } = node;
+  return { face, surface, regions, ...(chains === undefined ? {} : { chains }), mode, depth, direction, tolerance };
 }
 
 /** Cache-key text of the node given the key of its source. */
@@ -84,23 +84,33 @@ export function embossProblem(node: Record<string, unknown>): string | null {
   const fail = (why: string): string => `emboss: ${why}`;
   if (!Number.isInteger(node['face']) || (node['face'] as number) < 0) return fail('face must be a non-negative integer');
   const surface = node['surface'];
-  if (!isRecord(surface) || !['plane', 'cylinder', 'cone'].includes(String(surface['type'])))
-    return fail('surface.type must be plane, cylinder or cone');
+  if (!isRecord(surface) || !['plane', 'cylinder', 'cone', 'sphere', 'torus', 'face'].includes(String(surface['type'])))
+    return fail('surface.type must be plane, cylinder, cone, sphere, torus or face');
   if (!Array.isArray(surface['data']) || !surface['data'].every(isFiniteNumber))
     return fail('surface.data must be a list of finite numbers');
   const layout = surfaceDataProblem(surface['type'] as 'plane', surface['data'] as number[]);
   if (layout !== null) return fail(layout);
   const mode = node['mode'];
-  if (mode !== 'emboss' && mode !== 'deboss' && mode !== 'scribe') return fail('mode must be emboss, deboss or scribe');
+  if (mode !== 'emboss' && mode !== 'deboss' && mode !== 'scribe' && mode !== 'split')
+    return fail('mode must be emboss, deboss, scribe or split');
+  if ((surface['type'] === 'face') !== (mode === 'split')) return fail("surface.type 'face' goes with mode split, and only with it");
   const depth = node['depth'];
-  if (!isFiniteNumber(depth) || depth < 0 || (mode !== 'scribe' && !(depth > 0)))
-    return fail('depth must be finite, > 0 (0 only for scribe)');
+  const flat = mode === 'scribe' || mode === 'split';
+  if (!isFiniteNumber(depth) || depth < 0 || (!flat && !(depth > 0)))
+    return fail('depth must be finite, > 0 (0 only for scribe and split)');
   if (!isVec3(node['direction'])) return fail('direction must be a finite Vec3');
   if (!isFiniteNumber(node['tolerance']) || !(node['tolerance'] > 0)) return fail('tolerance must be > 0');
+  const budget = { segments: 0 };
+  if (mode === 'split') {
+    const chains = node['chains'];
+    if (!Array.isArray(chains) || chains.length === 0 || chains.length > MAX_REGIONS)
+      return fail(`chains must be a list of 1..${MAX_REGIONS}`);
+    const problem = (chains as unknown[]).map((chain) => loopProblem(chain as UvLoop, budget)).find((why) => why !== null);
+    return problem === undefined || problem === null ? null : fail(problem);
+  }
   const regions = node['regions'];
   if (!Array.isArray(regions) || regions.length === 0 || regions.length > MAX_REGIONS)
     return fail(`regions must be a list of 1..${MAX_REGIONS}`);
-  const budget = { segments: 0 };
   for (const region of regions as unknown[]) {
     if (!isRecord(region) || !Array.isArray(region['holes'])) return fail('a region needs an outer loop and a holes list');
     const problem = [region['outer'], ...(region['holes'] as unknown[])]

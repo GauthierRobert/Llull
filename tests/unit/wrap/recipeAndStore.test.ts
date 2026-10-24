@@ -13,6 +13,8 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { CadDocument, ShapeRecipe } from '@core/model/types';
 import { expectRefusal } from '../../helpers/commandAssertions';
+import { setGeometryKernel } from '@core/geometry/kernel';
+import { fakeWrapKernel } from '../../helpers/fakeWrapKernel';
 import { cylinder, emptyDoc, FACE, labelOn, make, meshOf, rectangleOn, useFakeKernel } from './support';
 import { FIRA_SHA256, firaBytes, firaProvider } from './fixtures';
 
@@ -74,7 +76,7 @@ describe('the emboss recipe node', () => {
     const bad = (extra: Record<string, unknown>): string | null => validateShapeRecipe({ ...node(), ...extra });
     expect(bad({ face: -1 })).toContain('face');
     expect(bad({ face: 1.5 })).toContain('face');
-    expect(bad({ surface: { type: 'sphere', data: [] } })).toContain('surface.type');
+    expect(bad({ surface: { type: 'bspline', data: [] } })).toContain('surface.type');
     expect(bad({ surface: { type: 'cylinder', data: ['x'] } })).toContain('surface.data');
     expect(bad({ surface: { type: 'cylinder', data: [1, 2, 3] } })).toContain('cylinder');
     expect(bad({ mode: 'engrave' })).toContain('mode');
@@ -295,7 +297,9 @@ describe('sketch outlines for the face commands', () => {
 
   it('extrude_profile of font text needs a kernel that can build prisms and unions', () => {
     const label = labelOn(emptyDoc(), 'LL');
+    setGeometryKernel(fakeWrapKernel({ refuseBoolean: true }));
     expectRefusal(label.doc, 'extrude_profile', { id: label.id, depth: 1 }, 'WRP_KERNEL_BUILD_FAILED', 'id');
+    setGeometryKernel(fakeWrapKernel());
     const blank = {
       ...label.doc,
       entities: {
