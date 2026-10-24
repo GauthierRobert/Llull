@@ -200,18 +200,26 @@ fn search_candidate(
 }
 
 /// Searches every first-move candidate on the global rayon pool; `progress` gets the expansions done so far (all candidates) every
-/// [`PROGRESS_EVERY`] expansions. `max_expansions` is the budget of each candidate.
-pub fn search(p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u64)) -> Outcome {
-    search_in(None, p, max_expansions, progress)
+/// [`PROGRESS_EVERY`] expansions. `max_expansions` is the budget of each candidate, further capped at `max_total` / candidates.
+pub fn search(p: &RouteProblem, max_expansions: u64, max_total: u64, progress: &mut dyn FnMut(u64)) -> Outcome {
+    search_in(None, p, max_expansions, max_total, progress)
 }
 
 /// [`search`] on `pool` (None = the global pool): the result never depends on the pool's thread count.
-pub fn search_in(pool: Option<&ThreadPool>, p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u64)) -> Outcome {
+pub fn search_in(
+    pool: Option<&ThreadPool>,
+    p: &RouteProblem,
+    max_expansions: u64,
+    max_total: u64,
+    progress: &mut dyn FnMut(u64),
+) -> Outcome {
     if p.from.axis == p.goal.axis && p.goal.cell == [0, 0, 0] {
         return Outcome::Found(Found { bend_cells: vec![], cost: 0, expansions: 0, candidate: p.from.axis, optimal: true });
     }
     let tree = ObstacleTree::build(&p.obstacles);
     let firsts = first_moves(p, &tree);
+    // The memory guard is split evenly, so the budget of a candidate (and with it every result) stays independent of timing.
+    let max_expansions = max_expansions.min(max_total / (firsts.len().max(1) as u64));
     let bound = AtomicU64::new(NO_BOUND);
     let (sender, receiver) = mpsc::channel::<()>();
     let (tree_ref, bound_ref, firsts_ref) = (&tree, &bound, &firsts);
@@ -336,7 +344,7 @@ mod tests {
 
     #[test]
     fn free_space_route_has_manhattan_length_and_two_bends() {
-        let route = found(search(&sc_rte_08(vec![]), 1_000_000, &mut |_| {}));
+        let route = found(search(&sc_rte_08(vec![]), 1_000_000, u64::MAX, &mut |_| {}));
         assert_eq!(route.bend_cells, vec![[56, 0, 0], [56, 40, 0]]);
         assert_eq!(route.cost, 5_600_000 + 2_000_000);
         assert!(route.optimal);
@@ -348,7 +356,7 @@ mod tests {
     #[test]
     fn a_box_on_the_first_leg_is_avoided_at_a_higher_cost() {
         let wall = ObstacleBox { id: "box".into(), min: [1_000_000, -500_000, -500_000], max: [1_100_000, 500_000, 500_000] };
-        let route = found(search(&sc_rte_08(vec![wall.clone()]), 1_000_000, &mut |_| {}));
+        let route = found(search(&sc_rte_08(vec![wall.clone()]), 1_000_000, u64::MAX, &mut |_| {}));
         assert!(route.cost > 7_600_000);
         let p = sc_rte_08(vec![wall]);
         let mut points = vec![p.cell_point([0, 0, 0])];
@@ -361,31 +369,70 @@ mod tests {
     #[test]
     fn budget_and_no_path_are_reported_with_their_expansions() {
         // Every candidate stops at its own budget: 3 expansions each, 5 candidates.
-        assert_eq!(search(&sc_rte_08(vec![]), 3, &mut |_| {}), Outcome::Budget { expansions: 15 });
+        assert_eq!(search(&sc_rte_08(vec![]), 3, u64::MAX, &mut |_| {}), Outcome::Budget { expansions: 15 });
         let wall = ObstacleBox { id: "wall".into(), min: [1_500_000, -9_000_000, -9_000_000], max: [1_510_000, 9_000_000, 9_000_000] };
         let mut p = sc_rte_08(vec![wall]);
         p.bounds = Bounds { min: [-2, -2, -2], max: [58, 42, 18] };
-        assert!(matches!(search(&p, 10_000_000, &mut |_| {}), Outcome::NoPath { expansions } if expansions > 0));
+        assert!(matches!(search(&p, 10_000_000, u64::MAX, &mut |_| {}), Outcome::NoPath { expansions } if expansions > 0));
+    }
+
+    /// The U-shaped pocket of the TypeScript candidate tests (centre / size in mm, inflated by the DN100 reach 107.15 mm).
+    fn pocket() -> Vec<ObstacleBox> {
+        let reach = 107_150;
+        [([1950, -1500, -1500], [2050, 1500, 1500]), ([500, 1400, -1500], [2000, 1500, 1500]), ([500, -1500, -1500], [2000, -1400, 1500])]
+            .iter()
+            .enumerate()
+            .map(|(index, (min, max))| ObstacleBox {
+                id: format!("pocket{index}"),
+                min: std::array::from_fn(|d| min[d] * 1000 - reach),
+                max: std::array::from_fn(|d| max[d] * 1000 + reach),
+            })
+            .collect()
     }
 
     #[test]
     fn the_result_does_not_depend_on_the_thread_count_or_the_run() {
-        for seed in [1, 7, 42, 2026] {
-            let p = sc_rte_08(seeded(seed, 12));
-            let reference = search_in(Some(&pool(1)), &p, 1_000_000, &mut |_| {});
-            for threads in [2, 5, 8] {
-                for _ in 0..3 {
-                    assert_eq!(search_in(Some(&pool(threads)), &p, 1_000_000, &mut |_| {}), reference, "seed {seed}, {threads} threads");
+        // Seeded boxes and the pocket, at budgets from tiny (losing candidates stop on budget) to ample.
+        let mut problems: Vec<(String, RouteProblem)> =
+            [1, 7, 42, 2026].iter().map(|&seed| (format!("seed {seed}"), sc_rte_08(seeded(seed, 12)))).collect();
+        problems.push(("pocket".to_string(), sc_rte_08(pocket())));
+        for (name, p) in &problems {
+            for budget in [60, 150, 500, 984, 1_000_000] {
+                let reference = search_in(Some(&pool(1)), p, budget, u64::MAX, &mut |_| {});
+                for threads in [2, 5, 8] {
+                    for _ in 0..3 {
+                        assert_eq!(
+                            search_in(Some(&pool(threads)), p, budget, u64::MAX, &mut |_| {}),
+                            reference,
+                            "{name}, budget {budget}, {threads} threads"
+                        );
+                    }
                 }
             }
         }
     }
 
     #[test]
+    fn a_losing_candidate_that_stops_on_budget_makes_the_pocket_route_unproven() {
+        let p = sc_rte_08(pocket());
+        let unproven = found(search(&p, 500, u64::MAX, &mut |_| {}));
+        assert_eq!((unproven.candidate, unproven.expansions, unproven.optimal, unproven.cost), (2, 104, false, 8_600_000));
+        let proven = found(search(&p, 2000, u64::MAX, &mut |_| {}));
+        assert_eq!((proven.candidate, proven.expansions, proven.optimal, proven.cost), (0, 984, true, 8_600_000));
+    }
+
+    #[test]
+    fn the_total_ceiling_is_split_evenly_over_the_candidates() {
+        // Free space has 5 first moves: a total of 15 is 3 expansions each, the same as a per-candidate budget of 3.
+        let p = sc_rte_08(vec![]);
+        assert_eq!(search(&p, 1_000_000, 15, &mut |_| {}), search(&p, 3, u64::MAX, &mut |_| {}));
+    }
+
+    #[test]
     fn the_candidates_find_the_cost_of_an_unpartitioned_search() {
         // A first-move partition keeps the optimum: the best candidate cost is the cheapest cost any single candidate reaches.
         let p = sc_rte_08(seeded(42, 12));
-        let best = found(search(&p, 1_000_000, &mut |_| {}));
+        let best = found(search(&p, 1_000_000, u64::MAX, &mut |_| {}));
         let tree = ObstacleTree::build(&p.obstacles);
         let costs: Vec<i64> = first_moves(&p, &tree)
             .into_iter()
@@ -414,7 +461,7 @@ mod tests {
     fn a_start_state_that_is_the_goal_is_the_straight_route() {
         let mut p = sc_rte_08(vec![]);
         p.goal = Goal { cell: [0, 0, 0], axis: 0 };
-        let route = found(search(&p, 10, &mut |_| {}));
+        let route = found(search(&p, 10, u64::MAX, &mut |_| {}));
         assert_eq!((route.bend_cells.len(), route.cost, route.expansions, route.candidate), (0, 0, 0, 0));
     }
 
