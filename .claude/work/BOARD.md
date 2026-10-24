@@ -99,12 +99,12 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
   (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
-  + draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
-  for the new entities. _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL_SPEC §14): desktop-app hands-on pass on face handles / pole
+  - draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
+    for the new entities. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
   selection + falloff drag, chip layout, bench (VC-18) + 200-face preview timing, true G1 patches, bevel across vertex chains, OCC reason in
-  `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net`, M7. _Lane 2 + 1 + native_ _deps: —_
+  `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net`, M7. \_Lane 2 + 1 + native* _deps: —_
 - `[TODO]` **DES-5b** 05 IMP left after M0–M3 (done 2026-10-23, §13): M4 native `llull-field` (Rust, tape format §13.3, parity §13.6) +
   `llull-compute field` + `server/src/native/fieldEngine.ts` installer (closes pack plans refused at their written voxel by the TS 2^21 grid
   budget); M5 scalar fields + graded laws, `infill_solid`, `edit_field` / `delete_field` / `regenerate_implicit_bodies`, `add_graph_lattice`,
