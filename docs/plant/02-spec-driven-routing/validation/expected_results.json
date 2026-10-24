@@ -592,7 +592,7 @@
         "withoutKernel": "CMD_KERNEL_UNAVAILABLE",
         "meshKernel": "XCH_WRITER_UNAVAILABLE",
         "products": 3,
-        "nativeVolumesMm3": [29222833.73, 18962007.28, 2387402.16]
+        "nativeVolumesMm3": [29222833.73, 18962007.28, 2449885.61]
       },
       "tolerance": "exact; volumes 1e-6 relative",
       "reference": "README D24",

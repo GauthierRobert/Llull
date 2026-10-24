@@ -4,9 +4,9 @@
  * llull-kernel binary is not built.
  *
  * Hand derivation (README D24): OD 114.3 so r = 57.15 mm. Pipe pieces are solid cylinders (display geometry): PIPE 1 from x 0 to 3000 - 152 = 2848,
- * PIPE 2 from z 152 to 2000 = 1848. V = pi r^2 L: 10260.82645 mm2 x 2848 = 29,222,833.73 mm3 and x 1848 = 18,962,007.28 mm3. The elbow section is the
- * 16-point polygon inscribed in the pipe circle (area 8 r^2 sin(pi/8) = 9999.12775 mm2, centre at the bend radius 152 from the bend axis), revolved
- * pi/2 about the axis: Pappus V = (pi/2) x 152 x 9999.12775 = 2,387,402.16 mm3. Total 50,572,243.17 mm3.
+ * PIPE 2 from z 152 to 2000 = 1848. V = pi r^2 L: 10260.82645 mm2 x 2848 = 29,222,833.73 mm3 and x 1848 = 18,962,007.28 mm3. The elbow is a true torus segment (R 152, r 57.15, the
+ * section is a circle, not the 16-gon of the display mesh) swept pi/2: V = (pi/2) x 152 x pi r^2 = 2,449,885.61 mm3 (Pappus), area (pi/2) x 152 x 2 pi r +
+ * 2 pi r^2. Total 50,634,726.63 mm3.
  */
 
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -22,7 +22,9 @@ const RADIUS = 57.15;
 const BEND_RADIUS = 152;
 const PIPE_1 = Math.PI * RADIUS ** 2 * 2848;
 const PIPE_2 = Math.PI * RADIUS ** 2 * 1848;
-const ELBOW = (Math.PI / 2) * BEND_RADIUS * 8 * RADIUS ** 2 * Math.sin(Math.PI / 8);
+/** Elbow: volume and area of the torus segment (end discs included). */
+const ELBOW_AREA = (Math.PI / 2) * BEND_RADIUS * 2 * Math.PI * RADIUS + 2 * Math.PI * RADIUS ** 2;
+const ELBOW = (Math.PI / 2) * BEND_RADIUS * Math.PI * RADIUS ** 2;
 
 function smallLine(): CadDocument {
   const line = cs150Line(100, '6001');
@@ -61,7 +63,7 @@ describeNative('export_pipe_step on the native OCCT kernel (VC-RTE-42)', () => {
       faceted: string[];
       skipped: string[];
       selfCheck: { band: string; missing: string[]; products: number };
-      gvp: Array<{ product: string; volume: number }>;
+      gvp: Array<{ product: string; volume: number; area: number }>;
     };
     expect(data.solidCount).toBe(3);
     expect(data.skipped).toEqual([]);
@@ -69,13 +71,23 @@ describeNative('export_pipe_step on the native OCCT kernel (VC-RTE-42)', () => {
     expect(data.selfCheck).toMatchObject({ band: 'green', missing: [], products: 3 });
     expect(data.step).toContain('ISO-10303-21');
     expect(data.step).toContain('MANIFOLD_SOLID_BREP');
+    // The elbow is a true torus segment (R 152, r 57.15), not a revolved polygon: its end circles are those of the pipe pieces (radius 57.15), and no
+    // other circle than those and the torus seams (152 +- 57.15) exists, so the welds close (a 16-gon end face would not match a pipe's circle).
+    expect(data.step).toMatch(/TOROIDAL_SURFACE\('',#\d+,152\.,57\.15\)/);
+    const radii = [...data.step.matchAll(/CIRCLE\('',#\d+,([\d.]+)\)/g)].map((match) => Number(match[1]));
+    expect(radii.filter((radius) => radius === RADIUS).length).toBeGreaterThanOrEqual(6);
+    expect(
+      radii.every((radius) => [RADIUS, BEND_RADIUS + RADIUS, BEND_RADIUS - RADIUS].some((wanted) => Math.abs(radius - wanted) < 1e-9)),
+    ).toBe(true);
     const volumes = data.gvp.map((entry) => entry.volume).sort((a, b) => a - b);
     const expected = [ELBOW, PIPE_2, PIPE_1];
     expect(volumes).toHaveLength(3);
     volumes.forEach((volume, index) =>
       expect(Math.abs(volume - (expected[index] as number))).toBeLessThanOrEqual(1e-6 * (expected[index] as number)),
     );
+    const elbowArea = data.gvp.find((entry) => Math.abs(entry.volume - ELBOW) < 1e-6 * ELBOW)?.area ?? 0;
+    expect(Math.abs(elbowArea - ELBOW_AREA)).toBeLessThanOrEqual(1e-6 * ELBOW_AREA);
     const total = volumes.reduce((sum, volume) => sum + volume, 0);
-    expect(Math.abs(total - 50572243.17485)).toBeLessThanOrEqual(1e-6 * 50572243.17485);
+    expect(Math.abs(total - 50634726.62934)).toBeLessThanOrEqual(1e-6 * 50634726.62934);
   }, 180_000);
 });

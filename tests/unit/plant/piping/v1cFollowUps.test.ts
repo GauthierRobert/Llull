@@ -11,7 +11,7 @@ import type { PipeSupportElement } from '@aec/building/types';
 import { reconcileRunSupports } from '@aec/plant/piping/supportReconcile';
 import { apply, data, ok } from '../../../helpers/commandAssertions';
 import { expectNoOp } from '../../../helpers/expectNoOp';
-import { addTie, cs150Document } from './rteFixtures';
+import { addTie, cs150Document, cs150Line } from './rteFixtures';
 
 /** A DN80 hot line (CS150) from x 0 to 6000 at height `z`, routed on `doc`; the sequence keeps line numbers apart. */
 function lineAt(doc: CadDocument, z: number, sequence: string, y: number): { doc: CadDocument; runId: string } {
@@ -118,9 +118,13 @@ describe('a support whose run is gone: load and live agree (V1c, SC-RTE-23)', ()
 
   it('load: the file with the orphans opens (no throw), keeps the supports, and check_pipe_supports says exactly what it says live', () => {
     const { doc, runId } = supported();
-    const live = orphaned(doc, runId);
+    const live = reconcileRunSupports(doc, orphaned(doc, runId)).document;
     const loaded = deserializeDocument(serializeDocument(live));
     expect(supportsOf(loaded)).toHaveLength(3);
+    // The same document, geometry included: the orphaned supports have no entities live (as after a load).
+    expect(loaded.entities).toEqual(live.entities);
+    expect(loaded.order).toEqual(live.order);
+    expect(supportsOf(live).every((support) => support.entityIds.length === 0)).toBe(true);
     const fromLive = ok(live, 'check_pipe_supports', {});
     const fromFile = ok(loaded, 'check_pipe_supports', {});
     expect(fromFile.data).toEqual(fromLive.data);
@@ -176,6 +180,20 @@ describe('move_building_element names the run a support rests on (V1c, SC-RTE-24
     expect(result.summary).toContain('edit_route');
   });
 
+  it('an orphaned support says so (RTE_SUPPORT_ORPHAN) instead of claiming it rests on the missing run', () => {
+    const base = apply(cs150Document(), 'add_level', { name: 'Ground', elevation: 0, height: 3000 });
+    const { doc, runId } = lineAt(base, 3000, '4001', 0);
+    const placed = apply(doc, 'add_pipe_support', { runId, at: [[3000, 0, 3000]] });
+    const piping = placed.plant?.piping as NonNullable<NonNullable<CadDocument['plant']>['piping']>;
+    const { [runId]: gone, ...runs } = piping.runs;
+    void gone;
+    const orphan: CadDocument = { ...placed, plant: { ...placed.plant, piping: { ...piping, runs, runOrder: [], entityIds: {} } } };
+    const support = supportsOf(orphan)[0] as PipeSupportElement;
+    const result = execute(orphan, 'move_building_element', { elementIds: [support.id], delta: [0, 100] });
+    expectNoOp(result, orphan, `${support.id} is orphaned (RTE_SUPPORT_ORPHAN)`);
+    expect(result.summary).not.toContain('rests on');
+  });
+
   it('a support on a building pipe names the pipe; an opening still names its wall, a steel column or a rafter', () => {
     const base = ok(cs150Document(), 'add_pipe_run', {
       points: [
@@ -191,5 +209,46 @@ describe('move_building_element names the run a support rests on (V1c, SC-RTE-24
     const support = supportsOf(placed)[0] as PipeSupportElement;
     const result = execute(placed, 'move_building_element', { elementIds: [support.id], delta: [0, 100] });
     expectNoOp(result, placed, `${support.id} rests on pipe ${pipeId}`);
+  });
+});
+
+describe('the elbow carries its true circular section for the exact kernel (V1c review, D24)', () => {
+  it('curves = two half arcs of the pipe circle (radius 57.15 about the bend radius 152) while profile stays the 16-gon display tessellation', () => {
+    const line = cs150Line(100, '6001');
+    const tie = addTie(line.doc, 'STEP-A', [0, 0, 0], [1, 0, 0]);
+    const withBend = apply(tie.doc, 'route_pipe', {
+      lineId: line.lineId,
+      from: { portId: tie.id },
+      legs: [
+        { direction: '+X', length: 3000 },
+        { direction: '+Z', length: 2000 },
+      ],
+    });
+    const elbows = Object.values(withBend.entities).filter(
+      (entity) => entity.kind === 'revolution' && entity.tags?.includes('piping-part:elbow'),
+    );
+    expect(elbows.length).toBeGreaterThan(0);
+    for (const elbow of elbows) {
+      if (elbow.kind !== 'revolution') continue;
+      expect(elbow.profile).toHaveLength(16);
+      expect(elbow.curves).toEqual([
+        {
+          type: 'arc',
+          points: [
+            [expect.closeTo(209.15, 6), 0],
+            [152, expect.closeTo(57.15, 6)],
+            [expect.closeTo(94.85, 6), 0],
+          ],
+        },
+        {
+          type: 'arc',
+          points: [
+            [expect.closeTo(94.85, 6), 0],
+            [152, expect.closeTo(-57.15, 6)],
+            [expect.closeTo(209.15, 6), 0],
+          ],
+        },
+      ]);
+    }
   });
 });

@@ -109,7 +109,12 @@ export function reconcileRunSupports(previous: CadDocument, next: CadDocument): 
   const changed = Object.values(supportsByRun(next))
     .flat()
     .filter((support) => geometryOf(previous, support) !== geometryOf(next, support));
-  if (changed.length === 0) return { document: next, notes: orphaned, affected: [] };
+  if (changed.length === 0) {
+    // Orphaned supports lose their geometry exactly as on load (no carrier, no entities): live and loaded documents are the same document.
+    if (orphanNotes.length === 0) return { document: next, notes: orphaned, affected: [] };
+    const document = regenerateBuilding(next, next.building);
+    return { document, notes: orphaned, affected: [...new Set(orphanSupports(next, next.building).map((support) => support.id))] };
+  }
   const followed = followCarrier(next, changed);
   return { document: followed.document, notes: [...followed.notes, ...orphaned], affected: followed.affected };
 }

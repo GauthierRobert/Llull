@@ -17,7 +17,7 @@ export type CarrierDoc = Pick<CadDocument, 'building' | 'plant' | 'units'>;
 /**
  * The level a run belongs to (V1c): the highest building level whose elevation is at or below the lowest point of the run centreline; a run below every
  * level belongs to the lowest one; '' when the building has no level. The one rule for every consumer that needs a run's level (the support layout, the
- * level filter of check_pipe_supports, add_pipe_support). A run is one level as a whole: a riser belongs to the level it starts on.
+ * level filter of check_pipe_supports, add_pipe_support). A run is one level as a whole: the level of its lowest point (a riser belongs to the level it rises from).
  * @invariant elevation is in document units, like the level elevations
  */
 function levelOfElevation(building: CadDocument['building'], elevation: number): string {
