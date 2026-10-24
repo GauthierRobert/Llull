@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 llull-protocol = { path = "../llull-protocol" }
+rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

@@ -1,4 +1,4 @@
-//! `llull-compute route <job-folder>` (plant 02 RTE §2.A).
+//! `llull-compute route <job-folder>` (plant 02 RTE §2 (false when a first-move candidate ran out of budget while it could still beat the route) and  (axis index 0..5 of the winning first move).A).
 //!
 //! # Input: `job.json` (camelCase)
 //!
@@ -9,7 +9,8 @@
 //!
 //! `{ "status": "found" | "no_path" | "budget", "problemHash", "expansions", "engine": "llull-route", "version" }` plus, when found,
 //! `"pisUm": [[x, y, z], ...]` (world µm), `"lengthUm"` (port to port, stubs included), `"bends"`, `"cost"` (integer µm) and
-//! `"optimal": true`. `no_path` / `budget` are results, not job errors: the host turns them into `RTE_AUTOROUTE_NO_PATH` /
+//! `"optimal"` (false when a first-move candidate ran out of budget while it could still beat the route) and `"candidate"` (axis index 0..5
+//! of the winning first move; `expansions` is the winner's, `maxExpansions` the budget of each candidate). `no_path` / `budget` are results, not job errors: the host turns them into `RTE_AUTOROUTE_NO_PATH` /
 //! `RTE_AUTOROUTE_BUDGET`.
 //!
 //! # Events (stdout NDJSON, `llull-protocol`)
@@ -65,7 +66,8 @@ pub fn result_json(problem: &RouteProblem, problem_hash: &str, outcome: &Outcome
                 object.insert("lengthUm".into(), json!(length));
                 object.insert("bends".into(), json!(pis.len()));
                 object.insert("cost".into(), json!(found.cost));
-                object.insert("optimal".into(), json!(true));
+                object.insert("optimal".into(), json!(found.optimal));
+                object.insert("candidate".into(), json!(found.candidate));
             }
             value
         }
@@ -129,7 +131,7 @@ mod tests {
         let folder = job_folder("budget", &format!(r#"{{"problemHash":"h","problem":{SC_RTE_08},"maxExpansions":2}}"#));
         run(&folder, &mut Vec::new()).unwrap();
         let result: serde_json::Value = serde_json::from_slice(&fs::read(folder.join("result.json")).unwrap()).unwrap();
-        assert_eq!((result["status"].as_str(), result["expansions"].as_u64()), (Some("budget"), Some(2)));
+        assert_eq!((result["status"].as_str(), result["expansions"].as_u64()), (Some("budget"), Some(10)));
         fs::remove_dir_all(&folder).unwrap();
         let bad = job_folder("bad", &format!(r#"{{"problemHash":"h","problem":{}}}"#, SC_RTE_08.replace("\"version\":1", "\"version\":2")));
         assert_eq!(run(&bad, &mut Vec::new()).unwrap_err().code, "NATIVE_JOB_INPUT");
