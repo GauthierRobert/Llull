@@ -55,17 +55,22 @@
       "plan": "plans/sc-rte-02-pump-discharge-gate-valve.json",
       "command": "insert_inline_component + piping_takeoff",
       "expected": {
-        "valveFacesZ": [1685.5, 1914.5],
+        "facesZ": [1685.5, 1914.5],
+        "legCutLengthsMm": [527.5, 354.5],
         "cutLengthMm": [527.5, 354.5, 2696, 2696, 1196, 2769],
-        "flangeWN": 4,
-        "gasket": 4,
+        "valveGate": 1,
+        "flangeWeldNeck": 4,
+        "gasketSpiralWound": 4,
         "boltSet": 4,
-        "buttWelds": 12
+        "studs": 32,
+        "buttWelds": 12,
+        "flangedJoints": 4
       },
       "tolerance": { "abs": 0.01 },
       "reference": "README D2; B16.10 CL150 NPS 4 gate F-F 229 (S16, S17)",
       "grade": "A",
-      "frs": ["FR-RTE-07"]
+      "frs": ["FR-RTE-07"],
+      "test": "tests/unit/plant/piping/inlineComponents.test.ts"
     },
     {
       "id": "VC-RTE-05",
@@ -75,20 +80,21 @@
       "tolerance": "exact",
       "reference": "explicit param maxHandwheelCentreHeight 1500 vs 1800",
       "grade": "closed form",
-      "frs": ["FR-RTE-13", "FR-RTE-18"]
+      "frs": ["FR-RTE-13", "FR-RTE-18"],
+      "test": "tests/unit/plant/piping/checks.test.ts"
     },
     {
       "id": "VC-RTE-06",
       "plan": "plans/sc-rte-03-header-branches.json",
       "command": "add_branch + piping_takeoff",
       "expected": {
-        "fittings": ["teeReducing", "weldolet"],
+        "fittings": ["reducingTee", "weldolet"],
         "headerCutMm": [3857, 5857],
         "branchDn100CutMm": [1870],
-        "branchDn50CutMm": "TBD - weldolet height from 01 PSC"
+        "branchDn50CutMm": [856]
       },
       "tolerance": { "abs": 0.01 },
-      "reference": "README D3; B16.9 6x6x4 C 143 / M 130 (S9, S12)",
+      "reference": "README D3; B16.9 6x6x4 C 143 / M 130 (S9, S12); weldolet outlet 144 mm from the header centreline = declared stub input (unverified), 1000 - 144",
       "grade": "A",
       "frs": ["FR-RTE-08", "FR-RTE-09"],
       "test": "tests/unit/plant/piping/branches.test.ts"
@@ -100,7 +106,8 @@
       "expected": { "openEnds": 1, "code": "RTE_OPEN_END", "status": "warn" },
       "tolerance": "exact",
       "grade": "closed form",
-      "frs": ["FR-RTE-12", "FR-RTE-13"]
+      "frs": ["FR-RTE-12", "FR-RTE-13"],
+      "test": "tests/unit/plant/piping/branches.test.ts, checks.test.ts"
     },
     {
       "id": "VC-RTE-08",
@@ -115,7 +122,7 @@
         "cutLengthMm": [7924.39999, 844],
         "withTolerance0p5": "RTE_NO_FITTING_FOR_ANGLE"
       },
-      "tolerance": { "abs": 1e-6, "cutAbs": 1e-3 },
+      "tolerance": { "abs": 0.000001, "cutAbs": 0.001 },
       "reference": "README D4",
       "grade": "closed form",
       "frs": ["FR-RTE-05", "FR-RTE-10"]
@@ -149,7 +156,7 @@
       "plan": "plans/sc-rte-05-routing-refusals.json#SC-RTE-05d",
       "command": "route_pipe",
       "expected": { "code": "RTE_NO_FITTING_FOR_ANGLE", "angleDeg": 60 },
-      "tolerance": { "abs": 1e-4 },
+      "tolerance": { "abs": 0.0001 },
       "reference": "compass ticks = spec fitting angles (S1)",
       "grade": "closed form",
       "frs": ["FR-RTE-05"]
@@ -186,7 +193,7 @@
       "plan": "plans/sc-rte-07-insulated-hot-line.json",
       "command": "line_heat_loss (V1)",
       "expected": { "heatLossWPerM": 73.12000884, "reviewRequired": true },
-      "tolerance": { "rel": 1e-4 },
+      "tolerance": { "rel": 0.0001 },
       "reference": "data/insulation_heat_loss.json (S19)",
       "grade": "A",
       "frs": ["FR-RTE-23"],
@@ -249,7 +256,8 @@
       "tolerance": { "abs": 0.01 },
       "reference": "README D9",
       "grade": "closed form",
-      "frs": ["FR-RTE-19"]
+      "frs": ["FR-RTE-19"],
+      "test": "tests/unit/plant/piping/convertPipeRun.test.ts"
     },
     {
       "id": "VC-RTE-21",
@@ -266,8 +274,8 @@
       "id": "VC-RTE-22",
       "plan": "plans/sc-rte-07-insulated-hot-line.json + set_heat_tracing (V1)",
       "command": "piping_takeoff",
-      "expected": { "tracedLengthM": 6.0 },
-      "tolerance": { "abs": 1e-6 },
+      "expected": { "tracedLengthM": 6 },
+      "tolerance": { "abs": 0.000001 },
       "reference": "tracers x (centreline + allowances), explicit inputs",
       "grade": "closed form",
       "frs": ["FR-RTE-17"]
@@ -298,13 +306,29 @@
         "nativeEqualsTsReference": ["pis", "bends", "costMicrometres", "optimal"],
         "nativeSolutionAccepted": true,
         "staleOrObstacleSolution": "RTE_AUTOROUTE_SOLUTION_INVALID, document unchanged",
-        "largeProblem": { "gridMm": 50, "boxM": [100, 100, 30], "maxExpansions": 2000000, "timeS": "TBD on the reference machine (budget <= 5 s, TECHNICAL section 8); development laptop 2026-10-19: 1 761 410 expansions in 3.65-3.98 s on a 1.6e10-cell box (TECHNICAL section 13.3)" }
+        "largeProblem": {
+          "gridMm": 50,
+          "boxM": [100, 100, 30],
+          "maxExpansions": 2000000,
+          "timeS": "TBD on the reference machine (budget <= 5 s, TECHNICAL section 8); development laptop 2026-10-19: 1 761 410 expansions in 3.65-3.98 s on a 1.6e10-cell box (TECHNICAL section 13.3)"
+        }
       },
       "tolerance": "exact (paths, cost, codes); time TBD - measure",
       "reference": "TECHNICAL_SPEC section 2.A and 5.12: same state, cost and total open-set order; integer-micrometre costs",
       "grade": "derived",
       "frs": ["FR-RTE-22"],
       "test": "server/tests/routeNativeParity.test.ts; llull-route cargo tests"
+    },
+    {
+      "id": "VC-RTE-26",
+      "plan": "golden piping_reducer_run (tests/golden/pipingPlans.ts)",
+      "command": "route_pipe inline reducer + piping_takeoff",
+      "expected": { "cutLengthMm": [2930, 2930], "pipePieceDn": [150, 100], "reducerConcentric": 1, "buttWelds": 4 },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D10: DN150 line to a DN100 port through a 6x4 concentric reducer (stub H 140, grade B) centred at 3000 on a 6000 leg",
+      "grade": "closed form",
+      "frs": ["FR-RTE-07"],
+      "test": "tests/unit/plant/piping/inlineComponents.test.ts"
     }
   ]
 }

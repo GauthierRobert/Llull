@@ -234,7 +234,7 @@ export const pipingDerivationGuard: DerivationGuard = {
     if (edited.length === 0) return null;
     return (
       `it would edit the derived geometry of pipe part(s) ${edited.slice(0, 5).join(', ')}${edited.length > 5 ? ' ...' : ''}. ` +
-      'Pipe runs change through the piping commands (route_pipe, auto_route_pipe, delete_pipe_run); derived geometry is read-only.'
+      'Pipe runs change through the piping commands (route_pipe, auto_route_pipe, insert_inline_component, add_branch, delete_pipe_run ...); derived geometry is read-only.'
     );
   },
 };

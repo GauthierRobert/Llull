@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import type { PipingModel } from '@aec/plant/types';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
-import { cs150Line, rteJson, routedPumpToVessel } from './rteFixtures';
+import { cs150Line, headerScene, rteJson, routedPumpToVessel } from './rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
 
@@ -125,5 +125,17 @@ describe('update_pipeline re-derives the runs of the line', () => {
     const result = ok(s.doc, 'update_pipeline', { lineId: s.line, service: 'CW' });
     for (const id of piping(s.doc).entityIds[s.runId] ?? []) expect(result.document.entities[id]).toBeDefined();
     expect((result.data as Updated).rederivedRuns).toEqual([s.runId]);
+  });
+});
+
+describe('update_pipeline on a line with a branch', () => {
+  it('re-derives the header and the branch run together (a spec copy keeps the cuts 3857 / 5857 / 1870)', () => {
+    const h = headerScene();
+    const branched = apply(h.doc, 'add_branch', { runId: h.headerId, at: { point: [4000, 0, 3000] }, dn: 100, to: { portId: h.tieC } });
+    const branchRun = piping(branched).runOrder.at(-1) as string;
+    const result = ok(withSpec(branched, 'CS150B'), 'update_pipeline', { lineId: h.lineId, spec: 'CS150B' });
+    expect((result.data as Updated).rederivedRuns).toEqual([h.headerId, branchRun]);
+    const pieces = data<{ pipePieces: Array<{ cutLengthMm: number }> }>(result.document, 'piping_takeoff', { lineId: h.lineId }).pipePieces;
+    expect(pieces.map((piece) => piece.cutLengthMm)).toEqual([3857, 5857, 1870]);
   });
 });

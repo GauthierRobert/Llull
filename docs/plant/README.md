@@ -1,7 +1,7 @@
 # Process plant design — gap analysis and specifications
 
 Status: specifications and validation packs written 2026-10-18. Built since: 02 RTE V2 auto-router with its minimal M0/M1
-slice (plugin `piping`, `doc.plant.piping`, native `llull-compute route`; 02 TECHNICAL_SPEC §13, 2026-10-19), then 02 RTE M1 (spec-driven `route_pipe`, `piping_takeoff`, derived parts and joints, flange sets; TECHNICAL_SPEC §13.6, 2026-10-24). D1 fixed (a6499537), D2 decided by the owner 2026-10-23; D3, D4, D6 and 03 Q1–Q3 / Q7 decided 2026-10-23 (owner delegated: "better for the app even if it takes more time"). The rest is not built.
+slice (plugin `piping`, `doc.plant.piping`, native `llull-compute route`; 02 TECHNICAL_SPEC §13, 2026-10-19), then 02 RTE M1 (spec-driven `route_pipe`, `piping_takeoff`, derived parts and joints, flange sets; TECHNICAL_SPEC §13.6, 2026-10-24), then 02 RTE M2 (inline valves and reducers, branches, `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline`; §13.7, 2026-10-24). D1 fixed (a6499537), D2 decided by the owner 2026-10-23; D3, D4, D6 and 03 Q1–Q3 / Q7 decided 2026-10-23 (owner delegated: "better for the app even if it takes more time"). The rest is not built.
 Target: the level of detail of AutoCAD Plant 3D / Autodesk Plant Design Suite, AVEVA E3D, Hexagon Smart 3D and
 CADMATIC: a complete process unit with vessels, columns, exchangers and pumps carrying nozzles; spec-driven piping
 with flanges, gaskets, bolts, valves and insulation; steel with platforms, caged ladders and handrails; pipe racks;

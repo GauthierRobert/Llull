@@ -636,14 +636,12 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 - [R15] CADMATIC PCF export; SST CAEPIPE PCF data types — https://www.sstusa.com/docs/users_manual/data_types_from_caepipe.htm (accessed 2026-10) [S26]
 - [R16] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)
 
-## 13. As built (RS1 RS-7 plant slice 2026-10-19; RTE-M1 2026-10-24)
+## 13. As built (RS1 RS-7 plant slice 2026-10-19; RTE-M1, RTE-M2 2026-10-24)
 
 Built: the V2 auto-router (§2.A, §5.12) end to end (2026-10-19), and **M1 (2026-10-24, §13.6)**: spec-driven `route_pipe`
 (compass legs, closing leg, spec elbows with deviation, joint stack and cut-back, flange sets at flanged ports), `piping_takeoff`,
 one derivation of parts and joints for every run (auto-routed runs included), per-part display geometry, `SpecLookup` over
-01 PSC and `PortSource` over tie-ins, equipment nozzles and run ends. Not built: inline components, reducers, branches,
-`check_piping`, `piping_connectivity`, stretch, slope, insulation clashes, heat loss, `convert_pipe_run`, `update_pipeline`,
-`edit_route` (M2–V1 stay open; the `check_piping` steps of SC-RTE-01, 02, 05, 08 are still blocked).
+01 PSC and `PortSource` over tie-ins, equipment nozzles and run ends. **M2 (2026-10-24, §13.7)** added inline valves and reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run` and `update_pipeline`. Not built: stretch, slope, insulation clashes, heat loss, `edit_route` (M3–V1 stay open).
 
 ### 13.1 What exists
 
@@ -798,7 +796,80 @@ Decisions (owner delegated: long-term quality over the cheap path; no backward c
 - **Counts keys** are the PSC component types (`elbow90LR`, `flangeWeldNeck`, `gasketSpiralWound`, `boltSet`) plus `pipePieces`, `studs`
   and joints by kind (`buttWelds`, `flangedJoints`, `fittingToFitting`, ...); the plans' old names (`flangeWN`, `gasket`) were renamed.
 
-Not built in M1, still open: `insert_inline_component` / `move_inline_component`, reducers and `legDn`, `add_branch`, `check_piping`,
+Not built in M1 (M2 built most of it, see §13.7; stretch, slope, `edit_route`, insulation and supports on runs stay open): `insert_inline_component` / `move_inline_component`, reducers and `legDn`, `add_branch`, `check_piping`,
 `piping_connectivity`, `edit_route`, `convert_pipe_run`, `update_pipeline`, slope legs (`planLength`, `slope`, §5.6), orthogonal stretch
 (§5.7), insulation envelope, supports on runs, `RTE_FROM_TO_MISMATCH`. SC-RTE-02 steps 8+ (valve), SC-RTE-03, 04, 06, 07, 09 and the `check_piping`
 steps of SC-RTE-01, 05, 08 stay blocked; their plans say so (`unbuilt`, `blockedFrom`) and `rteScenarioPlans.test.ts` keeps those lists honest.
+
+### 13.7 RTE-M2 as built (2026-10-24, plant 02 milestone M2)
+
+Built: flange sets on valve faces, inline valves and concentric reducers, branches (tee, reducing tee, olets, stub-in), `check_piping` core codes,
+`piping_connectivity`, `convert_pipe_run`, `update_pipeline`. SC-RTE-01, 02, 03, 05 and 09 run end to end; the `check_piping` steps of SC-RTE-04 and 08 run
+(SC-RTE-04 stays blocked at its slope legs, SC-RTE-06 at stretch, SC-RTE-07 at insulation and `line_heat_loss`: M3 / V1).
+
+| Part | Where (`packages/domain-aec/src/plant/piping/`) | Notes |
+| ---- | ----------------------------------------------- | ----- |
+| Run state | `routeEnv.ts`, `routeEnds.ts`, `routeInline.ts`, `routeBranch.ts`, `routeParts.ts`, `deriveTypes.ts`, `runSizes.ts` | `deriveRun` splits each leg into slots (end sets, elbows, valves, reducers, tees) sorted along the leg and cuts the pipe between them with the M1 joint stack; olets and stub-ins sit on a pipe piece afterwards. `PipeRun` gains `dn?`, `inline?`, `branches?`; `PortRef` gains `branch` |
+| Valves | `routeInline.ts` | Catalogue `faceToFace`; `FL` ends give a weld-neck flange + gasket + bolt set per face (the same `resolveFlangeSet` as a nozzle, with the valve row's rating and facing), `BW` ends none; any other end type is `RTE_NO_CONNECTION_RULE`. Occupies `F + 2 (g + Y)` (flanged) or `F` |
+| Reducers | `routeInline.ts`, `runSizes.ts` | Concentric, row `length` (`H`), occupies it centred; the run continues at `dn2` |
+| Branches | `routeBranch.ts`, `commands/addBranch.ts` | Fitting = branch-table cell of the HEADER line's spec for (header size at the point, branch size): `SpecLookup.branch()` over PSC `resolveBranch` (`PSC_BRANCH_UNDEFINED` -> `RTE_BRANCH_NO_TABLE_ROW`) |
+| Checks, graph | `checks.ts`, `graph.ts`, `commands/checkPiping.ts`, `commands/pipingConnectivity.ts` | See the rules below |
+| Conversion, line update | `commands/convertPipeRun.ts`, `commands/updatePipeline.ts` | |
+| Run commands | `commands/inlineComponents.ts` (`insert_inline_component`, `move_inline_component`, `remove_inline_component`), `commands/addBranch.ts`, `commands/deleteRun.ts` (`cascade`), `commands/routePipe.ts` (`inline`), `runUpdate.ts` (`rederive`: derive the changed runs and every run attached to them and rebuild their entities, or fail whole) | |
+| Display | `geometryInline.ts` | Valve = body + stem + handwheel disc on layer `P-VALV` (ids `<valve>`, `<valve>/stem`, `<valve>/wheel`), reducer frustum, tee = header cylinder + `<tee>/branch` stub, olet cylinder, stub-in none. Schematic: the proportions are named display constants, a catalogue `stemHeight` sets the stem length |
+| Tests | `tests/unit/plant/piping/{inlineComponents,inlineVariants,branches,branchPorts,checks,convertPipeRun,updatePipeline,rteScenarioPlans}.test.ts`, golden `piping_gate_valve`, `piping_header_branches`, `piping_reducer_run`, `piping_legacy_conversion` | Coverage of `plant/piping/**`: 97.97 % statements, 92.62 % branches, 99.08 % functions, 99.33 % lines (measured 2026-10-24 with `tests/unit/plant`) |
+
+Validation numbers (hand calculations from the stub catalogue, never copied from an output of llull):
+
+- SC-RTE-02: valve F-F 229 centred at 800 on a leg starting at z 1000: faces z 1685.5 / 1914.5; cuts `(1685.5 - 3 - 76) - (1000 + 3 + 76) = 527.5` and
+  `(2500 - 152) - (1914.5 + 3 + 76) = 354.5`; the run then has 6 pieces (527.5, 354.5, 2696, 2696, 1196, 2769), 4 flange sets (4 WN, 4 gaskets, 4 bolt
+  sets, 32 studs), 12 butt welds and 4 flanged joints; the handwheel centre z 1800 is over the explicit 1500 limit: one `RTE_VALVE_OPERATOR_HEIGHT` on the valve id.
+- SC-RTE-03: 6x6x4 reducing tee at 4000 (C 143, M 130): header 3857 / 5857, branch `2000 - 130 = 1870`; weldolet 6x2 at 7000 with the outlet face A = 144 from the
+  header centreline: branch `1000 - 144 = 856`, header unchanged; 4 pieces, 1 tee, 1 olet; exactly one `RTE_OPEN_END` (the free DN50 end), status warn.
+- SC-RTE-05b / c: the `check_piping` steps give one `RTE_FITTING_TO_FITTING` (304) and `RTE_WELD_SPACING` with `cutLengthMm 36`, `minWeldSpacingMm 50`.
+- SC-RTE-09: 3848 / 2696 / 2348, 2 elbows, 4 welds, line number `L-1`, 2 open ends.
+- Reducer run (VC-RTE-26): 6x4 H 140 centred at 3000 on 6000: 2930 / 2930.
+
+Decisions (owner delegated: long-term quality over the cheap path):
+
+- **Reducers are inline components, the run size is derived.** There is no `legDn`: a run stores its start size (`dn`, default the line DN; branch runs carry their own)
+  and its concentric reducers (`dn2`); the size at any point is a function of those (`runSizes.ts`). A port of another size is met by a reducer in the same call
+  (`route_pipe.inline`) or by inserting one into an open run; nothing inserts a reducer by itself. `RTE_SIZE_MISMATCH` stays the code for a run end at the wrong size.
+- **A branch is a run.** `add_branch` stores a `BranchPoint { id, leg, distance, branchRunId }` on the header and a branch run whose `start.ref` is
+  `{ kind: 'branch', runId, branchId }`, at the branch size (`dn`); it belongs to the header line unless `lineId` is given (the fitting always comes from the header spec). The
+  branch point is a port (`portOfRef`: on the header axis, facing along the branch), so a header edit that moves it breaks the branch with `RTE_STRETCH_FAILED` like any port.
+  The leg indices of `inline` and `branches` are indices of the merged legs; `edit_route` (M3) has to remap them.
+- **Fitting ids and lengths.** Fitting part ids are `<headerRun>/<tee|olet|stubIn>-<k>` (k per kind in route order). A tee splits the header leg by C each side and the branch pipe
+  starts at M (reducing tee: both from the row; an equal tee row with only `centreToEndRun` takes M = C, B16.9, named in `data.branchStartSource`). An olet leaves the header
+  whole and needs a straight header piece with the branch pipe radius to each end (else `RTE_BRANCH_ON_FITTING`). **Olet outlet:** the catalogue dimension is `centreToOutlet`
+  (MSS SP-97 dimension A, from the header centreline, how the tables publish it); a row with only `height` is read as `OD_header / 2 + height` (§5.5). The stub's weldolet 6x2 is a declared input
+  (A 144, unverified); sockolet and threadolet rows have an SW / THD outlet and are refused by the connection rule (`RTE_NO_CONNECTION_RULE`). A stub-in (`SI`, `SIR`) has no row: the branch pipe starts at the header
+  surface (`OD / 2`), the part is `stubIn`, `reviewRequired` is true and `check_piping` reports `RTE_STUB_IN_REVIEW`.
+- **Codes for overlaps.** A tee overlapping an elbow set, a valve or another tee is `RTE_BRANCH_ON_FITTING`; a valve or reducer overlapping anything is `RTE_INLINE_DOES_NOT_FIT`
+  (the inline commands report a tee collision with this code too); two plain fittings (elbows, flange sets) `RTE_SEGMENT_TOO_SHORT`.
+- **Added codes and commands.** `RTE_UNKNOWN_COMPONENT` (inline component id not on the run), `RTE_UNKNOWN_PIPE` (`convert_pipe_run`: not a legacy pipe) and `RTE_END_TYPE_MISMATCH`
+  (raised by `check_piping` when two connected ports disagree in end type). `remove_inline_component` and `delete_pipe_run { cascade }` are new surface that §4 does not list (a valve must be removable; deleting a
+  header with branches needs a way out).
+- **`check_piping` built / not built.** Built: `RTE_OPEN_END`, `RTE_DISCONNECTED_PORT` (info; only without `lineIds`: a nozzle or tie-in with no run), `RTE_FITTING_TO_FITTING`, `RTE_WELD_SPACING`
+  (recomputed per pipe piece against `minWeldSpacing` or `max(4 t, 50 mm)` of its own wall; the source is named in `detail`), `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH` / `RTE_FACING_MISMATCH` /
+  `RTE_END_TYPE_MISMATCH` across connections, `RTE_FROM_TO_MISMATCH` (the line's `from` / `to` text must equal an id or tag of a tie-in or nozzle that the line's connected group reaches; case-insensitive), `RTE_DUPLICATE_LINE_NUMBER`,
+  `RTE_SPEC_UNVERIFIED` (one per line), `RTE_STUB_IN_REVIEW`, `RTE_VALVE_OPERATOR_HEIGHT`, and the code of any run that no longer derives as an error issue (never a refusal). Not built: `RTE_VALVE_OPERATOR_CLASH` (operator
+  envelope against steel: V1), `RTE_ADVERSE_SLOPE` / `RTE_POCKET` (slope: M3), `RTE_NONSTANDARD_FITTING` (trimmed elbows: V1). The handwheel limit has no default (no public code value): the check is skipped without
+  `maxHandwheelCentreHeight` and the result says so (`limits`); the height is measured from the highest building level at or below the handwheel centre, else z = 0 (named in `detail.referenceLevel`); the centre is
+  the valve centre + stem x catalogue `stemHeight` (0 and flagged when the row has none). `lineIds` pulls in the runs attached to those lines (headers, branches, continuations), so a tee outlet is not reported open
+  because its branch is on another line.
+- **Graph rules** (`graph.ts`): parts and the tie-ins / nozzles that runs attach to are nodes; a part port is connected when another part port or an external port lies within 0.01 mm with an opposite direction (within 1 degree), or within the
+  gap of a joint of its part; bolt sets join their flange through the joint accessories. `piping_connectivity` returns `{ nodes, edges, openEnds, components, mismatches, path?, runs, brokenRuns }`; `path` is the shortest chain
+  of node ids between `from` and `to` (port ids or part ids), `null` when they are not connected.
+- **`convert_pipe_run`.** Vertices become PIs (collinear merge, z = level elevation + vertex z), both ends open, every bend must have a spec elbow (all failing vertices listed in `detail.vertices`, one refusal), the line number is the
+  legacy `line` text verbatim (the template when there is none), service / from / to are copied, the DN is the pipe `dn`, else the DN of its diameter in the pipe size table (else `RTE_SIZE_MISMATCH`). The legacy pipe stays unless `replace: true`
+  (then `delete_building_element`, which takes the hosted pipe supports with it). `spec` is optional when `lineId` names a line.
+- **`update_pipeline`.** Service, sequence, spec, line number, conditions, insulation (`null` clears), from / to (`""` clears); the size never changes. A number that followed the template follows it again; a changed spec re-derives every run
+  of the line (and what is attached) and is refused whole with the code of the first run that fails.
+- **Ids.** Flange sets are numbered in route order including valve sets (the end set of a run with one valve is `gasket-4`, not `gasket-2`); derived ids are not stored, so only entity ids shift.
+- **Reconcile.** `reconcile` re-derives the runs attached to a stale run (a header's branch runs, a run continuing from an end).
+- **Plans.** `facePositions` replaces `valveFacesZ`; `teeReducing` is the PSC type name `reducingTee`; `$alias` in an expected value stands for the first id the step with `as` produced; SC-RTE-09 imports the stub first. The test harness `pick`
+  accepts numeric filters (`[?dn==150]`) and maps a property over a list.
+
+Open for M3 / V1: orthogonal stretch for branches and inline components (their leg indices and distances move with the PIs), `edit_route`, slope legs and adverse slope, insulation envelope in `check_clashes`, line-number settings, supports on runs,
+eccentric reducers, trimmed elbows, valve operator clash, PCF / IFC output of valves and branches (05 / 08).

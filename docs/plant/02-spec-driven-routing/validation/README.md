@@ -33,9 +33,9 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | `data/flanged_components.json`       | B16.5 CL150 WN length through hub, bolt holes, raised face; B16.10 gate valve F-F; gasket thickness input; B31.3 socket-weld gap                                  | A / B / C per row                      |
 | `data/insulation_heat_loss.json`     | ht 1.2.0 insulated-pipe example (73.120 W/m) + formula; own re-derivation                                                                                         | A                                      |
 | `data/routing_rules.json`            | Vendor behaviours and project rules with their status (standard / vendor / project default)                                                                       | A / B / C per row                      |
-| `data/catalog_stub_cs150.json`       | Catalogue `rte-validation-stub` in the 01 PSC `llull-piping-catalog` format: the plans' INPUT dimensions (LR 90 A 152, 45 B 64, NPS 4 CL150 WN hub Y 76, gasket 3.0, 8 studs); searched before `llull-open-piping`; not a standard, rows unverified except the quoted grade A flange dimensions | inputs                                 |
+| `data/catalog_stub_cs150.json`       | Catalogue `rte-validation-stub` in the 01 PSC `llull-piping-catalog` format: the plans' INPUT dimensions (LR 90 A 152, 45 B 64, NPS 4 CL150 WN hub Y 76, gasket 3.0, 8 studs; M2: tees C = M, reducing tee 6×4 C 143 / M 130, concentric reducers 6×4 H 140 and 4×3 H 102, weldolet 6×2 outlet A 144); searched before `llull-open-piping`; not a standard, rows unverified except the quoted grade A flange dimensions | inputs                                 |
 | `data/spec_cs150.json`               | Spec CS150 (draft) in the 01 PSC `llull-pipe-spec` format: pipe B36.10M Sch 40, LR 90 / 45 elbows, WN flange, spiral-wound gasket, bolt set, gate valve, elbow angles 90 / 45 ± 1° | inputs                                 |
-| `data/spec_stub_cs150.json`          | Original human-readable stub (not the PSC format; the two files above replace it for M1). Kept for the tee / reducer / olet rows, branch table, insulation table that 02 M2 / M3 fold into the PSC files | inputs                                 |
+| `data/spec_stub_cs150.json`          | Original human-readable stub (not the PSC format; the two files above replace it for M1). The tee / reducing tee / reducer / weldolet rows and the branch table now live in the PSC files (02 RTE M2, TECHNICAL_SPEC §13.7); kept for the insulation table that 02 M3 folds in | inputs                                 |
 | `expected_results.json`              | Index of every VC                                                                                                                                                 | —                                      |
 | `plans/sc-rte-0*.json`               | `build_project` scenarios with `expected` rows; `status` / `unbuilt` list what is missing today                                                                   | —                                      |
 
@@ -82,6 +82,7 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | VC-RTE-23 | Display geometry: SC-RTE-01 elbow solid volume vs Pappus π (OD/2)² · R · π/2 = 2 449 885.6 mm³ (OD 114.3, R 152); 16-segment section gives ratio 0.97450                           | closed form (Pappus; regular-polygon area ratio (n/2π) sin(2π/n)) | ratio in [0.970, 1.001]                                                      | `mass_properties` on the elbow entity | FR-RTE-20             | AF-21, AF-22 |
 | VC-RTE-24 | Export hand-off: `piping_takeoff` counts of SC-RTE-01 equal the IFC `IfcPipeFitting` / `IfcPipeSegment` / `IfcDistributionPort` counts (08) and the PCF component records (05)     | TBD — measure with the 08 / 05 exporters once built               | exact                                                                        | 08 / 05 packs                         | FR-RTE-21, 25         | AF-10        |
 | VC-RTE-25 | Native vs reference (V2, [RS1](../../../decisions/RS1-native-compute.md) RS-7): on SC-RTE-08 and on obstacle problems small enough for the TS cap, `llull-compute route` and the TS A* return identical PIs, bends, integer-µm cost and `optimal`; the native solution passes `auto_route_pipe` validation; a solution with a stale `problemHash` or a leg through an obstacle is refused with `RTE_AUTOROUTE_SOLUTION_INVALID` and the document is unchanged; the 100 × 100 × 30 m / 50 mm problem finishes within 2·10⁶ expansions in ≤ 5 s (time: TBD — measure on the reference machine) | derived: same state, cost and total open-set order, integer costs (TECHNICAL §2.A, §5.12); budget from TECHNICAL §8 | exact (paths, cost, codes); time TBD — measure | `server/tests/routeNativeParity.test.ts`, `llull-route` cargo tests, SC-RTE-08 | FR-RTE-22 | AF-13, AF-40 |
+| VC-RTE-26 | Reducer in a run: DN150 line meets a DN100 port through a 6×4 concentric reducer (H 140) centred at 3000 on 6000 → cuts 2930 / 2930, one reducer, 4 welds | closed form §D10 | 0.01 mm | golden `piping_reducer_run`, `inlineComponents.test.ts` | FR-RTE-07 | AF-21 |
 
 ## Derivations used as expectations
 
@@ -97,6 +98,8 @@ Common inputs (stub CS150): NPS 4 LR 90 A = 152, WN CL150 Y = 76, gasket g = 3.0
   (1685.5 − 3 − 76) − (1000 + 3 + 76) = 527.5. Upper piece (2500 − 152) − (1914.5 + 3 + 76) = 354.5.
 - **D3 (SC-RTE-03).** Header 0 → 10 000 with a 6×6×4 tee at 4000 (C 143): 4000 − 143 = 3857 and
   6000 − 143 = 5857 (the weldolet at 7000 does not cut the header). Branch to TP-3 at y 2000: 2000 − 130 = 1870.
+- **D3b (SC-RTE-03, M2).** Weldolet 6×2 at 7000 with its outlet face A = 144 mm from the header centreline (stub input): the DN50
+  branch piece is 1000 − 144 = 856. Header pieces stay 3857 / 5857 (an olet does not cut the header). Pipe pieces of the line: 4.
 - **D4 (SC-RTE-04).** s = 0.01, plan length 8000: drop 80; leg √(8000² + 80²) = 8000.39999; angle atan 0.01 =
   0.5729387°; turn into the vertical acos(80 / 8000.39999) = 89.4270613°, deviation 0.5729387° (≤ 1° accept,
   > 0.5° refuse). NPS 2 A = 76: cuts 8000.39999 − 76 = 7924.39999 and (1000 − 80) − 76 = 844.
@@ -110,6 +113,8 @@ Common inputs (stub CS150): NPS 4 LR 90 A = 152, WN CL150 Y = 76, gasket g = 3.0
 - **D8 (SC-RTE-08).** Free space, start leaving +X at the origin, end entering travelling +Z at (3000, 2000,
   1000): every path has length ≥ |Δx| + |Δy| + |Δz| = 6000; three non-zero axis displacements need three
   directions, so ≥ 2 bends; the path +X 3000, +Y 2000, +Z 1000 reaches both bounds.
+- **D10 (reducer, VC-RTE-26).** DN150 line from RA (0,0,0) +X to RB DN100 (6000,0,0): 6×4 concentric reducer, H = 140, centred at
+  3000: occupies 2930–3070; cuts 2930 − 0 = 2930 (DN150) and 6000 − 3070 = 2930 (DN100); welds: tie-in, 2 at the reducer, tie-in = 4.
 - **D9 (SC-RTE-09).** Legacy points (1000,3000,1500) → (5000,3000,1500) → (5000,6000,1500) → (5000,6000,4000):
   legs 4000, 3000, 2500; open ends (gap 0): 4000 − 152 = 3848; 3000 − 304 = 2696; 2500 − 152 = 2348.
 
@@ -118,7 +123,7 @@ All derivations were recomputed with a scratch Python script (closed forms only;
 ## Known limits of this pack
 
 - No PCF / IDF sample could be downloaded (see sources.md "Not verified"); the hand-off is a 05 ISO VC.
-- Weldolet heights are not verified (SC-RTE-03 DN50 cut is TBD).
+- The weldolet outlet (144 mm from the header centreline) is a declared stub input, not a sourced MSS SP-97 value; the SC-RTE-03 DN50 cut 856 is derived from it. The reducer length 140 is grade B.
 - The WN flange Y values differ by 1.3-1.6 mm between sources (raised face included or not); they are stub
   inputs, not gates.
 - The beam-axis convention in SC-RTE-07 must be confirmed against `add_steel_member` before the plan is run.
