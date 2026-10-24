@@ -222,23 +222,3 @@ export function pipingErrors(raw: unknown): string[] {
     ...cycleErrors(raw),
   ];
 }
-
-/**
- * A pipe support whose `pipeId` is no building element must name a stored run (V1 part 2: the building validation accepts the id, the plant slice owns
- * the run table). Works on raw data; a malformed building or plant slice is reported by its own extension.
- */
-export function supportCarrierErrors(raw: Record<string, unknown>): string[] {
-  const building = raw['building'];
-  const elements = isRecord(building) ? building['elements'] : undefined;
-  if (!isRecord(elements)) return [];
-  const plant = raw['plant'];
-  const piping = isRecord(plant) ? plant['piping'] : undefined;
-  const runs = isRecord(piping) && isRecord(piping['runs']) ? piping['runs'] : {};
-  return Object.entries(elements).flatMap(([key, element]) => {
-    if (!isRecord(element) || element['category'] !== 'pipeSupport') return [];
-    const pipeId = element['pipeId'];
-    return typeof pipeId !== 'string' || pipeId in elements || pipeId in runs
-      ? []
-      : [`building element ${key}: pipeId '${pipeId}' is neither a building pipe nor a plant run`];
-  });
-}

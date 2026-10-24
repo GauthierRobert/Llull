@@ -26,6 +26,7 @@ import {
   type PipeRun,
 } from './pipeSupportLayout';
 import { riserRows, type RiserRow } from './pipeSupportRiser';
+import { orphanSupports } from './pipeCarrier';
 
 export interface PipeSupportRow {
   readonly id: string;
@@ -165,20 +166,21 @@ function rowOf(
 /**
  * @affects none; data = { ok, pipes: PipeSupportRow[], totals, csv, assumptions }
  * @invariant every pipe (of the level / line filter) has exactly one row
- * @failure no pipes / unknown level / line without pipes / spanFactor <= 0 / overhangRatio < 0 -> no-op, no data
+ * @invariant a support whose pipe or run no longer exists (a file with one loads) is listed in data.orphans with code RTE_SUPPORT_ORPHAN and makes ok false
+ * @failure no pipes and no orphan supports / unknown level / line without pipes / spanFactor <= 0 / overhangRatio < 0 -> no-op, no data
  */
 export const checkPipeSupports = defineCommand({
   name: 'check_pipe_supports',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only support-spacing check of every pipe (add_pipe_run) and every spec-driven run (route_pipe; its centreline is piping_takeoff.legs, it is listed under its run id and line number and counts as on the first building level) against the standard maximum span of water-filled standard-wall steel ' +
+    'Read-only support-spacing check of every pipe (add_pipe_run) and every spec-driven run (route_pipe; its centreline is piping_takeoff.legs, it is listed under its run id and line number and belongs to the highest building level whose elevation is at or below its lowest centreline point, else to the lowest level) against the standard maximum span of water-filled standard-wall steel ' +
     'pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, ' +
     "DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it " +
     'rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed ' +
     'span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), ' +
     'largestSpanM (actual; when every support is unattached, measured between them), overhangM, supports, unattached, unattachedSupports ' +
     '[{ id, mark, type, atM }], basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, ' +
-    'notes }; data.ok is true only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
+    'notes }; data.orphans lists pipe supports whose pipe or run no longer exists { id, mark, pipeId, levelId, code: "RTE_SUPPORT_ORPHAN" } (they carry nothing; fix with delete_building_element or re-create the run); data.ok is true only when every pipe passes and there is no orphan. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
     'risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy ("carried end" | "clamp" | "elbow ' +
     'support" | null), ok, issues }; they need lateral guides (add_pipe_support type "guide" at a point on the riser, bracketed to steel ' +
     'beside it) at most the span table value apart and at most overhangRatio × span from a free elbow, and their weight carried by an ' +
@@ -197,7 +199,9 @@ export const checkPipeSupports = defineCommand({
     levelId: z
       .string()
       .optional()
-      .describe('Only the pipes of this level id (spec-driven runs belong to the first level). Default: every level.'),
+      .describe(
+        'Only the pipes of this level id (a spec-driven run belongs to the highest level whose elevation is at or below its lowest centreline point, else the lowest level). Default: every level.',
+      ),
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
@@ -212,7 +216,10 @@ export const checkPipeSupports = defineCommand({
         (params.levelId === undefined || element.levelId === params.levelId) &&
         (params.line === undefined || element.line === params.line.trim()),
     );
-    if (selected.length === 0) {
+    const orphans = (params.line === undefined ? orphanSupports(doc, units.building) : []).filter(
+      (support) => params.levelId === undefined || support.levelId === params.levelId,
+    );
+    if (selected.length === 0 && orphans.length === 0) {
       return noop(
         doc,
         runs.length === 0
@@ -225,6 +232,13 @@ export const checkPipeSupports = defineCommand({
       .map(createBeamLoads);
     const pipes = selected.map((run) => rowOf(units, run, runs, beams, spanFactor, overhangRatio));
     const failing = pipes.filter((row) => !row.ok);
+    const orphanRows = orphans.map((support) => ({
+      id: support.id,
+      mark: support.mark,
+      pipeId: support.pipeId,
+      levelId: support.levelId,
+      code: 'RTE_SUPPORT_ORPHAN',
+    }));
     const unattached = pipes.reduce((sum, row) => sum + row.unattached, 0);
     const csv = toCsv(
       ['Mark', 'Line', 'DN', 'Length (m)', 'Allowed span (m)', 'Largest span (m)', 'Supports', 'Status', 'Issues'],
@@ -244,12 +258,16 @@ export const checkPipeSupports = defineCommand({
     return report(
       doc,
       `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
+        (orphans.length === 0
+          ? ''
+          : `; ${orphans.length} orphan support(s) RTE_SUPPORT_ORPHAN: ${orphans.map((support) => `${support.mark} (pipe ${support.pipeId} gone)`).join(', ')}`) +
         (failing.length === 0 ? '' : `, ${failing.length} failing: ${list}`) +
         (unattached > 0 ? `; ${unattached} unattached support(s)` : '') +
         '.',
       {
-        ok: failing.length === 0,
+        ok: failing.length === 0 && orphans.length === 0,
         pipes,
+        orphans: orphanRows,
         failures: failing.map((row) => row.id),
         totals: {
           pipes: pipes.length,
@@ -257,6 +275,7 @@ export const checkPipeSupports = defineCommand({
           failing: failing.length,
           supports: pipes.reduce((sum, row) => sum + row.supports, 0),
           unattached,
+          orphans: orphans.length,
         },
         spanFactor,
         overhangRatio,

@@ -193,13 +193,13 @@ describe('consumers read the run through the carrier', () => {
     expect(ifc).toContain(`IFCLABEL('${runId}')`);
   });
 
-  it('persistence: the supports survive a save and load; a support naming no pipe or run is refused on load', () => {
+  it('persistence: the supports survive a save and load; a support naming no pipe or run still loads (V1c: check_pipe_supports reports it)', () => {
     const { doc } = placed();
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(supportsOf(loaded)).toHaveLength(3);
     expect(loaded.entities).toEqual(doc.entities);
     const text = serializeDocument(doc).replace(/"pipeId":s*"run-[^"]*"/g, '"pipeId": "run-404"');
-    expect(() => deserializeDocument(text)).toThrow('neither a building pipe nor a plant run');
+    expect(supportsOf(deserializeDocument(text))).toHaveLength(3);
   });
 });
 

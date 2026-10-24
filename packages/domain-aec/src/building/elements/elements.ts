@@ -153,6 +153,25 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
   }
 }
 
+/** Why hosted elements cannot be moved without their host: a support names its pipe or plant run, the others a wall, a steel column or a rafter. */
+function strayMessage(building: BuildingModel, ids: ReadonlyArray<string>): string {
+  const supports = ids.flatMap((id) => {
+    const element = building.elements[id];
+    return element?.category === 'pipeSupport' ? [element] : [];
+  });
+  const others = ids.filter((id) => building.elements[id]?.category !== 'pipeSupport');
+  const supportHint = supports
+    .map((support) =>
+      building.elements[support.pipeId] === undefined
+        ? `${support.id} rests on plant run ${support.pipeId} (a run is no building element: it moves with the equipment it connects to, or re-route it with edit_route; to put the support elsewhere delete it and add_pipe_support at the new point)`
+        : `${support.id} rests on pipe ${support.pipeId} (move the pipe: its supports go along)`,
+    )
+    .join('; ');
+  if (supports.length === 0)
+    return `${others.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`;
+  return `${ids.join(', ')} follow their host: ${supportHint}${others.length === 0 ? '.' : `; ${others.join(', ')}: a wall, a steel column or a rafter is the host (slide openings with update_opening, or move the host).`}`;
+}
+
 /**
  * @affects regenerates the moved elements (hosted openings move with their wall)
  * @failure no known ids / invalid delta -> no-op
@@ -162,7 +181,7 @@ export const moveBuildingElement = defineCommand({
   description:
     'Move building elements in plan by delta [dx, dy]; use this instead of move_entities for building elements, because hosted elements and supports follow and joins are recomputed (move_entities would desync the building model). Doors/windows travel with their wall (to slide an opening along its wall use ' +
     'update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its ' +
-    'supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).',
+    'supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which). A support alone is refused: it rests on its pipe or on its spec-driven run (the refusal names it; a run moves with the equipment it connects to or by edit_route).',
   params: z.object({ elementIds: z.array(z.string()).describe('Element ids to move.'), delta: vec2('Plan translation [dx, dy].') }),
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
@@ -175,12 +194,7 @@ export const moveBuildingElement = defineCommand({
       const host = element ? hostOf(element) : null;
       return host !== null && !known.includes(host);
     });
-    if (strayOpenings.length > 0) {
-      return noop(
-        doc,
-        `move_building_element refused: ${strayOpenings.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`,
-      );
-    }
+    if (strayOpenings.length > 0) return noop(doc, `move_building_element refused: ${strayMessage(building, strayOpenings)}`);
     // Moving only one side of a moment connection would leave it floating.
     const detached = Object.values(building.elements).filter(
       (element) => element.category === 'connection' && known.includes(element.otherId) !== known.includes(element.rafterId),

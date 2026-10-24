@@ -81,7 +81,7 @@ interface SupportChange {
   readonly to: string | null;
 }
 
-interface SupportReconciliation {
+export interface SupportReconciliation {
   readonly building: BuildingModel;
   /** Supports whose pipe (building pipe or plant run) no longer exists: left as they are, not re-checked, named so the command can report them. */
   readonly orphaned: SupportChange[];

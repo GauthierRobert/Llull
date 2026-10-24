@@ -43,8 +43,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Add legs until the remaining offset (detail.offset) is along the target port axis, then the closing leg is added automatically.',
   RTE_STRETCH_FAILED:
     'The legs cannot follow the move orthogonally (the part no leg is parallel to is named, or a leg / component would vanish): move the equipment back, re-route the run with edit_route (its ends then follow their ports), or delete_pipe_run and route_pipe again. A broken run is kept as routed and its parts are not drawn.',
-  RTE_PIPE_HAS_SUPPORTS:
-    'Keep the legacy pipe (omit replace), or delete its pipe supports first (delete_building_element), convert with replace, then place supports on the new run with add_pipe_support runId.',
+  RTE_SUPPORT_OFF_RUN:
+    'The legacy pipe hosts a support that cannot sit on the new run (it is farther than one pipe outside diameter from the straightened centreline): keep the legacy pipe (omit replace), or move the support onto the pipe (move_building_element) or delete it (delete_building_element) and convert again.',
+  RTE_SUPPORT_ORPHAN:
+    'A pipe support names a pipe or run that no longer exists: delete it (delete_building_element) or re-create the run, then place it again with add_pipe_support. It carries nothing and is counted in no span check.',
   RTE_SLOPE_INVALID:
     'Give planLength (horizontal length, > 0) and slope { value > 0 and at most 45 degrees (100 %), unit percent | ratio | deg, fall } on a leg with a horizontal direction; omit length.',
   RTE_EDIT_INVALID:

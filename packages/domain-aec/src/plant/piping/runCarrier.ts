@@ -15,25 +15,37 @@ import { deriveRun } from './routeParts';
 export type CarrierDoc = Pick<CadDocument, 'building' | 'plant' | 'units'>;
 
 /**
- * The pipe element of run `runId` in the frame of level `levelId` (elevation 0 when the level is unknown), or undefined for an unknown run.
+ * The level a run belongs to (V1c): the highest building level whose elevation is at or below the lowest point of the run centreline; a run below every
+ * level belongs to the lowest one; '' when the building has no level. The one rule for every consumer that needs a run's level (the support layout, the
+ * level filter of check_pipe_supports, add_pipe_support). A run is one level as a whole: a riser belongs to the level it starts on.
+ * @invariant elevation is in document units, like the level elevations
+ */
+function levelOfElevation(building: CadDocument['building'], elevation: number): string {
+  const levels = Object.values(building?.levels ?? {}).sort((a, b) => a.elevation - b.elevation);
+  return (levels.filter((level) => level.elevation <= elevation).at(-1) ?? levels[0])?.id ?? '';
+}
+
+/**
+ * The pipe element of run `runId` in the frame of level `levelId` (default: the level of the run; elevation 0 when the level is unknown), or undefined for an unknown run.
  * The diameter is the pipe outside diameter of the derivation; a run that does not derive (broken) falls back to its nominal size in mm.
  */
-export function runCarrierPipe(doc: CarrierDoc, runId: string, levelId: string): PipeElement | undefined {
+export function runCarrierPipe(doc: CarrierDoc, runId: string, levelId?: string): PipeElement | undefined {
   const piping = getPiping(doc);
   const run = piping.runs[runId];
   const line = run === undefined ? undefined : piping.lines[run.lineId];
   if (run === undefined || line === undefined) return undefined;
   const derivation = deriveRun(doc as CadDocument, run);
-  const elevation = doc.building?.levels[levelId]?.elevation ?? 0;
   const centreline: Vec3[] = derivation.ok
     ? [(derivation.legs[0] ?? { start: run.start.point }).start, ...derivation.legs.map((leg) => leg.end)]
     : runPoints(run);
+  const frame = levelId ?? levelOfElevation(doc.building, Math.min(...centreline.map((point) => point[2])));
+  const elevation = doc.building?.levels[frame]?.elevation ?? 0;
   return {
     id: run.id,
     category: 'pipe',
     mark: run.id,
     entityIds: [],
-    levelId,
+    levelId: frame,
     points: centreline.map((point): Vec3 => [point[0], point[1], point[2] - elevation]),
     diameter: derivation.ok ? derivation.pipe.outsideDiameterMm : (run.dn ?? line.dn),
     service: line.service,

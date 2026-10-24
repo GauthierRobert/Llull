@@ -49,7 +49,7 @@ export const addPipeSupport = defineCommand({
     'position with no steel in reach is still created but UNATTACHED (memberId null): it carries nothing and the summary warns. Supports ' +
     'follow their pipe (moved, copied, deleted with it) and follow edits of their steel: deleting or moving a member or moving the pipe ' +
     "re-attaches them to the nearest steel in reach, or leaves them unattached (the edit command's summary lists which). The supports of a plant run follow its " +
-    'stretch (equipment moved) and edit_route: each is re-snapped to the nearest point of the new centreline and re-attached to steel, and the edit summary lists the ones moved, re-attached or left in place; a run needs a building level (add_level) to hold them, and a broken run is refused. Marks PS1, ' +
+    'stretch (equipment moved) and edit_route: each is re-snapped to the nearest point of the new centreline and re-attached to steel, and the edit summary lists the ones moved, re-attached or left in place; a run needs a building level (add_level) to hold them (the highest level whose elevation is at or below the lowest point of its centreline, else the lowest level), and a broken run is refused. A support whose pipe or run is later gone stays in place and is reported by check_pipe_supports as RTE_SUPPORT_ORPHAN. Marks PS1, ' +
     'PS2… data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength, standoff (riser bracket length) ' +
     '}.',
   params: z.object({

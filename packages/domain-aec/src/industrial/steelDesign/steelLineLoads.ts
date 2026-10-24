@@ -112,7 +112,7 @@ function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
     element.category === 'pipe' || element.category === 'tray' ? [runOf(units, element, params)] : [],
   );
   // Spec-driven plant runs weigh on the steel like building pipes (02 RTE V1 part 2): same carrier, same rules.
-  return [...elements, ...runPipes(units.source, units.building.levelOrder[0] ?? '').map((pipe) => runOf(units, pipe, params))];
+  return [...elements, ...runPipes(units.source).map((pipe) => runOf(units, pipe, params))];
 }
 
 /** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */

@@ -21,7 +21,7 @@ import { lineNumberTemplate, renderLineNumber } from './lineNumber';
 import { rereadRequest, resolveInsulation } from './insulation';
 import { createSpecLookup, isMiss } from './specLookup';
 import { stretchRun, type StretchDone } from './stretch';
-import { pipingErrors, supportCarrierErrors } from './validate';
+import { pipingErrors } from './validate';
 import { reconcileRunSupports } from './supportReconcile';
 
 interface RunState {
@@ -267,9 +267,9 @@ function reconcileRuns(previous: CadDocument, next: CadDocument): { document: Ca
 export const pipingDocument: DocumentExtension = {
   validate: (raw) => {
     const plant = raw['plant'];
-    if (plant === undefined) return supportCarrierErrors(raw);
+    if (plant === undefined) return [];
     if (!isRecord(plant)) return ['plant must be an object'];
-    return [...(plant['piping'] === undefined ? [] : pipingErrors(plant['piping'])), ...supportCarrierErrors(raw)];
+    return plant['piping'] === undefined ? [] : pipingErrors(plant['piping']);
   },
   derivedEntityIds: (doc) => new Set(Object.values(getPiping(doc).entityIds).flat()),
   reconcile,

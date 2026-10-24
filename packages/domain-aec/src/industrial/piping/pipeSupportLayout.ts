@@ -63,7 +63,7 @@ export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
 
 /** Every pipe a support can rest on: the building pipes in model order, then the plant runs in run order. */
 export function pipeRunsOf(units: ModelUnits): PipeRun[] {
-  return carrierPipes(units.source, units.building, units.building.levelOrder[0] ?? '').map((pipe) => pipeRunOf(units, pipe));
+  return carrierPipes(units.source, units.building).map((pipe) => pipeRunOf(units, pipe));
 }
 
 /** Supports of pipe `pipeId`, in model order. */
