@@ -4,7 +4,7 @@ import { changed } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, PipeRun } from '@aec/plant/types';
-import { dot3, sub3 } from '@lib/vec3';
+import { sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
 import { getBuilding } from '../../../building/model';
 import { pipeSizeByOutsideDiameter } from '../../../industrial/piping/pipeSizes';
@@ -19,7 +19,7 @@ import { takeoffOf } from '../takeoff';
 /**
  * @affects creates 1 pipe run (and 1 pipe line unless lineId is given) from a legacy building pipe; with `replace` deletes the legacy pipe
  *   (and the pipe supports hosted by it) from the building model
- * @invariant the polyline vertices become the points of intersection (collinear ones merge), world z = level elevation + vertex z; the line number is
+ * @invariant the polyline vertices become the points of intersection (vertices that bend by no more than the spec angle tolerance merge), world z = level elevation + vertex z; the line number is
  *   the legacy `line` text verbatim; both run ends are open; parts, cut lengths and welds are derived from the spec exactly as for route_pipe
  * @failure unknown pipe -> RTE_UNKNOWN_PIPE; unknown spec / line -> RTE_SPEC_UNKNOWN / RTE_UNKNOWN_LINE; no DN -> RTE_SIZE_MISMATCH; a bend no spec elbow
  *   fits -> RTE_NO_FITTING_FOR_ANGLE (detail.vertices); line number used -> RTE_DUPLICATE_LINE_NUMBER; leg too short -> RTE_SEGMENT_TOO_SHORT
@@ -97,15 +97,23 @@ export const convertPipeRun = defineCommand({
     const tolerance = lookup.elbowAngles().toleranceDeg;
     // Every bend must have a spec elbow: list them all, not only the first.
     const unfit: Array<{ vertex: number; angleDeg: number }> = [];
+    // A vertex that deflects by no more than the spec angle tolerance is straight pipe: it merges (counted in data.mergedPoints).
+    const kept: Vec3[] = [world[0] as Vec3];
+    let straightened = 0;
     for (let i = 1; i + 1 < world.length; i++) {
       const [before, after] = [
-        unitVector(sub3(world[i] as Vec3, world[i - 1] as Vec3)),
+        unitVector(sub3(world[i] as Vec3, kept.at(-1) as Vec3)),
         unitVector(sub3(world[i + 1] as Vec3, world[i] as Vec3)),
       ];
-      if (dot3(before, after) > 1 - 1e-12) continue;
-      const choice = chooseElbow(lookup, dn, turnAngleDeg(before, after), tolerance);
-      if ('code' in choice) unfit.push({ vertex: i, angleDeg: turnAngleDeg(before, after) });
+      const turn = turnAngleDeg(before, after);
+      if (turn <= tolerance) {
+        straightened += 1;
+        continue;
+      }
+      kept.push(world[i] as Vec3);
+      if ('code' in chooseElbow(lookup, dn, turn, tolerance)) unfit.push({ vertex: i, angleDeg: turn });
     }
+    kept.push(world.at(-1) as Vec3);
     if (unfit.length > 0)
       return refuse(
         doc,
@@ -121,7 +129,7 @@ export const convertPipeRun = defineCommand({
           toleranceDeg: tolerance,
         },
       );
-    const path = buildPath({ point: world[0] as Vec3 }, undefined, [], world.slice(1), tolerance);
+    const path = buildPath({ point: world[0] as Vec3 }, undefined, [], kept.slice(1), tolerance);
     if (!path.ok)
       return refuse(
         doc,
@@ -179,6 +187,15 @@ export const convertPipeRun = defineCommand({
     let removed: string[] = [];
     if (params.replace === true) {
       const deleted = execute(result, 'delete_building_element', { elementIds: [pipe.id] }, ctx);
+      if (deleted.rejected === true || deleted.document === result)
+        return refuse(
+          doc,
+          'convert_pipe_run',
+          deleted.error?.code ?? 'RTE_UNKNOWN_PIPE',
+          `the legacy pipe ${pipe.id} could not be replaced: ${deleted.summary}`,
+          [pipe.id],
+          ['replace'],
+        );
       result = deleted.document;
       removed = deleted.affected;
     }
@@ -220,6 +237,7 @@ export const convertPipeRun = defineCommand({
         warnings: takeoff.warnings,
         unverified: takeoff.unverified,
         unverifiedReasons: takeoff.unverifiedReasons,
+        mergedPoints: straightened + path.merged,
         replaced: params.replace === true,
       },
     };

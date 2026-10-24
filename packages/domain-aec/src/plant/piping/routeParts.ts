@@ -23,7 +23,7 @@ import {
 import { centrelineLength, chooseElbow, turnAngleDeg, type ElbowChoice } from './fittings';
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
-import { runPoints } from './model';
+import { getPiping, runPoints } from './model';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
 import { flangeParts, mintSet, setupEnd } from './routeEnds';
 import { at, makeEnv, partOf, type Env, type Mint, type Slot } from './routeEnv';
@@ -95,6 +95,12 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
   const pipe = env.pipeAt(dnStart);
   if (isFailure(pipe)) return pipe;
   const { od, wall } = pipe;
+  if (run.start.ref?.kind === 'branch') {
+    // A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code.
+    const header = getPiping(doc).runs[run.start.ref.runId];
+    const parent = header === undefined ? null : deriveRun(doc, header);
+    if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
+  }
   const start = setupEnd(env, run.start, 'start', dnStart);
   if (isFailure(start)) return start;
   const end = setupEnd(env, run.end, 'end', dnEnd);
@@ -187,7 +193,7 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
             gap: bw?.gapMm ?? 0,
             kind: 'fitting',
           };
-    const stack = stackLeg(length, [head, ...mids.map((slot) => slot.interval), tail], minWeld, eps);
+    const stack = stackLeg(length, [head, ...mids.map((slot) => slot.interval), tail], 0, eps);
     if (!stack.ok)
       return fail(
         stack.code,
@@ -209,6 +215,12 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
       if (piece !== undefined) {
         const info = env.pipeAt(dnHere);
         if (isFailure(info)) return info;
+        // Weld spacing is judged per piece against its own wall (the stack only reports fitting-to-fitting).
+        const minimum = defaultMinWeldSpacing(info.wall);
+        if (piece.cut < minimum)
+          warnings.push(
+            warningOf({ code: 'RTE_WELD_SPACING', from: a.id, to: b.id, cutLengthMm: piece.cut, minimumMm: minimum }, run.id, leg),
+          );
         const pieceId = mint('pipe');
         cuts.push(piece.cut);
         legPieces.push({ id: pieceId, start: piece.start, end: piece.end });

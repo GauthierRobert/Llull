@@ -91,11 +91,13 @@
         "fittings": ["reducingTee", "weldolet"],
         "headerCutMm": [3857, 5857],
         "branchDn100CutMm": [1870],
-        "branchDn50CutMm": [856]
+        "branchDn50CutMm": [856],
+        "buttWelds": 7,
+        "branchWelds": 1
       },
       "tolerance": { "abs": 0.01 },
       "reference": "README D3; B16.9 6x6x4 C 143 / M 130 (S9, S12); weldolet outlet 144 mm from the header centreline = declared stub input (unverified), 1000 - 144",
-      "grade": "A",
+      "grade": "A for the tee rows; the DN50 branch cut 856 is derived from a declared input (weldolet A 144), not grade A",
       "frs": ["FR-RTE-08", "FR-RTE-09"],
       "test": "tests/unit/plant/piping/branches.test.ts"
     },

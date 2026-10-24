@@ -115,6 +115,36 @@ describe('convert_pipe_run (SC-RTE-09)', () => {
     expect(result.pipePieces.map((piece) => piece.cutLengthMm)).toEqual([1848, 848]);
   });
 
+  it('treats a vertex that bends by no more than the spec tolerance (1 deg) as straight: a 0.29 deg kink merges and is reported', () => {
+    const l = legacy(
+      [
+        [0, 0, 0],
+        [1000, 0, 0],
+        [2000, 5, 0],
+        [2000, 1005, 0],
+      ],
+      { dn: 100, line: 'L-6' },
+    );
+    const result = data<Converted & { mergedPoints: number }>(l.doc, 'convert_pipe_run', { pipeId: l.pipeId, spec: 'CS150' });
+    expect(result.mergedPoints).toBe(1);
+    expect(result.pis).toEqual([[2000, 5, 0]]);
+    expect(result.counts).toMatchObject({ elbow90LR: 1, pipePieces: 2 });
+  });
+
+  it('refuses a 4 deg kink: it and the 86 deg bend after it have no spec elbow (vertices 1 and 2)', () => {
+    const l = legacy(
+      [
+        [0, 0, 0],
+        [1000, 0, 0],
+        [2000, 70, 0],
+        [2000, 1070, 0],
+      ],
+      { dn: 100, line: 'L-7' },
+    );
+    const refused = expectRefusal(l.doc, 'convert_pipe_run', { pipeId: l.pipeId, spec: 'CS150' }, 'RTE_NO_FITTING_FOR_ANGLE', 'points.1');
+    expect(refused.error?.detail?.['vertices']).toEqual([1, 2]);
+  });
+
   it('takes the DN from the diameter when the pipe has none (114.3 mm = DN100) and builds the template line number', () => {
     const l = legacy(
       [

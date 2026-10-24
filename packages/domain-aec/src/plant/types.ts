@@ -187,7 +187,7 @@ export interface RoutedPart {
 export interface Joint {
   /** `${runId}/joint-${k}` in route order. */
   readonly id: string;
-  readonly kind: 'buttWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
+  readonly kind: 'buttWeld' | 'branchWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
   readonly parts: readonly [string, string];
   readonly position: Vec3;
   /** Weld root gap (butt weld) or gasket thickness (flanged), mm. */

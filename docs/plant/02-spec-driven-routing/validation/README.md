@@ -98,8 +98,8 @@ Common inputs (stub CS150): NPS 4 LR 90 A = 152, WN CL150 Y = 76, gasket g = 3.0
   (1685.5 − 3 − 76) − (1000 + 3 + 76) = 527.5. Upper piece (2500 − 152) − (1914.5 + 3 + 76) = 354.5.
 - **D3 (SC-RTE-03).** Header 0 → 10 000 with a 6×6×4 tee at 4000 (C 143): 4000 − 143 = 3857 and
   6000 − 143 = 5857 (the weldolet at 7000 does not cut the header). Branch to TP-3 at y 2000: 2000 − 130 = 1870.
-- **D3b (SC-RTE-03, M2).** Weldolet 6×2 at 7000 with its outlet face A = 144 mm from the header centreline (stub input): the DN50
-  branch piece is 1000 − 144 = 856. Header pieces stay 3857 / 5857 (an olet does not cut the header). Pipe pieces of the line: 4.
+- **D3b (SC-RTE-03, M2; derived from a declared input, not grade A).** Weldolet 6×2 at 7000 with its outlet face A = 144 mm from the header centreline (stub input): the DN50
+  branch piece is 1000 − 144 = 856. Header pieces stay 3857 / 5857 (an olet does not cut the header). Pipe pieces of the line: 4. Butt welds 7 (header 4, tee branch 2, olet branch 1) + 1 branch (set-on) weld.
 - **D4 (SC-RTE-04).** s = 0.01, plan length 8000: drop 80; leg √(8000² + 80²) = 8000.39999; angle atan 0.01 =
   0.5729387°; turn into the vertical acos(80 / 8000.39999) = 89.4270613°, deviation 0.5729387° (≤ 1° accept,
   > 0.5° refuse). NPS 2 A = 76: cuts 8000.39999 − 76 = 7924.39999 and (1000 − 80) − 76 = 844.

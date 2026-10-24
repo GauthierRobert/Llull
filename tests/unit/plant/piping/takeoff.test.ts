@@ -35,6 +35,7 @@ describe('piping_takeoff: SC-RTE-01', () => {
     expect(takeoff.counts).toEqual({
       pipePieces: 5,
       buttWelds: 10,
+      branchWelds: 0,
       socketWelds: 0,
       threadedJoints: 0,
       flangedJoints: 2,

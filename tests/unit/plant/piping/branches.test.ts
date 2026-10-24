@@ -10,7 +10,7 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import { createEmptyDocument, type CadDocument, type RevolutionEntity } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
-import { addTie, cs150Line, headerScene, rteJson, valveScene } from './rteFixtures';
+import { addTie, cs150Line, headerScene, rteJson, routedPumpToVesselWithTee, valveScene } from './rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
 
@@ -89,7 +89,7 @@ describe('add_branch: tees and olets from the branch table (SC-RTE-03)', () => {
       legs: [{ direction: '+Z', length: 1000 }],
     });
     const t = data<Takeoff>(both, 'piping_takeoff', { lineId: s.lineId });
-    expect(t.counts).toMatchObject({ reducingTee: 1, weldolet: 1, pipePieces: 4 });
+    expect(t.counts).toMatchObject({ reducingTee: 1, weldolet: 1, pipePieces: 4, buttWelds: 7, branchWelds: 1 });
     expect(cuts(t.pipePieces, 150)).toEqual([3857, 5857]);
     expect(cuts(t.pipePieces, 100)).toEqual([1870]);
     expect(cuts(t.pipePieces, 50)).toEqual([856]);
@@ -538,5 +538,71 @@ describe('delete_pipe_run with branches', () => {
     expect(result.summary).toContain(`header ${s.headerId} re-derived without the branch`);
     const last = ok(result.document, 'delete_pipe_run', { runId: oletRun });
     expect((piping(last.document).runs[s.headerId] as PipeRun).branches).toBeUndefined();
+  });
+});
+
+describe('olets and stub-ins must not overlap (RTE_BRANCH_ON_FITTING)', () => {
+  const s = headerScene();
+  const olet = (x: number, direction: '+Z' | '-Z' = '+Z'): Record<string, unknown> => ({
+    runId: s.headerId,
+    at: { point: [x, 0, 3000] },
+    dn: 50,
+    legs: [{ direction, length: 1000 }],
+  });
+  const first = apply(s.doc, 'add_branch', olet(7000));
+
+  it('refuses the same weldolet twice, and one 10 mm away (footprints need 60.3 mm: two DN50 radii)', () => {
+    const duplicate = expectRefusal(first, 'add_branch', olet(7000), 'RTE_BRANCH_ON_FITTING', 'branches');
+    expect(duplicate.error?.detail).toMatchObject({ requiredMm: 60.3 });
+    expectRefusal(first, 'add_branch', olet(7010), 'RTE_BRANCH_ON_FITTING', 'branches');
+    expectRefusal(first, 'add_branch', olet(7060), 'RTE_BRANCH_ON_FITTING', 'branches');
+  });
+
+  it('allows a second olet once the footprints clear: 100 mm further along, or on the opposite side of the header', () => {
+    expect(ok(first, 'add_branch', olet(7100)).rejected).toBeUndefined();
+    // opposite side: arc = 84.15 x pi = 264 mm >= 60.3
+    expect(ok(first, 'add_branch', olet(7000, '-Z')).rejected).toBeUndefined();
+  });
+});
+
+describe('a branch hangs on its header: the header broken breaks the branch (and back)', () => {
+  const base = routedPumpToVesselWithTee();
+
+  it('moving the vessel nozzle breaks the header with RTE_STRETCH_FAILED and the tee branch with the header code, parts removed', () => {
+    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1200 });
+    const header = piping(broken).runs[base.runId] as PipeRun;
+    const branch = piping(broken).runs[base.branchRunId] as PipeRun;
+    expect(header.broken?.code).toBe('RTE_STRETCH_FAILED');
+    expect(branch.broken?.code).toBe('RTE_STRETCH_FAILED');
+    expect(branch.broken?.reason).toContain(`header ${base.runId}:`);
+    expect(piping(broken).entityIds[base.runId]).toEqual([]);
+    expect(piping(broken).entityIds[base.branchRunId]).toEqual([]);
+    const checks = data<{ issues: Array<{ code: string; ids: string[] }> }>(broken, 'check_piping', {});
+    expect(checks.issues.filter((issue) => issue.code === 'RTE_OPEN_END')).toEqual([]);
+    expect(checks.issues.filter((issue) => issue.code === 'RTE_STRETCH_FAILED').map((issue) => issue.ids[0])).toEqual([
+      base.runId,
+      base.branchRunId,
+    ]);
+  });
+
+  it('putting the nozzle back re-derives the header and the branch with their entities', () => {
+    const broken = apply(base.doc, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1200 });
+    const back = apply(broken, 'update_nozzle', { equipment: 'V-101', mark: 'N1', projection: 1000 });
+    for (const id of [base.runId, base.branchRunId]) {
+      expect((piping(back).runs[id] as PipeRun).broken).toBeUndefined();
+      expect(piping(back).entityIds[id]).toEqual(piping(base.doc).entityIds[id]);
+    }
+    expect(back.entities).toEqual(base.doc.entities);
+  });
+});
+
+describe('purity of delete_pipe_run with cascade', () => {
+  it('leaves the input header, branches and entities untouched and gives the same result twice', () => {
+    const s = headerScene();
+    const doc = apply(s.doc, 'add_branch', { runId: s.headerId, at: { point: [4000, 0, 3000] }, dn: 100, to: { portId: s.tieC } });
+    const before = structuredClone(doc);
+    const first = execute(doc, 'delete_pipe_run', { runId: s.headerId, cascade: true });
+    expect(doc).toEqual(before);
+    expect(execute(doc, 'delete_pipe_run', { runId: s.headerId, cascade: true }).document).toEqual(first.document);
   });
 });

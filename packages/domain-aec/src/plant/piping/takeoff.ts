@@ -55,6 +55,7 @@ const bump = (counts: Record<string, number>, key: string, by = 1): void => {
 
 const JOINT_KEYS: Readonly<Record<Joint['kind'], string>> = {
   buttWeld: 'buttWelds',
+  branchWeld: 'branchWelds',
   socketWeld: 'socketWelds',
   threaded: 'threadedJoints',
   flanged: 'flangedJoints',
@@ -66,7 +67,8 @@ const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
   const counts: Record<string, number> = {};
-  for (const key of ['pipePieces', 'buttWelds', 'socketWelds', 'threadedJoints', 'flangedJoints', 'fittingToFitting']) counts[key] = 0;
+  for (const key of ['pipePieces', 'buttWelds', 'branchWelds', 'socketWelds', 'threadedJoints', 'flangedJoints', 'fittingToFitting'])
+    counts[key] = 0;
   const parts: Takeoff['parts'][number][] = [];
   const pipePieces: PipePieceRow[] = [];
   const joints: Joint[] = [];

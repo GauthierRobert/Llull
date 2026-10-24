@@ -342,12 +342,13 @@ describe('insert_inline_component: reducers change the run size', () => {
       'RTE_SIZE_MISMATCH',
     );
     // A second reducer 100 -> 80 would leave the run at DN80 but the end port is DN100.
-    expectRefusal(
+    const second = expectRefusal(
       routed,
       'insert_inline_component',
       { runId, type: 'reducerConcentric', dn2: 80, at: { leg: 0, centreDistance: 5000 } },
       'RTE_SIZE_MISMATCH',
     );
+    expect(second.summary).toContain('the run is DN80 at its end (after its reducers; line');
   });
 
   it('removing the reducer is refused while the end port needs the small size, and restores the size on an open run', () => {
@@ -360,7 +361,9 @@ describe('insert_inline_component: reducers change the run size', () => {
     });
     const runId = piping(routed).runOrder[0] as string;
     const componentId = (piping(routed).runs[runId] as PipeRun).inline?.[0]?.id as string;
-    expectRefusal(routed, 'remove_inline_component', { runId, componentId }, 'RTE_SIZE_MISMATCH');
+    const refused = expectRefusal(routed, 'remove_inline_component', { runId, componentId }, 'RTE_SIZE_MISMATCH');
+    expect(refused.summary).toContain('the run is DN150 at its end');
+    expect(refused.summary).not.toContain('after its reducers');
   });
 });
 
@@ -476,6 +479,17 @@ describe('move_inline_component and remove_inline_component', () => {
       { runId: s.runId, componentId: s.valveId, centreDistance: 1450 },
       'RTE_INLINE_DOES_NOT_FIT',
     );
+  });
+
+  it('move and remove are pure: the input document is unchanged and repeating gives the same document', () => {
+    const before = structuredClone(s.doc);
+    const move = { runId: s.runId, componentId: s.valveId, delta: 100 };
+    const remove = { runId: s.runId, componentId: s.valveId };
+    const moved = execute(s.doc, 'move_inline_component', move);
+    const removed = execute(s.doc, 'remove_inline_component', remove);
+    expect(s.doc).toEqual(before);
+    expect(execute(s.doc, 'move_inline_component', move).document).toEqual(moved.document);
+    expect(execute(s.doc, 'remove_inline_component', remove).document).toEqual(removed.document);
   });
 
   it('removes the valve: the leg is one piece again (1269) and the run equals SC-RTE-01', () => {

@@ -817,7 +817,7 @@ Built: flange sets on valve faces, inline valves and concentric reducers, branch
 | Conversion, line update | `commands/convertPipeRun.ts`, `commands/updatePipeline.ts` | |
 | Run commands | `commands/inlineComponents.ts` (`insert_inline_component`, `move_inline_component`, `remove_inline_component`), `commands/addBranch.ts`, `commands/deleteRun.ts` (`cascade`), `commands/routePipe.ts` (`inline`), `runUpdate.ts` (`rederive`: derive the changed runs and every run attached to them and rebuild their entities, or fail whole) | |
 | Display | `geometryInline.ts` | Valve = body + stem + handwheel disc on layer `P-VALV` (ids `<valve>`, `<valve>/stem`, `<valve>/wheel`), reducer frustum, tee = header cylinder + `<tee>/branch` stub, olet cylinder, stub-in none. Schematic: the proportions are named display constants, a catalogue `stemHeight` sets the stem length |
-| Tests | `tests/unit/plant/piping/{inlineComponents,inlineVariants,branches,branchPorts,checks,convertPipeRun,updatePipeline,rteScenarioPlans}.test.ts`, golden `piping_gate_valve`, `piping_header_branches`, `piping_reducer_run`, `piping_legacy_conversion` | Coverage of `plant/piping/**`: 97.97 % statements, 92.62 % branches, 99.08 % functions, 99.33 % lines (measured 2026-10-24 with `tests/unit/plant`) |
+| Tests | `tests/unit/plant/piping/{inlineComponents,inlineVariants,branches,branchPorts,checks,convertPipeRun,updatePipeline,rteScenarioPlans}.test.ts`, golden `piping_gate_valve`, `piping_header_branches`, `piping_reducer_run`, `piping_legacy_conversion` | Coverage of `plant/piping/**`: 97.87 % statements, 92.51 % branches, 99.08 % functions, 99.29 % lines (measured 2026-10-24 with `tests/unit/plant`) |
 
 Validation numbers (hand calculations from the stub catalogue, never copied from an output of llull):
 
@@ -845,6 +845,14 @@ Decisions (owner delegated: long-term quality over the cheap path):
   (MSS SP-97 dimension A, from the header centreline, how the tables publish it); a row with only `height` is read as `OD_header / 2 + height` (§5.5). The stub's weldolet 6x2 is a declared input
   (A 144, unverified); sockolet and threadolet rows have an SW / THD outlet and are refused by the connection rule (`RTE_NO_CONNECTION_RULE`). A stub-in (`SI`, `SIR`) has no row: the branch pipe starts at the header
   surface (`OD / 2`), the part is `stubIn`, `reviewRequired` is true and `check_piping` reports `RTE_STUB_IN_REVIEW`.
+- **Olets and stub-ins must not overlap.** On one header leg the footprints (discs of radius = half the row `baseDiameter`, else the branch pipe radius) must clear:
+  `sqrt(dx^2 + (R angle)^2) >= r1 + r2`, dx the axial distance, R the header outside radius, angle the angle between the two branch directions. The same olet twice or 10 mm apart is
+  `RTE_BRANCH_ON_FITTING`; the opposite side of the header or 100 mm further is allowed. Checked in `layoutBranches`, so every command that derives the header refuses it.
+- **Set-on welds.** The olet / stub-in to header weld is a `branchWeld` joint, counted as `branchWelds` in the takeoff, apart from `buttWelds`. SC-RTE-03: 7 butt welds + 1 branch weld.
+- **A branch is broken with its header.** `deriveRun` of a branch run first derives its header and fails with `header <id>: <header message>` and the header's code, so a header
+  that lost its port (`RTE_STRETCH_FAILED`) breaks the branch too (parts removed) and the branch comes back when the header does.
+- **Weld spacing in the derivation** is judged per pipe piece against its own wall, as `check_piping` does. `convert_pipe_run` treats a vertex that bends by no more than the spec angle tolerance as straight
+  (merged, `data.mergedPoints`) and refuses the whole conversion if the nested `delete_building_element` of `replace` is rejected.
 - **Codes for overlaps.** A tee overlapping an elbow set, a valve or another tee is `RTE_BRANCH_ON_FITTING`; a valve or reducer overlapping anything is `RTE_INLINE_DOES_NOT_FIT`
   (the inline commands report a tee collision with this code too); two plain fittings (elbows, flange sets) `RTE_SEGMENT_TOO_SHORT`.
 - **Added codes and commands.** `RTE_UNKNOWN_COMPONENT` (inline component id not on the run), `RTE_UNKNOWN_PIPE` (`convert_pipe_run`: not a legacy pipe) and `RTE_END_TYPE_MISMATCH`
@@ -870,6 +878,9 @@ Decisions (owner delegated: long-term quality over the cheap path):
 - **Reconcile.** `reconcile` re-derives the runs attached to a stale run (a header's branch runs, a run continuing from an end).
 - **Plans.** `facePositions` replaces `valveFacesZ`; `teeReducing` is the PSC type name `reducingTee`; `$alias` in an expected value stands for the first id the step with `as` produced; SC-RTE-09 imports the stub first. The test harness `pick`
   accepts numeric filters (`[?dn==150]`) and maps a property over a list.
+
+TODO (data): the weldolet 6x2 `centreToOutlet` 144 is an invented stub input, so the DN50 cut 856 is only "derived from a declared input". Before a real catalogue maps MSS SP-97, source dimension A and its datum
+(header centreline, as assumed here, or header surface) and set `verified`.
 
 Open for M3 / V1: orthogonal stretch for branches and inline components (their leg indices and distances move with the PIs), `edit_route`, slope legs and adverse slope, insulation envelope in `check_clashes`, line-number settings, supports on runs,
 eccentric reducers, trimmed elbows, valve operator clash, PCF / IFC output of valves and branches (05 / 08).

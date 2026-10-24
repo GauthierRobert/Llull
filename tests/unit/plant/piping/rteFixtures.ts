@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { apply, data } from '../../../helpers/commandAssertions';
+import { apply, data, ok } from '../../../helpers/commandAssertions';
 
 const DATA = path.resolve(__dirname, '../../../../docs/plant/02-spec-driven-routing/validation/data');
 
@@ -143,4 +143,16 @@ export function headerScene(): { doc: CadDocument; lineId: string; headerId: str
   const c = addTie(b.doc, 'TP-3', [4000, 2000, 3000], [0, -1, 0], { dn: 100 });
   const doc = apply(c.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } });
   return { doc, lineId: line.lineId, headerId: doc.plant?.piping?.runOrder[0] as string, tieA: a.id, tieB: b.id, tieC: c.id };
+}
+
+/** SC-RTE-01 with a DN100 equal tee (C = M = 105) on its +Y leg (leg 1) at 1500, the branch going +X 1000 to an open end. */
+export function routedPumpToVesselWithTee(): { doc: CadDocument; runId: string; branchRunId: string; line: string } {
+  const base = routedPumpToVessel();
+  const result = ok(base.doc, 'add_branch', {
+    runId: base.runId,
+    at: { leg: 1, distance: 1500 },
+    dn: 100,
+    legs: [{ direction: '+X', length: 1000 }],
+  });
+  return { doc: result.document, runId: base.runId, branchRunId: (result.data as { branchRunId: string }).branchRunId, line: base.line };
 }

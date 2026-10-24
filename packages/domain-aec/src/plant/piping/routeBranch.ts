@@ -7,7 +7,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
-import { len3, scale3, sub3 } from '@lib/vec3';
+import { dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { fail, isFailure, type DerivationFailure, type DerivedBranch } from './deriveTypes';
 import { unitVector } from './legs';
 import { getPiping, runPoints } from './model';
@@ -153,7 +153,37 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
     const [runHalf, start]: [number | null, Dimension] = 'run' in sizes ? [sizes.run, sizes.branch] : [null, sizes];
     fits.push({ ...base, typeKey, partId, branchStart: start.value, branchStartSource: start.source, runHalf, outletEnd });
   }
-  return fits;
+  return overlap(run.id, fits) ?? fits;
+}
+
+/** Footprint radius of an olet or stub-in on the header surface: half its base diameter if the row has one, else the branch pipe radius. */
+const footprint = (fit: BranchFit): number => (fit.row?.dims['baseDiameter'] ?? fit.branchOd) / 2;
+
+/**
+ * Two olets / stub-ins whose footprints touch on the header surface collide (§5.5: a branch point inside another fitting's interval). The footprints are
+ * discs of radius r1, r2; their centres are |dx| apart along the header and R x angle apart round it (R = header outside radius, angle = the angle between
+ * the two branch directions), so branches in different directions are allowed when sqrt(dx^2 + (R angle)^2) >= r1 + r2.
+ */
+function overlap(runId: string, fits: readonly BranchFit[]): DerivationFailure | null {
+  const sits = fits.filter((fit) => fit.kind !== 'tee');
+  for (let i = 0; i < sits.length; i++)
+    for (let j = i + 1; j < sits.length; j++) {
+      const [a, b] = [sits[i] as BranchFit, sits[j] as BranchFit];
+      if (a.point.leg !== b.point.leg) continue;
+      const dx = Math.abs(a.point.distance - b.point.distance);
+      const angle = Math.acos(Math.max(-1, Math.min(1, dot3(a.direction, b.direction))));
+      const apart = Math.hypot(dx, (a.headerOd / 2) * angle);
+      const needed = footprint(a) + footprint(b);
+      if (apart < needed)
+        return fail(
+          'RTE_BRANCH_ON_FITTING',
+          `branches ${a.point.id} and ${b.point.id} of run ${runId} overlap on the header: their centres are ${+apart.toFixed(2)} mm apart on the surface, the footprints need ${+needed.toFixed(2)} mm`,
+          [runId, a.point.id, b.point.id],
+          ['branches'],
+          { distanceMm: apart, requiredMm: needed },
+        );
+    }
+  return null;
 }
 
 /** The slot a tee occupies on its header leg: centre-to-end C each side of the branch point. */
@@ -224,7 +254,7 @@ export function oletPart(env: Env, fit: BranchFit, onPart: string): { part: Rout
           ...extra,
         }
       : partOf(env.run.id, fit.partId, 'olet', fit.row, ports, extra);
-  return { part, joint: { kind: env.weld?.joint ?? 'buttWeld', parts: [fit.partId, onPart], position: base, gapMm: 0 } };
+  return { part, joint: { kind: 'branchWeld', parts: [fit.partId, onPart], position: base, gapMm: 0 } };
 }
 
 /** The `DerivedBranch` record of a fit. */

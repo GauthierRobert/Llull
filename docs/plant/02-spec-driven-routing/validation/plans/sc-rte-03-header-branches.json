@@ -54,8 +54,8 @@
     {
       "step": 11,
       "path": "data.counts",
-      "value": { "reducingTee": 1, "weldolet": 1, "pipePieces": 4 },
-      "source": "header cut by the tee only; the olet does not cut the header"
+      "value": { "reducingTee": 1, "weldolet": 1, "pipePieces": 4, "buttWelds": 7, "branchWelds": 1 },
+      "source": "header cut by the tee only; the olet does not cut the header. Butt welds: header tie-pipe, pipe-tee, tee-pipe, pipe-tie (4) + tee outlet-branch pipe, branch pipe-TP-3 (2) + olet outlet-DN50 pipe (1) = 7; the olet set-on weld to the header is the 1 branch weld"
     },
     {
       "step": 11,

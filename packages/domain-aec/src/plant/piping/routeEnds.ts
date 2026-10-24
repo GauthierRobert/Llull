@@ -24,7 +24,12 @@ export function setupEnd(env: Env, end: RunEnd, side: 'start' | 'end', dn: numbe
   const portId = portIdOf(doc, end.ref);
   if (port === null) return fail('RTE_UNKNOWN_PORT', `the ${side} port ${portId} no longer exists`, [portId], [side]);
   if (port.dn !== dn)
-    return fail('RTE_SIZE_MISMATCH', `port ${portId} is DN${port.dn}, line ${line.id} is DN${dn}`, [portId, line.id], [side]);
+    return fail(
+      'RTE_SIZE_MISMATCH',
+      `port ${portId} is DN${port.dn}, the run is DN${dn} at its ${side}${dn === line.dn ? '' : ` (after its reducers; line ${line.id} is DN${line.dn})`}`,
+      [portId, line.id],
+      [side],
+    );
   const moved = sub3(port.position, end.point);
   if (len3(moved) > epsilonFor(port.position, end.point))
     return fail(
