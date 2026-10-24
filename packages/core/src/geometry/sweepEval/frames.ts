@@ -15,6 +15,7 @@ import { add3, cross3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../..
 import { segmentLengths } from '../../lib/polyline';
 import { clamp01 } from '../../lib/clamp';
 import { chainLength, isClosedChain, minCurvatureRadius, segmentPoint, segmentSteps, segmentTangent } from '../curveSegments';
+import { ellipseCurvature, ellipseLengthTo } from '../ellipseSegment';
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -350,13 +351,15 @@ export function pathSamplesAt(
 
 /** Segment parameter at arc-length fraction `f` of the segment (identity for lines and arcs; bisection on the smooth length for Béziers). */
 function segmentParameter(segment: CurveSegment<Vec3>, f: number): number {
-  if (segment.type !== 'bezier') return f;
-  const target = f * bezierLengthTo(segment.points, 1);
+  if (segment.type === 'line' || segment.type === 'arc') return f;
+  const lengthTo = (u: number): number =>
+    segment.type === 'bezier' ? bezierLengthTo(segment.points, u) : ellipseLengthTo(segment.points, u);
+  const target = f * lengthTo(1);
   let lo = 0;
   let hi = 1;
   for (let i = 0; i < 48; i++) {
     const mid = (lo + hi) / 2;
-    if (bezierLengthTo(segment.points, mid) < target) lo = mid;
+    if (lengthTo(mid) < target) lo = mid;
     else hi = mid;
   }
   return (lo + hi) / 2;
@@ -384,6 +387,7 @@ export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: numb
 function endCurvature(segment: CurveSegment<Vec3>, end: boolean): number {
   if (segment.type === 'line') return 0;
   if (segment.type === 'arc') return 1 / Math.max(minCurvatureRadius(segment), 1e-300);
+  if (segment.type === 'ellipse') return ellipseCurvature(segment.points, end ? 1 : 0);
   const [p0, p1, p2, p3] = segment.points;
   const [d1, d2] = end
     ? [sub3(p3, p2), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 2)]

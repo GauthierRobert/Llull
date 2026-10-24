@@ -126,3 +126,6 @@ export function sizePair(input: {
   }
   return null;
 }
+
+/** DN values of the EN 10220 series, ascending. */
+export const en10220Dns = (): readonly number[] => [...EN_10220_OD_MM.keys()];

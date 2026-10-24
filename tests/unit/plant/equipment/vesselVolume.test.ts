@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { drumDocument, drumParams, separatorDocument } from './equipmentFixtures';
 
 interface VolumeData {
   totalVolumeM3: number;
@@ -159,5 +160,58 @@ describe('vessel_volume', () => {
   it('is registered 1:1 in the tool schemas', () => {
     expect(listCommands().some((command) => command.name === 'vessel_volume')).toBe(true);
     expect(toToolSchemas().some((tool) => tool.name === 'vessel_volume')).toBe(true);
+  });
+});
+
+describe('vessel_volume: equipment form (SC-EQP-01 / SC-EQP-02)', () => {
+  interface EquipmentVolume extends VolumeData {
+    operating?: { levelAboveBottomTangent: number; liquidVolumeM3: number; percent: number; liquidMassKg: number; specificGravity: number };
+  }
+
+  it('reads the stored vessel: total volume, and the operating liquid of its design data', () => {
+    const result = data<EquipmentVolume>(separatorDocument(), 'vessel_volume', { equipment: 'V-101' });
+    expect(rel(result.totalVolumeM3, 7.9521564043991635)).toBeLessThan(1e-9);
+    expect(rel(result.operating?.liquidVolumeM3 ?? 0, 3.0925052683774528)).toBeLessThan(1e-9);
+    expect(result.operating?.levelAboveBottomTangent).toBe(1500);
+    expect(rel(result.operating?.liquidMassKg ?? 0, 3.0925052683774528 * 850)).toBeLessThan(1e-12);
+    expect(result.insideHeight).toBeCloseTo(4750, 9);
+  });
+
+  it('SC-EQP-02 levels from the shell bottom; no operating block without a liquid; addressed by element id too', () => {
+    const doc = drumDocument(false);
+    const result = data<EquipmentVolume>(doc, 'vessel_volume', { equipment: 'D-201', levels: [1000, 500] });
+    expect(rel(result.totalVolumeM3, 20.943951023931955)).toBeLessThan(1e-9);
+    expect(rel(result.levels[0]?.liquidVolumeM3 ?? 0, 10.471975511965978)).toBeLessThan(1e-9);
+    expect(rel(result.levels[1]?.liquidVolumeM3 ?? 0, 4.012358330575208)).toBeLessThan(1e-9);
+    expect(result.operating).toBeUndefined();
+    expect(data<EquipmentVolume>(doc, 'vessel_volume', { equipment: 'equipment-1' }).totalVolumeM3).toBe(result.totalVolumeM3);
+  });
+
+  it('a horizontal vessel reports its operating liquid from the shell bottom', () => {
+    const doc = apply(mmDocument(), 'add_vessel', {
+      ...drumParams,
+      design: { operatingLiquid: { specificGravity: 1, levelAboveBottomTangent: 1000 } },
+    });
+    const result = data<EquipmentVolume>(doc, 'vessel_volume', { equipment: 'D-201' });
+    expect(rel(result.operating?.liquidVolumeM3 ?? 0, 10.471975511965978)).toBeLessThan(1e-9);
+    expect(result.operating?.percent).toBeCloseTo(50, 9);
+  });
+
+  it('refuses unknown or legacy equipment, equipment mixed with the inline geometry, and incomplete inline geometry', () => {
+    const doc = separatorDocument(false);
+    expectRefusal(doc, 'vessel_volume', { equipment: 'V-999' }, 'EQP_NOT_FOUND', 'equipment');
+    const block = apply(mmDocument(), 'add_equipment', { name: 'Skid', location: [0, 0], size: [1000, 1000, 1000], mark: 'P-1' });
+    expectRefusal(block, 'vessel_volume', { equipment: 'P-1' }, 'EQP_NOT_PARAMETRIC', 'equipment');
+    expectRefusal(doc, 'vessel_volume', { equipment: 'V-101', orientation: 'vertical' }, 'EQP_PARAM_INVALID', 'orientation');
+    expectRefusal(doc, 'vessel_volume', {}, 'EQP_PARAM_INVALID', 'orientation');
+    expectRefusal(doc, 'vessel_volume', { orientation: 'vertical' }, 'EQP_PARAM_INVALID', 'insideDiameter');
+    expectRefusal(doc, 'vessel_volume', { orientation: 'vertical', insideDiameter: 1000 }, 'EQP_PARAM_INVALID', 'tangentLength');
+    expectRefusal(
+      doc,
+      'vessel_volume',
+      { orientation: 'vertical', insideDiameter: 1000, tangentLength: 1000 },
+      'EQP_PARAM_INVALID',
+      'heads',
+    );
   });
 });

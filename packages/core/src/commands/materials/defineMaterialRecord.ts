@@ -37,7 +37,7 @@ export const defineMaterialRecord = defineCommand({
     licence: z
       .enum(LICENCE_FLAGS)
       .describe(
-        'Licence of the data: public-domain-us-gov, company-proprietary, vendor-catalogue, legacy. licensed-no-redistribution is refused here (MAT_LICENCE_EMBED_FORBIDDEN): it lives in a private library.',
+        'Licence of the data: public-domain-us-gov, open-data, company-proprietary, vendor-catalogue, legacy. licensed-no-redistribution is refused here (MAT_LICENCE_EMBED_FORBIDDEN): it lives in a private library.',
       ),
     exportMarking: markingInput.describe('Export-control marking of the material data.'),
     superseded: supersededSchema

@@ -2,6 +2,7 @@
 
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
+import { pipeSpecErrors } from '../spec/document';
 import { BUNDLED_CATALOG_ID } from './bundled';
 
 const isDim = (value: unknown): boolean =>
@@ -48,8 +49,11 @@ export function pipingCatalogErrors(raw: unknown): string[] {
 export const pipingCatalogDocument: DocumentExtension = {
   validate: (raw) => {
     const plant = raw['plant'];
-    if (!isRecord(plant) || plant['catalog'] === undefined) return [];
-    return pipingCatalogErrors(plant['catalog']);
+    if (!isRecord(plant)) return [];
+    return [
+      ...(plant['catalog'] === undefined ? [] : pipingCatalogErrors(plant['catalog'])),
+      ...(plant['spec'] === undefined ? [] : pipeSpecErrors(plant['spec'])),
+    ];
   },
   derivedEntityIds: () => new Set<string>(),
   restore: (raw) => raw,

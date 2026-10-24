@@ -2,7 +2,7 @@
   "id": "SC-PSC-05",
   "validates": ["VC-PSC-05", "VC-PSC-04", "VC-PSC-14", "VC-PSC-17"],
   "description": "Import a user catalogue fragment and check it: a wrong LR elbow radius (0.75 x OD, as in a FreeCAD table) is flagged, a missing citation is refused, an EN 10220 pipe mixed with ASME B16.9 fittings is flagged, and export / re-import is byte-stable",
-  "unbuilt": ["import_piping_catalog", "check_piping_catalog", "export_pipe_spec", "import_pipe_spec", "lookup_piping_component"],
+  "unbuilt": [],
   "actions": [
     { "command": "import_piping_catalog", "params": { "catalog": { "format": "llull-piping-catalog", "schemaVersion": 1, "id": "user-elbows", "licence": "company-proprietary", "families": [ { "id": "lr90-bad", "type": "elbow90", "radius": "LR", "standard": "ASME B16.9", "unit": "mm", "sizes": [ { "nps": 6, "outsideDiameter": 168.3, "centreToEnd": 126.2, "provenance": { "citation": "dodo tablez/Elbow_SCH-STD.csv BendRadius" } } ] } ] } } },
     { "command": "check_piping_catalog", "params": { "catalogId": "user-elbows" } },

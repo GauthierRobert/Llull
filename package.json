@@ -22,7 +22,7 @@
     "typecheck:production": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/production.tsbuildinfo -p tests/production",
     "claude:lint": "node .claude/hooks/claude-lint.mjs",
     "arch": "depcruise packages src server/src desktop/src --config .dependency-cruiser.cjs --output-type err",
-    "check": "node scripts/runParallel.mjs typecheck arch deadcode lint format:check native:check && npm run test",
+    "check": "npm run typecheck && node scripts/runParallel.mjs arch deadcode lint format:check native:check && npm run test",
     "native:check": "node scripts/nativeCheck.mjs",
     "format:check": "prettier --check --cache \"**/*.{ts,tsx,mts,mjs,cjs,js}\"",
     "test:e2e": "playwright test",

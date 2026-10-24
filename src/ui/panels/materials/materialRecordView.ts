@@ -29,6 +29,7 @@ const text = (value: unknown, fallback = ''): string => (typeof value === 'strin
 
 const LICENCE_TEXT: Readonly<Record<LicenceFlag, string>> = {
   'public-domain-us-gov': 'Public domain (US Gov)',
+  'open-data': 'Open data (redistributable, sourced)',
   'licensed-no-redistribution': 'Licensed, no redistribution',
   'company-proprietary': 'Company proprietary',
   'vendor-catalogue': 'Vendor catalogue',

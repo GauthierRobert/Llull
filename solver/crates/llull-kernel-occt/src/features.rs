@@ -172,7 +172,7 @@ pub fn shell_open(shape: &Shape, thickness: f64, open_near: &[f64]) -> Built {
     built(ffi::shell_open(inner(shape)?, thickness, open_near))
 }
 
-/// Planar face bounded by an encoded closed chain (per segment: type code 0 line / 1 arc / 2 Bezier, then its xyz points).
+/// Planar face bounded by an encoded closed chain (per segment: type code 0 line / 1 arc / 2 Bezier / 3 ellipse quarter [start, centre, end], then its xyz points).
 pub fn chain_face(chain: &[f64]) -> Built {
     built(ffi::chain_face(chain))
 }
@@ -388,6 +388,27 @@ mod tests {
         let section = circle_section([0.0; 3], [0.0, 0.0, 1.0], 1.0, Some(0.5)).unwrap().unwrap();
         let pipe = pipe_solid(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0], &section).unwrap().unwrap();
         assert!((volume(&pipe) - std::f64::consts::PI * 0.75 * 3.0).abs() < 1e-6);
+    }
+
+    /// 03 EQP Q3: a 2:1 ellipsoidal head (radius a, depth b = a / 2) revolved from an exact ellipse quarter is half an ellipsoid, 2/3 pi a^2 b.
+    #[test]
+    fn a_revolved_ellipse_quarter_is_an_exact_ellipsoidal_head() {
+        let pi = std::f64::consts::PI;
+        let (a, b) = (1.0, 0.5);
+        let expected = 2.0 / 3.0 * pi * a * a * b;
+        // line (0,0)->(a,0); ellipse quarter [(a,0), centre (0,0), (0,b)]; line (0,b)->(0,0)
+        let head = [0.0, 0.0, 0.0, 0.0, a, 0.0, 0.0, 3.0, a, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, b, 0.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let face = chain_face(&head).unwrap().unwrap();
+        let solid = revolution_of_face(&face, [0.0, 1.0, 0.0], 2.0 * pi).unwrap().unwrap();
+        assert!((volume(&solid) - expected).abs() < 1e-9 * expected, "volume {} vs {expected}", volume(&solid));
+        // the same head traversed the other way round (line up the axis, ellipse [(0, b), centre, (a, 0)], line back): same solid
+        let reversed = [0.0, 0.0, 0.0, 0.0, 0.0, b, 0.0, 3.0, 0.0, b, 0.0, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let face = chain_face(&reversed).unwrap().unwrap();
+        let solid = revolution_of_face(&face, [0.0, 1.0, 0.0], 2.0 * pi).unwrap().unwrap();
+        assert!((volume(&solid) - expected).abs() < 1e-9 * expected, "reversed volume {} vs {expected}", volume(&solid));
+        // a sheared (non-perpendicular conjugate) pair builds; a collinear start / centre / end is refused
+        assert!(chain_wire_ok(&[3.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0]).unwrap());
+        assert!(!chain_wire_ok(&[3.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0]).unwrap());
     }
 
     /// LIM-1 (9): an annulus swept around a closed spine is a valid hollow ring (no caps), like the full section.

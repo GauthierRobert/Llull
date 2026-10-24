@@ -12,6 +12,12 @@ export interface SectionEdge {
   readonly weights?: number[];
 }
 
+/** An ellipse quarter as ONE rational quadratic: the affine image of the unit-circle quarter (poles S, S + V, E; middle weight √2/2). */
+function ellipseEdge([start, center, end]: readonly [Vec2, Vec2, Vec2]): SectionEdge {
+  const corner: Vec2 = [start[0] + end[0] - center[0], start[1] + end[1] - center[1]];
+  return { degree: 2, poles: [start, corner, end], weights: [1, Math.SQRT1_2, 1] };
+}
+
 /** An arc given by centre, radius, start axis, perpendicular axis and sweep, split into rational quadratic pieces of at most 90 degrees. */
 function conicArc(center: Vec2, radius: number, u: Vec2, v: Vec2, sweep: number): SectionEdge[] {
   const pieces = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2) - 1e-9));
@@ -32,6 +38,7 @@ function segmentEdges(segment: CurveSegment<Vec2>): SectionEdge[] | null {
   const pts = segment.points;
   if (segment.type === 'line') return [{ degree: 1, poles: [pts[0] as Vec2, pts[1] as Vec2] }];
   if (segment.type === 'bezier') return [{ degree: 3, poles: pts.map((p): Vec2 => [p[0], p[1]]) }];
+  if (segment.type === 'ellipse') return [ellipseEdge(segment.points)];
   const geometry = arcGeometry(pts[0] as Vec2, pts[1] as Vec2, pts[2] as Vec2);
   if (geometry === null) return null;
   const { center, radius, u, v, sweep } = geometry;

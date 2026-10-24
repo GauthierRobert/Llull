@@ -2,6 +2,7 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
+import { testWorkers } from './testWorkers.ts';
 import { ISOLATED_SUITES } from './tests/isolatedSuites.ts';
 
 const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**'];
@@ -65,6 +66,7 @@ export default defineConfig(({ command }) => ({
     // Domain suites run whole engineering solves (portal-frame design, golden plans) that take
     // several seconds, more under coverage instrumentation.
     testTimeout: 30_000,
+    maxWorkers: testWorkers(),
     // Isolated agent worktrees (continue-working skill) live under the repo root
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app

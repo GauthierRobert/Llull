@@ -321,7 +321,7 @@ describe('rounded pocket outlines', () => {
     ).toMatch(/at least 3/);
   });
 
-  it('measures the distance to lines and arcs, including past an arc end', () => {
+  it('measures the distance to lines, arcs (including past an arc end) and sampled Bézier pieces', () => {
     const outline = roundedOutline(rectangle, 2);
     if (typeof outline === 'string') throw new Error(outline);
     expect(distanceToOutline(outline.curves, [10, 0])).toBeCloseTo(0, 9);
@@ -343,7 +343,7 @@ describe('rounded pocket outlines', () => {
         ],
         [1, 1],
       ),
-    ).toBe(Infinity);
+    ).toBeCloseTo(1, 3);
   });
 
   it('floorEdgeIndices picks the edges on the floor plane that follow the outline', () => {

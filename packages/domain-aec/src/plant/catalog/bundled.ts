@@ -201,7 +201,7 @@ function buildCatalog(): PipingCatalog {
     id: BUNDLED_CATALOG_ID,
     version: BUNDLED_CATALOG_VERSION,
     title: 'llull open piping catalogue: transcribed grade A / B rows of the 01 PSC validation pack (every value cites its source)',
-    licence: 'company-proprietary',
+    licence: 'open-data',
     families,
   };
 }

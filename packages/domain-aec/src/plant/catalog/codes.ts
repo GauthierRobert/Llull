@@ -7,6 +7,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PSC_CATALOG_CONFLICT: 'Pass replace: true or change the catalogue id.',
   PSC_CATALOG_UNKNOWN: 'Call list_piping_catalogs for the catalogue ids (the bundled one is llull-open-piping).',
   PSC_CATALOG_ROW_MISSING: "Import a catalogue that has the size, or change the spec's catalogRef.",
+  PSC_CATALOG_FAMILY_MISSING:
+    'The standard is import-only: import a catalogue that holds it (import_piping_catalog) or accept the unverified selection.',
+  PSC_RATING_TABLE_UNKNOWN:
+    'Import a rating table for the spec rating basis, or check the pressure by other means; the design pressure was not checked.',
   PSC_CATALOG_DIM_MISMATCH: 'Correct the value or remove the rule claim (standard) from the family.',
   PSC_PROVENANCE_MISSING: 'Add provenance.citation or provenance.sourceId to the size (or dimProvenance for the value).',
   PSC_UNIT_INVALID: 'Use mm or in for the family unit.',

@@ -12,6 +12,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-24 — main: plant M2 merged (3 lanes, cad-reviewer fixes in): 01 PSC-M2 specs + resolution, 03 EQP-M2 vessels / nozzles / ports,
+  core exact `ellipse` curve segment (native OCC + exact Pappus volumes). Gates green: static, unit 15222, coverage, server 1558 (with an
+  ellipse-capable `llull-kernel`). Test workers now sized from free memory. Next: wave 2, 02 RTE-M1.
 - 2026-10-23 — main: plant wave 1 merged (4 lanes): plugins `piping-catalog` (01 PSC M0–M1, 7 commands), `plant-equipment` (03 EQP M1,
   `vessel_volume`, toolset `plant_equipment`), `plantStructures` (06 STA M1, `list_access_rules`, `check_access`), core display slice +
   plugin property port + `plant-display` (09 VIS-M1, 7 commands, cad-reviewer fixes in). Gates: static + native:check green, unit 14678
@@ -101,12 +104,13 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
 - Plant packs `docs/plant/` (order = README "Dependencies and recommended order"; D1 fixed, D2 decided 2026-10-23). Wave 1 done 2026-10-23 (PSC M0–M1, EQP M1, STA M1, VIS-M1; as built = each pack's TECHNICAL_SPEC §13 / 09 §12.6).
 - Decisions 2026-10-23 (owner delegated): README D3, D4, D6; 01 §11; 03 §11.1 (Q1 extend `EquipmentElement`, Q2 both conventions `north_cw` default, Q3 exact ellipse segment, Q7 PSC flanges).
-- `[WIP]` **PSC-M2** 01 PSC spec model, `*_pipe_spec`, `resolve_spec_component`, `resolve_branch`, `check_pipe_spec` + D4 licence flag `open-data`. Worktree `llull-psc`, branch `feat/plant-psc-m2`. _deps: —_
-- `[WIP]` **EQP-M2** 03 EQP vessels + nozzles (`add_vessel`, `add_column`, `add_nozzle` angle + free forms, ports, `equipment_ports`, `update_equipment_parameters`, `vessel_volume` by equipment). Worktree `llull-eqp`, branch `feat/plant-eqp-m2`. _deps: —_
-- `[WIP]` **EQP-Q3** exact `ellipse` `CurveSegment` (core model, Manifold, closed-form volume, native OCC). Worktree `llull-ell`, branch `feat/core-ellipse-segment`. _deps: —_
+- `[DONE]` **PSC-M2** 01 PSC spec model, `*_pipe_spec`, `resolve_spec_component`, `resolve_branch`, `check_pipe_spec` + D4 licence flag `open-data` (resolution API `resolveComponent` / `resolveBranch`). Approval, assign and the stud rule stay M3/M4. Merged 2026-10-24.
+- `[DONE]` **EQP-M2** 03 EQP vessels + nozzles (`add_vessel`, `add_process_column` (`add_column` was taken), `add_nozzle` angle + free forms, ports `equipmentPorts`, `equipment_ports`, `update_equipment_parameters`, `vessel_volume` by equipment). Merged 2026-10-24. Open: 03 Q4, Q6.
+- `[DONE]` **EQP-Q3** exact `ellipse` `CurveSegment` (core model, Manifold, closed-form volume exact for arcs / Béziers too, native OCC chain code 3). Merged 2026-10-24. _Rebuild `llull-kernel` (`solver/`) in each checkout: older binaries answer `NATIVE_OCC_FAILURE: chain: unknown segment`._
+- Test memory (2026-10-24): vitest workers sized from free memory in both suites (`testWorkers.ts`, `LLULL_TEST_WORKERS` override); gates green on the merge: static, unit 15222, coverage, server 1558.
 - `[TODO]` **STA-M2/M3** 06 STA gratings, then `add_railing` (edge coverage by railings). _deps: —_
 - `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
-- `[TODO]` Wave 2: **RTE M1–M3 then V1** 02 `route_pipe`, fittings, flanges, branches, `check_piping`, stretch on nozzle edits. _deps: PSC-M2, EQP-M2_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[WIP]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry; sc-rte plans to the D3 `add_nozzle` form. Worktree `llull-rte`, branch `feat/plant-rte-m1`. Then **RTE-M2**, **RTE-M3**, **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 

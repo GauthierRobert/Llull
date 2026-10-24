@@ -38,6 +38,10 @@
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <GC_MakeArcOfEllipse.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Elips.hxx>
+#include <gp_Vec.hxx>
 #include <GeomFill_BSplineCurves.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_BSplineCurve.hxx>
@@ -105,7 +109,34 @@ TopoDS_Shape valid_or_null(const TopoDS_Shape &shape) {
   return check.IsValid() ? shape : TopoDS_Shape();
 }
 
-// occtCurves.ts segmentEdge: line / circular arc through three points / cubic Bezier; null edge when OCC rejects it.
+// Exact quarter of an ellipse from [start, centre, end] (conjugate semi-diameters u = start - centre, v = end - centre; P(t) = C + cos(pi t / 2) u +
+// sin(pi t / 2) v, curves.ts 'ellipse'): the ellipse on its principal axes, trimmed counter-clockwise about u x v from start to end. Null edge when
+// u, v are collinear or OCC rejects it.
+TopoDS_Edge ellipse_edge(rust::Slice<const double> chain, size_t offset) {
+  const gp_Pnt start = point_at(chain, offset);
+  const gp_Pnt center = point_at(chain, offset + 3);
+  const gp_Pnt end = point_at(chain, offset + 6);
+  const gp_Vec u(center, start);
+  const gp_Vec v(center, end);
+  const gp_Vec normal = u.Crossed(v);
+  if (normal.Magnitude() <= 1e-9 * u.Magnitude() * v.Magnitude()) return TopoDS_Edge();
+  const double theta = 0.5 * std::atan2(2.0 * u.Dot(v), u.Dot(u) - v.Dot(v));
+  const gp_Vec p = u * std::cos(theta) + v * std::sin(theta);
+  const gp_Vec q = u * -std::sin(theta) + v * std::cos(theta);
+  const bool p_major = p.Magnitude() >= q.Magnitude();
+  const gp_Vec major = p_major ? p : q;
+  const double major_radius = p_major ? p.Magnitude() : q.Magnitude();
+  const double minor_radius = p_major ? q.Magnitude() : p.Magnitude();
+  const gp_Elips ellipse(gp_Ax2(center, gp_Dir(normal), gp_Dir(major)), major_radius, minor_radius);
+  GC_MakeArcOfEllipse arc(ellipse, start, end, Standard_True);
+  if (!arc.IsDone()) return TopoDS_Edge();
+  const Handle(Geom_TrimmedCurve) trimmed = arc.Value();
+  const Handle(Geom_Curve) curve(trimmed);
+  BRepBuilderAPI_MakeEdge maker(curve);
+  return maker.IsDone() ? maker.Edge() : TopoDS_Edge();
+}
+
+// occtCurves.ts segmentEdge: line / circular arc through three points / cubic Bezier / ellipse quarter; null edge when OCC rejects it.
 TopoDS_Edge segment_edge(int type, rust::Slice<const double> chain, size_t offset) {
   if (type == 0) {
     BRepBuilderAPI_MakeEdge maker(point_at(chain, offset), point_at(chain, offset + 3));
@@ -119,6 +150,7 @@ TopoDS_Edge segment_edge(int type, rust::Slice<const double> chain, size_t offse
     BRepBuilderAPI_MakeEdge maker(curve);
     return maker.IsDone() ? maker.Edge() : TopoDS_Edge();
   }
+  if (type == 3) return ellipse_edge(chain, offset);
   TColgp_Array1OfPnt poles(1, 4);
   for (int k = 0; k < 4; ++k) poles.SetValue(k + 1, point_at(chain, offset + 3 * k));
   const Handle(Geom_Curve) bezier = new Geom_BezierCurve(poles);
@@ -132,11 +164,11 @@ TopoDS_Wire chain_wire(rust::Slice<const double> chain) {
   size_t offset = 0;
   while (offset < chain.size()) {
     const int type = static_cast<int>(chain[offset]);
-    if (type < 0 || type > 2) throw std::invalid_argument("chain: unknown segment type");
+    if (type < 0 || type > 3) throw std::invalid_argument("chain: unknown segment type");
     const TopoDS_Edge edge = segment_edge(type, chain, offset + 1);
     if (edge.IsNull()) return TopoDS_Wire();
     maker.Add(edge);
-    offset += 1 + 3 * static_cast<size_t>(type + 2);
+    offset += 1 + 3 * static_cast<size_t>(type == 3 ? 3 : type + 2);
   }
   return maker.IsDone() ? maker.Wire() : TopoDS_Wire();
 }

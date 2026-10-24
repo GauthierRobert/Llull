@@ -2,7 +2,7 @@
   "id": "SC-PSC-02",
   "validates": ["VC-PSC-08", "VC-PSC-09"],
   "description": "Import the CS150-A1 fixture spec, resolve components by type and size, resolve branches from the branch table, and refuse sizes and branches the spec does not cover",
-  "unbuilt": ["import_pipe_spec", "resolve_spec_component", "resolve_branch"],
+  "unbuilt": [],
   "harness": { "inline": { "actions[0].params.spec": "../data/sample_spec_cs150.json" }, "note": "the test harness (and the CLI `--param-file`, TR-PSC-14) inlines the fixture before the run" },
   "actions": [
     { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },

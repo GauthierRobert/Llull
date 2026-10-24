@@ -56,7 +56,7 @@ function sweepProblem(v: Record<string, unknown>): string | null {
 function sweepGeometryProblem(v: Record<string, unknown>): string | null {
   const path = v['path'];
   if (!Array.isArray(path) || path.length === 0 || !path.every((s) => isCurveSegment(s, 3)))
-    return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
+    return 'path must be a non-empty array of line/arc/bezier/ellipse segments with [x, y, z] points';
   // sweep_profile accepts closed loops (no end caps) unless the section varies along the path
   const chain = path as CurveSegment<Vec3>[];
   const closed = chainIssue(chain, true) === null;
@@ -143,7 +143,7 @@ function stationsProblem(stations: unknown): string | null {
 function curvesProblem(curves: unknown): string | null {
   if (curves === undefined) return null;
   if (!(Array.isArray(curves) && curves.every((s) => isCurveSegment(s, 2))))
-    return 'curves must be line/arc/bezier segments with [x, y] points';
+    return 'curves must be line/arc/bezier/ellipse segments with [x, y] points';
   const issue = chainIssue(curves as CurveSegment<Vec2>[], true);
   return issue === null ? null : `curves must form one closed loop — ${issue}`;
 }
@@ -158,7 +158,7 @@ function isCurveSegment(s: unknown, dims: number): boolean {
 }
 
 /** Points per curve segment type (`CurveSegment`). */
-const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4 };
+const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4, ellipse: 3 };
 
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
 

@@ -1,8 +1,11 @@
-# Horizontal drum D 2000 x T/T 6000 with 2:1 ellipsoidal heads: total and partial liquid volumes (Jones, 03 EQP SC-EQP-02)
-design drum_volume units=mm
-param D = 2000
-param L = 6000
-add_cylinder shell radius=D/2 height=L axis=[1, 0, 0]
-check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} path=totalVolumeM3 expect ~= pi*1*1*6 + 2*(2/3)*pi*1*1*0.5 ± 0.01%
-check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} levels=[D/2] path=levels.0.percent expect ~= 50 ± 0.01%
-check vessel_volume orientation="horizontal" insideDiameter=D tangentLength=L heads={"first":{"type":"ellipsoidal","ratio":2},"second":{"type":"ellipsoidal","ratio":2}} levels=[500] path=levels.0.liquidVolumeM3 expect ~= 4.012358 ± 0.01%
+# Vertical separator V-101 (03 EQP SC-EQP-01): 2:1 heads on a 2 m skirt, inlet on the shell and vapour outlet on the top head, ports and volumes
+design separator units=mm
+param D = 1500
+param L = 4000
+add_vessel separator tag="V-101" orientation="vertical" location=[5000,5000] insideDiameter=D tangentLength=L heads={"top":{"type":"ellipsoidal","ratio":2},"bottom":{"type":"ellipsoidal","ratio":2}} shellThickness=10 corrosionAllowance=3 support={"type":"skirt","height":2000} design={"operatingLiquid":{"specificGravity":0.85,"levelAboveBottomTangent":1500}}
+add_nozzle inlet equipment="V-101" mark="N1" dn=150 rating="CL150" location={"on":"shell","elevation":3200,"orientationDeg":0} projection=1000
+add_nozzle vapour equipment="V-101" mark="N3" dn=80 rating="CL150" location={"on":"head","head":"top","radialOffset":0} projection=700
+check vessel_volume equipment="V-101" path=totalVolumeM3 expect ~= pi*(D/2000)*(D/2000)*L/1000 + pi*(D/1000)*(D/1000)*(D/1000)/12 ± 0.01%
+check vessel_volume equipment="V-101" path=operating.liquidVolumeM3 expect ~= 3.0925052683774528 ± 0.01%
+check equipment_ports equipment="V-101" path=ports.V-101:N1.position.2 expect == 5200
+check equipment_ports equipment="V-101" path=ports.V-101:N3.position.2 expect == 6700
