@@ -7,64 +7,14 @@
  * @invariant plane and cylinder charts are affine (a NURBS sketch maps to an exact NURBS pcurve); the cone chart is polar and its pcurves are fitted
  */
 
-import type { FaceSlabRecipe } from '../model/faceSlab';
-import type { Vec2, Vec3 } from '../model/vectors';
+import type { Vec2 } from '../model/vectors';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { displacement, frameOf, type ChartPlacement, type ChartResult, type FaceChart } from './chartFrame';
 import type { SurfaceParams } from './kernelPorts';
-
-export interface ChartPlacement {
-  /** Sketch point that lands on `anchorOn`. */
-  readonly anchorChart: Vec2;
-  /** A point on the face. */
-  readonly anchorOn: Vec3;
-  readonly angleDeg: number;
-  readonly mirror: boolean;
-}
-
-type ChartKind = 'plane' | 'cylinder' | 'cone';
-
-export interface FaceChart {
-  readonly kind: ChartKind;
-  /** Wire form of the surface (`faceSlab` layout) whose (u, v) the chart produces. */
-  readonly wire: FaceSlabRecipe['surface'];
-  readonly affine: boolean;
-  readonly anchorUv: Vec2;
-  /** The sketch point that lands on the anchor. */
-  readonly anchorChart: Vec2;
-  /** Length of a full turn in the chart x direction at the anchor; null on a plane. */
-  readonly fullWrapWidth: number | null;
-  /** (u, v) of a chart point (a cone's polar angle is taken within half a turn of the anchor's). Null when the point falls on the cone apex. */
-  readonly uvAt: (point: Vec2) => Vec2 | null;
-  /** 3D point of (u, v). */
-  readonly pointAt: (uv: Vec2) => Vec3;
-  /** Unit normal in the direction of Su x Sv at (u, v): the sign reference of a lift (the kernel lifts along it, or against it when the wanted direction opposes it). */
-  readonly normalAt: (uv: Vec2) => Vec3;
-  /** (u, v) of a 3D point on the surface; the azimuth is wrapped to (-pi, pi]. */
-  readonly uvOfPoint: (point: Vec3) => Vec2;
-  /** Bound of the 3D length per unit of (u, v) change within `reach` (chart units) of the anchor: fit tolerances in (u, v) divide by it. */
-  readonly metricBound: (reach: number) => number;
-}
-
-export type ChartResult = FaceChart | { readonly error: string };
 
 const TWO_PI = 2 * Math.PI;
 
-/** `axis` completed to a right-handed frame (x orthogonalised against it). */
-function frameOf(axis: Vec3, xDir: Vec3): { axis: Vec3; x: Vec3; y: Vec3 } {
-  const a = normalize3(axis);
-  const x = normalize3(sub3(xDir, scale3(a, dot3(xDir, a))));
-  return { axis: a, x, y: cross3(a, x) };
-}
-
-/** Chart displacement of sketch point `p` from the anchor: mirror y, turn by the angle. */
-function displacement(placement: ChartPlacement, p: Vec2): Vec2 {
-  const qx = p[0] - placement.anchorChart[0];
-  const qy = (placement.mirror ? -1 : 1) * (p[1] - placement.anchorChart[1]);
-  const angle = (placement.angleDeg * Math.PI) / 180;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return [cos * qx - sin * qy, sin * qx + cos * qy];
-}
+const APEX = 'a point of the curve falls on the apex of the cone';
 
 function planeChart(surface: Extract<SurfaceParams, { type: 'plane' }>, placement: ChartPlacement): FaceChart {
   const x = normalize3(sub3(surface.xDir, scale3(normalize3(surface.normal), dot3(surface.xDir, normalize3(surface.normal)))));
@@ -77,6 +27,9 @@ function planeChart(surface: Extract<SurfaceParams, { type: 'plane' }>, placemen
   };
   return {
     kind: 'plane',
+    method: 'develop',
+    nullMeaning: APEX,
+    areaG: (v) => v,
     wire: { type: 'plane', data: [...surface.origin, ...x, ...y] },
     affine: true,
     anchorUv,
@@ -101,6 +54,9 @@ function cylinderChart(surface: Extract<SurfaceParams, { type: 'cylinder' }>, pl
   };
   return {
     kind: 'cylinder',
+    method: 'develop',
+    nullMeaning: APEX,
+    areaG: (v) => radius * v,
     wire: { type: 'cylinder', data: [...surface.origin, ...axis, ...x, radius] },
     affine: true,
     anchorUv,
@@ -140,6 +96,9 @@ function coneChart(surface: Extract<SurfaceParams, { type: 'cone' }>, placement:
   };
   return {
     kind: 'cone',
+    method: 'develop',
+    nullMeaning: APEX,
+    areaG: (v) => (sin * v * v) / 2,
     wire: { type: 'cone', data: [...surface.apex, ...axis, ...x, alpha] },
     affine: false,
     anchorUv: [u0, rho0],

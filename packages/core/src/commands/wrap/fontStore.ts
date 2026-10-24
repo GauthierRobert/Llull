@@ -1,5 +1,5 @@
 /**
- * Fonts in the document (03 WRP): store a font as a `font/ttf` blob + `FontRecord`, find it again, and turn a font reference (record id, family name
+ * Fonts in the document (03 WRP): store a font as a `font/ttf` or `font/otf` blob + `FontRecord`, find it again, and turn a font reference (record id, family name
  * or bundled id) into a record, embedding a bundled font on first use so a reopened document needs no font file (VC-WRP-19).
  * @invariant a stored font was parsed completely (every glyph) before it was stored; the blob key is the sha256 of the raw font bytes
  */
@@ -49,6 +49,8 @@ export function loadFont(doc: CadDocument, id: string): LoadedFont | FontFailure
   return { record, font: parsed.font };
 }
 
+const MEDIA_TYPE = { truetype: 'font/ttf', cff: 'font/otf', stroke: 'font/x-llull-stroke' } as const;
+
 export interface RegisterOptions {
   readonly licence?: string | undefined;
   readonly verified: boolean;
@@ -72,7 +74,7 @@ export function registerFont(doc: CadDocument, bytes: Uint8Array, options: Regis
   if (!parsed.ok) return { code: parsed.code, message: parsed.message };
   const scan = validateGlyphs(parsed.font);
   if (!scan.ok) return { code: scan.code, message: scan.message };
-  const blob = makeBinaryBlob('font/ttf', bytes);
+  const blob = makeBinaryBlob(MEDIA_TYPE[parsed.font.format], bytes);
   remember(blob.sha256, parsed.font);
   const known = Object.values(doc.fonts ?? {}).find((record) => record.blob === blob.sha256);
   if (known !== undefined) return { document: doc, record: known, existing: true, glyphs: parsed.font.numGlyphs };
@@ -83,7 +85,7 @@ export function registerFont(doc: CadDocument, bytes: Uint8Array, options: Regis
     family: font.names.family,
     style: font.names.style,
     blob: blob.sha256,
-    format: 'truetype',
+    format: font.format,
     unitsPerEm: font.unitsPerEm,
     capHeight: font.capHeight,
     capHeightSource: font.capHeightSource,

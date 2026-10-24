@@ -9,18 +9,20 @@ import { createFontProvider, installFontProvider } from '../src/fontProvider';
 afterEach(() => setFontProvider(null));
 
 describe('the bundled font provider (03 WRP)', () => {
-  it('lists Fira Sans and reads bytes that match the pinned hash', () => {
+  it('lists Fira Sans and the single-line font, and reads bytes that match each pinned hash', () => {
     const provider = createFontProvider();
-    const [font] = provider.list();
-    expect(font?.family).toBe('Fira Sans');
-    const bytes = provider.bytes('fira-sans-regular');
-    expect(bytes).not.toBeNull();
-    expect(
-      crypto
-        .createHash('sha256')
-        .update(bytes as Uint8Array)
-        .digest('hex'),
-    ).toBe(font?.sha256);
+    expect(provider.list().map((font) => font.family)).toEqual(['Fira Sans', 'LLULL Single Line']);
+    for (const font of provider.list()) {
+      const bytes = provider.bytes(font.id);
+      expect(bytes, font.id).not.toBeNull();
+      expect(
+        crypto
+          .createHash('sha256')
+          .update(bytes as Uint8Array)
+          .digest('hex'),
+        font.id,
+      ).toBe(font.sha256);
+    }
     expect(provider.bytes('missing')).toBeNull();
   });
 
@@ -31,7 +33,7 @@ describe('the bundled font provider (03 WRP)', () => {
       expect(installFontProvider({ LLULL_FONTS_DIR: empty })).toBe(false);
       expect(getFontProvider()).toBeNull();
       expect(installFontProvider({})).toBe(true);
-      expect(getFontProvider()?.list()).toHaveLength(1);
+      expect(getFontProvider()?.list()).toHaveLength(2);
     } finally {
       fs.rmSync(empty, { recursive: true, force: true });
     }

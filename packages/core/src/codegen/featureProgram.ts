@@ -17,6 +17,7 @@ import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
 import { blendNotExpressible, lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
+import { embossNodes } from '../geometry/embossRecipe';
 import type { Axis, Feature, FeatureBase, FeatureProgram, ProgramOutput, ProgramParameter, ShapeSpec, Term, Term2, Term3 } from './program';
 
 const EPSILON = 1e-9;
@@ -193,6 +194,8 @@ function entityFeatures(
 
 /** The note for a solid exported as triangles; a blend the program cannot express names BLD_CODEGEN_UNSUPPORTED (the export carries the exact result, never a different fillet). */
 function meshNote(subject: string, entity: Entity): string {
+  if (entity.kind === 'mesh' && entity.brep !== undefined && embossNodes(recipeOf(entity)).length > 0)
+    return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export STEP for the exact faces).`;
   const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
   return blend
     ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`

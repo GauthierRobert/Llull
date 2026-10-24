@@ -220,6 +220,23 @@ export interface SurfaceTexturePmi extends PmiBase {
   readonly process?: string;
 }
 
+/**
+ * A cosmetic knurl on a cylindrical face (03 WRP M4): the tooth count closes round the circumference, so the pitch used can differ from the pitch asked for.
+ * @invariant teeth is an integer >= 3 with pitch = pi d / teeth; helixAngleDeg only for diagonal and diamond patterns
+ */
+export interface KnurlPmi extends PmiBase {
+  readonly kind: 'knurl';
+  readonly feature: PmiFeature;
+  readonly pattern: 'straight' | 'diagonal' | 'diamond';
+  /** Circular pitch actually used, document units (pi d / teeth). */
+  readonly pitch: number;
+  readonly requestedPitch: number;
+  readonly teeth: number;
+  /** Diameter of the knurled face, document units. */
+  readonly diameter: number;
+  readonly helixAngleDeg?: number;
+}
+
 export interface NotePmi extends PmiBase {
   readonly kind: 'note';
   readonly text: string;
@@ -233,6 +250,7 @@ export type PmiItem =
   | LocationDimensionPmi
   | GeometricTolerancePmi
   | SurfaceTexturePmi
+  | KnurlPmi
   | NotePmi;
 
 export type PmiKind = PmiItem['kind'];
@@ -244,6 +262,7 @@ export const PMI_KINDS = [
   'location_dimension',
   'geometric_tolerance',
   'surface_texture',
+  'knurl',
   'note',
 ] as const satisfies readonly PmiKind[];
 

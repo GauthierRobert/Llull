@@ -10,6 +10,7 @@ import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
 import { existingLayerOrDefault } from '../solids/shared';
+import { entityCurves } from '../solids/sketchCurves';
 import { MAX_DISPLAY_PRECISION } from '../limits';
 import { MAX_TEXT_CHARACTERS } from '../../lib/font/layout';
 import { isFontFailure, loadFont, resolveFont } from '../wrap/fontStore';
@@ -40,6 +41,9 @@ export const addText = defineCommand({
     'Optional `font` (a font id from import_font / list_fonts, or the family of a bundled font such as "Fira Sans") turns the text into a closed outline ' +
     'profile that text_outline, extrude_profile, wrap_to_face and emboss_on_face accept; `height` is then the exact cap height. With a font, ' +
     '`verticalAnchor` (baseline | cap_middle | cap_top), `letterSpacing` (document units after each glyph), `kerning` and `lineSpacing` (newline breaks lines) apply. ' +
+    'A single-line font (family "LLULL Single Line", bundled) draws open strokes for engraving: wrap_to_face wraps them as curves and emboss_on_face mode engrave cuts a groove along them. ' +
+    '`onCurve` { curveId, offset?, reverse? } bends a font text along a line / arc / circle / polyline / spline of the same sketch plane (the baseline follows the curve, glyphs stand on its ' +
+    'left; anchor left / center / right aligns the text to the start / middle / end of the curve, `offset` shifts it along; refused when the text is longer than the curve). ' +
     'Without `font` the text stays an annotation. Characters the font lacks are reported in data.warnings (WRP_GLYPH_MISSING).',
   params: z.object({
     content: z.string().describe('The text string to display. Must not be empty.'),
@@ -76,6 +80,21 @@ export const addText = defineCommand({
       .positive()
       .describe('Font text only: line pitch as a multiple of the font line height (ascender - descender + line gap). Default 1.')
       .optional(),
+    onCurve: z
+      .object({
+        curveId: z
+          .string()
+          .describe(
+            'Id of a 2D curve entity (line, arc, circle, ellipse, polyline, spline) in the same plane as the text (same rotation).',
+          ),
+        offset: z.number().optional().describe('Arc length added to the anchor position along the curve, document units. Default 0.'),
+        reverse: z
+          .boolean()
+          .optional()
+          .describe('Run along the curve from its end to its start (the text then stands on the other side). Default false.'),
+      })
+      .describe('Font text only: bend the text along this curve.')
+      .optional(),
     layer: layerIdField(),
   }),
   run: (
@@ -93,6 +112,7 @@ export const addText = defineCommand({
       letterSpacing,
       kerning,
       lineSpacing,
+      onCurve,
     },
     ctx,
   ): CommandResult => {
@@ -101,6 +121,29 @@ export const addText = defineCommand({
     if (position.length < 3) return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
     const id = nextId('text');
     const reject = (code: string, message: string): CommandResult => wrapRejection(doc, 'add_text', code, message, [], ['font']);
+    if (onCurve !== undefined) {
+      if (font === undefined)
+        return wrapRejection(doc, 'add_text', 'WRP_TEXT_NO_FONT', 'onCurve bends outline text: give a font', [], ['onCurve']);
+      const curve = doc.entities[onCurve.curveId];
+      if (curve === undefined || entityCurves(curve) === null)
+        return wrapRejection(
+          doc,
+          'add_text',
+          'WRP_TEXT_CURVE_INVALID',
+          `'${onCurve.curveId}' is ${curve === undefined ? 'not in the document' : `a ${curve.kind}, not a 2D curve`}`,
+          [onCurve.curveId],
+          ['onCurve.curveId'],
+        );
+      if (curve.rotation.some((angle, k) => Math.abs(angle - (rotation[k] ?? 0)) > 1e-9))
+        return wrapRejection(
+          doc,
+          'add_text',
+          'WRP_TEXT_CURVE_PLANE',
+          `the curve '${onCurve.curveId}' and the text lie in different planes (rotations differ)`,
+          [onCurve.curveId],
+          ['rotation'],
+        );
+    }
     let target = doc;
     let fontId: string | undefined;
     let missing: string[] = [];
@@ -140,6 +183,15 @@ export const addText = defineCommand({
       ...(letterSpacing === undefined ? {} : { letterSpacing }),
       ...(kerning === undefined ? {} : { kerning }),
       ...(lineSpacing === undefined ? {} : { lineSpacing }),
+      ...(onCurve === undefined
+        ? {}
+        : {
+            onCurve: {
+              curveId: onCurve.curveId,
+              ...(onCurve.offset === undefined ? {} : { offset: onCurve.offset }),
+              ...(onCurve.reverse === undefined ? {} : { reverse: onCurve.reverse }),
+            },
+          }),
     };
     const warned =
       missing.length === 0

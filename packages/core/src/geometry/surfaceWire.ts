@@ -61,8 +61,16 @@ export function loopsProblem(loops: readonly number[]): string | null {
 }
 
 /** Why `data` is not a valid description of a `type` surface (the layouts of `encodeSurface` and the `faceSlab` recipe), or null. */
-export function surfaceDataProblem(type: 'bspline' | 'plane' | 'cylinder' | 'cone', data: readonly number[]): string | null {
+export function surfaceDataProblem(
+  type: 'bspline' | 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'face',
+  data: readonly number[],
+): string | null {
   if (type === 'plane') return data.length === 9 ? null : 'plane surface data must hold 9 numbers';
+  if (type === 'face') return data.length === 0 ? null : 'face surface data must be empty';
+  if (type === 'torus')
+    return data.length === 11 && (data[9] ?? 0) > 0 && (data[10] ?? 0) > 0
+      ? null
+      : 'torus surface data must hold 11 numbers (the last two > 0)';
   if (type !== 'bspline')
     return data.length === 10 && (data[9] ?? 0) > 0 ? null : `${type} surface data must hold 10 numbers (the last > 0)`;
   const [degreeU, degreeV, countU, countV, knotsU, knotsV, rational] = data;

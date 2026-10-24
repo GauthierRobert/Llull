@@ -3,6 +3,7 @@
  * baseline by their advance widths, scaled so the cap height equals the requested height, and aligned about the text origin.
  */
 
+import type { Vec2 } from '../../model/vectors';
 import { mapLoop, type OutlineLoop } from './outline';
 import type { ParsedFont } from './font';
 
@@ -22,6 +23,8 @@ interface PlacedGlyph {
   readonly character: string;
   readonly glyph: number;
   readonly loops: readonly OutlineLoop[];
+  /** Open strokes of a single-line font in document units (empty for outline fonts). */
+  readonly strokes: readonly (readonly Vec2[])[];
   /** Advance width in document units (before kerning and letter spacing). */
   readonly advance: number;
 }
@@ -29,6 +32,8 @@ interface PlacedGlyph {
 export interface TextLayout {
   readonly glyphs: readonly PlacedGlyph[];
   readonly loops: readonly OutlineLoop[];
+  /** Every open stroke of a single-line font, placed (document units). */
+  readonly strokes: readonly (readonly Vec2[])[];
   /** Document units per font unit. */
   readonly scale: number;
   /** Widest line: sum of advances, kerning and letter spacing between glyphs. */
@@ -77,7 +82,19 @@ export function layoutText(font: ParsedFont, content: string, options: LayoutOpt
         advance: font.advance(glyph) * scale,
         loops:
           glyph === 0 ? [] : font.outline(glyph).map((loop) => mapLoop(loop, ([x, y]) => [scale * x + origin + at, scale * y + baseline])),
+        strokes:
+          glyph === 0
+            ? []
+            : font.strokes(glyph).map((stroke) => stroke.map(([x, y]): Vec2 => [scale * x + origin + at, scale * y + baseline])),
       });
   }
-  return { glyphs, loops: glyphs.flatMap((glyph) => glyph.loops), scale, advanceWidth: widest, lines: lines.length, missing: [...missing] };
+  return {
+    glyphs,
+    loops: glyphs.flatMap((glyph) => glyph.loops),
+    strokes: glyphs.flatMap((glyph) => glyph.strokes),
+    scale,
+    advanceWidth: widest,
+    lines: lines.length,
+    missing: [...missing],
+  };
 }

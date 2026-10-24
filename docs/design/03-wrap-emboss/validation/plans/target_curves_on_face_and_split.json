@@ -1,0 +1,237 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "mode": "geodesic",
+   "from": [
+    20,
+    0,
+    0
+   ],
+   "to": [
+    10.806046117362795,
+    16.82941969615793,
+    10
+   ]
+  },
+  "as": "geodesic1"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "mode": "geodesic",
+   "from": [
+    20,
+    0,
+    0
+   ],
+   "to": [
+    17.551651237807455,
+    9.58851077208406,
+    0
+   ]
+  },
+  "as": "geodesic2"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "mode": "geodesic",
+   "from": [
+    20,
+    0,
+    0
+   ],
+   "to": [
+    -8.322936730942848,
+    18.185948536513635,
+    5
+   ]
+  },
+  "as": "geodesic3"
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 25,
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "ball"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$ball",
+   "face": {
+    "faceNear": [
+     100,
+     0,
+     25
+    ]
+   },
+   "mode": "geodesic",
+   "from": [
+    100,
+    0,
+    25
+   ],
+   "to": [
+    111.98563846510507,
+    0,
+    21.939564047259317
+   ]
+  },
+  "as": "greatCircle"
+ },
+ {
+  "command": "add_torus",
+  "params": {
+   "ringRadius": 10,
+   "tubeRadius": 3,
+   "position": [
+    200,
+    0,
+    0
+   ]
+  },
+  "as": "ring"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$ring",
+   "face": {
+    "faceNear": [
+     213,
+     0,
+     0
+    ]
+   },
+   "mode": "geodesic",
+   "from": [
+    213,
+    0,
+    0
+   ],
+   "to": [
+    212.41937435863287,
+    3.841762686597414,
+    0
+   ]
+  },
+  "as": "equator"
+ },
+ {
+  "command": "create_sketch_plane",
+  "params": {
+   "plane": "yz",
+   "offset": 30
+  },
+  "as": "side"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 6
+  },
+  "as": "mask"
+ },
+ {
+  "command": "place_on_sketch_plane",
+  "params": {
+   "ids": [
+    "$mask"
+   ],
+   "plane": "$side"
+  }
+ },
+ {
+  "command": "project_to_face",
+  "params": {
+   "id": "$body",
+   "entityIds": [
+    "$mask"
+   ],
+   "direction": [
+    -1,
+    0,
+    0
+   ]
+  },
+  "as": "projected"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$body"
+  }
+ },
+ {
+  "command": "split_face_by_curves",
+  "params": {
+   "id": "$body",
+   "curveIds": [
+    "$projected",
+    "$projected[1]"
+   ]
+  },
+  "as": "split"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$split"
+  }
+ }
+]

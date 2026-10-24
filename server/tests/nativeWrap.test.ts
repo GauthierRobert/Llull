@@ -342,7 +342,6 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP native' })('WRP M0-M3
     ).toBe('WRP_FACE_NOT_DEVELOPABLE');
     expect(emboss(small.id, { mode: 'deboss', depth: 25 }).error?.code).toBe('WRP_DEPTH_EXCEEDS_SOLID');
     expect(emboss(small.id, { depth: 0 }).error?.code).toBe('WRP_DEPTH_INVALID');
-    expect(emboss(small.id, { placement: { method: 'geodesic' } }).error?.code).toBe('WRP_METHOD_UNAVAILABLE');
     const wrongFace = run(doc, 'emboss_on_face', {
       id: body.id,
       face: { faceIndex: 99 },

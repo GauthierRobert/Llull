@@ -9,7 +9,7 @@
 | ------- | -------- |
 | [core](#core) | 36 |
 | [2d](#2d) | 33 |
-| [3d](#3d) | 96 |
+| [3d](#3d) | 100 |
 | [measure](#measure) | 8 |
 | [parametric](#parametric) | 14 |
 | [assembly](#assembly) | 36 |
@@ -129,6 +129,7 @@
 | `add_helix` | Create an exact helix (cylindrical, conical or with a variable pitch) or a planar spiral as a NURBS curve that remembers its definition: the sweep along it is … |  |
 | `add_internal_gear` | Create an internal (ring) involute gear: a cylindrical rim whose bore carries inward-pointing teeth, as ONE closed mesh solid built without booleans. |  |
 | `add_keyed_shaft` | Create a round shaft along +Z (z from 0 to length) with a rectangular keyway (pocket) on its +X side, built as one closed mesh solid without booleans. |  |
+| `add_knurl` | Mark a cylindrical face of a solid as knurled (cosmetic, like a cosmetic thread: a PMI note, no geometry): pattern straight (axial teeth), diagonal (one helix … | kernel |
 | `add_planetary_gearset` | Create a complete planetary (epicyclic) gear stage: one sun gear, planetCount planet gears and an internal ring gear, all sharing one module and pressure angle… |  |
 | `add_pyramid` | Create a pyramid solid with a rectangular base and a single apex. |  |
 | `add_sphere` | Create a sphere solid. |  |
@@ -154,6 +155,7 @@
 | `check_sweep_loft` | Read-only check of sweeps and lofts (every sweep and loft when `ids` is omitted; list the ids of swept or lofted sheets to check them too): the frame mode must… | read-only |
 | `check_wrap` | Audit the results of wrap_to_face, project_to_face and emboss_on_face. | read-only |
 | `create_conic` | Create a conic arc (ellipse, parabola or hyperbola segment) as a rational quadratic NURBS from `start` to `end` (Liming rho-conic, used for fuselage master lin… |  |
+| `create_curve_on_face` | Create a curve lying on a face of a solid (a nurbs_curve with `onFace`) without a sketch. | kernel |
 | `create_nurbs_curve` | Create a 3D NURBS curve (clamped B-spline, optionally rational) from its control polygon. |  |
 | `create_nurbs_surface` | Create a NURBS surface sheet (clamped tensor-product B-spline patch, optionally rational) from its control net. |  |
 | `deform_by_point` | Push the material of a 3D solid or mesh around a point: every point within radius of `point` moves along `direction` by distance x falloff(r), where r = (dista… |  |
@@ -163,7 +165,7 @@
 | `draft_faces` | Draft (taper) faces of a 3D solid for mould release: each picked face is tilted by angle degrees about its intersection with the neutral plane so the part open… | kernel |
 | `edit_nurbs` | Edit a nurbs_curve in place. |  |
 | `edit_subdivision_cage` | Sculpt a subdivision solid (add_subdivision_solid) by editing its control cage: select cage vertices by `vertexIndices`, by element references `vertices` / `ed… |  |
-| `emboss_on_face` | Emboss (raise), deboss (sink) or scribe (split the face along) closed 2D profiles on a plane, cylinder or cone face of a solid: the profiles are wrapped onto t… | kernel |
+| `emboss_on_face` | Emboss (raise), deboss (sink), scribe (split the face along) or engrave (cut a groove along) 2D profiles on a plane, cylinder, cone, sphere or torus face of a … | kernel |
 | `evaluate_subdivision` | Evaluate the limit surface of a subdivision solid exactly (independent of `levels`): the limit position and unit normal of cage `vertices` (default: all), and … | read-only |
 | `extrude_cage_faces` | Extrude faces of a subdivision cage along their average normal (or `direction`) by `distance` in document units, creating side quads; the smooth surface grows … |  |
 | `extrude_profile` | Extrude a closed 2D profile along +Z into an extrusion solid. |  |
@@ -173,7 +175,7 @@
 | `fillet_full_round` | Full round of a rib or wall top: replace the center face by a half-cylinder tangent to the two side faces (radius = half the distance between them, document un… | kernel |
 | `flow_along_curve` | Lay a straight 3D solid or mesh along a NURBS curve: the body axis (frame z, default the longest bounding-box direction, starting at the body start) is mapped … |  |
 | `flow_on_surface` | Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface. |  |
-| `import_font` | Embed a TrueType font (.ttf, TrueType outlines) in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). |  |
+| `import_font` | Embed a TrueType (.ttf) or CFF-outline OpenType (.otf) font in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). |  |
 | `inset_cage_faces` | Inset faces of a subdivision cage: the boundary of each region of selected faces moves `thickness` inward in the face plane (even offset: every new edge exactl… |  |
 | `inspect_faces` | List the faces of an exact 3D solid with located geometry: per face its index (the same index inspect_topology uses), surface type (plane, cylinder, cone, sphe… | read-only, kernel |
 | `inspect_nurbs` | Read-only: report the exact NURBS definition of a nurbs_surface (degreeU / degreeV, pole grid size, knots per direction, domain, continuity at each interior kn… | read-only |
@@ -188,6 +190,7 @@
 | `morph_bodies` | Create the shape a fraction t of the way between two entities with the same structure: two nurbs_curve entities with the same degree, knot vector and pole coun… |  |
 | `network_surface` | Surface through a network of crossing curves given in ANY order (nurbs_curve ids, 6 to 120): two families of curves, every curve of one meeting every curve of … |  |
 | `pattern_along_path` | Lay copies of an entity along a curve: chain links round a chainring and cassette loop, tyre tread blocks round a tyre, sprocket / gear teeth, cable clips, riv… |  |
+| `pattern_on_face` | Repeat seed profiles on a rectangular lattice and emboss, deboss or scribe all copies on a face in ONE exact operation (a perforation grid, a row of dimples, s… | kernel |
 | `probe_fillet` | Largest constant fillet radius each edge of a 3D solid accepts, measured by bisection on exact kernel evaluations (each edge probed alone with fillet_edge sema… | read-only, kernel |
 | `project_to_face` | Project 2D sketch entities (or font text) onto the faces of a solid: along `direction` (default: the sketch normal, turned to point at the solid) each point la… | kernel |
 | `push_pull_face` | Push or pull ONE planar face of a 3D solid along its outward normal: distance > 0 adds material (the face moves out, its side faces follow), distance < 0 remov… | kernel |
@@ -202,6 +205,7 @@
 | `shell_solid` | Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it with a new mesh entity. | kernel |
 | `split_body` | Split a 3D solid in two along a plane: the source is replaced by two mesh entities, the half on the normal side first, then the other. | kernel |
 | `split_face` | Split faces of a 3D solid along a plane (the body stays one solid; each picked face crossing the plane becomes two faces, e.g. | kernel |
+| `split_face_by_curves` | Divide the faces of a solid along curves lying on them (nurbs_curves made by wrap_to_face, project_to_face or create_curve_on_face on this solid): a closed cur… | kernel |
 | `stretch_body` | Stretch a 3D solid or mesh along an axis: inside the region the length is multiplied by factor (unitless, > 0; 1.5 lengthens by half, 0.5 halves); the part pas… |  |
 | `surface_from_curves` | Create a freeform shell part from boundary curves — hoods, fairings, fenders, panels, saddle tops, aero covers. |  |
 | `surface_from_points` | Create a NURBS surface sheet that passes exactly through a grid of points (global bicubic interpolation by default). |  |
@@ -213,7 +217,7 @@
 | `trim_surface` | Cut a nurbs_surface sheet, in one of two ways. |  |
 | `twist_body` | Twist a 3D solid or mesh about an axis: each cross-section perpendicular to the axis is rotated by angleDeg times a ramp that goes from 0 at region.start to 1 … |  |
 | `unwrap_face` | Develop a plane, cylinder or cone face of a solid into the flat: the unrolled outline (rectangle for a cylinder, annular sector for a cone, with its sector ang… | read-only, kernel |
-| `wrap_to_face` | Wrap 2D sketch entities onto a face of a solid as curves lying on that face, keeping every length (method develop: the face is unrolled like paper). | kernel |
+| `wrap_to_face` | Wrap 2D sketch entities onto a face of a solid as curves lying on that face. | kernel |
 
 ## measure
 

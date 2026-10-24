@@ -118,10 +118,33 @@ function kindProblem(where: string, item: Record<string, unknown>): string | nul
       if (typeof item['parameter'] !== 'string' || !isPositive(item['value']) || !isOneOf(['um', 'uin'], item['unit']))
         return `${where}: surface texture needs parameter, positive value and unit um|uin`;
       return featureProblem(where, item['feature']);
+    case 'knurl':
+      if (
+        !isOneOf(['straight', 'diagonal', 'diamond'], item['pattern']) ||
+        !isPositive(item['pitch']) ||
+        !isPositive(item['requestedPitch']) ||
+        !isPositive(item['diameter']) ||
+        !Number.isInteger(item['teeth']) ||
+        (item['teeth'] as number) < 3 ||
+        !isOptional(item['helixAngleDeg'], isFiniteNumber)
+      )
+        return `${where}: a knurl needs pattern straight|diagonal|diamond, positive pitch / requestedPitch / diameter and an integer teeth >= 3`;
+      return knurlProblem(where, item) ?? featureProblem(where, item['feature']);
     default:
       if (typeof item['text'] !== 'string' || item['text'] === '') return `${where}: a note needs non-empty text`;
       return item['feature'] === undefined ? null : featureProblem(where, item['feature']);
   }
+}
+
+/** The relations between the fields of a knurl: teeth close round the circumference, and only a helical pattern has a helix angle in (0, 90). */
+function knurlProblem(where: string, item: Record<string, unknown>): string | null {
+  const { pitch, diameter, teeth, helixAngleDeg } = item as { pitch: number; diameter: number; teeth: number; helixAngleDeg?: number };
+  if (teeth > 2000) return `${where}: a knurl has at most 2000 teeth`;
+  if (Math.abs(pitch - (Math.PI * diameter) / teeth) > 1e-6 * pitch) return `${where}: pitch must be pi x diameter / teeth`;
+  if (item['pattern'] === 'straight') return helixAngleDeg === undefined ? null : `${where}: a straight knurl has no helixAngleDeg`;
+  return helixAngleDeg !== undefined && helixAngleDeg > 0 && helixAngleDeg < 90
+    ? null
+    : `${where}: a helical knurl needs helixAngleDeg in (0, 90)`;
 }
 
 function itemProblem(key: string, item: unknown): string | null {

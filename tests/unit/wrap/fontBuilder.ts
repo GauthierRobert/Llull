@@ -34,6 +34,10 @@ export interface FontSpec {
   readonly os2?: { readonly version: number; readonly fsType: number; readonly capHeight?: number } | null;
   readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string }>;
   readonly kern?: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> | 'vertical' | 'version1';
+  /** An OpenType font with CFF outlines: the OTTO sfnt tag. */
+  readonly otto?: boolean;
+  /** Extra raw tables by tag (e.g. a GPOS from `gposBuilder`). */
+  readonly tables?: Readonly<Record<string, readonly number[]>>;
   readonly longLoca?: boolean;
   readonly metrics?: number;
   readonly omit?: readonly string[];
@@ -296,8 +300,14 @@ export function buildFont(spec: FontSpec): Uint8Array {
   }
   if (spec.names !== undefined) tables.push(['name', nameTable(spec.names)]);
   if (spec.kern !== undefined) tables.push(['kern', kernTable(spec.kern)]);
+  for (const [tag, data] of Object.entries(spec.tables ?? {})) tables.push([tag, [...data]]);
   const kept = tables.filter(([tag]) => spec.omit?.includes(tag) !== true);
-  const out = new Writer().u32(0x00010000).u16(kept.length).u16(0).u16(0).u16(0);
+  const out = new Writer()
+    .u32(spec.otto === true ? 0x4f54544f : 0x00010000)
+    .u16(kept.length)
+    .u16(0)
+    .u16(0)
+    .u16(0);
   let offset = 12 + 16 * kept.length;
   for (const [tag, data] of kept) {
     out.tag(tag).u32(0).u32(offset).u32(data.length);

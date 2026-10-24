@@ -157,6 +157,10 @@ export function pmiText(item: PmiItem, ascii = false): string {
       return `${item.parameter} ${formatNumber(item.value)} ${item.unit === 'um' ? (ascii ? 'um' : 'µm') : ascii ? 'uin' : 'µin'}${
         item.lay === undefined ? '' : ` lay ${item.lay}`
       }${item.process === undefined ? '' : ` ${item.process}`}`;
+    case 'knurl':
+      return `KNURL ${item.pattern.toUpperCase()} ${formatNumber(item.pitch)} PITCH, ${item.teeth} TEETH${
+        item.helixAngleDeg === undefined ? '' : `, ${formatNumber(item.helixAngleDeg)}${ascii ? ' deg' : '°'} HELIX`
+      }`;
     case 'note':
       return item.text;
   }

@@ -14,15 +14,15 @@ import { wrapRejection } from './codes';
  * @affects creates 1 font record `doc.fonts[font-<step>.<k>]` and its `font/ttf` blob (the raw bytes, keyed by their sha256), unless the same bytes are already stored
  * @invariant the font is parsed completely (every glyph, all offsets bounded) before anything is stored; embedding permission is enforced (OS/2 fsType 2 and bitmap-only refuse)
  * @invariant fonts are `unverified` unless `sourceSha256` was given and matches the bytes; replay needs no font file: the recorded step keeps only `blob` (the sha256), the bytes live once in the document blobs
- * @failure not base64 / not a font / truncated -> WRP_FONT_PARSE; CFF, WOFF, collection -> WRP_FONT_FORMAT_UNSUPPORTED; fsType 2 -> WRP_FONT_EMBEDDING_RESTRICTED; > 4 MB -> WRP_FONT_TOO_LARGE
+ * @failure not base64 / not a font / truncated -> WRP_FONT_PARSE; CFF, WOFF, collection -> WRP_FONT_FORMAT_UNSUPPORTED (CFF2, WOFF, collections); fsType 2 -> WRP_FONT_EMBEDDING_RESTRICTED; > 4 MB -> WRP_FONT_TOO_LARGE
  */
 export const importFont = defineCommand({
   name: 'import_font',
   description:
-    'Embed a TrueType font (.ttf, TrueType outlines) in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). ' +
+    'Embed a TrueType (.ttf) or CFF-outline OpenType (.otf) font in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). ' +
     'Give the file as `base64` (CLI: `file=PATH` or `path=PATH` reads the file and fills it). The font is parsed completely and stored with the ' +
     'document, so a reopened document needs no font file. Refused when the font forbids embedding (OS/2 fsType restricted), is larger than 4 MB, ' +
-    'is not TrueType (CFF .otf, WOFF and collections are not supported yet) or is damaged. The result is `unverified` unless you pass the sha256 of ' +
+    'is CFF2 / WOFF / a collection (not supported) or is damaged. The result is `unverified` unless you pass the sha256 of ' +
     'the file as `sourceSha256` and it matches. Importing the same bytes twice returns the first record. Next: add_text with font=<id>, then ' +
     'text_outline. Refusals carry error.code WRP_FONT_PARSE, WRP_FONT_FORMAT_UNSUPPORTED, WRP_FONT_EMBEDDING_RESTRICTED, WRP_FONT_TOO_LARGE.',
   params: z.object({

@@ -211,7 +211,7 @@ describe('emboss_on_face (VC-WRP-10, 14, 16)', () => {
     expect(
       execute(doc, 'emboss_on_face', { id: solid, face: FACE, profileIds: [profile], mode: 'emboss', depth: 25 }).rejected,
     ).toBeUndefined();
-    const placement = { method: 'parametric' };
+    const placement = { method: 'project' };
     expectRefusal(
       doc,
       'emboss_on_face',

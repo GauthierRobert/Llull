@@ -7,6 +7,7 @@
 
 pub mod deform;
 pub mod features;
+pub mod features_surface;
 pub mod lru;
 pub mod mesh;
 pub mod queries;
@@ -25,6 +26,8 @@ pub(crate) fn serial_blends() -> std::sync::MutexGuard<'static, ()> {
 mod blend_tests;
 #[cfg(test)]
 mod deform_tests;
+#[cfg(test)]
+mod features_tests;
 #[cfg(test)]
 mod naming_tests;
 #[cfg(test)]

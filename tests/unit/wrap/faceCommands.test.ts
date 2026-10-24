@@ -261,7 +261,7 @@ describe('wrap_to_face (VC-WRP-01, 02, 03, 07, 09)', () => {
     expectRefusal(
       line.doc,
       'wrap_to_face',
-      { id: ball.id, face: near, entityIds: [line.id], placement: { method: 'geodesic' } },
+      { id: ball.id, face: near, entityIds: [line.id], placement: { method: 'project' } },
       'WRP_METHOD_UNAVAILABLE',
     );
     const base = cylinder();
@@ -274,7 +274,7 @@ describe('wrap_to_face (VC-WRP-01, 02, 03, 07, 09)', () => {
     expectRefusal(
       seg.doc,
       'wrap_to_face',
-      { id: base.id, face: FACE, entityIds: [seg.id], placement: { method: 'geodesic' } },
+      { id: base.id, face: FACE, entityIds: [seg.id], placement: { method: 'project' } },
       'WRP_METHOD_UNAVAILABLE',
     );
     const high = make(seg.doc, 'draw_polyline', {

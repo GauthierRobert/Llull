@@ -91,6 +91,7 @@ export function refreshItem(item: PmiItem, lookup: SolidLookup, adopt = false): 
     case 'datum_feature':
     case 'datum_target':
     case 'surface_texture':
+    case 'knurl':
       return { item: { ...item, feature: run('feature', item.feature).feature }, findings, notRun };
     case 'note': {
       if (item.feature === undefined) return { item, findings, notRun };

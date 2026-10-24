@@ -19,6 +19,7 @@ const FIELDS_BY_KIND: Readonly<Record<PmiKind, readonly string[]>> = {
   location_dimension: ['tolerance'],
   geometric_tolerance: ['zone', 'materialCondition', 'modifiers', 'datums', 'facesNear'],
   surface_texture: ['parameter', 'value', 'unit', 'lay', 'process', 'facesNear'],
+  knurl: ['facesNear'],
   note: ['text', 'facesNear'],
 };
 const COMMON_FIELDS = ['placement', 'autoPlacement'];

@@ -689,7 +689,7 @@ export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode
  */
 export interface DocumentBlob {
   readonly sha256: string;
-  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges' | 'font/ttf' | 'font/otf';
+  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges' | 'font/ttf' | 'font/otf' | 'font/x-llull-stroke';
   /** Base64 of the payload text. */
   readonly bytes: string;
   readonly size: number;

@@ -1,0 +1,253 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "revolve_profile",
+  "params": {
+   "profile": [
+    [
+     0,
+     0
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     20,
+     50
+    ],
+    [
+     10,
+     60
+    ],
+    [
+     10,
+     80
+    ],
+    [
+     0,
+     80
+    ]
+   ],
+   "axis": "z",
+   "segments": 64
+  },
+  "as": "bottle"
+ },
+ {
+  "command": "add_text",
+  "params": {
+   "content": "LLULL",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "height": 8,
+   "anchor": "center",
+   "font": "Fira Sans"
+  },
+  "as": "label"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$bottle",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     25
+    ]
+   },
+   "profileIds": [
+    "$label"
+   ],
+   "mode": "emboss",
+   "depth": 0.6,
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      20,
+      0,
+      25
+     ]
+    },
+    "angleDeg": 180
+   }
+  },
+  "as": "branded"
+ },
+ {
+  "command": "add_text",
+  "params": {
+   "content": "SN 0042",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "height": 4,
+   "anchor": "center",
+   "verticalAnchor": "cap_middle",
+   "font": "LLULL Single Line"
+  },
+  "as": "serial"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$branded",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     10
+    ]
+   },
+   "profileIds": [
+    "$serial"
+   ],
+   "mode": "engrave",
+   "depth": 0.3,
+   "toolWidth": 0.5,
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      20,
+      0,
+      10
+     ]
+    },
+    "angleDeg": 180
+   }
+  },
+  "as": "engraved"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 2,
+   "height": 2,
+   "position": [
+    -1,
+    -1,
+    0
+   ]
+  },
+  "as": "dimple"
+ },
+ {
+  "command": "pattern_on_face",
+  "params": {
+   "id": "$engraved",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     40
+    ]
+   },
+   "seedProfileIds": [
+    "$dimple"
+   ],
+   "mode": "deboss",
+   "depth": 0.4,
+   "grid": {
+    "countX": 8,
+    "countY": 2,
+    "pitchX": 6,
+    "pitchY": 6
+   },
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      20,
+      0,
+      40
+     ]
+    },
+    "angleDeg": 180
+   }
+  },
+  "as": "dimpled"
+ },
+ {
+  "command": "create_curve_on_face",
+  "params": {
+   "id": "$dimpled",
+   "face": {
+    "faceNear": [
+     -20,
+     0,
+     18
+    ]
+   },
+   "mode": "isoparametric",
+   "through": [
+    -20,
+    0,
+    18
+   ],
+   "direction": "u"
+  },
+  "as": "seam"
+ },
+ {
+  "command": "split_face_by_curves",
+  "params": {
+   "id": "$dimpled",
+   "curveIds": [
+    "$seam"
+   ]
+  },
+  "as": "zoned"
+ },
+ {
+  "command": "add_knurl",
+  "params": {
+   "id": "$zoned",
+   "face": {
+    "faceNear": [
+     10,
+     0,
+     70
+    ]
+   },
+   "pattern": "straight",
+   "pitch": 1.5,
+   "model": "geometry"
+  },
+  "as": "finished"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$finished"
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {}
+ }
+]

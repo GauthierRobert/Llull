@@ -29,6 +29,17 @@
   "as": "disk"
  },
  {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 20
+  },
+  "as": "wide"
+ },
+ {
   "command": "wrap_to_face",
   "params": {
    "id": "$ball",
@@ -55,9 +66,42 @@
       25
      ]
     }
-   }
+   },
+   "maxLengthStrain": 0.05
   },
   "as": "onBall"
+ },
+ {
+  "command": "wrap_to_face",
+  "params": {
+   "id": "$ball",
+   "face": {
+    "faceNear": [
+     0,
+     0,
+     25
+    ]
+   },
+   "entityIds": [
+    "$wide"
+   ],
+   "placement": {
+    "method": "geodesic",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      0,
+      0,
+      25
+     ]
+    }
+   },
+   "maxLengthStrain": 0.2
+  },
+  "as": "onBallWide"
  },
  {
   "command": "emboss_on_face",
@@ -75,6 +119,7 @@
    ],
    "mode": "emboss",
    "depth": 0.5,
+   "maxLengthStrain": 0.05,
    "placement": {
     "method": "geodesic",
     "anchor": {
@@ -98,6 +143,15 @@
    "ids": [
     "$onBall",
     "$badge"
+   ],
+   "maxLengthStrain": 0.05
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$onBallWide"
    ],
    "maxLengthStrain": 0.05
   }

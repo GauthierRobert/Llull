@@ -6,6 +6,7 @@
 
 import type { Decal, Vec3 } from '../model/types';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { wrapPatch } from './decalWrap';
 import { facetNormal } from './tessellation';
 import { edgeCrossing, forEachEdge } from './planeEdges';
 import type { Triangle } from './triangles';
@@ -37,6 +38,7 @@ function clip(polygon: Vec3[], axis: 0 | 1 | 2, sign: 1 | -1, limit: number): Ve
  * · decal normal > 0.2) receive it.
  */
 export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { positions: number[]; uvs: number[] } {
+  if (decal.mapping === 'wrap' && decal.wrap !== undefined) return wrapPatch(decal, decal.wrap);
   const { x, y, z } = decalAxes(decal);
   const toLocal = (p: Vec3): Vec3 => {
     const d = sub3(p, decal.center);
@@ -72,6 +74,14 @@ export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { posi
 export function scaledDecals(decals: ReadonlyArray<Decal>, factor: number): Decal[] {
   return decals.map((decal) => ({
     ...decal,
+    ...(decal.wrap === undefined
+      ? {}
+      : {
+          wrap:
+            decal.wrap.type === 'cylinder'
+              ? { ...decal.wrap, origin: scale3(decal.wrap.origin, factor), radius: decal.wrap.radius * factor }
+              : { ...decal.wrap, apex: scale3(decal.wrap.apex, factor) },
+        }),
     center: scale3(decal.center, factor),
     width: decal.width * factor,
     height: decal.height * factor,

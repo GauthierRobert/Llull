@@ -58,3 +58,25 @@ export const firaProvider = (bytes: Uint8Array = firaBytes()): FontProvider => (
   ],
   bytes: (id) => (id === 'fira-sans-regular' ? bytes : null),
 });
+
+const SINGLE_PATH = path.join(root, 'server', 'fonts', 'LlullSingleLine.json');
+const SINGLE_SHA256 = 'c891a6177f8e8019d1344eceaa8504c22aa34106ecb3e3e61e79d39bd24d921e';
+
+/** The bundled single-line engraving font (an original open-stroke font, CC0-1.0). */
+export const singleLineBytes = (): Uint8Array => new Uint8Array(readFileSync(SINGLE_PATH));
+
+/** Both bundled fonts, as the host's provider lists them. */
+export const bundledProvider = (): FontProvider => ({
+  list: () => [
+    ...firaProvider().list(),
+    {
+      id: 'llull-single-line',
+      family: 'LLULL Single Line',
+      style: 'Regular',
+      licence: 'CC0-1.0',
+      sha256: SINGLE_SHA256,
+      source: 'test fixture',
+    },
+  ],
+  bytes: (id) => (id === 'llull-single-line' ? singleLineBytes() : firaProvider().bytes(id)),
+});

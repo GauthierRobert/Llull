@@ -1,7 +1,7 @@
 /**
  * The sfnt container of a TrueType font (03 WRP, TECHNICAL_SPEC §5.4): table directory, `head`, `maxp`, `hhea`, `hmtx`, `OS/2` and `name`.
  * @invariant every table lies inside the file; the table count, glyph count and metric counts are capped
- * @failure not an sfnt / truncated / out-of-range table -> WRP_FONT_PARSE; CFF (OTTO), WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED
+ * @failure not an sfnt / truncated / out-of-range table -> WRP_FONT_PARSE; CFF2 (variable OpenType), WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED
  */
 
 import { ByteView, FontError, parseError } from './reader';
@@ -12,6 +12,8 @@ const MAX_GLYPHS = 65535;
 
 export interface SfntTables {
   readonly file: ByteView;
+  /** Outline flavour: TrueType glyphs (`glyf`) or Compact Font Format (`CFF `, an OpenType font with the OTTO tag). */
+  readonly flavor: 'truetype' | 'cff';
   readonly table: (tag: string) => ByteView | null;
 }
 
@@ -21,15 +23,10 @@ export function readDirectory(bytes: Uint8Array): SfntTables {
   if (bytes.length < 12) throw parseError('font: shorter than the 12-byte sfnt header');
   const version = file.u32(0);
   const tag = file.ascii(0, 4);
-  if (tag === 'OTTO')
-    throw new FontError(
-      'WRP_FONT_FORMAT_UNSUPPORTED',
-      'font: CFF outlines (OpenType OTTO) are not supported yet; use a TrueType (.ttf) font',
-    );
   if (tag === 'wOFF' || tag === 'wOF2')
     throw new FontError('WRP_FONT_FORMAT_UNSUPPORTED', 'font: WOFF files are not supported; use a TrueType (.ttf) font');
   if (tag === 'ttcf') throw new FontError('WRP_FONT_FORMAT_UNSUPPORTED', 'font: TrueType collections are not supported; extract one font');
-  if (version !== 0x00010000 && tag !== 'true') throw parseError('font: not an sfnt font (unknown version tag)');
+  if (version !== 0x00010000 && tag !== 'true' && tag !== 'OTTO') throw parseError('font: not an sfnt font (unknown version tag)');
   const count = file.u16(4);
   if (count === 0 || count > MAX_TABLES) throw parseError(`font: ${count} tables (expected 1..${MAX_TABLES})`);
   const tables = new Map<string, ByteView>();
@@ -38,7 +35,12 @@ export function readDirectory(bytes: Uint8Array): SfntTables {
     const name = file.ascii(record, 4);
     tables.set(name, file.sub(file.u32(record + 8), file.u32(record + 12), `table '${name}'`));
   }
-  return { file, table: (name) => tables.get(name) ?? null };
+  if (tag === 'OTTO' && !tables.has('CFF '))
+    throw new FontError(
+      'WRP_FONT_FORMAT_UNSUPPORTED',
+      'font: an OpenType font without a CFF table (CFF2, variable outlines) is not supported',
+    );
+  return { file, flavor: tag === 'OTTO' ? 'cff' : 'truetype', table: (name) => tables.get(name) ?? null };
 }
 
 export function requireTable(tables: SfntTables, name: string): ByteView {

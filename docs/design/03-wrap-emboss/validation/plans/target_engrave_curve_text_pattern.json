@@ -1,0 +1,230 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "add_text",
+  "params": {
+   "content": "LLULL",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "height": 8,
+   "anchor": "center",
+   "verticalAnchor": "cap_middle",
+   "font": "LLULL Single Line"
+  },
+  "as": "serial"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$serial"
+   ],
+   "mode": "engrave",
+   "depth": 0.4,
+   "toolWidth": 0.8,
+   "placement": {
+    "method": "develop"
+   }
+  },
+  "as": "engraved"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "badge"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    -60
+   ],
+   "radius": 70,
+   "startAngle": 1.2,
+   "endAngle": 1.95
+  },
+  "as": "baseline"
+ },
+ {
+  "command": "add_text",
+  "params": {
+   "content": "LLULL",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "height": 5,
+   "anchor": "center",
+   "font": "Fira Sans",
+   "onCurve": {
+    "curveId": "$baseline"
+   }
+  },
+  "as": "bent"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$badge",
+   "face": {
+    "faceNear": [
+     120,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$bent"
+   ],
+   "mode": "emboss",
+   "depth": 0.5,
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      120,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "as": "lettered"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    200,
+    0,
+    0
+   ]
+  },
+  "as": "grip"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 2,
+   "height": 2,
+   "position": [
+    -1,
+    -1,
+    0
+   ]
+  },
+  "as": "dimple"
+ },
+ {
+  "command": "pattern_on_face",
+  "params": {
+   "id": "$grip",
+   "face": {
+    "faceNear": [
+     220,
+     0,
+     0
+    ]
+   },
+   "seedProfileIds": [
+    "$dimple"
+   ],
+   "mode": "emboss",
+   "depth": 0.5,
+   "grid": {
+    "countX": 12,
+    "countY": 3,
+    "pitchX": 5,
+    "pitchY": 6
+   },
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      217.55165123780745,
+      -9.58851077208406,
+      -6
+     ]
+    }
+   }
+  },
+  "as": "studded"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$engraved"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$lettered"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$studded"
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$engraved",
+    "$lettered",
+    "$studded"
+   ]
+  }
+ }
+]

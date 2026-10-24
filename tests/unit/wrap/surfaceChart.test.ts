@@ -9,7 +9,8 @@ import { bezier2, arc2, mapCurve2, pointAt2, sample2 } from '@lib/nurbs/curve2d'
 import { directionOnFace, fromFlat, isDevelopable, normalAt, toFlat, zeroDirection } from '@core/geometry/surfaceChart';
 import { embossClosedForm, regionsAreas } from '@core/geometry/embossVolume';
 import { segmentArea, segmentLength, segmentOfCurve, segmentOfOutline, sampleSegment, mapSegment2 } from '@core/geometry/planeSegments';
-import { buildFaceChart, type FaceChart } from '@core/geometry/wrapChart';
+import type { FaceChart } from '@core/geometry/chartFrame';
+import { buildFaceChart } from '@core/geometry/wrapChart';
 import { curve3d, extentOf, fitBySampling, isMappingError, lengthOnFace, mapPieces, pcurveOf } from '@core/geometry/wrapCurves';
 import type { SurfaceParams } from '@core/geometry/kernelPorts';
 import type { EmbossParams, UvLoop, UvRegion } from '@core/model/wrap';

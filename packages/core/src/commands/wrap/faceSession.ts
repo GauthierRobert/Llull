@@ -10,7 +10,8 @@ import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/
 import type { FaceQueryPort, SurfaceParams } from '../../geometry/kernelPorts';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import { operandRecipe } from '../../geometry/operandRecipe';
-import { buildFaceChart, type FaceChart } from '../../geometry/wrapChart';
+import type { ChartMethod, FaceChart } from '../../geometry/chartFrame';
+import { buildChart } from '../../geometry/faceChart';
 import { dot3 } from '../../lib/vec3';
 import { is3D } from '../../model/types';
 import { currentContext } from '../context';
@@ -27,7 +28,8 @@ export interface FaceRefInput {
   readonly faceName?: string | undefined;
 }
 
-export interface FaceSession {
+/** A solid opened for exact face work: its recipe, shape and topology, before any face is picked. */
+export interface SolidSession {
   readonly command: string;
   readonly entity: Entity;
   readonly kernel: GeometryKernel;
@@ -35,17 +37,20 @@ export interface FaceSession {
   readonly source: ShapeRecipe;
   readonly shape: ShapeHandle;
   readonly topology: ShapeTopology | null;
+  /** Diagonal of the solid's bounding box, document units. */
+  readonly diagonal: number;
+}
+
+export interface FaceSession extends SolidSession {
   readonly face: number;
   /** Persistent name of the picked face when the kernel keeps history. */
   readonly faceName: string | undefined;
   readonly surface: SurfaceParams;
   readonly uvBounds: readonly [Vec2, Vec2];
-  /** Diagonal of the solid's bounding box, document units. */
-  readonly diagonal: number;
   readonly note: string;
 }
 
-export const isRejection = (value: FaceSession | CommandResult): value is CommandResult => 'summary' in value;
+export const isRejection = <T extends object>(value: T | CommandResult): value is CommandResult => 'summary' in value;
 
 /** The context's kernel with exact face queries, else the reason it cannot work. */
 export function exactKernel(
@@ -70,14 +75,11 @@ export function exactKernel(
 /** 1e-6 x the diagonal (>= 1e-7): the named default of D-WRP-4, in document units. */
 export const defaultFitTolerance = (diagonal: number): number => Math.max(DEFAULT_FIT_RATIO * diagonal, MIN_FIT_TOLERANCE);
 
-/** See the module comment. */
-export function openFace(
-  doc: CadDocument,
-  ctx: ExecutionContext | undefined,
-  command: string,
-  id: string,
-  ref: FaceRefInput,
-): FaceSession | CommandResult {
+/**
+ * The solid `id` opened for exact face work.
+ * @failure unknown id / not a solid / no exact kernel / unbuildable solid -> a coded rejection
+ */
+export function openSolid(doc: CadDocument, ctx: ExecutionContext | undefined, command: string, id: string): SolidSession | CommandResult {
   const fail = (code: string, message: string, paths: string[] = [], ids: string[] = []): CommandResult =>
     wrapRejection(doc, command, code, message, ids, paths);
   const entity = doc.entities[id];
@@ -91,6 +93,23 @@ export function openFace(
   const shape = kernel.evaluate(source);
   if (shape === null) return fail('WRP_KERNEL_BUILD_FAILED', `the kernel could not build '${id}' (kind '${entity.kind}')`, ['id'], [id]);
   const topology = kernel.topology(shape);
+  const mesh = kernel.tessellate(shape);
+  return { command, entity, kernel, query, source, shape, topology, diagonal: mesh === null ? 1 : meshDiagonal(mesh) };
+}
+
+/** See the module comment. */
+export function openFace(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  command: string,
+  id: string,
+  ref: FaceRefInput,
+): FaceSession | CommandResult {
+  const fail = (code: string, message: string, paths: string[] = [], ids: string[] = []): CommandResult =>
+    wrapRejection(doc, command, code, message, ids, paths);
+  const solid = openSolid(doc, ctx, command, id);
+  if (isRejection(solid)) return solid;
+  const { kernel, query, shape, topology } = solid;
   if (ref.faceIndex === undefined && ref.faceNear === undefined && ref.faceName === undefined)
     return fail('WRP_FACE_NOT_FOUND', 'give face.faceNear (a point on the face), face.faceIndex or face.faceName', ['face']);
   const pick = pickFaces(kernel, shape, topology, {
@@ -116,21 +135,12 @@ export function openFace(
   const face = picked[0] as number;
   const geometry = query.faceGeometry(shape, face);
   if (geometry === null) return fail('WRP_FACE_NOT_FOUND', `face ${face} of '${id}' has no exact geometry`, ['face'], [id]);
-  const mesh = kernel.tessellate(shape);
-  const diagonal = mesh === null ? 1 : meshDiagonal(mesh);
   return {
-    command,
-    entity,
-    kernel,
-    query,
-    source,
-    shape,
-    topology,
+    ...solid,
     face,
     faceName: pick.record?.[0] ?? (ref.faceName !== undefined ? ref.faceName : topology?.faces[face]?.name),
     surface: geometry.surface,
     uvBounds: geometry.uvBounds,
-    diagonal,
     note: pick.note,
   };
 }
@@ -144,7 +154,8 @@ export interface ResolvedChart {
   readonly outward: Vec3;
   /** +1 when the outward normal agrees with the surface's Su x Sv at the anchor, -1 when it opposes it (a bore). */
   readonly orientation: 1 | -1;
-  readonly method: 'develop';
+  /** The method asked for (`placement.method`, default develop); `chart.method` is the one the chart is built with. */
+  readonly method: ChartMethod;
 }
 
 export interface PlacementInput {
@@ -160,8 +171,8 @@ export const isDevelopableSurface = (surface: SurfaceParams): boolean =>
 
 /**
  * The chart for `placement` on the session's face.
- * @failure non-developable face with develop -> WRP_FACE_NOT_DEVELOPABLE; any other method -> WRP_METHOD_UNAVAILABLE; anchor farther than 1e-3 x the solid diagonal from
- *   the face -> WRP_ANCHOR_OFF_FACE
+ * @failure sphere or torus face with develop -> WRP_FACE_NOT_DEVELOPABLE; freeform face, or method project -> WRP_METHOD_UNAVAILABLE; anchor farther than 1e-3 x the solid
+ *   diagonal from the face -> WRP_ANCHOR_OFF_FACE
  */
 export function resolveChart(
   doc: CadDocument,
@@ -171,20 +182,24 @@ export function resolveChart(
 ): ResolvedChart | CommandResult {
   const { command, id } = { command: session.command, id: session.entity.id };
   const fail = (code: string, message: string, path: string): CommandResult => wrapRejection(doc, command, code, message, [id], [path]);
-  const method = placement?.method ?? 'develop';
-  if (!isDevelopableSurface(session.surface)) {
-    return method === 'develop'
-      ? fail(
-          'WRP_FACE_NOT_DEVELOPABLE',
-          `face ${session.face} is ${session.surface.type} (Gaussian curvature != 0): it cannot be developed without stretch`,
-          'placement.method',
-        )
-      : fail('WRP_METHOD_UNAVAILABLE', `method '${method}' is not built yet`, 'placement.method');
-  }
-  if (method !== 'develop')
+  const requested = placement?.method ?? 'develop';
+  if (requested === 'project')
     return fail(
       'WRP_METHOD_UNAVAILABLE',
-      `method '${method}' is not built yet; a plane, cylinder or cone develops exactly`,
+      "method 'project' is the job of project_to_face; use develop, geodesic or parametric",
+      'placement.method',
+    );
+  const method: ChartMethod = requested;
+  if (session.surface.type === 'other')
+    return fail(
+      'WRP_METHOD_UNAVAILABLE',
+      `face ${session.face} is a freeform surface; charts are built for plane, cylinder, cone, sphere and torus faces`,
+      'face',
+    );
+  if (method === 'develop' && !isDevelopableSurface(session.surface))
+    return fail(
+      'WRP_FACE_NOT_DEVELOPABLE',
+      `face ${session.face} is ${session.surface.type} (Gaussian curvature != 0): it cannot be developed without stretch; use method geodesic or parametric and read data.distortion`,
       'placement.method',
     );
   const wanted = placement?.anchor?.on ?? nearHint;
@@ -205,13 +220,12 @@ export function resolveChart(
       'placement.anchor.on',
     );
   const anchorChart: Vec2 = placement?.anchor?.chart ?? [0, 0];
-  const built = buildFaceChart(session.surface, {
-    anchorChart,
-    anchorOn: hit.point,
-    angleDeg: placement?.angleDeg ?? 0,
-    mirror: placement?.mirror ?? false,
-  });
+  const built = buildChart(
+    session.surface,
+    { anchorChart, anchorOn: hit.point, angleDeg: placement?.angleDeg ?? 0, mirror: placement?.mirror ?? false },
+    method,
+  );
   if ('error' in built) return fail('WRP_ANCHOR_OFF_FACE', built.error, 'placement.anchor.on');
   const orientation = dot3(hit.normal, built.normalAt(built.anchorUv)) >= 0 ? 1 : -1;
-  return { chart: built, anchorOn: hit.point, anchorChart, outward: hit.normal, orientation, method: 'develop' };
+  return { chart: built, anchorOn: hit.point, anchorChart, outward: hit.normal, orientation, method: requested };
 }

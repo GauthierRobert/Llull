@@ -23,26 +23,28 @@ export interface TextProfile {
 
 const TWO_THIRDS = 2 / 3;
 
-/** The loop as an exact counter-clockwise chain; a quadratic [p0, c, p1] becomes the cubic [p0, p0 + 2/3 (c - p0), p1 + 2/3 (c - p1), p1]. */
+/** The loop as an exact counter-clockwise chain; a cubic is kept, a quadratic [p0, c, p1] becomes the cubic [p0, p0 + 2/3 (c - p0), p1 + 2/3 (c - p1), p1]. */
 function chainOf(loop: OutlineLoop): ProfileChain {
   const curves: CurveSegment<Vec2>[] = loop.map((segment) =>
     segment.kind === 'line'
       ? { type: 'line', points: [segment.from, segment.to] }
-      : {
-          type: 'bezier',
-          points: [
-            segment.from,
-            [
-              segment.from[0] + TWO_THIRDS * (segment.control[0] - segment.from[0]),
-              segment.from[1] + TWO_THIRDS * (segment.control[1] - segment.from[1]),
+      : segment.kind === 'cubic'
+        ? { type: 'bezier', points: [segment.from, segment.control1, segment.control2, segment.to] }
+        : {
+            type: 'bezier',
+            points: [
+              segment.from,
+              [
+                segment.from[0] + TWO_THIRDS * (segment.control[0] - segment.from[0]),
+                segment.from[1] + TWO_THIRDS * (segment.control[1] - segment.from[1]),
+              ],
+              [
+                segment.to[0] + TWO_THIRDS * (segment.control[0] - segment.to[0]),
+                segment.to[1] + TWO_THIRDS * (segment.control[1] - segment.to[1]),
+              ],
+              segment.to,
             ],
-            [
-              segment.to[0] + TWO_THIRDS * (segment.control[0] - segment.to[0]),
-              segment.to[1] + TWO_THIRDS * (segment.control[1] - segment.to[1]),
-            ],
-            segment.to,
-          ],
-        },
+          },
   );
   const oriented = loopArea(loop) < 0 ? reverseChain(curves) : curves;
   return { curves: oriented, profile: sampleProfile(oriented) };

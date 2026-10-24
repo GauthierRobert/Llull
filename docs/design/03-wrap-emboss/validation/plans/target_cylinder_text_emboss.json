@@ -6,13 +6,6 @@
   }
  },
  {
-  "command": "import_font",
-  "params": {
-   "path": "fixtures/wrp/FiraSans-Regular.ttf"
-  },
-  "as": "fira"
- },
- {
   "command": "add_cylinder",
   "params": {
    "radius": 20,
@@ -42,7 +35,7 @@
    ],
    "height": 10,
    "anchor": "center",
-   "font": "$fira"
+   "font": "Fira Sans"
   },
   "as": "label"
  },

@@ -5,7 +5,6 @@
 
 import type { CadDocument, Entity, ShapeRecipe, TextEntity, Vec3 } from '../../model/types';
 import { nextId } from '../../lib/id';
-import { outlineErrorCode, textOutline } from '../../geometry/textOutline';
 import { textProfiles, type ProfileChain } from '../../geometry/textProfiles';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
@@ -18,6 +17,7 @@ import { exactCurves } from './extrusionResult';
 import { resolveRotation } from './shared';
 import { wrapRejection } from '../wrap/codes';
 import { isFontFailure, loadFont } from '../wrap/fontStore';
+import { isOutlineFailure, outlineOfText } from '../wrap/textPath';
 import { wrapData } from '../wrap/conventions';
 
 /** Balanced union of `parts` (a text of hundreds of regions stays far below the recipe depth limit). */
@@ -47,8 +47,13 @@ export function extrudeText(doc: CadDocument, ctx: ExecutionContext | undefined,
   if (kernel === null) return noop(doc, kernelUnavailable('extrude_profile'));
   const loaded = loadFont(doc, text.font as string);
   if (isFontFailure(loaded)) return fail(loaded.code, loaded.message);
-  const outline = textOutline(text, loaded.font);
-  if ('error' in outline) return fail(outlineErrorCode(outline.error), outline.message);
+  if (loaded.font.singleLine)
+    return fail(
+      'WRP_TEXT_SINGLE_LINE',
+      `font '${loaded.record.family}' draws open strokes: they have no area to extrude (use emboss_on_face mode engrave, or an outline font)`,
+    );
+  const outline = outlineOfText(doc, text, loaded.font);
+  if (isOutlineFailure(outline)) return fail(outline.code, outline.message);
   const profiles = textProfiles(outline);
   if (profiles.length === 0) return fail('WRP_PROFILE_EMPTY', `text "${text.content}" has no outline (blank or unmapped characters)`);
   const resolved = resolveRotation(request.axis, request.rotation ?? text.rotation);

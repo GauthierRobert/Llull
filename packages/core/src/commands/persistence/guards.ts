@@ -12,6 +12,7 @@ import {
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
+import { decalWrapFieldsProblem } from './decalGuard';
 import { helixProblem, sweepDesignProblem } from './sweepGuard';
 import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem, surfaceTrimsProblem } from './nurbsGuard';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
@@ -94,6 +95,8 @@ function decalsProblem(decals: unknown): string | null {
       return `decal ${String(decal['id'])}: angle must be finite and width / height / depth > 0`;
     if (!isHexColor(decal['color']) || (decal['background'] !== undefined && !isHexColor(decal['background'])))
       return `decal ${String(decal['id'])}: color / background must be #rrggbb`;
+    const wrapIssue = decalWrapFieldsProblem(decal);
+    if (wrapIssue !== null) return `decal ${String(decal['id'])}: ${wrapIssue}`;
   }
   return null;
 }
