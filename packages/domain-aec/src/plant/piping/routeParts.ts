@@ -87,6 +87,24 @@ function chooseTurns(
  *   branch that does not fit or has no spec row -> DerivationFailure with the RTE_* code, the ids involved and the param path
  */
 export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | DerivationFailure {
+  return derivedOnce(doc, run, []);
+}
+
+type Derived = RunDerivation | DerivationFailure;
+/** Derivations per document and run object: a header is derived once however many branches hang on it (immutable documents make this exact). */
+const derivations = new WeakMap<CadDocument, Map<PipeRun, Derived>>();
+
+function derivedOnce(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {
+  const known = derivations.get(doc)?.get(run);
+  if (known !== undefined) return known;
+  const result = derive(doc, run, path);
+  const memo = derivations.get(doc) ?? new Map<PipeRun, Derived>();
+  memo.set(run, result);
+  derivations.set(doc, memo);
+  return result;
+}
+
+function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derived {
   const env = makeEnv(doc, run);
   if (isFailure(env)) return env;
   const { line, lookup, tolerance, weld: bw } = env;
@@ -98,7 +116,14 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
   if (run.start.ref?.kind === 'branch') {
     // A branch hangs on its header: when the header does not derive (moved port, missing part) the branch is broken with the header's code.
     const header = getPiping(doc).runs[run.start.ref.runId];
-    const parent = header === undefined ? null : deriveRun(doc, header);
+    if (header !== undefined && [...path, run.id].includes(header.id))
+      return fail(
+        'RTE_UNKNOWN_RUN',
+        `branch cycle: run ${run.id} hangs on ${header.id}, which hangs on ${run.id} again`,
+        [run.id, header.id],
+        ['start'],
+      );
+    const parent = header === undefined ? null : derivedOnce(doc, header, [...path, run.id]);
     if (parent !== null && isFailure(parent)) return { ...parent, message: `header ${header?.id}: ${parent.message}` };
   }
   const start = setupEnd(env, run.start, 'start', dnStart);
@@ -237,7 +262,9 @@ export function deriveRun(doc: CadDocument, run: PipeRun): RunDerivation | Deriv
             { cutLength: piece.cut, leg, dims: { outsideDiameter: info.od, wall: info.wall } },
           ),
         );
-        addJoint({ kind: weld, parts: [after, pieceId], position: at(origin, u, a.end), gapMm: a.gap });
+        // A stub-in is set on the header by one branch weld (made with the header): no butt weld to the first piece.
+        if (!(startSide?.weldless === true && a.id === head.id))
+          addJoint({ kind: weld, parts: [after, pieceId], position: at(origin, u, a.end), gapMm: a.gap });
         addJoint({ kind: weld, parts: [pieceId, before], position: at(origin, u, b.start), gapMm: b.gap });
       } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(origin, u, a.end), gapMm: 0 });
       const slot = slotById.get(b.id);

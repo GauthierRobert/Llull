@@ -817,7 +817,7 @@ Built: flange sets on valve faces, inline valves and concentric reducers, branch
 | Conversion, line update | `commands/convertPipeRun.ts`, `commands/updatePipeline.ts` | |
 | Run commands | `commands/inlineComponents.ts` (`insert_inline_component`, `move_inline_component`, `remove_inline_component`), `commands/addBranch.ts`, `commands/deleteRun.ts` (`cascade`), `commands/routePipe.ts` (`inline`), `runUpdate.ts` (`rederive`: derive the changed runs and every run attached to them and rebuild their entities, or fail whole) | |
 | Display | `geometryInline.ts` | Valve = body + stem + handwheel disc on layer `P-VALV` (ids `<valve>`, `<valve>/stem`, `<valve>/wheel`), reducer frustum, tee = header cylinder + `<tee>/branch` stub, olet cylinder, stub-in none. Schematic: the proportions are named display constants, a catalogue `stemHeight` sets the stem length |
-| Tests | `tests/unit/plant/piping/{inlineComponents,inlineVariants,branches,branchPorts,checks,convertPipeRun,updatePipeline,rteScenarioPlans}.test.ts`, golden `piping_gate_valve`, `piping_header_branches`, `piping_reducer_run`, `piping_legacy_conversion` | Coverage of `plant/piping/**`: 97.87 % statements, 92.51 % branches, 99.08 % functions, 99.29 % lines (measured 2026-10-24 with `tests/unit/plant`) |
+| Tests | `tests/unit/plant/piping/{inlineComponents,inlineVariants,branches,branchPorts,checks,convertPipeRun,updatePipeline,rteScenarioPlans}.test.ts`, golden `piping_gate_valve`, `piping_header_branches`, `piping_reducer_run`, `piping_legacy_conversion` | Coverage of `plant/piping/**`: 97.94 % statements, 92.68 % branches, 99.10 % functions, 99.35 % lines (measured 2026-10-24 with `tests/unit/plant`) |
 
 Validation numbers (hand calculations from the stub catalogue, never copied from an output of llull):
 
@@ -848,6 +848,10 @@ Decisions (owner delegated: long-term quality over the cheap path):
 - **Olets and stub-ins must not overlap.** On one header leg the footprints (discs of radius = half the row `baseDiameter`, else the branch pipe radius) must clear:
   `sqrt(dx^2 + (R angle)^2) >= r1 + r2`, dx the axial distance, R the header outside radius, angle the angle between the two branch directions. The same olet twice or 10 mm apart is
   `RTE_BRANCH_ON_FITTING`; the opposite side of the header or 100 mm further is allowed. Checked in `layoutBranches`, so every command that derives the header refuses it.
+- **Stub-in welds.** The stub-in is set on the header by its single branch weld; the first branch piece has no butt weld to the part (butt welds are not counted twice).
+- **Cycles and cost.** A branch run derives its header first; the walk carries the path, so a header that (through stored data) hangs on its own branch fails with `RTE_UNKNOWN_RUN` "branch cycle", and `pipingErrors` rejects such a model on load. Derivations and
+  header layouts are memoised per document object, so a header with k branches is derived once (200 branches: tens of ms; budget test "performance budgets" bounds it at 20 s).
+- **`convert_pipe_run` transparency.** `data.straightenedMaxOffsetMm` is the largest sideways distance of a merged vertex from the leg that now runs past it (0.29 deg kink: 5000 / 2000.00625 = 2.499992 mm).
 - **Set-on welds.** The olet / stub-in to header weld is a `branchWeld` joint, counted as `branchWelds` in the takeoff, apart from `buttWelds`. SC-RTE-03: 7 butt welds + 1 branch weld.
 - **A branch is broken with its header.** `deriveRun` of a branch run first derives its header and fails with `header <id>: <header message>` and the header's code, so a header
   that lost its port (`RTE_STRETCH_FAILED`) breaks the branch too (parts removed) and the branch comes back when the header does.

@@ -87,6 +87,25 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
   return errors;
 }
 
+/** A run that hangs on a branch of itself, directly or through other branch runs, can never be derived. */
+function cycleErrors(raw: Record<string, unknown>): string[] {
+  const runs = isRecord(raw['runs']) ? raw['runs'] : {};
+  const headerOf = (id: string): string | undefined => {
+    const run = runs[id];
+    const ref = isRecord(run) && isRecord(run['start']) && isRecord(run['start']['ref']) ? run['start']['ref'] : undefined;
+    return ref?.['kind'] === 'branch' && typeof ref['runId'] === 'string' ? ref['runId'] : undefined;
+  };
+  return Object.keys(runs).flatMap((id) => {
+    const seen = new Set<string>([id]);
+    for (let next = headerOf(id); next !== undefined; next = headerOf(next)) {
+      if (next === id) return [`plant.piping.runs.${id} hangs on a branch of itself (branch cycle)`];
+      if (seen.has(next)) return [];
+      seen.add(next);
+    }
+    return [];
+  });
+}
+
 export function pipingErrors(raw: unknown): string[] {
   if (!isRecord(raw)) return ['plant.piping must be an object'];
   const lines = isRecord(raw['lines']) ? raw['lines'] : {};
@@ -118,5 +137,6 @@ export function pipingErrors(raw: unknown): string[] {
       ...(Array.isArray(run['pis']) && run['pis'].every(isVec3) ? [] : [`plant.piping.runs.${id}.pis must be [x, y, z] points`]),
     ]),
     ...entityIdErrors(raw),
+    ...cycleErrors(raw),
   ];
 }

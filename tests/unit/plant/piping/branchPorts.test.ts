@@ -101,7 +101,7 @@ describe('validation of the stored M2 members', () => {
         ],
         branches: [{ id: 'b', leg: 0, distance: 2, branchRunId: 'r' }],
       },
-      { kind: 'branch', runId: 'r', branchId: 'b' },
+      { kind: 'branch', runId: 'header', branchId: 'b' },
     );
     expect(pipingErrors(good)).toEqual([]);
   });
@@ -132,7 +132,7 @@ describe('validation of the stored M2 members', () => {
   it('a branch reference is allowed at a run start and refused at a run end', () => {
     const atEnd = run({});
     const runs = atEnd['runs'] as Record<string, { end: Record<string, unknown> }>;
-    (runs['r'] as { end: Record<string, unknown> }).end['ref'] = { kind: 'branch', runId: 'r', branchId: 'b' };
+    (runs['r'] as { end: Record<string, unknown> }).end['ref'] = { kind: 'branch', runId: 'header', branchId: 'b' };
     expect(pipingErrors(atEnd)).toEqual(['plant.piping.runs.r.end.ref must be a tieIn, nozzle or runEnd reference']);
   });
 });

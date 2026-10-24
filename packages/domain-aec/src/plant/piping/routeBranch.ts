@@ -5,6 +5,7 @@
  *   branch runs mint the same id
  */
 
+import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { BranchPoint, EndType, Joint, PartPort, PipeRun, PortRef, PortSpec, RoutedPart } from '@aec/plant/types';
 import { dot3, len3, scale3, sub3 } from '@lib/vec3';
@@ -257,6 +258,20 @@ export function oletPart(env: Env, fit: BranchFit, onPart: string): { part: Rout
   return { part, joint: { kind: 'branchWeld', parts: [fit.partId, onPart], position: base, gapMm: 0 } };
 }
 
+const layouts = new WeakMap<CadDocument, Map<PipeRun, BranchFit[] | DerivationFailure>>();
+
+/** The branch fittings of a header run, computed once per document and run however many branch runs ask (a header with k branches is laid out once, not k times). */
+function headerLayout(doc: CadDocument, header: PipeRun): BranchFit[] | DerivationFailure {
+  const known = layouts.get(doc)?.get(header);
+  if (known !== undefined) return known;
+  const env = makeEnv(doc, header);
+  const result = isFailure(env) ? env : layoutBranches(env);
+  const memo = layouts.get(doc) ?? new Map<PipeRun, BranchFit[] | DerivationFailure>();
+  memo.set(header, result);
+  layouts.set(doc, memo);
+  return result;
+}
+
 /** The `DerivedBranch` record of a fit. */
 export const derivedBranch = (env: Env, fit: BranchFit): DerivedBranch => ({
   id: fit.point.id,
@@ -290,9 +305,7 @@ export function branchStartSetup(
   portId: string,
 ): EndSetup | DerivationFailure {
   const header = getPiping(env.doc).runs[ref.runId] as PipeRun;
-  const headerEnv = makeEnv(env.doc, header);
-  if (isFailure(headerEnv)) return { ...headerEnv, message: `header ${header.id}: ${headerEnv.message}` };
-  const fits = layoutBranches(headerEnv);
+  const fits = headerLayout(env.doc, header);
   if (isFailure(fits)) return { ...fits, message: `header ${header.id}: ${fits.message}` };
   const fit = fits.find((candidate) => candidate.point.id === ref.branchId) as BranchFit;
   return {
@@ -302,5 +315,6 @@ export function branchStartSetup(
     port,
     portId,
     fittingId: fit.partId,
+    ...(fit.kind === 'stubIn' ? { weldless: true } : {}),
   };
 }

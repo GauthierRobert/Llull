@@ -39,6 +39,8 @@ export interface EndSetup {
   readonly portId: string | null;
   /** Branch start: the header fitting part the first pipe piece welds to. */
   readonly fittingId?: string;
+  /** Branch start on a stub-in: the first piece is not butt welded to the part (the set-on branch weld is the one weld). */
+  readonly weldless?: boolean;
 }
 
 export const partOf = (

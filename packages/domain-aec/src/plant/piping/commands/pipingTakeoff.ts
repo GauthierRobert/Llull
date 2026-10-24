@@ -15,8 +15,8 @@ export const pipingTakeoff = defineCommand({
   name: 'piping_takeoff',
   description:
     'Query: bill of materials and cut list of routed pipe, derived from the stored runs and their spec: part counts by key (elbow90LR, flangeWeldNeck, ' +
-    'gasketSpiralWound, boltSet, valveGate, reducerConcentric, tee, reducingTee, weldolet, stubIn ...), pipePieces (cutLengthMm per straight piece, leg index), joints (buttWeld, flanged, fittingToFitting, with ' +
-    'position and gap), studs, totalPipeMm, centrelineLengthMm (legs - 2 x centre-to-end + arcs), legs and turns (angle, nominal angle, ' +
+    'gasketSpiralWound, boltSet, valveGate, reducerConcentric, tee, reducingTee, weldolet, stubIn ...), pipePieces (cutLengthMm per straight piece, leg index), joints (buttWeld, branchWeld = the set-on weld of an olet or stub-in to the header, flanged, fittingToFitting, with ' +
+    'position and gap), counts also hold buttWelds, branchWelds, socketWelds, threadedJoints, flangedJoints and fittingToFitting, studs, totalPipeMm, centrelineLengthMm (legs - 2 x centre-to-end + arcs), legs and turns (angle, nominal angle, ' +
     'deviationDeg, centreToEnd), inline (valves and reducers: faces, part ids, size), branches (tee / olet / stub-in per branch point), warnings and unverified (spec not approved or catalogue rows not grade A, with reasons). Lengths in mm. Give runId ' +
     'or lineId; with neither, every run is counted. A run that no longer derives (its equipment or tie-in moved or was removed, the spec lost a part: ' +
     'marked broken) is skipped and listed in data.brokenRuns [{ runId, code, message }]; asked for by runId it is refused with its RTE_* code. Refusals: ' +

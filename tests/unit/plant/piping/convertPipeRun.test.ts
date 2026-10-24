@@ -249,3 +249,26 @@ describe('convert_pipe_run refusals leave the document unchanged', () => {
     expectRefusal({ ...s.doc, units: 'in' as const }, 'convert_pipe_run', { pipeId: s.pipeId, spec: 'CS150' }, 'RTE_UNITS_UNSUPPORTED');
   });
 });
+
+describe('convert_pipe_run reports what straightening moved', () => {
+  it('the 0.29 deg kink at vertex 1 sits 2.499992 mm off the straightened leg: |cross((2000,5), (1000,0))| / |(2000,5)| = 5000 / 2000.00625', () => {
+    const l = legacy(
+      [
+        [0, 0, 0],
+        [1000, 0, 0],
+        [2000, 5, 0],
+        [2000, 1005, 0],
+      ],
+      { dn: 100, line: 'L-8' },
+    );
+    const result = data<Converted & { straightenedMaxOffsetMm: number }>(l.doc, 'convert_pipe_run', { pipeId: l.pipeId, spec: 'CS150' });
+    expect(result.straightenedMaxOffsetMm).toBeCloseTo(2.499992, 6);
+  });
+
+  it('is 0 when nothing was merged', () => {
+    const l = legacy();
+    expect(
+      data<{ straightenedMaxOffsetMm: number }>(l.doc, 'convert_pipe_run', { pipeId: l.pipeId, spec: 'CS150' }).straightenedMaxOffsetMm,
+    ).toBe(0);
+  });
+});

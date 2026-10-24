@@ -10,6 +10,8 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import { createEmptyDocument, type CadDocument, type RevolutionEntity } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
+import { deriveRun } from '@aec/plant/piping/routeParts';
+import { pipingErrors } from '@aec/plant/piping/validate';
 import { addTie, cs150Line, headerScene, rteJson, routedPumpToVesselWithTee, valveScene } from './rteFixtures';
 
 const piping = (doc: CadDocument): PipingModel => doc.plant?.piping as PipingModel;
@@ -604,5 +606,105 @@ describe('purity of delete_pipe_run with cascade', () => {
     const first = execute(doc, 'delete_pipe_run', { runId: s.headerId, cascade: true });
     expect(doc).toEqual(before);
     expect(execute(doc, 'delete_pipe_run', { runId: s.headerId, cascade: true }).document).toEqual(first.document);
+  });
+});
+
+describe('stub-in welds', () => {
+  it('a stub-in is set on the header by one branch weld: no butt weld between it and the first branch piece', () => {
+    const s = variantHeader(100);
+    const next = apply(s.doc, 'add_branch', {
+      runId: s.headerId,
+      at: { point: [5000, 0, 3000] },
+      dn: 80,
+      legs: [{ direction: '+Y', length: 1000 }],
+    });
+    // butt welds: the two header ends (tie-in, tie-in); branch welds: the stub-in on the header; the free branch end has none
+    expect(data<Takeoff>(next, 'piping_takeoff', {}).counts).toMatchObject({ buttWelds: 2, branchWelds: 1, stubIn: 1 });
+  });
+});
+
+describe('branch cycles', () => {
+  const h = headerScene();
+  const branched = apply(h.doc, 'add_branch', { runId: h.headerId, at: { point: [4000, 0, 3000] }, dn: 100, to: { portId: h.tieC } });
+  const branchRunId = piping(branched).runOrder.at(-1) as string;
+  /** The header starts at a branch point of its own branch run, which hangs on the header: a loop in the stored data. */
+  const looped: CadDocument = {
+    ...branched,
+    plant: {
+      ...branched.plant,
+      piping: {
+        ...piping(branched),
+        runs: {
+          ...piping(branched).runs,
+          [h.headerId]: {
+            ...(piping(branched).runs[h.headerId] as PipeRun),
+            start: { point: [0, 0, 3000], ref: { kind: 'branch', runId: branchRunId, branchId: 'bp-loop' } },
+          },
+          [branchRunId]: {
+            ...(piping(branched).runs[branchRunId] as PipeRun),
+            branches: [{ id: 'bp-loop', leg: 0, distance: 500, branchRunId: h.headerId }],
+          },
+        },
+      },
+    },
+  };
+
+  it('deriving a looped run fails with RTE_UNKNOWN_RUN naming the cycle, never a stack overflow', () => {
+    for (const id of [h.headerId, branchRunId]) {
+      const result = deriveRun(looped, piping(looped).runs[id] as PipeRun);
+      expect(result.ok).toBe(false);
+      expect((result as { code: string }).code).toBe('RTE_UNKNOWN_RUN');
+    }
+    const derived = deriveRun(looped, piping(looped).runs[h.headerId] as PipeRun);
+    expect((derived as { message: string }).message).toContain('branch cycle');
+  });
+
+  it('check_piping reports the looped runs as error issues', () => {
+    const result = data<{ status: string; issues: Array<{ code: string }> }>(looped, 'check_piping', {});
+    expect(result.status).toBe('fail');
+    expect(result.issues.some((issue) => issue.code === 'RTE_UNKNOWN_RUN')).toBe(true);
+  });
+
+  it('the saved model is rejected on load: pipingErrors names the cycle', () => {
+    const errors = pipingErrors(piping(looped));
+    expect(errors).toEqual(expect.arrayContaining([expect.stringContaining('hangs on a branch of itself (branch cycle)')]));
+  });
+});
+
+describe('performance budgets (plant 02 RTE section 8): a header with many branches', () => {
+  it('derives, checks and graphs a header with 200 weldolet branches without re-deriving the header per branch (bound 20 s)', () => {
+    const line = cs150Line(150, '9001');
+    const a = addTie(line.doc, 'PA', [0, 0, 3000], [1, 0, 0], { dn: 150 });
+    const b = addTie(a.doc, 'PB', [40000, 0, 3000], [-1, 0, 0], { dn: 150 });
+    const routed = apply(b.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, to: { portId: b.id } });
+    const model = piping(routed);
+    const headerId = model.runOrder[0] as string;
+    const header = model.runs[headerId] as PipeRun;
+    const count = 200;
+    const runs: Record<string, PipeRun> = { ...model.runs };
+    const branches = Array.from({ length: count }, (_, i) => {
+      const x = 200 + 150 * i;
+      runs[`rb-${i}`] = {
+        id: `rb-${i}`,
+        lineId: line.lineId,
+        dn: 50,
+        start: { point: [x, 0, 3000], direction: [0, 0, 1], ref: { kind: 'branch', runId: headerId, branchId: `bp-${i}` } },
+        end: { point: [x, 0, 4000] },
+        pis: [],
+      };
+      return { id: `bp-${i}`, leg: 0, distance: x, branchRunId: `rb-${i}` };
+    });
+    runs[headerId] = { ...header, branches };
+    const doc: CadDocument = {
+      ...routed,
+      plant: { ...routed.plant, piping: { ...model, runs, runOrder: [...model.runOrder, ...branches.map((point) => point.branchRunId)] } },
+    };
+    const start = performance.now();
+    const result = data<{ runIds: string[]; partCount: number; counts: { errors: number } }>(doc, 'check_piping', {});
+    const ms = performance.now() - start;
+    expect(result.runIds).toHaveLength(count + 1);
+    expect(result.counts.errors).toBe(0);
+    expect(result.partCount).toBeGreaterThan(count * 2);
+    expect(ms).toBeLessThan(20_000);
   });
 });

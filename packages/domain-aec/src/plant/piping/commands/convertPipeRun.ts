@@ -4,7 +4,7 @@ import { changed } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, PipeRun } from '@aec/plant/types';
-import { sub3 } from '@lib/vec3';
+import { cross3, len3, sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
 import { getBuilding } from '../../../building/model';
 import { pipeSizeByOutsideDiameter } from '../../../industrial/piping/pipeSizes';
@@ -28,14 +28,15 @@ export const convertPipeRun = defineCommand({
   name: 'convert_pipe_run',
   description:
     'Convert a legacy pipe (building element from add_pipe_run: a polyline with a diameter, no fittings) into a spec-driven pipe run: the vertices become ' +
-    'the points of intersection (collinear vertices merge; z is the level elevation + the vertex z), every bend gets the spec elbow, every straight ' +
+    'the points of intersection (a vertex that bends by no more than the spec elbow-angle tolerance, 1 deg for CS150, is straight pipe and merges; z is the level elevation + the vertex z), every bend gets the spec elbow, every straight ' +
     'piece its cut length, and both ends stay open (connect them later by routing from "<runId>:start|end" or compare with check_piping, which lists ' +
     'them as RTE_OPEN_END). A pipe line is created with the legacy line number verbatim (or the template DN-service-sequence-spec when the pipe has ' +
     'none), the legacy service, from and to text and size (the pipe dn, else the DN of its diameter in the pipe size table); pass lineId to put the run on ' +
     'an existing line instead (its spec is used and spec may be omitted). The legacy pipe stays unless replace is true, which deletes it with the pipe ' +
     'supports hosted on it (delete_building_element); keep it to compare, but its geometry then overlaps the run. Returns the run id (affected[0]) and ' +
     'the line id; data = { runId, lineId, lineNumber, lineCreated, dn, dnSource, spec, pis, legs, turns, counts, pipePieces, totalPipeMm, ' +
-    'centrelineLengthMm, warnings, unverified, unverifiedReasons, replaced }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_PIPE, RTE_UNKNOWN_LINE, ' +
+    'centrelineLengthMm, warnings, unverified, unverifiedReasons, mergedPoints (vertices merged as straight), straightenedMaxOffsetMm (the largest ' +
+    'sideways distance of a merged vertex from the straightened leg, 0 when none: the geometry the conversion moved), replaced }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_PIPE, RTE_UNKNOWN_LINE, ' +
     'RTE_SPEC_UNKNOWN, RTE_SIZE_MISMATCH, RTE_DUPLICATE_LINE_NUMBER, RTE_NO_FITTING_FOR_ANGLE (detail.vertices lists the vertex indices and angles of ' +
     'every bend with no spec elbow), RTE_ZERO_LEG, RTE_SEGMENT_TOO_SHORT, RTE_SPEC_NO_COMPONENT. Next: piping_takeoff, check_piping.',
   params: z.object({
@@ -99,7 +100,7 @@ export const convertPipeRun = defineCommand({
     const unfit: Array<{ vertex: number; angleDeg: number }> = [];
     // A vertex that deflects by no more than the spec angle tolerance is straight pipe: it merges (counted in data.mergedPoints).
     const kept: Vec3[] = [world[0] as Vec3];
-    let straightened = 0;
+    const merged: Array<{ point: Vec3; after: number }> = [];
     for (let i = 1; i + 1 < world.length; i++) {
       const [before, after] = [
         unitVector(sub3(world[i] as Vec3, kept.at(-1) as Vec3)),
@@ -107,13 +108,19 @@ export const convertPipeRun = defineCommand({
       ];
       const turn = turnAngleDeg(before, after);
       if (turn <= tolerance) {
-        straightened += 1;
+        merged.push({ point: world[i] as Vec3, after: kept.length - 1 });
         continue;
       }
       kept.push(world[i] as Vec3);
       if ('code' in chooseElbow(lookup, dn, turn, tolerance)) unfit.push({ vertex: i, angleDeg: turn });
     }
     kept.push(world.at(-1) as Vec3);
+    // How far the straightening moved the pipe: each merged vertex against the leg that now runs past it.
+    const straightenedMaxOffsetMm = merged.reduce((max, { point, after }) => {
+      const [from, to] = [kept[after] as Vec3, kept[after + 1] as Vec3];
+      const leg = sub3(to, from);
+      return Math.max(max, len3(cross3(leg, sub3(point, from))) / len3(leg));
+    }, 0);
     if (unfit.length > 0)
       return refuse(
         doc,
@@ -237,7 +244,8 @@ export const convertPipeRun = defineCommand({
         warnings: takeoff.warnings,
         unverified: takeoff.unverified,
         unverifiedReasons: takeoff.unverifiedReasons,
-        mergedPoints: straightened + path.merged,
+        mergedPoints: merged.length + path.merged,
+        straightenedMaxOffsetMm,
         replaced: params.replace === true,
       },
     };

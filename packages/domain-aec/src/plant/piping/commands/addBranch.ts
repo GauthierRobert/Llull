@@ -44,7 +44,7 @@ export const addBranch = defineCommand({
     '..., stubIn), fittingCode (T, RT, W, S, TH, SI, SIR), partId, headerDn, branchDn, leg, distance, position, direction, branchStartMm, ' +
     'branchStartSource, runCentreToEndMm, reviewRequired, pipePieces (header and branch cuts), legs, warnings, unverified }. A stub-in reports ' +
     'RTE_STUB_IN_REVIEW in check_piping (reinforcement is checked outside llull). Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_RUN, RTE_UNKNOWN_LINE, ' +
-    'RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_BRANCH_NO_TABLE_ROW, RTE_BRANCH_ON_FITTING, RTE_NO_FITTING_FOR_ANGLE (not ' +
+    'RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_BRANCH_NO_TABLE_ROW, RTE_BRANCH_ON_FITTING (also an olet or stub-in whose footprint overlaps another one on the same header leg), RTE_NO_FITTING_FOR_ANGLE (not ' +
     'perpendicular), RTE_NO_CONNECTION_RULE, RTE_SPEC_NO_COMPONENT, RTE_SEGMENT_TOO_SHORT, RTE_CLOSING_LEG_IMPOSSIBLE, RTE_ZERO_LEG. Next: ' +
     'piping_takeoff, piping_connectivity, check_piping.',
   params: z.object({
