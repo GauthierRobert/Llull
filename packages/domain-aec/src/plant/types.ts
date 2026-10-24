@@ -141,6 +141,8 @@ export interface PipeRun {
   readonly legSlopes?: ReadonlyArray<Slope | null>;
   /** Overrides the spec's elbow-angle tolerance (degrees) for this run; named in results. */
   readonly angleToleranceDeg?: number;
+  /** Pipe bends: the centreline radius (mm) of the bend a turn no spec angle fits becomes (butt-weld pipe); absent = the spec's trimmed elbow or bendRadiusD. */
+  readonly bendRadiusMm?: number;
   /**
    * Set when the run no longer derives (a port was moved or removed, a nozzle was resized, ...): its display entities are dropped until a
    * command makes it derivable again. `piping_takeoff` lists such runs. A moved port is first followed by orthogonal stretch (02 M3);

@@ -31,6 +31,10 @@ export interface Takeoff {
     readonly dn: number;
     readonly cutLengthMm?: number;
     readonly angleDeg?: number;
+    /** Elbows: arc radius of the centreline (a trimmed elbow's is the 90 degree elbow's; a bend's the bend radius), mm. */
+    readonly radiusMm?: number;
+    /** Pipe bends: length of pipe in the arc (R x turn), mm: pipe to cut for the bend, not counted in totalPipeMm. */
+    readonly developedLengthMm?: number;
     readonly studs?: number;
     readonly unverified: boolean;
   }>;
@@ -148,6 +152,8 @@ export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
         dn: part.dn,
         ...(part.cutLength === undefined ? {} : { cutLengthMm: round(part.cutLength) }),
         ...(part.angleDeg === undefined ? {} : { angleDeg: round(part.angleDeg) }),
+        ...(part.kind === 'elbow' && part.radius !== undefined ? { radiusMm: round(part.radius) } : {}),
+        ...(part.dims['developedLength'] === undefined ? {} : { developedLengthMm: round(part.dims['developedLength']) }),
         ...(part.studs === undefined ? {} : { studs: part.studs }),
         unverified: part.unverified,
       });

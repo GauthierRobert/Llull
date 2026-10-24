@@ -55,6 +55,13 @@ export const routePipe = defineCommand({
     to: portOrPoint.optional().describe('End: { portId } (a closing leg is added) or an open { point }. Omit to end at the last leg.'),
     legs: legsInput,
     via: viaInput,
+    bendRadius: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Pipe bends: centreline radius in mm (for example 5 x the outside diameter) of the bend each turn that no spec elbow angle fits becomes, instead of a trimmed elbow. Butt-weld pipe only; the bend is flagged RTE_NONSTANDARD_FITTING. Omit to use the spec (trimmedAllowed / bendRadiusD).',
+      ),
     angleToleranceDeg: z
       .number()
       .positive()
@@ -135,6 +142,7 @@ export const routePipe = defineCommand({
       pis: path.points.slice(1, -1),
       ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
       ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
+      ...(params.bendRadius === undefined ? {} : { bendRadiusMm: params.bendRadius }),
       ...(inline.length === 0 ? {} : { inline }),
     };
     const stored = withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] });
@@ -174,6 +182,7 @@ export const routePipe = defineCommand({
           deviationDeg: turn.deviationDeg,
           centreToEnd: turn.centreToEnd,
           fitting: turn.typeKey,
+          kind: turn.kind,
         })),
         counts: takeoff.counts,
         pipePieces: takeoff.pipePieces.map((piece) => ({ id: piece.id, leg: piece.leg, cutLengthMm: piece.cutLengthMm })),

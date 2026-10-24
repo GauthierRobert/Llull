@@ -63,6 +63,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_OPEN_END: 'Route to a port, add a cap / blind or a tie-in, or accept the open end.',
   RTE_DISCONNECTED_PORT: 'Route it (route_pipe) or leave it as a spare.',
   RTE_FITTING_TO_FITTING: 'Accept the zero-length piece or lengthen the leg.',
+  RTE_NONSTANDARD_FITTING:
+    'A reviewer accepts the trimmed elbow / pipe bend (fabrication cuts and bends it), or re-route with the angles the spec lists (90 / 45 degrees).',
   RTE_ECCENTRIC_OFFSET:
     'Turn the flat side toward the direction of the next leg (insert_inline_component flat / flatDirection) or accept the residual: the angle tolerance of the run decides.',
   RTE_WELD_SPACING: 'Lengthen the leg or accept per the project weld-spacing rule (minWeldSpacing).',
@@ -82,6 +84,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_FACING_MISMATCH: 'Use a spec whose flange facing equals the port facing, or fix the nozzle / tie-in facing.',
   RTE_END_TYPE_MISMATCH: 'Join ends of the same type (BW-BW, FL-FL) or add the connection rule to the spec.',
 };
+
+/** Codes of derivation warnings that `check_piping` reports as issues (weld spacing is recomputed per piece, so it is not among them). */
+const REPORTED_WARNINGS: ReadonlySet<string> = new Set(['RTE_FITTING_TO_FITTING', 'RTE_ECCENTRIC_OFFSET', 'RTE_NONSTANDARD_FITTING']);
 
 const remediationOf = (code: string): string =>
   REMEDIATION[code] ?? 'Re-route the run (route_pipe / edit_route) or fix the spec; delete_pipe_run clears it.';
@@ -147,7 +152,7 @@ function runIssues(out: Collector, doc: CadDocument, run: PipeRun, derivation: R
   for (const finding of [...slopeFindings(getPiping(doc), run), ...invertFindings(getPiping(doc), run, derivation.inline)])
     out.add(finding.code, 'warning', finding.ids, finding.message, finding.detail, finding.paths);
   for (const warning of derivation.warnings)
-    if (warning.code === 'RTE_FITTING_TO_FITTING' || warning.code === 'RTE_ECCENTRIC_OFFSET')
+    if (REPORTED_WARNINGS.has(warning.code))
       out.add(warning.code, 'warning', [...warning.ids, run.id], warning.message, warning.detail, [
         `runs.${run.id}.legs.${String(warning.detail['leg'])}`,
       ]);

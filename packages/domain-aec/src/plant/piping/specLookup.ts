@@ -45,6 +45,8 @@ export interface ElbowRule {
   readonly anglesDeg: readonly number[];
   readonly toleranceDeg: number;
   readonly trimmedAllowed: boolean;
+  /** Pipe bends for turns no angle fits: centreline radius in pipe outside diameters (absent = none). */
+  readonly bendRadiusD?: number | undefined;
   /** The spec declares no `elbowAngles`: angles come from its elbow components, tolerance is the named default. */
   readonly defaulted: boolean;
 }

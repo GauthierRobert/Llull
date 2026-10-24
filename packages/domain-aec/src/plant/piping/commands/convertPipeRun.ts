@@ -111,6 +111,8 @@ export const convertPipeRun = defineCommand({
     const elevation = building.levels[pipe.levelId]?.elevation ?? 0;
     const world = pipe.points.map((point): Vec3 => [point[0], point[1], point[2] + elevation]);
     const tolerance = lookup.elbowAngles().toleranceDeg;
+    const pipeRow = lookup.pipe(dn);
+    const bendOptions = isMiss(pipeRow) ? undefined : { pipeOd: pipeRow.dims['outsideDiameter'] ?? 0 };
     // Every bend must have a spec elbow: list them all, not only the first.
     const unfit: Array<{ vertex: number; angleDeg: number }> = [];
     // A vertex that deflects by no more than the spec angle tolerance is straight pipe: it merges (counted in data.mergedPoints).
@@ -127,7 +129,7 @@ export const convertPipeRun = defineCommand({
         continue;
       }
       kept.push(world[i] as Vec3);
-      if ('code' in chooseElbow(lookup, dn, turn, tolerance)) unfit.push({ vertex: i, angleDeg: turn });
+      if ('code' in chooseElbow(lookup, dn, turn, tolerance, bendOptions)) unfit.push({ vertex: i, angleDeg: turn });
     }
     kept.push(world.at(-1) as Vec3);
     // How far the straightening moved the pipe: each merged vertex against the leg that now runs past it.

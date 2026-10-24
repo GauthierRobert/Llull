@@ -89,6 +89,8 @@ export interface ElbowAngles {
   readonly anglesDeg: readonly number[];
   readonly toleranceDeg: number;
   readonly trimmedAllowed: boolean;
+  /** Pipe bends for turns no angle fits: centreline radius in pipe outside diameters (absent = no bends). */
+  readonly bendRadiusD?: number | undefined;
 }
 
 export interface SpecApproval {

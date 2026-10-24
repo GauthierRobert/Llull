@@ -20,9 +20,9 @@ import {
   type DerivedTurn,
   type RunDerivation,
 } from './deriveTypes';
-import { fittingEnd, type Join } from './connections';
+import type { Join } from './connections';
 import { DerivationMemo } from './derivationMemo';
-import { centrelineLength, chooseElbow, turnAngleDeg, withTangentLength, type ElbowChoice } from './fittings';
+import { centrelineLength, type ElbowChoice } from './fittings';
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
@@ -30,10 +30,11 @@ import { legShifts } from './legShifts';
 import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
 import { flangeParts, mintSet, setupEnd } from './routeEnds';
-import { at, joinOf, makeEnv, partOf, type Env, type Mint, type Slot } from './routeEnv';
+import { at, makeEnv, partOf, type Mint, type Slot } from './routeEnv';
 import { layoutInline } from './routeInline';
+import { chooseTurns, turnPartFields } from './routeTurns';
 import { dnAfter, endDn, startDn } from './runSizes';
-import { isMiss, type SpecLookup } from './specLookup';
+import type { SpecLookup } from './specLookup';
 
 const BRANCH_KINDS: ReadonlySet<string> = new Set(['olet', 'stubIn']);
 
@@ -67,45 +68,6 @@ function unverifiedReasons(lookup: SpecLookup, parts: readonly RoutedPart[]): st
   const rows = [...new Set(parts.filter((part) => part.unverified).map((part) => part.catalogueKey))];
   if (rows.length > 0) reasons.push(`catalogue rows not grade A: ${rows.join(', ')}`);
   return reasons;
-}
-
-/** Elbow choice at every interior point of intersection (the size at a point is the size at the end of the leg before it). */
-function chooseTurns(
-  env: Env,
-  points: readonly Vec3[],
-  dirs: readonly Vec3[],
-): { elbows: ElbowChoice[]; turns: DerivedTurn[]; joins: Join[] } | DerivationFailure {
-  const { run, line, lookup, tolerance } = env;
-  const elbows: ElbowChoice[] = [];
-  const turns: DerivedTurn[] = [];
-  const joins: Join[] = [];
-  for (let i = 1; i < dirs.length; i++) {
-    const turnDeg = turnAngleDeg(dirs[i - 1] as Vec3, dirs[i] as Vec3);
-    const dn = dnAfter(run, line.dn, i - 1, Number.POSITIVE_INFINITY);
-    const found = chooseElbow(lookup, dn, turnDeg, tolerance.valueDeg);
-    if (isMiss(found)) return fail(found.miss, found.detail, [...found.ids, run.id], [`legs.${i}`], { pi: i - 1 });
-    if ('code' in found) return fail(found.code, found.message, [run.id], [`legs.${i}`], { ...found.detail, pi: i - 1 });
-    const join = joinOf(env, fittingEnd(found.row), dn, found.row.dims, found.row.key, [run.id, found.row.key], [`legs.${i}`]);
-    if (isFailure(join)) return join;
-    joins.push(join);
-    // A socket-weld elbow bends up to the socket bottom (centre-to-end less the socket depth), not up to the mouth the pipe meets.
-    const depth = join.joint === 'socketWeld' ? found.row.dims['socketDepth'] : undefined;
-    const choice = depth !== undefined && depth < found.centreToEnd ? withTangentLength(found, found.centreToEnd - depth) : found;
-    elbows.push(choice);
-    turns.push({
-      index: i,
-      point: points[i] as Vec3,
-      partId: `${run.id}/elbow-${i}`,
-      turnDeg,
-      nominalDeg: choice.nominalDeg,
-      deviationDeg: choice.deviationDeg,
-      centreToEnd: choice.centreToEnd,
-      radius: choice.radius,
-      catalogueKey: choice.row.key,
-      typeKey: `${choice.row.type}${choice.row.radius ?? ''}`,
-    });
-  }
-  return { elbows, turns, joins };
 }
 
 /**
@@ -174,7 +136,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   if (isFailure(fits)) return fits;
   const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
   if (isFailure(shifts)) return shifts;
-  const warnings: DerivationWarning[] = [...shifts.warnings];
+  const warnings: DerivationWarning[] = [...shifts.warnings, ...chosen.warnings];
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
@@ -357,7 +319,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
             { position: at(pi, u, -c), direction: scale3(u, -1), dn, endType: (elbowJoins[leg] as Join).end },
             { position: at(pi, next, c), direction: next, dn, endType: (elbowJoins[leg] as Join).end },
           ],
-          { centre: pi, angleDeg: choice.turnDeg, radius: choice.radius, dims: { outsideDiameter: info.od, centreToEnd: c } },
+          { centre: pi, angleDeg: choice.turnDeg, radius: choice.radius, ...turnPartFields(choice, info.od) },
         ),
       );
     }

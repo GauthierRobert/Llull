@@ -38,8 +38,10 @@ export interface DerivedTurn {
   readonly centreToEnd: number;
   readonly radius: number;
   readonly catalogueKey: string;
-  /** Takeoff key of the elbow (`elbow90LR`). */
+  /** Takeoff key of the elbow (`elbow90LR`, `elbow90LRTrimmed`, `pipeBend`). */
   readonly typeKey: string;
+  /** `standard` catalogue elbow, `trimmed` 90 degree elbow cut to the turn, or a pipe `bend` (the last two raise RTE_NONSTANDARD_FITTING). */
+  readonly kind: 'standard' | 'trimmed' | 'bend';
 }
 
 export interface DerivationWarning {

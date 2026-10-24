@@ -95,6 +95,8 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
   const path = `plant.piping.runs.${id}`;
   const errors: string[] = [];
   if (run['dn'] !== undefined && !isPositive(run['dn'])) errors.push(`${path}.dn must be a positive size`);
+  if (run['bendRadiusMm'] !== undefined && !isPositive(run['bendRadiusMm']))
+    errors.push(`${path}.bendRadiusMm must be a positive radius (mm)`);
   const inline = run['inline'];
   if (inline !== undefined && !Array.isArray(inline)) errors.push(`${path}.inline must be a list`);
   else
