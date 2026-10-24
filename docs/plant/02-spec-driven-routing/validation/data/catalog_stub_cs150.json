@@ -120,6 +120,91 @@
           }
         }
       ]
+    },
+    {
+      "id": "asme-b16.9-tee-rte-stub",
+      "type": "tee",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 2,
+          "centreToEndRun": 64,
+          "centreToEndBranch": 64,
+          "provenance": { "sourceId": "S9+S10", "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)" }
+        },
+        {
+          "nps": 4,
+          "centreToEndRun": 105,
+          "centreToEndBranch": 105,
+          "provenance": { "sourceId": "S9+S10", "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)" }
+        },
+        {
+          "nps": 6,
+          "centreToEndRun": 143,
+          "centreToEndBranch": 143,
+          "provenance": { "sourceId": "S9+S10", "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)" }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.9-reducing-tee-rte-stub",
+      "type": "reducingTee",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 6,
+          "smallNps": 4,
+          "centreToEndRun": 143,
+          "centreToEndBranch": 130,
+          "provenance": {
+            "sourceId": "S9+S12",
+            "citation": "02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.9-reducer-concentric-rte-stub",
+      "type": "reducerConcentric",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 4,
+          "smallNps": 3,
+          "length": 102,
+          "provenance": { "sourceId": "S13", "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)" }
+        },
+        {
+          "nps": 6,
+          "smallNps": 4,
+          "length": 140,
+          "provenance": { "sourceId": "S13", "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)" }
+        }
+      ]
+    },
+    {
+      "id": "mss-sp-97-weldolet-rte-stub",
+      "type": "weldolet",
+      "standard": "MSS SP-97",
+      "dimensionalStandard": "ASME",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 6,
+          "smallNps": 2,
+          "centreToOutlet": 144,
+          "provenance": {
+            "sourceId": "RTE",
+            "citation": "02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"
+          }
+        }
+      ]
     }
   ]
 }

@@ -4,7 +4,7 @@
  */
 
 import type { Joint, RoutedPart } from '@aec/plant/types';
-import type { DerivationWarning, DerivedLeg, DerivedTurn, RunDerivation } from './routeParts';
+import type { DerivationWarning, DerivedBranch, DerivedInline, DerivedLeg, DerivedTurn, RunDerivation } from './deriveTypes';
 
 export interface TakeoffRun {
   readonly runId: string;
@@ -40,6 +40,9 @@ export interface Takeoff {
   readonly centrelineLengthMm: number;
   readonly legs: ReadonlyArray<DerivedLeg & { readonly runId: string }>;
   readonly turns: ReadonlyArray<DerivedTurn & { readonly runId: string }>;
+  /** Valves and reducers as placed (faces, parts) and the branch fittings of the runs. */
+  readonly inline: ReadonlyArray<DerivedInline & { readonly runId: string }>;
+  readonly branches: readonly DerivedBranch[];
   readonly studs: number;
   readonly warnings: readonly DerivationWarning[];
   readonly unverified: boolean;
@@ -69,6 +72,8 @@ export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
   const joints: Joint[] = [];
   const legs: Array<DerivedLeg & { runId: string }> = [];
   const turns: Array<DerivedTurn & { runId: string }> = [];
+  const inline: Array<DerivedInline & { runId: string }> = [];
+  const branches: DerivedBranch[] = [];
   const warnings: DerivationWarning[] = [];
   const reasons: string[] = [];
   let totalPipe = 0;
@@ -106,6 +111,8 @@ export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
     }
     legs.push(...derivation.legs.map((leg) => ({ ...leg, runId })));
     turns.push(...derivation.turns.map((turn) => ({ ...turn, runId })));
+    inline.push(...derivation.inline.map((item) => ({ ...item, runId })));
+    branches.push(...derivation.branches);
     warnings.push(...derivation.warnings);
     reasons.push(...derivation.unverifiedReasons.filter((reason) => !reasons.includes(reason)));
     totalPipe += derivation.totalPipeMm;
@@ -121,6 +128,8 @@ export function takeoffOf(runs: readonly TakeoffRun[]): Takeoff {
     centrelineLengthMm: round(centreline),
     legs,
     turns,
+    inline,
+    branches,
     studs,
     warnings,
     unverified: reasons.length > 0,

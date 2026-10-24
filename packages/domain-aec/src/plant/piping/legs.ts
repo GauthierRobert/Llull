@@ -89,7 +89,8 @@ export function directionLabel(u: Vec3): Compass | Vec3 {
 /** Angle between two unit vectors, degrees. */
 export const angleBetweenDeg = (a: Vec3, b: Vec3): number => (Math.acos(Math.max(-1, Math.min(1, dot3(a, b)))) * 180) / Math.PI;
 
-const compassVector = (direction: Compass | Vec3): Vec3 =>
+/** Unit vector of a compass name or an arbitrary direction (a zero vector stays zero). */
+export const legVector = (direction: Compass | Vec3): Vec3 =>
   typeof direction === 'string' ? COMPASS_VECTORS[direction] : unitVector(direction);
 
 function mergeCollinear(points: readonly Vec3[]): { points: Vec3[]; merged: number } {
@@ -109,7 +110,7 @@ function walk(start: Vec3, legs: readonly LegInput[], via: readonly Vec3[], end:
   const points: Vec3[] = [start];
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i] as LegInput;
-    const direction = compassVector(leg.direction);
+    const direction = legVector(leg.direction);
     if (!(len3(direction) > 0)) return fail('RTE_ZERO_LEG', `leg ${i} has a zero direction vector`, [`legs.${i}.direction`], { leg: i });
     const last = i === legs.length - 1 && via.length === 0;
     let length = leg.length;

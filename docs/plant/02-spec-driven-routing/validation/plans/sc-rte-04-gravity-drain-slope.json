@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-04",
-  "status": "BLOCKED (02 RTE M3): slope legs (planLength / slope, section 5.6) and the adverse-slope check are not built; route_pipe M1 takes compass or vector legs with a length only. check_piping is 02 M2.",
-  "unbuilt": ["check_piping"],
+  "status": "BLOCKED (02 RTE M3): slope legs (planLength / slope, section 5.6) and the adverse-slope check are not built; route_pipe M1 takes compass or vector legs with a length only. check_piping exists since 02 M2.",
+  "unbuilt": [],
   "blockedFrom": 5,
   "harness": {
     "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },

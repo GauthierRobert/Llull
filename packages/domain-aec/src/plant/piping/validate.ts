@@ -23,16 +23,20 @@ function tableErrors(
   );
 }
 
-const isRef = (ref: unknown): boolean =>
+const isRef = (ref: unknown, branchAllowed: boolean): boolean =>
   isRecord(ref) &&
   ((ref['kind'] === 'tieIn' && typeof ref['id'] === 'string') ||
     (ref['kind'] === 'nozzle' && typeof ref['equipmentId'] === 'string' && typeof ref['nozzleId'] === 'string') ||
-    (ref['kind'] === 'runEnd' && typeof ref['runId'] === 'string' && (ref['end'] === 'start' || ref['end'] === 'end')));
+    (ref['kind'] === 'runEnd' && typeof ref['runId'] === 'string' && (ref['end'] === 'start' || ref['end'] === 'end')) ||
+    (branchAllowed && ref['kind'] === 'branch' && typeof ref['runId'] === 'string' && typeof ref['branchId'] === 'string'));
 
-const endErrors = (path: string, end: unknown): string[] => {
+/** A run end; only the start of a branch run may reference a branch point. */
+const endErrors = (path: string, end: unknown, branchAllowed: boolean): string[] => {
   if (!isRecord(end) || !isVec3(end['point']) || (end['direction'] !== undefined && !isVec3(end['direction'])))
     return [`${path} needs a finite point`];
-  return end['ref'] === undefined || isRef(end['ref']) ? [] : [`${path}.ref must be a tieIn, nozzle or runEnd reference`];
+  return end['ref'] === undefined || isRef(end['ref'], branchAllowed)
+    ? []
+    : [`${path}.ref must be a tieIn, nozzle, runEnd${branchAllowed ? ' or branch' : ''} reference`];
 };
 
 const entityIdErrors = (raw: Record<string, unknown>): string[] => {
@@ -45,6 +49,43 @@ const entityIdErrors = (raw: Record<string, unknown>): string[] => {
       : [`plant.piping.entityIds.${runId} must list entity ids of a run`],
   );
 };
+
+const isPositive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+/** Errors of the M2 members of a run: its own size, the inline components and the branch points. */
+function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<string, unknown>): string[] {
+  const path = `plant.piping.runs.${id}`;
+  const errors: string[] = [];
+  if (run['dn'] !== undefined && !isPositive(run['dn'])) errors.push(`${path}.dn must be a positive size`);
+  const inline = run['inline'];
+  if (inline !== undefined && !Array.isArray(inline)) errors.push(`${path}.inline must be a list`);
+  else
+    (inline ?? []).forEach((item: unknown, index: number) => {
+      const ok =
+        isRecord(item) &&
+        typeof item['id'] === 'string' &&
+        typeof item['type'] === 'string' &&
+        Number.isInteger(item['leg']) &&
+        isPositive(item['centreDistance']) &&
+        (item['dn2'] === undefined || isPositive(item['dn2'])) &&
+        (item['stemDirection'] === undefined || isVec3(item['stemDirection']));
+      if (!ok) errors.push(`${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance`);
+    });
+  const branches = run['branches'];
+  if (branches !== undefined && !Array.isArray(branches)) errors.push(`${path}.branches must be a list`);
+  else
+    (branches ?? []).forEach((item: unknown, index: number) => {
+      const ok =
+        isRecord(item) &&
+        typeof item['id'] === 'string' &&
+        Number.isInteger(item['leg']) &&
+        isPositive(item['distance']) &&
+        typeof item['branchRunId'] === 'string' &&
+        item['branchRunId'] in runs;
+      if (!ok) errors.push(`${path}.branches.${index} needs an id, an integer leg, a positive distance and the id of a run`);
+    });
+  return errors;
+}
 
 export function pipingErrors(raw: unknown): string[] {
   if (!isRecord(raw)) return ['plant.piping must be an object'];
@@ -67,8 +108,9 @@ export function pipingErrors(raw: unknown): string[] {
     ),
     ...tableErrors(raw, 'runs', 'runOrder', (id, run) => [
       ...(typeof run['lineId'] === 'string' && run['lineId'] in lines ? [] : [`plant.piping.runs.${id}.lineId must name a line`]),
-      ...endErrors(`plant.piping.runs.${id}.start`, run['start']),
-      ...endErrors(`plant.piping.runs.${id}.end`, run['end']),
+      ...endErrors(`plant.piping.runs.${id}.start`, run['start'], true),
+      ...endErrors(`plant.piping.runs.${id}.end`, run['end'], false),
+      ...runSizeErrors(id, run, isRecord(raw['runs']) ? raw['runs'] : {}),
       ...(run['broken'] === undefined ||
       (isRecord(run['broken']) && typeof run['broken']['code'] === 'string' && typeof run['broken']['reason'] === 'string')
         ? []

@@ -1,73 +1,25 @@
-import { defineCommand, vec3, z } from '@core/commands/schema';
+import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
-import type { PipeLine, PipeRun, PortRef } from '@aec/plant/types';
+import type { InlineComponent, PipeRun } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { withRunEntities } from '../derive';
-import { buildPath, COMPASS_NAMES, unitVector, type PathEnd } from '../legs';
+import { buildPath, unitVector } from '../legs';
 import { getPiping, refuse, withPiping } from '../model';
-import { portOccupant, resolvePortId } from '../ports';
 import { deriveRun } from '../routeParts';
+import { byRoute } from '../runSizes';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
-
-const portOrPoint = z.union([
-  z.object({ portId: z.string().min(1).describe('Port id: a tie-in id, "<tag>:<mark>" of an equipment nozzle, or "<runId>:start|end".') }),
-  z.object({
-    point: vec3('Open end [x, y, z], document units (mm).'),
-    direction: vec3('Direction the pipe leaves (start) or arrives along reversed (end) [dx, dy, dz]; optional.').optional(),
-  }),
-]);
-
-type Endpoint = z.infer<typeof portOrPoint>;
-
-interface ResolvedEndpoint {
-  readonly end: PathEnd;
-  readonly ref?: PortRef;
-}
-
-function resolveEndpoint(doc: CadDocument, line: PipeLine, endpoint: Endpoint, side: 'from' | 'to'): ResolvedEndpoint | CommandResult {
-  if (!('portId' in endpoint)) {
-    if (endpoint.direction === undefined) return { end: { point: endpoint.point } };
-    const length = Math.hypot(...endpoint.direction);
-    if (!(length > 1e-12)) return refuse(doc, 'route_pipe', 'RTE_INVALID_PORT', `the ${side} direction is zero`, [], [`${side}.direction`]);
-    return { end: { point: endpoint.point, direction: unitVector(endpoint.direction) } };
-  }
-  const resolved = resolvePortId(doc, endpoint.portId);
-  if (!resolved.ok) return refuse(doc, 'route_pipe', 'RTE_UNKNOWN_PORT', resolved.message, [], [`${side}.portId`]);
-  const { port } = resolved;
-  const occupant = portOccupant(doc, port.ref);
-  if (occupant !== undefined)
-    return refuse(
-      doc,
-      'route_pipe',
-      'RTE_PORT_IN_USE',
-      `port ${port.id} is already connected (${occupant})`,
-      [port.id, occupant],
-      [`${side}.portId`],
-    );
-  if (port.spec.dn !== line.dn)
-    return refuse(
-      doc,
-      'route_pipe',
-      'RTE_SIZE_MISMATCH',
-      `port ${port.id} is DN${port.spec.dn}, line ${line.id} is DN${line.dn}`,
-      [port.id, line.id],
-      [`${side}.portId`],
-    );
-  return { end: { point: port.spec.position, direction: port.spec.direction }, ref: port.ref };
-}
-
-const isResolved = (value: ResolvedEndpoint | CommandResult): value is ResolvedEndpoint => 'end' in value;
+import { buildInline, inlineAt, inlineFields, isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput } from './routeInput';
 
 /**
- * @affects creates 1 pipe run (plant.piping) and its derived, read-only part entities `<runId>/<kind>-<k>` (pipe pieces, elbows, flanges, gaskets)
- * @invariant stored = the points of intersection only; parts, cut lengths and joints are derived from the line's spec; a straight closing leg
- *   is appended when the target port is on its axis; consecutive collinear legs merge; weld gap default 0 (named in data.weldGap)
+ * @affects creates 1 pipe run (plant.piping) and its derived, read-only part entities `<runId>/<kind>-<k>` (pipe pieces, elbows, flanges, gaskets,
+ *   valves, reducers)
+ * @invariant stored = the points of intersection and the inline components only; parts, cut lengths and joints are derived from the line's spec;
+ *   a straight closing leg is appended when the target port is on its axis; consecutive collinear legs merge; weld gap default 0 (data.weldGap)
  * @failure unknown line / port, port in use, size / rating / facing / end-type mismatch, port direction, closing leg, zero leg, angle with no
- *   spec elbow, leg too short, missing spec component -> RTE_* refusal, document unchanged
+ *   spec elbow, leg too short, an inline component that does not fit, missing spec component -> RTE_* refusal, document unchanged
  */
 export const routePipe = defineCommand({
   name: 'route_pipe',
@@ -79,40 +31,34 @@ export const routePipe = defineCommand({
     'from add_nozzle / equipment_ports, or "<runId>:start|end" to continue a run) or an open { point, direction? }. legs: [{ direction ' +
     '"+X"|"-X"|"+Y"|"-Y"|"+Z"|"-Z" or [dx,dy,dz], length }] from the start; the first leg must leave along the start port direction (within ' +
     'the tolerance). via: extra points of intersection after the legs. When `to` is a port, a straight closing leg to it is added if the last point ' +
-    'is on its axis (the last leg may omit length to run straight to it). Open-end directions are normalised (zero is refused). Returns the run id ' +
-    '(affected[0]); data = { runId, lineId, lineNumber, pis, closingLeg, mergedPoints, portDeviationDeg, legs (index, direction, lengthMm, ' +
+    'is on its axis (the last leg may omit length to run straight to it). inline: [{ type (valve or reducerConcentric), at: { leg, centreDistance }, ' +
+    'dn2 (reducers), tag, stemDirection }] places valves and reducers while routing (leg = index in data.legs, the closing leg included); a reducer is how ' +
+    'the run meets a `to` port of another size. Add them later with insert_inline_component. Open-end directions are normalised (zero is refused). ' +
+    'Returns the run id (affected[0]); data = { runId, lineId, lineNumber, pis, closingLeg, mergedPoints, portDeviationDeg, legs (index, direction, lengthMm, ' +
     'cutLengthsMm), turns (turnDeg, nominalDeg, deviationDeg, centreToEnd), counts, pipePieces (id, leg, cutLengthMm), totalPipeMm, ' +
-    'centrelineLengthMm, studs, warnings (RTE_WELD_SPACING, RTE_FITTING_TO_FITTING), unverified, unverifiedReasons, partIds, spec, angleTolerance, ' +
-    'weldGap, weldSpacing, pipe }; parts and joints are listed by piping_takeoff. A spec that is not ' +
+    'centrelineLengthMm, studs, warnings (RTE_WELD_SPACING, RTE_FITTING_TO_FITTING), unverified, unverifiedReasons, partIds, inlineIds, dn (start, end), spec, ' +
+    'angleTolerance, weldGap, weldSpacing, pipe }; parts and joints are listed by piping_takeoff. A spec that is not ' +
     'approved or has non-grade-A rows reports unverified. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, ' +
-    'RTE_INVALID_PORT (zero open-end direction), RTE_SIZE_MISMATCH, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, RTE_NO_CONNECTION_RULE, RTE_PORT_DIRECTION, RTE_CLOSING_LEG_IMPOSSIBLE ' +
-    '(detail.offset), RTE_ZERO_LEG, RTE_NO_FITTING_FOR_ANGLE (detail.anglesDeg), RTE_SEGMENT_TOO_SHORT (detail.cutLengthMm), ' +
-    'RTE_SPEC_UNKNOWN, RTE_SPEC_NO_COMPONENT, RTE_SPEC_AMBIGUOUS. Next: piping_takeoff for the cut list; delete_pipe_run to redo.',
+    'RTE_INVALID_PORT (zero open-end direction), RTE_SIZE_MISMATCH (also a reducer without dn2), RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, ' +
+    'RTE_NO_CONNECTION_RULE, RTE_PORT_DIRECTION, RTE_CLOSING_LEG_IMPOSSIBLE (detail.offset), RTE_ZERO_LEG, RTE_NO_FITTING_FOR_ANGLE ' +
+    '(detail.anglesDeg), RTE_SEGMENT_TOO_SHORT (detail.cutLengthMm), RTE_INLINE_DOES_NOT_FIT, RTE_SPEC_UNKNOWN, RTE_SPEC_NO_COMPONENT, ' +
+    'RTE_SPEC_AMBIGUOUS. Next: piping_takeoff for the cut list; check_piping; add_branch / insert_inline_component; delete_pipe_run to redo.',
   params: z.object({
     lineId: z.string().describe('Pipe line id (affected[0] of create_pipeline).'),
     from: portOrPoint.describe('Start: { portId } or an open { point, direction? }.'),
     to: portOrPoint.optional().describe('End: { portId } (a closing leg is added) or an open { point }. Omit to end at the last leg.'),
-    legs: z
-      .array(
-        z.object({
-          direction: z
-            .union([z.enum(COMPASS_NAMES), vec3('Direction vector [dx, dy, dz]; normalised.')])
-            .describe('"+X", "-X", "+Y", "-Y", "+Z", "-Z" or a vector.'),
-          length: z
-            .number()
-            .optional()
-            .describe('Length along the direction, document units, > 0. May be omitted on the last leg when `to` is a port.'),
-        }),
-      )
-      .optional()
-      .describe('Legs from the start point, in order.'),
-    via: z.array(vec3('Point of intersection [x, y, z].')).optional().describe('Points of intersection added after the legs.'),
+    legs: legsInput,
+    via: viaInput,
     angleToleranceDeg: z
       .number()
       .positive()
       .max(22.5)
       .optional()
       .describe('Overrides the spec tolerance for port directions and elbow angles, degrees, 22.5 at most (named in the result).'),
+    inline: z
+      .array(z.object({ ...inlineFields, at: inlineAt.describe('Where the centre sits: { leg, centreDistance }.') }))
+      .optional()
+      .describe('Valves and concentric reducers placed while routing (see insert_inline_component for the rules).'),
   }),
   run: (doc, params): CommandResult => {
     if (doc.units !== 'mm')
@@ -127,13 +73,45 @@ export const routePipe = defineCommand({
     if (line === undefined) return refuse(doc, 'route_pipe', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
     const lookup = createSpecLookup(doc, line.spec);
     if (isMiss(lookup)) return refuse(doc, 'route_pipe', lookup.miss, lookup.detail, [line.id, ...lookup.ids], ['lineId']);
-    const from = resolveEndpoint(doc, line, params.from, 'from');
+    const from = resolveEndpoint(doc, 'route_pipe', line, line.dn, params.from, 'from');
     if (!isResolved(from)) return from;
-    const to = params.to === undefined ? undefined : resolveEndpoint(doc, line, params.to, 'to');
+    const to = params.to === undefined ? undefined : resolveEndpoint(doc, 'route_pipe', line, null, params.to, 'to');
     if (to !== undefined && !isResolved(to)) return to;
+    // The run ends at the size of its last reducer (the line size without one): the end port must have it.
+    const reducers = (params.inline ?? [])
+      .filter((item) => item.type === 'reducerConcentric' && item.dn2 !== undefined)
+      .sort((a, b) =>
+        byRoute({ leg: a.at.leg, centreDistance: a.at.centreDistance }, { leg: b.at.leg, centreDistance: b.at.centreDistance }),
+      );
+    const endSize = reducers.at(-1)?.dn2 ?? line.dn;
+    if (to?.dn !== undefined && to.dn !== endSize)
+      return refuse(
+        doc,
+        'route_pipe',
+        'RTE_SIZE_MISMATCH',
+        `port ${to.portId} is DN${to.dn}, line ${line.id} is DN${endSize}${reducers.length === 0 ? '' : ' after its reducers'}`,
+        [to.portId ?? '', line.id],
+        ['to.portId'],
+      );
     const tolerance = params.angleToleranceDeg ?? lookup.elbowAngles().toleranceDeg;
     const path = buildPath(from.end, to?.end, params.legs ?? [], (params.via ?? []) as Vec3[], tolerance);
     if (!path.ok) return refuse(doc, 'route_pipe', path.code, path.message, [line.id], path.paths, path.detail);
+    const inline: InlineComponent[] = [];
+    for (const [index, item] of (params.inline ?? []).entries()) {
+      const [a, b] = [path.points[item.at.leg], path.points[item.at.leg + 1]];
+      if (a === undefined || b === undefined)
+        return refuse(
+          doc,
+          'route_pipe',
+          'RTE_INLINE_DOES_NOT_FIT',
+          `inline.${index} names leg ${item.at.leg}, but the route has ${path.legs.length} leg(s)`,
+          [line.id],
+          [`inline.${index}.at.leg`],
+        );
+      const built = buildInline(doc, 'route_pipe', item, item.at, unitVector([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), `inline.${index}`);
+      if ('document' in built) return built;
+      inline.push(built);
+    }
     const id = nextId('run');
     const run: PipeRun = {
       id,
@@ -150,6 +128,7 @@ export const routePipe = defineCommand({
       },
       pis: path.points.slice(1, -1),
       ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
+      ...(inline.length === 0 ? {} : { inline }),
     };
     const stored = withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] });
     const derived = deriveRun(stored, run);
@@ -161,7 +140,7 @@ export const routePipe = defineCommand({
         withRunEntities(stored, id),
         `route_pipe: run ${id} on line ${line.lineNumber}: ${path.legs.length} leg(s)${path.closingLeg === null ? '' : ` (closing leg ${String(path.closingLeg.direction)} ${+path.closingLeg.length.toFixed(3)} mm)`}, ` +
           `${derived.turns.length} elbow(s) (max deviation ${+worst.toFixed(4)} deg, tolerance ${derived.angleTolerance.valueDeg} deg ${derived.angleTolerance.source}), ` +
-          `${takeoff.pipePieces.length} pipe piece(s) totalling ${takeoff.totalPipeMm} mm, centreline ${takeoff.centrelineLengthMm} mm, ` +
+          `${inline.length === 0 ? '' : `${inline.length} inline component(s), `}${takeoff.pipePieces.length} pipe piece(s) totalling ${takeoff.totalPipeMm} mm, centreline ${takeoff.centrelineLengthMm} mm, ` +
           `${derived.warnings.length} warning(s)${derived.unverified ? `; unverified: ${derived.unverifiedReasons.join('; ')}` : ''}.`,
         [id],
       ),
@@ -196,6 +175,8 @@ export const routePipe = defineCommand({
         unverified: takeoff.unverified,
         unverifiedReasons: takeoff.unverifiedReasons,
         partIds: derived.parts.map((part) => part.id),
+        inlineIds: inline.map((item) => item.id),
+        dn: derived.dn,
         spec: derived.spec,
         angleTolerance: derived.angleTolerance,
         weldGap: derived.weldGap,

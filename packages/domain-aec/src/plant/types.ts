@@ -32,12 +32,13 @@ export interface TieInPoint {
 
 /**
  * Reference of a run end to a port. `nozzle`: `equipmentId` = equipment element id, `nozzleId` = nozzle mark (port id `<tag>:<mark>`, 03 EQP).
- * `runEnd`: the open end of another run. Branches join with 02 M2.
+ * `runEnd`: the open end of another run. `branch`: the branch point `branchId` of header run `runId` (02 M2: the start of a branch run).
  */
 export type PortRef =
   | { readonly kind: 'tieIn'; readonly id: string }
   | { readonly kind: 'nozzle'; readonly equipmentId: string; readonly nozzleId: string }
-  | { readonly kind: 'runEnd'; readonly runId: string; readonly end: 'start' | 'end' };
+  | { readonly kind: 'runEnd'; readonly runId: string; readonly end: 'start' | 'end' }
+  | { readonly kind: 'branch'; readonly runId: string; readonly branchId: string };
 
 export interface PipeLine {
   readonly id: string;
@@ -74,9 +75,41 @@ interface AutoRouteRecord {
   readonly engine: string;
 }
 
+/** A catalogue component placed in a leg of a run (valve, reducer): its centre is `centreDistance` from the start point of intersection of leg `leg`. */
+export interface InlineComponent {
+  /** Step-scoped id (`valve-8.1`). */
+  readonly id: string;
+  /** Catalogue component type: `valveGate`, `valveGlobe`, ..., `reducerConcentric`. */
+  readonly type: string;
+  readonly tag?: string;
+  /** Leg index in the run (legs = [start, ...pis, end]). */
+  readonly leg: number;
+  /** Centre of the component along the leg, from the leg start, document units. */
+  readonly centreDistance: number;
+  /** Reducers: outlet DN (the run continues at this size). */
+  readonly dn2?: number;
+  /** Valves: unit vector from the valve centre toward the handwheel. */
+  readonly stemDirection?: Vec3;
+}
+
+/** A branch off a header run: the branch run `branchRunId` starts at the point `distance` along leg `leg` of the header centreline. */
+export interface BranchPoint {
+  /** Step-scoped id (`branch-9.2`). */
+  readonly id: string;
+  readonly leg: number;
+  readonly distance: number;
+  readonly branchRunId: string;
+}
+
 export interface PipeRun {
   readonly id: string;
   readonly lineId: string;
+  /** Nominal size at the run start; absent = the line's DN (a branch run carries its own size). Reducers change it along the run. */
+  readonly dn?: number;
+  /** Valves and reducers placed in the legs (absent = none). */
+  readonly inline?: readonly InlineComponent[];
+  /** Branches taken off this run (absent = none). */
+  readonly branches?: readonly BranchPoint[];
   readonly start: RunEnd;
   readonly end: RunEnd;
   /** Interior points of intersection; legs = [start, ...pis, end]. */
@@ -125,7 +158,7 @@ export interface RoutedPart {
   readonly dn: number;
   readonly dn2?: number;
   readonly ports: readonly PartPort[];
-  /** Elbow centre of the PI (PCF CENTRE-POINT); bolt sets: the joint centre. */
+  /** Elbow / tee / valve centre (PCF CENTRE-POINT); bolt sets: the joint centre. */
   readonly centre?: Vec3;
   /** Pipe pieces only: cut length and the index of the leg the piece lies on. */
   readonly cutLength?: number;
@@ -134,6 +167,14 @@ export interface RoutedPart {
   readonly angleDeg?: number;
   /** Elbows: arc radius of the centreline, tangent to both ports. */
   readonly radius?: number;
+  /** Inline components: the stored `InlineComponent.id` (valve, reducer and the flange sets next to it); branch fittings: the `BranchPoint.id`. */
+  readonly componentId?: string;
+  /** Inline components: the tag (`XV-1001`). */
+  readonly tag?: string;
+  /** Valves: unit vector from the centre toward the handwheel. */
+  readonly stemDirection?: Vec3;
+  /** Olets and stub-ins: the header pipe piece they sit on (their first port is welded to it, not to another port). */
+  readonly onPart?: string;
   /** Bolt sets: stud count. */
   readonly studs?: number;
   /** Row dimensions the display geometry reads (outside diameter, wall, thickness, ring diameters ...), mm. */

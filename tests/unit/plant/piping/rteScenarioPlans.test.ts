@@ -1,7 +1,7 @@
 /**
- * Plant 02 RTE: runs the validation pack's scenario plans (`validation/plans/sc-rte-0{1,2,5}*.json`) through `build_project` (the path of
+ * Plant 02 RTE: runs the validation pack's scenario plans (`validation/plans/sc-rte-0*.json`) through `build_project` (the path of
  * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. `harness.inline` fixtures are inlined first. Steps
- * whose command is not registered yet (check_piping, insert_inline_component: 02 M2) stay unchecked; the plan's `unbuilt` list must say exactly
+ * whose command is not registered yet (line_heat_loss: 02 V1) stay unchecked; the plan's `unbuilt` list must say exactly
  * which commands those are (a stale list fails), and `blockedFrom` marks the first step whose rows depend on an unbuilt step.
  */
 
@@ -59,16 +59,17 @@ function load(name: string): Plan {
   return plan;
 }
 
-/** `a.b[2].c`, `list[*].key`, `issues[?code=='X'].length`. */
+/** `a.b[2].c`, `list[*].key`, `list[?dn==150].cutLengthMm` (a property of a list maps over it), `issues[?code=='X'].length`. */
 function pick(root: unknown, expression: string): unknown {
   const tokens = [...expression.matchAll(/([^.[\]]+)|\[(\*|\d+|\?[^\]]+)\]/g)].map((m) => (m[1] ?? `[${m[2]}]`) as string);
   const walk = (node: unknown, rest: string[]): unknown => {
     const [head, ...tail] = rest;
     if (head === undefined) return node;
     if (head === '[*]') return Array.isArray(node) ? node.map((item) => walk(item, tail)) : undefined;
-    const filter = /^\[\?(\w+)(==|!=)'(.*)'\]$/.exec(head);
+    const filter = /^\[\?(\w+)(==|!=)(?:'(.*)'|(-?\d+(?:\.\d+)?))\]$/.exec(head);
     if (filter !== null && Array.isArray(node)) {
-      const [, key, operator, wanted] = filter;
+      const [, key, operator, text, number] = filter;
+      const wanted = number === undefined ? text : Number(number);
       return walk(
         node.filter((item: Record<string, unknown>) => (operator === '==') === (item[key as string] === wanted)),
         tail,
@@ -76,6 +77,7 @@ function pick(root: unknown, expression: string): unknown {
     }
     const index = /^\[(\d+)\]$/.exec(head);
     if (index !== null) return walk(Array.isArray(node) ? node[Number(index[1])] : undefined, tail);
+    if (Array.isArray(node) && head !== 'length') return node.map((item) => walk(item, rest));
     return walk((node as Record<string, unknown> | undefined)?.[head], tail);
   };
   return walk(root, tokens);
@@ -93,9 +95,19 @@ function close(actual: unknown, expected: unknown, tolerance: number, where: str
   } else expect(actual, where).toEqual(expected);
 }
 
+/** Alias -> ids of the last `run` (`$name` in an expected value means the first id the step with `as: name` produced). */
+let aliases: Record<string, string[]> = {};
+
 function run(actions: Action[]): Step[] {
   const result = execute(createEmptyDocument(), 'build_project', { actions, onError: 'continue' });
-  return (result.data as { steps: Step[] }).steps;
+  const data = result.data as { steps: Step[]; aliases?: Record<string, string[]> };
+  aliases = data.aliases ?? {};
+  return data.steps;
+}
+
+function resolved(value: unknown): unknown {
+  if (typeof value === 'string' && value.startsWith('$')) return aliases[value.slice(1)]?.[0] ?? value;
+  return Array.isArray(value) ? value.map(resolved) : value;
 }
 
 function check(steps: Step[], offset: number, rows: Expected[], blockedFrom: number): number {
@@ -109,7 +121,7 @@ function check(steps: Step[], offset: number, rows: Expected[], blockedFrom: num
     else
       close(
         actual,
-        row.value,
+        resolved(row.value),
         row.abs ?? (row.rel === undefined ? 0 : Math.abs(row.value as number) * row.rel),
         `step ${index} ${row.path}`,
       );
@@ -131,6 +143,7 @@ describe.each([
   'sc-rte-05-routing-refusals.json',
   'sc-rte-07-insulated-hot-line.json',
   'sc-rte-08-auto-route-v2.json',
+  'sc-rte-09-legacy-pipe-run-conversion.json',
 ])('scenario plan %s', (file) => {
   const plan = load(file);
 

@@ -8,9 +8,9 @@
 import type { CadDocument } from '@core/model/types';
 import type { EndType, Joint } from '@aec/plant/types';
 import type { ComponentType, EndType as CatalogEndType, PipingCatalog } from '../catalog/types';
-import { resolveComponent, type ComponentQuery, type ResolveOutcome } from '../spec/resolve';
+import { resolveBranch, resolveComponent, type ComponentQuery, type ResolveOutcome } from '../spec/resolve';
 import { latestSpec, specCatalogs } from '../spec/store';
-import type { PipeSpec, SpecStatus } from '../spec/types';
+import type { BranchFitting, PipeSpec, SpecStatus } from '../spec/types';
 
 /** One resolved catalogue row as routing reads it. `dims` holds the row's dimensions in mm (counts as numbers). */
 export interface CatalogueRow {
@@ -32,7 +32,7 @@ export interface CatalogueRow {
 }
 
 export interface SpecMiss {
-  readonly miss: 'RTE_SPEC_UNKNOWN' | 'RTE_SPEC_NO_COMPONENT' | 'RTE_SPEC_AMBIGUOUS';
+  readonly miss: 'RTE_SPEC_UNKNOWN' | 'RTE_SPEC_NO_COMPONENT' | 'RTE_SPEC_AMBIGUOUS' | 'RTE_BRANCH_NO_TABLE_ROW';
   /** The PSC code and message, or the routing-side reason. */
   readonly detail: string;
   readonly ids: readonly string[];
@@ -65,12 +65,23 @@ export interface PartQuery {
   readonly facing?: 'RF' | 'FF' | 'RTJ' | undefined;
 }
 
+/** The fitting the spec's branch table gives for a header x branch size pair. */
+export interface BranchChoice {
+  /** Branch-table cell: T equal tee, RT reducing tee, W weldolet, S sockolet, TH threadolet, SI stub-in, SIR reinforced stub-in. */
+  readonly fitting: BranchFitting;
+  readonly fittingName: string;
+  /** The fitting's catalogue row; null for a stub-in (no fitting: the branch pipe is welded to the header). */
+  readonly row: CatalogueRow | null;
+}
+
 export interface SpecLookup {
   readonly id: string;
   readonly revision: number;
   status(): SpecStatus;
   pipe(dn: number): CatalogueRow | SpecMiss;
   component(query: PartQuery): CatalogueRow | SpecMiss;
+  /** The branch-table fitting for `headerDn` x `branchDn` (PSC `resolveBranch`); a cell-less pair is `RTE_BRANCH_NO_TABLE_ROW`. */
+  branch(headerDn: number, branchDn: number): BranchChoice | SpecMiss;
   elbowAngles(): ElbowRule;
   connection(a: EndType, b: EndType): ConnectionRule | null;
 }
@@ -192,6 +203,15 @@ export function createSpecLookup(doc: Pick<CadDocument, 'plant'>, specId: string
         first ??= found;
       }
       return first ?? miss('RTE_SPEC_NO_COMPONENT', 'no component type given');
+    },
+    branch: (headerDn, branchDn) => {
+      const outcome = resolveBranch(spec, catalogs, { headerDn: String(headerDn), branchDn: String(branchDn) });
+      if (!outcome.ok) {
+        const kind = outcome.code === 'PSC_BRANCH_UNDEFINED' ? 'RTE_BRANCH_NO_TABLE_ROW' : 'RTE_SPEC_NO_COMPONENT';
+        return miss(kind, `${outcome.code}: ${outcome.message}`, outcome.ids, outcome.paths);
+      }
+      const { fitting, fittingName, component } = outcome.resolved;
+      return { fitting, fittingName, row: component === null ? null : rowOf(spec, { ok: true, resolved: component }, headerDn, branchDn) };
     },
     elbowAngles: () => elbowRule(spec),
     connection: (a, b) => CONNECTIONS.find(([x, y]) => x === a && y === b)?.[2] ?? null,

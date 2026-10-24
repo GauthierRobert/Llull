@@ -1,8 +1,7 @@
 {
   "id": "SC-RTE-02",
-  "status": "PARTLY RUNNABLE (02 RTE M1): steps 0-7 run (the SC-RTE-01 prefix with the real add_nozzle / route_pipe). Blocked until 02 M2: insert_inline_component (step 8), check_piping and the valve rows of piping_takeoff.",
-  "unbuilt": ["insert_inline_component", "check_piping"],
-  "blockedFrom": 8,
+  "status": "RUNNABLE (02 RTE M2): every step runs (the SC-RTE-01 prefix, insert_inline_component, check_piping with an explicit handwheel limit, piping_takeoff).",
+  "unbuilt": [],
   "validates": ["VC-RTE-04", "VC-RTE-05"],
   "description": "SC-RTE-01 plus a flanged gate valve (B16.10 CL150 NPS 4, face-to-face 229) centred at z 1800 on the first (vertical) leg, stem horizontal toward -Y. The valve pulls in two WN flanges, two gaskets and two bolt sets. check_piping is given an explicit project limit maxHandwheelCentreHeight 1500 mm above the level, so the valve (handwheel centre at 1800) must be reported.",
   "units": "mm",
@@ -98,7 +97,8 @@
     { "command": "piping_takeoff", "params": { "runId": "$run" } }
   ],
   "expected": [
-    { "step": 8, "path": "data.valveFacesZ", "value": [1685.5, 1914.5], "abs": 0.01, "source": "1800 -/+ 229/2" },
+    { "step": 8, "path": "data.facePositions[*][2]", "value": [1685.5, 1914.5], "abs": 0.01, "source": "1800 -/+ 229/2 (z of the upstream and downstream valve faces)" },
+    { "step": 8, "path": "data.legCutLengthsMm", "value": [527.5, 354.5], "abs": 0.01, "source": "leg 0 split: (1685.5 - 3) - (1000 + 3 + 76) ; (2500 - 152) - (1914.5 + 3 + 76)" },
     { "step": 9, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_HEIGHT'].length", "value": 1, "source": "explicit param 1500 < 1800" },
     { "step": 9, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_HEIGHT'][0].ids", "value": ["$valve"] },
     { "step": 9, "path": "data.status", "value": "warn" },
@@ -108,8 +108,8 @@
       "value": {
         "elbow90LR": 4,
         "valveGate": 1,
-        "flangeWN": 4,
-        "gasket": 4,
+        "flangeWeldNeck": 4,
+        "gasketSpiralWound": 4,
         "boltSet": 4,
         "studs": 32,
         "pipePieces": 6,

@@ -11,6 +11,7 @@ import type { PipingModel, PipeRun, PortRef, PortSpec } from '@aec/plant/types';
 import { elementsOf, getBuilding } from '../../building/model';
 import { equipmentPorts } from '../equipment/geometry/ports';
 import { getPiping, runPoints } from './model';
+import { endDn, startDn } from './runSizes';
 
 export interface ResolvedPort {
   /** The id as the agent passes it: `tie-3`, `P-101:N2`, `run-4:end`. */
@@ -33,7 +34,25 @@ function runEndPort(piping: PipingModel, run: PipeRun, end: 'start' | 'end'): Po
   const points = runPoints(run);
   const [a, b] = end === 'end' ? [points.at(-2), points.at(-1)] : [points[1], points[0]];
   if (line === undefined || a === undefined || b === undefined) return null;
-  return { position: b, direction: unit(sub(b, a)), dn: line.dn, endType: 'BW' };
+  return { position: b, direction: unit(sub(b, a)), dn: end === 'end' ? endDn(run, line.dn) : startDn(run, line.dn), endType: 'BW' };
+}
+
+/** The branch point `branchId` of header run `runId` as the port its branch run starts at: on the header centreline, facing along the branch. */
+function branchPort(piping: PipingModel, runId: string, branchId: string): PortSpec | null {
+  const header = piping.runs[runId];
+  const point = header?.branches?.find((candidate) => candidate.id === branchId);
+  const branch = point === undefined ? undefined : piping.runs[point.branchRunId];
+  const line = branch === undefined ? undefined : piping.lines[branch.lineId];
+  const points = header === undefined ? [] : runPoints(header);
+  const [from, to] = [points[point?.leg ?? -1], points[(point?.leg ?? -1) + 1]];
+  if (point === undefined || branch === undefined || line === undefined || from === undefined || to === undefined) return null;
+  const along = unit(sub(to, from));
+  return {
+    position: [from[0] + along[0] * point.distance, from[1] + along[1] * point.distance, from[2] + along[2] * point.distance],
+    direction: branch.start.direction ?? [0, 0, 0],
+    dn: startDn(branch, line.dn),
+    endType: 'BW',
+  };
 }
 
 function nozzlePort(doc: CadDocument, equipmentId: string, nozzleId: string): PortSpec | null {
@@ -56,6 +75,8 @@ export function portOfRef(doc: CadDocument, ref: PortRef): PortSpec | null {
       const run = piping.runs[ref.runId];
       return run === undefined ? null : runEndPort(piping, run, ref.end);
     }
+    case 'branch':
+      return branchPort(piping, ref.runId, ref.branchId);
   }
 }
 
@@ -68,15 +89,23 @@ export function portIdOf(doc: CadDocument, ref: PortRef): string {
       return `${getBuilding(doc).elements[ref.equipmentId]?.mark ?? ref.equipmentId}:${ref.nozzleId}`;
     case 'runEnd':
       return `${ref.runId}:${ref.end}`;
+    case 'branch':
+      return `${ref.runId}#${ref.branchId}`;
   }
 }
 
-const sameRef = (a: PortRef, b: PortRef): boolean =>
-  a.kind === 'tieIn'
-    ? b.kind === 'tieIn' && a.id === b.id
-    : a.kind === 'nozzle'
-      ? b.kind === 'nozzle' && a.equipmentId === b.equipmentId && a.nozzleId === b.nozzleId
-      : b.kind === 'runEnd' && a.runId === b.runId && a.end === b.end;
+const sameRef = (a: PortRef, b: PortRef): boolean => {
+  switch (a.kind) {
+    case 'tieIn':
+      return b.kind === 'tieIn' && a.id === b.id;
+    case 'nozzle':
+      return b.kind === 'nozzle' && a.equipmentId === b.equipmentId && a.nozzleId === b.nozzleId;
+    case 'runEnd':
+      return b.kind === 'runEnd' && a.runId === b.runId && a.end === b.end;
+    case 'branch':
+      return b.kind === 'branch' && a.runId === b.runId && a.branchId === b.branchId;
+  }
+};
 
 /**
  * Resolves a port id: `tie-3` (add_tie_in_point), `run-4:start` / `run-4:end` (the open end of an existing run) or `<tag>:<mark>` (equipment nozzle).

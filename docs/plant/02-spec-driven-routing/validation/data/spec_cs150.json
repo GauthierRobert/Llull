@@ -33,6 +33,40 @@
       "scheduleFromPipe": true,
       "catalogRef": "asme-b16.9"
     },
+    { "id": "T-BW", "type": "tee", "fromNps": 2, "toNps": 6, "catalogRef": "asme-b16.9", "ends": "BW", "scheduleFromPipe": true },
+    {
+      "id": "RT-BW",
+      "type": "reducingTee",
+      "fromNps": 2,
+      "toNps": 6,
+      "catalogRef": "asme-b16.9",
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "branchFromNps": 2,
+      "branchToNps": 4
+    },
+    {
+      "id": "RED-C",
+      "type": "reducerConcentric",
+      "fromNps": 3,
+      "toNps": 6,
+      "catalogRef": "asme-b16.9",
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "branchFromNps": 2,
+      "branchToNps": 4
+    },
+    {
+      "id": "W-BW",
+      "type": "weldolet",
+      "fromNps": 2,
+      "toNps": 6,
+      "branchFromNps": 2,
+      "branchToNps": 2,
+      "ends": "BW",
+      "scheduleFromPipe": true,
+      "catalogRef": "mss-sp-97"
+    },
     { "id": "F-WN", "type": "flangeWeldNeck", "fromNps": 2, "toNps": 6, "facing": "RF", "class": 150, "catalogRef": "asme-b16.5" },
     { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 2, "toNps": 6, "class": 150, "catalogRef": "asme-b16.20" },
     { "id": "B-STUD", "type": "boltSet", "fromNps": 2, "toNps": 6, "class": 150, "facing": "RF", "catalogRef": "asme-b16.5-bolting" },
@@ -48,5 +82,6 @@
     }
   ],
   "status": "draft",
-  "provenance": { "author": "02 RTE validation pack", "accessed": "2026-10-24" }
+  "provenance": { "author": "02 RTE validation pack", "accessed": "2026-10-24" },
+  "branchTable": { "system": "NPS", "cells": { "4": { "4": "T" }, "6": { "2": "W", "4": "RT", "6": "T" } } }
 }

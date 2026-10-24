@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
-import { deriveRun, type DerivationFailure, type RunDerivation } from '@aec/plant/piping/routeParts';
+import type { DerivationFailure, RunDerivation } from '@aec/plant/piping/deriveTypes';
+import { deriveRun } from '@aec/plant/piping/routeParts';
 import { apply } from '../../../helpers/commandAssertions';
 import { addTie, cs150Line, rteJson, routedPumpToVessel } from './rteFixtures';
 

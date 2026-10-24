@@ -1,6 +1,6 @@
 /**
  * Run display geometry is derived from `plant.piping` (02 RTE §2 "stored intent, derived parts"): one read-only entity per part of every run
- * (`routeParts.deriveRun` -> `geometry.partEntity`; ids `<runId>/<kind>-<k>`), omitted from saved files, re-derived on load and after every command
+ * (`routeParts.deriveRun` -> `geometryInline.partEntities`; ids `<runId>/<kind>-<k>`), omitted from saved files, re-derived on load and after every command
  * that changes what they derive from (`reconcile`), and protected by a derivation guard (architecture L8). The ids of a run's entities are kept in
  * `plant.piping.entityIds`; a run that no longer derives is marked `broken` and has no entities.
  */
@@ -11,9 +11,11 @@ import type { DerivationGuard } from '@core/commands/derivation';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { ensureLayerIds } from '../../shared/derived';
-import { partEntity, PIPING_LAYER_COLORS } from './geometry';
+import { PIPING_LAYER_COLORS } from './geometry';
+import { partEntities } from './geometryInline';
 import { getPiping } from './model';
 import { portOfRef } from './ports';
+import { withDependents } from './runLinks';
 import { deriveRun } from './routeParts';
 import { pipingErrors } from './validate';
 
@@ -28,7 +30,7 @@ function runState(doc: CadDocument, run: PipeRun): RunState {
     const line = getPiping(doc).lines[run.lineId];
     const derived = deriveRun(doc, run);
     if (!derived.ok) return { entities: [], broken: { code: derived.code, reason: derived.message } };
-    return { entities: line === undefined ? [] : derived.parts.flatMap((part) => partEntity(part, line) ?? []) };
+    return { entities: line === undefined ? [] : derived.parts.flatMap((part) => partEntities(part, line)) };
   } catch {
     // Unvalidated raw data (restore) or a corrupt slice: the run is broken, never a throw.
     return { entities: [], broken: { code: 'RTE_SPEC_UNKNOWN', reason: 'the spec, catalogues or ports of the run could not be read' } };
@@ -117,7 +119,7 @@ function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
   const before = getPiping(previous);
   const specsChanged = next.plant?.spec !== previous.plant?.spec || next.plant?.catalog !== previous.plant?.catalog;
   const buildingChanged = next.building !== previous.building;
-  return piping.runOrder.filter((id) => {
+  const stale = piping.runOrder.filter((id) => {
     const run = piping.runs[id];
     if (run === undefined) return false;
     if (specsChanged || piping.lines[run.lineId] !== before.lines[run.lineId]) return true;
@@ -127,6 +129,9 @@ function affectedRuns(previous: CadDocument, next: CadDocument): string[] {
       return ref.kind === 'nozzle' && buildingChanged && !sameEquipment(previous, next, ref.equipmentId) && portMoved(previous, next, ref);
     });
   });
+  // Runs attached to a stale run (branches, continuations) read it, so they are re-derived with it.
+  const reached = new Set(stale.flatMap((id) => withDependents(piping, id)));
+  return piping.runOrder.filter((id) => reached.has(id));
 }
 
 /** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */

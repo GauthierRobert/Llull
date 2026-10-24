@@ -4,7 +4,10 @@
  */
 
 import type { PortSpec } from '@aec/plant/types';
-import { isMiss, type CatalogueRow, type SpecLookup } from './specLookup';
+import { isMiss, type CatalogueRow, type SpecLookup, type SpecMiss } from './specLookup';
+
+/** The part of a port a mating flange depends on: rating and facing. */
+export type FlangeFace = Pick<PortSpec, 'rating' | 'facing'>;
 
 export interface FlangeSet {
   readonly flange: CatalogueRow;
@@ -21,7 +24,7 @@ export interface FlangeSet {
 }
 
 export interface FlangeSetFailure {
-  readonly code: 'RTE_RATING_MISMATCH' | 'RTE_FACING_MISMATCH' | 'RTE_SPEC_NO_COMPONENT' | 'RTE_SPEC_UNKNOWN' | 'RTE_SPEC_AMBIGUOUS';
+  readonly code: 'RTE_RATING_MISMATCH' | 'RTE_FACING_MISMATCH' | SpecMiss['miss'];
   readonly message: string;
   readonly ids: readonly string[];
   readonly paths: readonly string[];
@@ -42,7 +45,7 @@ const noComponent = (message: string, ids: readonly string[] = []): FlangeSetFai
  * The mating weld-neck flange of `port`. A spec that offers the size only at another rating / facing is a mismatch, not a missing part.
  * @failure rating / facing differ -> RTE_RATING_MISMATCH / RTE_FACING_MISMATCH; no row -> the lookup's miss code
  */
-function matingFlange(lookup: SpecLookup, port: PortSpec, dn: number): CatalogueRow | FlangeSetFailure {
+function matingFlange(lookup: SpecLookup, port: FlangeFace, dn: number): CatalogueRow | FlangeSetFailure {
   const filtered = lookup.component({ types: ['flangeWeldNeck'], dn, rating: port.rating, facing: port.facing });
   const candidate = isMiss(filtered) ? lookup.component({ types: ['flangeWeldNeck'], dn }) : filtered;
   if (isMiss(candidate)) return { code: candidate.miss, message: candidate.detail, ids: candidate.ids, paths: candidate.paths };
@@ -69,7 +72,7 @@ function matingFlange(lookup: SpecLookup, port: PortSpec, dn: number): Catalogue
  * Weld-neck flange + gasket + bolt set for a port.
  * @failure see matingFlange; a row without lengthThroughHub / gasket thickness / stud count -> RTE_SPEC_NO_COMPONENT naming the dimension
  */
-export function resolveFlangeSet(lookup: SpecLookup, port: PortSpec, dn: number): FlangeSet | FlangeSetFailure {
+export function resolveFlangeSet(lookup: SpecLookup, port: FlangeFace, dn: number): FlangeSet | FlangeSetFailure {
   const flange = matingFlange(lookup, port, dn);
   if ('code' in flange) return flange;
   const hub = flange.dims['lengthThroughHub'];

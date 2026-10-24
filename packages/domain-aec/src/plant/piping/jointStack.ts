@@ -14,7 +14,7 @@ export interface Interval {
   /** Weld root gap deducted from the pipe piece next to this interval (connection rule; named default 0). */
   readonly gap: number;
   /** Why the interval exists: decides the refusal code on overlap. */
-  readonly kind: 'fitting' | 'inline';
+  readonly kind: 'fitting' | 'inline' | 'branch';
 }
 
 export interface Piece {
@@ -38,6 +38,8 @@ export interface StackWarning {
 
 export interface Stack {
   readonly ok: true;
+  /** The intervals sorted along the leg (the order the pieces and fitting-to-fitting joints follow). */
+  readonly order: readonly Interval[];
   readonly pieces: readonly Piece[];
   /** Neighbouring intervals with no pipe between them. */
   readonly fittingToFitting: ReadonlyArray<{ readonly from: string; readonly to: string; readonly at: number }>;
@@ -46,7 +48,7 @@ export interface Stack {
 
 export interface StackFailure {
   readonly ok: false;
-  readonly code: 'RTE_SEGMENT_TOO_SHORT' | 'RTE_INLINE_DOES_NOT_FIT';
+  readonly code: 'RTE_SEGMENT_TOO_SHORT' | 'RTE_INLINE_DOES_NOT_FIT' | 'RTE_BRANCH_ON_FITTING';
   readonly message: string;
   readonly detail: { readonly cutLengthMm: number; readonly from: string; readonly to: string; readonly legLengthMm: number };
 }
@@ -74,10 +76,11 @@ export function stackLeg(
     const end = b.start - b.gap;
     const cut = end - start;
     if (cut < -eps) {
+      const branch = a.kind === 'branch' || b.kind === 'branch';
       const inline = a.kind === 'inline' || b.kind === 'inline';
       return {
         ok: false,
-        code: inline ? 'RTE_INLINE_DOES_NOT_FIT' : 'RTE_SEGMENT_TOO_SHORT',
+        code: branch ? 'RTE_BRANCH_ON_FITTING' : inline ? 'RTE_INLINE_DOES_NOT_FIT' : 'RTE_SEGMENT_TOO_SHORT',
         message: `between ${a.id} and ${b.id} the pipe piece would be ${+cut.toFixed(4)} mm long on a ${+legLength.toFixed(4)} mm leg`,
         detail: { cutLengthMm: cut, from: a.id, to: b.id, legLengthMm: legLength },
       };
@@ -91,5 +94,5 @@ export function stackLeg(
       warnings.push({ code: 'RTE_WELD_SPACING', from: a.id, to: b.id, cutLengthMm: cut, minimumMm: minWeldSpacing });
     pieces.push({ start, end, cut, from: a.id, to: b.id });
   }
-  return { ok: true, pieces, fittingToFitting, warnings };
+  return { ok: true, order: sorted, pieces, fittingToFitting, warnings };
 }

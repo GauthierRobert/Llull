@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-01",
-  "status": "RUNNABLE (02 RTE M1): steps 0-7 and 9 run; step 8 check_piping is 02 M2 (unbuilt), its rows stay unchecked until then.",
-  "unbuilt": ["check_piping"],
+  "status": "RUNNABLE (02 RTE M2): every step runs, including step 8 check_piping (RTE_SPEC_UNVERIFIED is the only issue: the spec CS150 is a draft with rows not grade A).",
+  "unbuilt": [],
   "validates": ["VC-RTE-01", "VC-RTE-02", "VC-RTE-03", "VC-RTE-17"],
   "description": "Pump P-101 top discharge (DN100 CL150 RF flanged nozzle at z 1000, facing +Z) to vertical vessel V-101 side inlet N1 (DN100 CL150 RF, face at x 6000, facing -X). Spec CS150. Route by compass legs: up 1500, +Y 3000, +X 3000, up 1500, then +X into the nozzle (3000). Four LR 90 elbows, a weld-neck flange + gasket + bolt set at each nozzle.",
   "units": "mm",
@@ -125,7 +125,7 @@
       "step": 8,
       "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
       "value": 0,
-      "source": "no open end, sizes / ratings / end types match (check_piping: 02 M2)"
+      "source": "no open end, sizes / ratings / end types match (check_piping, 02 M2)"
     },
     {
       "step": 8,

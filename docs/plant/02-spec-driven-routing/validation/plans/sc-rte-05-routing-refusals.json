@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-05",
-  "status": "PARTLY RUNNABLE (02 RTE M1): cases a, d, e, f, g run; b and c run their step 0 (route_pipe); their check_piping step 1 is 02 M2. Each case is its own plan (a refused step stops build_project); the driver runs prefix + case one by one.",
-  "unbuilt": ["check_piping"],
+  "status": "RUNNABLE (02 RTE M2): every case runs, b and c with their check_piping step. Each case is its own plan (a refused step stops build_project); the driver runs prefix + case one by one.",
+  "unbuilt": [],
   "validates": ["VC-RTE-09", "VC-RTE-10", "VC-RTE-11"],
   "units": "mm",
   "prefix": [

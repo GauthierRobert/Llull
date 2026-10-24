@@ -21,9 +21,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Pass a tie-in id (add_tie_in_point), "<tag>:<mark>" of an equipment nozzle (equipment_ports), "<runId>:start|end", or { point, direction } for an open end.',
   RTE_UNKNOWN_RUN: 'Pass the id of a routed run (affected[0] of route_pipe / auto_route_pipe; plant.piping.runOrder).',
   RTE_PORT_IN_USE:
-    'Route from a free port; delete_pipe_run frees the ports of a run (a port takes one run; branches come with add_branch, 02 M2).',
+    'Route from a free port; delete_pipe_run frees the ports of a run (a port takes one run; take a branch off a run with add_branch).',
   RTE_HAS_BRANCHES:
-    'Delete the dependent runs first (delete_pipe_run on the ids listed); a run that continues from another run end depends on it.',
+    'Delete the dependent runs first (delete_pipe_run on the ids listed), or pass cascade: true to delete them with it; branch runs and runs that continue from a run end depend on it.',
   RTE_INVALID_PORT: 'Give a non-zero direction pointing from the connection face toward the pipe.',
   RTE_DUPLICATE_TAG: 'Choose another tag; tie-in tags are unique.',
   RTE_DUPLICATE_LINE_NUMBER: 'Choose another sequence or pass an explicit unique lineNumber.',
@@ -43,9 +43,19 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_STRETCH_FAILED:
     'The port moved away from the routed end (equipment or tie-in edit): delete_pipe_run and route_pipe again; orthogonal stretch comes with 02 M3. The run is marked broken and its parts are not drawn.',
   RTE_SIZE_MISMATCH:
-    'Route between ports of the line size (create a line of the port DN), or change the line DN; a reducer transition between sizes comes with 02 M2.',
+    'Route between ports of the line size (create a line of the port DN), or put a reducer in the run: pass inline [{ type: "reducerConcentric", dn2 }] to route_pipe, or insert_inline_component a reducer whose dn2 is the size the end port has.',
   RTE_RATING_MISMATCH: 'Use a spec whose flange rating equals the port rating (CL150, PN16 ...), or fix the nozzle / tie-in rating.',
   RTE_FACING_MISMATCH: 'Use a spec whose flange facing equals the port facing (RF, FF, RTJ), or fix the nozzle / tie-in facing.',
+  RTE_UNKNOWN_PIPE:
+    'Pass the building element id of a legacy pipe (affected[0] of add_pipe_run, e.g. "pipe-3"; building_schedule kind "pipe" lists them).',
+  RTE_UNKNOWN_COMPONENT:
+    'Pass the id of an inline component of that run (affected[0] of insert_inline_component; piping_takeoff lists them as data.inline).',
+  RTE_INLINE_DOES_NOT_FIT:
+    'Move the component (centreDistance on the leg), lengthen the leg, or pick another leg: it needs face-to-face + both flange sets (valve) or its length (reducer) between its neighbours.',
+  RTE_BRANCH_ON_FITTING:
+    'Move the branch point onto a straight pipe piece: clear of elbows, flange sets, valves and other tees (an olet needs the branch radius to each pipe end).',
+  RTE_BRANCH_NO_TABLE_ROW:
+    'Extend the spec branch table for this header x branch size (edit_pipe_spec), or pick a branch size the table has (resolve_branch lists them).',
   RTE_UNITS_UNSUPPORTED: 'Route in a mm document (plant lengths, ODs and the lattice are in mm until unit conversion lands): set_units mm.',
   RTE_PORT_DIRECTION:
     'Start the first leg along the start port direction and arrive along the end port direction (within the angle tolerance); auto-routing needs ports facing +X, -X, +Y, -Y, +Z or -Z.',
@@ -57,3 +67,26 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 };
 
 export const refuse = tableRejection(REMEDIATION);
+
+/**
+ * Where `point` lies on the centreline of `run`: the first leg whose axis passes within `toleranceMm` of it (between the two points of
+ * intersection), with the distance from that leg's start. Null when the point is not on the run.
+ */
+export function locateOnRun(run: PipeRun, point: Vec3, toleranceMm = 0.01): { leg: number; distance: number } | null {
+  const points = runPoints(run);
+  for (let leg = 0; leg + 1 < points.length; leg++) {
+    const [a, b] = [points[leg] as Vec3, points[leg + 1] as Vec3];
+    const axis: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const length = Math.hypot(...axis);
+    if (!(length > 0)) continue;
+    const offset: Vec3 = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
+    const distance = (offset[0] * axis[0] + offset[1] * axis[1] + offset[2] * axis[2]) / length;
+    const sideways = Math.hypot(
+      offset[0] - (axis[0] / length) * distance,
+      offset[1] - (axis[1] / length) * distance,
+      offset[2] - (axis[2] / length) * distance,
+    );
+    if (sideways <= toleranceMm && distance >= -toleranceMm && distance <= length + toleranceMm) return { leg, distance };
+  }
+  return null;
+}

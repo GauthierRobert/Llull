@@ -1,7 +1,7 @@
 /**
  * Display geometry of derived parts (02 RTE §5.11): one read-only revolution entity per part, id = the part id. Pipe piece = solid cylinder,
  * elbow = the 16-point pipe section revolved about the bend axis (24 steps per 90 degrees, exact torus segment), flange = revolved profile
- * (plate, hub, neck, bore), gasket = ring. Bolt sets have no geometry (hardware count only). Layers P-PIPE, P-FITT, P-FLNG.
+ * (plate, hub, neck, bore), gasket = ring. Bolt sets have no geometry (hardware count only). Layers P-PIPE, P-FITT, P-FLNG (valves and reducer bodies: geometryInline.ts, P-VALV).
  */
 
 import type { Entity, RevolutionEntity } from '@core/model/types';
@@ -15,28 +15,36 @@ import { unitVector } from './legs';
 export const PIPE_LAYER_ID = 'layer-P-PIPE';
 export const FITTING_LAYER_ID = 'layer-P-FITT';
 export const FLANGE_LAYER_ID = 'layer-P-FLNG';
+export const VALVE_LAYER_ID = 'layer-P-VALV';
 
-const COLORS = { [PIPE_LAYER_ID]: '#2f9c8f', [FITTING_LAYER_ID]: '#d9a441', [FLANGE_LAYER_ID]: '#8f98a3' } as const;
+const COLORS = {
+  [PIPE_LAYER_ID]: '#2f9c8f',
+  [FITTING_LAYER_ID]: '#d9a441',
+  [FLANGE_LAYER_ID]: '#8f98a3',
+  [VALVE_LAYER_ID]: '#c0504d',
+} as const;
 /** Layer id -> colour, for `ensureLayerIds`. */
 export const PIPING_LAYER_COLORS: ReadonlyMap<string, string> = new Map(Object.entries(COLORS));
 
-const RADIAL_SEGMENTS = 24;
+export const RADIAL_SEGMENTS = 24;
 const SECTION_POINTS = 16;
 const ARC_STEPS_PER_QUARTER = 24;
 
-type Section = Array<[number, number]>;
+export type Section = Array<[number, number]>;
+
+export type LayerId = keyof typeof COLORS;
 
 /** Euler angles taking local +Z onto the unit vector `axis` (local X is any perpendicular). */
-function rotationToward(axis: Vec3): Vec3 {
+export function rotationToward(axis: Vec3): Vec3 {
   const reference: Vec3 = Math.abs(axis[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
   const x = unitVector(cross3(reference, axis));
   return eulerFromAxes(x, cross3(axis, x), axis);
 }
 
-function entityOf(
+export function entityOf(
   part: RoutedPart,
   line: PipeLine,
-  layerId: keyof typeof COLORS,
+  layerId: LayerId,
   label: string,
   placement: { position: Vec3; rotation: Vec3 },
   profile: Section,
@@ -60,7 +68,7 @@ function entityOf(
 }
 
 /** Axis of a two-port part: the first port, and the unit direction toward the second. */
-function axisOf(ports: readonly PartPort[]): { origin: Vec3; axis: Vec3; length: number } | null {
+export function axisOf(ports: readonly PartPort[]): { origin: Vec3; axis: Vec3; length: number } | null {
   const [a, b] = ports;
   if (a === undefined || b === undefined) return null;
   const delta = sub3(b.position, a.position);

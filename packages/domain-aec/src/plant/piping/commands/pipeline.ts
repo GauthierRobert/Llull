@@ -6,6 +6,16 @@ import { nextId } from '@lib/id';
 import { getPiping, refuse, withPiping } from '../model';
 import { createSpecLookup, isMiss } from '../specLookup';
 
+/** The line number the template gives: `{dn}-{service}-{sequence}-{spec}[-{insulationCode}{thickness}]`. */
+export const templateLineNumber = (fields: {
+  readonly dn: number;
+  readonly service: string;
+  readonly sequence: string;
+  readonly spec: string;
+  readonly insulation?: { readonly code: string; readonly thicknessMm: number } | undefined;
+}): string =>
+  `${fields.dn}-${fields.service}-${fields.sequence}-${fields.spec}${fields.insulation === undefined ? '' : `-${fields.insulation.code}${fields.insulation.thicknessMm}`}`;
+
 /** 02 RTE §5.9 default template (one per document until `set_piping_settings`). */
 export const LINE_NUMBER_TEMPLATE = '{dn}-{service}-{sequence}-{spec}[-{insulationCode}{insulationThickness}]';
 
@@ -50,8 +60,7 @@ export const createPipeline = defineCommand({
     const pipe = lookup.pipe(dn);
     if (isMiss(pipe)) return refuse(doc, 'create_pipeline', pipe.miss, pipe.detail, [...pipe.ids], ['dn']);
     const unverified = lookup.status() !== 'approved' || pipe.unverified;
-    const suffix = insulation === undefined ? '' : `-${insulation.code}${insulation.thicknessMm}`;
-    const lineNumber = params.lineNumber ?? `${dn}-${service}-${sequence}-${spec}${suffix}`;
+    const lineNumber = params.lineNumber ?? templateLineNumber({ dn, service, sequence, spec, insulation });
     const clash = piping.lineOrder.find((id) => piping.lines[id]?.lineNumber === lineNumber);
     if (clash !== undefined)
       return refuse(

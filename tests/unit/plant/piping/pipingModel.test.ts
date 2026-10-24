@@ -183,7 +183,7 @@ describe('piping document extension', () => {
     const badRef = { id: 'r', lineId: 'l', start: { point: [0, 0, 0], ref: { kind: 'wormhole' } }, end: { point: [1, 0, 0] }, pis: [] };
     const withLine = { ...empty, lines: { l: { id: 'l', lineNumber: 'L', spec: 'S', dn: 1 } }, lineOrder: ['l'] };
     expect(pipingErrors({ ...withLine, runs: { r: badRef }, runOrder: ['r'] })).toEqual([
-      'plant.piping.runs.r.start.ref must be a tieIn, nozzle or runEnd reference',
+      'plant.piping.runs.r.start.ref must be a tieIn, nozzle, runEnd or branch reference',
     ]);
     const goodRefs = [
       { kind: 'tieIn', id: 't' },

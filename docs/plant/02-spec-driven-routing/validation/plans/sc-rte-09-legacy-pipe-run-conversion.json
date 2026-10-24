@@ -1,11 +1,17 @@
 {
   "id": "SC-RTE-09",
-  "status": "PROPOSED - partly runnable: add_pipe_run exists today (packages/domain-aec/src/industrial/equipment/equipment.ts). Unbuilt: import_pipe_spec (01), convert_pipe_run, check_piping, piping_takeoff.",
-  "unbuilt": ["import_pipe_spec", "convert_pipe_run", "check_piping", "piping_takeoff"],
+  "status": "RUNNABLE (02 RTE M2): every step runs (imports, legacy add_pipe_run, convert_pipe_run, piping_takeoff, check_piping).",
+  "unbuilt": [],
   "validates": ["VC-RTE-20"],
-  "description": "A legacy polyline pipe (add_pipe_run, DN100, two interior 90 deg bends) is converted into a spec-driven run on CS150: the polyline vertices become PIs, each bend becomes a catalogue LR elbow, the free ends become open ends.",
+  "description": "A legacy polyline pipe (add_pipe_run, DN100, two interior 90 deg bends) is converted into a spec-driven run on CS150: the polyline vertices become PIs, each bend becomes a catalogue LR elbow, the free ends become open ends. The legacy pipe is kept (replace is not set).",
   "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
   "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
     {
       "command": "add_pipe_run",
       "params": {
@@ -26,15 +32,15 @@
     { "command": "check_piping", "params": {} }
   ],
   "expected": [
-    { "step": 1, "path": "data.lineNumber", "value": "L-1", "source": "legacy line number is kept verbatim" },
-    { "step": 2, "path": "data.counts", "value": { "elbow90LR": 2, "pipePieces": 3, "buttWelds": 4 } },
+    { "step": 3, "path": "data.lineNumber", "value": "L-1", "source": "legacy line number is kept verbatim" },
+    { "step": 4, "path": "data.counts", "value": { "elbow90LR": 2, "pipePieces": 3, "buttWelds": 4 } },
     {
-      "step": 2,
+      "step": 4,
       "path": "data.pipePieces[*].cutLengthMm",
       "value": [3848, 2696, 2348],
       "abs": 0.01,
       "source": "4000 - 152 ; 3000 - 2 x 152 ; 2500 - 152"
     },
-    { "step": 3, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 2 }
+    { "step": 5, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 2, "source": "both ends of the converted run are open" }
   ]
 }

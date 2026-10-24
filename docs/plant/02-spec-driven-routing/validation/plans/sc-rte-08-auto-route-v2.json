@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-08",
-  "status": "V2 built 2026-10-19 (TECHNICAL_SPEC section 13), on the spec-driven derivation since 02 RTE M1: steps 0-5 run (imports, tie-ins, create_pipeline, auto_route_pipe) and give the expected step-5 data (tests/unit/plant/piping/autoRoute.test.ts, server/tests/routeNativeParity.test.ts). Unbuilt: check_piping (step 6).",
-  "unbuilt": ["check_piping"],
+  "status": "V2 built 2026-10-19 (TECHNICAL_SPEC section 13), on the spec-driven derivation since 02 RTE M1: steps 0-5 run (imports, tie-ins, create_pipeline, auto_route_pipe) and give the expected step-5 data (tests/unit/plant/piping/autoRoute.test.ts, server/tests/routeNativeParity.test.ts). Step 6 check_piping runs since 02 RTE M2.",
+  "unbuilt": [],
   "harness": {
     "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
     "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
