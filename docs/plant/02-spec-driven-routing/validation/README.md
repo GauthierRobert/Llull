@@ -120,7 +120,7 @@ Common inputs (stub CS150): NPS 4 LR 90 A = 152, WN CL150 Y = 76, gasket g = 3.0
   3000: occupies 2930–3070; cuts 2930 − 0 = 2930 (DN150) and 6000 − 3070 = 2930 (DN100); welds: tie-in, 2 at the reducer, tie-in = 4.
 - **D11 (SC-RTE-04c, VC-RTE-27).** Line declared 1 % fall. Legs: 0 sloped (+X, plan 4000, falls 40 mm), 1 -Z 500 (falls), 2 +X 1000 (z constant), 3 +Z 600 (rises).
   Vertical signs along the flow: -, -, 0, +. Adverse = a leg of a graded line that rises: leg 3 only (leg 2 is flat). Pocket = two consecutive non-flat legs of opposite sign
-  (flats between them ignored): (leg 1 -, leg 3 +) is one low point, relieved only by a branch leaving down (dz <= -0.707) from legs 1 to 3; none was added, so one `RTE_POCKET`.
+  (flats between them ignored): (leg 1 -, leg 3 +) is one low point, relieved only by a branch leaving down (dz <= -0.707) from legs 1 to 3; none was added, so one `RTE_POCKET`. The flat +X leg 2 sits on a line that declares a fall, so one `RTE_FLAT_ON_SLOPED_LINE` (leg 2); the sloped leg 0 and the vertical legs are not flat.
 - **D12 (edit_route, VC-RTE-28).** SC-RTE-01 legs +Z 1500, +Y 3000, +X 3000, +Z 1500, +X 3000, both ends on nozzles. Move PI 0 (0,0,2500) by (0,0,500): leg 0 absorbs it (2000),
   the lift is perpendicular to the +Y and +X legs (their PIs rise 500), the last +Z leg absorbs it again (1000): cuts 2000 - 152 - 79 = 1769, 2696, 2696, 1000 - 304 = 696, 2769.
   Stretch leg 2 to 3500 (+500 X): PI 3 and PI 4 move +500 X (the +Z leg is perpendicular to X), the last +X leg absorbs it (2500 from PI 4 to the nozzle face): leg 2 cut 3500 - 304 = 3196,

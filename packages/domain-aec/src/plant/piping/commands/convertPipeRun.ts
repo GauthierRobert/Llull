@@ -6,7 +6,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, PipeRun } from '@aec/plant/types';
 import { cross3, len3, sub3 } from '@lib/vec3';
 import { nextId } from '@lib/id';
-import { getBuilding } from '../../../building/model';
+import { elementsOf, getBuilding } from '../../../building/model';
 import { pipeSizeByOutsideDiameter } from '../../../industrial/piping/pipeSizes';
 import { withRunEntities } from '../derive';
 import { chooseElbow, turnAngleDeg } from '../fittings';
@@ -32,11 +32,11 @@ export const convertPipeRun = defineCommand({
     'piece its cut length, and both ends stay open (connect them later by routing from "<runId>:start|end" or compare with check_piping, which lists ' +
     'them as RTE_OPEN_END). A pipe line is created with the legacy line number verbatim (or the template DN-service-sequence-spec when the pipe has ' +
     'none), the legacy service, from and to text and size (the pipe dn, else the DN of its diameter in the pipe size table); pass lineId to put the run on ' +
-    'an existing line instead (its spec is used and spec may be omitted). The legacy pipe stays unless replace is true, which deletes it with the pipe ' +
+    'an existing line instead (its spec is used and spec may be omitted). The legacy pipe stays unless replace is true, which deletes it (refused when it hosts pipe supports; delete_building_element them first if they are to go) ' +
     'supports hosted on it (delete_building_element); keep it to compare, but its geometry then overlaps the run. Returns the run id (affected[0]) and ' +
     'the line id; data = { runId, lineId, lineNumber, lineCreated, dn, dnSource, spec, pis, legs, turns, counts, pipePieces, totalPipeMm, ' +
     'centrelineLengthMm, warnings, unverified, unverifiedReasons, mergedPoints (vertices merged as straight), straightenedMaxOffsetMm (the largest ' +
-    'sideways distance of a merged vertex from the straightened leg, 0 when none: the geometry the conversion moved), replaced }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_PIPE, RTE_UNKNOWN_LINE, ' +
+    'sideways distance of a merged vertex from the straightened leg, 0 when none: the geometry the conversion moved), replaced }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_PIPE, RTE_PIPE_HAS_SUPPORTS (replace with supports on the legacy pipe: they cannot move to the run yet), RTE_UNKNOWN_LINE, ' +
     'RTE_SPEC_UNKNOWN, RTE_SIZE_MISMATCH, RTE_DUPLICATE_LINE_NUMBER, RTE_NO_FITTING_FOR_ANGLE (detail.vertices lists the vertex indices and angles of ' +
     'every bend with no spec elbow), RTE_ZERO_LEG, RTE_SEGMENT_TOO_SHORT, RTE_SPEC_NO_COMPONENT. Next: piping_takeoff, check_piping.',
   params: z.object({
@@ -50,7 +50,12 @@ export const convertPipeRun = defineCommand({
       .string()
       .optional()
       .describe('Existing pipe line to put the run on (its spec and size must suit the pipe). Default: a new line.'),
-    replace: z.boolean().optional().describe('Delete the legacy pipe (and its hosted pipe supports) after converting. Default false.'),
+    replace: z
+      .boolean()
+      .optional()
+      .describe(
+        'Delete the legacy pipe after converting. Refused (RTE_PIPE_HAS_SUPPORTS) when the pipe hosts pipe supports. Default false.',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
     if (doc.units !== 'mm')
@@ -64,6 +69,16 @@ export const convertPipeRun = defineCommand({
     const pipe = building.elements[params.pipeId];
     if (pipe === undefined || pipe.category !== 'pipe')
       return refuse(doc, 'convert_pipe_run', 'RTE_UNKNOWN_PIPE', `no legacy pipe "${params.pipeId}" in the building model`, [], ['pipeId']);
+    const hosted = params.replace === true ? elementsOf(building, 'pipeSupport').filter((support) => support.pipeId === pipe.id) : [];
+    if (hosted.length > 0)
+      return refuse(
+        doc,
+        'convert_pipe_run',
+        'RTE_PIPE_HAS_SUPPORTS',
+        `the legacy pipe ${pipe.id} hosts ${hosted.length} pipe support(s) (${hosted.map((support) => support.mark).join(', ')}); replace would delete them and supports on spec-driven runs are not available yet (02 RTE V1)`,
+        [pipe.id, ...hosted.map((support) => support.id)],
+        ['replace'],
+      );
     const piping = getPiping(doc);
     const existing = params.lineId === undefined ? undefined : piping.lines[params.lineId];
     if (params.lineId !== undefined && existing === undefined)

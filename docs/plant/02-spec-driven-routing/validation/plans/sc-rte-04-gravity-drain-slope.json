@@ -137,6 +137,12 @@
           "source": "the profile falls (legs 0, 1), runs flat, then rises (leg 3): one low point, no drain"
         },
         { "step": 2, "path": "data.issues[?code=='RTE_POCKET'][0].detail.kind", "value": "low" },
+        {
+          "step": 2,
+          "path": "data.issues[?code=='RTE_FLAT_ON_SLOPED_LINE'][0].detail.leg",
+          "value": 2,
+          "source": "the +X 1000 leg is horizontal on a line declared 1 % fall"
+        },
         { "step": 2, "path": "data.status", "value": "warn" }
       ]
     }

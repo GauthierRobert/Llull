@@ -93,6 +93,11 @@ export interface CadPlugin {
   readonly document?: DocumentExtension;
   /** Domain properties of an entity for colour rules and reports (`ExecutionContext.properties`); pure, {} for entities it does not own. */
   readonly entityProperties?: EntityPropertyProvider;
+  /**
+   * Called once when the plugin is installed (`installPlugin`, not when its module is imported), e.g. to register with an extension point of another
+   * plugin. Idempotent registration is the plugin's job: install is skipped for a name that is already installed.
+   */
+  readonly onInstall?: () => void;
   /** Retired command name -> rewrite onto its replacement (saved steps are migrated on load). */
   readonly retiredCommands?: Readonly<Record<string, RetiredCommandRewrite>>;
 }

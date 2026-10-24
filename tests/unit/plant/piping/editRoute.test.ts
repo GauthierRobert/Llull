@@ -166,6 +166,34 @@ describe('edit_route: insert_pi and delete_pi re-index components, branches and 
     expect((moved.data as EditData).remapped).toHaveLength(1);
   });
 
+  it('a free move that tilts the header leg off the perpendicular of its tee refuses the edit (branch angle is judged by the derivation)', () => {
+    const base = routedPumpToVessel();
+    const added = ok(base.doc, 'add_branch', {
+      runId: base.runId,
+      at: { leg: 1, distance: 1500 },
+      dn: 100,
+      legs: [{ direction: '-X', length: 5000 }],
+    });
+    const branchId = (added.data as { branchId: string }).branchId;
+    const result = expectRefusal(
+      added.document,
+      'edit_route',
+      { runId: base.runId, op: 'move_pi', index: 1, delta: [1500, -1500, 0], mode: 'free' },
+      'RTE_NO_FITTING_FOR_ANGLE',
+    );
+    expect(result.error?.ids).toContain(branchId);
+    expect(result.error?.detail).toMatchObject({ branch: branchId, anglesDeg: [90] });
+  });
+
+  it('a summary of an edit that merges or splits legs gives the new leg count and lengths, not "no leg changed"', () => {
+    const s = simpleRun();
+    const jogged = ok(s.doc, 'edit_route', { runId: s.runId, op: 'insert_pi', index: 1, points: JOG });
+    expect(jogged.summary).toContain('legs 2 -> 6');
+    expect(jogged.summary).not.toContain('no leg changed');
+    const back = ok(jogged.document, 'edit_route', { runId: s.runId, op: 'delete_pi', index: 1, count: 4 });
+    expect(back.summary).toContain('legs 6 -> 2');
+  });
+
   it('insert_pi with a leg index out of range is refused', () => {
     const s = simpleRun();
     expectRefusal(s.doc, 'edit_route', { runId: s.runId, op: 'insert_pi', index: 7, points: [[1, 2, 3]] }, 'RTE_EDIT_INVALID', 'index');

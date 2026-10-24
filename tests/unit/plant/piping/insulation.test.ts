@@ -11,6 +11,8 @@ import { parseSpecFile, specToFile } from '@aec/plant/spec/file';
 import { createSpecLookup, isMiss } from '@aec/plant/piping/specLookup';
 import { envelopeDiameter, resolveInsulation } from '@aec/plant/piping/insulation';
 import { pipingErrors } from '@aec/plant/piping/validate';
+import { pipingDocument } from '@aec/plant/piping/derive';
+import { pipingPlugin } from '@aec/plant/piping/plugin';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { addTie, cs150Document, pumpToVessel, rteJson, routedPumpToVessel } from './rteFixtures';
 
@@ -247,5 +249,62 @@ describe('check_clashes: pipe runs and their insulation', () => {
         clash.a.startsWith('run-'),
       ),
     ).toEqual([]);
+  });
+});
+
+describe('insulation read from the spec follows the spec', () => {
+  const withTable = (doc: CadDocument, rows: unknown[] | undefined): CadDocument => {
+    const spec = doc.plant?.spec;
+    const latest = spec?.specs['CS150']?.[0];
+    if (spec === undefined || latest === undefined) throw new Error('no spec');
+    const { insulation, ...rest } = latest;
+    void insulation;
+    return {
+      ...doc,
+      plant: {
+        ...doc.plant,
+        spec: { ...spec, specs: { ...spec.specs, CS150: [rows === undefined ? rest : { ...latest, insulation: rows }] } },
+      },
+    } as CadDocument;
+  };
+
+  it('a revised table row re-reads the thickness of the spec-sourced line: the takeoff and the clash envelope follow (50 -> 55 mm)', () => {
+    const s = hotLine();
+    const rows = (s.doc.plant?.spec?.specs['CS150']?.[0]?.insulation ?? []).map((row) =>
+      row.thicknessMm === 50 ? { ...row, thicknessMm: 55 } : row,
+    );
+    const edited = withTable(s.doc, rows);
+    const result = pipingDocument.reconcile?.(s.doc, edited);
+    const line = result?.document.plant?.piping?.lines[s.lineId];
+    expect(line?.insulation).toMatchObject({ thicknessMm: 55, source: 'spec' });
+    expect(result?.notes.join(' ')).toContain('50 -> 55 mm');
+    expect(result?.affected).toContain(s.lineId);
+    const doc = result?.document as CadDocument;
+    expect(data<{ insulation: Array<{ thicknessMm: number }> }>(doc, 'piping_takeoff', {}).insulation[0]?.thicknessMm).toBe(55);
+    // beam top 2930; envelope bottom 3000 - (44.45 + 55) = 2900.55 -> 29.45
+    const found = clashes(apply(doc, 'add_steel_member', BEAM)).filter((clash) => clash.kind === 'insulation');
+    expect(found[0]?.depth).toBeCloseTo(29.45, 6);
+  });
+
+  it('explicit thickness is left alone, an unchanged table changes nothing, and a vanished row keeps the thickness and says so', () => {
+    const s = hotLine();
+    const same = pipingDocument.reconcile?.(s.doc, withTable(s.doc, s.doc.plant?.spec?.specs['CS150']?.[0]?.insulation as unknown[]));
+    expect(same?.notes.filter((note) => note.includes('insulation'))).toEqual([]);
+    const gone = pipingDocument.reconcile?.(s.doc, withTable(s.doc, undefined));
+    expect(gone?.document.plant?.piping?.lines[s.lineId]?.insulation?.thicknessMm).toBe(50);
+    expect(gone?.notes.join(' ')).toContain('not re-read from the spec');
+    const explicit = apply(s.doc, 'update_pipeline', { lineId: s.lineId, insulation: { code: 'H', thickness: 40 } });
+    const kept = pipingDocument.reconcile?.(explicit, withTable(explicit, []));
+    expect(kept?.document.plant?.piping?.lines[s.lineId]?.insulation?.thicknessMm).toBe(40);
+  });
+
+  it('the piping clash source is registered when the plugin is installed (onInstall), and registering again changes nothing', () => {
+    const s = hotLine();
+    const withBeam = apply(s.doc, 'add_steel_member', BEAM);
+    const before = clashes(withBeam).length;
+    expect(typeof pipingPlugin.onInstall).toBe('function');
+    pipingPlugin.onInstall?.();
+    expect(clashes(withBeam)).toHaveLength(before);
+    expect(before).toBeGreaterThan(0);
   });
 });

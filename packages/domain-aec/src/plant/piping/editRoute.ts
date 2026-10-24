@@ -34,6 +34,9 @@ export interface EditOk {
   readonly legChanges: readonly LegChange[];
   /** Components and branches that now sit on another leg or at another distance: `<id> leg a @ x -> leg b @ y`. */
   readonly remapped: readonly string[];
+  /** Number of legs before the edit and the lengths of the legs after it (mm); the leg count changes when legs merge or split. */
+  readonly legsBefore: number;
+  readonly legLengths: readonly number[];
 }
 
 /**
@@ -142,7 +145,7 @@ function rebuild(run: PipeRun, shape: Shape): EditOk | EditFailure {
           const direction = String(directionLabel(unitVector(sub3(points[leg + 1] as Vec3, points[leg] as Vec3))));
           return Math.abs(length - was) > eps ? [{ leg, direction, changeMm: length - was }] : [];
         });
-  return { ok: true, run: next, legChanges, remapped };
+  return { ok: true, run: next, legChanges, remapped, legsBefore: old.length - 1, legLengths: lengths };
 }
 
 const legSlopesOf = (run: PipeRun): Array<Slope | null> => Array.from({ length: run.pis.length + 1 }, (_, i) => run.legSlopes?.[i] ?? null);
@@ -168,7 +171,16 @@ function orthogonal(run: PipeRun, k: number, by: Vec3, ctx: EditContext): EditOk
     );
   const displaced = displaceRun(run, walked.displacements, ctx.startPort ?? undefined, ctx.endPort ?? undefined);
   if (!displaced.ok) return fail('RTE_STRETCH_FAILED', displaced.reason, ['delta']);
-  return { ok: true, run: displaced.run, legChanges: displaced.legChanges, remapped: [] };
+  return {
+    ok: true,
+    run: displaced.run,
+    legChanges: displaced.legChanges,
+    remapped: [],
+    legsBefore: run.pis.length + 1,
+    legLengths: runPoints(displaced.run)
+      .slice(1)
+      .map((p, i) => len3(sub3(p, runPoints(displaced.run)[i] as Vec3))),
+  };
 }
 
 /** The points of `run` with its connected ends set to their ports. */

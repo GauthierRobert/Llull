@@ -17,6 +17,8 @@ import { getPiping } from './model';
 import { portOfRef } from './ports';
 import { withDependents } from './runLinks';
 import { deriveRun } from './routeParts';
+import { resolveInsulation } from './insulation';
+import { createSpecLookup, isMiss } from './specLookup';
 import { stretchRun, type StretchDone } from './stretch';
 import { pipingErrors } from './validate';
 
@@ -155,8 +157,55 @@ function describeStretch(done: StretchDone): string {
   return `${done.run.id} (${moved.filter((text) => text !== '').join(', ')}; ${legs.join(', ')})`;
 }
 
+/**
+ * Insulation read from the spec table (`source: 'spec'`) follows the table: when `plant.spec` / `plant.catalog` changed, each such line reads its row again
+ * (spec revision, new rows). A line whose row can no longer be found keeps its thickness and is named in the notes.
+ */
+function refreshSpecInsulation(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; lineIds: string[] } {
+  const piping = getPiping(next);
+  if (next.plant?.spec === previous.plant?.spec && next.plant?.catalog === previous.plant?.catalog)
+    return { document: next, notes: [], lineIds: [] };
+  const lines = { ...piping.lines };
+  const notes: string[] = [];
+  const lineIds: string[] = [];
+  for (const id of piping.lineOrder) {
+    const line = piping.lines[id];
+    if (line?.insulation?.source !== 'spec') continue;
+    const lookup = createSpecLookup(next, line.spec);
+    const read = isMiss(lookup)
+      ? lookup
+      : resolveInsulation(lookup, line.dn, line.designTempC, { code: line.insulation.code, thickness: 'fromSpec' });
+    if (isMiss(read)) {
+      notes.push(`line ${line.lineNumber}: insulation not re-read from the spec (${read.detail}); kept ${line.insulation.thicknessMm} mm`);
+      continue;
+    }
+    if (JSON.stringify(read) === JSON.stringify(line.insulation)) continue;
+    lines[id] = { ...line, insulation: read };
+    lineIds.push(id);
+    notes.push(
+      `line ${line.lineNumber}: insulation re-read from the spec, ${line.insulation.thicknessMm} -> ${read.thicknessMm} mm (${read.row ?? ''})`,
+    );
+  }
+  return lineIds.length === 0
+    ? { document: next, notes, lineIds }
+    : { document: { ...next, plant: { ...next.plant, piping: { ...piping, lines } } }, notes, lineIds };
+}
+
 /** Re-derives the runs a command made stale (spec, catalogue, line, tie-in or equipment nozzle edits) and reports the runs that no longer derive. */
 function reconcile(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
+  const refreshed = refreshSpecInsulation(previous, next);
+  if (refreshed.document !== next || refreshed.notes.length > 0) {
+    const rest = reconcileRuns(previous, refreshed.document);
+    return {
+      document: rest.document,
+      notes: [...refreshed.notes, ...rest.notes],
+      affected: [...new Set([...refreshed.lineIds, ...rest.affected])],
+    };
+  }
+  return reconcileRuns(previous, next);
+}
+
+function reconcileRuns(previous: CadDocument, next: CadDocument): { document: CadDocument; notes: string[]; affected: string[] } {
   if ((next.plant === previous.plant && next.building === previous.building) || getPiping(next).runOrder.length === 0)
     return { document: next, notes: [], affected: [] };
   const affected = affectedRuns(previous, next);

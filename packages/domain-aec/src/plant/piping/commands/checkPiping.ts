@@ -20,7 +20,7 @@ export const checkPiping = defineCommand({
     'with no run, only when lineIds is omitted), RTE_FITTING_TO_FITTING (zero-length piece), RTE_WELD_SPACING (pipe piece shorter than minWeldSpacing, ' +
     'default max(4 t, 50 mm), named in detail), RTE_SIZE_MISMATCH / RTE_RATING_MISMATCH / RTE_FACING_MISMATCH / RTE_END_TYPE_MISMATCH (two connected ' +
     'ports disagree), RTE_FROM_TO_MISMATCH (line from / to text names equipment the runs do not reach), RTE_DUPLICATE_LINE_NUMBER, RTE_SPEC_UNVERIFIED ' +
-    '(spec not approved or catalogue rows not grade A; cannot be hidden), RTE_STUB_IN_REVIEW (reviewRequired), RTE_VALVE_OPERATOR_HEIGHT (handwheel ' +
+    '(spec not approved or catalogue rows not grade A; cannot be hidden), RTE_STUB_IN_REVIEW (reviewRequired), RTE_ADVERSE_SLOPE (a leg rises when its declared slope, or the line slope, says it falls; or the reverse), RTE_FLAT_ON_SLOPED_LINE (a horizontal leg on a line or leg that declares a slope: it does not drain), RTE_POCKET (a low point after a fall or a high point after a rise with no branch leaving down as a drain or up as a vent between the two legs; both legs must declare a slope), RTE_VALVE_OPERATOR_HEIGHT (handwheel ' +
     'centre higher above its level than maxHandwheelCentreHeight; skipped without that limit, which has no code value and is yours to give), and the ' +
     'RTE_* derivation code of a run that no longer derives (an error issue: moved port, missing spec row, leg too short). Does not modify the document. ' +
     'Refusal: RTE_UNKNOWN_LINE. Next: fix the issues with route_pipe / insert_inline_component / delete_pipe_run, or accept the warnings.',

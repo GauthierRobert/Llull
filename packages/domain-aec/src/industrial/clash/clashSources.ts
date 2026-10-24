@@ -1,6 +1,6 @@
 /**
  * Extension point of `check_clashes` for solids that are not building elements (02 RTE M3: spec-driven pipe runs and their insulation envelopes).
- * A domain registers a pure source once at module load; `check_clashes` asks every source for its bodies. The clash code stays unaware of the domain.
+ * A plugin registers a pure source when it is installed (`CadPlugin.onInstall`); `check_clashes` asks every source for its bodies. The clash code stays unaware of the domain.
  * @invariant a source is pure and returns bodies in document units; with no source registered, `check_clashes` behaves as before
  */
 

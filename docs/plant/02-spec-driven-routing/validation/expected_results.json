@@ -348,6 +348,7 @@
         "pocketIssues": 1,
         "pocketKind": "low",
         "pocketLegs": [1, 3],
+        "flatOnSlopedLineLegs": [2],
         "status": "warn"
       },
       "tolerance": "exact",

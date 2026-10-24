@@ -24,9 +24,6 @@ import { pipingDerivationGuard, pipingDocument } from './derive';
 import { pipingClashBodies } from './clashBodies';
 import { registerClashSource } from '../../industrial/clash/clashSources';
 
-// check_clashes sees the pipe runs and their insulation through this source (the clash code does not import the piping plugin).
-registerClashSource(pipingClashBodies);
-
 export const pipingPlugin: CadPlugin = {
   name: 'piping',
   toolset: 'piping',
@@ -49,6 +46,8 @@ export const pipingPlugin: CadPlugin = {
     autoRoutePipe,
     deletePipeRun,
   ),
+  // check_clashes sees the pipe runs and their insulation once the plugin is installed (registered at install, not at import; the clash code does not import the plugin).
+  onInstall: () => registerClashSource(pipingClashBodies),
   guards: [pipingDerivationGuard],
   document: pipingDocument,
 };

@@ -70,6 +70,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_STUB_IN_REVIEW: 'Have the stub-in reinforcement checked (ASME B31.3 304.3, 07 pipe stress) or use an olet / tee in the branch table.',
   RTE_ADVERSE_SLOPE:
     'Re-route the leg so it falls along the flow (edit_route move_pi / stretch_leg), or correct the declared slope of the line or leg.',
+  RTE_FLAT_ON_SLOPED_LINE: 'Give the leg its fall (route_pipe planLength + slope, edit_route), or accept a flat stretch on the line.',
   RTE_POCKET:
     'Add a drain at a low point or a vent at a high point (add_branch downward / upward on an adjacent leg), or re-route the profile to fall continuously.',
   RTE_SPEC_UNVERIFIED: 'A reviewer approves the spec (01 PSC) and the catalogue rows are verified to grade A.',

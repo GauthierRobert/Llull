@@ -79,6 +79,18 @@ function editOf(
   }
 }
 
+/** What the edit did to the legs: length changes, or the new leg count and lengths when legs merged or split. */
+function legSummary(edited: {
+  legChanges: readonly { leg: number; direction: string; changeMm: number }[];
+  legsBefore: number;
+  legLengths: readonly number[];
+}): string {
+  if (edited.legLengths.length !== edited.legsBefore)
+    return `legs ${edited.legsBefore} -> ${edited.legLengths.length} (merged / split), leg lengths ${edited.legLengths.map((v) => +v.toFixed(3)).join(' / ')} mm`;
+  const changes = edited.legChanges.map((c) => `leg ${c.leg} (${c.direction}) ${c.changeMm > 0 ? '+' : ''}${+c.changeMm.toFixed(3)} mm`);
+  return changes.length === 0 ? 'no leg changed length' : changes.join(', ');
+}
+
 /** RTE_PORT_DIRECTION text when the first / last leg of `run` no longer leaves / arrives along its port direction, else null. */
 function portDirectionProblem(run: PipeRun, toleranceDeg: number): { message: string; path: string } | null {
   const points = runPoints(run);
@@ -212,7 +224,7 @@ export const editRoute = defineCommand({
     return {
       ...changed(
         result.document,
-        `edit_route: ${params.op} on run ${run.id}: ${edited.legChanges.map((c) => `leg ${c.leg} (${c.direction}) ${c.changeMm > 0 ? '+' : ''}${+c.changeMm.toFixed(3)} mm`).join(', ') || 'no leg changed length'}; ` +
+        `edit_route: ${params.op} on run ${run.id}: ${legSummary(edited)}; ` +
           `${now?.pis.length ?? 0} PI(s), ${takeoff.pipePieces.length} pipe piece(s) totalling ${takeoff.totalPipeMm} mm` +
           `${edited.remapped.length === 0 ? '' : `; re-placed ${edited.remapped.join('; ')}`}${followed.length === 0 ? '' : `; stretched ${followed.join(', ')} with it`}` +
           `${derivation.unverified ? `; unverified: ${derivation.unverifiedReasons.join('; ')}` : ''}.`,

@@ -1,8 +1,8 @@
 /**
  * Slope rules of `check_piping` (02 RTE §5.6): a leg that rises against its declared fall (RTE_ADVERSE_SLOPE) and a low or high point of the vertical
  * profile with no drain or vent (RTE_POCKET). Read from the stored points only; nothing is derived.
- * @invariant a leg is graded when it declares a slope (route_pipe legs[].slope) or its line declares one (create_pipeline slope); a flat leg is never
- *   adverse; a pocket needs both of its adjacent non-flat legs graded; a branch on a leg from the first to the second of those legs
+ * @invariant a leg is graded when it declares a slope (route_pipe legs[].slope) or its line declares one (create_pipeline slope); a flat graded leg is
+ *   not adverse but reported as RTE_FLAT_ON_SLOPED_LINE (it does not drain); a pocket needs both of its adjacent non-flat legs graded; a branch on a leg from the first to the second of those legs
  *   (the low or high run between them) that leaves downward (low point: a drain) or upward (high point: a vent) relieves it
  */
 
@@ -13,7 +13,7 @@ import { unitVector } from './legs';
 import { runPoints } from './model';
 
 export interface SlopeFinding {
-  readonly code: 'RTE_ADVERSE_SLOPE' | 'RTE_POCKET';
+  readonly code: 'RTE_ADVERSE_SLOPE' | 'RTE_POCKET' | 'RTE_FLAT_ON_SLOPED_LINE';
   readonly ids: readonly string[];
   readonly message: string;
   readonly detail: Readonly<Record<string, unknown>>;
@@ -35,6 +35,16 @@ function adverse(run: PipeRun, line: PipeLine, dirs: readonly Vec3[]): SlopeFind
   dirs.forEach((u, leg) => {
     const slope = declaredSlope(run, line, leg);
     const direction = sign(u[2]);
+    if (slope !== null && direction === 0) {
+      findings.push({
+        code: 'RTE_FLAT_ON_SLOPED_LINE',
+        ids: [run.id],
+        message: `leg ${leg} of run ${run.id} is flat although the ${(run.legSlopes?.[leg] ?? null) === null ? 'line' : 'leg'} declares a ${slope.fall ? 'fall' : 'rise'} of ${slope.value} ${slope.unit}: it does not drain`,
+        detail: { leg, declared: slope, source: (run.legSlopes?.[leg] ?? null) === null ? 'line' : 'leg' },
+        paths: [`runs.${run.id}.legs.${leg}`],
+      });
+      return;
+    }
     if (slope === null || direction === 0 || (direction === 1) !== slope.fall) return;
     findings.push({
       code: 'RTE_ADVERSE_SLOPE',
@@ -80,7 +90,7 @@ function pockets(piping: PipingModel, run: PipeRun, line: PipeLine, dirs: readon
   return findings;
 }
 
-/** Adverse legs and pockets of `run` (nothing when no leg is graded). */
+/** Adverse legs, flat legs on a sloped line and pockets of `run` (nothing when no leg is graded). */
 export function slopeFindings(piping: PipingModel, run: PipeRun): SlopeFinding[] {
   const line = piping.lines[run.lineId];
   if (line === undefined) return [];

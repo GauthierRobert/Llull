@@ -20,6 +20,7 @@ export function installPlugin(plugin: CadPlugin): void {
   if (installed.some((existing) => existing.name === plugin.name)) return;
   installed.push(plugin);
   try {
+    plugin.onInstall?.();
     for (const listener of listeners) listener(plugin);
   } catch (error) {
     installed.splice(installed.indexOf(plugin), 1);

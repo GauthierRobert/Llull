@@ -80,6 +80,34 @@ describe('RTE_ADVERSE_SLOPE', () => {
   });
 });
 
+describe('RTE_FLAT_ON_SLOPED_LINE', () => {
+  it('a horizontal leg on a line (or leg) that declares a slope is reported once per leg, a vertical one is not', () => {
+    const s = route(
+      [
+        { direction: '+X', length: 2000 },
+        { direction: '-Z', length: 1000 },
+        { direction: '+X', length: 2000 },
+      ],
+      FALL,
+    );
+    const flat = issues(s.doc, 'RTE_FLAT_ON_SLOPED_LINE');
+    expect(flat.map((issue) => issue.detail['leg'])).toEqual([0, 2]);
+    expect(flat[0]).toMatchObject({ detail: { source: 'line' }, ids: [s.runId] });
+    const leg = route([
+      { direction: '+X', planLength: 2000, slope: FALL },
+      { direction: '-Z', length: 500 },
+    ]);
+    expect(issues(leg.doc, 'RTE_FLAT_ON_SLOPED_LINE')).toEqual([]);
+  });
+
+  it('is a warning and needs a declaration: an undeclared flat run is silent', () => {
+    const s = route([{ direction: '+X', length: 2000 }]);
+    expect(issues(s.doc, 'RTE_FLAT_ON_SLOPED_LINE')).toEqual([]);
+    const declared = route([{ direction: '+X', length: 2000 }], FALL);
+    expect(data<{ status: string }>(declared.doc, 'check_piping', {}).status).toBe('warn');
+  });
+});
+
 describe('RTE_POCKET', () => {
   const LOW = [
     { direction: '+X', length: 2000 },

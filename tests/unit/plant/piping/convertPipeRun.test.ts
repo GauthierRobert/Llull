@@ -272,3 +272,24 @@ describe('convert_pipe_run reports what straightening moved', () => {
     ).toBe(0);
   });
 });
+
+describe('convert_pipe_run replace with supports on the legacy pipe', () => {
+  it('is refused with the supports named (they cannot move to the run yet); without replace the conversion works and the pipe keeps them', () => {
+    const s = legacy();
+    const supported = apply(s.doc, 'add_pipe_support', { pipeId: s.pipeId, at: [[3000, 3000, 1500]], type: 'shoe' });
+    const supports = Object.values(supported.building?.elements ?? {}).filter((element) => element.category === 'pipeSupport');
+    expect(supports).toHaveLength(1);
+    const result = expectRefusal(
+      supported,
+      'convert_pipe_run',
+      { pipeId: s.pipeId, spec: 'CS150', replace: true },
+      'RTE_PIPE_HAS_SUPPORTS',
+      'replace',
+    );
+    expect(result.error?.ids).toEqual([s.pipeId, supports[0]?.id]);
+    expect(result.summary).toContain(String((supports[0] as { mark: string }).mark));
+    const kept = ok(supported, 'convert_pipe_run', { pipeId: s.pipeId, spec: 'CS150' });
+    expect(kept.document.building?.elements[s.pipeId]).toBeDefined();
+    expect(Object.values(kept.document.building?.elements ?? {}).filter((element) => element.category === 'pipeSupport')).toHaveLength(1);
+  });
+});
