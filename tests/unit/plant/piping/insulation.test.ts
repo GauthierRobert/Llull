@@ -308,3 +308,98 @@ describe('insulation read from the spec follows the spec', () => {
     expect(before).toBeGreaterThan(0);
   });
 });
+
+describe('edit_pipe_spec insulation rows, end to end', () => {
+  const setRow = (thicknessMm: number): unknown => ({
+    op: 'setInsulationRow',
+    row: { code: 'H', dnMax: 100, tempMaxC: 200, thicknessMm, material: 'mineral wool', conductivityWmK: 0.0598535265 },
+  });
+
+  it('replacing the row 50 -> 55 mm refreshes the line, its number, the takeoff and the clash envelope; replay_history gives the same document', () => {
+    const s = hotLine();
+    const edited = ok(s.doc, 'edit_pipe_spec', { specId: 'CS150', ops: [setRow(55)] });
+    expect(edited.summary).toContain('insulation re-read from the spec, 50 -> 55 mm');
+    const line = edited.document.plant?.piping?.lines[s.lineId];
+    expect(line?.insulation).toMatchObject({ thicknessMm: 55, source: 'spec' });
+    expect(line?.lineNumber).toBe('80-HO-4001-CS150-H55');
+    expect(edited.document.plant?.spec?.specs['CS150']?.[0]?.insulation).toHaveLength(3);
+    expect(
+      data<{ insulation: Array<{ thicknessMm: number; lineNumber: string }> }>(edited.document, 'piping_takeoff', {}).insulation[0],
+    ).toMatchObject({ thicknessMm: 55, lineNumber: '80-HO-4001-CS150-H55' });
+    const found = clashes(apply(edited.document, 'add_steel_member', BEAM)).filter((clash) => clash.kind === 'insulation');
+    expect(found[0]?.depth).toBeCloseTo(29.45, 6);
+    const replayed = execute(edited.document, 'replay_history', {}).document;
+    expect(replayed.plant).toEqual(edited.document.plant);
+    expect(Object.keys(replayed.entities).sort()).toEqual(Object.keys(edited.document.entities).sort());
+  });
+
+  it('keeps a material the user gave, and an explicit line number is not renumbered', () => {
+    const base = cs150Document();
+    const a = addTie(base, 'TP-H1', [0, 0, 3000], [1, 0, 0], { dn: 80 });
+    const b = addTie(a.doc, 'TP-H2', [6000, 0, 3000], [-1, 0, 0], { dn: 80 });
+    const created = ok(b.doc, 'create_pipeline', { ...HOT, insulation: { code: 'H', thickness: 'fromSpec', material: 'foam glass' } });
+    const lineId = created.affected[0] as string;
+    const second = ok(created.document, 'create_pipeline', { ...HOT, sequence: '4002', lineNumber: 'HOT-2' });
+    const edited = ok(second.document, 'edit_pipe_spec', { specId: 'CS150', ops: [setRow(60)] });
+    const lines = edited.document.plant?.piping?.lines;
+    expect(lines?.[lineId]?.insulation).toMatchObject({ thicknessMm: 60, material: 'foam glass', materialExplicit: true });
+    expect(lines?.[lineId]?.lineNumber).toBe('80-HO-4001-CS150-H60');
+    expect(lines?.[second.affected[0] as string]).toMatchObject({
+      lineNumber: 'HOT-2',
+      insulation: { thicknessMm: 60, material: 'mineral wool' },
+    });
+    // update_pipeline's re-read keeps the material too.
+    const cooler = apply(created.document, 'update_pipeline', { lineId, designTempC: 90 });
+    expect(cooler.plant?.piping?.lines[lineId]?.insulation).toMatchObject({ thicknessMm: 30, material: 'foam glass' });
+  });
+
+  it('a renumbering that would collide keeps the number and says so', () => {
+    const s = hotLine();
+    const taken = apply(s.doc, 'create_pipeline', {
+      service: 'HO',
+      sequence: '4001',
+      spec: 'CS150',
+      dn: 80,
+      lineNumber: '80-HO-4001-CS150-H55',
+    });
+    const edited = ok(taken, 'edit_pipe_spec', { specId: 'CS150', ops: [setRow(55)] });
+    expect(edited.document.plant?.piping?.lines[s.lineId]?.lineNumber).toBe('80-HO-4001-CS150-H50');
+    expect(edited.summary).toContain('number kept');
+  });
+
+  it('adds a row, removes a row, and refuses an unknown row or a malformed one with PSC_SPEC_INVALID; the document is unchanged', () => {
+    const doc = cs150Document();
+    const added = ok(doc, 'edit_pipe_spec', {
+      specId: 'CS150',
+      ops: [{ op: 'setInsulationRow', row: { code: 'C', dnMax: 50, tempMaxC: 10, thicknessMm: 25, material: 'foam' } }],
+    });
+    expect(added.document.plant?.spec?.specs['CS150']?.[0]?.insulation).toHaveLength(4);
+    const removed = apply(added.document, 'edit_pipe_spec', {
+      specId: 'CS150',
+      ops: [{ op: 'removeInsulationRow', code: 'C', dnMax: 50, tempMaxC: 10 }],
+    });
+    expect(removed.plant?.spec?.specs['CS150']?.[0]?.insulation).toHaveLength(3);
+    const all = apply(removed, 'edit_pipe_spec', {
+      specId: 'CS150',
+      ops: ['100', '200']
+        .map((tempMaxC) => ({ op: 'removeInsulationRow', code: 'H', dnMax: 100, tempMaxC: Number(tempMaxC) }))
+        .concat([{ op: 'removeInsulationRow', code: 'H', dnMax: 150, tempMaxC: 200 }]),
+    });
+    expect(all.plant?.spec?.specs['CS150']?.[0]?.insulation).toBeUndefined();
+    expectRefusal(
+      doc,
+      'edit_pipe_spec',
+      { specId: 'CS150', ops: [{ op: 'removeInsulationRow', code: 'Z', dnMax: 1, tempMaxC: 1 }] },
+      'PSC_SPEC_INVALID',
+      'ops.0.code',
+    );
+    expectRefusal(doc, 'edit_pipe_spec', { specId: 'CS150', ops: [setRow(-5)] }, 'PSC_SPEC_INVALID');
+  });
+
+  it('is pure', () => {
+    const doc = cs150Document();
+    const before = JSON.stringify(doc);
+    execute(doc, 'edit_pipe_spec', { specId: 'CS150', ops: [setRow(70)] });
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+});

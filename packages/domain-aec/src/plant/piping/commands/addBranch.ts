@@ -69,7 +69,7 @@ export const addBranch = defineCommand({
       .max(22.5)
       .optional()
       .describe(
-        'Overrides the spec angle tolerance for the perpendicular check, the port directions and the branch elbows, degrees, 22.5 at most.',
+        'Overrides the spec angle tolerance for the perpendicular check, the port directions and the branch elbows, degrees, 22.5 at most. Stored on the branch run: the override also holds when the header is re-derived or edited.',
       ),
   }),
   run: (doc, params): CommandResult => {
@@ -127,7 +127,7 @@ export const addBranch = defineCommand({
         [header.id],
         ['legs'],
       );
-    const tolerance = params.angleToleranceDeg ?? lookup.elbowAngles().toleranceDeg;
+    const tolerance = params.angleToleranceDeg ?? header.angleToleranceDeg ?? lookup.elbowAngles().toleranceDeg;
     const angle = angleBetweenDeg(direction, along);
     if (Math.abs(angle - 90) > tolerance)
       return refuse(

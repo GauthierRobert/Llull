@@ -96,7 +96,9 @@ Because the lookup table imports no command, a command that runs other commands
 Plugins follow the same shape: `packages/domain-aec` splits into `building/` (elements,
 geometry, evaluate, drawings, exchange, quantities), `industrial/` (one folder per
 discipline: frames, purlins, foundations, piping, …) and `civil/` (alignment, road, drainage,
-surface, …), each with its plugin entry at its root.
+surface, …), each with its plugin entry at its root. A `CadPlugin` is `{ name, toolset, commands, guards?, document?, entityProperties?, onInstall?, retiredCommands? }`;
+`onInstall` is a generic hook the host calls once, after the plugin was accepted, so a plugin can register with an extension point of another plugin
+(for example the piping plugin's clash source) at install time rather than at import.
 
 ## Architecture as code
 

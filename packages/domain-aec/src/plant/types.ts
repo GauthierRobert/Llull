@@ -52,6 +52,8 @@ export interface LineInsulation {
   readonly code: string;
   readonly thicknessMm: number;
   readonly material?: string;
+  /** The material was given by the user, not read from the spec row: a re-read of the table keeps it. */
+  readonly materialExplicit?: boolean;
   readonly source: 'spec' | 'explicit';
   /** `spec` source: which table row gave the thickness (`H dn<=100 T<=200C`). */
   readonly row?: string;

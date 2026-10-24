@@ -2,7 +2,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed, noop } from '@core/commands/noop';
 import type { PipeLine } from '@aec/plant/types';
-import { resolveInsulation } from '../insulation';
+import { rereadRequest, resolveInsulation } from '../insulation';
 import { lineNumberTemplate, renderLineNumber } from '../lineNumber';
 import { getPiping, refuse, withPiping } from '../model';
 import { refuseDerivation, rederive } from '../runUpdate';
@@ -72,7 +72,7 @@ export const updatePipeline = defineCommand({
         : params.insulation !== undefined
           ? resolveInsulation(lookup, line.dn, temperature, params.insulation)
           : readAgain && line.insulation !== undefined
-            ? resolveInsulation(lookup, line.dn, temperature, { code: line.insulation.code, thickness: 'fromSpec' })
+            ? resolveInsulation(lookup, line.dn, temperature, rereadRequest(line.insulation))
             : line.insulation;
     if (resolved !== undefined && isMiss(resolved))
       return refuse(doc, 'update_pipeline', resolved.miss, resolved.detail, [...resolved.ids], [...resolved.paths]);

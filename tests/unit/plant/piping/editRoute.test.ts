@@ -307,3 +307,36 @@ describe('edit_route: refusals', () => {
     expectRefusal(metres, 'edit_route', { runId: s.runId, op: 'move_pi', index: 0, delta: [1, 0, 0] }, 'RTE_UNITS_UNSUPPORTED');
   });
 });
+
+describe('branch perpendicularity uses the branch override at add time and on every re-derivation', () => {
+  const tilted = { runId: '', at: { leg: 1, distance: 1500 }, dn: 100, legs: [{ direction: [-1, 0.0524078, 0], length: 2000 }] };
+
+  it('3 deg off the perpendicular is refused with the spec tolerance (1 deg), accepted with angleToleranceDeg 5, and stays valid after an edit and a move', () => {
+    const base = routedPumpToVessel();
+    const params = { ...tilted, runId: base.runId };
+    expectRefusal(base.doc, 'add_branch', params, 'RTE_NO_FITTING_FOR_ANGLE');
+    const added = ok(base.doc, 'add_branch', { ...params, angleToleranceDeg: 5 });
+    const branchRunId = (added.data as { branchRunId: string }).branchRunId;
+    expect(runOf(added.document, branchRunId).angleToleranceDeg).toBe(5);
+    const edited = ok(added.document, 'edit_route', { runId: base.runId, op: 'move_pi', index: 0, delta: [0, 0, 500] });
+    expect(runOf(edited.document, branchRunId).broken).toBeUndefined();
+    const pump = Object.values(edited.document.building?.elements ?? {}).find(
+      (element) => element.category === 'equipment' && element.mark === 'P-101',
+    );
+    const moved = apply(edited.document, 'update_equipment', { elementId: pump?.id, location: [300, -300] });
+    expect(runOf(moved, branchRunId).broken).toBeUndefined();
+    expect(runOf(moved, base.runId).broken).toBeUndefined();
+  });
+
+  it('a header override applies to a branch without its own', () => {
+    const base = routedPumpToVessel();
+    const wide = apply(base.doc, 'update_pipeline', { lineId: base.line, designTempC: 60 });
+    const header = { ...runOf(wide, base.runId), angleToleranceDeg: 5 };
+    const model = wide.plant?.piping as PipingModel;
+    const withOverride: CadDocument = {
+      ...wide,
+      plant: { ...wide.plant, piping: { ...model, runs: { ...model.runs, [base.runId]: header } } },
+    };
+    ok(withOverride, 'add_branch', { ...tilted, runId: base.runId });
+  });
+});

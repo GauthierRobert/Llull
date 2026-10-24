@@ -46,6 +46,18 @@ export const editOpSchema = z.discriminatedUnion('op', [
     branch: nominal.describe('Branch size key.'),
   }),
   z.object({
+    op: z.literal('setInsulationRow').describe('Add or replace one row of the insulation thickness table.'),
+    row: json.describe(
+      'Row in file form: { code, dnMax, tempMaxC, thicknessMm, material, conductivityWmK? }. A row with the same code, dnMax and tempMaxC is replaced, else the row is added.',
+    ),
+  }),
+  z.object({
+    op: z.literal('removeInsulationRow').describe('Remove one row of the insulation thickness table.'),
+    code: z.string().describe('Insulation code of the row.'),
+    dnMax: z.number().describe('dnMax of the row.'),
+    tempMaxC: z.number().describe('tempMaxC of the row.'),
+  }),
+  z.object({
     op: z.literal('setHeader').describe('Set header members of the spec.'),
     fields: json.describe(
       'Header members to set (a member set to null is removed, except the required ones): title, service, dimensionalStandard, rating, materials, corrosionAllowance { value, unit }, millTolerance, designLimits, catalogs, elbowAngles, provenance.',
@@ -146,6 +158,22 @@ export function applyEditOps(file: Json, ops: readonly EditOp[]): { readonly fil
         if (Object.keys(row).length === 0) delete cells[header];
         else cells[header] = row;
         current = { ...current, branchTable: { ...table, cells } };
+        break;
+      }
+      case 'setInsulationRow':
+      case 'removeInsulationRow': {
+        const rows = (current['insulation'] as Json[] | undefined) ?? [];
+        const same = (row: Json, code: unknown, dnMax: unknown, tempMaxC: unknown): boolean =>
+          row['code'] === code && row['dnMax'] === dnMax && row['tempMaxC'] === tempMaxC;
+        const key = op.op === 'setInsulationRow' ? op.row : op;
+        const at = rows.findIndex((row) => same(row, key['code'], key['dnMax'], key['tempMaxC']));
+        if (op.op === 'removeInsulationRow') {
+          if (at < 0) return bad('code', `no insulation row "${op.code}" with dnMax ${op.dnMax} and tempMaxC ${op.tempMaxC}`);
+          const left = rows.filter((_, k) => k !== at);
+          const { insulation, ...rest } = current;
+          void insulation;
+          current = left.length === 0 ? rest : { ...current, insulation: left };
+        } else current = { ...current, insulation: at < 0 ? [...rows, op.row] : rows.map((row, k) => (k === at ? op.row : row)) };
         break;
       }
       case 'setHeader': {

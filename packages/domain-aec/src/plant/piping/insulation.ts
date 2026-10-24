@@ -6,6 +6,13 @@
 import type { LineInsulation } from '@aec/plant/types';
 import { isMiss, type SpecLookup, type SpecMiss } from './specLookup';
 
+/** The request that reads `insulation` (a spec-sourced record) from the table again, keeping a material the user gave. */
+export const rereadRequest = (insulation: LineInsulation): InsulationRequest => ({
+  code: insulation.code,
+  thickness: 'fromSpec',
+  ...(insulation.materialExplicit === true && insulation.material !== undefined ? { material: insulation.material } : {}),
+});
+
 export interface InsulationRequest {
   readonly code: string;
   /** mm, or `fromSpec` to read the spec's table. */
@@ -38,6 +45,7 @@ export function resolveInsulation(
     code: request.code,
     thicknessMm: choice.thicknessMm,
     material: request.material ?? choice.material,
+    ...(request.material === undefined ? {} : { materialExplicit: true }),
     source: 'spec',
     row: choice.row,
   };

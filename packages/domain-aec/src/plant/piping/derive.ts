@@ -17,7 +17,8 @@ import { getPiping } from './model';
 import { portOfRef } from './ports';
 import { withDependents } from './runLinks';
 import { deriveRun } from './routeParts';
-import { resolveInsulation } from './insulation';
+import { lineNumberTemplate, renderLineNumber } from './lineNumber';
+import { rereadRequest, resolveInsulation } from './insulation';
 import { createSpecLookup, isMiss } from './specLookup';
 import { stretchRun, type StretchDone } from './stretch';
 import { pipingErrors } from './validate';
@@ -172,18 +173,28 @@ function refreshSpecInsulation(previous: CadDocument, next: CadDocument): { docu
     const line = piping.lines[id];
     if (line?.insulation?.source !== 'spec') continue;
     const lookup = createSpecLookup(next, line.spec);
-    const read = isMiss(lookup)
-      ? lookup
-      : resolveInsulation(lookup, line.dn, line.designTempC, { code: line.insulation.code, thickness: 'fromSpec' });
+    const read = isMiss(lookup) ? lookup : resolveInsulation(lookup, line.dn, line.designTempC, rereadRequest(line.insulation));
     if (isMiss(read)) {
       notes.push(`line ${line.lineNumber}: insulation not re-read from the spec (${read.detail}); kept ${line.insulation.thicknessMm} mm`);
       continue;
     }
     if (JSON.stringify(read) === JSON.stringify(line.insulation)) continue;
-    lines[id] = { ...line, insulation: read };
+    // A number that followed the template follows it again (as update_pipeline does) unless another line already has the new number.
+    const template = lineNumberTemplate(piping).value;
+    const follows = line.lineNumber === renderLineNumber(template, line);
+    const renumbered = follows ? renderLineNumber(template, { ...line, insulation: read }) : line.lineNumber;
+    const taken =
+      renumbered !== line.lineNumber && Object.values(lines).some((other) => other.id !== id && other.lineNumber === renumbered);
+    const lineNumber = taken ? line.lineNumber : renumbered;
+    lines[id] = { ...line, insulation: read, lineNumber };
     lineIds.push(id);
     notes.push(
-      `line ${line.lineNumber}: insulation re-read from the spec, ${line.insulation.thicknessMm} -> ${read.thicknessMm} mm (${read.row ?? ''})`,
+      `line ${line.lineNumber}: insulation re-read from the spec, ${line.insulation.thicknessMm} -> ${read.thicknessMm} mm (${read.row ?? ''})` +
+        (taken
+          ? `; number kept, ${renumbered} is used by another line`
+          : lineNumber === line.lineNumber
+            ? ''
+            : `; renumbered ${lineNumber}`),
     );
   }
   return lineIds.length === 0

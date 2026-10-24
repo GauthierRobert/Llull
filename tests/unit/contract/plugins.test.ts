@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand, listCommands } from '@core/commands/registry';
 import { defineCommand, z } from '@core/commands/schema';
-import { installPlugin, pluginToolNames } from '@core/plugins/host';
+import { installPlugin, onPluginInstalled, pluginToolNames } from '@core/plugins/host';
 import { TOOLSETS, toolsetOf } from '@protocol/toolsets';
 import type { CadPlugin } from '@core/plugins/plugin';
 import type { CommandDefinition } from '@core/commands/types';
@@ -45,5 +45,30 @@ describe('plugins', () => {
     const before = listCommands().length;
     expect(() => installPlugin(clash)).toThrow(/add_box/);
     expect(listCommands().length).toBe(before);
+  });
+});
+
+describe('CadPlugin.onInstall', () => {
+  const bare = (name: string, onInstall: () => void): CadPlugin => ({ name, toolset: 'test', commands: [], onInstall });
+
+  it('runs once on install and not again for a second install of the same name', () => {
+    let calls = 0;
+    const plugin = bare('test-oninstall-once', () => (calls += 1));
+    installPlugin(plugin);
+    installPlugin(plugin);
+    installPlugin(bare('test-oninstall-once', () => (calls += 10)));
+    expect(calls).toBe(1);
+  });
+
+  it('does not run when a listener rejects the plugin, and the plugin is not installed', () => {
+    onPluginInstalled((plugin) => {
+      if (plugin.name === 'test-oninstall-rejected') throw new Error('rejected by a listener');
+    });
+    let calls = 0;
+    const plugin = bare('test-oninstall-rejected', () => (calls += 1));
+    expect(() => installPlugin(plugin)).toThrow(/rejected by a listener/);
+    expect(calls).toBe(0);
+    expect(() => installPlugin(plugin)).toThrow(/rejected/);
+    expect(calls).toBe(0);
   });
 });

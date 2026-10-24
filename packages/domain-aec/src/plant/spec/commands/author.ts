@@ -180,9 +180,9 @@ export const editPipeSpec = defineCommand({
   name: 'edit_pipe_spec',
   description:
     'Edit a piping spec with ordered operations, all or nothing: addComponent, updateComponent (members to change; null removes one), removeComponent, setSizeRange, setBranchCell (header, branch, fitting T | RT | W | S | TH | SI | SIR), ' +
-    'clearBranchCell, setHeader (title, service, dimensionalStandard, rating, materials, corrosionAllowance, millTolerance, designLimits, catalogs, elbowAngles, provenance). ' +
+    'clearBranchCell, setInsulationRow (code, dnMax, tempMaxC, thicknessMm, material, conductivityWmK?: adds or replaces a row of the insulation table that create_pipeline insulation "fromSpec" reads), removeInsulationRow (code, dnMax, tempMaxC), setHeader (title, service, dimensionalStandard, rating, materials, corrosionAllowance, millTolerance, designLimits, catalogs, elbowAngles, provenance). ' +
     'Component sizes are fromNps / toNps (inch designation) or fromDn / toDn. A draft spec is edited in place; editing an approved spec creates a new draft revision. ' +
-    'The result is validated like an import (PSC_SPEC_INVALID with the path, e.g. ops.2.id); removing the pipe component that a bound pipe element needs is refused (PSC_SPEC_IN_USE). ' +
+    'Pipe lines that took their insulation thickness from the table read it again (their line number, parts and clash envelope follow). The result is validated like an import (PSC_SPEC_INVALID with the path, e.g. ops.2.id; an unknown insulation row to remove is refused the same way); removing the pipe component that a bound pipe element needs is refused (PSC_SPEC_IN_USE). ' +
     'Next: check_pipe_spec, resolve_spec_component.',
   params: z.object({
     specId: z.string().describe('Spec id (list_pipe_specs).'),
@@ -191,7 +191,7 @@ export const editPipeSpec = defineCommand({
       .min(1)
       .max(200)
       .describe(
-        'Operations applied in order; each is { op, ... } (addComponent, updateComponent, removeComponent, setSizeRange, setBranchCell, clearBranchCell, setHeader).',
+        'Operations applied in order; each is { op, ... } (addComponent, updateComponent, removeComponent, setSizeRange, setBranchCell, clearBranchCell, setInsulationRow, removeInsulationRow, setHeader).',
       ),
   }),
   run: (doc, { specId, ops }): CommandResult => {

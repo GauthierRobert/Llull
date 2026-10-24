@@ -14,14 +14,15 @@ const listeners: Array<(plugin: CadPlugin) => void> = [];
 
 /**
  * Install `plugin` (no-op when a plugin with the same name is already installed).
- * @failure a listener rejects it (e.g. a command-name collision) -> not installed, error rethrown
+ * @invariant `plugin.onInstall` runs once, after every listener accepted the plugin (a rejected plugin has no side effect)
+ * @failure a listener rejects it (e.g. a command-name collision) -> not installed, `onInstall` not called, error rethrown
  */
 export function installPlugin(plugin: CadPlugin): void {
   if (installed.some((existing) => existing.name === plugin.name)) return;
   installed.push(plugin);
   try {
-    plugin.onInstall?.();
     for (const listener of listeners) listener(plugin);
+    plugin.onInstall?.();
   } catch (error) {
     installed.splice(installed.indexOf(plugin), 1);
     throw error;

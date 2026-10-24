@@ -104,13 +104,15 @@ export function layoutBranches(env: Env): BranchFit[] | DerivationFailure {
       return fail('RTE_INVALID_PORT', `branch run ${branchRun.id} has no start direction`, [branchRun.id], ['branches']);
     const headerAxis = unitVector(sub3(to, from));
     const angle = (Math.acos(Math.max(-1, Math.min(1, dot3(direction, headerAxis)))) * 180) / Math.PI;
-    if (Math.abs(angle - 90) > env.tolerance.valueDeg)
+    // The same rule as add_branch: the branch run's own tolerance when the user gave one, else the header's (run or spec).
+    const tolerance = branchRun.angleToleranceDeg ?? env.tolerance.valueDeg;
+    if (Math.abs(angle - 90) > tolerance)
       return fail(
         'RTE_NO_FITTING_FOR_ANGLE',
-        `branch ${point.id} leaves ${+angle.toFixed(4)} deg from the axis of leg ${point.leg} of run ${run.id}; tees and olets take branches perpendicular within ${env.tolerance.valueDeg} deg`,
+        `branch ${point.id} leaves ${+angle.toFixed(4)} deg from the axis of leg ${point.leg} of run ${run.id}; tees and olets take branches perpendicular within ${tolerance} deg`,
         [run.id, point.id, branchRun.id],
         ['branches'],
-        { angleDeg: angle, anglesDeg: [90], toleranceDeg: env.tolerance.valueDeg, branch: point.id },
+        { angleDeg: angle, anglesDeg: [90], toleranceDeg: tolerance, branch: point.id },
       );
     const headerDn = dnAfter(run, line.dn, point.leg, point.distance);
     const branchDn = startDn(branchRun, branchLine.dn);
