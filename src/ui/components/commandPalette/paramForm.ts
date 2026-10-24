@@ -32,6 +32,25 @@ export function humanizeName(name: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Labels where the plain `humanizeName` would not say what the command does (the freeform / direct-editing commands). */
+const COMMAND_LABELS: Readonly<Record<string, string>> = {
+  push_pull_face: 'Push / pull face',
+  replace_face: 'Flush face to plane',
+  draft_faces: 'Draft faces',
+  move_faces: 'Move faces (direct)',
+  delete_faces: 'Delete faces (defeature)',
+  edit_nurbs: 'Edit NURBS curve poles',
+  edit_nurbs_surface: 'Edit NURBS surface poles',
+  subdivision_to_nurbs: 'Convert cage to NURBS',
+  loop_cut_cage: 'Loop cut (cage)',
+  squash_steps: 'Squash history steps',
+};
+
+/** The palette / form title of a command: its override, else the humanized name. */
+export function commandLabel(name: string): string {
+  return COMMAND_LABELS[name] ?? humanizeName(name);
+}
+
 function isNumeric(type: ParamType | undefined): boolean {
   return type === 'number' || type === 'integer';
 }

@@ -33,6 +33,7 @@ export function CageEditLayer({ onDraggingChanged }: { onDraggingChanged: (dragg
   const tool = useDirectEditStore((s) => s.tool);
   const cuts = useDirectEditStore((s) => s.cuts);
   const preview = useDirectEditStore((s) => s.preview);
+  const loopFactor = useDirectEditStore((s) => (s.gesture?.kind === 'loop_cut' ? s.gesture.factor : undefined));
   const exit = useDirectEditStore((s) => s.exit);
   const setSelection = useDirectEditStore((s) => s.setSelection);
   const active = entityId !== null && cage !== undefined;
@@ -56,7 +57,13 @@ export function CageEditLayer({ onDraggingChanged }: { onDraggingChanged: (dragg
   return (
     <>
       <group name="cage-edit" position={cage.position} rotation={[cage.rotation[0], cage.rotation[1], cage.rotation[2]]}>
-        <CageOverlay cage={shown} selection={selection} hover={hover} loopCuts={tool === 'loop_cut' ? cuts : null} />
+        <CageOverlay
+          cage={shown}
+          selection={selection}
+          hover={hover}
+          loopCuts={tool === 'loop_cut' ? cuts : null}
+          loopFactor={loopFactor}
+        />
         {preview !== null && <CageGhost preview={preview} />}
       </group>
       {!isSelectionEmpty(selection) && tool === 'select' && (

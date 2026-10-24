@@ -55,11 +55,16 @@ export function dragGesture(start: DragStart, ray: WorldRay, lock: AxisLock): Ca
     ];
     return from === null || to === null ? null : { kind: 'extrude', distance: round(to - from) };
   }
+  const delta = translateDelta(start, ray, lock);
+  return delta === null ? null : { kind: 'translate', delta: [round(delta[0]), round(delta[1]), round(delta[2])] };
+}
+
+/** World displacement of a point dragged in the plane through the start point facing the start axis, optionally locked to one world axis; null when a ray misses the plane. */
+export function translateDelta(start: Pick<DragStart, 'ray' | 'origin' | 'axis'>, ray: WorldRay, lock: AxisLock): Vec3 | null {
   const [from, to] = [rayPlanePoint(start.ray, start.origin, start.axis), rayPlanePoint(ray, start.origin, start.axis)];
   if (from === null || to === null) return null;
   const delta = sub3(to, from);
-  const constrained = lock === null ? delta : scale3(AXES[lock], dot3(delta, AXES[lock]));
-  return { kind: 'translate', delta: [round(constrained[0]), round(constrained[1]), round(constrained[2])] };
+  return lock === null ? delta : scale3(AXES[lock], dot3(delta, AXES[lock]));
 }
 
 /** Axis (unit, world) and angle (degrees) of the rotation `q` = (x, y, z, w); angle 0 and axis +Z for the identity. */

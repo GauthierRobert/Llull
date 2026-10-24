@@ -49,7 +49,7 @@ export const editNurbs = defineCommand({
     index: z.number().describe('move_pole / set_weight: pole index, 0-based.').optional(),
     indices: z.array(z.number().int()).min(1).describe('move_poles: the pole indices (0-based) moved by the full delta.').optional(),
     delta: vec3(
-      'move_poles: translation [x, y, z] in document units added to every selected pole (and, weighted, to the falloff neighbours).',
+      'move_poles: translation [x, y, z] added to every selected pole (and, weighted, to the falloff neighbours), in the entity-local frame (before the entity rotation), document units.',
     ).optional(),
     displacement: vec3('drag_point: how far C(u) moves [x, y, z] in document units.').optional(),
     falloff: z

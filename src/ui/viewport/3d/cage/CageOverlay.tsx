@@ -54,9 +54,11 @@ export interface CageOverlayProps {
   readonly hover: CageElement | null;
   /** Loop-cut tool: show the loop that a click on the hovered edge would add. */
   readonly loopCuts: number | null;
+  /** The dragged position of the loop (0..1 from the first vertex of the hovered edge); the middle when not dragging. */
+  readonly loopFactor?: number | undefined;
 }
 
-export function CageOverlay({ cage, selection, hover, loopCuts }: CageOverlayProps): React.ReactElement {
+export function CageOverlay({ cage, selection, hover, loopCuts, loopFactor }: CageOverlayProps): React.ReactElement {
   const wire = useMemo(() => cageSegments(cage), [cage]);
   const dots = useMemo(() => vertexPositions(cage), [cage]);
   const creases = useMemo(() => creaseSegments(cage), [cage]);
@@ -78,8 +80,8 @@ export function CageOverlay({ cage, selection, hover, loopCuts }: CageOverlayPro
     return { segments: selectedSegments(cage, one), faces: selectedFaceTriangles(cage, one), vertices: selectedVertexPositions(cage, one) };
   }, [cage, hover]);
   const loop = useMemo(
-    () => (loopCuts !== null && hover?.kind === 'edge' ? loopCutSegments(cage, hover.id, 0.5) : new Float32Array(0)),
-    [cage, hover, loopCuts],
+    () => (loopCuts !== null && hover?.kind === 'edge' ? loopCutSegments(cage, hover.id, loopFactor ?? 0.5) : new Float32Array(0)),
+    [cage, hover, loopCuts, loopFactor],
   );
   return (
     <group name="cage-overlay">
