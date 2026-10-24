@@ -4,16 +4,16 @@
  * give the same problem and the same sha256 `problemHash`.
  */
 
-import { is3D, type CadDocument } from '@core/model/types';
-import type { PipeLine, PipingModel, PortRef, PortSpec } from '@aec/plant/types';
+import type { CadDocument } from '@core/model/types';
+import type { PipeLine, PortRef, PortSpec } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
-import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { sha256Hex } from '@lib/sha256';
-import { getPiping, runPoints } from '../model';
+import { getPiping } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
 import { resolveFlangeSet } from '../flangeSet';
 import { createSpecLookup, isMiss, pipeOutsideDiameter } from '../specLookup';
 import { AXIS_VECTORS, firstBlocking, type Int3, type ObstacleBox, type RouteProblem } from './lattice';
+import { collectObstacles } from './obstacles';
 
 export type Endpoint = { readonly portId: string } | { readonly point: Vec3; readonly direction: Vec3 };
 
@@ -151,52 +151,6 @@ function stubParts(doc: CadDocument, line: PipeLine, ends: { from: PortEnd; to: 
   return { elbow, elbowSource: `${row.key} (${row.source})`, flangeLengths, unverifiedReasons: reasons };
 }
 
-/** Inflated world boxes: 3D entities (not run meshes), legs of existing runs, explicit keep-out boxes. */
-function collectObstacles(
-  doc: CadDocument,
-  piping: PipingModel,
-  radius: number,
-  request: RouteRequest,
-): { obstacles: ObstacleBox[]; keepOutIds: ReadonlySet<string> } | ProblemRefusal {
-  const inflate = (id: string, min: Vec3, max: Vec3, extra: number): ObstacleBox => ({
-    id,
-    min: [Math.floor((min[0] - extra) * 1000), Math.floor((min[1] - extra) * 1000), Math.floor((min[2] - extra) * 1000)],
-    max: [Math.ceil((max[0] + extra) * 1000), Math.ceil((max[1] + extra) * 1000), Math.ceil((max[2] + extra) * 1000)],
-  });
-  const keepOut = new Set(request.keepOut ?? []);
-  const unknown = [...keepOut].filter((id) => doc.entities[id] === undefined);
-  if (unknown.length > 0) return refusal('RTE_UNKNOWN_KEEPOUT', `no entity ${unknown.join(', ')}`, ['keepOut'], unknown);
-  const runIds = new Set(piping.runOrder);
-  const obstacles: ObstacleBox[] = [];
-  for (const id of doc.order) {
-    const entity = doc.entities[id];
-    if (entity === undefined || runIds.has(id) || !is3D(entity)) continue;
-    const { min, max } = entityBoundsInDoc(doc, entity);
-    if ([...min, ...max].every(Number.isFinite)) obstacles.push(inflate(id, min, max, radius));
-  }
-  for (const runId of piping.runOrder) {
-    const run = piping.runs[runId];
-    const other = run === undefined ? undefined : piping.lines[run.lineId];
-    if (run === undefined || other === undefined) continue;
-    const otherRadius = (pipeOutsideDiameter(doc, other.spec, other.dn) ?? 0) / 2 + (other.insulation?.thicknessMm ?? 0);
-    const points = runPoints(run);
-    for (let leg = 0; leg + 1 < points.length; leg++) {
-      const [a, b] = [points[leg] as Vec3, points[leg + 1] as Vec3];
-      const min: Vec3 = [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
-      const max: Vec3 = [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
-      obstacles.push(inflate(`${runId}#leg${leg}`, min, max, radius + otherRadius));
-    }
-  }
-  (request.keepOutBoxes ?? []).forEach((box, index) => {
-    const id = `keepOutBox#${index}`;
-    keepOut.add(id);
-    const lower: Vec3 = [Math.min(box.min[0], box.max[0]), Math.min(box.min[1], box.max[1]), Math.min(box.min[2], box.max[2])];
-    const upper: Vec3 = [Math.max(box.min[0], box.max[0]), Math.max(box.min[1], box.max[1]), Math.max(box.min[2], box.max[2])];
-    obstacles.push(inflate(id, lower, upper, radius));
-  });
-  return { obstacles, keepOutIds: keepOut };
-}
-
 const strictlyInside = (p: Int3, box: ObstacleBox): boolean =>
   p.every((v, axis) => v > (box.min[axis] as number) && v < (box.max[axis] as number));
 
@@ -252,7 +206,7 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   };
   const radius = (pipeOutsideDiameter(doc, line.spec, line.dn) ?? 0) / 2 + (line.insulation?.thicknessMm ?? 0) + pick('clearance');
   const collected = collectObstacles(doc, piping, radius, request);
-  if ('ok' in collected) return collected;
+  if ('code' in collected) return refusal(collected.code, collected.message, collected.paths, collected.ids);
   const states = bounds.max.reduce((total, max, dim) => total * (max - (bounds.min[dim] as number) + 1), 6);
   if (states > Number.MAX_SAFE_INTEGER)
     return refusal(

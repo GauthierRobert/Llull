@@ -391,7 +391,7 @@ describe('auto_route_pipe search limits and preferences', () => {
     const line = ok(d.document, 'create_pipeline', { service: 'P', sequence: '8003', spec: 'CS150', dn: 100 });
     const second = { lineId: line.affected[0], from: { portId: c.affected[0] }, to: { portId: d.affected[0] }, bendCost: 1000 };
     const problem = data<ProblemData>(line.document, 'route_problem', second);
-    expect(problem.problem.obstacles.map((box) => box.id)).toContain(`${firstRun}#leg0`);
+    expect(problem.problem.obstacles.map((box) => box.id)).toContain(`${firstRun}/pipe-2`);
     expect(data<RouteData>(line.document, 'auto_route_pipe', second).bends).toBeGreaterThan(0);
   });
 });
