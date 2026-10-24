@@ -588,12 +588,50 @@
       "id": "VC-RTE-42",
       "plan": "plans/sc-rte-21-pipe-step-needs-kernel.json",
       "command": "export_pipe_step",
-      "expected": { "withoutKernel": "CMD_KERNEL_UNAVAILABLE", "meshKernel": "XCH_WRITER_UNAVAILABLE", "products": 3 },
-      "tolerance": "exact",
+      "expected": {
+        "withoutKernel": "CMD_KERNEL_UNAVAILABLE",
+        "meshKernel": "XCH_WRITER_UNAVAILABLE",
+        "products": 3,
+        "nativeVolumesMm3": [29222833.73, 18962007.28, 2387402.16]
+      },
+      "tolerance": "exact; volumes 1e-6 relative",
       "reference": "README D24",
       "grade": "contract",
       "frs": ["FR-RTE-20"],
-      "test": "tests/unit/plant/piping/exportPipeStep.test.ts"
+      "test": "tests/unit/plant/piping/exportPipeStep.test.ts; server/tests/nativePipeStep.test.ts"
+    },
+    {
+      "id": "VC-RTE-43",
+      "plan": "plans/sc-rte-22-level-from-elevation.json",
+      "command": "check_pipe_supports",
+      "expected": { "all": { "pipes": 2 }, "ground": { "pipes": 1, "lengthM": 4 }, "upper": { "pipes": 1, "lengthM": 6 } },
+      "tolerance": { "abs": 0.000001 },
+      "reference": "README D25",
+      "grade": "closed form",
+      "frs": ["FR-RTE-09"],
+      "test": "tests/unit/plant/piping/v1cFollowUps.test.ts"
+    },
+    {
+      "id": "VC-RTE-44",
+      "plan": "plans/sc-rte-23-convert-replace-moves-supports.json",
+      "command": "convert_pipe_run",
+      "expected": { "straightenedMaxOffsetMm": 10, "supportOffsetsMm": [5, 10, 5], "maxOffsetMm": 10, "supports": 3, "limitMm": 114.3 },
+      "tolerance": { "abs": 0.000001 },
+      "reference": "README D26",
+      "grade": "closed form",
+      "frs": ["FR-RTE-09", "FR-RTE-14"],
+      "test": "tests/unit/plant/piping/convertPipeRun.test.ts"
+    },
+    {
+      "id": "VC-RTE-45",
+      "plan": null,
+      "command": "check_pipe_supports",
+      "expected": { "orphans": 3, "code": "RTE_SUPPORT_ORPHAN", "ok": false, "loadEqualsLive": true },
+      "tolerance": "exact",
+      "reference": "README D27",
+      "grade": "contract",
+      "frs": ["FR-RTE-09"],
+      "test": "tests/unit/plant/piping/v1cFollowUps.test.ts"
     }
   ]
 }
