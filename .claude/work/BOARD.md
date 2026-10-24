@@ -12,6 +12,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+
+- 2026-10-24 — main: 02 RTE-M1 merged (cad-reviewer APPROVE after 3 rounds): `route_pipe` (legs, spec elbows, cut lengths, flange sets),
+  `piping_takeoff`, broken runs, core `DocumentExtension.reconcile` (live, nested, replay); fix: derived-model restore keeps the saved
+  entity key order. Gates green: static, unit 15499, server 1571 (1 worker). Next: 02 RTE-M2.
 - 2026-10-24 — main: plant M2 merged (3 lanes, cad-reviewer fixes in): 01 PSC-M2 specs + resolution, 03 EQP-M2 vessels / nozzles / ports,
   core exact `ellipse` curve segment (native OCC + exact Pappus volumes). Gates green: static, unit 15222, coverage, server 1558 (with an
   ellipse-capable `llull-kernel`). Test workers now sized from free memory. Next: wave 2, 02 RTE-M1.
@@ -25,7 +29,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - 2026-10-22 — main: PR #106 (llull-mesh) + NG1 Netgen mesher merged. Done on main, one commit each: ENG-10 (one density convention:
   add_rigid_body takes densityUnit; unverified density printed once; AF-32 flags kept), ENG-6 (inertiaKgM2, add_spring pointFrame "body",
   thrust work in the energy balance, VC-RBD-40 stop time 1.3e-5), ENG-9 (L-stair well outline; add_hole stays in `manufacturing`, `llull
-  list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3.14.0). Full unit suite 13149 pass after ENG-6; full
+list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3.14.0). Full unit suite 13149 pass after ENG-6; full
   `npm run check` + server suite not re-run since (memory). Open: owner to confirm llull's licence allows LGPL §6 reverse engineering of llull-mesh (NG1).
 - 2026-10-21 — main: KRN-MSVC merged unverified in full (owner): llull-kernel built with MSVC, dlltool stand-in removed (RS-MSVC), PMI
   tolerance pairing by faces. Pending: full native server suite + `npm run check` + TR-FEA-32 on MSVC.
@@ -45,7 +49,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 - `[TODO]` **LIM-1 follow-ups** (LIM-1 merged, PRs #101/#102): per-face colour on parametric primitives; plan time dominated by one OCCT
   sweep boolean (13–15 s); native follow-ups in `docs/decisions/LIM1-scale.md` (JSON depth, relative display tolerance, multi-tool cut). _deps: —_
-- `[TODO]` **RS follow-ups** (RS wave PR #98 and RS-6 llull-geomq done) RS-6 options (wgpu BVH traversal for geomq, plant 09 instance BVH / VC-VIS-60 (a), physics 13 broad phase VC-COR-17); plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). _deps: —_
+- `[TODO]` **RS follow-ups** (RS wave PR #98 and RS-6 llull-geomq done) RS-6 options (wgpu BVH traversal for geomq, plant 09 instance BVH / VC-VIS-60 (a), physics 13 broad phase VC-COR-17); plant 10 M3 viewport, plant 02 V1 (route\*pipe, fittings, check*piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: —*
 - `[TODO]` **TOP-V1b** Topology V1 left after TOP-V1 (MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads +
   compliance ratio, `deadlineS` checkpoint: built 2026-10-22, §15): VC-TOP-34 on a desktop GPU (GPU cap), PHY-18 shape optimisation (needs
   PHY-18 M2), unstructured SIMP on the tet mesh, displacement constraints for `min_volume`, `massG`: `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §15.7. _deps: —_
@@ -65,17 +69,17 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   frames overlay (UI), `ShapeRecipe` node `sheetSolid` (faces still in the leaf payload), `volumeConsistencyRel`, hollow round sections with laws,
   exact-curve `inspect_sweep` curvature, closed-loft drift distribution (single re-seam today), VC-SWG-32 table. _Lane 1 + 2_ _deps: —_
 - `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 (done 2026-10-23, TECHNICAL_SPEC §13.5–13.9): M3 `corners` / setback
-  + `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
-  profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on
-  CPython/OCP; true straight laws (OCCT 7.9.2 `Add(Law_Function)` crashes → graded nodes). _Lane 1 + native_ _deps: —_
-- `[TODO]` **DES-7c** 07 MSH left after M0–M5 (done 2026-10-23, TECHNICAL_SPEC §13.5): M6 `quad_remesh` (QuadriFlow), `fit_subdivision_to_mesh`,
+  - `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
+    profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on
+    CPython/OCP; true straight laws (OCCT 7.9.2 `Add(Law_Function)` crashes → graded nodes). _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-7c** 07 MSH left after M0–M5 (done 2026-10-23, TECHNICAL*SPEC §13.5): M6 `quad_remesh` (QuadriFlow), `fit_subdivision_to_mesh`,
   `fit_surface_to_mesh`, VC-22; native analyze / remesh / cut / fill / repair / sculpt + `--progress` events, async mesh engine port (backend blocks
   today, capped by `LLULL_MESH_OP_TIMEOUT_S`), native decimate speed (16.6 s vs 10 s target on 1.3M tris); `sculpt_mesh` `along`; asset full-res reads
-  through groups / selection (`readsMeshTriangles` sees named ids only); `shrinkwrap_mesh` / `displace_mesh`. _Lane 1 + 4 + native_ _deps: —_
-- `[TODO]` **DES-1c** 01 DEF left after M0–M3 + M5 + `flow_on_surface` (done 2026-10-24, TECHNICAL_SPEC §14): `preserveAnalytic` (VC-23), M4 UI
+  through groups / selection (`readsMeshTriangles` sees named ids only); `shrinkwrap_mesh` / `displace_mesh`. \_Lane 1 + 4 + native* _deps: —_
+- `[TODO]` **DES-1c** 01 DEF left after M0–M3 + M5 + `flow_on_surface` (done 2026-10-24, TECHNICAL*SPEC §14): `preserveAnalytic` (VC-23), M4 UI
   overlays + curved-sheet base for `flow_on_surface`, B-spline lattices / oriented boxes, `baseCurve`, `infinite` regions, `allowMeshFallback`,
   `compareTo` shapes, non-uniform fit grid (point push 5–8 s), native `faceQuery.bspline`, VC-22 STEP re-import, mass rule by face type
-  (`refined_mass` is provenance today, not through `blend_union`). _Lane 1 + 2 + native_ _deps: —_
+  (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
 - `[TODO]` **DES-3b** 03 WRP left after M0–M3 (done 2026-10-22, §13): M4 geodesic / parametric charts, emboss on doubly curved faces,
   `split_face_by_curves`, `create_curve_on_face`, CFF fonts, kerning, multi-line, decal + knurl; M5 single-line fonts, text on curve,
   `pattern_on_face`, modeled knurl; WRP golden plan (native). _Lane 1 + native_ _deps: —_
@@ -90,6 +94,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   (closes VC-15 mesh −1.1 %), Voronoi. _Lane 1 + native_ _deps: — (mesh asset store = DES-7b M3, adopt when built)_
 
 ## Aerospace + physics (spec = the linked pack)
+
 - `[TODO]` **AERO-6** Left after AERO-4/5 (each in its spec §13): CAx-IF composite conformance with a second CAD system / CAx-IF test files, JT (deferred by
   spec), QIF beyond MeasurementResults, EN 9300 LOTAR conformance (paid standard not read), PMI on
   edge/vertex-referenced dimensions (217/260), composite frames + datum targets in the AP242 transport, Windows Hello/TPM key for the PLM trust root; AP242 writer (OCC): same datum
@@ -97,8 +102,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   external mapping) unexamined (03 §13.5). _deps: —_
 - `[REVIEW]` **KRN-MSVC** (needs verification) llull-kernel builds with MSVC (VS Build Tools 17.14; merged 2026-10-21, commits 40353cf6 + 200bd473; dlltool stand-in removed = RS-MSVC done).
   Verified on MSVC: `native:check`, NIST PMI suites 41/41, CMP live-OCC cone pick (06 §13.4, new native test), GPU raster 3/3. Fixed: STEP-side PMI
-  tolerances now pair with XCAF ones on the same faces first (stc_07 gave 23 instead of 22 on MSVC). _Still to verify (runs killed by low memory):
-  full `LLULL_REQUIRE_NATIVE_KERNEL=1 npm --prefix server test`, `npm run check`, FE face map TR-FEA-32 (05 §13)._ _deps: —_
+  tolerances now pair with XCAF ones on the same faces first (stc*07 gave 23 instead of 22 on MSVC). \_Still to verify (runs killed by low memory):
+  full `LLULL_REQUIRE_NATIVE_KERNEL=1 npm --prefix server test`, `npm run check`, FE face map TR-FEA-32 (05 §13).* _deps: —_
 - `[TODO]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing) — both built_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
@@ -110,7 +115,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Test memory (2026-10-24): vitest workers sized from free memory in both suites (`testWorkers.ts`, `LLULL_TEST_WORKERS` override); gates green on the merge: static, unit 15222, coverage, server 1558.
 - `[TODO]` **STA-M2/M3** 06 STA gratings, then `add_railing` (edge coverage by railings). _deps: —_
 - `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
-- `[WIP]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry; sc-rte plans to the D3 `add_nozzle` form. Worktree `llull-rte`, branch `feat/plant-rte-m1`. Then **RTE-M2**, **RTE-M3**, **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
+- `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
+- `[WIP]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline`. Worktree `llull-rte`, branch `feat/plant-rte-m2`. Then **RTE-M3**, **RTE-V1**. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
