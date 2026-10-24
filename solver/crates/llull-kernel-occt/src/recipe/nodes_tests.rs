@@ -158,3 +158,74 @@ fn a_thread_tool_marks_every_recipe_built_on_it() {
     assert!(thread_bearing(&union));
     assert!(!thread_bearing(&json!({ "op": "blend", "sources": [cube_leaf(1.0), cube_leaf(2.0)] })));
 }
+
+fn plate_with_bore() -> Value {
+    let plate = json!({ "op": "solid", "entity": { "kind": "box", "size": [20, 20, 10], "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+    let pin =
+        json!({ "op": "solid", "entity": { "kind": "cylinder", "radius": 3, "height": 20, "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+    json!({ "op": "boolean", "boolean": "subtract", "a": plate, "b": pin })
+}
+
+fn face_op(source: &Value, node: Value) -> Value {
+    let mut recipe = node;
+    recipe["op"] = json!("faceOp");
+    recipe["source"] = source.clone();
+    recipe
+}
+
+#[test]
+fn move_faces_offsets_a_bore_translates_a_plane_and_rotates_a_plane() {
+    let mut evaluator = Evaluator::new(16);
+    let plate = plate_with_bore();
+    let before = volume(evaluator.evaluate(&plate));
+    assert!((before - (4000.0 - std::f64::consts::PI * 90.0)).abs() < 1e-6);
+    // the bore wall is the only cylindrical face: try each face, exactly one widens the bore by the offset
+    let widened = (0..8)
+        .map(|face| face_op(&plate, json!({ "kind": "moveFaces", "faces": [face], "move": { "type": "offset", "distance": 1 } })))
+        .filter_map(|recipe| evaluator.evaluate(&recipe).ok().flatten())
+        .map(|shape| crate::mass_properties(&shape).unwrap().volume)
+        .filter(|volume| (volume - (4000.0 - std::f64::consts::PI * 160.0)).abs() < 1e-6)
+        .count();
+    assert_eq!(widened, 1, "only the bore wall offsets radially away from its axis");
+    let cube = cube_leaf(10.0);
+    let up = |faces: Vec<u32>, vector: [f64; 3]| {
+        face_op(&cube, json!({ "kind": "moveFaces", "faces": faces, "move": { "type": "translate", "vector": vector } }))
+    };
+    let grown = (0..6).any(|face| {
+        evaluator
+            .evaluate(&up(vec![face], [0.0, 0.0, 2.0]))
+            .ok()
+            .flatten()
+            .is_some_and(|shape| (crate::mass_properties(&shape).unwrap().volume - 1200.0).abs() < 1e-6)
+    });
+    assert!(grown, "the +z face moved by the normal component");
+    assert!(evaluator.evaluate(&up(vec![0], [0.0, 0.0, 0.0])).unwrap().is_none(), "a zero vector is refused");
+    let tilted = (0..6).any(|face| {
+        let recipe = face_op(
+            &cube,
+            json!({ "kind": "moveFaces", "faces": [face], "move": { "type": "rotate", "axis": { "origin": [5.0, 0.0, -5.0], "direction": [0.0, 1.0, 0.0] }, "angle": 10f64.to_radians() } }),
+        );
+        evaluator.evaluate(&recipe).ok().flatten().is_some_and(|shape| (crate::mass_properties(&shape).unwrap().volume - 1088.16349035).abs() < 1e-6)
+    });
+    assert!(tilted, "the +x face tilted 10 degrees about its bottom edge");
+}
+
+#[test]
+fn delete_faces_refuses_what_it_cannot_heal_and_fills_a_bore() {
+    let mut evaluator = Evaluator::new(16);
+    let plate = plate_with_bore();
+    let filled = (0..8)
+        .map(|face| face_op(&plate, json!({ "kind": "deleteFaces", "faces": [face] })))
+        .filter_map(|recipe| evaluator.evaluate(&recipe).ok().flatten())
+        .map(|shape| crate::mass_properties(&shape).unwrap().volume)
+        .filter(|volume| (volume - 4000.0).abs() < 1e-6)
+        .count();
+    assert_eq!(filled, 1, "deleting the bore wall fills the hole");
+    let cube = cube_leaf(10.0);
+    let every_face = face_op(&cube, json!({ "kind": "deleteFaces", "faces": [0, 1, 2, 3, 4, 5] }));
+    assert!(evaluator.evaluate(&every_face).unwrap().is_none(), "nothing is left to extend");
+    let beyond = face_op(&cube, json!({ "kind": "deleteFaces", "faces": [99] }));
+    assert!(evaluator.evaluate(&beyond).unwrap().is_none(), "a face index outside the solid is refused");
+    let bad = face_op(&cube, json!({ "kind": "moveFaces", "faces": [0], "move": { "type": "spin" } }));
+    assert!(evaluator.evaluate(&bad).unwrap().is_none(), "an unknown move type is refused");
+}

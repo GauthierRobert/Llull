@@ -9,6 +9,7 @@ import { checkContinuity, measureDeviation } from './checkJoints';
 import { createConic, createNurbsCurve, interpolateCurve } from './createCurve';
 import { approximateCurve } from './approximateCurve';
 import { editNurbs } from './editNurbs';
+import { editNurbsSurface } from './editNurbsSurface';
 import { sewSurfaces, thickenSurface } from './editSurface';
 import { trimSurface } from './trimSurface';
 import { fillSurface } from './fillSurface';
@@ -26,6 +27,7 @@ export const surfaceCommands = commandCatalog(
   approximateCurve,
   createConic,
   editNurbs,
+  editNurbsSurface,
   inspectNurbs,
   analyzeCurveCurvature,
   createNurbsSurface,

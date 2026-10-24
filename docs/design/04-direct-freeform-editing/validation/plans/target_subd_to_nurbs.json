@@ -60,5 +60,12 @@
   "params": {
    "entityId": "c"
   }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "c",
+   "surfaceModel": "limit_patches"
+  }
  }
 ]

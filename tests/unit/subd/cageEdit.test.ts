@@ -543,18 +543,20 @@ describe('evaluate_subdivision and check_subdivision', () => {
         } as never,
       } as GeometryKernel;
     };
-    const exact = run(cube.doc, 'check_subdivision', { id: cube.id }, { ...defaultContext(), kernel: scripted(true) });
+    const exact = run(cube.doc, 'check_subdivision', { id: cube.id, exactSeams: true }, { ...defaultContext(), kernel: scripted(true) });
     expect(dataOf<{ limitPatches: { volume: number; seams: number; maxG1AngleRad: number } }>(exact).limitPatches).toMatchObject({
       volume: 2.6,
       seams: 1,
       maxG1AngleRad: 0.02,
     });
-    const silent = run(cube.doc, 'check_subdivision', { id: cube.id }, { ...defaultContext(), kernel: scripted(false) });
+    const optIn = run(cube.doc, 'check_subdivision', { id: cube.id }, { ...defaultContext(), kernel: scripted(true) });
+    expect(dataOf<{ limitPatches: unknown }>(optIn).limitPatches).toBeNull();
+    const silent = run(cube.doc, 'check_subdivision', { id: cube.id, exactSeams: true }, { ...defaultContext(), kernel: scripted(false) });
     expect(dataOf<{ limitPatches: unknown }>(silent).limitPatches).toBeNull();
     const meshOnly = run(
       cube.doc,
       'check_subdivision',
-      { id: cube.id },
+      { id: cube.id, exactSeams: true },
       { ...defaultContext(), kernel: { ...scripted(true), faceQuery: undefined } as unknown as GeometryKernel },
     );
     expect(dataOf<{ limitPatches: unknown }>(meshOnly).limitPatches).toBeNull();

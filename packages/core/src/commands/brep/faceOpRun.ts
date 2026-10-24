@@ -11,8 +11,9 @@ import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/
 import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { noop } from '../noop';
+import { commandError, noop } from '../noop';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { roundSignificant } from '../../lib/significant';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { pickFaces, type FaceRequest } from './faceReferences';
@@ -24,13 +25,23 @@ export interface FaceOpContext {
   readonly faces: readonly number[];
 }
 
+/** A refusal of `build` with a stable code; `FaceOpRequest.coded` turns it into the command's coded rejection. */
+export interface FaceOpRefusal {
+  readonly code: string;
+  readonly message: string;
+}
+
 export interface FaceOpRequest {
   readonly command: string;
   readonly id: string;
   readonly pick: FaceRequest;
   /** The node parameters for the picked faces, or why they do not fit (wrong surface, nothing to do). */
-  readonly build: (context: FaceOpContext) => FaceOpParams | string;
+  readonly build: (context: FaceOpContext) => FaceOpParams | string | FaceOpRefusal;
   readonly describe: (params: FaceOpParams) => string;
+  /** Coded refusal when the kernel cannot build the result, and `true` to report the exact volume before and after (needs the kernel's mass properties). */
+  readonly kernelFailure?: { readonly code: string; readonly remediation: string };
+  readonly reportVolume?: boolean;
+  readonly coded?: (code: string, message: string) => CommandResult;
 }
 
 /** @failure missing / non-solid target, no kernel, kernel without face operations, bad pick, `build` refusal, kernel refusal -> no-op */
@@ -52,9 +63,17 @@ export function runFaceOp(doc: CadDocument, ctx: ExecutionContext | undefined, r
     return pick.error === undefined ? fail(`${pick.problem} on '${id}'`) : { ...fail(`${pick.problem} on '${id}'`), error: pick.error };
   const params = request.build({ kernel, shape, topology, faces: pick.faces });
   if (typeof params === 'string') return fail(`${params} on '${id}'`);
+  if ('code' in params) return request.coded?.(params.code, params.message) ?? fail(`${params.message} on '${id}'`);
   const result = evaluateRecipe(kernel, { op: 'faceOp', source, ...params });
-  if (typeof result === 'string')
-    return fail(`the kernel could not ${request.describe(params)} into a valid solid (${result}); try a smaller value or other faces`);
+  if (typeof result === 'string') {
+    const refused = fail(
+      `the kernel could not ${request.describe(params)} into a valid solid (${result}); try a smaller value or other faces`,
+    );
+    const failure = request.kernelFailure;
+    return failure === undefined
+      ? refused
+      : { ...refused, rejected: true, error: commandError(failure.code, failure.remediation, [id], []) };
+  }
   const committed = commitKernelResult(
     doc,
     kernel,
@@ -63,7 +82,22 @@ export function runFaceOp(doc: CadDocument, ctx: ExecutionContext | undefined, r
     (newId, triangles) =>
       `${command}: ${request.describe(params)} on '${id}' → mesh '${newId}' (${triangles} triangles). Source entity consumed.${pick.note}`,
   );
-  return pick.record === null ? committed : { ...committed, recordExtras: { faceNames: pick.record } };
+  const volumes = request.reportVolume === true ? exactVolumes(kernel, shape, result.shape) : null;
+  const reported =
+    volumes === null
+      ? committed
+      : {
+          ...committed,
+          summary: `${committed.summary} Volume ${volumes.before} -> ${volumes.after} ${doc.units}^3 (exact).`,
+          data: { volumeBefore: volumes.before, volumeAfter: volumes.after, volumeUnit: `${doc.units}^3`, faces: [...pick.faces] },
+        };
+  return pick.record === null ? reported : { ...reported, recordExtras: { faceNames: pick.record } };
+}
+
+/** Exact volumes (kernel mass properties) of the source and the result, or null when the kernel reports none. */
+function exactVolumes(kernel: GeometryKernel, before: ShapeHandle, after: ShapeHandle): { before: number; after: number } | null {
+  const [a, b] = [kernel.massProperties?.(before) ?? null, kernel.massProperties?.(after) ?? null];
+  return a === null || b === null ? null : { before: roundSignificant(a.volume, 10), after: roundSignificant(b.volume, 10) };
 }
 
 /** Outward normal and a point of planar face `face` (exact face queries), or why there is none. */

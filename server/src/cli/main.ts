@@ -303,7 +303,8 @@ function runList(args: ParsedArgv, io: CliIo): number {
   const status = printEntries(listCatalog(toolset), args, io);
   const seeAlso = toolset === undefined ? undefined : TOOLSET_SEE_ALSO[toolset];
   if (seeAlso !== undefined && !booleanFlag(args, 'json'))
-    io.stdout(`See also (toolset ${seeAlso.toolset}): ${seeAlso.tools.join(', ')}. List them with: llull list ${seeAlso.toolset}`);
+    for (const pointer of seeAlso)
+      io.stdout(`See also (toolset ${pointer.toolset}): ${pointer.tools.join(', ')}. List them with: llull list ${pointer.toolset}`);
   return status;
 }
 

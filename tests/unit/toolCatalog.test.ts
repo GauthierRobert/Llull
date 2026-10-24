@@ -174,11 +174,15 @@ describe('TOOLSETS', () => {
     expect(TOOLSETS.building).not.toContain('pipe_hydraulics');
   });
   it('see-also pointers name tools that live in the pointed toolset, not in the one that points (ENG-9)', () => {
-    expect(TOOLSET_SEE_ALSO['3d']?.tools).toContain('add_hole');
-    for (const [from, seeAlso] of Object.entries(TOOLSET_SEE_ALSO)) {
-      for (const name of seeAlso?.tools ?? []) {
-        expect(toolsetOf(name)).toBe(seeAlso?.toolset);
-        expect(toolsetOf(name)).not.toBe(from);
+    expect(TOOLSET_SEE_ALSO['3d']?.flatMap((pointer) => pointer.tools)).toEqual(
+      expect.arrayContaining(['add_hole', 'add_subdivision_solid']),
+    );
+    for (const [from, pointers] of Object.entries(TOOLSET_SEE_ALSO)) {
+      for (const seeAlso of pointers ?? []) {
+        for (const name of seeAlso.tools) {
+          expect(toolsetOf(name)).toBe(seeAlso.toolset);
+          expect(toolsetOf(name)).not.toBe(from);
+        }
       }
     }
   });

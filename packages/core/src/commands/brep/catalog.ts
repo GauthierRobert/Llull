@@ -7,6 +7,7 @@ import { inspectTopology } from './topology';
 import { blendUnion } from './blend';
 import { inspectFaces } from './faces';
 import { draftFaces, pushPullFace, replaceFace, splitFace } from './faceOps';
+import { deleteFaces, moveFaces } from './faceMoves';
 import { splitBody } from './splitBody';
 import { probeFillet } from './probeFillet';
 import { filletFaces } from './filletFaces';
@@ -26,6 +27,8 @@ export const brepCommands = commandCatalog(
   draftFaces,
   pushPullFace,
   splitFace,
+  moveFaces,
+  deleteFaces,
   replaceFace,
   splitBody,
   inspectTopology,

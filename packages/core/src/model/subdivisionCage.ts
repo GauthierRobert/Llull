@@ -13,6 +13,9 @@ export interface CageVertexSharpness {
   readonly s: number;
 }
 
+/** Boundary rule of an open cage: 'edge_and_corner' also pins the corners (boundary vertices of a single face), 'edge_only' keeps them as smooth crease points. */
+export type CageBoundary = 'edge_and_corner' | 'edge_only';
+
 /** Mirror symmetry of a cage through entity-local planes at the origin; `partners[k][v]` = mirror of vertex v through `planes[k]` (v itself on the plane). */
 export interface CageSymmetry {
   readonly planes: ReadonlyArray<'x' | 'y' | 'z'>;

@@ -93,7 +93,7 @@ const rangeProblem = (entries: ReadonlyArray<{ s: number }>): string | null => {
 export const addSubdivisionSolid = defineCommand({
   name: 'add_subdivision_solid',
   description:
-    'Create a freeform solid as a Catmull-Clark subdivision surface over a coarse polygon control ' +
+    'Create a freeform solid (or, with `boundary`, an open surface) as a Catmull-Clark subdivision surface over a coarse polygon control ' +
     'cage — for organic shapes no primitive gives (saddles, shifter hoods, grips, dropouts, ' +
     'fairings, handles). Start from a `box` cage (size + segments per axis) or a `cylinder` cage ' +
     '(radius, height, sides, segments along Z), both centred on `position`, or give a custom closed ' +
@@ -153,6 +153,12 @@ export const addSubdivisionSolid = defineCommand({
       .enum(['uniform', 'chaikin'])
       .describe('How sharpness decays per level: uniform (default, minus 1) or chaikin (smoothed).')
       .optional(),
+    boundary: z
+      .enum(['edge_and_corner', 'edge_only'])
+      .describe(
+        'Accept an OPEN custom cage (some edges border one face, e.g. a sheet, a bowl, a cage with a hole): its boundary edges stay infinitely sharp. "edge_and_corner" also pins the corner vertices (boundary vertices of a single face); "edge_only" keeps them as smooth crease points. Absent = the cage must be closed. An open cage has no volume.',
+      )
+      .optional(),
     levels: levelsField.optional(),
     position: vec3('World position of the cage origin. Defaults to [0, 0, 0].').optional(),
     rotation: rotationField(),
@@ -174,6 +180,7 @@ export const addSubdivisionSolid = defineCommand({
       ...(sharp.edgeSharpness.length > 0 ? { edgeSharpness: sharp.edgeSharpness } : {}),
       ...(vertexSharpness.length > 0 ? { vertexSharpness } : {}),
       ...(params.creaseMethod !== undefined ? { creaseMethod: params.creaseMethod } : {}),
+      ...(params.boundary !== undefined ? { boundary: params.boundary } : {}),
     };
     const size = sizeProblem(cage, levels);
     if (size !== null) return dirRejection(doc, 'add_subdivision_solid', size.code, size.message);
@@ -191,6 +198,7 @@ export const addSubdivisionSolid = defineCommand({
         ...(cage.edgeSharpness !== undefined ? { edgeSharpness: cage.edgeSharpness } : {}),
         ...(cage.vertexSharpness !== undefined ? { vertexSharpness: cage.vertexSharpness } : {}),
         ...(cage.creaseMethod !== undefined ? { creaseMethod: cage.creaseMethod } : {}),
+        ...(cage.boundary !== undefined ? { boundary: cage.boundary } : {}),
         levels,
         elementIds: initialElementIds(cage.vertices.length, cage.faces.length),
       },

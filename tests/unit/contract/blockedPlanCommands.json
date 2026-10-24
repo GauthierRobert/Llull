@@ -1,19 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/design/04-direct-freeform-editing/validation/plans/target_brep_face_moves.json": [
-      "delete_faces",
-      "move_faces"
-    ],
-    "docs/design/04-direct-freeform-editing/validation/plans/target_creased_cube_topology.json": [
-      "bridge_cage_faces"
-    ],
-    "docs/design/04-direct-freeform-editing/validation/plans/target_nurbs_point_drag.json": [
-      "edit_nurbs_surface"
-    ],
-    "docs/design/04-direct-freeform-editing/validation/plans/target_subd_to_nurbs.json": [
-      "subdivision_to_nurbs"
-    ],
     "docs/design/05-implicit-lattice/validation/plans/target_graded_gyroid_column.json": [
       "create_scalar_field"
     ],

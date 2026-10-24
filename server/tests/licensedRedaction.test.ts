@@ -84,6 +84,28 @@ afterEach(() => {
 const command = (name: string, params: Record<string, unknown>, headers: Record<string, string> = {}): request.Test =>
   request(app).post('/command').set(headers).send({ name, params });
 
+describe('POST /preview applies the same redaction as /command', () => {
+  const preview = (name: string, params: Record<string, unknown>, headers: Record<string, string> = {}): request.Test =>
+    request(app).post('/preview').set(headers).send({ name, params });
+
+  it('a loopback peer reads the value, a relayed peer gets descriptors only and no geometry', async () => {
+    const local = await preview('get_material_allowable', ALLOWABLE);
+    expect(local.body.data).toMatchObject({ available: true, value: SENTINEL });
+    const remote = await preview('get_material_allowable', ALLOWABLE, REMOTE);
+    expect(remote.status).toBe(200);
+    expect(JSON.stringify(remote.body)).not.toContain(String(SENTINEL));
+    expect(remote.body.data).toMatchObject({ redacted: true, basis: 'A' });
+    expect(remote.body.summary).toContain('redacted: true');
+    expect(remote.body.entities).toEqual([]);
+  });
+
+  it('a relayed peer still previews an unlicensed mutation with its geometry', async () => {
+    const remote = await preview('add_box', { size: [1, 1, 1] }, REMOTE);
+    expect(remote.body.ok).toBe(true);
+    expect(remote.body.entities[0].positions.length).toBeGreaterThan(0);
+  });
+});
+
 describe('licensed values and non-local clients (TR-MAT-32)', () => {
   it('REST /command: a loopback peer reads the value, a relayed peer gets redacted data with basis and locator kept', async () => {
     const local = await command('get_material_allowable', ALLOWABLE);

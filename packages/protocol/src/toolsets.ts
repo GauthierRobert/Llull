@@ -35,6 +35,7 @@ export const TOOLSET_NAMES = [
   'scan',
   'mesh',
   'implicit',
+  'freeform',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -62,8 +63,16 @@ const MANUFACTURING_CORE_TOOLS: readonly string[] = words(
  * Tools an agent browsing one toolset looks for but that belong to another (each tool stays in exactly one toolset): listings point to them.
  * Holes, pockets and ribs are part features in most CAD tools, but here they are the 07 FTR `manufacturing` set (ENG-9).
  */
-export const TOOLSET_SEE_ALSO: Partial<Record<ToolsetName, { readonly toolset: ToolsetName; readonly tools: readonly string[] }>> = {
-  '3d': { toolset: 'manufacturing', tools: words('add_hole add_tapped_hole add_external_thread add_pocket add_rib') },
+export const TOOLSET_SEE_ALSO: Partial<
+  Record<ToolsetName, ReadonlyArray<{ readonly toolset: ToolsetName; readonly tools: readonly string[] }>>
+> = {
+  '3d': [
+    { toolset: 'manufacturing', tools: words('add_hole add_tapped_hole add_external_thread add_pocket add_rib') },
+    {
+      toolset: 'freeform',
+      tools: words('add_subdivision_solid edit_subdivision_cage edit_nurbs edit_nurbs_surface move_faces delete_faces'),
+    },
+  ],
 };
 
 /** Industrial piping commands: contributed by the `building` (industrial) plugin, exposed as their own small toolset. */
@@ -78,13 +87,13 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around create_sketch_plane place_on_sketch_plane project_edges_to_sketch break_sketch_link explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
   ),
   '3d': words(
-    'add_box add_cylinder add_sphere add_cone add_torus add_coil add_helix add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge probe_fillet fillet_faces fillet_full_round shell_solid draft_faces push_pull_face split_face replace_face split_body inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal delete_decal add_subdivision_solid edit_subdivision_cage set_cage_crease set_cage_symmetry extrude_cage_faces inset_cage_faces loop_cut_cage select_cage_elements evaluate_subdivision check_subdivision surface_from_curves create_nurbs_curve interpolate_curve create_conic edit_nurbs inspect_nurbs analyze_curve_curvature create_nurbs_surface surface_from_points loft_surface fill_surface trim_surface sew_surfaces thicken_surface blend_surfaces approximate_curve analyze_surface_curvature check_continuity measure_deviation analyze_draft check_surface_quality inspect_sweep check_sweep_loft ruled_surface sweep_surface network_surface scale_nonuniform twist_body taper_body stretch_body bend_body deform_lattice deform_by_point flow_along_curve flow_on_surface deform_curve_to_curve morph_bodies analyze_deformation check_deformation import_font list_fonts text_outline unwrap_face wrap_to_face project_to_face emboss_on_face create_curve_on_face split_face_by_curves pattern_on_face add_knurl check_wrap',
+    'add_box add_cylinder add_sphere add_cone add_torus add_coil add_helix add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge probe_fillet fillet_faces fillet_full_round shell_solid draft_faces push_pull_face split_face replace_face split_body inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal delete_decal surface_from_curves create_nurbs_curve interpolate_curve create_conic analyze_curve_curvature create_nurbs_surface surface_from_points loft_surface fill_surface trim_surface sew_surfaces thicken_surface blend_surfaces approximate_curve analyze_surface_curvature check_continuity measure_deviation analyze_draft inspect_sweep check_sweep_loft ruled_surface sweep_surface network_surface scale_nonuniform twist_body taper_body stretch_body bend_body deform_lattice deform_by_point flow_along_curve flow_on_surface deform_curve_to_curve morph_bodies analyze_deformation check_deformation import_font list_fonts text_outline unwrap_face wrap_to_face project_to_face emboss_on_face create_curve_on_face split_face_by_curves pattern_on_face add_knurl check_wrap',
   ),
   measure: words(
     'check_blends measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties geometric_validation_properties',
   ),
   parametric: words(
-    'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
+    'squash_steps replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
   assembly: words(
     'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion motion_study create_contact_set delete_contact_set drive_joint_to create_exploded_view set_active_exploded_view delete_exploded_view animate stop_animation ' +
@@ -134,6 +143,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get building(): readonly string[] {
     return pluginToolNames('building').filter((name) => !PIPING_TOOLS.includes(name));
   },
+  /** Direct and freeform editing (04 DIR): subdivision cages (creation, sculpting, creases, symmetry, topology tools, queries, conversion to NURBS), NURBS pole / point editing and exact face moves / deletion on B-reps. */
+  freeform: words(
+    'add_subdivision_solid edit_subdivision_cage set_cage_crease set_cage_symmetry extrude_cage_faces inset_cage_faces loop_cut_cage bridge_cage_faces bevel_cage_edges delete_cage_faces fill_cage_hole weld_cage_vertices slide_cage_edges select_cage_elements evaluate_subdivision check_subdivision subdivision_to_nurbs edit_nurbs edit_nurbs_surface inspect_nurbs check_surface_quality move_faces delete_faces',
+  ),
   /** Industrial pipe runs, supports, cable trays and hydraulics (industrial plugin) plus the plant piping plugin (02 RTE). */
   get piping(): readonly string[] {
     return [

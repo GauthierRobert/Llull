@@ -9,20 +9,26 @@ import { type Cage, subdivide } from '../subdivision';
 import { edgeKey } from './edgeKey';
 import { settleLevels } from './settle';
 import { levelQuadCount } from './volume';
-import { edgeSharpnessMap, vertexRule, vertexSharpnessArray, type VertexRule } from './sharpness';
+import { SHARP_MAX, edgeSharpnessMap, vertexRule, vertexSharpnessArray, type VertexRule } from './sharpness';
 import { type CageTopology, buildTopology, neighbourVertices, newellVector } from './topology';
 
 /** A cage level prepared for evaluation. */
-interface Level {
+export interface Level {
   readonly cage: Cage;
   readonly topology: CageTopology;
   readonly sharp: Map<string, number>;
   readonly corners: number[];
 }
 
-function prepare(cage: Cage): Level {
+export function prepare(cage: Cage): Level {
   const topology = buildTopology(cage.vertices.length, cage.faces);
-  return { cage, topology, sharp: edgeSharpnessMap(cage), corners: vertexSharpnessArray(cage, cage.vertices.length) };
+  const sharp = edgeSharpnessMap(cage);
+  const corners = vertexSharpnessArray(cage, cage.vertices.length);
+  // boundary edges are infinitely sharp; edge_and_corner pins the boundary vertices of a single face
+  for (const edge of topology.edges) if (edge.faces.length === 1) sharp.set(edgeKey(edge.a, edge.b), SHARP_MAX);
+  if (cage.boundary !== 'edge_only')
+    topology.vertexFaces.forEach((around, v) => around.length === 1 && topology.vertexEdges[v]?.length === 2 && (corners[v] = SHARP_MAX));
+  return { cage, topology, sharp, corners };
 }
 
 /** Subdominant eigenvalue of the Catmull-Clark subdivision matrix for valence n. */
@@ -133,10 +139,11 @@ export interface SurfaceSample {
   readonly approximate: boolean;
 }
 
-/** The 4 x 4 control grid of quad `f` (x along its first edge, y along its last) when its four corners are regular, interior and smooth. */
-function regularGrid(level: Level, f: number): Vec3[][] | null {
-  const { topology, cage, sharp, corners } = level;
-  const quad = topology.faces[f] as ReadonlyArray<number>;
+/** The 4 x 4 vertex ring of quad `f` started at its corner `rotation` (rows along the first edge, columns along the last) when its four corners are regular, interior and smooth. */
+export function regularRing(level: Level, f: number, rotation = 0): number[][] | null {
+  const { topology, sharp, corners } = level;
+  const raw = topology.faces[f] as ReadonlyArray<number>;
+  const quad = raw.map((_, i) => raw[(i + rotation) % raw.length] as number);
   for (const v of quad) {
     const fan = topology.vertexFaces[v] as number[];
     if (fan.length !== 4 || (corners[v] as number) > 0 || fan.some((g) => (topology.faces[g] as ReadonlyArray<number>).length !== 4))
@@ -151,13 +158,18 @@ function regularGrid(level: Level, f: number): Vec3[][] | null {
   const [pc, qd, pd, qa] = [after(cd, c, 1), after(cd, d, 3), after(da, d, 1), after(da, a, 3)];
   const diagonal = (key: string, v: number): number => after(faceWith(key), v, 2);
   const [c00, c30, c33, c03] = [diagonal(`${pa}>${a}`, a), diagonal(`${b}>${qb}`, b), diagonal(`${c}>${qc}`, c), diagonal(`${d}>${qd}`, d)];
-  const ring = [
+  return [
     [c00, qa, pd, c03],
     [pa, a, d, qd],
     [qb, b, c, pc],
     [c30, pb, qc, c33],
   ];
-  return ring.map((row) => row.map((w) => cage.vertices[w] as Vec3));
+}
+
+/** The 4 x 4 control grid of quad `f` (x along its first edge, y along its last) when its four corners are regular, interior and smooth. */
+function regularGrid(level: Level, f: number): Vec3[][] | null {
+  const ring = regularRing(level, f);
+  return ring === null ? null : ring.map((row) => row.map((w) => level.cage.vertices[w] as Vec3));
 }
 
 function evaluateGrid(grid: Vec3[][], x: number, y: number): Omit<SurfaceSample, 'depth' | 'approximate'> {

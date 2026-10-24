@@ -32,6 +32,31 @@ function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | nul
 }
 
 /**
+ * The limit-surface patch solid of a subdivision entity as a stand-in kernel result (a world-placed mesh entity whose `brep` is the subdivision
+ * recipe), so volume, centroid, inertia and method all come from ONE exact model; null without an exact kernel (mass properties + face queries) or
+ * when the kernel cannot build the patches.
+ */
+export function limitPatchEntity(e: Entity, ctx: ExecutionContext | undefined): Entity | null {
+  if (e.kind !== 'subdivision') return null;
+  const kernel = (ctx ?? currentContext()).kernel;
+  if (kernel?.massProperties === undefined || kernel.faceQuery === undefined) return null;
+  const shape = kernel.evaluate(recipeOf(e));
+  const volume = shape === null ? 0 : (kernel.massProperties(shape)?.volume ?? 0);
+  if (!(volume > 0)) return null;
+  return {
+    id: e.id,
+    kind: 'mesh',
+    layerId: e.layerId,
+    color: e.color,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    ...(e.materialId === undefined ? {} : { materialId: e.materialId }),
+    mesh: { positions: [], indices: [] },
+    brep: recipeOf(e),
+  };
+}
+
+/**
  * Volume of one solid entity (instances: the sum of their baked solid children).
  * @failure instance with a missing component, or a non-solid kind -> { error }
  */

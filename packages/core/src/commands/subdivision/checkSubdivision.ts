@@ -10,6 +10,7 @@ import { subdivide } from '../../geometry/subdivision';
 import { edgeSharpnessMap } from '../../geometry/subd/sharpness';
 import { symmetryDeviation } from '../../geometry/subd/symmetry';
 import { buildTopology, faceArea } from '../../geometry/subd/topology';
+import { boundaryLoops } from '../../geometry/subd/boundary';
 import { levelMeshVolume, levelQuadCount, limitVolumeEstimate } from '../../geometry/subd/volume';
 import { isEntity, subdivisionOf } from './shared';
 
@@ -49,7 +50,7 @@ function limitPatches(kernel: GeometryKernel | null, entity: SubdivisionEntity):
  * @affects none (read-only); data = status, findings, extraordinaryHistogram, creases, symmetry { maxDeviation }, euler, genus, meshVolume, limitVolumeEstimate, limitPatches (kernel), tolerances, provenance
  * @invariant status is "fail" when a finding fails, "warn" when only warnings remain, else "pass"; defaulted tolerances are listed with their source
  * @failure missing id (DIR_ENTITY_NOT_FOUND) -> refusal; findings are data, never refusals
- * @invariant kernel-optional: with ctx.kernel (exact B-rep + face queries) data.limitPatches reports the exact patch solid's volume and seam continuity; without it null
+ * @invariant kernel-optional: with exactSeams true and ctx.kernel (exact B-rep + face queries) data.limitPatches reports the exact patch solid's volume and seam continuity; without it null
  */
 export const checkSubdivision = defineCommand({
   name: COMMAND,
@@ -60,10 +61,16 @@ export const checkSubdivision = defineCommand({
     'DIR_CHECK_LEVEL_MESH_DEVIATION (warn: the level-mesh and limit-surface solids differ by more than `meshVsLimitRel` relative), ' +
     'DIR_CHECK_EXTRAORDINARY (info: vertices of valence other than 4 and n-gon faces). data also has the valence histogram, crease counts, ' +
     'Euler characteristic and genus, data.meshVolume (what mass_properties reports without the exact kernel), data.limitVolumeEstimate (extrapolated ' +
-    'limit surface) and, with the exact native kernel, data.limitPatches (patch solid, worst seam gap and tangent angle), in ' +
+    'limit surface) and, with `exactSeams` true on the exact native kernel, data.limitPatches (patch solid, worst seam gap and tangent angle: seconds on a cage of some dozens of vertices, so it is opt-in), in ' +
     'document units^3. Next: edit_subdivision_cage, set_cage_crease, evaluate_subdivision.',
   params: z.object({
     id: z.string().describe('Id of the subdivision solid.'),
+    exactSeams: z
+      .boolean()
+      .describe(
+        'true: with the native kernel also sew the exact patch solid and measure its seams (data.limitPatches). Slow (seconds on a 70-vertex level-3 cage); default false.',
+      )
+      .optional(),
     tolerances: z
       .object({
         symmetry: z
@@ -159,10 +166,15 @@ export const checkSubdivision = defineCommand({
         message: `the cage deviates ${deviation.toExponential(3)} from its declared mirror symmetry`,
         remediation: 'run set_cage_symmetry with snap true',
       });
-    const meshVolume = levelMeshVolume(entity, entity.levels);
-    const estimate = limitVolumeEstimate(entity);
-    const volumeRatio = estimate === null ? null : Math.abs(meshVolume - estimate.volume) / Math.abs(estimate.volume);
-    if (estimate === null)
+    const loops = boundaryLoops(topology);
+    const open = loops.length > 0;
+    const meshVolume = open ? null : levelMeshVolume(entity, entity.levels);
+    const estimate = open ? null : limitVolumeEstimate(entity);
+    const volumeRatio =
+      estimate === null || meshVolume === null ? null : Math.abs(meshVolume - estimate.volume) / Math.abs(estimate.volume);
+    if (open) {
+      // an open surface has no volume: the volume checks do not apply
+    } else if (estimate === null || meshVolume === null)
       findings.push({
         code: 'DIR_CHECK_LIMIT_VOLUME_UNAVAILABLE',
         severity: 'warn',
@@ -171,7 +183,7 @@ export const checkSubdivision = defineCommand({
         limit: 0,
         unit: 'volume',
         message: 'the cage is too large for the limit-volume estimate: the level-mesh deviation was not checked',
-        remediation: 'check a coarser cage or use the exact kernel (data.limitPatches)',
+        remediation: 'check a coarser cage, or use the exact kernel with exactSeams true (data.limitPatches)',
       });
     else if (volumeRatio === null || !Number.isFinite(volumeRatio))
       findings.push({
@@ -220,7 +232,7 @@ export const checkSubdivision = defineCommand({
     for (const { a, b } of topology.edges) parents[find(a)] = find(b);
     const components = new Set(entity.vertices.map((_, v) => find(v))).size;
     const kernel = (ctx ?? currentContext()).kernel;
-    const patches = limitPatches(kernel, entity);
+    const patches = open || params.exactSeams !== true ? null : limitPatches(kernel, entity);
     if (patches !== null && (patches['maxG0Gap'] as number) > gapLimit)
       findings.push({
         code: 'DIR_CHECK_PATCH_SEAM_GAP',
@@ -258,8 +270,11 @@ export const checkSubdivision = defineCommand({
       },
       symmetry: { planes: entity.symmetry?.planes ?? [], maxDeviation: deviation },
       euler,
-      genus: (2 * components - euler) / 2,
+      genus: (2 * components - euler - loops.length) / 2,
       components,
+      open,
+      boundary: open ? (entity.boundary ?? 'edge_and_corner') : null,
+      boundaryLoops: loops.map((loop) => loop.map((v) => entity.elementIds.vertices[v] as string)),
       meshVolume,
       limitVolumeEstimate: estimate === null ? null : estimate.volume,
       limitPatches: patches,
@@ -308,7 +323,9 @@ export const checkSubdivision = defineCommand({
     return report(
       doc,
       `${COMMAND}: '${entity.id}' — ${status}; ${findings.length} finding(s) [${findings.map((f) => f.code).join(', ')}]; Euler ${euler}, genus ${data.genus}; ` +
-        `level-${entity.levels} mesh volume ${meshVolume.toPrecision(10)}` +
+        (meshVolume === null
+          ? `open surface, ${loops.length} boundary loop(s), no volume`
+          : `level-${entity.levels} mesh volume ${meshVolume.toPrecision(10)}`) +
         (estimate === null ? '' : `, limit estimate ${estimate.volume.toPrecision(8)}`) +
         '.',
       data,

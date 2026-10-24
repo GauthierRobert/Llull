@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+mod face_nodes;
 mod floor;
 mod nodes;
 #[cfg(test)]
