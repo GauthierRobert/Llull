@@ -10,6 +10,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, PipeRun, PipingModel, Slope } from '@aec/plant/types';
 import { sub3 } from '@lib/vec3';
 import { unitVector } from './legs';
+import type { DerivedInline } from './deriveTypes';
 import { runPoints } from './model';
 
 export interface SlopeFinding {
@@ -85,6 +86,38 @@ function pockets(piping: PipingModel, run: PipeRun, line: PipeLine, dirs: readon
       message: `run ${run.id} has a ${low ? 'low' : 'high'} point after leg ${a.leg} (legs ${a.leg} to ${b.leg}) with no ${low ? 'drain' : 'vent'}`,
       detail: { kind: low ? 'low' : 'high', pi: a.leg, legs: [a.leg, b.leg], needs: low ? 'drain' : 'vent' },
       paths: [`runs.${run.id}.pis.${a.leg}`],
+    });
+  }
+  return findings;
+}
+
+/** Steps of the pipe bottom below this are geometric noise (the flush bottoms of a sloped pipe differ by the offset's tilt), mm. */
+const INVERT_STEP_NOISE_MM = 0.05;
+
+/** Largest vertical component of a leg direction for an eccentric reducer's invert step to count (steeper pipes have no bottom to keep flush). */
+const HORIZONTAL_ENOUGH = 0.5;
+
+/**
+ * Eccentric reducers whose downstream pipe bottom (invert) is higher than the upstream one on a graded line that falls: the liquid stops at the step, a
+ * low point without a drain (flat on top does this; flat on bottom keeps the bottoms flush).
+ */
+export function invertFindings(piping: PipingModel, run: PipeRun, inline: readonly DerivedInline[]): SlopeFinding[] {
+  const line = piping.lines[run.lineId];
+  if (line === undefined) return [];
+  const findings: SlopeFinding[] = [];
+  for (const placed of inline) {
+    const step = placed.flat?.invertStepMm ?? 0;
+    const slope = declaredSlope(run, line, placed.leg);
+    if (placed.flat === undefined || !(step > INVERT_STEP_NOISE_MM) || slope === null || !slope.fall) continue;
+    const points = runPoints(run);
+    const [from, to] = [points[placed.leg], points[placed.leg + 1]];
+    if (from === undefined || to === undefined || Math.abs(unitVector(sub3(to, from))[2]) > HORIZONTAL_ENOUGH) continue;
+    findings.push({
+      code: 'RTE_POCKET',
+      ids: [placed.id, run.id],
+      message: `eccentric reducer ${placed.id} on leg ${placed.leg} of run ${run.id} is flat on ${placed.flat.label}: the pipe bottom steps up ${+step.toFixed(4)} mm along the flow, so a line declared to fall holds liquid there (flat on bottom keeps the bottoms flush)`,
+      detail: { kind: 'eccentric-invert-step', leg: placed.leg, invertStepMm: step, flat: placed.flat.label, needs: 'flat on bottom' },
+      paths: [`runs.${run.id}.inline`],
     });
   }
   return findings;

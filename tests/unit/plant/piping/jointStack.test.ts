@@ -96,3 +96,19 @@ describe('stackLeg: weld gaps', () => {
     expect(result.pieces[0]).toMatchObject({ from: 'a', to: 'b', cut: 2696 });
   });
 });
+
+describe('stackLeg: socket / threaded joins (negative gap: the pipe goes inside)', () => {
+  it('a socket gap of -11.4 on both sides lengthens the piece by 22.8: 3000 - 2 x 41 + 22.8 = 2940.8', () => {
+    const result = stack(stackLeg(3000, [fitting('a', 0, 41, -11.4), fitting('b', 2959, 3000, -11.4)], 50));
+    expect(result.pieces[0]).toMatchObject({ start: 29.6, end: 2970.4 });
+    expect(result.pieces[0]?.cut).toBeCloseTo(2940.8, 9);
+  });
+
+  it('fittings whose faces overlap are refused even when the pipe between them would be positive', () => {
+    // a ends at 41, b starts at 30: the faces overlap by 11; with -11.4 gaps the pipe piece would be +11.8
+    const result = failure(stackLeg(100, [fitting('a', 0, 41, -11.4), fitting('b', 30, 100, -11.4)], 50));
+    expect(result.code).toBe('RTE_SEGMENT_TOO_SHORT');
+    expect(result.detail.cutLengthMm).toBeCloseTo(-11, 9);
+    expect(failure(stackLeg(100, [fitting('a', 0, 41, -11.4), inline('v', 30, 100, -11.4)], 50)).code).toBe('RTE_INLINE_DOES_NOT_FIT');
+  });
+});

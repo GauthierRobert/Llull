@@ -9,6 +9,7 @@ import type { Entity, RevolutionEntity } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { PipeLine, RoutedPart } from '@aec/plant/types';
 import { add3, len3, scale3, sub3 } from '@lib/vec3';
+import { operatorBodies, type OperatorKind } from './operator';
 import {
   axisOf,
   entityOf,
@@ -27,6 +28,8 @@ const STEM_RADIUS = 0.08;
 const WHEEL_RADIUS = 0.55;
 const WHEEL_THICKNESS = 0.06;
 const OLET_RADIUS = 0.65;
+const OPERATOR_LABEL: Readonly<Record<OperatorKind, string>> = { handwheel: 'Handwheel', gear: 'Gear operator', actuator: 'Actuator' };
+
 /** Stem length when the catalogue row gives no `stemHeight`, as a fraction of the face-to-face length. */
 const STEM_FRACTION_OF_LENGTH = 0.9;
 
@@ -63,6 +66,18 @@ function valveEntities(part: RoutedPart, line: PipeLine): Entity[] {
   if (part.centre === undefined || stem === undefined || !(len3(stem) > 0)) return entities;
   const length = part.dims['stemHeight'] ?? frame.length * STEM_FRACTION_OF_LENGTH;
   entities.push(withId(cylinder(part, line, VALVE_LAYER_ID, 'Valve stem', part.centre, stem, length, od * STEM_RADIUS), `${part.id}/stem`));
+  const operator = operatorBodies(part);
+  // A row that describes its operator (handwheel diameter, gear box, actuator) is drawn from those dimensions; otherwise the named display proportions.
+  if (operator.length > 0) {
+    for (const body of operator)
+      entities.push(
+        withId(
+          cylinder(part, line, VALVE_LAYER_ID, OPERATOR_LABEL[body.kind], body.from, body.axis, body.lengthMm, body.radiusMm),
+          body.id,
+        ),
+      );
+    return entities;
+  }
   const wheelAt = add3(part.centre, scale3(stem, length));
   entities.push(
     withId(cylinder(part, line, VALVE_LAYER_ID, 'Handwheel', wheelAt, stem, od * WHEEL_THICKNESS, od * WHEEL_RADIUS), `${part.id}/wheel`),

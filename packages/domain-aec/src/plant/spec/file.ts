@@ -120,7 +120,18 @@ export const headerShape = {
     .object({
       anglesDeg: z.array(z.number().positive()).min(1).describe('Allowed elbow angles in degrees.'),
       toleranceDeg: z.number().min(0).describe('Angle tolerance in degrees.'),
-      trimmedAllowed: z.boolean().describe('Whether a cut-to-angle (trimmed) elbow is allowed.'),
+      trimmedAllowed: z
+        .boolean()
+        .describe(
+          'Whether a cut-to-angle (trimmed) elbow is allowed: the spec 90 degree elbow cut to a turn up to 90 degrees (flagged RTE_NONSTANDARD_FITTING).',
+        ),
+      bendRadiusD: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Pipe bends: bend centreline radius in pipe outside diameters (5 = a 5D bend) for a turn no angle fits; butt-weld pipe only (flagged RTE_NONSTANDARD_FITTING). A run bendRadius (route_pipe) overrides it.',
+        ),
     })
     .strict()
     .describe('Elbow angle rules consumed by routing (02 RTE).')

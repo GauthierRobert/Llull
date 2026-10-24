@@ -169,17 +169,17 @@ results; approvals are human gates (AF-34).
 
 | FR                                | VC                    | FR                                  | VC            |
 | --------------------------------- | --------------------- | ----------------------------------- | ------------- |
-| FR-RTE-01 ports                   | VC-RTE-01, 09         | FR-RTE-14 editing / stretch         | VC-RTE-12     |
+| FR-RTE-01 ports                   | VC-RTE-01, 09         | FR-RTE-14 editing / stretch         | VC-RTE-12, 36 |
 | FR-RTE-02 pipelines, line numbers | VC-RTE-01, 13         | FR-RTE-15 takeoff                   | VC-RTE-02, 04 |
 | FR-RTE-03 compass routing         | VC-RTE-01             | FR-RTE-16 insulation                | VC-RTE-13     |
 | FR-RTE-04 spec-bound parts        | VC-RTE-02, 16         | FR-RTE-17 heat tracing              | VC-RTE-22     |
-| FR-RTE-05 elbows, tolerance       | VC-RTE-03, 08, 11, 15 | FR-RTE-18 valve operators           | VC-RTE-05     |
+| FR-RTE-05 elbows, tolerance       | VC-RTE-03, 08, 11, 15, 34 | FR-RTE-18 valve operators           | VC-RTE-05, 35 |
 | FR-RTE-06 flange sets             | VC-RTE-02, 09         | FR-RTE-19 legacy conversion         | VC-RTE-20     |
 | FR-RTE-07 inline components       | VC-RTE-04             | FR-RTE-20 3D geometry               | VC-RTE-23     |
 | FR-RTE-08 branch table            | VC-RTE-06             | FR-RTE-21 line list feed            | VC-RTE-13, 24 |
-| FR-RTE-09 cut-back                | VC-RTE-01, 10         | FR-RTE-22 auto-route (V2)           | VC-RTE-18     |
+| FR-RTE-09 cut-back                | VC-RTE-01, 10, 30, 31 | FR-RTE-22 auto-route (V2)           | VC-RTE-18     |
 | FR-RTE-10 slope                   | VC-RTE-08             | FR-RTE-23 heat loss (V1)            | VC-RTE-14     |
-| FR-RTE-11 reducers / size change  | VC-RTE-09             | FR-RTE-24 codes, units, determinism | VC-RTE-17, 19 |
+| FR-RTE-11 reducers / size change  | VC-RTE-09, 33         | FR-RTE-24 codes, units, determinism | VC-RTE-17, 19 |
 | FR-RTE-12 connectivity graph      | VC-RTE-07             | FR-RTE-25 exports                   | VC-RTE-24     |
 | FR-RTE-13 check_piping            | VC-RTE-05, 07, 10     | FR-RTE-26 unverified / review flags | VC-RTE-21     |
 

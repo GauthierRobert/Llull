@@ -100,7 +100,7 @@ interface AutoRouteRecord {
 export interface InlineComponent {
   /** Step-scoped id (`valve-8.1`). */
   readonly id: string;
-  /** Catalogue component type: `valveGate`, `valveGlobe`, ..., `reducerConcentric`. */
+  /** Catalogue component type: `valveGate`, `valveGlobe`, ..., `reducerConcentric`, `reducerEccentric`. */
   readonly type: string;
   readonly tag?: string;
   /** Leg index in the run (legs = [start, ...pis, end]). */
@@ -111,6 +111,8 @@ export interface InlineComponent {
   readonly dn2?: number;
   /** Valves: unit vector from the valve centre toward the handwheel. */
   readonly stemDirection?: Vec3;
+  /** Eccentric reducers: unit vector from the axis toward the flat side (the side where the outer surfaces of the two pipes line up). */
+  readonly flatDirection?: Vec3;
 }
 
 /** A branch off a header run: the branch run `branchRunId` starts at the point `distance` along leg `leg` of the header centreline. */
@@ -139,6 +141,8 @@ export interface PipeRun {
   readonly legSlopes?: ReadonlyArray<Slope | null>;
   /** Overrides the spec's elbow-angle tolerance (degrees) for this run; named in results. */
   readonly angleToleranceDeg?: number;
+  /** Pipe bends: the centreline radius (mm) of the bend a turn no spec angle fits becomes (butt-weld pipe); absent = the spec's trimmed elbow or bendRadiusD. */
+  readonly bendRadiusMm?: number;
   /**
    * Set when the run no longer derives (a port was moved or removed, a nozzle was resized, ...): its display entities are dropped until a
    * command makes it derivable again. `piping_takeoff` lists such runs. A moved port is first followed by orthogonal stretch (02 M3);
@@ -204,6 +208,8 @@ export interface RoutedPart {
   readonly tag?: string;
   /** Valves: unit vector from the centre toward the handwheel. */
   readonly stemDirection?: Vec3;
+  /** Eccentric reducers: unit vector from the axis toward the flat side. */
+  readonly flatDirection?: Vec3;
   /** Olets and stub-ins: the header pipe piece they sit on (their first port is welded to it, not to another port). */
   readonly onPart?: string;
   /** Bolt sets: stud count. */
@@ -221,8 +227,10 @@ export interface Joint {
   readonly kind: 'buttWeld' | 'branchWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
   readonly parts: readonly [string, string];
   readonly position: Vec3;
-  /** Weld root gap (butt weld) or gasket thickness (flanged), mm. */
+  /** Weld root gap (butt weld), socket root gap (socket weld) or gasket thickness (flanged), mm. */
   readonly gapMm: number;
+  /** Socket-weld and threaded joints: how far the pipe goes into the fitting, mm (the pipe piece cut length includes it). */
+  readonly engagementMm?: number;
   /** Flanged joints: the gasket and bolt set that belong to it. */
   readonly accessories?: readonly string[];
 }

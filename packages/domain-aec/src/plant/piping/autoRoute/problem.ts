@@ -142,7 +142,8 @@ function stubParts(doc: CadDocument, line: PipeLine, ends: { from: PortEnd; to: 
   for (const side of ['from', 'to'] as const) {
     const port = ends[side].port;
     if (port?.endType !== 'FL') continue;
-    const set = resolveFlangeSet(lookup, port, line.dn);
+    const pipe = lookup.pipe(line.dn);
+    const set = resolveFlangeSet(lookup, port, line.dn, isMiss(pipe) ? 'BW' : (pipe.pipeEnd ?? 'BW'));
     if ('code' in set) return refusal(set.code, set.message, [`${side}.portId`], set.ids);
     flangeLengths[side] = set.length;
     for (const part of [set.flange, set.gasket, set.bolts]) if (part.unverified) reasons.push(`${part.key} is not grade A`);

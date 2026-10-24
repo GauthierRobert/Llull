@@ -1,0 +1,83 @@
+{
+  "id": "SC-RTE-10",
+  "status": "RUNNABLE (02 RTE V1 part 1): every step runs (imports, SW tie-in, route_pipe, insert_inline_component, piping_takeoff, check_piping).",
+  "unbuilt": [],
+  "validates": ["VC-RTE-30"],
+  "description": "A DN25 (NPS 1) socket-weld line on the small-bore stub spec SW800 (plain-end pipe, SW fittings, Class 800 SW gate valve): from a SW tie-in at the origin facing +Z, up 1000, then +X 1500 to an open end, one SW 90 elbow. The pipe goes socketDepth J - socket gap g = 13 - 1.6 = 11.4 mm into every socket (the port included), so each cut is the leg minus the centre-to-mouth plus the engagement(s). A SW gate valve (face-to-face 79) is then inserted at 500 on the first leg and splits the first piece. The stub dimensions are declared INPUTS (data/catalog_stub_small_bore.json), not a standard.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_small_bore.json", "actions[1].params.spec": "../data/spec_sw800.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_small_bore.json = the INPUT dimensions of the small-bore plans (catalogue rte-validation-stub-small-bore), spec_sw800.json = spec SW800 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_small_bore.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_sw800.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "SW-A", "position": [0, 0, 0], "direction": [0, 0, 1], "dn": 25, "endType": "SW" },
+      "as": "a"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "5001", "spec": "SW800", "dn": 25 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "legs": [
+          { "direction": "+Z", "length": 1000 },
+          { "direction": "+X", "length": 1500 }
+        ]
+      },
+      "as": "run"
+    },
+    { "command": "piping_takeoff", "params": { "runId": "$run" } },
+    {
+      "command": "insert_inline_component",
+      "params": {
+        "runId": "$run",
+        "type": "valveGate",
+        "tag": "XV-5",
+        "at": { "leg": 0, "centreDistance": 500 },
+        "stemDirection": [0, -1, 0]
+      },
+      "as": "valve"
+    },
+    { "command": "piping_takeoff", "params": { "runId": "$run" } },
+    { "command": "check_piping", "params": { "lineIds": ["$line"] } }
+  ],
+  "expected": [
+    {
+      "step": 4,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [981.8, 1470.4],
+      "abs": 0.01,
+      "source": "e = J - g = 13 - 1.6 = 11.4 ; leg 0: 1000 - 41 + 2 e = 981.8 (port socket and elbow socket) ; leg 1: 1500 - 41 + e = 1470.4 (open end)"
+    },
+    { "step": 4, "path": "data.counts.socketWelds", "value": 3 },
+    { "step": 4, "path": "data.counts.buttWelds", "value": 0 },
+    { "step": 4, "path": "data.counts.elbow90", "value": 1 },
+    {
+      "step": 4,
+      "path": "data.centrelineLengthMm",
+      "value": 2487.982297,
+      "abs": 0.0001,
+      "source": "the bend ends at the socket bottom: R = 41 - 13 = 28 ; 2500 - 2 x 28 + 28 x pi / 2"
+    },
+    { "step": 5, "path": "data.joints[*].engagementMm", "value": [11.4, 11.4, 11.4], "abs": 0.0001 },
+    { "step": 5, "path": "data.joints[*].kind", "value": ["socketWeld", "socketWeld", "socketWeld"] },
+    { "step": 6, "path": "data.facePositions[*][2]", "value": [460.5, 539.5], "abs": 0.01, "source": "500 -/+ 79 / 2" },
+    {
+      "step": 6,
+      "path": "data.legCutLengthsMm",
+      "value": [483.3, 442.3],
+      "abs": 0.01,
+      "source": "(460.5 + 11.4) - (0 - 11.4) = 483.3 ; (1000 - 41 + 11.4) - (539.5 - 11.4) = 970.4 - 528.1 = 442.3"
+    },
+    { "step": 7, "path": "data.pipePieces[*].cutLengthMm", "value": [483.3, 442.3, 1470.4], "abs": 0.01 },
+    { "step": 7, "path": "data.counts.socketWelds", "value": 5 },
+    { "step": 7, "path": "data.totalPipeMm", "value": 2396, "abs": 0.01, "source": "483.3 + 442.3 + 1470.4" },
+    { "step": 8, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 1, "source": "only the free end of the last piece" },
+    { "step": 8, "path": "data.issues[?code=='RTE_END_TYPE_MISMATCH'].length", "value": 0 },
+    { "step": 8, "path": "data.issues[?code=='RTE_WELD_SPACING'].length", "value": 0 }
+  ]
+}

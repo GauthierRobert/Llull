@@ -60,7 +60,7 @@ export const editOpSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('setHeader').describe('Set header members of the spec.'),
     fields: json.describe(
-      'Header members to set (a member set to null is removed, except the required ones): title, service, dimensionalStandard, rating, materials, corrosionAllowance { value, unit }, millTolerance, designLimits, catalogs, elbowAngles, provenance.',
+      'Header members to set (a member set to null is removed, except the required ones): title, service, dimensionalStandard, rating, materials, corrosionAllowance { value, unit }, millTolerance, designLimits, catalogs, elbowAngles ({ anglesDeg, toleranceDeg, trimmedAllowed, bendRadiusD? }), provenance.',
     ),
   }),
 ]);

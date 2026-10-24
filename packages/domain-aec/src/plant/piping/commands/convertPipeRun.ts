@@ -28,7 +28,7 @@ export const convertPipeRun = defineCommand({
   name: 'convert_pipe_run',
   description:
     'Convert a legacy pipe (building element from add_pipe_run: a polyline with a diameter, no fittings) into a spec-driven pipe run: the vertices become ' +
-    'the points of intersection (a vertex that bends by no more than the spec elbow-angle tolerance, 1 deg for CS150, is straight pipe and merges; z is the level elevation + the vertex z), every bend gets the spec elbow, every straight ' +
+    'the points of intersection (a vertex that bends by no more than the spec elbow-angle tolerance, 1 deg for CS150, is straight pipe and merges; z is the level elevation + the vertex z), every bend gets the spec elbow (a bend no spec angle fits becomes a trimmed 90 elbow or a pipe bend when the spec allows: trimmedAllowed / bendRadiusD, flagged RTE_NONSTANDARD_FITTING), every straight ' +
     'piece its cut length, and both ends stay open (connect them later by routing from "<runId>:start|end" or compare with check_piping, which lists ' +
     'them as RTE_OPEN_END). A pipe line is created with the legacy line number verbatim (or the template DN-service-sequence-spec when the pipe has ' +
     'none), the legacy service, from and to text and size (the pipe dn, else the DN of its diameter in the pipe size table); pass lineId to put the run on ' +
@@ -38,7 +38,7 @@ export const convertPipeRun = defineCommand({
     'centrelineLengthMm, warnings, unverified, unverifiedReasons, mergedPoints (vertices merged as straight), straightenedMaxOffsetMm (the largest ' +
     'sideways distance of a merged vertex from the straightened leg, 0 when none: the geometry the conversion moved), replaced }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_PIPE, RTE_PIPE_HAS_SUPPORTS (replace with supports on the legacy pipe: they cannot move to the run yet), RTE_UNKNOWN_LINE, ' +
     'RTE_SPEC_UNKNOWN, RTE_SIZE_MISMATCH, RTE_DUPLICATE_LINE_NUMBER, RTE_NO_FITTING_FOR_ANGLE (detail.vertices lists the vertex indices and angles of ' +
-    'every bend with no spec elbow), RTE_ZERO_LEG, RTE_SEGMENT_TOO_SHORT, RTE_SPEC_NO_COMPONENT. Next: piping_takeoff, check_piping.',
+    'every bend with no spec elbow, trimmed elbow or bend), RTE_ZERO_LEG, RTE_SEGMENT_TOO_SHORT, RTE_SPEC_NO_COMPONENT. Next: piping_takeoff, check_piping.',
   params: z.object({
     pipeId: z.string().describe('Id of the legacy pipe: the building element id (affected[0] of add_pipe_run, e.g. "pipe-3").'),
     spec: z
@@ -111,6 +111,8 @@ export const convertPipeRun = defineCommand({
     const elevation = building.levels[pipe.levelId]?.elevation ?? 0;
     const world = pipe.points.map((point): Vec3 => [point[0], point[1], point[2] + elevation]);
     const tolerance = lookup.elbowAngles().toleranceDeg;
+    const pipeRow = lookup.pipe(dn);
+    const bendOptions = isMiss(pipeRow) ? undefined : { pipeOd: pipeRow.dims['outsideDiameter'] ?? 0 };
     // Every bend must have a spec elbow: list them all, not only the first.
     const unfit: Array<{ vertex: number; angleDeg: number }> = [];
     // A vertex that deflects by no more than the spec angle tolerance is straight pipe: it merges (counted in data.mergedPoints).
@@ -127,7 +129,7 @@ export const convertPipeRun = defineCommand({
         continue;
       }
       kept.push(world[i] as Vec3);
-      if ('code' in chooseElbow(lookup, dn, turn, tolerance)) unfit.push({ vertex: i, angleDeg: turn });
+      if ('code' in chooseElbow(lookup, dn, turn, tolerance, bendOptions)) unfit.push({ vertex: i, angleDeg: turn });
     }
     kept.push(world.at(-1) as Vec3);
     // How far the straightening moved the pipe: each merged vertex against the leg that now runs past it.

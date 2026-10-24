@@ -189,6 +189,33 @@
       ]
     },
     {
+      "id": "asme-b16.9-reducer-eccentric-rte-stub",
+      "type": "reducerEccentric",
+      "standard": "ASME B16.9",
+      "dimensionalStandard": "ASME",
+      "ends": ["BW"],
+      "sizes": [
+        {
+          "nps": 4,
+          "smallNps": 3,
+          "length": 102,
+          "provenance": {
+            "sourceId": "S13",
+            "citation": "02 RTE V1 declared INPUT: eccentric reducer 4x3, H = the concentric H (B16.9 tabulates one H for both), grade B"
+          }
+        },
+        {
+          "nps": 6,
+          "smallNps": 4,
+          "length": 140,
+          "provenance": {
+            "sourceId": "S13",
+            "citation": "02 RTE V1 declared INPUT: eccentric reducer 6x4, H = the concentric H (B16.9 tabulates one H for both), grade B"
+          }
+        }
+      ]
+    },
+    {
       "id": "mss-sp-97-weldolet-rte-stub",
       "type": "weldolet",
       "standard": "MSS SP-97",

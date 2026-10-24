@@ -41,6 +41,7 @@ function componentData(run: PipeRun, derivation: RunDerivation, component: Inlin
     partIds: placed?.partIds,
     ...(placed?.stemDirection === undefined ? {} : { stemDirection: placed.stemDirection }),
     handwheelCentre: handwheel,
+    operator: placed?.operator ?? null,
     legCutLengthsMm: derivation.legs[component.leg]?.cutLengthsMm,
     pipePieces: takeoff.pipePieces.map((piece) => ({ id: piece.id, dn: piece.dn, leg: piece.leg, cutLengthMm: piece.cutLengthMm })),
     counts: takeoff.counts,
@@ -100,16 +101,22 @@ const legDirection = (run: PipeRun, leg: number): Vec3 | null => {
 export const insertInlineComponent = defineCommand({
   name: 'insert_inline_component',
   description:
-    'Insert a valve or a concentric reducer into a routed pipe run (route_pipe / auto_route_pipe / add_branch), spec-driven. A flanged valve (the ' +
-    'spec row says FL ends) splits the leg: face-to-face from the catalogue, a weld-neck flange + gasket + bolt set on each face, pipe pieces ' +
-    'shortened to fit (data.pipePieces, data.legCutLengthsMm); a reducer occupies its end-to-end length and the run continues at dn2 downstream. ' +
+    'Insert a valve or a reducer (concentric or eccentric) into a routed pipe run (route_pipe / auto_route_pipe / add_branch), spec-driven. A flanged valve (the ' +
+    'spec row says FL ends) splits the leg: face-to-face from the catalogue, a flange + gasket + bolt set on each face, pipe pieces ' +
+    'shortened to fit (data.pipePieces, data.legCutLengthsMm); a butt-weld valve has no flanges; a socket-weld or threaded valve takes the pipe socketDepth - 1.6 mm / threadEngagement ' +
+    'into each end; a reducer occupies its end-to-end length and the run continues at dn2 downstream. An eccentric reducer (reducerEccentric) needs flat ("top" = flat on top, +Z; ' +
+    '"bottom", -Z; horizontal or sloped pipes) or flatDirection (any side, needed on vertical pipes): the outer surfaces of the two pipes line up on the flat side, so the smaller ' +
+    'axis sits (OD big - OD small) / 2 toward it; the leg after the reducer must take that offset up along its own axis (turn the flat to it; within the angle tolerance the residual is ' +
+    'a RTE_ECCENTRIC_OFFSET warning), else RTE_ECCENTRIC_OFFSET; a branch downstream of it on the same leg is refused. ' +
     'at: { leg, centreDistance } (leg index of route_pipe data.legs, distance of the centre from the leg start, mm) or { point: [x, y, z] } on the ' +
     'centreline. Valves: stemDirection points to the handwheel (default up, or +X on a vertical pipe); data.handwheelCentre = centre + stem x ' +
-    'catalogue stemHeight (0 when the row has none, stemHeightFromCatalogue false). Returns the component id (affected[0]) to pass to ' +
+    'catalogue stemHeight (0 when the row has none, stemHeightFromCatalogue false); data.operator = { kind handwheel | gear | actuator, bodies [{ id, kind, from, axis, lengthMm, radiusMm }] } is the operator envelope ' +
+    'from the row (handwheelDiameter, gearboxDiameter / gearboxHeight, actuatorDiameter / actuatorHeight along the stem direction), null when the row describes none; check_piping reports its clashes. Returns the component id (affected[0]) to pass to ' +
     'move_inline_component / remove_inline_component / check_piping; data = { componentId, runId, type, tag, leg, centreDistance, dn, dn2, lengthMm, ' +
     'centre, facePositions [[x,y,z],[x,y,z]] (upstream, downstream), partIds, stemDirection, handwheelCentre, legCutLengthsMm, pipePieces, counts, ' +
     'warnings, unverified }. Refusals: RTE_UNITS_UNSUPPORTED, RTE_UNKNOWN_RUN, RTE_INLINE_DOES_NOT_FIT (detail names the neighbours and the cut ' +
-    'length), RTE_SPEC_NO_COMPONENT, RTE_SIZE_MISMATCH, RTE_NO_CONNECTION_RULE, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH. Next: check_piping ' +
+    'length), RTE_SPEC_NO_COMPONENT, RTE_SIZE_MISMATCH, RTE_NO_CONNECTION_RULE, RTE_RATING_MISMATCH, RTE_FACING_MISMATCH, RTE_ECCENTRIC_INVALID (flat missing / both given / on a concentric ' +
+    'reducer / top or bottom on a vertical pipe), RTE_ECCENTRIC_OFFSET. Next: check_piping ' +
     '(maxHandwheelCentreHeight), piping_takeoff.',
   params: z.object({
     runId: z.string().describe('Pipe run id (affected[0] of route_pipe / auto_route_pipe / add_branch).'),

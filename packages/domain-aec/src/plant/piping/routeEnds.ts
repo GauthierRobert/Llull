@@ -4,14 +4,55 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import type { PartPort, RoutedPart, RunEnd } from '@aec/plant/types';
+import type { EndType, PartPort, PortSpec, RoutedPart, RunEnd } from '@aec/plant/types';
 import { len3, scale3, sub3 } from '@lib/vec3';
-import { fail, type DerivationFailure } from './deriveTypes';
+import { fail, isFailure, type DerivationFailure } from './deriveTypes';
+import { isJoinFailure, joinFrom } from './connections';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { angleBetweenDeg, epsilonFor, unitVector } from './legs';
 import { portIdOf, portOfRef } from './ports';
 import { at, partOf, type EndSetup, type Env, type Mint } from './routeEnv';
 import { branchStartSetup } from './routeBranch';
+import { isMiss } from './specLookup';
+
+/** Component types whose rows give the socket depth / thread engagement of a SW / threaded port (the project's own sockets of that size), in order. */
+const PORT_GAUGE_TYPES = ['elbow90', 'coupling', 'tee'] as const;
+
+/**
+ * The setup of a socket-weld or threaded port: the pipe goes into the port by the depth of the spec's own socket (or thread) fittings of that size,
+ * since a port carries no depth of its own.
+ * @failure no rule for the pair -> RTE_NO_CONNECTION_RULE; no spec row with a socketDepth / threadEngagement -> RTE_SPEC_NO_COMPONENT
+ */
+function socketPortSetup(env: Env, port: PortSpec, portId: string, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
+  const { lookup } = env;
+  const pipe = env.pipeAt(dn);
+  if (isFailure(pipe)) return pipe;
+  const pipeEnd: EndType = pipe.row.pipeEnd ?? 'BW';
+  const dimension = port.endType === 'SW' ? 'socketDepth' : 'threadEngagement';
+  const rule = lookup.connection(port.endType, pipeEnd);
+  if (rule === null)
+    return fail(
+      'RTE_NO_CONNECTION_RULE',
+      `spec ${lookup.id} has no rule joining a pipe with ${pipeEnd} ends to a ${port.endType} port (${portId}): socket weld needs plain-end (PE) pipe, threaded needs threaded pipe`,
+      [portId],
+      [side],
+      { portEndType: port.endType, pipeEndType: pipeEnd },
+    );
+  for (const type of PORT_GAUGE_TYPES) {
+    const row = lookup.component({ types: [type], dn });
+    if (isMiss(row) || row.dims[dimension] === undefined) continue;
+    const join = joinFrom(lookup, port.endType, pipeEnd, row.dims, row.key);
+    if (isJoinFailure(join)) return fail(join.code, join.message, [portId, row.key], [side], join.detail);
+    return { length: 0, gap: join.gapMm, set: null, join, port, portId };
+  }
+  return fail(
+    'RTE_SPEC_NO_COMPONENT',
+    `port ${portId} is ${port.endType} but spec ${lookup.id} has no ${PORT_GAUGE_TYPES.join(' / ')} row at DN${dn} with a ${dimension}: a ${port.endType} port has no depth of its own, it is read from the spec's own fittings`,
+    [portId],
+    [side],
+    { dimension },
+  );
+}
 
 /**
  * The setup of the port at one run end; `dn` is the run size there.
@@ -50,17 +91,20 @@ export function setupEnd(env: Env, end: RunEnd, side: 'start' | 'end', dn: numbe
   if (weld === null) return fail('RTE_NO_CONNECTION_RULE', `spec ${lookup.id} has no BW-BW connection rule`, [lookup.id], [side]);
   if (end.ref.kind === 'branch') return branchStartSetup(env, end.ref, port, portId);
   if (port.endType === 'BW') return { length: 0, gap: weld.gapMm, set: null, port, portId };
+  if (port.endType === 'SW' || port.endType === 'SC') return socketPortSetup(env, port, portId, side, dn);
   if (port.endType !== 'FL' || lookup.connection('FL', 'FL') === null)
     return fail(
       'RTE_NO_CONNECTION_RULE',
-      `spec ${lookup.id} has no rule joining a butt-weld pipe end to a ${port.endType} port (${portId})`,
+      `spec ${lookup.id} has no rule joining a pipe end to a ${port.endType} port (${portId}); ports are BW, FL, SW (socket weld) or SC (threaded)`,
       [portId],
       [side],
       { portEndType: port.endType },
     );
-  const set = resolveFlangeSet(lookup, port, dn);
+  const pipe = env.pipeAt(dn);
+  if (isFailure(pipe)) return pipe;
+  const set = resolveFlangeSet(lookup, port, dn, pipe.row.pipeEnd ?? 'BW');
   if ('code' in set) return fail(set.code, set.message, set.ids, [side], set.detail);
-  return { length: set.length, gap: weld.gapMm, set, portId, port };
+  return { length: set.length, gap: set.join.gapMm, set, join: set.join, portId, port };
 }
 
 /** Part ids of one flange set. */
@@ -88,7 +132,7 @@ export function flangeParts(
   away: boolean,
 ): RoutedPart[] {
   const g = set.gasketThickness;
-  const fl = (position: Vec3, direction: Vec3, end: 'FL' | 'BW'): PartPort => ({
+  const fl = (position: Vec3, direction: Vec3, end: EndType): PartPort => ({
     position,
     direction,
     dn: set.flange.dn,
@@ -108,7 +152,7 @@ export function flangeParts(
     ids.flange,
     'flange',
     set.flange,
-    order([fl(at(origin, into, g), out, 'FL'), fl(at(origin, into, g + set.hub), into, 'BW')]),
+    order([fl(at(origin, into, g), out, 'FL'), fl(at(origin, into, g + set.hub), into, set.join.end)]),
     { dims: { ...set.flange.dims, pipeOutsideDiameter: pipeOd } },
   );
   return away ? [gasket, bolts, flange] : [flange, bolts, gasket];

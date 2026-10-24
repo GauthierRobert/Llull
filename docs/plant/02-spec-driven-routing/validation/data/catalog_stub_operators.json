@@ -1,0 +1,80 @@
+{
+  "format": "llull-piping-catalog",
+  "schemaVersion": 1,
+  "id": "rte-validation-stub-operators",
+  "version": "1.0.0",
+  "title": "02 RTE V1 validation stub: NPS 4 Class 150 RF flanged valves with their operator envelopes (stemHeight = valve centre to the top of the operator along the stem; handwheelDiameter / handwheelThickness = a disc centred at stemHeight; gearbox and actuator = a cylinder whose top is at stemHeight). Face-to-face lengths are the B16.10 values of the stub; every operator dimension is a declared input. Not a standard; no value is verified.",
+  "licence": "open-data",
+  "families": [
+    {
+      "id": "asme-b16.10-gate-operators-rte-stub",
+      "type": "valveGate",
+      "standard": "ASME B16.10",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "facing": "RF",
+          "faceToFace": 229,
+          "stemHeight": 650,
+          "handwheelDiameter": 400,
+          "handwheelThickness": 30,
+          "provenance": {
+            "sourceId": "RTE",
+            "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
+          }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.10-globe-operators-rte-stub",
+      "type": "valveGlobe",
+      "standard": "ASME B16.10",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "facing": "RF",
+          "faceToFace": 292,
+          "stemHeight": 900,
+          "actuatorDiameter": 250,
+          "actuatorHeight": 500,
+          "handwheelDiameter": 200,
+          "handwheelThickness": 20,
+          "provenance": {
+            "sourceId": "RTE",
+            "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "asme-b16.10-ball-operators-rte-stub",
+      "type": "valveBall",
+      "standard": "ASME B16.10",
+      "dimensionalStandard": "ASME",
+      "ends": ["FL"],
+      "sizes": [
+        {
+          "nps": 4,
+          "class": 150,
+          "facing": "RF",
+          "faceToFace": 229,
+          "stemHeight": 520,
+          "gearboxDiameter": 200,
+          "gearboxHeight": 250,
+          "handwheelDiameter": 300,
+          "handwheelThickness": 25,
+          "provenance": {
+            "sourceId": "RTE",
+            "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
+          }
+        }
+      ]
+    }
+  ]
+}

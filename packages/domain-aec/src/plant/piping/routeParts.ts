@@ -9,7 +9,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { Joint, PipeRun, RoutedPart } from '@aec/plant/types';
-import { len3, scale3, sub3 } from '@lib/vec3';
+import { add3, len3, scale3, sub3 } from '@lib/vec3';
 import {
   fail,
   isFailure,
@@ -20,18 +20,21 @@ import {
   type DerivedTurn,
   type RunDerivation,
 } from './deriveTypes';
+import type { Join } from './connections';
 import { DerivationMemo } from './derivationMemo';
-import { centrelineLength, chooseElbow, turnAngleDeg, type ElbowChoice } from './fittings';
+import { centrelineLength, type ElbowChoice } from './fittings';
 import { stackLeg, defaultMinWeldSpacing, type Interval, type StackWarning } from './jointStack';
 import { directionLabel, epsilonFor, unitVector } from './legs';
 import { getPiping, runPoints } from './model';
+import { legShifts } from './legShifts';
 import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
 import { flangeParts, mintSet, setupEnd } from './routeEnds';
-import { at, makeEnv, partOf, type Env, type Mint, type Slot } from './routeEnv';
+import { at, makeEnv, partOf, type Mint, type Slot } from './routeEnv';
 import { layoutInline } from './routeInline';
+import { chooseTurns, turnPartFields } from './routeTurns';
 import { dnAfter, endDn, startDn } from './runSizes';
-import { isMiss, type SpecLookup } from './specLookup';
+import type { SpecLookup } from './specLookup';
 
 const BRANCH_KINDS: ReadonlySet<string> = new Set(['olet', 'stubIn']);
 
@@ -40,6 +43,13 @@ function slopeFields(u: Vec3, length: number): Pick<DerivedLeg, 'planLengthMm' |
   const fall = legFall(u, length);
   const round = (value: number): number => Math.round(value * 1e6) / 1e6;
   return { planLengthMm: round(fall.planLengthMm), dropMm: round(fall.dropMm), slopeDeg: round(fall.slopeDeg) };
+}
+
+/** The kind, root gap and engagement of the joint between the pipe and interval `side` (a butt weld of gap `side.gap` unless the interval has a join). */
+function jointOf(side: Interval, butt: Joint['kind']): Pick<Joint, 'kind' | 'gapMm' | 'engagementMm'> {
+  const join = side.join;
+  if (join === undefined) return { kind: butt, gapMm: side.gap };
+  return { kind: join.joint, gapMm: join.rootGapMm, ...(join.engagementMm > 0 ? { engagementMm: join.engagementMm } : {}) };
 }
 
 /** Warning record of a stack warning on leg `leg`. */
@@ -58,37 +68,6 @@ function unverifiedReasons(lookup: SpecLookup, parts: readonly RoutedPart[]): st
   const rows = [...new Set(parts.filter((part) => part.unverified).map((part) => part.catalogueKey))];
   if (rows.length > 0) reasons.push(`catalogue rows not grade A: ${rows.join(', ')}`);
   return reasons;
-}
-
-/** Elbow choice at every interior point of intersection (the size at a point is the size at the end of the leg before it). */
-function chooseTurns(
-  env: Env,
-  points: readonly Vec3[],
-  dirs: readonly Vec3[],
-): { elbows: ElbowChoice[]; turns: DerivedTurn[] } | DerivationFailure {
-  const { run, line, lookup, tolerance } = env;
-  const elbows: ElbowChoice[] = [];
-  const turns: DerivedTurn[] = [];
-  for (let i = 1; i < dirs.length; i++) {
-    const turnDeg = turnAngleDeg(dirs[i - 1] as Vec3, dirs[i] as Vec3);
-    const choice = chooseElbow(lookup, dnAfter(run, line.dn, i - 1, Number.POSITIVE_INFINITY), turnDeg, tolerance.valueDeg);
-    if (isMiss(choice)) return fail(choice.miss, choice.detail, [...choice.ids, run.id], [`legs.${i}`], { pi: i - 1 });
-    if ('code' in choice) return fail(choice.code, choice.message, [run.id], [`legs.${i}`], { ...choice.detail, pi: i - 1 });
-    elbows.push(choice);
-    turns.push({
-      index: i,
-      point: points[i] as Vec3,
-      partId: `${run.id}/elbow-${i}`,
-      turnDeg,
-      nominalDeg: choice.nominalDeg,
-      deviationDeg: choice.deviationDeg,
-      centreToEnd: choice.centreToEnd,
-      radius: choice.radius,
-      catalogueKey: choice.row.key,
-      typeKey: `${choice.row.type}${choice.row.radius ?? ''}`,
-    });
-  }
-  return { elbows, turns };
 }
 
 /**
@@ -144,24 +123,28 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   const dirs = points.slice(1).map((p, i) => unitVector(sub3(p, points[i] as Vec3)));
   const chosen = chooseTurns(env, points, dirs);
   if (isFailure(chosen)) return chosen;
-  const { elbows, turns } = chosen;
+  const { elbows, turns, joins: elbowJoins } = chosen;
 
   // Ids: kinds are counted separately, in route order; the start set is minted first, then the inline components, then the end set.
   const counters: Record<string, number> = {};
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
-  const inlineSlots = layoutInline(env, lengths, mint);
+  const inlineSlots = layoutInline(env, lengths, dirs, mint);
   if (isFailure(inlineSlots)) return inlineSlots;
   const endIds = end.set === null ? null : mintSet(mint);
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
+  const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
+  if (isFailure(shifts)) return shifts;
+  const warnings: DerivationWarning[] = [...shifts.warnings, ...chosen.warnings];
   const slotsByLeg = new Map<number, Slot[]>();
   for (const slot of [...inlineSlots, ...fits.filter((fit) => fit.kind === 'tee').map((fit) => teeSlot(env, fit))])
     slotsByLeg.set(slot.leg, [...(slotsByLeg.get(slot.leg) ?? []), slot]);
+  /** Length of a leg from its true start (an eccentric reducer before it moved the corner along its axis). */
+  const trueLengths = lengths.map((length, leg) => length - (shifts.start[leg] as number));
 
   const parts: RoutedPart[] = [];
   const joints: Joint[] = [];
-  const warnings: DerivationWarning[] = [];
   const legs: DerivedLeg[] = [];
   const inline: DerivedInline[] = [];
   const addJoint = (joint: Omit<Joint, 'id'>): void => {
@@ -187,6 +170,10 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     const u = dirs[leg] as Vec3;
     const origin = points[leg] as Vec3;
     const length = lengths[leg] as number;
+    const shift = shifts.start[leg] as number;
+    // Eccentric reducers move the axis sideways from their centre on: positions are measured from `axis`, the stored line plus that sideways offset.
+    let sideways: Vec3 = [0, 0, 0];
+    const axis = (): Vec3 => add3(origin, sideways);
     const mids = slotsByLeg.get(leg) ?? [];
     const startSide = leg === 0 ? start : null;
     const endSide = leg === legCount - 1 ? end : null;
@@ -198,13 +185,15 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
             end: startSide.length,
             gap: startSide.gap,
             kind: 'fitting',
+            ...(startSide.join === undefined ? {} : { join: startSide.join }),
           }
         : {
             id: `${run.id}/elbow-${leg}`,
-            start: 0,
-            end: (elbows[leg - 1] as ElbowChoice).centreToEnd,
-            gap: bw?.gapMm ?? 0,
+            start: shift,
+            end: shift + (elbows[leg - 1] as ElbowChoice).centreToEnd,
+            gap: (elbowJoins[leg - 1] as Join).gapMm,
             kind: 'fitting',
+            join: elbowJoins[leg - 1] as Join,
           };
     const tail: Interval =
       endSide !== null
@@ -214,13 +203,15 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
             end: length,
             gap: endSide.gap,
             kind: 'fitting',
+            ...(endSide.join === undefined ? {} : { join: endSide.join }),
           }
         : {
             id: `${run.id}/elbow-${leg + 1}`,
             start: length - (elbows[leg] as ElbowChoice).centreToEnd,
             end: length,
-            gap: bw?.gapMm ?? 0,
+            gap: (elbowJoins[leg] as Join).gapMm,
             kind: 'fitting',
+            join: elbowJoins[leg] as Join,
           };
     const stack = stackLeg(length, [head, ...mids.map((slot) => slot.interval), tail], 0, eps);
     if (!stack.ok)
@@ -246,7 +237,9 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
         if (isFailure(info)) return info;
         // Weld spacing is judged per piece against its own wall (the stack only reports fitting-to-fitting).
         const minimum = defaultMinWeldSpacing(info.wall);
-        if (piece.cut < minimum)
+        const [pipeStartEnd, pipeEndEnd] = [a.join?.pipeEnd ?? 'BW', b.join?.pipeEnd ?? 'BW'];
+        // The spacing rule is about butt welds: a piece between two socket / threaded joins has none to keep apart.
+        if (piece.cut < minimum && (pipeStartEnd === 'BW' || pipeEndEnd === 'BW'))
           warnings.push(
             warningOf({ code: 'RTE_WELD_SPACING', from: a.id, to: b.id, cutLengthMm: piece.cut, minimumMm: minimum }, run.id, leg),
           );
@@ -260,23 +253,24 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
             'pipe',
             info.row,
             [
-              { position: at(origin, u, piece.start), direction: scale3(u, -1), dn: dnHere, endType: 'BW' },
-              { position: at(origin, u, piece.end), direction: u, dn: dnHere, endType: 'BW' },
+              { position: at(axis(), u, piece.start), direction: scale3(u, -1), dn: dnHere, endType: pipeStartEnd },
+              { position: at(axis(), u, piece.end), direction: u, dn: dnHere, endType: pipeEndEnd },
             ],
             { cutLength: piece.cut, leg, dims: { outsideDiameter: info.od, wall: info.wall } },
           ),
         );
         // A stub-in is set on the header by one branch weld (made with the header): no butt weld to the first piece.
         if (!(startSide?.weldless === true && a.id === head.id))
-          addJoint({ kind: weld, parts: [after, pieceId], position: at(origin, u, a.end), gapMm: a.gap });
-        addJoint({ kind: weld, parts: [pieceId, before], position: at(origin, u, b.start), gapMm: b.gap });
-      } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(origin, u, a.end), gapMm: 0 });
+          addJoint({ ...jointOf(a, weld), parts: [after, pieceId], position: at(axis(), u, a.end) });
+        addJoint({ ...jointOf(b, weld), parts: [pieceId, before], position: at(axis(), u, b.start) });
+      } else addJoint({ kind: 'fittingToFitting', parts: [after, before], position: at(axis(), u, a.end), gapMm: 0 });
       const slot = slotById.get(b.id);
       if (slot !== undefined) {
-        const built = slot.build(origin, u);
+        const built = slot.build(axis(), u);
         parts.push(...built.parts);
         built.joints.forEach(addJoint);
         if (built.inline !== undefined) inline.push(built.inline);
+        if (slot.offset !== undefined) sideways = add3(sideways, slot.offset);
       }
     }
     for (const w of stack.warnings) warnings.push(warningOf(w, run.id, leg));
@@ -299,18 +293,18 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     legs.push({
       index: leg,
       direction: directionLabel(u),
-      lengthMm: length,
-      start: origin,
-      end: points[leg + 1] as Vec3,
+      lengthMm: length - shift,
+      start: at(origin, u, shift),
+      end: add3(points[leg + 1] as Vec3, shifts.offset[leg] as Vec3),
       cutLengthsMm: cuts,
-      ...(isSloped(u) ? slopeFields(u, length) : {}),
+      ...(isSloped(u) ? slopeFields(u, length - shift) : {}),
     });
     if (leg < legCount - 1) {
       const index = leg + 1;
       const choice = elbows[leg] as ElbowChoice;
       const turn = turns[leg] as DerivedTurn;
       const next = dirs[index] as Vec3;
-      const pi = points[index] as Vec3;
+      const pi = add3(points[index] as Vec3, shifts.offset[leg] as Vec3);
       const c = choice.centreToEnd;
       const dn = dnAfter(run, line.dn, leg, Number.POSITIVE_INFINITY);
       const info = env.pipeAt(dn);
@@ -322,10 +316,10 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
           'elbow',
           choice.row,
           [
-            { position: at(pi, u, -c), direction: scale3(u, -1), dn, endType: 'BW' },
-            { position: at(pi, next, c), direction: next, dn, endType: 'BW' },
+            { position: at(pi, u, -c), direction: scale3(u, -1), dn, endType: (elbowJoins[leg] as Join).end },
+            { position: at(pi, next, c), direction: next, dn, endType: (elbowJoins[leg] as Join).end },
           ],
-          { centre: pi, angleDeg: choice.turnDeg, radius: choice.radius, dims: { outsideDiameter: info.od, centreToEnd: c } },
+          { centre: pi, angleDeg: choice.turnDeg, radius: choice.radius, ...turnPartFields(choice, info.od) },
         ),
       );
     }
@@ -354,7 +348,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     inline,
     branches: fits.map((fit) => derivedBranch(env, fit)),
     warnings,
-    centrelineLengthMm: centrelineLength(lengths, elbows),
+    centrelineLengthMm: centrelineLength(trueLengths, elbows),
     totalPipeMm: pieces.reduce((sum, part) => sum + (part.cutLength ?? 0), 0),
     spec: { id: lookup.id, revision: lookup.revision, status: lookup.status() },
     unverified: reasons.length > 0,

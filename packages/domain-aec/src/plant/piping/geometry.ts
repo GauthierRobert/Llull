@@ -109,7 +109,9 @@ function elbowEntity(part: RoutedPart, line: PipeLine): RevolutionEntity | null 
   const out = to.direction;
   const inward = unitVector(sub3(out, scale3(travel, dot3(out, travel))));
   if (len3(inward) === 0) return null;
-  const arcCentre = add3(from.position, scale3(inward, radius));
+  // The bend starts one tangent length before the elbow centre (the port itself for a butt-weld elbow, the socket bottom for a socket-weld one).
+  const tangent = part.centre === undefined ? from.position : add3(part.centre, scale3(travel, -radius * Math.tan((turn * Math.PI) / 360)));
+  const arcCentre = add3(tangent, scale3(inward, radius));
   const x = scale3(inward, -1);
   const z = unitVector(cross3(travel, inward));
   const section: Section = circlePolygon([radius, 0], od / 2, SECTION_POINTS).map(([r, a]) => [r, a]);
@@ -120,7 +122,7 @@ function elbowEntity(part: RoutedPart, line: PipeLine): RevolutionEntity | null 
 
 function flangeEntity(part: RoutedPart, line: PipeLine): RevolutionEntity | null {
   const face = part.ports.find((port) => port.endType === 'FL');
-  const weld = part.ports.find((port) => port.endType === 'BW');
+  const weld = part.ports.find((port) => port.endType !== 'FL');
   const pipeOd = part.dims['pipeOutsideDiameter'];
   if (face === undefined || weld === undefined || pipeOd === undefined) return null;
   const hub = len3(sub3(weld.position, face.position));

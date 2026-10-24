@@ -1,0 +1,74 @@
+{
+  "id": "SC-RTE-15",
+  "status": "RUNNABLE (02 RTE V1 part 1): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-36"],
+  "description": "A DN100 gravity drain from a pump nozzle at (0, 0, 1000) facing +X to a hub tie-in at (8000, 0, 0) facing +Z: a sloped leg (plan 8000, 1 % fall, drop 80) then the closing vertical leg. The pump moves 500 mm along X, toward the hub: the sloped leg keeps its heading and slope, so its plan length falls to 7500 and its drop to 75 together; the corner rises to z 925 and the vertical leg (which takes the 5 mm) is 925 high. Moving the pump back restores the run.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Drain pump", "mark": "P-301", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 },
+      "as": "pump"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "P-301",
+        "mark": "N1",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": { "on": "free", "position": [0, 300, 1000], "direction": [1, 0, 0] },
+        "projection": 300
+      }
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-D2", "position": [8000, 0, 0], "direction": [0, 0, 1], "dn": 100, "endType": "BW" },
+      "as": "hub"
+    },
+    { "command": "create_pipeline", "params": { "service": "D", "sequence": "5007", "spec": "CS150", "dn": 100 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "P-301:N1" },
+        "to": { "portId": "$hub" },
+        "legs": [{ "direction": "+X", "planLength": 8000, "slope": { "value": 1, "unit": "percent", "fall": true } }]
+      },
+      "as": "run"
+    },
+    { "command": "update_equipment", "params": { "elementId": "$pump", "location": [500, -300] } },
+    { "command": "piping_takeoff", "params": { "runId": "$run" } },
+    { "command": "update_equipment", "params": { "elementId": "$pump", "location": [0, -300] } },
+    { "command": "piping_takeoff", "params": { "runId": "$run" } }
+  ],
+  "expected": [
+    {
+      "step": 6,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [7769.39999, 768],
+      "abs": 0.0001,
+      "source": "8000 sqrt(1 + 0.01^2) - 79 - 152 = 7769.39999 ; 920 - 152 = 768 (flange set 3 + 76 at the nozzle, NPS 4 elbow 152, the hub is a butt-weld tie-in)"
+    },
+    { "step": 8, "path": "data.legs[0].planLengthMm", "value": 7500, "abs": 0.0001, "source": "8000 - 500" },
+    { "step": 8, "path": "data.legs[0].dropMm", "value": 75, "abs": 0.0001, "source": "1 % of 7500: the slope is kept" },
+    { "step": 8, "path": "data.legs[0].slopeDeg", "value": 0.572939, "abs": 0.000001, "source": "atan 0.01" },
+    {
+      "step": 8,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [7269.374991, 773],
+      "abs": 0.0001,
+      "source": "7500 sqrt(1 + 0.01^2) - 231 = 7269.374991 ; the corner is at z 1000 - 75 = 925 : 925 - 152 = 773"
+    },
+    { "step": 8, "path": "data.legs[1].start", "value": [8000, 0, 925], "abs": 0.0001 },
+    { "step": 10, "path": "data.pipePieces[*].cutLengthMm", "value": [7769.39999, 768], "abs": 0.0001, "source": "back where it was" }
+  ]
+}
