@@ -28,7 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       # The latest merged cost file (ms per design) balances this run's shards; absent on the first run (shards split by hash).
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: action-matrix-costs.json
           key: action-matrix-costs-restore-only
@@ -52,7 +52,7 @@ jobs:
           pattern: action-matrix-shard-*
           merge-multiple: true
       - run: node scripts/actionMatrixMergeCosts.mjs action-matrix-costs.json cost-*.json
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         with:
           path: action-matrix-costs.json
           key: action-matrix-costs-${{ github.run_id }}
