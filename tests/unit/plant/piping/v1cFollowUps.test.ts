@@ -121,7 +121,8 @@ describe('a support whose run is gone: load and live agree (V1c, SC-RTE-23)', ()
     const live = orphaned(doc, runId);
     const loaded = deserializeDocument(serializeDocument(live));
     expect(supportsOf(loaded)).toHaveLength(3);
-    const [fromLive, fromFile] = [live, loaded].map((candidate) => ok(candidate, 'check_pipe_supports', {}));
+    const fromLive = ok(live, 'check_pipe_supports', {});
+    const fromFile = ok(loaded, 'check_pipe_supports', {});
     expect(fromFile.data).toEqual(fromLive.data);
     expect(fromFile.summary).toBe(fromLive.summary);
     const check = fromFile.data as Check;
