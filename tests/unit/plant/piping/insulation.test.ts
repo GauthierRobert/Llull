@@ -150,6 +150,15 @@ describe('create_pipeline / update_pipeline with insulation and slope', () => {
     (piping.lines[id] as Record<string, unknown>)['slope'] = { value: 500, unit: 'percent', fall: true };
     expect(pipingErrors(piping)).toEqual([expect.stringContaining('slope'), expect.stringContaining('insulation')]);
   });
+
+  it('a non-boolean materialExplicit in a file is a validation error', () => {
+    const doc = apply(cs150Document(), 'create_pipeline', HOT);
+    const piping = JSON.parse(JSON.stringify(doc.plant?.piping)) as { lines: Record<string, Record<string, unknown>> };
+    const line = Object.values(piping.lines)[0] as Record<string, unknown>;
+    expect(pipingErrors(piping)).toEqual([]);
+    line['insulation'] = { ...(line['insulation'] as Record<string, unknown>), materialExplicit: 'yes' };
+    expect(pipingErrors(piping)).toEqual([expect.stringContaining('materialExplicit?: boolean')]);
+  });
 });
 
 describe('route_pipe and piping_takeoff report the insulation', () => {

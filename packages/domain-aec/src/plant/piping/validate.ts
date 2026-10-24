@@ -71,9 +71,10 @@ function lineErrors(id: string, line: Record<string, unknown>): string[] {
     (isRecord(insulation) &&
       typeof insulation['code'] === 'string' &&
       isPositive(insulation['thicknessMm']) &&
-      (insulation['source'] === 'spec' || insulation['source'] === 'explicit'))
+      (insulation['source'] === 'spec' || insulation['source'] === 'explicit') &&
+      (insulation['materialExplicit'] === undefined || typeof insulation['materialExplicit'] === 'boolean'))
       ? []
-      : [`${path}.insulation must be { code, thicknessMm > 0, source: "spec" | "explicit" }`]),
+      : [`${path}.insulation must be { code, thicknessMm > 0, source: "spec" | "explicit", materialExplicit?: boolean }`]),
   ];
 }
 
