@@ -1007,7 +1007,7 @@ Built: pipe supports on spec-driven runs (`add_pipe_support runId`) with one car
 | PCF | `pcf.ts`, `commands/exportPcf.ts` | goldens `tests/golden/__snapshots__/piping_pcf_small_line.pcf`, `piping_pcf_pump_to_vessel.pcf` |
 | IFC | `building/exchange/ifcPipingExport.ts`, `ifcBuild.ts` | extends the one IFC writer; shared with the viewport and STEP geometry (`partEntities`) |
 | Exact solids | `commands/exportPipeStep.ts` | `requiresKernel`; composes `export_step_ap242` |
-| Tests | `tests/unit/plant/piping/{runSupports,heatLoss,pcf,ifcPiping,exportPipeStep,v1bPerformance}.test.ts`, plans SC-RTE-16 .. 21 (`validation/plans`) | |
+| Tests | `tests/unit/plant/piping/{runSupports,heatLoss,pcf,ifcPiping,exportPipeStep,v1bPerformance}.test.ts`, plans SC-RTE-16 .. 21 (`validation/plans`), goldens `piping_run_supports_tracing`, `piping_run_supports_stretch` (`tests/golden/pipingPlansV1b.ts`), `piping_pcf_small_line.pcf`, `piping_pcf_pump_to_vessel.pcf` | |
 
 Validation numbers (hand calculations, README D19 .. D24, never copied from an output of llull):
 
