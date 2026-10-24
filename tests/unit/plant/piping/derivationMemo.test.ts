@@ -183,3 +183,41 @@ describe('frozenCopy', () => {
     expect(frozenCopy(7)).toBe(7);
   });
 });
+
+describe('derivation memo: what V1 part 1 reads is on the run or in the spec', () => {
+  const line = cs150Line(150, '9001');
+  const tie = addTie(line.doc, 'M', [0, 0, 0], [1, 0, 0], { dn: 150 });
+  const routed = apply(tie.doc, 'route_pipe', {
+    lineId: line.lineId,
+    from: { portId: tie.id },
+    legs: [
+      { direction: '+X', length: 4000 },
+      { direction: '+Z', length: 1000 },
+    ],
+    inline: [{ type: 'reducerEccentric', dn2: 100, flat: 'top', at: { leg: 0, centreDistance: 2000 } }],
+  });
+  const stored = piping(routed).runs[piping(routed).runOrder[0] as string] as PipeRun;
+  const base = ok(deriveRun(routed, stored));
+
+  it('the flat side is read from the run component: a run with the flat turned is a miss with the other offset', () => {
+    const item = stored.inline?.[0];
+    if (item === undefined) throw new Error('no reducer');
+    const turned: PipeRun = { ...stored, inline: [{ ...item, flatDirection: [0, 0, -1] }] };
+    const other = ok(deriveRun(routed, turned));
+    expect(other).not.toBe(base);
+    expect(cuts(base)).toEqual([1930, 1778, 821]);
+    expect(cuts(other)).toEqual([1930, 1778, 875]);
+  });
+
+  it('the bend radius is read from the run, the trimmed / bend rule from the spec slice: both are keys, nothing else is read', () => {
+    const bent: PipeRun = { ...stored, pis: stored.pis, bendRadiusMm: 500 };
+    // standard turns ignore the radius: an equal result, but a different run object is a miss
+    expect(ok(deriveRun(routed, bent))).not.toBe(base);
+    expect(ok(deriveRun(routed, bent))).toEqual(base);
+    expect(ok(deriveRun(routed, stored))).toBe(base);
+  });
+
+  it('the valve operator and the clash bodies are read from the derivation: a hit on the same frozen result', () => {
+    expect(ok(deriveRun({ ...routed, units: 'mm' }, stored))).toBe(base);
+  });
+});

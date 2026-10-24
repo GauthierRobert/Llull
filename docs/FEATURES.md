@@ -720,7 +720,7 @@
 | `export_piping_catalog` | Export a piping catalogue (bundled llull-open-piping or one imported into the document) as canonical JSON (format llull-piping-catalog, sorted keys, millimetre… | read-only |
 | `import_pipe_spec` | Import a piping spec file into the document as a draft. |  |
 | `import_piping_catalog` | Import a piping component catalogue file into the document. |  |
-| `insert_inline_component` | Insert a valve or a concentric reducer into a routed pipe run (route_pipe / auto_route_pipe / add_branch), spec-driven. |  |
+| `insert_inline_component` | Insert a valve or a reducer (concentric or eccentric) into a routed pipe run (route_pipe / auto_route_pipe / add_branch), spec-driven. |  |
 | `list_pipe_specs` | List the piping specs in the document: id, title, latest revision and status (draft, approved, superseded), every revision, dimensional standard (ASME or EN), … | read-only |
 | `list_piping_catalogs` | List the piping component catalogues available: the bundled open catalogue llull-open-piping (ASME B36.10M / B36.19M pipe by NPS and schedule, B16.9 elbows / t… | read-only |
 | `lookup_piping_component` | Look up ONE component size row in a piping catalogue and return its dimensions in millimetres, each with verified (two sources agree) and its source. | read-only |
@@ -728,7 +728,7 @@
 | `pipe_hydraulics` | Read-only pressure drop of one pipe run (add_pipe_run), flowing from its first to its last point. | read-only |
 | `pipe_section_properties` | Section properties and mass per metre of a round steel pipe: inside diameter, metal and flow area (mm2), second moment I and section modulus Z (mm4, mm3), and … | read-only |
 | `piping_connectivity` | Query: the connectivity graph of routed pipe: nodes (every derived part, and the tie-ins / equipment nozzles that runs attach to), edges (joints between parts,… | read-only |
-| `piping_takeoff` | Query: bill of materials and cut list of routed pipe, derived from the stored runs and their spec: part counts by key (elbow90LR, flangeWeldNeck, gasketSpiralW… | read-only |
+| `piping_takeoff` | Query: bill of materials and cut list of routed pipe, derived from the stored runs and their spec: part counts by key (elbow90LR, elbow90LRTrimmed = a 90 elbow… | read-only |
 | `pt_rating` | Pressure-temperature rating of a flange class: the maximum working pressure in bar gauge (or psig) at a temperature, from the bundled ASME B16.5 table for mate… | read-only |
 | `remove_inline_component` | Remove a valve or reducer from a pipe run: the leg is cut again without it (the pipe pieces around it merge into one) and the downstream size returns to the up… |  |
 | `resolve_branch` | Resolve a branch connection from the spec branch table: the fitting kind for a header size x branch size (T equal tee, RT reducing tee, W weldolet, S sockolet,… | read-only |

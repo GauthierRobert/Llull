@@ -63,6 +63,34 @@
       "sources": ["S25"],
       "grade": "B",
       "use": "check_piping code set"
+    },
+    {
+      "id": "RR-10",
+      "rule": "Socket-weld joint: the pipe is inserted to the bottom of the socket and withdrawn about 1/16 in (1.6 mm) before welding; threaded joint: the pipe is screwed in by the tapered-thread engagement (B1.20.1 L1 hand tight, L2 effective length)",
+      "sources": ["S18"],
+      "grade": "B (gap); thread engagement is a stub input (C)",
+      "use": "FR-RTE-09: cut = distance between the mouths + socketDepth - 1.6 per socket (V1 part 1); socketDepth and threadEngagement are catalogue row dimensions, never guessed"
+    },
+    {
+      "id": "RR-11",
+      "rule": "Eccentric reducer: the outer surfaces of the two pipes line up on the flat side (flat on top for pump suction against vapour pockets, flat on bottom for gravity / rack lines against liquid pockets); the smaller axis is (OD big - OD small) / 2 off the bigger one",
+      "sources": [],
+      "grade": "C (closed geometry; the use rule is engineering practice, not a code value)",
+      "use": "FR-RTE-11 V1: offset by geometry; the invert-step pocket check is a project rule on lines declared to fall"
+    },
+    {
+      "id": "RR-12",
+      "rule": "Trimmed (mitred) elbow cut from a 90 degree LR elbow and cold pipe bends: tangent length R tan(turn / 2); allowed only where the spec says so, always flagged for review; a minimum bend radius is the bender own limit (no public value; llull refuses below one outside diameter)",
+      "sources": [],
+      "grade": "C",
+      "use": "FR-RTE-05 V1: RTE_NONSTANDARD_FITTING; spec trimmedAllowed / bendRadiusD or the run bendRadius"
+    },
+    {
+      "id": "RR-13",
+      "rule": "Valve operator envelopes (handwheel disc, gear box, actuator) are manufacturer data; the catalogue row carries them and the stem direction orients them",
+      "sources": [],
+      "grade": "C (project / vendor data)",
+      "use": "FR-RTE-18 V1: RTE_VALVE_OPERATOR_CLASH on the check_clashes boxes; no built-in numbers"
     }
   ]
 }

@@ -387,6 +387,127 @@
       "grade": "closed form",
       "frs": ["FR-RTE-02"],
       "test": "tests/unit/plant/piping/lineNumber.test.ts"
+    },
+    {
+      "id": "VC-RTE-30",
+      "plan": "plans/sc-rte-10-socket-weld-line.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "cutLengthMm": [981.8, 1470.4],
+        "cutLengthMmWithValve": [483.3, 442.3, 1470.4],
+        "socketWelds": 3,
+        "socketWeldsWithValve": 5,
+        "engagementMm": 11.4,
+        "centrelineLengthMm": 2487.982297
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D13 (stub c 41, socket depth J 13, socket gap 1.6)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-04", "FR-RTE-09"],
+      "test": "tests/unit/plant/piping/socketThreaded.test.ts"
+    },
+    {
+      "id": "VC-RTE-31",
+      "plan": "plans/sc-rte-11-threaded-line.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "cutLengthMm": [996.6, 1479.3],
+        "threadedJoints": 3,
+        "threadolet": { "branchCutMm": 967.3, "headerCutMm": 2000, "branchWelds": 1, "threadedJoints": 1 }
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D14 (stub c 38, thread engagement 17.3)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-04", "FR-RTE-09"],
+      "test": "tests/unit/plant/piping/socketThreaded.test.ts"
+    },
+    {
+      "id": "VC-RTE-32",
+      "plan": "plans/sc-rte-05-routing-refusals.json",
+      "command": "route_pipe",
+      "expected": {
+        "swPortOnButtWeldSpec": "RTE_NO_CONNECTION_RULE",
+        "threadedPortOnSocketWeldSpec": "RTE_NO_CONNECTION_RULE",
+        "socketPortWithoutSocketDepthRow": "RTE_SPEC_NO_COMPONENT",
+        "flangeRowWithoutSocketDepth": "RTE_SPEC_NO_COMPONENT",
+        "socketWeldFlangeFirstCutMm": 961.3
+      },
+      "tolerance": "exact codes; 0.01 mm",
+      "reference": "README D13",
+      "grade": "closed form",
+      "frs": ["FR-RTE-04"],
+      "test": "tests/unit/plant/piping/socketThreaded.test.ts"
+    },
+    {
+      "id": "VC-RTE-33",
+      "plan": "plans/sc-rte-12-eccentric-reducer.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "flatOnTop": {
+          "cutLengthMm": [1930, 1778, 821],
+          "legLengthsMm": [4000, 973],
+          "offsetMm": 27,
+          "invertStepMm": 54,
+          "centrelineLengthMm": 4907.761
+        },
+        "flatOnBottom": { "cutLengthMm": [1930, 1778, 875], "legLengthsMm": [4000, 1027], "invertStepMm": 0 },
+        "reducerAndExpander": { "cutLengthMm": [930, 1860, 1930] },
+        "offsetNotTakenUp": "RTE_ECCENTRIC_OFFSET"
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D15 (OD 168.3 / 114.3, H 140, A 152)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-07", "FR-RTE-11"],
+      "test": "tests/unit/plant/piping/eccentricReducers.test.ts"
+    },
+    {
+      "id": "VC-RTE-34",
+      "plan": "plans/sc-rte-13-trimmed-elbow-and-bend.json",
+      "command": "route_pipe",
+      "expected": {
+        "withoutRule": "RTE_NO_FITTING_FOR_ANGLE",
+        "trimmed": { "cutLengthMm": [2912.242759, 1912.242759], "centrelineLengthMm": 4983.659546, "warning": "RTE_NONSTANDARD_FITTING" },
+        "bendRadius500": { "cutLengthMm": [2711.324865, 1711.324865], "developedLengthMm": 523.598776, "centrelineLengthMm": 4946.248506 },
+        "bendRadiusD5": { "cutLengthMm": [2670.044321, 1670.044321] },
+        "radiusBelowOneDiameter": "RTE_NO_FITTING_FOR_ANGLE"
+      },
+      "tolerance": { "abs": 0.0001 },
+      "reference": "README D16 (tangent R tan(turn / 2))",
+      "grade": "closed form",
+      "frs": ["FR-RTE-05"],
+      "test": "tests/unit/plant/piping/trimmedBends.test.ts"
+    },
+    {
+      "id": "VC-RTE-35",
+      "plan": "plans/sc-rte-14-valve-operator-clash.json",
+      "command": "check_piping",
+      "expected": {
+        "actuator": { "fromZ": 400, "lengthMm": 500, "radiusMm": 125 },
+        "handwheel": { "fromZ": 890, "lengthMm": 20, "radiusMm": 100 },
+        "operatorClashDepthMm": 175,
+        "stemTurnedToX": "no clash",
+        "flangePlateClashDepthMm": 14.3
+      },
+      "tolerance": { "abs": 0.001 },
+      "reference": "README D17",
+      "grade": "closed form",
+      "frs": ["FR-RTE-18", "FR-RTE-20"],
+      "test": "tests/unit/plant/piping/valveOperators.test.ts"
+    },
+    {
+      "id": "VC-RTE-36",
+      "plan": "plans/sc-rte-15-slope-preserving-stretch.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "before": { "cutLengthMm": [7769.39999, 768] },
+        "pumpMoved500": { "planLengthMm": 7500, "dropMm": 75, "cornerZ": 925, "cutLengthMm": [7269.374991, 773] },
+        "movedBack": { "cutLengthMm": [7769.39999, 768] }
+      },
+      "tolerance": { "abs": 0.0001 },
+      "reference": "README D18",
+      "grade": "closed form",
+      "frs": ["FR-RTE-14"],
+      "test": "tests/unit/plant/piping/slopeStretch.test.ts"
     }
   ]
 }

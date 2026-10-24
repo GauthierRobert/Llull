@@ -1,0 +1,79 @@
+{
+  "id": "SC-RTE-11",
+  "status": "RUNNABLE (02 RTE V1 part 1): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-31"],
+  "description": "Threaded small-bore pipe on the stub spec THD800 (threaded pipe, threaded fittings): a DN25 line from a screwed (SC) tie-in up 1000 and +X 1500 to an open end, then a DN50 header with a threadolet 2x1 and a DN25 branch. The pipe is screwed threadEngagement E = 17.3 mm into every threaded end (the port included), so each cut is the leg minus the centre-to-end plus the engagement(s). The stub dimensions are declared INPUTS (data/catalog_stub_small_bore.json), not a standard.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_small_bore.json", "actions[1].params.spec": "../data/spec_thd800.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_small_bore.json = the INPUT dimensions of the small-bore plans, spec_thd800.json = spec THD800 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_small_bore.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_thd800.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "SC-A", "position": [0, 0, 0], "direction": [0, 0, 1], "dn": 25, "endType": "SC" },
+      "as": "a"
+    },
+    { "command": "create_pipeline", "params": { "service": "A", "sequence": "5002", "spec": "THD800", "dn": 25 }, "as": "line" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "legs": [
+          { "direction": "+Z", "length": 1000 },
+          { "direction": "+X", "length": 1500 }
+        ]
+      },
+      "as": "run"
+    },
+    { "command": "create_pipeline", "params": { "service": "A", "sequence": "5003", "spec": "THD800", "dn": 50 }, "as": "line2" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line2",
+        "from": { "point": [0, 3000, 0], "direction": [1, 0, 0] },
+        "legs": [{ "direction": "+X", "length": 2000 }]
+      },
+      "as": "header"
+    },
+    {
+      "command": "add_branch",
+      "params": { "runId": "$header", "at": { "leg": 0, "distance": 1000 }, "dn": 25, "legs": [{ "direction": "+Y", "length": 1000 }] }
+    },
+    { "command": "piping_takeoff", "params": { "lineId": "$line2" } }
+  ],
+  "expected": [
+    {
+      "step": 4,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [996.6, 1479.3],
+      "abs": 0.01,
+      "source": "E = 17.3 ; leg 0: 1000 - 38 + 2 E = 996.6 ; leg 1: 1500 - 38 + E = 1479.3 (threaded elbow centre-to-end 38)"
+    },
+    { "step": 4, "path": "data.counts.threadedJoints", "value": 3 },
+    { "step": 4, "path": "data.counts.buttWelds", "value": 0 },
+    { "step": 4, "path": "data.counts.socketWelds", "value": 0 },
+    { "step": 7, "path": "data.fitting", "value": "threadolet" },
+    {
+      "step": 8,
+      "path": "data.pipePieces[?dn==25].cutLengthMm",
+      "value": [967.3],
+      "abs": 0.01,
+      "source": "the outlet face is A = 50 from the header centreline ; the branch pipe is screwed in E = 17.3 : it starts at 50 - 17.3 = 32.7, so 1000 - 32.7 = 967.3"
+    },
+    {
+      "step": 8,
+      "path": "data.pipePieces[?dn==50].cutLengthMm",
+      "value": [2000],
+      "abs": 0.01,
+      "source": "an olet leaves the header whole"
+    },
+    { "step": 8, "path": "data.counts.threadolet", "value": 1 },
+    { "step": 8, "path": "data.counts.threadedJoints", "value": 1 },
+    { "step": 8, "path": "data.counts.branchWelds", "value": 1 }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "id": "SC-RTE-14",
+  "status": "RUNNABLE (02 RTE V1 part 1): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-35"],
+  "description": "A DN100 run between two butt-weld tie-ins at z 0 (x 0 to 6000) on CS150OP (CS150 with operator-bearing valves; the operator dimensions are declared stub INPUTS). A globe valve with an actuator (cylinder 250 x 500 topping at 900 above the axis, override handwheel 200 x 20) is inserted at 3000, stem up. An IPE200 beam along Y at x 3000, axis z 700 (bottom 600), runs into the actuator: RTE_VALVE_OPERATOR_CLASH with a penetration of 175 mm (the actuator radius 125 + the beam half flange 50 across X); check_clashes reports the same hard clash with the operator body id. Turning the stem to +X moves the whole operator out of the beam.",
+  "units": "mm",
+  "harness": {
+    "inline": {
+      "actions[0].params.catalog": "../data/catalog_stub_cs150.json",
+      "actions[1].params.catalog": "../data/catalog_stub_operators.json",
+      "actions[2].params.spec": "../data/spec_cs150_operators.json"
+    },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json and catalog_stub_operators.json = the input dimensions of these plans, spec_cs150_operators.json = spec CS150OP in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_operators.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150_operators.json>" } },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "OA", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "oa"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "OB", "position": [6000, 0, 0], "direction": [-1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "ob"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "5006", "spec": "CS150OP", "dn": 100 }, "as": "line" },
+    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$oa" }, "to": { "portId": "$ob" } }, "as": "run" },
+    {
+      "command": "insert_inline_component",
+      "params": { "runId": "$run", "type": "valveGlobe", "tag": "XV-6", "at": { "leg": 0, "centreDistance": 3000 } },
+      "as": "valve"
+    },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [3000, -1000, 700], "end": [3000, 1000, 700], "profile": "IPE200" }
+    },
+    { "command": "check_piping", "params": { "lineIds": ["$line"] } },
+    { "command": "check_clashes", "params": {} },
+    { "command": "remove_inline_component", "params": { "runId": "$run", "componentId": "$valve" } },
+    {
+      "command": "insert_inline_component",
+      "params": {
+        "runId": "$run",
+        "type": "valveGlobe",
+        "tag": "XV-6",
+        "at": { "leg": 0, "centreDistance": 3000 },
+        "stemDirection": [1, 0, 0]
+      }
+    },
+    { "command": "check_piping", "params": { "lineIds": ["$line"] } }
+  ],
+  "expected": [
+    { "step": 7, "path": "data.operator.kind", "value": "actuator" },
+    { "step": 7, "path": "data.operator.bodies[*].kind", "value": ["actuator", "handwheel"] },
+    {
+      "step": 7,
+      "path": "data.operator.bodies[0].from",
+      "value": [3000, 0, 400],
+      "abs": 0.000001,
+      "source": "the cylinder tops at stemHeight 900 and is 500 high: from 400 to 900 along +Z"
+    },
+    { "step": 7, "path": "data.operator.bodies[*].lengthMm", "value": [500, 20], "abs": 0.000001 },
+    { "step": 7, "path": "data.operator.bodies[*].radiusMm", "value": [125, 100], "abs": 0.000001 },
+    {
+      "step": 7,
+      "path": "data.operator.bodies[1].from",
+      "value": [3000, 0, 890],
+      "abs": 0.000001,
+      "source": "the wheel disc is centred at 900, 20 thick"
+    },
+    { "step": 9, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_CLASH'].length", "value": 1 },
+    { "step": 9, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_CLASH'][0].ids[0]", "value": "$valve" },
+    {
+      "step": 9,
+      "path": "data.issues[?code=='RTE_VALVE_OPERATOR_CLASH'][0].detail.depthMm",
+      "value": 175,
+      "abs": 0.001,
+      "source": "boxes: actuator half 125 across X, beam half flange 50 : 125 + 50 = 175 (along Z the overlap is 300, along Y the beam is 2000 long)"
+    },
+    { "step": 9, "path": "data.status", "value": "warn" },
+    { "step": 10, "path": "data.clashes[?kind=='hard'].length", "value": 1 },
+    { "step": 10, "path": "data.clashes[0].depth", "value": 175, "abs": 0.001 },
+    {
+      "step": 13,
+      "path": "data.issues[?code=='RTE_VALVE_OPERATOR_CLASH'].length",
+      "value": 0,
+      "source": "stem +X: the actuator axis is horizontal at x 3000 + 400 .. 3000 + 900, beyond the beam (x 2950 .. 3050)"
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "id": "SC-RTE-13",
+  "status": "RUNNABLE (02 RTE V1 part 1): every case runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-34"],
+  "description": "A DN100 line with a 60 degree turn (+X 3000, then 2000 along (cos 60, sin 60, 0)), open at both ends, on CS150 (angles 90 / 45 +- 1). Without a trimmed-elbow or bend rule the turn is refused (RTE_NO_FITTING_FOR_ANGLE). With the spec allowing trimmed elbows it is the NPS 4 LR 90 elbow (A = R = 152) cut to 60 degrees: tangent c = R tan(30 deg) = 87.757 mm. With a run bendRadius of 500 mm (or the spec bendRadiusD 5 x OD 114.3 = 571.5 mm) it is a pipe bend with tangent R tan(30 deg). Trimmed elbows and bends raise RTE_NONSTANDARD_FITTING.",
+  "units": "mm",
+  "harness": {
+    "inline": { "prefix[0].params.catalog": "../data/catalog_stub_cs150.json", "prefix[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "prefix": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "5004", "spec": "CS150", "dn": 100 }, "as": "line" }
+  ],
+  "cases": [
+    {
+      "id": "refused-without-a-rule",
+      "actions": [
+        {
+          "command": "route_pipe",
+          "params": {
+            "lineId": "$line",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "legs": [
+              { "direction": "+X", "length": 3000 },
+              { "direction": [0.5, 0.8660254037844386, 0], "length": 2000 }
+            ]
+          }
+        }
+      ],
+      "expected": [
+        { "step": 0, "path": "error.code", "value": "RTE_NO_FITTING_FOR_ANGLE" },
+        { "step": 0, "path": "error.detail.angleDeg", "value": 60, "abs": 0.000001 },
+        { "step": 0, "path": "error.detail.trimmedAllowed", "value": false }
+      ]
+    },
+    {
+      "id": "trimmed-elbow",
+      "actions": [
+        {
+          "command": "edit_pipe_spec",
+          "params": {
+            "specId": "CS150",
+            "ops": [
+              { "op": "setHeader", "fields": { "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": true } } }
+            ]
+          }
+        },
+        {
+          "command": "route_pipe",
+          "params": {
+            "lineId": "$line",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "legs": [
+              { "direction": "+X", "length": 3000 },
+              { "direction": [0.5, 0.8660254037844386, 0], "length": 2000 }
+            ]
+          },
+          "as": "run"
+        },
+        { "command": "check_piping", "params": { "lineIds": ["$line"] } }
+      ],
+      "expected": [
+        {
+          "step": 1,
+          "path": "data.pipePieces[*].cutLengthMm",
+          "value": [2912.242759, 1912.242759],
+          "abs": 0.0001,
+          "source": "c = 152 tan 30 = 87.757241 ; 3000 - c ; 2000 - c"
+        },
+        { "step": 1, "path": "data.turns[0].kind", "value": "trimmed" },
+        { "step": 1, "path": "data.counts.elbow90LRTrimmed", "value": 1 },
+        { "step": 1, "path": "data.counts.buttWelds", "value": 2 },
+        {
+          "step": 1,
+          "path": "data.centrelineLengthMm",
+          "value": 4983.659546,
+          "abs": 0.001,
+          "source": "5000 - 2 x 87.757241 + 152 x pi / 3 (arc radius R = 152)"
+        },
+        { "step": 1, "path": "data.warnings[?code=='RTE_NONSTANDARD_FITTING'].length", "value": 1 },
+        { "step": 2, "path": "data.issues[?code=='RTE_NONSTANDARD_FITTING'].length", "value": 1 },
+        { "step": 2, "path": "data.status", "value": "warn" }
+      ]
+    },
+    {
+      "id": "pipe-bend-run-radius",
+      "actions": [
+        {
+          "command": "route_pipe",
+          "params": {
+            "lineId": "$line",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "bendRadius": 500,
+            "legs": [
+              { "direction": "+X", "length": 3000 },
+              { "direction": [0.5, 0.8660254037844386, 0], "length": 2000 }
+            ]
+          },
+          "as": "run"
+        },
+        { "command": "piping_takeoff", "params": { "runId": "$run" } }
+      ],
+      "expected": [
+        {
+          "step": 0,
+          "path": "data.pipePieces[*].cutLengthMm",
+          "value": [2711.324865, 1711.324865],
+          "abs": 0.0001,
+          "source": "c = 500 tan 30 = 288.675135"
+        },
+        { "step": 0, "path": "data.turns[0].fitting", "value": "pipeBend" },
+        { "step": 0, "path": "data.counts.pipeBend", "value": 1 },
+        {
+          "step": 0,
+          "path": "data.centrelineLengthMm",
+          "value": 4946.248506,
+          "abs": 0.001,
+          "source": "5000 - 2 x 288.675135 + 500 x pi / 3"
+        },
+        {
+          "step": 1,
+          "path": "data.parts[?typeKey=='pipeBend'].developedLengthMm",
+          "value": [523.598776],
+          "abs": 0.0001,
+          "source": "the pipe in the arc: R x turn = 500 x pi / 3"
+        },
+        { "step": 1, "path": "data.parts[?typeKey=='pipeBend'].radiusMm", "value": [500], "abs": 0.000001 }
+      ]
+    },
+    {
+      "id": "pipe-bend-spec-radius",
+      "actions": [
+        {
+          "command": "edit_pipe_spec",
+          "params": {
+            "specId": "CS150",
+            "ops": [
+              {
+                "op": "setHeader",
+                "fields": { "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false, "bendRadiusD": 5 } }
+              }
+            ]
+          }
+        },
+        {
+          "command": "route_pipe",
+          "params": {
+            "lineId": "$line",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "legs": [
+              { "direction": "+X", "length": 3000 },
+              { "direction": [0.5, 0.8660254037844386, 0], "length": 2000 }
+            ]
+          }
+        }
+      ],
+      "expected": [
+        {
+          "step": 1,
+          "path": "data.pipePieces[*].cutLengthMm",
+          "value": [2670.044321, 1670.044321],
+          "abs": 0.0001,
+          "source": "R = 5 x 114.3 = 571.5 ; c = 571.5 tan 30 = 329.955679"
+        },
+        { "step": 1, "path": "data.turns[0].kind", "value": "bend" }
+      ]
+    },
+    {
+      "id": "bend-tighter-than-one-diameter",
+      "actions": [
+        {
+          "command": "route_pipe",
+          "params": {
+            "lineId": "$line",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "bendRadius": 50,
+            "legs": [
+              { "direction": "+X", "length": 3000 },
+              { "direction": [0.5, 0.8660254037844386, 0], "length": 2000 }
+            ]
+          }
+        }
+      ],
+      "expected": [{ "step": 0, "path": "error.code", "value": "RTE_NO_FITTING_FOR_ANGLE" }]
+    }
+  ]
+}

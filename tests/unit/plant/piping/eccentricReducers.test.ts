@@ -264,6 +264,27 @@ describe('refusals', () => {
     riser(s, 'top');
     expect(JSON.stringify(s.doc)).toBe(before);
   });
+
+  it('is pure: inserting an eccentric reducer into a routed run leaves the input document untouched', () => {
+    const s = scene();
+    const routed = ok(s.doc, 'route_pipe', {
+      lineId: s.lineId,
+      from: { portId: s.tie },
+      legs: [
+        { direction: '+X', length: 4000 },
+        { direction: '+Z', length: 1000 },
+      ],
+    });
+    const before = JSON.stringify(routed.document);
+    ok(routed.document, 'insert_inline_component', {
+      runId: (routed.data as Route).runId,
+      type: 'reducerEccentric',
+      dn2: 100,
+      flat: 'top',
+      at: { leg: 0, centreDistance: 2000 },
+    });
+    expect(JSON.stringify(routed.document)).toBe(before);
+  });
 });
 
 describe('branches and persistence', () => {
