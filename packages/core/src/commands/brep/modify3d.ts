@@ -17,6 +17,7 @@ import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
 import { FILLET_MODES, edgeLawSchema } from './filletSpec';
 import { profileSchema } from './filletProfile';
+import { cornerSchema } from './filletCorners';
 import { filletEach } from './filletEach';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
@@ -126,7 +127,7 @@ export const filletEdge = defineCommand({
     'A radius law runs from size at the start of the edge to sizeEnd at its end, through sizes control points ({ t in (0, 1) along the picked edge, size }): ' +
     'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "linear" joins them with straight pieces; ' +
     'or law { expression of t in [0, 1] (pi, cos, ...), samples } sampled at uniform t. On a CLOSED edge (a cylinder rim) the law must close on itself (r(0) = r(1), BLD_LAW_NOT_PERIODIC otherwise). ' +
-    'A bad value is BLD_LAW_INVALID with the param path; run check_blends afterwards to read the realised radius back. ' +
+    'corners [{ near | name | all, type: "setback", setback }] gives a vertex a setback corner instead of the rolling-ball one. A bad value is BLD_LAW_INVALID with the param path; run check_blends afterwards to read the realised radius back. ' +
     'profile { type: "conic", rho } or { type: "curvature", shape } changes the cross-section (conic: rho 0.4142 is the circle at 90 degrees; curvature: zero curvature at both contacts, G2 to planar faces); ' +
     'size2 (+ side1Near | side1Name) makes the blend asymmetric: size and size2 are then the two LEGS (tangent distances from the edge on each face). ' +
     'These are built for straight edges between planar faces that end on flat square faces, with one constant size per edge, and not at a vertex shared by two selected edges (BLD_PROFILE_FAILED says which condition fails); ' +
@@ -178,6 +179,14 @@ export const filletEdge = defineCommand({
           'radius / radiusEnd / edgeIndices / edgesNear. Differing radii need a kernel that reads radius laws (native OCC); equal ones work everywhere exact.',
       )
       .optional(),
+    corners: z
+      .array(cornerSchema)
+      .describe(
+        'Corner treatment per vertex (default everywhere: the kernel rolling-ball corner). { near | name | all: true, type: "setback", setback } stops the blend of every edge meeting at the vertex setback away from it (measured along the edge, document units) and fills the corner with a smooth patch (G1 to the blends and the faces); setbacks [{ near | name, distance }] overrides single edges. ' +
+          'It also completes a vertex of 4 or more rounded edges (a pyramid apex). Every edge meeting at a setback vertex must be rounded in this step, and every rounded edge must end at a setback vertex (its other end may be a vertex closed by one flat face, e.g. the base of a pyramid edge); a setback corner cannot be mixed with rolling_ball vertices on the same rounded edges. This build makes it for straight convex edges between planar faces with a constant radius (BLD_CORNER_UNSUPPORTED says which condition fails). ' +
+          'A setback no longer than the distance the blends reach is BLD_SETBACK_TOO_SHORT with the minimum. Vertices are recorded by persistent name "v(<edge names>)".',
+      )
+      .optional(),
     profile: profileSchema.optional(),
     mode: z
       .enum(FILLET_MODES)
@@ -190,11 +199,11 @@ export const filletEdge = defineCommand({
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile },
+    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners },
     ctx,
   ): CommandResult => {
-    if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined)
-      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile });
+    if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
+      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile, corners });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
     return modifyEdges(doc, ctx, {
       command: 'fillet_edge',

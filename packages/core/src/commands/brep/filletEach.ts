@@ -34,6 +34,8 @@ import { blendRefusal } from './blendRefusal';
 import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';
 import { commandError } from '../noop';
 import { REPICK_EDGES } from './edgeReferences';
+import { type CornerInput, type CornerRefusal, REPICK_VERTICES, resolveCorners } from './filletCorners';
+import type { SetbackCorner } from '../../model/blendTypes';
 
 export interface FilletRequest {
   readonly id: string;
@@ -46,6 +48,8 @@ export interface FilletRequest {
   /** Persistent names of the planned edges, in plan order, recorded by an earlier run (SC-N1). */
   readonly edgeNames?: readonly string[] | undefined;
   readonly profile?: ProfileInput | undefined;
+  /** Corner treatments (BLD M3): setback corners; vertices without an entry keep the kernel's rolling-ball corner. */
+  readonly corners?: readonly CornerInput[] | undefined;
 }
 
 interface Planned {
@@ -128,6 +132,7 @@ function recipeOfPlan(
   planned: readonly Planned[],
   topology: ShapeTopology | null,
   profile: BlendProfile | undefined,
+  corners: readonly SetbackCorner[],
 ): ShapeRecipe {
   const edges = planned.map((entry) => entry.edge);
   const mids = planned.map((entry) => topology?.edges[entry.edge]?.mid);
@@ -139,7 +144,7 @@ function recipeOfPlan(
     first.law.sizes === undefined &&
     first.law.interpolation !== 'linear' &&
     first.law.size2 === undefined;
-  const profiled = profile === undefined ? {} : { profile };
+  const profiled = { ...(profile === undefined ? {} : { profile }), ...(corners.length === 0 ? {} : { corners: [...corners] }) };
   if (uniform)
     return {
       op: 'fillet',
@@ -174,6 +179,16 @@ function byRecordedNames(
   return {
     ...request,
     edges: request.edges.map((entry, at): EdgeLawInput => ({ ...entry, index: resolved.indices[at] ?? 0, near: undefined })),
+  };
+}
+
+/** The refusal of a corner that cannot be resolved: a lost / split vertex (with the way to re-pick it) or a corner this build cannot make. */
+function cornerRefusal(doc: CadDocument, id: string, refusal: CornerRefusal): CommandResult {
+  if (refusal.code === 'BLD_CORNER_UNSUPPORTED')
+    return blendRejection(doc, 'fillet_edge', refusal.code, refusal.message, [id], [refusal.path]);
+  return {
+    ...noop(doc, `fillet_edge: ${refusal.message} on '${id}'; document unchanged.`),
+    error: commandError(refusal.code, REPICK_VERTICES, [id], [refusal.path]),
   };
 }
 
@@ -221,14 +236,22 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     return 'code' in sized && sized.code !== undefined ? refuse({ code: sized.code, message, path: 'mode' }) : fail(message);
   }
   const profiled = profile.profile !== undefined || sized.planned.some((entry) => entry.law.size2 !== undefined);
+  const cornered =
+    request.corners === undefined
+      ? null
+      : resolveCorners(topology, sized.planned, request.corners, profile.profile !== undefined && profile.profile.type !== 'circular');
+  if (cornered !== null && 'problem' in cornered) return fail(`${cornered.problem} on '${request.id}'`);
+  if (cornered !== null && 'refusal' in cornered) return cornerRefusal(doc, request.id, cornered.refusal);
   const prepared = profiled ? prepareProfile(kernel, shape, topology, sized.planned as PlannedProfile[]) : null;
   if (prepared !== null && isProfileRefusal(prepared)) return refuse(prepared);
   const plan = prepared === null ? sized.planned : (prepared.planned as Planned[]);
-  const modified = recipeOfPlan(source, plan, topology, profile.profile);
+  const corners = cornered === null ? [] : cornered.corners;
+  const modified = recipeOfPlan(source, plan, topology, profile.profile, corners);
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return blendRefusal(doc, 'fillet_edge', request.id, kernel, modified, result, topology);
   const list = plan.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
   const section = profileText(profile.profile);
+  const rounded = corners.length === 0 ? '' : `, ${corners.length} setback corner(s)`;
   const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
   const committed = commitKernelResult(
     doc,
@@ -236,7 +259,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     result,
     [entity],
     (newId, triangles) =>
-      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
+      `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
   const record =
     (request.edgeNames ?? []).length > 0
@@ -246,5 +269,10 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           'edge',
           sized.planned.map((entry) => entry.edge),
         );
-  return record === null || committed.document === doc ? committed : { ...committed, recordExtras: { edgeNames: record } };
+  const cornerRecord = cornered === null ? null : cornered.record;
+  if (committed.document === doc || (record === null && cornerRecord === null)) return committed;
+  return {
+    ...committed,
+    recordExtras: { ...(record === null ? {} : { edgeNames: record }), ...(cornerRecord === null ? {} : { corners: cornerRecord }) },
+  };
 }

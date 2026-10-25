@@ -78,6 +78,29 @@ export function blendSource(faceName: string): { readonly edge: string; readonly
   return supports === null ? null : { edge, supports };
 }
 
+/**
+ * For a corner patch name `blend(v:<edge name>,<edge name>,...)`: the names of the edges that meet at the vertex (split at top-level commas);
+ * null for any other name.
+ */
+export function cornerSources(faceName: string): readonly string[] | null {
+  if (!faceName.startsWith('blend(v:') || !faceName.endsWith(')')) return null;
+  const inner = faceName.slice(8, -1);
+  const parts: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let at = 0; at < inner.length; at++) {
+    const char = inner[at];
+    if (char === '(') depth++;
+    else if (char === ')') depth--;
+    else if (char === ',' && depth === 0) {
+      parts.push(inner.slice(from, at));
+      from = at + 1;
+    }
+  }
+  parts.push(inner.slice(from));
+  return parts;
+}
+
 /** Whether a recipe contains a `fillet` node. */
 export function hasFillet(recipe: ShapeRecipe): boolean {
   switch (recipe.op) {

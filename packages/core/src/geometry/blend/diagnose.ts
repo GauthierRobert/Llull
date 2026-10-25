@@ -13,6 +13,7 @@ export type BlendFailureCode =
   | 'BLD_TWISTED_SURFACE'
   | 'BLD_CORNER_UNSUPPORTED'
   | 'BLD_CORNER_FAILED'
+  | 'BLD_SETBACK_TOO_SHORT'
   | 'BLD_INVALID_RESULT'
   | 'BLD_PROFILE_FAILED'
   | 'BLD_FACE_FILLET_NO_SOLUTION'
@@ -23,6 +24,9 @@ export type BlendFailureCode =
 
 const CODED_REASON = /^\[(BLD_[A-Z_]+)\]\s*([\s\S]*)$/;
 const REASON_CODES: ReadonlySet<string> = new Set([
+  'BLD_SETBACK_TOO_SHORT',
+  'BLD_CORNER_UNSUPPORTED',
+  'BLD_CORNER_FAILED',
   'BLD_FACE_FILLET_NO_SOLUTION',
   'BLD_FACESETS_OVERLAP',
   'BLD_FACE_BLEND_UNSUPPORTED',
@@ -31,11 +35,14 @@ const REASON_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** The stable code and text of a profile / face-blend reason ("[BLD_X] text"; no prefix = BLD_PROFILE_FAILED). */
-function codedReason(message: string | undefined): { readonly code: BlendFailureCode; readonly text: string } {
+function codedReason(
+  message: string | undefined,
+  fallback: BlendFailureCode = 'BLD_PROFILE_FAILED',
+): { readonly code: BlendFailureCode; readonly text: string } {
   const found = message === undefined ? null : CODED_REASON.exec(message);
   const named = found?.[1];
   if (named !== undefined && REASON_CODES.has(named)) return { code: named as BlendFailureCode, text: found?.[2] ?? '' };
-  return { code: 'BLD_PROFILE_FAILED', text: message ?? 'the kernel gave no reason' };
+  return { code: fallback, text: message ?? 'the kernel gave no reason' };
 }
 
 export interface BlendFailure {
@@ -54,6 +61,10 @@ const list = (edges: readonly number[]): string => edges.join(', ');
 
 /** The failure `report` describes, or null when it describes a successful build. */
 export function diagnoseBlend(report: BlendReport): BlendFailure | null {
+  if (report.stage === 'setback') {
+    const { code, text } = codedReason(report.message, 'BLD_CORNER_FAILED');
+    return { code, edges: [], message: text };
+  }
   if (report.stage === 'profile' || report.stage === 'faceBlend' || report.stage === 'fullRound') {
     const { code, text } = codedReason(report.message);
     return { code, edges: [], message: code === 'BLD_PROFILE_FAILED' ? `the profile blend cannot be built: ${text}` : text };
@@ -106,8 +117,11 @@ const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
   BLD_RADIUS_TOO_LARGE: 'use a smaller radius (probe_fillet returns the largest radius that builds), or fewer edges per step',
   BLD_WALKING_FAILURE: 'use a smaller radius or a smoother law, or split the chain (fillet in two steps)',
   BLD_TWISTED_SURFACE: 'reduce the radius law slope or the radius on concave faces',
-  BLD_CORNER_UNSUPPORTED: 'round fewer of the edges meeting at that vertex per step, or use a smaller radius there',
-  BLD_CORNER_FAILED: 'try a different radius at that corner, or round fewer edges per step',
+  BLD_CORNER_UNSUPPORTED:
+    'give the vertex a setback corner: corners: [{ near: <the vertex>, type: "setback", setback: <distance> }] (straight convex edges between planar faces, every edge there rounded, constant radius), or round fewer of the edges meeting there per step',
+  BLD_CORNER_FAILED: 'try a setback corner at that vertex (corners), a different radius or setback there, or round fewer edges per step',
+  BLD_SETBACK_TOO_SHORT:
+    'use at least the minimum the message names (it is the distance along the edge that the neighbouring blends reach)',
   BLD_INVALID_RESULT: 'use a smaller radius or fewer edges per step',
   BLD_FACE_FILLET_NO_SOLUTION: 'use at least the radius the message names, or a smaller one if the legs leave the faces',
   BLD_FACESETS_OVERLAP: 'give two different faces (inspect_faces lists them)',

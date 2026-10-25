@@ -22,6 +22,8 @@ mod ffi {
         fn chamfer_edges(shape: &Shape, edges: &[u32], distance: f64) -> Result<UniquePtr<Shape>>;
         fn fillet_profile(shape: &Shape, specs: &[f64]) -> Result<UniquePtr<Shape>>;
         fn profile_reason(shape: &Shape, specs: &[f64]) -> Result<String>;
+        fn fillet_setback(shape: &Shape, edges: &[f64], corners: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn setback_reason(shape: &Shape, edges: &[f64], corners: &[f64]) -> Result<String>;
         fn face_blend(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn face_blend_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
         fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
@@ -96,6 +98,17 @@ pub fn chamfer(shape: &Shape, edges: &[u32], distance: f64) -> Built {
 /// 2 circular with two legs, rho or shape factor, size, size2 (NaN = size is a radius), side face index or -1, reserved 0).
 pub fn fillet_profile(shape: &Shape, specs: &[f64]) -> Built {
     built(ffi::fillet_profile(inner(shape)?, specs))
+}
+
+/// BLD M3 setback corners of straight convex edges between planar faces: `edges` = (unique edge index, radius) pairs, `corners` = per corner
+/// x, y, z, n, then n (unique edge index, setback distance) pairs for every edge meeting at the vertex.
+pub fn fillet_setback(shape: &Shape, edges: &[f64], corners: &[f64]) -> Built {
+    built(ffi::fillet_setback(inner(shape)?, edges, corners))
+}
+
+/// Why `fillet_setback` fails ("" when it builds; a leading `[BLD_CODE]` names the stable code).
+pub fn setback_reason(shape: &Shape, edges: &[f64], corners: &[f64]) -> OcctResult<String> {
+    occt(ffi::setback_reason(inner(shape)?, edges, corners))
 }
 
 /// BLD M4 `fillet_faces`: `spec` = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape.

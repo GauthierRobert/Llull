@@ -145,7 +145,7 @@ export interface SurfaceSample {
 
 /** Why an exact fillet recipe failed (or that it builds): the OCCT contour statuses, faulty vertices and 4+ edge vertices (BLD M0, `kernel.blendReport`). */
 export interface BlendReport {
-  readonly stage: 'contours' | 'corners' | 'validity' | 'profile' | 'faceBlend' | 'fullRound' | 'none';
+  readonly stage: 'contours' | 'corners' | 'validity' | 'profile' | 'setback' | 'faceBlend' | 'fullRound' | 'none';
   readonly contours: ReadonlyArray<{
     readonly edges: readonly number[];
     readonly status: 'ok' | 'error' | 'walking_failure' | 'startsol_failure' | 'twisted_surface';

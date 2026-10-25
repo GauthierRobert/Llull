@@ -7,6 +7,7 @@
 //! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier, 3 ellipse quarter [start, centre, end]), then its 2 / 3 / 4 / 3 xyz points.
 
 use super::floor::floor_edge_indices;
+use super::setback_node::setback_specs;
 use super::wrap_nodes::{loops_ok, surface_data_ok};
 use super::{number, place_entity, positive, refused, shape_of, vec3, EvalError, Evaluated, Evaluator};
 use crate::features;
@@ -336,6 +337,13 @@ impl Evaluator {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
         let Some(edges) = indices(recipe.get("edges")) else { return refused() };
         if !chamfer {
+            match setback_specs(recipe) {
+                Err(()) => return refused(),
+                Ok(Some((setback_edges, setback_corners))) => {
+                    return shape_of(features::fillet_setback(&source, &setback_edges, &setback_corners))
+                }
+                Ok(None) => {}
+            }
             match profile_specs(recipe, &edges) {
                 Err(()) => return refused(),
                 Ok(Some(specs)) => return shape_of(features::fillet_profile(&source, &specs)),
@@ -380,6 +388,19 @@ impl Evaluator {
         }
         let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
         let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
+        match setback_specs(recipe) {
+            Err(()) => {
+                return Ok(blend_stage_report(
+                    "setback",
+                    "[BLD_CORNER_UNSUPPORTED] the setback corner parameters are malformed or ask for more than this build makes (a radius that varies along an edge, a profile)",
+                ))
+            }
+            Ok(Some((setback_edges, setback_corners))) => {
+                let reason = features::setback_reason(&source, &setback_edges, &setback_corners).map_err(EvalError::Failure)?;
+                return Ok(blend_stage_report("setback", &reason));
+            }
+            Ok(None) => {}
+        }
         match profile_specs(recipe, &edges) {
             Err(()) => {
                 return Ok(blend_stage_report(

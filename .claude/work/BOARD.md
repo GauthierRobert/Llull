@@ -110,8 +110,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14), the code export of sweeps / lofts (done 2026-10-25, §15) and step 2 (done 2026-10-25, §16: `ShapeRecipe` node `sheetSolid`,
   `volumeConsistencyRel`, hollow round sections with laws, exact-curve `inspect_sweep` curvature, closed-loft drift distribution, VC-SWG-32 table):
   frames overlay (UI, step 3, done 2026-10-25, TECHNICAL_SPEC §17). Left: a native test that provokes `SWG_CHECK_VOLUME_MISMATCH` (§16.4). _Lane 1 + 2_ _deps: —_
-- `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 (done 2026-10-23, TECHNICAL_SPEC §13.5–13.9): M3 `corners` / setback
-  - `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
+- `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 + M3 (done 2026-10-23 / 25, TECHNICAL_SPEC §13.5–13.10): M3 remainder
+  (setback corners with a rolling-ball neighbour or on curved / non-straight edges, concave edges, non-constant radii, G2 patches, an exact-boundary corner patch that meets the default 1e-6 x diagonal G0 instead of the 5x `g0Corner`: §13.10); M2 G1 corner
+  refill, profiles on curved faces / edges, variable-size
     profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on
     CPython/OCP; true straight laws (OCCT 7.9.2 `Add(Law_Function)` crashes → graded nodes). _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-7c** 07 MSH left after M0–M5 (done 2026-10-23, TECHNICAL*SPEC §13.5): M6 `quad_remesh` (QuadriFlow), `fit_subdivision_to_mesh`,

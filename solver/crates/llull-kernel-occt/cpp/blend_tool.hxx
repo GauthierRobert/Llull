@@ -8,6 +8,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <Geom_Curve.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Pnt.hxx>
@@ -30,6 +31,21 @@ struct Tool {
   std::vector<std::string> names;
   bool convex = true;
 };
+
+// A straight edge between two planar faces, with the frame the spandrel tools are built in: the two faces, their outward normals, the unit
+// directions inside each face running away from the edge, the fold between the normals and whether the edge is convex.
+struct EdgeFrame {
+  TopoDS_Edge edge;
+  gp_Pnt start, end;
+  gp_Vec direction;
+  double length = 0;
+  TopoDS_Face faces[2];
+  gp_Vec normals[2], inward[2];
+  double fold = 0;
+  bool convex = true;
+};
+// The frame of unique edge `index` of `shape`; false with the reason in `why` (`what` names the kind of blend in the messages).
+bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFrame &frame, std::string &why);
 
 // Outward normal of a planar face (orientation applied).
 gp_Vec normal_of(const TopoDS_Face &face);

@@ -33,6 +33,10 @@ std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_
 // factor, size, size2 (NaN = size is a radius), side (unique face index carrying size, or -1), 0 (reserved). Null when the build fails; profile_reason says why ("" = builds).
 std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const double> specs);
 rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs);
+// Setback corners (cpp/blend_corner.cxx, BLD M3): `edges` = (unique edge index, radius) pairs; `corners` = per corner x, y, z, n, then n (unique edge index of
+// an edge meeting there, setback distance) pairs. Null when the build fails; setback_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
+std::unique_ptr<Shape> fillet_setback(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners);
+rust::String setback_reason(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners);
 // Face blends (cpp/blend_faces.cxx): face_blend spec = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape;
 // full_round spec = unique indices of side 1, center, side 2. Null when the build fails; *_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
 std::unique_ptr<Shape> face_blend(const Shape &shape, rust::Slice<const double> spec);

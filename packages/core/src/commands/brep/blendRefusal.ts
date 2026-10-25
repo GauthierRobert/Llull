@@ -63,6 +63,7 @@ function sizeHint(kernel: GeometryKernel, recipe: FilletRecipe, failure: BlendFa
 /** The param a refusal of `modified` is about: the radius (or edges of per-edge laws), or the center set of a full round. */
 function refusalPath(modified: ShapeRecipe): string {
   if (modified.op === 'fullRound') return 'center';
+  if (modified.op === 'fillet' && (modified.corners ?? []).length > 0) return 'corners';
   return modified.op === 'fillet' && modified.radii !== undefined ? 'edges' : 'radius';
 }
 

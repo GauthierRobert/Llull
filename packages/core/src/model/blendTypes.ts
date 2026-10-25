@@ -1,3 +1,5 @@
+import type { Vec3 } from './vectors';
+
 /** Blend section profiles (BLD M2, docs/design/06-variable-blends/TECHNICAL_SPEC.md §3, §5.3): kept apart from the near-full `types.ts`. */
 
 /**
@@ -9,6 +11,17 @@ export type BlendProfile =
   | { readonly type: 'circular' }
   | { readonly type: 'conic'; readonly rho: number }
   | { readonly type: 'curvature'; readonly shape: number };
+
+/**
+ * A resolved setback corner of a `fillet` node (BLD M3, docs/design/06-variable-blends/TECHNICAL_SPEC.md §5.5): the vertex position and, for every
+ * edge of the source that meets there (unique edge indices), how far from the vertex (along the edge, document units) its blend stops; the kernel
+ * fills the corner with a patch G1 to the blends and the support faces.
+ */
+export interface SetbackCorner {
+  readonly vertex: Vec3;
+  readonly type: 'setback';
+  readonly distances: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
+}
 
 /** Smallest and largest `rho` / `shape` (inclusive). */
 export const PROFILE_FACTOR_MIN = 0.05;

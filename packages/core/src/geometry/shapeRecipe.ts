@@ -48,7 +48,7 @@ function keyText(recipe: ShapeRecipe): string {
       return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
-      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`})`;
+      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`}${recipe.corners === undefined ? '' : `,corners${JSON.stringify(recipe.corners)}`})`;
     case 'blend':
       return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius})`;
     case 'shell':
@@ -255,6 +255,23 @@ function profileError(node: Record<string, unknown>): string | null {
   }
 }
 
+/** Why the `corners` of an untrusted fillet node are unusable (setback corners with a vertex point and a positive distance for edges), or null. */
+function cornersError(node: Record<string, unknown>): string | null {
+  const corners = node['corners'];
+  if (corners === undefined) return null;
+  if (node['op'] !== 'fillet') return 'chamfer: corners apply to fillets only';
+  if (!Array.isArray(corners)) return 'fillet: corners must be a list';
+  for (const corner of corners) {
+    const distances = isRecord(corner) ? corner['distances'] : undefined;
+    if (!isRecord(corner) || corner['type'] !== 'setback' || !isVec3(corner['vertex']) || !Array.isArray(distances) || distances.length < 3)
+      return 'fillet: a corner needs type "setback", a vertex [x, y, z] and distances for 3 or more edges';
+    for (const entry of distances)
+      if (!isRecord(entry) || !Number.isInteger(entry['edge']) || (entry['edge'] as number) < 0 || !positiveNumber(entry['distance']))
+        return 'fillet: corner distances need a non-negative edge index and a distance > 0';
+  }
+  return null;
+}
+
 /** Why a face-set field of an untrusted face-blend node is unusable (a non-empty list of non-negative face indices), or null. */
 function faceSetError(node: Record<string, unknown>, fields: readonly string[]): string | null {
   for (const field of fields) {
@@ -295,7 +312,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       const edges = node['edges'];
       if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
         return `${String(node['op'])}: edges must be non-negative integers`;
-      const radiiProblem = radiiError(node, edges.length) ?? sidedChamferError(node, edges.length) ?? profileError(node);
+      const radiiProblem =
+        radiiError(node, edges.length) ?? sidedChamferError(node, edges.length) ?? profileError(node) ?? cornersError(node);
       if (radiiProblem !== null) return radiiProblem;
       if (node['radii'] === undefined && (!isFiniteNumber(node['size']) || node['size'] <= 0))
         return `${String(node['op'])}: size must be > 0`;

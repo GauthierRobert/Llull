@@ -2,7 +2,7 @@
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
 import type { FaceGroup, MeshAssetRef, MeshSource } from './meshProvenance';
-import type { BlendProfile, FaceBlendParams, FullRoundParams } from './blendTypes';
+import type { BlendProfile, FaceBlendParams, FullRoundParams, SetbackCorner } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
@@ -813,6 +813,8 @@ export type ShapeRecipe =
       readonly angleDeg?: number;
       /** Fillet only (BLD M2): conic / curvature section; absent or circular = the rolling ball. A non-circular profile needs constant sizes. */
       readonly profile?: BlendProfile;
+      /** Fillet only (BLD M3): setback corners; a vertex without an entry keeps the kernel's rolling-ball corner. */
+      readonly corners?: readonly SetbackCorner[];
     }
   /**
    * A rolling-ball blend between two face sets that need not share an edge (BLD M4): `facesA` / `facesB` are unique face indices of the source,

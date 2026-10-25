@@ -26,7 +26,7 @@ Manifold column of every mutating case refuses cleanly (VC-BLD-24).
 
 Regenerate: `cd docs/design/06-variable-blends/validation && node generate_blend_refs.mjs && node generate_plans.mjs`.
 
-Commands / params used by the target plans that **do not exist yet** (after DES-6b): `fillet_edge` `corners` (M3) and the code `BLD_SETBACK_TOO_SHORT`.
+Commands / params used by the target plans that **do not exist yet** (after DES-6c step 1): none; `fillet_edge` `corners` and `BLD_SETBACK_TOO_SHORT` exist (M3, TECHNICAL_SPEC §13.10).
 
 ## 2. Real use cases
 
@@ -103,7 +103,7 @@ FR-26 (23) · FR-27 (27) · FR-28 (24) · FR-29 (33) · FR-30 (28). TR ↔ VC: T
    sizing on planar faces; the native kernel builds them — but no oracle case covers them, OCCT's failure status is discarded,
    native `edgeContinuity` / `edgeSamples` answer null, and codegen drops variable fillets. M0 is about these.
 
-7. **Measured on the native kernel (DES-6b)**: OCCT's `Add(r1, r2, E)` law is not straight (a cubic with zero end slopes; `ChFiDS_FilSpine` source read, and `Add(Law_Function)` crashes in 7.9.2), which is why VC-BLD-02 / 30 differ from both constructions; `interpolation: "linear"` (graded nodes) gives a straight contact line (9e-7) but a face area 4.3e-3 off for a law with a kink (VC-BLD-03 linear: 170.0043); a straight law without a kink (VC-BLD-17) is exact to 1e-6. Conic / curvature / asymmetric blends (VC-BLD-07 to 09) and the face blends (VC-BLD-14 to 17) are built as booleans with the corner spandrel and pass at 1e-6 relative; VC-BLD-12 / 13 (setback) and 22 (vertex names) wait for M3. See TECHNICAL_SPEC §13.5 to 13.9.
+7. **Measured on the native kernel (DES-6b)**: OCCT's `Add(r1, r2, E)` law is not straight (a cubic with zero end slopes; `ChFiDS_FilSpine` source read, and `Add(Law_Function)` crashes in 7.9.2), which is why VC-BLD-02 / 30 differ from both constructions; `interpolation: "linear"` (graded nodes) gives a straight contact line (9e-7) but a face area 4.3e-3 off for a law with a kink (VC-BLD-03 linear: 170.0043); a straight law without a kink (VC-BLD-17) is exact to 1e-6. Conic / curvature / asymmetric blends (VC-BLD-07 to 09) and the face blends (VC-BLD-14 to 17) are built as booleans with the corner spandrel and pass at 1e-6 relative; VC-BLD-12 / 13 (setback) and 22 (vertex names) were built in M3 (DES-6c step 1): cylinders span 6.000000, V 969.731 (bounds 920.549 to 984.549), patch G1 0.0005 rad interior / 0.0045 rad at the end points (limit 0.01), patch G0 gap within 5e-6 x diagonal (the corner limit, 5x the default; TECHNICAL_SPEC 13.10.5), pyramid apex valid with setback 1.5 (V 331.557), 8 vertex names recorded and followed through a resize; the setback volume is a golden of this build (Plate fill), not an analytic value. See TECHNICAL_SPEC §13.5 to 13.10.
 
 ## 5. How a future implementation runs this pack
 

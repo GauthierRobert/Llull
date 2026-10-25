@@ -46,6 +46,8 @@ const GRAPH = { faces: [], edgeFaces: [[0, 1], [1, 2], [0, 2], [2], [0, 3]], edg
 export interface BlendScript {
   /** g1 (angle between the outward normals) at `t` of an edge; default a right angle. */
   g1?: (edge: number, t: number) => number;
+  /** g0 (gap between the two faces) at `t` of an edge; default 0. */
+  g0?: (edge: number, t: number) => number;
   noContinuity?: boolean;
   noGraph?: boolean;
   noNames?: boolean;
@@ -82,7 +84,7 @@ export function scriptedKernel(script: BlendScript = {}): ScriptedKernel {
         : Array.from({ length: count }, (_, k) => ({
             t: k / (count - 1),
             point: [k, 0, 0] as [number, number, number],
-            g0: 0,
+            g0: (script.g0 ?? (() => 0))(edge, k / (count - 1)),
             g1: (script.g1 ?? (() => Math.PI / 2))(edge, k / (count - 1)),
             normalCurvature: [0, 0] as [number, number],
           })),

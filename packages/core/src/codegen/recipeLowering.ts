@@ -74,9 +74,11 @@ function filletLaws(recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>, 
   }));
 }
 
-/** A fillet with a conic / curvature section or a second leg. */
+/** A fillet with a conic / curvature section, a second leg or a setback corner. */
 const profiledFillet = (recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>): boolean =>
-  (recipe.profile !== undefined && recipe.profile.type !== 'circular') || (recipe.radii ?? []).some((law) => law.size2 !== undefined);
+  (recipe.profile !== undefined && recipe.profile.type !== 'circular') ||
+  (recipe.radii ?? []).some((law) => law.size2 !== undefined) ||
+  (recipe.op === 'fillet' && (recipe.corners ?? []).length > 0);
 
 /** Whether a fillet / chamfer node is one the program ops cannot express (a sided chamfer, a profile or two-leg fillet: BLD_CODEGEN_UNSUPPORTED, the export carries the exact result). */
 export function blendNotExpressible(recipe: ShapeRecipe): boolean {

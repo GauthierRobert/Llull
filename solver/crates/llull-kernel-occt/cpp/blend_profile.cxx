@@ -201,6 +201,71 @@ bool apply_tools(naming::Named &current, const std::vector<Tool> &tools, std::st
   return true;
 }
 
+bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFrame &frame, std::string &why) {
+  const TopTools_IndexedMapOfShape edges = query::distinct(shape, TopAbs_EDGE);
+  if (index < 0 || index >= edges.Extent()) {
+    why = "edge index out of range";
+    return false;
+  }
+  const std::string label = "edge " + std::to_string(index);
+  frame.edge = TopoDS::Edge(edges(index + 1));
+  const BRepAdaptor_Curve curve(frame.edge);
+  if (curve.GetType() != GeomAbs_Line) {
+    why = label + " is not a straight line (" + what + " need a straight edge)";
+    return false;
+  }
+  TopTools_IndexedDataMapOfShapeListOfShape owners;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
+  std::vector<TopoDS_Face> around;
+  for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(frame.edge)); it.More(); it.Next()) {
+    const TopoDS_Face face = TopoDS::Face(it.Value());
+    if (std::none_of(around.begin(), around.end(), [&](const TopoDS_Face &known) { return known.IsSame(face); })) around.push_back(face);
+  }
+  if (around.size() != 2) {
+    why = label + " does not join exactly two faces";
+    return false;
+  }
+  for (const TopoDS_Face &face : around)
+    if (BRepAdaptor_Surface(face, Standard_True).GetType() != GeomAbs_Plane) {
+      why = label + " meets a curved face (" + what + " need two planar faces)";
+      return false;
+    }
+  frame.faces[0] = around[0];
+  frame.faces[1] = around[1];
+  frame.start = curve.Value(curve.FirstParameter());
+  frame.end = curve.Value(curve.LastParameter());
+  frame.length = frame.start.Distance(frame.end);
+  if (!(frame.length > 1e-9)) {
+    why = label + " has no length";
+    return false;
+  }
+  frame.direction = gp_Vec(frame.start, frame.end) / frame.length;
+  for (int k = 0; k < 2; ++k) {
+    frame.normals[k] = outward_normal(shape, around[k]);
+    gp_Vec across = frame.normals[k].Crossed(frame.direction);
+    if (across.Magnitude() < 1e-9) {
+      why = label + " lies along the normal of a face";
+      return false;
+    }
+    across.Normalize();
+    const gp_Pnt middle = frame.start.Translated(frame.direction * (frame.length / 2));
+    const double probe = std::min(1e-3 * frame.length, 1e-3);
+    if (inside(around[k], middle.Translated(across * probe))) frame.inward[k] = across;
+    else if (inside(around[k], middle.Translated(across * -probe))) frame.inward[k] = across.Reversed();
+    else {
+      why = "cannot tell which way face " + std::to_string(k + 1) + " runs away from " + label;
+      return false;
+    }
+  }
+  frame.fold = std::acos(std::max(-1.0, std::min(1.0, frame.normals[0].Dot(frame.normals[1]))));
+  if (frame.fold < kTangentAngle || frame.fold > kPi - kTangentAngle) {
+    why = label + " joins tangent or folded-flat faces (no corner to blend)";
+    return false;
+  }
+  frame.convex = frame.normals[0].Dot(frame.inward[1]) < 0;
+  return true;
+}
+
 }  // namespace blend
 
 namespace {
@@ -227,76 +292,30 @@ std::vector<Spec> specs_of(rust::Slice<const double> raw) {
 
 // The spandrel prism of one edge, or the reason it cannot be built.
 bool make_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_names, const Spec &spec, Tool &tool, std::string &why) {
-  const TopTools_IndexedMapOfShape edges = query::distinct(shape, TopAbs_EDGE);
   const TopTools_IndexedMapOfShape faces = query::distinct(shape, TopAbs_FACE);
-  if (spec.edge < 0 || spec.edge >= edges.Extent()) {
-    why = "edge index out of range";
-    return false;
-  }
+  EdgeFrame frame;
+  if (!edge_frame(shape, spec.edge, "profile blends", frame, why)) return false;
   const std::string label = "edge " + std::to_string(spec.edge);
-  const TopoDS_Edge edge = TopoDS::Edge(edges(spec.edge + 1));
-  const BRepAdaptor_Curve curve(edge);
-  if (curve.GetType() != GeomAbs_Line) {
-    why = label + " is not a straight line (profile blends need a straight edge)";
-    return false;
-  }
-  TopTools_IndexedDataMapOfShapeListOfShape owners;
-  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
-  std::vector<TopoDS_Face> around;
-  for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next()) {
-    const TopoDS_Face face = TopoDS::Face(it.Value());
-    if (std::none_of(around.begin(), around.end(), [&](const TopoDS_Face &known) { return known.IsSame(face); })) around.push_back(face);
-  }
-  if (around.size() != 2) {
-    why = label + " does not join exactly two faces";
-    return false;
-  }
-  for (const TopoDS_Face &face : around)
-    if (BRepAdaptor_Surface(face, Standard_True).GetType() != GeomAbs_Plane) {
-      why = label + " meets a curved face (profile blends need two planar faces)";
-      return false;
-    }
+  const TopoDS_Edge edge = frame.edge;
+  const gp_Pnt start = frame.start, end = frame.end;
+  const double length = frame.length;
+  const gp_Vec direction = frame.direction;
+  std::vector<TopoDS_Face> around{frame.faces[0], frame.faces[1]};
+  gp_Vec normals[2] = {frame.normals[0], frame.normals[1]}, inward[2] = {frame.inward[0], frame.inward[1]};
   if (!std::isnan(spec.size2) && spec.side >= 0) {
     const int first = faces.FindIndex(around[0]) - 1;
     const int second = faces.FindIndex(around[1]) - 1;
-    if (spec.side == second) std::swap(around[0], around[1]);
-    else if (spec.side != first) {
+    if (spec.side == second) {
+      std::swap(around[0], around[1]);
+      std::swap(normals[0], normals[1]);
+      std::swap(inward[0], inward[1]);
+    } else if (spec.side != first) {
       why = "side1 is not a face of " + label;
       return false;
     }
   }
-  const gp_Pnt start = curve.Value(curve.FirstParameter());
-  const gp_Pnt end = curve.Value(curve.LastParameter());
-  const double length = start.Distance(end);
-  if (!(length > 1e-9)) {
-    why = label + " has no length";
-    return false;
-  }
-  const gp_Vec direction = gp_Vec(start, end) / length;
-  gp_Vec normals[2], inward[2];
-  for (int k = 0; k < 2; ++k) {
-    normals[k] = outward_normal(shape, around[k]);
-    gp_Vec across = normals[k].Crossed(direction);
-    if (across.Magnitude() < 1e-9) {
-      why = label + " lies along the normal of a face";
-      return false;
-    }
-    across.Normalize();
-    const gp_Pnt middle = start.Translated(direction * (length / 2));
-    const double probe = std::min(1e-3 * length, 1e-3);
-    if (inside(around[k], middle.Translated(across * probe))) inward[k] = across;
-    else if (inside(around[k], middle.Translated(across * -probe))) inward[k] = across.Reversed();
-    else {
-      why = "cannot tell which way face " + std::to_string(k + 1) + " runs away from " + label;
-      return false;
-    }
-  }
-  const double fold = std::acos(std::max(-1.0, std::min(1.0, normals[0].Dot(normals[1]))));
-  if (fold < kTangentAngle || fold > kPi - kTangentAngle) {
-    why = label + " joins tangent or folded-flat faces (no corner to blend)";
-    return false;
-  }
-  tool.convex = normals[0].Dot(inward[1]) < 0;
+  const double fold = frame.fold;
+  tool.convex = frame.convex;
   const double wedge = kPi - fold;
   const double leg1 = std::isnan(spec.size2) ? spec.size * std::tan(fold / 2) : spec.size;
   const double leg2 = std::isnan(spec.size2) ? leg1 : spec.size2;

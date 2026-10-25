@@ -3,7 +3,7 @@
  * from the kernel's exact face queries, plus validity. Numbers and coded findings instead of a zebra render.
  */
 
-import { hasFillet, blendSource, measureContact } from '../../geometry/blend/continuity';
+import { hasFillet, blendSource, cornerSources, measureContact } from '../../geometry/blend/continuity';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { Entity, ShapeRecipe } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
@@ -27,6 +27,8 @@ const DEFAULT_G1_ANGLE_RAD = 0.01;
 const DEFAULT_G2_REL = 0.1;
 /** Default G0 gap: 1e-6 x the bounding-box diagonal (the check_continuity default). */
 const G0_FRACTION = 1e-6;
+/** Corner patches may leave the edges they are sewn to by this multiple of the default gap (the native build accepts 5e-6 x the diagonal). */
+const CORNER_G0_FACTOR = 5;
 
 type Severity = 'fail' | 'warn' | 'info';
 
@@ -54,6 +56,8 @@ interface Contact {
   readonly name?: string;
   readonly g0Gap: number;
   readonly g1AngleRad: number;
+  /** Corner patches only: the largest angle at the two end points of the contact, where three faces meet (g1AngleRad covers the open interior). */
+  readonly g1EndAngleRad?: number;
   readonly g2Gap: number;
   readonly g2Rel: number;
   readonly order: string;
@@ -63,7 +67,7 @@ interface BlendRow {
   readonly entityId: string;
   readonly face: number;
   readonly name: string;
-  readonly kind: 'edge';
+  readonly kind: 'edge' | 'corner';
   readonly sourceEdges: readonly string[];
   readonly contacts: readonly Contact[];
   /** Realised radius along the blend (absent when the kernel cannot section the face). */
@@ -193,6 +197,55 @@ function checkEntity(
             : `${unverified - before} contact line(s) of blend face ${face.index} could not be measured by the kernel`,
       });
   }
+  // The corner patch is a B-spline fit of a plate surface (cpp/blend_corner.cxx): its gap to the edges it is sewn to is judged against 5x the default.
+  const cornerTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
+  for (const face of topology.faces) {
+    const sources = face.name === undefined ? null : cornerSources(face.name);
+    if (sources === null || face.name === undefined) continue;
+    const contacts: Contact[] = [];
+    graph.edgeFaces.forEach((around, edge) => {
+      if (around.length !== 2 || !around.includes(face.index)) return;
+      const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
+      // G0 over the whole contact (end points included); G1 on the open interior, the end points judged apart (three faces meet there).
+      const last = (measured?.length ?? 0) - 1;
+      const interior =
+        measured === null
+          ? null
+          : measureContact(
+              measured.map((sample, at) => (at === 0 || at === last ? { ...sample, g1: 0 } : sample)),
+              cornerTolerances,
+            );
+      const ends =
+        measured === null
+          ? null
+          : measureContact(
+              measured.filter((_, at) => at === 0 || at === last),
+              cornerTolerances,
+            );
+      if (interior === null || ends === null) return void unverified++;
+      const name = topology.edges[edge]?.name;
+      contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(interior), g1EndAngleRad: sig(ends.g1AngleRad) });
+      findings.push(
+        ...contactFindings(entityId, face.index, edge, interior, cornerTolerances, requireG2, unit).filter(
+          (found) => requireG2 || found.code !== 'BLD_CHECK_G2_JUMP',
+        ),
+      );
+      if (ends.g1AngleRad > cornerTolerances.g1AngleRad)
+        findings.push({
+          entityId,
+          face: face.index,
+          edge,
+          code: 'BLD_CHECK_G1_ANGLE',
+          severity: 'warn',
+          value: sig(ends.g1AngleRad),
+          limit: sig(cornerTolerances.g1AngleRad),
+          unit: 'rad',
+          remediation: REMEDIATION.BLD_CHECK_G1_ANGLE,
+          message: `the normals differ by ${sig(ends.g1AngleRad)} rad at an end point of edge ${edge} (corner patch ${face.index}, where three faces meet)`,
+        });
+    });
+    blends.push({ entityId, face: face.index, name: face.name, kind: 'corner', sourceEdges: [...sources], contacts, profile: 'patch' });
+  }
   return { blends, findings, unverified, g0: tolerances.g0 };
 }
 
@@ -269,7 +322,7 @@ const statusOf = (findings: readonly Finding[]): 'pass' | 'warn' | 'fail' =>
 
 /**
  * @affects none; data = { status, blends [{ entityId, face, name, kind, sourceEdges, contacts [{ edge, name?, g0Gap, g1AngleRad, g2Gap, g2Rel, order }] }], findings [{ code, severity, entityId, face?, edge?, value?, limit?, unit, remediation, message }], tolerances, unverified, reviewRequired, reviewReason?, unit, provenance }
- * @invariant kernel-optional: without a kernel, without exact face queries or with no filleted solid the result is status "not_run" (no error); status "fail" when any finding fails, "warn" when any warns, else "pass"; "not_run" without exact face queries; each blend row lists the contacts where it meets its two support faces
+ * @invariant kernel-optional: without a kernel, without exact face queries or with no filleted solid the result is status "not_run" (no error); status "fail" when any finding fails, "warn" when any warns, else "pass"; "not_run" without exact face queries; each blend row lists the contacts where it meets its two support faces; a corner patch (kind "corner") lists every edge it shares, measured on the open interior (g1AngleRad) and at its two end points (g1EndAngleRad)
  * @failure unknown id / no fillet in the solid -> SRF_ENTITY_NOT_FOUND; non-positive tolerance or samples outside 2..101 -> no-op
  */
 export const checkBlends = defineCommand({
@@ -280,7 +333,7 @@ export const checkBlends = defineCommand({
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +
     '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), ' +
     'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
-    'tolerances names every limit with `defaulted`. Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
+    'A setback corner patch is a row of kind "corner" listing every edge it shares: G0 over the whole contact against g0Corner, G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
   params: z.object({
     ids: z.array(z.string()).describe('Ids of solids to check. Default: every solid whose recipe contains a fillet.').optional(),
     require: z
@@ -291,7 +344,9 @@ export const checkBlends = defineCommand({
       .optional(),
     g0: z
       .number()
-      .describe('Largest allowed gap between the blend and a support face, document units (> 0). Default 1e-6 x the bounding-box diagonal.')
+      .describe(
+        'Largest allowed gap between the blend and a support face, document units (> 0). Default 1e-6 x the bounding-box diagonal. Corner patch contacts (blend rows of kind "corner") default to 5 x this (tolerance g0Corner: the plate-surface fit of a setback patch is that accurate); an explicit g0 applies to them unchanged.',
+      )
       .optional(),
     g1AngleRad: z
       .number()
@@ -335,6 +390,16 @@ export const checkBlends = defineCommand({
         defaulted: params.g0 === undefined,
         source: 'check_continuity default: 1e-6 x the bounding-box diagonal of each solid (the largest is shown)',
       },
+      ...(checks.some((check) => check.blends.some((blend) => blend.kind === 'corner'))
+        ? {
+            g0Corner: {
+              value: sig(params.g0 ?? g0Used * CORNER_G0_FACTOR),
+              unit,
+              defaulted: params.g0 === undefined,
+              source: 'corner patches (kind "corner"): 5x the default g0, the accuracy of the plate-surface fit of a setback patch',
+            },
+          }
+        : {}),
       g1AngleRad: {
         value: base.g1AngleRad,
         unit: 'rad',
