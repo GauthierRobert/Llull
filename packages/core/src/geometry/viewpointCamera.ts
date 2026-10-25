@@ -8,6 +8,7 @@ import type { CameraState, Vec3 } from '../model/types';
 import type { ViewpointCamera } from '../model/review';
 import { VIEWPORT_FOV_DEGREES } from '../model/viewport';
 import { add3, cross3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { clamp } from '../lib/clamp';
 
 const finite = (v: Vec3): boolean => v.every(Number.isFinite);
 
@@ -72,4 +73,21 @@ export function interpolateViewpointCamera(a: ViewpointCamera, b: ViewpointCamer
     return { projection: 'perspective', eye, direction, up, fovDeg: a.fovDeg + (b.fovDeg - a.fovDeg) * t };
   const heightOf = (camera: ViewpointCamera): number => (camera.projection === 'orthographic' ? camera.viewHeight : 1);
   return { projection: 'orthographic', eye, direction, up, viewHeight: heightOf(a) + (heightOf(b) - heightOf(a)) * t };
+}
+
+/**
+ * The document orbit camera (`set_camera` convention) that looks the way `camera` does (inverse of `documentCameraViewpoint`): target = eye +
+ * direction · r, where r is the distance along the view axis to `sceneCentre` when that lies ahead of the eye, else `fallbackDistance`.
+ * @invariant polar ∈ [0.01, π − 0.01] (the eye never reaches a pole, like set_camera); distance > 0
+ */
+export function viewpointDocumentCamera(camera: ViewpointCamera, sceneCentre: Vec3 | null, fallbackDistance: number): CameraState {
+  const ahead = sceneCentre === null ? 0 : dot3(sub3(sceneCentre, camera.eye), camera.direction);
+  const distance = ahead > 1e-6 ? ahead : Math.max(fallbackDistance, 1e-6);
+  const offset = scale3(camera.direction, -1);
+  return {
+    target: add3(camera.eye, scale3(camera.direction, distance)),
+    azimuth: Math.atan2(offset[0] + 0, offset[1]),
+    polar: clamp(Math.acos(clamp(offset[2], -1, 1)), 0.01, Math.PI - 0.01),
+    distance,
+  };
 }

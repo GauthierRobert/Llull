@@ -47,7 +47,7 @@ const PMI_CORE_TOOLS = words(
 );
 
 const REVIEW_CORE_TOOLS = words(
-  'allow_interference delete_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue export_bcf set_review_disposition define_colour_profile set_active_colour_profile delete_colour_profile colour_by_rule_report check_display',
+  'allow_interference delete_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue get_viewpoint update_viewpoint apply_viewpoint set_section_box delete_section_box section_box_report add_markup delete_markup add_review_comment set_issue_status review_act_payload check_review export_bcf set_review_disposition define_colour_profile set_active_colour_profile delete_colour_profile colour_by_rule_report check_display',
 );
 
 const ANALYSIS_CORE_TOOLS = words(

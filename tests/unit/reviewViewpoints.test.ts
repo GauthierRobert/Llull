@@ -10,6 +10,8 @@ import { nameUuid } from '@lib/nameUuid';
 const PERSPECTIVE = { projection: 'perspective', eye: [0, -50, 10], direction: [0, 1, 0], up: [0, 0, 1], fovDeg: 60 } as const;
 const ORTHO = { projection: 'orthographic', eye: [0, 0, 100], direction: [0, 0, -1], up: [0, 1, 0], viewHeight: 40 } as const;
 
+const OPEN = { status: 'open', priority: 'normal', history: [] };
+
 function withBox(): CadDocument {
   return execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10] }).document;
 }
@@ -210,8 +212,8 @@ describe('review persistence validation', () => {
         },
       },
       issues: {
-        'iss-4': { id: 'iss-4', guid: 'g', title: 't', labels: [], viewpointIds: ['vp-9'], entityIds: [] },
-        i2: { id: 'i2', guid: 'g', title: 't', labels: 'x' },
+        'iss-4': { ...OPEN, id: 'iss-4', guid: 'g', title: 't', labels: [], viewpointIds: ['vp-9'], entityIds: [] },
+        i2: { ...OPEN, id: 'i2', guid: 'g', title: 't', labels: 'x' },
         i3: { id: 'i3' },
       },
       viewpointOrder: ['vp-1', 'ghost'],
