@@ -478,9 +478,9 @@
 | `list_service_colour_schemes` | List the pipe-content colour schemes llull can apply with apply_service_colour_scheme: asme_a13_1 (ASME A13.1 marker colours: fire_quenching, toxic_corrosive, … | read-only |
 | `list_viewpoints` | List the saved review viewpoints in creation order: data.viewpoints [{ id, guid, name, camera }]. | read-only |
 | `render_walkthrough` | Render a walkthrough (create_walkthrough) to PNG frames: the camera glides between the saved viewpoints (eye linear, direction spherical) at `fps` frames per s… | read-only |
-| `review_act_payload` | The SHA-256 a human signs to authorize set_issue_status on an issue for a given target status, reason and nonce (the nonce is chosen by the signer and must als… | read-only |
+| `review_act_payload` | The SHA-256 a human signs to authorize a review act on an issue, with a nonce the signer chooses (the same nonce goes in `confirmation.nonce`). | read-only |
 | `save_viewpoint` | Save a named review viewpoint (a BCF viewpoint camera, for review issues, walkthroughs and render_view; for a drawing view that also shows chosen PMI items or … |  |
-| `section_box_report` | Classify every entity against a section box (sb-<n>) by its world bounding box: `inside` (box contained), `crossing` (cut by the box, or touching it) and `outs… | read-only |
+| `section_box_report` | Classify every entity against a section box (sb-<n>) by its world bounding box: `inside` (box contained), `crossing` (cut by the box, or touching it from outsi… | read-only |
 | `set_active_colour_profile` | Make a colour profile the active display profile (colour_by_rule_report and check_display default to it), or pass profileId null to show entity colours again. |  |
 | `set_issue_status` | Move a review issue (iss-<n>) along its workflow: open <-> in_progress <-> resolved, then closed. |  |
 | `set_part_grounded` | Mark 3D entities or instances as attached to the world (grounded = true) or release them (false). |  |

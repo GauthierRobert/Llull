@@ -91,13 +91,23 @@ type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 export const ISSUE_STATUSES = ['open', 'in_progress', 'resolved', 'closed'] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
-/** One status change of an issue; `by: 'human'` only when a human signature verified (then `signatureId` and `signer` are set). */
+/** Statuses an issue may move to from each status; a move into or out of `closed` is a human act. */
+export const ISSUE_TRANSITIONS: Readonly<Record<IssueStatus, readonly IssueStatus[]>> = {
+  open: ['in_progress', 'resolved', 'closed'],
+  in_progress: ['open', 'resolved', 'closed'],
+  resolved: ['open', 'in_progress', 'closed'],
+  closed: ['open'],
+};
+
+/** One status change of an issue; `by: 'human'` only when a human signature verified (then `signatureId`, `signer` and the `proof` are set). */
 export interface IssueHistoryEntry {
   readonly status: IssueStatus;
   readonly by: 'agent' | 'human';
   readonly reason: string;
   readonly signatureId?: string;
   readonly signer?: string;
+  /** The confirmation (signature object) a human made; check_review re-verifies it against the rebuilt act. */
+  readonly proof?: Readonly<Record<string, unknown>>;
 }
 
 /** A review topic (BCF Topic). Created `open`; `history` lists every later status change. */

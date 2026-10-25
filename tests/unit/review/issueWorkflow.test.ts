@@ -6,9 +6,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { validateDocumentValues } from '@core/commands/persistence/validation';
 import { reviewProblems } from '@core/commands/persistence/reviewValidation';
-import { fakePort } from '../plm/fakePort';
-
-const humanCtx = (): ExecutionContext => ({ ...defaultContext(), humanSignature: fakePort() });
+import { deleteIssue, humanCtx } from './humanActs';
 
 /** skid + pipe, one viewpoint, one issue citing both entities and the viewpoint. */
 function reviewed(): CadDocument {
@@ -200,7 +198,7 @@ describe('add_review_comment and create_review_issue extensions', () => {
       expect(result.error?.code).toBe('VIS_ISSUE_INVALID');
     }
     const commented = execute(doc, 'add_review_comment', { issueId: 'iss-2', text: 'a' }).document;
-    const deleted = execute(commented, 'delete_review_issue', { id: 'iss-2' });
+    const deleted = deleteIssue(commented, 'iss-2');
     expect(deleted.document.review?.comments).toEqual({});
     expect(deleted.summary).toContain('1 comment(s)');
   });
@@ -248,7 +246,14 @@ describe('set_issue_status and the human gate (VC-VIS-14, TR-VIS-15)', () => {
     expect(closed.error).toBeUndefined();
     const issue = closed.document.review?.issues['iss-2'];
     expect(issue?.status).toBe('closed');
-    expect(issue?.history.at(-1)).toEqual({ status: 'closed', by: 'human', reason: 'accept', signatureId: 'fake:grace', signer: 'grace' });
+    expect(issue?.history.at(-1)).toEqual({
+      status: 'closed',
+      by: 'human',
+      reason: 'accept',
+      signatureId: 'fake:grace',
+      signer: 'grace',
+      proof: confirmationFor(doc, 'closed', 'accept'),
+    });
     expect(closed.summary).toContain('by human (grace)');
     const agentReopen = execute(closed.document, 'set_issue_status', { issueId: 'iss-2', status: 'open', reason: 'oops' });
     expect(agentReopen.error?.code).toBe('VIS_HUMAN_GATE');
@@ -338,8 +343,9 @@ describe('check_review (VC-VIS-14)', () => {
   const data = (
     doc: CadDocument,
     params: Record<string, unknown> = {},
+    ctx?: ExecutionContext,
   ): { status: string; issues: { code: string; ids: string[]; severity: string }[]; counts: Record<string, unknown> } =>
-    execute(doc, 'check_review', params).data as never;
+    execute(doc, 'check_review', params, ctx).data as never;
 
   it('passes an empty document and reports counts', () => {
     expect(data(createEmptyDocument())).toMatchObject({ status: 'pass', issues: [], counts: { viewpoints: 0, markups: 0 } });
@@ -410,7 +416,8 @@ describe('check_review (VC-VIS-14)', () => {
       },
       humanCtx(),
     ).document;
-    expect(data(signed)).toMatchObject({ status: 'pass', counts: { issues: { closed: 1, open: 0 } } });
+    expect(data(signed, {}, humanCtx())).toMatchObject({ status: 'pass', counts: { issues: { closed: 1, open: 0 } } });
+    expect(data(signed).issues.map((row) => row.code)).toEqual(['VIS_SIGNATURE_UNVERIFIED']);
   });
 
   it('is pure', () => {
@@ -489,7 +496,7 @@ describe('the review model persists (VC-VIS-13)', () => {
     );
     const viewpoint = review['viewpoints']?.['vp-1'] ?? {};
     expect(problems({ viewpoints: { 'vp-1': { ...viewpoint, sectionBoxId: 'sb-9' } } })).toContain('sectionBoxId must name a section box');
-    expect(problems({ viewpoints: { 'vp-1': { ...viewpoint, colourProfileId: 3 } } })).toContain('colourProfileId must be a string');
+    expect(problems({ viewpoints: { 'vp-1': { ...viewpoint, colourProfileId: 'ghost' } } })).toContain('colourProfileId must name');
     expect(problems({ viewpoints: { 'vp-1': { ...viewpoint, selection: 3 } } })).toContain('selection must be a string array');
     expect(problems({ viewpoints: { 'vp-1': { ...viewpoint, visibility: { defaultVisible: 1 } } } })).toContain('visibility must be');
     expect(problems({ nextNumber: 2 })).toContain('nextNumber');

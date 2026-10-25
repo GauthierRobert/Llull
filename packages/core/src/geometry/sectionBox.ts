@@ -1,7 +1,7 @@
 /**
  * Section box maths (plant 09 VIS §5.4): validation of a box / half-space section and the classification of an entity AABB against it. Pure.
  * @invariant a box turned by rotationZ is tested in its own frame (the AABB corners rotated by −θ about the box centre): exact for θ = 0, a
- *   conservative bound of the rotated AABB otherwise; touching counts as crossing
+ *   conservative bound of the rotated AABB otherwise; an AABB inside the box whose faces lie on the box is inside; one that only touches the box from outside is crossing
  */
 
 import type { SectionBox, SectionPlane } from '../model/review';

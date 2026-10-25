@@ -1,7 +1,7 @@
 /** Load-time validation of the optional `review` field (viewpoints, section boxes, markups, walkthroughs, issues, comments; plant 09 VIS). Unknown keys are ignored. */
 
 import { sectionBoxProblem } from '../../geometry/sectionBox';
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, MARKUP_SHAPES } from '../../model/review';
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TRANSITIONS, MARKUP_SHAPES, type IssueStatus } from '../../model/review';
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
@@ -40,13 +40,15 @@ function entryProblem(
   return problem === null ? null : `review.${section}['${id}']: ${problem}`;
 }
 
-function viewpointProblem(entry: Record<string, unknown>, sectionBoxes: Section): string | null {
+function viewpointProblem(entry: Record<string, unknown>, sectionBoxes: Section, profiles: Section): string | null {
   if (typeof entry['guid'] !== 'string' || typeof entry['name'] !== 'string') return 'guid and name must be strings';
   const cameraIssue = cameraProblem(entry['camera']);
   if (cameraIssue !== null) return cameraIssue;
   const box = entry['sectionBoxId'];
   if (box !== undefined && (typeof box !== 'string' || !Object.hasOwn(sectionBoxes, box))) return 'sectionBoxId must name a section box';
-  if (entry['colourProfileId'] !== undefined && typeof entry['colourProfileId'] !== 'string') return 'colourProfileId must be a string';
+  const profile = entry['colourProfileId'];
+  if (profile !== undefined && (typeof profile !== 'string' || !Object.hasOwn(profiles, profile)))
+    return 'colourProfileId must name a display colour profile';
   if (entry['selection'] !== undefined && !isStringArray(entry['selection'])) return 'selection must be a string array';
   const visibility = entry['visibility'];
   if (
@@ -97,17 +99,23 @@ function commentProblem(entry: Record<string, unknown>, issues: Section, viewpoi
   return isAuthor(entry['author']) ? null : "author must be 'agent' or 'human'";
 }
 
-function historyProblem(history: unknown): string | null {
+/** The history is a legal chain from 'open' (every move in the workflow, a human entry carries its signature and proof) ending at `status`. */
+function historyProblem(history: unknown, status: unknown): string | null {
   if (!Array.isArray(history)) return 'history must be an array';
-  const bad = history.some(
-    (item) =>
-      !isRecord(item) ||
-      !isOneOf(ISSUE_STATUSES, item['status']) ||
-      !isAuthor(item['by']) ||
-      typeof item['reason'] !== 'string' ||
-      (item['by'] === 'human' && typeof item['signatureId'] !== 'string'),
-  );
-  return bad ? 'history entries are { status, by, reason } (a human entry carries signatureId)' : null;
+  let current: IssueStatus = 'open';
+  for (const item of history) {
+    if (!isRecord(item) || !isOneOf(ISSUE_STATUSES, item['status']) || !isAuthor(item['by']) || typeof item['reason'] !== 'string')
+      return 'history entries are { status, by, reason }';
+    const to = item['status'] as IssueStatus;
+    if (!ISSUE_TRANSITIONS[current].includes(to)) return `history has an illegal move ${current} -> ${to}`;
+    if (
+      item['by'] === 'human' &&
+      (typeof item['signatureId'] !== 'string' || typeof item['signer'] !== 'string' || !isRecord(item['proof']))
+    )
+      return 'a human history entry carries signatureId, signer and proof';
+    current = to;
+  }
+  return current === status ? null : `status '${String(status)}' is not where the history ends ('${current}')`;
 }
 
 function walkthroughProblem(entry: Record<string, unknown>, viewpoints: Section): string | null {
@@ -137,7 +145,7 @@ function issueProblem(entry: Record<string, unknown>, viewpoints: Section): stri
   if (typeof entry['guid'] !== 'string' || typeof entry['title'] !== 'string') return 'guid and title must be strings';
   if (!isOneOf(ISSUE_STATUSES, entry['status'])) return 'status is not an issue status';
   if (!isOneOf(ISSUE_PRIORITIES, entry['priority'])) return 'priority is not an issue priority';
-  const historyIssue = historyProblem(entry['history']);
+  const historyIssue = historyProblem(entry['history'], entry['status']);
   if (historyIssue !== null) return historyIssue;
   if (!isStringArray(entry['labels']) || !isStringArray(entry['viewpointIds']) || !isStringArray(entry['entityIds']))
     return 'labels, viewpointIds and entityIds must be string arrays';
@@ -146,7 +154,7 @@ function issueProblem(entry: Record<string, unknown>, viewpoints: Section): stri
 }
 
 /** Problems of the optional `review` field of a raw document (absent is valid). */
-export function reviewProblems(value: unknown): string[] {
+export function reviewProblems(value: unknown, display?: unknown): string[] {
   if (value === undefined) return [];
   if (
     !isRecord(value) ||
@@ -161,6 +169,7 @@ export function reviewProblems(value: unknown): string[] {
     typeof value['nextNumber'] !== 'number'
   )
     return ['review must be { viewpoints, viewpointOrder, sectionBoxes, markups, walkthroughs, issues, issueOrder, comments, nextNumber }'];
+  const profiles = isRecord(display) && isRecord(display['colourProfiles']) ? display['colourProfiles'] : {};
   const { viewpoints, sectionBoxes, markups, comments, issues, walkthroughs } = value;
   const ids = [
     ...Object.keys(viewpoints),
@@ -179,7 +188,9 @@ export function reviewProblems(value: unknown): string[] {
       : 'review.activeSectionBoxId must name a section box',
     duplicateIn('viewpointOrder', value['viewpointOrder']),
     duplicateIn('issueOrder', value['issueOrder']),
-    ...Object.entries(viewpoints).map(([id, entry]) => entryProblem('viewpoints', id, entry, (e) => viewpointProblem(e, sectionBoxes))),
+    ...Object.entries(viewpoints).map(([id, entry]) =>
+      entryProblem('viewpoints', id, entry, (e) => viewpointProblem(e, sectionBoxes, profiles)),
+    ),
     ...Object.entries(sectionBoxes).map(([id, entry]) => entryProblem('sectionBoxes', id, entry, sectionBoxEntryProblem)),
     ...Object.entries(markups).map(([id, entry]) => entryProblem('markups', id, entry, (e) => markupProblem(e, viewpoints))),
     ...Object.entries(walkthroughs).map(([id, entry]) => entryProblem('walkthroughs', id, entry, (e) => walkthroughProblem(e, viewpoints))),

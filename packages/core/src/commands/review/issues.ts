@@ -6,6 +6,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { isoDateProblem } from '../../lib/isoDate';
+import { humanGate } from '../../model/humanGate';
+import { DELETE_ACT, deleteDetails } from './reviewActs';
 import { mintReviewId, reviewOf, reviewRejection } from './reviewModel';
 
 /**
@@ -81,19 +83,40 @@ export const createReviewIssue = defineCommand({
 
 /**
  * @affects removes 1 issue and its comments from doc.review (affected: [id]); metaHistory
- * @failure unknown id -> VIS_ISSUE_NOT_FOUND
+ * @invariant deleting is a human act (an issue has no verified creator, and a deleted issue takes its signed record with it): needs a verified signature bound to the issue hash
+ * @failure unknown id -> VIS_ISSUE_NOT_FOUND; no / bad / foreign signature -> VIS_HUMAN_GATE
  */
 export const deleteReviewIssue = defineCommand({
   name: 'delete_review_issue',
   description:
     'Delete a review issue (iss-<n>); its viewpoints stay (delete_viewpoint is allowed once no issue or walkthrough uses them). ' +
-    'Unknown id: VIS_ISSUE_NOT_FOUND. Does not add a feature step.',
+    'HUMAN GATE: deleting an issue (and its comments and signed history) always needs `confirmation`, a signature a human made with a trusted key over the bytes ' +
+    'review_act_payload (act "delete_review_issue") returns; an agent gets VIS_HUMAN_GATE and hands over. Errors: VIS_ISSUE_NOT_FOUND, VIS_HUMAN_GATE. Does not add a feature step.',
   annotations: { metaHistory: true, destructive: true },
-  params: z.object({ id: z.string().describe('Issue id, e.g. "iss-4".') }),
-  run: (doc, { id }): CommandResult => {
+  params: z.object({
+    id: z.string().describe('Issue id, e.g. "iss-4".'),
+    confirmation: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'HUMAN SIGNATURE { alg: "Ed25519", keyId, publicKey, signature, nonce } over review_act_payload(issueId, act "delete_review_issue", nonce).',
+      ),
+  }),
+  run: (doc, { id, confirmation }, ctx): CommandResult => {
     const review = reviewOf(doc);
     if (review.issues[id] === undefined)
       return reviewRejection(doc, 'delete_review_issue', 'VIS_ISSUE_NOT_FOUND', `no issue '${id}'`, [id]);
+    const issue = review.issues[id];
+    const outcome = humanGate(ctx?.humanSignature ?? null, DELETE_ACT, [id], confirmation, issue === undefined ? {} : deleteDetails(issue));
+    if (!outcome.cleared)
+      return reviewRejection(
+        doc,
+        'delete_review_issue',
+        'VIS_HUMAN_GATE',
+        `deleting an issue is a human act: ${outcome.reason}`,
+        [id],
+        ['confirmation'],
+      );
     const issues = Object.fromEntries(Object.entries(review.issues).filter(([key]) => key !== id));
     const comments = Object.fromEntries(Object.entries(review.comments).filter(([, comment]) => comment.issueId !== id));
     const dropped = Object.keys(review.comments).length - Object.keys(comments).length;

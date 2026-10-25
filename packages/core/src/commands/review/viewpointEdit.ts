@@ -106,6 +106,7 @@ export const applyViewpoint = defineCommand({
     'Go to a saved viewpoint (vp-<n>): sets the document camera (orbit target, azimuth, polar, distance) so the view looks the way the viewpoint does, makes its ' +
     'colour profile and section box the active ones when it has them, and with resetDisplay clears the active profile / section box it does not carry. The orbit ' +
     'target is the point on the view axis at the scene centre (else at the current distance). data { camera, activeProfileId, activeSectionBoxId }. ' +
+    'The document camera is a perspective orbit camera: an orthographic viewpoint keeps its direction but loses its view height, and the roll of up is not kept (data.warnings VIS_VIEWPOINT_APPROXIMATED says so). ' +
     'Does not add a feature step. Error: VIS_VIEWPOINT_NOT_FOUND.',
   annotations: { metaHistory: true, idempotent: true },
   params: z.object({
@@ -138,6 +139,15 @@ export const applyViewpoint = defineCommand({
       ...(doc.display === undefined && profileId === undefined ? {} : { display: nextDisplay }),
     };
     const result = changed(document, `Applied viewpoint ${id} "${viewpoint.name}" to the document camera.`, []);
-    return { ...result, data: { camera, activeProfileId: profileId ?? null, activeSectionBoxId: sectionBoxId ?? null } };
+    const warnings =
+      viewpoint.camera.projection === 'orthographic'
+        ? [
+            {
+              code: 'VIS_VIEWPOINT_APPROXIMATED',
+              message: 'orthographic viewpoint applied as a perspective orbit camera (view height and roll are not kept)',
+            },
+          ]
+        : [];
+    return { ...result, data: { camera, activeProfileId: profileId ?? null, activeSectionBoxId: sectionBoxId ?? null, warnings } };
   },
 });

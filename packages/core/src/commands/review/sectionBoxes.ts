@@ -104,7 +104,7 @@ export const deleteSectionBox = defineCommand({
 export const sectionBoxReport = defineCommand({
   name: 'section_box_report',
   description:
-    'Classify every entity against a section box (sb-<n>) by its world bounding box: `inside` (box contained), `crossing` (cut by the box, or touching it) and ' +
+    'Classify every entity against a section box (sb-<n>) by its world bounding box: `inside` (box contained), `crossing` (cut by the box, or touching it from outside) and ' +
     '`outside` (removed). A rotated box is tested in its own frame (conservative for rotated parts). data: { inside[], crossing[], outside[], counts, warnings[] } ' +
     'in document order; warning VIS_SECTION_BOX_EMPTY when nothing is inside or crossing. Read-only. Error: VIS_SECTION_BOX_NOT_FOUND.',
   annotations: { readOnly: true },

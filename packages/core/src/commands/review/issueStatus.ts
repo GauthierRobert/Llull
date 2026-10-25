@@ -4,29 +4,15 @@
  * itself counts; `history[].by` is 'human' only when a signature verified.
  */
 
-import { humanGate, humanGatePayload } from '../../model/humanGate';
-import { ISSUE_STATUSES, type IssueHistoryEntry, type IssueStatus, type ReviewIssue } from '../../model/review';
+import { humanGate } from '../../model/humanGate';
+import { ISSUE_STATUSES, ISSUE_TRANSITIONS, type IssueHistoryEntry, type IssueStatus, type ReviewIssue } from '../../model/review';
+import { DELETE_ACT, STATUS_ACT, deletePayload, statusDetails, statusPayload } from './reviewActs';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, report } from '../noop';
 import { reviewOf, reviewRejection } from './reviewModel';
 
-const ACT = 'review:set_issue_status';
-
-/** Statuses an issue may move to from `from`; a transition into or out of `closed` is a human act. */
-const NEXT: Readonly<Record<IssueStatus, readonly IssueStatus[]>> = {
-  open: ['in_progress', 'resolved', 'closed'],
-  in_progress: ['open', 'resolved', 'closed'],
-  resolved: ['open', 'in_progress', 'closed'],
-  closed: ['open'],
-};
-
 export const isHumanTransition = (from: IssueStatus, to: IssueStatus): boolean => from === 'closed' || to === 'closed';
-
-/** What a human signs for a transition: bound to the issue, its current status and history length, the target and the reason (a replay of another state fails). */
-export function issueStatusPayload(issue: ReviewIssue, to: IssueStatus, reason: string, nonce: string): string {
-  return humanGatePayload(ACT, [issue.id], { from: issue.status, to, reason: reason.trim(), historyLength: issue.history.length }, nonce);
-}
 
 const confirmationParam = z
   .record(z.string(), z.unknown())
@@ -63,24 +49,19 @@ export const setIssueStatus = defineCommand({
     const why = reason.trim();
     if (why.length === 0)
       return reviewRejection(doc, 'set_issue_status', 'VIS_ISSUE_STATUS_INVALID', 'the reason is empty', [issueId], ['reason']);
-    if (!NEXT[issue.status].includes(status))
+    if (!ISSUE_TRANSITIONS[issue.status].includes(status))
       return reviewRejection(
         doc,
         'set_issue_status',
         'VIS_ISSUE_STATUS_INVALID',
-        `${issue.status} -> ${status} is not a transition (from ${issue.status}: ${NEXT[issue.status].join(', ')})`,
+        `${issue.status} -> ${status} is not a transition (from ${issue.status}: ${ISSUE_TRANSITIONS[issue.status].join(', ')})`,
         [issueId],
         ['status'],
       );
     const gated = isHumanTransition(issue.status, status);
     let entry: IssueHistoryEntry = { status, by: 'agent', reason: why };
     if (gated || confirmation !== undefined) {
-      const outcome = humanGate(ctx?.humanSignature ?? null, ACT, [issueId], confirmation, {
-        from: issue.status,
-        to: status,
-        reason: why,
-        historyLength: issue.history.length,
-      });
+      const outcome = humanGate(ctx?.humanSignature ?? null, STATUS_ACT, [issueId], confirmation, statusDetails(issue, status, why));
       if (!outcome.cleared)
         return reviewRejection(
           doc,
@@ -90,7 +71,14 @@ export const setIssueStatus = defineCommand({
           [issueId],
           ['confirmation'],
         );
-      entry = { status, by: 'human', reason: why, signatureId: outcome.signatureId, signer: outcome.signer };
+      entry = {
+        status,
+        by: 'human',
+        reason: why,
+        signatureId: outcome.signatureId,
+        signer: outcome.signer,
+        ...(confirmation === undefined ? {} : { proof: confirmation }),
+      };
     }
     const next: ReviewIssue = { ...issue, status, history: [...issue.history, entry] };
     const document = { ...doc, review: { ...review, issues: { ...review.issues, [issueId]: next } } };
@@ -103,25 +91,50 @@ export const setIssueStatus = defineCommand({
   },
 });
 
-/** @affects nothing — read-only; data { act, payloadSha256, from, to, ... } */
+/** @affects nothing — read-only; data { act, payloadSha256, ... } */
 export const reviewActPayload = defineCommand({
   name: 'review_act_payload',
   description:
-    'The SHA-256 a human signs to authorize set_issue_status on an issue for a given target status, reason and nonce (the nonce is chosen by the signer and must ' +
-    'also be inside `confirmation`). The payload is bound to the issue, its current status and history length, so a signature cannot be replayed on another ' +
-    'state. data { act, issueId, from, to, reason, nonce, payloadSha256 }. Read-only. Errors: VIS_ISSUE_NOT_FOUND, VIS_ISSUE_STATUS_INVALID.',
+    'The SHA-256 a human signs to authorize a review act on an issue, with a nonce the signer chooses (the same nonce goes in `confirmation.nonce`). ' +
+    'act "set_issue_status" (default): give status and reason; it is needed to close an issue or re-open a closed one, and a human may also sign any other move ' +
+    '(then it is recorded as a human act and the signature is spent). act "delete_review_issue": deleting an issue is always a human act; give only the nonce. ' +
+    'The payload is bound to the whole issue (its hash: guid, title, entities, viewpoints, history), its current status and history length, so a signature ' +
+    'cannot be replayed on another issue or state. data { act, issueId, from, to, reason, nonce, payloadSha256 }. Read-only. Errors: VIS_ISSUE_NOT_FOUND, VIS_ISSUE_STATUS_INVALID.',
   annotations: { readOnly: true },
   params: z.object({
     issueId: z.string().describe('Issue id, e.g. "iss-2".'),
-    status: z.enum(ISSUE_STATUSES).describe('Target status the human will sign for.'),
-    reason: z.string().describe('The reason that will be passed to set_issue_status (it is part of what is signed).'),
+    act: z.enum(['set_issue_status', 'delete_review_issue']).optional().describe('Which act is signed. Default "set_issue_status".'),
+    status: z.enum(ISSUE_STATUSES).optional().describe('set_issue_status: the target status the human will sign for.'),
+    reason: z
+      .string()
+      .optional()
+      .describe('set_issue_status: the reason that will be passed to set_issue_status (it is part of what is signed).'),
     nonce: z.string().min(1).describe('A fresh non-empty string chosen by the signer; the same nonce goes in `confirmation.nonce`.'),
   }),
-  run: (doc, { issueId, status, reason, nonce }): CommandResult => {
+  run: (doc, { issueId, act, status, reason, nonce }): CommandResult => {
     const issue = reviewOf(doc).issues[issueId];
     if (issue === undefined)
       return reviewRejection(doc, 'review_act_payload', 'VIS_ISSUE_NOT_FOUND', `no issue '${issueId}'`, [issueId], ['issueId']);
-    if (!NEXT[issue.status].includes(status))
+    if (act === 'delete_review_issue') {
+      const payloadSha256 = deletePayload(issue, nonce);
+      return report(doc, `Payload to sign for deleting ${issueId}: ${payloadSha256}.`, {
+        act: DELETE_ACT,
+        issueId,
+        from: issue.status,
+        nonce,
+        payloadSha256,
+      });
+    }
+    if (status === undefined || reason === undefined)
+      return reviewRejection(
+        doc,
+        'review_act_payload',
+        'VIS_ISSUE_STATUS_INVALID',
+        'set_issue_status needs status and reason',
+        [issueId],
+        ['status'],
+      );
+    if (!ISSUE_TRANSITIONS[issue.status].includes(status))
       return reviewRejection(
         doc,
         'review_act_payload',
@@ -130,9 +143,9 @@ export const reviewActPayload = defineCommand({
         [issueId],
         ['status'],
       );
-    const payloadSha256 = issueStatusPayload(issue, status, reason, nonce);
+    const payloadSha256 = statusPayload(issue, status, reason, nonce);
     return report(doc, `Payload to sign for ${issueId} ${issue.status} -> ${status}: ${payloadSha256}.`, {
-      act: ACT,
+      act: STATUS_ACT,
       issueId,
       from: issue.status,
       to: status,

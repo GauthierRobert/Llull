@@ -1,6 +1,9 @@
 /** check_review (plant 09 VIS §7, TR-VIS-16, AF-20): read-only status of the review data with stable VIS_* codes, ids, paths and remediation. */
 
-import { ISSUE_STATUSES } from '../../model/review';
+import { humanGatePayload } from '../../model/humanGate';
+import { ISSUE_STATUSES, type ReviewIssue } from '../../model/review';
+import type { HumanSignaturePort } from '../../model/analysis';
+import { STATUS_ACT, issueBefore, statusDetails } from './reviewActs';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
@@ -17,9 +20,20 @@ interface CheckRow {
   readonly remediation: string;
 }
 
+const humanEntries = (issue: ReviewIssue): number[] => issue.history.flatMap((entry, index) => (entry.by === 'human' ? [index] : []));
+
+/** Whether the human entry `index` of the issue history verifies against the act rebuilt from the chain (pure: the signature is not spent). */
+function entryVerifies(port: HumanSignaturePort, issue: ReviewIssue, index: number): boolean {
+  const entry = issue.history[index];
+  const nonce = entry?.proof?.['nonce'];
+  if (entry === undefined || entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return false;
+  const payload = humanGatePayload(STATUS_ACT, [issue.id], statusDetails(issueBefore(issue, index), entry.status, entry.reason), nonce);
+  return port.verify(entry.proof, payload) !== null;
+}
+
 /**
  * @affects nothing — read-only
- * @invariant status is fail when any error row exists (a closed issue without a human signature in its history), else warn when any warn row exists, else pass; rows are one per code in a fixed order, ids in creation order
+ * @invariant status is fail when any error row exists (a closed issue without a human entry, or a human history entry whose signature does not verify against the act rebuilt from the chain), else warn when any warn row exists, else pass; rows are one per code in a fixed order, ids in creation order
  */
 export const checkReview = defineCommand({
   name: 'check_review',
@@ -27,12 +41,13 @@ export const checkReview = defineCommand({
     'Check the model-review data: data { status "pass" | "warn" | "fail", issues[{ code, severity, ids, paths, message, remediation }], counts }. Codes: ' +
     'VIS_ISSUE_OPEN (info: issue open or in progress), VIS_ISSUE_AWAITING_APPROVAL (warn: resolved, waiting for a human to close it), VIS_ISSUE_ENTITY_MISSING ' +
     '(warn: an unclosed issue cites deleted entities), VIS_VIEWPOINT_STALE (warn: a viewpoint selects or lists deleted entities), VIS_HUMAN_GATE (error: a closed ' +
-    'issue has no human signature in its history). Read-only; run it before handing a review over.',
+    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier). Read-only; run it before handing a review over.',
   annotations: { readOnly: true },
   params: z.object({
     includeInfo: z.boolean().optional().describe('false: leave the info rows (VIS_ISSUE_OPEN) out of `issues`. Default true.'),
   }),
-  run: (doc, { includeInfo }): CommandResult => {
+  run: (doc, { includeInfo }, ctx): CommandResult => {
+    const port = ctx?.humanSignature ?? null;
     const review = reviewOf(doc);
     const issues = review.issueOrder.map((id) => review.issues[id]).filter((issue) => issue !== undefined);
     const missing = (ids: readonly string[]): string[] => ids.filter((id) => doc.entities[id] === undefined);
@@ -77,10 +92,24 @@ export const checkReview = defineCommand({
       {
         code: 'VIS_HUMAN_GATE',
         severity: 'error',
-        ids: issues.filter((issue) => issue.status === 'closed' && issue.history.at(-1)?.by !== 'human').map((issue) => issue.id),
+        ids: issues
+          .filter(
+            (issue) =>
+              (issue.status === 'closed' && issue.history.at(-1)?.by !== 'human') ||
+              (port !== null && humanEntries(issue).some((index) => !entryVerifies(port, issue, index))),
+          )
+          .map((issue) => issue.id),
         paths: ['review.issues[].history'],
-        message: 'closed issues whose closing is not a signed human act',
+        message: 'issues whose closing is not a human act, or whose recorded human signature does not verify',
         remediation: 'a human re-opens and closes them with a signature (set_issue_status); the file was edited outside the commands',
+      },
+      {
+        code: 'VIS_SIGNATURE_UNVERIFIED',
+        severity: 'warn',
+        ids: port === null ? issues.filter((issue) => humanEntries(issue).length > 0).map((issue) => issue.id) : [],
+        paths: ['review.issues[].history'],
+        message: 'issues with human history entries that this host cannot verify (no signature verifier installed)',
+        remediation: 'run check_review in the desktop app or the llull CLI, which install the signing port',
       },
     ];
     const rows = candidates.filter((row) => row.ids.length > 0);
