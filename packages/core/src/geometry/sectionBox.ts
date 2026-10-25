@@ -11,7 +11,7 @@ import { boundsCorners, type Bounds } from './bounds';
 
 export type SectionClass = 'inside' | 'crossing' | 'outside';
 
-export const MAX_SECTION_PLANES = 6;
+const MAX_SECTION_PLANES = 6;
 
 const finite = (v: readonly number[]): boolean => v.every(Number.isFinite);
 

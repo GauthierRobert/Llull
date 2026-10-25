@@ -453,7 +453,7 @@ describe('the review model persists (VC-VIS-13)', () => {
     return doc;
   }
 
-  it('survives a JSON round trip, validates, and undo / redo through the document history is value-equal', () => {
+  it('survives a JSON round trip and validates', () => {
     const doc = full();
     const reloaded = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
     expect(validateDocumentValues(reloaded)).toEqual([]);

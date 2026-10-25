@@ -164,8 +164,7 @@ return a size and a digest, never inline bytes over the cap (AF-12).
 - Redline tools gather points and dispatch `add_markup`.
 - Walk / fly modes are navigation only. Saving a path dispatches `create_walkthrough`.
 - A human closes an issue in the panel with a signature (AF-34a).
-- Camera bookmarks in `localStorage` (`namedViewStore.ts`) migrate to document viewpoints on first open (opt-in
-  prompt).
+- Camera bookmarks are document viewpoints (`namedViewStore.ts` is retired at VIS-M2; old localStorage bookmarks are not imported).
 
 ## 7. Acceptance criteria
 

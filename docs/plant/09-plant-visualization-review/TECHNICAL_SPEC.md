@@ -16,7 +16,7 @@ Status: proposed (2026-10-18). Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONA
 | Quality | `useRenderQuality.ts`: tier high / medium / low from the entity count (≤ 50, ≤ 200, else low); budget "≤ 16 ms median frame at 500 entities". `SceneLighting.tsx`: drei `Environment` + `Lightformer`, `SoftShadows` (PCSS), baked `ContactShadows`, key light sized to the scene. ACES tone mapping (`Viewport3D.tsx`). | No SSAO, no edges overlay in shaded mode, no material classes beyond `Material` colour / metalness / roughness / procedural `finish`. |
 | Materials | `useMaterialProps.ts`, `useFinishTextures.ts`, `displayMetalness.ts`; `Material` in `packages/core/src/model/types.ts` (color, metalness, roughness, finish). | Fine for PBR; no plant material-class library. |
 | Camera | `PerspectiveCamera` FOV `VIEWPORT_FOV_DEGREES` = 45 (`packages/core/src/model/viewport.ts`), `OrbitControls`, floating origin (`floatingOrigin.ts`), document camera `CameraState {target, azimuth, polar, distance}` written by `set_camera` / `fit_view` (`packages/core/src/commands/document/camera.ts`, `metaHistory`). | Orbit only; no walk / fly. |
-| Bookmarks | `NamedViews.tsx` + `src/ui/store/namedViewStore.ts`: "persisted to localStorage; UI-only, never in the CadDocument". | Not shareable, not reachable by CLI / MCP: violates the "persisted ⇒ command" rule for this gap. |
+| Bookmarks | `NamedViews.tsx` + `src/ui/store/namedViewStore.ts`: "persisted to localStorage; UI-only, never in the CadDocument". | Not shareable, not reachable by CLI / MCP: violates the "persisted ⇒ command" rule for this gap. **Retired at VIS-M2 (§12.7).** |
 | Section | `ClippingPlane.tsx` + `clipPlaneMath.ts`: one axis-aligned plane in UI store (`clipPlane`). | No box, not saved. |
 | Colour | Per-entity `color`; layer colours (`Layer.color`); industrial category layers in `packages/domain-aec/src/building/evaluate/entities.ts` (`P-PIPE` #2f9c8f, `P-SUPP` #c9a227, …); `evaluatePipe` (`packages/domain-aec/src/industrial/evaluate.ts`) colours a pipe by **material** (`colorForMaterial`), not by service. | No property-driven colour. No command re-colours an existing entity: the edit catalogue (`packages/core/src/commands/edit/`) has none; `assign_material` changes appearance only through a material. |
 
@@ -78,7 +78,7 @@ How the laws are respected:
 - **L1 / L4.** Every persisted thing is document data written by a command. The UI dispatches `save_viewpoint`,
   `add_markup`, `set_section_box`, `set_active_colour_profile` and the other commands. Navigation state (walk / fly
   mode, current camera while moving) is presentation and stays in the viewport store, like today's orbit.
-  `namedViewStore.ts` is retired after a one-time import that dispatches `save_viewpoint`.
+  `namedViewStore.ts` is retired at VIS-M2 and old bookmarks are not imported (owner rule: no backward compatibility, §12.7).
 - **L2.** `renderPlan.ts`, `colourRules.ts` and `instanceBvh.ts` are pure maths in core `geometry/`, with no three.js.
   The UI turns buckets into `THREE.InstancedMesh`. `render_stats` and `render_view` call the same plan, so the CLI
   numbers are the viewport's numbers.
@@ -679,7 +679,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
-| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d |
+| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
 | VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
@@ -732,7 +732,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 | Area | As built | Files |
 | ---- | -------- | ----- |
-| Review model (VIS-M2 slice) | `CadDocument.review` with `viewpoints` / `viewpointOrder`, `walkthroughs`, `issues` / `issueOrder`, `nextNumber`; load validation (`reviewProblems`). Section boxes, markups, comments arrive later as optional fields (no migration). | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| Review model (VIS-M2 slice) | `CadDocument.review` with `viewpoints` / `viewpointOrder`, `walkthroughs`, `issues` / `issueOrder`, `nextNumber`; load validation (`reviewProblems`). Section boxes, markups, comments arrived at VIS-M2 (§12.7). | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
 | Commands (metaHistory, coded refusals §7) | `save_viewpoint` (camera or `fromDocumentCamera`), `list_viewpoints`, `delete_viewpoint` (refused while used: `VIS_VIEWPOINT_IN_USE`), `create_walkthrough` / `delete_walkthrough`, `create_review_issue` (status `open`) | `commands/review/{viewpoints,walkthroughs,issues,reviewModel}.ts` |
 | Camera maths | orthonormalisation, document orbit camera → viewpoint (45°), interpolation: eye linear, direction / up slerp, fov or view height linear | `geometry/viewpointCamera.ts` |
 | `render_view` (VIS-M4 slice) | `projection: 'perspective'` + `fovDeg`, `viewpointId` (perspective or orthographic BCF camera; ortho `viewHeight` = visible height), `renderer: 'reference' \| 'native'`; data `renderer`, `rendererVersion`, `svgSha256` (reference) or `device` / `version` / `engine` / `deterministic: false` (native), `projection`, `viewpointId` | `commands/render/{viewRequest,viewSetup,rendererProvenance}.ts` |
@@ -797,8 +797,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (section boxes, markups, comments, status workflow,
-`check_review`, `apply_viewpoint`, `get_viewpoint`, UI), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
 (`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
@@ -826,7 +825,7 @@ Deviations from §2–§4 (law-driven or scoped to M1):
 - **Toolsets.** No new toolset names: the display commands and `plant-display` are in `review` (`TOOLSETS.review` is now `REVIEW_CORE_TOOLS` + `pluginToolNames('review')`).
 - **Report scope.** An entity is "in scope" for a profile when its property bag has at least one key the profile's rules test; only in-scope entities are
   grouped and can be `unmatched` (a box is not reported against a pipe-service profile). `groupBy` is `rule` (default), `entity` or `property` + `groupProperty` (SC-VIS-01 groups by `line`); the report knows no plant key.
-- **Not built:** `delete_colour_profile` has no `VIS_PROFILE_IN_USE` check (viewpoints do not reference profiles until VIS-M2 / M4);
+- **Not built:** (`delete_colour_profile` refuses a profile a viewpoint references since VIS-M2, `VIS_PROFILE_IN_USE`);
   `markerLetters` of `apply_service_colour_scheme` (VIS-M7 pipe markers); the profile result cache (`(profile, entities)`) waits for the renderer
   that needs it; `approve_colour_profile` and `define_palette` stay V1; BS 1710 / DIN 2403 stay documentation. Predicates nest one `any` level in
   the tool schema (the stored model nests four). Added code `VIS_RULE_PROPERTY_UNKNOWN` (warn): a rule tests a property no entity has.
@@ -836,6 +835,48 @@ Deviations from §2–§4 (law-driven or scoped to M1):
 
 Validation cases: VC-VIS-01 / 02 / 03 and SC-VIS-01 in `tests/unit/plant/display/serviceColour.test.ts` and `tests/unit/display/colourProfiles.test.ts`;
 the property port contract in `tests/unit/contract/entityPropertiesPort.test.ts`.
+
+### 12.7 As built — VIS-M2 review model, human gate, saved views, 2026-10-25
+
+Built on the VIS-M9 slice (§12.1: viewpoints, walkthroughs, minimal issues, camera maths, `delete_viewpoint` / `delete_review_issue`), which is extended, not duplicated. Pure commands in core (`commands/review/`, all metaHistory, coded refusals through `reviewRejection`); no plugin is involved (the review model is generic, like the display model of §12.6).
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Model | `ReviewModel` gains `sectionBoxes`, `activeSectionBoxId?`, `markups`, `comments`; `Viewpoint` gains `sectionBoxId?`, `colourProfileId?`, `visibility?`, `selection?`; `ReviewIssue` gains `assignedTo?`, `dueDate?`, `history` (status, `by`, reason, `signatureId`, `signer`). Ids `sb-`, `mk-`, `cm-` from `review.nextNumber`. Load validation checks every section, reference and history entry. | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| Section boxes | `set_section_box` (box `min` / `max` + `rotationZ`, or 1..6 `planes`; `id` replaces; `activate`), `delete_section_box` (`VIS_SECTION_BOX_IN_USE`), `section_box_report` (inside / crossing / outside in document order, `VIS_SECTION_BOX_EMPTY`). §5.4 maths: exact for axis-aligned boxes, conservative for `rotationZ`, touching counts as crossing, plane normals normalised on save. | `commands/review/sectionBoxes.ts`, `geometry/sectionBox.ts` |
+| Viewpoints | `save_viewpoint` also stores section box, profile, visibility and selection (references checked); `get_viewpoint` (fields + `markups[]`), `update_viewpoint` (null clears a field; id and guid kept), `apply_viewpoint` (writes `doc.camera`, activates the carried profile / section box; `resetDisplay` also clears the ones it does not carry). `viewpointDocumentCamera`: azimuth = atan2(o_x, o_y), polar = acos(o_z) clamped to [0.01, π − 0.01], target = eye + direction · distance to the scene centre (else the current distance). VC-VIS-11 holds to 1e-9. `delete_viewpoint` deletes its markups and uncites it from comments. `delete_colour_profile` is refused while a viewpoint uses the profile (`VIS_PROFILE_IN_USE`). | `commands/review/{viewpoints,viewpointEdit,viewpointRefs}.ts`, `geometry/viewpointCamera.ts` |
+| Markups, comments | `add_markup` / `delete_markup` (point counts: line 2, polyline 2..256, arrow 2, cloud 3..256, ellipse 2 bounding corners, text 1 + `text`; screen points in [0, 1]; colour `#rrggbb`), `add_review_comment` (optional viewpoint), `create_review_issue` takes `assignedTo` and `dueDate` (`YYYY-MM-DD`); deleting an issue deletes its comments. | `commands/review/{markups,comments,issues}.ts` |
+| Human gate | `set_issue_status` follows §5.5. Closing and re-opening a closed issue need `confirmation`: a signature a trusted human key made over `sha256({act: 'review:set_issue_status', ids: [issueId], details: {from, to, reason, historyLength}, nonce})` (`review_act_payload` returns the bytes). It is the shared `humanGate` of `ctx.humanSignature` (the port 09 PLM installs for releases; also used by 05 FEA dispositions and 08 MAT markings), not a copy; `humanGate` now also returns the `signatureId`. History records `by: 'human'`, `signatureId` and `signer` only from a verified signature. | `commands/review/issueStatus.ts`, `model/humanGate.ts` |
+| `check_review` | `{status, issues[{code, severity, ids, paths, message, remediation}], counts}`; one row per code: `VIS_ISSUE_OPEN` (info), `VIS_ISSUE_AWAITING_APPROVAL`, `VIS_ISSUE_ENTITY_MISSING`, `VIS_VIEWPOINT_STALE` (warn), `VIS_HUMAN_GATE` (error: a closed issue whose last history entry is not a human act, i.e. a file edited outside the commands). `includeInfo: false` leaves the info rows out. | `commands/review/checkReview.ts` |
+| Saved views in the UI | `NamedViews.tsx` reads `document.review` and dispatches `save_viewpoint` (live orbit camera: eye = camera, direction = target − eye), `apply_viewpoint` (the `CameraReactor` follows `document.camera`) and `delete_viewpoint`. `namedViewStore.ts` and its localStorage key are gone. | `src/ui/viewport/3d/{NamedViews.tsx,viewpointParams.ts,cameraBridge.ts}` |
+
+Decisions (owner delegated, quality first):
+
+- **Human = signature only.** Spec §5.5 allowed "a signature with a human-held key, or an authenticated human session". Only the signature path exists
+  (`ctx.humanSignature`: bound to the act, single use where the host has a ledger, trusted key); there is no session concept in `ExecutionContext`, and a session claim
+  is exactly what an agent could forge. `ctx.caller` is not used. A valid signature on a non-gated move is recorded as a human act; an invalid one refuses.
+- **Approving a review is closing its issues.** There is no separate "review approval" record. `approve_colour_profile` stays V1 (§12.6) and will use the same `humanGate`.
+- **`author` of markups and comments is a label**, not verified (default `agent`, the UI sends `human`). Only `history[].by` is a verified fact.
+- **No import of old bookmarks.** The one-time import of §2 and of the functional spec §6.3 is dropped: the owner rule is no backward-compatibility shims.
+  Existing localStorage bookmarks (`llull-named-views`) are simply no longer read. The review model has no backward compatibility either: a document saved with
+  the VIS-M9 slice (no `sectionBoxes` / `markups` / `comments`, issues without `history`) is refused at load with the reasons.
+- **A viewpoint stores eye, direction and up, not an orbit target.** `apply_viewpoint` puts the orbit target on the view axis at the scene centre. A bookmark
+  saved from the UI therefore returns to the same eye and view direction with the orbit pivot re-derived, which is what BCF viewpoints mean.
+- **`apply_viewpoint` changes the display only when the viewpoint carries it** (`resetDisplay: true` to clear). A plain camera bookmark never resets the user's
+  colour profile.
+- **`VIS_VIEWPOINT_NOT_ORTHONORMAL` is not emitted.** `save_viewpoint` keeps its VIS-M9 behaviour: direction and up are normalised and made orthogonal (an agent
+  rarely types an exactly orthogonal pair); a parallel or zero vector is `VIS_CAMERA_INVALID`. VC-VIS-50 reads accordingly.
+- **No `force` on `delete_viewpoint`.** It stays refused while a walkthrough or an issue uses the viewpoint (VIS-M9 rule, stricter than §4); delete those first.
+- **Markup `shape` is the param name** (the SC-VIS-04 plan said `kind`; the plan is corrected). A `text` markup takes one point (§4 said 2..256 for all shapes).
+- **No `realism` and no `clashKey`** on the data model yet: walk / fly arrive with VIS-M6, clash issues with VIS-M5.
+- **`activeSectionBoxId`** is review data written by `set_section_box` (`activate`) and `apply_viewpoint`; the viewport and `render_view` use it at VIS-M4 / M6.
+
+Not built (VIS-M2 UI part): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo, clipping with the active box in the
+viewport, and the BCF snapshot from the UI canvas (Q7). The commands they dispatch exist and are tested. The Views overlay is covered by component tests and
+was not run in the desktop app in this session.
+
+Validation: VC-VIS-11 / 12 / 13 / 14 in `tests/unit/review/` (`sectionBox.test.ts`, `issueWorkflow.test.ts`, `viewpointEdit.test.ts`); SC-VIS-04 is replayed
+command by command against its expected values in `tests/unit/review/scVis04.test.ts`; the UI in `tests/component/NamedViews.test.tsx`.
 
 ## 13. References
 

@@ -149,7 +149,7 @@ describe('apply_viewpoint', () => {
     expect(viewpointDocumentCamera(documentCameraViewpoint(start), [3, 4, 5], 1)).toMatchObject({ azimuth: 0.7, polar: 1.1 });
     const bcf = {
       projection: 'orthographic',
-      eye: [18674.638207107783, -19548.05982455614, 10538.476791232824],
+      eye: [18674.638207107782, -19548.05982455614, 10538.476791232824],
       direction: [-0.8050867319107056, 0.5154458284378052, -0.29351478815078735],
       up: [-0.24719256162643433, 0.15826167166233063, 0.9559545516967773],
       viewHeight: 9673.289179801941,
@@ -196,5 +196,16 @@ describe('apply_viewpoint', () => {
     const doc = execute(createEmptyDocument(), 'save_viewpoint', { name: 'v', fromDocumentCamera: true }).document;
     expect(execute(doc, 'apply_viewpoint', { id: 'vp-9' }).error?.code).toBe('VIS_VIEWPOINT_NOT_FOUND');
     expect(execute(doc, 'apply_viewpoint', { id: 'vp-1' }).document.display).toBeUndefined();
+  });
+});
+
+describe('delete_colour_profile with viewpoints (VIS_PROFILE_IN_USE)', () => {
+  it('refuses while a viewpoint references the profile, and deletes once it does not', () => {
+    const doc = execute(scene(), 'save_viewpoint', { name: 'v', camera: PERSPECTIVE, colourProfileId: 'by-kind' }).document;
+    const refused = execute(doc, 'delete_colour_profile', { profileId: 'by-kind' });
+    expect(refused.error).toMatchObject({ code: 'VIS_PROFILE_IN_USE', ids: ['vp-2'] });
+    expect(refused.document).toBe(doc);
+    const freed = execute(doc, 'update_viewpoint', { id: 'vp-2', colourProfileId: null }).document;
+    expect(execute(freed, 'delete_colour_profile', { profileId: 'by-kind' }).document.display?.colourProfiles).toEqual({});
   });
 });
