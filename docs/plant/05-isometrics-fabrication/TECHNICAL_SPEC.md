@@ -137,7 +137,7 @@ export interface NetworkComponent {
   readonly itemCode?: string;
   readonly category?: 'fabrication' | 'erection' | 'offshore';
   readonly weldKind?: 'shop' | 'site' | 'field_fit';  // WELD only (WW / WS / WF)
-  readonly weightKg?: number;
+  readonly weight?: number;                      // as written, in the file's UNITS-WEIGHT
   readonly derived?: true;                       // legacy-derived fitting
   readonly unverified?: true;                    // catalogue row not verified (AF-32, from PSC)
   readonly extra?: Readonly<Record<string, string>>; // unknown PCF attributes, written back verbatim
@@ -204,7 +204,7 @@ All names snake_case; every command carries `@affects / @invariant / @failure` t
 | Name | Kind | Params (sketch) | data | Failure codes |
 | ---- | ---- | --------------- | ---- | ------------- |
 | `import_pcf` | mutating (query when `preview`) | `text` (PCF content; CLI `file=`), `preview?`, `lineIdOverride?`, `levelId?`, `as: 'route' \| 'pcf_line'` (default `route` when RTE is installed) | `{ lineId, units, componentCount, countsByType, totalPipeLengthMm, pipeLengthsMm[], bom[], unknownRecords[], warnings[] }` | `ISO_PCF_HEADER`, `ISO_PCF_TAB`, `ISO_PCF_LINE_TOO_LONG`, `ISO_PCF_UNITS_MISSING`, `ISO_PCF_RECORD_INVALID`, `ISO_PCF_LINE_EXISTS` |
-| `export_pcf` | query (export) | `lineIds?` (default all), `units: 'mm' \| 'inch'`, `includeMaterials?` (true), `includeSupports?`, `confirmExportControlled` | `{ files: [{ name: "<line>.pcf", content, sha256, componentCount }], count }` | `ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`, `ISO_SKEY_MISSING` (refuses unless `allowMissingSkey`) |
+| `export_pcf` | query (export) | `lineIds?` (default all), `units: 'mm' \| 'inch'`, `includeMaterials?` (true), `strictSkey?` (false), `includeSupports?` (M5), `confirmExportControlled` | `{ files: [{ name: "<line>.pcf", content, sha256, componentCount }], count }` | `ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`, `ISO_SKEY_MISSING` (refuses unless `allowMissingSkey`) |
 | `add_field_weld` | mutating | `lineId`, `at` (point on a pipe, doc units), `type: 'site' \| 'field_fit'` | `{ weldId, splitPipeIds }` | `ISO_WELD_NOT_ON_PIPE`, `ISO_WELD_TOO_CLOSE` (< min cut piece from a joint) |
 | `set_weld_type` | mutating | `weldId \| at`, `type: 'shop' \| 'site' \| 'field_fit'` | `{ weldId, previous }` | `ISO_WELD_NOT_FOUND` |
 | `number_welds` | mutating | `lineId \| lineIds`, `renumber?: false` (true = explicit full renumber, reported) | `{ assigned[], kept[], orphaned[], highest }` | `ISO_LINE_NOT_FOUND` |
@@ -230,7 +230,7 @@ Example tag block:
 /**
  * @affects none; data = { files: [{ name, content, sha256, componentCount }], count }
  * @invariant one file per line; components in flow order; numbers printed with 1 decimal; no TAB; lines <= 1024 chars
- * @failure unknown line / no piping / missing SKEY (without allowMissingSkey) -> coded no-op, affected:[]
+ * @failure unknown line / no piping / missing SKEY (with strictSkey) -> coded no-op, affected:[]
  */
 export const exportPcf = defineCommand({ name: 'export_pcf', annotations: { readOnly: true, idempotent: true }, … });
 ```
@@ -434,7 +434,7 @@ REDUCER-CONCENTRIC / -ECCENTRIC, FLANGE, FLANGE-BLIND, GASKET, BOLT, VALVE, CAP,
 | `ISO_PCF_LINE_EXISTS` | import_pcf | a line with this reference already exists | "pass lineIdOverride or delete the line first" |
 | `ISO_LINE_NOT_FOUND` | all line commands | unknown line id | "list lines with building_schedule kind=pipe" |
 | `ISO_NO_PIPING` | export_pcf, export_piping_ga | the document has no piping | "route a line with add_pipe_run or import_pcf" |
-| `ISO_SKEY_MISSING` | export_pcf, check | a non-pipe component has no SKEY | "set the spec item's skey (01 PSC) or pass allowMissingSkey" |
+| `ISO_SKEY_MISSING` | export_pcf, check | a non-pipe component has no SKEY | "set the spec item's skey (01 PSC) or drop strictSkey" |
 | `ISO_ITEM_CODE_MISSING` | piping_bom, check | component without item code | "assign the spec item (01 PSC)" |
 | `ISO_DISCONNECTED` | check, export_isometric | two connection points within 1 mm that do not coincide, or a component not reachable from the line start | "reconnect the component (02 RTE) — ids listed" |
 | `ISO_OPEN_END` | check | a line end with no terminal component and no equipment / tie-in reference | "add an end flange, cap or set from / to" |
@@ -490,7 +490,7 @@ Coverage gate 90/85/90/90 applies (`packages/domain-aec/src/**`).
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| ISO-M1 | network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
+| ISO-M1 | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
 | ISO-M2 | welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
 | ISO-M3 | iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
 | ISO-M4 | sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
@@ -543,3 +543,71 @@ Rn = source Sn in [validation/sources.md](validation/sources.md) (graded table, 
 - [R26] / [R27] 01-piping-specs-catalog validation data (B16.9, B16.5) — `../01-piping-specs-catalog/validation/data/`.
 - [R28] PipeCAD / IsoAlgo — https://github.com/eryar/PipeCAD (accessed 2026-10).
 - [L1] llull source files cited in §1 (this repository).
+
+## 13. As built
+
+### 13.1 ISO-M1 (2026-10-25): network port, legacy network, PCF reader / writer, `import_pcf`, `export_pcf`
+
+Plugin `piping-fabrication` (toolset `piping`), folder `packages/domain-aec/src/plant/fabrication/`, installed after `piping` in `installDefaultPlugins()`.
+
+| File | Content |
+| ---- | ------- |
+| `model.ts` | the read port `PipingNetwork` / `NetworkComponent` / `NetworkPoint` (§3, mm), `IsoIssue`, and the stored form `PcfLineData` (plain JSON: header, pipeline attributes, components, MATERIALS, unknown records) and `FabricationModel` |
+| `pcf/pcfLexer.ts`, `pcf/pcfRead.ts` | lines + limits (TAB, 1024, header, 16 MB / 200000 lines) then records; units scaling; `extra` / `unknownRecords` kept; coded refusals with `line N` |
+| `pcf/pcfWrite.ts` | canonical writer (§5.2), mm (1 decimal) or inch (4 decimals) |
+| `pcf/pcfMap.ts` | `networkOf` (data to network, MATERIALS descriptions joined), `dataOfNetwork`, `summarise` (counts, pipe lengths, BOM), `missingSkeyIds` |
+| `routeNetwork.ts` | routed line (the derived parts of its runs) to network: the 02 RTE writer of its §13.10, moved here with unchanged output bytes |
+| `legacyNetwork.ts` | building `PipeElement` lines to a network with derived elbows (§5.3) |
+| `commands/` | `import_pcf`, `export_pcf`, `delete_pcf_line` |
+| `validate.ts`, `plugin.ts`, `catalog.ts`, `state.ts`, `codes.ts` | slice validation (`DocumentExtension`), registration, `getFabrication` / `lineIdsInUse`, `ISO_*` remediation table |
+
+Slice: `doc.plant.fabrication?: FabricationModel = { version: 1, pcfLines }` (plant README D2: a sub-record of `doc.plant`, type in the plugin, not in core;
+the core file `model/fabrication.ts` of §3 was not needed). `pcfLines[lineId]` is a `PcfLineData` in mm. Later milestones add welds, spools and isometric definitions.
+
+**How `export_pcf` evolved.** The 02 RTE V1 part 2 command (`piping/commands/exportPcf.ts` + `piping/pcf.ts`) was moved, not duplicated: the part-to-record mapping is now
+`routeNetwork.ts` (route line to `PipingNetwork`), the text is produced by the one canonical writer `pcf/pcfWrite.ts`, and the command lives in the 05 plugin. For routed lines the output is
+byte-identical to before (both golden files `tests/golden/__snapshots__/piping_pcf_*.pcf` unchanged). It gained: the two other line sources (imported lines are written back from their stored
+data, legacy pipes through the legacy network), `units: 'mm' | 'inch'`, `includeMaterials`, `strictSkey`, per-file `source` and `warnings`, and the ISO codes in place of RTE_UNKNOWN_LINE / RTE_NO_RUNS
+(`ISO_LINE_NOT_FOUND`, `ISO_NO_PIPING`; the `RTE_*` code of a run that no longer derives is still returned as is). `data.files[]` keeps every key it had.
+
+**Deviations from §4 (all decided, see below).** `import_pcf`: `as` has the single value `pcf_line` (routed components arrive with M5); `levelId` is not taken (PCF coordinates are world, z is absolute);
+the data adds `units` (the declared ones), `withoutItemCode`, `stored`. `export_pcf`: `strictSkey` replaces `allowMissingSkey` (inverted default); `includeSupports` waits for M5 (supports and welds are not written).
+New: `delete_pcf_line` (the remediation of `ISO_PCF_LINE_EXISTS` needs a way to delete). New codes: `ISO_PCF_TOO_LARGE` (the §8 cap), `ISO_PCF_UNKNOWN_RECORD`, `ISO_PCF_BORE_UNMAPPED` and
+`ISO_PCF_LINE_TRUNCATED` (warnings), `ISO_PCF_UNITS_VERBATIM` and `ISO_LINE_DUPLICATE` (refusals).
+
+**Reader rules beyond §5.1.** One `PIPELINE-REFERENCE` per file (a second one is `ISO_PCF_RECORD_INVALID`). `COMPONENT-IDENTIFIER` is dropped and renumbered on write; `UNIQUE-COMPONENT-IDENTIFIER` is the component id
+(absent: `pcf:<line>:<n>`, which the writer does not write back). A duplicated attribute, a point with a stray token, more than two `END-POINT`s, a `PIPE` / `ELBOW` / `BEND` / `TEE` / `REDUCER` without two
+`END-POINT`s, a non-numeric weight, a unit other than MM / INCH(ES) and a repeated MATERIALS item are `ISO_PCF_RECORD_INVALID` with the line (lossless storage is impossible otherwise). Unknown records are kept
+verbatim at their position (`after` = number of known components before them) and reported; unknown component attributes go to `extra` in file order. UNITS-BORE / -CO-ORDS are required; the four length
+units are chosen by the writer, `ISOGEN-FILES`, `UNITS-WEIGHT` and `UNITS-WEIGHT-LENGTH` pass through. SKEY WW / WS / WF on a WELD sets `weldKind`; FABRICATION-ITEM / ERECTION-ITEM / OFFSHORE-ITEM set `category`.
+
+**Writer attribute order** (a refinement of §5.2 "stored order"): `COMPONENT-IDENTIFIER`, `UNIQUE-COMPONENT-IDENTIFIER` (llull ids only), `END-POINT`s, `CENTRE-POINT`, `BRANCH1-POINT`, `CO-ORDS`,
+the unknown attributes in stored order, `SKEY`, the category flag, `ITEM-CODE`, `WEIGHT`. This reproduces the reference writer on the fixture (sha256 `56d1b90a...`, VC-ISO-03) and the 02 RTE output
+(UNIQUE-COMPONENT-IDENTIFIER right after the identifier, SPINDLE-DIRECTION before SKEY). A file that orders SKEY / ITEM-CODE differently is normalised, not preserved. Pipeline attributes are written in
+the fixed order PIPING-SPEC, INSULATION-SPEC, TRACING-SPEC, PAINTING-SPEC, PROJECT-IDENTIFIER, AREA, REVISION, DATE-DMY, SPOOL-PREFIX, WELD-PREFIX-*, HIGHEST-*, then the others in stored order.
+
+**Legacy network as built.** Elbows at every interior vertex whose turn is at least 0.5 degree (a smaller turn is straight pipe, the vertex is ignored). A turn within 1 degree of 90 / 45 is an ELBOW
+(SKEY ELBW, flagged `derived`) with the centre-to-end of the bundled B16.9 long-radius catalogue (`resolveCatalogRow` elbow90 / elbow45 LR; DN100: 152.4 and 63.5 mm: the PSC table value, not the 152 rounding of the
+02 RTE stub spec); any other turn is a derived BEND with A = R x tan(theta / 2), R the 90 degree value, and no SKEY. A size the catalogue does not know uses R = 1.5 x DN and is flagged `unverified`.
+Findings: one `ISO_LEGACY_FITTINGS_DERIVED` naming all derived fittings; `ISO_SEGMENT_TOO_SHORT` (error) when a pipe piece would be shorter than -0.05 mm, the piece is not emitted; `ISO_OPEN_END` per line end without
+`from` / `to`. Pipes sharing a line number form one network in element order with no joins inferred between elements; a pipe without a line number is its own line (keyed by its id). z = level elevation + point z.
+
+**Decisions (owner delegated quality-first, 2026-10-25).**
+
+- **OQ-ISO-04** separate plugin `piping-fabrication` in `plant/fabrication/`, slice `doc.plant.fabrication`, using PSC / RTE through their exported types and the catalogue lookup. Done as in §2.
+- **OQ-ISO-07** `import_pcf` stores a read-only `pcf_line` by default, and `as: route` (M5) will be explicit: matching a foreign PCF to spec rows can fail or change dimensions, so editable routed components must be a deliberate act,
+  while the lossless copy is always available and exports back to the same bytes.
+- **OQ-ISO-02 (partial)** a component without a confirmed SKEY is written without one and listed in `missingSkey` by default (the 02 behaviour: a routed line with a valve must stay exportable); `strictSkey: true` refuses with
+  `ISO_SKEY_MISSING`. llull never invents a key.
+- **Bore units** with UNITS-BORE INCH the bore is the nominal NPS (4, 0.75, 2.5), not 3.937: it maps to the DN (100, 20, 65) through the catalogue NPS / DN pairing on read and write (`pcf/pcfUnits.ts`); an inch value that is no nominal size is converted by value (25.4) and reported (`ISO_PCF_BORE_UNMAPPED`, warning). Stored bores are DN in mm.
+- **Declared units are kept** `PcfLineData.units` stores the four declared units (bore, coords, bolt diameter, bolt length; bolt units absent when undeclared). `export_pcf` writes a stored line in its own units by default (byte-equal round trip, also for an INCH file or a metric file with inch bolt units); `units: mm | inch` sets all four. Attributes and unknown records are kept verbatim and never scaled, so changing a declared unit on a line that has any is refused with `ISO_PCF_UNITS_VERBATIM`. The guard applies to imported lines only and to length-bearing content: unknown records and any unknown attribute with a value except SPINDLE-DIRECTION (COMPONENT-ATTRIBUTEn may hold lengths); bare flags and routed / legacy lines convert freely. WEIGHT is stored as written (`weight`, in UNITS-WEIGHT, not converted).
+- **Imported lines are not drawn** in M1 (no derived entities, no viewport change); they are data for `export_pcf` and the later fabrication commands. Rendering as centrelines belongs with the iso / GA work (M3, M5).
+- **Line ids** a line id is unique across routed lines (id and line number), imported lines and legacy line numbers; `import_pcf` refuses an id in use (`ISO_PCF_LINE_EXISTS`), its preview warns instead. create_pipeline / add_pipe_run do not know imported lines, so `export_pcf` keys every file by its PIPELINE-REFERENCE (routed: the line number) across the three sources and refuses a clash with `ISO_LINE_DUPLICATE` naming both owners (no file is overwritten or dropped); the comparison is on the sanitized file stem, so `L/100` and `L_100` clash. A legacy pipe whose level no longer exists is read at elevation 0 with an `ISO_LEVEL_MISSING` warning.
+- **Legacy findings** an error-severity finding (`ISO_SEGMENT_TOO_SHORT`, which also catches turns near 180 degrees) refuses `export_pcf` with its code. SKEY ELBW is inferred only from DN 50 up (butt weld); a smaller legacy elbow has none and is listed in `missingSkey`. Legacy points, elevations and the diameter fallback are converted from the document unit to mm before the (mm) bend radius is applied.
+
+**Tests.** `tests/unit/plant/fabrication/{pcfRead,pcfRoundTrip,legacyNetwork}.test.ts` (VC-ISO-01 counts / lengths / BOM, VC-ISO-02 every refusal with its line path, VC-ISO-03 byte-equal round trip and sha256 of the
+fixture, route to export to import preview, inch, unknown records, slice persistence and validation, legacy network cases, export refusals); `tests/unit/plant/piping/pcf.test.ts` (the 02 goldens, unchanged bytes);
+`server/tests/cliImportPcf.test.ts` (`import_pcf file=`, `export_pcf --save`). The CLI reads the file through one `FILE_PARAMS` row (`import_pcf: text`, utf8) in `server/src/cli/exchange.ts`.
+
+**Open.** Conformance of the fixture and of an llull export with a licensed ISOGEN (OQ-ISO-01, M6). SKEYs beyond ELBW, ELSW, TEBW, FLWN, REBW (OQ-ISO-02). Connectivity-based `openEnds` for imported and legacy lines (M3; routed lines
+use the RTE graph). Routed components from a PCF and supports in the PCF (M5). The pack plans `sc-iso-01/02/08` still need the M2+ commands to run end to end.

@@ -13,6 +13,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-25 — main: 05 ISO-M1 merged (cad-reviewer APPROVE after 3 rounds): PCF reader / writer, network port, `import_pcf`,
+  `export_pcf` (moved from 02), `delete_pcf_line`. Gates: static, unit ~16900 (10 sequential shards), server 1695 (with this tree's
+  own `llull-kernel`: the main checkout's binary, rebuilt from uncommitted solver edits, fails 13 sweep tests). Coverage not run.
+  Next: DAT-M1 (WIP).
+
 - 2026-10-25 — main: 09 VIS-M2 merged (cad-reviewer APPROVE after 4 rounds, human gate hardened twice): review model, section
   boxes, markups, comments, signed issue workflow, saved views as document viewpoints. Gates on the merge with DES-2c: static, unit
   16850 (10 sequential shards), server 1694 (branch, `llull-compute` rebuilt for the DES-5b field job). Coverage not run. Next: Wave 3,
@@ -152,8 +157,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - Test memory (2026-10-24): vitest workers sized from free memory in both suites (`testWorkers.ts`, `LLULL_TEST_WORKERS` override); gates green on the merge: static, unit 15222, coverage, server 1558.
 - `[DONE]` **STA-M2/M3** 06 STA FL / RD bars, grating catalogue + `add_grating` / `update_grating` / `check_grating` (support lines cover the panel width), `add_railing` / `update_railing`, railing checks + edge coverage in `check_access`, IFC railing / grating, takeoff (TECHNICAL_SPEC §13). Merged 2026-10-25. Open: coverage against the panel chord at each support (tapered panels refused conservatively), knee-rail offset wording, cast in `validateAccess.ts`; clashes, floor loads, openings, plan symbols, metric gratings per §13. Next STA: M4 `add_ladder`.
 - `[DONE]` **VIS-M2** 09 review model (TECHNICAL_SPEC §12.7): section boxes, viewpoint state (box / profile / visibility / selection), `apply_viewpoint`, markups, comments, issue workflow with the human gate (signature bound to the issue hash, proofs re-verified by `check_review`, gated deletion, `VIS_SIGNER_REVOKED` only for a revoked record of the signer), `namedViewStore` retired (saved views = document viewpoints). Merged 2026-10-25. Open: an exact copy of a signed issue still verifies in another document (no document identity; bind cited-entity hashes or add a document UUID, same limit as PLM `stateHash`); Review panel, redline tools, section-box gizmo, viewport / `render_view` clipping, UI signing flow; Views overlay not yet tried in the desktop app.
-- `[TODO]` **ISO-M1** 05 ISO first milestone (`docs/plant/05-isometrics-fabrication/TECHNICAL_SPEC.md` §10). _deps: RTE-V1b (done)_
-- `[TODO]` **DAT-M1** 08 DAT first milestone (`docs/plant/08-plant-data-reports-interop/TECHNICAL_SPEC.md` §10). _deps: —_
+- `[DONE]` **ISO-M1** 05 plugin `piping-fabrication`: PCF lexer / reader / canonical writer (declared units kept, inch bore = NPS), network port over routed, imported (`pcf_line`, read-only) and legacy lines, `import_pcf` (+ CLI `file=`), `export_pcf` (moved from 02, byte-identical for routed lines; one file per PIPELINE-REFERENCE), `delete_pcf_line` (TECHNICAL_SPEC §13.1). Merged 2026-10-25. Open: ISOGEN conformance (OQ-ISO-01), SKEYs beyond the five confirmed, connectivity `openEnds` for imported / legacy lines (M3), `as: route` + supports (M5), `create_pipeline` / `add_pipe_run` don't check imported line numbers (caught at export). Next ISO: M2 welds + spools.
+- `[WIP]` **DAT-M1** 08 DAT first milestone (`docs/plant/08-plant-data-reports-interop/TECHNICAL_SPEC.md` §10), branch `feat/plant-dat-m1`. _deps: —_
 - `[TODO]` **PID-M1** 04 PID first milestone (`docs/plant/04-pid-schematics/TECHNICAL_SPEC.md` §10), after ISO / DAT (README order). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
@@ -168,6 +173,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **ENG-4** Blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`; next: pack 09 frequency response, 11 creep, 19 impact, 17 topology, aero 06/03/09/02.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 - `[TODO]` **ENG-10b** Natural-frequency search finds few candidates (no modal-specific command): make modal analysis discoverable.
+- `[TODO]` **ENG-11** `execute` validates params with zod but `checkedRun` (`packages/core/src/commands/guard.ts` ~130) passes the RAW params to `run`, so no `.default()` / `.trim()` / coercion ever reaches a command (found in the 05 ISO-M1 review). Pass `checked.data`, then re-run the golden corpus + tool-schema snapshot and drop the hand-written trims / defaults it makes redundant. _Lane 1_
 
 ## Product backlog (no spec yet — write one before starting)
 

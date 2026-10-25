@@ -3,7 +3,7 @@
   "validates": ["VC-ISO-01", "VC-ISO-03", "VC-ISO-05", "VC-ISO-06", "VC-ISO-07", "VC-ISO-08", "VC-ISO-09"],
   "description": "Import the pack's sample PCF (line L-101, DN100: 3 flanges, 7 pipes, 3 elbows, 1 tee, 1 site weld), then read welds, spools, cut list and BOM, and write it back. Run as `llull run sc-iso-01-parse-sample-pcf.json --doc new.llull --json`; the harness inlines the file text.",
   "status": "UNBUILT - specification scenario",
-  "unbuilt": ["import_pcf", "weld_list", "split_spools", "spool_list", "cut_list", "piping_bom", "export_pcf", "check_isometric"],
+  "unbuilt": ["weld_list", "split_spools", "spool_list", "cut_list", "piping_bom", "check_isometric"],
   "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf", "actions[2].params.text": "../data/iso-01-L101-dn100.pcf" } },
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },

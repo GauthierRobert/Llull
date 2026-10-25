@@ -46,6 +46,7 @@ export {
 
 // plant: piping plugin
 export { pipingPlugin } from './plant/piping/plugin';
+export { pipingFabricationPlugin } from './plant/fabrication/plugin';
 export { pipingCatalogPlugin } from './plant/catalog/plugin';
 export { structuresPlugin } from './plant/structures/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';

@@ -3,7 +3,7 @@
   "validates": ["VC-ISO-15"],
   "description": "Orthographic piping general-arrangement plan and section of L-101: pipes drawn double-line above the size threshold, line label line-DN-spec, centreline and bottom-of-pipe elevations, flow arrows. Builds on export_plan_sheet / export_elevation_sheet.",
   "status": "UNBUILT - export_piping_ga is new; the plan and elevation drawings exist today",
-  "unbuilt": ["import_pcf", "export_piping_ga"],
+  "unbuilt": ["export_piping_ga"],
   "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" } },
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
