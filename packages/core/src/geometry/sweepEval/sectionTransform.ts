@@ -28,19 +28,21 @@ export function transformPoint([x, y]: Vec2, transform: SectionTransform): Vec2 
   return [px * c - py * s, px * s + py * c];
 }
 
-/** Transform at weight `u` between `a` and `b` (components mixed linearly). */
+/** The 2D affine map of a transform: its own, or the one its law (scale along x / y, then rotation) describes. */
+function asAffine(transform: SectionTransform): Affine2 {
+  if (transform.affine !== undefined) return transform.affine;
+  const c = Math.cos(transform.twist);
+  const s = Math.sin(transform.twist);
+  return [c * transform.sx, -s * transform.sy, s * transform.sx, c * transform.sy, 0, 0];
+}
+
+/** Transform at weight `u` between `a` and `b` (components mixed linearly; when only one side carries an affine, the other is promoted to its law matrix). */
 export function mixTransforms(a: SectionTransform, b: SectionTransform, u: number): SectionTransform {
   const mix = (p: number, q: number): number => p + (q - p) * u;
-  const affine: Affine2 | undefined =
-    a.affine === undefined || b.affine === undefined
-      ? undefined
-      : [
-          mix(a.affine[0], b.affine[0]),
-          mix(a.affine[1], b.affine[1]),
-          mix(a.affine[2], b.affine[2]),
-          mix(a.affine[3], b.affine[3]),
-          mix(a.affine[4], b.affine[4]),
-          mix(a.affine[5], b.affine[5]),
-        ];
+  let affine: Affine2 | undefined;
+  if (a.affine !== undefined || b.affine !== undefined) {
+    const [pa, pb] = [asAffine(a), asAffine(b)];
+    affine = [mix(pa[0], pb[0]), mix(pa[1], pb[1]), mix(pa[2], pb[2]), mix(pa[3], pb[3]), mix(pa[4], pb[4]), mix(pa[5], pb[5])];
+  }
   return { twist: mix(a.twist, b.twist), sx: mix(a.sx, b.sx), sy: mix(a.sy, b.sy), ...(affine === undefined ? {} : { affine }) };
 }

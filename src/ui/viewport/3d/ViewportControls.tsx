@@ -246,6 +246,8 @@ function SurfaceOverlayControl(): React.ReactElement {
   const setMap = useSurfaceOverlayStore((s) => s.setMap);
   const comb = useSurfaceOverlayStore((s) => s.comb);
   const setComb = useSurfaceOverlayStore((s) => s.setComb);
+  const frames = useSurfaceOverlayStore((s) => s.frames);
+  const setFrames = useSurfaceOverlayStore((s) => s.setFrames);
   const baseId = useId();
   return (
     <>
@@ -276,6 +278,19 @@ function SurfaceOverlayControl(): React.ReactElement {
         pressed={comb}
         title={comb ? 'Hide the curvature comb on nurbs curves' : 'Show the curvature comb on nurbs curves'}
         onClick={() => setComb(!comb)}
+      />
+      <ToggleButton
+        group="Frames overlay"
+        text="Frames"
+        label="Sweep frames"
+        icon="transformMove"
+        pressed={frames}
+        title={
+          frames
+            ? 'Hide the frames and section outlines of the selected sweeps and lofts'
+            : 'Show the frames and section outlines of the selected sweeps and lofts (the first 8)'
+        }
+        onClick={() => setFrames(!frames)}
       />
     </>
   );

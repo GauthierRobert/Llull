@@ -24,3 +24,14 @@ export function useStableList<T>(items: ReadonlyArray<T>): ReadonlyArray<T> {
   if (!same) stable.current = items;
   return stable.current;
 }
+
+/** Previous object while every own field is the same value (entities are immutable, so an untouched field keeps its reference). */
+export function useStableFields<T extends object>(value: T): T {
+  const stable = useRef(value);
+  const previous = stable.current as Record<string, unknown>;
+  const next = value as Record<string, unknown>;
+  const keys = Object.keys(next);
+  const same = keys.length === Object.keys(previous).length && keys.every((key) => previous[key] === next[key]);
+  if (!same) stable.current = value;
+  return stable.current;
+}

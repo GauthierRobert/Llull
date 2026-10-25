@@ -39,6 +39,7 @@ import { FocusOverlay } from '../FocusOverlay';
 import { FocusBanner } from '../FocusBanner';
 import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
+import { SweepFramesOverlay } from './analysis/SweepFramesOverlay';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
@@ -151,6 +152,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <DimensionLens />
         <PmiLayer />
         <AnalysisOverlay />
+        <SweepFramesOverlay />
         <FocusOverlay />
       </group>
 

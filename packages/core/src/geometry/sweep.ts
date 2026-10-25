@@ -21,7 +21,7 @@ export { stationRingAt } from './sweepEval/sections';
 export type { SweepShape } from './sweepEval/evaluate';
 
 /** Section loop placed at frame `i` (laws applied, `origin` added). */
-function placeLoop(evaluation: SweepEvaluation, i: number, loop: readonly Vec2[], origin: Vec3): Vec3[] {
+export function placeLoop(evaluation: SweepEvaluation, i: number, loop: readonly Vec2[], origin: Vec3): Vec3[] {
   const frame = evaluation.frames[i] as SweepFrame;
   const transform = evaluation.transforms?.[i];
   return loop.map((p) => {

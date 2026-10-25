@@ -16,12 +16,19 @@ import type { Triangle } from './triangles';
 const LOFT_SPAN_STEPS = 8;
 
 /**
- * Dense rings of a loft (local coordinates). The rings of an exact skin whose faces are all straight in u (polygon sections) are the polygons themselves:
- * smoothing their corners would round a square into a bulging ring (+25 % across the edge midpoints) and misstate the volume.
+ * The section rings of a loft as the model reads them (one per section, no span interpolation): the polygons themselves when every exact face
+ * is straight in u, else each ring's closed curve. Smoothing the corners of a polygon section would round a square into a bulging ring (+25 % across the edge midpoints).
+ */
+export function loftSectionRings(loft: Pick<LoftEntity, 'rings' | 'faces'>): Vec3[][] {
+  const polygons = loft.faces !== undefined && loft.faces.length > 0 && loft.faces.every((face) => face.degreeU === 1);
+  return loft.rings.map((ring) => (polygons ? [...ring] : sampleRing(ring)));
+}
+
+/**
+ * Dense rings of a loft (local coordinates). Section rings: see `loftSectionRings`.
  */
 export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces'>): Vec3[][] {
-  const polygons = loft.faces !== undefined && loft.faces.length > 0 && loft.faces.every((face) => face.degreeU === 1);
-  const sections = polygons ? loft.rings.map((ring) => [...ring]) : loft.rings.map(sampleRing);
+  const sections = loftSectionRings(loft);
   const first = sections[0];
   if (loft.ruled || loft.closed === true || sections.length < 3 || first === undefined) return sections;
   const columns = first.map((_, j) =>

@@ -12,18 +12,23 @@ interface SurfaceOverlayState {
   map: SurfaceMapChoice;
   /** Curvature comb on every nurbs_curve. */
   comb: boolean;
+  /** Frames (T/N/B) and section outlines of the selected sweep, section rings of the selected loft. */
+  frames: boolean;
   /** Zebra light direction / draft pull direction. */
   direction: Vec3;
   setMap(map: SurfaceMapChoice): void;
   setComb(comb: boolean): void;
+  setFrames(frames: boolean): void;
   setDirection(direction: Vec3): void;
 }
 
 export const useSurfaceOverlayStore = create<SurfaceOverlayState>()((set) => ({
   map: 'off',
   comb: false,
+  frames: false,
   direction: [0, 0, 1],
   setMap: (map) => set({ map }),
   setComb: (comb) => set({ comb }),
+  setFrames: (frames) => set({ frames }),
   setDirection: (direction) => set({ direction }),
 }));

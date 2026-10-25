@@ -85,6 +85,26 @@ describe('inspect_sweep', () => {
     expect(data.realisation).toBe('analytic');
     expect(data.totals.analyticVolume).toBeCloseTo(Math.PI * 100 * 100, 3);
   });
+  it('returns the section outline on the frame only when asked', () => {
+    const { document } = runSwgPlan([{ command: 'sweep_profile', params: { path: xyz(0, 0, 0, 0, 0, 100), radius: 10 }, as: 'p' }]);
+    const id = Object.keys(document.entities)[0] as string;
+    const plain = execute(document, 'inspect_sweep', { id, samples: 3 }).data as { samples: Array<{ outline?: number[][] }> };
+    expect(plain.samples[0]?.outline).toBeUndefined();
+    const data = execute(document, 'inspect_sweep', { id, samples: 3, outline: true }).data as {
+      samples: Array<{ point: number[]; outline: number[][] }>;
+    };
+    expect(data.samples).toHaveLength(3);
+    for (const sample of data.samples) {
+      expect(sample.outline.length).toBeGreaterThan(8);
+      for (const p of sample.outline) {
+        expect(p[2]).toBeCloseTo(sample.point[2] as number, 6);
+        expect(Math.hypot((p[0] as number) - (sample.point[0] as number), (p[1] as number) - (sample.point[1] as number))).toBeCloseTo(
+          10,
+          6,
+        );
+      }
+    }
+  });
   it('refuses unknown ids and bad sampling with stable codes, leaving the document alone', () => {
     const id = idOf('vane');
     expectNoOp(execute(plan.document, 'inspect_sweep', { id: 'nope' }), plan.document, 'SWG_ENTITY_NOT_FOUND');

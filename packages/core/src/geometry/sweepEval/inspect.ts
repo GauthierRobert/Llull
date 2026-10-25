@@ -3,9 +3,11 @@
 import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
 import { add3, cross3, dot3, len3, normalize3, scale3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
-import { baseSectionArea } from './laws';
+import { baseSectionArea, sectionTransforms } from './laws';
 import { mixTransforms, transformPoint, type SectionTransform } from './sectionTransform';
 import { evaluateSweep, type SweepEvaluation } from './evaluate';
+import { placeLoop } from '../sweep';
+import { isClosedChain } from '../curveSegments';
 import { pathBendAt } from './pathCurvature';
 import { orientedFrames, sweepFrames, type SweepFrame } from './frames';
 import { sectionLoops, stationLoopAt } from './sections';
@@ -26,6 +28,8 @@ export interface SweepSample {
   readonly sectionExtent: number | null;
   /** curvatureRadius / sectionExtent: <= 1 folds the swept envelope onto itself; null when there is no fold risk. */
   readonly margin: number | null;
+  /** Outer section loop under the laws, placed on the frame (entity-local points); only when requested. */
+  readonly outline?: ReadonlyArray<Vec3>;
 }
 
 /** Index of the frame span containing fraction `t`, and the blend weight inside it. */
@@ -38,9 +42,22 @@ function locate(fractions: readonly number[], t: number): { i: number; u: number
 
 const mix3 = (a: Vec3, b: Vec3, u: number): Vec3 => add3(scale3(a, 1 - u), scale3(b, u));
 
-function transformAt(evaluation: SweepEvaluation, i: number, u: number): SectionTransform {
+/** Frame index the span starting at `i` ends on: the next one, the first again on a closed chain (its closing wall), else the last. */
+function nextFrame(frameCount: number, i: number, closed: boolean): number {
+  return closed ? (i + 1) % frameCount : Math.min(i + 1, frameCount - 1);
+}
+
+/**
+ * Transform at weight `u` of span `i` -> `next`. The closing span of a closed path ends on frame 0, whose twist is the law's value at t = 0 while the
+ * law runs on to its value at t = 1 (a whole number of symmetry turns further, SWG_CLOSED_TWIST_NOT_PERIODIC): `closingTwist` carries the reported twist
+ * on to it, so `twistRad` rises monotonically to the law's end value. The solid itself closes on ring 0 (the same orientation). Where the total twist is only a
+ * whole number of turns of the section's symmetry (a square turned a quarter turn), ring 0 is a different vertex of the same shape, so the orientation
+ * does unwind across the seam: that is the closing-wall bug of `closedWalls` in geometry/sweep.ts, not of this report. And scale / stretch (not required to be periodic) mix toward frame 0's values, as the closing wall does.
+ */
+function transformAt(evaluation: SweepEvaluation, i: number, next: number, u: number, closingTwist: number | null): SectionTransform {
   const a = evaluation.transforms?.[i] ?? { twist: 0, sx: 1, sy: 1 };
-  const b = evaluation.transforms?.[Math.min(i + 1, evaluation.frames.length - 1)] ?? a;
+  const frame0 = evaluation.transforms?.[next] ?? a;
+  const b = closingTwist !== null && next <= i ? { ...frame0, twist: closingTwist } : frame0;
   return mixTransforms(a, b, u);
 }
 
@@ -51,24 +68,40 @@ function loopAtFraction(sweep: SweepEntity, t: number): Vec2[] {
     : sectionLoops(sweep.section).outer;
 }
 
+/** The outline the displayed solid has at weight `u` of frame span `i`: its two placed rings blended, as the wall between them is. */
+function outlineBetween(sweep: SweepEntity, evaluation: SweepEvaluation, i: number, next: number, u: number): Vec3[] {
+  const ringA = placeLoop(evaluation, i, loopAtFraction(sweep, evaluation.fractions[i] as number), [0, 0, 0]);
+  const ringB = placeLoop(evaluation, next, loopAtFraction(sweep, evaluation.fractions[next] as number), [0, 0, 0]);
+  return ringA.map((p, k) => mix3(p, ringB[k] as Vec3, u));
+}
+
 /** Measurements of `sweep` at each fraction in `ts`, or the evaluator's refusal. */
 export function sweepSamples(
   sweep: SweepEntity,
   ts: readonly number[],
+  withOutline = false,
 ): SweepSample[] | { readonly code: string; readonly message: string } {
   const evaluation = evaluateSweep(sweep);
   if (!('frames' in evaluation)) return evaluation;
   const { frames, fractions, length } = evaluation;
   if (frames.length === 0) return { code: 'SWG_PATH_INVALID', message: 'the path has no samples' };
   const bends = pathBendAt(sweep.path, ts, sweep.helix);
+  // a closed chain has no frame at its end: the last span runs on to fraction 1 and back to frame 0
+  const closed = isClosedChain(sweep.path);
+  const knots = closed ? [...fractions, 1] : fractions;
+  const closingTwist =
+    closed && evaluation.transforms !== null && sweep.rails === undefined
+      ? (sectionTransforms(sweep, [1], length)[0]?.twist ?? null)
+      : null;
   return ts.map((t, k) => {
-    const { i, u } = locate(fractions, t);
+    const { i, u } = locate(knots, t);
+    const next = nextFrame(frames.length, i, closed);
     const a = frames[i] as SweepFrame;
-    const b = frames[Math.min(i + 1, frames.length - 1)] as SweepFrame;
+    const b = frames[next] as SweepFrame;
     const tangent = normalize3(mix3(a.tangent, b.tangent, u));
     const normal = normalize3(mix3(a.normal, b.normal, u));
-    const binormal = cross3(tangent, normal);
-    const transform = transformAt(evaluation, i, u);
+    const binormal = normalize3(mix3(a.binormal, b.binormal, u));
+    const transform = transformAt(evaluation, i, next, u, closingTwist);
     const bend = bends[k] as Vec3;
     const kappa = len3(bend);
     let curvatureRadius: number | null = null;
@@ -81,10 +114,13 @@ export function sweepSamples(
       sectionExtent = Math.max(...loopAtFraction(sweep, t).map((p) => dot2(transformPoint(p, transform), direction)));
       margin = sectionExtent > 0 ? curvatureRadius / sectionExtent : null;
     }
+    const point = mix3(a.point, b.point, u);
+    const outline = withOutline ? outlineBetween(sweep, evaluation, i, next, u) : undefined;
     return {
+      ...(outline === undefined ? {} : { outline }),
       t,
       s: t * length,
-      point: mix3(a.point, b.point, u),
+      point,
       tangent,
       normal,
       binormal,
