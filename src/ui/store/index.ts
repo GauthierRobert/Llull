@@ -6,8 +6,6 @@ export { useThemeStore } from './themeStore';
 export type { Theme } from './themeStore';
 export { useViewportStore } from './viewportStore';
 export type { DisplayMode, ClipAxis, QualityTier, QualityOverride } from './viewportStore';
-export { useNamedViewStore } from './namedViewStore';
-export type { NamedViewCamera } from './namedViewStore';
 export { useLayoutStore } from './layoutStore';
 export type { SidebarTab } from './layoutStore';
 export { useToolStore } from './toolStore';

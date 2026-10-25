@@ -1,142 +1,53 @@
-import { resetStore } from '../helpers/componentEntities';
+import { resetOfflineStore } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useNamedViewStore } from '@ui/store';
 import { useStore } from '@ui/store';
 import { NamedViewsOverlay } from '@ui/viewport/3d/NamedViews';
-import type { NamedViewCamera } from '@ui/store';
+import { viewpointCameraParams } from '@ui/viewport/3d/viewpointParams';
+import type { CameraSnapshot } from '@ui/viewport/3d/cameraBridge';
+import { execute } from '@core/commands/registry';
 
-// Helpers
+const MOCK_CAMERA_A: CameraSnapshot = { position: [5, 10, 15], target: [0, 0, 0] };
 
-const MOCK_CAMERA_A: NamedViewCamera = { position: [5, 10, 15], target: [0, 0, 0] };
+const mocks = vi.hoisted(() => ({ snapshot: null as CameraSnapshot | null }));
+vi.mock('@ui/viewport/3d/cameraBridge', () => ({ getCameraSnapshot: () => mocks.snapshot }));
 
-const MOCK_CAMERA_B: NamedViewCamera = { position: [1, 2, 3], target: [4, 5, 6] };
-
-function resetStores(): void {
-  resetStore();
-  useNamedViewStore.setState({ namedViews: [] });
+function withViewpoints(...names: string[]): void {
+  let document = useStore.getState().document;
+  for (const name of names)
+    document = execute(document, 'save_viewpoint', {
+      name,
+      camera: { projection: 'perspective', eye: [0, -50, 10], direction: [0, 1, 0] },
+    }).document;
+  useStore.setState({ document });
 }
 
-/** Returns a getCameraSnapshot fn that always yields the given camera. */
-function makeSnapshot(cam: NamedViewCamera): () => NamedViewCamera {
-  return () => cam;
-}
+const viewNames = (): string[] => {
+  const review = useStore.getState().document.review;
+  return (review?.viewpointOrder ?? []).map((id) => review?.viewpoints[id]?.name ?? '');
+};
 
-/** Returns a getCameraSnapshot fn that always returns null (bridge not ready). */
-function nullSnapshot(): null {
-  return null;
-}
-
-// namedViewStore — saveNamedView
-
-describe('namedViewStore — saveNamedView', () => {
-  beforeEach(() => {
-    resetStores();
+describe('viewpointCameraParams', () => {
+  it('looks from the camera position at the orbit target, with +Z up', () => {
+    expect(viewpointCameraParams(MOCK_CAMERA_A)).toEqual({
+      projection: 'perspective',
+      eye: [5, 10, 15],
+      direction: [-5, -10, -15],
+      up: [0, 0, 1],
+    });
   });
-  it('starts with an empty named-views list', () => {
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(0);
+  it('uses +Y up when looking straight along Z', () => {
+    expect(viewpointCameraParams({ position: [1, 2, 9], target: [1, 2, 0] })?.up).toEqual([0, 1, 0]);
   });
-  it('adds a view with the given name and captured camera', () => {
-    useNamedViewStore.getState().saveNamedView('Front Close', makeSnapshot(MOCK_CAMERA_A));
-    const { namedViews } = useNamedViewStore.getState();
-    expect(namedViews).toHaveLength(1);
-    expect(namedViews[0]?.name).toBe('Front Close');
-    expect(namedViews[0]?.camera.position).toEqual([5, 10, 15]);
-    expect(namedViews[0]?.camera.target).toEqual([0, 0, 0]);
-  });
-  it('returns the new view id (string)', () => {
-    const id = useNamedViewStore.getState().saveNamedView('Top', makeSnapshot(MOCK_CAMERA_A));
-    expect(typeof id).toBe('string');
-    expect(id).toBeTruthy();
-  });
-  it('returns null and adds nothing if the camera snapshot returns null', () => {
-    const id = useNamedViewStore.getState().saveNamedView('Should fail', nullSnapshot);
-    expect(id).toBeNull();
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(0);
-  });
-  it('saves multiple views in creation order', () => {
-    useNamedViewStore.getState().saveNamedView('A', makeSnapshot(MOCK_CAMERA_A));
-    useNamedViewStore.getState().saveNamedView('B', makeSnapshot(MOCK_CAMERA_B));
-    const { namedViews } = useNamedViewStore.getState();
-    expect(namedViews).toHaveLength(2);
-    expect(namedViews[0]?.name).toBe('A');
-    expect(namedViews[1]?.name).toBe('B');
-  });
-  it('trims the name and falls back to "View" for empty string', () => {
-    useNamedViewStore.getState().saveNamedView('   ', makeSnapshot(MOCK_CAMERA_A));
-    expect(useNamedViewStore.getState().namedViews[0]?.name).toBe('View');
-  });
-  it('does not mutate the CadDocument (PRIME DIRECTIVE)', () => {
-    const docBefore = useStore.getState().document;
-    useNamedViewStore.getState().saveNamedView('Test', makeSnapshot(MOCK_CAMERA_A));
-    expect(useStore.getState().document).toBe(docBefore);
+  it('returns null when the eye is on the target', () => {
+    expect(viewpointCameraParams({ position: [1, 2, 3], target: [1, 2, 3] })).toBeNull();
   });
 });
-
-// namedViewStore — restoreNamedView
-
-describe('namedViewStore — restoreNamedView', () => {
-  beforeEach(() => {
-    resetStores();
-  });
-  it('calls applyCamera with the stored position and target', () => {
-    const applySpy = vi.fn();
-    const id = useNamedViewStore.getState().saveNamedView('Iso', makeSnapshot(MOCK_CAMERA_A));
-    useNamedViewStore.getState().restoreNamedView(id!, applySpy);
-    expect(applySpy).toHaveBeenCalledOnce();
-    expect(applySpy).toHaveBeenCalledWith(MOCK_CAMERA_A.position, MOCK_CAMERA_A.target);
-  });
-  it('does nothing if the id is not found', () => {
-    const applySpy = vi.fn();
-    useNamedViewStore.getState().restoreNamedView('nonexistent-id', applySpy);
-    expect(applySpy).not.toHaveBeenCalled();
-  });
-  it('does nothing if applyCamera is null (bridge not ready)', () => {
-    const id = useNamedViewStore.getState().saveNamedView('Side', makeSnapshot(MOCK_CAMERA_B));
-    // Should not throw
-    expect(() => {
-      useNamedViewStore.getState().restoreNamedView(id!, null);
-    }).not.toThrow();
-  });
-  it('does not mutate the CadDocument when restoring', () => {
-    const docBefore = useStore.getState().document;
-    const id = useNamedViewStore.getState().saveNamedView('Test', makeSnapshot(MOCK_CAMERA_A));
-    useNamedViewStore.getState().restoreNamedView(id!, vi.fn());
-    expect(useStore.getState().document).toBe(docBefore);
-  });
-});
-
-// namedViewStore — deleteNamedView
-
-describe('namedViewStore — deleteNamedView', () => {
-  beforeEach(() => {
-    resetStores();
-  });
-  it('removes the view with the given id', () => {
-    const id = useNamedViewStore.getState().saveNamedView('Delete me', makeSnapshot(MOCK_CAMERA_A));
-    useNamedViewStore.getState().deleteNamedView(id!);
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(0);
-  });
-  it('does not affect other views when deleting one', () => {
-    useNamedViewStore.getState().saveNamedView('Keep A', makeSnapshot(MOCK_CAMERA_A));
-    const idB = useNamedViewStore.getState().saveNamedView('Delete B', makeSnapshot(MOCK_CAMERA_B));
-    useNamedViewStore.getState().deleteNamedView(idB!);
-    const { namedViews } = useNamedViewStore.getState();
-    expect(namedViews).toHaveLength(1);
-    expect(namedViews[0]?.name).toBe('Keep A');
-  });
-  it('is a no-op for an unknown id', () => {
-    useNamedViewStore.getState().saveNamedView('Existing', makeSnapshot(MOCK_CAMERA_A));
-    useNamedViewStore.getState().deleteNamedView('bogus-id');
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(1);
-  });
-});
-
-// NamedViewsOverlay component
 
 describe('NamedViewsOverlay — toggle button', () => {
   beforeEach(() => {
-    resetStores();
+    resetOfflineStore();
+    mocks.snapshot = null;
   });
   it('renders a "Views" toggle button', () => {
     render(<NamedViewsOverlay />);
@@ -151,84 +62,104 @@ describe('NamedViewsOverlay — toggle button', () => {
     fireEvent.click(screen.getByRole('button', { name: /views/i }));
     expect(screen.getByRole('region', { name: /named views panel/i })).toBeDefined();
   });
-  it('toggle button has aria-expanded=false initially', () => {
+  it('toggle button has aria-expanded=false initially and true when expanded', () => {
     render(<NamedViewsOverlay />);
     const btn = screen.getByRole('button', { name: /views/i });
     expect(btn.getAttribute('aria-expanded')).toBe('false');
-  });
-  it('toggle button has aria-expanded=true when expanded', () => {
-    render(<NamedViewsOverlay />);
-    const btn = screen.getByRole('button', { name: /views/i });
     fireEvent.click(btn);
     expect(btn.getAttribute('aria-expanded')).toBe('true');
   });
 });
 
-describe('NamedViewsOverlay — save row', () => {
+describe('NamedViewsOverlay — save row (save_viewpoint)', () => {
   beforeEach(() => {
-    resetStores();
+    resetOfflineStore();
+    mocks.snapshot = MOCK_CAMERA_A;
   });
-  it('shows an input and a Save button when expanded', () => {
+  function open(): HTMLInputElement {
     render(<NamedViewsOverlay />);
     fireEvent.click(screen.getByRole('button', { name: /views/i }));
-    expect(screen.getByRole('textbox', { name: /new view name/i })).toBeDefined();
+    return screen.getByRole('textbox', { name: /new view name/i }) as HTMLInputElement;
+  }
+  it('shows an input and a Save button when expanded', () => {
+    open();
     expect(screen.getByRole('button', { name: /save current camera/i })).toBeDefined();
   });
-  it('Save button adds a view to the store (snapshot callback returns mock camera)', () => {
-    // Pre-inject a camera snapshot via the bridge ref isn't possible in unit tests
-    // (no real three.js context), so we call the store action directly and assert
-    // the store adds a view. The component wires the button → saveNamedView.
-    // We verify the button exists and triggers the action via a direct store call.
-    useNamedViewStore.getState().saveNamedView('Direct', makeSnapshot(MOCK_CAMERA_A));
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(1);
+  it('Save dispatches save_viewpoint with the live camera and clears the input', () => {
+    const input = open();
+    fireEvent.change(input, { target: { value: '  Front Close ' } });
+    fireEvent.click(screen.getByRole('button', { name: /save current camera/i }));
+    const viewpoint = useStore.getState().document.review?.viewpoints['vp-1'];
+    expect(viewpoint?.name).toBe('Front Close');
+    expect(viewpoint?.camera).toMatchObject({ projection: 'perspective', eye: [5, 10, 15] });
+    expect(viewpoint?.camera.direction[0]).toBeCloseTo(-5 / Math.hypot(5, 10, 15), 12);
+    expect(input.value).toBe('');
   });
-  it('view count appears in the toggle label after saving', () => {
-    useNamedViewStore.setState({
-      namedViews: [
-        { id: 'nv-1', name: 'Top', camera: MOCK_CAMERA_A },
-        { id: 'nv-2', name: 'Front', camera: MOCK_CAMERA_B },
-      ],
-    });
-    render(<NamedViewsOverlay />);
-    // The toggle button text should reflect the count: "Views (2)"
-    expect(screen.getByRole('button', { name: /views \(2\)/i })).toBeDefined();
+  it('Enter saves; an empty name or a camera that is not ready saves nothing', () => {
+    const input = open();
+    fireEvent.click(screen.getByRole('button', { name: /save current camera/i }));
+    expect(viewNames()).toEqual([]);
+    fireEvent.change(input, { target: { value: 'A' } });
+    mocks.snapshot = null;
+    fireEvent.click(screen.getByRole('button', { name: /save current camera/i }));
+    expect(viewNames()).toEqual([]);
+    mocks.snapshot = MOCK_CAMERA_A;
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(viewNames()).toEqual(['A']);
+  });
+  it('saves in creation order', () => {
+    const input = open();
+    for (const name of ['A', 'B']) {
+      fireEvent.change(input, { target: { value: name } });
+      fireEvent.click(screen.getByRole('button', { name: /save current camera/i }));
+    }
+    expect(viewNames()).toEqual(['A', 'B']);
   });
 });
 
 describe('NamedViewsOverlay — saved views list', () => {
   beforeEach(() => {
-    resetStores();
+    resetOfflineStore();
+    mocks.snapshot = MOCK_CAMERA_A;
   });
-  it('shows "No saved views yet." when list is empty', () => {
+  it('shows "No saved views yet." when the document has no viewpoint', () => {
     render(<NamedViewsOverlay />);
     fireEvent.click(screen.getByRole('button', { name: /views/i }));
     expect(screen.getByText(/no saved views yet/i)).toBeDefined();
   });
-  it('renders a restore button for each saved view', () => {
-    useNamedViewStore.setState({
-      namedViews: [
-        { id: 'nv-1', name: 'Iso', camera: MOCK_CAMERA_A },
-        { id: 'nv-2', name: 'Top Close', camera: MOCK_CAMERA_B },
-      ],
-    });
+  it('lists the document viewpoints and their count', () => {
+    withViewpoints('Iso', 'Top Close');
     render(<NamedViewsOverlay />);
     fireEvent.click(screen.getByRole('button', { name: /views \(2\)/i }));
     expect(screen.getByRole('button', { name: /restore view iso/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /restore view top close/i })).toBeDefined();
   });
-  it('clicking × removes the view from the store', () => {
-    useNamedViewStore.setState({ namedViews: [{ id: 'nv-1', name: 'Side', camera: MOCK_CAMERA_A }] });
+  it('restoring dispatches apply_viewpoint: the document camera looks the way the viewpoint does', () => {
+    withViewpoints('Iso');
+    const before = useStore.getState().document.camera;
     render(<NamedViewsOverlay />);
     fireEvent.click(screen.getByRole('button', { name: /views \(1\)/i }));
-    fireEvent.click(screen.getByRole('button', { name: /delete view side/i }));
-    expect(useNamedViewStore.getState().namedViews).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /restore view iso/i }));
+    const camera = useStore.getState().document.camera;
+    expect(camera).not.toBe(before);
+    expect(camera.polar).toBeCloseTo(Math.PI / 2, 9);
+    expect(camera.azimuth).toBeCloseTo(Math.PI, 9);
   });
-  it('does not mutate the CadDocument when deleting a view', () => {
-    useNamedViewStore.setState({ namedViews: [{ id: 'nv-1', name: 'Side', camera: MOCK_CAMERA_A }] });
-    const docBefore = useStore.getState().document;
+  it('clicking × dispatches delete_viewpoint', () => {
+    withViewpoints('Side', 'Keep');
+    render(<NamedViewsOverlay />);
+    fireEvent.click(screen.getByRole('button', { name: /views \(2\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete view side/i }));
+    expect(viewNames()).toEqual(['Keep']);
+  });
+  it('a viewpoint used by an issue stays when deleted (the command refuses)', () => {
+    withViewpoints('Side');
+    useStore.setState({
+      document: execute(useStore.getState().document, 'create_review_issue', { title: 't', viewpointIds: ['vp-1'] }).document,
+    });
     render(<NamedViewsOverlay />);
     fireEvent.click(screen.getByRole('button', { name: /views \(1\)/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete view side/i }));
-    expect(useStore.getState().document).toBe(docBefore);
+    expect(viewNames()).toEqual(['Side']);
   });
 });
