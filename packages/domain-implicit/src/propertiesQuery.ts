@@ -5,6 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { resolveFieldEngine } from '@core/geometry/field/engine';
 import { meshMeasures } from '@lib/isosurface/measures';
+import { fullBodyMesh } from './bodyMesh';
 import { refuseImplicit } from './codes';
 import { compileField } from './compile';
 import { quadratureVolume, regionProgram, resolveTarget, signComponentsOf, measureVoxel } from './measure';
@@ -39,6 +40,15 @@ export const implicitProperties = defineCommand({
         [p.id],
         ['params.id'],
       );
+    if (target.body !== undefined && !Object.hasOwn(doc.entities, target.body.id))
+      return refuseImplicit(
+        doc,
+        'implicit_properties',
+        'IMP_BODY_STALE',
+        `body '${p.id}' is not realised on this machine (it reads a stored body whose mesh asset is missing)`,
+        [p.id],
+        ['params.id'],
+      );
     if (p.region !== undefined && fieldOf(doc, p.region) === undefined)
       return refuseImplicit(
         doc,
@@ -69,7 +79,16 @@ export const implicitProperties = defineCommand({
     const quadrature = quadratureVolume(engine, compiled.program, region, box, voxel);
     if ('code' in quadrature) return refuseImplicit(doc, 'implicit_properties', quadrature.code, quadrature.message, [p.id]);
     const entity = target.body === undefined ? undefined : doc.entities[target.body.id];
-    const mesh = entity?.kind === 'mesh' ? meshMeasures(entity.mesh) : null;
+    const full = entity?.kind === 'mesh' ? fullBodyMesh(entity, ctx?.meshAssets) : null;
+    if (entity?.kind === 'mesh' && full === null)
+      return refuseImplicit(
+        doc,
+        'implicit_properties',
+        'IMP_ASSET_MISSING',
+        `the full mesh of body '${p.id}' is not in this machine's mesh asset store`,
+        [p.id],
+      );
+    const mesh = full === null ? null : meshMeasures(full);
     const meshEstimate =
       mesh !== null && Number.isFinite(compiled.minFeature)
         ? 0.6 * ((target.body?.voxel ?? 0) / compiled.minFeature) ** 2 * Math.abs(mesh.volume)

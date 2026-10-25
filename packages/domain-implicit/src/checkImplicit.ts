@@ -1,16 +1,19 @@
 /** check_implicit: manufacturability findings of an implicit body (05 IMP 4.4, FR-IMP-40..45; MVP set). */
 
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, vec3, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { resolveFieldEngine } from '@core/geometry/field/engine';
 import type { Vec3 } from '@core/model/types';
 import { toMm } from '@core/model/units';
 import { isClosedManifold } from '@lib/isosurface/measures';
+import { fullBodyMesh } from './bodyMesh';
 import { refuseImplicit } from './codes';
 import { compileField } from './compile';
 import { measureVoxel, signComponentsOf } from './measure';
 import { bodyOf, fieldOf } from './model';
+import { overhang } from './overhang';
+import { measureWalls } from './wallChecks';
 
 type Severity = 'fail' | 'warn';
 
@@ -27,6 +30,8 @@ interface Finding {
 }
 
 const MAX_LISTED = 20;
+/** Half-width of the band (in voxels) in which a measured thickness cannot be told from the limit. */
+const RESOLUTION_BAND = 2.5;
 
 /** Smallest wall, strut diameter and sheet thickness declared by the recipe nodes a field depends on (document units). */
 function recipeFeatures(doc: Parameters<typeof fieldOf>[0], ids: readonly string[]): { wall: number | null; strut: number | null } {
@@ -36,9 +41,10 @@ function recipeFeatures(doc: Parameters<typeof fieldOf>[0], ids: readonly string
   for (const id of ids) {
     const node = fieldOf(doc, id);
     if (node === undefined) continue;
-    if (node.op === 'shell') wall = smaller(wall, node.thickness);
-    else if (node.op === 'tpms' && node.form === 'sheet' && node.normalize === 'gradient') wall = smaller(wall, node.control.value);
-    else if (node.op === 'struts') strut = smaller(strut, 2 * node.radius);
+    if (node.op === 'shell' && typeof node.thickness === 'number') wall = smaller(wall, node.thickness);
+    else if (node.op === 'tpms' && node.form === 'sheet' && node.normalize === 'gradient' && typeof node.control.value === 'number')
+      wall = smaller(wall, node.control.value);
+    else if (node.op === 'struts' && typeof node.radius === 'number') strut = smaller(strut, 2 * node.radius);
   }
   return { wall, strut };
 }
@@ -65,7 +71,16 @@ export const checkImplicit = defineCommand({
         minPoreMm: z
           .number()
           .optional()
-          .describe('Smallest printable pore / channel in millimetres (recorded; not evaluated in this version).'),
+          .describe('Smallest printable pore / channel in millimetres (measured by the distance transform, +-2.5 voxels).'),
+        buildDirection: vec3(
+          'Build direction [x, y, z] pointing away from the plate; with criticalAngleDeg it enables the overhang analysis.',
+        ).optional(),
+        criticalAngleDeg: z
+          .number()
+          .optional()
+          .describe(
+            'Smallest self-supporting inclination of a face to the build plate in degrees (0..90), from your process data; required with buildDirection (never defaulted).',
+          ),
         minStrutMm: z.number().optional().describe('Smallest printable strut diameter in millimetres.'),
         source: z
           .string()
@@ -88,13 +103,32 @@ export const checkImplicit = defineCommand({
         [id],
         ['params.id'],
       );
+    if (!Object.hasOwn(doc.entities, id))
+      return refuseImplicit(
+        doc,
+        'check_implicit',
+        'IMP_BODY_STALE',
+        `body '${id}' is not realised on this machine (it reads a stored body whose mesh asset is missing)`,
+        [id],
+        ['params.id'],
+      );
     const compiled = compileField(doc, body.field);
     if (!compiled.ok) return refuseImplicit(doc, 'check_implicit', compiled.code, compiled.message, compiled.ids);
     const unit = doc.units;
     const findings: Finding[] = [];
     const add = (finding: Omit<Finding, 'unit'> & { unit?: string }): void => void findings.push({ unit, ...finding });
     const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
-    if (entity?.kind === 'mesh' && !isClosedManifold({ positions: [...entity.mesh.positions], indices: [...entity.mesh.indices] }))
+    const full = entity?.kind === 'mesh' ? fullBodyMesh(entity, ctx?.meshAssets) : null;
+    if (entity?.kind === 'mesh' && full === null)
+      return refuseImplicit(
+        doc,
+        'check_implicit',
+        'IMP_ASSET_MISSING',
+        `the full mesh of body '${id}' is not in this machine's mesh asset store`,
+        [id],
+        ['params.id'],
+      );
+    if (full !== null && !isClosedManifold({ positions: [...full.positions], indices: [...full.indices] }))
       add({
         code: 'IMP_CHECK_MESH_NOT_MANIFOLD',
         severity: 'fail',
@@ -155,6 +189,8 @@ export const checkImplicit = defineCommand({
           remediation: 'connect the islands or delete them',
         });
     }
+    const walls = measureWalls(engine, compiled.program, body.bounds, body.voxel);
+    let overhangResult: ReturnType<typeof overhang> | null = null;
     const limits: Array<Record<string, unknown>> = [];
     const notEvaluated: string[] = [];
     if (process === undefined)
@@ -175,7 +211,6 @@ export const checkImplicit = defineCommand({
       named('minWallMm', process.minWallMm);
       named('minPoreMm', process.minPoreMm);
       named('minStrutMm', process.minStrutMm);
-      if (process.minPoreMm !== undefined) notEvaluated.push('minPoreMm');
       const test = (code: string, label: string, size: number | null, limit: number | undefined): void => {
         if (size === null || limit === undefined || toMm(doc, size) >= limit) return;
         add({
@@ -190,9 +225,65 @@ export const checkImplicit = defineCommand({
           remediation: 'thicken it or enlarge the cells',
         });
       };
-      if (process.minWallMm !== undefined && wall === null) notEvaluated.push('minWallMm');
+      const measuredTest = (
+        code: string,
+        label: string,
+        size: number,
+        at: Vec3 | null,
+        limit: number | undefined,
+        resolution: number,
+      ): void => {
+        if (limit === undefined || toMm(doc, size) >= limit) return;
+        const definite = toMm(doc, size) + toMm(doc, RESOLUTION_BAND * resolution) < limit;
+        add({
+          code,
+          severity: definite ? 'fail' : 'warn',
+          ids: [id],
+          value: toMm(doc, size),
+          limit,
+          unit: 'mm',
+          location: at,
+          message: `${label} ${toMm(doc, size).toPrecision(4)} mm (distance transform, +-${toMm(doc, RESOLUTION_BAND * resolution).toPrecision(2)} mm) is ${definite ? 'below' : 'within the resolution of'} the process limit ${limit} mm (${process.source})`,
+          remediation: definite ? 'thicken it or enlarge the cells' : 'halve the voxel to settle it, or thicken it',
+        });
+      };
+      if (typeof walls === 'string') {
+        if (process.minPoreMm !== undefined) notEvaluated.push('minPoreMm');
+      } else {
+        if (process.minWallMm !== undefined && walls.wall.min !== null)
+          measuredTest('IMP_CHECK_MIN_WALL', 'measured smallest wall', walls.wall.min, walls.wallAt, process.minWallMm, walls.voxel);
+        if (process.minPoreMm !== undefined && walls.pore.min !== null)
+          measuredTest('IMP_CHECK_MIN_PORE', 'measured smallest pore', walls.pore.min, walls.poreAt, process.minPoreMm, walls.voxel);
+      }
+      const measuredWall = typeof walls === 'string' ? null : walls.wall.min;
+      if (process.buildDirection !== undefined) {
+        if (
+          process.criticalAngleDeg === undefined ||
+          !(process.criticalAngleDeg > 0 && process.criticalAngleDeg <= 90) ||
+          Math.hypot(...process.buildDirection) === 0
+        )
+          notEvaluated.push('overhang');
+        else if (full !== null) {
+          limits.push({ name: 'criticalAngleDeg', value: process.criticalAngleDeg, unit: 'deg', source: process.source, defaulted: false });
+          const found = overhang(full, process.buildDirection, process.criticalAngleDeg);
+          overhangResult = found;
+          if (found.area > 0)
+            add({
+              code: 'IMP_CHECK_OVERHANG',
+              severity: 'warn',
+              ids: [id],
+              value: found.area,
+              limit: process.criticalAngleDeg,
+              unit: `${unit}^2`,
+              location: found.centroid,
+              message: `${found.area.toPrecision(5)} ${unit}^2 (${(100 * found.fraction).toFixed(1)} % of the surface) looks downward and is flatter than ${process.criticalAngleDeg} degrees to the build plate (flattest ${found.flattestDeg?.toFixed(1)} degrees)`,
+              remediation: 'reorient the part, or use self-supporting cells and a lower overhang angle',
+            });
+        }
+      }
+      if (process.minWallMm !== undefined && wall === null && measuredWall === null) notEvaluated.push('minWallMm');
       if (process.minStrutMm !== undefined && strut === null) notEvaluated.push('minStrutMm');
-      test('IMP_CHECK_MIN_WALL', 'smallest wall', wall, process.minWallMm);
+      if (measuredWall === null) test('IMP_CHECK_MIN_WALL', 'smallest wall', wall, process.minWallMm);
       test('IMP_CHECK_MIN_STRUT', 'smallest strut diameter', strut, process.minStrutMm);
     }
     if (compiled.unverified)
@@ -237,13 +328,33 @@ export const checkImplicit = defineCommand({
           unit,
           source: 'recipe (declared shell / sheet thickness, strut diameter)',
         },
+        measured:
+          typeof walls === 'string'
+            ? { available: false, reason: walls }
+            : {
+                available: true,
+                wallMin: walls.wall.min,
+                wallMax: walls.wall.max,
+                wallAt: walls.wallAt,
+                poreMin: walls.pore.min,
+                poreAt: walls.poreAt,
+                voxel: walls.voxel,
+                accuracy: '+-2.5 voxels (curved walls); walls under 3 voxels are not resolved (halve the voxel)',
+                unit,
+              },
+        overhang: overhangResult,
         notEvaluated,
         componentNote,
         reviewRequired,
         reviewReason: reviewRequired ? 'release use: computed by llull, not approved; a qualified engineer must review' : null,
         unverified: compiled.unverified,
         unit,
-        provenance: { method: 'sign-grid components, recipe sizes, mesh edge check', engine: engine.name, voxel, deterministic: true },
+        provenance: {
+          method: 'sign-grid components and distance transform, recipe sizes, mesh edge check, overhang',
+          engine: engine.name,
+          voxel,
+          deterministic: true,
+        },
       },
     );
   },

@@ -6,6 +6,7 @@ import { report } from '../noop';
 import { currentContext } from '../context';
 import { DEFAULT_MODELING_TOLERANCE, modelingToleranceOf } from '../../model/kernelSettings';
 import { kernelMismatch, kernelStampOf } from '../persistence/kernelStamp';
+import { resolveFieldEngine } from '../../geometry/field/engine';
 import type { CadDocument } from '../../model/types';
 
 interface NamedDefault {
@@ -54,7 +55,7 @@ export const kernelInfo = defineCommand({
   description:
     'Report which geometry kernel is active for this session: "occt" (exact B-rep: STEP import, fillets, exact volumes) or "manifold" (mesh booleans only), ' +
     'its OCCT version / build, the optional capabilities it has (topology, analyze, distance, exportStep, importShapes, brepBlobs, ...), the isolation ' +
-    '(worker, in-process or process) and, when the exact kernel failed to start, the fallback reason. Also returns the document modelingTolerance ' +
+    '(worker, in-process or process) and, when the exact kernel failed to start, the fallback reason. Also returns the implicit field engine (data.fieldEngine: name "ts" or the native llull-field, with its sample and triangle limits) and the document modelingTolerance ' +
     '(linear mm, angular rad, maxImportTolerance mm) with its source, and warnings KRN_KERNEL_FALLBACK / KRN_KERNEL_MISMATCH ' +
     '(the document was written by another kernel or OCCT version). Call this before relying on exact results.',
   annotations: { readOnly: true, idempotent: true },
@@ -81,6 +82,7 @@ export const kernelInfo = defineCommand({
         remediation: 'recompute stored measures with the active kernel before relying on them',
       });
     const tolerance = namedTolerances(doc);
+    const field = resolveFieldEngine(ctx?.fieldEngine);
     const data = {
       active,
       ...(info?.occtVersion === undefined ? {} : { occtVersion: info.occtVersion }),
@@ -90,6 +92,7 @@ export const kernelInfo = defineCommand({
       ...(info?.fallbackReason === undefined ? {} : { fallbackReason: info.fallbackReason }),
       ...(doc.kernelSettings === undefined ? {} : { documentKernel: doc.kernelSettings }),
       modelingTolerance: tolerance,
+      fieldEngine: { name: field.name, limits: field.limits },
       issues,
     };
     const identity =
@@ -100,7 +103,7 @@ export const kernelInfo = defineCommand({
     return report(
       doc,
       `kernel_info: ${identity}; capabilities [${data.capabilities.join(', ')}]; modelingTolerance linear ${tolerance.linear.value} mm, ` +
-        `angular ${tolerance.angular.value} rad, maxImportTolerance ${tolerance.maxImportTolerance.value} mm.${warnings}`,
+        `angular ${tolerance.angular.value} rad, maxImportTolerance ${tolerance.maxImportTolerance.value} mm; field engine ${field.name} (up to ${field.limits.maxSamples} samples, ${field.limits.maxTriangles} triangles).${warnings}`,
       data,
     );
   },

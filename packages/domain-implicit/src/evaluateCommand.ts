@@ -73,6 +73,7 @@ export const evaluateField = defineCommand({
     if (!compiled.ok) return refuseImplicit(doc, 'evaluate_field', compiled.code, compiled.message, compiled.ids);
     const engine = resolveFieldEngine(ctx?.fieldEngine);
     const answer = engine.evaluate(compiled.program, Float64Array.from(samples), p.gradient === true);
+    if (answer.failure !== undefined) return refuseImplicit(doc, 'evaluate_field', answer.failure.code, answer.failure.message, [p.field]);
     const count = samples.length / 3;
     return report(doc, `evaluate_field: ${count} sample(s) of ${p.field} (distance ${compiled.program.quality}, ${doc.units}).`, {
       field: p.field,

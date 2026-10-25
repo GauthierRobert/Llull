@@ -743,7 +743,7 @@ Engine contract (`engineTypes.ts`): grid `cells_i = max(1, ceil((max_i - min_i)/
 - Guards: the mesh of a body is `IMP_DERIVED_READ_ONLY`; the source solids of a body (the `solid` nodes its field depends on) cannot be moved, modified or deleted while the body exists (`IMP_SOURCE_IN_USE`; a layer change is allowed). `check_implicit` reports every requested check it could not evaluate (limit without a declared size, pore size, refused components) in `data.notEvaluated` with the warning `IMP_CHECK_NOT_EVALUATED`, so the status is never `pass` for them.
 - `field_from_solid`: distance quality `exact` for planar solids (box, wedge, pyramid, B-rep-less mesh), `bound` for curved / B-rep sources (tessellation deflection is not recorded: `data.deflection` null with a note). `relativeDensity` with a cylindrical `map` is refused (`IMP_PARAM_CONFLICT`: it is solved on a rectangular cell); `lattice_properties` measures the unrotated, unmapped cell. The Lipschitz constant of approximate fields is an estimate (`data.lipschitzIsEstimate`).
 - Topology plugin: node values within 1e-3 of the threshold are moved to threshold - 1e-3 before meshing (node values are multiples of 1/8, so 0.5 is common); without it a block gave 120 of 144 zero-area triangles.
-- **Open gap (VC-15 / VC-49, tied to M6 dual contouring):** the 0.5 % mesh gate of the SC cell (-1.1 % at voxel 0.1) is not met by Kuhn marching tetrahedra at sharp box clips; sharp-feature meshing needs dual contouring (V2) or the native engine's finer voxel. The field quadrature meets it (-0.07 %).
+- **Closed by §14 (dual contouring, -0.017 % at voxel 0.1). Was: open gap (VC-15 / VC-49, tied to M6 dual contouring):** the 0.5 % mesh gate of the SC cell (-1.1 % at voxel 0.1) is not met by Kuhn marching tetrahedra at sharp box clips; sharp-feature meshing needs dual contouring (V2) or the native engine's finer voxel. The field quadrature meets it (-0.07 %).
 
 ### 13.5 Validation results (TS engine)
 
@@ -776,7 +776,7 @@ Implement §13.3 exactly; the TS engine is the oracle (`tests/unit/field/engine.
 triangle order) for the same program and grid, identical `contentHash`, same refusals and codes. Job folder = `job.json` (grid, request, program without meshes / strutSets) + little-endian f64 / u32
 binary files for `constants`, mesh positions / indices and strut nodes / beams, as `llull-geomq`.
 
-### 13.7 Left for later milestones
+### 13.7 Left for later milestones (all but the items of 14.7 were delivered by DES-5b, see §14)
 
 M4 native crate + host installer + a field-engine line in `kernel_info`; M5 `create_scalar_field`, field-valued laws, `edit_field` / `delete_field` / `regenerate_implicit_bodies`, `infill_solid`, `add_graph_lattice`,
 `section_field`, more TPMS / cells, spherical and surface maps, refinement, 3MF beam lattice, `IMP_STEP_NOT_EXACT` in `export_step_ap242`, overhang and EDT wall / pore checks, the `llull guide` implicit
@@ -798,3 +798,107 @@ the only entries of this pack left in `tests/unit/contract/blockedPlanCommands.j
 | `target_infill_solid_box` | 2/5: `infill_solid` unknown (M5) | n/a |
 
 The pack's voxels need the native engine (M4): the TS engine refuses them before sampling, with the native hint in the remediation.
+
+
+---
+
+## 14. As built (DES-5b: M4–M6, 2026-10-24)
+
+Delivered: M4 native `llull-field`, M5 (scalar fields, graded laws, lifecycle, infill, graph lattices, sections, more cells and maps, 3MF beam lattice, measured checks, mechanics), M6 (3MF implicit export,
+dual contouring, Voronoi lattices). Not delivered: §14.7. D1–D9 stand; the decisions taken here are in §14.6.
+
+### 14.1 Files
+
+| Area | Files |
+| ---- | ----- |
+| Native crate (M4) | `solver/crates/llull-field/src/{lib,files,tape,eval,interval,meshsdf,struts,sampling,tetra,measure,components,job,jsnum,testkit}.rs` + `tests/job.rs`; `llull-jsmath` gained `trig.rs` (V8-exact `sin`, `cos`, `atan2`; 36 node-generated reference bit patterns in `tests/trig_reference.rs`); `llull-geomq` `MeshTree` fields are public; `llull-compute field <job-folder>` |
+| Host (M4) | `server/src/native/fieldEngine.ts` (`createNativeFieldEngine`, `installFieldEngine`, `NATIVE_FIELD_LIMITS`), installed by `server/src/lifecycle.ts` and `server/src/cli/cliProcess.ts` together with the mesh asset store; `kernel_info` reports `data.fieldEngine {name, limits}` |
+| Core | `geometry/field/{dualContour,levelSetExport}.ts`, `engineTypes.ts` (`Mesher`, `maxStoredTriangles`, `nodes` measure), `geometry/mesh/assets.ts` (`setMeshAssetPort`), `geometry/{entityCurves,entityPolyline}.ts`, `model/beamLattice.ts`, `commands/exchange/{threeMf,threeMfBeamLattice,threeMfImplicit,export3mf}.ts`, `plugins/{plugin,host}.ts` (hooks `beamLattice`, `levelSet`, `stepSkip`), `lib/isosurface/measures.ts` (sorted-key manifold test) |
+| Plugin | `packages/domain-implicit/src/`: `scalar`, `scalarCommand`, `lawRange`, `lawCheck`, `compileTypes`, `compileLattice`, `tpmsHigher`, `graph`, `graphCommand`, `voronoi`, `voronoiCommand`, `editCommand`, `lifecycleCommands`, `rederive`, `infillCommand`, `sectionCommand`, `contour`, `edt`, `wallChecks`, `overhang`, `mechanics`, `latticeFacts`, `beamLattice`, `levelSet`, `bodyMesh` |
+| Schemas and data | `validation/data/3mf/{implicit.xsd,volumetric.xsd,Validate.java,README.md}` (pinned, sha256 `e88ce8d5...`); `server/tests/threeMfImplicit.test.ts` validates with the JDK, `server/tests/fieldNative.test.ts` is the parity suite |
+
+### 14.2 Commands (21 in the plugin; 8 new, 8 changed)
+
+New: `create_scalar_field`, `edit_field`, `delete_field`, `regenerate_implicit_bodies`, `add_graph_lattice`, `add_voronoi_lattice`, `infill_solid`, `section_field`. Changed: `add_tpms_lattice` (8 families, laws, spherical map),
+`add_strut_lattice` (9 cells, laws), `combine_fields` / `offset_field` / `shell_field` (laws), `create_implicit_body` (`mesher`, mesh asset store), `lattice_properties` (measured wall / pore, dangling struts, mechanics),
+`check_implicit` (measured walls, pores, overhang with `buildDirection` / `criticalAngleDeg`), `export_3mf` (`beamLattice`, `beamRepresentation`, `implicit: 'levelset'`), `export_step_ap242` (lists implicit bodies as skipped with
+`IMP_STEP_NOT_EXACT`), `kernel_info` (field engine line). New codes: `IMP_FIELD_CYCLE`, `IMP_GRAPH_EMPTY`, `IMP_GRAPH_TOO_LARGE`, `IMP_CHECK_OVERHANG`, `IMP_CHECK_MIN_PORE`, `IMP_STEP_NOT_EXACT`,
+`EXPORT_MESH_TOO_LARGE` (core).
+
+### 14.3 Native engine (M4) and parity
+
+The crate evaluates the §13.3 tape on a voxel grid (plane by plane, interval-pruned 8-cell tiles), contours it with marching tetrahedra in the same scan order as the TS engine, and answers `evaluate`, `mesh` and `measure`
+(volume, quantile, components, nodes). Bit-exact parity holds because the Rust side reproduces V8's `sin`, `cos`, `atan2`, `exp`, `log`, `hypot`, `pow` and the NaN-propagating JS `min` / `max`
+(`llull-jsmath`, checked against 4000 random values and 36 node-generated bit patterns). `server/tests/fieldNative.test.ts` (the parity suite): on seven fields (smooth blends, clipped gyroid, diamond, octet, solid-sourced, shell)
+the native mesh equals the TS mesh vertex for vertex and triangle for triangle, `contentHash` inputs, volumes, quadratures and quantiles are equal, `lattice_properties` / `check_implicit` agree, and refusals carry the same codes. Budgets:
+2^30 samples, 5 000 000 triangles inline, 20 000 000 when the host holds a mesh asset store (`maxStoredTriangles`); a failed native job falls back to the TS engine when the grid is below its cap, else is refused with
+`IMP_ENGINE_FAILED` and the named cause. Gradients and malformed programs are delegated to the TS engine. Rust: `cargo fmt --check`, `clippy -D warnings`, 24 unit + 6 job tests + the trig reference.
+
+Measured (CLI, this machine): smooth union corner 33.6e6 samples -> 3.45e6 triangles 2.3 s; octet block 66.4e6 samples -> 13.6e6 triangles 15.8 s; shell + gyroid 8.6e6 samples -> 6.87e6 triangles 6.3 s; sleeve 19.1e6 samples -> 9.14e6
+triangles 7.2 s; graded column 4.5e6 samples -> 2.47e6 triangles 1.7 s. The TS engine refuses all of them before sampling (`IMP_GRID_BUDGET`).
+
+### 14.4 Validation results (M4-M6)
+
+| VC | Result against tolerance |
+| -- | ------------------------ |
+| 05 | smooth corner at the written voxel 0.05 (native): 1446.49 mm3 vs 1446.667, -0.012 % (tol 0.1 %); the `evaluate_field` step of the plan runs |
+| 15, 49 | SC cell 82.934 mm3: tetrahedra -1.12 % at voxel 0.1 (-4.45 % at 0.2); **dual contouring -0.017 % at 0.1 and -0.175 % at 0.2** (tol 0.5 % mesh, met; the gap noted in §13.4 is closed); quadrature -0.07 % |
+| 17 | octet 2x2x2 block r 0.5 at voxel 0.05 (13.6e6 triangles, native): mesh 910.15 mm3, region quadrature 911.48 vs 911.84 (-0.04 %, tol 0.5 %) |
+| 22 | shell + gyroid infill at the written voxel 0.2: mesh 40659.9 mm3 vs 40672, -0.03 % (tol 0.2 %); 1 solid, 1 enclosed void (`IMP_TRAPPED_VOID`) |
+| 23 | `infill_solid` 40 mm box, wall 2, gyroid network: 40659.9 mm3 at voxel 0.2 (-0.03 %, tol 0.2 %); 6.87e6 triangles stored as an asset; 36.5 % lighter |
+| 24 | graded gyroid column: relative density 0.404266 vs 0.4043801 (|d| 1.1e-4, tol 5e-3); wall min / max 0.5 / 2.5 (tol 0.02) |
+| 26 | graph lattice, 10 mm beam r 1 -> 0.5, butt: quadrature 18.3229 vs 18.32596 mm3, -0.016 % (tol 0.2 %) |
+| 27 | Neovius 0.5000, Fischer-Koch S 0.5000, IWP 0.4708 (table 0.4693), Lidinoid 0.3848 (0.3842), Split P 0.5110 (0.51) at resolution 64 (tol 2e-3 symmetric / 5e-3 measured) |
+| 28 | noise nodes with equal seeds are equal (hash without sine; bitwise equal on both engines) |
+| 30 | octet 2x2x2: 63 nodes, 240 beams, beam-lattice + balls namespaces; the file of the pack plan is 856 kB (clipping mesh cut by dual contouring on 32 cells) |
+| 31 | five generated implicit functions (quadratic, exponential and chamfer blends, gyroid sheet, shell of a solid with a `mesh` operand) validate against the pinned `implicit.xsd` (Xerces via the JDK) |
+| 32 | `export_step_ap242` lists implicit bodies as skipped with `IMP_STEP_NOT_EXACT` |
+| 37 | overhang of a sphere R10, +Z, 45 deg: 184.99 vs 184.03 mm2 (+0.52 %, tol 1 %) at voxel 0.25 |
+| 38 | sphere section area 314.157 vs 314.159 mm2 (-0.001 %, tol 0.2 %); gyroid section solid fraction 0.5000000 |
+| 47 | mechanics: octet affine E/Es = rho/9 to 1e-9; always `unverified` + `reviewRequired`; Gibson-Ashby coefficient only from the caller |
+| 50 | Voronoi lattice: same (box, density, seed) gives identical nodes and beams; another seed differs; every node inside the box |
+
+Thickness (EDT) accuracy: the feature transform is exact, the medial-axis read-out is within +-2.5 voxels (plate 1.75 exact, tube wall +-2 voxels, spherical shell +-2.5 voxels, solid cube +-2 voxels); `check_implicit` compares a limit with the
+measured wall plus that band and says so in the finding.
+
+### 14.5 CLI runs of the pack plans (`llull --doc <file> run <plan> --continue` from the pack folder, native engine, 2026-10-24)
+
+| Plan | Result |
+| ---- | ------ |
+| `baseline_sc_unit_cell_cylinders` | 6/6, exact B-rep union 82.934 mm3 |
+| `target_errors` | 1/6 ok by design; the five refusals are `IMP_TPMS_CONTROL_RANGE`, `IMP_STRUT_RADIUS_RANGE`, `IMP_MAP_SEAM`, `IMP_GRID_BUDGET`, `IMP_FIELD_NOT_FOUND` |
+| `target_smooth_union_corner` | 9/9 at the written voxel 0.05, 1446.49 mm3, 3.45e6 triangles |
+| `target_sc_strut_lattice_cell` | 7/7 at voxel 0.1: mesh 82.008, quadrature 82.922 mm3, native engine |
+| `target_shell_gyroid_infill` | 11/11 at the written voxel 0.2; the last step `export_3mf` of a 6.87e6-triangle mesh streams into a 111 MB deflated package in 12.7 s (see 14.6) |
+| `target_cylindrical_gyroid_sleeve` | 8/8 at voxel 0.2, 9.14e6 triangles, density 0.2972 of the sleeve region |
+| `target_octet_beam_lattice_3mf` | 7/7 at the written voxel 0.05 (13.6e6 triangles), `export_3mf beamLattice` writes 63 nodes / 240 beams (856 kB) |
+| `target_graded_gyroid_column` | 9/9, density 0.4043, `check_implicit` FAIL `IMP_DISCONNECTED` (3 components: the clipped sheet leaves two thin fragments at the column corners; reported, not a plan assertion) |
+| `target_infill_solid_box` | 5/5, 40659.9 mm3, `check_implicit` FAIL `IMP_TRAPPED_VOID` (sealed gyroid channels; add `drainHoles`) |
+
+### 14.6 Decisions and deviations
+
+- **Interior sign of a 3MF level set (D7).** Neither the 3MF volumetric text (pinned sha256 `e88ce8d5...`) nor the XSD states it. llull writes the function negative inside, as the specification's own `mesh` and `beamlattice` distance nodes
+  are; recorded in the writer's `@invariant` and in `export_3mf` `implicit`.
+- **`<i:sqrt>` is written as `<i:pow A 0.5>`**: the pinned XSD declares two inputs on `sqrt` against its own documentation, so a conforming `sqrt` would not validate.
+- **Level-set export covers field programs without strut sets.** Strut and graph lattices stay beam lattices or meshes (`data.implicit.skipped` names the reason); a body built on solids needs a millimetre document (the operand meshes are written in millimetres).
+- **Dual contouring** (`mesher: 'dual_contouring'`): one QEF vertex per crossed cell (pseudo-inverse, singular values below 0.1 of the largest dropped, mass-point regularisation, vertex clamped to its cell), edge crossings refined by 8 bisections on the exact
+  field, normals from the exact gradient, one quad per crossed edge split on the shorter diagonal. The result is checked closed and edge-manifold; otherwise the tetrahedra are used and `data.mesherFallback` says so. The native engine delegates
+  it to the TS engine (grid cap 2^21). The mesher is part of the content hash.
+- **Mesh asset store (D3 host cache)** adopted for bodies above 100 000 triangles: the entity keeps a 50 000-triangle level of detail, the body record keeps the asset key; load reads the store, else re-derives. `fullBodyMesh` serves the properties and checks.
+- **Beam-lattice clipping meshes** are cut from the region by dual contouring on at most 32 cells along the longest side, independent of the body voxel (a 0.05 voxel over 20 mm wrote 8.3 MB of coplanar triangles and ran out of memory).
+- **`export_3mf` of large meshes** (review fix): an indexed mesh above 250 000 triangles is written straight from its arrays in batches into a streaming DEFLATE encoder (`lib/deflateStream.ts`, fixed Huffman + one-candidate LZ77, verified against zlib) and a chunked ZIP (`zipChunked`); smaller meshes are stored byte for byte as before. The package still travels as one base64 string, which caps the deflated model part at 375 000 000 bytes (V8 strings stop near 536 million characters): about 8 million triangles of a gyroid-like mesh. Above that, and for a non-indexed body over 2 000 000 triangles, the command answers `EXPORT_MESH_TOO_LARGE`. The 6.87M-triangle body of the shell + gyroid plan therefore exports. The triangle lists of asset-backed parts are built lazily, so beam-lattice and level-set exports never materialise them.
+- **Content hash and engines.** The hash covers the program, grid, mesher, engine major version and a determinism class (`FieldEngine.determinism`, default `js-ieee754-v8`), not the engine name: the TS and native engines are bit-identical, so a document made by the CLI is current in the renderer and a load does not rewrite the hash. `ImplicitBody.engine` records the engine that really produced the mesh (a native job that fell back to TS is recorded as `ts`).
+- **Trigonometry bound.** `llull-jsmath` reproduces V8 `sin`/`cos` for |x| < 2^19 pi / 2; beyond it the platform libm answers and a flag is raised. A native job that raised it ends with `NATIVE_UNSUPPORTED_ARGUMENT` and the host answers with the TS engine (or refuses above its cap), so the native engine never returns a value without V8 parity. Parity is checked on a checked-in corpus of 4000 node-generated points (`tests/data/trig_corpus.txt`) and on 3000 random points per field in `server/tests/fieldNative.test.ts`.
+- **Engine failure is not NaN.** A native `evaluate` that fails above the TS cap returns `FieldSamples.failure`; `evaluate_field`, `section_field` and the lattice code answer `IMP_ENGINE_FAILED`.
+- **Host without the mesh asset store.** A stored body this host cannot hold or realise at its voxel keeps a coarse display mesh (the field at 2 to 16 times the voxel) with its asset reference, and `afterLoad` reports `IMP_ASSET_MISSING`; measurements and exports refuse until the store is loaded. Only a body that cannot be realised at all is dropped (`IMP_BODY_STALE`). A body that reads a coarsely shown body through a solid, distance or graph node is not realised from the proxy either: it stays unrealised with its record and hash untouched, `afterLoad` reports `IMP_BODY_STALE`, and `implicit_properties` / `check_implicit` refuse it with the same code; loading with the store restores both. Streamed 3MF meshes are written unwelded (manifold is computed on the written triangles), an index outside the vertices is refused with `EXPORT_MESH_INVALID`, and `export_3mf` takes `maxBytes` to lower the 375 MB cap.
+- **Beam Lattice schemas** (`beamlattice.xsd`, `beamlattice-balls.xsd`, Appendix B of the extension document, only the network import removed) are pinned beside `implicit.xsd`; the JDK-gated test validates the `b:beamlattice` of a strut export with and without a representation mesh.
+- **Manifold test** (`isClosedManifold`) sorts packed edge keys in a typed array instead of a `Map` (a 6.9e6-triangle body has 20e6 edges, above the 2^24 entries of a `Map`).
+- **Voronoi** (`add_voronoi_lattice`): seeds from a mulberry32 generator over the region box grown by 1.2 mean spacings, Bowyer-Watson Delaunay tetrahedralisation, one beam per shared face, cut to the box; at most 700 seeds and 5000 beams (about 13 beams per seed).
+  Constant radius only. The explicit-set distance still tests every beam at every sample, so large Voronoi bodies are slow (a 20 mm cube at 0.04 seeds/mm3 is refused, `IMP_GRAPH_TOO_LARGE`).
+- **Reentrant cell** is llull's own definition (the eight corners and six face nodes pushed a quarter cell inward, each face node bonded to the 4 corners of its face: 24 struts), not a catalogue lattice; **mechanics** are the affine stretch-only stiffness (exact for the octet) plus a Gibson-Ashby law whose coefficient the caller supplies.
+- Tolerance changes: none. VC-IMP-15's mesh gate (0.5 %) is met by dual contouring and not by the default tetrahedra; `create_implicit_body` keeps `tetra` as the default because it is always manifold.
+
+### 14.7 Not built
+
+Surface-UV cell maps and maps for strut lattices; scalar kinds `topology_density` and `fea_result` (VC-IMP-29 stays open); numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a BVH for explicit strut sets
+(cap 5000 beams); native `gradient` evaluation and native dual contouring (both delegate to the TS engine); per-cell dual-contouring fallback (the whole body falls back); a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.

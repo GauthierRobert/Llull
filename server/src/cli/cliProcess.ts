@@ -25,16 +25,24 @@ async function prepareKernel(): Promise<void> {
     { installPhysicsEngine },
     { installRasterPort },
     { installGeometryQueryEngine },
+    { installFieldEngine },
+    { setMeshAssetPort },
+    { defaultMeshAssetStore },
     { installFontProvider },
   ] = await Promise.all([
     import('../geometryKernel'),
     import('../physicsEngine'),
     import('../native/rasterPort'),
     import('../native/geometryQueryEngine'),
+    import('../native/fieldEngine'),
+    import('@core/geometry/mesh/assets'),
+    import('../meshAssets/store'),
     import('../fontProvider'),
   ]);
   installRasterPort();
   installGeometryQueryEngine();
+  installFieldEngine();
+  setMeshAssetPort(defaultMeshAssetStore());
   installFontProvider();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
 }

@@ -7,7 +7,8 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { chainCurve, ellipseCurve, polygonCurve } from '../../geometry/sectionCurve';
 import { isVec2 } from '../../lib/vec2';
 import type { SectionSpec } from './sectionSpecs';
-import { entityCurves, sketchLoop } from './sketchCurves';
+import { entityCurves } from '../../geometry/entityCurves';
+import { sketchLoop } from './sketchCurves';
 
 /** `curve` with every pole moved by the plane placement (rotation about `origin`, then `origin` added). */
 export function placeCurve(curve: NurbsCurveData, origin: Vec3, rotation: Vec3): NurbsCurveData {

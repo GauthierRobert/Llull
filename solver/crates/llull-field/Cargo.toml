@@ -1,0 +1,18 @@
+[package]
+name = "llull-field"
+description = "Native field engine of llull-compute field (05 IMP M4): FieldProgram tape evaluation, interval-pruned voxel meshing (marching tetrahedra) and measures, bit-identical to the TypeScript engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-geomq = { path = "../llull-geomq" }
+llull-jsmath = { path = "../llull-jsmath" }
+llull-protocol = { path = "../llull-protocol" }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

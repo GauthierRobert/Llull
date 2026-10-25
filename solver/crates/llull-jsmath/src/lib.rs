@@ -1,11 +1,14 @@
 //! Bit-exact twins of the V8 `Math` functions used by the TypeScript references that native jobs must reproduce (RS1 §2 rule 4).
 //!
 //! The platform `f64::powf` / `log10` (glibc) differ from V8 in the last bit for several percent of the inputs, so a native port of a
-//! TypeScript formula would not be bit-identical. `pow`, `exp`, `log`, `log10` and `atan` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
+//! TypeScript formula would not be bit-identical. `pow`, `exp`, `log`, `log10`, `atan`, `sin`, `cos` and `atan2` (module `trig`) transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
 //! `hypot` is V8's Kahan-compensated `Math.hypot`; `cbrt` is V8's `ieee754::cbrt` (FreeBSD s_cbrt.c); `round` is ECMAScript `Math.round`.
 //!
 //! fdlibm notice (kept as its licence requires): Copyright (C) 1993-2004 by Sun Microsystems, Inc. All rights reserved.
 //! Permission to use, copy, modify, and distribute this software is freely granted, provided that this notice is preserved.
+
+mod trig;
+pub use trig::{atan2, cos, sin, take_platform_fallback};
 
 #[inline]
 fn high(x: f64) -> i32 {

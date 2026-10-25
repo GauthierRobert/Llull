@@ -6,8 +6,13 @@
 import { escapeXml } from '../../lib/escapeXml';
 import { isHexColor } from '../../lib/isHexColor';
 import { quantizedKey } from '../../lib/quantize';
-import { zipStore } from '../../lib/zip';
+import { crc32 } from '../../lib/crc32';
+import { isClosedManifold } from '../../lib/isosurface/measures';
+import { zipChunked, zipStore } from '../../lib/zip';
 import type { Triangle } from '../../geometry/triangles';
+import { IMPLICIT_NAMESPACE, type ThreeMfLevelSet, VOLUMETRIC_NAMESPACE, levelSetXml } from './threeMfImplicit';
+import { MAX_3MF_BYTES, type ThreeMfIndexedMesh, keptIndices, meshObjectChunks, modelSink } from './threeMfStream';
+import { BEAM_BALLS_NAMESPACE, BEAM_LATTICE_NAMESPACE, type ThreeMfLattice, latticeObjectXml, otherObjectXml } from './threeMfBeamLattice';
 
 export interface ThreeMfBody {
   readonly name: string;
@@ -15,6 +20,12 @@ export interface ThreeMfBody {
   readonly color: string;
   /** World-space triangles in millimetres. */
   readonly tris: readonly Triangle[];
+  /** Written instead of `tris` from the indexed arrays, streamed and deflated (a mesh too large to hold as triangles). */
+  readonly indexed?: ThreeMfIndexedMesh;
+  /** Written as a beam lattice object instead of a mesh (the triangles then go to the representation mesh of the lattice). */
+  readonly lattice?: ThreeMfLattice;
+  /** Written as a 3MF level set (an implicit function of native nodes) instead of a mesh. */
+  readonly levelset?: ThreeMfLevelSet;
 }
 
 export interface ThreeMfObjectReport {
@@ -23,6 +34,10 @@ export interface ThreeMfObjectReport {
   readonly triangles: number;
   /** Every edge is shared by exactly two triangles with opposite directions (a closed, consistently oriented shell). */
   readonly manifold: boolean;
+  /** Beams of a beam-lattice object (absent on mesh objects). */
+  readonly beams?: number;
+  /** Nodes of the implicit function of a level-set object (absent on mesh objects). */
+  readonly levelsetNodes?: number;
 }
 
 const DEFAULT_COLOR = '#9AA5B1';
@@ -91,6 +106,33 @@ function objectXml(id: number, materialIndex: number, body: ThreeMfBody, mesh: I
   ].join('\n');
 }
 
+/** A line of the model part, or a generator of text batches written between newlines. */
+type ModelPart = string | (() => Iterable<string>);
+
+const NO_MESH: IndexedMesh = { vertices: [], triangles: [] };
+const NO_INDICES = new Uint32Array(0);
+
+/** The archive with the model part streamed through a deflate sink (the two small parts are stored). */
+function zipStreamed(model: readonly ModelPart[], maxBytes: number): Uint8Array {
+  const sink = modelSink(maxBytes);
+  const encoder = new TextEncoder();
+  model.forEach((part, index) => {
+    if (index > 0) sink.push('\n');
+    if (typeof part === 'string') sink.push(part);
+    else for (const text of part()) sink.push(text);
+  });
+  const stored = (name: string, text: string): Parameters<typeof zipChunked>[0][number] => {
+    const data = encoder.encode(text);
+    return { name, method: 0, crc: crc32(data), size: data.length, chunks: [data], storedSize: data.length };
+  };
+  const { crc, size, chunks, storedSize } = sink.done();
+  return zipChunked([
+    stored('[Content_Types].xml', CONTENT_TYPES),
+    stored('_rels/.rels', ROOT_RELS),
+    { name: '3D/3dmodel.model', method: 8, crc, size, chunks, storedSize },
+  ]);
+}
+
 const CONTENT_TYPES =
   '<?xml version="1.0" encoding="UTF-8"?>\n' +
   '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
@@ -105,24 +147,75 @@ const ROOT_RELS =
   '</Relationships>\n';
 
 /**
- * The 3MF archive of `bodies` (empty-mesh bodies are skipped) and a per-object report. Object ids are 2..n+1; the base-material group is id 1,
- * one `base` per body (displaycolor = the body colour), referenced by `pindex`.
+ * The 3MF archive of `bodies` (empty bodies are skipped) and a per-object report. Object ids are 2..n+1; the base-material group is id 1,
+ * one `base` per body (displaycolor = the body colour), referenced by `pindex`. A body with a `lattice` becomes a beam-lattice object (Beam Lattice Extension
+ * 1.2); its clipping and representation meshes are extra `type="other"` objects (ids after n+1, defined before the objects that use them), never build items.
  */
-export function buildThreeMf(bodies: readonly ThreeMfBody[]): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
-  const meshes = bodies.map((body) => ({ body, mesh: indexTriangles(body.tris) })).filter(({ mesh }) => mesh.triangles.length > 0);
-  const bases = meshes.map(({ body }) => {
+export function buildThreeMf(
+  bodies: readonly ThreeMfBody[],
+  maxBytes: number = MAX_3MF_BYTES,
+): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
+  const entries = bodies
+    .map((body) => ({
+      body,
+      mesh: body.indexed === undefined ? indexTriangles(body.tris) : NO_MESH,
+      kept: body.indexed === undefined ? NO_INDICES : keptIndices(body.indexed),
+    }))
+    .filter(({ body, mesh, kept }) =>
+      body.levelset !== undefined
+        ? true
+        : body.indexed !== undefined
+          ? kept.length > 0
+          : body.lattice === undefined
+            ? mesh.triangles.length > 0
+            : body.lattice.beams.length > 0,
+    );
+  const bases = entries.map(({ body }) => {
     const color = isHexColor(body.color) ? body.color.toUpperCase() : DEFAULT_COLOR;
     return `   <base name="${escapeXml(body.name)}" displaycolor="${color}"/>`;
   });
-  const objects = meshes.map(({ body, mesh }, index) => objectXml(index + 2, index, body, mesh));
-  const items = meshes.map((_, index) => ` <item objectid="${index + 2}" transform="${IDENTITY_TRANSFORM}"/>`);
-  const model = [
+  let nextId = entries.length + 2;
+  const helpers: string[] = [];
+  const objects = entries.map(({ body, mesh, kept }, index): ModelPart => {
+    if (body.indexed !== undefined) {
+      const indexed = body.indexed;
+      return () => meshObjectChunks(index + 2, index, body.name, indexed, kept);
+    }
+    if (body.levelset !== undefined) {
+      const made = levelSetXml(index + 2, nextId, body.name, index, body.levelset);
+      nextId = made.nextId;
+      for (const resource of made.resources) helpers.push(resource);
+      return made.object;
+    }
+    const lattice = body.lattice;
+    if (lattice === undefined) return objectXml(index + 2, index, body, mesh);
+    const helper = (tris: readonly Triangle[] | null, label: string): number | null => {
+      if (tris === null || tris.length === 0) return null;
+      const id = nextId;
+      nextId += 1;
+      helpers.push(otherObjectXml(id, `${body.name} ${label}`, tris));
+      return id;
+    };
+    const ids = { clip: helper(lattice.clip, 'clipping mesh'), representation: helper(lattice.representation, 'representation mesh') };
+    return latticeObjectXml(index + 2, body.name, index, lattice, ids);
+  });
+  const items = entries.map((_, index) => ` <item objectid="${index + 2}" transform="${IDENTITY_TRANSFORM}"/>`);
+  const lattices = entries.filter(({ body }) => body.lattice !== undefined);
+  const balls = lattices.some(({ body }) => body.lattice?.ballRadius !== null && body.lattice?.ballRadius !== undefined);
+  const implicit = entries.some(({ body }) => body.levelset !== undefined);
+  const required = [...(lattices.length > 0 ? ['b'] : []), ...(balls ? ['b2'] : []), ...(implicit ? ['v', 'i'] : [])];
+  const extensions =
+    required.length === 0
+      ? ''
+      : `${lattices.length > 0 ? ` xmlns:b="${BEAM_LATTICE_NAMESPACE}"` : ''}${balls ? ` xmlns:b2="${BEAM_BALLS_NAMESPACE}"` : ''}${implicit ? ` xmlns:v="${VOLUMETRIC_NAMESPACE}" xmlns:i="${IMPLICIT_NAMESPACE}"` : ''} requiredextensions="${required.join(' ')}"`;
+  const model: ModelPart[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">',
+    `<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"${extensions}>`,
     ' <resources>',
     '  <basematerials id="1">',
     ...bases,
     '  </basematerials>',
+    ...helpers,
     ...objects,
     ' </resources>',
     ' <build>',
@@ -130,20 +223,30 @@ export function buildThreeMf(bodies: readonly ThreeMfBody[]): { bytes: Uint8Arra
     ' </build>',
     '</model>',
     '',
-  ].join('\n');
+  ];
   const encoder = new TextEncoder();
-  const bytes = zipStore([
-    { name: '[Content_Types].xml', data: encoder.encode(CONTENT_TYPES) },
-    { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
-    { name: '3D/3dmodel.model', data: encoder.encode(model) },
-  ]);
+  const bytes = model.every((part) => typeof part === 'string')
+    ? zipStore([
+        { name: '[Content_Types].xml', data: encoder.encode(CONTENT_TYPES) },
+        { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
+        { name: '3D/3dmodel.model', data: encoder.encode(model.join('\n')) },
+      ])
+    : zipStreamed(model, maxBytes);
   return {
     bytes,
-    objects: meshes.map(({ body, mesh }) => ({
-      name: body.name,
-      vertices: mesh.vertices.length,
-      triangles: mesh.triangles.length,
-      manifold: isManifold(mesh),
-    })),
+    objects: entries.map(({ body, mesh, kept }) =>
+      body.levelset !== undefined
+        ? { name: body.name, vertices: 0, triangles: 0, manifold: false, levelsetNodes: body.levelset.program.instructions.length }
+        : body.indexed !== undefined
+          ? {
+              name: body.name,
+              vertices: Math.floor(body.indexed.positions.length / 3),
+              triangles: kept.length / 3,
+              manifold: isClosedManifold({ positions: body.indexed.positions, indices: kept }),
+            }
+          : body.lattice === undefined
+            ? { name: body.name, vertices: mesh.vertices.length, triangles: mesh.triangles.length, manifold: isManifold(mesh) }
+            : { name: body.name, vertices: body.lattice.nodes.length, triangles: 0, manifold: false, beams: body.lattice.beams.length },
+    ),
   };
 }

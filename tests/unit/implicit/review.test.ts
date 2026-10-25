@@ -118,11 +118,11 @@ describe('check_implicit never passes what it did not evaluate', () => {
   ): { status: string; notEvaluated: string[]; findings: Array<{ code: string }> } =>
     ok(doc, 'check_implicit', { id, process }).data as { status: string; notEvaluated: string[]; findings: Array<{ code: string }> };
 
-  it('a requested wall or strut limit without a declared size is not evaluated and warns', () => {
+  it('a requested strut limit without a declared size is not evaluated and warns (the wall is measured)', () => {
     const body = sphere();
     const data = verdict(body.doc, body.id, { minWallMm: 0.4, minStrutMm: 0.4, source: 'owner-supplied' });
     expect(data.status).toBe('warn');
-    expect(data.notEvaluated).toEqual(['minWallMm', 'minStrutMm']);
+    expect(data.notEvaluated).toEqual(['minStrutMm']);
     expect(data.findings.map((f) => f.code)).toContain('IMP_CHECK_NOT_EVALUATED');
   });
 

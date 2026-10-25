@@ -1,4 +1,4 @@
-/** add_tpms_lattice and add_strut_lattice: periodic lattice fields (05 IMP 4.2, 5.4, 5.5). */
+/** add_tpms_lattice and add_strut_lattice: periodic lattice fields (05 IMP 4.2, 5.4, 5.5, 5.6). */
 
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
@@ -6,7 +6,8 @@ import { resolveFieldEngine } from '@core/geometry/field/engine';
 import type { Vec3 } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { refuseImplicit } from './codes';
-import { fieldOf, type StrutsNode, type TpmsControl, type TpmsNode } from './model';
+import { isLawProblem, lawBounds } from './lawCheck';
+import { type CellMap, type Law, type StrutsNode, type TpmsControl, type TpmsNode, fieldOf } from './model';
 import { addNode } from './nodeResult';
 import { strutGeometry } from './struts';
 import { controlInterval, solveRelativeDensity } from './tpmsControl';
@@ -15,38 +16,65 @@ const cellSizeSchema = z
   .union([z.number(), vec3('Cell size per axis [x, y, z].')])
   .describe('Unit-cell size in document units: one number (cubic cell) or [x, y, z]. Every size > 0.');
 
+const lawSchema = z.union([z.number(), z.string()]);
+
 const asVec3 = (cell: number | readonly [number, number, number]): Vec3 => (typeof cell === 'number' ? [cell, cell, cell] : cell);
 
 const badRegion = (doc: Parameters<typeof fieldOf>[0], region: string | undefined): string | undefined =>
   region !== undefined && fieldOf(doc, region) === undefined ? region : undefined;
 
+const MAP_SCHEMA = z
+  .discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('cylindrical').describe('Wrap the cells around an axis.'),
+      origin: vec3('A point on the axis [x, y, z] in document units.'),
+      axis: vec3('Axis direction [x, y, z] (non-zero).'),
+      cellsAround: z
+        .number()
+        .describe('Whole cells per full turn (an integer >= 1; a fraction makes the lattice jump at the seam: IMP_MAP_SEAM).'),
+      radialCellSize: z.number().describe('Cell size along the radius in document units (> 0). The axial cell size is cellSize[2].'),
+    }),
+    z.object({
+      kind: z.literal('spherical').describe('Wrap the cells around a point: longitude x colatitude x radius.'),
+      origin: vec3('Centre of the sphere [x, y, z] in document units.'),
+      cellsAround: z.number().describe('Whole cells per turn of longitude (an integer >= 1, else IMP_MAP_SEAM).'),
+      cellsPolar: z.number().describe('Whole cells over the half turn of colatitude pole to pole (an integer >= 1, else IMP_MAP_SEAM).'),
+      radialCellSize: z.number().describe('Cell size along the radius in document units (> 0).'),
+    }),
+  ])
+  .describe(
+    'Conformal cell map (replaces origin / rotation). cylindrical: sleeves and tubes. spherical: shells; the cells collapse at the poles (warning IMP_MAP_POLE). Normalised walls stay uniform away from the singularities.',
+  );
+
 /**
  * @affects creates 1 tpms node (the infinite lattice field, or its intersection with `region`); data.control is the resolved thickness / level
- * @invariant normalised walls (default) are the stated thickness to first order; a relativeDensity target is solved once (quantile of the sampled cell) and stored as the resolved control next to the target
+ * @invariant normalised walls (default) are the stated thickness to first order; a relativeDensity target is solved once (quantile of the sampled cell) and stored as the resolved control next to the target; a field id as thickness / level grades the lattice
  * @invariant field-engine-optional: reads ctx.fieldEngine when present, else the built-in TS engine (no kernel is needed)
- * @failure unknown region -> IMP_FIELD_NOT_FOUND; two or no controls -> IMP_PARAM_CONFLICT; control outside its valid interval or density unreachable -> IMP_TPMS_CONTROL_RANGE; cell size <= 0 -> IMP_PARAM_RANGE
+ * @failure unknown region / scalar -> IMP_FIELD_NOT_FOUND; two or no controls -> IMP_PARAM_CONFLICT; control (or the range of a graded one) outside its valid interval or density unreachable -> IMP_TPMS_CONTROL_RANGE; cell size <= 0 -> IMP_PARAM_RANGE; fractional cells in a map -> IMP_MAP_SEAM
  */
 export const addTpmsLattice = defineCommand({
   name: 'add_tpms_lattice',
   description:
-    'Create a triply periodic minimal surface lattice (gyroid, Schwarz P, diamond) as an implicit FIELD. form "sheet" is a wall around the surface F=0, "network" is the solid side {F <= level}. ' +
+    'Create a triply periodic minimal surface lattice (gyroid, schwarz_p, diamond, neovius, iwp, lidinoid, fischer_koch_s, split_p) as an implicit FIELD. form "sheet" is a wall around the surface F=0, "network" is the solid side {F <= level}. ' +
     'Give EXACTLY ONE control: thickness (sheet wall in document units; with normalize "gradient", the default, the wall is this thickness to first order; with normalize "none" it is the raw half-width t of {|F| <= t} in F units), ' +
-    'level (network level in F units, 0 = half of the volume) or relativeDensity (0..1 solid fraction of the cell, solved once for you). Sheet thickness must be < half the smallest cell. ' +
+    'level (network level in F units, 0 = half of the volume for gyroid / P / diamond / Neovius / Fischer-Koch S) or relativeDensity (0..1 solid fraction of the cell, solved once for you). thickness and level accept a scalar field id (create_scalar_field) to GRADE the lattice. Sheet thickness must be < half the smallest cell. ' +
     'The lattice is infinite: pass region (a bounded field id) to clip it, e.g. a box primitive, or create_implicit_body needs bounds. Next: create_implicit_body, then lattice_properties / check_implicit.',
   params: z.object({
-    kind: z.enum(['gyroid', 'schwarz_p', 'diamond']).describe('TPMS family.'),
+    kind: z
+      .enum(['gyroid', 'schwarz_p', 'diamond', 'neovius', 'iwp', 'lidinoid', 'fischer_koch_s', 'split_p'])
+      .describe('TPMS family (equations in the llull spec: Schoen, Lidin & Larsson, Fischer & Koch, Al-Ketan & Abu Al-Rub).'),
     cellSize: cellSizeSchema,
     form: z.enum(['sheet', 'network']).describe('sheet: wall of the given thickness around F=0; network: solid {F <= level}.'),
-    thickness: z
-      .number()
+    thickness: lawSchema
       .optional()
       .describe(
-        'Sheet control: wall thickness in document units (normalised) or raw half-width in F units (normalize "none"). Sheet only.',
+        'Sheet control: wall thickness in document units (normalised) or raw half-width in F units (normalize "none"); a number or a scalar field id (graded). Sheet only.',
       ),
-    level: z
-      .number()
+    level: lawSchema
       .optional()
-      .describe('Network control: level in F units (gyroid |level| < 1.5, P < 3, diamond < 1); 0 gives half the volume. Network only.'),
+      .describe(
+        'Network control: level in F units (gyroid |level| < 1.5, P < 3, diamond < 1); 0 gives half the volume; a number or a scalar field id. Network only.',
+      ),
     relativeDensity: z.number().optional().describe('Control by target solid fraction of the cell, strictly between 0 and 1.'),
     normalize: z
       .enum(['gradient', 'none'])
@@ -54,42 +82,34 @@ export const addTpmsLattice = defineCommand({
       .describe('gradient (default): divide F by its physical gradient so walls have uniform thickness; none: raw F.'),
     origin: vec3('Lattice origin [x, y, z] in document units. Default [0, 0, 0].').optional(),
     rotation: vec3('Lattice Euler XYZ rotation in radians about origin. Default [0, 0, 0].').optional(),
-    map: z
-      .object({
-        kind: z.literal('cylindrical').describe('Wrap the cells around an axis.'),
-        origin: vec3('A point on the axis [x, y, z] in document units.'),
-        axis: vec3('Axis direction [x, y, z] (non-zero).'),
-        cellsAround: z
-          .number()
-          .describe('Whole cells per full turn (an integer >= 1; a fraction makes the lattice jump at the seam: IMP_MAP_SEAM).'),
-        radialCellSize: z.number().describe('Cell size along the radius in document units (> 0). The axial cell size is cellSize[2].'),
-      })
-      .optional()
-      .describe('Conformal cylindrical cell map for sleeves and tubes; replaces origin / rotation. Normalised walls stay uniform.'),
+    map: MAP_SCHEMA.optional(),
     region: z.string().optional().describe('Id of a field that clips the lattice (the lattice is kept where that field is negative).'),
     name: z.string().optional().describe('Optional label for the node.'),
   }),
   run: (doc, p, ctx): CommandResult => {
-    const fail = (code: string, message: string, path: string): CommandResult =>
-      refuseImplicit(doc, 'add_tpms_lattice', code, message, [], [`params.${path}`]);
+    const fail = (code: string, message: string, path: string, ids: readonly string[] = []): CommandResult =>
+      refuseImplicit(doc, 'add_tpms_lattice', code, message, ids, [`params.${path}`]);
     const cellSize = asVec3(p.cellSize);
     if (!cellSize.every((c) => Number.isFinite(c) && c > 0))
       return fail('IMP_PARAM_RANGE', `cellSize must be > 0 on every axis (got ${JSON.stringify(p.cellSize)})`, 'cellSize');
     if (p.map !== undefined) {
-      if (!Number.isInteger(p.map.cellsAround) || p.map.cellsAround < 1)
+      const wholeCells = p.map.kind === 'spherical' ? [p.map.cellsAround, p.map.cellsPolar] : [p.map.cellsAround];
+      if (!wholeCells.every((n) => Number.isInteger(n) && n >= 1))
         return fail(
           'IMP_MAP_SEAM',
-          `cellsAround must be a whole number of cells per turn (got ${p.map.cellsAround}): a fraction jumps at the seam`,
+          `cell counts of a ${p.map.kind} map must be whole numbers >= 1 (got ${wholeCells.join(', ')}): a fraction jumps at the seam`,
           'map.cellsAround',
         );
-      if (!(Number.isFinite(p.map.radialCellSize) && p.map.radialCellSize > 0) || Math.hypot(...p.map.axis) === 0)
-        return fail('IMP_PARAM_RANGE', 'map needs radialCellSize > 0 and a non-zero axis', 'map');
+      if (
+        !(Number.isFinite(p.map.radialCellSize) && p.map.radialCellSize > 0) ||
+        (p.map.kind === 'cylindrical' && Math.hypot(...p.map.axis) === 0)
+      )
+        return fail('IMP_PARAM_RANGE', 'map needs radialCellSize > 0 and (cylindrical) a non-zero axis', 'map');
       if (p.origin !== undefined || p.rotation !== undefined)
         return fail('IMP_PARAM_CONFLICT', 'map replaces origin and rotation: give one or the other', 'origin');
     }
     const absent = badRegion(doc, p.region);
-    if (absent !== undefined)
-      return refuseImplicit(doc, 'add_tpms_lattice', 'IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, [absent], ['params.region']);
+    if (absent !== undefined) return fail('IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, 'region', [absent]);
     const given = [p.thickness, p.level, p.relativeDensity].filter((v) => v !== undefined).length;
     if (given !== 1) return fail('IMP_PARAM_CONFLICT', `give exactly one of thickness, level, relativeDensity (got ${given})`, 'thickness');
     if (p.form === 'sheet' && p.level !== undefined)
@@ -116,12 +136,15 @@ export const addTpmsLattice = defineCommand({
       if (typeof solved === 'string') return fail('IMP_TPMS_CONTROL_RANGE', solved, 'relativeDensity');
       control = solved;
     } else {
-      const value = p.thickness ?? p.level ?? 0;
-      const inside = interval.name === 'thickness' ? value > interval.low && value < interval.high : Math.abs(value) < interval.high;
-      if (!Number.isFinite(value) || !inside)
+      const value: Law = (p.thickness ?? p.level) as Law;
+      const range = lawBounds(doc, value);
+      if (isLawProblem(range)) return fail(range.code, range.message, interval.name, range.ids);
+      const inside = (v: number): boolean =>
+        interval.name === 'thickness' ? v > interval.low && v < interval.high : Math.abs(v) < interval.high;
+      if ((Number.isFinite(range.lo) && !inside(range.lo)) || (Number.isFinite(range.hi) && !inside(range.hi)))
         return fail(
           'IMP_TPMS_CONTROL_RANGE',
-          `${interval.name} ${value} is outside the valid interval (${interval.low}, ${interval.high})`,
+          `${interval.name} ${typeof value === 'number' ? value : `of '${value}' (range ${range.lo}..${range.hi})`} is outside the valid interval (${interval.low}, ${interval.high})`,
           interval.name,
         );
       control = { kind: interval.name, value };
@@ -137,7 +160,7 @@ export const addTpmsLattice = defineCommand({
       control,
       ...(p.relativeDensity === undefined ? {} : { relativeDensityTarget: p.relativeDensity }),
       normalize: request.normalize,
-      ...(p.map === undefined ? {} : { map: p.map }),
+      ...(p.map === undefined ? {} : { map: p.map as CellMap }),
       ...(p.region === undefined ? {} : { region: p.region }),
       ...(p.name === undefined ? {} : { name: p.name }),
     };
@@ -145,6 +168,7 @@ export const addTpmsLattice = defineCommand({
       control: {
         ...control,
         normalized: request.normalize === 'gradient',
+        graded: typeof control.value === 'string',
         ...(p.relativeDensity === undefined ? {} : { relativeDensityTarget: p.relativeDensity }),
       },
     });
@@ -153,44 +177,50 @@ export const addTpmsLattice = defineCommand({
 
 /**
  * @affects creates 1 struts node (periodic beams, clipped by `region` when given)
- * @invariant struts are cylinders with spherical end caps along the cell's bonds; every node of the four cells lies on a continuing strut, so node balls add nothing unless nodeRadius > radius
- * @failure unknown region -> IMP_FIELD_NOT_FOUND; radius <= 0 -> IMP_PARAM_RANGE; 2 * radius >= the shortest strut length -> IMP_STRUT_RADIUS_RANGE
+ * @invariant struts are cylinders with spherical end caps along the cell's bonds; every node lies on a continuing strut, so node balls add nothing unless nodeRadius > radius; a field id as radius grades the lattice (the radius is read at the sample point)
+ * @failure unknown region / scalar -> IMP_FIELD_NOT_FOUND; radius <= 0 -> IMP_STRUT_RADIUS_RANGE; 2 * radius >= the shortest strut length (also of the range of a graded radius) -> IMP_STRUT_RADIUS_RANGE
  */
 export const addStrutLattice = defineCommand({
   name: 'add_strut_lattice',
   description:
-    'Create a periodic strut (beam) lattice as an implicit FIELD: cubic (3 edges per cell), bcc (8 half body diagonals), fcc (6 face diagonals) or octet (24 bonds, stretch-dominated). ' +
-    'Struts are round with the given radius; the radius must stay below half the shortest strut. Pass region (a bounded field id, e.g. a box primitive) to clip the lattice to a body. ' +
-    'Next: create_implicit_body for a mesh, lattice_properties for strut counts, length, relative density and the Maxwell count.',
+    'Create a periodic strut (beam) lattice as an implicit FIELD: cubic (3 edges per cell), bcc (8 half body diagonals), fcc (6 face diagonals), octet (24 bonds, stretch-dominated), diamond (diamond cubic, 16 bonds), kelvin (bitruncated cubic honeycomb, 24 bonds), ' +
+    'bccz (bcc + vertical z edges), fccz (fcc + vertical z edges) or reentrant (auxetic: corner nodes + six face nodes pushed a quarter cell inward, 24 struts). ' +
+    'Struts are round with the given radius (a number, or a scalar field id to grade it: create_scalar_field); the radius must stay below half the shortest strut. Pass region (a bounded field id, e.g. a box primitive) to clip the lattice to a body. ' +
+    'Next: create_implicit_body for a mesh, lattice_properties for strut counts, length, relative density and the Maxwell count, export_3mf beamLattice for a slicer-native beam file.',
   params: z.object({
-    cell: z.enum(['cubic', 'bcc', 'fcc', 'octet']).describe('Unit cell type.'),
+    cell: z.enum(['cubic', 'bcc', 'fcc', 'octet', 'kelvin', 'diamond', 'bccz', 'fccz', 'reentrant']).describe('Unit cell type.'),
     cellSize: cellSizeSchema,
-    radius: z.number().describe('Strut radius in document units (> 0, and 2 * radius < the shortest strut length of the cell).'),
+    radius: lawSchema.describe(
+      'Strut radius in document units: a number (> 0, and 2 * radius < the shortest strut length of the cell) or a scalar field id (graded; its range must satisfy the same bound where known).',
+    ),
     nodeRadius: z
       .number()
       .optional()
-      .describe('Optional ball radius at every node in document units; only larger than radius has an effect.'),
+      .describe('Optional ball radius at every node in document units; only larger than radius has an effect (constant radius only).'),
     origin: vec3('Lattice origin [x, y, z] (a lattice node) in document units. Default [0, 0, 0].').optional(),
     rotation: vec3('Lattice Euler XYZ rotation in radians about origin. Default [0, 0, 0].').optional(),
     region: z.string().optional().describe('Id of a field that clips the lattice (kept where that field is negative).'),
     name: z.string().optional().describe('Optional label for the node.'),
   }),
   run: (doc, p): CommandResult => {
-    const fail = (code: string, message: string, path: string): CommandResult =>
-      refuseImplicit(doc, 'add_strut_lattice', code, message, [], [`params.${path}`]);
+    const fail = (code: string, message: string, path: string, ids: readonly string[] = []): CommandResult =>
+      refuseImplicit(doc, 'add_strut_lattice', code, message, ids, [`params.${path}`]);
     const cellSize = asVec3(p.cellSize);
     if (!cellSize.every((c) => Number.isFinite(c) && c > 0))
       return fail('IMP_PARAM_RANGE', `cellSize must be > 0 on every axis (got ${JSON.stringify(p.cellSize)})`, 'cellSize');
-    if (!(Number.isFinite(p.radius) && p.radius > 0))
-      return fail('IMP_STRUT_RADIUS_RANGE', `radius must be > 0 (got ${p.radius})`, 'radius');
     const absent = badRegion(doc, p.region);
-    if (absent !== undefined)
-      return refuseImplicit(doc, 'add_strut_lattice', 'IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, [absent], ['params.region']);
-    const shortest = Math.min(...strutGeometry(p.cell, cellSize, p.radius, undefined).lengths);
-    if (2 * p.radius >= shortest)
+    if (absent !== undefined) return fail('IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, 'region', [absent]);
+    const range = lawBounds(doc, p.radius);
+    if (isLawProblem(range)) return fail(range.code, range.message, 'radius', range.ids);
+    if (typeof p.radius === 'number' && !(Number.isFinite(p.radius) && p.radius > 0))
+      return fail('IMP_STRUT_RADIUS_RANGE', `radius must be > 0 (got ${p.radius})`, 'radius');
+    if (typeof p.radius === 'string' && p.nodeRadius !== undefined)
+      return fail('IMP_PARAM_CONFLICT', 'nodeRadius applies to a constant radius only', 'nodeRadius');
+    const shortest = Math.min(...strutGeometry(p.cell, cellSize, Number.isFinite(range.hi) ? range.hi : 1e-6, undefined).lengths);
+    if (Number.isFinite(range.hi) && 2 * range.hi >= shortest)
       return fail(
         'IMP_STRUT_RADIUS_RANGE',
-        `2 * radius (${2 * p.radius}) must stay below the shortest strut length ${shortest} of a ${p.cell} cell`,
+        `2 * radius (${2 * range.hi}) must stay below the shortest strut length ${shortest} of a ${p.cell} cell`,
         'radius',
       );
     const node: StrutsNode = {
@@ -207,6 +237,7 @@ export const addStrutLattice = defineCommand({
     };
     return addNode(doc, 'add_strut_lattice', node, `${p.cell} strut lattice, cell ${cellSize.join('x')}, radius ${p.radius}`, {
       shortestStrut: shortest,
+      radiusGraded: typeof p.radius === 'string',
     });
   },
 });

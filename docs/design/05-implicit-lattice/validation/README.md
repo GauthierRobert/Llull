@@ -97,7 +97,7 @@ is the call sequence (`--doc t.llull.json --json`), `cli.assert` the JSON path; 
 | VC-IMP-47 | 34 | `estimateMechanics: true` | `unverified: true`, `reviewRequired: true` | — | AF-32 | A | unit |
 | VC-IMP-48 | 01, 20 | saved document size; reload | ≤ 20 kB extra; same mesh hash after load | — | D3 | A | golden |
 | VC-IMP-49 | 22 | `mass_properties` of the realised SC cell | 82.934 mm³ | 0.5 % | as VC-IMP-15 | A | unit |
-| VC-IMP-50 | 19 | Voronoi lattice (V2) | deterministic per seed | — | TBD | C | — |
+| VC-IMP-50 | 19 | Voronoi lattice (V2) | same (box, density, seed) gives identical nodes and beams; another seed differs; all nodes inside the box | exact | construction (mulberry32 seeds, Bowyer-Watson) | A | unit |
 
 ## 4. Derivations not obvious from the scripts
 

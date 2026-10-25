@@ -24,10 +24,15 @@ export interface FieldSamples {
   readonly gradients: Float64Array | null;
   /** Samples whose value was NaN / infinite (counted, treated as outside). */
   readonly nonFinite: number;
+  /** Set when the engine could not evaluate (then `values` are NaN and must not be used): the caller refuses with this code and message. */
+  readonly failure?: { readonly code: 'IMP_ENGINE_FAILED'; readonly message: string };
 }
 
+export type Mesher = 'tetra' | 'dual_contouring';
+
 export interface MeshOptions {
-  readonly mesher: 'tetra';
+  /** tetra: marching tetrahedra (always closed and manifold); dual_contouring: sharp features kept, falls back to the tetrahedra when its result is not manifold. */
+  readonly mesher: Mesher;
   /** Refuse (IMP_TRIANGLE_BUDGET) a result with more triangles. */
   readonly maxTriangles: number;
 }
@@ -44,6 +49,9 @@ export interface FieldMeshResult {
   /** Largest |f| at a mesh vertex (distance of the vertex from the exact surface for an exact field). */
   readonly maxVertexResidual: number;
   readonly nonFiniteSamples: number;
+  /** The mesher that produced `mesh` (dual contouring reports `tetra` when it fell back). */
+  readonly mesher: Mesher;
+  readonly mesherFallback: boolean;
   readonly provenance: FieldProvenance;
 }
 
@@ -79,11 +87,23 @@ export type MeasureRequest =
       readonly absolute: boolean;
     }
   | {
+      /** The node sign grid itself (1 = inside the closed set {f < 2e-3 voxel}, clipped to the region), x fastest: the input of thickness analyses. */
+      readonly kind: 'nodes';
+    }
+  | {
       /** Connected components of {f < 0} (6-connectivity) and of its complement (26-connectivity) on the grid nodes. */
       readonly kind: 'components';
     };
 
 type FieldMeasures =
+  | {
+      readonly ok: true;
+      readonly kind: 'nodes';
+      readonly inside: Uint8Array;
+      readonly nodes: readonly [number, number, number];
+      readonly samples: number;
+      readonly provenance: FieldProvenance;
+    }
   | {
       readonly ok: true;
       readonly kind: 'volume';
@@ -111,10 +131,20 @@ type FieldMeasures =
       readonly provenance: FieldProvenance;
     };
 
+/** Determinism class of the TS and the native engine (IEEE-754 doubles with V8's libm results). */
+export const DEFAULT_DETERMINISM = 'js-ieee754-v8';
+
 export interface FieldEngine {
   /** 'ts' | 'llull-field'. */
   readonly name: string;
-  readonly limits: { readonly maxSamples: number; readonly maxTriangles: number };
+  /** Class of results the engine guarantees bit for bit (default `DEFAULT_DETERMINISM`): two engines of one class mesh a field identically, so a body's content hash does not name the engine. */
+  readonly determinism?: string;
+  readonly limits: {
+    readonly maxSamples: number;
+    readonly maxTriangles: number;
+    /** Triangle budget when the host keeps the full mesh in its mesh asset store (the document then holds a display level of detail only). */
+    readonly maxStoredTriangles?: number;
+  };
   evaluate(program: FieldProgram, points: Float64Array, withGradient: boolean): FieldSamples;
   mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): FieldMeshResult | FieldRefusal;
   measure(program: FieldProgram, grid: FieldGrid, region: FieldProgram | null, request: MeasureRequest): FieldMeasures | FieldRefusal;

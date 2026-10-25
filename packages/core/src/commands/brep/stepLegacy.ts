@@ -44,7 +44,8 @@ export function exportLegacyStep(
   const params = { acceptUnverified };
   const protocol = schema === 'ap242' ? 'AP242' : 'AP214';
   const { solids, sheets, skipped, entries } = stepTargets(doc, entityIds);
-  if (solids.length === 0 && sheets.length === 0) return noop(doc, 'export_step_ap242: no 3D solids to export.');
+  if (solids.length === 0 && sheets.length === 0)
+    return noop(doc, `export_step_ap242: no 3D solids to export${skipped.length > 0 ? ` (skipped ${skipped.join(', ')})` : ''}.`);
   if (kernel.exportStepAssembly !== undefined && entries.some((entry) => entry.kind === 'instance')) {
     const plan = planStepAssembly(doc, entries, kernel);
     if ('failed' in plan) return noop(doc, `export_step_ap242: the kernel could not build ${plan.failed}; nothing exported.`);

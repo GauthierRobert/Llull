@@ -7,6 +7,7 @@ import { nextId } from '@lib/id';
 import { refuseImplicit } from './codes';
 import { compileField } from './compile';
 import { type BooleanNode, type FieldNode, fieldOf } from './model';
+import { isLawProblem, lawBounds } from './lawCheck';
 import { addNode } from './nodeResult';
 
 const MAX_OPERANDS = 256;
@@ -47,7 +48,11 @@ export const combineFields = defineCommand({
     blend: z
       .object({
         kind: z.enum(['quadratic', 'exponential', 'chamfer']).describe('Blend law.'),
-        radius: z.number().describe('Blend radius k in document units (> 0): the setback of the transition from each face.'),
+        radius: z
+          .union([z.number(), z.string()])
+          .describe(
+            'Blend radius k in document units (> 0): the setback of the transition from each face; a number or a scalar field id (graded, keep its gradient below 1: IMP_BLEND_LAW_STEEP).',
+          ),
       })
       .optional()
       .describe('Smooth the junction. Omit for a sharp boolean.'),
@@ -67,7 +72,10 @@ export const combineFields = defineCommand({
       );
     if (operands.length < 2)
       return refuseImplicit(doc, 'combine_fields', 'IMP_PARAM_RANGE', 'a boolean needs at least two fields', [], ['params.b']);
-    if (blend !== undefined && !(Number.isFinite(blend.radius) && blend.radius > 0))
+    const blendRange = blend === undefined ? null : lawBounds(doc, blend.radius);
+    if (blendRange !== null && isLawProblem(blendRange))
+      return refuseImplicit(doc, 'combine_fields', blendRange.code, blendRange.message, blendRange.ids, ['params.blend.radius']);
+    if (blend !== undefined && typeof blend.radius === 'number' && !(Number.isFinite(blend.radius) && blend.radius > 0))
       return refuseImplicit(
         doc,
         'combine_fields',
@@ -87,14 +95,21 @@ export const combineFields = defineCommand({
     const extra: Record<string, unknown> = {};
     const warnings: Array<{ code: string; ids: string[]; message: string }> = [];
     if (blend !== undefined) {
-      extra['blend'] = { kind: blend.kind, radius: blend.radius, ...blendMetrics(blend.kind, blend.radius) };
+      const largest = typeof blend.radius === 'number' ? blend.radius : (blendRange as { hi: number }).hi;
+      extra['blend'] = {
+        kind: blend.kind,
+        radius: blend.radius,
+        graded: typeof blend.radius === 'string',
+        ...(Number.isFinite(largest) ? blendMetrics(blend.kind, largest) : {}),
+        metricsAt: 'the largest radius of the law',
+      };
       const features = operands.map((id) => compileField(doc, id)).flatMap((c) => (c.ok ? [c.minFeature] : []));
       const smallest = Math.min(...features);
-      if (blend.radius > smallest)
+      if (Number.isFinite(largest) && largest > smallest)
         warnings.push({
           code: 'IMP_BLEND_EXCEEDS_FEATURE',
           ids: [node.id],
-          message: `blend radius ${blend.radius} exceeds the smallest known feature radius ${smallest} of the operands`,
+          message: `blend radius ${largest} exceeds the smallest known feature radius ${smallest} of the operands`,
         });
     }
     const result = addNode(
@@ -132,13 +147,19 @@ export const offsetField = defineCommand({
     '(primitive, transform or field_from_solid of one); on blended / booleaned / lattice sources the surface is not the true offset and the reply carries warning IMP_OFFSET_NOT_EXACT.',
   params: z.object({
     field: z.string().describe('Id of the field to offset.'),
-    distance: z.number().describe('Offset distance in document units; positive grows the body, negative shrinks it.'),
+    distance: z
+      .union([z.number(), z.string()])
+      .describe(
+        'Offset distance in document units; positive grows the body, negative shrinks it. A number or a scalar field id (graded offset, create_scalar_field).',
+      ),
     name: z.string().optional().describe('Optional label for the result node.'),
   }),
   run: (doc, { field, distance, name }): CommandResult => {
     const missing = oneSource(doc, 'offset_field', field);
     if (missing !== null) return missing;
-    if (!Number.isFinite(distance))
+    const range = lawBounds(doc, distance);
+    if (isLawProblem(range)) return refuseImplicit(doc, 'offset_field', range.code, range.message, range.ids, ['params.distance']);
+    if (typeof distance === 'number' && !Number.isFinite(distance))
       return refuseImplicit(doc, 'offset_field', 'IMP_PARAM_RANGE', 'distance must be a finite number', [], ['params.distance']);
     const node: FieldNode = { id: nextId('fld'), op: 'offset', source: field, distance, ...(name === undefined ? {} : { name }) };
     return addNode(doc, 'offset_field', node, `offset of ${field} by ${distance}`);
@@ -157,7 +178,11 @@ export const shellField = defineCommand({
     'Never fails for thin features (unlike shell_solid). Exact on exact sources; otherwise warning IMP_OFFSET_NOT_EXACT. Combine with a lattice for infill (union of skin and lattice).',
   params: z.object({
     field: z.string().describe('Id of the field to hollow.'),
-    thickness: z.number().describe('Wall thickness in document units (> 0).'),
+    thickness: z
+      .union([z.number(), z.string()])
+      .describe(
+        'Wall thickness in document units (> 0): a number or a scalar field id (graded wall, create_scalar_field; its known range must stay > 0).',
+      ),
     side: z
       .enum(['inside', 'outside', 'centred'])
       .optional()
@@ -167,8 +192,17 @@ export const shellField = defineCommand({
   run: (doc, { field, thickness, side = 'inside', name }): CommandResult => {
     const missing = oneSource(doc, 'shell_field', field);
     if (missing !== null) return missing;
-    if (!(Number.isFinite(thickness) && thickness > 0))
-      return refuseImplicit(doc, 'shell_field', 'IMP_PARAM_RANGE', `thickness must be > 0 (got ${thickness})`, [], ['params.thickness']);
+    const range = lawBounds(doc, thickness);
+    if (isLawProblem(range)) return refuseImplicit(doc, 'shell_field', range.code, range.message, range.ids, ['params.thickness']);
+    if ((Number.isFinite(range.lo) && range.lo <= 0) || (typeof thickness === 'number' && !Number.isFinite(thickness)))
+      return refuseImplicit(
+        doc,
+        'shell_field',
+        'IMP_PARAM_RANGE',
+        `thickness must be > 0 (got ${typeof thickness === 'number' ? thickness : `range ${range.lo}..${range.hi}`})`,
+        [],
+        ['params.thickness'],
+      );
     const node: FieldNode = { id: nextId('fld'), op: 'shell', source: field, thickness, side, ...(name === undefined ? {} : { name }) };
     return addNode(doc, 'shell_field', node, `${side} shell of ${field}, wall ${thickness}`);
   },

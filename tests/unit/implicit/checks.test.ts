@@ -63,7 +63,7 @@ describe('implicit_properties on bodies', () => {
 });
 
 describe('check_implicit findings', () => {
-  it('a solid sphere with declared limits echoes them and reports what it could not evaluate (VC-IMP-36)', () => {
+  it('a solid sphere with declared limits echoes them; the wall and pore are measured, the strut has no declared size (VC-IMP-36)', () => {
     const { body } = sphereBody(5, 0.5);
     const verdict = check(body.doc, body.id, { process: { minWallMm: 0.4, minStrutMm: 0.5, minPoreMm: 1, source: 'owner-supplied' } });
     const data = verdict.data as unknown as Check;
@@ -74,7 +74,7 @@ describe('check_implicit findings', () => {
       { name: 'minPoreMm', value: 1, unit: 'mm', source: 'owner-supplied', defaulted: false },
       { name: 'minStrutMm', value: 0.5, unit: 'mm', source: 'owner-supplied', defaulted: false },
     ]);
-    expect(verdict.data['notEvaluated']).toEqual(['minPoreMm', 'minWallMm', 'minStrutMm']);
+    expect(verdict.data['notEvaluated']).toEqual(['minStrutMm']);
     expect(verdict.result.summary).toContain('WARN');
     expect(data.reviewRequired).toBe(false);
   });

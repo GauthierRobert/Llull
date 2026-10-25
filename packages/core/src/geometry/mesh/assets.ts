@@ -31,6 +31,17 @@ export interface MeshAssetPort {
   readFile(key: string): Uint8Array | null;
 }
 
+let installed: MeshAssetPort | null = null;
+
+/** Install (or clear with null) the host's mesh asset store for code that has no execution context (loading a saved document re-derives asset-backed bodies from it). */
+export function setMeshAssetPort(port: MeshAssetPort | null): void {
+  installed = port;
+}
+
+export function getMeshAssetPort(): MeshAssetPort | null {
+  return installed;
+}
+
 /** `mesh` (entity-local, as stored) placed in the world by the entity's `position` and Euler `rotation` (the rule of `meshTriangles`). */
 export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshData {
   if (position.every((v) => v === 0) && isZeroRotation(rotation)) return mesh;

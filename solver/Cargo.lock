@@ -1038,6 +1038,7 @@ version = "0.1.0"
 dependencies = [
  "llull-cloud",
  "llull-explicit",
+ "llull-field",
  "llull-flow-lbm",
  "llull-geomq",
  "llull-meshops",
@@ -1056,6 +1057,18 @@ version = "0.1.0"
 dependencies = [
  "llull-bvh",
  "llull-gpu",
+ "llull-protocol",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "llull-field"
+version = "0.1.0"
+dependencies = [
+ "llull-geomq",
+ "llull-jsmath",
  "llull-protocol",
  "rayon",
  "serde",

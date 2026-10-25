@@ -10,6 +10,9 @@ import type { FastenerRef } from '../model/features';
 import type { CommandDefinition, RetiredCommandRewrite } from '../commands/types';
 import type { DerivationGuard } from '../commands/derivation';
 import type { EntityPropertyProvider } from '../model/entityProperties';
+import type { BeamLatticeAnswer } from '../model/beamLattice';
+import type { LevelSetAnswer } from '../geometry/field/levelSetExport';
+import type { ExecutionContext } from '../commands/types';
 
 /** Clearance-hole size resolved from a standard-part reference (see `DocumentProjections.fastenerHole`). */
 export interface FastenerHoleSize {
@@ -93,6 +96,22 @@ export interface CadPlugin {
   readonly document?: DocumentExtension;
   /** Domain properties of an entity for colour rules and reports (`ExecutionContext.properties`); pure, {} for entities it does not own. */
   readonly entityProperties?: EntityPropertyProvider;
+  /**
+   * Why `entityId`, an entity this plugin derives, cannot be written as an exact STEP solid (export_step_ap242 lists it as skipped with this text), or null.
+   * @invariant pure query
+   */
+  readonly stepSkip?: (doc: CadDocument, entityId: string) => string | null;
+  /**
+   * The field of an entity this plugin derives as a 3MF level set (export_3mf implicit), a reason there is none, or null when the entity is not one of its bodies.
+   * @invariant pure query
+   */
+  readonly levelSet?: (doc: CadDocument, entityId: string, ctx: ExecutionContext | undefined) => LevelSetAnswer;
+  /**
+   * Beam lattice of an entity this plugin derives (export_3mf beamLattice): the lattice in world coordinates, a reason there is none, or null when the entity is not
+   * one of its lattice bodies.
+   * @invariant pure query
+   */
+  readonly beamLattice?: (doc: CadDocument, entityId: string, ctx: ExecutionContext | undefined) => BeamLatticeAnswer;
   /**
    * Called once when the plugin is installed (`installPlugin`, not when its module is imported), e.g. to register with an extension point of another
    * plugin. Idempotent registration is the plugin's job: install is skipped for a name that is already installed.

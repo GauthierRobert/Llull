@@ -32,7 +32,7 @@ describe('validate', () => {
     ['primitive', { dims: 1, position: v, rotation: v }],
     ['solid', { entityId: 1 }],
     ['boolean', { operands: [1] }],
-    ['offset', { source: 'a', distance: 'x' }],
+    ['offset', { source: 'a', distance: true }],
     ['shell', { source: 1, thickness: 1 }],
     ['transform', { source: 'a', position: v, rotation: v, scale: 'x' }],
     ['tpms', { cellSize: v, origin: v, control: 1 }],
@@ -47,7 +47,17 @@ describe('validate', () => {
     expect(errorsOf(slice({ n: 3 })).join()).toContain('not a valid node');
     expect(errorsOf({ implicit: 3 }).join()).toContain('malformed slice');
     expect(errorsOf({ implicit: { version: 1, fields: {} } }).join()).toContain('malformed slice');
-    const body = { id: 'b', field: 'a', voxel: 1, bounds: { min: v, max: v }, contentHash: 'h', name: 'n', engine: 'ts', color: '#fff' };
+    const body = {
+      id: 'b',
+      field: 'a',
+      voxel: 1,
+      bounds: { min: v, max: v },
+      contentHash: 'h',
+      name: 'n',
+      engine: 'ts',
+      mesher: 'tetra',
+      color: '#fff',
+    };
     expect(errorsOf(slice({}, { b: body }))).toEqual([]);
     for (const broken of [
       { voxel: 0 },
@@ -56,6 +66,7 @@ describe('validate', () => {
       { contentHash: 1 },
       { name: 1 },
       { engine: 1 },
+      { mesher: 'marching_cubes' },
       { color: 1 },
       { field: 1 },
       { id: 'x' },
