@@ -6,7 +6,6 @@
 
 import type { MeshData } from '../../model/types';
 import { type MeshBvh, buildMeshBvh } from '../meshBvh';
-import { closestPointOnTriangle } from '../triangleQueries';
 
 export interface MeshSdf {
   distance(x: number, y: number, z: number): number;
@@ -74,21 +73,86 @@ function dipolesOf(bvh: MeshBvh): NodeDipole[] {
   return out;
 }
 
+/**
+ * Distance from (x, y, z) to the triangle whose nine coordinates start at `corners[offset]`: `closestPointOnTriangle` (Ericson 5.1.5) on scalars, without
+ * allocating (the hot loop of every mesh-SDF sample).
+ * @invariant the same operations in the same order as `closestPointOnTriangle` + `Math.hypot`, so the result is bit-identical to them and to the native twin
+ */
+function distanceToTriangle(corners: Float64Array, offset: number, x: number, y: number, z: number): number {
+  const ax = corners[offset] as number;
+  const ay = corners[offset + 1] as number;
+  const az = corners[offset + 2] as number;
+  const bx = corners[offset + 3] as number;
+  const by = corners[offset + 4] as number;
+  const bz = corners[offset + 5] as number;
+  const cx = corners[offset + 6] as number;
+  const cy = corners[offset + 7] as number;
+  const cz = corners[offset + 8] as number;
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abz = bz - az;
+  const acx = cx - ax;
+  const acy = cy - ay;
+  const acz = cz - az;
+  const apx = x - ax;
+  const apy = y - ay;
+  const apz = z - az;
+  const d1 = abx * apx + aby * apy + abz * apz;
+  const d2 = acx * apx + acy * apy + acz * apz;
+  if (d1 <= 0 && d2 <= 0) return Math.hypot(ax - x, ay - y, az - z);
+  const bpx = x - bx;
+  const bpy = y - by;
+  const bpz = z - bz;
+  const d3 = abx * bpx + aby * bpy + abz * bpz;
+  const d4 = acx * bpx + acy * bpy + acz * bpz;
+  if (d3 >= 0 && d4 <= d3) return Math.hypot(bx - x, by - y, bz - z);
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+    const v = d1 / (d1 - d3);
+    return Math.hypot(ax + abx * v - x, ay + aby * v - y, az + abz * v - z);
+  }
+  const cpx = x - cx;
+  const cpy = y - cy;
+  const cpz = z - cz;
+  const d5 = abx * cpx + aby * cpy + abz * cpz;
+  const d6 = acx * cpx + acy * cpy + acz * cpz;
+  if (d6 >= 0 && d5 <= d6) return Math.hypot(cx - x, cy - y, cz - z);
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+    const w = d2 / (d2 - d6);
+    return Math.hypot(ax + acx * w - x, ay + acy * w - y, az + acz * w - z);
+  }
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
+    return Math.hypot(bx + (cx - bx) * w - x, by + (cy - by) * w - y, bz + (cz - bz) * w - z);
+  }
+  const denominator = 1 / (va + vb + vc);
+  const v = vb * denominator;
+  const w = vc * denominator;
+  return Math.hypot(ax + (abx * v + acx * w) - x, ay + (aby * v + acy * w) - y, az + (abz * v + acz * w) - z);
+}
+
 /** Evaluator over `mesh`; an empty mesh is +Infinity everywhere. */
 export function prepareMeshSdf(mesh: MeshData): MeshSdf {
   const bvh = buildMeshBvh(mesh);
   const dipoles = dipolesOf(bvh);
   const stack = new Int32Array(Math.max(64, bvh.left.length));
-  const corner = (triangle: number, k: number, axis: number): number => bvh.corners[triangle * 9 + k * 3 + axis] as number;
+  const corners = bvh.corners;
 
   const unsigned = (x: number, y: number, z: number): number => {
+    const boxes = bvh.boxes;
     let best = Infinity;
     let top = 0;
     stack[top++] = 0;
     while (top > 0) {
       const node = stack[--top] as number;
-      const b = (i: number): number => bvh.boxes[node * 6 + i] as number;
-      const gap = Math.hypot(Math.max(b(0) - x, 0, x - b(3)), Math.max(b(1) - y, 0, y - b(4)), Math.max(b(2) - z, 0, z - b(5)));
+      const o = node * 6;
+      const gap = Math.hypot(
+        Math.max((boxes[o] as number) - x, 0, x - (boxes[o + 3] as number)),
+        Math.max((boxes[o + 1] as number) - y, 0, y - (boxes[o + 4] as number)),
+        Math.max((boxes[o + 2] as number) - z, 0, z - (boxes[o + 5] as number)),
+      );
       if (gap >= best) continue;
       const left = bvh.left[node] as number;
       if (left >= 0) {
@@ -98,16 +162,7 @@ export function prepareMeshSdf(mesh: MeshData): MeshSdf {
       }
       const first = bvh.start[node] as number;
       for (let slot = first; slot < first + (bvh.count[node] as number); slot += 1) {
-        const t = bvh.order[slot] as number;
-        const q = closestPointOnTriangle(
-          [x, y, z],
-          [
-            [corner(t, 0, 0), corner(t, 0, 1), corner(t, 0, 2)],
-            [corner(t, 1, 0), corner(t, 1, 1), corner(t, 1, 2)],
-            [corner(t, 2, 0), corner(t, 2, 1), corner(t, 2, 2)],
-          ],
-        );
-        const d = Math.hypot(q[0] - x, q[1] - y, q[2] - z);
+        const d = distanceToTriangle(bvh.corners, (bvh.order[slot] as number) * 9, x, y, z);
         if (d < best) best = d;
       }
     }
@@ -122,7 +177,9 @@ export function prepareMeshSdf(mesh: MeshData): MeshSdf {
       const node = stack[--top] as number;
       const d = dipoles[node];
       if (d === undefined) continue;
-      const [rx, ry, rz] = [d.cx - x, d.cy - y, d.cz - z];
+      const rx = d.cx - x;
+      const ry = d.cy - y;
+      const rz = d.cz - z;
       const distance = Math.hypot(rx, ry, rz);
       const left = bvh.left[node] as number;
       if (distance > 2 * d.radius && distance > 0) {
@@ -136,11 +193,19 @@ export function prepareMeshSdf(mesh: MeshData): MeshSdf {
       }
       const first = bvh.start[node] as number;
       for (let slot = first; slot < first + (bvh.count[node] as number); slot += 1) {
-        const t = bvh.order[slot] as number;
-        const [ax, ay, az] = [corner(t, 0, 0) - x, corner(t, 0, 1) - y, corner(t, 0, 2) - z];
-        const [bx, by, bz] = [corner(t, 1, 0) - x, corner(t, 1, 1) - y, corner(t, 1, 2) - z];
-        const [cx, cy, cz] = [corner(t, 2, 0) - x, corner(t, 2, 1) - y, corner(t, 2, 2) - z];
-        const [la, lb, lc] = [Math.hypot(ax, ay, az), Math.hypot(bx, by, bz), Math.hypot(cx, cy, cz)];
+        const o = (bvh.order[slot] as number) * 9;
+        const ax = (corners[o] as number) - x;
+        const ay = (corners[o + 1] as number) - y;
+        const az = (corners[o + 2] as number) - z;
+        const bx = (corners[o + 3] as number) - x;
+        const by = (corners[o + 4] as number) - y;
+        const bz = (corners[o + 5] as number) - z;
+        const cx = (corners[o + 6] as number) - x;
+        const cy = (corners[o + 7] as number) - y;
+        const cz = (corners[o + 8] as number) - z;
+        const la = Math.hypot(ax, ay, az);
+        const lb = Math.hypot(bx, by, bz);
+        const lc = Math.hypot(cx, cy, cz);
         const numerator = ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
         const denominator =
           la * lb * lc + (ax * bx + ay * by + az * bz) * lc + (ax * cx + ay * cy + az * cz) * lb + (bx * cx + by * cy + bz * cz) * la;

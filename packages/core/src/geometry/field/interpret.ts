@@ -140,7 +140,29 @@ export function scalarOp(op: FieldOp, a: number, b: number, c: number): number {
   }
 }
 
-/** Value of the output register at (x, y, z); registers is scratch of at least one double per instruction. */
+const OP_CONST = CODE.const;
+const OP_X = CODE.x;
+const OP_Y = CODE.y;
+const OP_Z = CODE.z;
+const OP_ADD = CODE.add;
+const OP_SUB = CODE.sub;
+const OP_MUL = CODE.mul;
+const OP_DIV = CODE.div;
+const OP_NEG = CODE.neg;
+const OP_ABS = CODE.abs;
+const OP_MIN = CODE.min;
+const OP_MAX = CODE.max;
+const OP_SQRT = CODE.sqrt;
+const OP_SQUARE = CODE.square;
+const OP_SIN = CODE.sin;
+const OP_COS = CODE.cos;
+const OP_MESH_SDF = CODE.mesh_sdf;
+const OP_STRUT_SET = CODE.strut_set;
+
+/**
+ * Value of the output register at (x, y, z); registers is scratch of at least one double per instruction.
+ * @invariant dispatches on the integer opcode (the hot loop of every field sample); the common ops are inlined, the rest go through `scalarOp`
+ */
 export function evaluateAt(prepared: PreparedProgram, registers: Float64Array, x: number, y: number, z: number): number {
   const { opcodes, operands, program } = prepared;
   const constants = program.constants;
@@ -150,24 +172,60 @@ export function evaluateAt(prepared: PreparedProgram, registers: Float64Array, x
     const a = registers[operands[base] as number] as number;
     const b = registers[operands[base + 1] as number] as number;
     const c = registers[operands[base + 2] as number] as number;
-    const op = OPS[opcodes[i] as number] ?? 'const';
-    switch (op) {
-      case 'const':
+    const code = opcodes[i] as number;
+    switch (code) {
+      case OP_CONST:
         registers[i] = constants[operands[base] as number] as number;
         break;
-      case 'x':
+      case OP_X:
         registers[i] = x;
         break;
-      case 'y':
+      case OP_Y:
         registers[i] = y;
         break;
-      case 'z':
+      case OP_Z:
         registers[i] = z;
         break;
-      case 'mesh_sdf':
+      case OP_ADD:
+        registers[i] = a + b;
+        break;
+      case OP_SUB:
+        registers[i] = a - b;
+        break;
+      case OP_MUL:
+        registers[i] = a * b;
+        break;
+      case OP_DIV:
+        registers[i] = a / b;
+        break;
+      case OP_NEG:
+        registers[i] = -a;
+        break;
+      case OP_ABS:
+        registers[i] = Math.abs(a);
+        break;
+      case OP_MIN:
+        registers[i] = Math.min(a, b);
+        break;
+      case OP_MAX:
+        registers[i] = Math.max(a, b);
+        break;
+      case OP_SQRT:
+        registers[i] = Math.sqrt(a);
+        break;
+      case OP_SQUARE:
+        registers[i] = a * a;
+        break;
+      case OP_SIN:
+        registers[i] = Math.sin(a);
+        break;
+      case OP_COS:
+        registers[i] = Math.cos(a);
+        break;
+      case OP_MESH_SDF:
         registers[i] = prepared.meshes[operands[base + 3] as number]?.distance(a, b, c) ?? Infinity;
         break;
-      case 'strut_set': {
+      case OP_STRUT_SET: {
         const radiusRegister = operands[base + 4] as number;
         registers[i] =
           prepared.struts[operands[base + 3] as number]?.distance(
@@ -179,7 +237,7 @@ export function evaluateAt(prepared: PreparedProgram, registers: Float64Array, x
         break;
       }
       default:
-        registers[i] = scalarOp(op, a, b, c);
+        registers[i] = scalarOp(OPS[code] ?? 'const', a, b, c);
     }
   }
   return registers[program.output] as number;
