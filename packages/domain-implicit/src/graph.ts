@@ -95,6 +95,6 @@ export function graphGeometry(
       message: `${beams.length} beams exceed the limit of ${MAX_GRAPH_BEAMS}: raise chord`,
       ids: [...node.sourceIds],
     };
-  const radiusMax = Math.max(...beams.flatMap((beam) => [beam.ra, beam.rb]));
+  const radiusMax = beams.reduce((largest, beam) => Math.max(largest, beam.ra, beam.rb), -Infinity);
   return { ok: true, graph: { set: { periodic: null, nodes, beams }, dropped, totalLength, radiusMax } };
 }

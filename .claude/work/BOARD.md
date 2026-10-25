@@ -113,7 +113,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **DES-5c** 05 IMP left after M0–M6 (M4–M6 done 2026-10-25, §14.7): surface-UV cell maps + maps for strut lattices;
   scalar kinds `topology_density` / `fea_result` (VC-IMP-29); numerical homogenisation on `llull-voxfe`; BVH for explicit strut sets (lift the
   5000-beam cap, faster Voronoi realise); native `gradient` + native dual contouring + per-cell DC fallback; 3MF file sink (export above the
-  ~8M-triangle base64 ceiling); GPU preview; `llull guide` implicit section. _Lane 1 + native_ _deps: —_
+  ~8M-triangle base64 ceiling); GPU preview; `llull guide` implicit section; a plain field reading a body restored as a coarse proxy (no asset store) still evaluates the proxy. _Lane 1 + native_ _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
 

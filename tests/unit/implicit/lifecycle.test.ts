@@ -5,6 +5,7 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import { execute } from '@core/commands/registry';
 import { setFieldEngine } from '@core/geometry/field/engine';
 import type { FieldEngine } from '@core/geometry/field/engineTypes';
+import type { FieldNode } from '@implicit/model';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
 import { type MeshAssetPort, setMeshAssetPort } from '@core/geometry/mesh/assets';
 import type { MeshAssetRef } from '@core/model/meshProvenance';
@@ -264,9 +265,10 @@ describe('regenerate_implicit_bodies', () => {
 /** An in-memory mesh asset store keyed by a hash of the mesh (the host store is content addressed). */
 function memoryStore(): { port: MeshAssetPort; writes: () => number } {
   const meshes = new Map<string, MeshData>();
+  const refs = new Map<string, MeshAssetRef>();
   let writes = 0;
   const port: MeshAssetPort = {
-    manifest: () => null,
+    manifest: (key) => refs.get(key) ?? null,
     readMesh: (key) => meshes.get(key) ?? null,
     writeMesh: (mesh): MeshAssetRef => {
       writes += 1;
@@ -275,7 +277,14 @@ function memoryStore(): { port: MeshAssetPort; writes: () => number } {
         hash = (hash * 31 + Math.round(v * 1000)) >>> 0;
       const key = hash.toString(16).padStart(64, '0');
       meshes.set(key, mesh);
-      return { key, triangles: mesh.indices.length / 3, vertices: mesh.positions.length / 3, bounds: { min: [0, 0, 0], max: [1, 1, 1] } };
+      const ref: MeshAssetRef = {
+        key,
+        triangles: mesh.indices.length / 3,
+        vertices: mesh.positions.length / 3,
+        bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+      };
+      refs.set(key, ref);
+      return ref;
     },
     readFile: () => null,
   };
@@ -367,7 +376,7 @@ describe('a host that cannot hold or realise a stored body', () => {
 });
 
 describe('an engine that fails to evaluate', () => {
-  it('is surfaced as IMP_ENGINE_FAILED by evaluate_field, section_field and a graph lattice law, never as NaN values', () => {
+  it('is surfaced as IMP_ENGINE_FAILED by evaluate_field and section_field, never as NaN values', () => {
     const sphere = ok(empty(), 'add_field_primitive', { shape: 'sphere', radius: 2 });
     setFieldEngine({
       ...tsFieldEngine,
@@ -385,4 +394,89 @@ describe('an engine that fails to evaluate', () => {
       'IMP_ENGINE_FAILED',
     );
   });
+});
+
+describe('an engine that fails inside a beam lattice or its properties', () => {
+  const failing: FieldEngine = {
+    ...tsFieldEngine,
+    evaluate: (_program, points) => ({
+      values: new Float64Array(points.length / 3).fill(NaN),
+      gradients: null,
+      nonFinite: points.length / 3,
+      failure: { code: 'IMP_ENGINE_FAILED', message: 'native job failed' },
+    }),
+  };
+
+  const strutBody = (radius: number | string, doc: CadDocument, region: string): { doc: CadDocument; body: string; lattice: string } => {
+    const lattice = ok(doc, 'add_strut_lattice', { cell: 'cubic', cellSize: 5, radius, origin: [0, 0, 0], region });
+    const body = ok(lattice.doc, 'create_implicit_body', { field: lattice.id, voxel: 0.4 });
+    return { doc: body.doc, body: body.id, lattice: lattice.id };
+  };
+
+  const skippedReason = (doc: CadDocument, body: string): string => {
+    const data = ok(doc, 'export_3mf', { entityIds: [body], beamLattice: true }).data as {
+      beamLattice: { skipped: Array<{ reason: string }> };
+    };
+    return data.beamLattice.skipped[0]?.reason ?? '';
+  };
+
+  it('a region sample failure keeps the lattice as a mesh and says why; a graded radius law failure does the same', () => {
+    const box = ok(empty(), 'add_field_primitive', { shape: 'box', size: [10, 10, 10], position: [5, 5, 5] });
+    const constant = strutBody(0.4, box.doc, box.id);
+    const x = ok(constant.doc, 'create_scalar_field', { kind: 'coordinate', axis: 'x' });
+    const ramp = ok(x.doc, 'create_scalar_field', { kind: 'ramp', input: x.id, inMin: 0, inMax: 10, outMin: 0.3, outMax: 0.5 });
+    const graded = strutBody(ramp.id, ramp.doc, box.id);
+    setFieldEngine(failing);
+    expect(skippedReason(constant.doc, constant.body)).toContain('native job failed');
+    expect(skippedReason(graded.doc, graded.body)).toContain('native job failed');
+  });
+
+  it('lattice_properties reports the cut beams as unavailable instead of counting NaN as inside', () => {
+    const box = ok(empty(), 'add_field_primitive', { shape: 'box', size: [10, 10, 10], position: [5, 5, 5] });
+    const lattice = ok(box.doc, 'add_strut_lattice', { cell: 'cubic', cellSize: 5, radius: 0.4, origin: [0, 0, 0], region: box.id });
+    setFieldEngine(failing);
+    const data = ok(lattice.doc, 'lattice_properties', { id: lattice.id }).data;
+    expect(data['cutBeams']).toMatchObject({ available: false });
+    expect(String((data['cutBeams'] as { reason: string }).reason)).toContain('native job failed');
+  });
+});
+
+describe('a stored body this host can only show coarsely', () => {
+  it('leaves a body that reads it unrealised with its record and hash untouched, flags it, refuses to measure it, and restores A with the store', () => {
+    const store = memoryStore();
+    const field = ok(empty(), 'add_field_primitive', { shape: 'sphere', radius: 10 });
+    const created = withAssets(field.doc, 'create_implicit_body', { field: field.id, voxel: 0.25 }, store.port);
+    const idA = created.affected[0] ?? '';
+    const model = created.document.implicit;
+    const recordA = model?.bodies[idA];
+    if (model === undefined || recordA === undefined) throw new Error('body A expected');
+    const { asset, ...recordWithoutAsset } = recordA;
+    void asset;
+    const solid: FieldNode = { id: 'fld-solid', op: 'solid', entityId: idA };
+    const recordB = { ...recordWithoutAsset, id: 'imp-b', field: 'fld-solid', voxel: 2, contentHash: 'hash-of-b-as-saved', name: 'B' };
+    const withB: CadDocument = {
+      ...created.document,
+      implicit: { ...model, fields: { ...model.fields, 'fld-solid': solid }, bodies: { ...model.bodies, 'imp-b': recordB } },
+    };
+    const text = serializeDocument(withB);
+
+    setMeshAssetPort(null);
+    setFieldEngine({ ...tsFieldEngine, limits: { ...tsFieldEngine.limits, maxTriangles: 40_000 } });
+    const coarse = deserializeDocument(text);
+    expect((coarse.entities[idA] as MeshSolidEntity).asset?.key).toBe(recordA.asset?.key);
+    expect(coarse.entities['imp-b']).toBeUndefined();
+    expect(coarse.order).not.toContain('imp-b');
+    expect(coarse.implicit?.bodies['imp-b']?.contentHash).toBe('hash-of-b-as-saved');
+    const warnings = implicitDocument.afterLoad?.(coarse) ?? [];
+    expect(warnings.some((w) => w.startsWith('IMP_BODY_STALE') && w.includes("'imp-b'"))).toBe(true);
+    expect(warnings.some((w) => w.startsWith('IMP_ASSET_MISSING') && w.includes("'" + idA + "'"))).toBe(true);
+    expectRefused(coarse, run(coarse, 'implicit_properties', { id: 'imp-b' }), 'IMP_BODY_STALE');
+    expectRefused(coarse, run(coarse, 'check_implicit', { id: 'imp-b' }), 'IMP_BODY_STALE');
+
+    setFieldEngine(null);
+    setMeshAssetPort(store.port);
+    const full = deserializeDocument(text);
+    expect((full.entities[idA] as MeshSolidEntity).asset?.key).toBe(recordA.asset?.key);
+    expect((implicitDocument.afterLoad?.(full) ?? []).filter((w) => w.includes("'" + idA + "'"))).toEqual([]);
+  }, 180_000);
 });

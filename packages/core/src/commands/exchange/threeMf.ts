@@ -11,7 +11,7 @@ import { isClosedManifold } from '../../lib/isosurface/measures';
 import { zipChunked, zipStore } from '../../lib/zip';
 import type { Triangle } from '../../geometry/triangles';
 import { IMPLICIT_NAMESPACE, type ThreeMfLevelSet, VOLUMETRIC_NAMESPACE, levelSetXml } from './threeMfImplicit';
-import { type IndexedStats, type ThreeMfIndexedMesh, meshObjectChunks, modelSink } from './threeMfStream';
+import { MAX_3MF_BYTES, type ThreeMfIndexedMesh, keptIndices, meshObjectChunks, modelSink } from './threeMfStream';
 import { BEAM_BALLS_NAMESPACE, BEAM_LATTICE_NAMESPACE, type ThreeMfLattice, latticeObjectXml, otherObjectXml } from './threeMfBeamLattice';
 
 export interface ThreeMfBody {
@@ -110,10 +110,11 @@ function objectXml(id: number, materialIndex: number, body: ThreeMfBody, mesh: I
 type ModelPart = string | (() => Iterable<string>);
 
 const NO_MESH: IndexedMesh = { vertices: [], triangles: [] };
+const NO_INDICES = new Uint32Array(0);
 
 /** The archive with the model part streamed through a deflate sink (the two small parts are stored). */
-function zipStreamed(model: readonly ModelPart[]): Uint8Array {
-  const sink = modelSink();
+function zipStreamed(model: readonly ModelPart[], maxBytes: number): Uint8Array {
+  const sink = modelSink(maxBytes);
   const encoder = new TextEncoder();
   model.forEach((part, index) => {
     if (index > 0) sink.push('\n');
@@ -150,14 +151,21 @@ const ROOT_RELS =
  * one `base` per body (displaycolor = the body colour), referenced by `pindex`. A body with a `lattice` becomes a beam-lattice object (Beam Lattice Extension
  * 1.2); its clipping and representation meshes are extra `type="other"` objects (ids after n+1, defined before the objects that use them), never build items.
  */
-export function buildThreeMf(bodies: readonly ThreeMfBody[]): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
+export function buildThreeMf(
+  bodies: readonly ThreeMfBody[],
+  maxBytes: number = MAX_3MF_BYTES,
+): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
   const entries = bodies
-    .map((body) => ({ body, mesh: body.indexed === undefined ? indexTriangles(body.tris) : NO_MESH }))
-    .filter(({ body, mesh }) =>
+    .map((body) => ({
+      body,
+      mesh: body.indexed === undefined ? indexTriangles(body.tris) : NO_MESH,
+      kept: body.indexed === undefined ? NO_INDICES : keptIndices(body.indexed),
+    }))
+    .filter(({ body, mesh, kept }) =>
       body.levelset !== undefined
         ? true
         : body.indexed !== undefined
-          ? body.indexed.indices.length >= 3
+          ? kept.length > 0
           : body.lattice === undefined
             ? mesh.triangles.length > 0
             : body.lattice.beams.length > 0,
@@ -168,16 +176,15 @@ export function buildThreeMf(bodies: readonly ThreeMfBody[]): { bytes: Uint8Arra
   });
   let nextId = entries.length + 2;
   const helpers: string[] = [];
-  const stats = entries.map((): IndexedStats => ({ vertices: 0, triangles: 0 }));
-  const objects = entries.map(({ body, mesh }, index): ModelPart => {
+  const objects = entries.map(({ body, mesh, kept }, index): ModelPart => {
     if (body.indexed !== undefined) {
       const indexed = body.indexed;
-      return () => meshObjectChunks(index + 2, index, body.name, indexed, stats[index] as IndexedStats);
+      return () => meshObjectChunks(index + 2, index, body.name, indexed, kept);
     }
     if (body.levelset !== undefined) {
       const made = levelSetXml(index + 2, nextId, body.name, index, body.levelset);
       nextId = made.nextId;
-      helpers.push(...made.resources);
+      for (const resource of made.resources) helpers.push(resource);
       return made.object;
     }
     const lattice = body.lattice;
@@ -224,18 +231,18 @@ export function buildThreeMf(bodies: readonly ThreeMfBody[]): { bytes: Uint8Arra
         { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
         { name: '3D/3dmodel.model', data: encoder.encode(model.join('\n')) },
       ])
-    : zipStreamed(model);
+    : zipStreamed(model, maxBytes);
   return {
     bytes,
-    objects: entries.map(({ body, mesh }, index) =>
+    objects: entries.map(({ body, mesh, kept }) =>
       body.levelset !== undefined
         ? { name: body.name, vertices: 0, triangles: 0, manifold: false, levelsetNodes: body.levelset.program.instructions.length }
         : body.indexed !== undefined
           ? {
               name: body.name,
-              vertices: (stats[index] as IndexedStats).vertices,
-              triangles: (stats[index] as IndexedStats).triangles,
-              manifold: isClosedManifold({ positions: body.indexed.positions, indices: body.indexed.indices }),
+              vertices: Math.floor(body.indexed.positions.length / 3),
+              triangles: kept.length / 3,
+              manifold: isClosedManifold({ positions: body.indexed.positions, indices: kept }),
             }
           : body.lattice === undefined
             ? { name: body.name, vertices: mesh.vertices.length, triangles: mesh.triangles.length, manifold: isManifold(mesh) }

@@ -103,6 +103,15 @@ export const checkImplicit = defineCommand({
         [id],
         ['params.id'],
       );
+    if (!Object.hasOwn(doc.entities, id))
+      return refuseImplicit(
+        doc,
+        'check_implicit',
+        'IMP_BODY_STALE',
+        `body '${id}' is not realised on this machine (it reads a stored body whose mesh asset is missing)`,
+        [id],
+        ['params.id'],
+      );
     const compiled = compileField(doc, body.field);
     if (!compiled.ok) return refuseImplicit(doc, 'check_implicit', compiled.code, compiled.message, compiled.ids);
     const unit = doc.units;

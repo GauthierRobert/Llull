@@ -13,7 +13,7 @@ import type { Triangle } from '../../geometry/triangles';
 import { toMm } from '../../model/units';
 import { entityIdsField } from './exportFormats';
 import { buildThreeMf, type ThreeMfBody } from './threeMf';
-import { MAX_3MF_BYTES, ThreeMfTooLargeError } from './threeMfStream';
+import { MAX_3MF_BYTES, ThreeMfInvalidMeshError, ThreeMfTooLargeError } from './threeMfStream';
 import { beamLatticeOf, levelSetOf } from '../../plugins/host';
 import type { LevelSetExport } from '../../geometry/field/levelSetExport';
 import type { MeshData as FieldMesh } from '../../model/types';
@@ -86,9 +86,10 @@ function latticeInMm(lattice: BeamLatticeExport, representation: readonly Triang
  *   implicit (only with implicit:'levelset') = { written[ids], skipped[{ id, reason }] }; beamLattice (only with beamLattice:true) = { written[ids], skipped[{ id, reason }], beams };
  *   objects[].beams is set on a beam-lattice object, levelsetNodes on a level-set object (both with 0 triangles)
  * @invariant an indexed mesh above 250000 triangles is streamed from its arrays and DEFLATE-compressed (smaller ones are stored byte for byte as before);
- *   the package is one base64 string, so the deflated model part is capped at 375000000 bytes (about 8 million triangles of a gyroid-like mesh)
+ *   the package is one base64 string, so the deflated model part is capped at 375000000 bytes (about 8 million triangles of a gyroid-like mesh); streamed vertices are not welded
  * @failure no exportable 3D body -> no-op, no data; 2D and unknown ids skipped
- * @failure EXPORT_MESH_TOO_LARGE (coded rejection, document unchanged) -> the deflated model passes the cap, or a non-indexed body has over 2000000 triangles
+ * @failure EXPORT_MESH_TOO_LARGE (coded rejection, document unchanged) -> the deflated model passes the cap (maxBytes, at most 375000000), or a non-indexed body has over 2000000 triangles
+ * @failure EXPORT_MESH_INVALID (coded rejection, document unchanged) -> a streamed mesh has a triangle naming a vertex that does not exist
  * @failure an asset-backed mesh whose asset is missing -> MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE rejection
  */
 export const export3mf = defineCommand({
@@ -100,7 +101,7 @@ export const export3mf = defineCommand({
     'object, units millimetre (document lengths are converted). Vertices are welded into an indexed mesh; data.objects[].manifold says ' +
     'whether each body is a closed, consistently oriented shell (printable). Returns data: { format:"3mf", fileName, base64, objectCount, ' +
     'triangleCount, objects[] (name, vertices, triangles, manifold; beams for a beam lattice, levelsetNodes for a level set), implicit?, beamLattice? }; the CLI writes it with --save PATH.3mf. ' +
-    'Large meshes (over 250000 triangles) are streamed and compressed, so multi-million-triangle implicit bodies export; the package is returned as one base64 string, which caps it near 8 million triangles ' +
+    'Large meshes (over 250000 triangles) are streamed and compressed (their vertices are written as they are, not welded, so a mesh whose shells touch only by position reports manifold false), so multi-million-triangle implicit bodies export; the package is returned as one base64 string, which caps it near 8 million triangles ' +
     '(EXPORT_MESH_TOO_LARGE above: use implicit "levelset", beamLattice, a coarser voxel, decimate_mesh or export_stl). 2D shapes and unknown ids are skipped. Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
@@ -110,6 +111,14 @@ export const export3mf = defineCommand({
       .optional()
       .describe(
         'levelset: write implicit bodies as a 3MF Volumetric & Implicit level set (the field itself as an implicit function of native nodes, bounded by a box mesh; no triangles), for printers that read the extension; strut / graph lattices and bodies built on them stay beam lattices or meshes (data.implicit lists written and skipped with the reason). The function is negative inside (the spec does not state the interior sign of a level set; llull uses the sign of its own mesh-distance node). Document units other than millimetres are refused for bodies built on solids. mesh (default): triangles.',
+      ),
+    maxBytes: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Refuse with EXPORT_MESH_TOO_LARGE when the compressed model part of a streamed (large) export would exceed this many bytes. Default and maximum 375000000 (the package is returned as one base64 string). Bodies up to 250000 triangles are not limited by it.',
       ),
     beamRepresentation: z
       .boolean()
@@ -185,14 +194,23 @@ export const export3mf = defineCommand({
     if (bodies.length === 0) return noop(doc, 'export_3mf: no 3D body with geometry to export (2D shapes and unknown ids are skipped).');
     let built: ReturnType<typeof buildThreeMf>;
     try {
-      built = buildThreeMf(bodies);
+      built = buildThreeMf(bodies, Math.min(params.maxBytes ?? MAX_3MF_BYTES, MAX_3MF_BYTES));
     } catch (error) {
+      if (error instanceof ThreeMfInvalidMeshError)
+        return codedRejection(
+          doc,
+          'export_3mf',
+          'EXPORT_MESH_INVALID',
+          `a mesh body is malformed: ${error.message}`,
+          'rebuild the body (create_implicit_body, repair_mesh) so every triangle names existing vertices',
+          collected.parts.map((part) => part.id),
+        );
       if (!(error instanceof ThreeMfTooLargeError)) throw error;
       return codedRejection(
         doc,
         'export_3mf',
         'EXPORT_MESH_TOO_LARGE',
-        `the model needs more than ${MAX_3MF_BYTES} deflated bytes (${error.bytes} bytes of XML written when it stopped); the package is returned as one base64 string`,
+        `the model needs more than ${Math.min(params.maxBytes ?? MAX_3MF_BYTES, MAX_3MF_BYTES)} deflated bytes (${error.bytes} bytes of XML written when it stopped); the package is returned as one base64 string`,
         'export the large bodies one at a time, write implicit bodies as implicit: "levelset" (the field, no triangles) or beamLattice: true (strut lattices), reduce the mesh (decimate_mesh, a coarser voxel), or use export_stl',
         collected.parts.map((part) => part.id),
       );

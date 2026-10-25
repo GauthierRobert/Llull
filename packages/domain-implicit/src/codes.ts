@@ -16,6 +16,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   IMP_BODY_EMPTY: 'check the sign convention (negative inside) and the region',
   IMP_ENGINE_FAILED: 'retry, or use a coarser voxel (TS engine)',
   IMP_ASSET_MISSING: 'run regenerate_implicit_bodies on this machine (or load the mesh asset store that holds the body)',
+  IMP_BODY_STALE:
+    'load the mesh asset store that holds the bodies it reads, or run regenerate_implicit_bodies on a machine that can realise them',
   IMP_FIELD_CYCLE: 'reference only fields created earlier that do not depend on the field being edited',
   IMP_FIELD_IN_USE: 'delete the referrers first or pass cascade: true',
   IMP_GRAPH_EMPTY: 'pass lines, polylines, arcs, circles, splines or nurbs_curve ids that hold at least one beam',

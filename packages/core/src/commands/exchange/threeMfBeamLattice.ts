@@ -39,11 +39,14 @@ const num = (value: number): string => String(Number(value.toFixed(NUMBER_DIGITS
 
 /** Shortest beam, a safe `minlength`: half of it, so the consumer ignores none of ours. */
 function minLength(lattice: ThreeMfLattice): number {
-  const lengths = lattice.beams.map((beam) => {
+  let shortest = Infinity;
+  for (const beam of lattice.beams) {
     const [p, q] = [lattice.nodes[beam.a] as readonly number[], lattice.nodes[beam.b] as readonly number[]];
-    return Math.hypot((q[0] as number) - (p[0] as number), (q[1] as number) - (p[1] as number), (q[2] as number) - (p[2] as number));
-  });
-  const shortest = Math.min(...lengths);
+    shortest = Math.min(
+      shortest,
+      Math.hypot((q[0] as number) - (p[0] as number), (q[1] as number) - (p[1] as number), (q[2] as number) - (p[2] as number)),
+    );
+  }
   return Math.max(shortest / 2, 1e-6);
 }
 

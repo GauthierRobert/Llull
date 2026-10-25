@@ -14,7 +14,8 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
 import { bodyEntity, triangleBudget } from './bodyCommand';
 import { storeBodyMesh } from './bodyMesh';
-import { type ImplicitBody, entitySources, implicitOf, inputsOf } from './model';
+import { type ImplicitBody, type ImplicitModel, entitySources, implicitOf, inputsOf } from './model';
+import { readsEntity } from './rederive';
 import { realiseField } from './realise';
 
 const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts', 'graph', 'voronoi', 'scalar']);
@@ -119,7 +120,7 @@ function nodeError(key: string, node: unknown): string | null {
 }
 
 /** Whether a raw mesh asset reference is well formed (sha256 key, counts, bounds). */
-const assetErrors = (asset: unknown): boolean =>
+const isAssetRef = (asset: unknown): boolean =>
   isRecord(asset) &&
   typeof asset['key'] === 'string' &&
   /^[0-9a-f]{64}$/.test(asset['key']) &&
@@ -152,7 +153,7 @@ function implicitErrors(raw: Record<string, unknown>): string[] {
       (body['mesher'] === 'tetra' || body['mesher'] === 'dual_contouring') &&
       typeof body['color'] === 'string' &&
       (body['explicitBounds'] === undefined || typeof body['explicitBounds'] === 'boolean') &&
-      (body['asset'] === undefined || assetErrors(body['asset']));
+      (body['asset'] === undefined || isAssetRef(body['asset']));
     if (!valid) errors.push(`implicit body '${key}' is malformed`);
   }
   return errors;
@@ -183,7 +184,14 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
   const restored: Record<string, unknown> = { ...entities };
   const bodies: Record<string, ImplicitBody> = { ...slice.bodies };
   const dropped = new Set<string>();
+  /** Bodies shown by a coarse display mesh, and bodies that read one: their geometry would come from the proxy, so they stay unrealised (record and hash untouched, IMP_BODY_STALE). */
+  const proxies = new Set<string>();
   for (const body of missing) {
+    if (readsEntity(slice as unknown as ImplicitModel, body.field, proxies)) {
+      proxies.add(body.id);
+      dropped.add(body.id);
+      continue;
+    }
     const stored = body.asset === undefined ? null : (port?.readMesh(body.asset.key) ?? null);
     if (body.asset !== undefined && stored !== null) {
       restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(stored, MESH_LOD_TRIANGLES), body.asset);
@@ -206,7 +214,10 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
     if (!realised.ok) {
       const display = body.asset === undefined ? null : coarseDisplay(realiseAt, body.voxel);
       if (display === null || body.asset === undefined) dropped.add(body.id);
-      else restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(display, MESH_LOD_TRIANGLES), body.asset);
+      else {
+        restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(display, MESH_LOD_TRIANGLES), body.asset);
+        proxies.add(body.id);
+      }
       continue;
     }
     const again = storeBodyMesh(realised.mesh, port);
@@ -240,7 +251,10 @@ export const implicitDocument: DocumentExtension = {
             `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`,
         ),
       ...bodies
-        .filter((body) => body.asset !== undefined && Object.hasOwn(doc.entities, body.id) && port?.readMesh(body.asset.key) == null)
+        .filter(
+          (body) =>
+            body.asset !== undefined && Object.hasOwn(doc.entities, body.id) && (port === null || port.manifest(body.asset.key) === null),
+        )
         .map(
           (body) =>
             `IMP_ASSET_MISSING: implicit body '${body.id}' shows a coarse display mesh; its full mesh is not in this machine's mesh asset store (measurements and exports refuse until it is loaded)`,

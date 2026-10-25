@@ -165,7 +165,7 @@ export function beamLatticeOf(doc: CadDocument, entityId: string, ctx: Execution
       beam.ra = radii[beam.a] as number;
       beam.rb = radii[beam.b] as number;
     });
-    defaultRadius = Math.max(...radii, 0);
+    defaultRadius = radii.reduce((largest, radius) => Math.max(largest, radius), 0);
     nodeRadius = typeof root.radius === 'number' && root.nodeRadius !== undefined && root.nodeRadius > root.radius ? root.nodeRadius : null;
   } else {
     const built = root.op === 'voronoi' ? voronoiGeometry(root as VoronoiNode) : graphGeometry(doc, root as GraphNode);

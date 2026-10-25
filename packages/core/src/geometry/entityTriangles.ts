@@ -98,7 +98,13 @@ export function collectExportParts(
         continue;
       }
       parts.push(
-        lazyPart(id, entity, () => entityToTriangles({ ...entity, mesh: full }, doc), full.indices.length / 3, indexedOf(entity, full)),
+        lazyPart(
+          id,
+          entity,
+          () => entityToTriangles({ ...entity, mesh: full }, doc),
+          full.indices.length > 0 ? full.indices.length / 3 : Math.floor(full.positions.length / 9),
+          indexedOf(entity, full),
+        ),
       );
       continue;
     }

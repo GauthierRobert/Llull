@@ -40,6 +40,15 @@ export const implicitProperties = defineCommand({
         [p.id],
         ['params.id'],
       );
+    if (target.body !== undefined && !Object.hasOwn(doc.entities, target.body.id))
+      return refuseImplicit(
+        doc,
+        'implicit_properties',
+        'IMP_BODY_STALE',
+        `body '${p.id}' is not realised on this machine (it reads a stored body whose mesh asset is missing)`,
+        [p.id],
+        ['params.id'],
+      );
     if (p.region !== undefined && fieldOf(doc, p.region) === undefined)
       return refuseImplicit(
         doc,

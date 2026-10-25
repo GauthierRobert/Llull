@@ -29,6 +29,15 @@ function closureOf(model: ImplicitModel, root: string): Set<string> {
 /** Whether `candidate` is read, directly or not, by field `reader` (so a node of `reader` that referred to `candidate`'s dependents would close a cycle). */
 export const dependsOn = (model: ImplicitModel, reader: string, candidate: string): boolean => closureOf(model, reader).has(candidate);
 
+/** Whether field `root` reads, directly or not, the mesh entity of any id in `entityIds` (through a solid, distance or graph node). */
+export function readsEntity(model: ImplicitModel, root: string, entityIds: ReadonlySet<string>): boolean {
+  if (entityIds.size === 0) return false;
+  return [...closureOf(model, root)].some((id) => {
+    const node = model.fields[id];
+    return node !== undefined && entitySources(node).some((entity) => entityIds.has(entity));
+  });
+}
+
 /** Field ids that read `id`, directly or not (not including `id`). */
 export function dependentsOf(model: ImplicitModel, id: string): string[] {
   return Object.keys(model.fields).filter((other) => other !== id && closureOf(model, other).has(id));

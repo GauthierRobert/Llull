@@ -21,7 +21,7 @@ import { TPMS_FACTS } from './tpms';
 type Box = { readonly min: Vec3; readonly max: Vec3 };
 
 /** Radii (from the map's axis or centre) of region samples: a 24^3 grid over the region box, the points where the region field is <= 0. */
-function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine: FieldEngine): number[] {
+function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine: FieldEngine): number[] | null {
   const n = 24;
   const points: number[] = [];
   const spots: Vec3[] = [];
@@ -35,7 +35,9 @@ function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine
         spots.push(p);
         points.push(...p);
       }
-  const values = region === null ? null : engine.evaluate(region, Float64Array.from(points), false).values;
+  const answer = region === null ? null : engine.evaluate(region, Float64Array.from(points), false);
+  if (answer?.failure !== undefined) return null;
+  const values = answer === null ? null : answer.values;
   const length = map.kind === 'cylindrical' ? Math.hypot(...map.axis) : 1;
   return spots.flatMap((p, index) => {
     if (values !== null && (values[index] as number) > 0) return [];
@@ -55,7 +57,7 @@ function mapStretch(
 ): { min: number; max: number } | null {
   const map = node.map;
   if (map === undefined || box === null) return null;
-  const radii = regionRadii(map, box, region, engine).filter((r) => r > 1e-9);
+  const radii = (regionRadii(map, box, region, engine) ?? []).filter((r) => r > 1e-9);
   if (radii.length === 0) return null;
   const sizes = (rho: number): number[] =>
     map.kind === 'cylindrical'
