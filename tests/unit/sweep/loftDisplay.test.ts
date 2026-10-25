@@ -27,3 +27,21 @@ describe('display rings of a ruled polygon loft', () => {
     expect(squareLoft(1).rings[0]).toHaveLength(64);
   });
 });
+
+describe('an inline loft section with a closing repeat', () => {
+  it('builds the same rings as the section without the repeat', () => {
+    const loft = (repeat: boolean): LoftEntity => {
+      const ring = repeat ? [...corners, corners[0]] : corners;
+      const made = execute(createEmptyDocument(), 'loft_sections', {
+        sections: [
+          { section: ring, center: [0, 0, 0] },
+          { section: ring, center: [0, 0, 50] },
+        ],
+        ruled: true,
+      });
+      expect(made.affected, made.summary).toHaveLength(1);
+      return made.document.entities[made.affected[0] as string] as LoftEntity;
+    };
+    expect(loft(true).rings).toEqual(loft(false).rings);
+  });
+});

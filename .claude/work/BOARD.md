@@ -107,9 +107,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Freeform design (spec = `docs/design/README.md`, order = its "Recommended order")
 
-- `[TODO]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14), the code export of sweeps / lofts (done 2026-10-25, §15) and step 2 (done 2026-10-25, §16: `ShapeRecipe` node `sheetSolid`,
+- `[DONE]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14), the code export of sweeps / lofts (done 2026-10-25, §15) and step 2 (done 2026-10-25, §16: `ShapeRecipe` node `sheetSolid`,
   `volumeConsistencyRel`, hollow round sections with laws, exact-curve `inspect_sweep` curvature, closed-loft drift distribution, VC-SWG-32 table):
-  frames overlay (UI, step 3) only. _Lane 1 + 2_ _deps: —_
+  frames overlay (UI, step 3, done 2026-10-25, TECHNICAL_SPEC §17). Left: a native test that provokes `SWG_CHECK_VOLUME_MISMATCH` (§16.4). _Lane 1 + 2_ _deps: —_
 - `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 (done 2026-10-23, TECHNICAL_SPEC §13.5–13.9): M3 `corners` / setback
   - `BLD_SETBACK_TOO_SHORT`, 4+-edge vertices, vertex names, VC-12/13; M2 G1 corner refill, profiles on curved faces / edges, variable-size
     profiles; M4 curved / multi-face sets, `radiusEnd` / `law` / `width` on `fillet_faces`, cliff edges; M5; `llull guide` Blends; VC-26 run on

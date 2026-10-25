@@ -24,7 +24,7 @@ const refuse = tableRejection({
 });
 
 /**
- * @affects none; data = { id, unit, pathLength, sectionArea, samples [{ t, s, point, tangent, normal, binormal, twistRad, scale, curvatureRadius, sectionExtent, margin }], totals, realisation, provenance }
+ * @affects none; data = { id, unit, pathLength, sectionArea, samples [{ t, s, point, tangent, normal, binormal, twistRad, scale, curvatureRadius, sectionExtent, margin, outline? }], totals, realisation, provenance }
  * @invariant frames are entity-local; margin <= 1 means the swept envelope folds (SWG_SELF_INTERSECTION_LOCAL); null = no fold risk (straight run)
  * @failure unknown id / not a sweep -> SWG_ENTITY_NOT_FOUND; samples outside 2..2000 or at outside [0, 1] -> SWG_PARAM_INVALID
  */
@@ -45,8 +45,12 @@ export const inspectSweep = defineCommand({
       .describe('Number of equally spaced arc-length fractions, integer 2..2000. Default 21. Ignored when `at` is given.')
       .optional(),
     at: z.array(z.number()).describe('Explicit arc-length fractions in [0, 1] to measure (at most 2000).').optional(),
+    outline: z
+      .boolean()
+      .describe('Also return, per sample, `outline`: the outer section loop under the laws as entity-local 3D points (default false).')
+      .optional(),
   }),
-  run: (doc, { id, samples = 21, at }): CommandResult => {
+  run: (doc, { id, samples = 21, at, outline = false }): CommandResult => {
     const entity = doc.entities[id];
     if (entity?.kind !== 'sweep') return refuse(doc, 'inspect_sweep', 'SWG_ENTITY_NOT_FOUND', `no sweep with id "${id}"`, [id], ['id']);
     const bad = (message: string, path: string): CommandResult => refuse(doc, 'inspect_sweep', 'SWG_PARAM_INVALID', message, [id], [path]);
@@ -55,7 +59,7 @@ export const inspectSweep = defineCommand({
     if (at !== undefined && (at.length === 0 || at.length > MAX_SAMPLES || at.some((t) => !(t >= 0 && t <= 1))))
       return bad(`at must hold 1..${MAX_SAMPLES} fractions in [0, 1]`, 'at');
     const ts = at ?? Array.from({ length: samples }, (_, k) => k / (samples - 1));
-    const measured = sweepSamples(entity, ts);
+    const measured = sweepSamples(entity, ts, outline);
     const totals = sweepTotals(entity);
     const evaluation = evaluateSweep(entity);
     if (!Array.isArray(measured) || 'code' in totals || !('frames' in evaluation)) {
@@ -85,6 +89,7 @@ export const inspectSweep = defineCommand({
         curvatureRadius: sigOrNull(m.curvatureRadius),
         sectionExtent: sigOrNull(m.sectionExtent),
         margin: sigOrNull(m.margin),
+        ...(m.outline === undefined ? {} : { outline: m.outline.map(sig3) }),
       })),
       totals: {
         twistVsMinimalRad: sig(totals.twistVsMinimalRad),

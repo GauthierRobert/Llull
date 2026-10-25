@@ -161,6 +161,33 @@ describeNativeWhen({ capabilities: ['sheetSolid', 'pipeShell', 'massProperties']
       expect(relError(volumeOfEntity(swept.entity), expected)).toBeLessThan(1e-5);
     });
 
+    it('a square section turned a quarter turn round a closed path closes on itself in the exact solid (faces sew by geometry, not vertex index): volume A L to 1e-5', () => {
+      const ring = created(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 50 });
+      const swept = created(ring.doc, 'sweep_profile', {
+        pathId: ring.entity.id,
+        section: [
+          [-5, -5],
+          [5, -5],
+          [5, 5],
+          [-5, 5],
+        ],
+        twist: { type: 'linear', start: 0, end: Math.PI / 2 },
+      });
+      expect(relError(volumeOfEntity(swept.entity), 100 * 2 * Math.PI * 50)).toBeLessThan(1e-5);
+    });
+
+    it('a round section turned 1.3 rad (not a quarter turn) round a closed path: one valid solid, volume pi r^2 L to 1e-5', () => {
+      const ring = created(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 50 });
+      const swept = created(ring.doc, 'sweep_profile', {
+        pathId: ring.entity.id,
+        radius: 5,
+        twist: { type: 'linear', start: 0, end: 1.3 },
+      });
+      const shape = kernel.evaluate(recipeOf(swept.entity));
+      expect(kernel.analyze?.(shape as NonNullable<typeof shape>)).toMatchObject({ valid: true, closed: true, freeFaces: 0 });
+      expect(relError(volumeOfEntity(swept.entity), Math.PI * 25 * 2 * Math.PI * 50)).toBeLessThan(1e-5);
+    });
+
     it('a scale law along line - arc - line (a pipe elbow) is fitted run by run: volume A L (s0^2 + s0 s1 + s1^2) / 3 to 1e-6', () => {
       const elbow = created(createEmptyDocument(), 'sweep_profile', {
         path: [

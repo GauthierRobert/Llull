@@ -10,7 +10,8 @@ import { sweepTriangles } from '@core/geometry/sweep';
 import { subdivisionTriangles } from '@core/geometry/subdivision';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
 import { buildFaceColoredGeometry, buildMeshSolidGeometry, buildTriangleSoupGeometry } from './meshSolidGeometry';
-import { pointsKey, useStableByKey } from '../../useStableByKey';
+import { pointsKey, useStableByKey, useStableFields } from '../../useStableByKey';
+import { geometryFields } from './geometryFields';
 import {
   buildConeGeometry,
   buildCylinderGeometry,
@@ -124,17 +125,16 @@ function RevolutionMesh(props: Props<'revolution'>): React.ReactElement | null {
 }
 
 function SweepMesh({ entity, ...shell }: Props<'sweep'>): React.ReactElement {
-  const { path, section, stations } = entity;
-  const triangles = useMemo(
-    () => sweepTriangles(stations === undefined ? { path, section } : { path, section, stations }),
-    [path, section, stations],
-  );
+  // The whole shape (laws, orientation, rails, corners, helix), keyed on its geometry fields only: placement is the shell's group.
+  const shape = useStableFields(geometryFields(entity));
+  const triangles = useMemo(() => sweepTriangles(shape), [shape]);
   return <TriangleSoupMesh entity={entity} triangles={triangles} surface={surface(0.4, 0.3, 0.9)} {...shell} />;
 }
 
 function LoftMesh({ entity, ...shell }: Props<'loft'>): React.ReactElement {
-  const { rings, ruled } = entity;
-  const triangles = useMemo(() => loftTriangles({ rings, ruled }), [rings, ruled]);
+  // faces (exact polygon sections) and closed shape the skin too.
+  const shape = useStableFields(geometryFields(entity));
+  const triangles = useMemo(() => loftTriangles(shape), [shape]);
   return <TriangleSoupMesh entity={entity} triangles={triangles} surface={surface(0.4, 0.2, 0.9)} {...shell} />;
 }
 
