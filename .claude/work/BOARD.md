@@ -13,6 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-26 — main: 04 PID-M1 merged (cad-reviewer APPROVE after 3 rounds, hostile-input fuzzing of `xmlRead`): P&ID slice +
+  load validation, safe XML reader. Gates: `check:fast` 17603 (all files), deadcode, format, server 1706. Coverage not run.
+  Wave 3 first milestones done (ISO-M1, DAT-M1, PID-M1). Next: PID-M2 (DEXPI import).
+
 - 2026-10-26 — main: 08 DAT-M1 merged (cad-reviewer APPROVE after 3 rounds): plant data core (hierarchy, classes, tags +
   registry, providers, properties, table, 12-rule check), tag write-back through `rename_equipment_tag` / `set_pipe_line_number`.
   Gates on the merge with DES-2c step 3: `check:fast` 17363 (all files), server 1706. Coverage not run. Next: PID-M1 (WIP).
@@ -165,7 +169,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **DAT-M1** 08 plugin `plant-data` (toolset `plant_data`, slice `doc.plant.data`): hierarchy, classes + default library, typed properties, tag formats + registry, object providers (equipment, legacy pipes, routed lines, inline components, tie-ins), `assign_plant_object`, `set_plant_properties`, `set_tag_format`, `plant_data_table`, `check_plant_data` (12 rules); tags written back through the new `rename_equipment_tag` (03 EQP) and `set_pipe_line_number` (02) (TECHNICAL_SPEC §13). Merged 2026-10-25. Open (§13.8): `affected` misses plant objects whose from / to a rename rewrote; `renamedReference` should move to a pure module; direct renames of classified equipment are reported, not blocked; trays / supports / members not classifiable (no rename command); display colour rules on `mark` drift on rename.
 - `[TODO]` **DAT-M1b** bulk `assign_plant_object` (10 000 sequential assigns take 15.4 s; §8 wants < 1 s); needed before DAT-M2 `import_plant_data`. _deps: —_
 - `[TODO]` **EQP-R1** `update_equipment` renames `mark` without the EQP tag grammar or the reference rewrite: route its mark change through `rename_equipment_tag`. _deps: —_
-- `[WIP]` **PID-M1** 04 PID first milestone (`docs/plant/04-pid-schematics/TECHNICAL_SPEC.md` §10), branch `feat/plant-pid-m1`. _deps: —_
+- `[DONE]` **PID-M1** 04 plugin `pid` (toolset `pid`, slice `doc.plant.pid` per README D2, no stored tag index) with full load validation, and `@lib/xmlRead`: pure, never-throwing, namespace-aware XML reader for untrusted input (no DTD / entities, size / depth / element / attribute / namespace limits, linear time and memory, exact positions) (TECHNICAL_SPEC §13). Merged 2026-10-26. Open: tag patterns from a file pass a nested-quantifier scan but overlapping alternation (`(a|a)+`) is still exponential: M4 must use the bounded tag grammar (§5.1) or refuse it before matching; `pid.lld` is a stand-in until M2 / M3 commands.
+- `[TODO]` **PID-M2** 04 DEXPI import (Proteus 1.3 mapper, census-equal import of the 11 files, `pid_report kind=counts / connectivity`, DEXPI codes; map `XML_*` errors to `DEXPI_PARSE_ERROR` with line / column). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
