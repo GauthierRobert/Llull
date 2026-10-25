@@ -21,6 +21,7 @@ import {
 } from './takeoffBasics';
 import { netConcreteVolumes } from './netConcrete';
 import { routeLength } from '../../industrial/piping/routeSupport';
+import { addAccessTakeoff } from '../../plant/structures/quantities/accessTakeoff';
 
 /**
  * Bill of quantities grouped by category × material × unit. `net` (default) measures concrete columns and beams once where they
@@ -160,6 +161,7 @@ export function computeTakeoff(doc: CadDocument, measure: 'net' | 'gross' = 'net
       takeoff.add('connection', 'weld metal', 'Fillet welds', [['kg', 'weld metal', welds.metal]]);
     }
   }
+  addAccessTakeoff(doc, building, takeoff);
   return takeoff.result();
 }
 

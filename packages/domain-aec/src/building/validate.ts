@@ -10,6 +10,7 @@ import { parseWallLayers } from './elements/wallLayers';
 import { isVec2 } from './model';
 import { EQUIPMENT_SHAPES } from '../industrial/equipment/equipmentShape';
 import { plantDataErrors } from '../plant/equipment/validatePlant';
+import { accessElementErrors } from '../plant/structures/validateAccess';
 
 /** Problems with the optional landing fields of a stair (landingAt, landingLength, shape, turn, flightGap). */
 function stairLandingErrors(key: string, stair: Record<string, unknown>): string[] {
@@ -44,7 +45,8 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   footing: ['width', 'length', 'thickness', 'topOffset'], panel: ['thickness'], equipment: ['angle', 'clearance', 'weight'],
   pipe: ['diameter'], tray: ['width', 'height'], plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
   curvedWall: ['thickness', 'height', 'baseOffset'], connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
-  pipeSupport: ['rodLength', 'pedestalHeight'],
+  pipeSupport: ['rodLength', 'pedestalHeight'], grating: ['topOffset', 'bearingBarAngle'],
+  railing: ['height', 'kneeRails', 'toePlate', 'postSpacingMax'],
 };
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
@@ -54,7 +56,8 @@ const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
 const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
   wall: ['baseOffset'], door: ['offset', 'sillHeight'], window: ['offset', 'sillHeight'], slab: ['offset'], beam: ['topOffset'],
   stair: ['angle', 'riserCount'], member: ['roll'], footing: ['topOffset'], equipment: ['angle', 'clearance', 'weight'],
-  curvedWall: ['baseOffset'], connection: ['haunchLength'], pipeSupport: ['rodLength', 'pedestalHeight'],
+  curvedWall: ['baseOffset'], connection: ['haunchLength'], pipeSupport: ['rodLength', 'pedestalHeight'], grating: ['topOffset', 'bearingBarAngle'],
+  railing: ['kneeRails', 'toePlate'],
 };
 
 /** Fields that must be strictly positive. */
@@ -301,6 +304,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   if (category === 'plate') errors.push(...plateErrors(key, element, elements));
   if (category === 'pipeSupport') errors.push(...pipeSupportErrors(key, element, elements));
   if (category === 'door' || category === 'window') errors.push(...openingHostErrors(key, element, elements));
+  errors.push(...accessElementErrors(key, element, elements));
   return errors;
 }
 

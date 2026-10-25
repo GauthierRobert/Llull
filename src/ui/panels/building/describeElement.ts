@@ -23,6 +23,8 @@ export const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string
   curvedWall: 'Curved wall',
   connection: 'Connection',
   pipeSupport: 'Pipe support',
+  grating: 'Grating',
+  railing: 'Railing',
 };
 
 export function describe(element: BuildingElement, units: DocumentUnit): string {
@@ -64,5 +66,9 @@ export function describe(element: BuildingElement, units: DocumentUnit): string 
       return `${element.length}×${element.width}×${element.thickness} · ${element.boltCount}×${boltSize({ units }, element.boltDiameter)}`;
     case 'pipeSupport':
       return `${element.type} · ${element.memberId === null ? 'unattached' : 'attached'}`;
+    case 'grating':
+      return `${element.gratingType} · ${element.supportIds.length} supports`;
+    case 'railing':
+      return `${element.role} · ${element.height}`;
   }
 }

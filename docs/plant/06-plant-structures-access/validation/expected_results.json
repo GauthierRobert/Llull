@@ -92,7 +92,7 @@
       "source": "ISO-GRD-TOP 1100, ISO-GRD-GAP 500, ISO-TOE-HEIGHT 100, OSHA-GRD-TOP 990.6..1143 (A); OSHA-TOE-HEIGHT (B)",
       "frs": ["FR-STA-05", "FR-STA-09"],
       "plan": "plans/sc-sta-05-access-negative.json",
-      "test": "tests/unit/plantStructures/railing.test.ts"
+      "test": "tests/unit/plant/structures/railing.test.ts"
     },
     {
       "id": "VC-STA-06",
@@ -110,7 +110,7 @@
       "source": "S19 (F, E), S20 + S21 (two manufacturers agree) — grade A",
       "frs": ["FR-STA-01"],
       "plan": "plans/sc-sta-06-grating-span.json",
-      "test": "tests/unit/plantStructures/grating.test.ts"
+      "test": "tests/unit/plant/structures/grating.test.ts"
     },
     {
       "id": "VC-STA-07",
@@ -177,7 +177,7 @@
       "reference": "data/ifc4x3_enums/*.md (buildingSMART IFC 4.3)",
       "tolerance": "exact enum strings present in the enum files",
       "frs": ["FR-STA-12"],
-      "test": "tests/unit/plantStructures/ifcAccess.test.ts"
+      "test": "tests/unit/plant/structures/ifcAccess.test.ts"
     },
     {
       "id": "VC-STA-13",

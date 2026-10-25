@@ -29,7 +29,9 @@ export type BimCategory =
   | 'plate'
   | 'curvedWall'
   | 'connection'
-  | 'pipeSupport';
+  | 'pipeSupport'
+  | 'grating'
+  | 'railing';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -362,6 +364,63 @@ export interface MomentConnectionElement extends LevelElementBase {
   material: string;
 }
 
+/**
+ * One open-bar grating panel (06 STA M2): a convex plan polygon whose bearing bars span between two supports, perpendicular to them.
+ * Its TOP face sits at level elevation + `topOffset`; its depth is the bar depth of `gratingType`.
+ */
+export interface GratingElement extends LevelElementBase {
+  readonly category: 'grating';
+  /** Convex plan polygon (>= 3 points), document units. */
+  boundary: Vec2[];
+  topOffset: number;
+  /** Catalogue key (list_grating_types). */
+  gratingType: string;
+  /** Plan direction the bearing bars run along, radians (CCW from +X): the bars span between supports in this direction. */
+  bearingBarAngle: number;
+  /** The two members the bars bear on, in order along the bar direction. */
+  supportIds: string[];
+}
+
+/** Guard-rail of a platform edge or hand-rail of a stair side. */
+export type RailingRole = 'guardrail' | 'handrail';
+
+/** A gap in a railing between two distances along its path; a `gate` closes it with a self-closing gate (ladder exit). */
+export interface RailingOpening {
+  from: number;
+  to: number;
+  gate: boolean;
+}
+
+/** Slab (or grating) edges a railing was generated from: a provenance record, the path below is the stored geometry. */
+export interface RailingHost {
+  readonly hostId: string;
+  /** Slab ring: 'boundary' or the index of an opening. */
+  readonly ring: 'boundary' | number;
+  /** Edge indices of the ring, ascending; edge i runs from point i to point i + 1. */
+  readonly edges: number[];
+}
+
+/**
+ * A railing along a 3D polyline (06 STA M3): posts at the ends, the corners and at equal spacing <= `postSpacingMax`, a top rail,
+ * `kneeRails` intermediate rails and an optional toe plate. `path` z is the walking surface, relative to the level.
+ */
+export interface RailingElement extends LevelElementBase {
+  readonly category: 'railing';
+  path: Vec3[];
+  /** Top of the top rail above the path. */
+  height: number;
+  kneeRails: number;
+  /** Toe-plate height; 0 = none. */
+  toePlate: number;
+  /** Steel catalogue names. */
+  postProfile: string;
+  railProfile: string;
+  postSpacingMax: number;
+  openings: RailingOpening[];
+  role: RailingRole;
+  host?: RailingHost;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -380,7 +439,9 @@ export type BuildingElement =
   | BasePlateElement
   | CurvedWallElement
   | MomentConnectionElement
-  | PipeSupportElement;
+  | PipeSupportElement
+  | GratingElement
+  | RailingElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

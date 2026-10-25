@@ -146,6 +146,10 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, points: element.points.map(shift3) };
     case 'pipeSupport':
       return { ...element, position: shift3(element.position) };
+    case 'grating':
+      return { ...element, boundary: element.boundary.map(shift) };
+    case 'railing':
+      return { ...element, path: element.path.map(shift3) };
     case 'door':
     case 'window':
     case 'plate':
@@ -214,7 +218,10 @@ export const moveBuildingElement = defineCommand({
     const travelling = [
       ...known,
       ...Object.values(building.elements).flatMap((element) =>
-        element.category === 'pipeSupport' && known.includes(element.pipeId) && !known.includes(element.id) ? [element.id] : [],
+        (element.category === 'pipeSupport' && known.includes(element.pipeId) && !known.includes(element.id)) ||
+        (element.category === 'railing' && element.host !== undefined && known.includes(element.host.hostId) && !known.includes(element.id))
+          ? [element.id]
+          : [],
       ),
     ];
     for (const id of travelling) {

@@ -51,7 +51,7 @@ export function isVec2List(value: unknown, minimumLength: number): value is Vec2
 // prettier-ignore
 const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string>> = {
   wall: 'W', door: 'D', window: 'WN', slab: 'SL', column: 'C', beam: 'B', stair: 'ST', member: 'M', footing: 'F', panel: 'CL',
-  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS',
+  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS', grating: 'GR', railing: 'RL',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -221,13 +221,14 @@ export function followLevelHeight(element: BuildingElement, oldHeight: number, n
 }
 
 /**
- * Host of a hosted element: a door / window's wall, a base plate's column, a moment connection's rafter, a pipe support's pipe (else null).
+ * Host of a hosted element: a door / window's wall, a base plate's column, a moment connection's rafter, a pipe support's pipe, a railing's slab or grating (else null).
  * The element follows its host.
  */
 export function hostOf(element: BuildingElement): string | null {
   if (element.category === 'door' || element.category === 'window') return element.hostId;
   if (element.category === 'connection') return element.rafterId;
   if (element.category === 'pipeSupport') return element.pipeId;
+  if (element.category === 'railing') return element.host?.hostId ?? null;
   return element.category === 'plate' ? element.memberId : null;
 }
 
