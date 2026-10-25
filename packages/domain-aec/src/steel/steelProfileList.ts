@@ -8,11 +8,13 @@ export const listSteelProfiles = defineCommand({
   name: 'list_steel_profiles',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS and equal angles L, with depth h, width ' +
+    'Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS, equal angles L, flat bars FL<width>x<thickness> and solid round bars RD<diameter>, with depth h, width ' +
     'b, web / flange thickness (mm), mass (kg/m), area (mm²) and paint perimeter (mm). Optionally filter by family.',
   params: z.object({
     // tolerant: lower-case / padded family names are normalised in run.
-    family: tolerant(z.enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L']).optional().describe('Only this family.')),
+    family: tolerant(
+      z.enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L', 'FL', 'RD']).optional().describe('Only this family.'),
+    ),
   }),
   run: (doc, { family }): CommandResult => {
     const raw: unknown = family;

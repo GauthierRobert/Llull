@@ -676,7 +676,7 @@
 | `export_ifc` | Export the building model as IFC4 (OpenBIM, ISO 16739) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks…: project / site / building / storeys, walls … | read-only |
 | `export_nc_files` | Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. | read-only |
 | `export_plan_sheet` | Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the level plan at a true scale (1:50, 1:100…; auto-fitted when om… | read-only |
-| `list_steel_profiles` | Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS and equal angles L, with depth h, width b, web / flange thickness (… | read-only |
+| `list_steel_profiles` | Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS, equal angles L, flat bars FL<width>x<thickness> and solid round ba… | read-only |
 | `move_building_element` | Move building elements in plan by delta [dx, dy]; use this instead of move_entities for building elements, because hosted elements and supports follow and join… |  |
 | `quantity_takeoff` | Read-only bill of QUANTITIES (m, m2, m3 of construction) of the building model; for the parts list of a mechanical assembly use bill_of_materials (or plm engin… | read-only |
 | `set_active_level` | Set the active level: new building elements go there when no levelId is given. |  |

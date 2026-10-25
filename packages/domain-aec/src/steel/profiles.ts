@@ -8,11 +8,11 @@ import { circlePolygon } from '@lib/arc';
 import { round } from '../shared/numeric';
 import { bisect } from '@lib/bisect';
 
-type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
+type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L' | 'FL' | 'RD';
 
 export interface SteelProfile {
   readonly name: string;
-  readonly family: 'IPE' | 'HEA' | 'HEB' | 'UPN' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
+  readonly family: 'IPE' | 'HEA' | 'HEB' | 'UPN' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L' | 'FL' | 'RD';
   readonly shape: ProfileShape;
   /** Overall depth (outside diameter for CHS), mm. */
   readonly h: number;
@@ -92,7 +92,7 @@ const UPN = rolled('UPN', [
 
 /** Constant-wall-thickness section: `t` is web and flange alike; the mass follows from the area. */
 function thin(
-  family: 'SHS' | 'RHS' | 'CHS' | 'L' | 'C',
+  family: 'SHS' | 'RHS' | 'CHS' | 'L' | 'C' | 'FL' | 'RD',
   name: string,
   { h, b, t, lip = 0 }: { h: number; b: number; t: number; lip?: number },
   perimeter: number,
@@ -127,6 +127,17 @@ const COLD_FORMED: SteelProfile[] = ([[150, 65, 15, 2.0], [200, 75, 20, 2.0], [2
   thin('C', `C${h}x${b}x${t.toFixed(1)}`, { h, b, t, lip }, 2 * (h + 2 * b + 2 * lip), t * (h + 2 * b + 2 * lip - 4 * t)),
 );
 
+/** Flat bars `FL<width>x<thickness>` (stiles, toe plates, stringer flats): depth h = width, b = thickness, mm. */
+// prettier-ignore
+const FLAT_BARS: SteelProfile[] = ([[30, 5], [40, 5], [50, 5], [50, 6], [60, 6], [70, 10], [80, 8], [100, 5], [100, 8], [100, 10], [120, 10], [150, 10]] as const).map(([w, t]) =>
+  thin('FL', `FL${w}x${t}`, { h: w, b: t, t }, 2 * (w + t), w * t),
+);
+
+/** Solid round bars `RD<diameter>` (ladder rungs, cage bars), mm. */
+const ROUND_BARS: SteelProfile[] = ([10, 12, 16, 20, 25, 30, 40] as const).map((d) =>
+  thin('RD', `RD${d}`, { h: d, b: d, t: d / 2 }, Math.PI * d, (Math.PI * d * d) / 4),
+);
+
 /** Structural steel density, kg/m³. */
 export const STEEL_DENSITY_KG_PER_M3 = 7850;
 
@@ -140,6 +151,8 @@ export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
   ...RHS,
   ...CHS,
   ...ANGLES,
+  ...FLAT_BARS,
+  ...ROUND_BARS,
 ];
 
 /** Lightest catalogue profile accepted by `accept`; the first listed on equal mass. */
@@ -241,6 +254,10 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
       return { outer: rectangle(b, h), holes: [rectangle(b - 2 * tw, h - 2 * tw, true)] };
     case 'CHS':
       return { outer: circle(h / 2, false), holes: [circle(h / 2 - tw, true)] };
+    case 'FL':
+      return { outer: rectangle(b, h), holes: [] };
+    case 'RD':
+      return { outer: circle(h / 2, false), holes: [] };
   }
 }
 

@@ -66,6 +66,10 @@ function steelProfileDef(context: Context, profile: SteelProfile): string {
       );
     case 'CHS':
       return context.writer.add(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`);
+    case 'FL':
+      return context.writer.add(`IFCRECTANGLEPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)})`);
+    case 'RD':
+      return context.writer.add(`IFCCIRCLEPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)})`);
   }
 }
 
