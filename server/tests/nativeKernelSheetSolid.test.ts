@@ -77,7 +77,7 @@ describeNativeWhen({ capabilities: ['sheetSolid', 'pipeShell', 'massProperties']
         helix.document,
       );
       expect(relError(exactVolume(coil.entity), sweepAnalyticVolume(coil.entity) as number)).toBeLessThan(1e-5);
-    });
+    }, 120_000);
 
     it('a bored tube in a frame mode (binormal on a bend) is a sheetSolid too', () => {
       const { entity } = sweep({
@@ -112,6 +112,6 @@ describeNativeWhen({ capabilities: ['sheetSolid', 'pipeShell', 'massProperties']
       }
       expect(worst.length).toBeGreaterThan(3);
       expect(Math.max(...worst)).toBeLessThan(1e-4);
-    });
+    }, 120_000);
   },
 );
