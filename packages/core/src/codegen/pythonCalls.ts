@@ -4,6 +4,7 @@
  */
 
 import type { Feature, FeatureProgram, FilletLaw, ShapeSpec, Term, Term2, Term3 } from './program';
+import { sweptCallOpen, sweptDataLines, sweptFaceKeys } from './sweptCalls';
 import {
   featureLinesWithHeadings,
   formatDegrees,
@@ -31,7 +32,7 @@ function pythonDegrees(term: Term): string {
 }
 
 /** The OPEN helper call for a shape, e.g. `box((10, 20, 30)` — the caller appends kwargs and `)`. */
-export function shapeCallOpen(shape: ShapeSpec): string {
+export function shapeCallOpen(shape: ShapeSpec, key = ''): string {
   switch (shape.kind) {
     case 'box':
       return `box(${pythonTuple(shape.size)}`;
@@ -61,6 +62,8 @@ export function shapeCallOpen(shape: ShapeSpec): string {
         `creases=[${shape.creases.map(([a, b]) => `(${a}, ${b})`).join(', ')}], ` +
         `levels=${formatNumber(Math.trunc(shape.levels))}`
       );
+    case 'swept':
+      return sweptCallOpen(shape, key);
     case 'mesh':
       return `mesh([\n    ${numberRows(shape.positions, 9).join(',\n    ')},\n]`;
   }
@@ -101,13 +104,15 @@ export function placementKwargs(shape: ShapeSpec, position: Term3, rotation: Ter
 export function parametersAndModel(
   program: FeatureProgram,
   assignment: (parameter: FeatureProgram['parameters'][number]) => string,
-  featureLine: (feature: Feature) => string,
+  featureLine: (feature: Feature, faceKey: string) => string,
 ): string[] {
+  const keys = sweptFaceKeys(program);
   return [
     sectionBanner('PARAMETERS'),
     ...parameterLines(program, '#', assignment),
     '',
+    ...sweptDataLines(program, keys),
     sectionBanner('MODEL'),
-    ...featureLinesWithHeadings(program, '#', featureLine),
+    ...featureLinesWithHeadings(program, '#', (feature) => featureLine(feature, keys.get(feature) ?? '')),
   ];
 }

@@ -6,6 +6,8 @@
 import type { Feature, FeatureProgram } from './program';
 import { commentText, formatNumber, provenance, quote, sectionBanner } from './format';
 import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
+import { FREECAD_SWEPT_PY } from './pythonSwept';
+import { sweptComment } from './sweptCalls';
 import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
 
 const HELPERS = String.raw`
@@ -142,12 +144,17 @@ def show(shape, name, color):
 
 const OPERATIONS: Readonly<Record<'union' | 'cut' | 'intersect', string>> = { union: 'fuse', cut: 'cut', intersect: 'common' };
 
-function featureLine(feature: Feature): string {
+function featureLine(feature: Feature, faceKey: string): string {
   const v = feature.variable;
   switch (feature.op) {
     case 'solid': {
       const place = placementKwargs(feature.shape, feature.position, feature.rotation);
-      return `${v} = ${shapeCallOpen(feature.shape)}${place})`;
+      const comment =
+        feature.shape.kind === 'swept'
+          ? `# ${commentText(sweptComment(feature.shape))}
+`
+          : '';
+      return `${comment}${v} = ${shapeCallOpen(feature.shape, faceKey)}${place})`;
     }
     case 'boolean':
       return `${v} = ${feature.left}.${OPERATIONS[feature.kind]}(${feature.right}).removeSplitter()`;
@@ -173,9 +180,12 @@ export function emitFreeCad(program: FeatureProgram): string {
     ...provenance(program).map((line) => `# ${line}`),
     '# Rotations are XYZ Euler angles in degrees (applied about Z, then Y, then X).',
     '# Run from Macro ▸ Macros… or `freecadcmd <file>`; edit PARAMETERS to regenerate.',
+    '# sweep_profile / loft_sections calls rebuild the exported solid: only the radius / innerRadius of a pipe are read; any other edited keyword',
+    '# (edited, added or removed) warns SWG_CODEGEN_STALE and takes effect through import_code.',
     HELPERS,
     SUBDIVISION_PY,
     FREECAD_SUBDIVISION_PY,
+    FREECAD_SWEPT_PY,
     '',
     `doc = App.newDocument("llull")`,
     '',

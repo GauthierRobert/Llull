@@ -14,6 +14,7 @@ import { evaluateExpression, extractReferences } from '../parametric/expression'
 import { MAX_TRACE_FEATURES } from '../limits';
 import { isRecord } from '../../lib/isRecord';
 import { isIdentifier } from '../../lib/identifier';
+import { idTaken } from '../../lib/explicitId';
 import { migrateRetiredCalls } from '../persistence/retiredCommands';
 import { changed, noop } from '../noop';
 
@@ -45,6 +46,8 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'add_pyramid',
   'extrude_profile',
   'revolve_profile',
+  'sweep_profile',
+  'loft_sections',
   'import_mesh',
   'add_subdivision_solid',
   'boolean',
@@ -55,6 +58,15 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'delete_entities',
   'set_entity_name',
 ]);
+
+/** Commands whose recorded params may carry the explicit `id` of the entity they create (an `id` of any other command is a reference). */
+const EXPLICIT_ID_COMMANDS: ReadonlySet<string> = new Set(['sweep_profile', 'loft_sections']);
+
+/** `params` without its `id` key. */
+function withoutId(params: unknown): unknown {
+  if (!isRecord(params)) return params;
+  return Object.fromEntries(Object.entries(params).filter(([key]) => key !== 'id'));
+}
 
 interface Lowered {
   /** Params passed to the command (numbers, entity ids). */
@@ -229,14 +241,25 @@ export const applyCodeTrace = defineCommand({
     }
     // `ref` names the FIRST solid a feature created (every runtime helper creates exactly one).
     const refs = new Map<string, string>();
+    const reminted: string[] = [];
     for (const [i, feature] of trace.features.entries()) {
       const env = buildParamEnv(current.parameters);
       const lowered = lowerParams(feature.params, refs, env, current.parameters);
       if ('error' in lowered) return abort(doc, `feature ${i} (${feature.command}): ${lowered.error}`);
-      const result = executeRecorded(current, feature.command, lowered.run, lowered.record);
+      // an explicit id already held by the document (append mode) is dropped: the step re-mints a free one
+      const taken =
+        EXPLICIT_ID_COMMANDS.has(feature.command) &&
+        isRecord(lowered.run) &&
+        typeof lowered.run.id === 'string' &&
+        idTaken(current.entities, lowered.run.id);
+      const droppedId = taken ? (lowered.run as { id: string }).id : null;
+      const result = taken
+        ? executeRecorded(current, feature.command, withoutId(lowered.run), withoutId(lowered.record))
+        : executeRecorded(current, feature.command, lowered.run, lowered.record);
       if (result.document === current && result.affected.length === 0)
         return abort(doc, `feature ${i} (${feature.command}) failed: ${result.summary}`);
       current = result.document;
+      if (droppedId !== null) reminted.push(`${droppedId} → ${result.affected[0] ?? '?'}`);
       if (feature.ref !== undefined && result.affected[0] !== undefined) refs.set(feature.ref, result.affected[0]);
       const id = feature.ref !== undefined ? refs.get(feature.ref) : undefined;
       if (typeof feature.name === 'string' && feature.name !== '' && id !== undefined)
@@ -248,7 +271,8 @@ export const applyCodeTrace = defineCommand({
       current,
       `apply_code_trace (${mode}): ${trace.parameters.length} parameter(s)` +
         (parameterNames.length > 0 ? ` [${parameterNames.join(', ')}]` : '') +
-        `, ${trace.features.length} feature(s) → ${live.length} solid(s): ${live.join(', ') || 'none'}.`,
+        `, ${trace.features.length} feature(s) → ${live.length} solid(s): ${live.join(', ') || 'none'}.` +
+        (reminted.length > 0 ? ` Explicit id(s) already in use were re-minted (old → new): ${reminted.join(', ')}.` : ''),
       live,
     );
   },

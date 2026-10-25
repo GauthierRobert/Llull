@@ -18,7 +18,21 @@ import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
 import { blendNotExpressible, lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
 import { embossNodes } from '../geometry/embossRecipe';
-import type { Axis, Feature, FeatureBase, FeatureProgram, ProgramOutput, ProgramParameter, ShapeSpec, Term, Term2, Term3 } from './program';
+import { skinShape, withRefusalNotes } from './skinLowering';
+import { tracedCall } from './paramTree';
+import type {
+  Axis,
+  Feature,
+  FeatureBase,
+  FeatureProgram,
+  ProgramOutput,
+  ProgramParameter,
+  ShapeSpec,
+  Term,
+  Term2,
+  Term3,
+  TracedCall,
+} from './program';
 
 const EPSILON = 1e-9;
 
@@ -67,7 +81,7 @@ function dominantAxis(axis: Vec3): Axis {
 }
 
 /** Lower one evaluated entity to a shape; `raw` are the params of the step that produced it. */
-function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerContext): ShapeSpec {
+function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerContext, trace: TracedCall | null): ShapeSpec {
   const field = (key: string): unknown => child(raw, key);
   if (is2D(entity) || isCurve3D(entity) || isSheet(entity)) return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   switch (entity.kind) {
@@ -119,9 +133,10 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         levels: Math.max(0, entity.levels - settle),
       };
     }
-    case 'mesh':
     case 'sweep':
     case 'loft':
+      return skinShape(entity, doc, trace);
+    case 'mesh':
     case 'instance':
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   }
@@ -133,8 +148,9 @@ function solidFeature(
   raw: unknown,
   ctx: LowerContext,
   base: FeatureBase,
+  trace: TracedCall | null = null,
 ): Extract<Feature, { op: 'solid' }> {
-  const shape = lowerShape(entity, doc, raw, ctx);
+  const shape = lowerShape(entity, doc, raw, ctx, trace);
   const isMesh = shape.kind === 'mesh';
   return {
     ...base,
@@ -160,6 +176,7 @@ function entityFeatures(
   namer: Namer,
   base: (variable: string) => FeatureBase,
   variables: Map<string, string>,
+  trace: TracedCall | null = null,
 ): { features: Feature[]; triangles: boolean } {
   if (entity.kind === 'instance') {
     const component = doc.components[entity.componentId];
@@ -187,7 +204,7 @@ function entityFeatures(
   const variable = namer.take(preferredVariable(entity));
   variables.set(entity.id, variable);
   return {
-    features: [solidFeature(entity, doc, raw, ctx, base(variable))],
+    features: [solidFeature(entity, doc, raw, ctx, base(variable), trace)],
     triangles: entity.kind === 'mesh' || entity.kind === 'instance',
   };
 }
@@ -195,7 +212,7 @@ function entityFeatures(
 /** The note for a solid exported as triangles; a blend the program cannot express names BLD_CODEGEN_UNSUPPORTED (the export carries the exact result, never a different fillet). */
 function meshNote(subject: string, entity: Entity): string {
   if (entity.kind === 'mesh' && entity.brep !== undefined && embossNodes(recipeOf(entity)).length > 0)
-    return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export STEP for the exact faces).`;
+    return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export_step through the native kernel, without the Python bridge, keeps the exact faces).`;
   const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
   return blend
     ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
@@ -351,6 +368,15 @@ function modificationStep(
   return modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size);
 }
 
+/** The sweep_profile / loft_sections call a step recorded, when the solid it created can be rebuilt from those params alone. */
+function stepTrace(event: ReplayStepEvent, created: readonly Entity[], ctx: LowerContext): TracedCall | null {
+  const command = event.step.name;
+  if ((command !== 'sweep_profile' && command !== 'loft_sections') || created.length !== 1) return null;
+  const kind = created[0]?.kind;
+  if (kind !== (command === 'sweep_profile' ? 'sweep' : 'loft')) return null;
+  return tracedCall(command, event.params, event.rawParams, (value, raw) => term(value, raw, ctx));
+}
+
 /** Lower one replayed step into features, keeping `variables` (entity id → variable) current. */
 function lowerStep(
   event: ReplayStepEvent,
@@ -422,7 +448,7 @@ function lowerStep(
     }
   }
   for (const entity of created) {
-    const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
+    const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables, stepTrace(event, created, ctx));
     features.push(...lowered.features);
     if (lowered.triangles) notes.push(meshNote(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}'`, entity));
   }
@@ -451,14 +477,7 @@ function skippedSurfaceNote(doc: CadDocument): string[] {
   return skipped.length === 0 ? [] : [`not exported to code (curves and surface sheets have no solid form): ${skipped.join(', ')}.`];
 }
 
-/**
- * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
- * back to the current geometry when there is no history or replay does not reproduce the document.
- * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
- *   ids minted after an export differ from ids minted without one; no document content changes.
- * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).
- */
-export function buildFeatureProgram(
+function buildProgram(
   doc: CadDocument,
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
   kernel: GeometryKernel | null = null,
@@ -484,4 +503,19 @@ export function buildFeatureProgram(
     return lowerSnapshot(doc, parameters, ctx, freshNamer, notes);
   }
   return { units: doc.units, source: 'history', parameters, features, outputs: outputsFor(replayed, variables), notes };
+}
+
+/**
+ * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
+ * back to the current geometry when there is no history or replay does not reproduce the document.
+ * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
+ *   ids minted after an export differ from ids minted without one; no document content changes.
+ * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).
+ */
+export function buildFeatureProgram(
+  doc: CadDocument,
+  getCommand: (name: string) => CommandDefinition<unknown> | undefined,
+  kernel: GeometryKernel | null = null,
+): FeatureProgram {
+  return withRefusalNotes(buildProgram(doc, getCommand, kernel));
 }

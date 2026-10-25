@@ -97,7 +97,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Freeform design (spec = `docs/design/README.md`, order = its "Recommended order")
 
-- `[TODO]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14): CadQuery / build123d / FreeCAD lowering of sweeps + lofts,
+- `[TODO]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14) + code export of sweeps / lofts (done 2026-10-25, §15):
   frames overlay (UI), `ShapeRecipe` node `sheetSolid` (faces still in the leaf payload), `volumeConsistencyRel`, hollow round sections with laws,
   exact-curve `inspect_sweep` curvature, closed-loft drift distribution (single re-seam today), VC-SWG-32 table. _Lane 1 + 2_ _deps: —_
 - `[TODO]` **DES-6c** 06 BLD left after M0–M1 + restricted M2 / M4 (done 2026-10-23, TECHNICAL_SPEC §13.5–13.9): M3 `corners` / setback

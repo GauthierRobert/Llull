@@ -6,18 +6,24 @@
 
 import type { Feature, FeatureProgram } from './program';
 import { commentText, formatNumber, provenance, quote } from './format';
+import { sweptComment } from './sweptCalls';
 import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = { cadquery: 'CadQuery', build123d: 'build123d' };
 
-function featureLine(feature: Feature): string {
+function featureLine(feature: Feature, faceKey: string): string {
   const v = feature.variable;
   switch (feature.op) {
     case 'solid': {
       const name = feature.name !== undefined ? `, name=${quote(feature.name)}` : '';
       const place = placementKwargs(feature.shape, feature.position, feature.rotation);
-      return `${v} = ${shapeCallOpen(feature.shape)}${place}, color=${quote(feature.color)}${name})`;
+      const comment =
+        feature.shape.kind === 'swept'
+          ? `# ${commentText(sweptComment(feature.shape))}
+`
+          : '';
+      return `${comment}${v} = ${shapeCallOpen(feature.shape, faceKey)}${place}, color=${quote(feature.color)}${name})`;
     }
     case 'boolean':
       return `${v} = ${feature.kind}(${feature.left}, ${feature.right})`;
@@ -50,6 +56,8 @@ function header(program: FeatureProgram, backend: PythonBackend): string {
     "  * send it back with llull's import_code tool: parameters, expressions and",
     '    feature order are rebuilt as an editable llull feature history.',
     'Raw library code is welcome too: wrap a shape with custom(shape) to include it.',
+    'sweep_profile / loft_sections calls rebuild the exported solid; only the radius / innerRadius of a pipe are read, any other edited',
+    'keyword (edited, added or removed) warns SWG_CODEGEN_STALE and takes effect through import_code.',
     '"""',
   ].join('\n');
 }

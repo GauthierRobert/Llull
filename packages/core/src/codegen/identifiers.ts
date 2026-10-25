@@ -11,7 +11,7 @@ const RESERVED = new Set(
     // OpenSCAD keywords
     'module function let each true false undef include use',
     // llull runtime helpers emitted in generated code
-    'param box cylinder sphere cone torus wedge pyramid extrude revolve mesh union cut intersect translate remove label finish custom subdivision show show_object export_step Param Solid FreeCADGui LLULL_TRACE LLULL_LIVE LLULL_UNITS',
+    'param box cylinder sphere cone torus wedge pyramid extrude revolve mesh union cut intersect translate remove label finish custom subdivision sweep_profile loft_sections swept show show_object export_step Param Solid FreeCADGui LLULL_TRACE LLULL_LIVE LLULL_UNITS',
   ].flatMap((group) => group.split(' ')),
 );
 

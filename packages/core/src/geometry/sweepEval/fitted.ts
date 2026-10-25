@@ -39,6 +39,8 @@ function faceProbes(face: NurbsSurfaceData): number[] {
 export interface FittedSweep {
   /** Encoded B-spline surfaces (`encodeSurface`), one per section edge. */
   readonly faces: number[][];
+  /** The same faces as data (code generation emits them as B-spline constructors). */
+  readonly surfaces: NurbsSurfaceData[];
   readonly cells: number;
   /** Points (xyz triples) on the fitted faces: the check a faster exact builder (MakePipeShell) must pass. */
   readonly probes: number[];
@@ -230,7 +232,13 @@ export function fitSweepFaces(sweep: SweepEntity, tolerance: number): FittedSwee
     if ('code' in fit) return fit;
     last = fit.deviation;
     if (fit.deviation <= tolerance)
-      return { faces: fit.faces.map(encodeSurface), cells: fit.cells, deviation: fit.deviation, probes: fit.faces.flatMap(faceProbes) };
+      return {
+        faces: fit.faces.map(encodeSurface),
+        surfaces: fit.faces,
+        cells: fit.cells,
+        deviation: fit.deviation,
+        probes: fit.faces.flatMap(faceProbes),
+      };
   }
   return {
     code: 'SWG_FIT_TOLERANCE',

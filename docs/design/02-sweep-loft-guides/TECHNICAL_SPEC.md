@@ -523,7 +523,7 @@ Rails VC-16/17/35 1e-12; VC-21 bottle and VC-22 m=2 5.7e-11; VC-19 6e-11; elbow 
 
 ### 14.4 Not done
 
-CadQuery / build123d / FreeCAD lowering of sweeps and lofts (sketch: a ShapeSpec carrying faces with a mesh fallback); frames overlay (UI); `ShapeRecipe` node `sheetSolid`; `volumeConsistencyRel`; hollow round sections with laws; `inspect_sweep` curvature from the sampled path; VC-SWG-32 as one table. `rustfmt` / clippy on the Rust edits are covered by `native:check` (see report).
+Frames overlay (UI); `ShapeRecipe` node `sheetSolid`; `volumeConsistencyRel`; hollow round sections with laws; `inspect_sweep` curvature from the sampled path; VC-SWG-32 as one table. `rustfmt` / clippy on the Rust edits are covered by `native:check` (see report).
 
 ### 14.5 Review fixes (2026-10-23)
 
@@ -532,3 +532,56 @@ CadQuery / build123d / FreeCAD lowering of sweeps and lofts (sketch: a ShapeSpec
 - `ruled_surface` developable flag: K x diagonal^2 <= 1e-6 (unit free) on a 25 x 25 grid; `scaledGaussianCurvature` is reported.
 - Point ends of a loft add an apex row beyond the end section, every given section is kept (section deviation stays about 0).
 - Closed loft: the closing pair joins the seam twist and the check; the tangent jump across the periodic seam is reported (`closureJumpRad`, SWG_CHECK_LOFT_CLOSURE_G1). Surface orientation: `flip`, and a reversing sheet normal is SWG_FRAME_DEGENERATE. Networks need two curves per family and refuse a pair that crosses twice; `seams` must hold one fraction in [0, 1) per section.
+
+## 15. As built (DES-2c step 1: code export of sweeps and lofts, 2026-10-25)
+
+### 15.1 What was built
+
+`export_code` no longer writes sweeps and lofts as triangle meshes. Each sweep / loft becomes ONE traced helper call, `sweep_profile(build, exported, <params>)` / `loft_sections(build, exported, <params>)`, whose keywords are the step's own params (every number a Term, so `=expr` parameter bindings survive) and whose first argument says how the script builds the solid. Running the script records `sweep_profile` / `loft_sections` in `LLULL_TRACE`, so `import_code` rebuilds the editable step with its parameters (`apply_code_trace` accepts both commands). Code: `codegen/{skinLowering,paramTree,sweptCalls,pythonSwept}.ts`.
+
+| Build (first argument) | Used for | Construction in the generated code |
+| ---------------------- | -------- | ---------------------------------- |
+| `pipe` | a round or polygon section, no laws / frame mode / rails / stations / helix, open path (lines, arcs, cubics); a closed path with a round section and a tangent-continuous closing joint | `MakePipeShell` on the exact path wire, corrected Frenet frame (`isFrenet=False`); a bore is a second pipe cut out |
+| `pipe` with `mitre` | `corners: 'miter'`, constant section, straight legs | the same with the right-corner transition (the native kernel's first attempt) |
+| `helix` | a round section along an exact constant-pitch cylindrical `add_helix` | a 2D line on a `Geom_CylindricalSurface` with `BuildCurves3d` (the library's `makeHelix`), Frenet pipe; FreeCAD `Part.makeHelix` |
+| `loft` | a loft without faces: exact sections as B-spline wires, else the Catmull-Rom Bezier wires of its rings; `ruled` kept | `ThruSections(solid, ruled, 1e-6)`, `CheckCompatibility(False)` (the native `skinned_solid`) / `Part.makeLoft` |
+| `faces` (fallback) | laws, twist, scale / area, stretch, stations, frame modes, surface / guide orientation, rails, `pathIds` chains, closed paths with a non-round section or a kinked closing joint, non-round sections on non-planar paths, cone / spiral / pitch-law helices, screw sections, hollow tubes with laws; every loft with exact faces (end conditions, alignment, coupling, centreline, guides, closed, point ends) | the evaluator's fitted B-spline faces (`fitSweepFaces`, loft faces cut at their u knots) sewn at 1e-6 of the model size and closed by planar caps (no caps on a closed path / loft); a bore is a second face set cut out |
+
+The fitted faces are NOT inline in the MODEL lines: a `_SWG_FACES = {key: (faces, bore)}` DATA section, keyed by the variable (`var#n` when reused), sits between PARAMETERS and MODEL (the review asked for a trailing section, but a trailing one would be read after the model ran). `MAX_SKIN_POLES` (100 000 poles per solid, about 300 000 numbers) bounds that section: beyond it the solid stays a mesh with a named reason.
+
+A sweep or loft that references other entities (`pathId`, `pathIds`, `guideIds`, `sectionIds`, `centerlineId`, `surfaceId`, a face reference), one created by another command (`add_coil`, a recipe leaf of a kernel boolean), or edited after creation (a rotation: no `sweep_profile` param) uses the untraced `swept(build, ...)`: same construction, adopted like `custom(...)`, imported as a mesh. Reserved variable names: `sweep_profile`, `loft_sections`, `swept`.
+
+### 15.2 Support per target
+
+| Variant | CadQuery | build123d | FreeCAD macro | OpenSCAD |
+| ------- | -------- | --------- | ------------- | -------- |
+| plain round / polygon pipe, bent path, bore | pipe (library construction) | same | `makePipeShell` | exact result as a `polyhedron` |
+| mitre, round or polygon section, straight legs | pipe, right corner | same | `makePipeShell(..., transition 1)` | polyhedron |
+| constant-pitch cylindrical helix, round section / coil | exact helix + Frenet pipe | same | `Part.makeHelix` + pipe shell | polyhedron |
+| ruled / smooth loft of rings or exact sections | thru-sections | same | `Part.makeLoft` | polyhedron |
+| laws, rails, stations, frame modes, closed non-round or kinked paths, screws, cone helices, hollow tubes with laws, advanced lofts | fitted faces (data section) | same | same | polyhedron |
+| mitre with a law / frame mode / rails / stations / curved legs / bore / curved section edges; a fit refusal (`SWG_FIT_UNSUPPORTED`, `SWG_FIT_TOLERANCE`, frame / rail issue); a hollow tube with stations; a face that cannot be split; more than 100 000 poles; a closed loft without faces | mesh + `# SWG_CODEGEN_UNSUPPORTED: <subject> <reason>` | same | same | polyhedron |
+
+A refused solid keeps the exact result's triangle mesh and is named in the code and in the notes of `export_code`; it is never a different solid. OpenSCAD has no freeform surface: its sweeps and lofts are the exact result's world-space triangles, without a note (the same limit applies to every freeform feature there). A build the kernel cannot close or validate at run time raises `ValueError: SWG_CODEGEN_UNSUPPORTED: <subject>: <why>` (sewn shell count, free edges, `BRepCheck_Analyzer`, volume > 0, cap faces), naming the entity.
+
+### 15.3 Measured (generated code executed: CadQuery 2.8.0 and build123d 0.12.0 on OCCT 7.9, FreeCAD 1.1.4; `server/tests/sweepLoftCodeExecution.integration.test.ts`, 27 tests: 26 run, 1 skipped = the import round trip on FreeCAD)
+
+Relative volume error against the validation pack, all three libraries: VC-03 / 05 / 07 / 09 / 10 / 15 (laws, frames), VC-12 / 13 / 14 and `add_coil` (helices, the library helix for the round tube), VC-16 / 17 / 35 (rails), VC-19 / 21 / 22 (lofts) within 1e-6; VC-11 linear stations 1.2e-4 (gate 5e-4); the centreline elbow within 1e-4; mitre (VC-38) 15 707.96327; bored tube pi (25 - 9) 50; torus with a wobbling radius within 1e-5; a ruled frustum of two ring sections 1.1e-4 under pi h (R^2 + R r + r^2) / 3 (the 24-point Catmull-Rom rings are not circles, as on the native kernel). Placement: a rotated and moved sweep and a rotated and moved loft: centroid within 1e-6 and bounding box within 1e-3 of llull's display triangles (OCC boxes of B-spline faces are enlarged; FreeCAD `optimalBoundingBox`). Round trip (CadQuery, build123d): export, run, `LLULL_TRACE`, `apply_code_trace` gives the same `sweep_profile` / `loft_sections` steps with `radius: '=r'` and the same volumes (1e-9); editing `r = param("r", 4)` to 6 in the code rebuilds the solid in the script (pi 36 50 within 1e-6) and the imported step.
+
+### 15.4 Decisions and deviations
+
+- The helper's geometry is the resolved construction (path wire, section, faces from the evaluated entity); the keywords are the recorded params. Live in the script: only a pipe circle's `radius` and its bore's `innerRadius` (the helper overrides the exported numbers with the passed keywords, a literal or a parameter), and only when the spine does not depend on them: on a points path whose bends were resolved from the radius (no explicit `bendRadius`, arcs in the spine, no mitre) the `radius` is stale-checked like any other keyword. The rule is one: a key is live exactly when `exported` holds `None` for it, on both sides. A live value that `sweep_profile` would refuse (radius <= 0, `innerRadius` not below `radius`, `radius` at or above the bend radius of the spine or the mitre reach limit, both exported as the last element of the pipe build) raises `SWG_CODEGEN_UNSUPPORTED: <subject>: radius ... reaches ...` instead of building a self-intersecting solid. Helix builds are never traced (a helix path is another entity), so only the pipe has live keywords. Every other keyword (`path`, laws, `ruled`, sections ...) is only recorded: the `exported` dict (second argument: the flattened export-time values, `None` for a live keyword) lets the helper warn `SWG_CODEGEN_STALE: <subject>: <keyword> changed | was added | was removed; the solid here is the exported one - import_code to regenerate` for every keyword edited, added in the code (ignored by the script, applied by `import_code`) or removed (a removed live keyword leaves the exported number in the script, `import_code` uses the default); the warning is reported at the user's edited call line (checked in CadQuery and FreeCAD); it is a warning, not an error: `import_code` runs the script to read its trace). A comment above each call and a header sentence say which keywords are live. Making the path length or the helix pitch / height live was not done: the construction (spine wire, helix edge) is built from resolved numbers and re-deriving them from `path` / `pitch` would re-implement `sweep_profile` in Python.
+- Sweeps whose params name other entities are not replayable from the code: they use `swept(...)`. Exporting the curves they reference is out of scope.
+- An explicit `id` / `layerId` param travels with the recorded params (so ids survive the round trip); the colour and name are the helper's own arguments.
+- `apply_code_trace` in append mode drops an explicit `id` that the document already holds (only `sweep_profile` / `loft_sections` carry one) and lets the step mint a free one; the import summary lists the re-minted ids as `old → new` (the check uses the prototype-safe `idTaken`). A free id is kept; replace mode starts empty.
+- Failure isolation: a build the kernel refuses raises `SWG_CODEGEN_UNSUPPORTED` naming the entity; `export_step` (protocol `exportStepFile`) catches exactly that (the last non-empty line of the error is `ValueError: SWG_CODEGEN_UNSUPPORTED: ...`) and writes the STEP with the native kernel instead (`exportStepExact`), saying so in the summary and honouring `save` (the file is written and `savedTo` returned like the normal path); any other bridge failure still propagates.
+- `add_coil` has a `position` / `axis` of its own, so it is built by the helix pipe but traced as an imported mesh.
+- Polygon sections whose `curves` hold arcs / ellipses, and non-round sections on bent paths, use fitted faces.
+- `isWorldSpaceShape` (program.ts) is used by the OpenSCAD emitter only: a swept solid's placement must still be emitted for the Python targets (its poles are entity-local), so `solidFeature` keeps its own mesh test.
+- `fitSweepFaces` now also returns the faces as data (`surfaces`).
+- The `makeHelix` + sweep pipe is about 1e-6 exact on a helix (section 13.3); the pack gates still hold at 1e-6. A cone helix keeps fitted faces (a tapered `makeHelix` is a different parameterisation).
+- Source size: a sweep with fitted faces (screw section, pitch-law spring) is a few hundred kB of data section; the plain helical tube and every plain pipe are one short line.
+
+### 15.5 Not done (later DES-2c steps)
+
+`sheetSolid` recipe node, `volumeConsistencyRel`, hollow round sections with laws on the native kernel (the code export builds them as outer minus bore), exact-curve `inspect_sweep` curvature, closed-loft drift distribution, VC-SWG-32 as one table, frames overlay.
