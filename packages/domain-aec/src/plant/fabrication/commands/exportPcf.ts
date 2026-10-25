@@ -21,6 +21,9 @@ interface Entry {
   readonly key: string;
 }
 
+/** The file name stem of a line: characters outside letters, digits, `.`, `_`, `-` become `_`. */
+const fileStem = (key: string): string => key.replace(/[^A-Za-z0-9._-]/g, '_');
+
 const ALL = (unit: PcfUnit): PcfUnits => ({ bore: unit, coords: unit, boltDia: unit, boltLength: unit });
 
 /** The units a line is written in: the `units` param for every field, else the ones a stored line was read in, else mm. */
@@ -29,16 +32,23 @@ function effectiveUnits(source: Source, requested: 'mm' | 'inch' | undefined): P
   return source.network.source === 'pcf' ? source.data.units : GENERATED_UNITS;
 }
 
-/** A stored line with verbatim content (extra attributes, unknown records) cannot change a unit it declared. */
-function unitsConflict(data: PcfLineData, units: PcfUnits): boolean {
-  const verbatim = data.unknownRecords.length > 0 || data.components.some((component) => component.extra !== undefined);
+/** Unknown attributes known to carry no length: the valve spindle direction (a compass word) and bare flags. Every other one may hold a length (COMPONENT-ATTRIBUTEn, bolt sizes ...). */
+const NON_LENGTH_EXTRA = new Set(['SPINDLE-DIRECTION']);
+const carriesLength = (key: string, value: string): boolean => value !== '' && !NON_LENGTH_EXTRA.has(key);
+
+/** An imported line with verbatim content that may carry lengths (unknown records, length-bearing extra attributes) cannot change a unit it declared. */
+function unitsConflict(source: Source, units: PcfUnits): boolean {
+  const data = source.data;
+  const verbatim =
+    data.unknownRecords.length > 0 ||
+    data.components.some((component) => Object.entries(component.extra ?? {}).some(([key, value]) => carriesLength(key, value)));
   const declared = data.units;
   const changed =
     declared.bore !== units.bore ||
     declared.coords !== units.coords ||
     (declared.boltDia !== undefined && declared.boltDia !== units.boltDia) ||
     (declared.boltLength !== undefined && declared.boltLength !== units.boltLength);
-  return verbatim && changed;
+  return source.network.source === 'pcf' && verbatim && changed;
 }
 
 interface Source {
@@ -128,14 +138,14 @@ export const exportPcf = defineCommand({
         noRun,
         ['lineIds'],
       );
-    const clash = wanted.find((entry, index) => wanted.findIndex((other) => other.key === entry.key) !== index);
+    const clash = wanted.find((entry, index) => wanted.findIndex((other) => fileStem(other.key) === fileStem(entry.key)) !== index);
     if (clash !== undefined) {
-      const owners = wanted.filter((entry) => entry.key === clash.key);
+      const owners = wanted.filter((entry) => fileStem(entry.key) === fileStem(clash.key));
       return refuseIso(
         doc,
         'export_pcf',
         'ISO_LINE_DUPLICATE',
-        `PIPELINE-REFERENCE "${clash.key}" is used by ${owners.map((entry) => `${OWNER[entry.kind]} ${entry.id}`).join(' and ')}: one file per line would overwrite the other`,
+        `PIPELINE-REFERENCE "${clash.key}" (file ${fileStem(clash.key)}.pcf) is used by ${owners.map((entry) => `${OWNER[entry.kind]} ${entry.id}`).join(' and ')}: one file per line would overwrite the other`,
         owners.map((entry) => entry.id),
         ['lineIds'],
       );
@@ -181,7 +191,7 @@ export const exportPcf = defineCommand({
         errors.flatMap((error) => error.paths),
       );
     const effective = sources.map((source) => effectiveUnits(source, params.units));
-    const conflict = sources.find((source, index) => unitsConflict(source.data, effective[index] as PcfUnits));
+    const conflict = sources.find((source, index) => unitsConflict(source, effective[index] as PcfUnits));
     if (conflict !== undefined)
       return refuseIso(
         doc,

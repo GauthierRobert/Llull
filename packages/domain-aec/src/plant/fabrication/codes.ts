@@ -25,6 +25,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Set the isometric key of the spec item (01 PSC) or export without strictSkey (the component is then written without SKEY and listed).',
   ISO_LEGACY_FITTINGS_DERIVED: 'Re-route the line with a spec (convert_pipe_run) to place real fittings.',
   ISO_SEGMENT_TOO_SHORT: 'Lengthen the segment between the two bends, or use a bend of a smaller radius.',
+  ISO_LEVEL_MISSING: 'Recreate the level (add_level) or move the pipe onto an existing level: its z is relative to the level elevation.',
   ISO_OPEN_END: 'Add an end flange or cap, or set from / to on the pipe.',
   ISO_PARAM_INVALID: 'Fix the parameter named in paths.',
 };

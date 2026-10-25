@@ -153,7 +153,13 @@ export function legacyNetwork(doc: CadDocument, lineId: string): PipingNetwork |
   const building = getBuilding(doc);
   const mmPerUnit = MM_PER_UNIT[doc.units];
   const built: Built = { components: [], warnings: [] };
-  for (const pipe of pipes)
+  for (const pipe of pipes) {
+    if (building.levels[pipe.levelId] === undefined)
+      built.warnings.push(
+        isoIssue('ISO_LEVEL_MISSING', 'warning', `the level ${pipe.levelId} of ${pipe.id} no longer exists: its elevation is taken as 0`, [
+          pipe.id,
+        ]),
+      );
     buildElement(
       pipe,
       pipe.points.map(
@@ -166,6 +172,7 @@ export function legacyNetwork(doc: CadDocument, lineId: string): PipingNetwork |
       built,
       mmPerUnit,
     );
+  }
   const derived = built.components.filter((component) => component.derived === true).map((component) => component.id);
   const warnings: IsoIssue[] = [
     ...(derived.length === 0
