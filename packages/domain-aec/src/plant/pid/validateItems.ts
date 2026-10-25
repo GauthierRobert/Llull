@@ -123,7 +123,7 @@ function kindErrors(
       const ids = item['segmentIds'];
       if (!Array.isArray(ids)) return [`${path}.segmentIds must be an array`];
       return [
-        ...(members.get(String(item['id']))?.size === ids.length ? [] : [`${path}.segmentIds lists a segment twice`]),
+        ...(new Set(ids).size === ids.length ? [] : [`${path}.segmentIds lists a segment twice`]),
         ...optionalDn,
         ...optionalText(['lineNumber', 'pipingClass', 'fluidCode']),
         ...ids.flatMap((id, index) => {
