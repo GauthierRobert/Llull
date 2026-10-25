@@ -9,7 +9,7 @@ import { refuse } from '../model';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
 
 /** A port id `<tag>:<mark>` or a bare tag, with the equipment tag replaced; undefined when it does not name a renamed equipment. */
-function renamedReference(reference: string | undefined, renames: ReadonlyMap<string, string>): string | undefined {
+export function renamedReference(reference: string | undefined, renames: ReadonlyMap<string, string>): string | undefined {
   if (reference === undefined) return undefined;
   const colon = reference.indexOf(':');
   const base = colon < 0 ? reference : reference.slice(0, colon);

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { getPlantData } from '@aec/plant/data/model';
+import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { getProvider } from '@aec/plant/data/providers';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { routedPumpToVessel } from '../piping/rteFixtures';
@@ -174,6 +175,85 @@ describe('writing a tag renames through the owning commands', () => {
     expect(typeof written).not.toBe('string');
     const lines = (written as CadDocument).plant?.piping?.lines;
     expect([lines?.[base.line]?.lineNumber, lines?.[secondId]?.lineNumber]).toEqual([b, a]);
+  });
+});
+
+describe('round 2 review', () => {
+  it('a line object whose own from / to name the renamed equipment follows the rename and still resolves', () => {
+    const s = scene();
+    let doc = apply(s.doc, 'assign_plant_object', {
+      target: s.pipe,
+      className: 'ProcessLine',
+      hierarchy: 'U10',
+      tagFields: { fluidCode: 'P', seq: 7, spec: 'A1' },
+      properties: { from: 'V-101:N1', to: 'BL-1' },
+    });
+    doc = apply(doc, 'assign_plant_object', {
+      target: s.vessel,
+      className: 'PressureVessel',
+      hierarchy: 'U10',
+      tagFields: { seq: 2 },
+      properties: { DesignPressure: 10 },
+    });
+    const line = Object.values(getPlantData(doc).objects).find((object) => object.className === 'ProcessLine');
+    expect(line?.properties).toMatchObject({ from: 'V-102:N1', to: 'BL-1' });
+    expect(data<Check>(doc, 'check_plant_data', {}).findings.filter((finding) => finding.code === 'DAT_LINE_END_UNRESOLVED')).toEqual([]);
+  });
+
+  it('a tag renamed directly on classified equipment is a tag in use for the registry', () => {
+    const s = scene();
+    const tagged = apply(s.doc, 'assign_plant_object', {
+      target: s.vessel,
+      className: 'PressureVessel',
+      hierarchy: 'U10',
+      tagFields: { seq: 1 },
+      properties: { DesignPressure: 1 },
+    });
+    const renamed = apply(tagged, 'rename_equipment_tag', { renames: [{ equipment: 'V-101', tag: 'P-102' }] });
+    const clash = expectRefusal(
+      renamed,
+      'assign_plant_object',
+      { target: 'reserved', className: 'CentrifugalPump', hierarchy: 'U10', tagFields: { seq: 2 }, properties: { DesignPressure: 1 } },
+      'DAT_TAG_DUPLICATE',
+      'tag',
+    );
+    expect(clash.error?.ids).toEqual([s.vessel]);
+    expect(data<Check>(renamed, 'check_plant_data', {}).findings.map((finding) => finding.code)).toContain('DAT_TAG_MODEL_MISMATCH');
+  });
+
+  it('adjacent fields are refused only when both are free text', () => {
+    expect(parseTagFormat('{classCode}{seq}').ok).toBe(true);
+    expect(parseTagFormat('{area}{x}').ok).toBe(true);
+    expect(parseTagFormat('{hierarchy.unit.code}{x}').ok).toBe(true);
+    expect(parseTagFormat('{a}{seq:3}').ok).toBe(true);
+    expect(parseTagFormat('{a}{b}').ok).toBe(false);
+  });
+
+  it('set_pipe_line_number is pure', () => {
+    const s = scene();
+    const before = structuredClone(s.doc);
+    execute(s.doc, 'set_pipe_line_number', { pipes: [{ pipeId: s.pipe, line: 'L-9' }] });
+    expect(s.doc).toEqual(before);
+  });
+
+  it('the temporary number of a swap is never a number a line holds', () => {
+    const base = routedPumpToVessel();
+    const withA = apply(base.doc, 'create_pipeline', { service: 'P', sequence: '3003', spec: 'CS150', dn: 100 });
+    const a = withA.plant?.piping?.lineOrder.at(-1) as string;
+    const withB = apply(withA, 'create_pipeline', { service: 'P', sequence: '4004', spec: 'CS150', dn: 100, lineNumber: `DAT-TMP-${a}` });
+    const b = withB.plant?.piping?.lineOrder.at(-1) as string;
+    const numberOf = (document: CadDocument, id: string): string => document.plant?.piping?.lines[id]?.lineNumber as string;
+    const [na, nb] = [numberOf(withB, a), numberOf(withB, b)];
+    const written = getProvider('pipeLine')?.writeTags?.(
+      withB,
+      [
+        { id: a, tag: nb },
+        { id: b, tag: na },
+      ],
+      undefined,
+    );
+    expect(typeof written).not.toBe('string');
+    expect([numberOf(written as CadDocument, a), numberOf(written as CadDocument, b)]).toEqual([nb, na]);
   });
 });
 

@@ -11,7 +11,9 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import type { PipingModel } from '../types';
+import { renamedReference } from '../equipment/commands/renameEquipmentTag';
 import { getPiping } from '../piping/model';
+import { copyObject, getPlantData, withPlantData } from './model';
 import { registerPlantObjectProvider, type PlantObjectProvider, type ProviderElement } from './providers';
 import type { PlantValueInput } from './properties';
 
@@ -38,6 +40,26 @@ function describeElement(element: Extract<BuildingElement, { category: TaggedCat
 }
 
 /** Equipment tags go through rename_equipment_tag (tag grammar, uniqueness, pipe and line end references), legacy pipe line numbers through set_pipe_line_number. */
+/** The `from` / `to` properties of plant objects that name a renamed equipment (`<tag>` or `<tag>:<nozzle>`) follow the rename, in the same document. */
+function followRename(doc: CadDocument, renames: ReadonlyMap<string, string>): CadDocument {
+  if (renames.size === 0) return doc;
+  const data = getPlantData(doc);
+  let objects = data.objects;
+  for (const id of data.objectOrder) {
+    const object = data.objects[id];
+    if (object === undefined) continue;
+    const changes: Record<string, string> = {};
+    for (const end of ['from', 'to']) {
+      const value = object.properties[end];
+      const next = typeof value === 'string' ? renamedReference(value, renames) : undefined;
+      if (next !== undefined) changes[end] = next;
+    }
+    if (Object.keys(changes).length > 0)
+      objects = { ...objects, [id]: copyObject(object, { properties: { ...object.properties, ...changes } }) };
+  }
+  return objects === data.objects ? doc : withPlantData(doc, { ...data, objects });
+}
+
 function writeBuildingTags(
   doc: CadDocument,
   tags: readonly { readonly id: string; readonly tag: string }[],
@@ -52,7 +74,15 @@ function writeBuildingTags(
   if (renames.length > 0) {
     const result = execute(current, 'rename_equipment_tag', { renames }, ctx);
     if (result.rejected === true) return result.summary;
-    current = result.document;
+    current = followRename(
+      result.document,
+      new Map(
+        renames.flatMap((entry) => {
+          const old = (elements[entry.equipment] as { mark: string }).mark;
+          return old === entry.tag ? [] : [[old, entry.tag] as const];
+        }),
+      ),
+    );
   }
   if (pipes.length > 0) {
     const result = execute(current, 'set_pipe_line_number', { pipes }, ctx);
@@ -105,6 +135,13 @@ const buildingElementProvider: PlantObjectProvider = {
   },
   writeTags: (doc, tags, ctx) => writeBuildingTags(doc, tags, ctx),
 };
+
+/** A line number no line holds (`held`) and no other temporary number uses. */
+function temporaryNumber(held: ReadonlySet<string>, id: string): string {
+  let number = `DAT-TMP-${id}`;
+  while (held.has(number)) number += '_';
+  return number;
+}
 
 const lineElementsMemo = new WeakMap<PipingModel, readonly ProviderElement[]>();
 
@@ -160,7 +197,7 @@ const pipeLineProvider: PlantObjectProvider = {
     const current = getPiping(doc).lines;
     const held = new Set(Object.values(current).map((line) => line.lineNumber));
     const passes = tags.some((entry) => held.has(entry.tag) && current[entry.id]?.lineNumber !== entry.tag)
-      ? [tags.map((entry) => ({ id: entry.id, tag: `DAT-TMP-${entry.id}` })), tags]
+      ? [tags.map((entry) => ({ id: entry.id, tag: temporaryNumber(held, entry.id) })), tags]
       : [tags];
     let next = doc;
     for (const pass of passes)

@@ -78,6 +78,7 @@ export function objectRegistry(data: PlantDataModel): ObjectRegistry {
 /**
  * Moves the registry of `previous` on to `next` (= `previous` plus the appended `object`) in place, O(1): the registry is shared along the lineage and
  * stays valid for the newest record only (a record of another length rebuilds its own). A no-op when `previous` has no valid registry cached.
+ * @invariant `objectRegistry` returns a cached registry only when its `count` equals the record's object count, so the in-place growth can never be seen through an older record
  */
 export function extendRegistry(previous: PlantDataModel, next: PlantDataModel, object: PlantObject): void {
   const base = cache.get(previous);

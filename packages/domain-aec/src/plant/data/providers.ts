@@ -113,12 +113,16 @@ let foreignCache = new WeakMap<CadDocument, ReadonlyMap<string, readonly Foreign
 function foreignIndex(doc: CadDocument): ReadonlyMap<string, readonly ForeignHolder[]> {
   const cached = foreignCache.get(doc);
   if (cached !== undefined) return cached;
-  const claimed = objectRegistry(getPlantData(doc)).byTarget;
+  const data = getPlantData(doc);
+  const claimed = objectRegistry(data).byTarget;
   const index = new Map<string, ForeignHolder[]>();
   for (const provider of providers.values())
     for (const element of provider.elements(doc)) {
-      if (!element.tagUnique || element.tag === undefined || claimed.has(`${provider.id}:${element.id}`)) continue;
+      if (!element.tagUnique || element.tag === undefined) continue;
       const key = normaliseTag(element.tag);
+      const owner = claimed.get(`${provider.id}:${element.id}`);
+      // A claimed element is the plant object's own tag only while both agree; a mark changed behind the plant object's back is a tag in use.
+      if (owner !== undefined && normaliseTag(data.objects[owner]?.tag ?? '') === key) continue;
       index.set(key, [...(index.get(key) ?? []), { provider: provider.id, element }]);
     }
   foreignCache.set(doc, index);

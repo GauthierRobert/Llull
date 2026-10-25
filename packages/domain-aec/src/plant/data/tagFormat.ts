@@ -30,6 +30,10 @@ export function hierarchyField(name: string): { readonly kind: HierarchyKind; re
 
 const MAX_WIDTH = 12;
 
+/** A field matched as free text: not padded, and not one the class or the hierarchy fixes (classCode, area, hierarchy.*). */
+const isFreeField = (part: FieldPart): boolean =>
+  part.width === undefined && part.name !== 'classCode' && part.name !== 'area' && hierarchyField(part.name) === null;
+
 export function parseTagFormat(format: string): ParsedFormat {
   if (format.trim() === '') return { ok: false, problem: 'the format is empty' };
   if (format.length > 200) return { ok: false, problem: 'the format is longer than 200 characters' };
@@ -70,10 +74,10 @@ export function parseTagFormat(format: string): ParsedFormat {
   flush();
   for (const [index, part] of parts.entries()) {
     const following = parts[index + 1];
-    if (part.kind === 'field' && part.width === undefined && following?.kind === 'field' && following.width === undefined)
+    if (part.kind === 'field' && following?.kind === 'field' && isFreeField(part) && isFreeField(following))
       return {
         ok: false,
-        problem: `{${part.name}}{${following.name}} are adjacent: separate them with a literal, or pad one with {name:width}`,
+        problem: `{${part.name}}{${following.name}} are adjacent free-text fields: separate them with a literal, or pad one with {name:width} (classCode, area and hierarchy.* fields may touch another field)`,
       };
   }
   if (!parts.some((part) => part.kind === 'field')) return { ok: false, problem: 'the format has no {field}: every tag would be the same' };
