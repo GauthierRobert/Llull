@@ -21,14 +21,15 @@ export interface Finding {
 
 /** A measurement checked against one row: the finding of the breach, or null when the value complies. */
 export function breachFinding(rule: AccessRule, code: StaCode, id: string, value: number): Finding | null {
-  if (breach(rule, value) === null) return null;
+  const side = breach(rule, value);
+  if (side === null) return null;
   const unit = rule.unit ?? 'mm';
   return {
     code,
     ruleId: rule.id,
     ruleset: rule.ruleset,
     clause: rule.clause,
-    severity: severityOf(rule),
+    severity: severityOf(rule, side),
     grade: rule.grade,
     ids: [id],
     measured: { value, unit },

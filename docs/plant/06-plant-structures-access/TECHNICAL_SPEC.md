@@ -110,7 +110,7 @@ export interface GratingElement extends LevelElementBase {
   topOffset: number;                // document units
   gratingType: string;              // catalogue key, e.g. "19-W-4 1-1/4x3/16"
   bearingBarAngle: number;          // plan radians; bars span between supports in this direction
-  supportIds?: string[];            // members it bears on (resolved by add_grating)
+  supportIds: [string[], string[]]; // members it bears on, one list per side (end-to-end members share a side; resolved by add_grating)
   assemblyId?: string;
 }
 
@@ -192,10 +192,10 @@ leave the document unchanged.
 
 | Command | Kind | Params sketch | `@affects` / `@invariant` / `@failure` |
 | ------- | ---- | ------------- | -------------------------------------- |
-| `list_grating_types` | query | `{ standard?: 'naamm_mbg_531' \| 'metric', query? }` | data: rows with bar geometry, kg/m², `verified`, source |
-| `add_grating` | mutating | `{ boundary? \| bounds?, supportedBy: 'beams' \| memberIds[], gratingType, bearingBarDirection: [x,y], topOffset?, thickness?, levelId? }` | @affects 1 grating per support bay; @invariant top = level + topOffset, panels split at supports; @failure unknown type `STA_GRATING_TYPE_UNKNOWN`, no support under an edge `STA_NO_SUPPORT_FOUND`, polygon invalid `STA_INVALID_GEOMETRY` |
-| `check_grating` | query | `{ ids?, uniformLoadKPa, concentratedLoadKNPerM?, deflectionLimitMm \| deflectionRatio }` (no defaults: AF-31) | data.panels[]: spanMm, allowableUniformKPa, allowableConcentratedKNPerM, deflectionMm, utilisation, findings |
-| `add_railing` | mutating | `{ path? \| hostId + edges, height?, kneeRails?, toePlate?, postProfile?, railProfile?, postSpacingMax?, openings?, role?, rulesets? }` | @affects 1 railing + posts / rails / toe plate entities; @invariant posts at ends and corners, equal spacing ≤ max; @failure path < 2 points, opening outside the path |
+| `list_grating_types` | query | `{ standard?: 'naamm_mbg_531', query? }` (the metric catalogue is not in the MVP, Q3) | data: rows with bar geometry, kg/m², section values per metre, `verified`, mass source (built, M2) |
+| `add_grating` | mutating | `{ boundary? \| bounds?, supportedBy: 'beams' \| memberIds[], gratingType, bearingBarDirection: [x,y], topOffset?, thickness?, levelId? }` (built, M2; `thickness` must equal the bar depth) | @affects 1 grating per support bay; @invariant top = level + topOffset, panels split at supports; @failure unknown type `STA_GRATING_TYPE_UNKNOWN`, no support under an edge `STA_NO_SUPPORT_FOUND`, polygon invalid `STA_INVALID_GEOMETRY` |
+| `check_grating` | query | `{ ids?, uniformLoadKPa, concentratedLoadKNPerM?, deflectionLimitMm \| deflectionRatio, spanBasis? }` (no defaults: AF-31; built, M2) | data.panels[]: spanMm, allowableUniformKPa, allowableConcentratedKNPerM, deflectionMm, utilisation, findings |
+| `add_railing` | mutating | `{ path? \| hostId + edges (+ opening?), height?, kneeRails?, toePlate?, postProfile?, railProfile?, postSpacingMax?, openings?, role?, rulesets?, levelId? }` (built, M3) | @affects 1 railing + posts / rails / toe plate entities; @invariant posts at ends and corners, equal spacing ≤ max; @failure path < 2 points, opening outside the path |
 | `add_ladder` | mutating | `{ base, climbHeight? \| attachTo, facing, clearWidth?, rungPitch? \| rungPitchMax?, exit?, fallProtection?, installedOn?, rulesets? }` | @affects 1 ladder (+ gate in the host railing); @invariant uniform pitch; cage / landings placed per the active rulesets; @failure no arrival surface `STA_NO_ARRIVAL_SURFACE`, pitch infeasible for every ruleset `STA_LADDER_PITCH_INFEASIBLE` |
 | `add_steel_stair` | mutating | `{ start, angle, rise \| toSurfaceId, width?, riserMax, going, stringerProfile?, tread?, landingEvery? \| landings?, railings?: 'none' \| 'left' \| 'right' \| 'both', railingHeight?, rulesets? }` | @affects 1 steelStair + 2 stringer members + treads + railings; @invariant equal risers, n = ceil(rise / riserMax); @failure riserMax / going ≤ 0, rise > 30 m |
 | `add_platform` | mutating | `{ boundary, elevation, framing?: { profile, maxSpacing } \| 'existing', gratingType, bearingBarDirection, railing?: { edges: 'all' \| number[], height, … }, imposedLoadKPa? }` | @affects 1 assembly + beams + gratings + railings; @failure overlap with another platform at the same elevation `STA_PLATFORM_OVERLAP` |
@@ -210,11 +210,13 @@ leave the document unchanged.
 | `set_fireproofing` (V1) | mutating | `{ memberIds \| zone: { equipmentIds, radiusMm, heightMm, source }, type, method, thicknessMm, rating }` | @affects members' `fireproofing`; @failure zone without `source` refused `STA_FIREPROOF_ZONE_UNDEFINED` |
 | `fireproofing_takeoff` (V1) | query | `{ ids? }` | data: per member area m², volume m³, totals |
 
+`update_grating { ids, gratingType }` (M2) and `update_railing { id, … }` (M3) were added because the remediation of the findings names them. `update_platform` and the other `update_*` stay with their milestones.
+
 The existing commands are extended, not duplicated:
 
-- `quantity_takeoff`: lines `grating.<type>.m2/kg`, `railing.m`, `railing.post.ea`, `ladder.rung.ea`, `ladder.cage.m`,
+- `quantity_takeoff`: lines `grating.<type>.m2/kg/ea`, `railing.rail.m`, `railing.post.ea`, `railing.toe-plate.m`, `railing.gate.ea`, `railing.steel.kg` (keys are `<group>.<material>.<unit>`, so the spec's `railing.m` became `railing.rail.m`; built M2 / M3), `ladder.rung.ea`, `ladder.cage.m`,
   `fireproofing.m2/m3`.
-- `building_schedule`: kinds `grating`, `railing`, `ladder`, `stair_steel`, `platform`.
+- `building_schedule`: kinds `grating`, `railing` (built), `ladder`, `stair_steel`, `platform`.
 - `check_steel_members`: gratings contribute `floorDeadLoad` from the type's kg/m², and `platform.imposedLoadKPa`
   replaces the slab-only floor load.
 - `check_clashes`: adds the new categories.
@@ -274,14 +276,14 @@ export const addLadder = defineCommand({
 - The path is split into straight segments; corners always get a post. For a segment of length L, posts =
   `ceil(L / sMax) + 1`, at equal spacing. Shared corner posts are counted once.
 - Openings remove the rails between two end posts. `gate: true` adds a self-closing gate entity (the ladder exit).
-- Knee rails are equally spaced: clear gap = `(height − toePlate − k · railDepth) / (k + 1)`, compared with
-  ISO-GRD-GAP. The OSHA midrail is checked at mid-height.
+- Knee rails are equally spaced: clear gap = `(height − toePlate − (k + 1) · railDepth) / (k + 1)` (the top rail counts: §13.5), compared with
+  ISO-GRD-GAP. OSHA-GRD-MID is checked as the 19 in opening only: the "midway" position has no numeric tolerance in the rows and equal spacing places the midrail within (toe plate − rail depth) / 2 of mid-height (§13.5).
 - Comparison: Bonsai centres the remainder (`floor(L / s) + 1`) [S24]. llull keeps end posts, which fabrication needs.
 
 ### 5.4 Grating span (VC-STA-06)
 
 - Supports are members whose top flange lies within 10 mm below the grating underside and whose axis is
-  perpendicular (± 5°) to the bearing bars. The span is the distance between consecutive support axes along the
+  perpendicular (± 5°) to the bearing bars. Members on one support line (axes within 5 mm along the bars) carry the edge together; their extents across the bars must cover the panel width within 10 mm, else the panel is refused. The span is the distance between consecutive support axes along the
   bearing-bar direction (clear span option: minus the flange width).
 - Per 1 m (or 1 ft) width: `n = width / pitch`, `S = n t d² / 6`, `I = n t d³ / 12`.
   - Uniform: `U = 8 F S / L²` (per width).
@@ -417,6 +419,9 @@ a tolerance of 1e-6 mm.
 | `STA_OPERATING_HEIGHT`, `STA_REACH`, `STA_ACCESS_NO_EGRESS` | finding | reachability failures | add a platform / ladder / stair or move the target |
 | `STA_RULE_UNVERIFIED` | finding (warn) | a grade-B rule was used | reviewer confirms against the standard |
 | `STA_RULESET_UNKNOWN` | refusal | ruleset name not loaded | `list_access_rules` |
+| `STA_UNKNOWN_ELEMENT` | refusal | an id is not a building element of the right kind (added in M1) | pass ids of the kinds the command takes |
+| `STA_RAIL_OPENING` | refusal | a railing gap is outside the path, out of order, overlapping, or removes the whole railing (added in M3) | give `{ from, to, gate }` ascending inside 0..path length |
+| `STA_GRATING_TYPE_UNVERIFIED` | finding (warn) | a grating type whose mass is not checked against a manufacturer table (added in M2) | a reviewer confirms mass and load tables with the manufacturer |
 
 ## 8. Performance and robustness budgets
 
@@ -455,8 +460,8 @@ Coverage gate 90 / 85 / 90 / 90 applies (`packages/domain-aec/src/**`).
 | Milestone | Content | Depends on | Effort (engineer-weeks) |
 | --------- | ------- | ---------- | ----------------------- |
 | M1 | Plugin skeleton, codes, rule tables from `access_rules.json`, `list_access_rules`, `check_access` on the existing `stair` (concrete) and slabs (edges) | — | 1.0 |
-| M2 | Catalogue families FL / RD, grating types, `add_grating`, `check_grating`, takeoff lines | M1 | 1.5 |
-| M3 | `add_railing` (paths, host edges, openings, gates), evaluation, IFC railing | M1 | 1.5 |
+| M2 | Catalogue families FL / RD, grating types, `add_grating`, `check_grating`, takeoff lines. **Built 2026-10-25** (§13.4) | M1 | 1.5 |
+| M3 | `add_railing` (paths, host edges, openings, gates), evaluation, IFC railing, edge coverage in `check_access`. **Built 2026-10-25** (§13.5) | M1 | 1.5 |
 | M4 | `add_ladder` (cage, LSS, landings, exits, back clearance), IFC ladder | M3 | 1.5 |
 | M5 | `add_steel_stair` (stringers, treads, landings, railings) | M2, M3 | 1.5 |
 | M6 | `add_platform`, `add_circular_platform`, assemblies + derivation guard, `update_platform`, `platform_takeoff` | M2, M3 | 2.0 |
@@ -482,7 +487,7 @@ Dependencies on sibling gaps:
 2. OSHA 2036 retrofit date: the 2026 proposed repeal may become final. The rule-table version must change when it
    does, and the owner must decide who maintains the table.
 3. Grating: is a metric grating catalogue (RAL-GZ 638 / EN-based manufacturers) needed in the MVP for EU projects?
-   It needs two manufacturer tables to cross-check.
+   It needs two manufacturer tables to cross-check. **Decided 2026-10-25 (owner delegated, M2): not in the MVP.** A catalogue row without a cross-checked table would be a guess, and the NAAMM rows already serve the pack's validation; `list_grating_types.standard` keeps one value (`naamm_mbg_531`) and widens when two metric manufacturer tables are in `validation/sources.md`.
 4. Should the steel stair reuse `StairElement` (one stair category, a `construction` discriminant) or stay a separate
    `steelStair` category? This spec proposes separate, because plant stairs connect arbitrary elevations and the
    concrete stair is level-bound.
@@ -512,10 +517,10 @@ Full list with grades in [validation/sources.md](validation/sources.md). All acc
 - [R13] AISC Engineering Journal, pipe-rack design article — https://ej.aisc.org/index.php/engj/article/download/991/990
 - [R14] Roark's Formulas for Stress and Strain (simply supported beam cases) — closed forms used in §5.4
 
-## 13. As built (M1, 2026-10-23)
+## 13. As built (M1 2026-10-23, M2 and M3 2026-10-25)
 
-Built: M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges). Not built:
-every other command of §4 (`add_grating` … `check_reachability`, fireproofing) and the IFC export. M2..M8 stay open.
+Built: M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges), M2 (§13.4: FL / RD bars, grating catalogue, `add_grating`, `update_grating`, `check_grating`, takeoff) and M3 (§13.5: `add_railing`, `update_railing`, evaluation, IFC for railings and gratings, railing rules and edge coverage in `check_access`). Not built:
+ladder, steel stair, platforms, pipe rack, reachability, fireproofing, plan symbols; M4..M8 stay open.
 
 ### 13.1 What exists
 
@@ -539,6 +544,54 @@ every other command of §4 (`add_grating` … `check_reachability`, fireproofing
 | VC | State |
 | -- | ----- |
 | VC-STA-04 rule part (3 stair cases) | passing, `tests/unit/plant/structures/checkAccess.test.ts` |
-| VC-STA-13 (fields, B warn + unverified, `reviewRequired`, invalid ruleset) | passing for stairs and edges; ladder and railing codes follow M3 / M4 |
-| VC-STA-02, 03, 05 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks need M3 / M4 |
-| VC-STA-01, 06..12, 14 | not started |
+| VC-STA-13 (fields, B warn + unverified, `reviewRequired`, invalid ruleset) | passing for stairs, edges, railings and gratings; ladder codes follow M4 |
+| VC-STA-02, 03 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks need M4 |
+| VC-STA-05 | passing (M3): post counts 4 / 5 for 4000 / 6000 mm, the five height / knee-rail / toe-plate rows under both rulesets, `railing.test.ts`, `scenarioPlans.test.ts` (SC-STA-05 railing and edge rows) |
+| VC-STA-06 | passing (M2): closed form against the published 19-W-4 table at every span of the pack, pedestrian span, 0.5176 mm; SC-STA-06 meets all five rows, `grating.test.ts`, `scenarioPlans.test.ts` |
+| VC-STA-12 | railing, grating and the FL / RD profile definitions passing (`ifcAccess.test.ts`, every enum string read from `data/ifc4x3_enums`); ladder, stair, landing and rack strut follow M4..M7 |
+| VC-STA-01, 07..11, 14 | not started |
+
+### 13.4 M2 as built (2026-10-25): catalogue families FL / RD, gratings, takeoff
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| Steel families `FL` (flat bar `FL<width>x<thickness>`, 12 rows 30x5 .. 150x10) and `RD` (solid round bar `RD<diameter>`, 7 rows 10 .. 40) | `steel/profiles.ts` (`ProfileShape` gains `FL`, `RD`; outline = full rectangle / 20-gon disc), `steelProfileList.ts`, `exchange/ifcIndustrialExport.ts` (IfcRectangleProfileDef / IfcCircleProfileDef), `industrial/fabrication/ncMemberPieces.ts` (DSTV codes `B`, `RU`) | Same catalogue, no parallel path: both are ordinary `add_steel_member` profiles, so steel takeoff, schedules, NC1 and IFC treat them like any section. |
+| Grating catalogue | `grating/gratingTypes.ts`, `imperial.ts` | 7 NAAMM-basis rows: 19-W-4 at 1, 1-1/4, 1-1/2, 1-3/4, 2 in deep and 15-W-4 at 1-1/4, 1-1/2 in, all 3/16 in plain bars, 4 in cross bars. F = 18 000 psi and E = 29 000 ksi converted exactly (0.006894757293168 MPa/psi). Only `19-W-4 1-1/4x3/16` is `verified` (8.9 psf = 43.4536 kg/m², two manufacturers, S20 + S21); the other rows have a computed mass (bars + cross-bar share calibrated on the verified row, x1.1042) and say so in `massSource`. |
+| Closed forms | `grating/gratingSpan.ts` | U = 8FS/L², C = 4FS/L, 5wL⁴/384EI, CL³/48EI per metre of width (§5.4), checked against `data/grating_19w4_load_table.json` at every span of the pack. |
+| Element | `building/types.ts` `GratingElement` (category `grating`, mark `GR<n>`, layer `S-GRAT`), `evaluate/evaluateGrating.ts`, `validateAccess.ts` | One element per support bay (a prism of the convex panel polygon, bar depth deep, top at level + `topOffset`). Persisted as plain JSON, entities re-derived on load. |
+| `list_grating_types`, `add_grating`, `update_grating`, `check_grating` | `grating/*.ts`, registered in `catalog.ts` | See below. |
+| Takeoff / schedule | `quantities/accessTakeoff.ts`, hooked in `takeoffCompute.ts`, `scheduleBuild.ts` | `quantity_takeoff` lines `grating.<type>.m2`, `.kg`, `.ea`; `building_schedule` kind `grating`. |
+
+Decisions (owner delegated, 2026-10-25):
+
+- **Supports (§5.4)**: a support is a horizontal steel member (axis within 1° of horizontal) whose axis is perpendicular to the bars within 5°, whose top of steel is 0..10 mm below the grating underside (1 mm above is tolerated as model rounding; deeper bars that bury the beam top are a finding, not a silent pass), and whose axis overlaps the region across the bars. Members whose axes are within 5 mm along the bars are one support line and carry the edge together: their extents across the bars must cover the width of every panel they bound (10 mm), otherwise the command is refused with `STA_NO_SUPPORT_FOUND` naming the unsupported stretch (a beam covering a third of the width does not support the panel). The element stores every member of each side (`supportIds: [string[], string[]]`), and `check_grating` re-checks all of them: a deleted, turned or shortened member is a finding. The first and last support line must lie under the end edges (10 mm). `supportedBy: "beams"` means the members of role `beam`; named ids must all qualify or the command is refused (`STA_NO_SUPPORT_FOUND` lists them).
+- **Regions are convex** (all turns the same way and the turning angles add up to one revolution, so a pentagram is refused too). A concave region is refused (`STA_INVALID_GEOMETRY`: split it into rectangles). Half-plane clipping of a convex polygon at the support lines is exact; a concave one can split into disconnected pieces. Openings in a grating (equipment cut-outs) wait for M6 with `add_equipment_openings`; the element has no `openings` field until then.
+- **`thickness` is not a free input.** The catalogue decides the depth; a given value must equal the bar depth or the command is refused.
+- **`check_grating` demand includes the self weight, reported apart.** `deflectionMm` is the deflection under the applied load alone (the VC-STA-06 row: 0.5176 mm at 914.4 mm and 4.788 kPa); `totalDeflectionMm`, `stressUtilisation`, `deflectionUtilisation` and the findings use applied + self weight. This refines §5.4's "adds it to the demand" so the reference row stays comparable. The concentrated case is checked alone with the self weight through M/Mcap = P/C + w/U (exact for simply supported spans). The span is re-measured from the members now in the model (centre to centre; `spanBasis: "clear"` subtracts the half top-flange widths), so an edit of a beam shows up as `STA_NO_SUPPORT_FOUND` or `STA_GRATING_SPAN_DIRECTION` findings. A clear span of zero or less (flanges wider than the gap) is a `STA_INVALID_GEOMETRY` finding, not a set of allowables. No default load or limit (AF-31): exactly one of `deflectionLimitMm` / `deflectionRatio`, else a no-op.
+- **Findings** reuse the `check_access` finding shape. Strength and bearing findings are grade A (`naamm_mbg_531`), the deflection limit is the caller's (`ruleset: project`), `STA_GRATING_TYPE_UNVERIFIED` is a grade B warn. `reviewRequired` is always true.
+- **Not extended in M2** (no consumer yet): `check_clashes` (a grating on its beams clashes with nothing and the new categories have no clash box; M6 / M8), `check_steel_members` floor load from grating kg/m² (V1), plan symbols and DXF hatch (M8), `add_equipment_openings` cutting gratings (M6). Serrated bars are not in the catalogue.
+
+### 13.5 M3 as built (2026-10-25): railings
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| Element | `building/types.ts` `RailingElement` (category `railing`, mark `RL<n>`, layer `S-RAIL`), `railing/railingLayout.ts`, `evaluate/evaluateRailing.ts` | Posts, top rail, each knee-rail level, toe plate and gates are merged meshes (one entity per part: `<id>:posts`, `:top-rail`, `:knee-rail-<n>`, `:toe-plate`, `:gates`), so a 100 m railing is 5 entities, not 300. |
+| `add_railing`, `update_railing` | `railing/addRailing.ts`, `updateRailing.ts`, `railingValidate.ts`, `railingPath.ts`, `railingDefaults.ts`, `railingMeasure.ts` | Path or host (`hostId` of a slab or grating, `edges` "all" or indices, `opening` = slab opening index); gaps with optional gates. |
+| Rules | `access/railingChecks.ts`, `edgeChecks.ts` | Guard-rail height (ISO-GRD-TOP, OSHA-GRD-TOP), clear space (ISO-GRD-GAP, OSHA-GRD-MID), toe plate (ISO-TOE-HEIGHT, OSHA-TOE-HEIGHT). |
+| IFC | `exchange/ifcAccessExport.ts`, dispatched from `ifcBuild.ts` | `IfcRailing` `.GUARDRAIL.` / `.HANDRAIL.` carrying the rails, toe plate and gate leaves, aggregating one `IfcMember` `.POST.` per post; gratings as `IfcPlate` `.USERDEFINED.` with ObjectType `GRATING` and `Pset_llullGrating`. |
+| Takeoff / schedule | `quantities/accessTakeoff.ts` | `railing.rail.m`, `railing.post.ea`, `railing.toe-plate.m`, `railing.gate.ea`, `railing.steel.kg`; `building_schedule` kind `railing`. |
+
+Decisions (owner delegated, 2026-10-25):
+
+- **Defaults come from the rule rows, never from literals, and are named in `data.defaults`.** With both rulesets (the default): height = the highest nominal-or-minimum top-rail row (ISO 1100 mm; OSHA nominal 1066.8), toe plate = the highest minimum (100 mm), knee rails = the fewest that keep the clear space within the smallest limit (ISO-GRD-GAP 500, OSHA-GRD-MID 482.6): one, giving 451.7 mm. `postSpacingMax` defaults to 1500 mm and says that ISO-GRD-POST-SPACING is grade C (a default, not a gate). Posts and rails default to `CHS48.3x3.2`. A `handrail` has no rule rows: its height is required, it gets no knee rails or toe plate unless asked, and `check_access` lists it under `notEvaluated`.
+- **Clear space counts the top rail** (deviation from §5.3): gap = (height − toe − (k+1)·d) / (k+1) with d the rail depth, which is the space a person or object actually sees between two rails; §5.3 subtracted only k rails and was 24 mm optimistic. `check_access` compares it with both ISO-GRD-GAP (A) and OSHA-GRD-MID (B, so a warn plus `STA_RULE_UNVERIFIED`). Example: 1200 mm with one knee rail and a 100 mm toe plate is 501.7 mm and fails ISO; VC-STA-05's 1200 mm row needs two knee rails.
+- **Severity of OSHA-GRD-TOP is per side.** `maxSeverity: warn` caps only the over-limit side (above 1143 mm, `STA_RAIL_HEIGHT_HIGH` warn); below 990.6 mm is `STA_RAIL_HEIGHT_LOW` fail. `severityOf(rule, side)` takes the breached side; without it the cap applies, as before.
+- **Posts** at both ends, every path vertex and both ends of every gap, equal spacing ≤ `postSpacingMax` inside each interval (VC-STA-05: 4000 mm at 1500 → 4 posts at 1333.33; 6000 → 5). A closed path (all edges of a host) has no double post at the start. Path length is the 3D length, so a sloped path spaces its posts along the slope.
+- **Hosted railings** store the generated path (a snapshot) and `host { hostId, ring, edges }`. They move with the host (`move_building_element` carries them; moving one alone is refused), are deleted with it, and keep their path when the host is edited: re-deriving from the host is FR-STA-14 (SHOULD), planned with the assemblies of M6. `edges` selects ring edges (edge i = point i → i + 1); one railing per run of consecutive edges (cyclic), one closed railing for "all".
+- **Edge coverage (§5.8, completes the M1 note).** A railing protects a slab or grating edge when its role is `guardrail`, its top reaches the strictest top-rail minimum of the requested rulesets (1100 mm for `iso_14122`, 990.6 mm for `osha_1910`), its path stands within 50 mm of the surface top and within 150 mm of the edge line, over the guarded part of the path: gaps without a gate do not count, gates do (self-closing). Coverage still needs 99 % of the edge, summed with walls. The wall rule now uses the same height (it was always the ISO row; for an OSHA-only run a 990.6 mm wall now counts). A railing below the minimum does not protect: the edge is reported together with `STA_RAIL_HEIGHT_LOW`, and the remediation of both names `update_railing { height }`.
+- **Gratings are walking surfaces for the edge check** (and lower surfaces for the drop), so a platform of panels is checked like a slab; edges shared by two panels are continuations. `EdgeReport.slabId` became `surfaceId`; `data.checked` gained `gratings` and `railings`; `include` gained `"railings"`.
+- **Out of M3**: `role: handrail` is only a stored role until M5 (stair railings), railing posts as instanced geometry (09 VIS), `assemblyId` (M6), `check_clashes` for railings.
+- **Outside the lane, one compile fix**: adding categories to `BimCategory` broke the exhaustive label table of the element list (`src/ui/panels/building/describeElement.ts`, 6 lines: `Grating`, `Railing` and their one-line descriptors). No UI behaviour was added; the viewport renders the evaluated mesh entities like any element.
+
+Tests: 71 new (`tests/unit/plant/structures/{grating,railing,ifcAccess,scenarioPlans}.test.ts`, `tests/unit/building/barProfiles.test.ts`) plus the `check_access` expectations of M1 updated for `surfaceId` and the new `checked` fields.
+- **Review fixes (M2 / M3)**: load validation of a railing runs the unit-free part of the add_railing validation (path points, integer 0..10 knee rails, non-negative toe plate, ascending gaps inside the path, known profiles); the fit of the rails needs the document unit and stays a command-time check. A guard-rail whose profile left the catalogue is a `STA_INVALID_GEOMETRY` fail finding in `check_access`. OSHA-GRD-MID is evaluated as the 19 in opening only and listed under `notEvaluated` for its position. The IFC grating property `BearingBarAngle` is in radians (the project plane-angle unit); a grating whose type left the catalogue is not exported. The refusal to move a hosted railing names its slab or grating host.

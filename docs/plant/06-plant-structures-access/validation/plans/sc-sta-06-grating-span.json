@@ -1,6 +1,6 @@
 {
   "id": "SC-STA-06",
-  "status": "PROPOSED — list_grating_types, add_grating, check_grating are not built; add_grid_system, add_grid_columns, add_grid_beams exist today",
+  "status": "BUILT (M2) — list_grating_types, add_grating, check_grating run in tests/unit/plant/structures/scenarioPlans.test.ts",
   "validates": [
     "VC-STA-06"
   ],
@@ -78,9 +78,6 @@
     {
       "command": "check_grating",
       "params": {
-        "ids": [
-          "$gr"
-        ],
         "uniformLoadKPa": 4.788,
         "deflectionLimitMm": 6.35
       }

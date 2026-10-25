@@ -146,6 +146,10 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, points: element.points.map(shift3) };
     case 'pipeSupport':
       return { ...element, position: shift3(element.position) };
+    case 'grating':
+      return { ...element, boundary: element.boundary.map(shift) };
+    case 'railing':
+      return { ...element, path: element.path.map(shift3) };
     case 'door':
     case 'window':
     case 'plate':
@@ -160,7 +164,14 @@ function strayMessage(doc: CadDocument, building: BuildingModel, ids: ReadonlyAr
     const element = building.elements[id];
     return element?.category === 'pipeSupport' ? [element] : [];
   });
-  const others = ids.filter((id) => building.elements[id]?.category !== 'pipeSupport');
+  const railings = ids.filter((id) => building.elements[id]?.category === 'railing');
+  const others = ids.filter((id) => building.elements[id]?.category !== 'pipeSupport' && building.elements[id]?.category !== 'railing');
+  const railingHint = railings
+    .map((id) => {
+      const element = building.elements[id];
+      return `${id} follows its host ${element?.category === 'railing' ? (element.host?.hostId ?? 'slab or grating') : 'slab or grating'} (a slab or grating: move the host and the railing goes along)`;
+    })
+    .join('; ');
   const orphans = new Set(orphanSupports(doc, building).map((support) => support.id));
   const supportHint = supports
     .map((support) =>
@@ -171,9 +182,10 @@ function strayMessage(doc: CadDocument, building: BuildingModel, ids: ReadonlyAr
           : `${support.id} rests on pipe ${support.pipeId} (move the pipe: its supports go along)`,
     )
     .join('; ');
+  if (supports.length === 0 && others.length === 0) return `${railingHint}.`;
   if (supports.length === 0)
-    return `${others.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`;
-  return `${ids.join(', ')} follow their host: ${supportHint}${others.length === 0 ? '.' : `; ${others.join(', ')}: a wall, a steel column or a rafter is the host (slide openings with update_opening, or move the host).`}`;
+    return `${railings.length > 0 ? `${railingHint}; ` : ''}${others.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`;
+  return `${ids.join(', ')} follow their host: ${supportHint}${railings.length > 0 ? `; ${railingHint}` : ''}${others.length === 0 ? '.' : `; ${others.join(', ')}: a wall, a steel column or a rafter is the host (slide openings with update_opening, or move the host).`}`;
 }
 
 /**
@@ -214,7 +226,10 @@ export const moveBuildingElement = defineCommand({
     const travelling = [
       ...known,
       ...Object.values(building.elements).flatMap((element) =>
-        element.category === 'pipeSupport' && known.includes(element.pipeId) && !known.includes(element.id) ? [element.id] : [],
+        (element.category === 'pipeSupport' && known.includes(element.pipeId) && !known.includes(element.id)) ||
+        (element.category === 'railing' && element.host !== undefined && known.includes(element.host.hostId) && !known.includes(element.id))
+          ? [element.id]
+          : [],
       ),
     ];
     for (const id of travelling) {

@@ -1,4 +1,7 @@
-/** Open slab edges (06 STA §5.8, M1): the drop to the next surface below against a threshold the caller supplies. */
+/**
+ * Open edges of slabs and grating panels (06 STA §5.8): the drop to the next surface below against a threshold the caller supplies; an edge is
+ * protected by guard walls and by railings (M3) that cover it.
+ */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { toMm } from '@core/model/units';
@@ -6,7 +9,8 @@ import { pointInPolygon } from '@lib/polygon';
 import type { BuildingModel } from '@aec/building/types';
 import { elementsOf } from '@aec/building/model';
 import { remediationOf } from '../codes';
-import { ruleById } from '../rules/ruleTable';
+import { ruleById, type RulesetName } from '../rules/ruleTable';
+import { guardedSegments } from '../railing/railingLayout';
 import type { Finding } from './finding';
 
 /** Sample offset outward from the edge, mm (§5.8). */
@@ -16,8 +20,17 @@ const SAME_SURFACE_MM = 1;
 /** Share of the edge length a wall must cover to protect it. */
 const COVERAGE = 0.99;
 
-/** A wall protects an edge when its top is this far above the slab top: the ISO guard-rail minimum (grade A row ISO-GRD-TOP), mm. */
-const guardHeightMm = (): number => ruleById('ISO-GRD-TOP').min ?? 0;
+/** A railing stands on the surface when its path is this close to the surface top, mm. */
+const RAILING_Z_MM = 50;
+/** A railing covers an edge when its path runs within this distance of the edge line, mm. */
+const RAILING_OFFSET_MM = 150;
+
+/**
+ * Height a wall top or a railing must reach above the surface to guard an edge: the strictest top-rail minimum of the requested rulesets
+ * (grade A rows ISO-GRD-TOP 1100 mm, OSHA-GRD-TOP 990.6 mm), mm.
+ */
+const guardHeightMm = (rulesets: readonly RulesetName[]): number =>
+  Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));
 
 type Ring = readonly Vec2[];
 
@@ -36,14 +49,24 @@ interface GuardWall {
   readonly topMm: number;
 }
 
+/** A guarded stretch of a railing: plan end points and absolute height of the walking surface it stands on, mm. */
+interface GuardRun {
+  readonly a: Vec2;
+  readonly b: Vec2;
+  readonly zMm: number;
+  readonly heightMm: number;
+}
+
 interface Scene {
   readonly surfaces: ReadonlyMap<string, Surface>;
   readonly groundMm: number;
   readonly walls: readonly GuardWall[];
+  readonly railings: readonly GuardRun[];
+  readonly guardMm: number;
 }
 
 export interface EdgeReport {
-  readonly slabId: string;
+  readonly surfaceId: string;
   readonly location: string;
   readonly lengthMm: number;
   readonly dropMm: number;
@@ -60,7 +83,7 @@ export interface EdgeThreshold {
   readonly source: string | undefined;
 }
 
-function buildScene(doc: CadDocument, building: BuildingModel): Scene {
+function buildScene(doc: CadDocument, building: BuildingModel, rulesets: readonly RulesetName[]): Scene {
   const mm = (ring: Ring): Ring => ring.map(([x, y]): Vec2 => [toMm(doc, x), toMm(doc, y)]);
   const surfaces = new Map<string, Surface>();
   for (const slab of elementsOf(building, 'slab')) {
@@ -69,6 +92,26 @@ function buildScene(doc: CadDocument, building: BuildingModel): Scene {
     const holes = (slab.openings ?? []).map(mm);
     surfaces.set(slab.id, { levelId: slab.levelId, ring: mm(slab.boundary), holes, topMm: toMm(doc, level.elevation + slab.offset) });
   }
+  for (const grating of elementsOf(building, 'grating')) {
+    const level = building.levels[grating.levelId];
+    if (level === undefined) continue;
+    surfaces.set(grating.id, {
+      levelId: grating.levelId,
+      ring: mm(grating.boundary),
+      holes: [],
+      topMm: toMm(doc, level.elevation + grating.topOffset),
+    });
+  }
+  const railings = elementsOf(building, 'railing').flatMap((railing): GuardRun[] => {
+    const level = building.levels[railing.levelId];
+    if (level === undefined || railing.role !== 'guardrail') return [];
+    return guardedSegments(railing.path, railing.openings).map(([p, q]) => ({
+      a: [toMm(doc, p[0]), toMm(doc, p[1])],
+      b: [toMm(doc, q[0]), toMm(doc, q[1])],
+      zMm: toMm(doc, level.elevation + (p[2] + q[2]) / 2),
+      heightMm: toMm(doc, railing.height),
+    }));
+  });
   const walls = elementsOf(building, 'wall').flatMap((wall): GuardWall[] => {
     const level = building.levels[wall.levelId];
     if (level === undefined) return [];
@@ -84,7 +127,7 @@ function buildScene(doc: CadDocument, building: BuildingModel): Scene {
     ];
   });
   const elevations = Object.values(building.levels).map((level) => toMm(doc, level.elevation));
-  return { surfaces, groundMm: elevations.length === 0 ? 0 : Math.min(...elevations), walls };
+  return { surfaces, groundMm: elevations.length === 0 ? 0 : Math.min(...elevations), walls, railings, guardMm: guardHeightMm(rulesets) };
 }
 
 const onSurface = (surface: Surface, point: Vec2): boolean =>
@@ -100,21 +143,26 @@ function dropAt(scene: Scene, self: string, topMm: number, point: Vec2): number 
   return Math.max(0, topMm - below);
 }
 
-/** Share of the edge `a`-`b` covered by guard walls of the slab's level. */
-function wallCoverage(scene: Scene, surface: Surface, a: Vec2, b: Vec2): number {
+/** Share of the edge `a`-`b` covered by guard walls of the surface's level and by guard-rail runs standing on it. */
+function guardCoverage(scene: Scene, surface: Surface, a: Vec2, b: Vec2): number {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const ux = (b[0] - a[0]) / length;
   const uy = (b[1] - a[1]) / length;
   const across = (p: Vec2): number => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux);
   const along = (p: Vec2): number => (p[0] - a[0]) * ux + (p[1] - a[1]) * uy;
-  const spans = scene.walls
-    .filter((wall) => wall.levelId === surface.levelId && wall.topMm - surface.topMm >= guardHeightMm())
+  const clipped = (p: Vec2, q: Vec2): [number, number] => [
+    Math.max(0, Math.min(along(p), along(q))),
+    Math.min(length, Math.max(along(p), along(q))),
+  ];
+  const wallSpans = scene.walls
+    .filter((wall) => wall.levelId === surface.levelId && wall.topMm - surface.topMm >= scene.guardMm)
     .filter((wall) => Math.max(across(wall.start), across(wall.end)) <= wall.halfThicknessMm + SAME_SURFACE_MM)
-    .map((wall): [number, number] => {
-      const [p, q] = [along(wall.start), along(wall.end)];
-      return [Math.max(0, Math.min(p, q)), Math.min(length, Math.max(p, q))];
-    })
-    .sort((p, q) => p[0] - q[0]);
+    .map((wall) => clipped(wall.start, wall.end));
+  const railingSpans = scene.railings
+    .filter((run) => run.heightMm >= scene.guardMm && Math.abs(run.zMm - surface.topMm) <= RAILING_Z_MM)
+    .filter((run) => Math.max(across(run.a), across(run.b)) <= RAILING_OFFSET_MM)
+    .map((run) => clipped(run.a, run.b));
+  const spans = [...wallSpans, ...railingSpans].filter(([from, to]) => to > from).sort((p, q) => p[0] - q[0]);
   let covered = 0;
   let reached = 0;
   for (const [from, to] of spans) {
@@ -163,8 +211,8 @@ export const edgeRuleUnsetFinding = (): Finding => ({
   source: 'none: there is no graded drop-height rule (06 STA open question 6)',
 });
 
-/** Edges of one slab (boundary and openings) against the threshold. */
-function slabEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeResult {
+/** Edges of one slab or grating (boundary and openings) against the threshold. */
+function surfaceEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeResult {
   const surface = scene.surfaces.get(id);
   const findings: Finding[] = [];
   const edges: EdgeReport[] = [];
@@ -186,19 +234,25 @@ function slabEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeResu
         a[1] + (b[1] - a[1]) * t + ny * SAMPLE_OFFSET_MM,
       ];
       const drop = Math.max(...[0, 0.5, 1].map((t) => dropAt(scene, id, surface.topMm, sample(t))));
-      const guarded = drop > threshold.mm && wallCoverage(scene, surface, a, b) >= COVERAGE;
+      const guarded = drop > threshold.mm && guardCoverage(scene, surface, a, b) >= COVERAGE;
       const isProtected = drop <= threshold.mm || guarded;
       const location = `${label} edge ${index}`;
-      edges.push({ slabId: id, location, lengthMm: length, dropMm: drop, protected: isProtected });
+      edges.push({ surfaceId: id, location, lengthMm: length, dropMm: drop, protected: isProtected });
       if (!isProtected) findings.push(edgeFinding(id, location, drop, threshold));
     });
   }
   return { findings, edges };
 }
 
-/** Open-edge check of the slabs `ids`; the scene is the whole building so adjacent and lower surfaces count. */
-export function checkEdges(doc: CadDocument, building: BuildingModel, ids: readonly string[], threshold: EdgeThreshold): EdgeResult {
-  const scene = buildScene(doc, building);
-  const parts = ids.map((id) => slabEdges(scene, id, threshold));
+/** Open-edge check of the slabs and gratings `ids`; the scene is the whole building so adjacent and lower surfaces count. */
+export function checkEdges(
+  doc: CadDocument,
+  building: BuildingModel,
+  ids: readonly string[],
+  threshold: EdgeThreshold,
+  rulesets: readonly RulesetName[],
+): EdgeResult {
+  const scene = buildScene(doc, building, rulesets);
+  const parts = ids.map((id) => surfaceEdges(scene, id, threshold));
   return { findings: parts.flatMap((part) => part.findings), edges: parts.flatMap((part) => part.edges) };
 }

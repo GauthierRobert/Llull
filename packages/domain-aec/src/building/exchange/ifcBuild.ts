@@ -10,6 +10,7 @@ import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
 import { exportOther } from './ifcOtherExport';
+import { exportGrating, exportRailing } from '../../plant/structures/exchange/ifcAccessExport';
 import { exportPipeSupport } from './ifcSupportExport';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
@@ -52,6 +53,14 @@ function exportElement(
     }
     case 'pipeSupport': {
       const exported = exportPipeSupport(context, doc, building, element, carrierOfSupport(doc, building, element), storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'grating': {
+      const exported = exportGrating(context, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'railing': {
+      const exported = exportRailing(context, doc, element, storeyPlacement);
       return exported ? [exported] : [];
     }
     case 'connection':

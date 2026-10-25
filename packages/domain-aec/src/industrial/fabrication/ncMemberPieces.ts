@@ -39,7 +39,17 @@ export interface NcPiece {
   readonly sourceIds: ReadonlyArray<string>;
 }
 
-const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = { I: 'I', U: 'U', C: 'U', SHS: 'M', RHS: 'M', CHS: 'RO', L: 'L' };
+const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = {
+  I: 'I',
+  U: 'U',
+  C: 'U',
+  SHS: 'M',
+  RHS: 'M',
+  CHS: 'RO',
+  L: 'L',
+  FL: 'B',
+  RD: 'RU',
+};
 
 /** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
 function pitchCut(member: SteelMemberElement): number {

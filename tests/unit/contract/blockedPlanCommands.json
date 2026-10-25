@@ -192,13 +192,7 @@
       "add_pipe_rack"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-05-access-negative.json": [
-      "add_ladder",
-      "add_railing"
-    ],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-06-grating-span.json": [
-      "add_grating",
-      "check_grating",
-      "list_grating_types"
+      "add_ladder"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": [
       "add_circular_platform",

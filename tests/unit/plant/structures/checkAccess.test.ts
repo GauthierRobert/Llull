@@ -20,7 +20,7 @@ interface Access {
   verdict: string;
   findings: FindingRow[];
   byId: Record<string, { verdict: string; findings: number[] }>;
-  edges: Array<{ slabId: string; location: string; dropMm: number; protected: boolean }>;
+  edges: Array<{ surfaceId: string; location: string; dropMm: number; protected: boolean }>;
   checked: { stairs: number; slabs: number; edges: number };
   skipped: string[];
   ruleTableVersion: string;
@@ -53,7 +53,7 @@ describe('check_access: stairs (VC-STA-04)', () => {
     expect(result.verdict).toBe('pass');
     expect(result.findings).toEqual([]);
     expect(result.byId[id]).toEqual({ verdict: 'pass', findings: [] });
-    expect(result.checked).toEqual({ stairs: 1, slabs: 0, edges: 0 });
+    expect(result.checked).toEqual({ stairs: 1, slabs: 0, gratings: 0, railings: 0, edges: 0 });
     expect(result.reviewRequired).toBe(true);
     expect(result.ruleTableVersion).toBe('2026-10-18');
     expect(result.unverifiedRulesUsed).toEqual(['ISO-STR-FLIGHT-RISE']);
@@ -168,7 +168,7 @@ describe('check_access: slab edges', () => {
     expect(result.findings[0]?.limit).toEqual({ max: 500, unit: 'mm' });
     expect(result.findings[0]?.clause).toBe('project spec 3.2');
     expect(result.findings.map((f) => f.location)).toEqual(['boundary edge 0', 'boundary edge 1', 'boundary edge 2', 'boundary edge 3']);
-    expect(result.checked).toEqual({ stairs: 0, slabs: 1, edges: 4 });
+    expect(result.checked).toEqual({ stairs: 0, slabs: 1, gratings: 0, railings: 0, edges: 4 });
   });
 
   it('passes when the threshold is above the drop', () => {
@@ -256,7 +256,7 @@ describe('check_access: selection, refusals, VC-STA-13', () => {
     expect(result.skipped).toEqual([column]);
     expect(result.checked.slabs).toBe(1);
     const none = check(withColumn.document, { rulesets: BOTH, include: ['stairs'] });
-    expect(none.checked).toEqual({ stairs: 0, slabs: 0, edges: 0 });
+    expect(none.checked).toEqual({ stairs: 0, slabs: 0, gratings: 0, railings: 0, edges: 0 });
     expect(none.verdict).toBe('pass');
     expect(none.notEvaluated).toEqual([]);
   });

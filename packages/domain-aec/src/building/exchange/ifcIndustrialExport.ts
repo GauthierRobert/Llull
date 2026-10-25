@@ -40,7 +40,7 @@ import { vesselSolid } from './ifcVesselExport';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 
 /** IFC parametric profile definition of a catalogue section (dimensions in mm). */
-function steelProfileDef(context: Context, profile: SteelProfile): string {
+export function steelProfileDef(context: Context, profile: SteelProfile): string {
   const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
   const name = ifcString(profile.name);
   const r = ifcReal;
@@ -66,6 +66,10 @@ function steelProfileDef(context: Context, profile: SteelProfile): string {
       );
     case 'CHS':
       return context.writer.add(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`);
+    case 'FL':
+      return context.writer.add(`IFCRECTANGLEPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)})`);
+    case 'RD':
+      return context.writer.add(`IFCCIRCLEPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)})`);
   }
 }
 
@@ -78,7 +82,7 @@ const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }
 };
 
 /** One extruded-area solid per non-degenerate segment of a polyline, the profile swept along it. */
-function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray<Vec3>): string[] {
+export function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray<Vec3>): string[] {
   const solids: string[] = [];
   for (let index = 0; index + 1 < points.length; index++) {
     const start = points[index] as Vec3;

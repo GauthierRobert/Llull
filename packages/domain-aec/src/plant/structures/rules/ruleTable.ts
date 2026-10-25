@@ -75,5 +75,9 @@ export function breach(rule: AccessRule, value: number): 'below' | 'above' | nul
   return null;
 }
 
-/** `fail` for a grade A breach (capped at warn by `maxSeverity`), `warn` for grade B. */
-export const severityOf = (rule: AccessRule): 'fail' | 'warn' => (rule.grade === 'A' && rule.maxSeverity !== 'warn' ? 'fail' : 'warn');
+/**
+ * `fail` for a grade A breach, `warn` for grade B. `maxSeverity: 'warn'` caps the over-limit side (OSHA top rail above 45 in); pass the breached
+ * `side` to keep a below-limit breach of such a row a fail; without a side the cap applies.
+ */
+export const severityOf = (rule: AccessRule, side?: 'below' | 'above'): 'fail' | 'warn' =>
+  rule.grade === 'A' && !(rule.maxSeverity === 'warn' && side !== 'below') ? 'fail' : 'warn';
