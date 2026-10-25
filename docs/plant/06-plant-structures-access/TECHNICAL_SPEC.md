@@ -110,7 +110,7 @@ export interface GratingElement extends LevelElementBase {
   topOffset: number;                // document units
   gratingType: string;              // catalogue key, e.g. "19-W-4 1-1/4x3/16"
   bearingBarAngle: number;          // plan radians; bars span between supports in this direction
-  supportIds?: string[];            // members it bears on (resolved by add_grating)
+  supportIds: [string[], string[]]; // members it bears on, one list per side (end-to-end members share a side; resolved by add_grating)
   assemblyId?: string;
 }
 
@@ -277,13 +277,13 @@ export const addLadder = defineCommand({
   `ceil(L / sMax) + 1`, at equal spacing. Shared corner posts are counted once.
 - Openings remove the rails between two end posts. `gate: true` adds a self-closing gate entity (the ladder exit).
 - Knee rails are equally spaced: clear gap = `(height − toePlate − (k + 1) · railDepth) / (k + 1)` (the top rail counts: §13.5), compared with
-  ISO-GRD-GAP. The OSHA midrail is checked at mid-height.
+  ISO-GRD-GAP. OSHA-GRD-MID is checked as the 19 in opening only: the "midway" position has no numeric tolerance in the rows and equal spacing places the midrail within (toe plate − rail depth) / 2 of mid-height (§13.5).
 - Comparison: Bonsai centres the remainder (`floor(L / s) + 1`) [S24]. llull keeps end posts, which fabrication needs.
 
 ### 5.4 Grating span (VC-STA-06)
 
 - Supports are members whose top flange lies within 10 mm below the grating underside and whose axis is
-  perpendicular (± 5°) to the bearing bars. The span is the distance between consecutive support axes along the
+  perpendicular (± 5°) to the bearing bars. Members on one support line (axes within 5 mm along the bars) carry the edge together; their extents across the bars must cover the panel width within 10 mm, else the panel is refused. The span is the distance between consecutive support axes along the
   bearing-bar direction (clear span option: minus the flange width).
 - Per 1 m (or 1 ft) width: `n = width / pitch`, `S = n t d² / 6`, `I = n t d³ / 12`.
   - Uniform: `U = 8 F S / L²` (per width).
@@ -564,10 +564,10 @@ ladder, steel stair, platforms, pipe rack, reachability, fireproofing, plan symb
 
 Decisions (owner delegated, 2026-10-25):
 
-- **Supports (§5.4)**: a support is a horizontal steel member (axis within 1° of horizontal) whose axis is perpendicular to the bars within 5°, whose top of steel is 0..10 mm below the grating underside (1 mm above is tolerated as model rounding; deeper bars that bury the beam top are a finding, not a silent pass), and whose axis overlaps the region across the bars. Supports closer than 5 mm along the bars are one line; the first and last support must lie under the end edges (10 mm). `supportedBy: "beams"` means the members of role `beam`; named ids must all qualify or the command is refused (`STA_NO_SUPPORT_FOUND` lists them).
-- **Regions are convex.** A concave region is refused (`STA_INVALID_GEOMETRY`: split it into rectangles). Half-plane clipping of a convex polygon at the support lines is exact; a concave one can split into disconnected pieces. Openings in a grating (equipment cut-outs) wait for M6 with `add_equipment_openings`; the element has no `openings` field until then.
+- **Supports (§5.4)**: a support is a horizontal steel member (axis within 1° of horizontal) whose axis is perpendicular to the bars within 5°, whose top of steel is 0..10 mm below the grating underside (1 mm above is tolerated as model rounding; deeper bars that bury the beam top are a finding, not a silent pass), and whose axis overlaps the region across the bars. Members whose axes are within 5 mm along the bars are one support line and carry the edge together: their extents across the bars must cover the width of every panel they bound (10 mm), otherwise the command is refused with `STA_NO_SUPPORT_FOUND` naming the unsupported stretch (a beam covering a third of the width does not support the panel). The element stores every member of each side (`supportIds: [string[], string[]]`), and `check_grating` re-checks all of them: a deleted, turned or shortened member is a finding. The first and last support line must lie under the end edges (10 mm). `supportedBy: "beams"` means the members of role `beam`; named ids must all qualify or the command is refused (`STA_NO_SUPPORT_FOUND` lists them).
+- **Regions are convex** (all turns the same way and the turning angles add up to one revolution, so a pentagram is refused too). A concave region is refused (`STA_INVALID_GEOMETRY`: split it into rectangles). Half-plane clipping of a convex polygon at the support lines is exact; a concave one can split into disconnected pieces. Openings in a grating (equipment cut-outs) wait for M6 with `add_equipment_openings`; the element has no `openings` field until then.
 - **`thickness` is not a free input.** The catalogue decides the depth; a given value must equal the bar depth or the command is refused.
-- **`check_grating` demand includes the self weight, reported apart.** `deflectionMm` is the deflection under the applied load alone (the VC-STA-06 row: 0.5176 mm at 914.4 mm and 4.788 kPa); `totalDeflectionMm`, `stressUtilisation`, `deflectionUtilisation` and the findings use applied + self weight. This refines §5.4's "adds it to the demand" so the reference row stays comparable. The concentrated case is checked alone with the self weight through M/Mcap = P/C + w/U (exact for simply supported spans). The span is re-measured from the members now in the model (centre to centre; `spanBasis: "clear"` subtracts the half top-flange widths), so an edit of a beam shows up as `STA_NO_SUPPORT_FOUND` or `STA_GRATING_SPAN_DIRECTION` findings. No default load or limit (AF-31): exactly one of `deflectionLimitMm` / `deflectionRatio`, else a no-op.
+- **`check_grating` demand includes the self weight, reported apart.** `deflectionMm` is the deflection under the applied load alone (the VC-STA-06 row: 0.5176 mm at 914.4 mm and 4.788 kPa); `totalDeflectionMm`, `stressUtilisation`, `deflectionUtilisation` and the findings use applied + self weight. This refines §5.4's "adds it to the demand" so the reference row stays comparable. The concentrated case is checked alone with the self weight through M/Mcap = P/C + w/U (exact for simply supported spans). The span is re-measured from the members now in the model (centre to centre; `spanBasis: "clear"` subtracts the half top-flange widths), so an edit of a beam shows up as `STA_NO_SUPPORT_FOUND` or `STA_GRATING_SPAN_DIRECTION` findings. A clear span of zero or less (flanges wider than the gap) is a `STA_INVALID_GEOMETRY` finding, not a set of allowables. No default load or limit (AF-31): exactly one of `deflectionLimitMm` / `deflectionRatio`, else a no-op.
 - **Findings** reuse the `check_access` finding shape. Strength and bearing findings are grade A (`naamm_mbg_531`), the deflection limit is the caller's (`ruleset: project`), `STA_GRATING_TYPE_UNVERIFIED` is a grade B warn. `reviewRequired` is always true.
 - **Not extended in M2** (no consumer yet): `check_clashes` (a grating on its beams clashes with nothing and the new categories have no clash box; M6 / M8), `check_steel_members` floor load from grating kg/m² (V1), plan symbols and DXF hatch (M8), `add_equipment_openings` cutting gratings (M6). Serrated bars are not in the catalogue.
 
@@ -594,3 +594,4 @@ Decisions (owner delegated, 2026-10-25):
 - **Outside the lane, one compile fix**: adding categories to `BimCategory` broke the exhaustive label table of the element list (`src/ui/panels/building/describeElement.ts`, 6 lines: `Grating`, `Railing` and their one-line descriptors). No UI behaviour was added; the viewport renders the evaluated mesh entities like any element.
 
 Tests: 71 new (`tests/unit/plant/structures/{grating,railing,ifcAccess,scenarioPlans}.test.ts`, `tests/unit/building/barProfiles.test.ts`) plus the `check_access` expectations of M1 updated for `surfaceId` and the new `checked` fields.
+- **Review fixes (M2 / M3)**: load validation of a railing runs the unit-free part of the add_railing validation (path points, integer 0..10 knee rails, non-negative toe plate, ascending gaps inside the path, known profiles); the fit of the rails needs the document unit and stays a command-time check. A guard-rail whose profile left the catalogue is a `STA_INVALID_GEOMETRY` fail finding in `check_access`. OSHA-GRD-MID is evaluated as the 19 in opening only and listed under `notEvaluated` for its position. The IFC grating property `BearingBarAngle` is in radians (the project plane-angle unit); a grating whose type left the catalogue is not exported. The refusal to move a hosted railing names its slab or grating host.
