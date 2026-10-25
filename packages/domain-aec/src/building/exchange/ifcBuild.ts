@@ -55,8 +55,10 @@ function exportElement(
       const exported = exportPipeSupport(context, doc, building, element, carrierOfSupport(doc, building, element), storeyPlacement);
       return exported ? [exported] : [];
     }
-    case 'grating':
-      return [exportGrating(context, element, storeyPlacement)];
+    case 'grating': {
+      const exported = exportGrating(context, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
     case 'railing': {
       const exported = exportRailing(context, doc, element, storeyPlacement);
       return exported ? [exported] : [];

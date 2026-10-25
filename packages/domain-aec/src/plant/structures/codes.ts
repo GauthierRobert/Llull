@@ -5,7 +5,7 @@ import { tableRejection } from '@core/commands/noop';
 const REMEDIATION = {
   STA_RULESET_UNKNOWN: 'Call list_access_rules to see the loaded rulesets (iso_14122, osha_1910).',
   STA_UNKNOWN_ELEMENT:
-    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, slabs and railings, check_grating gratings, update_railing railings.',
+    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, slabs, gratings and railings, check_grating and update_grating gratings, update_railing railings.',
   STA_INVALID_GEOMETRY:
     'Fix the geometry: finite numbers, a convex grating boundary of 3+ points or a railing path of 2+ distinct points, a non-zero bar direction.',
   STA_GRATING_TYPE_UNKNOWN: 'Call list_grating_types for the catalogue names.',

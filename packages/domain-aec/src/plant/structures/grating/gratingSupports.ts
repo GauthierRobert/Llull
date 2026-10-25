@@ -72,17 +72,20 @@ export const bearsUnder = (line: SupportLine, undersideMm: number): boolean =>
 
 type Ring = ReadonlyArray<Vec2>;
 
-/** True for a simple convex polygon (all turns the same way, non-zero area). */
+/** True for a simple convex polygon: all turns the same way and the turning angles add up to one full revolution (a pentagram turns twice). */
 export function isConvex(ring: Ring): boolean {
   let sign = 0;
+  let turning = 0;
   for (let index = 0; index < ring.length; index++) {
     const [a, b, c] = [ring[index], ring[(index + 1) % ring.length], ring[(index + 2) % ring.length]] as [Vec2, Vec2, Vec2];
-    const turn = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    const [ux, uy, vx, vy] = [b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]];
+    const turn = ux * vy - uy * vx;
     if (Math.abs(turn) < 1e-9) continue;
     if (sign !== 0 && Math.sign(turn) !== sign) return false;
     sign = Math.sign(turn);
+    turning += Math.atan2(turn, ux * vx + uy * vy);
   }
-  return sign !== 0;
+  return sign !== 0 && Math.abs(Math.abs(turning) - 2 * Math.PI) < 1e-6;
 }
 
 /** The part of a convex polygon where `value(point) >= limit` (`keep: 'above'`) or `<= limit` (`'below'`). */
@@ -109,28 +112,64 @@ const ringArea = (ring: Ring): number =>
     }, 0) / 2,
   );
 
+/** The members on one support line (collinear within 5 mm along the bars): together they carry the panel edge. */
+export interface SupportGroup {
+  /** Mean position of the axes along the bars. */
+  readonly sMm: number;
+  readonly halfWidthMm: number;
+  readonly members: readonly SupportLine[];
+}
+
 export interface GratingPanel {
   /** Plan polygon, mm. */
   readonly ring: Vec2[];
-  readonly supports: readonly [SupportLine, SupportLine];
+  readonly supports: readonly [SupportGroup, SupportGroup];
 }
 
 export type PanelSplit = { readonly ok: true; readonly panels: GratingPanel[] } | { readonly ok: false; readonly reason: string };
 
+export const groupOf = (members: ReadonlyArray<SupportLine>): SupportGroup => ({
+  sMm: members.reduce((sum, line) => sum + line.sMm, 0) / members.length,
+  halfWidthMm: Math.max(...members.map((line) => line.halfWidthMm)),
+  members,
+});
+
+/** First stretch [from, to] of [pMin, pMax] (across the bars, mm) that the members do not cover within 10 mm, or null when they cover it all. */
+export function uncoveredStretch(members: ReadonlyArray<SupportLine>, pMin: number, pMax: number): readonly [number, number] | null {
+  let reached = pMin;
+  for (const line of [...members].sort((x, y) => x.pMin - y.pMin)) {
+    if (line.pMin - reached > END_TOLERANCE_MM) return [reached, line.pMin];
+    reached = Math.max(reached, line.pMax);
+  }
+  return pMax - reached > END_TOLERANCE_MM ? [reached, pMax] : null;
+}
+
+/** Extent of a ring across the bars, mm. */
+export function acrossExtent(ring: Ring, direction: Vec2): readonly [number, number] {
+  const values = ring.map((point) => -point[0] * direction[1] + point[1] * direction[0]);
+  return [Math.min(...values), Math.max(...values)];
+}
+
 /**
- * Splits a convex region (mm) at the support lines that cross it: one panel per pair of consecutive supports along the bars.
- * Supports closer than 5 mm along the bars are one line; the first and last must reach the region ends (10 mm).
+ * Splits a convex region (mm) at the support lines that cross it: one panel per pair of consecutive support lines along the bars.
+ * Members closer than 5 mm along the bars are one line and carry the edge together: their extents across the bars must cover the panel
+ * width (10 mm), else the split fails naming the unsupported stretch. The first and last line must reach the region ends (10 mm).
  */
 export function splitPanels(region: Ring, direction: Vec2, candidates: ReadonlyArray<SupportLine>): PanelSplit {
   const along = (point: Vec2): number => point[0] * direction[0] + point[1] * direction[1];
-  const across = (point: Vec2): number => -point[0] * direction[1] + point[1] * direction[0];
   const [sMin, sMax] = [Math.min(...region.map(along)), Math.max(...region.map(along))];
-  const [pMin, pMax] = [Math.min(...region.map(across)), Math.max(...region.map(across))];
+  const [pMin, pMax] = acrossExtent(region, direction);
   const usable = candidates
     .filter((line) => line.sMm >= sMin - END_TOLERANCE_MM && line.sMm <= sMax + END_TOLERANCE_MM)
     .filter((line) => Math.min(line.pMax, pMax) - Math.max(line.pMin, pMin) > OVERLAP_MM)
     .sort((a, b) => a.sMm - b.sMm || a.id.localeCompare(b.id));
-  const lines = usable.filter((line, index) => index === 0 || line.sMm - (usable[index - 1] as SupportLine).sMm > SAME_LINE_MM);
+  const clusters: SupportLine[][] = [];
+  for (const line of usable) {
+    const last = clusters[clusters.length - 1];
+    if (last !== undefined && line.sMm - (last[0] as SupportLine).sMm <= SAME_LINE_MM) last.push(line);
+    else clusters.push([line]);
+  }
+  const lines = clusters.map(groupOf);
   const first = lines[0];
   const last = lines[lines.length - 1];
   if (first === undefined || last === undefined || lines.length < 2)
@@ -141,9 +180,28 @@ export function splitPanels(region: Ring, direction: Vec2, candidates: ReadonlyA
     return { ok: false, reason: `no support under the end edge (the last support is ${(sMax - last.sMm).toFixed(0)} mm inside it)` };
   const panels: GratingPanel[] = [];
   for (let index = 0; index + 1 < lines.length; index++) {
-    const [a, b] = [lines[index], lines[index + 1]] as [SupportLine, SupportLine];
+    const [a, b] = [lines[index], lines[index + 1]] as [SupportGroup, SupportGroup];
     const strip = clip(clip(region, along, Math.max(a.sMm, sMin), 'above'), along, Math.min(b.sMm, sMax), 'below');
-    if (strip.length >= 3 && ringArea(strip) > 1) panels.push({ ring: strip, supports: [a, b] });
+    if (strip.length < 3 || ringArea(strip) <= 1) continue;
+    const [from, to] = acrossExtent(strip, direction);
+    const carriers = [a, b].map((group) =>
+      groupOf(group.members.filter((line) => Math.min(line.pMax, to) - Math.max(line.pMin, from) > OVERLAP_MM)),
+    );
+    for (const group of carriers) {
+      const gap = group.members.length === 0 ? ([from, to] as const) : uncoveredStretch(group.members, from, to);
+      if (gap !== null)
+        return {
+          ok: false,
+          reason: `the support line at ${(group === carriers[0] ? a : b).sMm.toFixed(0)} mm leaves ${gap[0].toFixed(0)}..${gap[1].toFixed(0)} mm across the bars unsupported (panel ${from.toFixed(0)}..${to.toFixed(0)} mm)`,
+        };
+    }
+    panels.push({
+      ring: strip,
+      supports: [
+        { ...a, members: carriers[0]?.members ?? [] },
+        { ...b, members: carriers[1]?.members ?? [] },
+      ],
+    });
   }
   return panels.length === 0 ? { ok: false, reason: 'the supports leave no panel area' } : { ok: true, panels };
 }
@@ -154,3 +212,9 @@ export const ringToMm = (doc: CadDocument, ring: ReadonlyArray<Vec2>): Vec2[] =>
 /** Plan ring from mm to document units. */
 export const ringFromMm = (doc: CadDocument, ring: ReadonlyArray<Vec2>): Vec2[] =>
   ring.map(([x, y]): Vec2 => [fromMm(doc, x), fromMm(doc, y)]);
+
+/** The member ids of both sides of a panel, as stored on the element. */
+export const supportIdsOf = (supports: readonly [SupportGroup, SupportGroup]): [string[], string[]] => [
+  supports[0].members.map((line) => line.id),
+  supports[1].members.map((line) => line.id),
+];

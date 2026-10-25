@@ -50,6 +50,18 @@ describe('export_ifc: access elements (VC-STA-12)', () => {
     expect(enumItems('IfcPlateTypeEnum.md')).toContain('USERDEFINED');
   });
 
+  it('writes the bar direction in radians (the project plane-angle unit) and nothing for a type that left the catalogue', () => {
+    const across = exported(gratedFrame({ bearingBarDirection: [0, 1] }).doc);
+    expect(across).toContain('radians from +X');
+    expect(across).toContain('IFCPLANEANGLEMEASURE(1.570796)');
+    expect(ifc).toContain('IFCPLANEANGLEMEASURE(0.)');
+    expect(ifc).toContain('IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)');
+    const broken = JSON.parse(JSON.stringify(doc)) as CadDocument;
+    const panel = broken.building?.elements[ids[0] as string];
+    if (panel?.category === 'grating') panel.gratingType = 'GONE';
+    expect(count(exported(broken), /=IFCPLATE\(/g)).toBe(ids.length - 1);
+  });
+
   it('writes the railing as IfcRailing GUARDRAIL aggregating one IfcMember POST per post', () => {
     expect(count(ifc, /=IFCRAILING\(/g)).toBe(1);
     expect(count(ifc, /=IFCRAILING\([^\n]*\.GUARDRAIL\.\);/g)).toBe(1);

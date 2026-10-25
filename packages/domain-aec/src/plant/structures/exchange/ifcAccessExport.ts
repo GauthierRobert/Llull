@@ -4,7 +4,6 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { toDegrees } from '@lib/angle';
 import { toMm } from '@core/model/units';
 import type { GratingElement, RailingElement } from '@aec/building/types';
 import {
@@ -25,10 +24,11 @@ import { findGratingType } from '../grating/gratingTypes';
 import { toePlateProfile, railingQuantities } from '../railing/railingMeasure';
 
 /** One grating panel: an extruded plate, with its type, bar direction and mass in a property set. */
-export function exportGrating(context: Context, grating: GratingElement, storeyPlacement: string): Exported {
+export function exportGrating(context: Context, grating: GratingElement, storeyPlacement: string): Exported | null {
   const { mm, writer } = context;
   const type = findGratingType(grating.gratingType);
-  const depth = type?.barDepthMm ?? 0;
+  if (type === undefined) return null;
+  const depth = type.barDepthMm;
   const local = placement(context, storeyPlacement, 0, 0, 0);
   const solid = extrusion(context, scaledPolygonProfile(context, grating.boundary), depth, 0, 0, mm(grating.topOffset) - depth);
   const ref = writer.add(
@@ -36,9 +36,9 @@ export function exportGrating(context: Context, grating: GratingElement, storeyP
   );
   addPropertySet(context, { id: grating.id, ref }, 'Pset_llullGrating', [
     `IFCPROPERTYSINGLEVALUE('GratingType','Catalogue key',IFCLABEL(${ifcString(grating.gratingType)}),$)`,
-    `IFCPROPERTYSINGLEVALUE('BearingBarAngle','Plan direction of the bearing bars, degrees from +X',IFCPLANEANGLEMEASURE(${ifcReal(toDegrees(grating.bearingBarAngle))}),$)`,
-    `IFCPROPERTYSINGLEVALUE('MassPerArea','Panel mass, kg/m2',IFCREAL(${ifcReal(type?.massKgM2 ?? 0)}),$)`,
-    `IFCPROPERTYSINGLEVALUE('Verified','Mass checked against two manufacturer tables',IFCBOOLEAN(${type?.verified === true ? '.T.' : '.F.'}),$)`,
+    `IFCPROPERTYSINGLEVALUE('BearingBarAngle','Plan direction of the bearing bars, radians from +X',IFCPLANEANGLEMEASURE(${ifcReal(grating.bearingBarAngle)}),$)`,
+    `IFCPROPERTYSINGLEVALUE('MassPerArea','Panel mass, kg/m2',IFCREAL(${ifcReal(type.massKgM2)}),$)`,
+    `IFCPROPERTYSINGLEVALUE('Verified','Mass checked against two manufacturer tables',IFCBOOLEAN(${type.verified ? '.T.' : '.F.'}),$)`,
   ]);
   return { ref, material: 'steel' };
 }

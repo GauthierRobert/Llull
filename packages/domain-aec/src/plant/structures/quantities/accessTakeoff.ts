@@ -36,7 +36,7 @@ export function gratingScheduleRows(doc: CadDocument, building: BuildingModel): 
   return elementsOf(building, 'grating').map((grating) => [
     grating.mark,
     grating.gratingType,
-    grating.supportIds.map((id) => building.elements[id]?.mark ?? id).join(' / '),
+    grating.supportIds.map((side) => side.map((id) => building.elements[id]?.mark ?? id).join('+')).join(' / '),
     round(gratingAreaM2(doc, grating), 3),
     round(gratingMassKg(doc, grating), 1),
     building.levels[grating.levelId]?.name ?? grating.levelId,

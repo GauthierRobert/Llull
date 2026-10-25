@@ -308,7 +308,7 @@ describe('add_railing on host edges', () => {
     expectNoOp(
       execute(withRail, 'move_building_element', { elementIds: ['railing-1'], delta: [10, 0] }),
       withRail,
-      'move_building_element refused',
+      `railing-1 follows its host ${deck} (a slab or grating`,
     );
     const deleted = apply(withRail, 'delete_building_element', { elementIds: [deck] });
     expect(deleted.building?.elements['railing-1']).toBeUndefined();
@@ -371,6 +371,27 @@ describe('railing takeoff, schedule and persistence', () => {
     expect(schedule.rows[0]!.slice(0, 7)).toEqual(['RL1', 'guardrail', 4, 4, 1100, 2, 100]);
   });
 
+  it('rejects stored railings that add_railing would refuse: negative or fractional knee rails, negative toe plate, unordered gaps, unknown profile', () => {
+    const errorsOf = (changes: Record<string, unknown>): string[] => {
+      const copy = JSON.parse(JSON.stringify(railed.building)) as { elements: Record<string, Record<string, unknown>> };
+      copy.elements['railing-1'] = { ...copy.elements['railing-1'], ...changes };
+      return buildingErrors(copy);
+    };
+    expect(errorsOf({ kneeRails: -1 })).toContain('building element railing-1: kneeRails must be an integer 0..10');
+    expect(errorsOf({ kneeRails: 2.5 })).toContain('building element railing-1: kneeRails must be an integer 0..10');
+    expect(errorsOf({ toePlate: -50 })).toContain('building element railing-1: toePlate must be >= 0');
+    expect(
+      errorsOf({
+        openings: [
+          { from: 2000, to: 3000, gate: false },
+          { from: 500, to: 900, gate: false },
+        ],
+      }).join('|'),
+    ).toContain('ascending and non-overlapping');
+    expect(errorsOf({ openings: [{ from: 0, to: 9000, gate: true }] }).join('|')).toContain('not inside 0..');
+    expect(errorsOf({ railProfile: 'GONE' }).join('|')).toContain("unknown rail profile 'GONE'");
+  });
+
   it('rejects a malformed stored railing', () => {
     const broken = JSON.parse(JSON.stringify(railed.building)) as { elements: Record<string, Record<string, unknown>> };
     broken.elements['railing-1'] = {
@@ -426,6 +447,7 @@ describe('check_access: railings (VC-STA-05)', () => {
     expect(result.byId['railing-1']?.verdict).toBe('pass');
     expect(result.unverifiedRulesUsed).toEqual(['OSHA-GRD-MID', 'OSHA-TOE-HEIGHT']);
     expect(result.notEvaluated.map((row) => row.ruleId)).toEqual([
+      'OSHA-GRD-MID',
       'OSHA-GRD-LOAD',
       'OSHA-GRD-DEFL',
       'OSHA-GRD-MIDLOAD',
@@ -456,6 +478,17 @@ describe('check_access: railings (VC-STA-05)', () => {
     expect(codes(high, 'osha_1910')).toEqual(['STA_RAIL_HEIGHT_HIGH:warn']);
     expect(codes(high, 'iso_14122')).toEqual([]);
     expect(high.verdict).toBe('warn');
+  });
+
+  it('fails a guard-rail whose profile left the catalogue instead of passing it silently', () => {
+    const broken = JSON.parse(JSON.stringify(rail({}))) as typeof doc;
+    const element = broken.building?.elements['railing-1'];
+    if (element?.category === 'railing') element.railProfile = 'GONE';
+    const result = check(broken);
+    expect(result.verdict).toBe('fail');
+    expect(result.findings.map((finding) => [finding.code, finding.ruleId, finding.severity])).toEqual([
+      ['STA_INVALID_GEOMETRY', 'RAILING-PROFILE', 'fail'],
+    ]);
   });
 
   it('only evaluates the requested ruleset and lists hand-rails as not evaluated', () => {

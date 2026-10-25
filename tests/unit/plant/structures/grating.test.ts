@@ -128,7 +128,7 @@ describe('add_grating', () => {
       thickness: 31.75,
     });
     const info = result.data as {
-      panels: Array<{ id: string; mark: string; spanMm: number; areaM2: number; massKg: number; supportIds: string[] }>;
+      panels: Array<{ id: string; mark: string; spanMm: number; areaM2: number; massKg: number; supportIds: string[][] }>;
       massKg: number;
       defaults: string[];
     };
@@ -141,9 +141,9 @@ describe('add_grating', () => {
     expect(info.massKg).toBeCloseTo(9.972 * 43.4536, 2);
     expect(info.defaults).toEqual(['topOffset 0 (walking surface at the level elevation)']);
     expect(info.panels.map((panel) => panel.supportIds)).toEqual([
-      ['member-9', 'member-10'],
-      ['member-10', 'member-11'],
-      ['member-11', 'member-12'],
+      [['member-9'], ['member-10']],
+      [['member-10'], ['member-11']],
+      [['member-11'], ['member-12']],
     ]);
     expect(result.affected.slice(0, 3)).toEqual(['grating-1', 'grating-2', 'grating-3']);
     expect(result.affected.length).toBeGreaterThan(3);
@@ -199,7 +199,7 @@ describe('add_grating', () => {
       gratingType: TYPE,
       bearingBarDirection: [1, 0],
     });
-    expect((result.data as { panels: Array<{ supportIds: string[] }> }).panels[0]?.supportIds).toEqual(['member-10', 'member-11']);
+    expect((result.data as { panels: Array<{ supportIds: string[][] }> }).panels[0]?.supportIds).toEqual([['member-10'], ['member-11']]);
   });
 
   it('refuses with a stable code: unknown type, region, thickness, direction, supports, twin, level', () => {
@@ -490,13 +490,13 @@ describe('grating takeoff, schedule and persistence', () => {
   it('validates the stored panels and rejects a malformed one', () => {
     expect(buildingErrors(doc.building)).toEqual([]);
     const broken = JSON.parse(JSON.stringify(doc.building)) as { elements: Record<string, Record<string, unknown>> };
-    broken.elements['grating-1'] = { ...broken.elements['grating-1'], boundary: [[0, 0]], supportIds: ['a'], gratingType: 3 };
+    broken.elements['grating-1'] = { ...broken.elements['grating-1'], boundary: [[0, 0]], supportIds: [['a'], []], gratingType: 3 };
     const errors = buildingErrors(broken);
     expect(errors).toEqual(
       expect.arrayContaining([
         'building element grating-1: boundary must be a polygon of ≥ 3 [x, y] points',
         'building element grating-1: gratingType must be a string',
-        'building element grating-1: supportIds must list two member ids',
+        'building element grating-1: supportIds must list the member ids of two support sides',
       ]),
     );
   });

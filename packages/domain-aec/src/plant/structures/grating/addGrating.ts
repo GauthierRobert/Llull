@@ -19,6 +19,7 @@ import {
   ringFromMm,
   ringToMm,
   splitPanels,
+  supportIdsOf,
   supportLineOf,
   type SupportLine,
 } from './gratingSupports';
@@ -29,7 +30,7 @@ const tidy = (ring: ReadonlyArray<Vec2>): Vec2[] => ring.map(([x, y]): Vec2 => [
 /**
  * @affects creates one grating element per support bay (plan polygon on layer S-GRAT, top at level + topOffset)
  * @invariant panels are split at the supports, every panel bears on two members perpendicular (+-5 deg) to its bars with the member top 0..10 mm under the grating underside
- * @failure unknown type -> STA_GRATING_TYPE_UNKNOWN; bad / non-convex region, zero direction, thickness != bar depth -> STA_INVALID_GEOMETRY; no support at an end edge -> STA_NO_SUPPORT_FOUND; unknown member id -> STA_UNKNOWN_ELEMENT; duplicate panel -> no-op
+ * @failure unknown type -> STA_GRATING_TYPE_UNKNOWN; bad / non-convex region, zero direction, thickness != bar depth -> STA_INVALID_GEOMETRY; no support at an end edge -> STA_NO_SUPPORT_FOUND; unknown member id -> STA_UNKNOWN_ELEMENT; a panel of the same type already at that outline -> STA_INVALID_GEOMETRY naming the twin
  */
 export const addGrating = defineCommand({
   name: 'add_grating',
@@ -185,7 +186,7 @@ export const addGrating = defineCommand({
         topOffset,
         gratingType: type.name,
         bearingBarAngle: barAngle,
-        supportIds: [panel.supports[0].id, panel.supports[1].id],
+        supportIds: supportIdsOf(panel.supports),
       }),
     );
     const areaM2 = panels.reduce((sum, panel) => sum + polygonArea(panel.boundary), 0) * toMetres(doc, 1) ** 2;
@@ -195,7 +196,7 @@ export const addGrating = defineCommand({
       spanMm: round(panel.supports[1].sMm - panel.supports[0].sMm, 3),
       areaM2: round(polygonArea(panel.boundary) * toMetres(doc, 1) ** 2, 6),
       massKg: round(polygonArea(panel.boundary) * toMetres(doc, 1) ** 2 * type.massKgM2, 3),
-      supportIds: [panel.supports[0].id, panel.supports[1].id],
+      supportIds: supportIdsOf(panel.supports),
     }));
     const massKg = round(areaM2 * type.massKgM2, 3);
     return commitBuilding(

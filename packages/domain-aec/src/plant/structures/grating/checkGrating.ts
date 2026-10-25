@@ -16,7 +16,18 @@ import {
   selfWeightKPa,
   uniformDeflectionMm,
 } from './gratingSpan';
-import { barDirection, bearsUnder, isPerpendicular, supportLineOf, type SupportLine } from './gratingSupports';
+import {
+  acrossExtent,
+  barDirection,
+  bearsUnder,
+  groupOf,
+  isPerpendicular,
+  ringToMm,
+  supportLineOf,
+  uncoveredStretch,
+  type SupportGroup,
+  type SupportLine,
+} from './gratingSupports';
 import { findGratingType, type GratingType } from './gratingTypes';
 
 const SOURCE = 'ANSI/NAAMM MBG 531 steel load-table basis (F = 18000 psi, E = 29000 ksi), closed forms of 06 STA §5.4 (grade A)';
@@ -49,66 +60,69 @@ const finding = (
   source,
 });
 
-/** The two supports of a panel as they are in the model now, or the finding that says why they are not. */
+/** The two support sides of a panel as they are in the model now, or the finding that says why they are not. */
 function currentSupports(
   doc: CadDocument,
   building: BuildingModel,
   panel: GratingElement,
   type: GratingType,
-): { readonly lines: readonly [SupportLine, SupportLine] } | { readonly problem: Finding } {
+): { readonly sides: readonly [SupportGroup, SupportGroup] } | { readonly problem: Finding } {
   const direction = barDirection(panel.bearingBarAngle);
   const level = building.levels[panel.levelId];
   const undersideMm = toMm(doc, (level?.elevation ?? 0) + panel.topOffset) - type.barDepthMm;
-  const lines: SupportLine[] = [];
-  for (const id of panel.supportIds) {
-    const member = building.elements[id];
-    const line = member?.category === 'member' ? supportLineOf(doc, building, member, direction) : null;
-    if (line === null) {
-      return {
-        problem: finding(
+  const [from, to] = acrossExtent(ringToMm(doc, panel.boundary), direction);
+  const problem = (
+    code: StaCode,
+    ruleId: string,
+    measured: { value: number; unit: string },
+    limit: { max?: number; unit: string },
+    clause: string,
+  ): { problem: Finding } => ({ problem: finding(code, ruleId, panel, 'fail', measured, limit, clause, SOURCE) });
+  const sides: SupportGroup[] = [];
+  for (const ids of panel.supportIds) {
+    const lines: SupportLine[] = [];
+    for (const id of ids) {
+      const member = building.elements[id];
+      const line = member?.category === 'member' ? supportLineOf(doc, building, member, direction) : null;
+      if (line === null)
+        return problem(
           'STA_NO_SUPPORT_FOUND',
           'NAAMM-SUPPORT',
-          panel,
-          'fail',
           { value: 0, unit: 'supports' },
           { max: 2, unit: 'supports' },
           `support ${id} is no longer a horizontal steel member`,
-          SOURCE,
-        ),
-      };
-    }
-    if (!isPerpendicular(line)) {
-      return {
-        problem: finding(
+        );
+      if (!isPerpendicular(line))
+        return problem(
           'STA_GRATING_SPAN_DIRECTION',
           'NAAMM-SPAN-DIRECTION',
-          panel,
-          'fail',
           { value: round((Math.acos(Math.min(1, line.parallelism)) * 180) / Math.PI, 2), unit: 'deg' },
           { unit: 'deg' },
           `support ${id} is not perpendicular (+-5 deg) to the bearing bars`,
-          SOURCE,
-        ),
-      };
-    }
-    if (!bearsUnder(line, undersideMm)) {
-      return {
-        problem: finding(
+        );
+      if (!bearsUnder(line, undersideMm))
+        return problem(
           'STA_NO_SUPPORT_FOUND',
           'NAAMM-SUPPORT',
-          panel,
-          'fail',
           { value: round(undersideMm - line.topMm, 2), unit: 'mm' },
           { max: 10, unit: 'mm' },
           `support ${id} no longer bears: its top is ${round(undersideMm - line.topMm, 2)} mm under the grating underside (allowed 0..10)`,
-          SOURCE,
-        ),
-      };
+        );
+      lines.push(line);
     }
-    lines.push(line);
+    const gap = uncoveredStretch(lines, from, to);
+    if (gap !== null)
+      return problem(
+        'STA_NO_SUPPORT_FOUND',
+        'NAAMM-SUPPORT',
+        { value: round(gap[1] - gap[0], 1), unit: 'mm' },
+        { max: 10, unit: 'mm' },
+        `the support members ${ids.join(', ')} no longer cover the panel width: ${round(gap[0], 0)}..${round(gap[1], 0)} mm across the bars is unsupported`,
+      );
+    sides.push(groupOf(lines));
   }
-  const [a, b] = lines as [SupportLine, SupportLine];
-  return { lines: [a, b] };
+  const [x, y] = sides as [SupportGroup, SupportGroup];
+  return { sides: [x, y] };
 }
 
 /**
@@ -209,9 +223,24 @@ export const checkGrating = defineCommand({
         findings.push(supports.problem);
         return { id: panel.id, mark: panel.mark, gratingType: type.name, verdict: 'fail' as const, findings };
       }
-      const [a, b] = supports.lines;
+      const [a, b] = supports.sides;
       const centre = Math.abs(b.sMm - a.sMm);
       const spanMm = basis === 'clear' ? centre - a.halfWidthMm - b.halfWidthMm : centre;
+      if (!(spanMm > 0)) {
+        findings.push(
+          finding(
+            'STA_INVALID_GEOMETRY',
+            'NAAMM-SPAN',
+            panel,
+            'fail',
+            { value: round(spanMm, 2), unit: 'mm' },
+            { unit: 'mm' },
+            `the ${basis} span between the supports is not positive`,
+            SOURCE,
+          ),
+        );
+        return { id: panel.id, mark: panel.mark, gratingType: type.name, verdict: 'fail' as const, findings };
+      }
       const allowableU = allowableUniformKPa(type, spanMm);
       const allowableC = allowableConcentratedKNPerM(type, spanMm);
       const selfKPa = selfWeightKPa(type);

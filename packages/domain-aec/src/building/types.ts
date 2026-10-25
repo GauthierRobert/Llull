@@ -377,8 +377,8 @@ export interface GratingElement extends LevelElementBase {
   gratingType: string;
   /** Plan direction the bearing bars run along, radians (CCW from +X): the bars span between supports in this direction. */
   bearingBarAngle: number;
-  /** The two members the bars bear on, in order along the bar direction. */
-  supportIds: string[];
+  /** The members the bars bear on, one list per side in order along the bar direction (end-to-end members share a side). */
+  supportIds: [string[], string[]];
 }
 
 /** Guard-rail of a platform edge or hand-rail of a stair side. */

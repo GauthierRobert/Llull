@@ -34,7 +34,7 @@ export const openingParam = z
 /**
  * @affects creates 1 railing element per path (posts, rails, toe plate and gate entities on layer S-RAIL)
  * @invariant posts at the ends, corners and gap ends, equal spacing <= postSpacingMax inside each interval; clear space between rails = (height - toePlate - (k+1) rail depth) / (k+1)
- * @failure path < 2 points / repeated point / rails do not fit -> STA_INVALID_GEOMETRY; unknown host -> STA_UNKNOWN_ELEMENT; gap outside the path -> STA_RAIL_OPENING; same railing again -> no-op
+ * @failure path < 2 points / repeated point / rails do not fit -> STA_INVALID_GEOMETRY; unknown host -> STA_UNKNOWN_ELEMENT; gap outside the path -> STA_RAIL_OPENING; same railing again -> STA_INVALID_GEOMETRY naming the twin
  */
 export const addRailing = defineCommand({
   name: 'add_railing',

@@ -4,6 +4,8 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { isStringArray } from '@lib/isStringArray';
 import { isVec3 } from '@lib/vec3';
+import type { RailingElement } from '@aec/building/types';
+import { railingStructureProblem } from './railing/railingValidate';
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
 
@@ -39,8 +41,9 @@ export function accessElementErrors(key: string, element: Record<string, unknown
     if (!(Array.isArray(boundary) && boundary.length >= 3 && boundary.every(isPoint)))
       errors.push(`building element ${key}: boundary must be a polygon of ≥ 3 [x, y] points`);
     if (typeof element['gratingType'] !== 'string') errors.push(`building element ${key}: gratingType must be a string`);
-    if (!(isStringArray(element['supportIds']) && element['supportIds'].length === 2))
-      errors.push(`building element ${key}: supportIds must list two member ids`);
+    const sides = element['supportIds'];
+    if (!(Array.isArray(sides) && sides.length === 2 && sides.every((side) => isStringArray(side) && side.length > 0)))
+      errors.push(`building element ${key}: supportIds must list the member ids of two support sides`);
   }
   if (category === 'railing') {
     const path = element['path'];
@@ -52,6 +55,10 @@ export function accessElementErrors(key: string, element: Record<string, unknown
     if (element['role'] !== 'guardrail' && element['role'] !== 'handrail')
       errors.push(`building element ${key}: role must be guardrail or handrail`);
     errors.push(...railingOpeningErrors(key, element['openings']), ...railingHostErrors(key, element['host'], elements));
+    if (errors.length === 0) {
+      const problem = railingStructureProblem(element as unknown as RailingElement);
+      if (problem !== null) errors.push(`building element ${key}: ${problem.message}`);
+    }
   }
   return errors;
 }
