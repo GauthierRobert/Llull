@@ -29,6 +29,7 @@ export const TOOLSET_NAMES = [
   'plant_structures',
   'plant_equipment',
   'plant_data',
+  'pid',
   'civil',
   'design',
   'pmi',
@@ -167,6 +168,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Plant data (08 DAT): hierarchy, classes, tags, typed properties and the data check, contributed by the installed plant-data plugin. */
   get plant_data(): readonly string[] {
     return pluginToolNames('plant_data');
+  },
+  /** P&ID schematics (04 PID): contributed by the installed pid plugin (M1 is the data model; the commands arrive with M2 / M3). */
+  get pid(): readonly string[] {
+    return pluginToolNames('pid');
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {

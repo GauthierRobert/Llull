@@ -10,6 +10,7 @@ import type { CatalogModel } from './catalog/types';
 import type { SpecModel } from './spec/types';
 import type { FabricationModel } from './fabrication/model';
 import type { PlantDataModel } from './data/model';
+import type { PidModel } from './pid/model';
 
 /** Butt weld, flanged, socket weld, screwed, plain end, wafer, lug (02 RTE §3.1). */
 export type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';
@@ -267,6 +268,8 @@ export interface PlantModel {
   readonly fabrication?: FabricationModel;
   /** 08 DAT: hierarchy, classes, tags and typed properties of the plant objects (the tag registry is derived from it). */
   readonly data?: PlantDataModel;
+  /** 04 PID: P&ID sheets, items (equipment, nozzles, lines, segments, inline items, instruments) and conventions; DEXPI import / export. */
+  readonly pid?: PidModel;
 }
 
 declare module '@core/model/documentExtensions' {

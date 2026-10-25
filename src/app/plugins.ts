@@ -7,6 +7,7 @@ import {
   industrialPlugin,
   pipingCatalogPlugin,
   pipingFabricationPlugin,
+  pidPlugin,
   pipingPlugin,
   plantDataPlugin,
   plantDisplayPlugin,
@@ -41,6 +42,7 @@ export function installDefaultPlugins(): void {
   installPlugin(structuresPlugin);
   installPlugin(plantEquipmentPlugin);
   installPlugin(plantDataPlugin);
+  installPlugin(pidPlugin);
   installPlugin(plantDisplayPlugin);
   installPlugin(caePlugin);
   installPlugin(topologyPlugin);

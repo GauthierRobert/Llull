@@ -1,0 +1,14 @@
+# P&ID sheet frame (04 PID M1): an A1 landscape drawing frame with its border, 20 mm inset, in sheet millimetres with the core 2D commands
+# (the pid toolset's own commands arrive with M2 / M3; the sheet and its items will then live in doc.plant.pid)
+design pid_sheet units=mm
+param w = 841
+param h = 594
+param inset = 20
+
+draw_rectangle sheet width=w height=h
+draw_rectangle border width=w-2*inset height=h-2*inset position=[inset, inset, 0]
+add_text title content="PID-001  FEED UNIT U10" position=[w-120, inset+8, 0] height=5 anchor=center
+
+check size of=sheet expect == [w, h, 0]
+check size of=border expect == [w-2*inset, h-2*inset, 0]
+check find_entities kind=rectangle path=count expect == 2
