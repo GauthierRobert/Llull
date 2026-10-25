@@ -84,10 +84,10 @@ describe('export_pcf: one small line (hand-checked golden)', () => {
 
   it('lineIds selects the line; an unknown line and a line without a run are refused with a code', () => {
     expect(exported(s.doc, { lineIds: [s.lineId] }).count).toBe(1);
-    expectRefusal(s.doc, 'export_pcf', { lineIds: ['line-99'] }, 'RTE_UNKNOWN_LINE', 'lineIds');
+    expectRefusal(s.doc, 'export_pcf', { lineIds: ['line-99'] }, 'ISO_LINE_NOT_FOUND', 'lineIds');
     const empty = cs150Line(100, '6002');
-    expectRefusal(empty.doc, 'export_pcf', { lineIds: [empty.lineId] }, 'RTE_NO_RUNS', 'lineIds');
-    expectRefusal(empty.doc, 'export_pcf', {}, 'RTE_NO_RUNS', 'lineIds');
+    expectRefusal(empty.doc, 'export_pcf', { lineIds: [empty.lineId] }, 'ISO_NO_PIPING', 'lineIds');
+    expectRefusal(empty.doc, 'export_pcf', {}, 'ISO_NO_PIPING', 'lineIds');
   });
 
   it('refuses a line whose run no longer derives (nothing is exported)', () => {

@@ -8,6 +8,7 @@
 import type { Vec3 } from '@core/model/vectors';
 import type { CatalogModel } from './catalog/types';
 import type { SpecModel } from './spec/types';
+import type { FabricationModel } from './fabrication/model';
 
 /** Butt weld, flanged, socket weld, screwed, plain end, wafer, lug (02 RTE §3.1). */
 export type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';
@@ -261,6 +262,8 @@ export interface PlantModel {
   readonly catalog?: CatalogModel;
   /** 01 PSC M2: pipe specs (every revision) and their branch tables. */
   readonly spec?: SpecModel;
+  /** 05 ISO: imported PCF lines (and, in later milestones, welds, spools and isometric definitions). */
+  readonly fabrication?: FabricationModel;
 }
 
 declare module '@core/model/documentExtensions' {

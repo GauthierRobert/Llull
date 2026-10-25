@@ -142,7 +142,6 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": [
       "check_isometric",
       "cut_list",
-      "import_pcf",
       "piping_bom",
       "split_spools",
       "spool_list",
@@ -151,12 +150,10 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": [
       "add_end_flange",
       "add_field_weld",
-      "import_pcf",
       "piping_bom"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-03-isometric-sheet.json": [
-      "export_isometric",
-      "import_pcf"
+      "export_isometric"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-04-sloped-line.json": [
       "export_isometric"
@@ -167,12 +164,10 @@
       "export_isometric"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": [
-      "export_piping_ga",
-      "import_pcf"
+      "export_piping_ga"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": [
       "check_isometric",
-      "import_pcf",
       "set_fabrication_rules"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": [
