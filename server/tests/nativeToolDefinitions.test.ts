@@ -7,7 +7,8 @@ import { isScanTool } from '../src/scan/scanTools';
 import { isMeshHostTool } from '../src/meshAssets/meshTools';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S } from '../src/native/topologySolve';
 import { DEFAULT_EXPLICIT_TIMEOUT_S } from '../src/native/explicitRun';
-import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS } from '../src/native/autoRoute';
+import { NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS } from '../src/native/autoRoute';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S } from '../src/native/autoRouteLines';
 import { DEFAULT_IMPORT_TIMEOUT_S } from '../src/scan/scanImport';
 
 const tools = buildNativeToolDefinitions();

@@ -174,6 +174,8 @@ export async function runAutoRouteLines(
     isError: committed.isError,
     data: {
       ...(isRecord(committed.data) ? committed.data : {}),
+      // Counted over every requested line: the commit only sees the planned ones.
+      ...(committed.isError ? {} : { failed: best.failed.length, complete: best.failed.length === 0 }),
       native: { passes: passes.length, routedInBestPass: best.planned.length, notRouted: best.failed },
     },
   };

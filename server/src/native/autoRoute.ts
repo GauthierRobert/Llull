@@ -15,7 +15,6 @@ import type { NativeDeps } from './fatigueField';
 import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, runAutoRouteLines } from './autoRouteLines';
 
 const TOOL = 'auto_route';
-export { DEFAULT_AUTO_ROUTE_TIMEOUT_S };
 /** 02 RTE §8 native budget (expansions); `maxExpansions` may raise it. */
 export const NATIVE_MAX_EXPANSIONS = 2_000_000;
 /** Ceiling of `maxExpansions`, per first-move candidate (memory guard: ~7.4e6 expansions took 37 s and a few hundred MB on the development laptop). */

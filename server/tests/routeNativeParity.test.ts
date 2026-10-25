@@ -248,7 +248,7 @@ describe('auto_route: native vs TypeScript reference (VC-RTE-25)', () => {
       const kept = routeData(
         await runAutoRoute({ lines, common, maxAttempts: 1, partial: true }, { timeoutS: 60 }, partialHost, nativeDeps()),
       );
-      expect(kept).toMatchObject({ routed: 1, failed: 0, complete: true });
+      expect(kept).toMatchObject({ routed: 1, failed: 1, complete: false });
       expect(partialHost.doc().plant?.piping?.runOrder).toHaveLength(1);
       const inProcess = must(doc, 'auto_route_lines', { lines, common, maxAttempts: 1, partial: true }).document.plant?.piping?.runOrder;
       expect(partialHost.doc().plant?.piping?.runOrder, 'ids do not shift when a line is left out').toEqual(inProcess);
