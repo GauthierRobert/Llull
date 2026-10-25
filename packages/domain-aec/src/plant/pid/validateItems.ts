@@ -22,13 +22,8 @@ const isStringRecord = (value: unknown): boolean => isRecord(value) && Object.va
 
 type Items = Record<string, unknown>;
 
-/** Members of each line's `segmentIds`, built once per array so the segment -> line check stays linear. */
-const memberSets = new WeakMap<readonly unknown[], Set<unknown>>();
-const membersOf = (ids: readonly unknown[]): Set<unknown> => {
-  let set = memberSets.get(ids);
-  if (!set) memberSets.set(ids, (set = new Set(ids)));
-  return set;
-};
+/** Line id -> the set of its `segmentIds`, built once per file so the segment -> line check stays linear. */
+type LineMembers = ReadonlyMap<string, ReadonlySet<unknown>>;
 
 const reservedKeys = (value: unknown, path: string): string[] =>
   isRecord(value)
@@ -93,7 +88,13 @@ function endpointErrors(value: unknown, path: string, items: Items): string[] {
   }
 }
 
-function kindErrors(item: Record<string, unknown>, path: string, items: Items, sheets: Record<string, unknown>): string[] {
+function kindErrors(
+  item: Record<string, unknown>,
+  path: string,
+  items: Items,
+  sheets: Record<string, unknown>,
+  members: LineMembers,
+): string[] {
   const reference = (field: string, kinds: readonly string[], optional = false): string[] => {
     if (optional && item[field] === undefined) return [];
     const kind = kindOf(items, item[field]);
@@ -122,7 +123,7 @@ function kindErrors(item: Record<string, unknown>, path: string, items: Items, s
       const ids = item['segmentIds'];
       if (!Array.isArray(ids)) return [`${path}.segmentIds must be an array`];
       return [
-        ...(membersOf(ids).size === ids.length ? [] : [`${path}.segmentIds lists a segment twice`]),
+        ...(members.get(String(item['id']))?.size === ids.length ? [] : [`${path}.segmentIds lists a segment twice`]),
         ...optionalDn,
         ...optionalText(['lineNumber', 'pipingClass', 'fluidCode']),
         ...ids.flatMap((id, index) => {
@@ -133,8 +134,7 @@ function kindErrors(item: Record<string, unknown>, path: string, items: Items, s
       ];
     }
     case 'segment': {
-      const line = items[String(item['lineId'])];
-      const listed = isRecord(line) && Array.isArray(line['segmentIds']) && membersOf(line['segmentIds']).has(item['id']);
+      const listed = members.get(String(item['lineId']))?.has(item['id']) === true;
       return [
         ...reference('lineId', ['line']),
         ...(kindOf(items, item['lineId']) !== 'line' || listed
@@ -250,6 +250,12 @@ export function itemErrors(raw: Record<string, unknown>, sheets: Record<string, 
     new Set(order).size !== keys.length
   )
     errors.push('plant.pid.itemOrder must list every item id exactly once');
+  const members = new Map<string, ReadonlySet<unknown>>();
+  for (const key of keys) {
+    const candidate = items[key];
+    if (isRecord(candidate) && candidate['kind'] === 'line' && Array.isArray(candidate['segmentIds']))
+      members.set(key, new Set(candidate['segmentIds']));
+  }
   for (const key of keys) {
     const path = `plant.pid.items.${key}`;
     const item = items[key];
@@ -264,7 +270,7 @@ export function itemErrors(raw: Record<string, unknown>, sheets: Record<string, 
     if (item['id'] !== key) errors.push(`${path}.id must equal its key`);
     const shape = baseErrors(item, path, sheets);
     errors.push(...shape);
-    if (shape.length === 0) errors.push(...kindErrors(item, path, items, sheets));
+    if (shape.length === 0) errors.push(...kindErrors(item, path, items, sheets, members));
   }
   errors.push(...parentCycleErrors(items));
   return errors;

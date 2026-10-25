@@ -105,18 +105,33 @@ describe('plant.pid: tag pattern safety', () => {
   const errorsFor = (pattern: string): string[] =>
     pidErrors(slice((raw) => (raw['tagFormats'] = { equipment: { pattern, separator: '-' } })));
 
-  it.each(['^[A-Z]-\\d{3}$', '^(?:FIC|TIC)-\\d+[A-Z]?$', '^([A-Z]{1,3})-(\\d{3})$', '^(?:[A-Z]\\d?)?$', '^(ab){2}$'])(
-    'accepts %s',
-    (pattern) => {
-      expect(errorsFor(pattern)).toEqual([]);
-    },
-  );
+  it.each([
+    '^[A-Z]-\\d{3}$',
+    '^(?:FIC|TIC)-\\d+[A-Z]?$',
+    '^([A-Z]{1,3})-(\\d{3})$',
+    '^(?:[A-Z]\\d?)?$',
+    '^(ab){2}$',
+    '^((ab)c)+$',
+    '^([A-Z]{2})-[0-9]{3}$',
+    '^([+*)(][a-z]+)$',
+    '^(\\)+)$',
+    '^(?<n>a{2})+$',
+  ])('accepts %s', (pattern) => {
+    expect(errorsFor(pattern)).toEqual([]);
+  });
 
   it.each([
     ['^(a+)+$', /catastrophic/],
     ['^(\\d*)*$', /catastrophic/],
     ['^(x{2,})*$', /catastrophic/],
     ['^(a|b+)+c$', /catastrophic/],
+    ['^((a+))+$', /catastrophic/],
+    ['^((a)+)+$', /catastrophic/],
+    ['^(?:(a+))+$', /catastrophic/],
+    ['^(?<n>(a?))*$', /catastrophic/],
+    ['^(a{1,30})+$', /catastrophic/],
+    ['^((((a*))))+$', /catastrophic/],
+    ['^(\\)a+)+$', /catastrophic/],
     ['^(a)\\1$', /backreferences/],
     ['^(?<n>a)\\k<n>$', /backreferences/],
     ['^(?=a)a$', /lookahead/],

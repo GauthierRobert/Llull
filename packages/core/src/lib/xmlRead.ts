@@ -317,6 +317,14 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
     /** Per open element, the prefixes it declared (undone when it closes). */
     const declaredStack: string[][] = [];
     let declarations = 0;
+    /** Undoes the bindings an element declared (innermost first is not needed: each prefix pops its own stack). */
+    const popBindings = (declared: readonly string[]): void => {
+      for (const prefix of declared) {
+        const uris = bindings.get(prefix);
+        if (uris && uris.length > 1) uris.pop();
+        else bindings.delete(prefix);
+      }
+    };
     const stack: MutableElement[] = [];
     let root: MutableElement | undefined;
     let elements = 0;
@@ -394,13 +402,6 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
         else bindings.set(prefix, [attr.value]);
         declared.push(prefix);
       }
-      const undo = (): void => {
-        for (const prefix of declared) {
-          const uris = bindings.get(prefix);
-          if (uris && uris.length > 1) uris.pop();
-          else bindings.delete(prefix);
-        }
-      };
       const resolve = (prefix: string, offset: number): string | null => {
         const uri = bindings.get(prefix)?.at(-1);
         if (prefix === '') return uri === undefined || uri === '' ? null : uri;
@@ -438,7 +439,7 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       const parent = stack[stack.length - 1];
       if (parent) parent.children.push(element);
       else root = element;
-      if (selfClosing) undo();
+      if (selfClosing) popBindings(declared);
       else {
         stack.push(element);
         declaredStack.push(declared);
@@ -476,11 +477,7 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
           fail('XML_MISMATCHED_TAG', `</${endName}> closes <${top.name}> (opened at line ${top.line}, column ${top.column})`, at);
         flushText();
         closeElement(stack.pop() as MutableElement);
-        for (const prefix of declaredStack.pop() ?? []) {
-          const uris = bindings.get(prefix);
-          if (uris && uris.length > 1) uris.pop();
-          else bindings.delete(prefix);
-        }
+        popBindings(declaredStack.pop() ?? []);
         at = close + 1;
       } else if (next === 0x21) {
         if (text.startsWith('<!--', at)) {
