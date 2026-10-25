@@ -22,6 +22,21 @@ const isStringRecord = (value: unknown): boolean => isRecord(value) && Object.va
 
 type Items = Record<string, unknown>;
 
+/** Members of each line's `segmentIds`, built once per array so the segment -> line check stays linear. */
+const memberSets = new WeakMap<readonly unknown[], Set<unknown>>();
+const membersOf = (ids: readonly unknown[]): Set<unknown> => {
+  let set = memberSets.get(ids);
+  if (!set) memberSets.set(ids, (set = new Set(ids)));
+  return set;
+};
+
+const reservedKeys = (value: unknown, path: string): string[] =>
+  isRecord(value)
+    ? Object.keys(value)
+        .filter(isReservedKey)
+        .map((key) => `${path}.${key}: the name is reserved`)
+    : [];
+
 /** The kind of item `id` names in `items`, or undefined. */
 const kindOf = (items: Items, id: unknown): string | undefined => {
   const item = typeof id === 'string' && Object.hasOwn(items, id) ? items[id] : undefined;
@@ -107,6 +122,7 @@ function kindErrors(item: Record<string, unknown>, path: string, items: Items, s
       const ids = item['segmentIds'];
       if (!Array.isArray(ids)) return [`${path}.segmentIds must be an array`];
       return [
+        ...(membersOf(ids).size === ids.length ? [] : [`${path}.segmentIds lists a segment twice`]),
         ...optionalDn,
         ...optionalText(['lineNumber', 'pipingClass', 'fluidCode']),
         ...ids.flatMap((id, index) => {
@@ -116,9 +132,14 @@ function kindErrors(item: Record<string, unknown>, path: string, items: Items, s
         }),
       ];
     }
-    case 'segment':
+    case 'segment': {
+      const line = items[String(item['lineId'])];
+      const listed = isRecord(line) && Array.isArray(line['segmentIds']) && membersOf(line['segmentIds']).has(item['id']);
       return [
         ...reference('lineId', ['line']),
+        ...(kindOf(items, item['lineId']) !== 'line' || listed
+          ? []
+          : [`${path}.lineId: the line does not list this segment in segmentIds`]),
         ...endpointErrors(item['from'], `${path}.from`, items),
         ...endpointErrors(item['to'], `${path}.to`, items),
         ...(isRoute(item['route']) ? [] : [`${path}.route must be at least two points of two finite numbers`]),
@@ -127,6 +148,7 @@ function kindErrors(item: Record<string, unknown>, path: string, items: Items, s
         ...optionalDn,
         ...optionalText(['pipingClass']),
       ];
+    }
     case 'inline':
       return [
         ...(Array.isArray(item['ports']) && item['ports'].every(isVec2) ? [] : [`${path}.ports must be an array of points`]),
@@ -182,9 +204,13 @@ function baseErrors(item: Record<string, unknown>, path: string, sheets: Record<
   for (const field of ['classUri', 'tag', 'sourceId'])
     if (item[field] !== undefined && typeof item[field] !== 'string') errors.push(`${path}.${field} must be a string`);
   if (!isRecord(item['attributes'])) errors.push(`${path}.attributes must be an object`);
-  else for (const [name, value] of Object.entries(item['attributes'])) errors.push(...valueErrors(value, `${path}.attributes.${name}`));
+  else {
+    errors.push(...reservedKeys(item['attributes'], `${path}.attributes`));
+    for (const [name, value] of Object.entries(item['attributes'])) errors.push(...valueErrors(value, `${path}.attributes.${name}`));
+  }
   if (item['passthrough'] !== undefined && !isStringRecord(item['passthrough']))
     errors.push(`${path}.passthrough must map strings to strings`);
+  errors.push(...reservedKeys(item['passthrough'], `${path}.passthrough`));
   return errors;
 }
 

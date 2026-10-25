@@ -292,7 +292,7 @@ describe('readXml: safety', () => {
       "<a b='\"'/>x",
     ];
     for (const source of noise) expect(() => readXml(source)).not.toThrow();
-    expect(readXml('<a>\u{D800}</a>').ok).toBe(true);
+    expect(readXml('<a>\u{D800}</a>').ok).toBe(false);
   });
 });
 

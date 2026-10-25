@@ -6,6 +6,7 @@
 import { isRecord } from '@lib/isRecord';
 import { isReservedKey } from '@lib/reservedKey';
 import { PID_CONVENTIONS, PID_IMPORT_FORMATS, PID_PAPERS, PID_SHEET_STATUSES, PID_TAG_FORMAT_KINDS } from './model';
+import { tagPatternErrors } from './patternSafety';
 import { itemErrors } from './validateItems';
 
 const nonEmpty = (value: unknown): boolean => typeof value === 'string' && value !== '';
@@ -23,12 +24,7 @@ function settingsErrors(raw: Record<string, unknown>): string[] {
     if (!isOneOf(PID_TAG_FORMAT_KINDS, kind)) errors.push(`${path}: the kind must be ${PID_TAG_FORMAT_KINDS.join(', ')}`);
     else if (!isRecord(format) || typeof format['pattern'] !== 'string' || typeof format['separator'] !== 'string')
       errors.push(`${path} must be { pattern: string, separator: string }`);
-    else
-      try {
-        new RegExp(format['pattern']);
-      } catch {
-        errors.push(`${path}.pattern must be a regular expression`);
-      }
+    else errors.push(...tagPatternErrors(format['pattern'], `${path}.pattern`));
   }
   return errors;
 }
@@ -78,9 +74,11 @@ function recordErrors(raw: Record<string, unknown>): string[] {
   if (acceptances !== undefined) {
     if (!isRecord(acceptances)) errors.push('plant.pid.acceptances must be an object');
     else
-      for (const [key, value] of Object.entries(acceptances))
+      for (const [key, value] of Object.entries(acceptances)) {
+        if (isReservedKey(key)) errors.push(`plant.pid.acceptances.${key}: the name is reserved`);
         if (!(isRecord(value) && nonEmpty(value['reason']) && nonEmpty(value['by']) && nonEmpty(value['at'])))
           errors.push(`plant.pid.acceptances.${key} must be { reason, by, at } (non-empty strings)`);
+      }
   }
   const imports = raw['imports'];
   if (imports !== undefined) {
@@ -100,6 +98,7 @@ function recordErrors(raw: Record<string, unknown>): string[] {
   const counters = raw['counters'];
   if (!isRecord(counters) || !Object.values(counters).every((n) => Number.isInteger(n) && (n as number) >= 0))
     errors.push('plant.pid.counters must map names to non-negative integers');
+  else for (const key of Object.keys(counters)) if (isReservedKey(key)) errors.push(`plant.pid.counters.${key}: the name is reserved`);
   return errors;
 }
 

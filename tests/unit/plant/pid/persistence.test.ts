@@ -46,7 +46,7 @@ const items: PidItem[] = [
     dn: 100,
     pipingClass: 'A1A',
     fluidCode: 'P',
-    segmentIds: ['pid-3.2', 'pid-3.3'],
+    segmentIds: ['pid-3.2', 'pid-3.3', 'pid-5.2'],
   },
   {
     ...base,

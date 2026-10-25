@@ -3,8 +3,9 @@
  * coded error with line / column (1-based, UTF-16 units; a lone CR or CRLF is one line break).
  *
  * Safety: DOCTYPE / DTDs are refused (`XML_DTD_FORBIDDEN`), so no external entity is ever resolved and no entity can expand (no XXE, no billion laughs);
- * only the five predefined entities and numeric character references are decoded (output never longer than input). Size, nesting depth, element count and
- * attributes per element are bounded. One iterative pass, no regex on unbounded input (linear time; no recursion, so no stack overflow).
+ * only the five predefined entities and numeric character references are decoded (output never longer than input). Size, nesting depth, element count,
+ * attributes per element and namespace declarations are bounded. One iterative pass; namespace scopes are push/pop stacks (linear time and memory);
+ * the few regexes are linear (no nested quantifiers) and no recursion is used while reading, so no stack overflow.
  *
  * Tree: elements keep qualified name, prefix, local name, resolved namespace, attributes (namespace declarations included, namespace
  * `XMLNS_NAMESPACE`) and children (elements and text; CDATA is merged into text; comments and processing instructions are dropped). Whitespace-only text
@@ -20,6 +21,7 @@ type XmlErrorCode =
   | 'XML_TOO_DEEP'
   | 'XML_TOO_MANY_ELEMENTS'
   | 'XML_TOO_MANY_ATTRIBUTES'
+  | 'XML_TOO_MANY_NAMESPACES'
   | 'XML_SYNTAX'
   | 'XML_DTD_FORBIDDEN'
   | 'XML_ENTITY_UNDEFINED'
@@ -87,9 +89,17 @@ export interface XmlReadLimits {
   readonly maxElements?: number;
   /** Attributes on one element (default 1024). */
   readonly maxAttributes?: number;
+  /** Namespace declarations (xmlns, xmlns:p) in the whole document (default 100 000). */
+  readonly maxNamespaceDeclarations?: number;
 }
 
-const XML_DEFAULT_LIMITS = { maxChars: 50_000_000, maxDepth: 256, maxElements: 5_000_000, maxAttributes: 1024 } as const;
+const XML_DEFAULT_LIMITS = {
+  maxChars: 50_000_000,
+  maxDepth: 256,
+  maxElements: 5_000_000,
+  maxAttributes: 1024,
+  maxNamespaceDeclarations: 100_000,
+} as const;
 
 const MAX_NAME_LENGTH = 1024;
 const PREDEFINED: Readonly<Record<string, string>> = { lt: '<', gt: '>', amp: '&', apos: "'", quot: '"' };
@@ -164,12 +174,16 @@ interface MutableElement {
 /** Normalised line ends (CRLF and lone CR become LF). */
 const lineEnds = (value: string): string => (value.includes('\r') ? value.replace(/\r\n?/g, '\n') : value);
 
+/** Attribute-value normalisation of a literal run: line ends, then tab and LF become spaces. */
+const attributeRun = (run: string): string => lineEnds(run).replace(/[\t\n]/g, ' ');
+
 /** Reads `source` as an XML document. Never throws. */
 export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResult {
   const maxChars = limits.maxChars ?? XML_DEFAULT_LIMITS.maxChars;
   const maxDepth = limits.maxDepth ?? XML_DEFAULT_LIMITS.maxDepth;
   const maxElements = limits.maxElements ?? XML_DEFAULT_LIMITS.maxElements;
   const maxAttributes = limits.maxAttributes ?? XML_DEFAULT_LIMITS.maxAttributes;
+  const maxNamespaceDeclarations = limits.maxNamespaceDeclarations ?? XML_DEFAULT_LIMITS.maxNamespaceDeclarations;
   const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
   const length = text.length;
 
@@ -191,13 +205,14 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
     throw new XmlFailure(code, message, offset);
   }
 
-  const decodeRefs = (raw: string, offset: number): string => {
+  /** Decodes the references of `raw` (error offsets are raw offsets); `literal` normalises the text between references, never a decoded character. */
+  const decodeRefs = (raw: string, offset: number, literal: (run: string) => string): string => {
     let amp = raw.indexOf('&');
-    if (amp < 0) return raw;
+    if (amp < 0) return literal(raw);
     let out = '';
     let from = 0;
     while (amp >= 0) {
-      out += raw.slice(from, amp);
+      out += literal(raw.slice(from, amp));
       const semicolon = raw.indexOf(';', amp + 1);
       if (semicolon < 0 || semicolon - amp > 12) fail('XML_SYNTAX', 'unterminated entity or character reference', offset + amp);
       const name = raw.slice(amp + 1, semicolon);
@@ -217,13 +232,20 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       from = semicolon + 1;
       amp = raw.indexOf('&', from);
     }
-    return out + raw.slice(from);
+    return out + literal(raw.slice(from));
   };
 
   const checkChars = (raw: string, offset: number, what: string): void => {
     for (let index = 0; index < raw.length; index++) {
       const code = raw.charCodeAt(index);
-      if (isBadControl(code))
+      if (code >= 0xd800 && code <= 0xdbff) {
+        const low = raw.charCodeAt(index + 1);
+        if (low >= 0xdc00 && low <= 0xdfff) {
+          index++;
+          continue;
+        }
+      }
+      if (isBadControl(code) || (code >= 0xd800 && code <= 0xdfff))
         fail(
           'XML_CHAR_INVALID',
           `${what} contains the invalid character U+${code.toString(16).toUpperCase().padStart(4, '0')}`,
@@ -290,7 +312,11 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       declaration = readDeclaration(text.slice(5, end), 5);
       at = end + 2;
     }
-    const scopes: Array<ReadonlyMap<string, string>> = [new Map([['xml', XML_NAMESPACE]])];
+    /** prefix -> stack of bound URIs (innermost last); '' is the default namespace, an empty URI undeclares it. */
+    const bindings = new Map<string, string[]>([['xml', [XML_NAMESPACE]]]);
+    /** Per open element, the prefixes it declared (undone when it closes). */
+    const declaredStack: string[][] = [];
+    let declarations = 0;
     const stack: MutableElement[] = [];
     let root: MutableElement | undefined;
     let elements = 0;
@@ -346,28 +372,38 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
         if (rawValue.includes('<')) fail('XML_SYNTAX', `attribute ${attrName} contains <`, quoteAt + 1 + rawValue.indexOf('<'));
         checkChars(rawValue, quoteAt + 1, `attribute ${attrName}`);
         if (raw.length >= maxAttributes) fail('XML_TOO_MANY_ATTRIBUTES', `more than ${maxAttributes} attributes on <${name}>`, afterSpace);
-        const normalised = lineEnds(rawValue).replace(/[\t\n]/g, ' ');
-        raw.push({ name: attrName, ...split, value: decodeRefs(normalised, quoteAt + 1), offset: afterSpace });
+        raw.push({ name: attrName, ...split, value: decodeRefs(rawValue, quoteAt + 1, attributeRun), offset: afterSpace });
         cursor = close + 1;
       }
 
-      const parentScope = scopes[scopes.length - 1] as ReadonlyMap<string, string>;
-      let scope = parentScope;
+      const declared: string[] = [];
       for (const attr of raw) {
         const declaresDefault = attr.name === 'xmlns';
         if (!declaresDefault && attr.prefix !== 'xmlns') continue;
-        if (scope === parentScope) scope = new Map(parentScope);
-        const bindings = scope as Map<string, string>;
         const prefix = declaresDefault ? '' : attr.local;
         if (prefix === 'xmlns' || (prefix === 'xml' && attr.value !== XML_NAMESPACE))
           fail('XML_SYNTAX', `the prefix ${prefix} cannot be declared`, attr.offset);
+        if (attr.value === XML_NAMESPACE && prefix !== 'xml')
+          fail('XML_SYNTAX', 'the XML namespace can only be bound to the prefix xml', attr.offset);
+        if (attr.value === XMLNS_NAMESPACE) fail('XML_SYNTAX', 'the xmlns namespace cannot be bound', attr.offset);
         if (attr.value === '' && !declaresDefault) fail('XML_SYNTAX', `xmlns:${prefix} cannot be bound to an empty namespace`, attr.offset);
-        if (attr.value === '') bindings.delete('');
-        else bindings.set(prefix, attr.value);
+        if (++declarations > maxNamespaceDeclarations)
+          fail('XML_TOO_MANY_NAMESPACES', `more than ${maxNamespaceDeclarations} namespace declarations`, attr.offset);
+        const uris = bindings.get(prefix);
+        if (uris) uris.push(attr.value);
+        else bindings.set(prefix, [attr.value]);
+        declared.push(prefix);
       }
+      const undo = (): void => {
+        for (const prefix of declared) {
+          const uris = bindings.get(prefix);
+          if (uris && uris.length > 1) uris.pop();
+          else bindings.delete(prefix);
+        }
+      };
       const resolve = (prefix: string, offset: number): string | null => {
-        if (prefix === '') return scope.get('') ?? null;
-        const uri = scope.get(prefix);
+        const uri = bindings.get(prefix)?.at(-1);
+        if (prefix === '') return uri === undefined || uri === '' ? null : uri;
         if (uri === undefined) fail('XML_NAMESPACE_UNBOUND', `the namespace prefix "${prefix}" is not declared`, offset);
         return uri ?? null;
       };
@@ -402,9 +438,11 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
       const parent = stack[stack.length - 1];
       if (parent) parent.children.push(element);
       else root = element;
-      if (selfClosing) return cursor;
-      stack.push(element);
-      scopes.push(scope);
+      if (selfClosing) undo();
+      else {
+        stack.push(element);
+        declaredStack.push(declared);
+      }
       return cursor;
     };
 
@@ -420,7 +458,7 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
         } else {
           checkChars(run, at, 'text');
           if (run.includes(']]>')) fail('XML_SYNTAX', 'the sequence ]]> is not allowed in text', at + run.indexOf(']]>'));
-          pendingText += decodeRefs(lineEnds(run), at);
+          pendingText += decodeRefs(run, at, lineEnds);
         }
       }
       if (lt < 0) break;
@@ -438,14 +476,19 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
           fail('XML_MISMATCHED_TAG', `</${endName}> closes <${top.name}> (opened at line ${top.line}, column ${top.column})`, at);
         flushText();
         closeElement(stack.pop() as MutableElement);
-        scopes.pop();
+        for (const prefix of declaredStack.pop() ?? []) {
+          const uris = bindings.get(prefix);
+          if (uris && uris.length > 1) uris.pop();
+          else bindings.delete(prefix);
+        }
         at = close + 1;
       } else if (next === 0x21) {
         if (text.startsWith('<!--', at)) {
           const end = text.indexOf('-->', at + 4);
           if (end < 0) fail('XML_UNCLOSED', 'the comment is not closed with -->', at);
           const body = text.slice(at + 4, end);
-          if (body.includes('--') || body.endsWith('-')) fail('XML_SYNTAX', 'a comment cannot contain --', at + 4 + body.indexOf('--'));
+          if (body.includes('--') || body.endsWith('-'))
+            fail('XML_SYNTAX', 'a comment cannot contain --', at + 4 + (body.includes('--') ? body.indexOf('--') : body.length - 1));
           checkChars(body, at + 4, 'comment');
           at = end + 3;
         } else if (text.startsWith('<![CDATA[', at)) {
