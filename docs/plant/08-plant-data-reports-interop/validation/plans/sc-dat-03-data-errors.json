@@ -1,6 +1,6 @@
 {
   "id": "SC-DAT-03",
-  "status": "PROPOSED — DAT MVP commands flagged \"unbuilt\". Run with build_project onError \"continue\" so the refused steps are reported and the plan goes on.",
+  "status": "BUILT (DAT-M1, run in tests/unit/plant/data/scenarioPlans.test.ts). Run with build_project onError \"continue\" so the refused steps are reported and the plan goes on.",
   "validates": [
     "VC-DAT-12",
     "VC-DAT-02"
@@ -23,7 +23,6 @@
     },
     {
       "command": "define_plant_hierarchy",
-      "unbuilt": true,
       "params": {
         "nodes": [
           {
@@ -48,7 +47,6 @@
     },
     {
       "command": "load_plant_class_library",
-      "unbuilt": true,
       "params": {
         "library": "llull-default-process"
       }
@@ -87,7 +85,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$pa",
         "className": "CentrifugalPump",
@@ -102,7 +99,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$pa",
         "className": "CentrifugalPump",
@@ -118,7 +114,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$pb",
         "className": "CentrifugalPump",
@@ -132,7 +127,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$pb",
         "className": "CentrifugalPump",
@@ -144,7 +138,8 @@
           "Description": "Pump B"
         }
       },
-      "note": "accepted, DesignPressure (required) missing"
+      "note": "accepted, DesignPressure (required) missing",
+      "as": "pbObject"
     },
     {
       "command": "add_pipe_run",
@@ -170,7 +165,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$l1",
         "className": "ProcessLine",
@@ -185,7 +179,6 @@
     },
     {
       "command": "check_plant_data",
-      "unbuilt": true,
       "params": {}
     }
   ],
@@ -224,9 +217,10 @@
       "step": 12,
       "path": "findings[code=DAT_REQUIRED_PROPERTY_MISSING].ids",
       "value": [
+        "$pbObject",
         "$pb"
       ],
-      "source": "DesignPressure required on Equipment"
+      "source": "DesignPressure required on Equipment; a finding names the plant object, then the model element it stands for (DAT-M1 decision)"
     },
     {
       "step": 12,

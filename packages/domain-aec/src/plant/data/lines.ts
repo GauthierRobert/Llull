@@ -10,7 +10,6 @@ import { isKindOf } from './classes';
 import type { PlantDataModel, PlantObject } from './model';
 import { allProviders, elementOf, foreignTagHolders } from './providers';
 import { holdersOf, objectRegistry, objectScope } from './registry';
-import { normaliseTag } from './tagFormat';
 
 export const PROCESS_LINE_CLASS = 'ProcessLine';
 
@@ -39,8 +38,7 @@ function isBatteryLimit(doc: CadDocument, data: PlantDataModel, name: string): b
 }
 
 const resolvesAsTag = (doc: CadDocument, data: PlantDataModel, line: PlantObject, name: string): boolean =>
-  holdersOf(objectRegistry(data), objectScope(data, line), name).length > 0 ||
-  foreignTagHolders(doc, Object.values(data.objects), name, normaliseTag).length > 0;
+  holdersOf(objectRegistry(data), objectScope(data, line), name).length > 0 || foreignTagHolders(doc, name).length > 0;
 
 /** `<equipment tag>:<nozzle mark>` (03 EQP port id): the equipment resolves as a tag and carries a nozzle of that mark. */
 function resolvesAsNozzle(doc: CadDocument, data: PlantDataModel, line: PlantObject, name: string): boolean {

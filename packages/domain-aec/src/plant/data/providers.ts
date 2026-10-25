@@ -8,8 +8,9 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
-import type { PlantObject, PlantObjectTarget } from './model';
+import { getPlantData, type PlantObjectTarget } from './model';
 import type { PlantValueInput } from './properties';
+import { normaliseTag } from './tagFormat';
 
 export interface ProviderElement {
   readonly id: string;
@@ -52,6 +53,7 @@ const providers = new Map<string, PlantObjectProvider>();
 /** Registers (or replaces) a provider; called by the plugins' `onInstall`. */
 export function registerPlantObjectProvider(provider: PlantObjectProvider): void {
   providers.set(provider.id, provider);
+  foreignCache = new WeakMap();
 }
 
 export const getProvider = (id: string): PlantObjectProvider | undefined => providers.get(id);
@@ -99,29 +101,30 @@ export function resolveTarget(doc: CadDocument, reference: string | { readonly p
 const asTarget = (providerId: string, id: string): PlantObjectTarget =>
   providerId === 'buildingElement' ? { kind: 'buildingElement', id } : { kind: 'provider', provider: providerId, id };
 
-/** Model objects whose own tag field equals `tag`, that must be unique, and that no plant object stands for (they are tags in use that the plant objects do not know). */
-export function foreignTagHolders(
-  doc: CadDocument,
-  objects: Iterable<PlantObject>,
-  tag: string,
-  normalise: (text: string) => string,
-): Array<{ readonly provider: string; readonly element: ProviderElement }> {
+type ForeignHolder = { readonly provider: string; readonly element: ProviderElement };
+
+let foreignCache = new WeakMap<CadDocument, ReadonlyMap<string, readonly ForeignHolder[]>>();
+
+/** Normalised tag -> the model objects that carry it as a field that must be unique and that no plant object stands for (tags in use the plant objects do not know). Built once per document. */
+function foreignIndex(doc: CadDocument): ReadonlyMap<string, readonly ForeignHolder[]> {
+  const cached = foreignCache.get(doc);
+  if (cached !== undefined) return cached;
   const claimed = new Set<string>();
-  for (const object of objects) {
+  for (const object of Object.values(getPlantData(doc).objects)) {
     const key = targetKey(object.target);
     if (key !== null) claimed.add(key);
   }
-  const wanted = normalise(tag);
-  return [...providers.values()].flatMap((provider) =>
-    provider
-      .elements(doc)
-      .filter(
-        (element) =>
-          element.tagUnique &&
-          element.tag !== undefined &&
-          normalise(element.tag) === wanted &&
-          !claimed.has(`${provider.id}:${element.id}`),
-      )
-      .map((element) => ({ provider: provider.id, element })),
-  );
+  const index = new Map<string, ForeignHolder[]>();
+  for (const provider of providers.values())
+    for (const element of provider.elements(doc)) {
+      if (!element.tagUnique || element.tag === undefined || claimed.has(`${provider.id}:${element.id}`)) continue;
+      const key = normaliseTag(element.tag);
+      index.set(key, [...(index.get(key) ?? []), { provider: provider.id, element }]);
+    }
+  foreignCache.set(doc, index);
+  return index;
 }
+
+/** Model objects whose unique tag field equals `tag` and that no plant object stands for. */
+export const foreignTagHolders = (doc: CadDocument, tag: string): readonly ForeignHolder[] =>
+  foreignIndex(doc).get(normaliseTag(tag)) ?? [];

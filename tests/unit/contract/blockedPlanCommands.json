@@ -235,23 +235,10 @@
       "spring_variability"
     ],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-01-tank-pump-mvp.json": [
-      "assign_plant_object",
-      "check_plant_data",
-      "define_plant_class",
-      "define_plant_hierarchy",
       "plant_report"
     ],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-02-inline-valves-v1.json": [
-      "check_plant_data",
-      "define_plant_hierarchy",
-      "load_plant_class_library",
       "plant_report"
-    ],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-03-data-errors.json": [
-      "assign_plant_object",
-      "check_plant_data",
-      "define_plant_hierarchy",
-      "load_plant_class_library"
     ],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": [
       "export_plant_data",
