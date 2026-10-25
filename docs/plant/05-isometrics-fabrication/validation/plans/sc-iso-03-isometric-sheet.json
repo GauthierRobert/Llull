@@ -3,7 +3,7 @@
   "validates": ["VC-ISO-10", "VC-ISO-11"],
   "description": "Produce the final isometric of L-101 (imported from the sample PCF) on an A3 sheet: true isometric projection, north arrow, centreline string dimensions, elevations, weld and spool marks, BOM, cut list and weld tables. Save SVG and DXF with --save.",
   "status": "UNBUILT - specification scenario",
-  "unbuilt": ["import_pcf", "export_isometric"],
+  "unbuilt": ["export_isometric"],
   "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" } },
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },

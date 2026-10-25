@@ -3,7 +3,7 @@
   "validates": ["VC-ISO-04", "VC-ISO-17"],
   "description": "Route L-101 DN100 in llull with the same geometry as the sample PCF (main run with three 90 deg turns, a vertical branch at x = 7105), let routing place LR elbows, an equal tee and weld-neck flanges from the spec, add a site weld at x = 2500, export the PCF and re-import it as a preview. Pipe length must equal route length minus fitting take-outs.",
   "status": "UNBUILT - depends on 01-piping-specs-catalog (spec CS150-A1) and 02-spec-driven-routing (fittings, flanges, branch); names of RTE commands are placeholders owned by that pack",
-  "unbuilt": ["import_pipe_spec (PSC)", "add_pipe_run.spec (PSC)", "add_branch (RTE)", "add_end_flange (RTE)", "add_field_weld", "export_pcf", "import_pcf", "piping_bom"],
+  "unbuilt": ["import_pipe_spec (PSC)", "add_pipe_run.spec (PSC)", "add_branch (RTE)", "add_end_flange (RTE)", "add_field_weld", "piping_bom"],
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
     { "command": "import_pipe_spec", "params": { "spec": "<01-piping-specs-catalog/validation/data/sample_spec_cs150.json>" } },

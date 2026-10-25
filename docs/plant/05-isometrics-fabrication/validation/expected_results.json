@@ -1,7 +1,7 @@
 {
   "pack": "05 ISO",
   "generatedBy": "hand-written index; computed values come from data/pcf_reference_parse.py run on data/iso-01-L101-dn100.pcf (output saved as data/iso-01-L101-dn100.expected.json) or from the closed forms quoted here",
-  "status": "specification only: every command below is unbuilt (TECHNICAL_SPEC §4); tests are named where they will live",
+  "status": "ISO-M1 built (VC-ISO-01..03: import_pcf, export_pcf; TECHNICAL_SPEC §13); every other command below is unbuilt (TECHNICAL_SPEC §4); tests are named where they will live",
   "cases": [
     {
       "id": "VC-ISO-01",

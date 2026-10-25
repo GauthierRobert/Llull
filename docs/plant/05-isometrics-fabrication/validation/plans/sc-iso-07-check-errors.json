@@ -3,7 +3,7 @@
   "validates": ["VC-ISO-02", "VC-ISO-16"],
   "description": "Deliberately broken inputs: a PCF with a TAB, and a line whose flange has no SKEY, whose last pipe stops 5 mm short of the next fitting and whose single spool is longer than the 12 m shipping limit given by the user. Every problem must come back with its stable code, ids and a remediation.",
   "status": "UNBUILT - specification scenario",
-  "unbuilt": ["import_pcf", "check_isometric", "set_fabrication_rules"],
+  "unbuilt": ["check_isometric", "set_fabrication_rules"],
   "harness": {
     "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" },
     "mutate": [

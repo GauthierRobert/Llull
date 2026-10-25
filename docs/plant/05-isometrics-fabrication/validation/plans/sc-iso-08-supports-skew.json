@@ -2,8 +2,8 @@
   "id": "SC-ISO-08",
   "validates": ["VC-ISO-21"],
   "description": "A DN80 line with a 45 deg horizontal offset (legs 1000 / 1000 mm) and two shoes placed with add_pipe_support: the PCF carries two SUPPORT records with CO-ORDS on the centreline, the iso draws the offset inside a squaring-in triangle with both leg dimensions.",
-  "status": "UNBUILT - add_pipe_run and add_pipe_support exist today; export_pcf and export_isometric are unbuilt; 45 deg elbows come from the legacy derivation (warning ISO_LEGACY_FITTINGS_DERIVED expected)",
-  "unbuilt": ["export_pcf", "export_isometric"],
+  "status": "UNBUILT - add_pipe_run and add_pipe_support exist today; export_pcf is built (ISO-M1); export_isometric is unbuilt; 45 deg elbows come from the legacy derivation (warning ISO_LEGACY_FITTINGS_DERIVED expected)",
+  "unbuilt": ["export_isometric"],
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
     { "command": "add_pipe_run", "params": { "points": [[0, 0, 2000], [2000, 0, 2000], [3000, 1000, 2000], [5000, 1000, 2000]], "dn": 80, "line": "S-501", "service": "steam condensate" }, "as": "s501" },
