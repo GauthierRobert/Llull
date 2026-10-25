@@ -9,8 +9,10 @@ export) is right. Every expected value comes from one of three places, listed in
   for IDS, openpyxl 3.1.5 for XLSX);
 - a third-party file measured with that reference implementation (buildingSMART IFC 4.3 ADD2 samples).
 
-**No expected value was produced by running llull.** The plant data commands do not exist yet; the plans flag every
-command that is not built (`"unbuilt": true`).
+**No expected value was produced by running llull.** The plans flag every command that is not built (`"unbuilt": true`).
+Built with DAT-M1 (2026-10-25): VC-DAT-01, 02 (`tag_format_cases.json`), VC-DAT-12 (SC-DAT-03), VC-DAT-14, the tag part of
+SC-DAT-01 and the data-model rows of VC-DAT-11, run by `tests/unit/plant/data/`; reports, XLSX, IFC 4.3 and the V1 / V2 commands are
+still `unbuilt`. In a finding of `check_plant_data`, `ids` lists the plant object id, then the model element id it stands for.
 
 ## How the cases run
 
