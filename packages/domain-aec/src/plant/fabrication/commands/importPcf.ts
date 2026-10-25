@@ -20,7 +20,7 @@ export const importPcf = defineCommand({
     'PIPELINE-REFERENCE or lineIdOverride). One pipeline per file; give the file text in `text` (CLI: file=<path>). The header units scale coordinates and bores to mm (UNITS-BORE and UNITS-CO-ORDS ' +
     'are required, never assumed); components PIPE, ELBOW, BEND, TEE, OLET, REDUCER-CONCENTRIC / -ECCENTRIC, FLANGE, FLANGE-BLIND, GASKET, BOLT, VALVE, CAP, WELD, SUPPORT, INSTRUMENT with ' +
     'END-POINT / CENTRE-POINT / BRANCH1-POINT / CO-ORDS, SKEY, ITEM-CODE, WEIGHT, FABRICATION-ITEM / ERECTION-ITEM and the MATERIALS block are read; everything else is kept and written back verbatim by export_pcf ' +
-    '(listed in data.unknownRecords with its line). Returns data = { lineId, units: { bore, coords } (as declared in the file), componentCount, countsByType, totalPipeLengthMm (sum of PIPE END-POINT distances), pipeLengthsMm[], ' +
+    '(listed in data.unknownRecords with its line). Returns data = { lineId, units: { bore, coords, boltDia?, boltLength? } (as declared in the file; an INCH bore is the nominal NPS and maps to DN, 4 -> 100), componentCount, countsByType, totalPipeLengthMm (sum of PIPE END-POINT distances), pipeLengthsMm[], ' +
     'bom: [{ itemCode, description, count, lengthMm? }], withoutItemCode, unknownRecords: [{ type, line }], warnings: [{ code, severity, message, ids, paths, remediation }], stored }. ' +
     'preview true only reports (document unchanged). Refusals (document unchanged, path "line N"): ISO_PCF_TAB, ISO_PCF_LINE_TOO_LONG, ISO_PCF_HEADER (first line must be ISOGEN-FILES), ISO_PCF_TOO_LARGE, ' +
     'ISO_PCF_UNITS_MISSING, ISO_PCF_RECORD_INVALID, ISO_PCF_LINE_EXISTS (pass lineIdOverride or delete_pcf_line). Next: export_pcf writes it back; delete_pcf_line removes it.',
@@ -29,6 +29,7 @@ export const importPcf = defineCommand({
     preview: z.boolean().optional().describe('true = only parse and report; the document is not changed. Default false.'),
     lineIdOverride: z
       .string()
+      .trim()
       .min(1)
       .optional()
       .describe("Store the line under this id instead of the file's PIPELINE-REFERENCE (use when that reference is already in use)."),
@@ -42,7 +43,7 @@ export const importPcf = defineCommand({
   run: (doc, params): CommandResult => {
     const read = readPcf(params.text);
     if (!read.ok) return refuseIso(doc, 'import_pcf', read.code, read.message, [], read.paths);
-    const lineId = params.lineIdOverride?.trim() || read.file.lineId;
+    const lineId = params.lineIdOverride?.trim() ?? read.file.lineId;
     const file = { ...read.file, lineId };
     const taken = lineIdsInUse(doc).has(lineId);
     if (taken && params.preview !== true)
@@ -63,7 +64,7 @@ export const importPcf = defineCommand({
     ];
     const data = {
       lineId,
-      units: { bore: read.sourceUnits.bore, coords: read.sourceUnits.coords },
+      units: read.file.units,
       componentCount: summary.componentCount,
       countsByType: summary.countsByType,
       totalPipeLengthMm: summary.totalPipeLengthMm,

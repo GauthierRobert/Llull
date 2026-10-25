@@ -1,7 +1,7 @@
 /** `PcfLineData` <-> `PipingNetwork` and the summaries both read paths report (plant 05 ISO §5.1 step 5, §5.7). Pure. */
 
 import { distance3 } from '@lib/vec3';
-import type { IsoIssue, NetworkComponent, PcfLineData, PcfMaterial, PipingNetwork } from '../model';
+import type { IsoIssue, NetworkComponent, PcfLineData, PcfMaterial, PcfUnits, PipingNetwork } from '../model';
 
 /** The network view of a stored / read PCF line: MATERIALS descriptions joined to the components by item code. */
 export function networkOf(data: PcfLineData, warnings: readonly IsoIssue[] = []): PipingNetwork {
@@ -18,8 +18,12 @@ export function networkOf(data: PcfLineData, warnings: readonly IsoIssue[] = [])
   };
 }
 
+/** Header and units of a line llull generates (route, legacy): millimetres, kilograms. */
+const GENERATED_HEADER = { 'ISOGEN-FILES': 'ISOGEN.FLS', 'UNITS-WEIGHT': 'KGS' } as const;
+export const GENERATED_UNITS: PcfUnits = { bore: 'MM', coords: 'MM', boltDia: 'MM', boltLength: 'MM' };
+
 /** The stored form of a network built by the route or legacy reader: MATERIALS from the first description of each item code (first-use order). */
-export function dataOfNetwork(network: PipingNetwork, header: Readonly<Record<string, string>>): PcfLineData {
+export function dataOfNetwork(network: PipingNetwork): PcfLineData {
   const materials = new Map<string, PcfMaterial>();
   const components = network.components.map(({ description, ...component }): NetworkComponent => {
     if (component.itemCode !== undefined && !materials.has(component.itemCode))
@@ -31,7 +35,8 @@ export function dataOfNetwork(network: PipingNetwork, header: Readonly<Record<st
   });
   return {
     lineId: network.lineId,
-    header,
+    header: GENERATED_HEADER,
+    units: GENERATED_UNITS,
     attributes: network.attributes,
     components,
     materials: [...materials.values()],

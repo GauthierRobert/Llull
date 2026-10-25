@@ -15,23 +15,21 @@ import {
   type PcfComponentType,
   type PcfLineData,
   type PcfMaterial,
+  type PcfUnit,
+  type PcfUnits,
   type PcfUnknownRecord,
   type WeldKind,
 } from '../model';
+import { MM_PER_INCH, boreToMm } from './pcfUnits';
 import { lexPcf, type LexLine, type LexRefusal } from './pcfLexer';
-
-export type PcfUnit = 'MM' | 'INCH';
 
 export interface PcfRead {
   readonly file: PcfLineData;
-  /** Units the file declared (the stored data is millimetres). */
-  readonly sourceUnits: { readonly bore: PcfUnit; readonly coords: PcfUnit };
   readonly warnings: readonly IsoIssue[];
 }
 
 export type PcfReadResult = ({ readonly ok: true } & PcfRead) | LexRefusal;
 
-const MM_PER_INCH = 25.4;
 const LENGTH_UNIT_KEYS = ['UNITS-BORE', 'UNITS-CO-ORDS', 'UNITS-BOLT-DIA', 'UNITS-BOLT-LENGTH'] as const;
 const WELD_KINDS: Readonly<Record<string, WeldKind>> = { WW: 'shop', WS: 'site', WF: 'field_fit' };
 const CATEGORY_FLAGS: Readonly<Record<string, ComponentCategory>> = {
@@ -73,23 +71,31 @@ function unitOf(line: LexLine): PcfUnit {
   throw new PcfInvalid(line.n, `${line.key} on line ${line.n}: unit must be MM or INCH`);
 }
 
-function point(line: LexLine, withBore: boolean, coordFactor: number, boreFactor: number): NetworkPoint {
+function point(line: LexLine, withBore: boolean, scale: Scale): NetworkPoint {
   const parts = words(line);
   const count = withBore ? 4 : 3;
   if (parts.length < count || parts.length > (withBore ? 5 : 3))
     throw new PcfInvalid(line.n, `${line.key} on line ${line.n} must be: x y z${withBore ? ' bore [end type]' : ''}`);
   const xyz: Vec3 = [
-    num(parts[0], line, 'x') * coordFactor,
-    num(parts[1], line, 'y') * coordFactor,
-    num(parts[2], line, 'z') * coordFactor,
+    num(parts[0], line, 'x') * scale.coord,
+    num(parts[1], line, 'y') * scale.coord,
+    num(parts[2], line, 'z') * scale.coord,
   ];
   const endType = parts[4];
-  return { xyz, boreMm: withBore ? num(parts[3], line, 'bore') * boreFactor : 0, ...(endType === undefined ? {} : { endType }) };
+  let boreMm = 0;
+  if (withBore) {
+    const bore = boreToMm(num(parts[3], line, 'bore'), scale.bore);
+    boreMm = bore.mm;
+    if (!bore.mapped) scale.unmapped.push(line.n);
+  }
+  return { xyz, boreMm, ...(endType === undefined ? {} : { endType }) };
 }
 
 interface Scale {
   readonly coord: number;
-  readonly bore: number;
+  readonly bore: PcfUnit;
+  /** Lines whose inch bore is no nominal size (converted by value). */
+  readonly unmapped: number[];
 }
 
 interface Builder {
@@ -100,7 +106,7 @@ interface Builder {
   coords: Vec3 | undefined;
   skey: string | undefined;
   itemCode: string | undefined;
-  weightKg: number | undefined;
+  weight: number | undefined;
   category: ComponentCategory | undefined;
   extra: Record<string, string>;
 }
@@ -125,7 +131,7 @@ function component(
     coords: undefined,
     skey: undefined,
     itemCode: undefined,
-    weightKg: undefined,
+    weight: undefined,
     category: undefined,
     extra: {},
   };
@@ -139,19 +145,19 @@ function component(
         break;
       case 'END-POINT':
         if (b.ends.length === 2) throw new PcfInvalid(line.n, `${type} on line ${head.n} has more than two END-POINT records`);
-        b.ends.push(point(line, true, scale.coord, scale.bore));
+        b.ends.push(point(line, true, scale));
         break;
       case 'BRANCH1-POINT':
         single(b.branch, line);
-        b.branch = point(line, true, scale.coord, scale.bore);
+        b.branch = point(line, true, scale);
         break;
       case 'CENTRE-POINT':
         single(b.centre, line);
-        b.centre = point(line, false, scale.coord, scale.bore).xyz;
+        b.centre = point(line, false, scale).xyz;
         break;
       case 'CO-ORDS':
         single(b.coords, line);
-        b.coords = point(line, false, scale.coord, scale.bore).xyz;
+        b.coords = point(line, false, scale).xyz;
         break;
       case 'SKEY':
         single(b.skey, line);
@@ -162,8 +168,8 @@ function component(
         b.itemCode = line.rest;
         break;
       case 'WEIGHT':
-        single(b.weightKg, line);
-        b.weightKg = num(line.rest, line, 'the weight');
+        single(b.weight, line);
+        b.weight = num(line.rest, line, 'the weight');
         break;
       default: {
         const category = CATEGORY_FLAGS[line.key];
@@ -188,7 +194,7 @@ function component(
     ...(b.itemCode === undefined ? {} : { itemCode: b.itemCode }),
     ...(b.category === undefined ? {} : { category: b.category }),
     ...(weldKind === undefined ? {} : { weldKind }),
-    ...(b.weightKg === undefined ? {} : { weightKg: b.weightKg }),
+    ...(b.weight === undefined ? {} : { weight: b.weight }),
     ...(Object.keys(b.extra).length === 0 ? {} : { extra: b.extra }),
   };
 }
@@ -236,7 +242,7 @@ function parse(lines: readonly LexLine[]): PcfRead {
   const bore = units.get('UNITS-BORE');
   const coords = units.get('UNITS-CO-ORDS');
   if (bore === undefined || coords === undefined) throw new PcfMissingUnits(bore === undefined ? 'UNITS-BORE' : 'UNITS-CO-ORDS');
-  const scale: Scale = { coord: coords === 'INCH' ? MM_PER_INCH : 1, bore: bore === 'INCH' ? MM_PER_INCH : 1 };
+  const scale: Scale = { coord: coords === 'INCH' ? MM_PER_INCH : 1, bore, unmapped: [] };
   const all = records(lines.slice(cursor));
   const first = all[0];
   if (first === undefined) throw new PcfInvalid(lines[lines.length - 1]?.n ?? 1, 'the file has no PIPELINE-REFERENCE');
@@ -249,6 +255,14 @@ function parse(lines: readonly LexLine[]): PcfRead {
   const warnings: IsoIssue[] = [];
   const ids = new Set<string>();
   let inMaterials = false;
+  const boltDia = units.get('UNITS-BOLT-DIA');
+  const boltLength = units.get('UNITS-BOLT-LENGTH');
+  const declared: PcfUnits = {
+    bore,
+    coords,
+    ...(boltDia === undefined ? {} : { boltDia }),
+    ...(boltLength === undefined ? {} : { boltLength }),
+  };
   for (const record of all.slice(1)) {
     const { head, body } = record;
     if (head.key === 'PIPELINE-REFERENCE')
@@ -267,7 +281,13 @@ function parse(lines: readonly LexLine[]): PcfRead {
       ids.add(made.id);
       components.push(made);
     } else {
-      unknownRecords.push({ type: head.key, line: head.n, after: components.length, text: [head.raw, ...body.map((line) => line.raw)] });
+      unknownRecords.push({
+        type: head.key,
+        line: head.n,
+        after: components.length,
+        ...(inMaterials ? { afterMaterials: true as const } : {}),
+        text: [head.raw, ...body.map((line) => line.raw)],
+      });
       warnings.push(
         isoIssue(
           'ISO_PCF_UNKNOWN_RECORD',
@@ -279,7 +299,17 @@ function parse(lines: readonly LexLine[]): PcfRead {
       );
     }
   }
-  return { file: { lineId, header, attributes, components, materials, unknownRecords }, sourceUnits: { bore, coords }, warnings };
+  if (scale.unmapped.length > 0)
+    warnings.push(
+      isoIssue(
+        'ISO_PCF_BORE_UNMAPPED',
+        'warning',
+        `inch bore on line(s) ${scale.unmapped.join(', ')} is no nominal pipe size: converted by value (25.4 mm per inch)`,
+        [],
+        scale.unmapped.map((n) => `line ${n}`),
+      ),
+    );
+  return { file: { lineId, header, units: declared, attributes, components, materials, unknownRecords }, warnings };
 }
 
 /**

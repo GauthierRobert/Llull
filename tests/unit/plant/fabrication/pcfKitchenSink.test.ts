@@ -60,13 +60,13 @@ describe('the rarer records of the subset', () => {
     expect(read.file.header).toEqual({ 'ISOGEN-FILES': 'ISOGEN.FLS', 'UNITS-WEIGHT': 'KGS', 'UNITS-WEIGHT-LENGTH': 'METER' });
     expect(read.file.attributes['NOTE-FREE-FORM']).toBe('some text');
     const [pipe, olet, bolt, weld, support] = read.file.components;
-    expect(pipe).toMatchObject({ category: 'fabrication', weightKg: 12.5 });
+    expect(pipe).toMatchObject({ category: 'fabrication', weight: 12.5 });
     expect(olet).toMatchObject({ ends: [], centre: [500, 0, 0], branch: { boreMm: 50 } });
     expect(bolt).toMatchObject({ category: 'offshore', ends: [] });
     expect(weld).toMatchObject({ weldKind: 'field_fit', skey: 'WF' });
     expect(support).toMatchObject({ coords: [250, 0, -100], skey: 'SU01' });
     expect(read.file.materials[0]?.fields).toEqual({ DESCRIPTION: 'pipe   with  spaces', 'NOTE-FLAG': '' });
-    expect(writePcfText(read.file, { units: 'mm', includeMaterials: true }).content).toBe(SINK);
+    expect(writePcfText(read.file, { units: read.file.units, includeMaterials: true }).content).toBe(SINK);
   });
 
   it('the writer derives the weld key from weldKind and prints negative zero as 0.0', () => {
@@ -80,7 +80,7 @@ describe('the rarer records of the subset', () => {
       }
       return component;
     });
-    const content = writePcfText({ ...read.file, components }, { units: 'mm', includeMaterials: false }).content;
+    const content = writePcfText({ ...read.file, components }, { units: read.file.units, includeMaterials: false }).content;
     expect(content).toContain('WELD\n    COMPONENT-IDENTIFIER 4\n    END-POINT 0.0 0.0 0.0 100 BW\n    SKEY WW\n');
     expect(content).not.toContain('MATERIALS');
   });

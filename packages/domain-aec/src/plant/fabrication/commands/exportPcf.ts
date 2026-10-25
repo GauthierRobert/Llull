@@ -6,13 +6,40 @@ import { buildGraph, selectRuns } from '../../piping/graph';
 import { getPiping, refuse } from '../../piping/model';
 import { isoIssue, refuseIso } from '../codes';
 import { legacyLines, legacyNetwork } from '../legacyNetwork';
-import type { IsoIssue, PcfLineData, PipingNetwork } from '../model';
-import { dataOfNetwork, missingSkeyIds, networkOf, summarise } from '../pcf/pcfMap';
+import type { IsoIssue, PcfLineData, PcfUnit, PcfUnits, PipingNetwork } from '../model';
+import { GENERATED_UNITS, dataOfNetwork, missingSkeyIds, networkOf, summarise } from '../pcf/pcfMap';
 import { writePcfText } from '../pcf/pcfWrite';
 import { routeNetwork, type RouteNetwork } from '../routeNetwork';
 import { getFabrication } from '../state';
 
-const GENERATED_HEADER = { 'ISOGEN-FILES': 'ISOGEN.FLS', 'UNITS-WEIGHT': 'KGS' } as const;
+const OWNER = { route: 'routed line', pcf: 'imported line', legacy: 'legacy pipe line' } as const;
+
+interface Entry {
+  readonly kind: 'route' | 'pcf' | 'legacy';
+  readonly id: string;
+  /** The PIPELINE-REFERENCE and file name. */
+  readonly key: string;
+}
+
+const ALL = (unit: PcfUnit): PcfUnits => ({ bore: unit, coords: unit, boltDia: unit, boltLength: unit });
+
+/** The units a line is written in: the `units` param for every field, else the ones a stored line was read in, else mm. */
+function effectiveUnits(source: Source, requested: 'mm' | 'inch' | undefined): PcfUnits {
+  if (requested !== undefined) return ALL(requested === 'inch' ? 'INCH' : 'MM');
+  return source.network.source === 'pcf' ? source.data.units : GENERATED_UNITS;
+}
+
+/** A stored line with verbatim content (extra attributes, unknown records) cannot change a unit it declared. */
+function unitsConflict(data: PcfLineData, units: PcfUnits): boolean {
+  const verbatim = data.unknownRecords.length > 0 || data.components.some((component) => component.extra !== undefined);
+  const declared = data.units;
+  const changed =
+    declared.bore !== units.bore ||
+    declared.coords !== units.coords ||
+    (declared.boltDia !== undefined && declared.boltDia !== units.boltDia) ||
+    (declared.boltLength !== undefined && declared.boltLength !== units.boltLength);
+  return verbatim && changed;
+}
 
 interface Source {
   readonly network: PipingNetwork;
@@ -71,21 +98,27 @@ export const exportPcf = defineCommand({
     const stored = getFabrication(doc).pcfLines;
     const legacy = legacyLines(doc);
     const hasRun = (lineId: string): boolean => piping.runOrder.some((runId) => piping.runs[runId]?.lineId === lineId);
-    const routed = piping.lineOrder.filter(hasRun);
-    const everything = [
-      ...routed,
-      ...Object.keys(stored)
-        .sort()
-        .filter((id) => !routed.includes(id)),
-      ...[...legacy.keys()].filter((id) => !routed.includes(id) && stored[id] === undefined),
+    const entries = (id: string): Entry[] => [
+      ...(piping.lines[id] === undefined ? [] : [{ kind: 'route' as const, id, key: piping.lines[id]?.lineNumber ?? id }]),
+      ...(stored[id] === undefined ? [] : [{ kind: 'pcf' as const, id, key: id }]),
+      ...(legacy.has(id) ? [{ kind: 'legacy' as const, id, key: id }] : []),
     ];
-    const wanted = [...new Set(params.lineIds ?? everything)];
-    const unknown = wanted.filter((id) => piping.lines[id] === undefined && stored[id] === undefined && !legacy.has(id));
+    const wanted: Entry[] =
+      params.lineIds === undefined
+        ? [
+            ...piping.lineOrder.filter(hasRun).flatMap((id) => entries(id).filter((entry) => entry.kind === 'route')),
+            ...Object.keys(stored)
+              .sort()
+              .flatMap((id) => entries(id).filter((entry) => entry.kind === 'pcf')),
+            ...[...legacy.keys()].flatMap((id) => entries(id).filter((entry) => entry.kind === 'legacy')),
+          ]
+        : [...new Set(params.lineIds)].flatMap(entries);
+    const unknown = (params.lineIds ?? []).filter((id) => entries(id).length === 0);
     if (unknown.length > 0)
       return refuseIso(doc, 'export_pcf', 'ISO_LINE_NOT_FOUND', `no pipe line ${unknown.map((id) => `"${id}"`).join(', ')}`, unknown, [
         'lineIds',
       ]);
-    const noRun = wanted.filter((id) => piping.lines[id] !== undefined && !hasRun(id));
+    const noRun = wanted.filter((entry) => entry.kind === 'route' && !hasRun(entry.id)).map((entry) => entry.id);
     if (wanted.length === 0 || noRun.length > 0)
       return refuseIso(
         doc,
@@ -95,7 +128,19 @@ export const exportPcf = defineCommand({
         noRun,
         ['lineIds'],
       );
-    const routedWanted = wanted.filter((id) => piping.lines[id] !== undefined);
+    const clash = wanted.find((entry, index) => wanted.findIndex((other) => other.key === entry.key) !== index);
+    if (clash !== undefined) {
+      const owners = wanted.filter((entry) => entry.key === clash.key);
+      return refuseIso(
+        doc,
+        'export_pcf',
+        'ISO_LINE_DUPLICATE',
+        `PIPELINE-REFERENCE "${clash.key}" is used by ${owners.map((entry) => `${OWNER[entry.kind]} ${entry.id}`).join(' and ')}: one file per line would overwrite the other`,
+        owners.map((entry) => entry.id),
+        ['lineIds'],
+      );
+    }
+    const routedWanted = wanted.filter((entry) => entry.kind === 'route').map((entry) => entry.id);
     const selection = selectRuns(doc, routedWanted);
     const broken = selection.broken.find((entry) => routedWanted.includes(piping.runs[entry.runId]?.lineId ?? ''));
     if (broken !== undefined)
@@ -109,28 +154,50 @@ export const exportPcf = defineCommand({
         broken.failure.detail,
       );
     const graph = buildGraph(doc, selection.graphRuns);
-    const sources = wanted.map((lineId): Source => {
-      const line = piping.lines[lineId];
-      if (line !== undefined) {
+    const sources = wanted.flatMap((entry): Source[] => {
+      const line = piping.lines[entry.id];
+      if (entry.kind === 'route' && line !== undefined) {
         const route = routeNetwork({
           line,
-          runs: selection.graphRuns.filter((run) => run.lineId === lineId),
+          runs: selection.graphRuns.filter((run) => run.lineId === entry.id),
           project: doc.building?.project.name,
         });
-        return { network: route.network, data: dataOfNetwork(route.network, GENERATED_HEADER), route };
+        return [{ network: route.network, data: dataOfNetwork(route.network), route }];
       }
-      const data = stored[lineId];
-      if (data !== undefined) return { network: networkOf(data), data };
-      const network = legacyNetwork(doc, lineId) as PipingNetwork;
-      return { network, data: dataOfNetwork(network, GENERATED_HEADER) };
+      const data = stored[entry.id];
+      if (entry.kind === 'pcf' && data !== undefined) return [{ network: networkOf(data), data }];
+      const network = entry.kind === 'legacy' ? legacyNetwork(doc, entry.id) : null;
+      return network === null ? [] : [{ network, data: dataOfNetwork(network) }];
     });
+    const errors = sources.flatMap((source) => source.network.warnings.filter((warning) => warning.severity === 'error'));
+    const firstError = errors[0];
+    if (firstError !== undefined)
+      return refuseIso(
+        doc,
+        'export_pcf',
+        firstError.code,
+        `${firstError.message}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''}`,
+        errors.flatMap((error) => error.ids),
+        errors.flatMap((error) => error.paths),
+      );
+    const effective = sources.map((source) => effectiveUnits(source, params.units));
+    const conflict = sources.find((source, index) => unitsConflict(source.data, effective[index] as PcfUnits));
+    if (conflict !== undefined)
+      return refuseIso(
+        doc,
+        'export_pcf',
+        'ISO_PCF_UNITS_VERBATIM',
+        `line ${conflict.data.lineId} keeps attributes or records verbatim that may carry lengths in the units it was read in; writing it in other units would mislabel them`,
+        [conflict.data.lineId],
+        ['units'],
+      );
     const missingIds = sources.flatMap((source) => missingSkeyIds(source.data.components));
     if (params.strictSkey === true && missingIds.length > 0)
       return refuseIso(doc, 'export_pcf', 'ISO_SKEY_MISSING', `${missingIds.length} component(s) have no confirmed SKEY`, missingIds, [
         'strictSkey',
       ]);
-    const files = sources.map((source) => {
-      const written = writePcfText(source.data, { units: params.units ?? 'mm', includeMaterials: params.includeMaterials ?? true });
+    const files = sources.map((source, index) => {
+      const written = writePcfText(source.data, { units: effective[index] as PcfUnits, includeMaterials: params.includeMaterials ?? true });
       const warnings: IsoIssue[] = [
         ...source.network.warnings,
         ...written.truncatedLines.map((line) =>
@@ -157,6 +224,7 @@ export const exportPcf = defineCommand({
         openEnds: graph.openEnds
           .filter((end) => piping.lines[end.lineId]?.lineNumber === source.data.lineId)
           .map((end) => ({ partId: end.partId, position: end.position, dn: end.dn })),
+        units: effective[index],
         warnings,
       };
     });

@@ -33,7 +33,7 @@ describe('import_pcf preview: the authored fixture (VC-ISO-01)', () => {
   it('15 components, 13045 mm of pipe in 7 pieces, the header units and the pipeline reference', () => {
     const result = preview(fixturePcf());
     expect(result.lineId).toBe('L-101');
-    expect(result.units).toEqual({ bore: 'MM', coords: 'MM' });
+    expect(result.units).toMatchObject({ bore: 'MM', coords: 'MM' });
     expect(result.componentCount).toBe(15);
     expect(result.countsByType).toEqual({ FLANGE: 3, PIPE: 7, WELD: 1, ELBOW: 3, TEE: 1 });
     expect(result.pipeLengthsMm).toEqual([2424, 2348, 3696, 1696, 1848, 714, 319]);
@@ -102,10 +102,10 @@ describe('units (AF-04)', () => {
     const read = readPcf(inchFile);
     expect(read.ok).toBe(true);
     if (!read.ok) return;
-    expect(read.sourceUnits).toEqual({ bore: 'INCH', coords: 'INCH' });
+    expect(read.file.units).toMatchObject({ bore: 'INCH', coords: 'INCH' });
     expect(read.file.components[0]?.ends).toEqual([
-      { xyz: [0, 0, 254], boreMm: 101.6, endType: 'BW' },
-      { xyz: [2540, 0, 254], boreMm: 101.6, endType: 'BW' },
+      { xyz: [0, 0, 254], boreMm: 100, endType: 'BW' },
+      { xyz: [2540, 0, 254], boreMm: 100, endType: 'BW' },
     ]);
     expect(preview(inchFile).totalPipeLengthMm).toBeCloseTo(2540, 6);
   });

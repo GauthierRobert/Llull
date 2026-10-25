@@ -31,7 +31,13 @@ function componentErrors(value: unknown, path: string, ids: Set<string>): string
     if (value[key] !== undefined && !isVec3(value[key])) errors.push(`${path}.${key} must be three finite numbers`);
   for (const key of ['skey', 'itemCode', 'description'])
     if (value[key] !== undefined && typeof value[key] !== 'string') errors.push(`${path}.${key} must be a string`);
-  if (value['weightKg'] !== undefined && !isFiniteNumber(value['weightKg'])) errors.push(`${path}.weightKg must be a finite number`);
+  if (value['weight'] !== undefined && !isFiniteNumber(value['weight'])) errors.push(`${path}.weight must be a finite number`);
+  if (value['category'] !== undefined && !['fabrication', 'erection', 'offshore'].includes(String(value['category'])))
+    errors.push(`${path}.category must be fabrication, erection or offshore`);
+  if (value['weldKind'] !== undefined && !['shop', 'site', 'field_fit'].includes(String(value['weldKind'])))
+    errors.push(`${path}.weldKind must be shop, site or field_fit`);
+  for (const key of ['derived', 'unverified'])
+    if (value[key] !== undefined && value[key] !== true) errors.push(`${path}.${key} must be true when present`);
   if (value['extra'] !== undefined && !isStringRecord(value['extra'])) errors.push(`${path}.extra must map strings to strings`);
   return errors;
 }
@@ -42,6 +48,12 @@ function lineErrors(key: string, value: unknown): string[] {
   const errors: string[] = [];
   if (value['lineId'] !== key) errors.push(`${path}.lineId must equal its key`);
   if (!isStringRecord(value['header'])) errors.push(`${path}.header must map strings to strings`);
+  const units = value['units'];
+  if (!isRecord(units) || !['MM', 'INCH'].includes(String(units['bore'])) || !['MM', 'INCH'].includes(String(units['coords'])))
+    errors.push(`${path}.units must declare bore and coords as MM or INCH`);
+  else
+    for (const key of ['boltDia', 'boltLength'])
+      if (units[key] !== undefined && !['MM', 'INCH'].includes(String(units[key]))) errors.push(`${path}.units.${key} must be MM or INCH`);
   if (!isStringRecord(value['attributes'])) errors.push(`${path}.attributes must map strings to strings`);
   const ids = new Set<string>();
   if (!Array.isArray(value['components'])) errors.push(`${path}.components must be an array`);

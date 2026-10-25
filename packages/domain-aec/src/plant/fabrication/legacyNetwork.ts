@@ -1,13 +1,14 @@
 /**
  * `PipingNetwork` of a legacy line (plant 05 ISO §5.3): the building `PipeElement`s of one line number, a polyline with a bend at every interior point,
  * turned into pipes and derived long-radius elbows. A bend of turn angle theta gets centre-to-end A = R x tan(theta / 2) with R the long-radius 90 centre-to-end of
- * the bundled B16.9 catalogue (152 mm at DN100); 90 and 45 degree turns (within 1 degree) are ELBOWs with SKEY ELBW, any other turn a derived BEND without a key.
+ * the bundled B16.9 catalogue (152.4 mm at DN100); 90 and 45 degree turns (within 1 degree) are ELBOWs with SKEY ELBW, any other turn a derived BEND without a key.
  * No catalogue row (an untabulated DN): R = 1.5 x DN (1.5 x NPS x 25.4 with DN standing for NPS x 25.4), flagged unverified. Every derived fitting is flagged
- * `derived` and listed in one ISO_LEGACY_FITTINGS_DERIVED warning. Pure; z is the level elevation plus the point z.
+ * `derived` and listed in one ISO_LEGACY_FITTINGS_DERIVED warning. Pure; z is the level elevation plus the point z; document units are converted to mm.
  */
 
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
+import { MM_PER_UNIT } from '@core/model/units';
 import { add3, distance3, dot3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { elementsOf, getBuilding } from '../../building/model';
 import type { PipeElement } from '../../building/types';
@@ -17,6 +18,8 @@ import { resolveCatalogRow } from '../catalog/lookup';
 import { isoIssue } from './codes';
 import type { IsoIssue, NetworkComponent, NetworkPoint, PipingNetwork } from './model';
 
+/** A legacy pipe has no end type: from this DN up (NPS 2) it is butt welded; below it no key is inferred (socket weld or threaded). */
+const BUTT_WELD_FROM_DN = 50;
 /** Turns below this are straight pipe (degrees). */
 const STRAIGHT_DEG = 0.5;
 /** A turn this close to 90 / 45 degrees is that standard elbow (degrees). */
@@ -34,7 +37,8 @@ export function legacyLines(doc: CadDocument): Map<string, PipeElement[]> {
   return lines;
 }
 
-const nominalBore = (pipe: PipeElement): number => pipe.dn ?? pipeSizeByOutsideDiameter(pipe.diameter)?.[0] ?? pipe.diameter;
+const nominalBore = (pipe: PipeElement, mmPerUnit: number): number =>
+  pipe.dn ?? pipeSizeByOutsideDiameter(pipe.diameter * mmPerUnit)?.[0] ?? pipe.diameter * mmPerUnit;
 
 interface Radius {
   readonly centreToEnd90: number;
@@ -66,10 +70,10 @@ interface Built {
 }
 
 /** Pipes and derived elbows of one element (`points` in world mm). */
-function buildElement(pipe: PipeElement, points: readonly Vec3[], out: Built): void {
+function buildElement(pipe: PipeElement, points: readonly Vec3[], out: Built, mmPerUnit: number): void {
   const distinct = points.filter((point, index) => index === 0 || distance3(point, points[index - 1] as Vec3) >= LENGTH_TOLERANCE_MM);
   if (distinct.length < 2) return;
-  const bore = nominalBore(pipe);
+  const bore = nominalBore(pipe, mmPerUnit);
   const radius = radiusOf(bore);
   let pipes = 0;
   let fittings = 0;
@@ -114,7 +118,7 @@ function buildElement(pipe: PipeElement, points: readonly Vec3[], out: Built): v
       type: standard === undefined ? 'BEND' : 'ELBOW',
       ends: [bw(sub3(vertex, scale3(incoming, centreToEnd)), bore), bw(exit, bore)],
       centre: vertex,
-      ...(standard === undefined ? {} : { skey: 'ELBW' }),
+      ...(standard === undefined || bore < BUTT_WELD_FROM_DN ? {} : { skey: 'ELBW' }),
       derived: true,
       ...(radius.unverified ? { unverified: true as const } : {}),
     });
@@ -147,12 +151,20 @@ export function legacyNetwork(doc: CadDocument, lineId: string): PipingNetwork |
   const pipes = legacyLines(doc).get(lineId);
   if (pipes === undefined) return null;
   const building = getBuilding(doc);
+  const mmPerUnit = MM_PER_UNIT[doc.units];
   const built: Built = { components: [], warnings: [] };
   for (const pipe of pipes)
     buildElement(
       pipe,
-      pipe.points.map((point): Vec3 => [point[0], point[1], point[2] + (building.levels[pipe.levelId]?.elevation ?? 0)]),
+      pipe.points.map(
+        (point): Vec3 => [
+          point[0] * mmPerUnit,
+          point[1] * mmPerUnit,
+          (point[2] + (building.levels[pipe.levelId]?.elevation ?? 0)) * mmPerUnit,
+        ],
+      ),
       built,
+      mmPerUnit,
     );
   const derived = built.components.filter((component) => component.derived === true).map((component) => component.id);
   const warnings: IsoIssue[] = [

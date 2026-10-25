@@ -36,7 +36,7 @@ describe('read -> write is byte-equal on the MVP subset (VC-ISO-03)', () => {
     const read = readPcf(text);
     expect(read.ok).toBe(true);
     if (!read.ok) return;
-    const written = writePcfText(read.file, { units: 'mm', includeMaterials: true });
+    const written = writePcfText(read.file, { units: read.file.units, includeMaterials: true });
     expect(written.content).toBe(text);
     expect(written.truncatedLines).toEqual([]);
   });
@@ -68,7 +68,7 @@ describe('read -> write is byte-equal on the MVP subset (VC-ISO-03)', () => {
     const stored = apply(createEmptyDocument(), 'import_pcf', { text });
     const inch = exported(stored, { units: 'inch' }).files[0]?.content ?? '';
     expect(inch).toContain('UNITS-BORE INCH\nUNITS-CO-ORDS INCH\nUNITS-WEIGHT KGS\nUNITS-BOLT-DIA INCH\nUNITS-BOLT-LENGTH INCH\n');
-    expect(inch).toContain('END-POINT 0.0000 0.0000 118.1102 3.937 FL');
+    expect(inch).toContain('END-POINT 0.0000 0.0000 118.1102 4 FL');
     const again = data<{ totalPipeLengthMm: number; units: { coords: string } }>(createEmptyDocument(), 'import_pcf', {
       text: inch,
       preview: true,
@@ -89,7 +89,7 @@ describe('read -> write is byte-equal on the MVP subset (VC-ISO-03)', () => {
     if (!read.ok) throw new Error(read.message);
     const [first, ...others] = read.file.materials;
     const long = { ...read.file, materials: [{ itemCode: first?.itemCode ?? '', fields: { DESCRIPTION: 'x'.repeat(1100) } }, ...others] };
-    const written = writePcfText(long, { units: 'mm', includeMaterials: true });
+    const written = writePcfText(long, { units: read.file.units, includeMaterials: true });
     expect(written.content.split('\n').every((line) => line.length <= 1024)).toBe(true);
     expect(written.truncatedLines).toHaveLength(1);
   });
@@ -191,11 +191,35 @@ describe('the stored slice persists and validates', () => {
     const line = good.pcfLines['L-101'] as { components: Array<Record<string, unknown>>; materials: unknown[]; unknownRecords: unknown[] };
     const first = line.components[0] as Record<string, unknown>;
     const second = line.components[1] as Record<string, unknown>;
-    Object.assign(first, { branch: 3, centre: [1], skey: 4, weightKg: 'x', extra: { a: 1 }, id: second['id'] });
+    Object.assign(first, {
+      branch: 3,
+      centre: [1],
+      skey: 4,
+      weight: 'x',
+      extra: { a: 1 },
+      category: 'x',
+      weldKind: 'y',
+      derived: false,
+      id: second['id'],
+    });
+    Object.assign(line, { units: { bore: 'FURLONG', coords: 'MM' } });
     line.materials = [{ itemCode: 3 }];
     line.unknownRecords = [{ type: 'X' }];
     const problems = fabricationErrors(good).join('\n');
-    for (const fragment of ['branch', 'centre', 'skey', 'weightKg', 'extra', 'used twice', 'materials[0]', 'unknownRecords[0]'])
+    for (const fragment of [
+      'branch',
+      'centre',
+      'skey',
+      'weight',
+      'extra',
+      'used twice',
+      'category',
+      'weldKind',
+      'derived',
+      'units',
+      'materials[0]',
+      'unknownRecords[0]',
+    ])
       expect(problems).toContain(fragment);
   });
 });

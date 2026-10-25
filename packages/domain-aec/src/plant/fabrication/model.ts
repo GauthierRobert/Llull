@@ -58,7 +58,8 @@ export interface NetworkComponent {
   readonly category?: ComponentCategory;
   /** WELD only, from the SKEY WW / WS / WF. */
   readonly weldKind?: WeldKind;
-  readonly weightKg?: number;
+  /** WEIGHT as written, in the file's UNITS-WEIGHT (header `UNITS-WEIGHT`, KGS by default). */
+  readonly weight?: number;
   /** Legacy-derived fitting (not placed by a spec). */
   readonly derived?: true;
   /** The catalogue row it came from is not grade A (AF-32). */
@@ -103,14 +104,28 @@ export interface PcfUnknownRecord {
   /** 1-based line of the record keyword in the source file. */
   readonly line: number;
   readonly after: number;
+  /** The record came after the MATERIALS block and is written after it. */
+  readonly afterMaterials?: true;
   readonly text: readonly string[];
+}
+
+export type PcfUnit = 'MM' | 'INCH';
+
+/** The four length units a file declares (bore in INCH is the nominal NPS, see `pcf/pcfUnits.ts`). Bolt units are absent when the file does not declare them. */
+export interface PcfUnits {
+  readonly bore: PcfUnit;
+  readonly coords: PcfUnit;
+  readonly boltDia?: PcfUnit;
+  readonly boltLength?: PcfUnit;
 }
 
 /** A PCF line in storable form (plain JSON): the lossless image of one file on the MVP subset (§6.1). */
 export interface PcfLineData {
   readonly lineId: string;
-  /** Header values by keyword, without the four length units (UNITS-BORE / -CO-ORDS / -BOLT-DIA / -BOLT-LENGTH are chosen when written). */
+  /** Header values by keyword, without the four length units (they are in `units`). */
   readonly header: Readonly<Record<string, string>>;
+  /** Units the file declared; stored coordinates and bores are mm whatever they are. */
+  readonly units: PcfUnits;
   readonly attributes: LineAttributes;
   readonly components: readonly NetworkComponent[];
   readonly materials: readonly PcfMaterial[];
