@@ -212,14 +212,25 @@ describe('a revoked signer key and the stored proof', () => {
     return execute(doc, 'set_issue_status', closeParams(doc), humanCtx()).document;
   };
 
-  it('reports a genuine signature by a key that is no longer trusted as VIS_SIGNER_REVOKED (warn), not as tampering', () => {
-    const doc = signedClose();
-    const revoked = rows(doc, humanCtx(ledgerPort('untrusted')));
+  it('reports a genuine signature by a REVOKED key of the recorded signer as VIS_SIGNER_REVOKED (warn), not as tampering', () => {
+    const revoked = rows(signedClose(), humanCtx(ledgerPort('revoked')));
     expect(revoked.status).toBe('warn');
     expect(revoked.issues.map((row) => [row.code, row.ids])).toEqual([['VIS_SIGNER_REVOKED', ['iss-2']]]);
   });
 
-  it('still fails a forged signature when the key is untrusted (a forger cannot pass for a revoked signer)', () => {
+  it('fails a revoked key whose record belongs to another user than the recorded signer', () => {
+    const result = rows(signedClose(), humanCtx(ledgerPort('revoked', 'mallory')));
+    expect(result.status).toBe('fail');
+    expect(result.issues.map((row) => row.code)).toEqual(['VIS_HUMAN_GATE']);
+  });
+
+  it('fails a cryptographically valid signature by an unknown key (an agent pair, a test key): no revoked record, so not a historical approval', () => {
+    const result = rows(signedClose(), humanCtx(ledgerPort('untrusted')));
+    expect(result.status).toBe('fail');
+    expect(result.issues.map((row) => row.code)).toEqual(['VIS_HUMAN_GATE']);
+  });
+
+  it('still fails a forged signature under a revoked-key port', () => {
     const doc = documentWith('t');
     const forged = withIssue(doc, {
       status: 'closed',
@@ -235,7 +246,7 @@ describe('a revoked signer key and the stored proof', () => {
         },
       ],
     });
-    const result = rows(forged, humanCtx(ledgerPort('untrusted')));
+    const result = rows(forged, humanCtx(ledgerPort('revoked')));
     expect(result.status).toBe('fail');
     expect(result.issues.map((row) => row.code)).toEqual(['VIS_HUMAN_GATE']);
   });

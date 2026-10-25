@@ -29,10 +29,8 @@ function entryVerdict(port: HumanSignaturePort, issue: ReviewIssue, index: numbe
   if (entry === undefined || entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return 'invalid';
   const payload = humanGatePayload(STATUS_ACT, [issue.id], statusDetails(issueBefore(issue, index), entry.status, entry.reason), nonce);
   if (port.verify(entry.proof, payload) !== null) return 'ok';
-  // A genuine signature by a key that is no longer trusted (revoked) is not tampering; anything else that fails is.
-  const key = entry.proof['publicKey'];
-  const genuine = port.signatureValid?.(entry.proof, payload) === true;
-  return genuine && typeof key === 'string' && port.keyTrust?.(key) !== 'trusted' ? 'revoked' : 'invalid';
+  // Revoked only when the trust store holds a revoked record for exactly this key, the signature is genuine and that record's user is the recorded signer.
+  return entry.signer !== undefined && port.revokedSignerOf?.(entry.proof, payload) === entry.signer ? 'revoked' : 'invalid';
 }
 
 /**
@@ -45,7 +43,7 @@ export const checkReview = defineCommand({
     'Check the model-review data: data { status "pass" | "warn" | "fail", issues[{ code, severity, ids, paths, message, remediation }], counts }. Codes: ' +
     'VIS_ISSUE_OPEN (info: issue open or in progress), VIS_ISSUE_AWAITING_APPROVAL (warn: resolved, waiting for a human to close it), VIS_ISSUE_ENTITY_MISSING ' +
     '(warn: an unclosed issue cites deleted entities), VIS_VIEWPOINT_STALE (warn: a viewpoint selects or lists deleted entities), VIS_HUMAN_GATE (error: a closed ' +
-    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier), VIS_SIGNER_REVOKED (warn: a genuine signature whose key is no longer trusted). Read-only; run it before handing a review over.',
+    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier), VIS_SIGNER_REVOKED (warn: a genuine signature by a revoked key of the recorded signer). Read-only; run it before handing a review over.',
   annotations: { readOnly: true },
   params: z.object({
     includeInfo: z.boolean().optional().describe('false: leave the info rows (VIS_ISSUE_OPEN) out of `issues`. Default true.'),
@@ -110,7 +108,7 @@ export const checkReview = defineCommand({
         severity: 'warn',
         ids: issues.filter((issue) => !verdicts(issue).includes('invalid') && verdicts(issue).includes('revoked')).map((issue) => issue.id),
         paths: ['review.issues[].history'],
-        message: 'issues with a genuine human signature whose key is no longer trusted (revoked or removed)',
+        message: 'issues with a genuine human signature by a key the trust store later revoked (same user as the recorded signer)',
         remediation: 'the reviewer re-confirms with a currently trusted key, or accepts the recorded signature as a historical fact',
       },
       {

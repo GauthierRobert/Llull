@@ -9,9 +9,10 @@ import { isRecord } from '@lib/isRecord';
 
 /**
  * A scripted port with a spend ledger: a confirmation verifies when its `signature` IS the payload and its key is trusted (the signer is `keyId`), and
- * spends once. `trust` scripts the key trust (an 'untrusted' key still carries a cryptographically valid signature, like a revoked one).
+ * spends once. `trust` scripts the key: 'untrusted' = unknown to the store (an agent's own pair), 'revoked' = a revoked record of user `revokedUser`.
+ * Both still carry cryptographically valid signatures; only 'revoked' lets `revokedSignerOf` name the record's user.
  */
-export function ledgerPort(trust: 'trusted' | 'untrusted' = 'trusted'): HumanSignaturePort {
+export function ledgerPort(trust: 'trusted' | 'untrusted' | 'revoked' = 'trusted', revokedUser = 'grace'): HumanSignaturePort {
   const used = new Set<string>();
   const valid = (confirmation: unknown, payload: string): confirmation is Record<string, string> =>
     isRecord(confirmation) && confirmation['signature'] === payload && typeof confirmation['keyId'] === 'string';
@@ -20,8 +21,8 @@ export function ledgerPort(trust: 'trusted' | 'untrusted' = 'trusted'): HumanSig
       trust === 'trusted' && valid(confirmation, payload)
         ? { signer: confirmation['keyId'] ?? '', signatureId: `fake:${confirmation['keyId']}` }
         : null,
-    signatureValid: valid,
-    keyTrust: () => trust,
+    revokedSignerOf: (confirmation, payload) => (trust === 'revoked' && valid(confirmation, payload) ? revokedUser : null),
+    keyTrust: () => (trust === 'trusted' ? 'trusted' : 'untrusted'),
     spend: (signature, payload) => {
       const key = `${JSON.stringify(signature)}|${payload}`;
       if (used.has(key)) return false;

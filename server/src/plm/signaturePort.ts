@@ -41,12 +41,12 @@ export function createSignaturePort(
       if (!isRecord(signature) || typeof signature['publicKey'] !== 'string' || typeof signature['signature'] !== 'string') return false;
       return trust.consume(`${signature['publicKey'].slice(0, 16)}:${payloadSha256}:${signature['signature']}`);
     },
-    signatureValid(signature, payloadSha256) {
-      if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return false;
+    revokedSignerOf(signature, payloadSha256) {
+      if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return null;
       const { publicKey, signature: value } = signature;
-      return (
-        typeof publicKey === 'string' && typeof value === 'string' && verifyEd25519(publicKey, `${GATE_CONTEXT}${payloadSha256}`, value)
-      );
+      if (typeof publicKey !== 'string' || typeof value !== 'string' || RFC8032_TEST_KEYS.has(publicKey)) return null;
+      const record = trust.list().find((key) => key.publicKey === publicKey && key.revokedAt !== undefined);
+      return record !== undefined && verifyEd25519(publicKey, `${GATE_CONTEXT}${payloadSha256}`, value) ? record.userId : null;
     },
     verify(signature, payloadSha256) {
       if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return null;
