@@ -220,6 +220,17 @@ function exportStepExact(getDoc: () => CadDocument, name?: string, confirmation?
   };
 }
 
+/** The last non-empty line of an error message (a Python traceback ends with the raised error). */
+function lastLine(message: string): string {
+  return (
+    message
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== '')
+      .pop()
+      ?.trim() ?? ''
+  );
+}
+
 /**
  * The model's STEP: export_code → Python port → exact B-rep (export_step tool + GET /export/step).
  * @failure no solids / bad language / bridge error → { error } (port errors propagate as throws)
@@ -240,7 +251,27 @@ export async function exportStepFile(
   const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
   if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
-  const run = await port.runProgram({ language, source: codeData.text, step: true });
+  let run: Awaited<ReturnType<CadExchangePort['runProgram']>>;
+  try {
+    run = await port.runProgram({ language, source: codeData.text, step: true });
+  } catch (error) {
+    // a sweep / loft the code could not build (the script's last line is "ValueError: SWG_CODEGEN_UNSUPPORTED: ..."): the native kernel still has its exact faces
+    const failure = lastLine(error instanceof Error ? error.message : String(error));
+    if (!/(^|\s)ValueError: SWG_CODEGEN_UNSUPPORTED: /.test(failure)) throw error;
+    const exact = exportStepExact(getDoc, options.name, options.confirmExportControlled);
+    if ('error' in exact) return { error: `${exact.error} (the ${language} code failed first: ${failure})` };
+    const savedTo =
+      options.save !== false && port.writeExchangeFile !== undefined
+        ? await port.writeExchangeFile(exact.fileName, exact.stepBase64)
+        : undefined;
+    const cause = `The ${language} code could not build a sweep or loft (SWG_CODEGEN_UNSUPPORTED), so the exact OCC kernel wrote this STEP`;
+    // like the normal path: a saved file is not also "returned as data.stepBase64"
+    const summary =
+      savedTo === undefined
+        ? `${exact.summary} ${cause}.`
+        : `${exact.summary.replace('; returned as data.stepBase64.', '.')} ${cause}; saved to ${savedTo}.`;
+    return { ...exact, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
+  }
   if (run.stepBase64 === undefined) return { error: 'export_step: the Python bridge returned no STEP data.' };
   // export_code already sanitised the base name; only the extension changes.
   const fileName = codeData.fileName.replace(/\.[^.]+$/, '.step');

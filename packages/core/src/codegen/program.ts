@@ -6,7 +6,9 @@
  * @invariant features follow featureHistory order; one variable per live solid.
  */
 
-import type { DocumentUnit } from '../model/types';
+import type { DocumentUnit, Vec3 } from '../model/types';
+import type { NurbsCurveData } from '../lib/nurbs/types';
+import type { NurbsSurfaceData } from '../lib/nurbs/surfaceTypes';
 
 export interface Term {
   readonly value: number;
@@ -16,6 +18,67 @@ export interface Term {
 export type Term3 = readonly [Term, Term, Term];
 export type Term2 = readonly [Term, Term];
 export type Axis = 'x' | 'y' | 'z';
+
+/** One loft section: a wire of straight lines and cubic Béziers (each segment is its 2 or 4 points), or one B-spline curve (+ a straight closing edge). */
+export type LoftSection =
+  | { readonly kind: 'chain'; readonly segments: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> }
+  | { readonly kind: 'bspline'; readonly curve: NurbsCurveData; readonly closing: boolean };
+
+/** Section of a swept solid at the spine start: a circle (centre, normal, radius) or a closed polygon. */
+export type PipeSection =
+  | { readonly kind: 'circle'; readonly center: Vec3; readonly normal: Vec3; readonly radius: number }
+  | { readonly kind: 'polygon'; readonly points: readonly Vec3[] };
+
+/** Value tree of a traced command's params: every number is a Term, so `=expr` parameter bindings survive into the generated code. */
+export type ParamTree =
+  | { readonly kind: 'term'; readonly term: Term }
+  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'flag'; readonly value: boolean | null }
+  | { readonly kind: 'list'; readonly items: readonly ParamTree[] }
+  | { readonly kind: 'map'; readonly entries: ReadonlyArray<readonly [string, ParamTree]> };
+
+/** The command a swept solid records in LLULL_TRACE (its params, so `import_code` rebuilds an editable step). */
+export interface TracedCall {
+  readonly command: 'sweep_profile' | 'loft_sections';
+  readonly params: ReadonlyArray<readonly [string, ParamTree]>;
+}
+
+/** How generated code builds a sweep / loft (02 SWG): the library's own construction where it maps faithfully, fitted faces otherwise. */
+export type SweptBuild =
+  /** Sewn B-spline faces (entity-local), closed by planar caps when `cap`; `bore`: faces of a hollow tube's inner solid, cut out. */
+  | {
+      readonly kind: 'faces';
+      readonly faces: readonly NurbsSurfaceData[];
+      readonly bore?: readonly NurbsSurfaceData[];
+      readonly cap: boolean;
+      readonly tolerance: number;
+    }
+  /** Pipe shell of the section along the spine (segments of 2 / 3 / 4 points: line, arc through, cubic); `mitre`: right-corner transition. `bore`: inner radius. */
+  | {
+      readonly kind: 'pipe';
+      readonly spine: ReadonlyArray<ReadonlyArray<Vec3>>;
+      readonly section: PipeSection;
+      readonly mitre: boolean;
+      readonly bore?: number;
+      /** The radius at which sweep_profile refuses (a bend not wider than the section, or the mitre reach exceeding a leg); absent = no limit. */
+      readonly limit?: number;
+    }
+  /** Round section along an exact constant-pitch cylindrical helix (the library's `makeHelix` construction). */
+  | {
+      readonly kind: 'helix';
+      readonly origin: Vec3;
+      readonly axis: Vec3;
+      readonly xAxis: Vec3;
+      readonly radius: number;
+      readonly pitch: number;
+      readonly turns: number;
+      readonly left: boolean;
+      readonly startAngle: number;
+      readonly section: PipeSection;
+      readonly bore?: number;
+    }
+  /** Thru-sections loft of exact sections (ruled = straight between neighbours). */
+  | { readonly kind: 'loft'; readonly sections: readonly LoftSection[]; readonly ruled: boolean };
 
 export type ShapeSpec =
   | { readonly kind: 'box'; readonly size: Term3 }
@@ -41,8 +104,23 @@ export type ShapeSpec =
       readonly creases: ReadonlyArray<readonly [number, number]>;
       readonly levels: number;
     }
-  /** Fallback for geometry without an analytic form: world-space triangle soup (9 numbers each). */
-  | { readonly kind: 'mesh'; readonly positions: readonly number[] };
+  /**
+   * A sweep or loft (02 SWG, entity-local; the solid feature carries the placement). `trace` is the command it records for `import_code`;
+   * `fallback` is the world-space triangle soup targets without freeform geometry (OpenSCAD) use instead.
+   */
+  | {
+      readonly kind: 'swept';
+      readonly subject: string;
+      readonly build: SweptBuild;
+      readonly trace?: TracedCall;
+      readonly fallback: readonly number[];
+    }
+  /** Fallback for geometry without an analytic form: world-space triangle soup (9 numbers each); `reason` names why a generator refused an exact form. */
+  | { readonly kind: 'mesh'; readonly positions: readonly number[]; readonly reason?: string };
+
+/** Shapes whose fallback triangles (`positions` / `fallback`) are already in world space: the placement must not be applied to them again. */
+export const isWorldSpaceShape = (shape: ShapeSpec): shape is Extract<ShapeSpec, { kind: 'mesh' | 'swept' }> =>
+  shape.kind === 'mesh' || shape.kind === 'swept';
 
 export interface FeatureBase {
   /** 1-based featureHistory index that produced the feature; null in snapshot mode. */

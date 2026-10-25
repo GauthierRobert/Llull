@@ -3,7 +3,7 @@
  * becomes a module so booleans and edits keep order.
  */
 
-import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
+import { type Feature, type FeatureProgram, type ShapeSpec, type Term, type Term2, type Term3, isWorldSpaceShape } from './program';
 import { subdivisionTriangles } from '../geometry/subdivision';
 import {
   commentText,
@@ -80,6 +80,9 @@ function shapeSource(shape: ShapeSpec): string {
     case 'subdivision':
       // OpenSCAD has no freeform surfaces: the subdivided surface as a polyhedron (local frame).
       return meshPolyhedron(subdivisionTriangles(shape).flat(2));
+    case 'swept':
+      // freeform faces and thru-sections have no OpenSCAD form: the exact result's world-space triangles (placement already folded in)
+      return meshPolyhedron(shape.fallback);
     case 'mesh':
       return meshPolyhedron(shape.positions);
   }
@@ -128,7 +131,9 @@ export function emitOpenScad(program: FeatureProgram): string {
     const v = feature.variable;
     switch (feature.op) {
       case 'solid': {
-        const body = placed(shapeSource(feature.shape), feature.position, feature.rotation);
+        const body = isWorldSpaceShape(feature.shape)
+          ? shapeSource(feature.shape)
+          : placed(shapeSource(feature.shape), feature.position, feature.rotation);
         return `module ${next(v)}() ${body};`;
       }
       case 'boolean': {

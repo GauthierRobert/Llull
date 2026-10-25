@@ -41,8 +41,8 @@ order from this file, edit it, and send it back. `import_code` rebuilds the mode
 
 The generated CadQuery/build123d file is standalone. Its first block is a small runtime of
 helpers (`param`, `box`, `cylinder`, `sphere`, `cone`, `torus`, `wedge`, `pyramid`,
-`extrude`, `revolve`, `mesh`, `union`, `cut`, `intersect`, `translate`, `remove`, `label`,
-`custom`, `finish`). Each helper does two things:
+`extrude`, `revolve`, `sweep_profile`, `loft_sections`, `swept`, `mesh`, `union`, `cut`, `intersect`,
+`translate`, `remove`, `label`, `custom`, `finish`). Each helper does two things:
 
 1. It builds the real solid with CadQuery or build123d, so `python model.py` writes `model.step`
    and CQ-editor shows the model.
@@ -78,6 +78,17 @@ workbench in a new document, with named and coloured objects. Both are export-on
 - Each primitive's `position` is the point llull stores: the centre for box, cylinder,
   sphere and torus, the base centre for cone and pyramid, the min corner for wedge, and the
   profile origin for extrude and revolve.
+- Sweeps and lofts are one `sweep_profile(build, exported, <params>)` / `loft_sections(...)` call each. The keywords
+  are the step's own params (numbers keep their `=expr` bindings), so `import_code` rebuilds the editable
+  `sweep_profile` / `loft_sections` step. `build` says how the script builds the solid: the library's own pipe shell,
+  exact helix, mitre or thru-sections where that is faithful, otherwise fitted B-spline faces kept in a
+  `_SWG_FACES = {...}` data section between PARAMETERS and MODEL. Only the `radius` / `innerRadius` of a pipe are
+  read by the script (edited, they change the built solid, and a value `sweep_profile` would refuse - radius not above the bore, a bend or a mitre reach the section no longer fits - raises `SWG_CODEGEN_UNSUPPORTED`, as `import_code` would refuse it; a `radius` on a bent points path without an explicit `bendRadius` is not read, the bends were resolved from it); a keyword edited, added or removed any other way makes the script
+  warn `SWG_CODEGEN_STALE` at the edited call (the solid is still the exported one) and takes effect through `import_code`. A sweep or loft that names other entities (`pathId`, `guideIds`,
+  `sectionIds`, ...) is the untraced `swept(build, ...)` and comes back as a mesh; an explicit `id` / `layerId` travel with
+  the params (appending a trace whose `id` the document already holds re-mints it and lists `old → new` in the summary). A solid the code cannot build raises `SWG_CODEGEN_UNSUPPORTED: <subject>: <why>`; `export_step` then falls back
+  to the exact OCC kernel when it is available, and says so. Which variants use which construction:
+  `docs/design/02-sweep-loft-guides/TECHNICAL_SPEC.md` section 15.
 - Geometry with no analytic form (boolean results with no recorded operands, fillets,
   assembly instances, imported STEP bodies) is written as `mesh([...])` triangles. The code
   carries a `Note:` line when this happens.
