@@ -10,8 +10,11 @@ green without running it. For deep coverage work, delegate to `test-verifier`.
 
 ## 1. Static + tests (always)
 ```bash
-npm run check          # typecheck + arch + deadcode + lint (max-lines 500) + format:check + native:check (skipped without cargo) + test
-npm run test:coverage  # gate 90 stmts / 85 branch / 90 fn / 90 lines on
+npm run check:fast     # while iterating: typecheck + arch + lint + tests affected by the diff vs origin/main
+npm run check          # once, at the end: typecheck + arch + deadcode + lint (max-lines 500) + format:check + native:check
+                       # (skipped without cargo or when solver/ is unchanged vs origin/main; LLULL_NATIVE_CHECK=1 forces it) + test
+npm run check:coverage # instead of check when packages/*/src changed (never both): tests run with the coverage
+                       # gate 90 stmts / 85 branch / 90 fn / 90 lines on
                        # packages/core/src/{commands,geometry,dynamics}/** and
                        # packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/** (vite.config.ts)
 ```

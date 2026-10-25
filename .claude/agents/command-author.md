@@ -44,7 +44,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    resulting entity, `document.order`) AND a failure path (missing id / invalid input
    ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.
 5. Update + review the tool-schema snapshot (`npx vitest run tests/unit/contract -u`); keep
-   the golden corpus green. Run `npm run check`. Fix until green. Confirm the coverage gate
+   the golden corpus green. Iterate with `npm run check:fast`; finish with ONE `npm run check:coverage`. Fix until green. Confirm the coverage gate
    (90/85/90/90 on `packages/core/src/{commands,geometry}/**`, `packages/domain-aec/src/**`) still holds.
 
 ## Add structured doc-comments
