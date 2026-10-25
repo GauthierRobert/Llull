@@ -4,12 +4,12 @@ This pack defines how llull's plant access structures (gratings, platforms, ladd
 racks, fireproofing, reachability) will be proven right. Every reference value is either quoted from a source graded in
 [sources.md](sources.md) or derived from a cited closed form in [`data/derive_expected.py`](data/derive_expected.py)
 (run it with `python3 -I data/derive_expected.py`). **No expected value comes from running llull.** The commands do not
-exist yet, so every plan is marked `PROPOSED` and names the commands that are missing.
+exist progressively: a plan is marked `PROPOSED` and names the commands that are missing until they are built (SC-STA-06 is built since M2, SC-STA-05 runs without its ladder rows since M3).
 
 When the commands land, the cases run without a human:
 
 - Unit tests read `data/access_rules.json`, `data/grating_19w4_load_table.json` and `expected_results.json` directly.
-- `tests/unit/plantStructures/scenarioPlans.test.ts` runs every plan in `plans/` through `build_project`, which is the
+- `tests/unit/plant/structures/scenarioPlans.test.ts` runs every plan in `plans/` through `build_project`, which is the
   same path as `llull run plan.json --json`. Each `expected` row is a JSON path into a step's `data`, a value and a
   tolerance (AF-23).
 
