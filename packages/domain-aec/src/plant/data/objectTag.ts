@@ -86,7 +86,7 @@ function freeSource(env: TagEnv, part: FieldPart, next: string | undefined): str
     ];
     return codes.length > 0 ? codes.map(escapeRegex).join('|') : '[A-Za-z0-9]+';
   }
-  return next === undefined ? '.+' : `[^${escapeRegex(next.slice(0, 1))}]+`;
+  return next === undefined ? '.+' : '.+?';
 }
 
 function matcherSource(env: TagEnv, part: FieldPart, next: string | undefined): string {

@@ -176,3 +176,11 @@ export function copyObject(object: PlantObject, change: ObjectChange): PlantObje
     ...(lineId === undefined ? {} : { lineId }),
   };
 }
+
+/** Provider id of a target (`buildingElement` or the provider name), null for a reserved tag. */
+export const providerIdOf = (target: PlantObjectTarget): string | null =>
+  target.kind === 'buildingElement' ? 'buildingElement' : target.kind === 'provider' ? target.provider : null;
+
+/** `<provider>:<id>` of the model object a target stands for, null for a reserved tag. */
+export const targetKey = (target: PlantObjectTarget): string | null =>
+  target.kind === 'reserved' ? null : `${providerIdOf(target)}:${target.id}`;

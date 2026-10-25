@@ -4,6 +4,7 @@
  * @invariant a cycle or an unknown parent is reported, never followed
  */
 
+import { definitionProblem } from './properties';
 import type { IfcMapping, PlantClass, PlantDataModel, PropertyDefinition, TagScope } from './model';
 
 export interface ResolvedClass {
@@ -52,7 +53,10 @@ function merge(inherited: readonly PropertyDefinition[], own: readonly PropertyD
     else {
       const problem = overrideProblem(merged[index] as PropertyDefinition, definition);
       if (problem !== null) return problem;
-      merged[index] = { ...(merged[index] as PropertyDefinition), ...definition };
+      const combined = { ...(merged[index] as PropertyDefinition), ...definition };
+      const invalid = definitionProblem(combined);
+      if (invalid !== null) return invalid;
+      merged[index] = combined;
     }
   }
   return merged;

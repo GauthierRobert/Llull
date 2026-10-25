@@ -22,6 +22,7 @@ import { addBranch } from './commands/addBranch';
 import { checkPiping } from './commands/checkPiping';
 import { insertInlineComponent, moveInlineComponent, removeInlineComponent } from './commands/inlineComponents';
 import { pipingConnectivity } from './commands/pipingConnectivity';
+import { setPipeLineNumber } from './commands/setPipeLineNumber';
 import { setPipingSettings } from './commands/pipingSettings';
 import { pipingTakeoff } from './commands/pipingTakeoff';
 import { updatePipeline } from './commands/updatePipeline';
@@ -37,6 +38,7 @@ export const pipingPlugin: CadPlugin = {
     createPipeline,
     setPipingSettings,
     updatePipeline,
+    setPipeLineNumber,
     routePipe,
     editRoute,
     insertInlineComponent,

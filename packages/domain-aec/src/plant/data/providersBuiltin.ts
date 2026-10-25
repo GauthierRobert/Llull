@@ -6,15 +6,16 @@
  */
 
 import type { BuildingElement, BuildingModel } from '@aec/building/types';
-import { commitBuilding } from '@aec/building/evaluate/evaluateElements';
 import { getBuilding } from '@aec/building/model';
 import { execute } from '@core/commands/registry';
+import type { ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
+import type { PipingModel } from '../types';
 import { getPiping } from '../piping/model';
 import { registerPlantObjectProvider, type PlantObjectProvider, type ProviderElement } from './providers';
 import type { PlantValueInput } from './properties';
 
-const TAGGED_CATEGORIES = ['equipment', 'pipe', 'tray', 'pipeSupport', 'member'] as const;
+const TAGGED_CATEGORIES = ['equipment', 'pipe'] as const;
 type TaggedCategory = (typeof TAGGED_CATEGORIES)[number];
 
 const isTagged = (element: BuildingElement): element is Extract<BuildingElement, { category: TaggedCategory }> =>
@@ -36,29 +37,32 @@ function describeElement(element: Extract<BuildingElement, { category: TaggedCat
   };
 }
 
-function writeBuildingTags(doc: CadDocument, tags: readonly { readonly id: string; readonly tag: string }[]): CadDocument | string {
-  const building = getBuilding(doc);
-  const elements: Record<string, BuildingElement> = { ...building.elements };
-  for (const { id, tag } of tags) {
-    const element = elements[id];
-    if (element === undefined || !isTagged(element)) return `no building element "${id}" to tag`;
-    elements[id] = element.category === 'pipe' ? { ...element, line: tag } : { ...element, mark: tag };
+/** Equipment tags go through rename_equipment_tag (tag grammar, uniqueness, pipe and line end references), legacy pipe line numbers through set_pipe_line_number. */
+function writeBuildingTags(
+  doc: CadDocument,
+  tags: readonly { readonly id: string; readonly tag: string }[],
+  ctx: ExecutionContext | undefined,
+): CadDocument | string {
+  const elements = getBuilding(doc).elements;
+  const renames = tags
+    .filter((entry) => elements[entry.id]?.category === 'equipment')
+    .map((entry) => ({ equipment: entry.id, tag: entry.tag }));
+  const pipes = tags.filter((entry) => elements[entry.id]?.category === 'pipe').map((entry) => ({ pipeId: entry.id, line: entry.tag }));
+  let current = doc;
+  if (renames.length > 0) {
+    const result = execute(current, 'rename_equipment_tag', { renames }, ctx);
+    if (result.rejected === true) return result.summary;
+    current = result.document;
   }
-  const marks = new Map<string, string>();
-  for (const element of Object.values(elements)) {
-    if (element.category !== 'equipment') continue;
-    const twin = marks.get(element.mark);
-    if (twin !== undefined) return `equipment mark "${element.mark}" would be used by ${twin} and ${element.id}`;
-    marks.set(element.mark, element.id);
+  if (pipes.length > 0) {
+    const result = execute(current, 'set_pipe_line_number', { pipes }, ctx);
+    if (result.rejected === true) return result.summary;
+    current = result.document;
   }
-  const model: BuildingModel = { ...building, elements };
-  return commitBuilding(
-    doc,
-    model,
-    tags.map((entry) => entry.id),
-    '',
-  ).document;
+  return current;
 }
+
+const elementsMemo = new WeakMap<BuildingModel, readonly ProviderElement[]>();
 
 const buildingElementProvider: PlantObjectProvider = {
   id: 'buildingElement',
@@ -68,13 +72,20 @@ const buildingElementProvider: PlantObjectProvider = {
   },
   elements: (doc) => {
     const building = getBuilding(doc);
-    return building.elementOrder.flatMap((id) => {
-      const element = building.elements[id];
-      return element !== undefined && isTagged(element) && (element.category === 'equipment' || element.category === 'pipe')
-        ? [describeElement(element)]
-        : [];
-    });
+    let listed = elementsMemo.get(building);
+    if (listed === undefined) {
+      listed = building.elementOrder.flatMap((id) => {
+        const element = building.elements[id];
+        return element !== undefined && isTagged(element) ? [describeElement(element)] : [];
+      });
+      elementsMemo.set(building, listed);
+    }
+    return listed;
   },
+  tagProblem: (doc, id, tag) =>
+    getBuilding(doc).elements[id]?.category === 'equipment' && /[:\s]/.test(tag)
+      ? "an equipment tag must not contain whitespace or ':' (the port id is <tag>:<mark>): change the tag format of the class"
+      : null,
   ends: (doc, id) => {
     const element = getBuilding(doc).elements[id];
     return element?.category === 'pipe'
@@ -92,8 +103,10 @@ const buildingElementProvider: PlantObjectProvider = {
     if (element?.category === 'pipe' && element.dn !== undefined) return { nominalSize: element.dn };
     return {};
   },
-  writeTags: (doc, tags) => writeBuildingTags(doc, tags),
+  writeTags: (doc, tags, ctx) => writeBuildingTags(doc, tags, ctx),
 };
+
+const lineElementsMemo = new WeakMap<PipingModel, readonly ProviderElement[]>();
 
 const pipeLineProvider: PlantObjectProvider = {
   id: 'pipeLine',
@@ -105,7 +118,9 @@ const pipeLineProvider: PlantObjectProvider = {
   },
   elements: (doc) => {
     const piping = getPiping(doc);
-    return piping.lineOrder.flatMap((id) => {
+    const memo = lineElementsMemo.get(piping);
+    if (memo !== undefined) return memo;
+    const listed = piping.lineOrder.flatMap((id) => {
       const line = piping.lines[id];
       return line === undefined
         ? []
@@ -120,6 +135,8 @@ const pipeLineProvider: PlantObjectProvider = {
             },
           ];
     });
+    lineElementsMemo.set(piping, listed);
+    return listed;
   },
   ends: (doc, id) => {
     const line = getPiping(doc).lines[id];
@@ -139,13 +156,20 @@ const pipeLineProvider: PlantObjectProvider = {
     return seeds;
   },
   writeTags: (doc, tags, ctx) => {
-    let current = doc;
-    for (const { id, tag } of tags) {
-      const result = execute(current, 'update_pipeline', { lineId: id, lineNumber: tag }, ctx);
-      if (result.rejected === true) return `update_pipeline ${id} "${tag}": ${result.summary}`;
-      current = result.document;
-    }
-    return current;
+    // A swap of two numbers is valid but each step alone would duplicate one: go through temporary numbers when a new number is a current one.
+    const current = getPiping(doc).lines;
+    const held = new Set(Object.values(current).map((line) => line.lineNumber));
+    const passes = tags.some((entry) => held.has(entry.tag) && current[entry.id]?.lineNumber !== entry.tag)
+      ? [tags.map((entry) => ({ id: entry.id, tag: `DAT-TMP-${entry.id}` })), tags]
+      : [tags];
+    let next = doc;
+    for (const pass of passes)
+      for (const { id, tag } of pass) {
+        const result = execute(next, 'update_pipeline', { lineId: id, lineNumber: tag }, ctx);
+        if (result.rejected === true) return `update_pipeline ${id} "${tag}": ${result.summary}`;
+        next = result.document;
+      }
+    return next;
   },
 };
 

@@ -33,7 +33,7 @@ export const setPlantProperties = defineCommand({
     'null clears the value. provenance { source, ref?, unverified? } records where the value comes from; unverified values are flagged by reports and ' +
     'check_plant_data. Changing a property the tag format reads (e.g. nominalSize in a line tag) regenerates the object tag, refuses the batch on a duplicate, ' +
     'and writes the new tag into the model object. Returns data = { changed (values), objects [ids], retagged [{ id, from, to }] }. ' +
-    'Refusals: DAT_OBJECT_UNKNOWN, DAT_PROPERTY_UNKNOWN, DAT_PROPERTY_READONLY, DAT_PROPERTY_TYPE, DAT_PROPERTY_UNIT, DAT_TAG_DUPLICATE. Next: check_plant_data.',
+    'Refusals: DAT_OBJECT_UNKNOWN, DAT_PROPERTY_UNKNOWN, DAT_PROPERTY_READONLY, DAT_PROPERTY_TYPE, DAT_PROPERTY_UNIT; for a tag-driving edit also DAT_TAG_DUPLICATE, DAT_TAG_FORMAT (the new tag does not fit, e.g. an equipment tag with whitespace or ":"), DAT_TAG_FIELD_MISSING and DAT_TARGET_TAG_READONLY (the model object cannot be renamed). Next: check_plant_data.',
   params: z.object({
     edits: z
       .array(

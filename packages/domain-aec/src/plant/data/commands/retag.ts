@@ -6,11 +6,10 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
-import { copyObject, withPlantData, type PlantDataModel, type PlantObject } from '../model';
+import { copyObject, providerIdOf, withPlantData, type PlantDataModel, type PlantObject } from '../model';
 import { expectedTag } from '../objectTag';
-import { elementOf, foreignTagHolders, getProvider, providerIdOf } from '../providers';
-import { objectRegistry } from '../registry';
-import { normaliseTag } from '../tagFormat';
+import { elementOf, foreignTagHolders, getProvider } from '../providers';
+import { collidingHolders, objectRegistry, type ScopeInfo } from '../registry';
 import { failure, type Outcome } from './params';
 
 export interface TagChange {
@@ -40,8 +39,12 @@ export function retagObjects(
   const next: PlantDataModel = { ...data, objects };
   const registry = objectRegistry(next);
   for (const change of changes) {
-    const holders = registry.byScope.get(registry.scopeOf.get(change.id) as string)?.get(normaliseTag(change.to)) ?? [];
+    const holders = collidingHolders(next, registry, registry.scopeOf.get(change.id) as ScopeInfo, change.to);
     const model = elementOf(doc, objects[change.id]?.target ?? { kind: 'reserved' });
+    const problem =
+      model?.provider.writeTags === undefined ? null : (model.provider.tagProblem?.(doc, model.element.id, change.to) ?? null);
+    if (problem !== null)
+      return failure('DAT_TAG_FORMAT', `${change.to} (${change.id}): ${problem}`, [`objects.${change.id}.tag`], [change.id]);
     const foreign = foreignTagHolders(doc, change.to).filter(
       (holder) => !(model !== null && holder.element.id === model.element.id && holder.provider === model.provider.id),
     );

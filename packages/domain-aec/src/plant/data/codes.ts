@@ -52,7 +52,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_LINE_END_UNRESOLVED:
     'Tag the object the line ends at, or name the end BL-... / TI-... (settings.batteryLimitPattern) when it leaves the unit.',
   DAT_LINE_SIZE_MISMATCH: 'Make the line nominalSize equal to the DN of its pipe, or re-size the pipe.',
-  DAT_OBJECT_ORPHAN: 'Unassign the object, or re-create the model element it stood for.',
+  DAT_OBJECT_ORPHAN:
+    'unassign_plant_object removes it; or model the element again and assign_plant_object it with the same tag (class and fields): the orphan is re-bound to the new element.',
   DAT_UNCLASSIFIED_ELEMENT: 'Classify the element with assign_plant_object.',
   DAT_OUTSIDE_HIERARCHY: 'Re-assign the object to an existing hierarchy node (the file was edited by hand).',
   DAT_VALUE_UNVERIFIED: 'Verify the value against its source and send it again with set_plant_properties without the unverified flag.',

@@ -25,7 +25,7 @@ export const assignPlantObject = defineCommand({
     'its object exists. Facts the model object already carries (equipment name and weight, line size, service, spec, sequence, design pressure) fill the ' +
     'class fields you do not send. properties: values by property name, physical numbers in the unit of the definition (plant_data_table columns) or ' +
     '{ value, unit }; provenance: { source, ref?, unverified? } per property. line: id or tag of the process line object a pipe or component belongs to. ' +
-    'Returns the plant object id (affected[0]) and data = { objectId, tag, className, hierarchy, scope, seeded, tagWritten }. Next: set_plant_properties, check_plant_data, plant_data_table.',
+    'A tag held by an ORPHAN plant object of the same class (its model object was deleted) is re-bound to the new target instead of being refused as a duplicate (data.rebound). Returns the plant object id (affected[0]) and data = { objectId, tag, className, hierarchy, scope, seeded, tagWritten, rebound }. Next: set_plant_properties, check_plant_data, plant_data_table.',
   params: z.object({
     target: z
       .union([
@@ -66,7 +66,7 @@ export const assignPlantObject = defineCommand({
     return {
       ...changed(
         assigned.document,
-        `assign_plant_object: ${assigned.object.className} ${assigned.object.tag} (${assigned.object.id}) at ${hierarchy}${model === null ? ' (reserved tag)' : ` for ${model.element.label}`}${assigned.tagWritten ? '; tag written to the model object' : ''}${assigned.seeded.length === 0 ? '' : `; defaults from the model: ${assigned.seeded.join(', ')}`}.`,
+        `assign_plant_object: ${assigned.object.className} ${assigned.object.tag} (${assigned.object.id}) at ${hierarchy}${model === null ? ' (reserved tag)' : ` for ${model.element.label}`}${assigned.rebound ? '; re-bound the orphaned plant object that held this tag' : ''}${assigned.tagWritten ? '; tag written to the model object' : ''}${assigned.seeded.length === 0 ? '' : `; defaults from the model: ${assigned.seeded.join(', ')}`}.`,
         [...assigned.affected],
       ),
       data: {
@@ -77,6 +77,7 @@ export const assignPlantObject = defineCommand({
         scope: assigned.scope,
         seeded: assigned.seeded,
         tagWritten: assigned.tagWritten,
+        rebound: assigned.rebound,
       },
     };
   },

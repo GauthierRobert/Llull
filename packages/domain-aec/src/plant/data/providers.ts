@@ -8,7 +8,9 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
-import { getPlantData, type PlantObjectTarget } from './model';
+import { providerIdOf, type PlantObjectTarget } from './model';
+import { objectRegistry } from './registry';
+import { getPlantData } from './model';
 import type { PlantValueInput } from './properties';
 import { normaliseTag } from './tagFormat';
 
@@ -40,6 +42,8 @@ export interface PlantObjectProvider {
   seeds?(doc: CadDocument, id: string): Readonly<Record<string, PlantValueInput>>;
   /** Names of battery limits the provider declares (tie-in points of kind battery_limit). */
   batteryLimits?(doc: CadDocument): readonly string[];
+  /** Why the provider cannot carry `tag` in its own tag field (a grammar of the owning plugin), or null. Checked before any tag is written. */
+  tagProblem?(doc: CadDocument, id: string, tag: string): string | null;
   /** Writes tags into the model objects in one step; a text says why it cannot. Absent = the provider cannot rename its objects. */
   writeTags?(
     doc: CadDocument,
@@ -56,12 +60,15 @@ export function registerPlantObjectProvider(provider: PlantObjectProvider): void
   foreignCache = new WeakMap();
 }
 
+/** Removes a provider (tests that register their own). */
+export function unregisterPlantObjectProvider(id: string): void {
+  providers.delete(id);
+  foreignCache = new WeakMap();
+}
+
 export const getProvider = (id: string): PlantObjectProvider | undefined => providers.get(id);
 
 export const allProviders = (): readonly PlantObjectProvider[] => [...providers.values()];
-
-export const providerIdOf = (target: PlantObjectTarget): string | null =>
-  target.kind === 'buildingElement' ? 'buildingElement' : target.kind === 'provider' ? target.provider : null;
 
 /** Provider and model object of a target, or null (reserved target, unregistered provider, deleted object). */
 export function elementOf(
@@ -73,9 +80,6 @@ export function elementOf(
   const element = provider?.element(doc, target.id);
   return provider === undefined || element === undefined ? null : { provider, element };
 }
-
-export const targetKey = (target: PlantObjectTarget): string | null =>
-  target.kind === 'reserved' ? null : `${providerIdOf(target)}:${target.id}`;
 
 export type ResolvedTarget =
   | { readonly ok: true; readonly target: PlantObjectTarget; readonly provider: PlantObjectProvider; readonly element: ProviderElement }
@@ -109,11 +113,7 @@ let foreignCache = new WeakMap<CadDocument, ReadonlyMap<string, readonly Foreign
 function foreignIndex(doc: CadDocument): ReadonlyMap<string, readonly ForeignHolder[]> {
   const cached = foreignCache.get(doc);
   if (cached !== undefined) return cached;
-  const claimed = new Set<string>();
-  for (const object of Object.values(getPlantData(doc).objects)) {
-    const key = targetKey(object.target);
-    if (key !== null) claimed.add(key);
-  }
+  const claimed = objectRegistry(getPlantData(doc)).byTarget;
   const index = new Map<string, ForeignHolder[]>();
   for (const provider of providers.values())
     for (const element of provider.elements(doc)) {
@@ -128,3 +128,6 @@ function foreignIndex(doc: CadDocument): ReadonlyMap<string, readonly ForeignHol
 /** Model objects whose unique tag field equals `tag` and that no plant object stands for. */
 export const foreignTagHolders = (doc: CadDocument, tag: string): readonly ForeignHolder[] =>
   foreignIndex(doc).get(normaliseTag(tag)) ?? [];
+
+/** Every normalised tag some model object carries as a unique tag field without a plant object standing for it. */
+export const foreignTags = (doc: CadDocument): string[] => [...foreignIndex(doc).keys()];

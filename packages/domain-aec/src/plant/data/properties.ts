@@ -50,6 +50,8 @@ export function definitionProblem(definition: PropertyDefinition): string | null
     } catch {
       return `${name}: pattern "${definition.pattern}" is not a regular expression`;
     }
+    if ((new RegExp(`${definition.pattern}|`).exec('')?.length ?? 1) > 1)
+      return `${name}: pattern "${definition.pattern}" must not contain capture groups (write (?:...)): tag formats capture the fields of a tag`;
   }
   if (definition.default !== undefined && definition.default !== null) {
     const check = coerceValue(definition, definition.default);

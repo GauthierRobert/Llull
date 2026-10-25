@@ -68,6 +68,14 @@ export function parseTagFormat(format: string): ParsedFormat {
     } else text += ch;
   }
   flush();
+  for (const [index, part] of parts.entries()) {
+    const following = parts[index + 1];
+    if (part.kind === 'field' && part.width === undefined && following?.kind === 'field' && following.width === undefined)
+      return {
+        ok: false,
+        problem: `{${part.name}}{${following.name}} are adjacent: separate them with a literal, or pad one with {name:width}`,
+      };
+  }
   if (!parts.some((part) => part.kind === 'field')) return { ok: false, problem: 'the format has no {field}: every tag would be the same' };
   return { ok: true, parts };
 }

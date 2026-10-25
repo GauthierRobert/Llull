@@ -12,8 +12,8 @@ import { isProcessLine, lineEnds, resolveEnd } from './lines';
 import { getPlantData, type PlantDataModel, type PlantObject } from './model';
 import { naturalCompare } from './naturalSort';
 import { expectedTag } from './objectTag';
-import { allProviders, elementOf, targetKey } from './providers';
-import { objectRegistry } from './registry';
+import { allProviders, elementOf } from './providers';
+import { duplicateTags, objectRegistry } from './registry';
 
 const RULE_ORDER = [
   'DAT_OUTSIDE_HIERARCHY',
@@ -148,18 +148,18 @@ function lineFindings(doc: CadDocument, data: PlantDataModel, line: PlantObject)
 }
 
 function tagFindings(data: PlantDataModel, scoped: (ids: readonly string[]) => boolean): DataFinding[] {
+  const registry = objectRegistry(data);
   const findings: DataFinding[] = [];
-  for (const [scope, tags] of objectRegistry(data).byScope) {
+  for (const { tag, ids } of duplicateTags(data, registry))
+    if (scoped(ids))
+      findings.push(
+        datFinding('DAT_TAG_DUPLICATE', 'fail', `tag ${tag} is held by ${ids.length} objects in colliding scopes: ${ids.join(', ')}`, ids, [
+          tag,
+        ]),
+      );
+  for (const tags of registry.byScope.values()) {
     const byLower = new Map<string, Array<{ tag: string; ids: readonly string[] }>>();
-    for (const [tag, ids] of tags) {
-      byLower.set(tag.toLowerCase(), [...(byLower.get(tag.toLowerCase()) ?? []), { tag, ids }]);
-      if (ids.length > 1 && scoped(ids))
-        findings.push(
-          datFinding('DAT_TAG_DUPLICATE', 'fail', `tag ${tag} is held by ${ids.length} objects in scope ${scope}: ${ids.join(', ')}`, ids, [
-            tag,
-          ]),
-        );
-    }
+    for (const [tag, ids] of tags) byLower.set(tag.toLowerCase(), [...(byLower.get(tag.toLowerCase()) ?? []), { tag, ids }]);
     for (const group of byLower.values()) {
       const ids = group.flatMap((entry) => entry.ids);
       if (group.length > 1 && scoped(ids))
@@ -178,7 +178,7 @@ function tagFindings(data: PlantDataModel, scoped: (ids: readonly string[]) => b
 }
 
 function unclassified(doc: CadDocument, data: PlantDataModel): DataFinding[] {
-  const claimed = new Set(Object.values(data.objects).flatMap((object) => targetKey(object.target) ?? []));
+  const claimed = objectRegistry(data).byTarget;
   return allProviders().flatMap((provider) =>
     provider
       .elements(doc)

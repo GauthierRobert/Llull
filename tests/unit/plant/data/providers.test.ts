@@ -7,7 +7,13 @@ import type { CadDocument } from '@core/model/types';
 import { afterEach, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { getPlantData } from '@aec/plant/data/model';
-import { allProviders, getProvider, registerPlantObjectProvider, type PlantObjectProvider } from '@aec/plant/data/providers';
+import {
+  allProviders,
+  getProvider,
+  registerPlantObjectProvider,
+  unregisterPlantObjectProvider,
+  type PlantObjectProvider,
+} from '@aec/plant/data/providers';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { addTie, routedPumpToVessel, valveScene } from '../piping/rteFixtures';
 import { addEquipment, assignPump, libraryDocument } from './dataFixtures';
@@ -145,7 +151,7 @@ describe('a provider registered by a sibling plugin', () => {
   };
 
   afterEach(() => {
-    registerPlantObjectProvider({ id: 'testNozzle', element: () => undefined, elements: () => [] });
+    unregisterPlantObjectProvider('testNozzle');
   });
 
   it('is reached by { provider, id }, by a bare id, reported unclassified until assigned, and read-only', () => {
@@ -199,7 +205,7 @@ describe('write-back failures', () => {
       'target',
     );
     expect(refusal.summary).toContain('the file is locked');
-    registerPlantObjectProvider({ id: 'testWriter', element: () => undefined, elements: () => [] });
+    unregisterPlantObjectProvider('testWriter');
   });
 
   it('a routed line is not tagged twice, and set_plant_properties re-tags it through update_pipeline', () => {
