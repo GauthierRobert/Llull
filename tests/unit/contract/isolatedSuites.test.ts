@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { DOM_ISOLATED_SUITES, ISOLATED_SUITES } from '../../isolatedSuites';
 
@@ -15,7 +17,14 @@ const domSources = import.meta.glob<string>(
   ],
   { query: '?raw', import: 'default', eager: true },
 );
-const uiSources = import.meta.glob<string>(['/src/ui/**/*.ts', '/src/ui/**/*.tsx'], { query: '?raw', import: 'default', eager: true });
+// Read from disk, not import.meta.glob: a glob import would make every UI module reachable for knip (deadcode).
+const ROOT = join(import.meta.dirname, '..', '..', '..');
+const uiSources: Record<string, string> = Object.fromEntries(
+  readdirSync(join(ROOT, 'src', 'ui'), { recursive: true, encoding: 'utf8' })
+    .filter((path) => /\.tsx?$/.test(path))
+    .map((path) => join(ROOT, 'src', 'ui', path))
+    .map((file) => [`/${relative(ROOT, file).replace(/\\/g, '/')}`, readFileSync(file, 'utf8')]),
+);
 
 // A shared (isolate: false) module graph must not see module mocks, stubbed globals, DOM state or test-only commands.
 const NEEDS_ISOLATION =
