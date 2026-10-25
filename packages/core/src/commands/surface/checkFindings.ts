@@ -34,6 +34,8 @@ export const REMEDIATION: Readonly<Record<string, string>> = {
   SWG_CHECK_FIT_APPROXIMATION:
     'none for an info finding; a warning means the exact solid is not built (mesh only): loosen fitTolerance or simplify the sweep',
   SWG_CHECK_RAIL_DEVIATION: 'loosen railTolerance / fitTolerance, simplify the rails, or split the path',
+  SWG_CHECK_VOLUME_MISMATCH:
+    'the sweep overlaps itself or folds: use a larger pitch, bend radius or a smaller section / scale so the solid keeps its full volume',
   SWG_CHECK_LOFT_TWIST: 'rebuild the loft with alignment auto (or seams) so the section starts line up',
   SWG_CHECK_LOFT_CLOSURE_G1: 'add a section or move the last one so the closed loft returns to the first section tangentially',
   SWG_CHECK_SURFACE_DEGENERATE: 'move the sections or guides so the skin has no pinched or folded interior point',

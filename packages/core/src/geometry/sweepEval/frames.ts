@@ -330,13 +330,8 @@ function smoothLength(segment: CurveSegment<Vec3>): number {
   return segment.type === 'bezier' ? bezierLengthTo(segment.points, 1) : chainLength([segment]);
 }
 
-/** Exact point and tangent of the path at each arc-length fraction (lines and arcs exactly, Béziers by smooth arc length; an exact `helix` wins over its Bézier chain). */
-export function pathSamplesAt(
-  path: ReadonlyArray<CurveSegment<Vec3>>,
-  fractions: readonly number[],
-  helix?: HelixDefinition,
-): PathSample[] {
-  if (helix !== undefined) return helixSamplesAtFractions(helix, fractions).map((sample) => ({ ...sample, segment: 0 }));
+/** Segment index and segment parameter of each arc-length fraction (lines and arcs exactly, Béziers and ellipses by smooth arc length). */
+export function locateOnPath(path: ReadonlyArray<CurveSegment<Vec3>>, fractions: readonly number[]): Array<{ segment: number; u: number }> {
   const lengths = path.map(smoothLength);
   const total = lengths.reduce((sum, length) => sum + length, 0);
   return fractions.map((t) => {
@@ -344,7 +339,19 @@ export function pathSamplesAt(
     let index = 0;
     while (index < path.length - 1 && remaining > (lengths[index] as number)) remaining -= lengths[index++] as number;
     const segment = path[index] as CurveSegment<Vec3>;
-    const u = segmentParameter(segment, (lengths[index] as number) > 0 ? remaining / (lengths[index] as number) : 0);
+    return { segment: index, u: segmentParameter(segment, (lengths[index] as number) > 0 ? remaining / (lengths[index] as number) : 0) };
+  });
+}
+
+/** Exact point and tangent of the path at each arc-length fraction (lines and arcs exactly, Béziers by smooth arc length; an exact `helix` wins over its Bézier chain). */
+export function pathSamplesAt(
+  path: ReadonlyArray<CurveSegment<Vec3>>,
+  fractions: readonly number[],
+  helix?: HelixDefinition,
+): PathSample[] {
+  if (helix !== undefined) return helixSamplesAtFractions(helix, fractions).map((sample) => ({ ...sample, segment: 0 }));
+  return locateOnPath(path, fractions).map(({ segment: index, u }) => {
+    const segment = path[index] as CurveSegment<Vec3>;
     return { point: segmentPoint(segment, u), tangent: segmentTangent(segment, u), segment: index };
   });
 }

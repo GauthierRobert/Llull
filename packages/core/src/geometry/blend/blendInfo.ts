@@ -108,6 +108,7 @@ export function filletNodes(recipe: ShapeRecipe): FilletNode[] {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return [];
     case 'boolean':
       return [...filletNodes(recipe.a), ...filletNodes(recipe.b)];

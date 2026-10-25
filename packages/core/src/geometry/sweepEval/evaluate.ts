@@ -1,17 +1,19 @@
 /**
  * The sweep evaluator: frames per orientation mode, arc-length fractions and the section transform (twist / scale / area / stretch) at each
  * frame. One evaluator feeds the mesh, the display, `inspect_sweep` and the native payload.
- * @invariant a sweep without laws, station blend or orientation is sampled and framed exactly as before the laws existed
+ * @invariant a sweep without laws, station blend or orientation is sampled and framed exactly as before the laws existed, except that the path of an
+ *   off-centre profile is sampled twice as finely: its volume (Pappus) grows with the rotation of every slab, whose chord error is quadratic in the step
  */
 
 import type { CurveSegment } from '../../model/curve';
-import type { SweepEntity, Vec3 } from '../../model/types';
+import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
+import { polygonCentroid } from '../../lib/polygon';
 import type { LawIssue } from '../../lib/law/types';
 import { helixLength } from '../../lib/helix/helix';
 import { chainLength, isClosedChain, segmentSteps } from '../curveSegments';
 import { frameFractions, orientedFrames, type FrameIssue, type SweepFrame } from './frames';
 import { applyMiter } from './miter';
-import { hasSweepLaws, stationTransforms, sweepLawIssue, twistVariation, type SweepLawShape } from './laws';
+import { hasSweepLaws, stationTransforms, sweepLawIssue, twistVariation } from './laws';
 import type { RailIssue } from './rails';
 import type { SectionTransform } from './sectionTransform';
 
@@ -59,9 +61,21 @@ const FRAMES_PER_RADIAN = 24;
 const MIN_LAW_FRAMES = 64;
 const MIN_RAIL_FRAMES = 256;
 const MAX_FRAMES = 4000;
+/** Sampling multiple of the path of an off-centre profile section without laws. */
+const OFF_CENTRE_REFINEMENT = 2;
 
-function refinement(path: ReadonlyArray<CurveSegment<Vec3>>, shape: SweepLawShape, length: number): number {
-  if (!hasSweepLaws(shape)) return 1;
+/** True when the profile's area centroid is off the path (more than 1e-9 of its extent away). */
+function offCentre(section: SweepShape['section']): boolean {
+  if (section.shape !== 'profile') return false;
+  const [cx, cy] = polygonCentroid(section.profile as Vec2[]);
+  return Math.hypot(cx, cy) > 1e-9 * Math.max(...section.profile.map(([x, y]) => Math.hypot(x, y)), 1e-12);
+}
+
+function refinement(path: ReadonlyArray<CurveSegment<Vec3>>, shape: SweepShape, length: number): number {
+  if (!hasSweepLaws(shape))
+    return (shape.orientation === undefined || shape.orientation.mode === 'minimal') && offCentre(shape.section)
+      ? OFF_CENTRE_REFINEMENT
+      : 1;
   const floor = shape.rails === undefined ? MIN_LAW_FRAMES : MIN_RAIL_FRAMES;
   const base = path.reduce((total, segment) => total + segmentSteps(segment), 0);
   const wanted = Math.min(MAX_FRAMES, Math.max(floor, Math.ceil(FRAMES_PER_RADIAN * twistVariation(shape, length))));

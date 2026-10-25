@@ -121,6 +121,7 @@ export async function prepareFeatures(op: string, args: readonly unknown[], mesh
       case 'solid':
       case 'brep':
       case 'faceSlab':
+      case 'sheetSolid':
         return;
       case 'boolean':
         await visit(recipe.a);

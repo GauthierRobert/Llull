@@ -12,6 +12,7 @@ export function unsupportedOp(kernel: Pick<GeometryKernel, 'supports' | 'support
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return null;
     case 'boolean':
       return unsupportedOp(kernel, recipe.a) ?? unsupportedOp(kernel, recipe.b);

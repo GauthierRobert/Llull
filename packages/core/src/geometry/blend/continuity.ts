@@ -86,6 +86,7 @@ export function hasFillet(recipe: ShapeRecipe): boolean {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return false;
     case 'faceBlend':
     case 'fullRound':

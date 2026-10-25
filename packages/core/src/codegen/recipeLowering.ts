@@ -91,6 +91,7 @@ export function blendNotExpressible(recipe: ShapeRecipe): boolean {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return false;
     case 'boolean':
       return blendNotExpressible(recipe.a) || blendNotExpressible(recipe.b);
@@ -195,6 +196,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     case 'faceBlend':
     case 'fullRound':
     case 'faceSlab':
+    case 'sheetSolid':
     case 'faceOp':
     case 'emboss':
     case 'deform':

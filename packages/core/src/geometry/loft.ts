@@ -15,9 +15,13 @@ import type { Triangle } from './triangles';
 /** Interpolated rings per span of a smooth loft. */
 const LOFT_SPAN_STEPS = 8;
 
-/** Dense rings of a loft (local coordinates). */
-export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed'>): Vec3[][] {
-  const sections = loft.rings.map(sampleRing);
+/**
+ * Dense rings of a loft (local coordinates). The rings of an exact skin whose faces are all straight in u (polygon sections) are the polygons themselves:
+ * smoothing their corners would round a square into a bulging ring (+25 % across the edge midpoints) and misstate the volume.
+ */
+export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces'>): Vec3[][] {
+  const polygons = loft.faces !== undefined && loft.faces.length > 0 && loft.faces.every((face) => face.degreeU === 1);
+  const sections = polygons ? loft.rings.map((ring) => [...ring]) : loft.rings.map(sampleRing);
   const first = sections[0];
   if (loft.ruled || loft.closed === true || sections.length < 3 || first === undefined) return sections;
   const columns = first.map((_, j) =>
@@ -35,7 +39,7 @@ export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed'>):
 }
 
 /** Closed, outward-wound triangles of a loft; `origin` is added to every vertex. */
-export function loftTriangles(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
+export function loftTriangles(loft: Pick<LoftEntity, 'rings' | 'ruled' | 'closed' | 'faces'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
   const rings = loftRings(loft).map((ring) => ring.map((p) => add3(p, origin)));
   if (loft.closed !== true) return skinTriangles(rings);
   // a closed loft has no end caps: the last ring joins the first

@@ -101,11 +101,8 @@ export function helixLength(def: HelixDefinition): number {
   return integrate((theta) => len3(helixAt(def, theta).derivative), 0, total, Math.max(8, Math.ceil(def.turns * 64)));
 }
 
-/**
- * Exact points and unit tangents at equally spaced ARC-LENGTH fractions (the cumulative length is tabulated at 4096 angle steps and inverted by a
- * local Newton step), so a sweep along the helix has smooth stations independent of how its NURBS chain was cut.
- */
-export function helixSamplesAtFractions(def: HelixDefinition, fractions: readonly number[]): Array<{ point: Vec3; tangent: Vec3 }> {
+/** Winding angles theta (radians) at arc-length fractions: the cumulative length is tabulated at 4096 angle steps and inverted by a local Newton step. */
+function anglesAtFractions(def: HelixDefinition, fractions: readonly number[]): number[] {
   const total = totalAngle(def);
   const steps = 4096;
   const lengths = [0];
@@ -130,8 +127,49 @@ export function helixSamplesAtFractions(def: HelixDefinition, fractions: readonl
       theta +=
         (target - (lengths[lo] as number) - integrate((x) => len3(helixAt(def, x).derivative), (total * lo) / steps, theta, 1)) / speed;
     }
+    return theta;
+  });
+}
+
+/**
+ * Exact points and unit tangents at equally spaced ARC-LENGTH fractions, so a sweep along the helix has smooth stations independent of how its
+ * NURBS chain was cut.
+ */
+export function helixSamplesAtFractions(def: HelixDefinition, fractions: readonly number[]): Array<{ point: Vec3; tangent: Vec3 }> {
+  return anglesAtFractions(def, fractions).map((theta) => {
     const { point, derivative } = helixAt(def, theta);
     return { point, tangent: normalize3(derivative) };
+  });
+}
+
+/** Rate of change of the axial advance per radian at turn fraction `u` (0 for a constant pitch and a spiral): central difference of the pitch law. */
+function pitchRate(def: HelixDefinition, u: number): number {
+  if (def.type === 'spiral' || typeof def.pitch === 'number') return 0;
+  const h = 1e-5;
+  const [lo, hi] = [Math.max(0, u - h), Math.min(1, u + h)];
+  return (pitchAt(def, hi) - pitchAt(def, lo)) / (hi - lo) / (totalAngle(def) * 2 * Math.PI);
+}
+
+/**
+ * Curvature vector dT/ds (toward the centre of curvature, length 1 / radius of curvature) of the exact helix at arc-length fractions, from its analytic
+ * first and second derivatives: (d1 x d2) x d1 / |d1|^4. A constant-pitch cylindrical helix gives R / (R^2 + c^2), c = pitch / 2 pi, in closed form; a
+ * pitch law contributes the central difference of the law to the second derivative.
+ */
+export function helixBendAtFractions(def: HelixDefinition, fractions: readonly number[]): Vec3[] {
+  const total = totalAngle(def);
+  const { x, y } = helixFrame(def.axis);
+  const sign = def.handedness === 'right' ? 1 : -1;
+  const slope = (def.endRadius - def.radius) / total;
+  return anglesAtFractions(def, fractions).map((theta) => {
+    const u = theta / total;
+    const phi = def.startAngle + sign * theta;
+    const radius = def.radius + slope * theta;
+    const radial = add3(scale3(x, Math.cos(phi)), scale3(y, Math.sin(phi)));
+    const azimuthal = add3(scale3(x, -Math.sin(phi)), scale3(y, Math.cos(phi)));
+    const { derivative } = helixAt(def, theta);
+    const second = add3(add3(scale3(azimuthal, 2 * sign * slope), scale3(radial, -radius)), scale3(def.axis, pitchRate(def, u)));
+    const speedSquared = dot3(derivative, derivative);
+    return scale3(cross3(cross3(derivative, second), derivative), 1 / (speedSquared * speedSquared));
   });
 }
 

@@ -18,6 +18,7 @@ import { affineWorld } from '@core/geometry/deform/laws';
 import { recipeKey } from '@core/geometry/shapeRecipe';
 import { clearTangentContact } from '@core/geometry/tangentGuard';
 import { nativeLeaf, type WireOptions } from './kernelLeaves';
+import { sheetSolidOf } from './kernelSheets';
 
 /** The sidecar does not implement the op or recipe node: the call returns this error (the command reports a kernel failure). */
 const NATIVE_UNSUPPORTED = 'NATIVE_UNSUPPORTED';
@@ -179,6 +180,8 @@ export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = N
   const child = (node: ShapeRecipe): ShapeRecipe => nativeRecipe(node, features, wire);
   switch (recipe.op) {
     case 'solid': {
+      const sheet = sheetSolidOf(recipe.entity, wire);
+      if (sheet !== null) return sheet;
       const entity = asNativeLeaf(recipe.entity, wire);
       return entity === recipe.entity ? recipe : { op: 'solid', entity };
     }
@@ -190,6 +193,7 @@ export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = N
       return { ...recipe, sources: recipe.sources.map(child) };
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return recipe;
     case 'deform': {
       // an affine law is one GTransform; every other law stays a deform node, which the sidecar answers NATIVE_UNSUPPORTED (exact warp: later milestone)

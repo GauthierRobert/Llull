@@ -8,7 +8,7 @@ import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { CageBoundary, CageElementIds, CageEdgeSharpness, CageSymmetry, CageVertexSharpness } from './subdivisionCage';
-import type { FaceSlabRecipe } from './faceSlab';
+import type { ExactLeafRecipe } from './sheetSolid';
 import type { Decal } from './decal';
 import type { TextLayout } from './fonts';
 import type { CurveOnFace, EmbossParams } from './wrap';
@@ -833,7 +833,7 @@ export type ShapeRecipe =
   | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
   | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
-  | FaceSlabRecipe
+  | ExactLeafRecipe
   /** Space deformation of `source` (01 DEF): every point p maps to frame⁻¹(law(frame(p))); the mesh path stays within `output.tolerance`. */
   | ({ readonly op: 'deform'; readonly source: ShapeRecipe } & DeformParams)
   /** Draft, push-pull or split of faces of `source` on its exact B-rep (SC-F1, `model/faceOps`); exact kernels only. */

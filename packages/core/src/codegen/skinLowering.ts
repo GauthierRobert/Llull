@@ -48,12 +48,6 @@ function tooLarge(count: number): Refusal | null {
   return count > MAX_SKIN_POLES ? refusal(`needs ${count} fitted poles (more than ${MAX_SKIN_POLES})`) : null;
 }
 
-/** Fitted faces of one sweep, or the reason it has none. */
-function fitFaces(entity: SweepEntity): NurbsSurfaceData[] | Refusal {
-  const fit = fitSweepFaces(entity, fitToleranceOf(entity));
-  return 'code' in fit ? refusal(`has no exact faces (${fit.code}: ${fit.message})`) : fit.surfaces;
-}
-
 const roundSection = (entity: SweepEntity): { radius: number; innerRadius?: number } | null =>
   entity.section.shape === 'circle'
     ? { radius: entity.section.radius, ...(entity.section.innerRadius === undefined ? {} : { innerRadius: entity.section.innerRadius }) }
@@ -74,13 +68,10 @@ function fitBuild(entity: SweepEntity): SweptBuild | Refusal {
   const { section } = entity;
   if (section.shape === 'circle' && section.innerRadius !== undefined && entity.stations !== undefined)
     return refusal('has a bore and stations, which no generated code rebuilds');
-  const outer = fitFaces(section.shape === 'circle' ? { ...entity, section: { shape: 'circle', radius: section.radius } } : entity);
-  if (isRefusal(outer)) return outer;
-  const bore =
-    section.shape === 'circle' && section.innerRadius !== undefined
-      ? fitFaces({ ...entity, section: { shape: 'circle', radius: section.innerRadius } })
-      : null;
-  if (isRefusal(bore)) return bore;
+  const fit = fitSweepFaces(entity, fitToleranceOf(entity));
+  if ('code' in fit) return refusal(`has no exact faces (${fit.code}: ${fit.message})`);
+  const outer = fit.surfaces;
+  const bore = fit.bore?.surfaces ?? null;
   const large = tooLarge(poleCount(outer) + (bore === null ? 0 : poleCount(bore)));
   if (large !== null) return large;
   return {

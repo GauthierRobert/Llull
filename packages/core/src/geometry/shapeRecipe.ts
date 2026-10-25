@@ -63,6 +63,8 @@ function keyText(recipe: ShapeRecipe): string {
       return featureKeyText(recipe, recipeKey(recipe.source));
     case 'faceSlab':
       return `faceSlab(${recipe.surface.type}:${recipe.surface.data.join(',')}|${recipe.loops.join(',')}|${recipe.from},${recipe.to}|${recipe.direction.join(',')}|${recipe.tolerance})`;
+    case 'sheetSolid':
+      return `sheetSolid(${JSON.stringify([recipe.faces, recipe.bore, recipe.tolerance, recipe.caps, recipe.position, recipe.rotation, recipe.name, recipe.pipeShell])})`;
     case 'deform':
       return deformKeyText(recipe, recipeKey(recipe.source));
     case 'emboss':
@@ -164,6 +166,43 @@ function slabError(node: Record<string, unknown>): string | null {
 }
 
 const positiveNumber = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
+
+/** Why a face list of an untrusted `sheetSolid` node is unusable (a non-empty list of consistent B-spline surface descriptions), or null. */
+function sheetFacesError(faces: unknown, field: string): string | null {
+  if (!Array.isArray(faces) || faces.length === 0) return `sheetSolid: ${field} must be a non-empty list of encoded surfaces`;
+  for (const face of faces) {
+    const problem = isNumberList(face) ? surfaceDataProblem('bspline', face as number[]) : 'must be a list of finite numbers';
+    if (problem !== null) return `sheetSolid: ${field} surface ${problem}`;
+  }
+  return null;
+}
+
+/** Why the `pipeShell` attempt of an untrusted `sheetSolid` node is unusable, or null. */
+function pipeShellError(shell: unknown): string | null {
+  if (!isRecord(shell)) return 'sheetSolid: pipeShell must be an object';
+  if (!isNumberList(shell['spine']) || !isNumberList(shell['probes']))
+    return 'sheetSolid: pipeShell spine and probes must be lists of finite numbers';
+  if (shell['chain'] !== undefined && !isNumberList(shell['chain'])) return 'sheetSolid: pipeShell chain must be a list of finite numbers';
+  if (shell['law'] !== undefined && !isNumberList(shell['law'])) return 'sheetSolid: pipeShell law must be a list of finite numbers';
+  if (!Number.isInteger(shell['mode']) || !Number.isInteger(shell['transition']))
+    return 'sheetSolid: pipeShell mode and transition must be integers';
+  if (!isVec3(shell['direction'])) return 'sheetSolid: pipeShell direction must be a finite Vec3';
+  return positiveNumber(shell['tolerance']) && positiveNumber(shell['check'])
+    ? null
+    : 'sheetSolid: pipeShell tolerance and check must be > 0';
+}
+
+/** Checks a `sheetSolid` node; returns an error text or null. */
+function sheetSolidError(node: Record<string, unknown>): string | null {
+  const facesProblem =
+    sheetFacesError(node['faces'], 'faces') ?? (node['bore'] === undefined ? null : sheetFacesError(node['bore'], 'bore'));
+  if (facesProblem !== null) return facesProblem;
+  if (!positiveNumber(node['tolerance'])) return 'sheetSolid: tolerance must be > 0';
+  if (node['caps'] !== 0 && node['caps'] !== 1 && node['caps'] !== 2) return 'sheetSolid: caps must be 0, 1 or 2';
+  if (!isVec3(node['position']) || !isVec3(node['rotation'])) return 'sheetSolid: position and rotation must be finite Vec3';
+  if (node['name'] !== undefined && typeof node['name'] !== 'string') return 'sheetSolid: name must be a string';
+  return node['pipeShell'] === undefined ? null : pipeShellError(node['pipeShell']);
+}
 
 /** Why the `radii` of an untrusted fillet node are unusable (a chamfer has none; one law per edge; sizes > 0; interior `t` increasing in (0, 1)), or null. */
 function radiiError(node: Record<string, unknown>, edgeCount: number): string | null {
@@ -306,6 +345,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return featureError(node) ?? child(node['source']);
     case 'faceSlab':
       return slabError(node);
+    case 'sheetSolid':
+      return sheetSolidError(node);
     default:
       return `unknown recipe op '${String(node['op'])}'`;
   }

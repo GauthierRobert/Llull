@@ -7,6 +7,7 @@
 
 import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
 import { add3, distance3, scale3 } from '../../lib/vec3';
+import { LruCache } from '../../lib/lruCache';
 import { evaluateCurve } from '../../lib/nurbs/evaluate';
 import { evaluateSurface } from '../../lib/nurbs/surface';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
@@ -38,14 +39,20 @@ function faceProbes(face: NurbsSurfaceData): number[] {
 
 export interface FittedSweep {
   /** Encoded B-spline surfaces (`encodeSurface`), one per section edge. */
-  readonly faces: number[][];
+  readonly faces: ReadonlyArray<readonly number[]>;
   /** The same faces as data (code generation emits them as B-spline constructors). */
-  readonly surfaces: NurbsSurfaceData[];
+  readonly surfaces: ReadonlyArray<NurbsSurfaceData>;
   readonly cells: number;
   /** Points (xyz triples) on the fitted faces: the check a faster exact builder (MakePipeShell) must pass. */
-  readonly probes: number[];
+  readonly probes: readonly number[];
   /** Largest measured distance between the fitted faces and the exact evaluator (document units). */
   readonly deviation: number;
+  /** A hollow round section: the faces of its bore (same stations and laws), cut out of the solid the outer faces close. */
+  readonly bore?: {
+    readonly faces: ReadonlyArray<readonly number[]>;
+    readonly surfaces: ReadonlyArray<NurbsSurfaceData>;
+    readonly probes: readonly number[];
+  };
 }
 
 /** A sweep the fitted path cannot or may not realise (the host keeps the mesh). */
@@ -173,27 +180,29 @@ function chunksOf(cells: number): Array<{ first: number; width: number }> {
 
 function fitOnce(
   sweep: SweepEntity,
-  constant: SectionEdge[] | null,
+  constants: ReadonlyArray<SectionEdge[] | null>,
   cells: number,
-): { faces: NurbsSurfaceData[]; deviation: number; cells: number } | FitRefusal {
+): { faceSets: NurbsSurfaceData[][]; deviation: number; cells: number } | FitRefusal {
   const runs = stationRuns(sweep, cells);
   if (!Array.isArray(runs)) return runs;
-  const faces: NurbsSurfaceData[] = [];
+  const faceSets: NurbsSurfaceData[][] = constants.map(() => []);
   let deviation = 0;
   let total = 0;
   for (const run of runs) {
-    const edgesByStation = Array.from({ length: run.cells + 1 }, (_, k) => edgesAt(sweep, constant, (run.stations[2 * k] as Station).t));
-    const edgeCount = (edgesByStation[0] as SectionEdge[]).length;
-    for (let e = 0; e < edgeCount; e++)
-      for (const { first, width } of chunksOf(run.cells)) {
-        const made = chunkFace(sweep, constant, run.stations, edgesByStation, e, first, width);
-        if (made === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'the station interpolation system is singular' };
-        faces.push(made.face);
-        deviation = Math.max(deviation, made.deviation);
-      }
+    for (const [set, constant] of constants.entries()) {
+      const edgesByStation = Array.from({ length: run.cells + 1 }, (_, k) => edgesAt(sweep, constant, (run.stations[2 * k] as Station).t));
+      const edgeCount = (edgesByStation[0] as SectionEdge[]).length;
+      for (let e = 0; e < edgeCount; e++)
+        for (const { first, width } of chunksOf(run.cells)) {
+          const made = chunkFace(sweep, constant, run.stations, edgesByStation, e, first, width);
+          if (made === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'the station interpolation system is singular' };
+          (faceSets[set] as NurbsSurfaceData[]).push(made.face);
+          deviation = Math.max(deviation, made.deviation);
+        }
+    }
     total += run.cells;
   }
-  return { faces, deviation, cells: total };
+  return { faceSets, deviation, cells: total };
 }
 
 function modelSize(sweep: SweepShape): number {
@@ -216,32 +225,70 @@ export function sewToleranceOf(sweep: SweepShape): number {
   return Math.max(1e-7, 1e-6 * modelSize(sweep));
 }
 
+/** The edge sets one fit runs on: the outer section and, for a hollow round section with no stations, its bore (laws scale both alike). */
+function edgeSets(sweep: SweepEntity): Array<SectionEdge[] | null> | null {
+  const { section } = sweep;
+  if (sweep.stations !== undefined) return section.shape === 'circle' && section.innerRadius !== undefined ? null : [null];
+  if (section.shape === 'circle' && section.innerRadius !== undefined) {
+    const outer = constantEdges({ shape: 'circle', radius: section.radius });
+    const bore = constantEdges({ shape: 'circle', radius: section.innerRadius });
+    return outer === null || bore === null ? null : [outer, bore];
+  }
+  const constant = constantEdges(section);
+  return constant === null ? null : [constant];
+}
+
 /**
  * Fitted faces of `sweep` within `tolerance`, refining the station count (64 up to 3200 cells, cut into faces of 100 cells) until the probes agree.
- * @failure hollow circle, degenerate arc -> SWG_FIT_UNSUPPORTED; frame mode degenerate -> SWG_FRAME_DEGENERATE;
- *   tolerance not reached with 3200 cells -> SWG_FIT_TOLERANCE
+ * A hollow round section is fitted as its outer and its bore faces on the same stations and laws (`bore`).
+ * @failure degenerate arc -> SWG_FIT_UNSUPPORTED; frame mode degenerate -> SWG_FRAME_DEGENERATE; tolerance not reached with 3200 cells -> SWG_FIT_TOLERANCE
  */
-export function fitSweepFaces(sweep: SweepEntity, tolerance: number): FittedSweep | FitRefusal {
-  const constant = sweep.stations === undefined ? constantEdges(sweep.section) : null;
-  if (sweep.stations === undefined && constant === null)
-    return { code: 'SWG_FIT_UNSUPPORTED', message: 'a hollow round section or a degenerate arc is realised as a mesh' };
+function computeFit(sweep: SweepEntity, tolerance: number): FittedSweep | FitRefusal {
+  const sets = edgeSets(sweep);
+  if (sets === null) return { code: 'SWG_FIT_UNSUPPORTED', message: 'a degenerate arc, or a bore with stations, is realised as a mesh' };
   const wanted = Math.ceil(CELLS_PER_RADIAN * twistVariation(sweep, chainLength(sweep.path)));
   let last = Number.POSITIVE_INFINITY;
   for (const cells of CELL_LADDER.filter((n) => n >= wanted || n === CELL_LADDER[CELL_LADDER.length - 1])) {
-    const fit = fitOnce(sweep, constant, cells);
+    const fit = fitOnce(sweep, sets, cells);
     if ('code' in fit) return fit;
     last = fit.deviation;
-    if (fit.deviation <= tolerance)
+    if (fit.deviation <= tolerance) {
+      const [outer, bore] = fit.faceSets as [NurbsSurfaceData[], NurbsSurfaceData[] | undefined];
       return {
-        faces: fit.faces.map(encodeSurface),
-        surfaces: fit.faces,
+        faces: outer.map(encodeSurface),
+        surfaces: outer,
         cells: fit.cells,
         deviation: fit.deviation,
-        probes: fit.faces.flatMap(faceProbes),
+        probes: outer.flatMap(faceProbes),
+        ...(bore === undefined ? {} : { bore: { faces: bore.map(encodeSurface), surfaces: bore, probes: bore.flatMap(faceProbes) } }),
       };
+    }
   }
   return {
     code: 'SWG_FIT_TOLERANCE',
     message: `fit deviation ${last.toExponential(2)} exceeds ${tolerance.toExponential(2)} with ${CELL_LADDER[CELL_LADDER.length - 1]} cells`,
   };
+}
+
+/** Fits kept: the latest few (a fit is some hundred kB to a few MB of poles), so the cache cannot grow with the sweeps a long session, undo or replay passes through. */
+const FIT_CACHE_SIZE = 6;
+const fits = new LruCache<FittedSweep | FitRefusal>(FIT_CACHE_SIZE);
+/** Identity of an entity object for the cache key (entities are immutable, so the object is a sound key; the id does not keep the entity alive). */
+const identities = new WeakMap<SweepEntity, number>();
+let nextIdentity = 0;
+
+/**
+ * Memoised fit of `sweep` within `tolerance` (see `computeFit`): a check and the kernel request of one sweep share one fit. The result is shared and
+ * read-only; the cache holds the latest 6 fits, whichever entities they belong to.
+ * @failure as `computeFit`
+ */
+export function fitSweepFaces(sweep: SweepEntity, tolerance: number): FittedSweep | FitRefusal {
+  let identity = identities.get(sweep);
+  if (identity === undefined) identities.set(sweep, (identity = nextIdentity++));
+  const key = `${identity}:${tolerance}`;
+  const known = fits.get(key);
+  if (known !== undefined) return known;
+  const made = computeFit(sweep, tolerance);
+  fits.set(key, made);
+  return made;
 }
