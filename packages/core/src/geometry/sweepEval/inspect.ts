@@ -11,6 +11,7 @@ import { isClosedChain } from '../curveSegments';
 import { pathBendAt } from './pathCurvature';
 import { orientedFrames, sweepFrames, type SweepFrame } from './frames';
 import { sectionLoops, stationLoopAt } from './sections';
+import { sweepClosingShift } from './symmetry';
 
 /** Measurements at one arc-length fraction (entity-local frame); the curvature is exact (arc, Bézier and ellipse derivatives, the analytic helix). */
 export interface SweepSample {
@@ -50,9 +51,9 @@ function nextFrame(frameCount: number, i: number, closed: boolean): number {
 /**
  * Transform at weight `u` of span `i` -> `next`. The closing span of a closed path ends on frame 0, whose twist is the law's value at t = 0 while the
  * law runs on to its value at t = 1 (a whole number of symmetry turns further, SWG_CLOSED_TWIST_NOT_PERIODIC): `closingTwist` carries the reported twist
- * on to it, so `twistRad` rises monotonically to the law's end value. The solid itself closes on ring 0 (the same orientation). Where the total twist is only a
- * whole number of turns of the section's symmetry (a square turned a quarter turn), ring 0 is a different vertex of the same shape, so the orientation
- * does unwind across the seam: that is the closing-wall bug of `closedWalls` in geometry/sweep.ts, not of this report. And scale / stretch (not required to be periodic) mix toward frame 0's values, as the closing wall does.
+ * on to it, so `twistRad` rises monotonically to the law's end value. Where the total twist is only a whole number of turns of the section's symmetry
+ * (a square turned a quarter turn), ring 0 is the same shape with its vertices renumbered: the solid closes on ring 0 read from vertex `shift`
+ * (`sweepClosingShift`, as `closedWalls` in geometry/sweep.ts) and `outlineBetween` blends toward it, so the outline turns with `twistRad`. And scale / stretch (not required to be periodic) mix toward frame 0's values, as the closing wall does.
  */
 function transformAt(evaluation: SweepEvaluation, i: number, next: number, u: number, closingTwist: number | null): SectionTransform {
   const a = evaluation.transforms?.[i] ?? { twist: 0, sx: 1, sy: 1 };
@@ -69,10 +70,11 @@ function loopAtFraction(sweep: SweepEntity, t: number): Vec2[] {
 }
 
 /** The outline the displayed solid has at weight `u` of frame span `i`: its two placed rings blended, as the wall between them is. */
-function outlineBetween(sweep: SweepEntity, evaluation: SweepEvaluation, i: number, next: number, u: number): Vec3[] {
+function outlineBetween(sweep: SweepEntity, evaluation: SweepEvaluation, i: number, next: number, u: number, wraps: boolean): Vec3[] {
+  const shift = wraps ? sweepClosingShift(sweep, evaluation, loopAtFraction(sweep, 0).length) : 0;
   const ringA = placeLoop(evaluation, i, loopAtFraction(sweep, evaluation.fractions[i] as number), [0, 0, 0]);
   const ringB = placeLoop(evaluation, next, loopAtFraction(sweep, evaluation.fractions[next] as number), [0, 0, 0]);
-  return ringA.map((p, k) => mix3(p, ringB[k] as Vec3, u));
+  return ringA.map((p, k) => mix3(p, ringB[(k + shift) % ringB.length] as Vec3, u));
 }
 
 /** Measurements of `sweep` at each fraction in `ts`, or the evaluator's refusal. */
@@ -115,7 +117,7 @@ export function sweepSamples(
       margin = sectionExtent > 0 ? curvatureRadius / sectionExtent : null;
     }
     const point = mix3(a.point, b.point, u);
-    const outline = withOutline ? outlineBetween(sweep, evaluation, i, next, u) : undefined;
+    const outline = withOutline ? outlineBetween(sweep, evaluation, i, next, u, closingTwist !== null && next <= i) : undefined;
     return {
       ...(outline === undefined ? {} : { outline }),
       t,

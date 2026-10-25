@@ -32,6 +32,15 @@ export interface SectionSpec {
 
 const ELLIPSE_POINTS = 96;
 
+/** The points without a point equal (within 1e-9 of the section size) to the one before it or, at the end, to the first (a closing repeat): the loop is closed implicitly. */
+function withoutRepeats(points: readonly Vec2[]): Vec2[] {
+  const tolerance = Math.max(...points.map(([x, y]) => Math.hypot(x, y)), 1e-12) * 1e-9;
+  const same = (a: Vec2, b: Vec2): boolean => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
+  const kept = points.filter((p, i) => i === 0 || !same(p, points[i - 1] as Vec2));
+  const first = kept[0];
+  return first !== undefined && kept.length > 1 && same(kept[kept.length - 1] as Vec2, first) ? kept.slice(0, -1) : kept;
+}
+
 /**
  * The closed loop of an explicit `section` point list (no exact curves) or of the `sectionId` sketch (with its exact curves), or an error
  * message; exactly one of the two must be given.
@@ -46,7 +55,9 @@ export function sectionLoop(
     if (bad >= 0) return `section point ${bad} must be a finite [x, y] pair`;
     if (section.length < 3 || section.length > MAX_PROFILE_POINTS)
       return `section needs 3..${MAX_PROFILE_POINTS} points (got ${section.length})`;
-    return { profile: section as Vec2[], curves: [] };
+    const profile = withoutRepeats(section as Vec2[]);
+    if (profile.length < 3) return `section needs 3 distinct points (got ${profile.length} after dropping repeated points)`;
+    return { profile, curves: [] };
   }
   const loop = sketchLoop(doc, [sectionId as string]);
   return typeof loop === 'string' ? `section ${loop}` : loop;

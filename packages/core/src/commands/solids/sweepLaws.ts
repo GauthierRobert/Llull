@@ -3,7 +3,7 @@
 import type { CadDocument, SweepEntity } from '../../model/types';
 import type { ScalarLaw } from '../../lib/law/types';
 import { evaluateSweep } from '../../geometry/sweepEval/evaluate';
-import { sectionSymmetryOrder } from '../../geometry/sweepEval/symmetry';
+import { sectionSymmetryOrder, symmetryTurns } from '../../geometry/sweepEval/symmetry';
 import { lawFunction } from '../../lib/law/evaluate';
 import { parseLaw, type LawInput } from '../../lib/law/parse';
 import { tableRejection } from '../noop';
@@ -216,9 +216,8 @@ export function sweepDesign(doc: CadDocument, entity: SweepEntity, closed: boole
   if (closed && entity.twist !== undefined && Number.isFinite(sectionSymmetryOrder(entity.section))) {
     const f = lawFunction(entity.twist);
     const total = f(1, evaluation.length) - f(0, evaluation.length);
-    const order = sectionSymmetryOrder(entity.section);
-    const step = (2 * Math.PI) / order;
-    const turns = total / step;
+    const step = (2 * Math.PI) / sectionSymmetryOrder(entity.section);
+    const turns = symmetryTurns(entity.section, total);
     if (Math.abs(turns - Math.round(turns)) > 1e-6)
       return refuseSweep(
         doc,

@@ -15,6 +15,7 @@ import { evaluateSweep, type SweepEvaluation, type SweepShape } from './sweepEva
 import type { SweepFrame } from './sweepEval/frames';
 import { transformPoint } from './sweepEval/sectionTransform';
 import { sectionLoops, stationLoopAt } from './sweepEval/sections';
+import { sweepClosingShift } from './sweepEval/symmetry';
 
 export { frameAtFraction, sweepFrames } from './sweepEval/frames';
 export { stationRingAt } from './sweepEval/sections';
@@ -54,13 +55,27 @@ export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
   );
 }
 
-/** Walls of a sweep round a closed path: consecutive rings joined, the last back to the first. */
-function closedWalls(outerRings: Vec3[][], innerRings: Vec3[][] | null, alternate: boolean): Triangle[] {
+/** `ring` read from vertex `shift` on: vertex j of the result is vertex (j + shift) mod length of the ring. */
+const rotated = (ring: Vec3[], shift: number): Vec3[] => ring.map((_, j) => ring[(j + shift) % ring.length] as Vec3);
+
+/**
+ * Walls of a sweep round a closed path: consecutive rings joined, the last back to the first.
+ * @invariant the last ring closes on ring 0 read from vertex `shift` (sweepClosingShift): a total twist of whole symmetry turns lands each vertex on another
+ */
+function closedWalls(sweep: SweepShape, evaluation: SweepEvaluation, outerRings: Vec3[][], innerRings: Vec3[][] | null): Triangle[] {
   const triangles: Triangle[] = [];
-  for (let i = 0; i < outerRings.length; i++) {
-    const next = (i + 1) % outerRings.length;
-    triangles.push(...walls(outerRings[i] as Vec3[], outerRings[next] as Vec3[], false, alternate ? i : undefined));
-    if (innerRings !== null) triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true, alternate ? i : undefined));
+  const alternate = evaluation.transforms !== null;
+  const count = outerRings.length;
+  const [outerShift, innerShift] = [
+    sweepClosingShift(sweep, evaluation, (outerRings[0] as Vec3[]).length),
+    innerRings === null ? 0 : sweepClosingShift(sweep, evaluation, (innerRings[0] as Vec3[]).length),
+  ];
+  for (let i = 0; i < count; i++) {
+    const closing = i === count - 1;
+    const upper = (rings: Vec3[][], shift: number): Vec3[] => (closing ? rotated(rings[0] as Vec3[], shift) : (rings[i + 1] as Vec3[]));
+    triangles.push(...walls(outerRings[i] as Vec3[], upper(outerRings, outerShift), false, alternate ? i : undefined));
+    if (innerRings !== null)
+      triangles.push(...walls(innerRings[i] as Vec3[], upper(innerRings, innerShift), true, alternate ? i : undefined));
   }
   return triangles;
 }
@@ -90,7 +105,7 @@ function ringTriangles(sweep: SweepShape, origin: Vec3): Triangle[] {
   const outerRings = frames.map((_, i) => placeLoop(evaluation, i, outer, origin));
   const innerRings = inner === null ? null : frames.map((_, i) => placeLoop(evaluation, i, inner, origin));
   const alternate = evaluation.transforms !== null;
-  if (isClosedChain(path)) return closedWalls(outerRings, innerRings, alternate);
+  if (isClosedChain(path)) return closedWalls(sweep, evaluation, outerRings, innerRings);
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < frames.length; i++) {
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false, alternate ? i : undefined));
