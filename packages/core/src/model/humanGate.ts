@@ -17,7 +17,9 @@ export function verifyAndSpend(
   return signer === null || port.spend?.(signature, payloadSha256) === false ? null : signer;
 }
 
-export type HumanGateOutcome = { readonly cleared: true; readonly signer: string } | { readonly cleared: false; readonly reason: string };
+export type HumanGateOutcome =
+  | { readonly cleared: true; readonly signer: string; readonly signatureId: string }
+  | { readonly cleared: false; readonly reason: string };
 
 /** The payload a human signs for `act`: the act, the ids it touches, its details (from / to markings, document hash) and the confirmation nonce. */
 export const humanGatePayload = (act: string, ids: readonly string[], details: Readonly<Record<string, unknown>>, nonce: string): string =>
@@ -44,5 +46,7 @@ export function humanGate(
   if (typeof nonce !== 'string' || nonce === '')
     return { cleared: false, reason: `the confirmation for ${act} needs a non-empty nonce string` };
   const signer = verifyAndSpend(port, confirmation, humanGatePayload(act, ids, details, nonce));
-  return signer === null ? { cleared: false, reason: `the signature did not verify for ${act}` } : { cleared: true, signer: signer.signer };
+  return signer === null
+    ? { cleared: false, reason: `the signature did not verify for ${act}` }
+    : { cleared: true, signer: signer.signer, signatureId: signer.signatureId };
 }

@@ -1,16 +1,19 @@
-// DOM overlay of camera bookmarks (useNamedViewStore), driving the camera through cameraBridge.
+// DOM overlay of saved viewpoints (document.review, save_viewpoint / apply_viewpoint / delete_viewpoint); presentation + param gathering only.
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useNamedViewStore } from '@ui/store';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { enterEscapeKeys } from '../enterEscapeKeys';
-import { getCameraSnapshot, placeCamera } from './cameraBridge';
+import { getCameraSnapshot } from './cameraBridge';
+import { viewpointCameraParams } from './viewpointParams';
 
 export function NamedViewsOverlay(): React.ReactElement {
-  const namedViews = useNamedViewStore((s) => s.namedViews);
-  const saveNamedView = useNamedViewStore((s) => s.saveNamedView);
-  const restoreNamedView = useNamedViewStore((s) => s.restoreNamedView);
-  const deleteNamedView = useNamedViewStore((s) => s.deleteNamedView);
+  const review = useStore((s) => s.document.review);
+  const dispatch = useStore((s) => s.dispatch);
+  const viewpoints = useMemo(
+    () => (review?.viewpointOrder ?? []).flatMap((id) => (review?.viewpoints[id] === undefined ? [] : [review.viewpoints[id]])),
+    [review],
+  );
 
   const [newName, setNewName] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -23,7 +26,10 @@ export function NamedViewsOverlay(): React.ReactElement {
   const handleSave = (): void => {
     const trimmed = newName.trim();
     if (trimmed === '') return; // no silent "View"
-    saveNamedView(trimmed, getCameraSnapshot);
+    const snapshot = getCameraSnapshot();
+    const camera = snapshot === null ? null : viewpointCameraParams(snapshot);
+    if (camera === null) return; // the Canvas is not mounted yet
+    dispatch('save_viewpoint', { name: trimmed, camera });
     setNewName('');
   };
 
@@ -31,15 +37,15 @@ export function NamedViewsOverlay(): React.ReactElement {
     <div className="named-views" aria-label="Named camera views" role="group">
       <button
         type="button"
-        className={`vp-btn${namedViews.length > 0 ? '' : ' vp-btn--icon'}${isExpanded ? ' vp-btn--toggled' : ''}`}
+        className={`vp-btn${viewpoints.length > 0 ? '' : ' vp-btn--icon'}${isExpanded ? ' vp-btn--toggled' : ''}`}
         onClick={() => setIsExpanded((expanded) => !expanded)}
         aria-expanded={isExpanded}
         aria-controls="named-views-panel"
-        aria-label={`Views${namedViews.length > 0 ? ` (${namedViews.length})` : ''}`}
-        title="Named views"
+        aria-label={`Views${viewpoints.length > 0 ? ` (${viewpoints.length})` : ''}`}
+        title="Saved viewpoints"
       >
         <Icon name="bookmark" size={14} />
-        {namedViews.length > 0 && <span className="vp-count">{namedViews.length}</span>}
+        {viewpoints.length > 0 && <span className="vp-count">{viewpoints.length}</span>}
       </button>
 
       {isExpanded && (
@@ -77,14 +83,14 @@ export function NamedViewsOverlay(): React.ReactElement {
             </button>
           </div>
 
-          {namedViews.length > 0 ? (
+          {viewpoints.length > 0 ? (
             <ul className="named-views-list" role="list" aria-label="Saved views">
-              {namedViews.map((view) => (
+              {viewpoints.map((view) => (
                 <li key={view.id} className="named-views-item">
                   <button
                     type="button"
                     className="named-views-restore-btn"
-                    onClick={() => restoreNamedView(view.id, placeCamera)}
+                    onClick={() => dispatch('apply_viewpoint', { id: view.id })}
                     title={`Restore view: ${view.name}`}
                     aria-label={`Restore view ${view.name}`}
                   >
@@ -93,7 +99,7 @@ export function NamedViewsOverlay(): React.ReactElement {
                   <button
                     type="button"
                     className="named-views-delete-btn"
-                    onClick={() => deleteNamedView(view.id)}
+                    onClick={() => dispatch('delete_viewpoint', { id: view.id })}
                     title={`Delete view: ${view.name}`}
                     aria-label={`Delete view ${view.name}`}
                   >

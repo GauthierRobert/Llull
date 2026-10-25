@@ -267,24 +267,13 @@
       "ifc_summary"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
-      "apply_viewpoint",
       "export_bcf_viewpoint",
-      "get_viewpoint",
       "import_bcf_viewpoint"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-03-synthetic-rack-drawcalls.json": [
       "render_stats"
     ],
-    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-04-section-box-markup-issue.json": [
-      "add_markup",
-      "add_review_comment",
-      "check_review",
-      "section_box_report",
-      "set_issue_status",
-      "set_section_box"
-    ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-06-clash-review.json": [
-      "check_review",
       "create_clash_issues"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [

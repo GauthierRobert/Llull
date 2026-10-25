@@ -137,17 +137,30 @@ export const setActiveColourProfile = defineCommand({
 
 /**
  * @affects removes doc.display.colourProfiles[profileId]; clears activeProfileId when it was active (affected: []); metaHistory
- * @failure unknown profile -> VIS_PROFILE_NOT_FOUND
+ * @failure unknown profile -> VIS_PROFILE_NOT_FOUND; a saved viewpoint references it -> VIS_PROFILE_IN_USE
  */
 export const deleteColourProfile = defineCommand({
   name: 'delete_colour_profile',
-  description: 'Delete a colour profile (deactivates it when it was active). Error: VIS_PROFILE_NOT_FOUND. Does not add a feature step.',
+  description:
+    'Delete a colour profile (deactivates it when it was active). Refused while a saved viewpoint references it (VIS_PROFILE_IN_USE: update_viewpoint / delete_viewpoint first). ' +
+    'Error: VIS_PROFILE_NOT_FOUND. Does not add a feature step.',
   annotations: { metaHistory: true, destructive: true },
   params: z.object({ profileId: z.string().describe('Profile id to delete.') }),
   run: (doc, { profileId }): CommandResult => {
     const display = displayOf(doc);
     if (findProfile(display, profileId) === undefined)
       return displayRejection(doc, 'delete_colour_profile', 'VIS_PROFILE_NOT_FOUND', `no profile '${profileId}'`, [profileId]);
+    const users = Object.values(doc.review?.viewpoints ?? {})
+      .filter((viewpoint) => viewpoint.colourProfileId === profileId)
+      .map((viewpoint) => viewpoint.id);
+    if (users.length > 0)
+      return displayRejection(
+        doc,
+        'delete_colour_profile',
+        'VIS_PROFILE_IN_USE',
+        `profile '${profileId}' is used by ${users.join(', ')}`,
+        users,
+      );
     const colourProfiles = Object.fromEntries(Object.entries(display.colourProfiles).filter(([id]) => id !== profileId));
     const { activeProfileId } = display;
     const keepActive = activeProfileId !== undefined && activeProfileId !== profileId;

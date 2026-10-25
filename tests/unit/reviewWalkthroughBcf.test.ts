@@ -6,6 +6,7 @@ import { defaultContext } from '@core/commands/context';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { RasterOutcome, RasterPort } from '@core/model/raster';
 import { rasterScenePixels } from '@core/commands/render/raster';
+import { deleteIssue, humanCtx } from './review/humanActs';
 
 const PERSPECTIVE = { projection: 'perspective', eye: [0, -60, 20], direction: [0, 1, -0.3], fovDeg: 50 } as const;
 
@@ -312,12 +313,12 @@ describe('review fixes (cad-reviewer)', () => {
 
   it('delete_review_issue removes an issue, then the viewpoint can be deleted; unknown ids are refused', () => {
     const doc = withIssues();
-    const deleted = execute(doc, 'delete_review_issue', { id: 'iss-7' });
+    const deleted = deleteIssue(doc, 'iss-7');
     expect(deleted.affected).toEqual(['iss-7']);
     expect(deleted.document.review?.issueOrder).toEqual(['iss-6']);
-    expect(execute(doc, 'delete_review_issue', { id: 'iss-1' }).error?.code).toBe('VIS_ISSUE_NOT_FOUND');
+    expect(execute(doc, 'delete_review_issue', { id: 'iss-1' }, humanCtx()).error?.code).toBe('VIS_ISSUE_NOT_FOUND');
     const before = JSON.stringify(doc);
-    execute(doc, 'delete_review_issue', { id: 'iss-6' });
+    deleteIssue(doc, 'iss-6');
     expect(JSON.stringify(doc)).toBe(before);
   });
 });

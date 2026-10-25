@@ -10,6 +10,7 @@ import type { ExecutionContext } from '../types';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_PROFILE_NOT_FOUND: 'list the profiles with check_display, or create one with define_colour_profile',
+  VIS_PROFILE_IN_USE: 'update or delete the viewpoints that reference the profile first (update_viewpoint, delete_viewpoint)',
   VIS_PROFILE_EXISTS: 'pass replace: true to overwrite the profile, or choose another id',
   VIS_RULE_INVALID:
     'fix the rule at the reported path: every rule needs a unique id and a predicate with a clause (regex <= 200 chars, range low <= high)',

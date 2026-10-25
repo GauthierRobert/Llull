@@ -261,7 +261,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   errors.push(...exchangeProblems(v['exchange']));
   errors.push(...dynamicsProblems(v['dynamics']));
   errors.push(...prototypeProblems(v['prototype']));
-  errors.push(...reviewProblems(v['review']));
+  errors.push(...reviewProblems(v['review'], v['display']));
   errors.push(...displayProblems(v['display']));
   errors.push(...kernelSliceProblems(v));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));

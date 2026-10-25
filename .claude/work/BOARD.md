@@ -13,6 +13,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-25 — main: 09 VIS-M2 merged (cad-reviewer APPROVE after 4 rounds, human gate hardened twice): review model, section
+  boxes, markups, comments, signed issue workflow, saved views as document viewpoints. Gates on the merge with DES-2c: static, unit
+  16850 (10 sequential shards), server 1694 (branch, `llull-compute` rebuilt for the DES-5b field job). Coverage not run. Next: Wave 3,
+  ISO-M1 + DAT-M1 (one at a time, RAM).
+
 - 2026-10-25 — main: 06 STA-M2/M3 merged (cad-reviewer APPROVE after 2 rounds): gratings (catalogue, support lines, NAAMM
   load / deflection check), railings (paths or host edges, gates, OSHA / ISO 14122-3 checks, edge coverage), IFC + takeoff. Gates on
   the merge with DES-5b: static, unit 16720 (10 sequential shards), server 1672 (branch). Coverage not run. Next: VIS-M2 (WIP).
@@ -146,7 +151,10 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **EQP-Q3** exact `ellipse` `CurveSegment` (core model, Manifold, closed-form volume exact for arcs / Béziers too, native OCC chain code 3). Merged 2026-10-24. _Rebuild `llull-kernel` (`solver/`) in each checkout: older binaries answer `NATIVE_OCC_FAILURE: chain: unknown segment`._
 - Test memory (2026-10-24): vitest workers sized from free memory in both suites (`testWorkers.ts`, `LLULL_TEST_WORKERS` override); gates green on the merge: static, unit 15222, coverage, server 1558.
 - `[DONE]` **STA-M2/M3** 06 STA FL / RD bars, grating catalogue + `add_grating` / `update_grating` / `check_grating` (support lines cover the panel width), `add_railing` / `update_railing`, railing checks + edge coverage in `check_access`, IFC railing / grating, takeoff (TECHNICAL_SPEC §13). Merged 2026-10-25. Open: coverage against the panel chord at each support (tapered panels refused conservatively), knee-rail offset wording, cast in `validateAccess.ts`; clashes, floor loads, openings, plan symbols, metric gratings per §13. Next STA: M4 `add_ladder`.
-- `[WIP]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
+- `[DONE]` **VIS-M2** 09 review model (TECHNICAL_SPEC §12.7): section boxes, viewpoint state (box / profile / visibility / selection), `apply_viewpoint`, markups, comments, issue workflow with the human gate (signature bound to the issue hash, proofs re-verified by `check_review`, gated deletion, `VIS_SIGNER_REVOKED` only for a revoked record of the signer), `namedViewStore` retired (saved views = document viewpoints). Merged 2026-10-25. Open: an exact copy of a signed issue still verifies in another document (no document identity; bind cited-entity hashes or add a document UUID, same limit as PLM `stateHash`); Review panel, redline tools, section-box gizmo, viewport / `render_view` clipping, UI signing flow; Views overlay not yet tried in the desktop app.
+- `[TODO]` **ISO-M1** 05 ISO first milestone (`docs/plant/05-isometrics-fabrication/TECHNICAL_SPEC.md` §10). _deps: RTE-V1b (done)_
+- `[TODO]` **DAT-M1** 08 DAT first milestone (`docs/plant/08-plant-data-reports-interop/TECHNICAL_SPEC.md` §10). _deps: —_
+- `[TODO]` **PID-M1** 04 PID first milestone (`docs/plant/04-pid-schematics/TECHNICAL_SPEC.md` §10), after ISO / DAT (README order). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).

@@ -2,7 +2,7 @@ import { isRecord } from './isRecord';
 
 /**
  * `value` with every `confirmation` object (a human signature, TR-MAT-51) replaced by `{ verified: true }`, at any depth (a plan step carries
- * its own). Signatures are checked by the command and never stored in history, saved files or the live command log.
+ * its own). Signatures are checked by the command and never reach the command log or the feature history; a gate may keep its proof in its own record for re-verification (e.g. review issue history).
  * @invariant the input is not mutated; a value with no `confirmation` object is returned as the same reference
  */
 export function withoutConfirmations(value: unknown): unknown {

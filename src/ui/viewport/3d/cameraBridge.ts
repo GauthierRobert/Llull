@@ -1,14 +1,20 @@
 // The single camera driver: under frameloop="demand" a programmatic move needs controls.update() AND invalidate().
-// CameraBridge (in-Canvas) registers it for DOM overlays (view presets, named views); never holds the document.
+// CameraBridge (in-Canvas) registers it for DOM overlays (view presets, saved viewpoints); never holds the document.
 
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { type NamedViewCamera, useStore } from '@ui/store';
+import { useStore } from '@ui/store';
 import { toRenderPosition } from './floatingOrigin';
 
 type Vec3 = readonly [number, number, number];
+
+/** The live camera in world space: where the eye is and what it orbits. */
+export interface CameraSnapshot {
+  position: Vec3;
+  target: Vec3;
+}
 
 /** WORLD-space position/target (the camera lives in render space). */
 export function driveCamera(camera: THREE.Camera, orbit: OrbitControlsImpl, invalidate: () => void, position: Vec3, target: Vec3): void {
@@ -24,7 +30,7 @@ export function driveCamera(camera: THREE.Camera, orbit: OrbitControlsImpl, inva
 
 const bridge: {
   placeCamera: ((position: Vec3, target: Vec3) => void) | null;
-  getCameraSnapshot: (() => NamedViewCamera | null) | null;
+  getCameraSnapshot: (() => CameraSnapshot | null) | null;
   getAspect: (() => number) | null;
 } = { placeCamera: null, getCameraSnapshot: null, getAspect: null };
 
@@ -33,7 +39,7 @@ export function placeCamera(position: Vec3, target: Vec3): void {
 }
 
 /** World space; null before the Canvas mounts. */
-export function getCameraSnapshot(): NamedViewCamera | null {
+export function getCameraSnapshot(): CameraSnapshot | null {
   return bridge.getCameraSnapshot?.() ?? null;
 }
 

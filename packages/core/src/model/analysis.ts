@@ -611,13 +611,7 @@ export interface FeArtifactPort {
   get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | null;
 }
 
-/** How a signing key is trusted: registered, unknown / revoked, or a published RFC 8032 test key (refused outside test mode). */
-type KeyTrust = 'trusted' | 'untrusted' | 'test';
-
-/**
- * THE signature port (`ExecutionContext.humanSignature`; 05 FEA dispositions, 08 MAT markings, 09 PLM releases). Hosts with a local key
- * store install it; none installed, so human gates refuse. Verification only: a command never signs.
- */
+/** THE signature port (`ExecutionContext.humanSignature`; 05 FEA, 08 MAT, 09 PLM, 09 VIS). Hosts with a key store install it; none: gates refuse. A command never signs. */
 export interface HumanSignaturePort {
   /** Human gate: the signer when `signature` (an Ed25519 signature object signed over the UTF-8 hex `payloadSha256`) verifies and its key is trusted, else null. */
   verify(signature: unknown, payloadSha256: string): { readonly signer: string; readonly signatureId: string } | null;
@@ -625,8 +619,14 @@ export interface HumanSignaturePort {
   spend?(signature: unknown, payloadSha256: string): boolean;
   /** Raw Ed25519 (RFC 8032 PureEdDSA) verification of `signatureHex` over the UTF-8 bytes of `message`; absent = this host cannot verify. */
   verifyEd25519?(publicKeyHex: string, message: string, signatureHex: string): boolean;
-  /** Trust of a public key (64 hex chars); absent = every key is treated as untrusted. */
-  keyTrust?(publicKeyHex: string): KeyTrust;
+  /**
+   * The userId of the REVOKED enrolled key record that made `signature`, when the signature is cryptographically valid over `payloadSha256` by exactly that key
+   * (a key the trust store knew and later revoked). Unknown keys, test keys and bad signatures give null. It says nothing about the trust of any other key
+   * and must never decide anything without a trust record behind it; used only to tell a revoked signer from a forgery. Absent = unknown.
+   */
+  revokedSignerOf?(signature: unknown, payloadSha256: string): string | null;
+  /** Trust of a public key (64 hex chars): registered, unknown / revoked, or a published RFC 8032 test key (refused outside test mode); absent = untrusted. */
+  keyTrust?(publicKeyHex: string): 'trusted' | 'untrusted' | 'test';
   /** The enrolled record of a trusted public key (the signer identity is always taken from here, never from request params). */
   signerOf?(publicKeyHex: string): { readonly keyId: string; readonly userId: string; readonly name: string } | null;
 }

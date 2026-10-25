@@ -119,6 +119,39 @@ describe('trust is separate from enrollment and cannot be minted by an agent', (
     expect(port.keyTrust?.(record.publicKey)).toBe('untrusted');
   });
 
+  it('revokedSignerOf names the user of a REVOKED enrolled key whose signature is genuine, and nobody else', async () => {
+    const payload = 'ab'.repeat(32);
+    const key = await trustedKey(home, 'u-1');
+    const signature = (await key.gate(payload)) ?? '';
+    const proof = { alg: 'Ed25519', keyId: key.record.keyId, publicKey: key.record.publicKey, signature, nonce: 'n' };
+    const trust = createTrustStore(home.trust);
+    const port = createSignaturePort(trust);
+    expect(port.revokedSignerOf?.(proof, payload)).toBeNull();
+    trust.revoke(key.record.publicKey, T);
+    expect(port.revokedSignerOf?.(proof, payload)).toBe('u-1');
+    expect(port.revokedSignerOf?.(proof, 'cd'.repeat(32))).toBeNull();
+    expect(port.revokedSignerOf?.({ ...proof, alg: 'RSA' }, payload)).toBeNull();
+    expect(port.revokedSignerOf?.({ ...proof, publicKey: 3 }, payload)).toBeNull();
+    // An unknown key (an agent's own pair) and a published RFC 8032 test key sign validly but have no revoked record.
+    const own = generateEd25519();
+    const ownProof = {
+      alg: 'Ed25519',
+      publicKey: own.publicKeyHex,
+      signature: signEd25519(own.seedHex, `${GATE_CONTEXT}${payload}`),
+      nonce: 'n',
+    };
+    expect(port.revokedSignerOf?.(ownProof, payload)).toBeNull();
+    const testSeed = '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';
+    const testProof = {
+      alg: 'Ed25519',
+      publicKey: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
+      signature: signEd25519(testSeed, `${GATE_CONTEXT}${payload}`),
+      nonce: 'n',
+    };
+    expect(verifyEd25519(testProof.publicKey, `${GATE_CONTEXT}${payload}`, testProof.signature)).toBe(true);
+    expect(port.revokedSignerOf?.(testProof, payload)).toBeNull();
+  });
+
   it('LLULL_KEYS_DIR cannot swap the trust store: another keys directory with a self-made key trusts nothing', async () => {
     const mine = await trustedKey(home, 'u-1');
     const attackerEnv = { ...home.env, LLULL_KEYS_DIR: path.join(home.dir, 'attacker-keys') };
