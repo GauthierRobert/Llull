@@ -10,7 +10,8 @@ import { prepareMeshSdf } from '@core/geometry/field/meshSdf';
 import { type FieldOp, type FieldProgram, programError } from '@core/geometry/field/program';
 import { prepareStrutSet } from '@core/geometry/field/strutSet';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
-import type { MeshData } from '@core/model/types';
+import { closestPointOnTriangle } from '@core/geometry/triangleQueries';
+import type { MeshData, Vec3 } from '@core/model/types';
 
 const META = { bounds: null, lipschitz: 1, quality: 'exact' } as const;
 
@@ -249,6 +250,31 @@ describe('mesh_sdf (field_from_solid core, VC-IMP-08)', () => {
     expect(big.distance(0, 0, 0)).toBeCloseTo(-5, 1);
     expect(big.distance(0, 0, 9)).toBeCloseTo(4, 1);
     expect(big.distance(30, 0, 0)).toBeCloseTo(25, 1);
+  });
+  it('is bit-identical to closestPointOnTriangle + Math.hypot over every triangle (the arithmetic the native twin replicates)', () => {
+    const sphere = tsFieldEngine.mesh(
+      sphereProgram(5),
+      { min: [-6, -6, -6], max: [6, 6, 6], voxel: 1 },
+      { mesher: 'tetra', maxTriangles: 1e6 },
+    );
+    if (!sphere.ok) throw new Error('mesh failed');
+    const { positions, indices } = sphere.mesh;
+    const vertex = (i: number): Vec3 => [positions[3 * i] as number, positions[3 * i + 1] as number, positions[3 * i + 2] as number];
+    const evaluator = prepareMeshSdf(sphere.mesh);
+    for (let n = 0; n < 200; n += 1) {
+      const scatter = (step: number): number => ((0.5 + (n + 1) * step) % 1) * 16 - 8;
+      const p: Vec3 = [scatter(0.8191725), scatter(0.6710436), scatter(0.5497004)];
+      let brute = Infinity;
+      for (let t = 0; t < indices.length; t += 3) {
+        const q = closestPointOnTriangle(p, [
+          vertex(indices[t] as number),
+          vertex(indices[t + 1] as number),
+          vertex(indices[t + 2] as number),
+        ]);
+        brute = Math.min(brute, Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]));
+      }
+      expect(Math.abs(evaluator.distance(...p))).toBe(brute);
+    }
   });
 });
 

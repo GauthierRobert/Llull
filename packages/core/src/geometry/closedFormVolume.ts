@@ -10,7 +10,7 @@ import { entityBounds } from './bounds';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
 import { chainMoments } from './chainMoments';
 import { sweepTriangles } from './sweep';
-import { sweepAnalyticVolume } from './sweepEval/volume';
+import { sweepAnalyticVolume, sweepConsistencyVolume } from './sweepEval/volume';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
 import { isOpenCage } from './subd/boundary';
@@ -28,9 +28,17 @@ function closedMeshVolume(positions: number[]): number {
   return Math.abs(signedMeshVolume(positions, []));
 }
 
-/** Round sections: the closed form of sweepAnalyticVolume (annulus area x path length unless laws or orientation change it); else the tessellated volume. */
+/** A round section driven by rails that keep it centred and normal to the path: V = circle area x the integral of its rail-driven scale (the premise is `sweepConsistencyVolume`'s); null otherwise. */
+function railsVolume(e: Extract<Entity, { kind: 'sweep' }>): number | null {
+  return e.section.shape === 'circle' && e.rails !== undefined ? sweepConsistencyVolume(e) : null;
+}
+
+/**
+ * Round sections: the closed form of sweepAnalyticVolume (annulus area x path length unless laws or orientation change it); a round section driven by
+ * rails keeps its circle area and is integrated along the frames (a 24-point ring meshes 1.1 % small); else the tessellated volume.
+ */
 function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): ClosedFormVolume {
-  const exact = sweepAnalyticVolume(e);
+  const exact = sweepAnalyticVolume(e) ?? railsVolume(e);
   if (exact !== null) return { volume: exact, analytic: true };
   return { volume: closedMeshVolume(sweepTriangles(e).flat(2)), analytic: false };
 }

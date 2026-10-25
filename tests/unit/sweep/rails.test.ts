@@ -10,8 +10,6 @@ import { volumeOf } from '../../helpers/fixtureDocument';
 import { relError, runSwgPlan, swgCase, swgPlan, swgValue } from '../../helpers/swgPack';
 
 const empty = createEmptyDocument();
-/** Area of the 24-gon the display mesh uses for a circle, relative to the circle: round-section mesh volumes sit this far under the exact ones. */
-const POLYGON_24 = (24 / (2 * Math.PI)) * Math.sin((2 * Math.PI) / 24);
 const MESH = 0.005;
 
 function line(doc: CadDocument, points: number[][]): { doc: CadDocument; id: string } {
@@ -56,14 +54,14 @@ describe('target_rails_and_surface_mode — the pack plan', () => {
   it('every step succeeds (the sheet check is covered with the loft checks)', () => {
     expect(steps.filter((s) => !s.ok && s.command !== 'check_sweep_loft').map((s) => `${s.command}: ${s.summary}`)).toEqual([]);
   });
-  it('VC-SWG-16: two straight rails 20 -> 10 scale the section uniformly (the frustum; mesh = circle x 24-gon)', () => {
-    expect(relError(planVolume('twoRail') / POLYGON_24, swgValue('VC-SWG-16', 'two_rails_uniform_scale'))).toBeLessThan(MESH);
+  it('VC-SWG-16: two straight rails 20 -> 10 scale the section uniformly (the frustum: the circle area integrated along the frames)', () => {
+    expect(relError(planVolume('twoRail'), swgValue('VC-SWG-16', 'two_rails_uniform_scale'))).toBeLessThan(1e-4);
   });
   it('VC-SWG-17: maintainHeight keeps the height and stretches the width (elliptic sections)', () => {
-    expect(relError(planVolume('twoRailHeight') / POLYGON_24, swgValue('VC-SWG-17', 'two_rails_maintain_height'))).toBeLessThan(MESH);
+    expect(relError(planVolume('twoRailHeight'), swgValue('VC-SWG-17', 'two_rails_maintain_height'))).toBeLessThan(MESH);
   });
   it('VC-SWG-35: one rail 10 -> 5 scales like the frustum', () => {
-    expect(relError(planVolume('oneRail') / POLYGON_24, swgValue('VC-SWG-35', 'linear_1_to_0.5_straight'))).toBeLessThan(MESH);
+    expect(relError(planVolume('oneRail'), swgValue('VC-SWG-35', 'linear_1_to_0.5_straight'))).toBeLessThan(MESH);
   });
   it('VC-SWG-18: the segment between two opposite helical rails is a helicoid of area 1 555.878', () => {
     const data = steps.find((s) => s.command === 'sweep_surface')?.data as { area: number; fitDeviation: number } | undefined;
@@ -130,7 +128,7 @@ describe('rails — exact fitted faces and orientation (VC-SWG-16, 35)', () => {
     ]);
     const entity = sweep(rail.doc, { pathId: spine.id, guideIds: [rail.id], guideMode: 'stretch', radius: 10, anchors: [[10, 0]] });
     // the x half-axis shrinks 10 -> 5 along the bar and the y half-axis stays 10: V = pi * 10 * mean(a) * L
-    expect(relError(volumeOf(entity) / POLYGON_24, Math.PI * 10 * 7.5 * 100)).toBeLessThan(MESH);
+    expect(relError(volumeOf(entity), Math.PI * 10 * 7.5 * 100)).toBeLessThan(MESH);
   });
 });
 

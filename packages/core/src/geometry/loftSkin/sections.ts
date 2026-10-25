@@ -38,20 +38,62 @@ function rotationBetween(a: Vec3, b: Vec3): (v: Vec3) => Vec3 {
   return (v) => add3(add3(scale3(v, cosine), scale3(cross3(k, v), sine)), scale3(k, dot3(k, v) * (1 - cosine)));
 }
 
+/** Rotation by `angle` about the unit `axis` (Rodrigues). */
+function rotateAbout(axis: Vec3, angle: number): (v: Vec3) => Vec3 {
+  const [sine, cosine] = [Math.sin(angle), Math.cos(angle)];
+  return (v) => add3(add3(scale3(v, cosine), scale3(cross3(axis, v), sine)), scale3(axis, dot3(axis, v) * (1 - cosine)));
+}
+
+/** Fraction of the travel below which a section normal counts as perpendicular to it. */
+const EDGE_ON = 1e-6;
+
+/**
+ * Unit normals of the section planes, each signed to point along the direction of travel (centroid of the next section minus centroid of the previous one;
+ * cyclic when `closed`). A section wound against the others thus does not turn the loop the wrong way, however far the planes turn between neighbours
+ * (a sign taken from the previous normal alone breaks when a step turns by 90 degrees or more). A section edge-on to the travel, or a travel of zero, is signed
+ * like the previous section's axis.
+ */
+function travelAxes(curves: readonly NurbsCurveData[], closed: boolean): Vec3[] {
+  const centroids = curves.map(wireCentroid);
+  const count = curves.length;
+  const axes: Vec3[] = [];
+  curves.forEach((curve, i) => {
+    const before = centroids[closed ? (i + count - 1) % count : Math.max(i - 1, 0)] as Vec3;
+    const after = centroids[closed ? (i + 1) % count : Math.min(i + 1, count - 1)] as Vec3;
+    const axis = normalize3(sectionNormal(curve));
+    const travel = sub3(after, before);
+    const along = dot3(axis, travel);
+    // an edge-on section (the plane contains the travel) or no travel at all (a 2-section closed loft) has no sign of its own: follow the previous axis
+    const undecided = len3(travel) < 1e-12 || Math.abs(along) < EDGE_ON * len3(travel);
+    const previous = axes[i - 1];
+    const forward = undecided ? (previous === undefined ? true : dot3(axis, previous) >= 0) : along > 0;
+    axes.push(forward ? axis : scale3(axis, -1));
+  });
+  return axes;
+}
+
+/** Where the start of `previous` (plane axis `from`) lands on a plane of axis `to`: its offset from the centroid, carried by the minimal rotation between the axes. */
+function carriedStart(previous: NurbsCurveData, from: Vec3, to: Vec3): Vec3 {
+  return rotationBetween(from, to)(sub3(evaluateCurve(previous, curveDomain(previous)[0]), wireCentroid(previous)));
+}
+
 /**
  * Seams of closed sections moved by exact re-seaming. `auto`: each section starts at the point nearest to the previous section's start
- * (carried over by the translation and the minimal rotation between their planes); `seams`: at the given parameter fractions.
+ * (carried over by the translation and the minimal rotation between their planes, then turned about the section axis by `drift`); `seams`:
+ * at the given parameter fractions.
  * @failure a failing knot insertion -> LoftIssue
  */
-export function alignSections(
+function alignPass(
   curves: readonly NurbsCurveData[],
-  mode: 'auto' | 'none' | 'seams',
+  mode: 'auto' | 'seams',
   seams: readonly number[] | undefined,
-  closed = false,
+  drift: number,
+  closed: boolean,
 ): NurbsCurveData[] | LoftIssue {
-  if (mode === 'none') return [...curves];
   const out: NurbsCurveData[] = [];
+  const axes = travelAxes(curves, closed);
   for (const [i, curve] of curves.entries()) {
+    const axis = axes[i] as Vec3;
     let seam: number | null = null;
     if (!isClosedCurve(curve)) seam = null;
     else if (mode === 'seams') {
@@ -59,11 +101,8 @@ export function alignSections(
       const fraction = seams?.[i] ?? 0;
       seam = a + (b - a) * fraction;
     } else if (i > 0) {
-      const previous = out[i - 1] as NurbsCurveData;
-      const [centreA, centreB] = [wireCentroid(previous), wireCentroid(curve)];
-      const rotate = rotationBetween(sectionNormal(previous), sectionNormal(curve));
-      const startOffset = sub3(evaluateCurve(previous, curveDomain(previous)[0]), centreA);
-      seam = nearestParameter(curve, add3(centreB, rotate(startOffset)));
+      const carried = rotateAbout(axis, drift)(carriedStart(out[i - 1] as NurbsCurveData, axes[i - 1] as Vec3, axis));
+      seam = nearestParameter(curve, add3(wireCentroid(curve), carried));
     }
     if (seam === null) {
       out.push(curve);
@@ -73,20 +112,45 @@ export function alignSections(
     if (typeof moved === 'string') return { code: 'SRF_NURBS_INVALID', message: `section ${i}: ${moved}`, section: i };
     out.push(moved);
   }
-  return closed && mode === 'auto' ? closeSeams(out) : out;
+  return out;
 }
 
-/** A periodic loft's closing pair: the first seam moves to the point nearest to the last section's start, kept only when the worst twist of the pairs it touches drops. */
-function closeSeams(sections: NurbsCurveData[]): NurbsCurveData[] | LoftIssue {
+/**
+ * Seam alignment of the sections of a loft.
+ * @invariant a closed loft carries the sections' start around the loop by the minimal rotation between neighbouring planes, which gains a holonomy
+ *   (the start carried round the whole loop does not meet the first one); that closure drift is shared out evenly over all pairs, the closing pair
+ *   included, so no single pair twists by all of it. The shared-out result is kept only when its worst pair twist is lower.
+ */
+export function alignSections(
+  curves: readonly NurbsCurveData[],
+  mode: 'auto' | 'none' | 'seams',
+  seams: readonly number[] | undefined,
+  closed = false,
+): NurbsCurveData[] | LoftIssue {
+  if (mode === 'none') return [...curves];
+  const sequential = alignPass(curves, mode, seams, 0, closed);
+  if (!closed || mode !== 'auto' || !Array.isArray(sequential)) return sequential;
+  const drift = closureDrift(sequential);
+  if (Math.abs(drift) < 1e-9) return sequential;
+  const shared = alignPass(curves, 'auto', undefined, drift / curves.length, true);
+  return Array.isArray(shared) && seamTwist(shared, true) < seamTwist(sequential, true) ? shared : sequential;
+}
+
+/**
+ * Signed angle about the first section's axis from the last section's start (carried onto the first plane) to the first section's own start; 0 for open or
+ * short loops.
+ * @invariant the axes point along the travel (`travelAxes`), so the sign of the angle is the sense of the loop whatever the winding of each section
+ */
+function closureDrift(sections: readonly NurbsCurveData[]): number {
   const [first, last] = [sections[0] as NurbsCurveData, sections[sections.length - 1] as NurbsCurveData];
-  if (sections.length < 3 || !isClosedCurve(first) || !isClosedCurve(last)) return sections;
-  const rotate = rotationBetween(sectionNormal(last), sectionNormal(first));
-  const offset = sub3(evaluateCurve(last, curveDomain(last)[0]), wireCentroid(last));
-  const seam = nearestParameter(first, add3(wireCentroid(first), rotate(offset)));
-  const moved = reseamCurve(first, seam);
-  if (typeof moved === 'string') return { code: 'SRF_NURBS_INVALID', message: `section 0: ${moved}`, section: 0 };
-  const twist = (head: NurbsCurveData): number => seamTwist([last, head, sections[1] as NurbsCurveData], false);
-  return twist(moved) < twist(first) ? [moved, ...sections.slice(1)] : sections;
+  if (sections.length < 3 || !isClosedCurve(first) || !isClosedCurve(last)) return 0;
+  const axes = travelAxes(sections, true);
+  const axis = axes[0] as Vec3;
+  const flatten = (v: Vec3): Vec3 => sub3(v, scale3(axis, dot3(v, axis)));
+  const carried = flatten(carriedStart(last, axes[sections.length - 1] as Vec3, axis));
+  const own = flatten(sub3(evaluateCurve(first, curveDomain(first)[0]), wireCentroid(first)));
+  if (len3(carried) < 1e-12 || len3(own) < 1e-12) return 0;
+  return Math.atan2(dot3(cross3(carried, own), axis), dot3(carried, own));
 }
 
 /** Largest angle in the plane of travel between the seam directions (start point seen from the centroid) of neighbouring closed sections; a closed loft includes the closing pair (last, first). */

@@ -127,28 +127,82 @@ fn freeform_leaves_build_from_the_host_payload() {
     assert!((volume(evaluator.evaluate(&leaf(malformed))) - 8.0).abs() < 1e-6, "fallback to the chains");
     let sweep = json!({ "kind": "sweep", "native": { "spine": [0, 0, 0, 0, 0, 0, 2], "chain": square(0.0) } });
     assert!((volume(evaluator.evaluate(&leaf(sweep))) - 8.0).abs() < 1e-6);
-    // fitted lateral faces (capability sheetSolid): the four sides of a 2 x 2 x 2 prism are sewn and capped; a bad tolerance or malformed face is refused
+    let tetra = json!({ "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] });
+    let faceted = json!({ "kind": "subdivision", "native": { "patches": [0.0], "triangles": tetra } });
+    assert!((volume(evaluator.evaluate(&leaf(faceted))) - 1.0 / 6.0).abs() < 1e-9, "bad patches fall back to the triangles");
+    let extrusion = json!({ "kind": "extrusion", "profile": [[1, 1], [-1, 1], [-1, -1], [1, -1]], "depth": 3, "chain": square(0.0) });
+    assert!((volume(evaluator.evaluate(&leaf(extrusion))) - 12.0).abs() < 1e-9);
+}
+
+/// The four lateral faces of a square prism of half width `half` and height 2 (clamped bilinear surfaces).
+fn prism_sides(half: f64) -> Vec<Vec<f64>> {
     let side = |a: [f64; 2], b: [f64; 2]| {
         let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];
         data.extend([a[0], a[1], 0.0, a[0], a[1], 2.0, b[0], b[1], 0.0, b[0], b[1], 2.0]);
         data.extend([0.0, 1.0, 2.0, 2.0, 0.0, 1.0, 2.0, 2.0]);
         data
     };
-    let faces = vec![
-        side([-1.0, -1.0], [1.0, -1.0]),
-        side([1.0, -1.0], [1.0, 1.0]),
-        side([1.0, 1.0], [-1.0, 1.0]),
-        side([-1.0, 1.0], [-1.0, -1.0]),
-    ];
-    let fitted = json!({ "kind": "sweep", "native": { "faces": faces, "tolerance": 1e-6 } });
-    assert!((volume(evaluator.evaluate(&leaf(fitted))) - 8.0).abs() < 1e-9, "fitted faces");
-    let bad_tolerance = json!({ "kind": "sweep", "native": { "faces": [[1.0]], "tolerance": 1e-6 } });
-    assert!(evaluator.evaluate(&leaf(bad_tolerance)).unwrap().is_none(), "malformed face data is refused");
-    let tetra = json!({ "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] });
-    let faceted = json!({ "kind": "subdivision", "native": { "patches": [0.0], "triangles": tetra } });
-    assert!((volume(evaluator.evaluate(&leaf(faceted))) - 1.0 / 6.0).abs() < 1e-9, "bad patches fall back to the triangles");
-    let extrusion = json!({ "kind": "extrusion", "profile": [[1, 1], [-1, 1], [-1, -1], [1, -1]], "depth": 3, "chain": square(0.0) });
-    assert!((volume(evaluator.evaluate(&leaf(extrusion))) - 12.0).abs() < 1e-9);
+    vec![
+        side([-half, -half], [half, -half]),
+        side([half, -half], [half, half]),
+        side([half, half], [-half, half]),
+        side([-half, half], [-half, -half]),
+    ]
+}
+
+fn sheet_node(faces: Vec<Vec<f64>>) -> Value {
+    json!({ "op": "sheetSolid", "faces": faces, "tolerance": 1e-6, "caps": 2, "position": [0, 0, 0], "rotation": [0, 0, 0] })
+}
+
+#[test]
+fn a_sheet_solid_node_sews_caps_places_and_cuts_a_bore() {
+    let mut evaluator = Evaluator::new(16);
+    // the four sides of a 2 x 2 x 2 prism are sewn and capped
+    assert!((volume(evaluator.evaluate(&sheet_node(prism_sides(1.0)))) - 8.0).abs() < 1e-9, "fitted faces");
+    // placed like an entity leaf, and named after its entity
+    let mut placed = sheet_node(prism_sides(1.0));
+    placed["position"] = json!([5, 0, 0]);
+    placed["name"] = json!("sweep-1");
+    let shape = evaluator.evaluate(&placed).unwrap().unwrap();
+    let bounds = crate::mass_properties(&shape).unwrap();
+    assert!((bounds.volume - 8.0).abs() < 1e-9 && (bounds.centroid[0] - 5.0).abs() < 1e-9, "placed at x = 5");
+    // a bored prism: outer 4 x 4 x 2 minus the inner 2 x 2 x 2
+    let mut hollow = sheet_node(prism_sides(2.0));
+    hollow["bore"] = json!(prism_sides(1.0));
+    assert!((volume(evaluator.evaluate(&hollow)) - 24.0).abs() < 1e-9, "outer minus bore");
+    // malformed data is refused, never a panic: face data, tolerance, caps, bore faces, placement
+    let mut bad_face = sheet_node(prism_sides(1.0));
+    bad_face["faces"] = json!([[1.0]]);
+    let mut bad_tolerance = sheet_node(prism_sides(1.0));
+    bad_tolerance["tolerance"] = json!(0);
+    let mut bad_caps = sheet_node(prism_sides(1.0));
+    bad_caps["caps"] = json!(3);
+    let mut bad_bore = sheet_node(prism_sides(2.0));
+    bad_bore["bore"] = json!([[1.0]]);
+    let mut no_placement = sheet_node(prism_sides(1.0));
+    no_placement.as_object_mut().unwrap().remove("position");
+    let mut open = sheet_node(prism_sides(1.0)[..3].to_vec());
+    open["caps"] = json!(2);
+    for (label, node) in
+        [("face", bad_face), ("tolerance", bad_tolerance), ("caps", bad_caps), ("bore", bad_bore), ("placement", no_placement)]
+    {
+        assert!(evaluator.evaluate(&node).unwrap().is_none(), "{label} is refused");
+    }
+    assert!(evaluator.evaluate(&open).map_or(true, |shape| shape.is_none()), "an open prism is refused");
+}
+
+#[test]
+fn a_sheet_solid_node_accepts_a_pipe_shell_only_when_it_matches_the_fitted_faces() {
+    let mut evaluator = Evaluator::new(16);
+    // a 2 x 2 square section along +z by 2: the pipe shell builds the same prism, so it passes (volume 8 either way)
+    let corners = [[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0]];
+    let chain: Vec<f64> = corners.windows(2).flat_map(|pair| [0.0, pair[0][0], pair[0][1], 0.0, pair[1][0], pair[1][1], 0.0]).collect();
+    let mut node = sheet_node(prism_sides(1.0));
+    node["pipeShell"] = json!({ "spine": [0, 0, 0, 0, 0, 0, 2], "chain": chain, "mode": 0, "direction": [0, 0, 1], "transition": 0, "tolerance": 1e-6, "probes": [], "check": 1e-6 });
+    assert!((volume(evaluator.evaluate(&node)) - 8.0).abs() < 1e-6, "pipe shell or fitted faces, the same prism");
+    // a pipe shell without a section falls back to the fitted faces
+    node["pipeShell"] = json!({ "spine": [0, 0, 0, 0, 0, 0, 2], "mode": 0 });
+    assert!((volume(evaluator.evaluate(&node)) - 8.0).abs() < 1e-9, "fitted faces");
 }
 
 #[test]

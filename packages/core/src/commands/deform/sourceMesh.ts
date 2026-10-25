@@ -46,6 +46,7 @@ export function hasUnverifiedLeaf(recipe: ShapeRecipe): boolean {
       return recipe.sources.some(hasUnverifiedLeaf);
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return false;
     default:
       return hasUnverifiedLeaf(recipe.source);

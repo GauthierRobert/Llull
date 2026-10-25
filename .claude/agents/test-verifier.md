@@ -37,9 +37,9 @@ Rules are already in context (workflow W3 = test map). Read `.claude/context/com
 
 ## Procedure
 
-1. Run `npm run check`; if failing, read the actual output and diagnose precisely
+1. Run `npm run check:coverage` (it is `npm run check` with the coverage gate — never run both); if failing, read the actual output and diagnose precisely
    (constrained machine: `npx vitest run --maxWorkers=2 --minWorkers=1`).
-2. `npm run test:coverage`; open the report; add tests for each uncovered branch in
+2. Open the coverage report from that run; add tests for each uncovered branch in
    `packages/core/src/commands` / `packages/domain-aec/src`.
 3. Re-run until typecheck + lint + tests + coverage all pass.
 4. Report exactly what passed/failed with the command output. If something is skipped

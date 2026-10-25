@@ -44,7 +44,7 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
   - the **already-DONE dependency outputs** it may read (resolved deps live in committed files —
     that is how you receive sibling work; there is no live channel between agents);
   - "you do NOT edit `.claude/work/BOARD.md` — the orchestrator owns it";
-  - "follow `.claude/rules/*`; finish with `npm run check` green; happy + failure tests for any
+  - "follow `.claude/rules/*`; iterate with `npm run check:fast`, finish with ONE `npm run check:coverage` green (workflow W1); happy + failure tests for any
     new command."
 - For long lanes, run agents with `run_in_background: true` so several proceed at once; you'll
   be notified on completion. If the repo is git-initialized, prefer `isolation: "worktree"`

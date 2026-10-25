@@ -19,7 +19,7 @@ pub(super) fn numbers(value: Option<&Value>) -> Option<Vec<f64>> {
     value?.as_array()?.iter().map(Value::as_f64).collect()
 }
 
-fn chains(value: Option<&Value>) -> Option<Vec<Vec<f64>>> {
+pub(super) fn chains(value: Option<&Value>) -> Option<Vec<Vec<f64>>> {
     value?.as_array()?.iter().map(|chain| numbers(Some(chain))).collect()
 }
 
@@ -59,18 +59,9 @@ pub(super) fn revolution(face: Shape, axis: [f64; 3], angle: f64, entity: &Value
 
 /// Loft (`loftedSolid`): ThruSections through the ring curves (`native.chains`), placed. With the capability `bsplineSections` the host also
 /// sends each exact section as ONE B-spline (`native.bsplines`): those are tried first, and a refusal or malformed data falls back to the chains.
+/// An advanced loft (end conditions, alignment, coupling, closed, guides) is a `sheetSolid` node, not a leaf (`sheet_node.rs`).
 pub(super) fn loft(entity: &Value) -> Evaluated {
     let native = entity.get("native");
-    // an advanced loft (end conditions, alignment, coupling, closed, guides) arrives as its exact NURBS faces: sewn and capped like a fitted sweep
-    if let Some(faces) = chains(native.and_then(|inner| inner.get("faces"))) {
-        let tolerance = native.and_then(|inner| inner.get("tolerance")).and_then(Value::as_f64).unwrap_or(1e-6);
-        if faces.is_empty() || !faces.iter().all(|face| surface_data_ok(0, face)) || !positive(tolerance) {
-            return refused();
-        }
-        let caps =
-            native.and_then(|inner| inner.get("caps")).and_then(Value::as_i64).filter(|caps| (0..=2).contains(caps)).unwrap_or(2) as i32;
-        return place_entity(shape_of(features::sheet_solid_capped(&faces, tolerance, caps))?, entity, [0.0; 3]);
-    }
     let ruled = native.and_then(|inner| inner.get("ruled")).and_then(Value::as_bool).unwrap_or(false);
     if let Some(curves) = chains(native.and_then(|inner| inner.get("bsplines"))) {
         if let Ok(Some(shape)) = features::skinned_solid_bsplines(&curves, ruled) {
@@ -93,20 +84,19 @@ pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
     place_entity(shape_of(features_surface::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
 }
 
-/// The MakePipeShell fast path of a sweep (capability `pipeShell`, `native.pipeShell`): the host sends the spine and section as for a pipe plus the
-/// trihedron mode, a homothetic law, the transition mode and probe points of its exact evaluator; the result is used only when it passes the probes, so
-/// `None` (refused, no payload, or a missed probe) falls through to the fitted faces / the plain pipe.
-fn pipe_shell(native: &Value, volume: f64) -> Evaluated {
-    let Some(settings) = native.get("pipeShell") else { return Ok(None) };
-    let Some(spine) = numbers(native.get("spine")) else { return Ok(None) };
+/// The MakePipeShell fast path (capability `pipeShell`, TECHNICAL_SPEC 5.5): `source` holds the spine and the section (`circle` or `chain`) as for a pipe,
+/// `settings` the trihedron mode, a homothetic law, the transition mode and probe points of the host's exact evaluator. The result is used only when it
+/// passes the probes (and, with `volume` > 0, the volume of the fitted faces), so `None` (refused, no payload, or a missed probe) falls through.
+pub(super) fn pipe_shell(source: &Value, settings: &Value, volume: f64) -> Evaluated {
+    let Some(spine) = numbers(source.get("spine")) else { return Ok(None) };
     if !features::chain_wire_ok(&spine).map_err(EvalError::Failure)? {
         return Ok(None);
     }
-    let section = if let Some(circle) = native.get("circle") {
+    let section = if let Some(circle) = source.get("circle") {
         let (Some(center), Some(normal)) = (vec3_of(circle.get("center")), vec3_of(circle.get("normal"))) else { return Ok(None) };
         features::circle_section(center, normal, number(circle, "radius").unwrap_or(f64::NAN), number(circle, "innerRadius"))
     } else {
-        let Some(chain) = numbers(native.get("chain")) else { return Ok(None) };
+        let Some(chain) = numbers(source.get("chain")) else { return Ok(None) };
         features::chain_face(&chain)
     };
     let Some(section) = section.map_err(EvalError::Failure)? else { return Ok(None) };
@@ -131,32 +121,14 @@ fn pipe_shell(native: &Value, volume: f64) -> Evaluated {
     shape_of(features::pipe_shell_solid(&spine, &section, &shell))
 }
 
-/// Sweep (`sweptSolid`): fitted lateral faces (capability `sheetSolid`, laws / frames MakePipe cannot do) are sewn and capped; else the spine
-/// must make a wire, and a variable sweep skins its station rings, else MakePipe of the section.
+/// Sweep (`sweptSolid`) leaf: a mitred sweep tries MakePipeShell first (`native.pipeShell`); else the spine must make a wire, and a variable sweep skins
+/// its station rings, else MakePipe of the section. A sweep with laws or frame modes is a `sheetSolid` node, not a leaf (`sheet_node.rs`).
 pub(super) fn sweep(entity: &Value) -> Evaluated {
     let Some(native) = entity.get("native") else { return refused() };
-    // fitted faces first: their volume is what the MakePipeShell attempt must reproduce (probes alone cannot see a pipe that is too fat)
-    let fitted = if let Some(faces) = chains(native.get("faces")) {
-        let tolerance = native.get("tolerance").and_then(Value::as_f64).unwrap_or(1e-6);
-        if faces.is_empty() || !faces.iter().all(|face| surface_data_ok(0, face)) || !positive(tolerance) {
-            return refused();
+    if let Some(settings) = native.get("pipeShell") {
+        if let Some(exact) = pipe_shell(native, settings, 0.0)? {
+            return place_entity(Some(exact), entity, [0.0; 3]);
         }
-        // a sweep round a closed path has no end sections to cap
-        let caps = native.get("caps").and_then(Value::as_i64).filter(|caps| (0..=2).contains(caps)).unwrap_or(2) as i32;
-        Some(shape_of(features::sheet_solid_capped(&faces, tolerance, caps))?)
-    } else {
-        None
-    };
-    let volume = fitted
-        .as_ref()
-        .and_then(|solid| solid.as_ref())
-        .and_then(|solid| crate::mass_properties(solid).ok())
-        .map_or(0.0, |properties| properties.volume);
-    if let Some(exact) = pipe_shell(native, volume)? {
-        return place_entity(Some(exact), entity, [0.0; 3]);
-    }
-    if let Some(solid) = fitted {
-        return place_entity(solid, entity, [0.0; 3]);
     }
     let Some(spine) = numbers(native.get("spine")) else { return refused() };
     if !features::chain_wire_ok(&spine).map_err(EvalError::Failure)? {

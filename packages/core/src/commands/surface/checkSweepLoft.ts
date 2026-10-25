@@ -2,6 +2,7 @@
 
 import type { LoftEntity, NurbsSurfaceEntity, SweepEntity } from '../../model/types';
 import type { CommandResult } from '../types';
+import type { GeometryKernel } from '../../geometry/kernel';
 import { defineCommand, z } from '../schema';
 import { report, tableRejection } from '../noop';
 import { evaluateSweep } from '../../geometry/sweepEval/evaluate';
@@ -12,6 +13,7 @@ import { fitSweepFaces, fitToleranceOf } from '../../geometry/sweepEval/fitted';
 import { helixOverlap } from '../solids/sweepOrientation';
 import { REMEDIATION, sig, type Finding, type NamedTolerance } from './checkFindings';
 import { checkLoft, checkSheet } from './checkLoft';
+import { checkVolume, type VolumeCheck } from './checkVolume';
 
 const CHECK_SAMPLES = 256;
 
@@ -26,8 +28,16 @@ function transformsOf(entity: SweepEntity): SectionTransform[] | null {
   return 'frames' in evaluation ? evaluation.transforms : null;
 }
 
-/** Fits measured per call when `ids` is omitted (each fit costs up to a second); the rest get an info finding asking for `ids`. */
+/** Fits (and exact volumes) measured per call when `ids` is omitted (each costs up to a second); the rest get an info finding asking for `ids`. */
 const MAX_UNLISTED_FITS = 8;
+
+/** What the volume-consistency check reads: the kernel (absent = not measured), its limit and the collected comparisons. */
+interface VolumeProbe {
+  readonly kernel: GeometryKernel | null | undefined;
+  readonly tolerance: number;
+  readonly checks: VolumeCheck[];
+  readonly budget: { left: number };
+}
 
 function checkSweep(
   entity: SweepEntity,
@@ -35,6 +45,7 @@ function checkSweep(
   fitTolerance: number | undefined,
   unit: string,
   fitBudget: { left: number },
+  volume: VolumeProbe,
 ): Finding[] {
   const findings: Finding[] = [];
   const ts = Array.from({ length: CHECK_SAMPLES }, (_, k) => k / (CHECK_SAMPLES - 1));
@@ -81,6 +92,14 @@ function checkSweep(
       remediation: REMEDIATION.SWG_CHECK_SELF_INTERSECTION_GLOBAL as string,
       message: overlap,
     });
+  if (volume.kernel !== undefined && volume.kernel !== null && volume.budget.left > 0) {
+    volume.budget.left -= 1;
+    const measured = checkVolume(entity, volume.kernel, volume.tolerance, unit);
+    if (measured !== null) {
+      volume.checks.push(measured.check);
+      if (measured.finding !== null) findings.push(measured.finding);
+    }
+  }
   if (sweepRealisation(entity) === 'fitted') {
     const tolerance = fitTolerance ?? fitToleranceOf(entity);
     if (fitBudget.left <= 0) {
@@ -117,7 +136,8 @@ function checkSweep(
 }
 
 /**
- * @affects none; data = { status, checked, findings [{ code, severity, entityId, at?, value, limit, unit, remediation, message }], tolerances, provenance }
+ * @affects none; data = { status, checked, findings [{ code, severity, entityId, at?, value, limit, unit, remediation, message }], volumeChecks [{ entityId, expected, measured, relativeDeviation }], tolerances, provenance }
+ * @invariant kernel-optional: the volume-consistency check (SWG_CHECK_VOLUME_MISMATCH) runs only with an exact kernel that reports mass properties; `volumeChecks` lists what was measured
  * @invariant status is "fail" when any finding fails, else "warn" when any warns, else "pass"
  * @failure unknown id / not a sweep, loft or sheet -> SWG_ENTITY_NOT_FOUND; a non-positive tolerance -> SWG_PARAM_INVALID
  */
@@ -128,7 +148,7 @@ export const checkSweepLoft = defineCommand({
     'Read-only check of sweeps and lofts (every sweep and loft when `ids` is omitted; list the ids of swept or lofted sheets to check them too): the frame mode must be defined along the whole path (SWG_CHECK_FRAME_DEGENERATE), the laws finite and positive ' +
     '(SWG_CHECK_LAW_INVALID), and the swept surface must not fold onto itself — at 256 samples the fold margin (path curvature radius / section extent toward the centre of curvature) must stay above ' +
     '`selfIntersectionMargin` (default 1.0; SWG_CHECK_SELF_INTERSECTION_LOCAL). Fitted-face sweeps add an info finding. Returns status pass | warn | fail and findings with code, severity, ' +
-    'location t, value, limit, unit and remediation; `tolerances` names every limit with `defaulted` and its `source`. Rail sweeps whose fitted faces miss the rails report SWG_CHECK_RAIL_DEVIATION. Lofts: SWG_CHECK_LOFT_TWIST (neighbouring section starts more than `endAngleRad` apart, including the closing pair of a closed loft: the rulings twist), SWG_CHECK_LOFT_CLOSURE_G1 (a closed loft kinks across its closing seam by more than `endAngleRad`), SWG_CHECK_SURFACE_DEGENERATE (a pinched or folded skin); sheets: SWG_CHECK_SURFACE_DEGENERATE. End every sweep, loft and swept sheet with this check.',
+    'location t, value, limit, unit and remediation; `tolerances` names every limit with `defaulted` and its `source`. Rail sweeps whose fitted faces miss the rails report SWG_CHECK_RAIL_DEVIATION. Lofts: SWG_CHECK_LOFT_TWIST (neighbouring section starts more than `endAngleRad` apart, including the closing pair of a closed loft: the rulings twist), SWG_CHECK_LOFT_CLOSURE_G1 (a closed loft kinks across its closing seam by more than `endAngleRad`), SWG_CHECK_SURFACE_DEGENERATE (a pinched or folded skin); sheets: SWG_CHECK_SURFACE_DEGENERATE. With an exact kernel, a sweep whose section stays normal to the path and centred on it must have the volume of the integral of its section area along the path within `volumeConsistencyRel` (SWG_CHECK_VOLUME_MISMATCH: a deficit means overlapping turns); `data.volumeChecks` lists the comparisons. End every sweep, loft and swept sheet with this check.',
   params: z.object({
     ids: z
       .array(z.string())
@@ -144,6 +164,12 @@ export const checkSweepLoft = defineCommand({
         'Largest allowed distance of the fitted exact faces from the evaluator, document units, > 0. Default 1e-7 × the model size (at least 1e-9).',
       )
       .optional(),
+    volumeConsistencyRel: z
+      .number()
+      .describe(
+        'Largest allowed relative difference between the exact (kernel) volume of a sweep whose section stays normal to the path and centred on it and the integral of its section area along the path, dimensionless, > 0. Default 1e-4. Measured only with an exact kernel; a larger deficit means the solid overlaps itself.',
+      )
+      .optional(),
     selfIntersectionMargin: z
       .number()
       .describe(
@@ -151,11 +177,20 @@ export const checkSweepLoft = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { ids, selfIntersectionMargin, fitTolerance, endAngleRad }): CommandResult => {
+  run: (doc, { ids, selfIntersectionMargin, fitTolerance, endAngleRad, volumeConsistencyRel }, ctx): CommandResult => {
     if (endAngleRad !== undefined && !(endAngleRad > 0))
       return refuse(doc, 'check_sweep_loft', 'SWG_PARAM_INVALID', `endAngleRad must be > 0 (got ${endAngleRad})`, [], ['endAngleRad']);
     if (fitTolerance !== undefined && !(fitTolerance > 0))
       return refuse(doc, 'check_sweep_loft', 'SWG_PARAM_INVALID', `fitTolerance must be > 0 (got ${fitTolerance})`, [], ['fitTolerance']);
+    if (volumeConsistencyRel !== undefined && !(volumeConsistencyRel > 0))
+      return refuse(
+        doc,
+        'check_sweep_loft',
+        'SWG_PARAM_INVALID',
+        `volumeConsistencyRel must be > 0 (got ${volumeConsistencyRel})`,
+        [],
+        ['volumeConsistencyRel'],
+      );
     if (selfIntersectionMargin !== undefined && !(selfIntersectionMargin > 0))
       return refuse(
         doc,
@@ -176,9 +211,15 @@ export const checkSweepLoft = defineCommand({
     const margin = selfIntersectionMargin ?? 1;
     const fitBudget = { left: ids === undefined ? MAX_UNLISTED_FITS : Number.POSITIVE_INFINITY };
     const angle = endAngleRad ?? 0.01;
+    const volume: VolumeProbe = {
+      kernel: ctx?.kernel,
+      tolerance: volumeConsistencyRel ?? 1e-4,
+      checks: [],
+      budget: { left: ids === undefined ? MAX_UNLISTED_FITS : Number.POSITIVE_INFINITY },
+    };
     const findings = targets.flatMap((entity) =>
       entity.kind === 'sweep'
-        ? checkSweep(entity, margin, fitTolerance, doc.units, fitBudget)
+        ? checkSweep(entity, margin, fitTolerance, doc.units, fitBudget, volume)
         : entity.kind === 'loft'
           ? checkLoft(entity, angle, doc.units)
           : checkSheet(entity, doc.units),
@@ -192,6 +233,12 @@ export const checkSweepLoft = defineCommand({
         source: 'llull choice: 1e-7 x model size keeps the exact volume within ~1e-6 (TECHNICAL_SPEC 5.8 names 1e-6 x model size)',
       },
       endAngleRad: { value: angle, unit: 'rad', defaulted: endAngleRad === undefined, source: 'OCCT TolAngular 1e-2 (TECHNICAL_SPEC 5.8)' },
+      volumeConsistencyRel: {
+        value: volume.tolerance,
+        unit: 'ratio',
+        defaulted: volumeConsistencyRel === undefined,
+        source: 'llull choice: far above the fit error (1e-6), far below any real overlap (TECHNICAL_SPEC 5.8)',
+      },
       selfIntersectionMargin: {
         value: margin,
         unit: 'ratio',
@@ -207,6 +254,7 @@ export const checkSweepLoft = defineCommand({
         status,
         checked: targets.map((t) => t.id),
         findings,
+        volumeChecks: volume.checks,
         tolerances,
         provenance: { method: 'frame evaluation and fold margin at 256 arc-length samples', inputs: { ids: targets.map((t) => t.id) } },
       },

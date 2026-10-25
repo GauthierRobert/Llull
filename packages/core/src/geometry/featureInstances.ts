@@ -32,6 +32,7 @@ export function featureNodes(recipe: ShapeRecipe): FeatureRecipe[] {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
     case 'deform':
       return [];
   }
@@ -147,6 +148,7 @@ export function editFeatureNode(recipe: ShapeRecipe, ordinal: number, edit: (nod
       case 'solid':
       case 'brep':
       case 'faceSlab':
+      case 'sheetSolid':
       case 'deform':
         return node;
     }

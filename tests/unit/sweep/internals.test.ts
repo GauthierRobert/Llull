@@ -216,7 +216,7 @@ describe('section edges and fitted faces', () => {
     expect('faces' in fit && fit.faces.length).toBe(24);
   });
 
-  it('fits a twisted square ring round a closed path (faces meet where they started); refuses hollow sections, an unreachable tolerance, a degenerate frame', () => {
+  it('fits a twisted square ring round a closed path (faces meet where they started); fits a hollow section with a bore, refuses a bore with stations, an unreachable tolerance, a degenerate frame', () => {
     const ring = sweepEntity({
       path: xyz(0, 0, 0, 100, 0, 0, 100, 100, 0, 0, 100, 0),
       closed: true,
@@ -227,7 +227,31 @@ describe('section edges and fitted faces', () => {
     const loop = fitSweepFaces(ring, 1e-6);
     expect('faces' in loop && loop.faces.length >= 4 && loop.deviation <= 1e-6).toBe(true);
     const hollow = sweepEntity({ path: BAR, radius: 5, innerRadius: 2, scale: { type: 'linear', start: 1, end: 2 } });
-    expect(fitSweepFaces(hollow, 1e-6)).toMatchObject({ code: 'SWG_FIT_UNSUPPORTED' });
+    expect(fitSweepFaces(hollow, 1e-6)).toMatchObject({ bore: expect.anything() });
+    const stationed = {
+      ...hollow,
+      stations: [
+        {
+          at: 0,
+          ring: [
+            [1, 0],
+            [0, 1],
+            [-1, 0],
+            [0, -1],
+          ],
+        },
+        {
+          at: 1,
+          ring: [
+            [2, 0],
+            [0, 2],
+            [-2, 0],
+            [0, -2],
+          ],
+        },
+      ],
+    } as unknown as SweepEntity;
+    expect(fitSweepFaces(stationed, 1e-6)).toMatchObject({ code: 'SWG_FIT_UNSUPPORTED' });
     const wavy = sweepEntity({ path: BAR, section: SQUARE, twist: { type: 'expression', expression: '40*sin(30*t)' } });
     expect(fitSweepFaces(wavy, 1e-12)).toMatchObject({ code: 'SWG_FIT_TOLERANCE' });
     const straight = { ...sweepEntity({ path: BAR, radius: 5 }), orientation: { mode: 'frenet' as const } };

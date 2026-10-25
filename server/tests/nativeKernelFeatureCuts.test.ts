@@ -41,6 +41,7 @@ function lowered(recipe: ShapeRecipe): ShapeRecipe {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return recipe;
     case 'boolean':
       return { ...recipe, a: lowered(recipe.a), b: lowered(recipe.b) };

@@ -20,10 +20,11 @@ mod floor;
 mod nodes;
 #[cfg(test)]
 mod nodes_tests;
+mod sheet_node;
 mod warp;
 mod wrap_nodes;
 
-pub const RECIPE_OPS: [&str; 17] = [
+pub const RECIPE_OPS: [&str; 18] = [
     "solid",
     "boolean",
     "place",
@@ -37,6 +38,7 @@ pub const RECIPE_OPS: [&str; 17] = [
     "shell",
     "featureCut",
     "faceSlab",
+    "sheetSolid",
     "faceOp",
     "emboss",
     "faceBlend",
@@ -407,6 +409,7 @@ impl Evaluator {
             "shell" => self.shell(recipe),
             "featureCut" => self.feature_cut(recipe),
             "faceSlab" => wrap_nodes::face_slab(recipe),
+            "sheetSolid" => sheet_node::sheet_solid(recipe),
             "faceOp" => self.face_op(recipe),
             "emboss" => self.emboss(recipe),
             "faceBlend" => self.face_blend(recipe),

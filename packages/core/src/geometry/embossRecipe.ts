@@ -27,6 +27,7 @@ export function embossNodes(recipe: ShapeRecipe): EmbossNode[] {
     case 'solid':
     case 'brep':
     case 'faceSlab':
+    case 'sheetSolid':
       return [];
     default:
       return embossNodes(recipe.source);

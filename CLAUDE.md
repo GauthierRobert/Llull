@@ -84,7 +84,9 @@ On demand: `.claude/context/command-layer.md` (signatures) · `.claude/context/m
 npm install          # root + workspaces (server/, desktop/ separately: npm --prefix <dir> install)
 npm --prefix desktop run build && npm --prefix desktop start   # run the desktop app (desktop/README.md)
 npm run dev          # Vite renderer dev server (HMR) for UI iteration only; verify in the desktop app
-npm run check        # typecheck + arch + deadcode + lint + format:check + native:check (solver/; skipped without cargo) + test — MUST pass before commit
+npm run check        # typecheck + arch + deadcode + lint + format:check + native:check (solver/; skipped without cargo or when unchanged) + test — MUST pass before commit
+npm run check:fast   # while iterating: typecheck + arch + lint + tests affected by the diff vs origin/main (workflow W1)
+npm run check:coverage # the final gate when packages/*/src changed: check with test:coverage in place of test (as CI)
 npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero,dynamics,implicit} + design-lang + plm
 npm run claude:lint  # after editing .claude/
 npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)

@@ -1,15 +1,16 @@
 /** Read-only measurements of a sweep for `inspect_sweep` / `check_sweep_loft`: frames, twist, scale, curvature and fold margin at a path fraction. */
 
 import type { SweepEntity, Vec2, Vec3 } from '../../model/types';
-import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
+import { add3, cross3, dot3, len3, normalize3, scale3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
 import { baseSectionArea } from './laws';
 import { mixTransforms, transformPoint, type SectionTransform } from './sectionTransform';
 import { evaluateSweep, type SweepEvaluation } from './evaluate';
+import { pathBendAt } from './pathCurvature';
 import { orientedFrames, sweepFrames, type SweepFrame } from './frames';
 import { sectionLoops, stationLoopAt } from './sections';
 
-/** Measurements at one arc-length fraction (entity-local frame). */
+/** Measurements at one arc-length fraction (entity-local frame); the curvature is exact (arc, Bézier and ellipse derivatives, the analytic helix). */
 export interface SweepSample {
   readonly t: number;
   readonly s: number;
@@ -37,14 +38,6 @@ function locate(fractions: readonly number[], t: number): { i: number; u: number
 
 const mix3 = (a: Vec3, b: Vec3, u: number): Vec3 => add3(scale3(a, 1 - u), scale3(b, u));
 
-/** Curvature vector dT/ds around frame `i` (central difference of tangents over the chord). */
-function curvatureVector(frames: readonly SweepFrame[], i: number): Vec3 {
-  const before = frames[Math.max(0, i - 1)] as SweepFrame;
-  const after = frames[Math.min(frames.length - 1, i + 1)] as SweepFrame;
-  const chord = len3(sub3(after.point, before.point));
-  return chord > 0 ? scale3(sub3(after.tangent, before.tangent), 1 / chord) : [0, 0, 0];
-}
-
 function transformAt(evaluation: SweepEvaluation, i: number, u: number): SectionTransform {
   const a = evaluation.transforms?.[i] ?? { twist: 0, sx: 1, sy: 1 };
   const b = evaluation.transforms?.[Math.min(i + 1, evaluation.frames.length - 1)] ?? a;
@@ -67,7 +60,8 @@ export function sweepSamples(
   if (!('frames' in evaluation)) return evaluation;
   const { frames, fractions, length } = evaluation;
   if (frames.length === 0) return { code: 'SWG_PATH_INVALID', message: 'the path has no samples' };
-  return ts.map((t) => {
+  const bends = pathBendAt(sweep.path, ts, sweep.helix);
+  return ts.map((t, k) => {
     const { i, u } = locate(fractions, t);
     const a = frames[i] as SweepFrame;
     const b = frames[Math.min(i + 1, frames.length - 1)] as SweepFrame;
@@ -75,8 +69,7 @@ export function sweepSamples(
     const normal = normalize3(mix3(a.normal, b.normal, u));
     const binormal = cross3(tangent, normal);
     const transform = transformAt(evaluation, i, u);
-    const nearest = u < 0.5 ? i : Math.min(i + 1, frames.length - 1);
-    const bend = curvatureVector(frames, nearest);
+    const bend = bends[k] as Vec3;
     const kappa = len3(bend);
     let curvatureRadius: number | null = null;
     let sectionExtent: number | null = null;
@@ -156,7 +149,8 @@ export function sweepTotals(sweep: SweepEntity): SweepTotals | { readonly code: 
   const baseArea = sweep.stations === undefined ? baseSectionArea(sweep) : null;
   let integral = 0;
   for (let i = 0; i + 1 < frames.length; i++) {
-    const ds = len3(sub3((frames[i + 1] as SweepFrame).point, (frames[i] as SweepFrame).point));
+    // the exact path length shared out by the frames' chord fractions: no chord deficit on a curved path
+    const ds = ((evaluation.fractions[i + 1] as number) - (evaluation.fractions[i] as number)) * evaluation.length;
     const area = (j: number): number => {
       const transform = transforms?.[j];
       const loop = baseArea === null ? loopAtFraction(sweep, evaluation.fractions[j] as number) : null;

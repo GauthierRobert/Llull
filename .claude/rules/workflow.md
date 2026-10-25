@@ -5,8 +5,11 @@
 1. Locate the layer (architecture.md decision shortcuts).
 2. Write the change **and its test in the same change** (`packages/*` logic always). A bug fix
    starts with a failing test or golden plan (`fix-bug` skill).
-3. `npm run check` (typecheck + arch + deadcode + lint + format:check + native:check + test) → green. While iterating, run the
-   slice: `npx vitest run <file>` or `npx vitest related --run <changed files>`.
+3. Iterate on the slice: `npx vitest run <file>` or `npx vitest related --run <changed files>`, and `npm run check:fast`
+   (typecheck + arch + lint + the tests affected by your diff against origin/main). Run the full gate ONCE, when the change is
+   done: `npm run check:coverage` (typecheck + arch + deadcode + lint + format:check + native:check + tests with the coverage gate,
+   the same as CI) when `packages/*/src` changed, else `npm run check` (same without coverage). Never run both: the coverage
+   run already runs every test. `native:check` skips itself when `solver/` is unchanged against origin/main.
 4. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
 
 A Stop hook blocks once if `packages/*/src` changed without a test change, or a snapshot changed —
@@ -34,6 +37,8 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 
 `tests/unit` + `tests/golden` run in node with one shared module graph per worker (vitest project `node`); a suite that
 mocks modules, stubs globals, uses the DOM or registers test commands goes in `tests/isolatedSuites.ts` (contract-tested).
+DOM suites share one jsdom graph per worker too (project `dom`; `tests/setupDom.ts` unmounts renders and resets every UI zustand
+store + storage per test); one that mocks modules, stubs globals or registers test commands goes in `DOM_ISOLATED_SUITES` (same file).
 `tests/setup.ts` installs default plugins and resets the injected kernel/physics/library per file. Ids are deterministic per document; never assert on
 `Date.now()`. Assert observed behavior (entities, `affected`, `summary`), not internals.
 
@@ -41,7 +46,7 @@ mocks modules, stubs globals, uses the DOM or registers test commands goes in `t
 
 - [ ] User-facing changes verified in the desktop app, or via `llull --app` + `render_view` (`verify-llull` skill).
 - [ ] New command registered, happy + failure tests; golden corpus green.
-- [ ] `npm run check` green; coverage gate satisfied.
+- [ ] `npm run check:coverage` green (or `npm run check` when no `packages/*/src` changed).
 - [ ] Docs updated **only if** behavior/architecture changed.
 - [ ] Changed `.claude/`? `npm run claude:lint` green.
 

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
 import { testWorkers } from './testWorkers.ts';
-import { ISOLATED_SUITES } from './tests/isolatedSuites.ts';
+import { DOM_ISOLATED_SUITES, ISOLATED_SUITES } from './tests/isolatedSuites.ts';
 
 const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**'];
 const NODE_SUITES = [
@@ -81,7 +81,17 @@ export default defineConfig(({ command }) => ({
         test: { name: 'node', environment: 'node', isolate: false, include: NODE_SUITES, exclude: [...testExcludes, ...ISOLATED_SUITES] },
       },
       { extends: true, test: { name: 'isolated', include: ISOLATED_SUITES } },
-      { extends: true, test: { name: 'dom', include: DOM_SUITES } },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          isolate: false,
+          include: DOM_SUITES,
+          exclude: [...testExcludes, ...DOM_ISOLATED_SUITES],
+          setupFiles: ['./tests/setupDom.ts'],
+        },
+      },
+      { extends: true, test: { name: 'dom-isolated', include: [...DOM_ISOLATED_SUITES] } },
     ],
     coverage: {
       provider: 'v8',

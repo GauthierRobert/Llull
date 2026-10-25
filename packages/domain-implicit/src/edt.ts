@@ -77,15 +77,17 @@ function featureTransform(site: Uint8Array, nodes: Nodes): Transform {
   const arg = new Int32Array(longest);
   const v = new Int32Array(longest);
   const z = new Float64Array(longest + 1);
+  const previousX = new Int32Array(longest);
+  const previousY = new Int32Array(longest);
   for (let k = 0; k < nz; k += 1)
     for (let i = 0; i < nx; i += 1) {
       for (let j = 0; j < ny; j += 1) line[j] = d2[index(i, j, k)] as number;
       envelope(line, ny, out, arg, v, z);
-      const [oldX] = [Int32Array.from({ length: ny }, (_, j) => sx[index(i, j, k)] as number)];
+      for (let j = 0; j < ny; j += 1) previousX[j] = sx[index(i, j, k)] as number;
       for (let j = 0; j < ny; j += 1) {
         const q = arg[j] as number;
         d2[index(i, j, k)] = out[j] as number;
-        sx[index(i, j, k)] = oldX[q] as number;
+        sx[index(i, j, k)] = previousX[q] as number;
         sy[index(i, j, k)] = q;
       }
     }
@@ -93,12 +95,15 @@ function featureTransform(site: Uint8Array, nodes: Nodes): Transform {
     for (let i = 0; i < nx; i += 1) {
       for (let k = 0; k < nz; k += 1) line[k] = d2[index(i, j, k)] as number;
       envelope(line, nz, out, arg, v, z);
-      const previous = Array.from({ length: nz }, (_, k) => [sx[index(i, j, k)] as number, sy[index(i, j, k)] as number] as const);
+      for (let k = 0; k < nz; k += 1) {
+        previousX[k] = sx[index(i, j, k)] as number;
+        previousY[k] = sy[index(i, j, k)] as number;
+      }
       for (let k = 0; k < nz; k += 1) {
         const q = arg[k] as number;
         d2[index(i, j, k)] = out[k] as number;
-        sx[index(i, j, k)] = (previous[q] as readonly [number, number])[0];
-        sy[index(i, j, k)] = (previous[q] as readonly [number, number])[1];
+        sx[index(i, j, k)] = previousX[q] as number;
+        sy[index(i, j, k)] = previousY[q] as number;
         sz[index(i, j, k)] = q;
       }
     }

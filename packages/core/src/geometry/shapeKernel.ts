@@ -193,6 +193,7 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       return source === null || ops.emboss === undefined ? null : ops.emboss(source, embossParamsOf(recipe));
     }
     case 'faceSlab':
+    case 'sheetSolid':
     case 'faceBlend':
     case 'fullRound':
       return null;

@@ -55,7 +55,7 @@ Rules are already in context (`rules/react.md` loads for `src/ui/`). Read
 2. Build/modify the component; wire interactions to `dispatch`.
 3. Verify in the desktop app — `verify-llull` skill §4: drive it with `llull --app`, check the
    document with `render_view --save shot.png`, no new `llull crashes` report.
-4. `npm run check` green.
+4. Iterate with `npm run check:fast`; finish with one `npm run check` green.
 
 ## Done means
 

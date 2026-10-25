@@ -69,11 +69,11 @@ current code.
 | VC-SWG-25b | — (TR-02) | **today**: TS RMF mesh vs OCC corrected-Frenet solid, rectangle 10 × 2 on the same helix | TBD — measure with `llull --kernel occt` | — | grade C | server |
 | VC-SWG-26 | 25, 17 | network / loft edge G1 to a neighbour sheet | G1 angle 0 | 0.01 rad | OCCT TolAngular [R1] | unit |
 | VC-SWG-27 | 02, 04, 10, 16, 31 | `plans/bad_refusals.json` (+ anchor-less rail, `fitTolerance` 1e-12) | `SWG_SELF_INTERSECTION_LOCAL`, `SWG_CLOSED_TWIST_NOT_PERIODIC`, `SWG_FRAME_DEGENERATE`, `SWG_SELF_INTERSECTION_GLOBAL`, `SWG_LAW_NONPOSITIVE`, `SWG_LAW_INVALID`, `SWG_GUIDE_ANCHOR_UNDEFINED`, `SWG_FIT_TOLERANCE` | exact | TECHNICAL §7.1 | unit + CLI |
-| VC-SWG-28 | 29, 30 | `check_sweep_loft` over every target plan | pass; every tolerance named, `defaulted`, `source` | exact | TECHNICAL §5.8 | unit + CLI |
-| VC-SWG-29 | 14 | native `sheetSolid`, `helixEdge`, `pipeShell` vs the evaluator | 0 free edges; volumes as above | 1e-6 | — | server (cargo + node) |
+| VC-SWG-28 | 29, 30 | `check_sweep_loft` over every target plan; with the exact kernel also the volume consistency (`volumeConsistencyRel` 1e-4, `data.volumeChecks`) | pass; every tolerance named, `defaulted`, `source`; 13 volume comparisons within 1.1e-6 | exact | TECHNICAL §5.8, §16 | unit + CLI + server |
+| VC-SWG-29 | 14 | native `sheetSolid` (recipe node, also bored tubes with laws: outer minus bore), `helixEdge`, `pipeShell` vs the evaluator | 0 free edges; volumes as above; bored tubes with laws within 1e-8 of their closed forms | 1e-6 | TECHNICAL §16 | server (cargo + node) |
 | VC-SWG-30 | 32, 34, 35 | `llull search` / `describe` audit | 0 params / result numbers without unit | exact | AF-01..04, AF-10 | contract |
 | VC-SWG-31 | 33, 36 | edit a law / rail / pitch in history; replay existing goldens | ids stable; old snapshots bit-identical | exact | L8 | golden |
-| VC-SWG-32 | 37 | every volume VC on Manifold | within 0.5 % | 5e-3 | — | unit |
+| VC-SWG-32 | 37 | every volume VC on Manifold (the mesh path, no exact kernel), as one table | within 0.5 %: 37 of 37 rows, worst 3.9e-3 (VC-36), table in section 6 | 5e-3 | — | unit (`tests/unit/sweep/volumes.test.ts`) |
 | VC-SWG-33 | 38 | budgets TECHNICAL §8 | within 4 × | — | — | perf |
 | VC-SWG-34 | 03, 12 | 10 mm segment along the reference-surface normal round a circle R 50: plane / cylinder | area 3 141.5927 / 3 455.7519 | 1e-5 | closed form | unit |
 | VC-SWG-35 | 08 | one rail 10 → 5 (`scale`); helical rail r 5 p 100, square, `orient` | 18 325.9571; 10 000 | 1e-6 | §4.6, §4.1 | server |
@@ -181,7 +181,7 @@ volume and the solid differ by about that length error. FR-SWG-15 replaces the p
 ## 5. How a future implementation runs this pack
 
 - `tests/unit/sweep/laws.test.ts`, `frames.test.ts`, `helix.test.ts` iterate `data/*.json` (closed forms, 1e-9 to 1e-12).
-- `tests/unit/sweep/volumes.test.ts` builds each VC on the Manifold path and checks `mass_properties` within 0.5 % (VC-SWG-32).
+- `tests/unit/sweep/volumes.test.ts` builds each VC on the Manifold (mesh) path and checks `mass_properties` within 0.5 % (VC-SWG-32) as one table; it fails when the pack gains a volume value the table lacks.
 - `server/tests/nativeKernelSweeps.test.ts` runs the same table on the native sidecar at 1e-6 rel (VC-SWG-29).
 - `tests/golden/plans.ts` imports `plans/baseline_today_sweeps_lofts.json` now and each `plans/target_*.json` once
   `proposed_steps.json` is empty for it (until then they are listed in `tests/unit/contract/blockedPlanCommands.json`).
@@ -189,3 +189,29 @@ volume and the solid differ by about that length error. FR-SWG-15 replaces the p
 - Baseline run 2026-10-22 (`llull run plans/baseline_today_sweeps_lofts.json --continue`, native kernel, 12/12 steps ok): torus sweep
   98 696.044 (VC-SWG-01, = Pappus), L-path bend 14 696.676 (VC-SWG-38, = closed form), taper 18 310.743 display mesh (VC-SWG-11: the
   frustum, not the smoothstep value — see FR-SWG-06), ruled loft 9 161.906 exact, `add_coil` 3 turns 4 750.288. VC-SWG-25b still TBD.
+
+## 6. VC-SWG-32 as built (2026-10-25)
+
+`tests/unit/sweep/volumes.test.ts`: `mass_properties` volume without an exact kernel (mesh path; round sections without laws by closed form) against the closed forms of `expected_results.json`; limit `meshKernelRel` 5e-3. mm³ and relative error:
+
+| VC | Case | Expected | Mesh path | Rel. error |
+| --- | --- | --- | --- | --- |
+| 01 | torus sweep | 98 696.04 | 98 696.04 | 6e-14 |
+| 02 | quarter torus / offset square on a quarter arc | 24 674.01 / 7 068.583 | 24 674.01 / 7 057.234 | 9e-13 / 1.6e-3 |
+| 03 | twist 90° / 360° / S-curve 180° | 10 000 | 9 998.996 / 9 997.115 / 9 996.584 | 1.0e-4 / 2.9e-4 / 3.4e-4 |
+| 04 | off-centre rectangle 180° / square on a helix 720° | 10 000 / 37 818.29 | 9 997.153 / 37 808.59 | 2.9e-4 / 2.6e-4 |
+| 05 / 06 / 07 | cone / S-curve / expression laws (round) | 18 325.96 / 18 625.16 / 32 397.67 | closed form | 2e-12 / 9e-13 / 1e-12 |
+| 09 | square on a quarter arc, scale 1 → 0.5 | 4 581.489 | 4 581.029 | 1.0e-4 |
+| 10 | area law 100 → 25 | 6 250 | 6 249.894 | 1.7e-5 |
+| 11 | stations r 10 → 5, linear / smooth | 18 325.96 / 18 625.16 | 18 310.74 / 18 609.31 | 8.3e-4 / 8.5e-4 |
+| 12 / 14 | tube on a helix / conical helix wire (round) | 4 752.386 / 1 489.420 | closed form | 9e-13 / 3e-12 |
+| 13 | screw rectangle, pitch 10 / 5 | 4 523.893 | 4 525.704 / 4 524.395 | 4.0e-4 / 1.1e-4 |
+| 15 | normal / fixed 45° (round) | 31 415.93 / 22 214.41 | closed form | 5e-12 / 5e-12 |
+| 16 / 17 / 35 | rails: uniform scale / maintain height / one rail | 18 325.96 / 23 561.94 / 18 325.96 | 18 325.98 / 23 561.94 / 18 325.98 | 1.1e-6 / 1e-12 / 1.1e-6 |
+| 19 | ruled circles, seam turned 0 / 60 / 90 / 120 / 180° | 15 707.96 / 13 089.97 / 10 471.98 / 7 853.982 / 5 235.988 | 15 705.01 / 13 078.21 / 10 459.27 / 7 843.21 / 5 235.00 | 1.9e-4 / 9.0e-4 / 1.2e-3 / 1.4e-3 / 1.9e-4 |
+| 21 / 22 | loft end conditions m 1 / m 2, centreline quarter arc | 9 312.578 / 9 462.178 / 24 674.01 | 9 307.77 / 9 454.29 / 24 666.89 | 5.2e-4 / 8.3e-4 / 2.9e-4 |
+| 36 | squares one corner apart, `none` | 3 333.333 | 3 320.312 | 3.9e-3 |
+| 37 | square 20 → circle 10, arc-length coupling | 17 904.76 | 17 910.17 | 3.0e-4 |
+| 38 | L path round corner / mitre (round) | 14 696.68 / 15 707.96 | closed form | 2e-12 / 3e-12 |
+
+Three mesh-path faults found by the table were fixed rather than excused: polygon-section lofts were displayed through a Catmull-Rom smoothing of their corners (VC-36 was 32 % off), the path of an off-centre profile was sampled too coarsely (VC-02 offset square 6.4e-3), and a round section driven by rails meshed as a 24-gon (1.14 % small). Details: TECHNICAL_SPEC §16.3.
