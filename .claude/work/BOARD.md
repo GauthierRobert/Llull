@@ -13,6 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-10-25 — main: 06 STA-M2/M3 merged (cad-reviewer APPROVE after 2 rounds): gratings (catalogue, support lines, NAAMM
+  load / deflection check), railings (paths or host edges, gates, OSHA / ISO 14122-3 checks, edge coverage), IFC + takeoff. Gates on
+  the merge with DES-5b: static, unit 16720 (10 sequential shards), server 1672 (branch). Coverage not run. Next: VIS-M2 (WIP).
+
 - 2026-10-25 — main: 02 RTE-V2 merged (cad-reviewer APPROVE after 3 rounds): `route_problem` obstacles from the V1 clash bodies
   (geometry-only problem hash), first-move candidate searches in parallel (rayon) in `llull-route` with a total expansion ceiling,
   `auto_route_lines` + `route_lines_order` (ordering + retry, all-or-nothing, ids by request position) and `llull auto_route lines=`,
@@ -141,8 +145,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **EQP-M2** 03 EQP vessels + nozzles (`add_vessel`, `add_process_column` (`add_column` was taken), `add_nozzle` angle + free forms, ports `equipmentPorts`, `equipment_ports`, `update_equipment_parameters`, `vessel_volume` by equipment). Merged 2026-10-24. Open: 03 Q4, Q6.
 - `[DONE]` **EQP-Q3** exact `ellipse` `CurveSegment` (core model, Manifold, closed-form volume exact for arcs / Béziers too, native OCC chain code 3). Merged 2026-10-24. _Rebuild `llull-kernel` (`solver/`) in each checkout: older binaries answer `NATIVE_OCC_FAILURE: chain: unknown segment`._
 - Test memory (2026-10-24): vitest workers sized from free memory in both suites (`testWorkers.ts`, `LLULL_TEST_WORKERS` override); gates green on the merge: static, unit 15222, coverage, server 1558.
-- `[TODO]` **STA-M2/M3** 06 STA gratings, then `add_railing` (edge coverage by railings). _deps: —_
-- `[TODO]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
+- `[DONE]` **STA-M2/M3** 06 STA FL / RD bars, grating catalogue + `add_grating` / `update_grating` / `check_grating` (support lines cover the panel width), `add_railing` / `update_railing`, railing checks + edge coverage in `check_access`, IFC railing / grating, takeoff (TECHNICAL_SPEC §13). Merged 2026-10-25. Open: coverage against the panel chord at each support (tapered panels refused conservatively), knee-rail offset wording, cast in `validateAccess.ts`; clashes, floor loads, openings, plan symbols, metric gratings per §13. Next STA: M4 `add_ladder`.
+- `[WIP]` **VIS-M2** 09 review model rest (section boxes, markups, comments, `check_review`). _deps: —_
 - `[DONE]` Wave 2: **RTE-M1** 02 `route_pipe` (legs, closing leg), `SpecLookup` over PSC, `PortSource` (tie-ins, nozzles, run ends), elbows, BW + flanged ends, cut-back, `piping_takeoff`, display geometry, broken runs + `reconcile`; sc-rte plans to the D3 `add_nozzle` form.
 - `[DONE]` **RTE-M2** 02 flange sets + connection rules, inline components, reducers, branches (tee / olet / stub-in), `check_piping`, `piping_connectivity`, `convert_pipe_run`, `update_pipeline` (TECHNICAL_SPEC §13.7; weldolet dimension A still a declared stub input).
 - `[DONE]` **RTE-M3** 02 stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope + pockets, insulation envelope in `check_clashes`, line-number template (TECHNICAL_SPEC §13.8). Supports on runs moved to V1 (one carrier lookup across the ~10 building-pipe consumers).
