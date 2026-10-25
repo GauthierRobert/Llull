@@ -29,12 +29,14 @@ P&ID ↔ 3D check. Nothing in the repository references DEXPI, ISA 5.1 or ISO 10
   (mutating commands), `connectivity/` (graph, split / heal, flow), `tags/` (grammar, ISA table), `checks/`
   (`check_pid`, `check_pid_3d`), `reports/` (lists), `dexpi/` (`proteus/` 1.3 / 1.4 mapper, `dexpi2/` mapper,
   `census.ts`), `symbols/` (built-in library as data), `render/` (sheet primitives).
-- **Model types in core**, like `building.ts` / `civil.ts`: `packages/core/src/model/pid.ts`, and
-  `CadDocument.pid?: PidModel` ("absent until the first P&ID command"). Persistence validation through the plugin's
-  `DocumentExtension.validate` (L8). This is the one core change; it goes through `cad-reviewer`.
-- **XML reader** `packages/core/src/lib/xmlRead.ts`: a small pure parser (elements, attributes, text, CDATA,
-  comments, processing instructions, the five predefined entities and numeric character references, UTF-8 input as a
-  JS string) returning a plain tree. No DOM, no network (L2). The writer side reuses `escapeXml`.
+- **Model types in the plugin, slice `doc.plant.pid`** (plant README D2, decided 2026-10-23): `plant/pid/model.ts` and
+  `PlantModel.pid?: PidModel` ("absent until the first P&ID command"), validated by the plugin's `DocumentExtension.validate`
+  (L8). ~~`packages/core/src/model/pid.ts` and `CadDocument.pid`~~ (the first draft) is superseded: core gets no P&ID code
+  (decision in §13.3).
+- **XML reader** `packages/core/src/lib/xmlRead.ts` (`@lib/xmlRead`, **built in M1**, §13.2): a pure parser (elements,
+  attributes, namespaces, text, CDATA, comments, processing instructions, the five predefined entities and numeric
+  character references, UTF-8 input as a JS string) returning a plain tree. No DOM, no network (L2). The writer side
+  reuses `escapeXml`.
 - **Pure commands** (L1, L3): every mutation returns a new document; P&ID items are created only inside `pid`
   commands (L4). Imports are commands too (`import_dexpi` takes the XML text), so they replay from history (L8).
   Exports are read-only commands returning `data.text`; the CLI writes it with `--save` (AF-12).
@@ -51,13 +53,13 @@ P&ID ↔ 3D check. Nothing in the repository references DEXPI, ISA 5.1 or ISO 10
 src/app/plugins.ts ──installs──> @aec/plant/pid (plugin 'pid', toolset 'pid')
                                      │ uses: @core/model/pid, @core/lib/xmlRead, @core/commands/{schema,types,noop,registry}
                                      │ reads: doc.building (3D equipment / pipes), later 02 RTE / 03 EQP data
-packages/core/src/model/pid.ts  ◄── types only; core never imports the plugin
+packages/domain-aec/src/plant/pid/model.ts  ◄── `PidModel`, in `doc.plant.pid` (D2); core never imports the plugin
 ```
 
 ## 3. Data model
 
 ```ts
-// packages/core/src/model/pid.ts (sketch)
+// packages/domain-aec/src/plant/pid/model.ts (sketch; as built in §13.1: readonly fields, no tagIndex)
 export type PidConvention = 'ISA-5.1' | 'ISO-10628-2';
 export type PidItemKind =
   | 'equipment' | 'nozzle' | 'line' | 'segment' | 'inline' | 'instrument' | 'loop'
@@ -74,7 +76,7 @@ export interface PidModel {
   sheetOrder: string[];
   items: Record<string, PidItem>;        // keyed by step-scoped id `pid-<step>.<k>` (L8)
   itemOrder: string[];
-  /** Full tag (normalised) -> item id; rebuilt by the plugin, validated on load. */
+  /** (sketch only, not built: derived from `items`, see §13.3) Full tag (normalised) -> item id. */
   tagIndex: Record<string, string>;
   /** Accepted findings: findingKey -> who / why (human gate when severity is error). */
   acceptances?: Record<string, { reason: string; by: string; at: string }>;
@@ -157,7 +159,7 @@ export type PidItem = PidEquipment | PidNozzle | PidLine | PidSegment | PidInlin
 Rules: units of every sheet coordinate are millimetres (DEXPI `Units="mm"`); DN is the integer nominal size, the
 textual representation ("DN 80", "3\"") is kept in `attributes.nominalDiameterText`; inline items are separate
 items between two segments (DEXPI 2.0 models items and `Pipe`s inside a segment; llull normalises to
-"segment between two items" and rebuilds DEXPI segments on export, §6.3). Document migration: new optional field,
+"segment between two items" and rebuilds DEXPI segments on export, §6.3). Document migration: new optional sub-record of `doc.plant`,
 `version: 1`; no existing data changes.
 
 ## 4. Commands
@@ -170,7 +172,7 @@ and every `tag` / `line` param also accepts an item id or a `$alias`.
 
 | Command | Params sketch | Tags |
 | --- | --- | --- |
-| `create_pid_sheet` | `{ number, title?, paper?='A1', convention?='ISA-5.1', lineNumberFormat? }` | @affects creates sheet (+ `doc.pid` on first use) · @invariant sheet numbers unique · @failure duplicate number → `PID_SHEET_DUPLICATE` |
+| `create_pid_sheet` | `{ number, title?, paper?='A1', convention?='ISA-5.1', lineNumberFormat? }` | @affects creates sheet (+ `doc.plant.pid` on first use) · @invariant sheet numbers unique · @failure duplicate number → `PID_SHEET_DUPLICATE` |
 | `add_pid_equipment` | `{ sheet, class, tag, at:[x,y] mm, rotationDeg?, attributes?: Record<string,{value,unit}\|string>, nozzles?: [{ subTag, side:'left'\|'right'\|'top'\|'bottom'\|[dx,dy], dn?, access? }] }` | @affects creates equipment + nozzles · @invariant tag unique; nozzle sub-tags unique per equipment · @failure unknown class → `PID_CLASS_UNKNOWN` (lists close names); duplicate → `PID_TAG_DUPLICATE` |
 | `add_pid_nozzle` | `{ equipment, subTag, side \| at, dn?, access? }` | @affects 1 nozzle · @failure equipment not found → `PID_ITEM_NOT_FOUND` |
 | `add_pid_line` | `{ sheet, from: Endpoint, to: Endpoint, via?: Vec2[], lineNumber?, dn?, pipingClass?, fluidCode?, flow?='forward', insulation? }`, Endpoint = `{tag,nozzle}` \| `{line,at}` \| `{opc,targetSheet?}` \| `{free:[x,y]}` | @affects creates line + 1 segment (+ tee on a branch, + OPC) · @invariant a nozzle has ≤ 1 segment; orthogonal auto-route when `via` absent · @failure occupied nozzle → `PID_NOZZLE_OCCUPIED`; bad endpoint → `PID_LINE_ENDPOINT_INVALID`; lineNumber taken by another line → `PID_LINE_NUMBER_DUPLICATE` |
@@ -365,7 +367,7 @@ walking each line's segment chain and folding inline items back into one `Piping
 - SVG / PNG through `export_pid_svg` and the existing sheet frame; DXF export of P&ID sheets in V1 (layers per kind:
   `PID-EQPT`, `PID-PIPE`, `PID-INST`, `PID-SIGN`, `PID-TEXT`).
 - Lists as CSV in `data.csv` (RFC 4180, header row, UTF-8).
-- Persistence: `doc.pid` saved with the document; `DocumentExtension.validate` checks referential integrity (every
+- Persistence: `doc.plant.pid` saved with the document; `DocumentExtension.validate` checks referential integrity (every
   endpoint id exists, tag index matches items) and refuses a corrupt file.
 
 ## 7. CLI / MCP / UI surfaces and error codes
@@ -443,7 +445,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/plant/pid/**` (NON
 
 | Milestone | Content | Depends on | Effort |
 | --- | --- | --- | --- |
-| M1 Model + XML | `model/pid.ts`, `CadDocument.pid`, persistence validation, `xmlRead`, plugin skeleton, toolset | — | 4 d |
+| M1 Model + XML | `plant/pid/model.ts`, `doc.plant.pid` (D2), persistence validation, `xmlRead`, plugin skeleton, toolset — **built 2026-10-25 (PID-M1), §13**; no command (none is listed for M1) | — | 4 d |
 | M2 DEXPI import | Proteus 1.3 mapper, census-equal import of 11 files, `pid_report kind=counts / connectivity`, DEXPI codes | M1 | 6 d |
 | M3 Authoring + connectivity | sheets, equipment / nozzles, lines, inline split / heal, instruments, signals, actuating systems, OPC, flow | M1 | 8 d |
 | M4 Tags + checks + lists | grammar + ISA table, tag registry, `check_pid` (16 rules), five lists, CSV | M3 | 6 d |
@@ -457,12 +459,12 @@ MVP total ≈ 40 developer-days, lanes: Core (M1–M4, M6, M7), 2D (M5 rendering
 ## 11. Open questions
 
 1. XML parser: in-house `@lib/xmlRead` (proposed) or a dependency such as `fast-xml-parser` (stack change needs the
-   owner's approval).
+   owner's approval). **Decided (PID-M1, owner delegated): in-house**, §13.3.
 2. One `pid` toolset, or a shared `plant` toolset with 02 / 03 / 08? Proposed: `pid` now, merged by 08 DAT if a
-   plant-wide toolset is introduced.
+   plant-wide toolset is introduced. **Decided (PID-M1): `pid`**, §13.3 (03 built `plant_equipment`, 06 `plant_structures`, 08 `plant_data`: one toolset per plugin is the plant convention).
 3. Default convention for new projects: ISA 5.1 bubbles with ISO 10628-2-style equipment / valve symbols (common in
    European EPC practice), or one family per project?
-4. Tag uniqueness scope: document (MVP) vs project registry across documents (08 DAT).
+4. Tag uniqueness scope: document (MVP) vs project registry across documents (08 DAT). **Decided (PID-M1): document**; the tag index is derived, not stored, so it can move behind the 08 DAT registry without a data migration, §13.3.
 5. Proteus 4.2.0 XSD (S15) could not be fetched; DEXPI 1.4 export is accepted on round-trip equality until it is
    available.
 6. Should imported DEXPI presentation (exact symbol graphics from `ShapeCatalogue`) be rendered verbatim, or always
@@ -489,7 +491,57 @@ TR-PID-08 Proteus import mapper (§6.1), TR-PID-09 DEXPI 2.0 mapper (§6.2), TR-
 TR-PID-11 robust import (§8), TR-PID-12 tag grammar (§5.1), TR-PID-14 `check_pid` rules (§5.5), TR-PID-16
 `check_pid_3d` (§5.6), TR-PID-20 performance budgets (§8).
 
-## 13. References
+## 13. As built
+
+### 13.1 PID-M1 (2026-10-25): model, XML reader, plugin skeleton
+
+Plugin `pid` (toolset `pid`, installed after `plant-data` in `installDefaultPlugins()`), folder `packages/domain-aec/src/plant/pid/`, slice `doc.plant.pid` (plant README D2). Hosts need only `pidPlugin` from `@aec/index`. **No command is registered in M1**: §10 lists none for it (`import_dexpi` and `pid_report` are M2, authoring M3), and none was invented; the toolset is empty (`TOOLSETS.pid = []`, hidden from `docs/FEATURES.md` until M2) and its `.lld` example `pid.lld` draws the A1 sheet frame with core 2D commands.
+
+| File | Content |
+| ---- | ------- |
+| `model.ts` | the §3 types as stored: `PidModel`, `PidSheet`, the ten item kinds (`PidItem` union), `PidEndpoint`, `PidValue`, `PidImportRecord`, `PidAcceptance`; the literal lists (`PID_ITEM_KINDS`, papers, statuses, actuators, ...) the validator reads |
+| `state.ts` | `EMPTY_PID`, `getPid(doc)` (empty model when the slice is absent), `withPid(doc, pid)` (keeps the other `doc.plant` slices) |
+| `validate.ts`, `validateItems.ts` | `pidErrors(raw)`: settings, sheets, accepted findings, import records, counters, then every item and the references between items |
+| `plugin.ts`, `catalog.ts` | the plugin (`name: 'pid'`, `toolset: 'pid'`, `document` extension: `validate`, no derived entities, identity `restore`) and the empty catalogue |
+
+`PlantModel` (`plant/types.ts`) gains `pid?: PidModel`; `TOOLSET_NAMES` gains `pid` (`@protocol/toolsets`), the palette label is "P&ID schematics".
+
+**Load validation (refuses the file with a path):** version 1; convention in the two values; non-empty line-number format; tag formats only for `equipment` / `instrument` / `valve` with a compilable pattern; sheet id = key, unique non-empty number, paper A0..A4, status, `issuedBy` shape, an `issued_for_construction` sheet carries `issuedBy` (AF-34); `sheetOrder` / `itemOrder` list every id once; ids that are `Object.prototype` names are refused; every item: kind, existing sheet, finite position and rotation, non-empty `dexpiClass`, attribute values typed (`text` / `quantity` with unit / `enum`), `passthrough` strings only; per kind the references: a nozzle names an equipment, sub-equipment names an equipment and the chain has no cycle, a line's segments are segments whose `lineId` is that line and appear once, and a segment is listed by its line, a segment names a line and both ends exist with the right kind (an `inline` end names a port index that exists, a `branch` end a segment), routes have at least two finite points, an instrument's loop is a loop, an actuating system names an inline valve (and an instrument as controller), an OPC's `targetSheet` is a sheet; record keys (attributes, passthrough, acceptances, counters) are not `Object.prototype` names; tag-format patterns are at most 200 characters, with no backreference, lookaround or quantified group containing a quantifier (`patternSafety.ts`; **M4 must** still match only tags of at most 64 characters and prefer the bounded grammar of §5.1, since overlapping alternations such as `(a|a)*` are not detected); acceptances and import records (64 lowercase hex `sha256`) are well-formed. **Not a load error:** a repeated tag (imported data; `check_pid` reports `PID_TAG_DUPLICATE` in M4), dangling DEXPI references (the import turns them into `free` ends with a warning, `DEXPI_DANGLING_REFERENCE`).
+
+### 13.2 `@lib/xmlRead` (`packages/core/src/lib/xmlRead.ts`)
+
+`readXml(text, limits?)` returns `{ ok: true, root, declaration? }` or `{ ok: false, error: { code, message, line, column, offset } }`; it never throws. Helpers `xmlChildren(el, local?, ns?)`, `xmlAttr(el, qualifiedName)`, `xmlText(el)`. Tree: `XmlElement { name, prefix, local, namespace, attributes[] (namespace declarations included, namespace `XMLNS_NAMESPACE`), children[] (elements and text), line, column }`; the namespace is resolved for elements and prefixed attributes (an unprefixed attribute has none); CDATA is merged into text; comments and processing instructions are dropped; whitespace-only text between child elements is dropped, a text-only element keeps its text verbatim; CRLF / CR become LF; literal tab / LF in attribute values become spaces (character references are kept); a leading BOM is removed. Positions are 1-based, UTF-16 units, a CR, LF or CRLF is one break; references are decoded on the raw text, so an error offset is exact after CRLF.
+
+**Safety properties** (VC-PID-15, TR-PID-11; all tested in `tests/unit/lib/xmlRead.test.ts`):
+
+| Property | How |
+| -------- | --- |
+| no XXE, no billion laughs | any `<!DOCTYPE` is refused (`XML_DTD_FORBIDDEN`); only `lt gt amp apos quot` and numeric references are decoded, any other `&name;` is `XML_ENTITY_UNDEFINED`; a decoded value is never longer than its source, and nothing is fetched or re-scanned |
+| bounded size | 50 000 000 UTF-16 units (`XML_TOO_LARGE`), 5 000 000 elements (`XML_TOO_MANY_ELEMENTS`), 1024 attributes per element (`XML_TOO_MANY_ATTRIBUTES`; namespace declarations count), 100 000 namespace declarations in the whole document (`XML_TOO_MANY_NAMESPACES`), names of 1024 characters; all overridable per call |
+| bounded depth | 256 (`XML_TOO_DEEP`); the parser is iterative, so even a million `<a>` cannot overflow the stack, and the check fires before any deep structure is built |
+| linear time and memory | namespace scopes are a prefix -> stack of URIs with a per-element undo list (no scope copies: an element costs its own declarations only); one pass of `indexOf` / char-code scans, no backtracking regex (the few regexes have no nested quantifiers or backtracking, and the declaration and reference ones run on bounded tokens); eight hostile shapes (200 000 `&`, 100 000 `&#x`, 50 000 `<!--`, 20 000 `<![CDATA[`, 200 000 attributes, 100 000 `<?`, ...) end in a coded refusal in well under a second |
+| strict well-formedness | one root, matched tags (the message names both elements and where the open one started), quoted attributes separated by space, no duplicate attribute (also after namespace expansion), `<` never in an attribute, `]]>` never in text, `--` never in a comment, control characters, unpaired surrogates and U+FFFE / U+FFFF refused, the XML and xmlns namespace URIs bound only to their own prefixes, character references must name an XML Char, unbound prefixes refused, `xmlns` / `xml` prefixes protected, the XML declaration only first |
+| all-or-nothing | the result is a tree or an error, never a partial tree |
+| codes | `XML_EMPTY XML_TOO_LARGE XML_TOO_DEEP XML_TOO_MANY_ELEMENTS XML_TOO_MANY_ATTRIBUTES XML_TOO_MANY_NAMESPACES XML_SYNTAX XML_DTD_FORBIDDEN XML_ENTITY_UNDEFINED XML_CHAR_INVALID XML_MISMATCHED_TAG XML_UNCLOSED XML_DUPLICATE_ATTRIBUTE XML_NAMESPACE_UNBOUND XML_TRAILING_CONTENT`; M2 maps every one to `DEXPI_PARSE_ERROR` with `line N, column M` in `paths` ("too large" for the first three limits) |
+
+All 12 DEXPI files of the validation pack read (element count = number of start tags, an independent regex count), each cut in the middle is refused with a position, and C01 (446 KB) reads well inside the 150 ms budget of §8 (the test allows 300 ms for a loaded machine). The input is a JS string: decoding bytes (and an `encoding="..."` other than UTF-8) is the caller's job; the declaration is returned as data and never refused.
+
+### 13.3 Decisions (owner delegated, quality-first)
+
+1. **D2 over the first draft (`CadDocument.pid`, core `model/pid.ts`).** The slice lives in `doc.plant.pid`, typed in the plugin. Reasons: the owner decided D2 on 2026-10-23 and 02, 05 and 08 already follow it; core stays free of P&ID types (L10: a domain is a plugin); the persistence round trip, load validation and the future migration are the plugin's. Cost: none (`doc.pid` was never released). The spec's other mentions of `doc.pid` mean `doc.plant.pid`.
+2. **Q1 XML parser: in-house `@lib/xmlRead`**, not `fast-xml-parser`: DEXPI needs positions in errors, a hard refusal of DTDs and namespace-resolved names; a small reader is cheaper than auditing a dependency's prototype-pollution and entity options, and nothing in the repository read XML before. The reader is generic (BCF / 3MF / IFC-XML readers can use it), hence `@lib`.
+3. **DOCTYPE is refused outright**, not skipped: the DEXPI files of the pack have none, a Proteus file never needs one, and "refuse" is the only rule that cannot be bypassed.
+4. **Q2 toolset `pid`** (not a shared `plant`): see §11.2.
+5. **Q4 tag scope: document; the tag index is derived, not stored.** The sketch's `PidModel.tagIndex` is dropped: a stored copy of what `items` already says is a second source of truth (L4) that every mutation must keep in step and a hand-edited file can falsify. M3 / M4 derive it (`normalised tag -> ids`, so duplicates stay visible) from `items`; when 08 DAT's `TagRegistryPort` arrives (V1) the derivation moves behind it with no data migration.
+6. **Q3 default convention: `ISA-5.1`** (the `EMPTY_PID` value; `set_pid_conventions`, M3, changes it per project): ISA 5.1 bubbles are the instrument convention the DEXPI cases use; equipment and valve symbols follow `ISO-10628-2` from the symbol library (M5) whichever is chosen.
+7. **No placeholder command.** An empty toolset still needs a `.lld` example (`tests/unit/design/examples.test.ts`), so `pid.lld` is an A1 frame drawn with core commands, marked in its header as the stand-in until M2 / M3.
+8. Still open (§11): Q5 (Proteus 4.2.0 XSD), Q6 (imported symbol graphics).
+
+### 13.4 Tests
+
+`tests/unit/lib/xmlRead.test.ts` (documents, namespaces, entities, CDATA, BOM, UTF-8 names, line ends, 46 coded refusals with line / column, limits, hostile shapes, never throws), `tests/unit/lib/xmlReadFiles.test.ts` (the 12 DEXPI files, truncated copies, budget), `tests/unit/plant/pid/persistence.test.ts` (state helpers, exact save / load round trip with all ten item kinds, about 90 refusals with their paths, repeated tags load), `tests/unit/plant/pid/plugin.test.ts` (skeleton, toolset, extension). There is no command, so no `is pure` test beyond `withPid`; the golden corpus and the tool-schema snapshot are unchanged.
+
+## 14. References
 
 - [R1] DEXPI e.V., TrainingTestCases — https://gitlab.com/dexpi/TrainingTestCases (CC BY 4.0, accessed 2026-10)
 - [R2] DEXPI e.V., Specification repository (2.0.1 `reference_pid.xml`, `DEXPI_XML_Schema.xsd`, `metamodel_and_exchange_format.rst`, changelog) — https://gitlab.com/dexpi/Specification (accessed 2026-10)

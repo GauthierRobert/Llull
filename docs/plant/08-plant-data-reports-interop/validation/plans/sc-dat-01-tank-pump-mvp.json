@@ -1,6 +1,6 @@
 {
   "id": "SC-DAT-01",
-  "status": "PROPOSED \u2014 needs the DAT MVP commands (flagged \"unbuilt\": true): define_plant_hierarchy, define_plant_class, set_tag_format, assign_plant_object, set_plant_properties, plant_report, check_plant_data, and the `schema` param of export_ifc. set_units, add_level, add_equipment and add_pipe_run exist today.",
+  "status": "PARTLY BUILT \u2014 DAT-M1 built define_plant_hierarchy, define_plant_class, assign_plant_object and check_plant_data (the steps run in tests/unit/plant/data/scenarioPlans.test.ts); still flagged \"unbuilt\": true: plant_report (M2) and the `schema` param of export_ifc (M3).",
   "validates": [
     "VC-DAT-01",
     "VC-DAT-02",
@@ -28,7 +28,6 @@
     },
     {
       "command": "define_plant_hierarchy",
-      "unbuilt": true,
       "params": {
         "nodes": [
           {
@@ -56,7 +55,6 @@
     },
     {
       "command": "define_plant_class",
-      "unbuilt": true,
       "params": {
         "name": "Equipment",
         "abstract": true,
@@ -83,38 +81,35 @@
     },
     {
       "command": "define_plant_class",
-      "unbuilt": true,
       "params": {
         "name": "Tank",
         "parent": "Equipment",
         "classCode": "T",
         "ifc": {
-          "class": "IfcTank",
+          "entity": "IfcTank",
           "predefinedType": "STORAGE"
         }
       }
     },
     {
       "command": "define_plant_class",
-      "unbuilt": true,
       "params": {
         "name": "CentrifugalPump",
         "parent": "Equipment",
         "classCode": "P",
         "ifc": {
-          "class": "IfcPump",
+          "entity": "IfcPump",
           "predefinedType": "ENDSUCTION"
         }
       }
     },
     {
       "command": "define_plant_class",
-      "unbuilt": true,
       "params": {
         "name": "ProcessLine",
         "tagFormat": "{nominalSize}-{fluidCode}-{seq:4}-{spec}",
         "ifc": {
-          "class": "IfcDistributionSystem",
+          "entity": "IfcDistributionSystem",
           "predefinedType": "USERDEFINED",
           "objectType": "PIPELINE"
         },
@@ -243,7 +238,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$tank",
         "className": "Tank",
@@ -259,7 +253,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$pump",
         "className": "CentrifugalPump",
@@ -275,7 +268,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$l1",
         "className": "ProcessLine",
@@ -290,7 +282,6 @@
     },
     {
       "command": "assign_plant_object",
-      "unbuilt": true,
       "params": {
         "target": "$l2",
         "className": "ProcessLine",
@@ -345,11 +336,11 @@
     },
     {
       "command": "check_plant_data",
-      "unbuilt": true,
       "params": {}
     },
     {
       "command": "export_ifc",
+      "unbuilt": true,
       "params": {
         "timestamp": "2026-10-18T00:00:00"
       },

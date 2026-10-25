@@ -50,6 +50,8 @@ export { pipingFabricationPlugin } from './plant/fabrication/plugin';
 export { pipingCatalogPlugin } from './plant/catalog/plugin';
 export { structuresPlugin } from './plant/structures/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';
+export { plantDataPlugin } from './plant/data/plugin';
+export { pidPlugin } from './plant/pid/plugin';
 
 // plant: display plugin (service colour schemes, entity properties; plant 09 VIS)
 export { plantDisplayPlugin } from './plant/display/plugin';

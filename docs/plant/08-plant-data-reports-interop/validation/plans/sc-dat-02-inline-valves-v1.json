@@ -8,7 +8,6 @@
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 6000 } },
     {
       "command": "define_plant_hierarchy",
-      "unbuilt": true,
       "params": {
         "nodes": [
           { "code": "S1", "kind": "site" },
@@ -19,7 +18,6 @@
     },
     {
       "command": "load_plant_class_library",
-      "unbuilt": true,
       "params": { "library": "llull-default-process" },
       "note": "ships the classes of SC-DAT-01 plus GateValve / CheckValve / Elbow with tag formats {valveCode}-{seq:4}"
     },
@@ -116,7 +114,7 @@
       "params": { "line": "$l2", "at": [6000, 0, 2000], "component": "check_valve", "tagFields": { "valveCode": "NRV", "seq": 1002 } }
     },
     { "command": "plant_report", "unbuilt": true, "params": { "kind": "valve_list" } },
-    { "command": "check_plant_data", "unbuilt": true, "params": {} },
+    { "command": "check_plant_data", "params": {} },
     { "command": "export_ifc", "params": { "timestamp": "2026-10-18T00:00:00" } }
   ],
   "expected": [

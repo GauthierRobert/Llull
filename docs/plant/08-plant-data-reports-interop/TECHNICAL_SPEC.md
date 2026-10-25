@@ -26,9 +26,8 @@ the source files.
 ## 2. Target architecture
 
 - **Plugin** `plantData` in `packages/domain-aec/src/plant/data/` (decision: inside `domain-aec`, beside `industrial/`,
-  because it classifies building elements and shares the IFC writer). MCP toolset **`plant`**, shared with the
-  sibling plant gaps (01–07, 09, 10); `packages/mcp/src/toolsets.ts` gains the getter. Installed by
-  `src/app/plugins.ts`.
+  because it classifies building elements and shares the IFC writer). ~~MCP toolset **`plant`**~~ **As built (M1): plugin
+  `plant-data`, toolset `plant_data`, slice `doc.plant.data`** (plant README D2; §13.1). Installed by `src/app/plugins.ts`.
 - **Exchange code** stays with the IFC writer in `packages/domain-aec/src/building/exchange/`: `export_ifc` gains a
   `schema` param; the IFC 4.3 plant mapping lives in new files `ifcPlant.ts`, `ifcPorts.ts`, `ifcPlantHierarchy.ts`
   that read the `plant` slice through pure view functions of the plugin (`plant/data/view.ts`). The building plugin
@@ -112,9 +111,10 @@ packages/core/src/lib/
 
 ## 3. Data model
 
-The plant slice is an optional top-level field declared through the plugin's `DocumentExtension` (validate / restore),
-like `building` and `civil`. It is additive: the document format version stays 3; an older build keeps the unknown
-slice and re-serialises it (same behaviour as recorded for `plm` in 09 TR-PLM-10), so no migration is needed.
+The plant data slice is the optional sub-record `doc.plant.data` of the one plant slice (plant README D2; the sketch below
+calls it the "plant slice"), declared through the plugin's `DocumentExtension` (validate / restore), like `building` and
+`civil`. It is additive: the document format version stays 3; an older build keeps the unknown slice and re-serialises it
+(same behaviour as recorded for `plm` in 09 TR-PLM-10), so no migration is needed. The M1 stored form is in §13.2.
 
 ```ts
 // packages/domain-aec/src/plant/data/model.ts (sketch)
@@ -212,7 +212,7 @@ Invariants checked by `validate.ts` (a file breaking one is refused on load):
 - every `hierarchyId`, `className`, `lineId` resolves; the hierarchy is a tree with kind order respected;
 - every non-reserved `target` resolves through its provider (a deleted building element leaves its plant object as an
   orphan: `check_plant_data` reports `DAT_OBJECT_ORPHAN`, load does not fail);
-- `tag` equals `generate(...)` and is unique within its scope;
+- `tag` is unique within its scope (as built, the tag is NOT required to equal `generate(...)` on load: a drifted tag is the `check_plant_data` finding `DAT_TAG_FORMAT`, §13.4 D4);
 - property values match their definition (type, enum, pattern, unit).
 
 The **tag registry** is derived (`registry.ts` builds `Map<scopeKey, Map<tag, objectId>>` on demand, cached by
@@ -620,7 +620,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/**` (non-negotiabl
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| M1 data core | model, validate, hierarchy, classes + default library, tag formats, registry, `assign_plant_object`, `set_plant_properties`, `plant_data_table`, `check_plant_data` (MVP rules) | — | 2.5 weeks |
+| M1 data core | model, validate, hierarchy, classes + default library, tag formats, registry, `assign_plant_object`, `set_plant_properties`, `plant_data_table`, `check_plant_data` (MVP rules) | — | 2.5 weeks — **built 2026-10-25 (DAT-M1), §13**: also `define_plant_hierarchy`, `define_plant_class`, `load_plant_class_library`, `set_tag_format`, `unassign_plant_object`, the object providers; not in M1 and still open: the port rules of the check (`DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE`: M2 / M3), `renumber_tags` (M4) |
 | M2 reports | line list, equipment list, nozzle schedule (inferred), tag register, MTO (centreline), CSV; `@lib` crc32 / zipWrite / xlsxWrite; `export_plant_data` | M1 | 1.5 weeks |
 | M3 IFC 4.3 | `schema` param, hierarchy, class mapping, decomposition + ports + connections + systems, units + Psets, `Tag` in IFC4 too; `stepRead` promoted; production-oracle Python hook | M1 | 2.5 weeks |
 | M4 round trip + checks | inflate, xlsxRead, `import_plant_data`, `import_tag_list`, `renumber_tags`, report definitions, `ifc_summary`, `check_ifc_requirements` | M2, M3 | 3 weeks |
@@ -647,7 +647,9 @@ Cross-gap contracts (by folder name):
 ## 11. Open questions / decisions needed
 
 - **Q1** Default `tagScope`: per plant (assumed) or per project? Owner-operators with several plants on one site
-  often require site-wide uniqueness.
+  often require site-wide uniqueness. **Decided (DAT-M1, owner delegated): per plant by default**, because the plan
+  data (VC-DAT-02) allows one tag in two plants; a class chooses `tagScope: 'site' | 'project'` (inherited by its subclasses)
+  for site-wide uniqueness.
 - **Q2** IFC 4.3 hierarchy: export plant areas as `IfcFacilityPartCommon USERDEFINED` (assumed) or keep
   `IfcBuildingStorey` only for viewer compatibility? Needs a check in two common viewers.
 - **Q3** Distillation columns and reactors: `IfcTank USERDEFINED 'COLUMN'` vs `IfcBuildingElementProxy` vs a
@@ -659,6 +661,8 @@ Cross-gap contracts (by folder name):
   reciprocal pair written by IfcOpenShell's API, for round-trip parity with Bonsai users?
 - **Q8** Should `add_equipment` / `add_pipe_run` accept a `className` directly (one call instead of two), or stay
   geometry-only with classification as a separate step (assumed: separate; a convenience may come later)?
+  **Decided (DAT-M1): separate step.** Classification is `assign_plant_object`; it reads the facts the model object already
+  carries (name, weight, size, service, spec, sequence, design pressure) as defaults, so the second call repeats nothing.
 - **Q9** CFIHOS: obtain the IOGP release files (licence permitting) to turn the handover profile from `unverified`
   into a gated deliverable.
 
@@ -677,3 +681,94 @@ Cross-gap contracts (by folder name):
 - [R11] openpyxl 3.1.5 — https://pypi.org/project/openpyxl/ (accessed 2026-10)
 - [R12] RFC 1951 DEFLATE Compressed Data Format Specification — https://www.rfc-editor.org/rfc/rfc1951 ; RFC 4180 CSV — https://www.rfc-editor.org/rfc/rfc4180 (cited by number; not fetched)
 - [R13] llull source files listed in §1 (this repository)
+
+## 13. As built
+
+### 13.1 DAT-M1 (2026-10-25): data core
+
+Plugin `plant-data` (toolset `plant_data`, installed after `plant-equipment` in `installDefaultPlugins()`), folder `packages/domain-aec/src/plant/data/`, slice `doc.plant.data` (plant README D2; the type is `PlantDataModel` in `data/model.ts`, the sketch of §3 with the changes of §13.4). Hosts need nothing from it beyond `plantDataPlugin` in `@aec/index`. Nine commands:
+
+| Command | Kind | What it does |
+| ------- | ---- | ------------ |
+| `define_plant_hierarchy` | mutating | nodes site > plant > area > unit > system (a node may skip levels), codes unique among siblings, parents by code / path / id, `replace` while no object exists |
+| `define_plant_class` | mutating | class with parent, abstract flag, class code, tag format, scope, typed properties, IFC mapping; library classes locked |
+| `load_plant_class_library` | mutating | `llull-default-process`: Equipment (abstract) > Tank T, PressureVessel V, Column C, CentrifugalPump P, Compressor K, HeatExchanger E; ProcessLine; Valve (abstract) > IsolationValve, CheckValve, ControlValve, ReliefValve |
+| `set_tag_format` | mutating | changes the format of a project class; `retag` regenerates the tags and writes them back, atomically |
+| `assign_plant_object` | mutating | class + hierarchy node + target + tag (generated, typed, or next sequence) + typed properties; writes the tag into the model object |
+| `set_plant_properties` | mutating | up to 10 000 typed edits as one atomic step; a tag-driving property regenerates the tag |
+| `unassign_plant_object` | mutating | removes plant objects (the model objects stay) |
+| `plant_data_table` | query | the Data Manager grid: typed columns with unit, natural tag order, filter, sort, paging |
+| `check_plant_data` | query | the rules of §13.5 |
+
+### 13.2 Files
+
+| File | Content |
+| ---- | ------- |
+| `model.ts` | `PlantDataModel`, hierarchy / class / property / object types, `getPlantData`, `copyObject` |
+| `validate.ts`, `validateObjects.ts` | `DocumentExtension.validate`: structure, references, class resolution, typed properties, unique tags per scope (refused on load with a path) |
+| `classes.ts` | `resolveClass` (chain, merged properties, inherited format / code / scope / IFC; memoised), `overrideProblem` (tightening only) |
+| `properties.ts`, `units.ts` | `coerceValue` (type, enum, pattern, unit conversion; gauge and absolute pressure never mix), `definitionProblem`; unit families length, pressure, temperature, mass, volumetric and mass flow |
+| `tagFormat.ts`, `objectTag.ts` | grammar (§5.2), generation, anchored matcher with captures, `nextSequence` (max + 1), field precedence tagFields > properties > classCode > hierarchy |
+| `registry.ts`, `hierarchy.ts`, `naturalSort.ts` | derived registry per tag scope (cached by data identity), node references and ancestry, natural tag order |
+| `providers.ts`, `providersBuiltin.ts` | the provider port and the four built-in providers (§13.3) |
+| `lines.ts`, `check.ts`, `table.ts`, `codes.ts` | line ends, the check rules, the table, the `DAT_*` remediation table |
+| `ifcMapping.ts`, `library/process.ts` | IFC4X3_ADD2 entities and enumerations a class may map to (compared with the pack facts by a test); the default library as data |
+| `commands/*.ts`, `catalog.ts`, `plugin.ts` | the nine commands |
+
+### 13.3 How the existing tag fields feed the registry (one tag system)
+
+A plant object stands for a model object through a provider (`PlantObjectProvider`, registered by the plugin's `onInstall`; siblings call `registerPlantObjectProvider`). A provider answers `element` / `elements` (label, the tag-like field the object already carries, whether that field must be unique, whether the object needs a class), and optionally `ends`, `dn`, `seeds`, `batteryLimits`, `writeTags`.
+
+| Provider id | Model object | Existing tag field | Written back | Also used for |
+| ----------- | ------------ | ------------------ | ------------ | ------------- |
+| `buildingElement` | equipment and legacy pipes (`doc.building`; trays, supports and members are not classified in M1) | equipment `mark` (unique among equipment: 03 EQP `EQP_TAG_DUPLICATE`); legacy pipe `line` (several runs may share a line number) | yes, through `rename_equipment_tag` / `set_pipe_line_number` (§13.8), one call per batch | pipe `from` / `to` and `dn` (line ends, `DAT_LINE_SIZE_MISMATCH`); seeds: equipment name -> `Description`, weight -> `OperatingWeight`, pipe DN -> `nominalSize` |
+| `pipeLine` | routed line (`doc.plant.piping.lines`, 02 RTE) | `lineNumber`, built by the template of `set_piping_settings` (RTE-M3) | yes, through `update_pipeline` (an explicit number from then on) | `from` / `to` text, `dn`; seeds: DN -> `nominalSize`, service -> `fluidCode`, spec, sequence -> `seq`, design pressure / temperature |
+| `inlineComponent` | valve / reducer of a run | `tag` | no (read-only: the tag it carries is adopted, a different typed tag is refused with `DAT_TARGET_TAG_READONLY`) | M5 valve list |
+| `tieIn` | tie-in / battery limit point | `tag` | no | line ends: a `battery_limit` tie-in is a battery limit |
+
+The registry is the union of the plant objects (per tag scope) and these model tags: a new tag is refused (`DAT_TAG_DUPLICATE`, holder ids, next free tag) when a plant object holds it in the scope OR a unique model tag field of an object no plant object stands for already carries it, so a typed tag can never collide silently with an equipment mark or a routed line number. The template of `set_piping_settings` stays the owner of routed line numbers; the ProcessLine format `{nominalSize}-{fluidCode}-{seq:4}-{spec}` is the DAT view of the same number, seeded from the line (DN, service, sequence, spec), and the generated tag is written back with `update_pipeline`. Line ends accept a tag, a battery limit (`settings.batteryLimitPattern` default `^(BL|TI)-`, reported in `data.defaults` of the check, or a `battery_limit` tie-in) and a 03 EQP port id `<equipment tag>:<nozzle mark>` (the equipment resolves and carries that nozzle).
+
+### 13.4 Decisions (owner delegated: quality first, long-term best)
+
+| # | Decision | Why |
+| - | -------- | --- |
+| D1 | Slice `doc.plant.data`, `version: 1`; toolset `plant_data` (not `plant`). `reports` and `deliverables` of the §3 sketch are added by M2 / M6 as optional fields. | plant README D2 (one slice, one sub-record per area); 03 / 06 use `plant_equipment` / `plant_structures`, one toolset per area keeps `llull list` short |
+| D2 | A tag field that is also a class property (`nominalSize`, `fluidCode`, `valveCode`) is stored in `properties`; `tagFields` keeps only the other fields (`seq`). | one source of truth: the required check, tables and edits see the value once |
+| D3 | The IFC mapping key is `entity` (the §3 sketch); the pack plans said `class` and were corrected. | `class` is a reserved word in several tools; `entity` is the §3 name |
+| D4 | A hand-edited / changed-format tag that differs from `generate(...)` loads and is a `check_plant_data` failure `DAT_TAG_FORMAT`; load refuses structure, references, types and duplicate tags. | §3 and §5.13 contradicted each other; refusing to load a user's own saved file after `set_tag_format` without `retag` would lose data |
+| D5 | `set_plant_properties` on a tag-driving property regenerates the tag, refuses the batch on a duplicate, writes the tag back. | tags are pure functions of their fields (§2 determinism); a stale cached tag is worse |
+| D6 | Findings name the plant object id, then the model element id; a finding about a model object says so (`DAT_TAG_MODEL_MISMATCH`). | an agent acts on either id (`update_equipment` takes the element, `set_plant_properties` the object) |
+| D7 | New codes: `DAT_PARAM_INVALID`, `DAT_TARGET_TAG_READONLY` (provider cannot rename), `DAT_TAG_MODEL_MISMATCH` (warn: the model object was renamed after tagging). A missing `from` / `to` is `DAT_LINE_END_UNRESOLVED` as a warning, an unresolvable one a failure. | needed by the surfaces above; remediation texts in `codes.ts` |
+| D8 | A typed tag must match the format exactly (padded integers have their exact width, no overflow); a value that does not fit its width is refused. `nextSequence` is max + 1 among the tags with the same other fields (gaps are never reused; `reuseNumbers` is not offered in M1). | VC-DAT-02 (`P-1011` is invalid); numbers of retired tags are not recycled |
+| D9 | Q1 per plant by default, `tagScope` per class; Q8 classification is a separate step with model facts as defaults (§11). Q3, Q4, Q7 stay open for M3. | |
+| D10 | Units are the closed table of `units.ts`; a gauge pressure never converts to an absolute one (the atmosphere would be an assumption), temperature K / degC / degF are affine. | AF-04, AF-31 (no hidden default) |
+
+### 13.5 Check rules built
+
+`DAT_OUTSIDE_HIERARCHY`, `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE` (one finding per tag, all holder ids), `DAT_TAG_CASE_COLLISION`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED`, `DAT_LINE_SIZE_MISMATCH`, `DAT_TAG_MODEL_MISMATCH`, `DAT_OBJECT_ORPHAN`, `DAT_UNCLASSIFIED_ELEMENT` (equipment, legacy pipes, routed lines; only without a hierarchy / classes filter), `DAT_VALUE_UNVERIFIED`, `DAT_RESERVED_TAG_UNMODELLED`. Not yet: `DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE` (need the M2 nozzle schedule and the M3 ports).
+
+### 13.6 Tests and validation
+
+`tests/unit/plant/data/` (9 files, 205 tests): `tagFormat` (VC-DAT-01 9 generation cases, VC-DAT-02 13 validation + 3 uniqueness cases from `tag_format_cases.json`, grammar, natural order), `hierarchyClasses`, `assign`, `properties` (VC-DAT-14: atomic batch, one step, `is pure`, replay), `check` (one test per rule, the 02 RTE scene with nozzle ends and an inline valve), `table`, `providers`, `persistence` (round trip, 37 refused hand-edited files), `scenarioPlans` (SC-DAT-01 steps 0-14 and 20, SC-DAT-03 whole, VC-DAT-11 replay equality). Measured on this machine: registry of 50 000 objects 60 ms, 10 000 value edits 70 ms, 9 999 retagging edits 134 ms, `check_plant_data` on 50 000 objects 274 ms (budgets of §8); 1 500 sequential assigns 1.4 s (the registry is rebuilt per command: quadratic, an incremental registry is a later optimisation). The `bench` of VC-DAT-17 is not written.
+
+### 13.7 Left for later milestones
+
+Reports and XLSX (M2), `export_ifc` `schema` / ports / systems (M3), import, `renumber_tags`, report definitions (M4), nozzle / component / instrument providers (M5), deliverables and handover (M6). The built-in `inlineComponent` provider has no write path yet (the valve tag is owned by 02 RTE `insert_inline_component`).
+
+### 13.8 Review fixes (2026-10-25)
+
+**Tags are written through the owning commands.** The first M1 wrote `mark` / `line` straight into the building slice. That broke 03 EQP's tag grammar (a format like `{classCode} {seq:3}` gave a mark with a space), left `<tag>:<nozzle>` references of pipes and lines dangling after a rename, and renamed parametric vessels that `update_equipment` refuses to edit. Now:
+
+- `rename_equipment_tag` (plugin `plant-equipment`, toolset `plant_equipment`): batch rename with the `add_vessel` grammar (no whitespace, no `:`), uniqueness after the whole batch (a swap is valid), rewrite of legacy pipe `from` / `to` (`<tag>` and `<tag>:<nozzle>`) and of routed line `from` / `to` text through `update_pipeline`. **Decision: parametric vessels are renamed by this command only**: the tag carries no geometry, and the element id, nozzle marks and routed ports (by element id) do not change.
+- `set_pipe_line_number` (plugin `piping`): batch line numbers of legacy pipes; several pipes may share one, never the number of a routed or imported PCF line (`ISO_LINE_DUPLICATE`).
+- `writeTags` of the `buildingElement` provider composes them with `execute(..., ctx)`, as `pipeLine` composes `update_pipeline` (a swap of routed line numbers goes through temporary numbers). Trays, supports and members are not targets any more (no command renames them).
+- A provider can answer `tagProblem(doc, id, tag)`; `assign_plant_object`, `set_plant_properties` and `set_tag_format` with `retag` refuse a generated tag the owning plugin would not accept with `DAT_TAG_FORMAT` before anything is written.
+
+**Other changes.** A property pattern may not contain capture groups (they would shift the field captures); two adjacent unpadded fields in a format are refused at parse and free text is matched lazily against the anchored canonical re-check (`HC-1-0007` reads `code = HC-1`, `seq = 7`); the merged definition of an overriding property is validated again (an inherited default outside a narrowed enum is refused); tag scopes collide across widths (a project-scoped tag collides with the same tag in any plant, a site-scoped one with the plants below it; disjoint plants do not) in `assign_plant_object`, `set_tag_format`, the check and load validation; an **orphan keeps its tag and is re-bound** by `assign_plant_object` when the same class is assigned to a new target with the same tag (it keeps its id, its values win over defaults read from the new model object, `data.rebound: true`), `DAT_OBJECT_ORPHAN` points at `unassign_plant_object` or this re-bind; `set_plant_properties` lists the retag refusals in its description; `unregisterPlantObjectProvider` lets a test remove the provider it registered.
+
+**Assign cost.** The registry is derived from the previous one in place along an append-only lineage (valid for the newest record only, others rebuild), the twin scan uses the target index, the provider element lists are memoised per slice. Measured here: 10 000 sequential `assign_plant_object` (explicit seq) 15.4 s (2 500: 0.8 s; 5 000: 3.6 s); 3 000 with `nextSequence` 2.0 s. The remaining cost is the immutable copy of `objects` (a 5 000-key record spread is 1.2 ms), so it stays quadratic for one-object-per-command loads; the batch paths are flat (§13.6: 10 000 edits 70 ms). A bulk assign command is the fix if plans need it.
+
+**Round 2.** After an equipment tag is written back, the `from` / `to` properties of every plant object that name `<old>` or `<old>:<nozzle>` are rewritten in the same document (assign, `set_plant_properties` and `set_tag_format` retag all go through the provider), so `check_plant_data` keeps resolving them. A mark changed directly on classified equipment (`rename_equipment_tag` or `update_equipment`, which the plant object does not hear about) is a tag in use for the registry (a claimed element is skipped only while its mark equals its plant object's tag) and the check reports `DAT_TAG_MODEL_MISMATCH`; no guard blocks the direct rename (decision: the check names it, a rename that must stay in step goes through `assign_plant_object` / `set_plant_properties`). Adjacent fields in a format are refused only when both would be matched as free text (`{classCode}{seq}`, `{area}{x}`, `{hierarchy.*}{x}` and a padded neighbour stay valid). The registry grows in place along appends and is valid for the newest record only (`count` check); the temporary number of a routed-line swap is never a held number.
+
+**Known deviations and follow-ups.** (1) The §8 row "`assign_plant_object` / `set_plant_properties` batch, 10 000 edits < 1 s" is met for `set_plant_properties` (70 ms) and **NOT met for 10 000 sequential `assign_plant_object`** (15.4 s, §13.8): a bulk assign is needed before M2's `import_plant_data`. (2) Display colour rules `when: { property: 'mark', equals }` (09 VIS) keep the old text silently when an equipment is renamed; `update_equipment`'s mark change should route through `rename_equipment_tag` (board follow-up).
+

@@ -1,0 +1,14 @@
+# Feed unit U10 of plant P1 (08 DAT SC-DAT-01): hierarchy, default class library, a tank, a pump and a transfer line tagged from the class formats, then checked
+design feed_unit units=mm
+define_plant_hierarchy breakdown nodes=[{"code":"S1","kind":"site"},{"code":"P1","kind":"plant","parent":"S1"},{"code":"U10","kind":"unit","parent":"P1","properties":{"areaNumber":"1"}}]
+load_plant_class_library classes library="llull-default-process"
+add_equipment tank name="Feed tank" location=[0,0] size=[3000,0,4000] shape="vertical_vessel" weight=2500
+add_equipment pump name="Transfer pump" location=[6000,0] size=[1000,500,800] weight=450
+add_pipe_run transfer points=[[1400,0,500],[3000,0,500],[3000,0,300],[5600,0,300]] dn=150 line="L-1" from="T-101" to="P-101" service="process"
+assign_plant_object tank_tag target="equipment-1" className="Tank" hierarchy="U10" nextSequence=true properties={"DesignPressure":3.5}
+assign_plant_object pump_tag target="equipment-2" className="CentrifugalPump" hierarchy="U10" nextSequence=true properties={"DesignPressure":16}
+assign_plant_object line_tag target="pipe-1" className="ProcessLine" hierarchy="U10" tagFields={"fluidCode":"P","seq":1001,"spec":"A1A"}
+check check_plant_data path=status expect == "pass"
+check plant_data_table className="Equipment" columns=["tag"] path=total expect == 2
+check plant_data_table className="Tank" columns=["tag"] path=rows.0.tag expect == "T-101"
+check plant_data_table className="ProcessLine" columns=["tag"] path=rows.0.tag expect == "150-P-1001-A1A"
