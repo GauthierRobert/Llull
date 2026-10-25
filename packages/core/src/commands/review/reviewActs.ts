@@ -29,7 +29,11 @@ export const deleteDetails = (issue: ReviewIssue): Record<string, unknown> => ({
 export const deletePayload = (issue: ReviewIssue, nonce: string): string =>
   humanGatePayload(DELETE_ACT, [issue.id], deleteDetails(issue), nonce);
 
-/** The issue as it was just before history entry `index` was appended (what the signer of that entry saw). */
+/**
+ * The issue as it was just before history entry `index` was appended (what the signer of that entry saw).
+ * @invariant no command edits an issue's title, entityIds, viewpointIds, assignedTo or dueDate after creation, so the rebuilt state equals what was signed; a future
+ *   editing command must gate the edit (human act) or record it in the history
+ */
 export function issueBefore(issue: ReviewIssue, index: number): ReviewIssue {
   const previous = index === 0 ? undefined : issue.history[index - 1];
   return { ...issue, status: previous?.status ?? 'open', history: issue.history.slice(0, index) };

@@ -89,7 +89,7 @@ export const createReviewIssue = defineCommand({
 export const deleteReviewIssue = defineCommand({
   name: 'delete_review_issue',
   description:
-    'Delete a review issue (iss-<n>); its viewpoints stay (delete_viewpoint is allowed once no issue or walkthrough uses them). ' +
+    'Delete a review issue (iss-<n>); HUMAN GATE: it needs a human signature (confirmation), see below. Its viewpoints stay (delete_viewpoint is allowed once no issue or walkthrough uses them). ' +
     'HUMAN GATE: deleting an issue (and its comments and signed history) always needs `confirmation`, a signature a human made with a trusted key over the bytes ' +
     'review_act_payload (act "delete_review_issue") returns; an agent gets VIS_HUMAN_GATE and hands over. Errors: VIS_ISSUE_NOT_FOUND, VIS_HUMAN_GATE. Does not add a feature step.',
   annotations: { metaHistory: true, destructive: true },

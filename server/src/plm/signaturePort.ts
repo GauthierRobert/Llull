@@ -41,6 +41,13 @@ export function createSignaturePort(
       if (!isRecord(signature) || typeof signature['publicKey'] !== 'string' || typeof signature['signature'] !== 'string') return false;
       return trust.consume(`${signature['publicKey'].slice(0, 16)}:${payloadSha256}:${signature['signature']}`);
     },
+    signatureValid(signature, payloadSha256) {
+      if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return false;
+      const { publicKey, signature: value } = signature;
+      return (
+        typeof publicKey === 'string' && typeof value === 'string' && verifyEd25519(publicKey, `${GATE_CONTEXT}${payloadSha256}`, value)
+      );
+    },
     verify(signature, payloadSha256) {
       if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return null;
       const { publicKey, signature: value } = signature;

@@ -1,7 +1,7 @@
 /** Load-time validation of the optional `review` field (viewpoints, section boxes, markups, walkthroughs, issues, comments; plant 09 VIS). Unknown keys are ignored. */
 
 import { sectionBoxProblem } from '../../geometry/sectionBox';
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TRANSITIONS, MARKUP_SHAPES, type IssueStatus } from '../../model/review';
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TRANSITIONS, MARKUP_SHAPES, PROOF_FIELDS, type IssueStatus } from '../../model/review';
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
@@ -113,6 +113,14 @@ function historyProblem(history: unknown, status: unknown): string | null {
       (typeof item['signatureId'] !== 'string' || typeof item['signer'] !== 'string' || !isRecord(item['proof']))
     )
       return 'a human history entry carries signatureId, signer and proof';
+    const proof = item['proof'];
+    if (
+      isRecord(proof) &&
+      !Object.entries(proof).every(
+        ([key, value]) => (PROOF_FIELDS as readonly string[]).includes(key) && typeof value === 'string' && value.length <= 256,
+      )
+    )
+      return `a history proof holds only ${PROOF_FIELDS.join(', ')} as strings`;
     current = to;
   }
   return current === status ? null : `status '${String(status)}' is not where the history ends ('${current}')`;

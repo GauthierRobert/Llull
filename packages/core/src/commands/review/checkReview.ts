@@ -23,12 +23,16 @@ interface CheckRow {
 const humanEntries = (issue: ReviewIssue): number[] => issue.history.flatMap((entry, index) => (entry.by === 'human' ? [index] : []));
 
 /** Whether the human entry `index` of the issue history verifies against the act rebuilt from the chain (pure: the signature is not spent). */
-function entryVerifies(port: HumanSignaturePort, issue: ReviewIssue, index: number): boolean {
+function entryVerdict(port: HumanSignaturePort, issue: ReviewIssue, index: number): 'ok' | 'revoked' | 'invalid' {
   const entry = issue.history[index];
   const nonce = entry?.proof?.['nonce'];
-  if (entry === undefined || entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return false;
+  if (entry === undefined || entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return 'invalid';
   const payload = humanGatePayload(STATUS_ACT, [issue.id], statusDetails(issueBefore(issue, index), entry.status, entry.reason), nonce);
-  return port.verify(entry.proof, payload) !== null;
+  if (port.verify(entry.proof, payload) !== null) return 'ok';
+  // A genuine signature by a key that is no longer trusted (revoked) is not tampering; anything else that fails is.
+  const key = entry.proof['publicKey'];
+  const genuine = port.signatureValid?.(entry.proof, payload) === true;
+  return genuine && typeof key === 'string' && port.keyTrust?.(key) !== 'trusted' ? 'revoked' : 'invalid';
 }
 
 /**
@@ -41,7 +45,7 @@ export const checkReview = defineCommand({
     'Check the model-review data: data { status "pass" | "warn" | "fail", issues[{ code, severity, ids, paths, message, remediation }], counts }. Codes: ' +
     'VIS_ISSUE_OPEN (info: issue open or in progress), VIS_ISSUE_AWAITING_APPROVAL (warn: resolved, waiting for a human to close it), VIS_ISSUE_ENTITY_MISSING ' +
     '(warn: an unclosed issue cites deleted entities), VIS_VIEWPOINT_STALE (warn: a viewpoint selects or lists deleted entities), VIS_HUMAN_GATE (error: a closed ' +
-    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier). Read-only; run it before handing a review over.',
+    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier), VIS_SIGNER_REVOKED (warn: a genuine signature whose key is no longer trusted). Read-only; run it before handing a review over.',
   annotations: { readOnly: true },
   params: z.object({
     includeInfo: z.boolean().optional().describe('false: leave the info rows (VIS_ISSUE_OPEN) out of `issues`. Default true.'),
@@ -51,6 +55,8 @@ export const checkReview = defineCommand({
     const review = reviewOf(doc);
     const issues = review.issueOrder.map((id) => review.issues[id]).filter((issue) => issue !== undefined);
     const missing = (ids: readonly string[]): string[] => ids.filter((id) => doc.entities[id] === undefined);
+    const verdicts = (issue: ReviewIssue): string[] =>
+      port === null ? [] : humanEntries(issue).map((index) => entryVerdict(port, issue, index));
     const candidates: CheckRow[] = [
       {
         code: 'VIS_ISSUE_OPEN',
@@ -93,15 +99,19 @@ export const checkReview = defineCommand({
         code: 'VIS_HUMAN_GATE',
         severity: 'error',
         ids: issues
-          .filter(
-            (issue) =>
-              (issue.status === 'closed' && issue.history.at(-1)?.by !== 'human') ||
-              (port !== null && humanEntries(issue).some((index) => !entryVerifies(port, issue, index))),
-          )
+          .filter((issue) => (issue.status === 'closed' && issue.history.at(-1)?.by !== 'human') || verdicts(issue).includes('invalid'))
           .map((issue) => issue.id),
         paths: ['review.issues[].history'],
-        message: 'issues whose closing is not a human act, or whose recorded human signature does not verify',
+        message: 'issues whose closing is not a human act, or whose recorded human signature is not genuine',
         remediation: 'a human re-opens and closes them with a signature (set_issue_status); the file was edited outside the commands',
+      },
+      {
+        code: 'VIS_SIGNER_REVOKED',
+        severity: 'warn',
+        ids: issues.filter((issue) => !verdicts(issue).includes('invalid') && verdicts(issue).includes('revoked')).map((issue) => issue.id),
+        paths: ['review.issues[].history'],
+        message: 'issues with a genuine human signature whose key is no longer trusted (revoked or removed)',
+        remediation: 'the reviewer re-confirms with a currently trusted key, or accepts the recorded signature as a historical fact',
       },
       {
         code: 'VIS_SIGNATURE_UNVERIFIED',

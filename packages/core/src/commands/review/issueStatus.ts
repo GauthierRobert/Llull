@@ -5,7 +5,14 @@
  */
 
 import { humanGate } from '../../model/humanGate';
-import { ISSUE_STATUSES, ISSUE_TRANSITIONS, type IssueHistoryEntry, type IssueStatus, type ReviewIssue } from '../../model/review';
+import {
+  ISSUE_STATUSES,
+  ISSUE_TRANSITIONS,
+  PROOF_FIELDS,
+  type IssueHistoryEntry,
+  type IssueStatus,
+  type ReviewIssue,
+} from '../../model/review';
 import { DELETE_ACT, STATUS_ACT, deletePayload, statusDetails, statusPayload } from './reviewActs';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -13,6 +20,18 @@ import { changed, report } from '../noop';
 import { reviewOf, reviewRejection } from './reviewModel';
 
 export const isHumanTransition = (from: IssueStatus, to: IssueStatus): boolean => from === 'closed' || to === 'closed';
+
+/** The part of a confirmation kept in the history (only the fields a port verifies with), or why it is refused. */
+function proofOf(confirmation: Record<string, unknown>): Record<string, string> | string {
+  const extra = Object.keys(confirmation).filter((key) => !(PROOF_FIELDS as readonly string[]).includes(key));
+  if (extra.length > 0) return `confirmation carries unexpected fields (${extra.join(', ')}); only ${PROOF_FIELDS.join(', ')} are accepted`;
+  const proof: Record<string, string> = {};
+  for (const [key, value] of Object.entries(confirmation)) {
+    if (typeof value !== 'string' || value.length > 256) return `confirmation.${key} must be a string of at most 256 characters`;
+    proof[key] = value;
+  }
+  return proof;
+}
 
 const confirmationParam = z
   .record(z.string(), z.unknown())
@@ -61,6 +80,8 @@ export const setIssueStatus = defineCommand({
     const gated = isHumanTransition(issue.status, status);
     let entry: IssueHistoryEntry = { status, by: 'agent', reason: why };
     if (gated || confirmation !== undefined) {
+      const proof = confirmation === undefined ? undefined : proofOf(confirmation);
+      if (typeof proof === 'string') return reviewRejection(doc, 'set_issue_status', 'VIS_HUMAN_GATE', proof, [issueId], ['confirmation']);
       const outcome = humanGate(ctx?.humanSignature ?? null, STATUS_ACT, [issueId], confirmation, statusDetails(issue, status, why));
       if (!outcome.cleared)
         return reviewRejection(
@@ -77,7 +98,7 @@ export const setIssueStatus = defineCommand({
         reason: why,
         signatureId: outcome.signatureId,
         signer: outcome.signer,
-        ...(confirmation === undefined ? {} : { proof: confirmation }),
+        ...(proof === undefined ? {} : { proof }),
       };
     }
     const next: ReviewIssue = { ...issue, status, history: [...issue.history, entry] };

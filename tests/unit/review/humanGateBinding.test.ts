@@ -96,7 +96,7 @@ describe('check_review re-verifies every human history entry', () => {
           reason: 'accept',
           signatureId: 'k:abc',
           signer: 'grace',
-          proof: { nonce: 'n-1', signature: 'forged', as: 'grace' },
+          proof: { nonce: 'n-1', signature: 'forged', keyId: 'grace' },
         },
       ],
     });
@@ -156,7 +156,7 @@ describe('load validation of the history chain', () => {
 describe('delete_review_issue is a human act', () => {
   it('refuses an agent whatever it passes, and leaves the document alone', () => {
     const doc = documentWith('t');
-    const forged = { alg: 'Ed25519', as: 'grace', nonce: 'd-1', signature: 'forged' };
+    const forged = { alg: 'Ed25519', keyId: 'grace', nonce: 'd-1', signature: 'forged' };
     const other = documentWith('other');
     for (const confirmation of [
       undefined,
@@ -203,5 +203,69 @@ describe('apply_viewpoint on an orthographic viewpoint', () => {
     }).document;
     const result = execute(doc, 'apply_viewpoint', { id: 'vp-1' });
     expect((result.data as { warnings: { code: string }[] }).warnings.map((w) => w.code)).toEqual(['VIS_VIEWPOINT_APPROXIMATED']);
+  });
+});
+
+describe('a revoked signer key and the stored proof', () => {
+  const signedClose = (): CadDocument => {
+    const doc = documentWith('t');
+    return execute(doc, 'set_issue_status', closeParams(doc), humanCtx()).document;
+  };
+
+  it('reports a genuine signature by a key that is no longer trusted as VIS_SIGNER_REVOKED (warn), not as tampering', () => {
+    const doc = signedClose();
+    const revoked = rows(doc, humanCtx(ledgerPort('untrusted')));
+    expect(revoked.status).toBe('warn');
+    expect(revoked.issues.map((row) => [row.code, row.ids])).toEqual([['VIS_SIGNER_REVOKED', ['iss-2']]]);
+  });
+
+  it('still fails a forged signature when the key is untrusted (a forger cannot pass for a revoked signer)', () => {
+    const doc = documentWith('t');
+    const forged = withIssue(doc, {
+      status: 'closed',
+      history: [
+        ...doc.review!.issues['iss-2']!.history,
+        {
+          status: 'closed',
+          by: 'human',
+          reason: 'accept',
+          signatureId: 'k:abc',
+          signer: 'grace',
+          proof: { keyId: 'grace', nonce: 'n-1', signature: 'forged' },
+        },
+      ],
+    });
+    const result = rows(forged, humanCtx(ledgerPort('untrusted')));
+    expect(result.status).toBe('fail');
+    expect(result.issues.map((row) => row.code)).toEqual(['VIS_HUMAN_GATE']);
+  });
+
+  it('stores only { alg, keyId, publicKey, signature, nonce } of the confirmation', () => {
+    const doc = signedClose();
+    const proof = doc.review!.issues['iss-2']!.history.at(-1)!.proof!;
+    expect(Object.keys(proof).sort()).toEqual(['alg', 'keyId', 'nonce', 'publicKey', 'signature']);
+  });
+
+  it('refuses a confirmation with extra fields or oversized values, leaving the document alone', () => {
+    const doc = documentWith('t');
+    const good = confirmationOver(doc, close);
+    for (const confirmation of [
+      { ...good, note: 'x' },
+      { ...good, keyId: 'g'.repeat(300) },
+      { ...good, nonce: 5 },
+    ]) {
+      const result = execute(doc, 'set_issue_status', { ...close, confirmation }, humanCtx());
+      expect(result.error?.code).toBe('VIS_HUMAN_GATE');
+      expect(result.document).toBe(doc);
+    }
+  });
+
+  it('refuses a larger proof at load', () => {
+    const base = JSON.parse(JSON.stringify(signedClose().review)) as {
+      issues: Record<string, { history: { proof: Record<string, unknown> }[] }>;
+    };
+    const entry = base.issues['iss-2']!.history.at(-1)!;
+    entry.proof['extra'] = 'x';
+    expect(reviewProblems(base).join()).toContain('a history proof holds only');
   });
 });

@@ -469,7 +469,7 @@
 | `delete_colour_profile` | Delete a colour profile (deactivates it when it was active). |  |
 | `delete_interference_intent` | Remove a declared interference intent (fit-<step>.<k>, from allow_interference). |  |
 | `delete_markup` | Delete a markup (mk-<n>) from its viewpoint. |  |
-| `delete_review_issue` | Delete a review issue (iss-<n>); its viewpoints stay (delete_viewpoint is allowed once no issue or walkthrough uses them). |  |
+| `delete_review_issue` | Delete a review issue (iss-<n>); HUMAN GATE: it needs a human signature (confirmation), see below. |  |
 | `delete_section_box` | Delete a section box (sb-<n>). |  |
 | `delete_viewpoint` | Delete a saved viewpoint. |  |
 | `delete_walkthrough` | Delete a walkthrough (wt-<n>); its viewpoints stay. |  |

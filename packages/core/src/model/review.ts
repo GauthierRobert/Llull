@@ -91,6 +91,9 @@ type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 export const ISSUE_STATUSES = ['open', 'in_progress', 'resolved', 'closed'] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
+/** The only fields of a confirmation kept as a history proof (what a signing port needs to verify it). */
+export const PROOF_FIELDS = ['alg', 'keyId', 'publicKey', 'signature', 'nonce'] as const;
+
 /** Statuses an issue may move to from each status; a move into or out of `closed` is a human act. */
 export const ISSUE_TRANSITIONS: Readonly<Record<IssueStatus, readonly IssueStatus[]>> = {
   open: ['in_progress', 'resolved', 'closed'],
@@ -106,8 +109,8 @@ export interface IssueHistoryEntry {
   readonly reason: string;
   readonly signatureId?: string;
   readonly signer?: string;
-  /** The confirmation (signature object) a human made; check_review re-verifies it against the rebuilt act. */
-  readonly proof?: Readonly<Record<string, unknown>>;
+  /** The signature a human made ({ alg, keyId, publicKey, signature, nonce } only); check_review re-verifies it against the rebuilt act. */
+  readonly proof?: Readonly<Record<string, string>>;
 }
 
 /** A review topic (BCF Topic). Created `open`; `history` lists every later status change. */

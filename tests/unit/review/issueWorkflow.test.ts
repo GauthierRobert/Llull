@@ -27,7 +27,7 @@ function reviewed(): CadDocument {
 /** The confirmation a human makes for `status` on `issueId`: a signature over exactly the payload review_act_payload reports. */
 function confirmationFor(doc: CadDocument, status: string, reason: string, as = 'grace', nonce = 'n-1'): Record<string, unknown> {
   const payload = execute(doc, 'review_act_payload', { issueId: 'iss-2', status, reason, nonce }).data as { payloadSha256: string };
-  return { alg: 'Ed25519', as, nonce, signature: payload.payloadSha256 };
+  return { alg: 'Ed25519', keyId: as, publicKey: 'ab'.repeat(32), nonce, signature: payload.payloadSha256 };
 }
 
 describe('add_markup / delete_markup', () => {
@@ -223,7 +223,7 @@ describe('set_issue_status and the human gate (VC-VIS-14, TR-VIS-15)', () => {
   it('refuses closing for an agent (VIS_HUMAN_GATE) whatever it claims, with or without a signing port', () => {
     const doc = execute(reviewed(), 'set_issue_status', { issueId: 'iss-2', status: 'resolved', reason: 'done' }).document;
     const params = { issueId: 'iss-2', status: 'closed', reason: 'accept' };
-    const forged = { alg: 'Ed25519', as: 'grace', nonce: 'n-1', signature: 'forged' };
+    const forged = { alg: 'Ed25519', keyId: 'grace', nonce: 'n-1', signature: 'forged' };
     const other = confirmationFor(doc, 'closed', 'another reason');
     for (const ctx of [undefined, humanCtx(), { ...defaultContext(), humanSignature: null }]) {
       for (const confirmation of [undefined, {}, forged, other]) {
