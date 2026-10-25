@@ -87,8 +87,11 @@ export function displaceRun(
     if (typeof distance === 'string') return { ok: false, reason: distance };
     branches.push({ ...branch, distance });
   }
+  // A stretched route is no longer the one the router committed: the auto-route record goes with the old geometry.
+  const { autoRoute: computed, ...kept } = run;
+  void computed;
   const next: PipeRun = {
-    ...run,
+    ...kept,
     start: { ...run.start, point: moved[0] as Vec3 },
     end: { ...run.end, point: moved[moved.length - 1] as Vec3 },
     pis: moved.slice(1, -1),

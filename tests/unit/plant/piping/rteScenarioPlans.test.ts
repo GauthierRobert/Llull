@@ -159,6 +159,8 @@ describe.each([
   'sc-rte-21-pipe-step-needs-kernel.json',
   'sc-rte-22-level-from-elevation.json',
   'sc-rte-23-convert-replace-moves-supports.json',
+  'sc-rte-24-auto-route-around-insulated-run.json',
+  'sc-rte-25-auto-route-lines-reorder.json',
 ])('scenario plan %s', (file) => {
   const plan = load(file);
 

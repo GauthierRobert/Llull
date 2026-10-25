@@ -124,8 +124,10 @@ function rebuild(run: PipeRun, shape: Shape): EditOk | EditFailure {
     if ('ok' in at) return at;
     branches.push({ ...branch, leg: at.leg, distance: at.distance });
   }
-  const { legSlopes: previousSlopes, ...rest } = run;
+  // The route is hand-edited from here: the auto-route record described the geometry the router committed, so it goes.
+  const { legSlopes: previousSlopes, autoRoute: computed, ...rest } = run;
   void previousSlopes;
+  void computed;
   const next: PipeRun = {
     ...rest,
     start: { ...run.start, point: points[0] as Vec3 },

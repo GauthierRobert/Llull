@@ -3,13 +3,15 @@
 //! # Input: `job.json` (camelCase)
 //!
 //! `{ "problemHash": "<sha256 from route_problem>", "problem": <route_problem data.problem>, "maxExpansions": 2000000 }`
-//! (`maxExpansions` optional, default [`DEFAULT_MAX_EXPANSIONS`]).
+//! (`maxExpansions` optional, default [`DEFAULT_MAX_EXPANSIONS`], the budget of each first-move candidate; `maxTotalExpansions` optional, default
+//! [`DEFAULT_MAX_TOTAL_EXPANSIONS`], a memory guard across the candidates: each gets `min(maxExpansions, maxTotalExpansions / candidates)`).
 //!
 //! # Output: `result.json`
 //!
 //! `{ "status": "found" | "no_path" | "budget", "problemHash", "expansions", "engine": "llull-route", "version" }` plus, when found,
 //! `"pisUm": [[x, y, z], ...]` (world µm), `"lengthUm"` (port to port, stubs included), `"bends"`, `"cost"` (integer µm) and
-//! `"optimal": true`. `no_path` / `budget` are results, not job errors: the host turns them into `RTE_AUTOROUTE_NO_PATH` /
+//! `"optimal"` (false when a first-move candidate ran out of budget while it could still beat the route) and `"candidate"` (axis index 0..5
+//! of the winning first move; `expansions` is the winner's, `maxExpansions` the budget of each candidate). `no_path` / `budget` are results, not job errors: the host turns them into `RTE_AUTOROUTE_NO_PATH` /
 //! `RTE_AUTOROUTE_BUDGET`.
 //!
 //! # Events (stdout NDJSON, `llull-protocol`)
@@ -29,6 +31,9 @@ use std::path::Path;
 /// 02 RTE §8 budget: 2·10⁶ expansions.
 pub const DEFAULT_MAX_EXPANSIONS: u64 = 2_000_000;
 
+/// Ceiling on the expansions of all candidates together.
+pub const DEFAULT_MAX_TOTAL_EXPANSIONS: u64 = 20_000_000;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobError {
     pub code: &'static str,
@@ -41,6 +46,7 @@ struct RouteJob {
     problem_hash: String,
     problem: RouteProblem,
     max_expansions: Option<u64>,
+    max_total_expansions: Option<u64>,
 }
 
 fn manhattan(a: &Int3, b: &Int3) -> i64 {
@@ -65,7 +71,8 @@ pub fn result_json(problem: &RouteProblem, problem_hash: &str, outcome: &Outcome
                 object.insert("lengthUm".into(), json!(length));
                 object.insert("bends".into(), json!(pis.len()));
                 object.insert("cost".into(), json!(found.cost));
-                object.insert("optimal".into(), json!(true));
+                object.insert("optimal".into(), json!(found.optimal));
+                object.insert("candidate".into(), json!(found.candidate));
             }
             value
         }
@@ -81,7 +88,8 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         serde_json::from_str(&text).map_err(|error| JobError { code: "NATIVE_JOB_INPUT", message: format!("job.json: {error}") })?;
     job.problem.validate().map_err(|message| JobError { code: "NATIVE_JOB_INPUT", message })?;
     let max = job.max_expansions.unwrap_or(DEFAULT_MAX_EXPANSIONS);
-    let outcome = search(&job.problem, max, &mut |expansions| {
+    let total = job.max_total_expansions.unwrap_or(DEFAULT_MAX_TOTAL_EXPANSIONS);
+    let outcome = search(&job.problem, max, total, &mut |expansions| {
         let _ = emit(out, &Event::Progress { step: expansions, total: max, message: "route: expanding lattice states", detail: None });
     });
     let bytes = serde_json::to_vec(&result_json(&job.problem, &job.problem_hash, &outcome))
@@ -129,7 +137,7 @@ mod tests {
         let folder = job_folder("budget", &format!(r#"{{"problemHash":"h","problem":{SC_RTE_08},"maxExpansions":2}}"#));
         run(&folder, &mut Vec::new()).unwrap();
         let result: serde_json::Value = serde_json::from_slice(&fs::read(folder.join("result.json")).unwrap()).unwrap();
-        assert_eq!((result["status"].as_str(), result["expansions"].as_u64()), (Some("budget"), Some(2)));
+        assert_eq!((result["status"].as_str(), result["expansions"].as_u64()), (Some("budget"), Some(10)));
         fs::remove_dir_all(&folder).unwrap();
         let bad = job_folder("bad", &format!(r#"{{"problemHash":"h","problem":{}}}"#, SC_RTE_08.replace("\"version\":1", "\"version\":2")));
         assert_eq!(run(&bad, &mut Vec::new()).unwrap_err().code, "NATIVE_JOB_INPUT");

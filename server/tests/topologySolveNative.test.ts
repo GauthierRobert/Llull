@@ -150,9 +150,9 @@ describe('topology_solve with the real llull-compute', () => {
   native(
     'checkpoints at the deadline and resumeFromLast finishes the run with the same field as an uninterrupted one (TOP-V1 deadlineS)',
     async () => {
-      // a changeTol no iteration meets keeps the density-filter run going for all 300 iterations (several seconds); timeoutS 8 gives a 3 s
-      // deadline, so the job checkpoints part way
-      const settings = { filter: { kind: 'density' }, maxIterations: 300, changeTol: 1e-9 };
+      // a changeTol no iteration meets keeps the density-filter run going for all 1500 iterations (300 took 2.8 s on a fast machine, under the
+      // deadline); timeoutS 8 gives a 3 s deadline, so the job checkpoints part way
+      const settings = { filter: { kind: 'density' }, maxIterations: 1500, changeTol: 1e-9 };
       const whole = await solveWith(settings, {});
       expect(whole.result.isError, whole.result.summary).toBe(false);
       const stopped = await solveWith(settings, { timeoutS: 8 });
@@ -162,7 +162,7 @@ describe('topology_solve with the real llull-compute', () => {
       });
       const done = (stopped.result.data as { iterations: number }).iterations;
       expect(done).toBeGreaterThan(0);
-      expect(done).toBeLessThan(300);
+      expect(done).toBeLessThan(settings.maxIterations);
       const resumed = await solveWith(settings, { resumeFromLast: true }, stopped.doc);
       expect(resumed.result.isError, resumed.result.summary).toBe(false);
       expect((resumed.result.data as { resumedFromIteration: number }).resumedFromIteration).toBe(done);

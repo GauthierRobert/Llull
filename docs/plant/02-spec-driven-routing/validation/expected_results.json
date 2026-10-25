@@ -318,7 +318,7 @@
           "gridMm": 50,
           "boxM": [100, 100, 30],
           "maxExpansions": 2000000,
-          "timeS": "TBD on the reference machine (budget <= 5 s, TECHNICAL section 8); development laptop 2026-10-19: 1 761 410 expansions in 3.65-3.98 s on a 1.6e10-cell box (TECHNICAL section 13.3)"
+          "timeS": "TBD on the reference machine (budget <= 5 s, TECHNICAL section 8); development laptop 2026-10-19: 1 761 410 expansions in 3.65-3.98 s on a 1.6e10-cell box (TECHNICAL section 13.3); V2 finish 2026-10-25 (first-move candidates, release profile): 1 759 636 expansions (winner) in 1.7-1.9 s at 1 to 22 threads (TECHNICAL section 13.12)"
         }
       },
       "tolerance": "exact (paths, cost, codes); time TBD - measure",
@@ -632,6 +632,56 @@
       "grade": "contract",
       "frs": ["FR-RTE-09"],
       "test": "tests/unit/plant/piping/v1cFollowUps.test.ts"
+    },
+    {
+      "id": "VC-RTE-46",
+      "plan": "plans/sc-rte-24-auto-route-around-insulated-run.json",
+      "command": "auto_route_pipe",
+      "expected": { "centrelineToPiLengthMm": 6800, "bends": 4, "bareHeaderLengthMm": 6700, "clearanceNeededMm": 351.3 },
+      "tolerance": { "abs": 0.000001 },
+      "reference": "README D28",
+      "grade": "closed form",
+      "frs": ["FR-RTE-22"],
+      "test": "tests/unit/plant/piping/autoRouteObstacles.test.ts"
+    },
+    {
+      "id": "VC-RTE-47",
+      "plan": "plans/sc-rte-25-auto-route-lines-reorder.json",
+      "command": "auto_route_lines",
+      "expected": { "attempts": 2, "routed": 2, "order": ["Y", "X"], "lengthsMm": { "Y": 8800, "X": 12400 } },
+      "tolerance": { "abs": 0.000001 },
+      "reference": "README D29",
+      "grade": "closed form",
+      "frs": ["FR-RTE-22"],
+      "test": "tests/unit/plant/piping/autoRouteLines.test.ts; server/tests/routeNativeParity.test.ts"
+    },
+    {
+      "id": "VC-RTE-48",
+      "plan": null,
+      "command": "auto_route_pipe + llull-compute route (pocket problem)",
+      "expected": {
+        "costUm": 8600000,
+        "tieWinnerFirstMove": "+X",
+        "budget500": { "winnerFirstMove": "+Y", "optimal": false },
+        "nativeEqualsTs": true,
+        "threadCountIndependent": true
+      },
+      "tolerance": "exact",
+      "reference": "README D30",
+      "grade": "derived",
+      "frs": ["FR-RTE-22"],
+      "test": "tests/unit/plant/piping/autoRouteCandidates.test.ts; solver/crates/llull-route (cargo test); server/tests/routeNativeParity.test.ts"
+    },
+    {
+      "id": "VC-RTE-49",
+      "plan": null,
+      "command": "edit_route, update_equipment_parameters (stretch)",
+      "expected": { "autoRouteAfterEdit": null, "autoRouteAfterStretch": null, "autoRouteAfterValve": "kept", "autoRouteAfterSaveLoad": "kept" },
+      "tolerance": "exact",
+      "reference": "README D31",
+      "grade": "contract",
+      "frs": ["FR-RTE-22"],
+      "test": "tests/unit/plant/piping/autoRouteEdits.test.ts"
     }
   ]
 }

@@ -83,6 +83,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_AUTOROUTE_NO_PATH: 'Widen the grid box (gridMargin), lower the clearance, use a finer grid or move the ports onto a common grid.',
   RTE_AUTOROUTE_BUDGET:
     'Run the native router: llull auto_route with the same params (llull-compute route, 2e6 expansions), or use a coarser grid.',
+  RTE_AUTOROUTE_LINES_INVALID:
+    'Give each line once (distinct lineId) and only give solutions with order: given (a solution is valid for one routing order).',
+  RTE_AUTOROUTE_LINES_FAILED:
+    'See data/detail.lines for the line that failed and why; route it alone with auto_route_pipe, widen gridMargin, lower clearance, raise maxAttempts, or set partial: true to keep the lines that routed.',
   RTE_AUTOROUTE_SOLUTION_INVALID: 'Re-run llull auto_route on the current document, or drop solution to route with the TypeScript search.',
 };
 

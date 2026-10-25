@@ -60,7 +60,7 @@ export function solutionFromSearch(
     lengthMm: lengthUm(points) / 1000,
     bends: result.bends,
     cost: result.cost,
-    optimal: true,
+    optimal: result.optimal,
     expansions: result.expansions,
     engine,
   };

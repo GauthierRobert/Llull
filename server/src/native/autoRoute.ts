@@ -3,6 +3,7 @@
  * route` searches it (sparse 3D A*, NDJSON progress) and `auto_route_pipe { ..., solution }` validates the solution against the problem
  * rebuilt from the current document before committing it. The native code never writes the document; a missing binary refuses with
  * NATIVE_TOOL_MISSING (the in-process TypeScript search still runs through `auto_route_pipe` without `solution`, under its cap).
+ * With `lines` it routes several lines in one transaction (`./autoRouteLines`).
  */
 
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
@@ -11,16 +12,18 @@ import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type JobRun } from './computeJob';
 import { nativeInstallHint } from './nativeBinary';
 import type { NativeDeps } from './fatigueField';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, runAutoRouteLines } from './autoRouteLines';
 
 const TOOL = 'auto_route';
-export const DEFAULT_AUTO_ROUTE_TIMEOUT_S = 60;
 /** 02 RTE §8 native budget (expansions); `maxExpansions` may raise it. */
 export const NATIVE_MAX_EXPANSIONS = 2_000_000;
-/** Ceiling of `maxExpansions` (memory guard: ~7.4e6 expansions took 37 s and a few hundred MB on the development laptop). */
+/** Ceiling of `maxExpansions`, per first-move candidate (memory guard: ~7.4e6 expansions took 37 s and a few hundred MB on the development laptop). */
 export const NATIVE_EXPANSIONS_CEILING = 20_000_000;
+/** Ceiling of the expansions of all (up to 5) candidates of one search together: each candidate gets at most this / candidates, so memory stays bounded. */
+const NATIVE_TOTAL_EXPANSIONS_CEILING = 20_000_000;
 
 /** Params of the transport itself; everything else is forwarded to route_problem / auto_route_pipe. */
-const TRANSPORT_KEYS: ReadonlySet<string> = new Set(['timeoutS', 'maxExpansions', 'solution']);
+const TRANSPORT_KEYS: ReadonlySet<string> = new Set(['timeoutS', 'maxExpansions', 'solution', 'transactionTimeoutS']);
 
 export interface AutoRouteOptions {
   readonly timeoutS?: number;
@@ -104,6 +107,7 @@ export async function runAutoRoute(
   host: FeaHost,
   deps: NativeDeps,
 ): Promise<FeaToolResult> {
+  if (params['lines'] !== undefined) return runAutoRouteLines(params, options, host, deps, runAutoRoute);
   const forwarded = routeParams(params);
   const built = host.applyCommand('route_problem', forwarded);
   if (built.isError) return { ...built, summary: `${TOOL}: ${built.summary}` };
@@ -115,7 +119,7 @@ export async function runAutoRoute(
   const maxExpansions = Math.min(options.maxExpansions ?? NATIVE_MAX_EXPANSIONS, NATIVE_EXPANSIONS_CEILING);
   const sink = deps.onProgress;
   const outcome = await withJobFolder(
-    { 'job.json': JSON.stringify({ problemHash, problem, maxExpansions }) },
+    { 'job.json': JSON.stringify({ problemHash, problem, maxExpansions, maxTotalExpansions: NATIVE_TOTAL_EXPANSIONS_CEILING }) },
     async (folder) => {
       const run = await deps.runner.run(
         ['route'],
@@ -143,7 +147,7 @@ export async function runAutoRoute(
   if (result.status === 'budget')
     return failure(
       'RTE_AUTOROUTE_BUDGET',
-      `no route within ${result.expansions} expansions; raise maxExpansions or use a coarser grid`,
+      `no route within ${result.expansions} expansions; each first-move candidate had min(${maxExpansions}, ${NATIVE_TOTAL_EXPANSIONS_CEILING} / candidates): raise maxExpansions (ceiling ${NATIVE_EXPANSIONS_CEILING}) or use a coarser grid`,
       lineId,
     );
   const solution = {

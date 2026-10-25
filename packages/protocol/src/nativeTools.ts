@@ -185,24 +185,46 @@ function autoRouteSchema(): ParamsSchema {
   const schema = wrappedSchema(
     'route_problem',
     z.object({
-      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 60).'),
-      maxExpansions: z.number().int().optional().describe('Native expansion budget (default 2000000); above it RTE_AUTOROUTE_BUDGET.'),
+      timeoutS: timeoutS('Wall-clock limit of the native job in seconds (default 60), per line.'),
+      maxExpansions: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'Native expansion budget per first-move candidate (default 2000000); above it RTE_AUTOROUTE_BUDGET. All candidates together are capped at 20000000 (each gets at most that / candidates).',
+        ),
+      transactionTimeoutS: z
+        .number()
+        .min(1)
+        .optional()
+        .describe(
+          'With lines: wall-clock limit of the whole plan in seconds (default 600); beyond it NATIVE_TIMEOUT and nothing is committed.',
+        ),
     }),
   );
   const budget = schema.properties['maxExpansions'];
   if (budget !== undefined) Object.assign(budget, { minimum: 1, maximum: 20_000_000 });
-  return schema;
+  const several = getCommand('auto_route_lines')?.paramsSchema.properties ?? {};
+  const own = Object.fromEntries(
+    ['lines', 'common', 'partial', 'maxAttempts'].flatMap((key) => (several[key] === undefined ? [] : [[key, several[key]]])),
+  );
+  // The tool takes one of two forms (the schema format has no oneOf): lineId + from + to, or lines. Neither set is required on its own; the description says which.
+  return { ...schema, properties: { ...schema.properties, ...own }, required: [] };
 }
 
 const autoRoute = (): ToolDefinition => ({
   name: 'auto_route',
   description:
     'Auto-route a pipe line between two ports with the native router (llull-compute route, plant 02 RTE V2): route_problem builds the ' +
-    'lattice problem from the document, the native sparse 3D A* searches it (up to maxExpansions, default 2e6) and auto_route_pipe validates ' +
-    'the solution against the current document (problem hash, legs, clearance, length / bends / cost) and adds the pipe run. Same params as ' +
-    'route_problem / auto_route_pipe. data = auto_route_pipe data + native { version, elapsedMs }. Errors: route_problem refusals, ' +
-    'RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID, NATIVE_TOOL_MISSING (then auto_route_pipe alone runs the ' +
-    'TypeScript search on small grids), NATIVE_TIMEOUT.',
+    'lattice problem from the document, the native sparse 3D A* (one search per first move, run in parallel, deterministic) searches it (up to ' +
+    'maxExpansions per candidate, default 2e6) and auto_route_pipe validates the solution against the current document (problem hash, legs, ' +
+    'clearance, length / bends / cost) and adds the pipe run. Same params as route_problem / auto_route_pipe; required for one line: lineId, from, to. ' +
+    'With lines (instead of ' +
+    'lineId / from / to) it routes several lines in one transaction like auto_route_lines (automatic order, bounded retry, all-or-nothing unless ' +
+    'partial): it plans on a scratch copy of the document, one native search per line, then commits once. data = auto_route_pipe data (or ' +
+    'auto_route_lines data) + native { version, elapsedMs }. Errors: route_problem refusals, RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, ' +
+    'RTE_AUTOROUTE_SOLUTION_INVALID, RTE_AUTOROUTE_LINES_FAILED / RTE_AUTOROUTE_LINES_INVALID, NATIVE_TOOL_MISSING (then auto_route_pipe / ' +
+    'auto_route_lines alone run the TypeScript search on small grids), NATIVE_TIMEOUT.',
   inputSchema: autoRouteSchema(),
   annotations: {},
 });

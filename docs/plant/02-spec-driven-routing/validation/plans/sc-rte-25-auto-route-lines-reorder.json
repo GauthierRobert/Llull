@@ -1,0 +1,66 @@
+{
+  "id": "SC-RTE-25",
+  "status": "RUNNABLE (02 RTE V2): every step runs.",
+  "unbuilt": [],
+  "validates": ["VC-RTE-47"],
+  "description": "Several lines in one transaction. A wall across x = 5000 (keep-out boxes, 100 thick, 1000 each way from the axis) has one 400 x 400 hole at the origin height. DN100 line X runs straight through the hole (ports (0,0,0) and (10000,0,0), grid box margin 1600, so it can go round the wall); DN100 line Y is 400 above it (ports (1000,0,400) and (9000,0,400), margin 400, so it cannot). Equal DN, X is 10000 apart and Y 8000: the order is X, Y. X fills the hole (a DN100 pipe inflated by 57.15 + 50 = 107.15 mm leaves no room for a second one in 400 mm); Y fails (no path); the first failed line is promoted and the second pass is Y, X: Y goes through the hole, X goes round the wall.",
+  "units": "mm",
+  "harness": {
+    "inline": { "actions[0].params.catalog": "../data/catalog_stub_cs150.json", "actions[1].params.spec": "../data/spec_cs150.json" },
+    "note": "the test harness (and the CLI --param-file) inlines the fixtures before the run: catalog_stub_cs150.json = the input dimensions of these plans (catalogue rte-validation-stub), spec_cs150.json = spec CS150 in the 01 PSC llull-pipe-spec format"
+  },
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": "<data/catalog_stub_cs150.json>" } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/spec_cs150.json>" } },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "9001", "spec": "CS150", "dn": 100 }, "as": "lineX" },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "9002", "spec": "CS150", "dn": 100 }, "as": "lineY" },
+    {
+      "command": "auto_route_lines",
+      "params": {
+        "lines": [
+          {
+            "lineId": "$lineX",
+            "from": { "point": [0, 0, 0], "direction": [1, 0, 0] },
+            "to": { "point": [10000, 0, 0], "direction": [-1, 0, 0] },
+            "gridMargin": 1600
+          },
+          {
+            "lineId": "$lineY",
+            "from": { "point": [1000, 0, 400], "direction": [1, 0, 0] },
+            "to": { "point": [9000, 0, 400], "direction": [-1, 0, 0] },
+            "gridMargin": 400
+          }
+        ],
+        "common": {
+          "grid": 200,
+          "keepOutBoxes": [
+            { "min": [4950, -1000, 200], "max": [5050, 1000, 1000] },
+            { "min": [4950, -1000, -1000], "max": [5050, 1000, -200] },
+            { "min": [4950, -1000, -200], "max": [5050, -200, 200] },
+            { "min": [4950, 200, -200], "max": [5050, 1000, 200] }
+          ]
+        }
+      }
+    }
+  ],
+  "expected": [
+    { "step": 4, "path": "data.attempts.length", "value": 2, "source": "pass 1 fails Y, pass 2 routes both" },
+    { "step": 4, "path": "data.attempts[0].routed", "value": 1 },
+    { "step": 4, "path": "data.routed", "value": 2 },
+    { "step": 4, "path": "data.lines[0].lineId", "value": "$lineY", "source": "the committed order is Y, X" },
+    {
+      "step": 4,
+      "path": "data.lines[0].centrelineToPiLengthMm",
+      "value": 8800,
+      "abs": 0.000001,
+      "source": "8000 along x + 2 x 400 (down to the hole and back up)"
+    },
+    {
+      "step": 4,
+      "path": "data.lines[1].centrelineToPiLengthMm",
+      "value": 12400,
+      "abs": 0.000001,
+      "source": "10000 along x + 2 x 1200 (the wall edge 1000 + 107.15 clears on the 200 mm lattice at 1200)"
+    }
+  ]
+}

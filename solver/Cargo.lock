@@ -1219,6 +1219,7 @@ name = "llull-route"
 version = "0.1.0"
 dependencies = [
  "llull-protocol",
+ "rayon",
  "serde",
  "serde_json",
 ]
