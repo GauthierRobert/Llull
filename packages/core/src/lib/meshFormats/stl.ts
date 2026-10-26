@@ -13,6 +13,7 @@ export function isBinaryStl(bytes: Uint8Array): boolean {
 }
 
 export function parseBinaryStl(bytes: Uint8Array): ParsedMeshFile | MeshParseFailure {
+  if (!isBinaryStl(bytes)) return parseFailure('MESH_IMPORT_PARSE', 'binary STL: the byte length is not 84 + 50 x the facet count');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(80, true);
   const positions: number[] = [];

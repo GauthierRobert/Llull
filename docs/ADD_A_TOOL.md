@@ -17,6 +17,20 @@ The short version:
 
 Then `llull search <words>` finds it, `llull describe <name>` prints its schema and `llull exec <name> …` (or a plan step) runs it.
 
+## A plugin that stores data in the document (a document slice)
+
+A plugin whose commands keep data in the document declares a `DocumentExtension` (`packages/core/src/plugins/plugin.ts`) whose
+`validate(raw)` runs on every load, on data that may be hand-edited or corrupt. **New plugin slices declare a zod schema** and return
+`sliceSchemaErrors(schema, raw.<slice>, '<dotted.root>')` (`@core/plugins/sliceSchema`): every issue becomes `<root>.<path inside the slice>:
+<what is wrong>`, never throws, and rejects NaN / Infinity. Write only the checks a schema cannot express (a map key equals its record's `id`,
+references resolve, ids are unique) as a small function next to it, tolerant of a malformed shape. Do not hand-write `typeof` / `isRecord`
+ladders (example: `packages/domain-aec/src/plant/fabrication/validate.ts`).
+
+`tests/unit/contract/pluginSliceFuzz.test.ts` mutates every installed plugin's slice (deleted keys, swapped types, huge / negative numbers,
+reserved keys, duplicate ids, dangling references) through `load_document` and fails when a load throws, is refused without a validation
+summary, or does not re-save to the same text. It also fails by name for a plugin with a `document` extension and no seed: add one row to
+`tests/helpers/pluginSliceSeeds.ts` (a valid document built through real commands, the slice paths, a query and a mutating command).
+
 Where the details live:
 
 - Step-by-step procedure: `.claude/skills/add-command/SKILL.md`

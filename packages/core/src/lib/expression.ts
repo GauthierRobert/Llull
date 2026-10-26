@@ -98,8 +98,13 @@ export function tokenize(src: string): Token[] | string {
 interface ParseState {
   tokens: Token[];
   pos: number;
+  /** Open parentheses / calls around the current position (capped by MAX_NESTING). */
+  depth: number;
   env: Readonly<Record<string, number>>;
 }
+
+/** Parentheses / calls nested deeper than this are refused instead of overflowing the call stack. */
+export const MAX_NESTING = 200;
 
 function peek(s: ParseState): Token {
   return s.tokens[s.pos] ?? EOF_TOKEN;
@@ -129,7 +134,13 @@ function parseBinary(s: ParseState, operators: string, parseOperand: (s: ParseSt
   return left;
 }
 
-const parseExpr = (s: ParseState): EvalResult => parseBinary(s, '+-', parseTerm);
+function parseExpr(s: ParseState): EvalResult {
+  if (s.depth >= MAX_NESTING) return { ok: false, error: `expression nested deeper than ${MAX_NESTING} levels` };
+  s.depth++;
+  const result = parseBinary(s, '+-', parseTerm);
+  s.depth--;
+  return result;
+}
 
 const parseTerm = (s: ParseState): EvalResult => parseBinary(s, '*/', parseFactor);
 
@@ -209,7 +220,7 @@ export function evaluateExpression(expression: string, env: Readonly<Record<stri
   if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
   const tokensOrError = tokenize(expression);
   if (typeof tokensOrError === 'string') return { ok: false, error: tokensOrError };
-  const state: ParseState = { tokens: tokensOrError, pos: 0, env };
+  const state: ParseState = { tokens: tokensOrError, pos: 0, depth: 0, env };
   const result = parseExpr(state);
   if (!result.ok) return result;
   // Ensure the entire input was consumed.

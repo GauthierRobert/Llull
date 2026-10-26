@@ -24,7 +24,7 @@ interface ObjectDef {
 
 function attributes(tag: string): Record<string, string> {
   const found: Record<string, string> = {};
-  for (const match of tag.matchAll(/([\w:]+)\s*=\s*"([^"]*)"/g)) found[match[1] as string] = match[2] as string;
+  for (const match of tag.matchAll(/(?<![\w:])([\w:]+)\s*=\s*"([^"]*)"/g)) found[match[1] as string] = match[2] as string;
   return found;
 }
 
@@ -56,20 +56,24 @@ function apply(m: Affine, x: number, y: number, z: number): number[] {
 
 function readObjects(xml: string): Map<string, ObjectDef> {
   const objects = new Map<string, ObjectDef>();
-  for (const match of xml.matchAll(/<object\b([^>]*)>([\s\S]*?)<\/object>/g)) {
+  const open = /<object\b([^<>]*)>/g;
+  for (let match = open.exec(xml); match !== null; match = open.exec(xml)) {
+    const close = xml.indexOf('</object>', open.lastIndex);
+    if (close < 0) break;
     const attrs = attributes(match[1] ?? '');
-    const inner = match[2] ?? '';
+    const inner = xml.slice(open.lastIndex, close);
+    open.lastIndex = close + '</object>'.length;
     const positions: number[] = [];
     const triangles: number[] = [];
-    for (const v of inner.matchAll(/<vertex\b([^>]*)\/?>/g)) {
+    for (const v of inner.matchAll(/<vertex\b([^<>]*)\/?>/g)) {
       const a = attributes(v[1] ?? '');
       positions.push(Number(a['x']), Number(a['y']), Number(a['z']));
     }
-    for (const t of inner.matchAll(/<triangle\b([^>]*)\/?>/g)) {
+    for (const t of inner.matchAll(/<triangle\b([^<>]*)\/?>/g)) {
       const a = attributes(t[1] ?? '');
       triangles.push(Number(a['v1']), Number(a['v2']), Number(a['v3']));
     }
-    const components = [...inner.matchAll(/<component\b([^>]*)\/?>/g)].map((c) => {
+    const components = [...inner.matchAll(/<component\b([^<>]*)\/?>/g)].map((c) => {
       const a = attributes(c[1] ?? '');
       return { objectId: a['objectid'] ?? '', transform: transformOf(a['transform']) };
     });
@@ -126,12 +130,12 @@ export function parse3mf(bytes: Uint8Array, limits: ParseLimits): ParsedMeshFile
   }
   if (model === undefined) return parseFailure('MESH_IMPORT_PARSE', '3MF archive has no 3D/3dmodel.model part');
   const xml = new TextDecoder().decode(model);
-  const unit = attributes(/<model\b([^>]*)>/.exec(xml)?.[1] ?? '')['unit'] ?? 'millimeter';
+  const unit = attributes(/<model\b([^<>]*)>/.exec(xml)?.[1] ?? '')['unit'] ?? 'millimeter';
   const unitMetres = UNIT_METRES[unit];
   if (unitMetres === undefined)
     return parseFailure('MESH_IMPORT_PARSE', `3MF unit "${unit}" is not one of ${Object.keys(UNIT_METRES).join(', ')}`);
   const objects = readObjects(xml);
-  const items = [...xml.matchAll(/<item\b([^>]*)\/?>/g)].map((m) => attributes(m[1] ?? ''));
+  const items = [...xml.matchAll(/<item\b([^<>]*)\/?>/g)].map((m) => attributes(m[1] ?? ''));
   const bodies: ParsedBody[] = [];
   const tally: Tally = { bodies: 0, triangles: 0 };
   const roots =

@@ -16,27 +16,31 @@ describe('validate', () => {
   it('accepts an absent slice and every well-formed node op', () => {
     expect(errorsOf({})).toEqual([]);
     const fields = {
-      a: { id: 'a', op: 'primitive', dims: {}, position: v, rotation: v },
+      a: { id: 'a', op: 'primitive', shape: 'sphere', dims: { radius: 1 }, position: v, rotation: v },
       b: { id: 'b', op: 'solid', entityId: 'x' },
       c: { id: 'c', op: 'boolean', operands: ['a', 'b'] },
       d: { id: 'd', op: 'offset', source: 'a', distance: 1 },
       e: { id: 'e', op: 'shell', source: 'a', thickness: 1 },
       f: { id: 'f', op: 'transform', source: 'a', position: v, rotation: v, scale: 1 },
-      g: { id: 'g', op: 'tpms', cellSize: v, origin: v, control: {} },
-      h: { id: 'h', op: 'struts', cellSize: v, origin: v, radius: 1 },
+      g: { id: 'g', op: 'tpms', kind: 'gyroid', cellSize: v, origin: v, rotation: v, form: 'sheet', normalize: 'none', control: {} },
+      h: { id: 'h', op: 'struts', cell: 'cubic', cellSize: v, origin: v, rotation: v, radius: 1 },
     };
     expect(errorsOf(slice(fields))).toEqual([]);
   });
 
   it.each([
-    ['primitive', { dims: 1, position: v, rotation: v }],
+    ['primitive', { shape: 'sphere', dims: 1, position: v, rotation: v }],
+    ['primitive', { shape: [], dims: {}, position: v, rotation: v }],
+    ['primitive', { shape: 'box', dims: { size: [1, 1, Number.POSITIVE_INFINITY] }, position: v, rotation: v }],
     ['solid', { entityId: 1 }],
     ['boolean', { operands: [1] }],
     ['offset', { source: 'a', distance: true }],
     ['shell', { source: 1, thickness: 1 }],
     ['transform', { source: 'a', position: v, rotation: v, scale: 'x' }],
-    ['tpms', { cellSize: v, origin: v, control: 1 }],
-    ['struts', { cellSize: [1], origin: v, radius: 1 }],
+    ['tpms', { kind: 'gyroid', cellSize: v, origin: v, rotation: v, form: 'sheet', normalize: 'none', control: 1 }],
+    ['tpms', { cellSize: v, origin: v, control: {} }],
+    ['struts', { cell: 'cubic', cellSize: [1], origin: v, rotation: v, radius: 1 }],
+    ['struts', { cellSize: v, origin: v, radius: 1 }],
   ])('rejects a %s node with malformed parameters', (op, extra) => {
     expect(errorsOf(slice({ n: { id: 'n', op, ...extra } })).join()).toContain('malformed parameters');
   });

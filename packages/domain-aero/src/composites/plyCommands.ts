@@ -100,6 +100,27 @@ export function insertPly(model: CompositesModel, part: CompositePart, spec: Ply
   return { model: { ...model, plies: renumbered({ ...model.plies, [ply.id]: ply }, ordered), plyOrder: [...model.plyOrder, ply.id] }, ply };
 }
 
+/** `model` with the plies of `specs` pushed on top of the stack of `part` in order, in one pass (linear, where inserting one by one copies the model per ply). */
+export function insertPliesOnTop(
+  model: CompositesModel,
+  part: CompositePart,
+  specs: readonly PlySpec[],
+): { model: CompositesModel; plies: Ply[] } {
+  const existing = pliesOf(model, part.id);
+  const added = specs.map((spec, k) =>
+    compact<Ply>({
+      id: nextId('ply'),
+      partId: part.id,
+      order: existing.length + k,
+      ...spec,
+      orientation: normalizeAngle(spec.orientation),
+    }),
+  );
+  const ordered = [...existing, ...added];
+  const plies = renumbered({ ...model.plies, ...Object.fromEntries(added.map((ply) => [ply.id, ply])) }, ordered);
+  return { model: { ...model, plies, plyOrder: [...model.plyOrder, ...added.map((ply) => ply.id)] }, plies: added };
+}
+
 const MAX_PLIES = 5000;
 
 /**

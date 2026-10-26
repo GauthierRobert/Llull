@@ -57,7 +57,7 @@ function buildRow(design: Design, summary: string, ok: boolean): MatrixRow {
   };
 }
 
-function buildDesign(design: Design): { doc: CadDocument | null; row: MatrixRow } {
+export function buildDesign(design: Design): { doc: CadDocument | null; row: MatrixRow } {
   try {
     const result = execute(createEmptyDocument(), 'build_project', { actions: design.actions });
     const steps = (result.data as { steps?: { index: number; command: string; ok: boolean; summary: string }[] } | undefined)?.steps ?? [];

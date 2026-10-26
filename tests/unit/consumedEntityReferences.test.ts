@@ -20,7 +20,7 @@ function constrainedBoxes(): { doc: CadDocument; a: string; b: string } {
   return { doc: constrained.document, a, b };
 }
 
-const NOTE = 'Also removed 1 constraint/joint/drive record(s)';
+const NOTE = 'Also removed 1 constraint/joint/drive/animation record(s)';
 
 describe('commands that consume entities report the constraints they drop', () => {
   afterEach(() => setGeometryKernel(null));
@@ -57,6 +57,21 @@ describe('commands that consume entities report the constraints they drop', () =
     const result = execute(constrained.document, 'explode_polyline', { id: polyId });
     expect(result.summary).toContain(NOTE);
     expect(Object.keys(result.document.constraints)).toHaveLength(1);
+  });
+  it('delete_entities drops the animations of the deleted entity and of a dissolved group, and keeps the others', () => {
+    const { doc: boxes, a, b } = constrainedBoxes();
+    const third = execute(boxes, 'add_box', { size: [1, 1, 1], position: [9, 0, 0] });
+    const c = third.affected[0]!;
+    const spun = (document: CadDocument, targetId: string): CadDocument =>
+      execute(document, 'animate', { targetId, mode: 'spin', speed: 1 }).document;
+    const grouped = execute(third.document, 'group_entities', { ids: [a, b] });
+    const groupId = grouped.affected[0]!;
+    const animated = [a, c, groupId].reduce(spun, grouped.document);
+    expect(Object.keys(animated.animations)).toHaveLength(3);
+    const result = execute(animated, 'delete_entities', { ids: [a] });
+    expect(Object.values(result.document.animations).map((animation) => animation.targetId)).toEqual([c]);
+    expect(result.summary).toContain('animation record(s)');
+    expect(execute(animated, 'delete_entities', { ids: [c] }).document.animations).toHaveProperty(Object.keys(animated.animations)[2]!);
   });
   it('an operation that drops nothing adds no note', () => {
     const lone = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
