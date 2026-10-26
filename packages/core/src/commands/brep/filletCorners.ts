@@ -4,7 +4,7 @@
  * vertex names to record so a regeneration follows the same corners (REF_LOST / REF_SPLIT when one is gone).
  * @invariant a vertex gets one treatment; a setback corner has a distance for every edge meeting at the vertex (non-degenerate edges)
  * @failure a selector that is not exactly one of name / near / all, an unknown or repeated vertex, a distance missing for an edge, an override
- *   edge that does not meet the vertex -> a problem; a lost / split vertex or edge name -> REF_LOST / REF_SPLIT; a varying or profiled blend with a
+ *   edge that does not meet the vertex -> a problem; a lost / split vertex or edge name -> REF_LOST / REF_SPLIT; a smooth, multi-station or profiled blend with a
  *   setback corner -> BLD_CORNER_UNSUPPORTED
  */
 
@@ -65,7 +65,7 @@ export const cornerSchema = z
       .optional(),
   })
   .describe(
-    'Corner treatment at one vertex or all: a setback corner (this build: every edge meeting there is a straight convex edge between planar faces, rounded in this step with a constant radius).',
+    'Corner treatment at one vertex or all: a setback corner (this build: every edge meeting there is a straight edge between planar faces, all convex or all concave, rounded in this step with a constant radius).',
   );
 
 export type CornerInput = z.infer<typeof cornerSchema>;
@@ -91,7 +91,11 @@ interface Planned {
   readonly law: EdgeRadius;
 }
 
-const isVarying = (law: EdgeRadius): boolean => law.sizeEnd !== undefined || law.sizes !== undefined || law.size2 !== undefined;
+/** A radius a setback corner cannot take: anything but a constant one or a straight (linear) one between the two ends of the edge. */
+const isVarying = (law: EdgeRadius): boolean =>
+  law.sizes !== undefined ||
+  law.size2 !== undefined ||
+  (law.sizeEnd !== undefined && law.sizeEnd !== law.size && law.interpolation !== 'linear');
 
 /** The distance of every edge override, by unique-edge index; or why one cannot be resolved. */
 function overrides(
@@ -185,7 +189,7 @@ export function resolveCorners(
       return {
         refusal: {
           code: 'BLD_CORNER_UNSUPPORTED',
-          message: `${path}: setback corners need constant circular edge blends in this build (no radiusEnd, sizes, law, size2 or profile)`,
+          message: `${path}: setback corners need circular edge blends whose radius is constant or linear between the two ends of the edge in this build (edges[] with sizeEnd and interpolation "linear"; no smooth radiusEnd, sizes, law, size2 or profile)`,
           path,
         },
       };

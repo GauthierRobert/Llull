@@ -44,6 +44,14 @@
    "file": "plans/target_profiles_curved_variable.json",
    "description": "Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies and a cube whose twelve edges are profiled (G1 corner patches), each followed by check_blends.",
    "unbuilt": []
+  },
+  {
+   "file": "plans/target_corners_concave_tapered.json",
+   "description": "Setback corners on a concave inner corner (a notch in a cube: the blends add material), on a cube whose twelve edges taper linearly from 0.8 to 1.2, and the refusal of a vertex of convex and concave edges; each followed by check_blends.",
+   "unbuilt": [],
+   "expectedCodesInOrder": [
+    "BLD_CORNER_UNSUPPORTED"
+   ]
   }
  ],
  "cases": [
@@ -1047,6 +1055,65 @@
    "cli": {
     "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
     "assert": "check_blends($cubeC); mass_properties($cubeC); data.profile.corners"
+   }
+  },
+  {
+   "vc": "VC-BLD-40",
+   "what": "cube 10 less the octant [0, 6]^3 (a notch), its three concave inner edges r 0.5 with a setback 1.2 corner at the inner vertex: 3 blend cylinders spanning 3.8, 1 corner patch, material is ADDED (volume above the notch solid), blends and patch G1 (<= 0.01 rad), check_blends passes",
+   "value": {
+    "cylinders": 3,
+    "patches": 1,
+    "span": 3.8,
+    "volumeAdded": true,
+    "g1MaxRad": 0.01
+   },
+   "tolerance": {
+    "span": 0.000001,
+    "g1": 0.01,
+    "g0": "5 x 1e-6 x diagonal"
+   },
+   "unit": "mm / rad",
+   "grade": "A (span, counts, bound)",
+   "source": "definition (a concave blend fills the corner between its faces)",
+   "plan": "target_corners_concave_tapered",
+   "assert": "inspect_topology($f40); mass_properties($notch, $f40); check_blends($f40)",
+   "proves": [
+    "FR-BLD-09",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_concave_tapered.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_topology($f40); mass_properties($notch, $f40); check_blends($f40)"
+   }
+  },
+  {
+   "vc": "VC-BLD-41",
+   "what": "cube 10, all 12 edges with a radius linear from 0.8 at the start to 1.2 at the end, setback 2.5 at the 8 corners: 26 faces, 8 corner patches, volume between the constant r 1.2 and r 0.8 cubes, G1 <= 0.01 rad, check_blends passes (the law readback is not compared over a setback blend)",
+   "value": {
+    "faces": 26,
+    "patches": 8,
+    "volumeBetween": [
+     "constant r 1.2",
+     "constant r 0.8"
+    ],
+    "g1MaxRad": 0.01
+   },
+   "tolerance": {
+    "g1": 0.01,
+    "g0": "5 x 1e-6 x diagonal"
+   },
+   "unit": "rad / mm3",
+   "grade": "A (counts, bounds)",
+   "source": "definition (a linear law between the two ends of the edge)",
+   "plan": "target_corners_concave_tapered",
+   "assert": "inspect_topology($f41); mass_properties($f41); check_blends($f41)",
+   "proves": [
+    "FR-BLD-09",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_concave_tapered.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_topology($f41); mass_properties($f41); check_blends($f41)"
    }
   }
  ]

@@ -1,0 +1,280 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "nc"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     6,
+     6,
+     6
+    ],
+    "position": [
+     3,
+     3,
+     3
+    ]
+   },
+   "as": "nt"
+  },
+  {
+   "command": "boolean",
+   "params": {
+    "op": "subtract",
+    "a": "$nc",
+    "b": "$nt"
+   },
+   "as": "notch"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$notch"
+   }
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$notch",
+    "edgesNear": [
+     [
+      2.5,
+      0,
+      0
+     ],
+     [
+      0,
+      2.5,
+      0
+     ],
+     [
+      0,
+      0,
+      2.5
+     ]
+    ],
+    "radius": 0.5,
+    "corners": [
+     {
+      "near": [
+       0,
+       0,
+       0
+      ],
+      "type": "setback",
+      "setback": 1.2
+     }
+    ]
+   },
+   "as": "f40"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f40"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f40"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "tc"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$tc",
+    "edges": [
+     {
+      "index": 0,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 1,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 2,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 3,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 4,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 5,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 6,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 7,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 8,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 9,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 10,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     },
+     {
+      "index": 11,
+      "size": 0.8,
+      "sizeEnd": 1.2,
+      "interpolation": "linear"
+     }
+    ],
+    "corners": [
+     {
+      "all": true,
+      "type": "setback",
+      "setback": 2.5
+     }
+    ]
+   },
+   "as": "f41"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f41"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f41"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "nc2"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     6,
+     6,
+     6
+    ],
+    "position": [
+     3,
+     3,
+     3
+    ]
+   },
+   "as": "nt2"
+  },
+  {
+   "command": "boolean",
+   "params": {
+    "op": "subtract",
+    "a": "$nc2",
+    "b": "$nt2"
+   },
+   "as": "notch2"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$notch2",
+    "edgesNear": [
+     [
+      0,
+      0,
+      2.5
+     ],
+     [
+      2.5,
+      0,
+      5
+     ],
+     [
+      0,
+      2.5,
+      5
+     ]
+    ],
+    "radius": 0.5,
+    "corners": [
+     {
+      "near": [
+       0,
+       0,
+       5
+      ],
+      "type": "setback",
+      "setback": 1.2
+     }
+    ]
+   }
+  }
+ ]
+}

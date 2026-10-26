@@ -13,6 +13,7 @@ import type { IsolatedKernel } from '../src/isolatedKernel';
 
 interface Face {
   readonly name?: string;
+  readonly area?: number;
   readonly surface: string;
   readonly axis?: { readonly span?: readonly [number, number] };
 }
@@ -144,6 +145,134 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     expect(crowded.document).toBe(doc);
     expect(crowded.error?.code).toBe('BLD_CORNER_FAILED');
     expect(crowded.summary).toContain('leave no length');
+  });
+
+  /** A cube of side 10 s with the octant [0, 6 s]^3 cut away: the inner vertex is at the origin of the document, the cube is centred on it. */
+  const notched = (scale: number): { doc: CadDocument; id: string } => {
+    const base = cube(10 * scale);
+    const tool = execute(base.doc, 'add_box', { size: [6 * scale, 6 * scale, 6 * scale], position: [3 * scale, 3 * scale, 3 * scale] });
+    const done = execute(tool.document, 'boolean', { op: 'subtract', a: base.id, b: tool.affected[0] as string });
+    expect(done.error).toBeUndefined();
+    return { doc: done.document, id: done.affected[0] as string };
+  };
+
+  for (const scale of [0.1, 1, 100]) {
+    it(`a concave inner corner (a notch in a cube of ${10 * scale}) takes a setback corner that adds material and passes check_blends`, () => {
+      const { doc, id } = notched(scale);
+      const before = volume(doc, id);
+      const inner = execute(doc, 'fillet_edge', {
+        id,
+        edgesNear: [
+          [2.5 * scale, 0, 0],
+          [0, 2.5 * scale, 0],
+          [0, 0, 2.5 * scale],
+        ],
+        radius: 0.5 * scale,
+        corners: [{ near: [0, 0, 0], type: 'setback', setback: 1.2 * scale }],
+      });
+      expect(inner.error).toBeUndefined();
+      const resultId = inner.affected[0] as string;
+      const list = faces(inner.document, resultId);
+      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(1);
+      expect(list.filter((face) => face.surface === 'cylinder')).toHaveLength(3);
+      // three prisms of area r^2 (1 - pi / 4) over 5 s - 1.2 s, plus the patch region (measured 0.339 s^3, under a quarter of the cube of the setback)
+      const prisms = 3 * 0.25 * scale ** 2 * (1 - Math.PI / 4) * 3.8 * scale;
+      const added = volume(inner.document, resultId) - before;
+      expect(added).toBeGreaterThan(prisms);
+      expect(added).toBeLessThan(prisms + 0.4 * scale ** 3);
+      const check = execute(inner.document, 'check_blends', { ids: [resultId] });
+      expect(check.error).toBeUndefined();
+      expect((check.data as { status: string }).status).toBe('pass');
+    });
+  }
+
+  it('a vertex of convex and concave edges is refused by name; a concave setback keeps the names of split faces and replays', () => {
+    const { doc, id } = notched(1);
+    const mixed = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: [
+        [0, 0, 2.5],
+        [2.5, 0, 5],
+        [0, 2.5, 5],
+      ],
+      radius: 0.5,
+      corners: [{ near: [0, 0, 5], type: 'setback', setback: 1.2 }],
+    });
+    expect(mixed.document).toBe(doc);
+    expect(mixed.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
+    expect(mixed.summary).toContain('convex and concave edges meet');
+    // split the face x = -5 (far from the notch) in two: its halves must come out of the concave setback with their names
+    const split = execute(doc, 'split_face', { id, facesNear: [[-5, 0, 0]], plane: { origin: [0, 0, -2], normal: [0, 0, 1] } });
+    expect(split.error).toBeUndefined();
+    const splitId = split.affected[0] as string;
+    const halves = faces(split.document, splitId).filter(
+      (face) => face.name !== undefined && face.area !== undefined && face.area < 70 && face.area > 20,
+    );
+    expect(halves.length).toBeGreaterThanOrEqual(2);
+    const done = execute(split.document, 'fillet_edge', {
+      id: splitId,
+      edgesNear: [
+        [2.5, 0, 0],
+        [0, 2.5, 0],
+        [0, 0, 2.5],
+      ],
+      radius: 0.5,
+      corners: [{ near: [0, 0, 0], type: 'setback', setback: 1.2 }],
+    });
+    expect(done.error).toBeUndefined();
+    const after = faces(done.document, done.affected[0] as string).map((face) => face.name);
+    for (const half of halves) expect(after).toContain(half.name);
+    const replayed = execute(done.document, 'replay_history', {});
+    expect(replayed.rejected).not.toBe(true);
+    expect(replayed.error).toBeUndefined();
+  });
+
+  for (const size of [1, 10, 1000]) {
+    it(`a radius linear from 0.08 to 0.12 x ${size} along every edge of a cube with setback size / 4 builds tangent patches; check_blends reads 0.09 to 0.11 x size over the blends`, () => {
+      const { doc, id } = cube(size);
+      const edges = Array.from({ length: 12 }, (_, index) => ({
+        index,
+        size: 0.08 * size,
+        sizeEnd: 0.12 * size,
+        interpolation: 'linear' as const,
+      }));
+      const done = execute(doc, 'fillet_edge', { id, edges, corners: [{ all: true, type: 'setback', setback: size / 4 }] });
+      expect(done.error).toBeUndefined();
+      const result = done.affected[0] as string;
+      const list = faces(done.document, result);
+      expect(list).toHaveLength(26);
+      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(8);
+      const checked = execute(done.document, 'check_blends', { ids: [result] }).data as {
+        status: string;
+        findings: Array<{ code: string }>;
+        blends: Array<{ kind: string; lawChecked?: boolean; radius?: { min: number; max: number; at: Array<{ value: number }> } }>;
+      };
+      expect(checked.status).toBe('pass');
+      expect(checked.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+      const rows = checked.blends.filter((row) => row.kind === 'edge');
+      expect(rows).toHaveLength(12);
+      for (const row of rows) {
+        // the blend stops size / 4 from both ends of the edge (length size): its radius there is size x (0.08 + 0.04 x 0.25) at one end, x 0.75 at the other
+        expect(row.lawChecked).toBe(true);
+        expect((row.radius?.min ?? 0) / size).toBeCloseTo(0.09, 5);
+        expect((row.radius?.max ?? 0) / size).toBeCloseTo(0.11, 5);
+        const ends = [row.radius?.at[0]?.value ?? 0, row.radius?.at[(row.radius?.at.length ?? 1) - 1]?.value ?? 0].sort((x, y) => x - y);
+        expect((ends[0] ?? 0) / size).toBeCloseTo(0.09, 5);
+        expect((ends[1] ?? 0) / size).toBeCloseTo(0.11, 5);
+      }
+    });
+  }
+
+  it('a radius linear from 0.8 to 1.2 on a cube of 10 with setback 2.5 takes more material than r 1.2 and less than r 0.8', () => {
+    const { doc, id } = cube();
+    const edges = Array.from({ length: 12 }, (_, index) => ({ index, size: 0.8, sizeEnd: 1.2, interpolation: 'linear' as const }));
+    const done = execute(doc, 'fillet_edge', { id, edges, corners: [{ all: true, type: 'setback', setback: 2.5 }] });
+    expect(done.error).toBeUndefined();
+    const constant = execute(doc, 'fillet_edge', { id, radius: 1.2, corners: [{ all: true, type: 'setback', setback: 2.5 }] });
+    const smallest = execute(doc, 'fillet_edge', { id, radius: 0.8, corners: [{ all: true, type: 'setback', setback: 2.5 }] });
+    const tapered = volume(done.document, done.affected[0] as string);
+    expect(tapered).toBeGreaterThan(volume(constant.document, constant.affected[0] as string));
+    expect(tapered).toBeLessThan(volume(smallest.document, smallest.affected[0] as string));
   });
 
   it('VC-BLD-22: the corners are recorded by vertex name; resizing the cube upstream re-runs the same corners; a gone vertex name is REF_LOST', () => {

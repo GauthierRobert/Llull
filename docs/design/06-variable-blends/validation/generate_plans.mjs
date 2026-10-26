@@ -435,6 +435,63 @@ plan(
   ],
 );
 
+plan(
+  'target_corners_concave_tapered',
+  'Setback corners on a concave inner corner (a notch in a cube: the blends add material), on a cube whose twelve edges taper linearly from 0.8 to 1.2, and the refusal of a vertex of convex and concave edges; each followed by check_blends.',
+  [],
+  [
+    { command: 'add_box', params: { size: [10, 10, 10] }, as: 'nc' },
+    { command: 'add_box', params: { size: [6, 6, 6], position: [3, 3, 3] }, as: 'nt' },
+    { command: 'boolean', params: { op: 'subtract', a: '$nc', b: '$nt' }, as: 'notch' },
+    mass('$notch'),
+    {
+      command: 'fillet_edge',
+      params: {
+        id: '$notch',
+        edgesNear: [
+          [2.5, 0, 0],
+          [0, 2.5, 0],
+          [0, 0, 2.5],
+        ],
+        radius: 0.5,
+        corners: [{ near: [0, 0, 0], type: 'setback', setback: 1.2 }],
+      },
+      as: 'f40',
+    },
+    mass('$f40'),
+    { command: 'check_blends', params: { ids: ['$f40'] } },
+    { command: 'add_box', params: { size: [10, 10, 10] }, as: 'tc' },
+    {
+      command: 'fillet_edge',
+      params: {
+        id: '$tc',
+        edges: Array.from({ length: 12 }, (_, index) => ({ index, size: 0.8, sizeEnd: 1.2, interpolation: 'linear' })),
+        corners: [{ all: true, type: 'setback', setback: 2.5 }],
+      },
+      as: 'f41',
+    },
+    mass('$f41'),
+    { command: 'check_blends', params: { ids: ['$f41'] } },
+    { command: 'add_box', params: { size: [10, 10, 10] }, as: 'nc2' },
+    { command: 'add_box', params: { size: [6, 6, 6], position: [3, 3, 3] }, as: 'nt2' },
+    { command: 'boolean', params: { op: 'subtract', a: '$nc2', b: '$nt2' }, as: 'notch2' },
+    {
+      command: 'fillet_edge',
+      params: {
+        id: '$notch2',
+        edgesNear: [
+          [0, 0, 2.5],
+          [2.5, 0, 5],
+          [0, 2.5, 5],
+        ],
+        radius: 0.5,
+        corners: [{ near: [0, 0, 5], type: 'setback', setback: 1.2 }],
+      },
+      expect: 'BLD_CORNER_UNSUPPORTED',
+    },
+  ],
+);
+
 // ---------- expected results ----------
 const D = '--doc t.llull.json --kernel occt --json';
 const cases = [
@@ -942,6 +999,30 @@ const cases = [
     assert: 'check_blends($cubeC); mass_properties($cubeC); data.profile.corners',
     proves: ['FR-BLD-09', 'TR-BLD-06', 'TR-BLD-07'],
   },
+  {
+    vc: 'VC-BLD-40',
+    what: 'cube 10 less the octant [0, 6]^3 (a notch), its three concave inner edges r 0.5 with a setback 1.2 corner at the inner vertex: 3 blend cylinders spanning 3.8, 1 corner patch, material is ADDED (volume above the notch solid), blends and patch G1 (<= 0.01 rad), check_blends passes',
+    value: { cylinders: 3, patches: 1, span: 3.8, volumeAdded: true, g1MaxRad: 0.01 },
+    tolerance: { span: 1e-6, g1: 0.01, g0: '5 x 1e-6 x diagonal' },
+    unit: 'mm / rad',
+    grade: 'A (span, counts, bound)',
+    source: 'definition (a concave blend fills the corner between its faces)',
+    plan: 'target_corners_concave_tapered',
+    assert: 'inspect_topology($f40); mass_properties($notch, $f40); check_blends($f40)',
+    proves: ['FR-BLD-09', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-41',
+    what: 'cube 10, all 12 edges with a radius linear from 0.8 at the start to 1.2 at the end, setback 2.5 at the 8 corners: 26 faces, 8 corner patches, volume between the constant r 1.2 and r 0.8 cubes, G1 <= 0.01 rad, check_blends passes (the law readback is not compared over a setback blend)',
+    value: { faces: 26, patches: 8, volumeBetween: ['constant r 1.2', 'constant r 0.8'], g1MaxRad: 0.01 },
+    tolerance: { g1: 0.01, g0: '5 x 1e-6 x diagonal' },
+    unit: 'rad / mm3',
+    grade: 'A (counts, bounds)',
+    source: 'definition (a linear law between the two ends of the edge)',
+    plan: 'target_corners_concave_tapered',
+    assert: 'inspect_topology($f41); mass_properties($f41); check_blends($f41)',
+    proves: ['FR-BLD-09', 'TR-BLD-06'],
+  },
 ];
 // Measured on the native kernel (DES-6b, OCCT 7.9.2): what each gated case actually gave and where it misses the pack tolerance.
 const MEASURED = {
@@ -998,4 +1079,4 @@ writeFileSync(
   join(here, 'expected_results.json'),
   `${JSON.stringify({ gap: 'BLD', generated: '2026-10-22', notes: 'Values: (a) quoted, (b) derived (generate_blend_refs.mjs, data/*.json) or (c) TBD with the tool to measure. Only grade A gates pass/fail. Units: the plans use the default document unit (mm).', plans: planIndex, cases }, null, 1)}\n`,
 );
-process.stdout.write(`wrote ${cases.length} cases and 6 plans\n`);
+process.stdout.write(`wrote ${cases.length} cases and ${planIndex.length} plans\n`);

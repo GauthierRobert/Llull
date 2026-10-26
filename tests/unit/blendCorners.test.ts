@@ -286,6 +286,45 @@ describe('fillet_edge corners', () => {
     expect(rolling.error).toBeUndefined();
   });
 
+  it('a radius that is linear between the two ends of each edge is accepted at a setback corner; the smooth law of radiusEnd and a multi-station law are refused', () => {
+    const kernel = scriptedKernel({ topology: TOPOLOGY });
+    const { doc, id } = cube();
+    const law = { size: 1, sizeEnd: 1.5, interpolation: 'linear' as const };
+    const linear = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: TOPOLOGY.edges.map((edge) => ({ index: edge.index, ...law })), corners: [{ all: true, setback: 2 }] },
+      ctxOf(kernel),
+    );
+    expect(linear.error).toBeUndefined();
+    expect(filletOf(linear.document, linear.affected[0] as string).corners).toHaveLength(8);
+    const equal = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: TOPOLOGY.edges.map((edge) => ({ index: edge.index, size: 1, sizeEnd: 1 })), corners: [{ all: true, setback: 2 }] },
+      ctxOf(kernel),
+    );
+    expect(equal.error).toBeUndefined();
+    const smooth = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: TOPOLOGY.edges.map((edge) => ({ index: edge.index, size: 1, sizeEnd: 1.5 })), corners: [{ all: true, setback: 2 }] },
+      ctxOf(kernel),
+    );
+    expect(smooth.error).toMatchObject({ code: 'BLD_CORNER_UNSUPPORTED', paths: ['corners[0]'] });
+    const stations = execute(
+      doc,
+      'fillet_edge',
+      {
+        id,
+        edges: TOPOLOGY.edges.map((edge) => ({ index: edge.index, size: 1, sizes: [{ t: 0.5, size: 2 }] })),
+        corners: [{ all: true, setback: 2 }],
+      },
+      ctxOf(kernel),
+    );
+    expect(stations.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
+  });
+
   it('works with per-edge entries and chord mode: the corner distances follow the planned edges', () => {
     const kernel = scriptedKernel({ topology: TOPOLOGY });
     const { doc, id } = cube();

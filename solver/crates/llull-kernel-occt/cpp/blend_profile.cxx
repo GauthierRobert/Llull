@@ -24,7 +24,9 @@
 #include <BRepGProp.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepClass_FaceClassifier.hxx>
+#include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <TopoDS_Wire.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
 #include <GC_MakeArcOfCircle.hxx>
@@ -133,8 +135,8 @@ Handle(Geom_Curve) section_curve(const gp_Pnt &start, const gp_Pnt &a, const gp_
   return section;
 }
 
-bool spandrel_tool(const gp_Pnt &start, const gp_Pnt &end, const gp_Pnt &a, const gp_Pnt &b, int kind, double param, double wedge,
-                   const std::string &blend_name, Tool &tool, std::string &why) {
+static bool spandrel_wire(const gp_Pnt &start, const gp_Pnt &a, const gp_Pnt &b, int kind, double param, double wedge, TopoDS_Wire &wire_out,
+                   std::string &why) {
   const Handle(Geom_Curve) section = section_curve(start, a, b, kind, param, wedge);
   BRepBuilderAPI_MakeEdge corner_to_a(start, a);
   BRepBuilderAPI_MakeEdge arc(section);
@@ -151,7 +153,38 @@ bool spandrel_tool(const gp_Pnt &start, const gp_Pnt &end, const gp_Pnt &a, cons
     why = "the section outline does not close";
     return false;
   }
-  BRepBuilderAPI_MakeFace profile(wire.Wire(), Standard_True);
+  wire_out = wire.Wire();
+  return true;
+}
+
+bool tapered_spandrel_tool(const gp_Pnt &start_from, const gp_Pnt &a_from, const gp_Pnt &b_from, const gp_Pnt &start_to, const gp_Pnt &a_to,
+                           const gp_Pnt &b_to, double wedge, const std::string &blend_name, Tool &tool, std::string &why) {
+  TopoDS_Wire first, last;
+  if (!spandrel_wire(start_from, a_from, b_from, 2, 0.0, wedge, first, why) || !spandrel_wire(start_to, a_to, b_to, 2, 0.0, wedge, last, why)) return false;
+  BRepOffsetAPI_ThruSections loft(Standard_True, Standard_True);
+  loft.AddWire(first);
+  loft.AddWire(last);
+  loft.Build();
+  if (!loft.IsDone()) {
+    why = "the tapered blend tool could not be lofted";
+    return false;
+  }
+  tool.shape = loft.Shape();
+  const TopTools_IndexedMapOfShape tool_faces = query::distinct(tool.shape, TopAbs_FACE);
+  tool.names.assign(static_cast<size_t>(tool_faces.Extent()), "");
+  for (TopExp_Explorer it(first, TopAbs_EDGE); it.More(); it.Next()) {
+    if (BRepAdaptor_Curve(TopoDS::Edge(it.Current())).GetType() == GeomAbs_Line) continue;
+    const int blend_face = tool_faces.FindIndex(loft.GeneratedFace(it.Current()));
+    if (blend_face > 0) tool.names[static_cast<size_t>(blend_face - 1)] = blend_name;
+  }
+  return std::find(tool.names.begin(), tool.names.end(), blend_name) != tool.names.end();
+}
+
+bool spandrel_tool(const gp_Pnt &start, const gp_Pnt &end, const gp_Pnt &a, const gp_Pnt &b, int kind, double param, double wedge,
+                   const std::string &blend_name, Tool &tool, std::string &why) {
+  TopoDS_Wire outline;
+  if (!spandrel_wire(start, a, b, kind, param, wedge, outline, why)) return false;
+  BRepBuilderAPI_MakeFace profile(outline, Standard_True);
   if (!profile.IsDone()) {
     why = "the section outline is not planar";
     return false;

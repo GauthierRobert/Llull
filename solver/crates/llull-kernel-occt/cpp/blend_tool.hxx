@@ -77,6 +77,11 @@ Handle(Geom_Curve) section_curve(const gp_Pnt &start, const gp_Pnt &a, const gp_
 bool spandrel_tool(const gp_Pnt &start, const gp_Pnt &end, const gp_Pnt &a, const gp_Pnt &b, int kind, double param, double wedge,
                    const std::string &blend_name, Tool &tool, std::string &why);
 
+// The spandrel prism of an edge whose circular blend tapers: the ruled loft of the circular spandrel sections at the two ends (corner, leg points a, b
+// of each, so the lateral face of the arcs is a cone), named `blend_name` on the arc face. False with the reason in `why`.
+bool tapered_spandrel_tool(const gp_Pnt &start_from, const gp_Pnt &a_from, const gp_Pnt &b_from, const gp_Pnt &start_to, const gp_Pnt &a_to, const gp_Pnt &b_to,
+                           double wedge, const std::string &blend_name, Tool &tool, std::string &why);
+
 // `current` after cutting (or fusing, per tool) every tool, with names carried by the boolean histories; false with the reason in `why`.
 bool apply_tools(naming::Named &current, const std::vector<Tool> &tools, std::string &why);
 

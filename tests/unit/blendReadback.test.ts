@@ -18,6 +18,9 @@ import {
   radiusSamples,
   sameDirection,
 } from '@core/geometry/blend/blendInfo';
+import { checkRadius, type LawRecord } from '@core/commands/brep/checkBlendRadius';
+import type { ShapeHandle } from '@core/geometry/kernelTypes';
+import type { EdgeRadius } from '@core/model/types';
 import { scriptedKernel, edgeOf } from '../helpers/blendKernel';
 import { expectPure } from '../helpers/expectNoOp';
 
@@ -194,6 +197,83 @@ describe('check_blends radius readback', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).not.toHaveProperty('radius');
     }
+  });
+});
+
+describe('radius law over a setback blend (checkRadius)', () => {
+  // an edge from x = -10 to 10 whose blend covers x = -8 .. 8 (setbacks of 2 at both ends): sections along it, mid points on the edge line
+  const covered =
+    (radius: (t: number) => number, reverse = false) =>
+    (_face: number, count: number): BlendSection[] =>
+      Array.from({ length: count }, (_, k) => {
+        const t = k / (count - 1);
+        const x = reverse ? 8 - 16 * t : -8 + 16 * t;
+        return { t, a: [x, 4, 2.5], mid: [x, 5, 2.5], b: [x, 5, 1.5], radius: radius(t), centre: [x, 4, 1.5] };
+      });
+  const run = (law: EdgeRadius, setback: boolean, sections: ReturnType<typeof covered>): ReturnType<typeof checkRadius> => {
+    const kernel = kernelWith(sections);
+    const shape = {} as ShapeHandle;
+    const record: LawRecord = { node: 0, law, shape, topology: TOPOLOGY, edge: 3, setback };
+    return checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
+  };
+  const linear: EdgeRadius = { size: 1, sizeEnd: 2, interpolation: 'linear' };
+
+  it('a linear law is read over the span the blend covers: 1.1 at its first section, 1.9 at its last, in either direction', () => {
+    const met = run(
+      linear,
+      true,
+      covered((t) => 1.1 + 0.8 * t),
+    );
+    expect(met).toMatchObject({ lawChecked: true, deviations: [] });
+    expect(met.radius?.at[0]?.value).toBeCloseTo(1.1, 9);
+    const backwards = run(
+      linear,
+      true,
+      covered((t) => 1.9 - 0.8 * t, true),
+    );
+    expect(backwards).toMatchObject({ lawChecked: true, deviations: [] });
+  });
+
+  it('a reversed taper, a taper read over the whole edge and a wrong constant are deviations', () => {
+    expect(
+      run(
+        linear,
+        true,
+        covered((t) => 1.9 - 0.8 * t),
+      ).deviations.length,
+    ).toBeGreaterThan(5);
+    expect(
+      run(
+        linear,
+        true,
+        covered((t) => 1 + t),
+      ).deviations.length,
+    ).toBeGreaterThan(5);
+    const constant: EdgeRadius = { size: 1.5 };
+    expect(
+      run(
+        constant,
+        true,
+        covered(() => 1.5),
+      ),
+    ).toMatchObject({ lawChecked: true, deviations: [] });
+    expect(
+      run(
+        constant,
+        true,
+        covered(() => 1.4),
+      ).deviations.length,
+    ).toBeGreaterThan(5);
+  });
+
+  it('without a setback the same sections are compared with the whole edge (the previous behaviour)', () => {
+    expect(
+      run(
+        linear,
+        false,
+        covered((t) => 1 + t),
+      ).deviations,
+    ).toHaveLength(0);
   });
 });
 

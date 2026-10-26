@@ -1,8 +1,8 @@
 //! BLD M3: setback corners (`features::fillet_setback`, `cpp/blend_corner.cxx`).
 
-use crate::features::{fillet_setback, setback_reason};
+use crate::features::{fillet_profile_blend, fillet_setback, profile_blend_reason, setback_reason};
 use crate::queries::{edge_continuity, topology};
-use crate::{analyze, make_box, make_sewn_solid, mass_properties, Shape};
+use crate::{analyze, boolean, make_box, make_sewn_solid, mass_properties, BooleanOp, Shape};
 use serde_json::Value;
 
 fn cube(size: f64) -> Shape {
@@ -17,23 +17,35 @@ fn point(value: &Value) -> [f64; 3] {
     [num(&value[0]), num(&value[1]), num(&value[2])]
 }
 
+/// The unique indices of the edges that start or end at `vertex`.
+fn edges_at(shape: &Shape, vertex: [f64; 3]) -> Vec<usize> {
+    let topo = topology(shape).unwrap();
+    let near = |a: [f64; 3], b: [f64; 3]| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6);
+    topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, edge)| near(point(&edge["start"]), vertex) || near(point(&edge["end"]), vertex))
+        .map(|(index, _)| index)
+        .collect()
+}
+
 /// Edge indices (all of them) with radius `radius`, and one corner per `vertex` with `setback` on every edge that meets it.
 fn spec(shape: &Shape, edges: &[usize], radius: f64, vertices: &[[f64; 3]], setback: f64) -> (Vec<f64>, Vec<f64>) {
-    let topo = topology(shape).unwrap();
-    let list = topo["edges"].as_array().unwrap();
-    let near = |a: [f64; 3], b: [f64; 3]| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6);
+    let tapers: Vec<(usize, f64, f64)> = edges.iter().map(|&edge| (edge, radius, radius)).collect();
+    spec_tapered(shape, &tapers, vertices, setback)
+}
+
+/// Like `spec` with a radius that goes linearly from the first to the second number along each edge (edge index, radius at its start, radius at its end).
+fn spec_tapered(shape: &Shape, edges: &[(usize, f64, f64)], vertices: &[[f64; 3]], setback: f64) -> (Vec<f64>, Vec<f64>) {
     let mut flat_edges = Vec::new();
-    for &edge in edges {
-        flat_edges.extend([edge as f64, radius]);
+    for &(edge, start, end) in edges {
+        flat_edges.extend([edge as f64, start, end]);
     }
     let mut flat_corners = Vec::new();
     for vertex in vertices {
-        let meeting: Vec<usize> = list
-            .iter()
-            .enumerate()
-            .filter(|(_, edge)| near(point(&edge["start"]), *vertex) || near(point(&edge["end"]), *vertex))
-            .map(|(index, _)| index)
-            .collect();
+        let meeting = edges_at(shape, *vertex);
         flat_corners.extend([vertex[0], vertex[1], vertex[2], meeting.len() as f64]);
         for edge in meeting {
             flat_corners.extend([edge as f64, setback]);
@@ -71,7 +83,12 @@ fn worst_tangent_angle(shape: &Shape) -> f64 {
 }
 
 fn pyramid() -> Shape {
-    let apex = [5.0, 5.0, 10.0];
+    tall_pyramid(10.0)
+}
+
+/// A pyramid on a 10 x 10 base whose apex is `height` above the centre.
+fn tall_pyramid(height: f64) -> Shape {
+    let apex = [5.0, 5.0, height];
     let corners = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [10.0, 10.0, 0.0], [0.0, 10.0, 0.0]];
     let mut positions = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
@@ -200,4 +217,297 @@ fn the_patch_is_valid_and_tangent_at_every_size() {
         let worst = worst_tangent_angle(&built);
         assert!(worst < 0.01, "size {size}: tangent within 0.01 rad, ends included: {worst}");
     }
+}
+
+/// A 10 cube with the octant [5, 11]^3 cut away: the notch has an inner corner at (5, 5, 5) where three concave edges meet.
+fn notched_cube() -> Shape {
+    let notch = make_box([5.0; 3], [6.0; 3]).unwrap().unwrap();
+    boolean(BooleanOp::Subtract, &cube(10.0), &notch, true).unwrap().unwrap()
+}
+
+#[test]
+fn a_concave_inner_corner_takes_a_setback_corner_that_adds_material() {
+    let _serial = crate::serial_blends();
+    let shape = notched_cube();
+    let before = mass_properties(&shape).unwrap().volume;
+    let inner = [5.0; 3];
+    let concave = edges_at(&shape, inner);
+    assert_eq!(concave.len(), 3);
+    let (edges, corners) = spec(&shape, &concave, 0.5, &[inner], 1.2);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let topo = topology(&built).unwrap();
+    let faces = topo["faces"].as_array().unwrap();
+    assert_eq!(faces.len(), 13, "9 planes, 3 blend cylinders, 1 corner patch");
+    assert_eq!(faces.iter().filter(|face| face["surface"] == "cylinder").count(), 3);
+    for cylinder in faces.iter().filter(|face| face["surface"] == "cylinder") {
+        let span = cylinder["axis"]["span"].as_array().unwrap();
+        assert!((num(&span[1]) - num(&span[0]) - 3.8).abs() < 1e-6, "a blend spans 5 - 1.2: {cylinder}");
+    }
+    assert_eq!(faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count(), 1);
+    let after = mass_properties(&built).unwrap().volume;
+    // three spandrel prisms of area r^2 (1 - pi / 4) over the 3.8 between the setback sections, plus the patch region (measured 0.339: under a quarter of the sharp corner cube of 1.2, 0.432)
+    let prisms = 3.0 * 0.25 * (1.0 - std::f64::consts::FRAC_PI_4) * 3.8;
+    assert!(
+        after - before > prisms && after - before < prisms + 0.4,
+        "a concave blend adds the prisms and a corner: {prisms} + ? = {}",
+        after - before
+    );
+    let worst = worst_tangent_angle(&built);
+    assert!(worst < 0.01, "blends, patch and faces are tangent: {worst}");
+}
+
+#[test]
+fn concave_and_convex_corners_can_share_one_step() {
+    let _serial = crate::serial_blends();
+    let shape = notched_cube();
+    let (inner, outer) = ([5.0; 3], [0.0; 3]);
+    let mut rounded = edges_at(&shape, inner);
+    rounded.extend(edges_at(&shape, outer));
+    let (edges, mut corners) = spec(&shape, &rounded, 0.5, &[inner], 1.2);
+    corners.extend(spec(&shape, &rounded, 0.5, &[outer], 1.2).1);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 9 + 6 + 2, "9 planes, 6 blends, 2 patches");
+    assert!(worst_tangent_angle(&built) < 0.01);
+}
+
+#[test]
+fn a_vertex_of_convex_and_concave_edges_is_named_not_faked() {
+    let _serial = crate::serial_blends();
+    let shape = notched_cube();
+    let rim = [5.0, 5.0, 10.0];
+    let meeting = edges_at(&shape, rim);
+    assert_eq!(meeting.len(), 3);
+    let (edges, corners) = spec(&shape, &meeting, 0.5, &[rim], 1.2);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("convex and concave edges meet"), "{reason}");
+}
+
+#[test]
+fn a_pocket_with_all_its_inner_edges_rounded_and_four_setback_corners() {
+    let _serial = crate::serial_blends();
+    let pocket = make_box([3.0, 3.0, 3.0], [4.0, 4.0, 8.0]).unwrap().unwrap();
+    let shape = boolean(BooleanOp::Subtract, &cube(10.0), &pocket, true).unwrap().unwrap();
+    let before = mass_properties(&shape).unwrap().volume;
+    let floor_corners = [[3.0, 3.0, 3.0], [7.0, 3.0, 3.0], [7.0, 7.0, 3.0], [3.0, 7.0, 3.0]];
+    let mut rounded: Vec<usize> = floor_corners.iter().flat_map(|corner| edges_at(&shape, *corner)).collect();
+    rounded.sort_unstable();
+    rounded.dedup();
+    assert_eq!(rounded.len(), 8, "4 floor edges and 4 vertical edges");
+    let (edges, corners) = spec(&shape, &rounded, 0.5, &floor_corners, 1.3);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 11 + 8 + 4, "11 planes, 8 blends, 4 corner patches");
+    assert!(mass_properties(&built).unwrap().volume > before);
+    assert!(worst_tangent_angle(&built) < 0.01);
+}
+
+#[test]
+fn a_radius_that_varies_linearly_along_the_edges_still_gets_tangent_corner_patches() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let tapers: Vec<(usize, f64, f64)> = (0..12).map(|edge| (edge, 0.8, 1.2)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &cube_vertices(10.0), 2.5);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 26, "6 planes, 12 tapered blends, 8 corner patches");
+    let worst = worst_tangent_angle(&built);
+    assert!(worst < 0.01, "tapered blends, patches and faces are tangent: {worst}");
+    // the smaller blends take less material than 1.2 everywhere and more than 0.8 everywhere
+    let volume = mass_properties(&built).unwrap().volume;
+    let (low, high) = (mass_properties(&corner_cube(0.8)).unwrap().volume, mass_properties(&corner_cube(1.2)).unwrap().volume);
+    assert!(volume < low && volume > high, "{high} < {volume} < {low}");
+}
+
+/// The cube rounded with a constant radius and setback 2.5 at the 8 corners (the bounds of the tapered one).
+fn corner_cube(radius: f64) -> Shape {
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let (edges, corners) = spec(&shape, &all, radius, &cube_vertices(10.0), 2.5);
+    fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid")
+}
+
+#[test]
+fn a_setback_shorter_than_the_tapered_blends_reach_is_named_with_the_larger_radius_there() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let tapers: Vec<(usize, f64, f64)> = (0..12).map(|edge| (edge, 0.5, 2.0)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &cube_vertices(10.0), 1.5);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_SETBACK_TOO_SHORT]"), "{reason}");
+}
+
+#[test]
+fn profile_corners_on_concave_edges_are_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let shape = notched_cube();
+    let specs: Vec<f64> = edges_at(&shape, [5.0; 3]).iter().flat_map(|&edge| [edge as f64, 0.0, 0.5, 0.5, f64::NAN, -1.0, 0.0]).collect();
+    assert!(fillet_profile_blend(&shape, &specs, &[], &[], 0.0, 0.5).unwrap().is_none());
+    let reason = profile_blend_reason(&shape, &specs, &[], &[], 0.0, 0.5).unwrap();
+    assert!(reason.contains("is concave: profile corners round convex edges"), "{reason}");
+}
+
+/// The corner at the origin of a cube with its three edges there rounded with a radius from `start` to `end` along their 10 mm.
+fn tapered_corner(shape: &Shape, start: f64, end: f64, setback: f64) -> (Vec<f64>, Vec<f64>) {
+    let tapers: Vec<(usize, f64, f64)> = edges_at(shape, [0.0; 3]).into_iter().map(|edge| (edge, start, end)).collect();
+    spec_tapered(shape, &tapers, &[[0.0; 3]], setback)
+}
+
+#[test]
+fn the_least_setback_of_a_tapered_corner_is_the_fixed_point_and_builds() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let (edges, corners) = tapered_corner(&shape, 0.5, 2.0, 0.5);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_SETBACK_TOO_SHORT]"), "{reason}");
+    let minimum: f64 = reason.split("must exceed ").nth(1).and_then(|rest| rest.split(' ').next()).unwrap().parse().unwrap();
+    // r(d) = 0.5 + 0.15 d, and the setback must exceed the tangent distance (45 degrees: equal to the radius): d > 0.5 / (1 - 0.15)
+    assert!((minimum - 0.5 / 0.85).abs() < 1e-5, "{minimum}");
+    let (edges, corners) = tapered_corner(&shape, 0.5, 2.0, minimum * (1.0 + 1e-6));
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "the reported minimum builds");
+    let (edges, corners) = tapered_corner(&shape, 0.5, 2.0, minimum * (1.0 - 1e-6));
+    assert!(setback_reason(&shape, &edges, &corners).unwrap().starts_with("[BLD_SETBACK_TOO_SHORT]"));
+}
+
+#[test]
+fn a_radius_that_grows_as_fast_as_the_setback_is_named() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let (edges, corners) = tapered_corner(&shape, 0.5, 12.0, 3.0);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("no setback outruns it"), "{reason}");
+}
+
+/// The number after "must exceed " in a BLD_SETBACK_TOO_SHORT reason, and the `edge N value` pairs of its list of least setbacks.
+fn minimums(reason: &str) -> (f64, Vec<(usize, f64)>) {
+    assert!(reason.starts_with("[BLD_SETBACK_TOO_SHORT]"), "{reason}");
+    let first = reason.split("must exceed ").nth(1).and_then(|rest| rest.split(' ').next()).unwrap().parse().unwrap();
+    let list = reason.split(": edge ").nth(1).unwrap().split(';').next().unwrap();
+    let pairs = format!("edge {list}")
+        .split(", ")
+        .map(|entry| {
+            let mut words = entry.split(' ').skip(1);
+            (words.next().unwrap().parse().unwrap(), words.next().unwrap().parse().unwrap())
+        })
+        .collect();
+    (first, pairs)
+}
+
+/// Whether the corner built with the same setback `scale` x on every edge builds: the reported minimum x (1 + 1e-6) does, x (1 - 1e-6) does not.
+fn assert_minimum_is_sharp(shape: &Shape, edges: &[(usize, f64, f64)], vertex: [f64; 3], first: f64) {
+    let (flat_edges, corners) = spec_tapered(shape, edges, &[vertex], first * (1.0 + 1e-6));
+    assert_eq!(setback_reason(shape, &flat_edges, &corners).unwrap(), "", "the reported minimum {first} builds");
+    let (flat_edges, corners) = spec_tapered(shape, edges, &[vertex], first * (1.0 - 1e-6));
+    assert!(setback_reason(shape, &flat_edges, &corners).unwrap().starts_with("[BLD_SETBACK_TOO_SHORT]"), "just under {first} is refused");
+}
+
+#[test]
+fn the_reported_minimum_is_the_joint_one_at_an_angle_other_than_a_right_one() {
+    let _serial = crate::serial_blends();
+    let shape = pyramid();
+    let lateral: Vec<(usize, f64, f64)> = topology(&shape).unwrap()["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, edge)| num(&edge["start"][2]) > 9.0 || num(&edge["end"][2]) > 9.0)
+        .map(|(index, _)| (index, 0.5, 1.0))
+        .collect();
+    let apex = [5.0, 5.0, 10.0];
+    let (edges, corners) = spec_tapered(&shape, &lateral, &[apex], 0.3);
+    let (first, _) = minimums(&setback_reason(&shape, &edges, &corners).unwrap());
+    assert_minimum_is_sharp(&shape, &lateral, apex, first);
+}
+
+#[test]
+fn the_reported_minimum_is_the_joint_one_for_unequal_edges_at_right_angles() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let mut tapers: Vec<(usize, f64, f64)> = edges_at(&shape, [0.0; 3]).into_iter().map(|edge| (edge, 0.5, 0.5)).collect();
+    tapers[0].2 = 2.0;
+    let (edges, corners) = spec_tapered(&shape, &tapers, &[[0.0; 3]], 0.3);
+    let (first, _) = minimums(&setback_reason(&shape, &edges, &corners).unwrap());
+    assert_minimum_is_sharp(&shape, &tapers, [0.0; 3], first);
+}
+
+#[test]
+fn with_a_setback_per_edge_the_reported_minimums_are_the_least_fixed_point_of_all_the_edges() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let tapers: Vec<(usize, f64, f64)> = edges_at(&shape, [0.0; 3]).into_iter().map(|edge| (edge, 0.5, 2.0)).collect();
+    let flat_edges: Vec<f64> = tapers.iter().flat_map(|&(edge, start, end)| [edge as f64, start, end]).collect();
+    let corner_with = |distances: &[f64]| -> Vec<f64> {
+        let mut flat = vec![0.0, 0.0, 0.0, tapers.len() as f64];
+        for (&(edge, _, _), &distance) in tapers.iter().zip(distances) {
+            flat.extend([edge as f64, distance]);
+        }
+        flat
+    };
+    let reason = setback_reason(&shape, &flat_edges, &corner_with(&[0.3, 0.9, 0.5])).unwrap();
+    let (_, least) = minimums(&reason);
+    assert_eq!(least.len(), 3, "{reason}");
+    let scaled = |factor: f64| -> Vec<f64> { least.iter().map(|&(_, value)| value * factor).collect() };
+    assert_eq!(setback_reason(&shape, &flat_edges, &corner_with(&scaled(1.0 + 1e-6))).unwrap(), "", "{least:?}");
+    assert!(setback_reason(&shape, &flat_edges, &corner_with(&scaled(1.0 - 1e-6))).unwrap().starts_with("[BLD_SETBACK_TOO_SHORT]"));
+}
+
+/// The four lateral edges of `tall_pyramid(18.0)` (a 30 degree angle between two of them on a face) with a radius from `near` at the base to `far` at the apex
+/// when `growing`, else the other way, and the apex.
+fn narrow_apex(near: f64, far: f64, growing: bool) -> (Shape, Vec<(usize, f64, f64)>, [f64; 3]) {
+    let shape = tall_pyramid(18.0);
+    let lateral: Vec<(usize, f64, f64)> = topology(&shape).unwrap()["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, edge)| num(&edge["start"][2]) > 17.0 || num(&edge["end"][2]) > 17.0)
+        .map(|(index, edge)| {
+            let apex_first = num(&edge["start"][2]) > 17.0;
+            let (at_apex, at_base) = if growing { (far, near) } else { (near, far) };
+            if apex_first {
+                (index, at_apex, at_base)
+            } else {
+                (index, at_base, at_apex)
+            }
+        })
+        .collect();
+    (shape, lateral, [5.0, 5.0, 18.0])
+}
+
+#[test]
+fn a_narrow_corner_whose_blends_outgrow_every_uniform_setback_is_named() {
+    let _serial = crate::serial_blends();
+    // two lateral edges of a face meet at about 30 degrees (sin 0.5, cos 0.87): a radius slope g with g (1 + cos) >= sin leaves no uniform setback (and per-edge setbacks that feed each other never settle)
+    for far in [8.0, 10.0] {
+        let (shape, lateral, apex) = narrow_apex(0.5, far, false);
+        let (edges, corners) = spec_tapered(&shape, &lateral, &[apex], 0.1);
+        let reason = setback_reason(&shape, &edges, &corners).unwrap();
+        assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("no setback outruns the blends"), "{reason}");
+    }
+    // a steeper law makes the neighbour's reach grow faster than the setback on its own
+    let (shape, lateral, apex) = narrow_apex(0.5, 15.0, false);
+    let (edges, corners) = spec_tapered(&shape, &lateral, &[apex], 0.1);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("the reach of its neighbour's blend along edge"), "{reason}");
+}
+
+#[test]
+fn per_edge_setbacks_whose_blends_outgrow_each_other_do_not_settle_and_are_named() {
+    let _serial = crate::serial_blends();
+    let (shape, lateral, apex) = narrow_apex(0.5, 10.0, false);
+    let flat_edges: Vec<f64> = lateral.iter().flat_map(|&(edge, start, end)| [edge as f64, start, end]).collect();
+    let mut flat = vec![apex[0], apex[1], apex[2], lateral.len() as f64];
+    for (k, &(edge, _, _)) in lateral.iter().enumerate() {
+        flat.extend([edge as f64, 0.1 + 0.05 * k as f64]);
+    }
+    let reason = setback_reason(&shape, &flat_edges, &flat).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("they do not settle"), "{reason}");
 }

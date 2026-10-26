@@ -1,8 +1,9 @@
-// Setback corners (BLD M3, docs/design/06-variable-blends/TECHNICAL_SPEC.md §5.5). Scope of this build: every edge that meets a setback vertex is a
-// STRAIGHT convex edge between two PLANAR faces with a constant radius, every such edge is rounded, and each rounded edge ends at a setback vertex
-// (the other end of an edge may be free: it ends on one flat face). The edge blends are the spandrel prisms of blend_profile.cxx, each stopping at
-// the section plane `setback` away from its vertex; the sharp stubs and the flat end walls that leave at the vertex are then replaced by a patch
-// (BRepOffsetAPI_MakeFilling, G1 to the blend ends and to the support faces along straight chords between the contact points), sewn into a solid.
+// Setback corners (BLD M3, docs/design/06-variable-blends/TECHNICAL_SPEC.md §5.5, §13.10, §13.12). Scope of this build: every edge that meets a setback vertex is a
+// STRAIGHT edge between two PLANAR faces, all convex (the blends remove material) or all concave (they add it) at one vertex, rounded in the same step with a circular
+// radius that is constant or linear between the two ends of the edge; each rounded edge ends at a setback vertex (the other end of an edge may be free: it ends on one
+// flat face). The edge blends are the spandrel prisms of blend_profile.cxx (a ruled loft of two sections when the radius tapers), each stopping at the section plane
+// `setback` away from its vertex; the sharp stubs and the flat end walls that leave at the vertex are then replaced by a patch (BRepOffsetAPI_MakeFilling, G1 to the
+// blend ends and to the support faces along straight chords between the contact points), sewn into a solid.
 // A reason that starts with "[CODE] " carries the stable BLD_* code it maps to.
 #include <algorithm>
 #include <cmath>
@@ -16,6 +17,8 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
@@ -27,6 +30,9 @@
 #include <Geom2d_Curve.hxx>
 #include <Geom_Surface.hxx>
 #include <GProp_GProps.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <TopTools_MapOfShape.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
@@ -64,9 +70,21 @@ constexpr double kPatchGapFraction = 5e-6;
 constexpr double kFillSetbackFraction = 1e-4;
 // MakeFilling settings: plate degree, constraint points per curve, iterations, and the B-spline approximation of the plate (maximum degree and
 // segments; the OCCT defaults 8 / 9 leave the patch up to 6e-4 off the edges it is sewn to and 0.019 rad off tangent at the corners).
-constexpr int kFillDegree = 3, kFillPoints = 15, kFillIterations = 2, kFillMaxDegree = 12, kFillSegments = 60;
+constexpr int kFillDegree = 3, kFillIterations = 2;
+// 30 segments would halve the fill time but leave the patch 3.2 to 3.4e-6 x the diagonal off its edges and the end-point angle of a
+// profile corner at 0.012 rad on a 1000 mm cube (above the check_blends G1 default), so 60 is the first setting.
+// The fits tried in turn (points per curve, approximation degree, segments): the first leaves 1.4 to 1.7e-6 x the diagonal at the samples of 21 points, but
+// the gap measured at 101 points reaches 6e-6 near the hole corners on some parts, and the gap of a fit is not monotonic in its settings, so a patch over the
+// limit is filled again with the next.
+struct FillSetting {
+  int points, max_degree, segments;
+};
+constexpr FillSetting kFillSettings[] = {{15, 12, 60}, {15, 14, 100}, {40, 12, 100}, {15, 13, 100}, {25, 12, 60}};
 // A setback must exceed the distance its blends reach by this relative margin (equal means the contact lines meet in one point).
 constexpr double kMarginRelative = 1e-9;
+
+// check_blends samples a contact at up to 101 points (its `samples` limit): the built gap is measured at as many.
+constexpr int kGapSamples = 100;
 
 constexpr const char *kUnsupported = "[BLD_CORNER_UNSUPPORTED] ";
 constexpr const char *kTooShort = "[BLD_SETBACK_TOO_SHORT] ";
@@ -82,6 +100,12 @@ struct Mode {
 };
 // The factors an automatic corner tries in turn (the fill of a patch is more or less exact depending on the section and the size of the patch).
 constexpr double kAutomaticFactors[] = {2.0, 1.5, 2.5, 1.25, 3.0};
+
+// The radius of a rounded edge at its start and at its end (the edge direction of the kernel); it varies linearly along the edge.
+struct Taper {
+  double start = 0.0, end = 0.0;
+  bool constant() const { return std::fabs(end - start) <= 1e-9 * std::max(start, end); }
+};
 
 struct Corner {
   gp_Pnt at;
@@ -146,18 +170,18 @@ std::vector<int> edges_at(const TopTools_IndexedDataMapOfShapeListOfShape &verte
   return found;
 }
 
-bool parse(rust::Slice<const double> edges, rust::Slice<const double> corners, bool automatic, std::map<int, double> &radius,
+bool parse(rust::Slice<const double> edges, rust::Slice<const double> corners, bool automatic, std::map<int, Taper> &radius,
            std::vector<Corner> &list, std::string &why) {
-  if (edges.empty() || edges.size() % 2 != 0) {
+  if (edges.empty() || edges.size() % 3 != 0) {
     why = std::string(kFailed) + "the setback blend parameters are malformed (edges)";
     return false;
   }
-  for (size_t at = 0; at < edges.size(); at += 2) {
-    if (!(edges[at + 1] > 0) || edges[at] < 0) {
+  for (size_t at = 0; at < edges.size(); at += 3) {
+    if (!(edges[at + 1] > 0) || !(edges[at + 2] > 0) || edges[at] < 0) {
       why = std::string(kFailed) + "the radius of every rounded edge must be > 0";
       return false;
     }
-    radius[static_cast<int>(edges[at])] = edges[at + 1];
+    radius[static_cast<int>(edges[at])] = Taper{edges[at + 1], edges[at + 2]};
   }
   size_t at = 0;
   while (at < corners.size()) {
@@ -188,14 +212,21 @@ bool parse(rust::Slice<const double> edges, rust::Slice<const double> corners, b
 struct Plan {
   double tolerance = 1e-9;                          // two points closer than this are the same vertex
   std::map<int, EdgeFrame> frames;
-  std::map<int, double> legs;                       // tangent distance of each rounded edge
+  std::map<int, Taper> radii;                       // radius of each rounded edge at its two ends
+  std::map<int, double> half_tangent;               // tan(fold / 2) of each rounded edge: its tangent distance is the radius times this
+  // Tangent distance of edge `edge` at `along` (distance from the start of the edge).
+  double leg_at(int edge, double along) const {
+    const Taper &taper = radii.at(edge);
+    return (taper.start + (taper.end - taper.start) * along / frames.at(edge).length) * half_tangent.at(edge);
+  }
   std::vector<TopoDS_Vertex> vertices;              // source vertex of each corner
   std::vector<std::map<int, gp_Vec>> stubs;         // per corner: unit direction away from the vertex of each incident edge
+  std::vector<bool> concave;                        // per corner: its edges are concave (the blends add material), else convex (they remove it)
 };
 
 // Checks the corner `c` against the source and fills `plan`; false with the reason in `why`.
 bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &edge_map, const TopTools_IndexedDataMapOfShapeListOfShape &vertex_edges,
-                 const TopTools_IndexedDataMapOfShapeListOfShape &vertex_faces, const std::map<int, double> &radius, const Mode &mode,
+                 const TopTools_IndexedDataMapOfShapeListOfShape &vertex_faces, const std::map<int, Taper> &radius, const Mode &mode,
                  Corner &corner, Plan &plan, std::string &why) {
   const TopoDS_Vertex vertex = vertex_at(shape, corner.at, plan.tolerance);
   if (vertex.IsNull()) {
@@ -232,10 +263,38 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       return false;
     }
   }
+  const int concave_edges = static_cast<int>(std::count_if(incident.begin(), incident.end(), [&](int edge) { return !plan.frames.at(edge).convex; }));
+  if (concave_edges != 0 && concave_edges != static_cast<int>(incident.size())) {
+    why = std::string(kUnsupported) + "convex and concave edges meet at " + where(corner.at) + " (" + std::to_string(concave_edges) + " of " +
+          std::to_string(incident.size()) + " are concave): a " + noun + " rounds the edges of one kind, a vertex of mixed kinds has no patch in this build";
+    return false;
+  }
+  plan.concave.push_back(concave_edges != 0);
   // Each face at the vertex is bounded there by exactly two rounded edges i, j whose contact lines (distance leg_i, leg_j from the edges, inside the
   // face) meet in one point; the setback of an edge must end beyond it, else the chord of the patch across the face has no length.
-  std::map<int, double> required;
-  for (const int edge : incident) required[edge] = plan.legs.at(edge);
+  // The tangent distance of edge e at setback d from this vertex is a_e + g_e d (the radius may vary linearly along an edge; g_e = 0 for a constant one).
+  // The setback must exceed every distance the blends reach, and those distances are linear in d_e, so the least setback is a closed form per term:
+  // d > c0 + c1 d  <=>  d > c0 / (1 - c1); a slope c1 >= 1 means no setback outruns the growing blend.
+  std::map<int, double> offset, slope;
+  for (const int edge : incident) {
+    const EdgeFrame &frame = plan.frames.at(edge);
+    const bool from_start = same_point(frame.start, corner.at, plan.tolerance);
+    const double rate = (plan.radii.at(edge).end - plan.radii.at(edge).start) / frame.length * plan.half_tangent.at(edge);
+    offset[edge] = plan.leg_at(edge, from_start ? 0.0 : frame.length);
+    slope[edge] = from_start ? rate : -rate;
+  }
+  const auto leg_of = [&](int edge) { return offset.at(edge) + slope.at(edge) * distance.at(edge); };
+  struct Term {
+    double c0, c1;
+    bool cross;  // from the blend of a neighbour on a shared face, not from the edge's own
+  };
+  std::map<int, std::vector<Term>> terms;  // per edge
+  struct Pair {
+    int i, j;
+    double cosine, sine;
+  };
+  std::vector<Pair> pairs;  // the two rounded edges that bound each face at the vertex, and the angle between them
+  for (const int edge : incident) terms[edge].push_back({offset.at(edge), slope.at(edge), false});
   for (TopTools_ListIteratorOfListOfShape it(vertex_faces.FindFromKey(vertex)); it.More(); it.Next()) {
     std::vector<int> on_face;
     for (const int edge : incident) {
@@ -254,8 +313,21 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       why = std::string(kUnsupported) + "two edges leave " + where(corner.at) + " along one line";
       return false;
     }
-    required[i] = std::max(required[i], (plan.legs.at(j) + plan.legs.at(i) * cosine) / sine);
-    required[j] = std::max(required[j], (plan.legs.at(i) + plan.legs.at(j) * cosine) / sine);
+    pairs.push_back({i, j, cosine, sine});
+    terms[i].push_back({(leg_of(j) + offset.at(i) * cosine) / sine, slope.at(i) * cosine / sine, true});
+    terms[j].push_back({(leg_of(i) + offset.at(j) * cosine) / sine, slope.at(j) * cosine / sine, true});
+  }
+  std::map<int, double> required;
+  for (const int edge : incident) {
+    required[edge] = 0.0;
+    for (const Term &term : terms.at(edge)) {
+      if (term.c1 >= 1.0) {
+        why = std::string(kUnsupported) + (term.cross ? "the reach of its neighbour's blend along edge " : "the radius of edge ") + std::to_string(edge) +
+              " grows by " + number(term.c1) + " per unit of setback at " + where(corner.at) + ": no setback outruns it (the radius law is too steep there)";
+        return false;
+      }
+      required[edge] = std::max(required[edge], term.c0 / (1.0 - term.c1));
+    }
   }
   if (mode.automatic) {
     corner.setbacks.clear();
@@ -266,8 +338,48 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
   }
   for (const int edge : incident)
     if (distance[edge] <= required[edge] * (1 + kMarginRelative)) {
+      // The number to report is the least setback that works when the neighbours' setbacks move with it, not the one that holds them at the given values
+      // (the blend of a neighbour reaches further when its own setback grows with a tapered radius, or at an angle other than a right one): the joint
+      // minimum, uniform when every edge was given the same setback, else the least fixed point of the setbacks of all the edges.
+      const bool uniform = std::all_of(incident.begin(), incident.end(), [&](int e) { return std::fabs(distance[e] - distance[edge]) <= 1e-12 * distance[edge]; });
+      std::map<int, double> least;
+      std::string problem;
+      if (uniform) {
+        double best = 0.0;
+        for (const int e : incident) best = std::max(best, offset.at(e) / (1.0 - slope.at(e)));
+        for (const Pair &pair : pairs)
+          for (const auto &[a, b] : {std::make_pair(pair.i, pair.j), std::make_pair(pair.j, pair.i)}) {
+            const double denominator = pair.sine - slope.at(b) - slope.at(a) * pair.cosine;
+            if (denominator <= 1e-12) problem = "edges " + std::to_string(a) + " and " + std::to_string(b) + " (their blends outgrow the setback)";
+            else best = std::max(best, (offset.at(b) + offset.at(a) * pair.cosine) / denominator);
+          }
+        for (const int e : incident) least[e] = best;
+      } else {
+        for (const int e : incident) least[e] = 0.0;
+        bool settled = false;
+        for (int round = 0; round < 1000 && !settled; ++round) {
+          std::map<int, double> next;
+          for (const int e : incident) next[e] = offset.at(e) + slope.at(e) * least.at(e);
+          for (const Pair &pair : pairs)
+            for (const auto &[a, b] : {std::make_pair(pair.i, pair.j), std::make_pair(pair.j, pair.i)})
+              next[a] = std::max(next[a], (offset.at(b) + slope.at(b) * least.at(b) + (offset.at(a) + slope.at(a) * least.at(a)) * pair.cosine) / pair.sine);
+          settled = true;
+          for (const int e : incident) {
+            settled = settled && std::fabs(next[e] - least[e]) <= 1e-10 * std::max(std::fabs(next[e]), 1e-300);
+            least[e] = next[e];
+          }
+        }
+        if (!settled) problem = "the setbacks of the edges (they do not settle: the blends outgrow them)";
+      }
+      if (!problem.empty()) {
+        why = std::string(kUnsupported) + "no setback outruns the blends at " + where(corner.at) + ": " + problem;
+        return false;
+      }
+      std::string list;
+      for (const int e : incident) list += (list.empty() ? "" : ", ") + std::string("edge ") + std::to_string(e) + " " + number(least.at(e));
       why = std::string(kTooShort) + "setback " + number(distance[edge]) + " on edge " + std::to_string(edge) + " at " + where(corner.at) +
-            " must exceed " + number(required[edge]) + " (the distance along the edge its neighbours' blends reach)";
+            " must exceed " + number(least.at(edge)) + " (the least " + (uniform ? "setback of every edge there" : "setbacks together") + ": " + list +
+            "; the distance along the edge its neighbours' blends reach)";
       return false;
     }
   plan.stubs.push_back(stub);
@@ -310,6 +422,11 @@ bool free_extension(const TopoDS_Shape &shape, double tolerance, const TopTools_
   }
   extension = 0;
   if (slope > 1 - 1e-9) return true;
+  if (!frame.convex) {
+    // A concave blend adds material: running it past the closing face would add it outside the part, so it must end flush.
+    why = std::string(kUnsupported) + "a concave rounded edge ends at " + where(point) + " on a face that is not square to it";
+    return false;
+  }
   const gp_Pnt corners[3] = {point, point.Translated(frame.inward[0] * leg), point.Translated(frame.inward[1] * leg)};
   for (const gp_Pnt &corner : corners) extension = std::max(extension, -normal.Dot(gp_Vec(point, corner)) / slope);
   extension += 0.25 * leg;
@@ -360,7 +477,7 @@ std::vector<TopoDS_Edge> loop_of(std::vector<TopoDS_Edge> pending) {
   return loop;
 }
 
-// Largest distance between the 3D curve of `edge` and the surface of `face` at the pcurve of the edge, over 21 samples; false when the edge has no
+// Largest distance between the 3D curve of `edge` and the surface of `face` at the pcurve of the edge, over kGapSamples + 1 samples; false when the edge has no
 // pcurve on the face or its curves do not share a parameter (the distance would mean nothing).
 bool edge_gap(const TopoDS_Edge &edge, const TopoDS_Face &face, double &worst) {
   double first = 0, last = 0;
@@ -369,12 +486,29 @@ bool edge_gap(const TopoDS_Edge &edge, const TopoDS_Face &face, double &worst) {
   if (pcurve.IsNull() || surface.IsNull() || !BRep_Tool::SameParameter(edge)) return false;
   const BRepAdaptor_Curve curve(edge);
   worst = 0;
-  for (int k = 0; k <= 20; ++k) {
-    const double t = first + (last - first) * k / 20.0;
+  for (int k = 0; k <= kGapSamples; ++k) {
+    const double t = first + (last - first) * k / static_cast<double>(kGapSamples);
     const gp_Pnt2d uv = pcurve->Value(t);
     worst = std::max(worst, surface->Value(uv.X(), uv.Y()).Distance(curve.Value(t)));
   }
   return true;
+}
+
+// The diagonal of the box of `members` (the faces of the solid about to be sewn) where each of the last `patch_count` faces counts by its edges only. The
+// true box of the solid is never smaller, so a limit built from this diagonal is never looser than the one check_blends computes; the box of a patch
+// (a B-spline of thousands of poles) costs more than the whole rest of a corner.
+double lower_diagonal(const std::vector<TopoDS_Face> &members, size_t patch_count) {
+  Bnd_Box box;
+  const size_t plain = members.size() - std::min(members.size(), patch_count);
+  for (size_t m = 0; m < members.size(); ++m) {
+    if (m < plain) BRepBndLib::AddOptimal(members[m], box, Standard_False, Standard_False);
+    else
+      for (TopExp_Explorer it(members[m], TopAbs_EDGE); it.More(); it.Next()) BRepBndLib::AddOptimal(it.Current(), box, Standard_False, Standard_False);
+  }
+  if (box.IsVoid()) return 0.0;
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  return gp_Pnt(x0, y0, z0).Distance(gp_Pnt(x1, y1, z1));
 }
 
 double volume_of(const TopoDS_Shape &shape) {
@@ -386,7 +520,7 @@ double volume_of(const TopoDS_Shape &shape) {
 std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
                                      bool &fill_failed, std::string &corners_json, std::string &why) {
   fill_failed = false;
-  std::map<int, double> radius;
+  std::map<int, Taper> radius;
   std::vector<Corner> corners;
   if (!parse(edge_raw, corner_raw, mode.automatic, radius, corners, why)) return nullptr;
   const TopoDS_Shape &shape = source.shape;
@@ -397,7 +531,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   const double sewing_tolerance = std::max(1e-6 * diagonal, 1e-12);
   // How far a corner patch may leave the edges it is sewn to while it is made (check_blends judges corner contacts against the same fraction of the
   // true diagonal); the acceptance is repeated against the smaller of the source's and the result's diagonal once the solid exists.
-  const double patch_gap_limit = kPatchGapFraction * diagonal;
+  const double patch_gap_limit = blend::kGapAccepted * kPatchGapFraction * diagonal;
   double worst_patch_gap = 0;
   const TopTools_IndexedMapOfShape edge_map = query::distinct(shape, TopAbs_EDGE);
   TopTools_IndexedDataMapOfShapeListOfShape vertex_edges, vertex_faces;
@@ -406,24 +540,32 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
 
   Plan plan;
   plan.tolerance = vertex_tolerance;
-  for (const auto &[index, size] : radius) {
+  for (const auto &[index, taper] : radius) {
     EdgeFrame frame;
     if (!edge_frame(shape, index, mode.automatic ? "profile corners" : "setback blends", frame, why)) {
       why = std::string(kUnsupported) + why;
       return nullptr;
     }
-    if (!frame.convex) {
-      why = std::string(kUnsupported) + "edge " + std::to_string(index) + " is concave: " + (mode.automatic ? "profile" : "setback") +
-            " corners round convex edges";
+    if (mode.automatic && !frame.convex) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(index) + " is concave: profile corners round convex edges";
       return nullptr;
     }
     plan.frames[index] = frame;
-    plan.legs[index] = size * std::tan(frame.fold / 2);
+    plan.radii[index] = taper;
+    plan.half_tangent[index] = std::tan(frame.fold / 2);
+    if (mode.automatic && !taper.constant()) {
+      why = std::string(kUnsupported) + "profile corners need one constant size per edge (edge " + std::to_string(index) + " varies)";
+      return nullptr;
+    }
+    if (!taper.constant() && mode.kind != 2) {
+      why = std::string(kUnsupported) + "a radius that varies along edge " + std::to_string(index) + " is made for circular blends only";
+      return nullptr;
+    }
   }
   if (mode.automatic) {
     // A corner at every vertex where two or more of the rounded edges meet (plan_corner checks the rest).
     std::vector<TopoDS_Vertex> found;
-    for (const auto &[index, size] : radius)
+    for (const auto &[index, taper] : radius)
       for (const gp_Pnt &point : {plan.frames.at(index).start, plan.frames.at(index).end}) {
         const TopoDS_Vertex vertex = vertex_at(shape, point, vertex_tolerance);
         if (vertex.IsNull() || std::any_of(found.begin(), found.end(), [&](const TopoDS_Vertex &known) { return known.IsSame(vertex); })) continue;
@@ -465,9 +607,8 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     return found == list.end() ? -1.0 : found->second;
   };
   std::vector<Tool> tools;
-  for (const auto &[index, size] : radius) {
+  for (const auto &[index, taper] : radius) {
     const EdgeFrame &frame = plan.frames.at(index);
-    const double leg = plan.legs.at(index);
     const int start_corner = corner_at(frame.start), end_corner = corner_at(frame.end);
     const std::string label = "edge " + std::to_string(index);
     if (start_corner < 0 && end_corner < 0) {
@@ -495,32 +636,65 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
           return nullptr;
         }
       double extension = 0;
-      if (!free_extension(shape, vertex_tolerance, vertex_faces, frame, at_end, leg, extension, why)) return nullptr;
+      if (!free_extension(shape, vertex_tolerance, vertex_faces, frame, at_end, plan.leg_at(index, at_end ? frame.length : 0.0), extension, why)) return nullptr;
       (at_end ? hi : lo) += (at_end ? 1 : -1) * extension;
     }
     if (!(hi - lo > 1e-6 * frame.length)) {
       why = std::string(kFailed) + "the setbacks at both ends of " + label + " leave no length to round (edge length " + number(frame.length) + ")";
       return nullptr;
     }
-    const auto leg_ok = [&](double along) {
+    const double leg_lo = plan.leg_at(index, lo), leg_hi = plan.leg_at(index, hi);
+    if (!(leg_lo > 0) || !(leg_hi > 0)) {
+      why = std::string(kUnsupported) + "the radius of " + label + " is not positive over the length that is rounded";
+      return nullptr;
+    }
+    const auto leg_ok = [&](double along, double leg) {
       const gp_Pnt base = frame.start.Translated(frame.direction * along);
       return inside(frame.faces[0], base.Translated(frame.inward[0] * leg)) && inside(frame.faces[1], base.Translated(frame.inward[1] * leg));
     };
-    if ((start_corner >= 0 && !leg_ok(lo)) || (end_corner >= 0 && !leg_ok(hi))) {
-      why = std::string(kUnsupported) + "the round of " + label + " (tangent distance " + number(leg) + ") reaches past its faces at the setback section";
+    if ((start_corner >= 0 && !leg_ok(lo, leg_lo)) || (end_corner >= 0 && !leg_ok(hi, leg_hi))) {
+      why = std::string(kUnsupported) + "the round of " + label + " (tangent distance " + number(std::max(leg_lo, leg_hi)) +
+            ") reaches past its faces at the setback section";
       return nullptr;
     }
     const gp_Pnt from = frame.start.Translated(frame.direction * lo), to = frame.start.Translated(frame.direction * hi);
+    const std::string blend_name = "blend(" + edge_names[static_cast<size_t>(index)] + ")";
     Tool tool;
-    if (!spandrel_tool(from, to, from.Translated(frame.inward[0] * leg), from.Translated(frame.inward[1] * leg), mode.kind, mode.param, kPi - frame.fold,
-                       "blend(" + edge_names[static_cast<size_t>(index)] + ")", tool, why))
+    if (taper.constant()) {
+      if (!spandrel_tool(from, to, from.Translated(frame.inward[0] * leg_lo), from.Translated(frame.inward[1] * leg_lo), mode.kind, mode.param,
+                         kPi - frame.fold, blend_name, tool, why))
+        return nullptr;
+    } else if (!tapered_spandrel_tool(from, from.Translated(frame.inward[0] * leg_lo), from.Translated(frame.inward[1] * leg_lo), to,
+                                      to.Translated(frame.inward[0] * leg_hi), to.Translated(frame.inward[1] * leg_hi), kPi - frame.fold, blend_name,
+                                      tool, why))
       return nullptr;
-    tool.convex = true;
+    tool.convex = frame.convex;
+    // Only the blend face keeps a name: a cap of the tool that ends up as part of a closing face takes that face's name when they are merged.
+    for (std::string &name : tool.names)
+      if (name.rfind("tool.", 0) == 0) name.clear();
     tools.push_back(std::move(tool));
   }
   naming::Named current = input;
   const double volume_before = volume_of(shape);
   if (!apply_tools(current, tools, why)) return nullptr;
+  if (std::any_of(tools.begin(), tools.end(), [](const Tool &tool) { return !tool.convex; })) {
+    // The end cap of a fused (concave) blend that ends flush on a closing face stays a face of its own next to it: merge the coplanar faces.
+    // Only the faces that came from the tools (they carry no name) may merge: every other edge is kept, so a face split by split_face or an imported
+    // coplanar face keeps its name.
+    const TopTools_IndexedMapOfShape fused_faces = query::distinct(current.shape, TopAbs_FACE);
+    TopTools_MapOfShape cap_edges, keep;
+    for (int f = 1; f <= fused_faces.Extent(); ++f)
+      if (current.names[static_cast<size_t>(f - 1)].empty())
+        for (TopExp_Explorer it(fused_faces(f), TopAbs_EDGE); it.More(); it.Next()) cap_edges.Add(it.Current());
+    for (TopExp_Explorer it(current.shape, TopAbs_EDGE); it.More(); it.Next())
+      if (!cap_edges.Contains(it.Current())) keep.Add(it.Current());
+    ShapeUpgrade_UnifySameDomain unifier(current.shape, Standard_False, Standard_True, Standard_False);
+    unifier.KeepShapes(keep);
+    unifier.AllowInternalEdges(Standard_False);
+    unifier.Build();
+    const std::vector<naming::Named> fused{current};
+    current = naming::Named{unifier.Shape(), naming::inherit(unifier.Shape(), fused, unifier.History(), "unify")};
+  }
 
   // Corners: chords across the support faces between the contact points at the wall arcs, then the patch over the hole they bound.
   std::vector<std::vector<Wall>> walls(corners.size());
@@ -622,41 +796,67 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     for (const auto &entry : corners[c].setbacks) smallest = std::min(smallest, entry.second);
     const double fill_tolerance_3d = std::min(sewing_tolerance, kFillSetbackFraction * smallest);
     const double fill_tolerance_2d = 1e-5 * smallest / 2;
-    BRepOffsetAPI_MakeFilling filling(kFillDegree, kFillPoints, kFillIterations, Standard_False, fill_tolerance_2d, fill_tolerance_3d, kFillAngle, 0.1, kFillMaxDegree, kFillSegments);
-    for (const TopoDS_Edge &edge : loop) {
-      const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) -
-                                            boundary.begin());
-      filling.Add(edge, supports[at], GeomAbs_G1);
-    }
-    filling.Build();
-    if (!filling.IsDone()) {
-      fill_failed = true;
-      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " could not be filled";
-      return nullptr;
-    }
-    TopoDS_Face patch = TopoDS::Face(filling.Shape());
-    double gap = 0;
-    for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
-      double edge_worst = 0;
-      if (!edge_gap(TopoDS::Edge(it.Current()), patch, edge_worst)) {
-        fill_failed = true;
-        why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " has an edge without a shared parameter on its surface";
-        return nullptr;
+    // One fill of the hole; false with the reason in `problem` when the patch cannot be used (not built, off its edges, off tangent).
+    const auto fill_hole = [&](const FillSetting &setting, TopoDS_Face &patch, double &gap, std::string &problem) {
+      BRepOffsetAPI_MakeFilling filling(kFillDegree, setting.points, kFillIterations, Standard_False, fill_tolerance_2d, fill_tolerance_3d, kFillAngle, 0.1,
+                                        setting.max_degree, setting.segments);
+      for (const TopoDS_Edge &edge : loop) {
+        const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) -
+                                              boundary.begin());
+        filling.Add(edge, supports[at], GeomAbs_G1);
       }
-      gap = std::max(gap, edge_worst);
+      filling.Build();
+      if (!filling.IsDone()) {
+        problem = "could not be filled";
+        return false;
+      }
+      patch = TopoDS::Face(filling.Shape());
+      gap = 0;
+      for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
+        double edge_worst = 0;
+        if (!edge_gap(TopoDS::Edge(it.Current()), patch, edge_worst)) {
+          problem = "has an edge without a shared parameter on its surface";
+          return false;
+        }
+        gap = std::max(gap, edge_worst);
+      }
+      if (gap > patch_gap_limit) {
+        problem = "misses the blend ends by " + number(gap) + " (limit " + number(patch_gap_limit) + ")";
+        return false;
+      }
+      if (filling.G1Error() > kFillAngle) {
+        problem = "leaves its supports by " + number(filling.G1Error()) + " rad (limit " + number(kFillAngle) + ")";
+        return false;
+      }
+      return true;
+    };
+    TopoDS_Face patch;
+    double gap = 0;
+    std::string problem;
+    bool filled = false;
+    for (const FillSetting &setting : kFillSettings) {
+      filled = fill_hole(setting, patch, gap, problem);
+      if (filled) break;
+    }
+    if (!filled) {
+      fill_failed = true;
+      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + problem;
+      return nullptr;
     }
     worst_patch_gap = std::max(worst_patch_gap, gap);
-    if (gap > patch_gap_limit) {
-      fill_failed = true;
-      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " misses the blend ends by " + number(gap) + " (limit " +
-            number(patch_gap_limit) + ")";
-      return nullptr;
-    }
-    if (filling.G1Error() > kFillAngle) {
-      fill_failed = true;
-      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " leaves its supports by " + number(filling.G1Error()) +
-            " rad (limit " + number(kFillAngle) + ")";
-      return nullptr;
+    {
+      // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
+      GProp_GProps props;
+      BRepGProp::SurfaceProperties(patch, props);
+      BRepClass3d_SolidClassifier classifier(shape);
+      classifier.Perform(props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
+      const TopAbs_State expected = plan.concave[c] ? TopAbs_OUT : TopAbs_IN;
+      if (classifier.State() != expected) {
+        // deliberately not fill_failed: a patch on the wrong side is a logic failure of the construction, a finer fit would not change it
+        why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " lies " + (plan.concave[c] ? "inside" : "outside") +
+              " the source solid, on the wrong side of a " + (plan.concave[c] ? "concave" : "convex") + " corner";
+        return nullptr;
+      }
     }
     patches.push_back(patch);
     std::vector<std::string> around;
@@ -702,15 +902,18 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     return nullptr;
   }
   // A fillet can lower an extreme and shrink the box: the patch gap is judged against the smaller diagonal, so check_blends never reads more.
-  const double accepted = blend::kGapAccepted * kPatchGapFraction * std::min(diagonal, blend::diagonal_of(solid));
+  const double accepted = blend::kGapAccepted * kPatchGapFraction * std::min(diagonal, lower_diagonal(members, patches.size()));
   if (worst_patch_gap > accepted) {
     fill_failed = true;
     why = std::string(kFailed) + "the corner patches miss the blend ends by " + number(worst_patch_gap) + " (limit " + number(accepted) +
-          " = 0.95 x 5e-6 x the smaller diagonal of the source and the result)";
+          " = 0.95 x 5e-6 x the smaller of the source's diagonal and the lower bound of the result's box)";
     return nullptr;
   }
   const double volume_after = volume_of(solid);
-  if (!(volume_after > 0) || !(volume_after < volume_before)) {
+  // Convex corners remove material, concave ones add it; a step with both only has to leave a solid.
+  const size_t concave_corners = static_cast<size_t>(std::count(plan.concave.begin(), plan.concave.end(), true));
+  const bool moved_wrongly = concave_corners == 0 ? !(volume_after < volume_before) : (concave_corners == plan.concave.size() ? !(volume_after > volume_before) : false);
+  if (!(volume_after > 0) || moved_wrongly) {
     fill_failed = true;
     why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (source " + number(volume_before) + ")";
     return nullptr;
@@ -756,14 +959,13 @@ namespace blend {
 std::unique_ptr<Shape> profile_corner_blend(const Shape &source, const std::vector<std::pair<int, double>> &radii, int kind, double param,
                                             std::string &notes, std::string &why) {
   std::vector<double> flat;
-  for (const auto &[edge, radius] : radii) flat.insert(flat.end(), {static_cast<double>(edge), radius});
+  for (const auto &[edge, radius] : radii) flat.insert(flat.end(), {static_cast<double>(edge), radius, radius});
   std::unique_ptr<Shape> built;
   std::string tried;
   for (const double factor : kAutomaticFactors) {
     bool fill_failed = false;
     std::string corners_json;
-    built = build_setback(source, rust::Slice<const double>(flat.data(), flat.size()), rust::Slice<const double>(), Mode{kind, param, true, factor}, fill_failed,
-                          corners_json, why);
+    built = build_setback(source, rust::Slice<const double>(flat.data(), flat.size()), rust::Slice<const double>(), Mode{kind, param, true, factor}, fill_failed, corners_json, why);
     if (built) {
       JsonWriter out;
       out.begin_object().key("builder").string("corners").key("factor").number(factor).key("corners").raw(corners_json).end_object();
