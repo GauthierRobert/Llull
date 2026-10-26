@@ -1,0 +1,400 @@
+{
+ "actions": [
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 10,
+    "height": 20,
+    "anchor": "base-center"
+   },
+   "as": "rim"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$rim",
+    "edgesNear": [
+     [
+      10,
+      0,
+      20
+     ]
+    ],
+    "radius": 2,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "rimC"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$rimC"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$rimC"
+    ]
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 10,
+    "height": 20,
+    "anchor": "base-center"
+   },
+   "as": "rim2"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$rim2",
+    "edgesNear": [
+     [
+      10,
+      0,
+      20
+     ]
+    ],
+    "radius": 2,
+    "profile": {
+     "type": "curvature",
+     "shape": 0.5
+    }
+   },
+   "as": "rimG2"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$rimG2"
+    ],
+    "require": "G2"
+   }
+  },
+  {
+   "command": "add_sphere",
+   "params": {
+    "radius": 5
+   },
+   "as": "ball"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     20,
+     5
+    ]
+   },
+   "as": "slab"
+  },
+  {
+   "command": "boolean",
+   "params": {
+    "op": "intersect",
+    "a": "$ball",
+    "b": "$slab"
+   },
+   "as": "band"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$band",
+    "edgesNear": [
+     [
+      4.330127018922194,
+      0,
+      2.5
+     ],
+     [
+      4.330127018922194,
+      0,
+      -2.5
+     ]
+    ],
+    "radius": 0.4,
+    "profile": {
+     "type": "curvature",
+     "shape": 0.5
+    }
+   },
+   "as": "bandG2"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$bandG2"
+    ],
+    "require": "G2"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     60,
+     60,
+     5
+    ],
+    "anchor": "min"
+   },
+   "as": "plate"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 10,
+    "height": 15,
+    "position": [
+     30,
+     30,
+     5
+    ],
+    "anchor": "base-center"
+   },
+   "as": "boss"
+  },
+  {
+   "command": "boolean",
+   "params": {
+    "op": "union",
+    "a": "$plate",
+    "b": "$boss"
+   },
+   "as": "fused"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$fused"
+   }
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$fused",
+    "edgesNear": [
+     [
+      40,
+      30,
+      5
+     ]
+    ],
+    "radius": 2,
+    "profile": {
+     "type": "conic",
+     "rho": 0.4
+    }
+   },
+   "as": "bossRing"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$bossRing"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     10
+    ],
+    "anchor": "min"
+   },
+   "as": "varA"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$varA",
+    "edges": [
+     {
+      "near": [
+       10,
+       10,
+       10
+      ],
+      "size": 1,
+      "sizeEnd": 2
+     }
+    ]
+   },
+   "as": "varCircular"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$varCircular"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     10
+    ],
+    "anchor": "min"
+   },
+   "as": "varB"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$varB",
+    "edges": [
+     {
+      "near": [
+       10,
+       10,
+       10
+      ],
+      "size": 1,
+      "sizeEnd": 2
+     }
+    ],
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "varConic"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$varConic"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$varConic"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     40,
+     30,
+     6
+    ],
+    "anchor": "min"
+   },
+   "as": "outline"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$outline",
+    "edgesNear": [
+     [
+      0,
+      0,
+      3
+     ],
+     [
+      40,
+      0,
+      3
+     ],
+     [
+      0,
+      30,
+      3
+     ],
+     [
+      40,
+      30,
+      3
+     ]
+    ],
+    "radius": 5
+   },
+   "as": "outlineRound"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$outlineRound",
+    "edgesNear": [
+     [
+      20,
+      30,
+      6
+     ]
+    ],
+    "radius": 1.5,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "outlineLoop"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$outlineLoop"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ],
+    "anchor": "min"
+   },
+   "as": "cube"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$cube",
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "cubeC"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$cubeC"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$cubeC"
+    ]
+   }
+  }
+ ]
+}

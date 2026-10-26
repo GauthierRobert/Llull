@@ -24,6 +24,19 @@ mod ffi {
         fn profile_reason(shape: &Shape, specs: &[f64]) -> Result<String>;
         fn fillet_setback(shape: &Shape, edges: &[f64], corners: &[f64]) -> Result<UniquePtr<Shape>>;
         fn setback_reason(shape: &Shape, edges: &[f64], corners: &[f64]) -> Result<String>;
+        fn fillet_profile_blend(
+            shape: &Shape,
+            specs: &[f64],
+            edges: &[u32],
+            laws: &[f64],
+            kind: f64,
+            param: f64,
+        ) -> Result<UniquePtr<Shape>>;
+        fn profile_blend_last_reason() -> Result<String>;
+        fn shape_notes(shape: &Shape) -> Result<String>;
+        fn profile_blend_reason(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<String>;
+        fn fillet_rails(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<UniquePtr<Shape>>;
+        fn rails_reason(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<String>;
         fn face_blend(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn face_blend_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
         fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
@@ -98,6 +111,38 @@ pub fn chamfer(shape: &Shape, edges: &[u32], distance: f64) -> Built {
 /// 2 circular with two legs, rho or shape factor, size, size2 (NaN = size is a radius), side face index or -1, reserved 0).
 pub fn fillet_profile(shape: &Shape, specs: &[f64]) -> Built {
     built(ffi::fillet_profile(inner(shape)?, specs))
+}
+
+/// BLD M2 profile blend of a fillet node: the prism builder for `specs` (empty when a size varies), corners where edges meet, else the rail builder
+/// for `edges` / `laws` (empty when a leg is asymmetric) with the section `kind` / `param`.
+pub fn fillet_profile_blend(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Built {
+    built(ffi::fillet_profile_blend(inner(shape)?, specs, edges, laws, kind, param))
+}
+
+/// Why `fillet_profile_blend` fails ("" when it builds).
+pub fn profile_blend_reason(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> OcctResult<String> {
+    occt(ffi::profile_blend_reason(inner(shape)?, specs, edges, laws, kind, param))
+}
+
+/// What the builder of `shape` reported about how it made it (a JSON object, empty for most shapes).
+pub fn shape_notes(shape: &Shape) -> OcctResult<String> {
+    occt(ffi::shape_notes(inner(shape)?))
+}
+
+/// The reason the last `fillet_profile_blend` of this thread returned `None`.
+pub fn profile_blend_last_reason() -> OcctResult<String> {
+    occt(ffi::profile_blend_last_reason())
+}
+
+/// BLD M2 rail-preserving profile blend: the circular fillet of the unique edges `edges` with `laws` (the `fillet_laws` layout), re-skinned with the
+/// section `kind` (0 conic, 1 curvature) and `param` (rho or shape) on curved edges and faces, with any size law.
+pub fn fillet_rails(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Built {
+    built(ffi::fillet_rails(inner(shape)?, edges, laws, kind, param))
+}
+
+/// Why `fillet_rails` fails ("" when it builds).
+pub fn rails_reason(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> OcctResult<String> {
+    occt(ffi::rails_reason(inner(shape)?, edges, laws, kind, param))
 }
 
 /// BLD M3 setback corners of straight convex edges between planar faces: `edges` = (unique edge index, radius) pairs, `corners` = per corner

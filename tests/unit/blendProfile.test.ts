@@ -7,11 +7,12 @@ import { createEmptyDocument, type CadDocument, type MeshSolidEntity, type Shape
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
-import type { BlendReport } from '@core/geometry/kernelPorts';
+import type { BlendBuildNotes, BlendReport } from '@core/geometry/kernelPorts';
 import { diagnoseBlend, remediationOf } from '@core/geometry/blend/diagnose';
 import { kernelFromOps } from '@core/geometry/shapeKernel';
 import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { isProfileRefusal, prepareProfile, profileText, resolveProfile } from '@core/commands/brep/filletProfile';
+import { describeProfileNotes } from '@core/commands/brep/profileNotes';
 import { SOURCE, TOPOLOGY, scriptedKernel, type ScriptedKernel } from '../helpers/blendKernel';
 import { TETRA } from '../helpers/fakeKernel';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
@@ -48,17 +49,24 @@ describe('resolveProfile and prepareProfile', () => {
     expect(profileText({ type: 'curvature', shape: 0.5 })).toBe(', curvature profile shape 0.5');
   });
 
-  it('prepareProfile: constant laws pass; a varying size, size2 without a usable side are refused with the entry path', () => {
+  it('prepareProfile: any symmetric law passes; a varying size with size2, size2 without a usable side are refused with the entry path', () => {
     const kernel = scriptedKernel();
     const shape = kernel.evaluate({ op: 'solid', entity: { id: 'x', kind: 'box' } as never });
     const run = (planned: Parameters<typeof prepareProfile>[3], topology = TOPOLOGY): ReturnType<typeof prepareProfile> =>
       prepareProfile(kernel, shape as never, topology, planned);
     expect(run([{ edge: 0, law: { size: 1 } }])).toEqual({ planned: [{ edge: 0, law: { size: 1 } }] });
-    expect(run([{ edge: 0, law: { size: 1, sizeEnd: 2 }, entry: 3 }])).toMatchObject({
+    const varying = [{ edge: 0, law: { size: 1, sizeEnd: 2 }, entry: 3 }];
+    expect(run(varying)).toEqual({ planned: varying });
+    const piecewise = [{ edge: 0, law: { size: 1, sizes: [{ t: 0.5, size: 2 }] } }];
+    expect(run(piecewise)).toEqual({ planned: piecewise });
+    expect(run([{ edge: 0, law: { size: 1, sizeEnd: 2, size2: 2 }, entry: 3 }])).toMatchObject({
       code: 'BLD_PROFILE_FAILED',
-      path: 'edges[3].sizeEnd',
+      path: 'edges[3].size2',
     });
-    expect(run([{ edge: 0, law: { size: 1, sizes: [{ t: 0.5, size: 2 }] } }])).toMatchObject({ code: 'BLD_PROFILE_FAILED', path: 'sizes' });
+    expect(run([{ edge: 0, law: { size: 1, sizes: [{ t: 0.5, size: 2 }], size2: 2 } }])).toMatchObject({
+      code: 'BLD_PROFILE_FAILED',
+      path: 'size2',
+    });
     expect(run([{ edge: 0, law: { size: 1, size2: 2 }, entry: 0 }])).toMatchObject({
       code: 'BLD_ASYMMETRIC_SIDE_MISSING',
       path: 'edges[0].side1Near',
@@ -139,18 +147,110 @@ describe('fillet_edge profile and size2', () => {
     expect(none.error).toMatchObject({ code: 'BLD_ASYMMETRIC_SIDE_MISSING', paths: ['edges[0].side1Near'] });
   });
 
-  it('a varying size with a profile is BLD_PROFILE_FAILED on the entry; the kernel is not asked', () => {
+  it('a varying size with a profile reaches the kernel as radii laws with the profile (straight or smooth, piecewise, expression)', () => {
     const kernel = scriptedKernel();
     const { doc, id } = box();
     const result = execute(
       doc,
       'fillet_edge',
-      { id, edges: [{ index: 0, size: 1, sizeEnd: 2 }], profile: { type: 'conic', rho: 0.5 } },
+      { id, edges: [{ index: 0, size: 1, sizeEnd: 2, interpolation: 'linear' }], profile: { type: 'conic', rho: 0.5 } },
       context(kernel),
     );
-    expect(result.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].sizeEnd'] });
+    expect(result.error).toBeUndefined();
+    expect(brepOf(result.document, result.affected[0] as string)).toMatchObject({
+      op: 'fillet',
+      radii: [{ size: 1, sizeEnd: 2, interpolation: 'linear' }],
+      profile: { type: 'conic', rho: 0.5 },
+    });
+    const shorthand = execute(
+      doc,
+      'fillet_edge',
+      { id, edgeIndices: [0], radius: 1, radiusEnd: 3, profile: { type: 'curvature', shape: 0.4 } },
+      context(kernel),
+    );
+    expect(brepOf(shorthand.document, shorthand.affected[0] as string)).toMatchObject({
+      size: 1,
+      sizeEnd: 3,
+      profile: { type: 'curvature', shape: 0.4 },
+    });
+    expect(shorthand.summary).toContain('r 1>3');
+    const expression = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: [{ index: 0, law: { expression: '1 + t', samples: 5 } }], profile: { type: 'conic', rho: 0.3 } },
+      context(kernel),
+    );
+    expect(expression.error).toBeUndefined();
+    expect(
+      (brepOf(expression.document, expression.affected[0] as string) as unknown as { radii: Array<{ sizes: unknown[] }> }).radii[0]?.sizes,
+    ).toHaveLength(3);
+  });
+
+  it('a second leg with a varying size is BLD_PROFILE_FAILED on the entry; the kernel is not asked', () => {
+    const kernel = scriptedKernel();
+    const { doc, id } = box();
+    const result = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: [{ index: 0, size: 1, sizeEnd: 2, size2: 2, side1Near: [0, 0, 2.5] }] },
+      context(kernel),
+    );
+    expect(result.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
     expect(result.document).toBe(doc);
     expect(kernel.recipes.some((recipe) => recipe.op === 'fillet')).toBe(false);
+  });
+});
+
+describe('how a profile blend was made, from the kernel report', () => {
+  const built = (notes: BlendBuildNotes | null): BlendReport => ({
+    stage: 'none',
+    contours: [],
+    vertices: [],
+    partial: false,
+    unsupportedVertices: [],
+    done: true,
+    valid: true,
+    notes,
+  });
+  const withNotes = (notes: BlendBuildNotes | null): GeometryKernel => ({ ...scriptedKernel(), blendReport: () => built(notes) });
+  const curvature = { id: '', edgeIndices: [0], radius: 1, profile: { type: 'curvature', shape: 0.5 } } as const;
+
+  it('a fallback to the G1 quartic is named in the summary (edges by persistent name) and in data', () => {
+    const { doc, id } = box();
+    const fallback = { edges: [0, 1], reason: 'support curvature jumps at a chain junction' };
+    const result = execute(
+      doc,
+      'fillet_edge',
+      { ...curvature, id },
+      context(withNotes({ builder: 'rails', gap: 2e-7, gapLimit: 5e-6, fallback })),
+    );
+    expect(result.error).toBeUndefined();
+    const names = [TOPOLOGY.edges[0]?.name, TOPOLOGY.edges[1]?.name];
+    expect(result.summary).toContain('fell back to the G1 quartic');
+    for (const name of names) expect(result.summary).toContain(name);
+    expect(result.summary).toContain('measured gap to the neighbouring faces 2.00e-7');
+    expect(result.data).toEqual({
+      profile: { builder: 'rails', unit: doc.units, gap: 2e-7, gapLimit: 5e-6, fallback: { edges: names, reason: fallback.reason } },
+    });
+  });
+
+  it('corner setbacks are reported in data; a build without notes (or a kernel without the port) adds nothing', () => {
+    const { doc, id } = box();
+    const corners = [{ vertex: [0, 0, 0] as [number, number, number], setbacks: [{ edge: 0, distance: 2 }] }];
+    const reported = execute(doc, 'fillet_edge', { ...curvature, id }, context(withNotes({ builder: 'corners', factor: 2, corners })));
+    expect(reported.summary).toContain('1 corner patch(es), setback 2 x the least distance');
+    expect(reported.data).toMatchObject({
+      profile: { builder: 'corners', cornerSetbackFactor: 2, corners: [{ setbacks: [{ distance: 2 }] }] },
+    });
+    expect(execute(doc, 'fillet_edge', { ...curvature, id }, context(withNotes(null))).data).toBeUndefined();
+    const bare: { blendReport?: unknown } = { ...scriptedKernel() };
+    delete bare.blendReport;
+    expect(execute(doc, 'fillet_edge', { ...curvature, id }, context(bare as GeometryKernel)).data).toBeUndefined();
+    // a circular fillet asks nothing
+    const asked: string[] = [];
+    const watching: GeometryKernel = { ...scriptedKernel(), blendReport: (recipe) => (asked.push(recipe.op), built(null)) };
+    execute(doc, 'fillet_edge', { id, edgeIndices: [0], radius: 1 }, context(watching));
+    expect(asked).toEqual([]);
   });
 });
 
@@ -303,4 +403,42 @@ describe('is pure: new fillet_edge paths leave the input document untouched, acc
       expect(bad.document).toBe(doc);
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
+});
+
+describe('describeProfileNotes', () => {
+  const edgeNames = TOPOLOGY.edges.map((edge) => edge.name);
+  it('gives the sentences and the data of a fallback with its gap, junction angle and corner setbacks, edges named from the topology', () => {
+    const notes: BlendBuildNotes = {
+      builder: 'rails',
+      gap: 2.5e-7,
+      gapLimit: 5e-6,
+      junctionG1: 0.0087,
+      fallback: { edges: [0, 2, 9], reason: 'support curvature jumps at a chain junction' },
+      factor: 2,
+      corners: [{ vertex: [1, 2, 3], setbacks: [{ edge: 1, distance: 2 }] }],
+    };
+    const { text, data } = describeProfileNotes(notes, TOPOLOGY, 'mm');
+    expect(text).toBe(
+      ` Profile: curvature profile on ${edgeNames[0]}, ${edgeNames[2]}, edge 9 fell back to the G1 quartic (support curvature jumps at a chain junction; G2 does not hold there); measured gap to the neighbouring faces 2.50e-7 mm (limit 0.00000500); blends of a chain meet at up to 0.00870 rad (limit 0.0095); 1 corner patch(es), setback 2 x the least distance.`,
+    );
+    expect(data).toEqual({
+      builder: 'rails',
+      unit: 'mm',
+      gap: 2.5e-7,
+      gapLimit: 5e-6,
+      junctionG1: 0.0087,
+      fallback: { edges: [edgeNames[0], edgeNames[2], 'edge 9'], reason: 'support curvature jumps at a chain junction' },
+      cornerSetbackFactor: 2,
+      corners: [{ vertex: [1, 2, 3], setbacks: [{ edge: edgeNames[1], distance: 2 }] }],
+    });
+  });
+
+  it('says nothing for a prism build and keeps a zero junction angle in data only; without a topology edges are numbered', () => {
+    expect(describeProfileNotes({ builder: 'prism' }, TOPOLOGY, 'mm')).toEqual({ text: '', data: { builder: 'prism', unit: 'mm' } });
+    const quiet = describeProfileNotes({ builder: 'rails', gap: 1e-9, gapLimit: 1e-6, junctionG1: 0 }, null, 'mm');
+    expect(quiet.text).not.toContain('chain meet');
+    expect(quiet.data.junctionG1).toBe(0);
+    const unnamed = describeProfileNotes({ builder: 'rails', fallback: { edges: [3], reason: 'r' } }, null, 'mm');
+    expect(unnamed.data.fallback?.edges).toEqual(['edge 3']);
+  });
 });

@@ -25,6 +25,8 @@ pub(crate) fn serial_blends() -> std::sync::MutexGuard<'static, ()> {
 #[cfg(test)]
 mod blend_corner_tests;
 #[cfg(test)]
+mod blend_rail_tests;
+#[cfg(test)]
 mod blend_tests;
 #[cfg(test)]
 mod deform_tests;

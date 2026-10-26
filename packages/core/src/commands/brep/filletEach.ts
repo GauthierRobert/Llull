@@ -34,6 +34,7 @@ import { blendRefusal } from './blendRefusal';
 import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';
 import { commandError } from '../noop';
 import { REPICK_EDGES } from './edgeReferences';
+import { describeProfileNotes, readProfileNotes } from './profileNotes';
 import { type CornerInput, type CornerRefusal, REPICK_VERTICES, resolveCorners } from './filletCorners';
 import type { SetbackCorner } from '../../model/blendTypes';
 
@@ -261,6 +262,11 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     (newId, triangles) =>
       `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
+  // how a profile blend was made (builder, measured gap, a reported fallback, corner setbacks): in the summary and in `data`
+  const notes = profiled && committed.document !== doc ? readProfileNotes(kernel, modified) : null;
+  const described = notes === null ? null : describeProfileNotes(notes, topology, doc.units);
+  const reported: CommandResult =
+    described === null ? committed : { ...committed, summary: `${committed.summary}${described.text}`, data: { profile: described.data } };
   const record =
     (request.edgeNames ?? []).length > 0
       ? null
@@ -270,9 +276,9 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           sized.planned.map((entry) => entry.edge),
         );
   const cornerRecord = cornered === null ? null : cornered.record;
-  if (committed.document === doc || (record === null && cornerRecord === null)) return committed;
+  if (committed.document === doc || (record === null && cornerRecord === null)) return reported;
   return {
-    ...committed,
+    ...reported,
     recordExtras: { ...(record === null ? {} : { edgeNames: record }), ...(cornerRecord === null ? {} : { corners: cornerRecord }) },
   };
 }

@@ -547,7 +547,7 @@ describe('is pure: face blends', () => {
     }
   });
 
-  it('a hold line carries its profile: a constant line with a conic profile reaches the recipe, a sloped one is BLD_PROFILE_FAILED', () => {
+  it('a hold line carries its profile: a constant line and a sloped one (a varying size) with a conic profile reach the recipe', () => {
     const { doc, id } = box();
     const kernel = scriptedKernel({ edgePoint: (_edge, t) => [-10 + 20 * t, 5, 2.5] });
     const holdKernel: GeometryKernel = {
@@ -591,14 +591,15 @@ describe('is pure: face blends', () => {
       size: 1,
       profile: { type: 'conic', rho: 0.5 },
     });
-    const refused = execute(
+    const sloped = execute(
       slope.document,
       'fillet_faces',
       { id, ...sets, holdLine: { id: slope.affected[0], onFaces: 'A' }, profile: { type: 'conic', rho: 0.5 } },
       context(holdKernel),
     );
-    expect(refused.error?.code).toBe('BLD_PROFILE_FAILED');
-    expect(refused.document).toBe(slope.document);
+    expect(sloped.error).toBeUndefined();
+    expect(brepOf(sloped.document, sloped.affected[0] as string)).toMatchObject({ op: 'fillet', profile: { type: 'conic', rho: 0.5 } });
+    expect((brepOf(sloped.document, sloped.affected[0] as string) as { radii?: unknown[] }).radii?.length).toBe(1);
   });
 });
 

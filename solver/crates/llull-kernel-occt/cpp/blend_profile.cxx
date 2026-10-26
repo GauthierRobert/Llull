@@ -12,6 +12,8 @@
 #include <vector>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -49,6 +51,27 @@ namespace llull {
 using namespace blend;
 
 namespace blend {
+
+double diagonal_of(const TopoDS_Shape &shape) {
+  Bnd_Box box;
+  BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
+  if (box.IsVoid()) return 0.0;
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  return gp_Pnt(x0, y0, z0).Distance(gp_Pnt(x1, y1, z1));
+}
+
+double vertex_diagonal_of(const TopoDS_Shape &shape) {
+  gp_Pnt low(1e300, 1e300, 1e300), high(-1e300, -1e300, -1e300);
+  TopTools_IndexedMapOfShape vertices;
+  TopExp::MapShapes(shape, TopAbs_VERTEX, vertices);
+  for (int v = 1; v <= vertices.Extent(); ++v) {
+    const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(vertices(v)));
+    low = gp_Pnt(std::min(low.X(), p.X()), std::min(low.Y(), p.Y()), std::min(low.Z(), p.Z()));
+    high = gp_Pnt(std::max(high.X(), p.X()), std::max(high.Y(), p.Y()), std::max(high.Z(), p.Z()));
+  }
+  return vertices.Extent() == 0 ? 0.0 : low.Distance(high);
+}
 
 gp_Vec normal_of(const TopoDS_Face &face) {
   const BRepAdaptor_Surface surface(face, Standard_True);
@@ -354,43 +377,79 @@ bool make_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_n
 
 }  // namespace
 
-// The profiled shape, or null with the reason in `why`.
-static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<const double> raw, std::string &why) {
+// Whether the unique edges `picked` meet at a vertex that is not a smooth junction of exactly two of them (parallel, opposite directions: one chain);
+// false with the reason in `why` for a repeated or unknown edge.
+static bool meets_at_corner(const TopoDS_Shape &shape, const std::vector<int> &picked, bool &corner, std::string &why) {
+  const TopTools_IndexedMapOfShape edges = query::distinct(shape, TopAbs_EDGE);
+  TopTools_IndexedMapOfShape vertices;
+  TopExp::MapShapes(shape, TopAbs_VERTEX, vertices);
+  std::set<int> selected;
+  std::map<int, std::vector<gp_Vec>> leaving;  // per vertex: the unit direction away from it of each selected edge ending there
+  for (const int index : picked) {
+    if (!selected.insert(index).second) {
+      why = "edge " + std::to_string(index) + " is listed twice";
+      return false;
+    }
+    if (index < 0 || index >= edges.Extent()) {
+      why = "edge index out of range";
+      return false;
+    }
+    const TopoDS_Edge edge = TopoDS::Edge(edges(index + 1));
+    const BRepAdaptor_Curve curve(edge);
+    const TopoDS_Vertex ends[2] = {TopExp::FirstVertex(edge), TopExp::LastVertex(edge)};
+    if (ends[0].IsSame(ends[1])) continue;  // a closed edge meets only itself
+    for (int end = 0; end < 2; ++end) {
+      gp_Pnt at;
+      gp_Vec direction;
+      curve.D1(end == 0 ? curve.FirstParameter() : curve.LastParameter(), at, direction);
+      if (direction.Magnitude() > 1e-14) direction.Normalize();
+      leaving[vertices.FindIndex(ends[end])].push_back(end == 0 ? direction : direction.Reversed());
+    }
+  }
+  corner = false;
+  for (const auto &[vertex, directions] : leaving) {
+    if (directions.size() < 2) continue;
+    // two edges that leave in opposite directions are one smooth chain (a tangent junction of blends), anything else is a corner
+    const bool junction = directions.size() == 2 && directions[0].Dot(directions[1]) < -std::cos(kTangentAngle * 1e3);
+    corner = corner || !junction;
+  }
+  return true;
+}
+
+// The profiled shape of the prism builder, or null with the reason in `why`; `scope` is true when the failure is a limit of the prism builder
+// (straight edge, planar faces, square flat ends) that the rail builder does not share.
+static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<const double> raw, std::string &notes, std::string &why, bool &scope) {
+  scope = false;
   const std::vector<Spec> specs = specs_of(raw);
   if (specs.empty() || specs.size() * kSpecWidth != raw.size()) {
     why = "profile specification is malformed";
     return nullptr;
   }
+  // Selected edges meeting at a vertex that is not a smooth junction of two edges meet in a corner: every edge there is profiled and the corner is
+  // a G1 patch (blend_corner.cxx).
+  std::vector<int> picked;
+  for (const Spec &spec : specs) picked.push_back(spec.edge);
+  bool shared = false;
+  if (!meets_at_corner(source.shape, picked, shared, why)) return nullptr;
+  if (shared) {
+    std::vector<std::pair<int, double>> radii;
+    for (const Spec &spec : specs) {
+      if (!std::isnan(spec.size2) || spec.kind == 2 || spec.kind != specs.front().kind || spec.param != specs.front().param) {
+        why = "edges that meet at a vertex need one conic or curvature profile with symmetric sizes (no size2, one rho / shape)";
+        return nullptr;
+      }
+      radii.emplace_back(spec.edge, spec.size);
+    }
+    return profile_corner_blend(source, radii, specs.front().kind, specs.front().param, notes, why);
+  }
   const naming::Named input = naming::named(source);
   const std::vector<std::string> edge_names = naming::edge_names(source.shape, input.names);
   std::vector<Tool> tools;
-  std::set<int> selected;
+  scope = true;
   for (const Spec &spec : specs) {
-    if (!selected.insert(spec.edge).second) {
-      why = "edge " + std::to_string(spec.edge) + " is listed twice";
-      return nullptr;
-    }
     Tool tool;
     if (!make_tool(source.shape, edge_names, spec, tool, why)) return nullptr;
     tools.push_back(std::move(tool));
-  }
-  // Selected edges sharing a vertex would need a corner patch: not built.
-  const TopTools_IndexedMapOfShape edges = query::distinct(source.shape, TopAbs_EDGE);
-  std::map<int, int> vertex_owner;
-  TopTools_IndexedMapOfShape vertices;
-  TopExp::MapShapes(source.shape, TopAbs_VERTEX, vertices);
-  for (const Spec &spec : specs) {
-    const TopoDS_Edge edge = TopoDS::Edge(edges(spec.edge + 1));
-    for (const TopoDS_Vertex &vertex : {TopExp::FirstVertex(edge), TopExp::LastVertex(edge)}) {
-      const int index = vertices.FindIndex(vertex);
-      const auto found = vertex_owner.find(index);
-      if (found != vertex_owner.end() && found->second != spec.edge) {
-        why = "edges " + std::to_string(found->second) + " and " + std::to_string(spec.edge) +
-              " meet at a vertex: a corner between profile blends is not built (use the circular profile there)";
-        return nullptr;
-      }
-      vertex_owner[index] = spec.edge;
-    }
   }
   naming::Named current = input;
   const double volume_before = [&] {
@@ -405,23 +464,88 @@ static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<con
     why = "the blend removed or added no material";
     return nullptr;
   }
+  notes = "{\"builder\":\"prism\"}";
   return naming::wrap_named(current.shape, current.names);
 }
 
+// The reason the last fillet_profile_blend of this thread failed (empty after a success): the one it computed, so a refusal is explained without a rebuild.
+static thread_local std::string g_last_reason;
+
+// The profile blend: the prism builder for constant sizes on straight edges between planar faces (exact), corners where edges meet, else the rail
+// builder (curved edges and faces, any size law). `specs` is empty when a size varies; `laws` is empty when a leg is asymmetric.
+static std::unique_ptr<Shape> build_blend(const Shape &source, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                          rust::Slice<const double> laws, double kind, double param, std::string &notes, std::string &why) {
+  if (!specs.empty()) {
+    bool scope = false;
+    std::unique_ptr<Shape> built = build_profile(source, specs, notes, why, scope);
+    if (built || !scope || laws.empty()) return built;
+  }
+  if (laws.empty()) {
+    why = why.empty() ? "profile specification is malformed" : why;
+    return nullptr;
+  }
+  // A varying size has no corner builder (the setbacks assume one constant size per edge): say so before the rail builder reports an end it cannot make.
+  if (specs.empty()) {
+    bool corner = false;
+    std::vector<int> picked(edges.begin(), edges.end());
+    if (!meets_at_corner(source.shape, picked, corner, why)) return nullptr;
+    if (corner) {
+      why = "profiled edges that meet at a vertex need one constant size (a varying size has no corner patch)";
+      return nullptr;
+    }
+  }
+  return rails_blend(source, edges, laws, static_cast<int>(kind), param, notes, why);
+}
+
 std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const double> specs) {
-  std::string why;
+  std::string why, notes;
+  bool scope = false;
   try {
-    return build_profile(shape, specs, why);
+    std::unique_ptr<Shape> built = build_profile(shape, specs, notes, why, scope);
+    if (built) built->notes = notes;
+    return built;
   } catch (const Standard_Failure &) {
     return nullptr;
   }
 }
 
-rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs) {
-  std::string why;
+std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                            rust::Slice<const double> laws, double kind, double param) {
+  g_last_reason.clear();
+  std::string why, notes;
+  try {
+    std::unique_ptr<Shape> built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
+    if (built) built->notes = notes;
+    g_last_reason = built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why);
+    return built;
+  } catch (const Standard_Failure &error) {
+    g_last_reason = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    return nullptr;
+  }
+}
+
+rust::String profile_blend_last_reason() { return rust::String(g_last_reason); }
+
+rust::String shape_notes(const Shape &shape) { return rust::String(shape.notes); }
+
+rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                  rust::Slice<const double> laws, double kind, double param) {
+  std::string why, notes;
   std::unique_ptr<Shape> built;
   try {
-    built = build_profile(shape, specs, why);
+    built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
+  } catch (const Standard_Failure &error) {
+    why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+  }
+  return rust::String(built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why));
+}
+
+rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs) {
+  std::string why, notes;
+  std::unique_ptr<Shape> built;
+  bool scope = false;
+  try {
+    built = build_profile(shape, specs, notes, why, scope);
   } catch (const Standard_Failure &error) {
     why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
   }

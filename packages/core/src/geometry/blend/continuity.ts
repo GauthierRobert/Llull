@@ -20,6 +20,8 @@ export interface ContactTolerances {
   readonly g0: number;
   readonly g1AngleRad: number;
   readonly g2Rel: number;
+  /** Normal curvatures below this (1/unit) count as flat: a plane's reading is numerical noise, so the relative jump is 0. Default 1e-12; check_blends passes 1e-8 / diagonal. */
+  readonly flatCurvature?: number;
 }
 
 export interface ContactMeasure {
@@ -42,6 +44,7 @@ export function measureContact(samples: readonly ContactSample[], tolerances: Co
   let g1AngleRad = 0;
   let g2Gap = 0;
   let g2Rel = 0;
+  const flat = tolerances.flatCurvature ?? 1e-12;
   for (const sample of samples) {
     const [first, second] = sample.normalCurvature;
     const gap = Math.abs(first - second);
@@ -49,7 +52,7 @@ export function measureContact(samples: readonly ContactSample[], tolerances: Co
     g0Gap = Math.max(g0Gap, sample.g0);
     g1AngleRad = Math.max(g1AngleRad, sample.g1);
     g2Gap = Math.max(g2Gap, gap);
-    g2Rel = Math.max(g2Rel, scale < 1e-12 ? 0 : gap / scale);
+    g2Rel = Math.max(g2Rel, scale < flat ? 0 : gap / scale);
   }
   const order: ContinuityOrder =
     g0Gap > tolerances.g0 ? 'none' : g1AngleRad > tolerances.g1AngleRad ? 'G0' : g2Rel > tolerances.g2Rel ? 'G1' : 'G2';
@@ -58,8 +61,10 @@ export function measureContact(samples: readonly ContactSample[], tolerances: Co
 
 /** The two operands of a persistent name `e(<A>|<B>)` (split at the top-level bar), or null for any other name. */
 export function splitEdgeName(name: string): readonly [string, string] | null {
-  if (!name.startsWith('e(') || !name.endsWith(')')) return null;
-  const inner = name.slice(2, -1);
+  // a pair of faces that meets twice is told apart by a suffix: e(A|B)#2
+  const base = name.replace(/#\d+$/, '');
+  if (!base.startsWith('e(') || !base.endsWith(')')) return null;
+  const inner = base.slice(2, -1);
   let depth = 0;
   for (let at = 0; at < inner.length; at++) {
     const char = inner[at];

@@ -2,7 +2,9 @@
 // geometry helpers they use. Definitions live in blend_profile.cxx.
 #pragma once
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
@@ -24,6 +26,9 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kInsideTolerance = 1e-7;
 // Normals closer than this to parallel / anti-parallel are not a corner.
 constexpr double kTangentAngle = 1e-6;
+// A built gap is accepted up to this fraction of its limit: check_blends samples other points (and the entity may be placed or rotated after
+// the fillet), so a gap a builder accepted must not read above the limit there. Shared by the rail and corner builders.
+constexpr double kGapAccepted = 0.95;
 
 // A blend tool and the persistent names of its faces; `convex` tools are cut from the source, the others fused to it.
 struct Tool {
@@ -47,6 +52,13 @@ struct EdgeFrame {
 // The frame of unique edge `index` of `shape`; false with the reason in `why` (`what` names the kind of blend in the messages).
 bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFrame &frame, std::string &why);
 
+// Diagonal of the true bounding box of `shape` (BRepBndLib::AddOptimal without enlargement: the bounds mass_properties gives, so the length
+// scale check_blends measures against). Construction tolerances use it; an acceptance limit uses the smaller of the source's and the result's.
+double diagonal_of(const TopoDS_Shape &shape);
+// Diagonal of the box of the VERTICES of `shape` (0 when it has none): the scale of the vertex-matching tolerance, which core computes the same way
+// (geometry/blend/vertices.ts), never an acceptance limit.
+double vertex_diagonal_of(const TopoDS_Shape &shape);
+
 // Outward normal of a planar face (orientation applied).
 gp_Vec normal_of(const TopoDS_Face &face);
 // Outward normal of a planar face of `shape`: the oriented plane normal, flipped when a probe just off the face centre lies in the solid (the
@@ -67,6 +79,28 @@ bool spandrel_tool(const gp_Pnt &start, const gp_Pnt &end, const gp_Pnt &a, cons
 
 // `current` after cutting (or fusing, per tool) every tool, with names carried by the boolean histories; false with the reason in `why`.
 bool apply_tools(naming::Named &current, const std::vector<Tool> &tools, std::string &why);
+
+// The point of `support` nearest to `point`, `on`; false when the projection fails.
+bool project_on_face(const TopoDS_Face &support, const gp_Pnt &point, gp_Pnt &on);
+
+// What a curvature-continuous section must match at `point` of `support`: the curvature `kappa` of the face along the unit-free `direction` (in its
+// tangent plane) measured toward the side of `toward` (a vector from the contact point to the other contact point), and that unit normal `nu`.
+// False when the point does not project on the face or its parametrisation is degenerate there.
+bool support_curvature(const TopoDS_Face &support, const gp_Pnt &point, const gp_Vec &direction, const gp_Vec &toward, gp_Vec &nu, double &kappa);
+
+// The rail-preserving profile blend (cpp/blend_rails.cxx): the circular fillet of unique edges `edges` with `laws` (the fillet_laws layout) re-skinned with
+// the section `kind` (0 conic, 1 curvature) and `param`. Null with the reason in `why`.
+// `notes` receives the JSON object the built shape carries (Shape::notes): builder, measured gap, a reported fallback. A curvature profile that
+// falls back to the zero-curvature quartic says so there.
+std::unique_ptr<Shape> rails_blend(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, int kind, double param,
+                                   std::string &notes, std::string &why);
+
+// The profile blend of edges that meet at vertices (cpp/blend_corner.cxx): one spandrel prism per edge of `radii` (unique edge index, radius), kind and
+// param as for spandrel_tool, stopping at the least setback that leaves a patch at every vertex where rounded edges meet, each filled G1 to the
+// blends and the supports. Null with the reason in `why` (no [BLD_CODE] prefix).
+// `notes` receives the JSON the shape carries: the setback factor that built and, per corner, its vertex and the setback of each edge.
+std::unique_ptr<Shape> profile_corner_blend(const Shape &source, const std::vector<std::pair<int, double>> &radii, int kind, double param,
+                                            std::string &notes, std::string &why);
 
 }  // namespace blend
 }  // namespace llull

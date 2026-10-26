@@ -51,7 +51,9 @@ export interface RadiusCheck {
   readonly deviations: readonly RadiusFinding[];
 }
 
-interface LawRecord {
+export interface LawRecord {
+  /** Position of the fillet node (outermost first) the record comes from: blends of one node are rounded together, of two nodes in two steps. */
+  readonly node: number;
   readonly law: EdgeRadius;
   /** The section the recipe asked for (absent = circular). */
   readonly profile?: BlendProfile;
@@ -63,7 +65,7 @@ interface LawRecord {
 /** The law given to each source edge (by persistent name) in the fillet nodes of `recipe`. */
 export function lawIndex(kernel: GeometryKernel, recipe: ShapeRecipe): Map<string, LawRecord> {
   const index = new Map<string, LawRecord>();
-  for (const node of filletNodes(recipe)) {
+  for (const [position, node] of filletNodes(recipe).entries()) {
     const shape = kernel.evaluate(node.source);
     const topology = shape === null ? null : kernel.topology(shape);
     if (shape === null || topology === null) continue;
@@ -72,7 +74,7 @@ export function lawIndex(kernel: GeometryKernel, recipe: ShapeRecipe): Map<strin
       const name = topology.edges[edge]?.name;
       const law = laws[at];
       if (name !== undefined && law !== undefined && !index.has(name))
-        index.set(name, { law, shape, topology, edge, ...(node.profile === undefined ? {} : { profile: node.profile }) });
+        index.set(name, { node: position, law, shape, topology, edge, ...(node.profile === undefined ? {} : { profile: node.profile }) });
     });
   }
   return index;

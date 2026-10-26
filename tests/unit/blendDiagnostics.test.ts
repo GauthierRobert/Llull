@@ -102,6 +102,8 @@ describe('continuity helpers', () => {
     expect(splitEdgeName('a|b')).toBeNull();
     expect(splitEdgeName('e(ab)')).toBeNull();
     expect(blendSource('blend(e(a|b))')).toEqual({ edge: 'e(a|b)', supports: ['a', 'b'] });
+    expect(splitEdgeName('e(a|b)#2')).toEqual(['a', 'b']);
+    expect(blendSource('blend(e(blend(e(a|b))|c)#2)')).toEqual({ edge: 'e(blend(e(a|b))|c)#2', supports: ['blend(e(a|b))', 'c'] });
     expect(blendSource('a:top')).toBeNull();
     expect(blendSource('blend(v:x)')).toBeNull();
   });

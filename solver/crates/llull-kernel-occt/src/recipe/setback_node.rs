@@ -4,10 +4,13 @@ use super::nodes::{indices, vec3_of};
 use super::{number, positive};
 use serde_json::Value;
 
+/// The flat specs of `features::fillet_setback`: `(edges, corners)`.
+pub(super) type SetbackSpecs = (Vec<f64>, Vec<f64>);
+
 /// `(edges, corners)` for a fillet node with setback corners: `edges` = (unique edge index, radius) pairs, `corners` = per corner x, y, z, n, then
 /// n (unique edge index, setback distance) pairs. `Ok(None)` when the node has no `setback` corner (rolling-ball corners are the default),
 /// `Err` when the node is malformed or asks for more than this build makes (a radius that varies, a profile, a non-positive size or distance).
-pub(super) fn setback_specs(recipe: &Value) -> Result<Option<(Vec<f64>, Vec<f64>)>, ()> {
+pub(super) fn setback_specs(recipe: &Value) -> Result<Option<SetbackSpecs>, ()> {
     let Some(corners) = recipe.get("corners").and_then(Value::as_array) else { return Ok(None) };
     let setbacks: Vec<&Value> = corners.iter().filter(|corner| corner.get("type").and_then(Value::as_str) == Some("setback")).collect();
     if setbacks.is_empty() {

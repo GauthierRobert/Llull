@@ -7,6 +7,7 @@
 //! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier, 3 ellipse quarter [start, centre, end]), then its 2 / 3 / 4 / 3 xyz points.
 
 use super::floor::floor_edge_indices;
+use super::profile_node::profile_plan;
 use super::setback_node::setback_specs;
 use super::wrap_nodes::{loops_ok, surface_data_ok};
 use super::{number, place_entity, positive, refused, shape_of, vec3, EvalError, Evaluated, Evaluator};
@@ -244,50 +245,6 @@ fn blend_stage_report(stage: &str, reason: &str) -> Value {
     report
 }
 
-/// BLD M2: the flat layout of `features::fillet_profile` for a fillet node with a conic / curvature `profile` or a `size2` leg (7 numbers per
-/// edge); `Ok(None)` for a circular, symmetric fillet, `Err` when the node is malformed (a size that varies, rho / shape outside 0.05..0.95).
-fn profile_specs(recipe: &Value, edges: &[u32]) -> Result<Option<Vec<f64>>, ()> {
-    let profile = recipe.get("profile").filter(|profile| !profile.is_null());
-    let name = profile.and_then(|profile| profile.get("type")).and_then(Value::as_str).unwrap_or("circular");
-    let laws: Vec<&Value> = match recipe.get("radii").filter(|radii| !radii.is_null()) {
-        Some(radii) => radii.as_array().ok_or(())?.iter().collect(),
-        None => vec![recipe; edges.len()],
-    };
-    let sided = laws.iter().any(|law| law.get("size2").is_some_and(|size2| !size2.is_null()));
-    if name == "circular" && !sided {
-        return Ok(None);
-    }
-    if laws.len() != edges.len() || edges.is_empty() {
-        return Err(());
-    }
-    let factor = |field: &str| profile.and_then(|profile| number(profile, field)).filter(|value| (0.05..=0.95).contains(value));
-    let (kind, param) = match name {
-        "conic" => (0.0, factor("rho").ok_or(())?),
-        "curvature" => (1.0, factor("shape").ok_or(())?),
-        "circular" => (2.0, 0.0),
-        _ => return Err(()),
-    };
-    let mut flat = Vec::new();
-    for (edge, law) in edges.iter().zip(laws) {
-        let size = number(law, "size").filter(|size| positive(*size)).ok_or(())?;
-        let varying = law.get("sizeEnd").is_some_and(|end| !end.is_null())
-            || law.get("sizes").and_then(Value::as_array).is_some_and(|sizes| !sizes.is_empty());
-        if varying {
-            return Err(());
-        }
-        let size2 = match law.get("size2").filter(|size2| !size2.is_null()) {
-            Some(value) => value.as_f64().filter(|size2| positive(*size2)).ok_or(())?,
-            None => f64::NAN,
-        };
-        let side = law.get("sideFace").and_then(Value::as_u64).map_or(-1.0, |face| face as f64);
-        if !size2.is_nan() && side < 0.0 {
-            return Err(());
-        }
-        flat.extend([f64::from(*edge), kind, param, size, size2, side, 0.0]);
-    }
-    Ok(Some(flat))
-}
-
 const FACE_SET_REASON: &str = "[BLD_FACE_BLEND_UNSUPPORTED] this build blends one planar face per set";
 
 /// The single unique face index of a face set, `None` when the set is empty or has several faces.
@@ -344,9 +301,17 @@ impl Evaluator {
                 }
                 Ok(None) => {}
             }
-            match profile_specs(recipe, &edges) {
+            match profile_plan(recipe, &edges) {
                 Err(()) => return refused(),
-                Ok(Some(specs)) => return shape_of(features::fillet_profile(&source, &specs)),
+                Ok(Some(plan)) => {
+                    let built = features::fillet_profile_blend(&source, &plan.specs, &edges, &plan.laws, plan.kind, plan.param);
+                    if matches!(built, Ok(None)) {
+                        // the reason was computed while building: kept for blend_report, so a refusal is explained without a rebuild
+                        let why = features::profile_blend_last_reason().map_err(EvalError::Failure)?;
+                        self.reports.insert(super::canonical_key(recipe), Value::String(why));
+                    }
+                    return shape_of(built);
+                }
                 Ok(None) => {}
             }
         }
@@ -401,15 +366,27 @@ impl Evaluator {
             }
             Ok(None) => {}
         }
-        match profile_specs(recipe, &edges) {
+        match profile_plan(recipe, &edges) {
             Err(()) => {
                 return Ok(blend_stage_report(
                     "profile",
-                    "the profile blend parameters are malformed (a varying size, rho or shape outside 0.05..0.95, size2 without a side)",
+                    "the profile blend parameters are malformed (rho or shape outside 0.05..0.95, size2 without a side, or size2 on an edge whose size varies)",
                 ))
             }
-            Ok(Some(specs)) => {
-                let reason = features::profile_reason(&source, &specs).map_err(EvalError::Failure)?;
+            Ok(Some(plan)) => {
+                // built (cached by the evaluation that asked): what the builder reported about how
+                if let Some(shape) = self.evaluate(recipe)? {
+                    let notes = features::shape_notes(&shape).map_err(EvalError::Failure)?;
+                    let mut report = blend_stage_report("profile", "");
+                    report["notes"] = serde_json::from_str(&notes).unwrap_or(Value::Null);
+                    return Ok(report);
+                }
+                let kept = self.reports.get(&super::canonical_key(recipe)).and_then(|why| why.as_str().map(str::to_string));
+                let reason = match kept {
+                    Some(why) => why,
+                    None => features::profile_blend_reason(&source, &plan.specs, &edges, &plan.laws, plan.kind, plan.param)
+                        .map_err(EvalError::Failure)?,
+                };
                 return Ok(blend_stage_report("profile", &reason));
             }
             Ok(None) => {}

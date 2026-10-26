@@ -159,6 +159,28 @@ export interface BlendReport {
   readonly done: boolean;
   readonly valid: boolean;
   readonly message?: string;
+  /** How a profile blend that builds was made (stage "none" only): the builder, the measured gap, a reported fallback, the corner setbacks chosen. */
+  readonly notes?: BlendBuildNotes | null;
+}
+
+/** What the builder of a profile blend reports about the shape it made (DES-6c step 2). Lengths in document units. */
+export interface BlendBuildNotes {
+  readonly builder: 'prism' | 'rails' | 'corners';
+  /** Largest distance between a re-skinned face and its neighbour along their shared edges, and the limit it was held to (5e-6 x diagonal). */
+  readonly gap?: number;
+  readonly gapLimit?: number;
+  /** Largest angle (radians) between the normals of two blends of a chain along their junction; the build is refused above 0.0095 (0.95 x the check_blends default). */
+  readonly junctionG1?: number;
+  /** The step mixes convex and concave blends, so the volume check against the circular fillet was not applied. */
+  readonly mixed?: boolean;
+  /** The curvature profile fell back to the zero-curvature quartic: the unique edges it applies to and why. */
+  readonly fallback?: { readonly edges: readonly number[]; readonly reason: string };
+  /** Corner builder: the setback factor (x the least distance) that built, and per corner its vertex and the setback of each edge there. */
+  readonly factor?: number;
+  readonly corners?: ReadonlyArray<{
+    readonly vertex: Vec3;
+    readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
+  }>;
 }
 
 /** How an exact `deform` node built, or why it was refused (01 DEF M2, `kernel.deformReport`). Lengths in document units. */

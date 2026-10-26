@@ -33,6 +33,20 @@ std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_
 // factor, size, size2 (NaN = size is a radius), side (unique face index carrying size, or -1), 0 (reserved). Null when the build fails; profile_reason says why ("" = builds).
 std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const double> specs);
 rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs);
+// Rail-preserving profile blends (cpp/blend_rails.cxx): the circular fillet of `edges` with `laws` (the fillet_laws layout) re-skinned with the
+// section `kind` (0 conic, 1 curvature) and `param` (rho / shape); curved edges and faces, any size law. Null when the build fails; rails_reason says why.
+std::unique_ptr<Shape> fillet_rails(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, double kind, double param);
+rust::String rails_reason(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, double kind, double param);
+// The profile blend of a fillet node (cpp/blend_profile.cxx): prism builder when `specs` (7 numbers per edge, as fillet_profile) is given and builds, corners
+// where edges meet, else the rail builder with `edges` / `laws` / `kind` / `param` (as fillet_rails; `laws` empty = not eligible). Null when it fails;
+// profile_blend_reason says why ("" = builds).
+std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                            rust::Slice<const double> laws, double kind, double param);
+// The reason the last fillet_profile_blend of this thread returned null (it computed it while building).
+rust::String profile_blend_last_reason();
+rust::String shape_notes(const Shape &shape);
+rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                  rust::Slice<const double> laws, double kind, double param);
 // Setback corners (cpp/blend_corner.cxx, BLD M3): `edges` = (unique edge index, radius) pairs; `corners` = per corner x, y, z, n, then n (unique edge index of
 // an edge meeting there, setback distance) pairs. Null when the build fails; setback_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
 std::unique_ptr<Shape> fillet_setback(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners);

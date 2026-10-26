@@ -39,6 +39,11 @@
     "BLD_SETBACK_TOO_SHORT",
     "BLD_FACE_FILLET_NO_SOLUTION"
    ]
+  },
+  {
+   "file": "plans/target_profiles_curved_variable.json",
+   "description": "Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies and a cube whose twelve edges are profiled (G1 corner patches), each followed by check_blends.",
+   "unbuilt": []
   }
  ],
  "cases": [
@@ -902,6 +907,146 @@
    "cli": {
     "run": "llull run plans/component.json --doc t.llull.json --kernel occt --json",
     "assert": "store snapshot"
+   }
+  },
+  {
+   "vc": "VC-BLD-34",
+   "what": "conic rim of a cylinder R 10 h 20, r 2, rho 0.5: the revolved spandrel is removed (rail-preserving profile on a curved edge); check_blends G1 at both contacts",
+   "value": {
+    "removedVolume": 40.21238601307367
+   },
+   "tolerance": 0.000001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) 2 pi |closed integral of rho^2 / 2 dz| over the spandrel (Green), generate_plans.mjs",
+   "plan": "target_profiles_curved_variable",
+   "assert": "mass_properties($rimC); check_blends($rimC)",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($rimC); check_blends($rimC)"
+   }
+  },
+  {
+   "vc": "VC-BLD-35",
+   "what": "curvature profile on a plane-cylinder rim and on a sphere band (R 5, planar caps): contacts G2, curvature jump x R below 1e-6",
+   "value": {
+    "g2GapTimesRadius": 0
+   },
+   "tolerance": 0.000001,
+   "unit": "dimensionless",
+   "grade": "A",
+   "source": "(b) the section takes the curvature of each support (quintic, TECHNICAL_SPEC §13.11)",
+   "plan": "target_profiles_curved_variable",
+   "assert": "check_blends($rimG2, $bandG2).blends[*].contacts[*].order == G2",
+   "proves": [
+    "FR-BLD-07",
+    "FR-BLD-21",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($rimG2, $bandG2).blends[*].contacts[*].order == G2"
+   }
+  },
+  {
+   "vc": "VC-BLD-36",
+   "what": "conic ring (rho 0.4, r 2) on the concave edge of a boss R 10 on a plate: the revolved spandrel on the outside is added",
+   "value": {
+    "addedVolume": 58.580469210424546
+   },
+   "tolerance": 0.000001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) as VC-BLD-34 on the air side of the corner",
+   "plan": "target_profiles_curved_variable",
+   "assert": "mass_properties($bossRing) - mass_properties($fused)",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($bossRing) - mass_properties($fused)"
+   }
+  },
+  {
+   "vc": "VC-BLD-37",
+   "what": "conic profile on a straight edge whose size runs 1 -> 2: same contact lines as the circular variable fillet, so the removed volume is the ratio c(rho) / (1 - pi/4) of the circular one (rho 0.5: 1/6)",
+   "value": {
+    "ratioToCircular": 0.7766320610542478
+   },
+   "tolerance": 0.0001,
+   "unit": "relative",
+   "grade": "A",
+   "source": "(b) affine invariance of the section area at a right angle",
+   "plan": "target_profiles_curved_variable",
+   "assert": "(V0 - V($varConic)) / (V0 - V($varCircular))",
+   "proves": [
+    "FR-BLD-05",
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "(V0 - V($varConic)) / (V0 - V($varCircular))"
+   }
+  },
+  {
+   "vc": "VC-BLD-38",
+   "what": "conic profile on one top edge of a rounded outline (4 straight edges + 4 corner arcs): the whole tangent chain gets the profile, 8 blend faces, check_blends passes",
+   "value": {
+    "profileBlends": 8
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "definition (OCCT rounds the tangent chain of a picked edge)",
+   "plan": "target_profiles_curved_variable",
+   "assert": "check_blends($outlineLoop).data.blends where profile == conic",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($outlineLoop).data.blends where profile == conic"
+   }
+  },
+  {
+   "vc": "VC-BLD-39",
+   "what": "cube 10, all 12 edges conic rho 0.5 r 1: 8 G1 corner patches (setback 2 x the least distance, reported in data.profile), G1 <= 0.01 rad, patch G0 within 5 x the default; volume: golden 975.822 +- 0.05, below a^3 - 12 (a - 2 sb) d^2 / 6 (the prism spandrels over the span), within 1e-3 of the circular rolling-ball cube",
+   "value": {
+    "patches": 8,
+    "g1MaxRad": 0.01,
+    "volumeGolden": 975.822,
+    "volumeBounds": [
+     975.772,
+     988
+    ],
+    "againstCircular": 0.001
+   },
+   "tolerance": {
+    "g1": 0.01,
+    "g0": "5 x 1e-6 x diagonal",
+    "volume": 0.05
+   },
+   "unit": "rad / mm3",
+   "grade": "A (bound, circular ratio) / C (volume golden: Plate fill)",
+   "source": "M2 corner refill: setback corner pipeline with the least setback x 2 (TECHNICAL_SPEC §13.11)",
+   "plan": "target_profiles_curved_variable",
+   "assert": "check_blends($cubeC); mass_properties($cubeC); data.profile.corners",
+   "proves": [
+    "FR-BLD-09",
+    "TR-BLD-06",
+    "TR-BLD-07"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($cubeC); mass_properties($cubeC); data.profile.corners"
    }
   }
  ]

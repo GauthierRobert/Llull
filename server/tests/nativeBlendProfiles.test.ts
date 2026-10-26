@@ -1,6 +1,6 @@
 /**
  * BLD M2 on the native OCCT kernel (docs/design/06-variable-blends, validation pack): conic, curvature-continuous and asymmetric blend sections
- * for straight edges between planar faces (VC-BLD-07, 08, 09, 15 refusals, 21). Skipped when the llull-kernel binary is not built.
+ * for straight edges between planar faces (VC-BLD-07, 08, 09, 15 refusals, 21); curved edges, varying sizes and corners: nativeBlendRails.test.ts. Skipped when the llull-kernel binary is not built.
  */
 
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -144,30 +144,24 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
     expect(volume(done.doc, done.id) - before).toBeCloseTo(10 / 6, 3);
   });
 
-  it('BLD_PROFILE_FAILED names what the kernel does not build: a curved face, a varying size, two selected edges at a vertex, a leg past the face', () => {
+  it('BLD_PROFILE_FAILED names what the kernel does not build: a second leg on a curved edge, a leg with a varying size, a third edge left sharp at a vertex, a size no fillet has', () => {
     const { doc, id } = block();
     const cylinder = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 10 });
-    const rim = execute(cylinder.doc, 'fillet_edge', {
+    const legs = execute(cylinder.doc, 'fillet_edge', {
       id: cylinder.id,
-      edgesNear: [[5, 0, 5]],
-      radius: 1,
-      profile: { type: 'conic', rho: 0.5 },
+      edges: [{ near: [5, 0, 5], size: 1, size2: 2, side1Near: [0, 0, 5] }],
     });
-    expect(rim.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [cylinder.id] });
-    expect(rim.summary).toContain('straight');
-    expect(rim.document).toBe(cylinder.doc);
-    const varying = execute(doc, 'fillet_edge', {
-      id,
-      edges: [{ near: topEdge, size: 1, sizeEnd: 2 }],
-      profile: { type: 'conic', rho: 0.5 },
-    });
-    expect(varying.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].sizeEnd'] });
+    expect(legs.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [cylinder.id] });
+    expect(legs.summary).toContain('straight');
+    expect(legs.document).toBe(cylinder.doc);
+    const varying = execute(doc, 'fillet_edge', { id, edges: [{ near: topEdge, size: 1, sizeEnd: 2, size2: 2, side1Near: [0, 0, 2.5] }] });
+    expect(varying.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
     const corner = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge, [10, 0, 2.5]], radius: 1, profile: { type: 'conic', rho: 0.5 } });
     expect(corner.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
-    expect(corner.summary).toContain('meet at a vertex');
+    expect(corner.summary).toContain('not rounded');
     const long = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge], radius: 9, profile: { type: 'conic', rho: 0.5 } });
     expect(long.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
-    expect(long.summary).toContain('reach past the faces');
+    expect(long.summary).toContain('could not be built');
     expect(long.error?.remediation).toContain('circular profile');
   });
 

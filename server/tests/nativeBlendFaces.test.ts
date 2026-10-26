@@ -276,7 +276,7 @@ describeNative('BLD M4: fillet_faces, hold lines and fillet_full_round (native O
     expect(top?.area).toBeCloseTo(140, 4);
   });
 
-  it('a hold line with a conic profile keeps the profile: a constant hold line builds it, a sloped one is BLD_PROFILE_FAILED', () => {
+  it('a hold line with a conic profile keeps the profile: a constant and a sloped hold line build it', () => {
     const block = made(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
     const flat = made(block.doc, 'draw_polyline', {
       points: [
@@ -301,13 +301,35 @@ describeNative('BLD M4: fillet_faces, hold lines and fillet_full_round (native O
       ],
       position: [0, 0, 2.5],
     });
-    const refused = execute(sloped.doc, 'fillet_faces', {
+    // a sloped line is a straight law 1 -> 2: the profile follows it (DES-6c step 2); the parabolic section removes (1/6) integral of leg^2 = 7.7778 mm3
+    const varying = made(sloped.doc, 'fillet_faces', {
       ...base,
+      id: block.id,
       holdLine: { id: sloped.id, onFaces: 'A' },
       profile: { type: 'conic', rho: 0.5 },
     });
-    expect(refused.error?.code).toBe('BLD_PROFILE_FAILED');
-    expect(refused.document).toBe(sloped.doc);
+    expect(varying.result.error).toBeUndefined();
+    const removed = (20 / 6) * (7 / 3);
+    expect(Math.abs(volume(varying.doc, varying.id) - (1000 - removed))).toBeLessThan(1e-6 * removed);
+    const checked = execute(varying.doc, 'check_blends', { ids: [varying.id] }).data as {
+      status: string;
+      findings: Array<{ severity: string }>;
+    };
+    expect(checked.status).toBe('pass');
+    expect(checked.findings.filter((finding) => finding.severity === 'fail')).toEqual([]);
+    // the contact on the top face lies on the drawn polyline y = 4 - (x + 10) / 20 within 1e-6 x the diagonal, at several t
+    const brep = (varying.doc.entities[varying.id] as MeshSolidEntity).brep;
+    const shape = kernel.evaluate(brep as never);
+    const topology = kernel.topology(shape as never);
+    const contact = topology?.edges.find((edge) => edge.name?.includes('blend(') && edge.name.endsWith(`|${block.id}:z+)`));
+    expect(contact).toBeDefined();
+    const points = kernel.faceQuery?.edgeSamples(shape as never, contact?.index ?? 0, 9) ?? [];
+    expect(points).toHaveLength(9);
+    const diagonal = Math.hypot(20, 10, 5);
+    for (const sample of points) {
+      expect(Math.abs(sample.point[2] - 2.5)).toBeLessThan(1e-6 * diagonal);
+      expect(Math.abs(sample.point[1] - (4 - (sample.point[0] + 10) / 20))).toBeLessThan(1e-6 * diagonal);
+    }
   });
 
   it('a concave blend whose arc would lie in the material is BLD_FACE_FILLET_NO_SOLUTION; with room it adds material', () => {

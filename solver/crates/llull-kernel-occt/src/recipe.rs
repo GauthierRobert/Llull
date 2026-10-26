@@ -20,6 +20,7 @@ mod floor;
 mod nodes;
 #[cfg(test)]
 mod nodes_tests;
+mod profile_node;
 mod setback_node;
 mod sheet_node;
 mod warp;

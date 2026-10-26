@@ -328,6 +328,113 @@ plan(
   ],
 );
 
+// ---------- DES-6c step 2: profiles on curved edges and faces, varying sizes, corners (TECHNICAL_SPEC §13.11) ----------
+/** Revolved spandrel volume: 2 pi |closed integral of rho^2 / 2 dz| over corner -> a, the rational quadratic a, t, b (weight w), b -> corner. */
+const revolvedSpandrel = (a, t, b, w) => {
+  const n = 40000;
+  let sum = 0;
+  let previous = a;
+  for (let k = 1; k <= n; k++) {
+    const u = k / n;
+    const basis = [(1 - u) * (1 - u), 2 * u * (1 - u) * w, u * u];
+    const norm = basis[0] + basis[1] + basis[2];
+    const point = [0, 1].map((axis) => (basis[0] * a[axis] + basis[1] * t[axis] + basis[2] * b[axis]) / norm);
+    sum += 0.25 * (previous[0] ** 2 + point[0] ** 2) * (point[1] - previous[1]);
+    previous = point;
+  }
+  const line = (from, to) => 0.25 * (from[0] ** 2 + to[0] ** 2) * (to[1] - from[1]);
+  return 2 * Math.PI * Math.abs(sum + line(b, t) + line(t, a));
+};
+const rimRemoved = revolvedSpandrel([8, 20], [10, 20], [10, 18], 1);
+const bossAdded = revolvedSpandrel([12, 0], [10, 0], [10, 2], 0.4 / 0.6);
+const parabolaToCircle = 1 / 6 / (1 - Math.PI / 4);
+
+plan(
+  'target_profiles_curved_variable',
+  'Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies and a cube whose twelve edges are profiled (G1 corner patches), each followed by check_blends.',
+  [],
+  [
+    { command: 'add_cylinder', params: { radius: 10, height: 20, anchor: 'base-center' }, as: 'rim' },
+    {
+      command: 'fillet_edge',
+      params: { id: '$rim', edgesNear: [[10, 0, 20]], radius: 2, profile: { type: 'conic', rho: 0.5 } },
+      as: 'rimC',
+    },
+    mass('$rimC'),
+    { command: 'check_blends', params: { ids: ['$rimC'] } },
+    { command: 'add_cylinder', params: { radius: 10, height: 20, anchor: 'base-center' }, as: 'rim2' },
+    {
+      command: 'fillet_edge',
+      params: { id: '$rim2', edgesNear: [[10, 0, 20]], radius: 2, profile: { type: 'curvature', shape: 0.5 } },
+      as: 'rimG2',
+    },
+    { command: 'check_blends', params: { ids: ['$rimG2'], require: 'G2' } },
+    { command: 'add_sphere', params: { radius: 5 }, as: 'ball' },
+    { command: 'add_box', params: { size: [20, 20, 5] }, as: 'slab' },
+    { command: 'boolean', params: { op: 'intersect', a: '$ball', b: '$slab' }, as: 'band' },
+    {
+      command: 'fillet_edge',
+      params: {
+        id: '$band',
+        edgesNear: [
+          [Math.sqrt(18.75), 0, 2.5],
+          [Math.sqrt(18.75), 0, -2.5],
+        ],
+        radius: 0.4,
+        profile: { type: 'curvature', shape: 0.5 },
+      },
+      as: 'bandG2',
+    },
+    { command: 'check_blends', params: { ids: ['$bandG2'], require: 'G2' } },
+    { command: 'add_box', params: { size: [60, 60, 5], anchor: 'min' }, as: 'plate' },
+    { command: 'add_cylinder', params: { radius: 10, height: 15, position: [30, 30, 5], anchor: 'base-center' }, as: 'boss' },
+    { command: 'boolean', params: { op: 'union', a: '$plate', b: '$boss' }, as: 'fused' },
+    { command: 'mass_properties', params: { entityId: '$fused' } },
+    {
+      command: 'fillet_edge',
+      params: { id: '$fused', edgesNear: [[40, 30, 5]], radius: 2, profile: { type: 'conic', rho: 0.4 } },
+      as: 'bossRing',
+    },
+    mass('$bossRing'),
+    { command: 'add_box', params: { size: [20, 10, 10], anchor: 'min' }, as: 'varA' },
+    { command: 'fillet_edge', params: { id: '$varA', edges: [{ near: [10, 10, 10], size: 1, sizeEnd: 2 }] }, as: 'varCircular' },
+    mass('$varCircular'),
+    { command: 'add_box', params: { size: [20, 10, 10], anchor: 'min' }, as: 'varB' },
+    {
+      command: 'fillet_edge',
+      params: { id: '$varB', edges: [{ near: [10, 10, 10], size: 1, sizeEnd: 2 }], profile: { type: 'conic', rho: 0.5 } },
+      as: 'varConic',
+    },
+    mass('$varConic'),
+    { command: 'check_blends', params: { ids: ['$varConic'] } },
+    { command: 'add_box', params: { size: [40, 30, 6], anchor: 'min' }, as: 'outline' },
+    {
+      command: 'fillet_edge',
+      params: {
+        id: '$outline',
+        edgesNear: [
+          [0, 0, 3],
+          [40, 0, 3],
+          [0, 30, 3],
+          [40, 30, 3],
+        ],
+        radius: 5,
+      },
+      as: 'outlineRound',
+    },
+    {
+      command: 'fillet_edge',
+      params: { id: '$outlineRound', edgesNear: [[20, 30, 6]], radius: 1.5, profile: { type: 'conic', rho: 0.5 } },
+      as: 'outlineLoop',
+    },
+    { command: 'check_blends', params: { ids: ['$outlineLoop'] } },
+    { command: 'add_box', params: { size: [10, 10, 10], anchor: 'min' }, as: 'cube' },
+    { command: 'fillet_edge', params: { id: '$cube', radius: 1, profile: { type: 'conic', rho: 0.5 } }, as: 'cubeC' },
+    mass('$cubeC'),
+    { command: 'check_blends', params: { ids: ['$cubeC'] } },
+  ],
+);
+
 // ---------- expected results ----------
 const D = '--doc t.llull.json --kernel occt --json';
 const cases = [
@@ -763,6 +870,78 @@ const cases = [
     assert: 'store snapshot',
     proves: ['FR-BLD-29'],
   },
+  {
+    vc: 'VC-BLD-34',
+    what: 'conic rim of a cylinder R 10 h 20, r 2, rho 0.5: the revolved spandrel is removed (rail-preserving profile on a curved edge); check_blends G1 at both contacts',
+    value: { removedVolume: rimRemoved },
+    tolerance: 1e-6,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) 2 pi |closed integral of rho^2 / 2 dz| over the spandrel (Green), generate_plans.mjs',
+    plan: 'target_profiles_curved_variable',
+    assert: 'mass_properties($rimC); check_blends($rimC)',
+    proves: ['FR-BLD-06', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-35',
+    what: 'curvature profile on a plane-cylinder rim and on a sphere band (R 5, planar caps): contacts G2, curvature jump x R below 1e-6',
+    value: { g2GapTimesRadius: 0 },
+    tolerance: 1e-6,
+    unit: 'dimensionless',
+    grade: 'A',
+    source: '(b) the section takes the curvature of each support (quintic, TECHNICAL_SPEC §13.11)',
+    plan: 'target_profiles_curved_variable',
+    assert: 'check_blends($rimG2, $bandG2).blends[*].contacts[*].order == G2',
+    proves: ['FR-BLD-07', 'FR-BLD-21', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-36',
+    what: 'conic ring (rho 0.4, r 2) on the concave edge of a boss R 10 on a plate: the revolved spandrel on the outside is added',
+    value: { addedVolume: bossAdded },
+    tolerance: 1e-6,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) as VC-BLD-34 on the air side of the corner',
+    plan: 'target_profiles_curved_variable',
+    assert: 'mass_properties($bossRing) - mass_properties($fused)',
+    proves: ['FR-BLD-06', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-37',
+    what: 'conic profile on a straight edge whose size runs 1 -> 2: same contact lines as the circular variable fillet, so the removed volume is the ratio c(rho) / (1 - pi/4) of the circular one (rho 0.5: 1/6)',
+    value: { ratioToCircular: parabolaToCircle },
+    tolerance: 1e-4,
+    unit: 'relative',
+    grade: 'A',
+    source: '(b) affine invariance of the section area at a right angle',
+    plan: 'target_profiles_curved_variable',
+    assert: '(V0 - V($varConic)) / (V0 - V($varCircular))',
+    proves: ['FR-BLD-05', 'FR-BLD-06', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-38',
+    what: 'conic profile on one top edge of a rounded outline (4 straight edges + 4 corner arcs): the whole tangent chain gets the profile, 8 blend faces, check_blends passes',
+    value: { profileBlends: 8 },
+    tolerance: 'exact',
+    unit: '-',
+    grade: 'A',
+    source: 'definition (OCCT rounds the tangent chain of a picked edge)',
+    plan: 'target_profiles_curved_variable',
+    assert: 'check_blends($outlineLoop).data.blends where profile == conic',
+    proves: ['FR-BLD-06', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-39',
+    what: 'cube 10, all 12 edges conic rho 0.5 r 1: 8 G1 corner patches (setback 2 x the least distance, reported in data.profile), G1 <= 0.01 rad, patch G0 within 5 x the default; volume: golden 975.822 +- 0.05, below a^3 - 12 (a - 2 sb) d^2 / 6 (the prism spandrels over the span), within 1e-3 of the circular rolling-ball cube',
+    value: { patches: 8, g1MaxRad: 0.01, volumeGolden: 975.822, volumeBounds: [975.772, 988], againstCircular: 1e-3 },
+    tolerance: { g1: 0.01, g0: '5 x 1e-6 x diagonal', volume: 0.05 },
+    unit: 'rad / mm3',
+    grade: 'A (bound, circular ratio) / C (volume golden: Plate fill)',
+    source: 'M2 corner refill: setback corner pipeline with the least setback x 2 (TECHNICAL_SPEC §13.11)',
+    plan: 'target_profiles_curved_variable',
+    assert: 'check_blends($cubeC); mass_properties($cubeC); data.profile.corners',
+    proves: ['FR-BLD-09', 'TR-BLD-06', 'TR-BLD-07'],
+  },
 ];
 // Measured on the native kernel (DES-6b, OCCT 7.9.2): what each gated case actually gave and where it misses the pack tolerance.
 const MEASURED = {
@@ -819,4 +998,4 @@ writeFileSync(
   join(here, 'expected_results.json'),
   `${JSON.stringify({ gap: 'BLD', generated: '2026-10-22', notes: 'Values: (a) quoted, (b) derived (generate_blend_refs.mjs, data/*.json) or (c) TBD with the tool to measure. Only grade A gates pass/fail. Units: the plans use the default document unit (mm).', plans: planIndex, cases }, null, 1)}\n`,
 );
-process.stdout.write(`wrote ${cases.length} cases and 5 plans\n`);
+process.stdout.write(`wrote ${cases.length} cases and 6 plans\n`);

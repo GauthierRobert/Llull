@@ -46,6 +46,8 @@ class Shape {
   // Built by a deformation (gtransform, warp): its B-spline faces are integrated with the adaptive rule (mass_properties), and so are the shapes
   // derived from it by placement, scaling, naming or a boolean.
   bool refined_mass = false;
+  // What the builder of this shape reports about how it was made (a JSON object; blend builders: builder, measured gap, fallback, corner setbacks).
+  std::string notes;
 };
 
 class StepWriter {
