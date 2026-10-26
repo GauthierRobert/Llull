@@ -78,3 +78,71 @@ describe('CONVENTIONS_GUIDE aerospace section (AF-03)', () => {
     expect(section).toMatch(/FTR_WAIVER_NOT_APPROVED/);
   });
 });
+
+describe('CONVENTIONS_GUIDE blends section (BLD, AF-03)', () => {
+  const start = CONVENTIONS_GUIDE.indexOf('## 14. Fillets, chamfers and blends');
+  const section = CONVENTIONS_GUIDE.slice(start);
+
+  it('exists and names the blend commands, the laws, the corners and the checks', () => {
+    expect(start).toBeGreaterThan(0);
+    for (const name of [
+      'fillet_edge',
+      'fillet_faces',
+      'fillet_full_round',
+      'chamfer_edge',
+      'blend_union',
+      'probe_fillet',
+      'check_blends',
+      'setback',
+      'profile',
+      'radiusEnd',
+      'distanceEnd',
+    ])
+      expect(section).toContain(name);
+  });
+
+  it('names only registered commands', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    expect(new Set(names).size).toBeGreaterThan(8);
+    const unknown = [...new Set(names)].filter((name) => getCommand(name) === undefined && name !== 'kernel_info');
+    expect(unknown).toEqual([]);
+  });
+
+  it('names every code its refusal table lists as a code the blend commands can return', async () => {
+    const codes = [...section.matchAll(/BLD_[A-Z_]+/g)].map((match) => match[0]);
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const dir = join(process.cwd(), 'packages/core/src');
+    const sources: string[] = [];
+    const walk = (folder: string): void => {
+      for (const entry of readdirSync(folder, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(folder, entry.name));
+        else if (entry.name.endsWith('.ts') && /blend|fillet|chamfer|diagnose|modify3d/i.test(entry.name))
+          sources.push(readFileSync(join(folder, entry.name), 'utf8'));
+      }
+    };
+    walk(dir);
+    const all = sources.join('\n');
+    expect([...new Set(codes)].filter((code) => !all.includes(code))).toEqual([]);
+  });
+
+  it('its worked plan is valid: every action is a registered command and its params pass the command schema', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    const block = /```json\n([\s\S]*?)\n```/.exec(section)?.[1];
+    expect(block).toBeDefined();
+    const plan = JSON.parse(block ?? '{}') as { actions: Array<{ command: string; params: Record<string, unknown> }> };
+    expect(plan.actions.length).toBeGreaterThan(5);
+    for (const action of plan.actions) {
+      const command = getCommand(action.command);
+      expect(command, action.command).toBeDefined();
+      const params = JSON.parse(JSON.stringify(action.params).replace(/"\$[a-z]+"/g, '"id-1"')) as unknown;
+      const parsed = command?.paramsValidator?.safeParse(params);
+      expect(parsed?.success, `${action.command}: ${JSON.stringify(parsed?.error?.issues)}`).toBe(true);
+    }
+  });
+
+  it('says what is not offered', () => {
+    expect(section).toMatch(/partial fillets, cliff \/ trim modes/);
+  });
+});

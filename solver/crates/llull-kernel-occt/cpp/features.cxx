@@ -3,9 +3,14 @@
 // occtPatches.ts (Coons-filled B-spline patches with their poles set, sewn) and occtFeatures.ts (BRepFeat makers).
 #include "llull-kernel-occt/cpp/features.hxx"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
+#include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -463,8 +468,39 @@ std::unique_ptr<Shape> chamfer_sided(const Shape &shape, rust::Slice<const uint3
   return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "chamfer")), shape);
 }
 
-std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
-  if (list.shapes.size() < 2 || !(radius > 0)) return nullptr;
+// A joint pick may lie at most this many of its own radii away from the joint it names: a pick farther than that is a mistake, not a choice.
+constexpr double kJointReach = 10.0;
+
+// The joint edge (section edge of the fuse) nearest to `point` and its distance, or -1 when there is none.
+static int nearest_joint(const std::vector<TopoDS_Edge> &joints, const gp_Pnt &point, double &distance_out) {
+  const TopoDS_Vertex probe = BRepBuilderAPI_MakeVertex(point);
+  int best = -1;
+  double best_distance = std::numeric_limits<double>::infinity();
+  for (size_t k = 0; k < joints.size(); ++k) {
+    BRepExtrema_DistShapeShape distance(probe, joints[k]);
+    if (!distance.IsDone()) continue;
+    if (distance.Value() < best_distance) {
+      best_distance = distance.Value();
+      best = static_cast<int>(k);
+    }
+  }
+  distance_out = best_distance;
+  return best;
+}
+
+// `picks` = x, y, z, radius per picked joint: the joint (and its tangent chain) nearest to the point takes that radius, every other joint `radius`.
+// `notes` receives the JSON the shape carries: per pick the distance to its joint and its radius, per contour its radius and the names of its joint edges.
+// A reason that starts with "[BLD_JOINT_PARAMS] joints[i]." is about pick i.
+static std::unique_ptr<Shape> build_blend_union(const ShapeList &list, double radius, rust::Slice<const double> picks, std::string &notes,
+                                                std::string &why) {
+  if (list.shapes.size() < 2 || !(radius > 0)) {
+    why = "needs two or more solids and a radius > 0";
+    return nullptr;
+  }
+  if (picks.size() % 4 != 0) {
+    why = "[BLD_JOINT_PARAMS] joints: the joint radii are malformed";
+    return nullptr;
+  }
   TopTools_ListOfShape arguments;
   arguments.Append(list.shapes[0]);
   TopTools_ListOfShape tools;
@@ -473,26 +509,127 @@ std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
   fuse.SetArguments(arguments);
   fuse.SetTools(tools);
   fuse.Build();
-  if (!fuse.IsDone()) return nullptr;
+  if (!fuse.IsDone()) {
+    why = "the union of the solids failed";
+    return nullptr;
+  }
   const TopoDS_Shape fused = fuse.Shape();
   std::vector<naming::Named> inputs;
   for (size_t i = 0; i < list.shapes.size(); ++i) inputs.push_back(naming::Named{list.shapes[i], list.names[i]});
   const std::vector<std::string> fused_names = naming::inherit(fused, inputs, fuse.History(), "boolean");
   const TopTools_IndexedMapOfShape boundary = unique_sub_shapes(fused, TopAbs_EDGE);
+  const std::vector<std::string> edge_names = naming::edge_names(fused, fused_names);
   std::vector<TopoDS_Edge> joints;
   for (TopTools_ListIteratorOfListOfShape it(fuse.SectionEdges()); it.More(); it.Next()) {
     const TopoDS_Edge edge = TopoDS::Edge(it.Value());
     if (BRep_Tool::Degenerated(edge)) continue;
     if (boundary.Contains(edge)) joints.push_back(edge);
   }
-  if (joints.empty()) return naming::wrap_named(fused, fused_names);
+  notes = "{\"builder\":\"union\",\"picks\":[],\"contours\":[]}";
+  if (joints.empty()) {
+    if (picks.size() > 0) {
+      why = "[BLD_JOINT_PARAMS] joints: the solids share no joint to give a radius to; give joints only for solids that overlap or touch along a joint";
+      return nullptr;
+    }
+    return naming::wrap_named(fused, fused_names);
+  }
   BRepFilletAPI_MakeFillet maker(fused, ChFi3d_Rational);
-  for (const TopoDS_Edge &edge : joints) maker.Add(radius, edge);
+  std::map<int, double> contour_radius;
+  std::map<int, size_t> contour_pick;  // the first pick that named the contour
+  std::ostringstream pick_notes;
+  pick_notes.precision(17);
+  for (size_t at = 0; at + 4 <= picks.size(); at += 4) {
+    const std::string label = "joints[" + std::to_string(at / 4) + "]";
+    const double r = picks[at + 3];
+    if (!(r > 0) || !std::isfinite(r)) {
+      why = "[BLD_JOINT_PARAMS] " + label + ".radius: a joint radius must be > 0";
+      return nullptr;
+    }
+    double distance = 0;
+    const int joint = nearest_joint(joints, gp_Pnt(picks[at], picks[at + 1], picks[at + 2]), distance);
+    if (joint < 0) {
+      why = "[BLD_JOINT_PARAMS] " + label + ".near: the pick could not be measured against the joints";
+      return nullptr;
+    }
+    if (distance > kJointReach * r) {
+      why = "[BLD_JOINT_PARAMS] " + label + ".near: the point is " + std::to_string(distance) + " from the nearest joint, more than 10 x its radius (" +
+            std::to_string(kJointReach * r) + "); move it onto the joint you mean";
+      return nullptr;
+    }
+    pick_notes << (at == 0 ? "" : ",") << "{\"distance\":" << distance << ",\"radius\":" << r << "}";
+    const TopoDS_Edge &edge = joints[static_cast<size_t>(joint)];
+    const int known = maker.Contour(edge);
+    if (known > 0) {
+      if (std::fabs(contour_radius[known] - r) > 1e-12 * std::max(r, contour_radius[known])) {
+        why = "[BLD_JOINT_PARAMS] " + label + ".radius: " + std::to_string(r) + " and " + std::to_string(contour_radius[known]) +
+              " go to joints of one tangent chain, which is rounded with one radius: give one radius per chain";
+        return nullptr;
+      }
+      continue;
+    }
+    maker.Add(r, edge);
+    contour_radius[maker.Contour(edge)] = r;
+    contour_pick[maker.Contour(edge)] = at / 4;
+  }
+  for (const TopoDS_Edge &edge : joints) {
+    if (picks.size() > 0 && maker.Contour(edge) > 0) continue;
+    maker.Add(radius, edge);
+  }
   maker.Build();
-  if (!maker.IsDone()) return nullptr;
+  if (!maker.IsDone()) {
+    why = "the kernel could not fillet the joints with these radii";
+    return nullptr;
+  }
+  std::ostringstream contour_notes;
+  contour_notes.precision(17);
+  std::map<int, std::pair<double, std::vector<std::string>>> by_contour;
+  for (const TopoDS_Edge &edge : joints) {
+    const int contour = maker.Contour(edge);
+    auto &entry = by_contour[contour];
+    entry.first = contour_radius.count(contour) > 0 ? contour_radius[contour] : radius;
+    entry.second.push_back(edge_names[static_cast<size_t>(boundary.FindIndex(edge) - 1)]);
+  }
+  bool first_contour = true;
+  for (const auto &[contour, entry] : by_contour) {
+    const std::string source = contour_pick.count(contour) > 0 ? "joints[" + std::to_string(contour_pick[contour]) + "]" : "default";
+    contour_notes << (first_contour ? "" : ",") << "{\"radius\":" << entry.first << ",\"source\":\"" << source << "\",\"edges\":[";
+    first_contour = false;
+    for (size_t k = 0; k < entry.second.size(); ++k) {
+      contour_notes << (k == 0 ? "" : ",") << '"';
+      for (const char c : entry.second[k]) {
+        if (c == '"' || c == '\\') contour_notes << '\\';
+        contour_notes << c;
+      }
+      contour_notes << '"';
+    }
+    contour_notes << "]}";
+  }
+  notes = "{\"builder\":\"union\",\"picks\":[" + pick_notes.str() + "],\"contours\":[" + contour_notes.str() + "]}";
   const std::vector<naming::Named> joined{naming::Named{fused, fused_names}};
   const TopoDS_Shape result = maker.Shape();
   return naming::wrap_named(result, naming::inherit(result, joined, naming::history_of(joined, maker), "blend"));
+}
+
+std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius, rust::Slice<const double> joints) {
+  std::string why, notes;
+  try {
+    std::unique_ptr<Shape> built = build_blend_union(list, radius, joints, notes, why);
+    if (built) built->notes = notes;
+    return built;
+  } catch (const Standard_Failure &) {
+    return nullptr;
+  }
+}
+
+rust::String blend_union_reason(const ShapeList &list, double radius, rust::Slice<const double> joints) {
+  std::string why, notes;
+  std::unique_ptr<Shape> built;
+  try {
+    built = build_blend_union(list, radius, joints, notes, why);
+  } catch (const Standard_Failure &error) {
+    why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+  }
+  return rust::String(built ? std::string() : (why.empty() ? std::string("the blend failed") : why));
 }
 
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {

@@ -11,6 +11,9 @@ const REMEDIATION = {
   BLD_CHAMFER_PARAMS: 'give exactly one of distance2 or angleDeg (with side1Near / side1Name)',
   BLD_CORNER_UNSUPPORTED:
     'give the vertex a setback corner on straight edges between planar faces (all convex or all concave at the vertex), all rounded in this step with a constant radius (corners: [{ near: <vertex>, type: "setback", setback: <distance> }]), or round fewer of the edges meeting there',
+  BLD_CHAMFER_VARIABLE_PARAMS: 'distanceEnd: > 0, symmetric legs (no distance2 / angleDeg), list the edges',
+  BLD_JOINT_PARAMS:
+    'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
   BLD_CHAMFER_ANGLE_RANGE: 'give the angle in degrees strictly between 0 and 90, measured on the side1 face',
 } as const;
 

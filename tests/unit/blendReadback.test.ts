@@ -213,7 +213,7 @@ describe('radius law over a setback blend (checkRadius)', () => {
   const run = (law: EdgeRadius, setback: boolean, sections: ReturnType<typeof covered>): ReturnType<typeof checkRadius> => {
     const kernel = kernelWith(sections);
     const shape = {} as ShapeHandle;
-    const record: LawRecord = { node: 0, law, shape, topology: TOPOLOGY, edge: 3, setback };
+    const record: LawRecord = { node: 0, law, shape, topology: TOPOLOGY, edge: 3, chain: new Set(), setback };
     return checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
   };
   const linear: EdgeRadius = { size: 1, sizeEnd: 2, interpolation: 'linear' };
@@ -369,5 +369,63 @@ describe('blendInfo helpers', () => {
     expect(isolatedEdge(topology(stub), 0)).toBe(false);
     const skipped = edgeOf(6, { start: [10, 0, 0], end: [20, 0, 0], seam: true });
     expect(isolatedEdge(topology(skipped), 0)).toBe(true);
+  });
+});
+
+describe('check_blends over a blend_union (the radius of each joint is verified)', () => {
+  const report =
+    (radius: number, source = 'default'): NonNullable<GeometryKernel['blendReport']> =>
+    () => ({
+      stage: 'blend',
+      contours: [],
+      vertices: [],
+      partial: false,
+      unsupportedVertices: [],
+      done: true,
+      valid: true,
+      notes: { builder: 'union', picks: [], contours: [{ radius, source, edges: [SOURCE_EDGE] }] },
+    });
+  const unioned = (kernel: GeometryKernel): { doc: CadDocument; id: string } => {
+    const first = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
+    const second = execute(first.document, 'add_box', { size: [4, 4, 4], position: [0, 0, 5] });
+    const result = execute(second.document, 'blend_union', { ids: [first.affected[0], second.affected[0]], radius: 1 }, context(kernel));
+    return { doc: result.document, id: result.affected[0] as string };
+  };
+
+  it('the realised radius of the joint equals the one the union gave it: pass, the law compared', () => {
+    const kernel = { ...kernelWith(sectionsOf(() => 1)), blendReport: report(1) };
+    const { doc } = unioned(kernel);
+    const { rows, findings, status } = check(kernel, doc);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ lawChecked: true, radius: { min: 1, max: 1 }, source: 'default' });
+    expect(findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW')).toEqual([]);
+    expect(status).toBe('pass');
+  });
+
+  it('each joint row says where its radius came from: the pick (joints[i]) or the default, so a mis-pick is visible', () => {
+    const kernel = { ...kernelWith(sectionsOf(() => 1)), blendReport: report(1, 'joints[2]') };
+    const { doc } = unioned(kernel);
+    expect(check(kernel, doc).rows[0]).toMatchObject({ source: 'joints[2]' });
+  });
+
+  it('BLD_CHECK_RADIUS_LAW (fail) when the joint is rounded with another radius than the union gave it', () => {
+    const kernel = { ...kernelWith(sectionsOf(() => 1.5)), blendReport: report(1) };
+    const { doc } = unioned(kernel);
+    const { findings, status } = check(kernel, doc);
+    const found = findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW');
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]).toMatchObject({ severity: 'fail', limit: 1e-4 });
+    expect(found[0]?.value).toBeCloseTo(0.5, 9);
+    expect(status).toBe('fail');
+  });
+
+  it('a kernel that reports no contours verifies nothing and still reads the radius back', () => {
+    const kernel = kernelWith(sectionsOf(() => 1.5));
+    const { doc } = unioned(kernel);
+    const { rows, status } = check(kernel, doc);
+    expect(rows[0]).toMatchObject({ radius: { min: 1.5, max: 1.5 } });
+    expect(rows[0]).not.toHaveProperty('lawChecked', true);
+    expect(rows[0]).not.toHaveProperty('source');
+    expect(status).toBe('pass');
   });
 });

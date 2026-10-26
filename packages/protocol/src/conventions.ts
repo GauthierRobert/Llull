@@ -300,4 +300,68 @@ peak factor is a named default stated in every result; Miles' equation is a quic
   \`analysis_report\` view dynamic → \`equivalent_static_load_case\` into a static case → \`compute_margins\` → \`check_structural_dynamics\`.
   frequency_response: same set-up with loads or \`set_base_excitation\` amplitudeG; \`analysis_report\` view dynamic gives the peaks and half-power Q.
 - Report results as "computed by llull, not approved": every dynamic result carries reviewRequired and its unverified reasons.
+
+## 14. Fillets, chamfers and blends (toolset 3d, measure)
+
+Blends need the exact native kernel (\`kernel_info\`); the mesh kernel refuses them and leaves the document unchanged. Sizes are document units, angles of
+\`chamfer_edge\` are degrees. Pick edges by \`edgesNear\` points (an edge mid point from \`inspect_topology\`) or \`edgeNames\`: the step records persistent names, so a later
+\`edit_step_params\` of the box re-rounds the same edge (REF_LOST / REF_SPLIT when the name is gone).
+
+**Which command**
+
+| Need | Command |
+| ---- | ------- |
+| round an edge, constant radius | \`fillet_edge\` with \`radius\` |
+| the largest radius an edge accepts, BEFORE rounding | \`probe_fillet\` (maxRadius per edge) |
+| radius that varies along the edge | \`fillet_edge\` \`radiusEnd\`, or \`edges: [{ near, size, sizeEnd, sizes, interpolation, law }]\`; "linear" is a straight transition, the default is smooth with flat ends |
+| size by the chord between the contact lines | \`fillet_edge\` \`mode: "chord"\` |
+| conic or curvature-continuous (G2 to planes) section, asymmetric legs | \`fillet_edge\` \`profile: { type: "conic", rho }\` / \`{ type: "curvature", shape }\`; asymmetric legs \`edges: [{ near, size, size2, side1Near }]\` |
+| a vertex of 4+ rounded edges, or a patch you control | \`fillet_edge\` \`corners: [{ near: <vertex>, type: "setback", setback }]\` (straight edges between planar faces, constant or linear radius) |
+| blend two face sets (several faces, curved faces, faces that share an edge) | \`fillet_faces\` \`facesA\` / \`facesB\` with \`radius\`, \`width\`, \`law\` or \`holdLine\` |
+| half-round on the top of a rib | \`fillet_full_round\` \`side1\` / \`center\` / \`side2\` |
+| bevel | \`chamfer_edge\` \`distance\`; \`distance2\` or \`angleDeg\` with \`side1Near\`; \`distanceEnd\` for a distance that runs along the edge |
+| weld solids and round the joints | \`blend_union\` \`radius\`, \`joints: [{ near, radius }]\` for joints with their own radius |
+| prove it | \`check_blends\` after every blend |
+
+**Laws.** \`t\` runs 0..1 along the picked edge from its start point (\`inspect_topology\` lists start and end; \`fillet_faces\` has \`startNear\`). A radius on a closed edge (a rim)
+must close on itself (BLD_LAW_NOT_PERIODIC). A variable radius needs one edge, not a chain. **Profiles** keep the contact lines of the circular fillet of the same size; the
+result reports the measured gap. **Corners:** the default is the kernel rolling ball; a setback corner stops each blend that far from the vertex (at least the reported minimum)
+and fills the corner with a G1 patch. Profile blends, setback patches and \`blend_union\` radii are held to the \`check_blends\` defaults when they are built (G0 1e-6 x diagonal, G1 0.01 rad; patches and re-skinned profiles 5 x the gap). Known exception: two circular \`fillet_edge\` steps on a box can read BLD_CHECK_G1_ANGLE (about 0.029 rad) where the second blend meets the first.
+
+**Main refusals** (the document is unchanged; the error carries a code, the param paths and a remediation)
+
+| Code | Do |
+| ---- | -- |
+| BLD_RADIUS_TOO_LARGE | use the largest radius named in the message, or \`probe_fillet\` it |
+| BLD_WALKING_FAILURE, BLD_TWISTED_SURFACE | smaller radius, smoother law, or round fewer edges per step |
+| BLD_CORNER_UNSUPPORTED, BLD_CORNER_FAILED | give the vertex a setback corner, or round fewer of the edges that meet there |
+| BLD_SETBACK_TOO_SHORT | setback larger than the reported minimum |
+| BLD_PROFILE_FAILED | the reason says which condition fails; try the circular profile, a smaller size, or a conic closer to rho 0.4142 |
+| BLD_LAW_INVALID, BLD_RHO_RANGE, BLD_SHAPE_RANGE, BLD_CHAMFER_PARAMS | fix the param named in the error paths |
+| BLD_CHAMFER_VARIABLE_PARAMS | \`distanceEnd\` > 0, no \`distance2\` / \`angleDeg\`, edges listed |
+| BLD_CHAMFER_FAILED | variable chamfer: smaller distances, unlist edges that share a vertex, or a constant chamfer (no \`distanceEnd\`) |
+| BLD_JOINT_PARAMS | \`blend_union\` \`joints\`: radius > 0, one radius per tangent chain, each point within 10 x its radius of a joint |
+| BLD_ASYMMETRIC_SIDE_MISSING | add \`side1Near\` (a point on the face that carries the first size) |
+| BLD_FACESET_EMPTY, BLD_FACESETS_OVERLAP | pick points on the faces (\`inspect_topology\`), no face in both sets |
+| BLD_FACE_FILLET_NO_SOLUTION | use at least the reported radius, or a width |
+| BLD_FACE_BLEND_UNSUPPORTED | the blend would round a face outside the sets (add it), or the shape is not built: the message names what |
+
+**Worked plan** (\`llull run plan.json\`, native kernel): probe, round with a varying radius, bevel with a varying distance, a conic round, and check each.
+
+\`\`\`json
+{ "actions": [
+  { "command": "add_box", "params": { "size": [20, 10, 5] }, "as": "b" },
+  { "command": "probe_fillet", "params": { "id": "$b", "edgesNear": [[0, 5, 2.5]] } },
+  { "command": "fillet_edge", "params": { "id": "$b", "edgesNear": [[0, 5, 2.5]], "radius": 1, "radiusEnd": 2 }, "as": "f" },
+  { "command": "check_blends", "params": { "ids": ["$f"] } },
+  { "command": "add_box", "params": { "size": [20, 10, 5] }, "as": "c" },
+  { "command": "chamfer_edge", "params": { "id": "$c", "edgesNear": [[0, 5, 2.5]], "distance": 1, "distanceEnd": 2 }, "as": "ch" },
+  { "command": "add_box", "params": { "size": [20, 10, 5] }, "as": "d" },
+  { "command": "fillet_edge", "params": { "id": "$d", "edgesNear": [[0, 5, 2.5]], "radius": 1, "profile": { "type": "conic", "rho": 0.5 } }, "as": "p" },
+  { "command": "check_blends", "params": { "ids": ["$p"], "require": "G1" } }
+] }
+\`\`\`
+
+Read \`check_blends\`: \`status\` pass / warn / fail, per blend face the contacts (gap, \`g1AngleRad\`, \`order\`) and the realised radius, and coded findings (BLD_CHECK_*). A circular
+fillet is G1 to a plane, never G2: ask for \`require: "G2"\` only with a curvature profile. Not offered (no param exists): partial fillets, cliff / trim modes of face blends, G3 blends.
 `;

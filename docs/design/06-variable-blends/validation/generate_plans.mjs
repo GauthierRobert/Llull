@@ -629,6 +629,49 @@ plan(
   ],
 );
 
+// ---------- DES-6c step 5: M5, variable chamfer and per-joint blend_union radii (TECHNICAL_SPEC §13.14) ----------
+const variableChamferRemoved = 0.5 * 20 * ((1 + 2 + 4) / 3);
+const tPlain = 40 * 20 * 4 + 10 * 20 * 16;
+const tJointsAdded = CORNER_AREA * 20 * (0.5 * 0.5 + 1.5 * 1.5);
+plan(
+  'target_m5',
+  'DES-6c step 5: the variable chamfer 1 -> 2, its refusals, blend_union with per-joint radii and the readback, and the worked plan of the llull guide (Blends)',
+  [],
+  [
+    block('c19'),
+    { command: 'chamfer_edge', params: { id: '$c19', edgesNear: [TOP_EDGE], distance: 1, distanceEnd: 2 }, as: 'k19' },
+    mass('$k19'),
+    block('c19b'),
+    { command: 'chamfer_edge', params: { id: '$c19b', edgesNear: [TOP_EDGE], distance: 1, distanceEnd: 6 }, expect: 'BLD_CHAMFER_FAILED' },
+    { command: 'chamfer_edge', params: { id: '$c19b', distance: 1, distanceEnd: 2 }, expect: 'BLD_CHAMFER_VARIABLE_PARAMS' },
+    { command: 'add_box', params: { size: [40, 20, 4], position: [20, 10, 2] }, as: 'tp' },
+    { command: 'add_box', params: { size: [10, 20, 18], position: [20, 10, 11] }, as: 'ts' },
+    {
+      command: 'blend_union',
+      params: {
+        ids: ['$tp', '$ts'],
+        radius: 1,
+        joints: [
+          { near: [15, 10, 4], radius: 0.5 },
+          { near: [25, 10, 4], radius: 1.5 },
+        ],
+      },
+      as: 'j32',
+    },
+    mass('$j32'),
+    { command: 'check_blends', params: { ids: ['$j32'] } },
+    { command: 'add_box', params: { size: [20, 10, 5] }, as: 'g1' },
+    { command: 'probe_fillet', params: { id: '$g1', edgesNear: [TOP_EDGE] } },
+    { command: 'fillet_edge', params: { id: '$g1', edgesNear: [TOP_EDGE], radius: 1, radiusEnd: 2 }, as: 'gf' },
+    { command: 'check_blends', params: { ids: ['$gf'] } },
+    { command: 'add_box', params: { size: [20, 10, 5] }, as: 'g2' },
+    { command: 'chamfer_edge', params: { id: '$g2', edgesNear: [TOP_EDGE], distance: 1, distanceEnd: 2 }, as: 'gc' },
+    { command: 'add_box', params: { size: [20, 10, 5] }, as: 'g3' },
+    { command: 'fillet_edge', params: { id: '$g3', edgesNear: [TOP_EDGE], radius: 1, profile: { type: 'conic', rho: 0.5 } }, as: 'gp' },
+    { command: 'check_blends', params: { ids: ['$gp'], require: 'G1' } },
+  ],
+);
+
 // ---------- expected results ----------
 const D = '--doc t.llull.json --kernel occt --json';
 const cases = [
@@ -866,14 +909,14 @@ const cases = [
   },
   {
     vc: 'VC-BLD-19',
-    what: 'variable chamfer 1 -> 2 along the block top edge (COULD)',
-    value: chamfers.variableLinear_1to2_block20.volumeAfter,
-    tolerance: 0.02,
-    unit: 'mm3',
+    what: 'variable chamfer 1 -> 2 along the block top edge (chamfer_edge distanceEnd, M5): the ruled loft of the corner triangles; removed volume 1/2 integral d^2; refused with the reason when a distance reaches past the faces, and without listed edges (BLD_CHAMFER_VARIABLE_PARAMS); refusals by the kernel are BLD_CHAMFER_FAILED',
+    value: { volume: chamfers.variableLinear_1to2_block20.volumeAfter, removed: variableChamferRemoved },
+    tolerance: 1e-8,
+    unit: 'mm3 (relative)',
     grade: 'A (section construction)',
     source: '(b) (1/2) integral d^2',
-    plan: '-',
-    assert: 'mass_properties',
+    plan: 'target_m5',
+    assert: 'mass_properties($k19)',
     proves: ['FR-BLD-18'],
   },
   {
@@ -1042,14 +1085,14 @@ const cases = [
   },
   {
     vc: 'VC-BLD-32',
-    what: 'blend_union with per-joint radii (COULD): two crossing cylinders and a plate, each joint its own radius; check_blends lists one blend chain per joint with its radius',
-    value: { radiiMatch: true },
-    tolerance: { radius: 1e-6 },
-    unit: 'mm',
+    what: 'blend_union with per-joint radii (M5): a plate 40 x 20 x 4 with a stem 10 x 20 x 18 sunk 2 into it, joints of length 20 at radius 0.5 and 1.5 beside a default 1; added volume (1 - pi/4) L (r1^2 + r2^2); check_blends reads one radius per joint',
+    value: { volume: tPlain + tJointsAdded, addedVolume: tJointsAdded, radii: [0.5, 1.5] },
+    tolerance: { volume: 1e-9, radius: 1e-6 },
+    unit: 'mm3 (relative) / mm',
     grade: 'A (radius readback)',
-    source: 'definition',
-    plan: '-',
-    assert: 'check_blends.data.blends[*].radius',
+    source: '(b) (1 - pi/4) r^2 L per concave right-angle joint',
+    plan: 'target_m5',
+    assert: 'mass_properties($j32); check_blends($j32).data.blends[*].radius',
     proves: ['FR-BLD-17'],
   },
   {

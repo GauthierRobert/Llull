@@ -2,7 +2,7 @@
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
 import type { FaceGroup, MeshAssetRef, MeshSource } from './meshProvenance';
-import type { BlendProfile, FaceBlendParams, FullRoundParams, SetbackCorner } from './blendTypes';
+import type { BlendProfile, FaceBlendParams, FullRoundParams, JointRadius, SetbackCorner } from './blendTypes';
 import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
@@ -823,8 +823,8 @@ export type ShapeRecipe =
   | ({ readonly op: 'faceBlend'; readonly source: ShapeRecipe } & FaceBlendParams)
   /** The full round of a rib top (BLD M4): a half-round tangent to `side1`, `side2` and `center`, which it consumes (unique face indices of the source). */
   | ({ readonly op: 'fullRound'; readonly source: ShapeRecipe } & FullRoundParams)
-  /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
-  | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
+  /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`; `joints` (BLD M5) give single joints their own radius. */
+  | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number; readonly joints?: readonly JointRadius[] }
   /** `openNear`: points, each picking the face of the source nearest to it to remove (an open pocket); absent = a sealed internal cavity. */
   | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number; readonly openNear?: readonly Vec3[] }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */

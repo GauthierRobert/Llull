@@ -63,6 +63,7 @@ function sizeHint(kernel: GeometryKernel, recipe: FilletRecipe, failure: BlendFa
 /** The param a refusal of `modified` is about: the radius (or edges of per-edge laws), or the center set of a full round. */
 function refusalPath(modified: ShapeRecipe): string {
   if (modified.op === 'fullRound') return 'center';
+  if (modified.op === 'chamfer') return 'distanceEnd';
   if (modified.op === 'fillet' && (modified.corners ?? []).length > 0) return 'corners';
   return modified.op === 'fillet' && modified.radii !== undefined ? 'edges' : 'radius';
 }
@@ -81,7 +82,11 @@ export function blendRefusal(
   topology: ShapeTopology | null,
 ): CommandResult {
   const generic = (): CommandResult => ({ document: doc, summary: modifyFailure(command, kernel, modified, result), affected: [] });
-  const reported = modified.op === 'fillet' || modified.op === 'faceBlend' || modified.op === 'fullRound';
+  const reported =
+    modified.op === 'fillet' ||
+    modified.op === 'faceBlend' ||
+    modified.op === 'fullRound' ||
+    (modified.op === 'chamfer' && modified.sizeEnd !== undefined);
   if (result !== 'refused' || !reported || kernel.blendReport === undefined) return generic();
   const report = kernel.blendReport(modified);
   const failure = report === null ? null : diagnoseBlend(report);

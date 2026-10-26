@@ -16,6 +16,7 @@ export type BlendFailureCode =
   | 'BLD_SETBACK_TOO_SHORT'
   | 'BLD_INVALID_RESULT'
   | 'BLD_PROFILE_FAILED'
+  | 'BLD_CHAMFER_FAILED'
   | 'BLD_FACE_FILLET_NO_SOLUTION'
   | 'BLD_FACESETS_OVERLAP'
   | 'BLD_FACE_BLEND_UNSUPPORTED'
@@ -65,6 +66,12 @@ export function diagnoseBlend(report: BlendReport): BlendFailure | null {
     const { code, text } = codedReason(report.message, 'BLD_CORNER_FAILED');
     return { code, edges: [], message: text };
   }
+  if (report.stage === 'chamfer')
+    return {
+      code: 'BLD_CHAMFER_FAILED',
+      edges: [],
+      message: `the variable chamfer cannot be built: ${report.message === undefined || report.message === '' ? 'the kernel gave no reason' : report.message}`,
+    };
   if (report.stage === 'profile' || report.stage === 'faceBlend' || report.stage === 'fullRound') {
     const { code, text } = codedReason(report.message);
     return { code, edges: [], message: code === 'BLD_PROFILE_FAILED' ? `the profile blend cannot be built: ${text}` : text };
@@ -114,6 +121,8 @@ export function diagnoseBlend(report: BlendReport): BlendFailure | null {
 }
 
 const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
+  BLD_CHAMFER_FAILED:
+    'use smaller distances (they must stay inside both faces along the whole edge), unlist edges that share a vertex, or use a constant chamfer (no distanceEnd); a variable chamfer needs straight edges between planar faces ending on flat square faces',
   BLD_RADIUS_TOO_LARGE: 'use a smaller radius (probe_fillet returns the largest radius that builds), or fewer edges per step',
   BLD_WALKING_FAILURE: 'use a smaller radius or a smoother law, or split the chain (fillet in two steps)',
   BLD_TWISTED_SURFACE: 'reduce the radius law slope or the radius on concave faces',

@@ -106,7 +106,7 @@ export function cornerSources(faceName: string): readonly string[] | null {
   return parts;
 }
 
-/** Whether a recipe contains a `fillet` node. */
+/** Whether a recipe contains a `fillet`, `faceBlend`, `fullRound` or `blend` (blend_union joints) node. */
 export function hasFillet(recipe: ShapeRecipe): boolean {
   switch (recipe.op) {
     case 'fillet':
@@ -118,11 +118,10 @@ export function hasFillet(recipe: ShapeRecipe): boolean {
       return false;
     case 'faceBlend':
     case 'fullRound':
+    case 'blend':
       return true;
     case 'boolean':
       return hasFillet(recipe.a) || hasFillet(recipe.b);
-    case 'blend':
-      return recipe.sources.some(hasFillet);
     default:
       return hasFillet(recipe.source);
   }

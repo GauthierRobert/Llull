@@ -211,8 +211,16 @@ pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> 
 }
 
 /// A `chamfer` node (BLD M1): symmetric `size` by default; with `faces` (one unique face index per edge, the face carrying the first leg) a second
-/// leg `size2` (distance-distance) or `angleDeg` (distance-angle, degrees measured on that face, 0 < angle < 90).
-fn chamfer_node(source: &Shape, edges: &[u32], size: f64, recipe: &Value) -> Evaluated {
+/// leg `size2` (distance-distance) or `angleDeg` (distance-angle, degrees measured on that face, 0 < angle < 90); with `sizeEnd` a symmetric
+/// distance that runs linearly from `size` to `sizeEnd` along each straight edge (BLD M5).
+fn chamfer_node(source: &Shape, edges: &[u32], size: f64, size_end: Option<f64>, recipe: &Value) -> Evaluated {
+    if let Some(end) = size_end {
+        // BLD M5: a distance running linearly from `size` to `end`; symmetric legs only
+        if recipe.get("faces").is_some_and(|faces| !faces.is_null()) {
+            return refused();
+        }
+        return shape_of(features::chamfer_variable(source, edges, size, end));
+    }
     let Some(faces) = recipe.get("faces").filter(|faces| !faces.is_null()) else {
         return shape_of(features::chamfer(source, edges, size));
     };
@@ -274,6 +282,9 @@ fn full_round_spec(recipe: &Value) -> Option<[f64; 3]> {
     Some([one_face(recipe, "side1")?, one_face(recipe, "center")?, one_face(recipe, "side2")?])
 }
 
+/// The evaluated operands of a `blend` node and its flat joint picks.
+type BlendOperands = (Vec<Rc<Shape>>, Vec<f64>);
+
 impl Evaluator {
     /// BLD M4 `faceBlend`: a rolling-ball blend between two planar faces (`features::face_blend`).
     pub(super) fn face_blend(&mut self, recipe: &Value) -> Evaluated {
@@ -320,12 +331,12 @@ impl Evaluator {
             return shape_of(features::fillet_laws(&source, &edges, &laws));
         }
         let size = number(recipe, "size").unwrap_or(f64::NAN);
-        let size_end = if chamfer { None } else { number(recipe, "sizeEnd") };
+        let size_end = number(recipe, "sizeEnd");
         if !positive(size) || size_end.is_some_and(|end| !positive(end)) {
             return refused();
         }
         if chamfer {
-            return chamfer_node(&source, &edges, size, recipe);
+            return chamfer_node(&source, &edges, size, size_end, recipe);
         }
         shape_of(features::fillet(&source, &edges, size, size_end))
     }
@@ -347,6 +358,27 @@ impl Evaluator {
                 _ => ("fullRound", FACE_SET_REASON.to_string()),
             };
             return Ok(blend_stage_report(stage, &reason));
+        }
+        if op == Some("blend") {
+            let Some((shapes, picks)) = self.blend_operands(recipe)? else { return Ok(Value::Null) };
+            let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
+            let radius = number(recipe, "radius").unwrap_or(f64::NAN);
+            // built (cached by the evaluation that asked): what the union reported about its picks and contours, no second build
+            if let Some(shape) = self.evaluate(recipe)? {
+                let notes = features::shape_notes(&shape).map_err(EvalError::Failure)?;
+                let mut report = blend_stage_report("blend", "");
+                report["notes"] = serde_json::from_str(&notes).unwrap_or(Value::Null);
+                return Ok(report);
+            }
+            let reason = features::blend_reason(&borrowed, radius, &picks).map_err(EvalError::Failure)?;
+            return Ok(blend_stage_report("blend", &reason));
+        }
+        if op == Some("chamfer") && number(recipe, "sizeEnd").is_some() {
+            let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
+            let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
+            let (first, last) = (number(recipe, "size").unwrap_or(f64::NAN), number(recipe, "sizeEnd").unwrap_or(f64::NAN));
+            let reason = features::chamfer_variable_reason(&source, &edges, first, last).map_err(EvalError::Failure)?;
+            return Ok(blend_stage_report("chamfer", &reason));
         }
         if op != Some("fillet") {
             return Ok(Value::Null);
@@ -403,16 +435,31 @@ impl Evaluator {
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
     }
 
-    /// `blend` (`blendedUnion`).
-    pub(super) fn blend(&mut self, recipe: &Value) -> Evaluated {
-        let Some(sources) = recipe.get("sources").and_then(Value::as_array) else { return refused() };
+    /// The operands of a `blend` node and its flat joint picks (x, y, z, radius per entry of `joints`; `None` when a pick is malformed).
+    fn blend_operands(&mut self, recipe: &Value) -> Result<Option<BlendOperands>, EvalError> {
+        let Some(sources) = recipe.get("sources").and_then(Value::as_array) else { return Ok(None) };
         let mut shapes: Vec<Rc<Shape>> = Vec::with_capacity(sources.len());
         for source in sources {
-            let Some(shape) = self.evaluate(source)? else { return refused() };
+            let Some(shape) = self.evaluate(source)? else { return Ok(None) };
             shapes.push(shape);
         }
+        let mut picks: Vec<f64> = Vec::new();
+        for joint in recipe.get("joints").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default() {
+            let (Some(near), Some(radius)) = (numbers(joint.get("near")), number(joint, "radius")) else { return Ok(None) };
+            if near.len() != 3 || !positive(radius) {
+                return Ok(None);
+            }
+            picks.extend(near);
+            picks.push(radius);
+        }
+        Ok(Some((shapes, picks)))
+    }
+
+    /// `blend` (`blendedUnion`): every joint `radius`, the joints nearest to the `joints` picks their own radius (BLD M5).
+    pub(super) fn blend(&mut self, recipe: &Value) -> Evaluated {
+        let Some((shapes, picks)) = self.blend_operands(recipe)? else { return refused() };
         let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
-        shape_of(features::blend(&borrowed, number(recipe, "radius").unwrap_or(f64::NAN)))
+        shape_of(features::blend(&borrowed, number(recipe, "radius").unwrap_or(f64::NAN), &picks))
     }
 
     /// `shell`: open where the faces nearest to `openNear` were (`openShell`), else a sealed cavity (`hollow`).

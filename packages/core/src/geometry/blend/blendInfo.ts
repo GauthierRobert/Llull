@@ -119,6 +119,23 @@ export function filletNodes(recipe: ShapeRecipe): FilletNode[] {
   }
 }
 
+/** Every blend_union node of `recipe` (through sources and boolean operands), outermost first. */
+export function blendNodes(recipe: ShapeRecipe): Array<Extract<ShapeRecipe, { op: 'blend' }>> {
+  switch (recipe.op) {
+    case 'blend':
+      return [recipe, ...recipe.sources.flatMap(blendNodes)];
+    case 'solid':
+    case 'brep':
+    case 'faceSlab':
+    case 'sheetSolid':
+      return [];
+    case 'boolean':
+      return [...blendNodes(recipe.a), ...blendNodes(recipe.b)];
+    default:
+      return blendNodes(recipe.source);
+  }
+}
+
 /** The radius law each edge of `node` was given. */
 export const lawsOfNode = (node: FilletNode): readonly EdgeRadius[] =>
   node.radii ?? node.edges.map(() => ({ size: node.size, ...(node.sizeEnd === undefined ? {} : { sizeEnd: node.sizeEnd }) }));

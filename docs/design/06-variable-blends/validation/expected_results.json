@@ -62,6 +62,15 @@
     "BLD_FACE_BLEND_UNSUPPORTED",
     "BLD_FACE_BLEND_UNSUPPORTED"
    ]
+  },
+  {
+   "file": "plans/target_m5.json",
+   "description": "DES-6c step 5: the variable chamfer 1 -> 2, its refusals, blend_union with per-joint radii and the readback, and the worked plan of the llull guide (Blends)",
+   "unbuilt": [],
+   "expectedCodesInOrder": [
+    "BLD_CHAMFER_FAILED",
+    "BLD_CHAMFER_VARIABLE_PARAMS"
+   ]
   }
  ],
  "cases": [
@@ -606,20 +615,23 @@
   },
   {
    "vc": "VC-BLD-19",
-   "what": "variable chamfer 1 -> 2 along the block top edge (COULD)",
-   "value": 976.666666667,
-   "tolerance": 0.02,
-   "unit": "mm3",
+   "what": "variable chamfer 1 -> 2 along the block top edge (chamfer_edge distanceEnd, M5): the ruled loft of the corner triangles; removed volume 1/2 integral d^2; refused with the reason when a distance reaches past the faces, and without listed edges (BLD_CHAMFER_VARIABLE_PARAMS); refusals by the kernel are BLD_CHAMFER_FAILED",
+   "value": {
+    "volume": 976.666666667,
+    "removed": 23.333333333333336
+   },
+   "tolerance": 1e-8,
+   "unit": "mm3 (relative)",
    "grade": "A (section construction)",
    "source": "(b) (1/2) integral d^2",
-   "plan": "-",
-   "assert": "mass_properties",
+   "plan": "target_m5",
+   "assert": "mass_properties($k19)",
    "proves": [
     "FR-BLD-18"
    ],
    "cli": {
-    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
-    "assert": "mass_properties"
+    "run": "llull run plans/target_m5.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($k19)"
    }
   },
   {
@@ -889,24 +901,30 @@
   },
   {
    "vc": "VC-BLD-32",
-   "what": "blend_union with per-joint radii (COULD): two crossing cylinders and a plate, each joint its own radius; check_blends lists one blend chain per joint with its radius",
+   "what": "blend_union with per-joint radii (M5): a plate 40 x 20 x 4 with a stem 10 x 20 x 18 sunk 2 into it, joints of length 20 at radius 0.5 and 1.5 beside a default 1; added volume (1 - pi/4) L (r1^2 + r2^2); check_blends reads one radius per joint",
    "value": {
-    "radiiMatch": true
+    "volume": 6410.730091830128,
+    "addedVolume": 10.730091830127586,
+    "radii": [
+     0.5,
+     1.5
+    ]
    },
    "tolerance": {
+    "volume": 1e-9,
     "radius": 0.000001
    },
-   "unit": "mm",
+   "unit": "mm3 (relative) / mm",
    "grade": "A (radius readback)",
-   "source": "definition",
-   "plan": "-",
-   "assert": "check_blends.data.blends[*].radius",
+   "source": "(b) (1 - pi/4) r^2 L per concave right-angle joint",
+   "plan": "target_m5",
+   "assert": "mass_properties($j32); check_blends($j32).data.blends[*].radius",
    "proves": [
     "FR-BLD-17"
    ],
    "cli": {
-    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
-    "assert": "check_blends.data.blends[*].radius"
+    "run": "llull run plans/target_m5.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($j32); check_blends($j32).data.blends[*].radius"
    }
   },
   {

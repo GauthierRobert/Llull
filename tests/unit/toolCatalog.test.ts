@@ -196,7 +196,7 @@ describe('backticked names in the conventions guide', () => {
       const schema = tool.inputSchema as { properties?: Record<string, unknown> };
       Object.keys(schema.properties ?? {}).forEach((name) => known.add(name));
     }
-    // Plan fields, result fields and document-level literals the guide explains, which are not command parameters.
+    // Plan fields, result fields, and document-level literals the guide explains, which are not top-level command parameters.
     const explained = new Set(['actions', 'as', 'command', 'params', 'affected', 'summary', 'data', 'units', 'mm', 'cm', 'm', 'in', 'ft']);
     const stale = [...CONVENTIONS_GUIDE.matchAll(/`([A-Za-z_][A-Za-z0-9_]*)`/g)]
       .map((match) => match[1] ?? '')

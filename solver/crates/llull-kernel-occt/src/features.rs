@@ -42,7 +42,10 @@ mod ffi {
         fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn full_round_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
         fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, second: f64, angle: bool) -> Result<UniquePtr<Shape>>;
-        fn blend_union(list: &ShapeList, radius: f64) -> Result<UniquePtr<Shape>>;
+        fn chamfer_variable(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Result<UniquePtr<Shape>>;
+        fn chamfer_variable_reason(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Result<String>;
+        fn blend_union(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<String>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
         fn shell_open(shape: &Shape, thickness: f64, open_near: &[f64]) -> Result<UniquePtr<Shape>>;
 
@@ -187,15 +190,38 @@ pub fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, se
     built(ffi::chamfer_sided(inner(shape)?, edges, faces, first, second, angle))
 }
 
-/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`.
-pub fn blend(shapes: &[&Shape], radius: f64) -> Built {
+/// BLD M5 chamfer whose symmetric distance runs linearly from `first` at the start of each listed straight edge to `last` at its end.
+pub fn chamfer_variable(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Built {
+    built(ffi::chamfer_variable(inner(shape)?, edges, first, last))
+}
+
+/// Why [`chamfer_variable`] fails (empty when it builds).
+pub fn chamfer_variable_reason(shape: &Shape, edges: &[u32], first: f64, last: f64) -> OcctResult<String> {
+    occt(ffi::chamfer_variable_reason(inner(shape)?, edges, first, last))
+}
+
+/// The shape list of a blend: one fuse of `shapes`.
+fn shape_list(shapes: &[&Shape]) -> Result<cxx::UniquePtr<ffi::ShapeList>, String> {
     let mut list = ffi::new_shape_list();
     for shape in shapes {
         let Some(pinned) = list.as_mut() else { return Err("shape list not created".to_string()) };
         ffi::shape_list_add(pinned, inner(shape)?);
     }
+    Ok(list)
+}
+
+/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`, except the joints nearest to the picks `joints` (x, y, z, radius per pick).
+pub fn blend(shapes: &[&Shape], radius: f64, joints: &[f64]) -> Built {
+    let list = shape_list(shapes)?;
     let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
-    built(ffi::blend_union(list, radius))
+    built(ffi::blend_union(list, radius, joints))
+}
+
+/// Why [`blend`] fails (empty when it builds).
+pub fn blend_reason(shapes: &[&Shape], radius: f64, joints: &[f64]) -> OcctResult<String> {
+    let list = shape_list(shapes)?;
+    let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
+    occt(ffi::blend_union_reason(list, radius, joints))
 }
 
 /// Sealed hollow: the solid minus its inward offset.

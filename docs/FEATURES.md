@@ -212,7 +212,7 @@
 
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
-| `check_blends` | Read-only continuity check of the fillets of solids (every solid with a fillet when `ids` is omitted). | read-only |
+| `check_blends` | Read-only continuity and radius check of the blends of solids: the results of fillet_edge, fillet_faces, fillet_full_round and blend_union (every solid with su… | read-only |
 | `geometric_validation_properties` | Compute the CAx-IF geometric validation properties of 3D solids: volume, surface area, centre of volume (centroid) and bounding box, in document units (volume … | read-only |
 | `mass_properties` | Measure the volume, area, centroid, inertia and (when a density is known) the mass of a 3D solid, in the document unit. | read-only |
 | `measure_angle` | Measure an angle. | read-only |

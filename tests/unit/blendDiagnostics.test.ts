@@ -60,6 +60,19 @@ describe('diagnoseBlend: OCCT report -> BLD_* code', () => {
     });
   });
 
+  it('a variable chamfer report with no message (undefined or empty) says the kernel gave no reason', () => {
+    for (const message of [undefined, '']) {
+      const failure = diagnoseBlend(report({ stage: 'chamfer', ...(message === undefined ? {} : { message }) }));
+      expect(failure).toMatchObject({
+        code: 'BLD_CHAMFER_FAILED',
+        message: 'the variable chamfer cannot be built: the kernel gave no reason',
+      });
+    }
+    expect(diagnoseBlend(report({ stage: 'chamfer', message: 'a distance reaches past the faces' }))?.message).toBe(
+      'the variable chamfer cannot be built: a distance reaches past the faces',
+    );
+  });
+
   it('a result without a vertex or a contour error is BLD_INVALID_RESULT; a build that works has no diagnosis', () => {
     expect(diagnoseBlend(report({ stage: 'validity', done: true }))?.code).toBe('BLD_INVALID_RESULT');
     expect(diagnoseBlend(report({ stage: 'corners' }))?.code).toBe('BLD_INVALID_RESULT');

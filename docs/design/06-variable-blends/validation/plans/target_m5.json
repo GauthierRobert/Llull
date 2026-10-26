@@ -1,0 +1,260 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "c19"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$c19",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "distance": 1,
+    "distanceEnd": 2
+   },
+   "as": "k19"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$k19"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "c19b"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$c19b",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "distance": 1,
+    "distanceEnd": 6
+   }
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$c19b",
+    "distance": 1,
+    "distanceEnd": 2
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     40,
+     20,
+     4
+    ],
+    "position": [
+     20,
+     10,
+     2
+    ]
+   },
+   "as": "tp"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     20,
+     18
+    ],
+    "position": [
+     20,
+     10,
+     11
+    ]
+   },
+   "as": "ts"
+  },
+  {
+   "command": "blend_union",
+   "params": {
+    "ids": [
+     "$tp",
+     "$ts"
+    ],
+    "radius": 1,
+    "joints": [
+     {
+      "near": [
+       15,
+       10,
+       4
+      ],
+      "radius": 0.5
+     },
+     {
+      "near": [
+       25,
+       10,
+       4
+      ],
+      "radius": 1.5
+     }
+    ]
+   },
+   "as": "j32"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$j32"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$j32"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "g1"
+  },
+  {
+   "command": "probe_fillet",
+   "params": {
+    "id": "$g1",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ]
+   }
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$g1",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "radiusEnd": 2
+   },
+   "as": "gf"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$gf"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "g2"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$g2",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "distance": 1,
+    "distanceEnd": 2
+   },
+   "as": "gc"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "g3"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$g3",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "gp"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$gp"
+    ],
+    "require": "G1"
+   }
+  }
+ ]
+}

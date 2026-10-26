@@ -3,7 +3,9 @@ import { type CadDocument, type MeshSolidEntity, type MeshData, type ShapeRecipe
 import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
+import { hasFillet } from '@core/geometry/blend/continuity';
 import { fakeKernel } from '../helpers/fakeKernel';
+import { scriptedKernel } from '../helpers/blendKernel';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 
 const BLEND_MESH: MeshData = { positions: [0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0], indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3] };
@@ -77,6 +79,83 @@ describe('blend_union', () => {
     const instance = Object.values(withInstance.entities).find((e) => e.kind === 'instance');
     setGeometryKernel(fakeKernel({ blend: BLEND_MESH }));
     expectNoOp(execute(withInstance, 'blend_union', { ids: [ids[0], instance?.id], radius: 0.2 }), withInstance, 'explode_instance');
+  });
+});
+
+describe('blend_union per-joint radii (BLD M5)', () => {
+  afterEach(() => setGeometryKernel(null));
+  const joints = [
+    { near: [0, 0, 5], radius: 0.1 },
+    { near: [1, 0, 5], radius: 0.4 },
+  ];
+  it('records the joints on the blend recipe next to the default radius, and the key separates them', () => {
+    setGeometryKernel(scriptedKernel());
+    const { doc, ids } = frame();
+    const result = execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints });
+    const brep = (result.document.entities[result.affected[0] as string] as MeshSolidEntity).brep as Extract<ShapeRecipe, { op: 'blend' }>;
+    expect(brep).toMatchObject({ op: 'blend', radius: 0.2, joints });
+    expect(recipeKey(brep)).not.toBe(recipeKey({ ...brep, joints: [{ near: [0, 0, 5], radius: 0.1 }] }));
+    expect(recipeKey(brep)).not.toBe(recipeKey({ op: 'blend', sources: brep.sources, radius: brep.radius }));
+    // an empty list is the plain blend
+    const plain = execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints: [] });
+    expect((plain.document.entities[plain.affected[0] as string] as MeshSolidEntity).brep).not.toHaveProperty('joints');
+    expectPure(doc, () => execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints }));
+  });
+  it('validates the joints of a recipe and refuses a non-positive joint radius without calling the kernel', () => {
+    const leaf = (id: string): ShapeRecipe => ({
+      op: 'solid',
+      entity: { id, kind: 'box', size: [1, 1, 1], position: [0, 0, 0], rotation: [0, 0, 0], layerId: 'layer-default', color: '#888888' },
+    });
+    const blend: ShapeRecipe = { op: 'blend', sources: [leaf('a'), leaf('b')], radius: 1, joints: [{ near: [0, 0, 0], radius: 0.5 }] };
+    expect(validateShapeRecipe(blend)).toBeNull();
+    expect(validateShapeRecipe({ ...blend, joints: [{ near: [0, 0, 0], radius: 0 }] })).toContain('joints must be');
+    expect(validateShapeRecipe({ ...blend, joints: [{ near: [0, 0], radius: 1 } as never] })).toContain('joints must be');
+    expect(validateShapeRecipe({ ...blend, joints: 'x' as never })).toContain('joints must be');
+    const fake = fakeKernel({ blend: BLEND_MESH });
+    setGeometryKernel(fake);
+    const { doc, ids } = frame();
+    const negative = execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints: [{ near: [0, 0, 0], radius: -1 }] });
+    expectNoOp(negative, doc, 'joints[0].radius must be > 0');
+    expect(negative.error).toMatchObject({ code: 'BLD_JOINT_PARAMS', paths: ['joints[0].radius'] });
+    expect(negative.error?.remediation).toBe(
+      'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
+    );
+    expect(fake.calls.filter((call) => call.op === 'blend')).toHaveLength(0);
+  });
+  it('an in-process kernel that cannot honour per-joint radii refuses instead of rounding every joint alike', () => {
+    setGeometryKernel(fakeKernel({ blend: BLEND_MESH }));
+    const { doc, ids } = frame();
+    expectNoOp(execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints }), doc, 'try another radius');
+  });
+  it('check_blends takes a blend_union result for a blended solid (its joints are blend faces)', () => {
+    const leaf = (id: string): ShapeRecipe => ({
+      op: 'solid',
+      entity: { id, kind: 'box', size: [1, 1, 1], position: [0, 0, 0], rotation: [0, 0, 0], layerId: 'layer-default', color: '#888888' },
+    });
+    expect(hasFillet({ op: 'blend', sources: [leaf('a'), leaf('b')], radius: 1 })).toBe(true);
+    expect(hasFillet(leaf('a'))).toBe(false);
+  });
+  it('a kernel refusal carries the reason the kernel computed', () => {
+    const fake = fakeKernel({ blend: null });
+    setGeometryKernel({
+      ...fake,
+      blendReport: () => ({
+        stage: 'blend',
+        contours: [],
+        vertices: [],
+        partial: false,
+        unsupportedVertices: [],
+        done: false,
+        valid: false,
+        message:
+          '[BLD_JOINT_PARAMS] joints[1].radius: 0.8 and 0.5 go to joints of one tangent chain, which is rounded with one radius: give one radius per chain',
+      }),
+    });
+    const { doc, ids } = frame();
+    const refused = execute(doc, 'blend_union', { ids: ids.slice(0, 2), radius: 0.2, joints });
+    expectNoOp(refused, doc, 'one tangent chain');
+    expect(refused.error).toMatchObject({ code: 'BLD_JOINT_PARAMS', paths: ['joints[1].radius'] });
+    expect(refused.error?.remediation).toContain('one radius per tangent chain');
   });
 });
 

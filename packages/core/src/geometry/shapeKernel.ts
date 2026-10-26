@@ -148,7 +148,8 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'chamfer': {
       const source = child(recipe.source);
       if (source === null) return null;
-      if (recipe.op === 'chamfer') return recipe.faces !== undefined ? null : ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.op === 'chamfer')
+        return recipe.faces !== undefined || recipe.sizeEnd !== undefined ? null : ops.chamfer(source, recipe.edges, recipe.size);
       if (profiled(recipe)) return null;
       if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
       const [first] = recipe.radii;
@@ -164,7 +165,7 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
         if (shape === null) return null;
         shapes.push(shape);
       }
-      return ops.blend(shapes, recipe.radius);
+      return recipe.joints === undefined ? ops.blend(shapes, recipe.radius) : null;
     }
     case 'shell': {
       const source = child(recipe.source);

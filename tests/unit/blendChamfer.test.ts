@@ -191,3 +191,71 @@ describe('is pure: sided chamfers', () => {
     }
   });
 });
+
+describe('chamfer_edge distanceEnd (variable chamfer, BLD M5)', () => {
+  const source: ShapeRecipe = { op: 'solid', entity: { id: 'b', kind: 'box' } as never };
+
+  it('records sizeEnd on the chamfer node, symmetric, with the listed edges', () => {
+    const kernel = scriptedKernel();
+    const { doc, id } = box();
+    const result = execute(doc, 'chamfer_edge', { id, edgeIndices: [0], distance: 1, distanceEnd: 2 }, context(kernel));
+    expect(result.affected).toHaveLength(1);
+    const brep = brepOf(result.document, result.affected[0] as string);
+    expect(brep).toMatchObject({ op: 'chamfer', edges: [0], size: 1, sizeEnd: 2 });
+    expect(brep).not.toHaveProperty('faces');
+    expectPure(doc, () => execute(doc, 'chamfer_edge', { id, edgeIndices: [0], distance: 1, distanceEnd: 2 }, context(kernel)));
+  });
+
+  it('BLD_CHAMFER_VARIABLE_PARAMS: with distance2 / angleDeg, not positive (path distanceEnd), or without listed edges (path edgeIndices); nothing reaches the kernel', () => {
+    const kernel = scriptedKernel();
+    const { doc, id } = box();
+    for (const [path, params] of [
+      ['distanceEnd', { distanceEnd: 2, distance2: 1, side1Near: [0, 0, 0] }],
+      ['distanceEnd', { distanceEnd: 2, angleDeg: 30, side1Near: [0, 0, 0] }],
+      ['distanceEnd', { distanceEnd: 0, edgeIndices: [0] }],
+      ['distanceEnd', { distanceEnd: -1, edgeIndices: [0] }],
+      ['edgeIndices', { distanceEnd: 2 }],
+    ] as const) {
+      const result = execute(doc, 'chamfer_edge', { id, distance: 1, ...params }, context(kernel));
+      expect(result.error).toMatchObject({ code: 'BLD_CHAMFER_VARIABLE_PARAMS', ids: [id], paths: [path] });
+      expect(result.error?.remediation).toBe('distanceEnd: > 0, symmetric legs (no distance2 / angleDeg), list the edges');
+      expect(result.document).toBe(doc);
+      expect(result.affected).toEqual([]);
+    }
+    expect(kernel.recipes.some((recipe) => recipe.op === 'chamfer')).toBe(false);
+  });
+
+  it('a kernel that cannot build it answers with the reason it computed (BLD_CHAMFER_FAILED, path distanceEnd, chamfer advice); the document is unchanged', () => {
+    const { doc, id } = box();
+    const base = scriptedKernel();
+    const refusing: GeometryKernel = {
+      ...base,
+      evaluate: (recipe) => (recipe.op === 'chamfer' ? null : base.evaluate(recipe)),
+      blendReport: () => ({
+        stage: 'chamfer',
+        contours: [],
+        vertices: [],
+        partial: false,
+        unsupportedVertices: [],
+        done: false,
+        valid: false,
+        message: 'a distance of 6 reaches past the faces of edge 0; use a smaller distance',
+      }),
+    };
+    const result = execute(doc, 'chamfer_edge', { id, edgeIndices: [0], distance: 1, distanceEnd: 6 }, context(refusing));
+    expect(result.document).toBe(doc);
+    expect(result.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED', ids: [id], paths: ['distanceEnd'] });
+    expect(result.error?.remediation).toContain('use smaller distances');
+    expect(result.error?.remediation).toContain('unlist edges that share a vertex');
+    expect(result.error?.remediation).not.toContain('circular profile');
+    expect(result.summary).toContain('the variable chamfer cannot be built: a distance of 6 reaches past the faces');
+  });
+
+  it('the recipe key and validation separate a variable chamfer from a constant one and refuse faces with sizeEnd', () => {
+    const base = { op: 'chamfer', source, edges: [0], size: 1 } as const;
+    expect(recipeKey({ ...base, sizeEnd: 2 })).not.toBe(recipeKey(base));
+    expect(validateShapeRecipe({ ...base, sizeEnd: 2 }, () => null)).toBeNull();
+    expect(validateShapeRecipe({ ...base, sizeEnd: 0 }, () => null)).toContain('sizeEnd must be > 0');
+    expect(validateShapeRecipe({ ...base, sizeEnd: 2, faces: [0], size2: 1 }, () => null)).toContain('symmetric');
+  });
+});

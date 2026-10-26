@@ -79,4 +79,15 @@ describe('export_code of radius laws', () => {
     const snapshot = code({ ...chamfered.doc, featureHistory: [] }, 'cadquery');
     expect(snapshot.summary).toContain('BLD_CODEGEN_UNSUPPORTED');
   });
+
+  it('a variable chamfer is not expressible either: never exported as a constant chamfer', () => {
+    setGeometryKernel(scriptedKernel());
+    const box = step(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
+    const chamfered = step(box.doc, 'chamfer_edge', { id: box.id, edgeIndices: [0], distance: 1, distanceEnd: 2 });
+    for (const language of ['cadquery', 'freecad']) {
+      const { text, summary } = code(chamfered.doc, language);
+      expect(summary).toContain('BLD_CODEGEN_UNSUPPORTED');
+      expect(text).toContain('mesh([');
+    }
+  });
 });

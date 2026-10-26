@@ -52,6 +52,10 @@ struct EdgeFrame {
 // The frame of unique edge `index` of `shape`; false with the reason in `why` (`what` names the kind of blend in the messages).
 bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFrame &frame, std::string &why);
 
+// Whether both ends of the straight edge of `frame` lie on a planar face perpendicular to it (the other faces at each end vertex), so a prism
+// along the edge can end flush; false with the reason in `why`.
+bool ends_square(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *what, std::string &why);
+
 // Diagonal of the true bounding box of `shape` (BRepBndLib::AddOptimal without enlargement: the bounds mass_properties gives, so the length
 // scale check_blends measures against). Construction tolerances use it; an acceptance limit uses the smaller of the source's and the result's.
 double diagonal_of(const TopoDS_Shape &shape);

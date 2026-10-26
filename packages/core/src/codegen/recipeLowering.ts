@@ -84,7 +84,7 @@ const profiledFillet = (recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' 
 export function blendNotExpressible(recipe: ShapeRecipe): boolean {
   switch (recipe.op) {
     case 'chamfer':
-      return recipe.faces !== undefined || blendNotExpressible(recipe.source);
+      return recipe.faces !== undefined || recipe.sizeEnd !== undefined || blendNotExpressible(recipe.source);
     case 'fillet':
       return profiledFillet(recipe) || blendNotExpressible(recipe.source);
     case 'faceBlend':
@@ -117,7 +117,7 @@ export function modificationFeature(
 ): Feature | null {
   const fallback = mesh === undefined ? {} : { mesh };
   if (recipe.op === 'shell') return { ...base, op: 'shell', thickness: size, ...fallback };
-  if (recipe.op === 'chamfer' && recipe.faces !== undefined) return null;
+  if (recipe.op === 'chamfer' && (recipe.faces !== undefined || recipe.sizeEnd !== undefined)) return null;
   if (recipe.op === 'fillet' && profiledFillet(recipe)) return null;
   const varying = recipe.op === 'fillet' && (recipe.sizeEnd !== undefined || recipe.radii !== undefined);
   const laws = varying ? filletLaws(recipe, kernel) : undefined;

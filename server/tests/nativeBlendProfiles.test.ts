@@ -165,6 +165,38 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
     expect(long.error?.remediation).toContain('circular profile');
   });
 
+  it.each([64, 120])(
+    'a %d-sided prism top rim: OCCT chains every side edge across creases of up to 0.1 rad, whose mitre ends the rail builder cannot skin: refused, never a half-profiled chain',
+    (sides) => {
+      const ring = (k: number): [number, number] => [50 * Math.cos((2 * Math.PI * k) / sides), 50 * Math.sin((2 * Math.PI * k) / sides)];
+      const prism = made(createEmptyDocument(), 'extrude_profile', {
+        profile: Array.from({ length: sides }, (_, k) => ring(k)),
+        depth: 20,
+      });
+      const [a, b] = [ring(0), ring(1)];
+      const near = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 20];
+      const refused = execute(prism.doc, 'fillet_edge', {
+        id: prism.id,
+        edgesNear: [near],
+        radius: 1,
+        profile: { type: 'conic', rho: 0.5 },
+      });
+      expect(refused.document).toBe(prism.doc);
+      expect(refused.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [prism.id] });
+      // the gap at the mitre is the radius times the turn between two sides
+      const gap = Number(/only to ([0-9.e-]+)/.exec(refused.summary)?.[1]);
+      expect(gap / ((2 * Math.PI) / sides)).toBeCloseTo(1, 1);
+      // the circular fillet of the same edge builds and chains every side edge
+      const circular = execute(prism.doc, 'fillet_edge', { id: prism.id, edgesNear: [near], radius: 1 });
+      expect(circular.error).toBeUndefined();
+      const checked = execute(circular.document, 'check_blends', { ids: [circular.affected[0] as string] }).data as {
+        blends: Array<{ kind: string; profile: string }>;
+      };
+      expect(checked.blends.filter((blend) => blend.kind === 'edge' && blend.profile === 'circular')).toHaveLength(sides);
+    },
+    120_000,
+  );
+
   it('BLD_RHO_RANGE and BLD_SHAPE_RANGE are refused before any build; the document is unchanged', () => {
     const { doc, id } = block();
     const rho = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge], radius: 1, profile: { type: 'conic', rho: 1.2 } });

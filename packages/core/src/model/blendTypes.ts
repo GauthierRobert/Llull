@@ -41,3 +41,9 @@ export interface FullRoundParams {
   readonly center: readonly number[];
   readonly side2: readonly number[];
 }
+
+/** A joint radius of `blend_union` (BLD M5): the joint (and its tangent chain) nearest to `near` is rounded with `radius` (document units). */
+export interface JointRadius {
+  readonly near: Vec3;
+  readonly radius: number;
+}

@@ -145,7 +145,7 @@ export interface SurfaceSample {
 
 /** Why an exact fillet recipe failed (or that it builds): the OCCT contour statuses, faulty vertices and 4+ edge vertices (BLD M0, `kernel.blendReport`). */
 export interface BlendReport {
-  readonly stage: 'contours' | 'corners' | 'validity' | 'profile' | 'setback' | 'faceBlend' | 'fullRound' | 'none';
+  readonly stage: 'contours' | 'corners' | 'validity' | 'profile' | 'setback' | 'faceBlend' | 'fullRound' | 'chamfer' | 'blend' | 'none';
   readonly contours: ReadonlyArray<{
     readonly edges: readonly number[];
     readonly status: 'ok' | 'error' | 'walking_failure' | 'startsol_failure' | 'twisted_surface';
@@ -165,7 +165,7 @@ export interface BlendReport {
 
 /** What the builder of a profile blend reports about the shape it made (DES-6c step 2). Lengths in document units. */
 export interface BlendBuildNotes {
-  readonly builder: 'prism' | 'rails' | 'corners';
+  readonly builder: 'prism' | 'rails' | 'corners' | 'union';
   /** Largest distance between a re-skinned face and its neighbour along their shared edges, and the limit it was held to (5e-6 x diagonal). */
   readonly gap?: number;
   readonly gapLimit?: number;
@@ -177,6 +177,9 @@ export interface BlendBuildNotes {
   readonly fallback?: { readonly edges: readonly number[]; readonly reason: string };
   /** Corner builder: the setback factor (x the least distance) that built, and per corner its vertex and the setback of each edge there. */
   readonly factor?: number;
+  /** Union builder (blend_union): per joint pick its distance to the joint it named and its radius; per contour of joints the radius it got, where it came from ("joints[i]" for the pick that named it, "default") and the names of its joint edges. */
+  readonly picks?: ReadonlyArray<{ readonly distance: number; readonly radius: number }>;
+  readonly contours?: ReadonlyArray<{ readonly radius: number; readonly source: string; readonly edges: readonly string[] }>;
   readonly corners?: ReadonlyArray<{
     readonly vertex: Vec3;
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;

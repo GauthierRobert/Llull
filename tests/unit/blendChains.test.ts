@@ -5,9 +5,10 @@
 import { describe, expect, it } from 'vitest';
 import { recordsByFace } from '@core/commands/brep/blendChains';
 import { junctionsOf } from '@core/commands/brep/blendJunctions';
-import type { LawRecord } from '@core/commands/brep/checkBlendRadius';
+import { type LawRecord, lawIndex } from '@core/commands/brep/checkBlendRadius';
+import type { ShapeRecipe } from '@core/model/types';
 import { measureContact } from '@core/geometry/blend/continuity';
-import type { ShapeTopology } from '@core/geometry/kernel';
+import type { GeometryKernel, ShapeTopology } from '@core/geometry/kernel';
 import type { FaceGraph } from '@core/geometry/kernelPorts';
 
 const face = (index: number, name: string): ShapeTopology['faces'][number] => ({ index, name, surface: 'plane', area: 1 }) as never;
@@ -18,56 +19,50 @@ const topology = {
   vertices: 0,
   volume: 1,
 } as ShapeTopology;
-// 0-1 and 1-2 share an edge (a chain), 2-3 a blend against a plane, 3-4 a plane against a separate blend
-const edgeFaces = [[0, 1], [1, 2], [2, 3], [3, 4], [0]];
-const graph = { faces: [], edgeFaces, edgeConvexity: [] } as unknown as FaceGraph;
 const always = (): boolean => true;
-const except =
-  (...creased: number[]) =>
-  (edge: number): boolean =>
-    !creased.includes(edge);
-const record = (profile?: LawRecord['profile']): LawRecord =>
-  ({ law: { size: 1 }, shape: {}, topology, edge: 0, ...(profile === undefined ? {} : { profile }) }) as unknown as LawRecord;
+const record = (chain: string[], profile?: LawRecord['profile']): LawRecord =>
+  ({
+    law: { size: 1 },
+    shape: {},
+    topology,
+    edge: 0,
+    chain: new Set(chain),
+    ...(profile === undefined ? {} : { profile }),
+  }) as unknown as LawRecord;
 
 describe('recordsByFace', () => {
-  it('a profile spreads over the blend faces that continue the face it was asked for, not over other faces or other blends', () => {
-    const conic = record({ type: 'conic', rho: 0.5 });
-    const found = recordsByFace(topology, graph, new Map([['e(a|b)', conic]]), always);
+  it('a profile spreads over the blend faces the kernel built with the picked edge (its chain), not over other blends or planes', () => {
+    const conic = record(['blend(e(a|b))', 'blend(e(c|d))', 'blend(e(e|f))'], { type: 'conic', rho: 0.5 });
+    const found = recordsByFace(topology, new Map([['e(a|b)', conic]]));
     expect([...found.keys()].sort()).toEqual([0, 1, 2]);
     expect(found.get(2)).toBe(conic);
     expect(found.has(4)).toBe(false);
+    expect(found.has(3)).toBe(false);
   });
 
   it('a face with its own record keeps it, and a circular record does not spread', () => {
-    const own = record({ type: 'curvature', shape: 0.5 });
-    const conic = record({ type: 'conic', rho: 0.5 });
+    const own = record(['blend(e(c|d))'], { type: 'curvature', shape: 0.5 });
+    const conic = record(['blend(e(a|b))', 'blend(e(c|d))', 'blend(e(e|f))'], { type: 'conic', rho: 0.5 });
     const kept = recordsByFace(
       topology,
-      graph,
       new Map([
         ['e(a|b)', conic],
         ['e(c|d)', own],
       ]),
-      always,
     );
     expect(kept.get(1)).toBe(own);
-    expect(kept.get(2)).toBe(own);
-    const circular = recordsByFace(topology, graph, new Map([['e(a|b)', record()]]), always);
+    expect(kept.get(2)).toBe(conic);
+    const circular = recordsByFace(topology, new Map([['e(a|b)', record(['blend(e(a|b))', 'blend(e(c|d))'])]]));
     expect([...circular.keys()]).toEqual([0]);
   });
 
-  it('a profile does not cross a crease: a blend that meets a profiled face at a convex or concave edge keeps no record', () => {
-    const conic = record({ type: 'conic', rho: 0.5 });
-    // edge 1 (between faces 1 and 2) is a crease: the chain stops there
-    const creased = recordsByFace(topology, graph, new Map([['e(a|b)', conic]]), except(1));
-    expect([...creased.keys()].sort()).toEqual([0, 1]);
-    // the first edge is a crease: nothing spreads at all
-    const nothing = recordsByFace(topology, graph, new Map([['e(a|b)', conic]]), except(0));
-    expect([...nothing.keys()]).toEqual([0]);
+  it('the chain is the kernel chain, with no angle rule: a blend built by another step keeps no profile even when it touches the profiled face', () => {
+    const conic = record(['blend(e(a|b))', 'blend(e(c|d))'], { type: 'conic', rho: 0.5 });
+    expect([...recordsByFace(topology, new Map([['e(a|b)', conic]])).keys()].sort()).toEqual([0, 1]);
   });
 
   it('no records: nothing', () => {
-    expect(recordsByFace(topology, graph, new Map(), always).size).toBe(0);
+    expect(recordsByFace(topology, new Map()).size).toBe(0);
   });
 });
 
@@ -129,5 +124,58 @@ describe('junctionsOf across fillet steps', () => {
     expect(junctionsOf(named, graph, 1, sameStep)).toEqual([]);
     // the same edges in one step are junctions
     expect(junctionsOf(named, graph, 0, always)).toEqual([{ edge: 0, neighbour: 'blend(e(d|e))' }]);
+  });
+});
+
+describe('lawIndex chains across fillet steps', () => {
+  const edge = (index: number, name: string): ShapeTopology['edges'][number] =>
+    ({
+      index,
+      name,
+      curve: 'line',
+      length: 1,
+      start: [0, 0, 0],
+      end: [1, 0, 0],
+      mid: [0.5, 0, 0],
+      seam: false,
+      degenerate: false,
+    }) as never;
+  const shape = (faces: string[], edges: string[]): ShapeTopology =>
+    ({
+      solids: 1,
+      faces: faces.map((name, index) => face(index, name)),
+      edges: edges.map((name, index) => edge(index, name)),
+      vertices: 0,
+      volume: 1,
+    }) as never;
+  const solid = { op: 'solid', entity: { id: 'x', kind: 'box' } } as unknown as ShapeRecipe;
+  const stepA: ShapeRecipe = { op: 'fillet', source: solid, edges: [0], size: 1, profile: { type: 'curvature', shape: 0.5 } };
+  const stepB: ShapeRecipe = { op: 'fillet', source: stepA, edges: [0], size: 1, profile: { type: 'conic', rho: 0.5 } };
+  // A rounds e(a|b); B rounds the first edge of A's result, and its result also holds a blend face whose source edge is not an edge of A's result
+  const sourceShape = shape(['a', 'b'], ['e(a|b)']);
+  const afterA = shape(['a', 'b', 'blend(e(a|b))'], ['e(a|blend(e(a|b)))']);
+  const afterB = shape(['a', 'b', 'blend(e(a|b))', 'blend(e(a|blend(e(a|b))))', 'blend(e(stray|other))'], []);
+  const topologies = new Map<ShapeRecipe, ShapeTopology>([
+    [solid, sourceShape],
+    [stepA, afterA],
+    [stepB, afterB],
+  ]);
+  const kernel = {
+    evaluate: (recipe: ShapeRecipe) => ({ recipe }),
+    topology: (handle: { recipe: ShapeRecipe }) => topologies.get(handle.recipe) ?? null,
+  } as unknown as GeometryKernel;
+
+  it('a node owns only the blend faces made from edges of its own source: a later step never claims a face of an earlier one', () => {
+    const records = lawIndex(kernel, stepB);
+    const second = records.get('e(a|blend(e(a|b)))');
+    const first = records.get('e(a|b)');
+    expect([...(second?.chain ?? [])]).toEqual(['blend(e(a|blend(e(a|b))))']);
+    expect([...(first?.chain ?? [])]).toEqual(['blend(e(a|b))']);
+    expect(first?.profile).toEqual({ type: 'curvature', shape: 0.5 });
+    const byFace = recordsByFace(afterB, records);
+    expect(byFace.get(2)?.profile?.type).toBe('curvature');
+    expect(byFace.get(3)?.profile?.type).toBe('conic');
+    // the stray face belongs to no record
+    expect(byFace.has(4)).toBe(false);
   });
 });

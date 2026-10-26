@@ -322,6 +322,26 @@ bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFram
   return true;
 }
 
+bool ends_square(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *what, std::string &why) {
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_faces;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertex_faces);
+  for (const TopoDS_Vertex &vertex : {TopExp::FirstVertex(frame.edge), TopExp::LastVertex(frame.edge)}) {
+    bool capped = false;
+    for (TopTools_ListIteratorOfListOfShape it(vertex_faces.FindFromKey(vertex)); it.More(); it.Next()) {
+      const TopoDS_Face face = TopoDS::Face(it.Value());
+      if (face.IsSame(frame.faces[0]) || face.IsSame(frame.faces[1])) continue;
+      if (BRepAdaptor_Surface(face, Standard_True).GetType() == GeomAbs_Plane &&
+          std::fabs(std::fabs(normal_of(face).Dot(frame.direction)) - 1.0) < 1e-9)
+        capped = true;
+    }
+    if (!capped) {
+      why = "an end of the edge is not on a face perpendicular to it (" + std::string(what) + " need flat square ends)";
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace blend
 
 namespace {
@@ -388,22 +408,9 @@ bool make_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_n
       return false;
     }
   }
-  // Both ends must be closed by a planar face perpendicular to the edge, so the prism can end flush with it.
-  TopTools_IndexedDataMapOfShapeListOfShape vertex_faces;
-  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertex_faces);
-  for (const TopoDS_Vertex &vertex : {TopExp::FirstVertex(edge), TopExp::LastVertex(edge)}) {
-    bool capped = false;
-    for (TopTools_ListIteratorOfListOfShape it(vertex_faces.FindFromKey(vertex)); it.More(); it.Next()) {
-      const TopoDS_Face face = TopoDS::Face(it.Value());
-      if (face.IsSame(around[0]) || face.IsSame(around[1])) continue;
-      if (BRepAdaptor_Surface(face, Standard_True).GetType() == GeomAbs_Plane &&
-          std::fabs(std::fabs(normal_of(face).Dot(direction)) - 1.0) < 1e-9)
-        capped = true;
-    }
-    if (!capped) {
-      why = label + " does not end on a face perpendicular to it (profile blends need flat square ends)";
-      return false;
-    }
+  if (!ends_square(shape, frame, "profile blends", why)) {
+    why = label + ": " + why;
+    return false;
   }
   return spandrel_tool(start, end, a, b, spec.kind, spec.param, wedge, "blend(" + edge_names[static_cast<size_t>(spec.edge)] + ")", tool, why);
 }
