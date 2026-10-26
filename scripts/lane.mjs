@@ -3,7 +3,7 @@
  * Persistent lane worktrees: `npm run lane -- <n> <branch> [--base origin/main]` prepares `<repo parent>/llull-lane<n>` on a fresh
  * `<branch>` from `<base>` and prints its path. The directory is reused task after task, so its ignored state stays warm: node_modules,
  * the vitest module cache (keyed by absolute path, so a new worktree path always starts cold: ~20 s per test file instead of ~5 s),
- * tsc incremental build info, the eslint cache and `solver/target`. Dependencies are reinstalled only when a lockfile changed.
+ * tsc incremental build info and `solver/target`. Dependencies are reinstalled only when a lockfile changed.
  * Refuses to switch a lane that has uncommitted changes or commits on no remote branch (`--force` overrides the latter only).
  */
 import { execFileSync, execSync } from 'node:child_process';
