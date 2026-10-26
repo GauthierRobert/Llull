@@ -118,9 +118,7 @@ export function hostileCases(reader: HostileReader): HostileCase[] {
   const keep = new Set([0.25, 0.75].map((fraction) => Math.max(1, Math.floor(length * fraction))));
   return cases.map((entry) => ({
     name: entry.name,
-    heavy:
-      isHeavy(entry.name, keep) ||
-      (reader.costly === true && !/^(empty|whitespace|BOM only|truncated)/.test(entry.name)),
+    heavy: isHeavy(entry.name, keep) || (reader.costly === true && !/^(empty|whitespace|BOM only|truncated)/.test(entry.name)),
     input: () => {
       const value = entry.input();
       return reader.input === 'bytes' ? asBytes(value) : typeof value === 'string' ? value : asText(value);
