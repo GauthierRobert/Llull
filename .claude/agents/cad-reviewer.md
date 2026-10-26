@@ -38,6 +38,8 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
 
 ### Tests & quality (blocking)
 - [ ] New command has happy + failure-path tests.
+- [ ] Contract suites of the checklist pass for what the diff touches; a new slice has a fuzz seed, a new reader a
+      `tests/helpers/hostileReaders.ts` entry.
 - [ ] `npm run check` green; coverage gate on `packages/core/src/{commands,geometry}/**` +
       `packages/domain-aec/src/**` satisfied (run it).
 - [ ] `toToolSchemas()` length == `listCommands()` length; schema snapshot / golden corpus
@@ -48,6 +50,10 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
 - Model invariants held (`model.md`): id↔order↔selection consistency, valid layerId,
   delete cleans order+selection, vec3 lengths, hex colors.
 - Edge cases: empty doc, missing id, zero/negative sizes, duplicate operations.
+- Walk `.claude/context/review-checklist.md` (the recurring finding classes: load validation, untrusted input, lifecycle,
+  ids/units, outcomes, gates). For a finding in a class a contract suite covers (slice fuzz, hostile input, lifecycle), also
+  say what the suite missed and how to extend it (seed, mutation, reader entry, corpus design): a finding the contract
+  catches next time is worth more than the fix alone.
 
 ## Output (fixed format — terse)
 

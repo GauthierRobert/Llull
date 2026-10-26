@@ -22,7 +22,7 @@ One registered command = one UI action + one CLI tool. Editing entities in a com
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
 Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + tool JSON Schema + validation) ·
 kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (the exact kernel) and Manifold WASM (in-process mesh kernel: renderer, tests, fallback) ·
-Rust workspace `solver/` (`llull-compute`, `llull-kernel`, `llull-mesh`: Netgen FE mesher, `llull-netgen` cxx facade, `llull-meshops`: mesh decimate / smooth / deviation job) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
+Rust workspace `solver/` (`llull-compute`, `llull-kernel`, `llull-mesh`: Netgen FE mesher, `llull-netgen` cxx facade, `llull-meshops`: mesh decimate / smooth / deviation job) · TypeScript 7 typecheck (`typescript-native`; TS 6 kept for tool APIs) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
 Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
 agents: `llull` CLI only (`--app` drives the desktop app); no MCP server.
 Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.
@@ -71,7 +71,8 @@ Dependency law: `.claude/rules/architecture.md` L2, enforced by `npm run arch` +
 
 Path-scoped (auto-load): `rules/commands.md` (packages/**, tests/**), `rules/sync.md` (protocol/server/store), `rules/react.md` (src/ui/**).
 On demand: `.claude/context/command-layer.md` (signatures) · `.claude/context/model.md` (entity schema) ·
-`docs/ARCHITECTURE.md` · `docs/ADD_A_TOOL.md` · `docs/ROADMAP.md` · `.claude/work/BOARD.md` (task board).
+`.claude/context/review-checklist.md` (self-review before cad-reviewer) · `docs/ARCHITECTURE.md` · `docs/ADD_A_TOOL.md` · `docs/ROADMAP.md` ·
+`.claude/work/BOARD.md` (task board).
 
 ## SKILLS (descriptions + agents come from the harness; delegation: workflow W5; names kept in sync by `claude:lint`)
 
@@ -89,6 +90,7 @@ npm run check:fast   # while iterating: typecheck + arch + lint + tests affected
 npm run check:coverage # the final gate when packages/*/src changed: check with test:coverage in place of test (as CI)
 npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero,dynamics,implicit} + design-lang + plm
 npm run claude:lint  # after editing .claude/
+npm run lane -- <n> <branch>   # persistent lane worktree ../llull-lane<n> (warm caches; docs/decisions/DL1-dev-loop.md)
 npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)
 node server/bin/llull.cjs help # CLI (llull-cli skill)
 npm --prefix server test ; npm --prefix desktop test

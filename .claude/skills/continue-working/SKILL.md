@@ -45,10 +45,13 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
     that is how you receive sibling work; there is no live channel between agents);
   - "you do NOT edit `.claude/work/BOARD.md` — the orchestrator owns it";
   - "follow `.claude/rules/*`; iterate with `npm run check:fast`, finish with ONE `npm run check:coverage` green (workflow W1); happy + failure tests for any
-    new command."
+    new command; self-review against `.claude/context/review-checklist.md` before reporting."
+  - its **lane worktree path** and "prefix every shell command with `cd \"<path>\" &&`; never `git stash`, never kill processes by name".
 - For long lanes, run agents with `run_in_background: true` so several proceed at once; you'll
-  be notified on completion. If the repo is git-initialized, prefer `isolation: "worktree"`
-  per agent for hard conflict isolation.
+  be notified on completion. Give each lane its own persistent worktree: `npm run lane -- <n> <branch>` prepares
+  `../llull-lane<n>` on a fresh branch from origin/main and keeps node_modules, the vitest module cache, tsc build info and
+  `solver/target` warm between tasks. Do NOT use `isolation: "worktree"`: every new path starts cold (npm ci, ~20 s per
+  test file instead of ~5 s, a cargo rebuild). A lane with uncommitted or unpushed work is refused; merge it first.
 
 ### 5. Converge
 - When an agent returns, flip its task to `[REVIEW]`, then run `cad-reviewer` on the diff.

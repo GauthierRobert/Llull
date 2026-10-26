@@ -6,12 +6,11 @@
 import { spawn } from 'node:child_process';
 
 const scripts = process.argv.slice(2);
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function run(script) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const child = spawn(npm, ['run', '--silent', script], { shell: process.platform === 'win32' });
+    const child = spawn(`npm run --silent ${script}`, { shell: true });
     let output = '';
     child.stdout.on('data', (chunk) => (output += chunk));
     child.stderr.on('data', (chunk) => (output += chunk));

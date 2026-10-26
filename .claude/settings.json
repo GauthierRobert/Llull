@@ -55,6 +55,15 @@
             "command": "node .claude/hooks/enforce-architecture.mjs"
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pre-shell.mjs"
+          }
+        ]
       }
     ],
     "PostToolUse": [
