@@ -236,7 +236,7 @@ def chamfer(solid, edges, distance, near=None):
 
 
 def fillet_laws(solid, edges, laws, near=None):
-    """Round edges with one radius law each: law = (size, size_end | None, [(t, size)...], linear, nodes | None); nodes = (t, radius) pairs OCCT interpolates."""
+    """Round edges with one radius law each: law = (size, size_end | None, [(t, size)...], linear, nodes | None); nodes = (t, radius) pairs OCCT interpolates with a cubic spline of zero end slopes (a straight law is sent as graded nodes along its polyline: OCP has no exact straight law)."""
     entries = []
     for index, law in zip(edges, laws):
         entry = {"index": int(index), "size": _term(law[0])}

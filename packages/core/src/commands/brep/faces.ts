@@ -29,19 +29,26 @@ function faceLine(face: FaceDetail, precision: number): string {
   return `#${face.index} ${face.surface} area ${fixedNumber(face.area, precision)} centroid ${fmtVec(face.centroid, precision)}${extras}`;
 }
 
-function summaryOf(id: string, total: number, faces: readonly FaceDetail[], graph: FaceGraph | undefined, precision: number): string {
+function summaryOf(
+  id: string,
+  total: number,
+  faces: readonly FaceDetail[],
+  graph: FaceGraph | undefined,
+  precision: number,
+  note?: string,
+): string {
   const listed = faces.slice(0, SUMMARY_FACE_LIMIT).map((face) => faceLine(face, precision));
   const more = faces.length > SUMMARY_FACE_LIMIT ? `; … ${faces.length - SUMMARY_FACE_LIMIT} more in data.faces` : '';
   const kinds =
     graph === undefined
       ? ''
       : ` Edge convexity: ${(['convex', 'concave', 'smooth', 'unknown'] as const).map((kind) => `${graph.edgeConvexity.filter((k) => k === kind).length} ${kind}`).join(', ')}.`;
-  return `inspect_faces: '${id}' has ${total} faces; ${faces.length} reported: ${listed.join('; ')}${more}.${kinds}`;
+  return `inspect_faces: '${id}' has ${total} faces; ${faces.length} reported: ${listed.join('; ')}${more}.${kinds}${note === undefined ? '' : ` Note: ${note}.`}`;
 }
 
 /**
  * @affects nothing — read-only
- * @invariant data = { entityId, faceCount, faces[FaceDetail] (only `faces` when given, ascending index), graph? }; face indices are those of
+ * @invariant data = { entityId, faceCount, faces[FaceDetail] (only `faces` when given, ascending index), graph?, note? }; face indices are those of
  *   inspect_topology on the same entity; lengths and areas in document units
  * @failure missing id, 2D / instance entity, no kernel or a kernel without a face-query port (error.code KRN_NO_EXACT_KERNEL), unbuildable
  *   solid (KRN_SHAPE_UNAVAILABLE), face index out of range (KRN_FACE_INDEX), kernel unable to answer (KRN_FACE_QUERY_FAILED) -> rejected no-op, no data
@@ -58,7 +65,8 @@ export const inspectFaces = defineCommand({
     'concave, smooth (tangent faces) or unknown. Use it to pick faces for holes, datums, tolerances or meshing: sample points and ' +
     'centroids are positions in the document frame. All lengths are document units and areas their square. ' +
     `Needs the exact kernel (check kernel_info): ${OCC_HINT}; the mesh kernel has no B-rep and the command is refused with error.code KRN_NO_EXACT_KERNEL. ` +
-    'For edges, edge indices and vertex counts (the fillet_edge / chamfer_edge selectors) use inspect_topology. Does not modify the document.',
+    'For edges, edge indices and vertex counts (the fillet_edge / chamfer_edge selectors) use inspect_topology. ' +
+    'data.note is set (and on the face concerned) when the adaptive integration guard tripped and an area comes from the fixed rule. Does not modify the document.',
   params: z.object({
     entityId: z.string().describe('Id of the 3D solid entity to inspect (a primitive, or a boolean / fillet / chamfer / shell result).'),
     faces: z
@@ -147,7 +155,14 @@ export const inspectFaces = defineCommand({
         'the kernel could not build the face graph of this shape',
         'Retry without graph=true.',
       );
-    const data = { entityId, faceCount: details.length, faces: selected, ...(adjacency === null ? {} : { graph: adjacency }) };
-    return report(doc, summaryOf(entityId, details.length, selected, adjacency ?? undefined, doc.displayPrecision), data);
+    const note = details.find((face) => face.note !== undefined)?.note ?? adjacency?.note;
+    const data = {
+      entityId,
+      faceCount: details.length,
+      faces: selected,
+      ...(adjacency === null ? {} : { graph: adjacency }),
+      ...(note === undefined ? {} : { note }),
+    };
+    return report(doc, summaryOf(entityId, details.length, selected, adjacency ?? undefined, doc.displayPrecision, note), data);
   },
 });

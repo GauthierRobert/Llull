@@ -38,6 +38,8 @@ export interface ResolvedMass {
   readonly bounds?: Bounds;
   /** Relative error estimate of the exact volume integration. */
   readonly relError?: number;
+  /** Kernel note on the integration (the adaptive guard tripped and the fixed rule was used). */
+  readonly note?: string;
   /** The inertia (not the volume) was integrated from the display mesh although `method` is 'exact'. */
   readonly inertiaFromMesh: boolean;
   /** A 'mesh' entity without a B-rep recipe: a faceted body. */
@@ -101,6 +103,7 @@ function exactMass(e: Entity, density: number, kernel: GeometryKernel): Resolved
       area: exact.area,
       bounds: exact.bounds,
       ...(exact.relError === undefined ? {} : { relError: exact.relError }),
+      ...(exact.note === undefined ? {} : { note: exact.note }),
       inertiaFromMesh: false,
       facetedBody: false,
     };

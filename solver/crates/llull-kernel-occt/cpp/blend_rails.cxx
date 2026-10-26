@@ -22,7 +22,6 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
-#include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
 #include <BRepLib.hxx>
 #include <BRepTools.hxx>
@@ -485,7 +484,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     why = "no edge to blend";
     return nullptr;
   }
-  BRepFilletAPI_MakeFillet maker(shape, ChFi3d_Rational);
+  LawFillet maker(shape);
   if (!add_fillet_laws(maker, unique, edges, laws)) {
     why = "edge index or radius law out of range";
     return nullptr;
@@ -765,6 +764,7 @@ std::unique_ptr<Shape> blend::rails_blend(const Shape &source, rust::Slice<const
     }
   }
   if (!built) return nullptr;
+  if (has_straight_kink(laws)) built->refined_mass = true;
   JsonWriter out;
   out.begin_object().key("builder").string("rails").key("gap").number(measured.gap).key("gapLimit").number(measured.limit).key("junctionG1").number(measured.junction).key("mixed").boolean(measured.mixed);
   if (!curved_reason.empty()) {

@@ -68,9 +68,10 @@ describeNative('BLD M1: radius laws, chord on curved faces, chamfer variants and
     // the exact planar area is 200 - integral(r ds): 170 to the 1e-6 gate (a temporary eps 1e-9 build of BRepGProp read the face 170.00000046)
     expect(Math.abs(200 - integral - 170)).toBeLessThan(1e-6);
     const list = faces(done.doc, done.id);
-    // the default (non-adaptive) face-area quadrature reads 170.00435 on this B-spline boundary: an artefact of the quadrature, not of the law
-    expect(Math.abs(areaOf(list, `${id}:z+`) - 170)).toBeLessThan(0.01);
-    expect(Math.abs(areaOf(list, `${id}:y+`) - 70)).toBeLessThan(0.01);
+    // the exact kink of the contact curve is a C0 knot, which the fixed Gauss rule misreads (169.9697 / 70.0303); a shape with a kinked straight
+    // law is read with the adaptive rule (Shape::refined_mass), which gives the planar areas exactly
+    expect(Math.abs(areaOf(list, `${id}:z+`) - 170)).toBeLessThan(1e-6);
+    expect(Math.abs(areaOf(list, `${id}:y+`) - 70)).toBeLessThan(1e-6);
   });
 
   it('VC-BLD-03 (smooth): the default interpolation passes through the control point but is not the straight-piece area', () => {

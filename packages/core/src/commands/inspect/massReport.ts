@@ -56,6 +56,7 @@ export interface MassDetail {
   readonly areaUnit?: string;
   readonly inertia: InertiaReport;
   readonly relErrorEstimate?: number;
+  readonly note?: string;
 }
 
 /** Centroid and inertia of `resolved` in the requested frame ('entity': the entity's position and rotation), about `about` (that frame). */
@@ -97,6 +98,7 @@ export function massDetail(
       frame,
     },
     ...(resolved.relError === undefined ? {} : { relErrorEstimate: resolved.relError }),
+    ...(resolved.note === undefined ? {} : { note: resolved.note }),
   };
 }
 

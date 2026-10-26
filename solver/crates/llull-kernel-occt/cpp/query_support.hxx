@@ -5,6 +5,8 @@
 #include <array>
 #include <cmath>
 #include <optional>
+#include <sstream>
+#include <string>
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
@@ -83,9 +85,31 @@ struct FaceMetric {
   gp_Pnt centroid;
 };
 
-// occtFaceMetrics.ts: BRepGProp surface properties of one face.
-inline FaceMetric face_metric(const TopoDS_Face &face) {
+// Relative accuracy asked of the adaptive rule for a face of a shape with a C0 knot in a boundary, and the error estimate up to which it is trusted.
+constexpr double kRefinedFaceEps = 1e-9;
+constexpr double kRefinedFaceDrift = 1e-5;
+
+// The note a result carries when the adaptive rule's own error estimate (`worst`, the largest over the tripped integrals) exceeded
+// kRefinedFaceDrift and the fixed Gauss rule was used there instead; empty when no guard tripped (`worst` NaN).
+inline std::string guard_note(double worst) {
+  if (!std::isfinite(worst)) return {};
+  std::ostringstream text;
+  text << "the adaptive integration rule's error estimate (largest " << worst << ") exceeded " << kRefinedFaceDrift
+       << " on at least one face or volume of this shape, so the fixed Gauss rule was used there; areas and volumes may be off by the kinks of the boundaries";
+  return text.str();
+}
+
+// occtFaceMetrics.ts: BRepGProp surface properties of one face. `refined` (Shape::refined_mass and a freeform face: `adaptive_rule`): the adaptive
+// rule when its own error estimate is within kRefinedFaceDrift, else the fixed Gauss rule (that rule is wrong across a C0 knot of a boundary, a
+// straight radius law with a kink); a tripped guard raises `*tripped` (may be null) to its estimate.
+inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, double *tripped = nullptr) {
   GProp_GProps props;
+  if (refined) {
+    GProp_GProps adaptive;
+    const double error = BRepGProp::SurfaceProperties(face, adaptive, kRefinedFaceEps, Standard_False);
+    if (error <= kRefinedFaceDrift) return {adaptive.Mass(), adaptive.CentreOfMass()};
+    if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
+  }
   BRepGProp::SurfaceProperties(face, props, Standard_False, Standard_False);
   return {props.Mass(), props.CentreOfMass()};
 }

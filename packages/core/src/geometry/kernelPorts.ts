@@ -36,6 +36,8 @@ export interface ExactMassProperties {
   readonly bounds: { readonly min: Vec3; readonly max: Vec3 };
   /** Relative error estimate of the volume integration, when the kernel reports one. */
   readonly relError?: number;
+  /** Why the numbers may be off: the adaptive integration guard tripped and the fixed Gauss rule was used (absent when nothing is to be said). */
+  readonly note?: string;
 }
 
 /** Healing options of an exact import (TR-KRN-11/24); lengths in mm. */
@@ -101,6 +103,8 @@ export interface FaceDetail {
   readonly radius?: number;
   /** Up to `options.samples` (default 64) points inside the trimmed face. */
   readonly samples: readonly Vec3[];
+  /** Set when the adaptive integration guard tripped on this face and its area is the fixed Gauss rule's. */
+  readonly note?: string;
 }
 
 export interface FaceGraphFace {
@@ -119,6 +123,8 @@ export interface FaceGraph {
   /** Per edge index: the faces bounding it. */
   readonly edgeFaces: readonly (readonly number[])[];
   readonly edgeConvexity: readonly ('convex' | 'concave' | 'smooth' | 'unknown')[];
+  /** Set when the adaptive integration guard tripped on a face and its area is the fixed Gauss rule's. */
+  readonly note?: string;
 }
 
 export interface FaceProjection {

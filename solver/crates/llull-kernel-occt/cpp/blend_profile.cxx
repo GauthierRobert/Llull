@@ -44,6 +44,7 @@
 #include <gp_Vec.hxx>
 
 #include "llull-kernel-occt/cpp/blend_tool.hxx"
+#include "llull-kernel-occt/cpp/blends.hxx"
 #include "llull-kernel-occt/cpp/features.hxx"
 #include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/cpp/query_support.hxx"
@@ -556,6 +557,7 @@ std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<cons
   try {
     std::unique_ptr<Shape> built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
     if (built) built->notes = notes;
+    if (built && has_straight_kink(laws)) built->refined_mass = true;
     g_last_reason = built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why);
     return built;
   } catch (const Standard_Failure &error) {

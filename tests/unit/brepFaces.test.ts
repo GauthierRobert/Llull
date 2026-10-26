@@ -59,6 +59,20 @@ const run = (doc: CadDocument, params: unknown, kernel: GeometryKernel | null): 
   execute(doc, 'inspect_faces', params, { ...defaultContext(), kernel });
 
 describe('inspect_faces', () => {
+  it('carries the kernel guard note (an area from the fixed rule after the adaptive guard tripped) from a face record or the graph into data.note and the summary', () => {
+    const { doc, box } = scene();
+    const note =
+      "the adaptive integration rule's error estimate (largest 0.03) exceeded 0.00001 on one face, so the fixed Gauss rule was used there";
+    const fromFace = withPort({ faceDetails: () => [{ ...(DETAILS[0] as FaceDetail), note }, ...DETAILS.slice(1)] });
+    const faceResult = run(doc, { entityId: box, faces: [1] }, fromFace.kernel);
+    expect((faceResult.data as { note?: string }).note).toBe(note);
+    expect(faceResult.summary).toContain('fixed Gauss rule was used there');
+    const fromGraph = withPort({ faceGraph: () => ({ ...GRAPH, note }) });
+    const graphResult = run(doc, { entityId: box, graph: true }, fromGraph.kernel);
+    expect((graphResult.data as { note?: string }).note).toBe(note);
+    expect(run(doc, { entityId: box }, withPort().kernel).data).not.toHaveProperty('note');
+  });
+
   it('reports every face, document untouched, and is pure', () => {
     const { doc, box } = scene();
     const before = JSON.stringify(doc);

@@ -360,12 +360,14 @@ function modificationStep(
   const brep = result.brep;
   if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell')) return null;
   if (brep.op === 'shell' && brep.openNear !== undefined && brep.openNear.length > 0) return null;
-  variables.delete(sourceId);
-  variables.set(result.id, variable);
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
   const value = brep.op === 'shell' ? brep.thickness : brep.size;
   const size = term(value, child(event.rawParams, sizeParam), ctx);
-  return modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size);
+  const feature = modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size);
+  if (feature === null) return null;
+  variables.delete(sourceId);
+  variables.set(result.id, variable);
+  return feature;
 }
 
 /** The sweep_profile / loft_sections call a step recorded, when the solid it created can be rebuilt from those params alone. */
@@ -477,6 +479,15 @@ function skippedSurfaceNote(doc: CadDocument): string[] {
   return skipped.length === 0 ? [] : [`not exported to code (curves and surface sheets have no solid form): ${skipped.join(', ')}.`];
 }
 
+/** The note of a program that exports a straight radius law: OCP has no exact one, so the fillet call carries graded nodes (`lawNodes`). */
+const STRAIGHT_LAW_NOTE =
+  'straight radius law exported as a graded-node spline (OCP has no exact straight law), within 1e-8 relative of the exact volume (adaptive reading, measured 3e-10); the native kernel and its STEP carry the exact law.';
+
+function withStraightLawNote(program: FeatureProgram): FeatureProgram {
+  const straight = program.features.some((feature) => feature.op === 'fillet' && (feature.laws ?? []).some((law) => law.linear));
+  return straight ? { ...program, notes: [...program.notes, STRAIGHT_LAW_NOTE] } : program;
+}
+
 function buildProgram(
   doc: CadDocument,
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
@@ -517,5 +528,5 @@ export function buildFeatureProgram(
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
   kernel: GeometryKernel | null = null,
 ): FeatureProgram {
-  return withRefusalNotes(buildProgram(doc, getCommand, kernel));
+  return withRefusalNotes(withStraightLawNote(buildProgram(doc, getCommand, kernel)));
 }

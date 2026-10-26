@@ -72,6 +72,8 @@ export interface ShapeTopology {
   readonly edges: readonly ShapeEdge[];
   readonly vertices: number;
   readonly volume: number;
+  /** Why the areas or the volume may be off (the adaptive integration guard tripped and the fixed Gauss rule was used); absent normally. */
+  readonly note?: string;
 }
 
 /** Health and lump structure of one shape (`GeometryKernel.analyze`). Lengths in document units. */

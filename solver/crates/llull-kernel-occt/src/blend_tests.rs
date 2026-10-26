@@ -179,6 +179,58 @@ fn the_variable_radius_volume_is_confirmed_by_a_fine_mesh() {
     }
 }
 
+/// BLD 13.15: a straight law (mode 1) is exact Law_Linear pieces, so its volume is the normal-section value of a radius that is linear along the
+/// edge to 1e-8 relative (the cubic law of mode 0 is 8.9e-5 below it, previous test).
+#[test]
+fn a_straight_radius_law_removes_exactly_the_normal_section_volume() {
+    let _serial = crate::serial_blends();
+    let block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let topo = topology(&block).unwrap();
+    let at = |edge: &Value, key: &str, axis: usize, value: f64| (f(&edge[key][axis]) - value).abs() < 1e-9;
+    let top = topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|e| ["start", "end"].iter().all(|key| at(e, key, 2, 5.0) && at(e, key, 1, 10.0)))
+        .unwrap() as u32;
+    for (end, section) in [(2.0, 989.985247625), (3.0, 981.401174161)] {
+        let shape = crate::features::fillet_laws(&block, &[top], &[1.0, end, 1.0, 0.0]).unwrap().unwrap();
+        let exact = crate::mass_properties(&shape).unwrap().volume;
+        assert!((exact - section).abs() < 1e-8 * section, "r 1 -> {end}: straight law {exact} vs section {section}");
+    }
+    // equal ends are a constant radius whatever the mode
+    let constant = crate::features::fillet_laws(&block, &[top], &[1.0, 1.0, 1.0, 0.0]).unwrap().unwrap();
+    let plain = crate::features::fillet(&block, &[top], 1.0, None).unwrap().unwrap();
+    let (a, b) = (crate::mass_properties(&constant).unwrap().volume, crate::mass_properties(&plain).unwrap().volume);
+    assert!((a - b).abs() < 1e-9 * b, "constant straight law {a} vs plain fillet {b}");
+}
+
+/// BLD 13.15: a kinked straight law asks for the adaptive mass rule (`refined_mass`); the per-face areas use it only while a freeform face is left, the
+/// same condition as the totals. Cutting the blend away keeps the flag and drops the rule.
+#[test]
+fn the_adaptive_face_rule_follows_the_freeform_faces_not_the_flag_alone() {
+    let _serial = crate::serial_blends();
+    let block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let topo = topology(&block).unwrap();
+    let at = |edge: &Value, key: &str, axis: usize, value: f64| (f(&edge[key][axis]) - value).abs() < 1e-9;
+    let top = topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|e| ["start", "end"].iter().all(|key| at(e, key, 2, 5.0) && at(e, key, 1, 10.0)))
+        .unwrap() as u32;
+    let kinked = crate::features::fillet_laws(&block, &[top], &[1.0, 1.0, 1.0, 1.0, 0.5, 2.0]).unwrap().unwrap();
+    assert!(crate::test_bridge::refined_mass(&kinked), "an interior node asks for the adaptive rule");
+    assert!(crate::test_bridge::adaptive_rule(&kinked), "the blend face is freeform");
+    let plain = crate::features::fillet_laws(&block, &[top], &[1.0, 2.0, 1.0, 0.0]).unwrap().unwrap();
+    assert!(!crate::test_bridge::refined_mass(&plain), "a straight law without an interior node needs no flag");
+    let inner = make_box([5.0, 2.0, 1.0], [10.0, 4.0, 2.0]).unwrap().unwrap();
+    let cut = crate::boolean(crate::BooleanOp::Intersect, &kinked, &inner, false).unwrap().unwrap();
+    assert!(crate::test_bridge::refined_mass(&cut), "the flag survives a boolean");
+    assert!(!crate::test_bridge::adaptive_rule(&cut), "no freeform face is left: the face areas use the rule of the totals (fixed)");
+    assert!(crate::mass_properties(&cut).unwrap().rel_error.is_nan(), "and so do the totals");
+}
+
 #[test]
 fn a_seam_edge_in_the_selection_is_skipped_and_the_report_still_comes_back() {
     let _serial = crate::serial_blends();
@@ -210,7 +262,7 @@ fn a_linear_law_through_a_control_point_builds_and_removes_the_straight_piece_vo
     let volume = |shape: &Shape| crate::mass_properties(shape).unwrap().volume;
     // Cavalieri: removed = int A(r(s)) ds with A = r^2 (1 - pi/4) at 90 degrees; r is piecewise linear 1 -> 2 -> 1 over the 20 mm.
     let removed = 2.0 * 10.0 * (1.0 - std::f64::consts::FRAC_PI_4) * (7.0 / 3.0);
-    assert!((1000.0 - volume(&linear) - removed).abs() < 0.05, "linear law removes {} vs {removed}", 1000.0 - volume(&linear));
+    assert!((1000.0 - volume(&linear) - removed).abs() < 1e-6, "linear law removes {} vs {removed}", 1000.0 - volume(&linear));
     assert!((volume(&linear) - volume(&smooth)).abs() > 1e-6, "the two interpolations differ");
 }
 

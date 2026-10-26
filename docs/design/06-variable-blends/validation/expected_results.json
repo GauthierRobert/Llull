@@ -152,16 +152,16 @@
    ],
    "measuredNative": {
     "linear": {
-     "topFaceArea": 170.0043,
-     "contactLineVsPolyline": 8.6e-7,
-     "volume": 989.990385,
-     "volumeVsSection": 0.005137
+     "topFaceArea": 170,
+     "contactLineVsPolyline": 6.4e-15,
+     "volume": 989.985248,
+     "volumeVsSection": 2.6e-9
     },
     "smooth": {
      "topFaceArea": 168.749
     }
    },
-   "finding": "interpolation \"linear\" puts the contact line on the polyline to 9e-7 (radius readback r(0.5) = 2 to 1e-4); the planar face area reads 170.0043 (2.5e-5 relative) because the kink of the law makes the B-spline boundary hard for the face-area quadrature, so the 1e-6 face-area gate is NOT met for a law with a kink (a straight law without kink is exact: VC-BLD-17 170 / 70 to 1e-6). Default \"smooth\" interpolation overshoots between the control points (168.749).",
+   "finding": "interpolation \"linear\" is the exact polyline (DES-6c step 6: Law_Linear pieces in the fillet spine, TECHNICAL_SPEC 13.15): the contact line is on it to 6.4e-15 (it was 8.6e-7 with the graded-node spline of DES-6b), the top face reads 170 and the side 70 to 1e-6 and the volume equals the closed form 989.985248 to 2.6e-12 relative. A kink is a C0 knot that BRepGProp's fixed Gauss rule misreads (989.991 / 169.9697 / 70.0303 before the fix), so a shape with a kinked straight law is read with the adaptive rule (Shape::refined_mass, 13.15.3); the +5.1e-3 \"over the section value\" of DES-6b was that quadrature error, not a construction offset. Default \"smooth\" interpolation overshoots between the control points (168.749).",
    "cli": {
     "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
     "assert": "check_blends($f03).data.blends[0].radius.at[t=0.5]; inspect_faces($f03)"

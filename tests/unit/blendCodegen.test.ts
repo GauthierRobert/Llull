@@ -10,6 +10,21 @@ import { scriptedKernel } from '../helpers/blendKernel';
 
 afterEach(() => setGeometryKernel(null));
 
+/** What each language writes for the exact mesh that replaces an inexpressible blend, and for the removal of the unblended source. */
+const MESH_EXPORT: Readonly<Record<string, { mesh: string; removed: string }>> = {
+  cadquery: { mesh: 'mesh([', removed: 'remove(box_1)' },
+  build123d: { mesh: 'mesh([', removed: 'remove(box_1)' },
+  freecad: { mesh: 'mesh([', removed: 'box_1 = None' },
+  openscad: { mesh: 'polyhedron', removed: '// box_1 removed' },
+};
+const expectMeshInstead = (doc: CadDocument, language: string): void => {
+  const { text, summary } = code(doc, language);
+  const expected = MESH_EXPORT[language] as { mesh: string; removed: string };
+  expect(summary, language).toContain('BLD_CODEGEN_UNSUPPORTED');
+  expect(text, language).toContain(expected.mesh);
+  expect(text, language).toContain(expected.removed);
+};
+
 const step = (doc: CadDocument, name: string, params: unknown): { doc: CadDocument; id: string } => {
   const result = execute(doc, name, params);
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
@@ -61,6 +76,13 @@ describe('export_code of radius laws', () => {
     expect(text).toContain('shape.makeFillet(float(first[0]), float(end)');
   });
 
+  it('a straight law is exported as a graded-node spline and says so (OCP has no exact straight law); a smooth law carries no such note', () => {
+    const straight = code(modelWith([{ index: 0, size: 1, sizeEnd: 2, interpolation: 'linear' }]), 'cadquery');
+    expect(straight.summary).toContain('straight radius law exported as a graded-node spline');
+    expect(straight.summary).toContain('within 1e-8 relative of the exact volume');
+    expect(code(modelWith([{ index: 0, size: 1, sizeEnd: 2 }]), 'cadquery').summary).not.toContain('graded-node');
+  });
+
   it('OpenSCAD keeps the exact result as triangles for a law fillet', () => {
     const { text } = code(modelWith([{ index: 0, size: 1, sizeEnd: 2 }]), 'openscad');
     expect(text).toMatch(/polyhedron|module/);
@@ -71,11 +93,7 @@ describe('export_code of radius laws', () => {
     setGeometryKernel(scriptedKernel());
     const box = step(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
     const chamfered = step(box.doc, 'chamfer_edge', { id: box.id, edgeIndices: [0], distance: 1, distance2: 2, side1Near: [0, 0, 0] });
-    for (const language of ['cadquery', 'freecad']) {
-      const { text, summary } = code(chamfered.doc, language);
-      expect(summary).toContain('BLD_CODEGEN_UNSUPPORTED');
-      expect(text).toContain('mesh([');
-    }
+    for (const language of Object.keys(MESH_EXPORT)) expectMeshInstead(chamfered.doc, language);
     const snapshot = code({ ...chamfered.doc, featureHistory: [] }, 'cadquery');
     expect(snapshot.summary).toContain('BLD_CODEGEN_UNSUPPORTED');
   });
@@ -84,10 +102,6 @@ describe('export_code of radius laws', () => {
     setGeometryKernel(scriptedKernel());
     const box = step(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
     const chamfered = step(box.doc, 'chamfer_edge', { id: box.id, edgeIndices: [0], distance: 1, distanceEnd: 2 });
-    for (const language of ['cadquery', 'freecad']) {
-      const { text, summary } = code(chamfered.doc, language);
-      expect(summary).toContain('BLD_CODEGEN_UNSUPPORTED');
-      expect(text).toContain('mesh([');
-    }
+    for (const language of Object.keys(MESH_EXPORT)) expectMeshInstead(chamfered.doc, language);
   });
 });

@@ -51,6 +51,7 @@
 #include <gp_Trsf.hxx>
 
 #include "llull-kernel-occt/cpp/naming.hxx"
+#include "llull-kernel-occt/cpp/query_support.hxx"
 #include "llull-kernel-occt/src/lib.rs.h"
 
 namespace llull {
@@ -364,7 +365,7 @@ MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_
 constexpr double kRefinedEps = 1e-9;
 constexpr double kRefinedDrift = 1e-5;
 
-GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error) {
+GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped) {
   // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
   // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
   GProp_GProps fixed_rule;
@@ -375,18 +376,27 @@ GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool on
   if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
   GProp_GProps adaptive;
   const double error = BRepGProp::VolumeProperties(piece, adaptive, kRefinedEps, only_closed, Standard_False);
-  if (!(error <= kRefinedDrift)) return fixed_rule;
+  if (!(error <= kRefinedDrift)) {
+    if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
+    return fixed_rule;
+  }
   if (rel_error != nullptr) *rel_error = error;
   return adaptive;
 }
 
-GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece) {
+bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freeform_face(shape.shape); }
+
+bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
+
+GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double *tripped) {
   GProp_GProps fixed_rule;
   BRepGProp::SurfaceProperties(piece, fixed_rule, Standard_False, Standard_False);
   if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
   GProp_GProps adaptive;
   const double error = BRepGProp::SurfaceProperties(piece, adaptive, kRefinedEps, Standard_False);
-  return error <= kRefinedDrift ? adaptive : fixed_rule;
+  if (error <= kRefinedDrift) return adaptive;
+  if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
+  return fixed_rule;
 }
 
 MassOut mass_properties(const Shape &shape) {
@@ -405,9 +415,11 @@ MassOut mass_properties(const Shape &shape) {
   MassOut out;
   out.rel_error = std::numeric_limits<double>::quiet_NaN();
   double estimate = std::numeric_limits<double>::quiet_NaN();
-  const GProp_GProps volume = volume_props(shape, local, true, &estimate);
-  const GProp_GProps surface = surface_props(shape, local);
+  double tripped = std::numeric_limits<double>::quiet_NaN();
+  const GProp_GProps volume = volume_props(shape, local, true, &estimate, &tripped);
+  const GProp_GProps surface = surface_props(shape, local, &tripped);
   out.rel_error = estimate;
+  out.note = query::guard_note(tripped);
   const double signed_volume = volume.Mass();
   out.volume = std::fabs(signed_volume);
   out.area = surface.Mass();

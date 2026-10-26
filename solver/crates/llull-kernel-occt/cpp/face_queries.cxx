@@ -1,6 +1,7 @@
 // Face-query port (01 §5.9) of the native kernel, following occtFaceQuery.ts and occtFaceGraph.ts of the retired opencascade.js kernel
 // (same OCC algorithms, same sample grids, same arithmetic order). Index rule: queries.hxx.
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -84,9 +85,10 @@ void write_interior_samples(JsonWriter &out, const TopoDS_Face &face, const BRep
   out.end_array();
 }
 
-void write_face_detail(JsonWriter &out, const TopoDS_Face &face, int index, int samples) {
+void write_face_detail(JsonWriter &out, const TopoDS_Face &face, int index, int samples, bool refined) {
   const BRepAdaptor_Surface adaptor(face, Standard_True);
-  const query::FaceMetric metric = query::face_metric(face);
+  double tripped = std::numeric_limits<double>::quiet_NaN();
+  const query::FaceMetric metric = query::face_metric(face, refined, &tripped);
   out.begin_object().key("index").integer(index).key("surface").string(query::surface_kind(adaptor.GetType()));
   out.key("area").number(metric.area).key("centroid").point(metric.centroid);
   switch (adaptor.GetType()) {
@@ -129,6 +131,9 @@ void write_face_detail(JsonWriter &out, const TopoDS_Face &face, int index, int 
   }
   out.key("samples");
   write_interior_samples(out, face, adaptor, samples);
+  // a tripped adaptive guard is never silent: the face says that its area came from the fixed rule
+  const std::string note = query::guard_note(tripped);
+  if (!note.empty()) out.key("note").string(note);
   out.end_object();
 }
 
@@ -226,9 +231,10 @@ const char *convexity_at(const TopoDS_Edge &edge, const TopoDS_Face &face_a, con
 
 rust::String face_details_json(const Shape &shape, int32_t samples) {
   const TopTools_IndexedMapOfShape faces = distinct(shape.shape, TopAbs_FACE);
+  const bool adaptive = adaptive_rule(shape);
   JsonWriter out;
   out.begin_array();
-  for (int f = 1; f <= faces.Extent(); ++f) write_face_detail(out, TopoDS::Face(faces(f)), f - 1, std::max(0, samples));
+  for (int f = 1; f <= faces.Extent(); ++f) write_face_detail(out, TopoDS::Face(faces(f)), f - 1, std::max(0, samples), adaptive);
   out.end_array();
   return text_of(out);
 }
@@ -324,13 +330,15 @@ rust::String face_graph_json(const Shape &shape) {
   for (int f = 1; f <= face_map.Extent(); ++f) faces.push_back(TopoDS::Face(face_map(f)));
   std::vector<std::vector<std::vector<EdgeUse>>> uses;
   for (const TopoDS_Face &face : faces) uses.push_back(face_loops(face, edge_map));
+  const bool adaptive = adaptive_rule(shape);
+  double tripped = std::numeric_limits<double>::quiet_NaN();
   JsonWriter out;
   out.begin_object().key("faces").begin_array();
   for (size_t f = 0; f < faces.size(); ++f) {
     const BRepAdaptor_Surface adaptor(faces[f], Standard_True);
     out.begin_object().key("index").integer(static_cast<long long>(f)).key("surface");
     query::write_surface_params(out, adaptor);
-    out.key("reversed").boolean(query::is_reversed(faces[f])).key("area").number(query::face_metric(faces[f]).area);
+    out.key("reversed").boolean(query::is_reversed(faces[f])).key("area").number(query::face_metric(faces[f], adaptive, &tripped).area);
     out.key("loops").begin_array();
     for (const auto &loop : uses[f]) {
       std::vector<int> seen;
@@ -381,7 +389,10 @@ rust::String face_graph_json(const Shape &shape) {
     const TopoDS_Edge edge = TopoDS::Edge(edge_map(static_cast<int>(e) + 1));
     out.string(convexity_at(edge, faces[static_cast<size_t>(list[0])], faces[static_cast<size_t>(list[1])], reversed));
   }
-  out.end_array().end_object();
+  out.end_array();
+  const std::string note = query::guard_note(tripped);
+  if (!note.empty()) out.key("note").string(note);
+  out.end_object();
   return text_of(out);
 }
 

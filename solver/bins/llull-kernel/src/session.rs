@@ -157,6 +157,9 @@ impl Session {
                 if mass.rel_error.is_finite() && mass.rel_error >= 0.0 {
                     result["relError"] = json!(mass.rel_error);
                 }
+                if !mass.note.is_empty() {
+                    result["note"] = json!(mass.note);
+                }
                 Ok(result)
             }),
             "analyze" => self.with_shape(first, |shape| {

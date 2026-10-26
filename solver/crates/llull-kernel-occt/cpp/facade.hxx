@@ -57,8 +57,14 @@ class StepWriter {
 
 // Volume / surface properties of `piece` (the shape or one solid of it) by the rule `shape` asks for: the default Gauss rule, and for a deformed
 // shape the adaptive rule wherever the two differ (see mass_properties). `rel_error` (may be null) receives the adaptive estimate when it was used.
-GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error);
-GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece);
+// `tripped` (may be null) is raised to the adaptive estimate when its error guard rejected the adaptive rule and the Gauss rule was used instead.
+GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped = nullptr);
+GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double *tripped = nullptr);
+
+// Whether the per-face areas of `shape` use the adaptive rule: the same condition as its totals (a refined shape with a freeform face).
+bool adaptive_rule(const Shape &shape);
+// `shape.refined_mass`, for the test-only view in src/test_bridge.rs.
+bool refined_mass_flag(const Shape &shape);
 
 void init_runtime();
 rust::String occt_version();

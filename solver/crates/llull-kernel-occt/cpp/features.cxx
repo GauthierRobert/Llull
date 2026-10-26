@@ -415,14 +415,17 @@ std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32
 std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws) {
   const TopTools_IndexedMapOfShape unique = unique_sub_shapes(shape.shape, TopAbs_EDGE);
   if (edges.empty()) return nullptr;
-  BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
+  LawFillet maker(shape.shape);
   if (!add_fillet_laws(maker, unique, edges, laws)) return nullptr;
   maker.Build();
   if (!maker.IsDone()) return nullptr;
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;
   const std::vector<naming::Named> inputs{naming::named(shape)};
-  return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "blend")), shape);
+  std::unique_ptr<Shape> out =
+      keep_mass_rule(naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "blend")), shape);
+  if (out != nullptr && has_straight_kink(laws)) out->refined_mass = true;
+  return out;
 }
 
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance) {

@@ -38,7 +38,8 @@ const OCCT_LIBS: &[&str] = &[
 ];
 
 /// Rust modules holding a `#[cxx::bridge]`.
-const BRIDGES: [&str; 6] = ["src/lib.rs", "src/features.rs", "src/features_surface.rs", "src/queries.rs", "src/xde.rs", "src/deform.rs"];
+const BRIDGES: [&str; 7] =
+    ["src/lib.rs", "src/features.rs", "src/features_surface.rs", "src/queries.rs", "src/xde.rs", "src/deform.rs", "src/test_bridge.rs"];
 
 /// IGES translator (XCH M4): linked and compiled in (`LLULL_HAS_IGES`) only when the prefix holds it, so a prefix built before TKDEIGES joined
 /// `build-occt.mjs` still builds the kernel (STEP only); `iges_available()` tells the host which it got.

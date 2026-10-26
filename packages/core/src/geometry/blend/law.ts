@@ -172,15 +172,16 @@ export function lawTimesFactors(law: EdgeRadius, factors: readonly number[]): Ed
   };
 }
 
-/** Distance (document units) of the first node from an end or kink of a straight-piece law; mirrors `kStraightBlend` of the native kernel. */
+/** Distance (document units) of the first node from an end or kink of a straight-piece law in the OCP export (`lawNodes`). */
 const STRAIGHT_BLEND = 1e-5;
-/** Growth of the node spacing away from an end or kink; mirrors `kStraightGrowth`. */
+/** Growth of the node spacing away from an end or kink. */
 const STRAIGHT_GROWTH = 1.5;
 
 /**
- * The (relative position, radius) nodes a kernel interpolates for `law` on an edge of `length`, or null when it takes the law as plain radii
- * (constant, or start -> end). Straight pieces (`interpolation: "linear"`) are sent as graded nodes along the polyline because OCCT's
- * interpolation is a cubic spline with zero end slopes; mirrors `straight_law` of `solver/crates/llull-kernel-occt/cpp/blends.cxx`.
+ * The (relative position, radius) nodes the generated OCP code gives `BRepFilletAPI_MakeFillet.Add` for `law` on an edge of `length`, or null
+ * when it takes the law as plain radii (constant, or start -> end). OCP can only interpolate nodes with a cubic spline of zero end slopes, so
+ * straight pieces (`interpolation: "linear"`) are sent as graded nodes along the polyline: the radius stays within 1.1e-7 mm of the straight
+ * law for a 1 to 2 mm radius (8.6e-7 mm across a kink; measured, 13.15). The native kernel builds the exact straight law itself (TECHNICAL_SPEC 13.15).
  */
 export function lawNodes(law: EdgeRadius, length: number): ReadonlyArray<readonly [number, number]> | null {
   const [start, end] = lawEnds(law);

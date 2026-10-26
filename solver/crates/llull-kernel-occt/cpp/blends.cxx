@@ -33,54 +33,17 @@ namespace llull {
 
 namespace {
 
-// Distance, in document units, of the first node from every end and kink of a straight-piece law (see straight_law).
-constexpr double kStraightBlend = 1e-5;
-// Growth of the node spacing away from an end or kink.
-constexpr double kStraightGrowth = 1.5;
-// Approximation tolerances of a straight-law build (OCCT defaults 1e-4 / 1e-5 / 1e-4 / 1e-5 / 1e-3): the radius law must be followed closely.
-constexpr double kAngularTolerance = 1e-2;
-constexpr double kTightTolerance = 1e-5;
-constexpr double kTightDeflection = 1e-5;
-
-double edge_length(const TopoDS_Edge &edge) {
-  GProp_GProps props;
-  BRepGProp::LinearProperties(edge, props);
-  return props.Mass();
-}
-
-// OCCT builds every evolving radius as a cubic spline through (relative position, radius) nodes with ZERO slope at both ends
-// (ChFiDS_FilSpine mklaw -> Law_Interpol); its Law_Function entry point is a no-op in 7.9.2 and Build then crashes. A straight-piece law is
-// therefore sent as the corners of the polyline plus, inside every piece, nodes on the line at distances kStraightBlend * kStraightGrowth^j from
-// both of its ends (graded, so each spline interval is at most twice its neighbour and the oscillation a kink excites dies out at once): the
-// spline follows the polyline to about the slope jump x kStraightBlend (area error below 1e-7 mm2 on a 20 mm edge, measured).
-TColgp_Array1OfPnt2d straight_law(const double *points, size_t count, double start, double end, double length) {
-  std::vector<gp_Pnt2d> corners;
-  corners.emplace_back(0.0, start);
-  for (size_t k = 0; k < count; ++k) corners.emplace_back(points[2 * k], points[2 * k + 1]);
-  corners.emplace_back(1.0, end);
-  const double blend = std::min(kStraightBlend / std::max(length, 1e-9), 0.25 / static_cast<double>(corners.size()));
-  std::vector<gp_Pnt2d> nodes{corners.front()};
-  for (size_t piece = 0; piece + 1 < corners.size(); ++piece) {
-    const gp_Pnt2d &from = corners[piece];
-    const gp_Pnt2d &to = corners[piece + 1];
-    const auto at = [&](double t) { return gp_Pnt2d(t, from.Y() + (to.Y() - from.Y()) * (t - from.X()) / (to.X() - from.X())); };
-    std::set<double> inside;
-    for (double offset = blend; offset < (to.X() - from.X()) / 2; offset *= kStraightGrowth) {
-      inside.insert(from.X() + offset);
-      inside.insert(to.X() - offset);
-    }
-    inside.insert((from.X() + to.X()) / 2);
-    for (double t : inside) nodes.push_back(at(t));
-    nodes.push_back(to);
-  }
-  TColgp_Array1OfPnt2d array(1, static_cast<int>(nodes.size()));
-  for (size_t k = 0; k < nodes.size(); ++k) array.SetValue(static_cast<int>(k) + 1, nodes[k]);
-  return array;
+// (relative position, radius) nodes of a law: the start, the control points, the end.
+std::vector<gp_Pnt2d> law_nodes(double start, double end, const double *points, size_t count) {
+  std::vector<gp_Pnt2d> nodes{gp_Pnt2d(0, start)};
+  for (size_t k = 0; k < count; ++k) nodes.emplace_back(points[2 * k], points[2 * k + 1]);
+  nodes.emplace_back(1, end);
+  return nodes;
 }
 
 }  // namespace
 
-bool add_fillet_laws(BRepFilletAPI_MakeFillet &maker, const TopTools_IndexedMapOfShape &unique, rust::Slice<const uint32_t> edges,
+bool add_fillet_laws(LawFillet &maker, const TopTools_IndexedMapOfShape &unique, rust::Slice<const uint32_t> edges,
                      rust::Slice<const double> laws, bool lenient) {
   size_t offset = 0;
   for (uint32_t index : edges) {
@@ -94,19 +57,14 @@ bool add_fillet_laws(BRepFilletAPI_MakeFillet &maker, const TopTools_IndexedMapO
     const TopoDS_Edge edge = TopoDS::Edge(unique(static_cast<int>(index) + 1));
     try {
       if (linear && (count > 0 || !std::isnan(end))) {
-        maker.SetParams(kAngularTolerance, kTightTolerance, kTightTolerance, kTightTolerance, kTightTolerance, kTightDeflection);
-        maker.Add(straight_law(points, count, start, std::isnan(end) ? start : end, edge_length(edge)), edge);
+        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), true);
       } else if (count == 0 && std::isnan(end)) {
-        maker.Add(start, edge);
+        maker.constant(edge, start);
       } else if (count == 0) {
-        maker.Add(start, end, edge);
+        maker.range(edge, start, end);
       } else {
         // Evolving radius: (relative parameter, radius) from the start through the control points to the end.
-        TColgp_Array1OfPnt2d law(1, static_cast<int>(count) + 2);
-        law.SetValue(1, gp_Pnt2d(0, start));
-        for (size_t k = 0; k < count; ++k) law.SetValue(static_cast<int>(k) + 2, gp_Pnt2d(points[2 * k], points[2 * k + 1]));
-        law.SetValue(static_cast<int>(count) + 2, gp_Pnt2d(1, std::isnan(end) ? start : end));
-        maker.Add(law, edge);
+        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), false);
       }
     } catch (const Standard_Failure &) {
       if (!lenient) throw;
@@ -114,6 +72,16 @@ bool add_fillet_laws(BRepFilletAPI_MakeFillet &maker, const TopTools_IndexedMapO
     offset += kLawHeader + 2 * count;
   }
   return true;
+}
+
+bool has_straight_kink(rust::Slice<const double> laws) {
+  size_t offset = 0;
+  while (offset + kLawHeader <= laws.size()) {
+    const size_t count = static_cast<size_t>(laws[offset + 3]);
+    if (laws[offset + 2] == 1.0 && count > 0) return true;
+    offset += kLawHeader + 2 * count;
+  }
+  return false;
 }
 
 namespace {
@@ -162,7 +130,7 @@ rust::String fillet_report_json(const Shape &shape, rust::Slice<const uint32_t> 
   const bool all_edges = selected.empty();
   if (all_edges)
     for (int i = 0; i < unique.Extent(); ++i) selected.push_back(static_cast<uint32_t>(i));
-  BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
+  LawFillet maker(shape.shape);
   std::string failure;
   if (all_edges) {
     // One law for every edge (laws[0..3)); a degenerate or seam edge is skipped like fillet_edges does.

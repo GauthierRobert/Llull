@@ -277,7 +277,7 @@ export const massProperties = defineCommand({
     'area and areaUnit when known, frame, inertia: { atCentroid, atOrigin (about `about`, default the frame origin), about, principal: ' +
     '{ moments (ascending), axes (unit vectors, right-handed) }, radiiOfGyration, unit ("g·mm²" with a density, else "mm⁵ (per unit density)") } ' +
     '(3x3 matrices, row-major, off-diagonals are -∫xy dm), provenance: { method, kernel: { name, ... }, inputs: { entityIds, recipeKey?, ' +
-    'densitySource } }, reviewRequired: { value, reasons[] }, warnings? (KRN_PRECISION_ENVELOPE when the part is beyond ±1e5 mm), relErrorEstimate? } ' +
+    'densitySource } }, reviewRequired: { value, reasons[] }, warnings? (KRN_PRECISION_ENVELOPE when the part is beyond ±1e5 mm), relErrorEstimate?, note? (set when the adaptive integration guard tripped and the fixed rule was used) } ' +
     'and, when a density is known, { density (g/(document-unit)³), densityKgPerM3, mass (in massUnit), massUnit, massG, massKg, massLb, ' +
     'densitySource (which value was used), densityDefaulted, unverified, unverifiedReasons } (plus unit: "g" when massUnit is g). ' +
     'A plain material density or a param is always unverified (no basis or source); a density model is unverified when its basis is typical / ' +

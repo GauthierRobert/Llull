@@ -165,7 +165,9 @@ rust::String topology_json(const Shape &shape) {
   const std::vector<int> face_counts = adjacent_face_counts(faces, edges);
   const std::vector<std::string> face_names = naming::face_names(shape);
   const std::vector<std::string> edge_names = naming::edge_names(solid, face_names);
-  const GProp_GProps volume = volume_props(shape, solid, false, nullptr);
+  double tripped = std::numeric_limits<double>::quiet_NaN();
+  const GProp_GProps volume = volume_props(shape, solid, false, nullptr, &tripped);
+  const bool adaptive = adaptive_rule(shape);
   JsonWriter out;
   out.begin_object().key("solids").integer(distinct(solid, TopAbs_SOLID).Extent());
   out.key("faces").begin_array();
@@ -174,14 +176,17 @@ rust::String topology_json(const Shape &shape) {
     const BRepAdaptor_Surface adaptor(face, Standard_True);
     out.begin_object().key("index").integer(f - 1).key("name").string(face_names[static_cast<size_t>(f - 1)]);
     out.key("surface").string(query::surface_kind(adaptor.GetType()));
-    out.key("area").number(query::face_metric(face).area);
+    out.key("area").number(query::face_metric(face, adaptive, &tripped).area);
     write_face_geometry(out, face, adaptor);
     out.end_object();
   }
   out.end_array().key("edges").begin_array();
   for (int e = 1; e <= edges.Extent(); ++e) write_edge(out, TopoDS::Edge(edges(e)), e - 1, face_counts[static_cast<size_t>(e - 1)], edge_names[static_cast<size_t>(e - 1)]);
   out.end_array().key("vertices").integer(distinct(solid, TopAbs_VERTEX).Extent());
-  out.key("volume").number(std::fabs(volume.Mass())).end_object();
+  out.key("volume").number(std::fabs(volume.Mass()));
+  const std::string note = query::guard_note(tripped);
+  if (!note.empty()) out.key("note").string(note);
+  out.end_object();
   return text_of(out);
 }
 

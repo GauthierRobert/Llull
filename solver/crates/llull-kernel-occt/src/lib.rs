@@ -39,6 +39,8 @@ mod features_tests;
 #[cfg(test)]
 mod naming_tests;
 #[cfg(test)]
+mod test_bridge;
+#[cfg(test)]
 mod wrap_tests;
 
 pub use ffi::{AnalysisOut, MassOut, MeshOut};
@@ -64,6 +66,8 @@ mod ffi {
         inertia: Vec<f64>,
         bounds: Vec<f64>,
         rel_error: f64,
+        /// Why the numbers may be off (the adaptive rule's guard tripped and the fixed rule was used); empty when nothing is to be said.
+        note: String,
     }
 
     /// BRepCheck validity, free faces / edges and one lump per solid: `lumps` = [volume, area, min xyz, max xyz] per solid.

@@ -322,6 +322,23 @@ describe('exact kernel path', () => {
     expect(typeof data.provenance.inputs.recipeKey).toBe('string');
   });
 
+  it('carries the kernel note (the adaptive guard tripped and the fixed rule was used) into mass_properties and inspect_topology', () => {
+    const note =
+      "the adaptive integration rule's error estimate (largest 0.03) exceeded 0.00001 on at least one face or volume of this shape, so the fixed Gauss rule was used there";
+    const { doc, id, kernel } = kernelResult();
+    const noted: GeometryKernel = {
+      ...kernel,
+      massProperties: () => ({ ...EXACT, note }),
+      topology: () => ({ solids: 1, faces: [], edges: [], vertices: 0, volume: 7, note }),
+    };
+    const ctx = { ...defaultContext(), kernel: noted };
+    expect((execute(doc, 'mass_properties', { entityId: id }, ctx).data as MassData & { note?: string }).note).toBe(note);
+    expect(execute(doc, 'mass_properties', { entityId: id }, { ...defaultContext(), kernel }).data).not.toHaveProperty('note');
+    const topology = execute(doc, 'inspect_topology', { id }, ctx);
+    expect((topology.data as { note?: string }).note).toBe(note);
+    expect(topology.summary).toContain('fixed Gauss rule was used there');
+  });
+
   it('a kernel that returns null falls back to the mesh path', () => {
     const { doc, id, kernel } = kernelResult();
     const silent: GeometryKernel = { ...kernel, massProperties: () => null };
