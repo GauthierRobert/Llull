@@ -1,0 +1,473 @@
+{
+ "actions": [
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      0,
+      0
+     ],
+     [
+      10,
+      0
+     ],
+     [
+      10,
+      5
+     ],
+     [
+      5,
+      5
+     ],
+     [
+      5,
+      10
+     ],
+     [
+      0,
+      10
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "lp"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$lp"
+   }
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$lp",
+    "facesA": {
+     "near": [
+      [
+       2,
+       2,
+       10
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ],
+      [
+       2.5,
+       10,
+       5
+      ]
+     ]
+    },
+    "radius": 1
+   },
+   "as": "f42"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f42"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f42"
+    ]
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 5,
+    "height": 10,
+    "anchor": "base-center"
+   },
+   "as": "cy"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$cy"
+   }
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$cy",
+    "facesA": {
+     "near": [
+      [
+       2.5,
+       0,
+       10
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ]
+     ]
+    },
+    "radius": 1
+   },
+   "as": "f43"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f43"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f43"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     60,
+     60,
+     5
+    ],
+    "anchor": "min"
+   },
+   "as": "pl"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 10,
+    "height": 15,
+    "position": [
+     30,
+     30,
+     5
+    ],
+    "anchor": "base-center"
+   },
+   "as": "bs"
+  },
+  {
+   "command": "boolean",
+   "params": {
+    "op": "union",
+    "a": "$pl",
+    "b": "$bs"
+   },
+   "as": "fu"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$fu"
+   }
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$fu",
+    "facesA": {
+     "near": [
+      [
+       5,
+       5,
+       5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       40,
+       30,
+       10
+      ]
+     ]
+    },
+    "radius": 2
+   },
+   "as": "f44"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f44"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f44"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bl"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$bl"
+   }
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$bl",
+    "facesA": {
+     "near": [
+      [
+       0,
+       0,
+       2.5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       0,
+       5,
+       0
+      ]
+     ]
+    },
+    "law": {
+     "expression": "1 + t",
+     "samples": 33
+    }
+   },
+   "as": "f45"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f45"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f45"
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bw"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$bw",
+    "facesA": {
+     "near": [
+      [
+       0,
+       0,
+       2.5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       0,
+       5,
+       0
+      ]
+     ]
+    },
+    "width": 1.4142135623730951
+   },
+   "as": "f46"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f46"
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      0,
+      0
+     ],
+     [
+      10,
+      0
+     ],
+     [
+      10,
+      5
+     ],
+     [
+      5,
+      5
+     ],
+     [
+      5,
+      10
+     ],
+     [
+      0,
+      10
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "lq"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$lq",
+    "facesA": {
+     "near": [
+      [
+       2,
+       2,
+       10
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ],
+      [
+       2.5,
+       10,
+       5
+      ]
+     ]
+    },
+    "radius": 1,
+    "radiusEnd": 2
+   }
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$lq",
+    "facesA": {
+     "near": [
+      [
+       7.5,
+       5,
+       5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ],
+      [
+       2.5,
+       10,
+       5
+      ]
+     ]
+    },
+    "radius": 1
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     100,
+     100,
+     100
+    ],
+    "anchor": "min"
+   },
+   "as": "cc"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$cc",
+    "edgesNear": [
+     [
+      100,
+      100,
+      50
+     ]
+    ],
+    "radius": 20
+   },
+   "as": "cr"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$cr",
+    "facesA": {
+     "near": [
+      [
+       50,
+       50,
+       100
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       50,
+       100,
+       50
+      ]
+     ]
+    },
+    "radius": 5
+   }
+  }
+ ]
+}

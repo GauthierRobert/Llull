@@ -1,12 +1,12 @@
 /**
- * fillet_faces (BLD M4, TECHNICAL_SPEC §4, §5.6): a rolling-ball blend between two face sets that need not share an edge (a chamfer face
- * between them is consumed), or, with a hold line, a variable-radius blend of the edge the two faces share whose contact line on one face is
- * a drawn curve. Built by the exact kernel for one planar face per set.
+ * fillet_faces (BLD M4, TECHNICAL_SPEC §4, §5.6): a rolling-ball blend between two face sets. One planar face per set with a constant radius
+ * need not share an edge (a chamfer face between them is consumed); sets of several planar or curved faces that meet, a varying radius
+ * (radiusEnd / law), a chord width and a hold line blend the edges the sets share, through fillet_edge's builder.
  */
 
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
-import { defineCommand, z } from '../schema';
+import { defineCommand, vec3, z } from '../schema';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { holdLineLaw } from '../../geometry/blend/holdLine';
 import { diagonalOf } from './shapeDiagonal';
@@ -14,6 +14,8 @@ import { filletEach } from './filletEach';
 import { type BlendBuild, type BlendContext, type FaceSetInput, faceSetSchema, pickedFaces, runFaceBlend } from './faceBlendRun';
 import { type ProfileInput, isProfileRefusal, profileSchema, resolveProfile } from './filletProfile';
 import { blendRejection } from './blendCodes';
+import { edgeLawSchema } from './filletSpec';
+import { edgeBlend, onePlanarFaceEach, readEdgeResult } from './faceBlendEdges';
 
 const HOLD_STATIONS = 33;
 const unsupported = (message: string, path: string): BlendBuild => ({ code: 'BLD_FACE_BLEND_UNSUPPORTED', message, path });
@@ -82,28 +84,63 @@ function holdLineBlend(request: HoldRequest, context: BlendContext): BlendBuild 
     radiusEnd: undefined,
     profile: request.profile,
   });
-  return { result: { ...result, summary: result.summary.replace(/^fillet_edge/, 'fillet_faces') } };
+  return readEdgeResult(result, {
+    doc: request.doc,
+    context,
+    seeds: [edge],
+    varying: !constant,
+    varyingPath: 'holdLine',
+    rename: (path) => (path.startsWith('edges[') ? 'holdLine' : path),
+    flipped: false,
+  });
 }
 
 /**
- * @affects removes the source solid; creates 1 mesh entity with the blend face (and the consumed faces gone); data { id, blends, consumedFaces, unit }
- * @invariant requiresKernel; exactly one of radius / holdLine; each set resolves to a face and the sets share none; the blend is tangent to both faces
- * @failure BLD_FACESET_EMPTY, BLD_FACESETS_OVERLAP, BLD_FACE_FILLET_NO_SOLUTION (with the smallest radius), BLD_FACE_BLEND_UNSUPPORTED, BLD_HOLD_LINE_NOT_ON_FACE, BLD_RHO_RANGE, BLD_SHAPE_RANGE, REF_LOST / REF_SPLIT -> unchanged document
+ * @affects removes the source solid; creates 1 mesh entity with the blend faces (and the consumed faces gone); data { id, blends, consumedFaces, unit } and, on the edge path, blendEdges [{ index, start, end }]
+ * @invariant requiresKernel; exactly one of radius / width / law / holdLine; radiusEnd only with radius, widthEnd only with width; each set resolves to faces and the sets share none; the blend is tangent to both sets
+ * @failure BLD_FACESET_EMPTY, BLD_FACESETS_OVERLAP, BLD_FACE_FILLET_NO_SOLUTION (with the smallest radius), BLD_FACE_BLEND_UNSUPPORTED (no shared sharp edge for curved / multi-face sets or a varying size; a kernel tangent chain that rests on a face outside both sets; a varying size over a chain of several edges; startNear on a closed edge; cliff edges), BLD_HOLD_LINE_NOT_ON_FACE, BLD_LAW_INVALID, BLD_LAW_NOT_PERIODIC, BLD_CHORD_UNDEFINED, BLD_RHO_RANGE, BLD_SHAPE_RANGE, REF_LOST / REF_SPLIT -> unchanged document
  */
 export const filletFaces = defineCommand({
   name: 'fillet_faces',
   annotations: { requiresKernel: true },
   description:
-    'Blend two sets of faces of a 3D solid that need not share an edge (a rolling ball of radius `radius` touching both, tangent to each) and replace the solid by the result; the faces between the contact lines (e.g. a chamfer between two walls) are consumed ' +
+    'Blend two sets of faces of a 3D solid that meet along edges, or, as one planar face per set with a constant radius and no shared edge, do not (a rolling ball of radius `radius` touching both, tangent to each) and replace the solid by the result; the faces between the contact lines (e.g. a chamfer between two walls) are consumed ' +
     '(data.consumedFaces lists them, data.blends the new blend face). facesA / facesB pick faces by points on them (near) and/or persistent names. ' +
     'Alternatively holdLine { id of a drawn line or polyline lying on one of the two faces, onFaces "A" | "B" } rounds the edge the two faces share with the radius that makes the blend leave that face on the drawn curve (radius = distance to the edge / tan(fold / 2), fold = angle between the outward normals); a conic / curvature profile with a hold line follows the profile rules of fillet_edge (a sloped line is a varying size, which a profile blend takes). ' +
-    'profile { type: "conic", rho } or { type: "curvature", shape } changes the section. This kernel build blends ONE planar face per set that end on flat faces square to the blend; BLD_FACE_FILLET_NO_SOLUTION says when no ball of that radius stays in the material (and the smallest radius that does), ' +
+    'profile { type: "conic", rho } or { type: "curvature", shape } changes the section. Each set may hold several faces, planar or curved (cylinders, cones, spheres, B-spline faces, tangent-continuous or not): the blend runs along every sharp edge shared by a face of facesA and a face of facesB, built as fillet_edge builds it (same radius laws, chord mode, profiles and limits; data.blendEdges lists them with their two ends). The blend rounds the whole tangent chain of every shared edge, as fillet_edge does: if that chain bounds a face outside facesA and facesB the blend is refused (BLD_FACE_BLEND_UNSUPPORTED names the edges and faces) rather than round a face you did not pick. ' +
+    'radiusEnd (smooth start-to-end radius), law { expression, samples } (radius as an expression of t in [0, 1] along the shared edge) and width (the CHORD between the two contact lines at the start, widthEnd at the end) vary or size the blend like fillet_edge; a varying size needs the blend to be exactly one edge (t runs along an edge, not a chain) and startNear picks which end is t = 0. ' +
+    'Faces that share no sharp edge (a chamfer between them is consumed) are blended only as one planar face per set with a constant radius that end on flat faces square to the blend. A blend that runs out over a boundary edge of a face (a cliff edge) is not offered: it is refused (BLD_FACE_FILLET_NO_SOLUTION / BLD_FACE_BLEND_UNSUPPORTED). BLD_FACE_FILLET_NO_SOLUTION says when no ball of that radius stays in the material (and the smallest radius that does), ' +
     'BLD_FACE_BLEND_UNSUPPORTED what else is not built. Needs the exact native kernel (check kernel_info); with the mesh kernel it no-ops. Run check_blends afterwards.',
   params: z.object({
     id: z.string().describe('Id of the 3D solid entity to blend. Must exist and be a 3D solid kind.'),
-    facesA: faceSetSchema.describe('First face set (one planar face in this build).'),
-    facesB: faceSetSchema.describe('Second face set (one planar face in this build); must not share a face with facesA.'),
-    radius: z.number().describe('Radius of the rolling ball in document units (> 0). Give exactly one of radius or holdLine.').optional(),
+    facesA: faceSetSchema.describe('First face set: one or several faces, planar or curved.'),
+    facesB: faceSetSchema.describe('Second face set: one or several faces; must not share a face with facesA.'),
+    radius: z
+      .number()
+      .describe('Radius of the rolling ball in document units (> 0). Give exactly one of radius, width, law or holdLine.')
+      .optional(),
+    radiusEnd: z
+      .number()
+      .describe(
+        'With radius: radius at the END of the shared edge (> 0, document units); the radius goes smoothly from radius to radiusEnd as fillet_edge radiusEnd does. Needs exactly one shared edge; equal to radius on a closed edge.',
+      )
+      .optional(),
+    width: z
+      .number()
+      .describe(
+        'Chord between the two contact lines at the START of the shared edge (> 0, document units) instead of a radius (fillet_edge mode "chord"). Give exactly one of radius, width, law or holdLine.',
+      )
+      .optional(),
+    widthEnd: z
+      .number()
+      .describe('With width: chord at the END of the shared edge (> 0, document units). Needs exactly one shared edge.')
+      .optional(),
+    law: edgeLawSchema.shape.law
+      .unwrap()
+      .describe(
+        'Radius as an expression of t in [0, 1] along the shared edge (document units), e.g. "1 + 0.5*cos(2*pi*t)"; only t, pi, tau and built-in functions; > 0 at every sample; periodic on a closed edge. samples: number of uniform samples (default and range as fillet_edge). Needs exactly one shared edge. Give exactly one of radius, width, law or holdLine.',
+      )
+      .optional(),
     holdLine: z
       .object({
         id: z
@@ -113,14 +150,39 @@ export const filletFaces = defineCommand({
       })
       .describe('Hold line: the blend leaves face set `onFaces` on this drawn curve. facesA and facesB must share an edge.')
       .optional(),
+    startNear: vec3(
+      'A point [x, y, z] in document units near the end of the blend edge where radius / width / the law at t = 0 applies. Without it the size starts at the edge own start (data.blendEdges and the summary give both ends). Only a varying size (radiusEnd, widthEnd, law) uses it; the blend must be one open edge (a closed edge, a rim, has no start end: refused).',
+    ).optional(),
     profile: profileSchema.optional(),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const { id, facesA, facesB, radius, holdLine } = params;
-    if ((radius === undefined) === (holdLine === undefined))
-      return blendRejection(doc, 'fillet_faces', 'BLD_BLEND_PARAMS', 'give exactly one of radius or holdLine', [id], ['radius']);
-    if (radius !== undefined && !(radius > 0))
-      return blendRejection(doc, 'fillet_faces', 'BLD_LAW_INVALID', `radius must be > 0 (got ${radius})`, [id], ['radius']);
+    const { id, facesA, facesB, radius, radiusEnd, width, widthEnd, law, holdLine } = params;
+    const given = [radius, width, law, holdLine].filter((value) => value !== undefined).length;
+    if (given !== 1)
+      return blendRejection(
+        doc,
+        'fillet_faces',
+        'BLD_BLEND_PARAMS',
+        'give exactly one of radius, width, law or holdLine',
+        [id],
+        ['radius'],
+      );
+    if ((radiusEnd !== undefined && radius === undefined) || (widthEnd !== undefined && width === undefined)) {
+      const name = radiusEnd !== undefined && radius === undefined ? 'radiusEnd' : 'widthEnd';
+      return blendRejection(
+        doc,
+        'fillet_faces',
+        'BLD_BLEND_PARAMS',
+        `${name} needs ${name === 'radiusEnd' ? 'radius' : 'width'}`,
+        [id],
+        [name],
+      );
+    }
+    const positive = { radius, radiusEnd, width, widthEnd };
+    for (const [name, value] of Object.entries(positive))
+      if (value !== undefined && !(value > 0))
+        return blendRejection(doc, 'fillet_faces', 'BLD_LAW_INVALID', `${name} must be > 0 (got ${value})`, [id], [name]);
+    const edgeRoute = law !== undefined || radiusEnd !== undefined || width !== undefined;
     const profile = resolveProfile(params.profile);
     if (isProfileRefusal(profile)) return blendRejection(doc, 'fillet_faces', profile.code, profile.message, [id], [profile.path]);
     const sets = { facesA, facesB };
@@ -130,22 +192,35 @@ export const filletFaces = defineCommand({
       sets,
       describe: (newId, triangles) =>
         `fillet_faces: blended '${id}' (radius ${radius}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
-      build: (context) =>
-        holdLine !== undefined
-          ? holdLineBlend(
-              { doc, ctx, id, holdId: holdLine.id, onFaces: holdLine.onFaces, profile: params.profile, facesA, facesB },
-              context,
-            )
-          : {
-              recipe: {
-                op: 'faceBlend',
-                source: context.source,
-                facesA: pickedFaces(context, 'facesA'),
-                facesB: pickedFaces(context, 'facesB'),
-                radius: radius ?? 0,
-                ...(profile.profile === undefined ? {} : { profile: profile.profile }),
-              },
-            },
+      build: (context) => {
+        if (holdLine !== undefined)
+          return holdLineBlend(
+            { doc, ctx, id, holdId: holdLine.id, onFaces: holdLine.onFaces, profile: params.profile, facesA, facesB },
+            context,
+          );
+        const spandrel = (): BlendBuild => ({
+          recipe: {
+            op: 'faceBlend',
+            source: context.source,
+            facesA: pickedFaces(context, 'facesA'),
+            facesB: pickedFaces(context, 'facesB'),
+            radius: radius ?? 0,
+            ...(profile.profile === undefined ? {} : { profile: profile.profile }),
+          },
+        });
+        return edgeBlend(
+          {
+            doc,
+            ctx,
+            id,
+            profile: params.profile,
+            size: { start: radius ?? width ?? 0, end: radiusEnd ?? widthEnd, law, chord: width !== undefined },
+            startNear: params.startNear,
+            spandrel: edgeRoute || !onePlanarFaceEach(context) ? undefined : spandrel,
+          },
+          context,
+        );
+      },
     });
   },
 });

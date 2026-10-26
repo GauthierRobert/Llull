@@ -33,7 +33,7 @@ export const faceSetSchema = z
       )
       .optional(),
   })
-  .describe('A set of faces, picked by points on them and/or persistent names. This build blends one planar face per set.');
+  .describe('A set of faces, picked by points on them and/or persistent names.');
 
 export type FaceSetInput = z.infer<typeof faceSetSchema>;
 
@@ -129,13 +129,20 @@ export function runFaceBlend(doc: CadDocument, ctx: ExecutionContext | undefined
   if (typeof result === 'string') return blendRefusal(doc, command, id, kernel, built.recipe, result, topology);
   const after = kernel.topology(result.shape);
   const committed = commitKernelResult(doc, kernel, result, [entity], (newId, triangles) => request.describe(newId, triangles));
+  return withNames({ ...committed, data: faceBlendData(topology, after, committed.affected[0], doc.units) });
+}
+
+/** The `data` of a face-blend result: the new entity id, its blend faces (by persistent name), the faces the blend consumed, the unit. */
+export function faceBlendData(
+  before: ShapeTopology | null,
+  after: ShapeTopology | null,
+  id: string | undefined,
+  unit: string,
+): { id: string | undefined; blends: Array<{ face: number; name: string }>; consumedFaces: string[]; unit: string } {
   const blends = (after?.faces ?? []).flatMap((face) =>
     face.name !== undefined && blendSource(face.name) !== null ? [{ face: face.index, name: face.name }] : [],
   );
-  return withNames({
-    ...committed,
-    data: { id: committed.affected[0], blends, consumedFaces: consumedFaces(topology, after), unit: doc.units },
-  });
+  return { id, blends, consumedFaces: consumedFaces(before, after), unit };
 }
 
 const REMEDIATION = {

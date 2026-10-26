@@ -210,3 +210,14 @@ export function lawNodes(law: EdgeRadius, length: number): ReadonlyArray<readonl
   }
   return nodes;
 }
+
+/** `law` run from its end to its start: sizes swapped and control points mirrored (t -> 1 - t); the same law seen from the other end of the edge. */
+export function reverseLaw(law: EdgeRadius): EdgeRadius {
+  const { size, sizeEnd = size, sizes, ...rest } = law;
+  return {
+    ...rest,
+    size: sizeEnd,
+    sizeEnd: size,
+    ...(sizes === undefined ? {} : { sizes: sizes.map((point) => ({ t: 1 - point.t, size: point.size })).reverse() }),
+  };
+}

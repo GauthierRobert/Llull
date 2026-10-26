@@ -166,7 +166,7 @@
 | `extrude_profile` | Extrude a closed 2D profile along +Z into an extrusion solid. |  |
 | `fill_surface` | Fill a closed loop of 3 to 12 boundary curves (nurbs_curve ids, non-rational, in any order and orientation) with ONE surface sheet that contains every boundary… |  |
 | `fillet_edge` | Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe), so booleans, f… | kernel |
-| `fillet_faces` | Blend two sets of faces of a 3D solid that need not share an edge (a rolling ball of radius `radius` touching both, tangent to each) and replace the solid by t… | kernel |
+| `fillet_faces` | Blend two sets of faces of a 3D solid that meet along edges, or, as one planar face per set with a constant radius and no shared edge, do not (a rolling ball o… | kernel |
 | `fillet_full_round` | Full round of a rib or wall top: replace the center face by a half-cylinder tangent to the two side faces (radius = half the distance between them, document un… | kernel |
 | `flow_along_curve` | Lay a straight 3D solid or mesh along a NURBS curve: the body axis (frame z, default the longest bounding-box direction, starting at the body start) is mapped … |  |
 | `flow_on_surface` | Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface. |  |

@@ -754,3 +754,78 @@ The taper takes about 3x the step time after review round 1 (8 to 16 s after rou
 - **G2 corner patches**: `BRepFill_Filling` has no G2 order for these faces; needs the exact-boundary patch above.
 - **Corner time in the whole step** (tessellation of 8100-pole patches): a compact patch surface.
 - The rest of DES-6c is as in 13.9, 13.10.4 and 13.11.5.
+
+## 13.13 As built: M4 remainder, face sets, curved faces, laws and widths on `fillet_faces` (DES-6c step 4, 2026-10-26)
+
+Done: each face set of `fillet_faces` may hold several faces, planar or curved (cylinder, cone, sphere, B-spline, tangent-continuous or not); `radiusEnd`, `law` and `width` / `widthEnd` size the blend as `fillet_edge` does. No native (C++) change: the new cases are built by the existing edge path. Left after this step: 13.13.5.
+
+### 13.13.1 Code
+
+| Piece     | Where                                                                                                                                                                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge path | `commands/brep/faceBlendEdges.ts` (`edgeBlend`, `readEdgeResult`, `onePlanarFaceEach`): the seed edges are the sharp edges between a face of `facesA` and a face of `facesB` (`faceGraph.edgeFaces`, no seam, no degenerate, not `smooth`); `readEdgeResult` reads the built result back (the kernel's chain, the sets, the size); the result is `filletEach`'s |
+| Command   | `commands/brep/filletFaces.ts`: params `radiusEnd`, `width`, `widthEnd`, `law`, `startNear` (the `law` schema of `edgeLawSchema`, so the same expression grammar, `samples` range and `BLD_LAW_*` validation); `facesA` / `facesB` descriptions                                          |
+| Tests     | `tests/unit/blendFaceSets.test.ts` (scripted kernel), `server/tests/nativeBlendFaceSets.test.ts` (native, 1 / 10 / 100 / 1000 mm; `LLULL_BLEND_TABLE=1 ... --reporter=verbose` prints the size table)                                                                      |
+| Pack      | plan `target_face_sets`, VC-BLD-42 to 47 (`generate_plans.mjs`)                                                                                                                                                                                                            |
+
+### 13.13.2 Decisions
+
+- **Meeting faces go through the edge path.** A rolling-ball blend of faces that share an edge IS the blend of that edge; building it with fillet_edge's builder gives curved faces, profiles, laws, chord mode, the continuity checks and `check_blends` for free, and no second law vocabulary (`law`, `radiusEnd`, `width` are `edges[].law`, `radiusEnd`, `mode: "chord"` of fillet_edge). Reason: the spandrel build (13.7) is exact only for planar faces and flush square ends; a curved-face spandrel in C++ would duplicate the profile builder for no gain where the faces meet.
+- **Every pair that shares a sharp edge goes through the edge path**, a plain constant radius of one planar face against one planar face included (review round 1: the same pair was refused with `radius` and built with `radiusEnd` or `width`; the inconsistency is gone). The spandrel `faceBlend` build is used only when the sets share NO sharp edge: one planar face per set with a constant radius (the faces between them are consumed). No compatibility with the old routing is kept (owner rule): `fillet_faces` of an adjacent pair now records a `fillet` node, not a `faceBlend` node.
+- **The kernel's chain is the truth, and the blend never leaves the sets.** OCCT rounds the whole tangent chain of every picked edge (13.7) and its chaining reaches about 0.1 rad: measured on extruded regular N-gon prisms (R 50, depth 20, top against ONE side face, r 1), N = 120 / 100 / 64 (turn 0.052 / 0.063 / 0.098 rad) chain every side edge and N = 56 or fewer do not. A geometric closure (an earlier round used 0.05 rad) is therefore a second, wrong rule and was removed. `readEdgeResult` (`faceBlendEdges.ts`) builds with the shared edges, then reads the built result: every NEW blend face (`blendSource` of its name: source edge name and the two support face names) must rest on faces of `facesA` U `facesB`; otherwise the blend is refused (`BLD_FACE_BLEND_UNSUPPORTED`, path `facesA`, the edges and the out-of-set faces named) and the document is unchanged. `data.blendEdges` lists the kernel's chain (the source edges of the new blend faces, by name). The hold line goes through the same read-back.
+- **A varying size needs a kernel chain of exactly one edge.** `t` runs along each picked edge (13.7: `over: "chain"` is not built), so a law over a chain would restart at each junction. The sets must share one edge (checked before the build) and the read-back must show one new blend face; otherwise `BLD_FACE_BLEND_UNSUPPORTED`, path `radiusEnd` / `widthEnd` / `law` / `holdLine`.
+- **`startNear`** (a point near the end where t = 0): the end nearer to it starts the size; the other direction is the reversed law (`reverseLaw` in `geometry/blend/law.ts`: the sampled law with its sizes swapped and its control points mirrored, i.e. evaluated at 1 - t, not an edit of the expression text). Without it the edge's own direction applies. On a closed edge (a rim: no start end) it is refused at path `startNear`, naming the seam vertex. `data.blendEdges` is `[{ index, start, end }]` with `start` the point where the first size applies (the summary prints the same, in that order).
+- **Refusal paths are `fillet_faces` params:** `law.expression`, `radius` / `width`, `radiusEnd` / `widthEnd` (`law` for a non-periodic law on a closed edge), in `error.paths` and in the summary suffix.
+- **`width` is the chord** between the two contact lines (fillet_edge `mode: "chord"`; right angle: r = width / sqrt 2). `widthEnd` is the chord at the end.
+- **Tangent (`smooth`) shared edges are not blend edges**; a face of a set that touches the other set nowhere is only a support (the summary and `data.blendEdges` list the blended edges).
+- **Tolerances and the check default:** nothing new to tune: the sizes, the `kGapAccepted` margin and the profile gates are the ones of fillet_edge (13.11.3); a law was run at the lowest and highest `samples` (5, 257) and passes `check_blends`.
+- **`data`** on the edge path is `{ id, blends, consumedFaces, unit, blendEdges }`; `blends` is read from the result topology by the helper `faceBlendData` shared with the spandrel path.
+
+### 13.13.3 Validation results (native llull-kernel, OCCT 7.9.2)
+
+Errors are relative volume errors against the analytic value (radiusEnd: against `fillet_edge` of the same edge and sizes; the sphere is a numeric Pappus integral of the spandrel; every case also asserts g0 below `tolerances.g0`); G0 / G1 are the worst contact of `check_blends` (mm / rad); time is the whole `fillet_faces` step (exact build + tessellation).
+
+| Case                                | Size (mm) | G0 (mm) | G1 (rad) | Volume error | Time (ms) |
+| ----------------------------------- | --------- | ------- | -------- | ------------ | --------- |
+| top cap against 2 walls (VC-BLD-42) | 1         | 1.7e-16 | 0        | 0            | 35        |
+|                                     | 10        | 8.9e-16 | 0        | 1.6e-16      | 16        |
+|                                     | 100       | 1.4e-14 | 0        | 1.6e-16      | 17        |
+|                                     | 1000      | 1.7e-13 | 0        | 1.6e-16      | 18        |
+| cylinder rim, Pappus (VC-BLD-43)    | 1         | 1.2e-15 | 1.5e-8   | 1.5e-16      | 8         |
+|                                     | 10        | 1.2e-14 | 0        | 0            | 18        |
+|                                     | 100       | 1.2e-13 | 0        | 0            | 76        |
+|                                     | 1000      | 1.2e-12 | 0        | 0            | 1218      |
+| boss ring, concave (VC-BLD-44)      | 1         | 3.6e-15 | 2.6e-8   | 0            | 11        |
+|                                     | 10        | 5.7e-14 | 0        | 0            | 21        |
+|                                     | 100       | 4.6e-13 | 1.5e-8   | 0            | 193       |
+|                                     | 1000      | 3.6e-12 | 1.5e-8   | 0            | 6936      |
+| radiusEnd 1 to 2 x size, vs fillet_edge | 1         | 7.3e-15 | 0        | 0            | 22        |
+|                                     | 10        | 8.6e-14 | 0        | 0            | 28        |
+|                                     | 100       | 5.2e-13 | 0        | 0            | 171       |
+|                                     | 1000      | 7.5e-12 | 0        | 0            | 3604      |
+| law r = 1 + t (VC-BLD-45)           | 1         | 7.7e-14 | 0        | 1.4e-8       | 77        |
+|                                     | 10        | 3.1e-12 | 0        | 6.1e-8       | 75        |
+|                                     | 100       | 2.3e-11 | 0        | 1.1e-8       | 458       |
+|                                     | 1000      | 7.1e-11 | 0        | 1.1e-8       | 3972      |
+| width sqrt 2 (VC-BLD-46)            | 1 to 1000 | 0       | 0        | <= 2.3e-16   | 7 to 10   |
+| cone base, Pappus                   | 1         | 9.4e-16 | 0        | 8.5e-16      | 11        |
+|                                     | 10        | 1.1e-14 | 2.6e-8   | 5.0e-15      | 29        |
+|                                     | 100       | 1.0e-13 | 2.1e-8   | 1.1e-16      | 193       |
+|                                     | 1000      | 9.5e-13 | 2.1e-8   | 3.1e-15      | 6247      |
+| sphere cut flat, numeric Pappus     | 1         | 1.8e-6  | 1.7e-6   | 6.0e-6       | 33        |
+|                                     | 10        | 2.7e-6  | 3.4e-7   | 6.6e-7       | 70        |
+|                                     | 100       | 5.4e-6  | 3.7e-8   | 4.5e-8       | 1197      |
+|                                     | 1000      | 5.4e-7  | 1.5e-8   | 4.8e-9       | 31763     |
+
+The time at 1000 mm (3 to 31 s for curved faces) is the cost of the fillet_edge path on large curved parts, not of the routing; it is not tuned here. Plans (`llull run ... --continue`, native kernel): `target_face_sets` 28/31 (the 3 refusals are designed: a varying size over two shared edges, faces that share no edge with several faces per set, a chain that leaves the sets); the other seven plans as before (24/24, 6/8, 32/32, 28/28, 4/9, 33/33, 14/15), and the earlier plans as in 13.12.4.
+
+### 13.13.4 Cliff edges
+
+The spec lists "cliff / trim modes" only as an M5 COULD item (section 10) and defines no input and no expected geometry for it (which boundary edge, which side runs out, what the blend does at the end). It is NOT built: no param exists, and a blend that would have to run out over a boundary edge is refused by the existing codes (`BLD_FACE_FILLET_NO_SOLUTION` with the smallest radius where the spandrel build can say it, `BLD_FACE_BLEND_UNSUPPORTED` / `BLD_PROFILE_FAILED` from the edge path with the reason). The `fillet_faces` description says so.
+
+### 13.13.5 Left (exactly)
+
+- **Faces that do not meet, other than one planar face per set with a constant radius** (cylinders, cones, spheres or several faces per set with a gap between them, or a varying size across a gap): `BLD_FACE_BLEND_UNSUPPORTED` ("share no sharp edge"). Needs a rolling ball between non-adjacent curved faces (offset-surface intersection spine, 5.6): not built.
+- **A varying size over a chain of several edges** (`over: "chain"`), **cliff edges** (13.13.4), **a hold line with curved or multi-face sets** (a hold line needs one planar face per set).
+- **The 1000 mm time of curved blends** (13.13.3).
+- The rest of DES-6c is as in 13.9, 13.10.4, 13.11.5 and 13.12.5 without the M4 remainder.

@@ -52,6 +52,16 @@
    "expectedCodesInOrder": [
     "BLD_CORNER_UNSUPPORTED"
    ]
+  },
+  {
+   "file": "plans/target_face_sets.json",
+   "description": "DES-6c step 4: fillet_faces with sets of several faces (an L prism, a cylinder rim, a boss ring), a law, a width, and the refusals of what is not built",
+   "unbuilt": [],
+   "expectedCodesInOrder": [
+    "BLD_FACE_BLEND_UNSUPPORTED",
+    "BLD_FACE_BLEND_UNSUPPORTED",
+    "BLD_FACE_BLEND_UNSUPPORTED"
+   ]
   }
  ],
  "cases": [
@@ -1114,6 +1124,137 @@
    "cli": {
     "run": "llull run plans/target_corners_concave_tapered.json --doc t.llull.json --kernel occt --json",
     "assert": "inspect_topology($f41); mass_properties($f41); check_blends($f41)"
+   }
+  },
+  {
+   "vc": "VC-BLD-42",
+   "what": "fillet_faces, top cap of an L prism (10 x 10, notch 5 x 5, depth 10) against TWO side walls (10 and 5 long), r 1: two blend faces, removed volume (1 - pi/4) r^2 (10 + 5)",
+   "value": {
+    "removedVolume": 3.219027549038276,
+    "blends": 2
+   },
+   "tolerance": 0.000001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) V = V0 - (1 - pi/4) r^2 sum(L)",
+   "plan": "target_face_sets",
+   "assert": "mass_properties($lp) - mass_properties($f42); check_blends($f42)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($lp) - mass_properties($f42); check_blends($f42)"
+   }
+  },
+  {
+   "vc": "VC-BLD-43",
+   "what": "fillet_faces, cap of a cylinder R 5 H 10 against its curved wall, r 1: Pappus volume 2 pi ((R - r)(1 - pi/4) r^2 + r^3 / 6) removed, G1",
+   "value": {
+    "removedVolume": 6.440729977736227
+   },
+   "tolerance": 0.0001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) Pappus on the corner spandrel",
+   "plan": "target_face_sets",
+   "assert": "mass_properties($cy) - mass_properties($f43); check_blends($f43)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($cy) - mass_properties($f43); check_blends($f43)"
+   }
+  },
+  {
+   "vc": "VC-BLD-44",
+   "what": "fillet_faces, plate top against the wall of a boss R 10 (concave ring), r 2: the spandrel on the air side is ADDED, 2 pi ((R + r)(1 - pi/4) r^2 - r^3 / 6)",
+   "value": {
+    "addedVolume": 56.34480870890277
+   },
+   "tolerance": 0.0001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) Pappus on the corner spandrel, air side",
+   "plan": "target_face_sets",
+   "assert": "mass_properties($f44) - mass_properties($fu); check_blends($f44)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f44) - mass_properties($fu); check_blends($f44)"
+   }
+  },
+  {
+   "vc": "VC-BLD-45",
+   "what": "fillet_faces law r = 1 + t on the 20-long top edge of the 20 x 10 x 5 block: removed volume (1 - pi/4) L (r0^2 + r0 r1 + r1^2) / 3 (a sampled straight expression)",
+   "value": {
+    "removedVolume": 10.014752374785747
+   },
+   "tolerance": 0.00002,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) integral of (1 - pi/4) r(s)^2",
+   "plan": "target_face_sets",
+   "assert": "mass_properties($bl) - mass_properties($f45); check_blends($f45)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($bl) - mass_properties($f45); check_blends($f45)"
+   }
+  },
+  {
+   "vc": "VC-BLD-46",
+   "what": "fillet_faces width sqrt 2 (chord between the contact lines) on a right-angle edge of the block = radius 1: removed volume (1 - pi/4) r^2 L",
+   "value": {
+    "removedVolume": 4.292036732051034
+   },
+   "tolerance": 0.000001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) chord = 2 r cos(wedge / 2) = r sqrt 2",
+   "plan": "target_face_sets",
+   "assert": "mass_properties($bw) - mass_properties($f46)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($bw) - mass_properties($f46)"
+   }
+  },
+  {
+   "vc": "VC-BLD-47",
+   "what": "fillet_faces refusals by name: a varying size over two shared edges, sets of faces that share no edge with several faces, and a shared edge whose tangent chain leaves the sets (the corner of a rounded cube: the x+ top edge is in neither set); the document is unchanged",
+   "value": {
+    "codes": [
+     "BLD_FACE_BLEND_UNSUPPORTED",
+     "BLD_FACE_BLEND_UNSUPPORTED",
+     "BLD_FACE_BLEND_UNSUPPORTED"
+    ]
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "definition (TECHNICAL_SPEC §13.13)",
+   "plan": "target_face_sets",
+   "assert": "the last three steps are rejected with the codes",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_face_sets.json --doc t.llull.json --kernel occt --json",
+    "assert": "the last three steps are rejected with the codes"
    }
   }
  ]

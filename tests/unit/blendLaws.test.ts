@@ -17,6 +17,7 @@ import {
   periodicProblem,
   radiusAt,
   resolveLaw,
+  reverseLaw,
   sampleExpression,
   scaleLaw,
 } from '@core/geometry/blend/law';
@@ -86,6 +87,37 @@ describe('resolveLaw: explicit and expression radius laws', () => {
     expect(resolveLaw({ law: { expression: '1', samples: 7.5 } })).toMatchObject({ path: 'law.samples' });
     expect(resolveLaw({ law: { expression: '1' }, size: 1 })).toMatchObject({ path: 'law', message: expect.stringContaining('not both') });
     expect(sampleExpression('t + 1', 5)).toEqual([1, 1.25, 1.5, 1.75, 2]);
+  });
+});
+
+describe('reverseLaw', () => {
+  it('swaps the ends, mirrors the control points in increasing t, and keeps the other fields; the input is untouched', () => {
+    const law: EdgeRadius = {
+      size: 1,
+      sizeEnd: 3,
+      sizes: [
+        { t: 0.25, size: 2 },
+        { t: 0.5, size: 1.5 },
+      ],
+      interpolation: 'linear',
+      size2: 0.5,
+      sideFace: 2,
+    };
+    const snapshot = JSON.stringify(law);
+    expect(reverseLaw(law)).toEqual({
+      size: 3,
+      sizeEnd: 1,
+      sizes: [
+        { t: 0.5, size: 1.5 },
+        { t: 0.75, size: 2 },
+      ],
+      interpolation: 'linear',
+      size2: 0.5,
+      sideFace: 2,
+    });
+    expect(JSON.stringify(law)).toBe(snapshot);
+    expect(reverseLaw({ size: 2 })).toEqual({ size: 2, sizeEnd: 2 });
+    expect(reverseLaw(reverseLaw(law))).toEqual(law);
   });
 });
 

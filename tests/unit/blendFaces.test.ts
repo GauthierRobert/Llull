@@ -8,7 +8,7 @@ import { createEmptyDocument, type CadDocument, type MeshSolidEntity, type Shape
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
-import type { BlendReport } from '@core/geometry/kernelPorts';
+import type { BlendReport, FaceGraph } from '@core/geometry/kernelPorts';
 import { diagnoseBlend, remediationOf } from '@core/geometry/blend/diagnose';
 import { holdLineLaw, type HoldStation } from '@core/geometry/blend/holdLine';
 import { kernelFromOps } from '@core/geometry/shapeKernel';
@@ -20,6 +20,9 @@ import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 afterEach(() => setGeometryKernel(null));
 
 const context = (kernel: GeometryKernel): ReturnType<typeof defaultContext> => ({ ...defaultContext(), kernel });
+/** A scripted kernel whose faces share no edge: the flat spandrel build (faces that do not meet). */
+const apart = (): ReturnType<typeof scriptedKernel> =>
+  scriptedKernel({ graph: { faces: [], edgeFaces: [], edgeConvexity: [] } as unknown as FaceGraph });
 const box = (): { doc: CadDocument; id: string } => {
   const made = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
   return { doc: made.document, id: made.affected[0] as string };
@@ -32,7 +35,7 @@ const setOf = (face: number): { near: Array<[number, number, number]> } => ({ ne
 
 describe('fillet_faces', () => {
   it('a radius between two faces is a faceBlend node over the picked faces; the picked names are recorded', () => {
-    const kernel = scriptedKernel();
+    const kernel = apart();
     const { doc, id } = box();
     const result = execute(doc, 'fillet_faces', { id, facesA: setOf(0), facesB: setOf(1), radius: 2 }, context(kernel));
     expect(result.affected).toHaveLength(1);
@@ -47,7 +50,7 @@ describe('fillet_faces', () => {
   });
 
   it('a profile rides along in the node; names given are used as they are and are not recorded again', () => {
-    const kernel = scriptedKernel();
+    const kernel = apart();
     const { doc, id } = box();
     const named = execute(
       doc,
@@ -68,7 +71,7 @@ describe('fillet_faces', () => {
   });
 
   it('BLD_FACESET_EMPTY / BLD_FACESETS_OVERLAP / BLD_BLEND_PARAMS / BLD_LAW_INVALID / ranges, with the unchanged document', () => {
-    const kernel = scriptedKernel();
+    const kernel = apart();
     const { doc, id } = box();
     const base = { id, facesA: setOf(0), facesB: setOf(1) };
     const empty = execute(doc, 'fillet_faces', { ...base, facesA: {}, radius: 1 }, context(kernel));
@@ -114,7 +117,7 @@ describe('fillet_faces', () => {
       message,
     });
     const refusing = (blendReport: BlendReport): GeometryKernel => {
-      const base = scriptedKernel();
+      const base = apart();
       return { ...base, evaluate: (recipe) => (recipe.op === 'faceBlend' ? null : base.evaluate(recipe)), blendReport: () => blendReport };
     };
     const noSolution = execute(
@@ -157,7 +160,7 @@ describe('fillet_faces', () => {
 
   it('data lists the blend faces and the faces the result no longer has (the consumed faces)', () => {
     const { doc, id } = box();
-    const base = scriptedKernel();
+    const base = apart();
     const reduced: GeometryKernel = {
       ...base,
       topology: (shape) => {
@@ -423,7 +426,7 @@ describe('face blend recipe nodes', () => {
     expect(kernel.evaluate({ op: 'faceBlend', source, facesA: [0], facesB: [1], radius: 1 })).toBeNull();
     expect(kernel.evaluate({ op: 'fullRound', source, side1: [0], center: [1], side2: [2] })).toBeNull();
     const { doc, id } = box();
-    const scripted = scriptedKernel();
+    const scripted = apart();
     const blended = execute(doc, 'fillet_faces', { id, facesA: setOf(0), facesB: setOf(1), radius: 1 }, context(scripted));
     setGeometryKernel(scripted);
     const exported = execute(blended.document, 'export_code', { language: 'cadquery' });

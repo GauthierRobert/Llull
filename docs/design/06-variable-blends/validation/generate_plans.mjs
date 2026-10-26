@@ -492,6 +492,143 @@ plan(
   ],
 );
 
+// ---------- DES-6c step 4: fillet_faces over face sets, curved faces, radiusEnd / law / width (TECHNICAL_SPEC §13.13) ----------
+const CORNER_AREA = 1 - Math.PI / 4;
+const lRemoved = CORNER_AREA * 1 * 1 * (10 + 5);
+const cylinderRimRemoved = 2 * Math.PI * ((5 - 1) * CORNER_AREA * 1 + 1 / 6);
+const bossRingAdded = 2 * Math.PI * ((10 + 2) * CORNER_AREA * 4 - 8 / 6);
+const lawRemoved = (CORNER_AREA * 20 * (1 + 2 + 4)) / 3;
+const widthRemoved = CORNER_AREA * 1 * 20;
+plan(
+  'target_face_sets',
+  'DES-6c step 4: fillet_faces with sets of several faces (an L prism, a cylinder rim, a boss ring), a law, a width, and the refusals of what is not built',
+  [],
+  [
+    {
+      command: 'extrude_profile',
+      params: {
+        profile: [
+          [0, 0],
+          [10, 0],
+          [10, 5],
+          [5, 5],
+          [5, 10],
+          [0, 10],
+        ],
+        depth: 10,
+      },
+      as: 'lp',
+    },
+    mass('$lp'),
+    {
+      command: 'fillet_faces',
+      params: {
+        id: '$lp',
+        facesA: { near: [[2, 2, 10]] },
+        facesB: {
+          near: [
+            [5, 0, 5],
+            [2.5, 10, 5],
+          ],
+        },
+        radius: 1,
+      },
+      as: 'f42',
+    },
+    mass('$f42'),
+    { command: 'check_blends', params: { ids: ['$f42'] } },
+    { command: 'add_cylinder', params: { radius: 5, height: 10, anchor: 'base-center' }, as: 'cy' },
+    mass('$cy'),
+    {
+      command: 'fillet_faces',
+      params: { id: '$cy', facesA: { near: [[2.5, 0, 10]] }, facesB: { near: [[5, 0, 5]] }, radius: 1 },
+      as: 'f43',
+    },
+    mass('$f43'),
+    { command: 'check_blends', params: { ids: ['$f43'] } },
+    { command: 'add_box', params: { size: [60, 60, 5], anchor: 'min' }, as: 'pl' },
+    { command: 'add_cylinder', params: { radius: 10, height: 15, position: [30, 30, 5], anchor: 'base-center' }, as: 'bs' },
+    { command: 'boolean', params: { op: 'union', a: '$pl', b: '$bs' }, as: 'fu' },
+    mass('$fu'),
+    {
+      command: 'fillet_faces',
+      params: { id: '$fu', facesA: { near: [[5, 5, 5]] }, facesB: { near: [[40, 30, 10]] }, radius: 2 },
+      as: 'f44',
+    },
+    mass('$f44'),
+    { command: 'check_blends', params: { ids: ['$f44'] } },
+    block('bl'),
+    mass('$bl'),
+    {
+      command: 'fillet_faces',
+      params: { id: '$bl', facesA: { near: [TOP_FACE] }, facesB: { near: [SIDE_FACE] }, law: { expression: '1 + t', samples: 33 } },
+      as: 'f45',
+    },
+    mass('$f45'),
+    { command: 'check_blends', params: { ids: ['$f45'] } },
+    block('bw'),
+    {
+      command: 'fillet_faces',
+      params: { id: '$bw', facesA: { near: [TOP_FACE] }, facesB: { near: [SIDE_FACE] }, width: Math.SQRT2 },
+      as: 'f46',
+    },
+    mass('$f46'),
+    {
+      command: 'extrude_profile',
+      params: {
+        profile: [
+          [0, 0],
+          [10, 0],
+          [10, 5],
+          [5, 5],
+          [5, 10],
+          [0, 10],
+        ],
+        depth: 10,
+      },
+      as: 'lq',
+    },
+    {
+      command: 'fillet_faces',
+      params: {
+        id: '$lq',
+        facesA: { near: [[2, 2, 10]] },
+        facesB: {
+          near: [
+            [5, 0, 5],
+            [2.5, 10, 5],
+          ],
+        },
+        radius: 1,
+        radiusEnd: 2,
+      },
+      expect: 'BLD_FACE_BLEND_UNSUPPORTED',
+    },
+    {
+      command: 'fillet_faces',
+      params: {
+        id: '$lq',
+        facesA: { near: [[7.5, 5, 5]] },
+        facesB: {
+          near: [
+            [5, 0, 5],
+            [2.5, 10, 5],
+          ],
+        },
+        radius: 1,
+      },
+      expect: 'BLD_FACE_BLEND_UNSUPPORTED',
+    },
+    { command: 'add_box', params: { size: [100, 100, 100], anchor: 'min' }, as: 'cc' },
+    { command: 'fillet_edge', params: { id: '$cc', edgesNear: [[100, 100, 50]], radius: 20 }, as: 'cr' },
+    {
+      command: 'fillet_faces',
+      params: { id: '$cr', facesA: { near: [[50, 50, 100]] }, facesB: { near: [[50, 100, 50]] }, radius: 5 },
+      expect: 'BLD_FACE_BLEND_UNSUPPORTED',
+    },
+  ],
+);
+
 // ---------- expected results ----------
 const D = '--doc t.llull.json --kernel occt --json';
 const cases = [
@@ -1022,6 +1159,78 @@ const cases = [
     plan: 'target_corners_concave_tapered',
     assert: 'inspect_topology($f41); mass_properties($f41); check_blends($f41)',
     proves: ['FR-BLD-09', 'TR-BLD-06'],
+  },
+  {
+    vc: 'VC-BLD-42',
+    what: 'fillet_faces, top cap of an L prism (10 x 10, notch 5 x 5, depth 10) against TWO side walls (10 and 5 long), r 1: two blend faces, removed volume (1 - pi/4) r^2 (10 + 5)',
+    value: { removedVolume: lRemoved, blends: 2 },
+    tolerance: 1e-6,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) V = V0 - (1 - pi/4) r^2 sum(L)',
+    plan: 'target_face_sets',
+    assert: 'mass_properties($lp) - mass_properties($f42); check_blends($f42)',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
+  },
+  {
+    vc: 'VC-BLD-43',
+    what: 'fillet_faces, cap of a cylinder R 5 H 10 against its curved wall, r 1: Pappus volume 2 pi ((R - r)(1 - pi/4) r^2 + r^3 / 6) removed, G1',
+    value: { removedVolume: cylinderRimRemoved },
+    tolerance: 1e-4,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) Pappus on the corner spandrel',
+    plan: 'target_face_sets',
+    assert: 'mass_properties($cy) - mass_properties($f43); check_blends($f43)',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
+  },
+  {
+    vc: 'VC-BLD-44',
+    what: 'fillet_faces, plate top against the wall of a boss R 10 (concave ring), r 2: the spandrel on the air side is ADDED, 2 pi ((R + r)(1 - pi/4) r^2 - r^3 / 6)',
+    value: { addedVolume: bossRingAdded },
+    tolerance: 1e-4,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) Pappus on the corner spandrel, air side',
+    plan: 'target_face_sets',
+    assert: 'mass_properties($f44) - mass_properties($fu); check_blends($f44)',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
+  },
+  {
+    vc: 'VC-BLD-45',
+    what: 'fillet_faces law r = 1 + t on the 20-long top edge of the 20 x 10 x 5 block: removed volume (1 - pi/4) L (r0^2 + r0 r1 + r1^2) / 3 (a sampled straight expression)',
+    value: { removedVolume: lawRemoved },
+    tolerance: 2e-5,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) integral of (1 - pi/4) r(s)^2',
+    plan: 'target_face_sets',
+    assert: 'mass_properties($bl) - mass_properties($f45); check_blends($f45)',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
+  },
+  {
+    vc: 'VC-BLD-46',
+    what: 'fillet_faces width sqrt 2 (chord between the contact lines) on a right-angle edge of the block = radius 1: removed volume (1 - pi/4) r^2 L',
+    value: { removedVolume: widthRemoved },
+    tolerance: 1e-6,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) chord = 2 r cos(wedge / 2) = r sqrt 2',
+    plan: 'target_face_sets',
+    assert: 'mass_properties($bw) - mass_properties($f46)',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
+  },
+  {
+    vc: 'VC-BLD-47',
+    what: 'fillet_faces refusals by name: a varying size over two shared edges, sets of faces that share no edge with several faces, and a shared edge whose tangent chain leaves the sets (the corner of a rounded cube: the x+ top edge is in neither set); the document is unchanged',
+    value: { codes: ['BLD_FACE_BLEND_UNSUPPORTED', 'BLD_FACE_BLEND_UNSUPPORTED', 'BLD_FACE_BLEND_UNSUPPORTED'] },
+    tolerance: 'exact',
+    unit: '-',
+    grade: 'A',
+    source: 'definition (TECHNICAL_SPEC §13.13)',
+    plan: 'target_face_sets',
+    assert: 'the last three steps are rejected with the codes',
+    proves: ['FR-BLD-13', 'TR-BLD-08'],
   },
 ];
 // Measured on the native kernel (DES-6b, OCCT 7.9.2): what each gated case actually gave and where it misses the pack tolerance.
