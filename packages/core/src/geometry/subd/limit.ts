@@ -5,7 +5,8 @@
 
 import type { Vec3 } from '../../model/types';
 import { add3, cross3, dot3, len3, normalize3OrZero, scale3 } from '../../lib/vec3';
-import { type Cage, subdivide } from '../subdivision';
+import { type Cage, type RefinableCage, subdivide } from '../subdivision';
+import { dartMask } from './dartMask';
 import { edgeKey } from './edgeKey';
 import { settleLevels } from './settle';
 import { levelQuadCount } from './volume';
@@ -20,7 +21,8 @@ export interface Level {
   readonly corners: number[];
 }
 
-export function prepare(cage: Cage): Level {
+/** Adjacency and effective sharpness of a refined level (boundary edges infinitely sharp, single-face boundary vertices corners unless `edge_only`). */
+export function prepareSharpness(cage: RefinableCage<unknown>): Omit<Level, 'cage'> {
   const topology = buildTopology(cage.vertices.length, cage.faces);
   const sharp = edgeSharpnessMap(cage);
   const corners = vertexSharpnessArray(cage, cage.vertices.length);
@@ -28,7 +30,11 @@ export function prepare(cage: Cage): Level {
   for (const edge of topology.edges) if (edge.faces.length === 1) sharp.set(edgeKey(edge.a, edge.b), SHARP_MAX);
   if (cage.boundary !== 'edge_only')
     topology.vertexFaces.forEach((around, v) => around.length === 1 && topology.vertexEdges[v]?.length === 2 && (corners[v] = SHARP_MAX));
-  return { cage, topology, sharp, corners };
+  return { topology, sharp, corners };
+}
+
+export function prepare(cage: Cage): Level {
+  return { cage, ...prepareSharpness(cage) };
 }
 
 /** Subdominant eigenvalue of the Catmull-Clark subdivision matrix for valence n. */
@@ -51,7 +57,7 @@ function ruleAt(level: Level, v: number): { rule: VertexRule; sharpNeighbours: n
 }
 
 /** Fan of an interior vertex of an all-quad closed level: edge neighbours e_i and the opposite vertices d_i of the quad whose next vertex is e_i. */
-function fanOf(level: Level, v: number): { e: number[]; d: number[] } {
+export function fanOf(level: Pick<Level, 'topology'>, v: number): { e: number[]; d: number[] } {
   const { faces, directed, vertexFaces } = level.topology;
   const start = (vertexFaces[v] as number[])[0] as number;
   const e: number[] = [];
@@ -88,7 +94,15 @@ function vertexLimitOf(level: Level, v: number): VertexLimit {
   const n = fan.e.length;
   const sumE = fan.e.reduce<Vec3>((total, w) => add3(total, p(w)), [0, 0, 0]);
   const sumD = fan.d.reduce<Vec3>((total, w) => add3(total, p(w)), [0, 0, 0]);
-  const point = scale3(add3(add3(scale3(p(v), n * n), scale3(sumE, 4)), sumD), 1 / (n * (n + 5)));
+  const sharpIndex = sharpNeighbours.length === 1 ? fan.e.indexOf(sharpNeighbours[0] as number) : -1;
+  const dart = sharpIndex >= 0 ? dartMask(n, sharpIndex) : null;
+  const point =
+    dart === null
+      ? scale3(add3(add3(scale3(p(v), n * n), scale3(sumE, 4)), sumD), 1 / (n * (n + 5)))
+      : [...fan.e, ...fan.d].reduce<Vec3>(
+          (total, w, k) => add3(total, scale3(p(w), dart[1 + k] as number)),
+          scale3(p(v), dart[0] as number),
+        );
   const theta = (2 * Math.PI) / n;
   const k = 1 / (4 * subdominantEigenvalue(n) - 1);
   const tangent = (shift: number): Vec3 => {

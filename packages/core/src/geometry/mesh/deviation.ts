@@ -1,6 +1,6 @@
 /**
  * Symmetric deviation between two triangle meshes (07 MSH FR-MSH-25): closest-surface distance from sample points of each mesh to the other.
- * Samples are the vertices and the triangle centroids (evenly strided down to `maxSamples` per mesh), so the Hausdorff value is a lower bound
+ * Samples are the vertices and the triangle centroids (and, with `edgeMidpoints`, the midpoints of the edges) (evenly strided down to `maxSamples` per mesh), so the Hausdorff value is a lower bound
  * of the true one that is exact for vertex-dominated differences and tight for fine meshes.
  * @invariant deterministic: same inputs -> same numbers
  */
@@ -27,7 +27,7 @@ export interface DeviationSummary {
 /** Default samples per mesh. */
 export const DEVIATION_MAX_SAMPLES = 20_000;
 
-function samplePoints(mesh: MeshData, maxSamples: number): Vec3[] {
+function samplePoints(mesh: MeshData, maxSamples: number, edgeMidpoints: boolean): Vec3[] {
   const points: Vec3[] = [];
   const vertices = mesh.positions.length / 3;
   const used = new Uint8Array(vertices);
@@ -41,6 +41,22 @@ function samplePoints(mesh: MeshData, maxSamples: number): Vec3[] {
       ((mesh.positions[a * 3 + axis] as number) + (mesh.positions[b * 3 + axis] as number) + (mesh.positions[c * 3 + axis] as number)) / 3;
     points.push([centre(0), centre(1), centre(2)]);
   }
+  if (edgeMidpoints) {
+    const seen = new Set<number>();
+    const count = vertices;
+    for (let f = 0; f + 2 < mesh.indices.length; f += 3)
+      for (let k = 0; k < 3; k++) {
+        const [a, b] = [mesh.indices[f + k] as number, mesh.indices[f + ((k + 1) % 3)] as number];
+        const key = Math.min(a, b) * count + Math.max(a, b);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        points.push([
+          ((mesh.positions[a * 3] as number) + (mesh.positions[b * 3] as number)) / 2,
+          ((mesh.positions[a * 3 + 1] as number) + (mesh.positions[b * 3 + 1] as number)) / 2,
+          ((mesh.positions[a * 3 + 2] as number) + (mesh.positions[b * 3 + 2] as number)) / 2,
+        ]);
+      }
+  }
   if (points.length <= maxSamples) return points;
   const stride = points.length / maxSamples;
   return Array.from({ length: maxSamples }, (_, i) => points[Math.floor(i * stride)] as Vec3);
@@ -51,10 +67,18 @@ function distances(points: ReadonlyArray<Vec3>, target: SurfaceIndex): number[] 
 }
 
 /** Both-way deviation of `a` and `b`; null when either mesh has no triangle. */
-export function symmetricDeviation(a: MeshData, b: MeshData, maxSamples = DEVIATION_MAX_SAMPLES): DeviationSummary | null {
+export function symmetricDeviation(
+  a: MeshData,
+  b: MeshData,
+  maxSamples = DEVIATION_MAX_SAMPLES,
+  options: { readonly edgeMidpoints?: boolean } = {},
+): DeviationSummary | null {
   if (a.indices.length < 3 || b.indices.length < 3) return null;
   const [indexA, indexB] = [new SurfaceIndex(a.positions, a.indices), new SurfaceIndex(b.positions, b.indices)];
-  const [pointsA, pointsB] = [samplePoints(a, maxSamples), samplePoints(b, maxSamples)];
+  const [pointsA, pointsB] = [
+    samplePoints(a, maxSamples, options.edgeMidpoints === true),
+    samplePoints(b, maxSamples, options.edgeMidpoints === true),
+  ];
   const forward = distances(pointsA, indexB);
   const backward = distances(pointsB, indexA);
   const all = [...forward, ...backward];

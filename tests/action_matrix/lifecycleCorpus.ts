@@ -98,6 +98,36 @@ function quadRemeshDesign(): LifecycleDesign {
   };
 }
 
+/** fit_subdivision_to_mesh and fit_surface_to_mesh (07 MSH M6, pure TypeScript): a cage fitted to a sphere mesh and a patch fitted to a cap of it, through replay, undo, delete and clear. */
+function fitToMeshDesign(): LifecycleDesign {
+  return {
+    id: 'seed/fit_to_mesh',
+    commands: new Set(['import_mesh', 'add_subdivision_solid', 'fit_subdivision_to_mesh', 'fit_surface_to_mesh']),
+    size: 0,
+    build: () => {
+      const { doc, ids } = docWithMeshes(icosphere(10, 3));
+      const cage = quadSphere(10, 3);
+      const vertices = Array.from({ length: cage.positions.length / 3 }, (_, i) =>
+        [0, 1, 2].map((a) => (cage.positions[3 * i + a] as number) * 0.9),
+      );
+      const faces = Array.from({ length: cage.quads.length / 4 }, (_, f) => cage.quads.slice(4 * f, 4 * f + 4));
+      const added = execute(doc, 'add_subdivision_solid', { vertices, faces });
+      const fitted = execute(added.document, 'fit_subdivision_to_mesh', {
+        cageId: added.affected[0] as string,
+        targetId: ids[0] as string,
+        maxDeviation: 0.1,
+        levels: 2,
+      });
+      const patch = execute(fitted.document, 'fit_surface_to_mesh', {
+        id: ids[0] as string,
+        region: { center: [0, 0, 10], radius: 4 },
+        controlPoints: [5, 5],
+      });
+      return patch.document;
+    },
+  };
+}
+
 /** Every lifecycle design, in a stable order. */
 export function lifecycleDesigns(): LifecycleDesign[] {
   const extra = Object.entries(EXTRA_SETS).flatMap(([set, plans]) =>
@@ -117,7 +147,7 @@ export function lifecycleDesigns(): LifecycleDesign[] {
     };
     return [design];
   });
-  return [...loadDesigns().map(planDesign), ...extra, ...seeds, quadRemeshDesign()];
+  return [...loadDesigns().map(planDesign), ...extra, ...seeds, quadRemeshDesign(), fitToMeshDesign()];
 }
 
 /** Plugins with a document extension and at least one command that no design exercises (a plugin without commands has no way to create its slice). */

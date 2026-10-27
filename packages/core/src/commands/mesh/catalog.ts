@@ -1,4 +1,4 @@
-/** Mesh modelling (07 MSH, toolset `mesh`): import, inspect and check triangle meshes; hull, Minkowski, offset, hollow, wrap and subdivision through the mesh-engine port; repair, hole filling, decimation, remeshing, smoothing and plane cuts; quad remeshing. */
+/** Mesh modelling (07 MSH, toolset `mesh`): import, inspect and check triangle meshes; hull, Minkowski, offset, hollow, wrap and subdivision through the mesh-engine port; repair, hole filling, decimation, remeshing, smoothing and plane cuts; quad remeshing; fitting a subdivision cage and a B-spline patch to a mesh. */
 
 import { commandCatalog } from '../schema';
 import { analyzeMesh } from './analyzeMesh';
@@ -9,6 +9,8 @@ import { importMeshFile } from './importMeshFile';
 import { cutMesh } from './cutMesh';
 import { decimateMesh } from './decimateMesh';
 import { fillMeshHoles } from './fillMeshHoles';
+import { fitSubdivisionToMesh } from './fitSubdivisionToMesh';
+import { fitSurfaceToMesh } from './fitSurfaceToMesh';
 import { hollowMesh, offsetMesh } from './levelSetCommands';
 import { meshToBrep } from './meshToBrep';
 import { addGridMesh, addIcosphereMesh } from './addGeneratedMesh';
@@ -43,4 +45,6 @@ export const meshCommands = commandCatalog(
   addIcosphereMesh,
   subdivideMesh,
   quadRemesh,
+  fitSubdivisionToMesh,
+  fitSurfaceToMesh,
 );

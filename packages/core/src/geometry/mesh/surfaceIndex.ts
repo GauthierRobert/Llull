@@ -17,6 +17,8 @@ export interface SurfaceHit {
 
 export class SurfaceIndex {
   readonly faceCount: number;
+  /** Triangle tests made by all `closest` calls so far (a work counter for callers with a budget). */
+  tests = 0;
   private readonly corners: Float64Array;
   private readonly order: Int32Array;
   private readonly centres: Float64Array;
@@ -101,6 +103,7 @@ export class SurfaceIndex {
       if ((this.left[node] as number) < 0) {
         for (let i = this.start[node] as number; i < (this.end[node] as number); i++) {
           const t = this.order[i] as number;
+          this.tests++;
           const o = t * 9;
           const c = this.corners;
           const hit = closestPointOnTriangle(p, [

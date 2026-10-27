@@ -190,11 +190,11 @@ save('target_defect_repair.json', {
 save('target_sculpt_quad_brep.json', {
   id: 'MSH-SCULPT-BREP',
   status:
-    'PARTIAL: steps 0-5 (add_grid_mesh, sculpt_mesh, import, remesh, quad_remesh) run; steps 6-7 need fit_subdivision_to_mesh (M6, not built)',
-  unbuilt: ['fit_subdivision_to_mesh'],
+    'RUNNABLE: quad_remesh needs the native mesh engine (llull-compute built with QuadriFlow); the exact limit-patch mass of the fitted cage (step 8) also needs the native OCC kernel',
+  unbuilt: [],
   validates: ['VC-MSH-19', 'VC-MSH-21', 'VC-MSH-22'],
   description:
-    'Sculpt a symmetric bump on a flat patch (closed-form displaced volume), then quad-remesh an organic mesh, fit a subdivision cage to it and hand it to the exact kernel as B-spline faces.',
+    'Sculpt a symmetric bump on a flat patch (closed-form displaced volume) and fit one B-spline patch to it, then quad-remesh an organic mesh (the fine icosphere R 10, remeshed to 1 mm edges), fit a subdivision cage to it and hand it to the exact kernel as B-spline faces (limit-patch volume against the sphere).',
   expect: {
     stepIndexBase: 0,
     'step 2 data.displacedVolume': {
@@ -204,12 +204,24 @@ save('target_sculpt_quad_brep.json', {
       source: 'data/sculpt_cases.json smooth (discrete grid)',
     },
     'step 2 data.symmetryError': { value: 0, tolerance: 1e-12 },
-    'step 5 data.quads': {
-      range: [510, 690],
+    'step 3 data.maxDeviation': {
+      max: 0.01,
       source:
-        'target 600 within 15 %; measured 631 (the 80-triangle l1 STL remeshed to 1.5 mm); cage Hausdorff 0.344 against the faceted l1 remesh',
+        'fit_surface_to_mesh on the sculpted patch, requested 0.01 mm; measured 0.00936 with a 24 x 24 grid (the grid grows 6, 8, 12, 16, 24 until met)',
     },
-    'step 6 data.maxDeviation': 'TBD - measure with fit_subdivision_to_mesh on the icosphere l4 (target <= 0.05 mm)',
+    'step 6 data.quads': { range: [510, 690], source: 'target 600 within 15 %; measured 629 (the l5 STL remeshed to 1 mm edges)' },
+    'step 7 data.maxDeviation': {
+      max: 0.05,
+      source: 'VC-MSH-22: requested 0.05 mm, measured 0.0201 after 1 round (input 0.100), both directions, on the level-4 limit mesh',
+    },
+    'step 7 data.converged': true,
+    'step 8 data.volume': {
+      value: 4188.790205,
+      tolerance: 0.005,
+      relative: true,
+      source:
+        'sphere R 10 (4/3 pi R^3), exact limit-patch volume; measured 4177.361 (-0.27 %, the 1 mm remesh chords are inside the sphere); the unfitted cage is -2.2 %',
+    },
   },
   actions: [
     { command: 'set_units', params: { units: 'mm' } },
@@ -227,19 +239,20 @@ save('target_sculpt_quad_brep.json', {
         symmetry: { plane: 'yz' },
       },
     },
+    { command: 'fit_surface_to_mesh', params: { id: '$patch', maxDeviation: 0.01 }, as: 'bump' },
     {
       command: 'import_mesh_file',
-      params: { format: 'stl', file: 'validation/data/icosphere_r10_l1_ascii.stl', units: 'mm' },
+      params: { format: 'stl', file: 'validation/data/icosphere_r10_l5_binary.stl', units: 'mm' },
       as: 'organic',
     },
-    { command: 'remesh_mesh', params: { id: '$organic', targetEdgeLength: 1.5, iterations: 5 } },
+    { command: 'remesh_mesh', params: { id: '$organic', targetEdgeLength: 1, iterations: 5 } },
     { command: 'quad_remesh', params: { id: '$organic', targetQuadCount: 600, adaptiveSize: 0, detectHardEdgesDeg: 30 }, as: 'quads' },
     {
       command: 'fit_subdivision_to_mesh',
       params: { cageId: '$quads', targetId: '$organic', levels: 3, maxDeviation: 0.05, iterations: 10 },
       as: 'subd',
     },
-    { command: 'mass_properties', params: { entityId: '$subd' } },
+    { command: 'mass_properties', params: { entityId: '$subd', surfaceModel: 'limit_patches' } },
   ],
 });
 

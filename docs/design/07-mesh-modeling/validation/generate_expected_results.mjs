@@ -282,7 +282,7 @@ const cases = [
   },
   {
     vc: 'VC-MSH-22',
-    what: 'quad_remesh + fit_subdivision_to_mesh + exact B-spline solid of an icosphere R 10 (quad_remesh and the B-spline solid of the unfitted cage are built and measured; the fit step is not)',
+    what: 'quad_remesh + fit_subdivision_to_mesh + exact B-spline solid of an icosphere R 10 (all built and measured)',
     expected: {
       allQuads: true,
       quadCount: '545..614 for targetQuadCount 600 (within 15 %; measured 614 on icosphere l4, 609 on l5, 545 through the float32 STL)',
@@ -292,14 +292,20 @@ const cases = [
       bsplineFaces: 'quads x 4^(levels - 1) = 2456 for 614 quads at levels 2, all bspline, one closed solid, on the native kernel',
       unfittedLimitVsSphere:
         'volume 4097.719 (-2.17 % of 4188.790), area 1238.371 (-1.45 % of 1256.637): the Catmull-Clark limit of the cage lies inside it',
-      maxDeviationAfterFit: '<= 0.05 (requested; fit_subdivision_to_mesh not built)',
+      maxDeviationAfterFit:
+        '<= 0.05 (fit_subdivision_to_mesh, both directions, level-4 limit mesh): measured 0.0078 on the l4 icosphere (input 0.095, 1 round), 0.0201 through the plan (remeshed STL, input 0.100)',
+      fittedLimitVsSphere:
+        'exact limit-patch volume -0.10 % (4184.6 of 4188.790), area -0.067 % of 1256.637 (before the fit -2.17 % / -1.45 %)',
     },
     tolerance: 'bounds',
     source:
       '(c) measured with the implementation (server/tests/quadRemeshNative.test.ts); QuadriFlow face count grows linearly with the requested resolution [S8]',
     grade: 'C',
     proves: ['FR-MSH-22', 'FR-MSH-23', 'TR-MSH-10'],
-    cli: { run: `llull run plans/target_quad_remesh.json --kernel occt ${D}`, assert: 'steps[2].data.quads, steps[3].data.volume' },
+    cli: {
+      run: `llull run plans/target_quad_remesh.json --kernel occt ${D}; llull run plans/target_sculpt_quad_brep.json --kernel occt ${D}`,
+      assert: 'steps[2].data.quads, steps[3].data.volume; sculpt plan steps[7].data.maxDeviation <= 0.05',
+    },
   },
   {
     vc: 'VC-MSH-23',

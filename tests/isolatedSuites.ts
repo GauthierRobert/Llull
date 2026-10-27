@@ -16,6 +16,7 @@ export const ISOLATED_SUITES: readonly string[] = [
   'tests/unit/serverConfig.test.ts',
   'tests/unit/serverFiles.test.ts',
   'tests/unit/cae/ports.test.ts',
+  'tests/unit/mesh/fitSubdivisionBudget.test.ts',
   'tests/unit/plant/piping/convertReplaceGuard.test.ts',
   'tests/unit/contract/entityPropertiesPort.test.ts',
   'tests/unit/contract/plugins.test.ts',

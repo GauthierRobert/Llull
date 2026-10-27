@@ -1,9 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/design/07-mesh-modeling/validation/plans/target_sculpt_quad_brep.json": [
-      "fit_subdivision_to_mesh"
-    ],
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
       "add_imperfection"
     ],

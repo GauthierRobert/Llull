@@ -65,6 +65,24 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_KERNEL_UNSUPPORTED: 'Run on the native OCC kernel (the llull CLI / desktop app default); Manifold has no exact B-rep builder.',
   MESH_QUAD_REMESH_FAILED:
     'Run remesh_mesh first for an even triangulation, raise targetQuadCount (very few quads on a detailed surface), or repair_mesh the input.',
+  MESH_FIT_SYMMETRY: 'Clear the cage symmetry first (set_cage_symmetry planes []): a fit moves the vertices independently.',
+  MESH_FIT_CAGE_INVALID: 'Repair the cage (check_subdivision lists the problem), then fit again.',
+  MESH_FIT_TOO_LARGE:
+    'fit_subdivision_to_mesh: lower levels, use a coarser cage, or decimate_mesh the target (at most 120000 limit samples and 500000 target triangles). fit_surface_to_mesh: pick a smaller region or decimate_mesh first (at most 200000 region triangles).',
+  MESH_FIT_FOLDED:
+    'Warning: part of the limit surface faces against the target. Undo the fit, repair the cage (check_subdivision), or fit a cage that is already on the outside of the target.',
+  MESH_FIT_SOLVER_RESIDUAL: 'Warning: the linear solve stopped at its iteration cap. Raise smoothing, or fit again from the result.',
+  MESH_FIT_PIN_SHARED:
+    'Warning: the target is coarser than the cage, so several cage vertices were pinned to the same target vertex. Use the least-squares fit (interpolate off) or a coarser cage.',
+  MESH_FIT_PIN_RESIDUAL: 'Warning: a pinned limit point misses its vertex. Fit again, or use the least-squares fit instead of interpolate.',
+  MESH_FIT_FAILED: 'Raise smoothing, check the cage and the target with check_subdivision / analyze_mesh, or fit a coarser cage first.',
+  MESH_FIT_CAGE_FAR:
+    'Move and scale the cage onto the target first (edit_subdivision_cage), or make the cage from the target with quad_remesh.',
+  MESH_FIT_NOT_CONVERGED: 'Raise iterations or maxDeviation, add cage detail (quad_remesh with more quads), or lower smoothing.',
+  MESH_FIT_REGION_EMPTY: 'Move or enlarge the region sphere so that it holds triangle centres, or omit region.',
+  MESH_FIT_NOT_PROJECTABLE:
+    'Pick a smaller region that looks like a height field over one plane (a gently curved patch), or split the mesh with segment_mesh first.',
+  MESH_FIT_TOO_FEW_SAMPLES: 'Give fewer controlPoints, a larger region, or refine the mesh (subdivide_mesh).',
   MESH_CUT_MISSES: 'Move the plane so that the mesh has vertices on both sides.',
 };
 

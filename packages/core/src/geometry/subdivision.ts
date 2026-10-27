@@ -146,8 +146,27 @@ interface EdgeInfo {
   readonly sharpness: number;
 }
 
-/** One Catmull-Clark step with semi-sharp creases (cage assumed valid: see cageProblem). */
-function subdivideOnce(cage: Cage): Cage {
+/** The linear operations Catmull-Clark refinement needs on a vertex value: points (`VEC3_OPS`) or, for the fit operator, sparse stencils over the cage vertices. */
+export interface RefineOps<T> {
+  readonly add: (a: T, b: T) => T;
+  readonly scale: (a: T, factor: number) => T;
+  readonly centroid: (values: ReadonlyArray<T>) => T;
+  readonly lerp: (a: T, b: T, t: number) => T;
+}
+
+export const VEC3_OPS: RefineOps<Vec3> = { add: add3, scale: scale3, centroid: centroid3, lerp: lerp3 };
+
+/** A cage whose vertices are values of type `T` (points, stencils): the topology and sharpness fields of `Cage`. */
+export interface RefinableCage<T> extends SharpnessSource {
+  readonly vertices: ReadonlyArray<T>;
+  readonly faces: ReadonlyArray<ReadonlyArray<number>>;
+  readonly creaseMethod?: CreaseMethod | undefined;
+  readonly boundary?: CageBoundary | undefined;
+}
+
+/** One Catmull-Clark step with semi-sharp creases (cage assumed valid: see cageProblem), over any vertex algebra. */
+export function refineOnce<T>(cage: RefinableCage<T>, ops: RefineOps<T>): RefinableCage<T> {
+  const { add, scale, centroid, lerp } = ops;
   const { vertices, faces } = cage;
   const method = cage.creaseMethod ?? 'uniform';
   const sharpness = edgeSharpnessMap(cage);
@@ -168,15 +187,15 @@ function subdivideOnce(cage: Cage): Cage {
   if (cage.boundary !== 'edge_only') faceCount.forEach((n, v) => n === 1 && (cornerSharpness[v] = SHARP_MAX));
   // a boundary edge (one face) is infinitely sharp
   for (const [key, edge] of edges) if (edge.faces.length === 1) edges.set(key, { ...edge, sharpness: SHARP_MAX });
-  const facePoints = faces.map((face) => centroid3(face.map((v) => vertices[v] as Vec3)));
+  const facePoints = faces.map((face) => centroid(face.map((v) => vertices[v] as T)));
   const edgeList = [...edges.values()];
   const edgeIndex = new Map(edgeList.map((edge, i) => [edgeKey(edge.a, edge.b), i]));
   const edgePoints = edgeList.map((edge) => {
-    const ends = [vertices[edge.a] as Vec3, vertices[edge.b] as Vec3];
-    const sharp = centroid3(ends);
+    const ends = [vertices[edge.a] as T, vertices[edge.b] as T];
+    const sharp = centroid(ends);
     if (edge.sharpness >= 1) return sharp;
-    const smooth = centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
-    return edge.sharpness <= 0 ? smooth : lerp3(smooth, sharp, edge.sharpness);
+    const smooth = centroid([...ends, ...edge.faces.map((f) => facePoints[f] as T)]);
+    return edge.sharpness <= 0 ? smooth : lerp(smooth, sharp, edge.sharpness);
   });
   const incident = vertices.map((): EdgeInfo[] => []);
   const adjacentFaces = vertices.map((): number[] => []);
@@ -193,21 +212,21 @@ function subdivideOnce(cage: Cage): Cage {
       method,
       (incident[v] as EdgeInfo[]).filter((e) => e !== edge && e.sharpness > 0).map((e) => e.sharpness),
     );
-  const position = (v: number, rule: VertexRule, sharpEdges: readonly EdgeInfo[]): Vec3 => {
-    const p = vertices[v] as Vec3;
+  const position = (v: number, rule: VertexRule, sharpEdges: readonly EdgeInfo[]): T => {
+    const p = vertices[v] as T;
     if (rule === 'corner') return p;
     if (rule === 'crease') {
-      const [first, second] = sharpEdges.map((edge) => vertices[other(edge, v)] as Vec3);
-      return scale3(add3(add3(scale3(p, 6), first as Vec3), second as Vec3), 1 / 8);
+      const [first, second] = sharpEdges.map((edge) => vertices[other(edge, v)] as T);
+      return scale(add(add(scale(p, 6), first as T), second as T), 1 / 8);
     }
     const around = incident[v] as EdgeInfo[];
     const n = around.length;
-    const q = centroid3((adjacentFaces[v] as number[]).map((f) => facePoints[f] as Vec3));
-    const r = centroid3(around.map((edge) => centroid3([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])));
-    return scale3(add3(add3(q, scale3(r, 2)), scale3(p, n - 3)), 1 / n);
+    const q = centroid((adjacentFaces[v] as number[]).map((f) => facePoints[f] as T));
+    const r = centroid(around.map((edge) => centroid([vertices[edge.a] as T, vertices[edge.b] as T])));
+    return scale(add(add(q, scale(r, 2)), scale(p, n - 3)), 1 / n);
   };
   const childCorner = vertices.map((_, v) => uniformChild(cornerSharpness[v] as number));
-  const vertexPoints = vertices.map((_, v): Vec3 => {
+  const vertexPoints = vertices.map((_, v): T => {
     const around = incident[v] as EdgeInfo[];
     const sharp = around.filter((edge) => edge.sharpness > 0);
     const parentRule = vertexRule(sharp.length, cornerSharpness[v] as number);
@@ -218,7 +237,7 @@ function subdivideOnce(cage: Cage): Cage {
     const faded = sharp.filter((edge) => childAt(edge, v) <= 0).map((edge) => edge.sharpness);
     if (childCorner[v] === 0 && (cornerSharpness[v] as number) > 0) faded.push(cornerSharpness[v] as number);
     const weight = Math.min(1, faded.reduce((total, s) => total + s, 0) / Math.max(1, faded.length));
-    return lerp3(position(v, childRule, childSharp), parent, weight);
+    return lerp(position(v, childRule, childSharp), parent, weight);
   });
   const edgeBase = vertices.length;
   const faceBase = edgeBase + edgeList.length;
@@ -254,7 +273,7 @@ function subdivideOnce(cage: Cage): Cage {
 /** The cage refined `levels` times. */
 export function subdivide(cage: Cage, levels: number): Cage {
   let current = cage;
-  for (let level = 0; level < levels; level++) current = subdivideOnce(current);
+  for (let level = 0; level < levels; level++) current = refineOnce(current, VEC3_OPS);
   return current;
 }
 
