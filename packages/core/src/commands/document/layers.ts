@@ -15,7 +15,7 @@ const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({ ...doc, la
 
 /**
  * @affects creates 1 new Layer; affected = [newLayerId]
- * @invariant new layer is visible, unlocked, appended to layerOrder
+ * @invariant new layer is visible, unlocked, appended to layerOrder once (a replay re-runs this step on the layers it carries: the id is already listed)
  * @failure empty name or non-#rrggbb color -> no-op, affected:[]
  */
 export const addLayer = defineCommand({
@@ -39,7 +39,8 @@ export const addLayer = defineCommand({
     if (color !== undefined && !isHexColor(color)) return noop(doc, `add_layer: color must be a #rrggbb hex string (got "${color}").`);
     const id = nextId('layer');
     const layer: Layer = { id, name: trimmed, visible: true, locked: false, ...(color !== undefined ? { color } : {}) };
-    return changed({ ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] }, `Created layer ${id} ("${trimmed}").`, [id]);
+    const layerOrder = doc.layerOrder.includes(id) ? doc.layerOrder : [...doc.layerOrder, id];
+    return changed({ ...withLayer(doc, layer), layerOrder }, `Created layer ${id} ("${trimmed}").`, [id]);
   },
 });
 

@@ -20,7 +20,7 @@
   There is a test that enforces this (`is pure` in `commands.test.ts`).
 - **One schema per command.** Declare commands with `defineCommand` and a zod `params`
   object; never hand-write a `paramsSchema` or a separate params interface.
-- **Small files.** At most 500 lines of code per file (ESLint `max-lines`); split by concern.
+- **Small files.** At most 500 lines of code per file (oxlint `max-lines`); split by concern.
 - **Files are kebab or camel per folder convention already present.** Match the
   neighbours.
 

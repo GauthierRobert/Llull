@@ -84,7 +84,7 @@ Installing a kernel is the composition root's job, never a command's. Rigid-body
 
 A domain extends core through `CadPlugin` (`{ name, toolset, commands, guards?, document?, onInstall? }`; `onInstall` = one-time hook run after the host accepted the plugin),
 installed by `src/app/plugins.ts` `installDefaultPlugins()`. `packages/core` NEVER imports a plugin.
-A plugin sees core only through its public API (`model`, `lib`, `geometry`, `plugins/plugin`,
+A plugin sees core only through its public API (`model`, `lib`, `geometry`, `plugins/{plugin,sliceSchema}`,
 `commands/{schema,types,noop,derivation,registry}`) and composes other commands via `execute`.
 New domain capability ⇒ a command in its plugin package, not in core.
 Hosts (`server/`, `desktop/`, `src/app`, `src/ui`) use a plugin package ONLY through its `src/index.ts` API (`@cae/index`, `@aec/index`, …):

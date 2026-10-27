@@ -77,6 +77,11 @@ export const fastenersDocument: DocumentExtension = {
     if (!isRecord(slice) || !isRecord(slice['catalogs']) || !isRecord(slice['stacks'])) return ['fasteners must be { catalogs, stacks }'];
     const errors: string[] = [];
     for (const [key, family] of Object.entries(slice['catalogs'])) {
+      const sizes: unknown[] = isRecord(family) && Array.isArray(family['sizes']) ? family['sizes'] : [];
+      sizes.forEach((size, index) => {
+        if (!isRecord(size) || !isRecord(size['dims']))
+          errors.push(`fasteners.catalogs.${key}.sizes.${index}.dims must be an object (stored catalogues carry it)`);
+      });
       const checked = checkFamily(family, `fasteners.catalogs.${key}`);
       if ('issues' in checked) errors.push(...checked.issues.map((issue) => `${issue.code}: ${issue.message}`));
       else if (checked.family.id !== key) errors.push(`fasteners.catalogs.${key}.id must equal its key`);

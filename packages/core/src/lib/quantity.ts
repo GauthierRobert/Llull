@@ -124,16 +124,23 @@ const tokenize = (text: string): string[] | null => {
   return tokens;
 };
 
+/** Parentheses nested deeper than this are a syntax error (the recursion would exhaust the call stack). */
+const MAX_NESTING = 100;
+
 /** Recursive-descent parser over the token list; returns null on any syntax error or unknown symbol. */
 const parseTokens = (tokens: readonly string[]): Term | null => {
   let position = 0;
+  let depth = 0;
   const factor = (): Term | null => {
     const token = tokens[position];
     if (token === undefined) return null;
     position += 1;
     let term: Term | null;
     if (token === '(') {
+      if (depth >= MAX_NESTING) return null;
+      depth += 1;
       term = product();
+      depth -= 1;
       if (tokens[position] !== ')') return null;
       position += 1;
     } else if (/^[+-]?\d/.test(token)) {
@@ -170,7 +177,7 @@ const withCarets = (text: string): string =>
   text
     .replace(/²/g, '^2')
     .replace(/³/g, '^3')
-    .replace(/(?<![\d.])([A-Za-zµμ]+)(\d+)(?![\d.])/g, '$1^$2');
+    .replace(/(?<![\d.A-Za-zµμ])([A-Za-zµμ]+)(\d+)(?![\d.])/g, '$1^$2');
 
 /** Parse a unit; an absolute temperature (`degC`, `degF`) alone keeps its affine offset. */
 export function parseUnit(text: string): ParsedUnit | UnitFailure {

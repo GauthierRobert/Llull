@@ -101,9 +101,18 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
   return next === 1 && stored === undefined ? raw : { ...raw, nextStepNumber: next };
 }
 
-/** Re-derive geometry the file omitted, via every installed plugin's document extension. */
+/**
+ * Re-derive geometry the file omitted, via every installed plugin's document extension.
+ * @invariant the saved draw order survives: each extension restores against the order its predecessor left, which no longer lists the ids a LATER
+ *   extension derives, so the saved order is re-applied once all have run (ids a restore added follow in their own order)
+ */
 function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, unknown> {
-  return documentExtensions().reduce((current, extension) => extension.restore(current), raw);
+  const restored = documentExtensions().reduce((current, extension) => extension.restore(current), raw);
+  const [saved, order, entities] = [raw['order'], restored['order'], restored['entities']];
+  if (restored === raw || !Array.isArray(saved) || !Array.isArray(order) || !isRecord(entities)) return restored;
+  const placed = saved.filter((id): id is string => typeof id === 'string' && Object.hasOwn(entities, id));
+  const known = new Set(placed);
+  return { ...restored, order: [...known, ...(order as string[]).filter((id) => !known.has(id))] };
 }
 
 /** Optional document collections, in output key order; absent (older files) -> empty default. */

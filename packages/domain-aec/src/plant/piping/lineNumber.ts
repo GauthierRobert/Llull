@@ -118,8 +118,12 @@ export interface ParsedLineNumber {
   readonly differences: ReadonlyArray<{ readonly field: string; readonly parsed: string; readonly line: string }>;
 }
 
-/** Best-effort reading of `lineNumber` with `template`, compared with the line's fields. */
+/**
+ * Best-effort reading of `lineNumber` with `template`, compared with the line's fields.
+ * @failure a template `templateProblem` refuses (too long, nested or unbalanced groups, repeated placeholders) is never compiled -> not matched
+ */
 export function parseLineNumber(template: string, lineNumber: string, fields: LineNumberFields): ParsedLineNumber {
+  if (templateProblem(template) !== null) return { matched: false, fields: {}, differences: [] };
   const match = new RegExp(`^${patternOf(tokenize(template))}$`).exec(lineNumber);
   if (match === null) return { matched: false, fields: {}, differences: [] };
   const parsed = Object.fromEntries(

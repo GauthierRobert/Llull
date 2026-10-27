@@ -1,0 +1,152 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "react"
+  ],
+  "jsPlugins": [
+    "./scripts/lint/llullRules.mjs"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/*.cjs",
+    ".claude/worktrees/**",
+    "desktop/build/**",
+    "desktop/release/**",
+    "solver/target/**"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": [
+      "warn",
+      {
+        "additionalHooks": "(useDisposable)"
+      }
+    ],
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "typescript/explicit-function-return-type": [
+      "warn",
+      {
+        "allowExpressions": true
+      }
+    ],
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "@core/lib/*"
+            ],
+            "message": "Import core helpers via @lib/* instead."
+          }
+        ]
+      }
+    ],
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "separate-type-imports",
+        "disallowTypeAnnotations": false
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-namespace": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-array-constructor": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "no-unused-expressions": "error",
+    "no-unsafe-optional-chaining": "off",
+    "react/refs": "off",
+    "react/immutability": "off",
+    "react/use-memo": "off",
+    "react/purity": "off",
+    "react/preserve-manual-memoization": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.{ts,tsx,mts,cts}"
+      ],
+      "rules": {
+        "no-var": "error",
+        "prefer-const": "error",
+        "prefer-rest-params": "error",
+        "prefer-spread": "error"
+      }
+    },
+    {
+      "files": [
+        "src/**/*.{ts,tsx}",
+        "packages/*/src/**/*.ts",
+        "server/src/**/*.ts"
+      ],
+      "rules": {
+        "max-lines": [
+          "error",
+          {
+            "max": 500,
+            "skipBlankLines": true,
+            "skipComments": true
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "server/src/**/*.ts",
+        "desktop/src/**/*.ts"
+      ],
+      "rules": {
+        "llull/no-import-meta": "error"
+      }
+    },
+    {
+      "files": [
+        "**/*.mjs",
+        "**/*.js"
+      ],
+      "rules": {
+        "typescript/explicit-function-return-type": "off"
+      }
+    }
+  ]
+}

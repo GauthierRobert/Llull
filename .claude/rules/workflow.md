@@ -10,7 +10,11 @@
    done: `npm run check:coverage` (typecheck + arch + deadcode + lint + format:check + native:check + tests with the coverage gate,
    the same as CI) when `packages/*/src` changed, else `npm run check` (same without coverage). Never run both: the coverage
    run already runs every test. `native:check` skips itself when `solver/` is unchanged against origin/main.
-4. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
+   Heavy runs (`check`, `check:coverage`, `npm test`, the server / desktop suites, `native:check`) take a machine-wide slot
+   (`scripts/heavyLock.mjs`): parallel lanes queue instead of thrashing RAM; a run narrowed to test files never waits. Typecheck
+   with the npm scripts (TypeScript 7, incremental, seconds), never a bare `tsc --noEmit` (a hook blocks it).
+4. Before review: self-review against `.claude/context/review-checklist.md` and run the contract suites it names.
+5. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
 
 A Stop hook blocks once if `packages/*/src` changed without a test change, or a snapshot changed —
 answer it (add the test, or state why none is needed / why the snapshot diff is intended).

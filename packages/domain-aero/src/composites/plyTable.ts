@@ -13,7 +13,7 @@ import { syncOutlines } from './derive';
 import { piecesOf } from './geometry2d';
 import { normalizeAngle } from './notation';
 import { frameRefusal, orientationInPartFrame, orientationInRosette } from './plyFrame';
-import { insertPly } from './plyCommands';
+import { insertPliesOnTop, type PlySpec } from './plyCommands';
 import { isUnverified } from '@lib/laminate/provenance';
 import { compositesOf, findPart, findRosette, pliesOf, withComposites, zonesOf } from './state';
 
@@ -204,23 +204,24 @@ export const importPlyTable = defineCommand({
       plies: Object.fromEntries(Object.entries(model.plies).filter(([id]) => !drop.has(id))),
       plyOrder: model.plyOrder.filter((id) => !drop.has(id)),
     };
-    const ids: string[] = [];
+    const specs: PlySpec[] = [];
     for (const row of [...parsed].sort((a, b) => a.order - b.order || a.line - b.line)) {
       const rosette = row.rosette === '' ? null : findRosette(model, row.rosette);
       const frame = orientationInPartFrame(part, rosette ?? (findRosette(model, part.rosetteId) as Rosette), row.orientation);
       const refusal = frameRefusal(doc, 'import_ply_table', frame, part, 'params.csv');
       if (refusal !== null) return refusal;
-      const result = insertPly(model, part, {
+      specs.push({
         name: row.name,
         materialName: row.material,
         orientation: normalizeAngle((frame as { orientation: number }).orientation),
-        sequence: row.sequence === '' ? `S${ids.length + 1}` : row.sequence,
+        sequence: row.sequence === '' ? `S${specs.length + 1}` : row.sequence,
         rosetteId: rosette?.id ?? part.rosetteId,
         boundary: { kind: 'whole_face' },
       });
-      model = result.model;
-      ids.push(result.ply.id);
     }
+    const inserted = insertPliesOnTop(model, part, specs);
+    model = inserted.model;
+    const ids = inserted.plies.map((ply) => ply.id);
     return changed(
       syncOutlines(withComposites(doc, model)),
       `import_ply_table: part "${part.name}": ${ids.length} whole-face ply(ies) created from the CSV.`,

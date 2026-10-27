@@ -263,5 +263,5 @@ The agent edits the same document the UI does because it is calling the same
 - **Component tests** (Testing Library) cover panels and param-gathering, not
   geometry math. **E2E tests** (Playwright) drive the real app.
 
-Files are kept small (at most 500 lines of code each, enforced by ESLint) so that a
+Files are kept small (at most 500 lines of code each, enforced by oxlint) so that a
 change touches, and an agent reads, only what it needs.

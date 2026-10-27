@@ -14,8 +14,8 @@
     "prepare:python": "node scripts/prepare-python.mjs",
     "prepare:native": "node scripts/prepare-native.mjs",
     "dist": "npm run build && npm run stage:server && npm run prepare:python && npm run prepare:native && electron-builder --config electron-builder.yml",
-    "typecheck": "tsc --noEmit",
-    "test": "npm --prefix ../server run --silent bundle && vitest run --config vitest.config.mts",
+    "typecheck": "node ../node_modules/typescript-native/bin/tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc7/desktop.tsbuildinfo",
+    "test": "node ../scripts/heavyLock.mjs desktop-test -- \"npm --prefix ../server run --silent bundle && vitest run --config vitest.config.mts\"",
     "stage:server": "node scripts/stage-server.mjs"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@
       "Bash(npm test:*)",
       "Bash(npx vitest:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx eslint:*)",
+      "Bash(npx oxlint:*)",
       "Bash(npx prettier:*)",
       "Bash(node:*)",
       "Bash(git status:*)",
@@ -53,6 +53,15 @@
           {
             "type": "command",
             "command": "node .claude/hooks/enforce-architecture.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pre-shell.mjs"
           }
         ]
       }

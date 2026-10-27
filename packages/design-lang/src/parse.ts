@@ -63,12 +63,15 @@ const IDENTIFIER = /^[A-Za-z_]\w*$/;
 const ALIAS = /^[A-Za-z_][\w{}+\-*/]*$/;
 const CHECK_OPS: readonly CheckOp[] = ['==', '~=', '<=', '>=', '<', '>'];
 
+/** Nesting limit of `for` blocks and `[…]` lists: deeper input is refused instead of overflowing the call stack. */
+const MAX_NESTING = 64;
+
 const syntax = (line: number, detail: string, fix: string): DesignError => new DesignError('DESIGN_SYNTAX', line, detail, fix);
 
 /** The statements of `source`. */
 export function parseDesign(source: string): Statement[] {
   const lines = sourceLines(source);
-  const cursor = { index: 0 };
+  const cursor = { index: 0, depth: 0 };
   const statements = parseBlock(lines, cursor, null);
   const headerAt = statements.findIndex((s) => s.kind === 'header');
   if (headerAt > 0) {
@@ -78,7 +81,9 @@ export function parseDesign(source: string): Statement[] {
   return statements;
 }
 
-function parseBlock(lines: readonly SourceLine[], cursor: { index: number }, openedAt: number | null): Statement[] {
+function parseBlock(lines: readonly SourceLine[], cursor: { index: number; depth: number }, openedAt: number | null): Statement[] {
+  if (cursor.depth >= MAX_NESTING) throw syntax(openedAt ?? 0, `blocks nested deeper than ${MAX_NESTING}`, 'Flatten the nested loops.');
+  cursor.depth++;
   const statements: Statement[] = [];
   while (cursor.index < lines.length) {
     const current = lines[cursor.index];
@@ -86,6 +91,7 @@ function parseBlock(lines: readonly SourceLine[], cursor: { index: number }, ope
     if (current === undefined) break;
     if (current.text === '}') {
       if (openedAt === null) throw syntax(current.line, 'unexpected "}"', 'Remove it, or open a block with "for … {".');
+      cursor.depth--;
       return statements;
     }
     statements.push(parseStatement(current, lines, cursor));
@@ -94,7 +100,7 @@ function parseBlock(lines: readonly SourceLine[], cursor: { index: number }, ope
   return statements;
 }
 
-function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor: { index: number }): Statement {
+function parseStatement(source: SourceLine, lines: readonly SourceLine[], cursor: { index: number; depth: number }): Statement {
   const { line, text } = source;
   const first = /^\S+/.exec(text)?.[0] ?? '';
   if (first === 'param') return parseParam(line, text);
@@ -178,11 +184,12 @@ function parsePair(token: string, line: number): Pair {
 }
 
 /** One value token: `[…]` list, `"…"` string, `{…}` JSON, anything else a word (number, expression, name, anchor, boolean). */
-export function parseValue(text: string, line: number): ValueNode {
+export function parseValue(text: string, line: number, depth = 0): ValueNode {
+  if (depth > MAX_NESTING) throw syntax(line, `lists nested deeper than ${MAX_NESTING}`, 'Flatten the list.');
   if (text === '') throw syntax(line, 'missing value', 'Write a value after "=".');
   if (text.startsWith('[')) {
     if (!text.endsWith(']')) throw syntax(line, `malformed list "${text}"`, 'Close the list with "]".');
-    return { kind: 'list', items: splitTop(text.slice(1, -1), isComma, line).map((item) => parseValue(item, line)) };
+    return { kind: 'list', items: splitTop(text.slice(1, -1), isComma, line).map((item) => parseValue(item, line, depth + 1)) };
   }
   if (text.startsWith('"') || text.startsWith('{')) {
     try {

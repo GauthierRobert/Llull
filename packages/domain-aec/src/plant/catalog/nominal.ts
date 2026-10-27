@@ -17,7 +17,7 @@ const reduce = (numerator: number, denominator: number): Rational => {
   return { numerator: numerator / divisor, denominator: denominator / divisor };
 };
 
-/** Parses `"2-1/2"`, `"2 1/2"`, `"1/2"`, `"24"`; null when it is not a positive rational. */
+/** Parses `"2-1/2"`, `"2 1/2"`, `"1/2"`, `"24"`; null when it is not a positive rational of safe integers (the gcd never sees Infinity or NaN). */
 function parseRational(text: string): Rational | null {
   const match = /^\s*(?:(\d+)(?:[-\s]+(\d+)\/(\d+))?|(\d+)\/(\d+))\s*$/.exec(text);
   if (match === null) return null;
@@ -25,6 +25,7 @@ function parseRational(text: string): Rational | null {
   const denominator = Number(fractionD ?? onlyD ?? 1);
   if (denominator === 0) return null;
   const numerator = Number(whole ?? 0) * denominator + Number(fractionN ?? onlyN ?? 0);
+  if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator)) return null;
   return numerator > 0 ? reduce(numerator, denominator) : null;
 }
 

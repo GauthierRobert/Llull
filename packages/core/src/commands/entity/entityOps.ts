@@ -92,9 +92,25 @@ function pruneReferences(doc: CadDocument, removed: ReadonlySet<string>): { refe
   };
 }
 
+/** Animations whose target (an entity, or a group that no longer exists) was removed. */
+function pruneAnimations(
+  doc: CadDocument,
+  removed: ReadonlySet<string>,
+  groups: CadDocument['groups'],
+): { animations: CadDocument['animations']; dropped: number } {
+  const orphaned = (targetId: string): boolean =>
+    removed.has(targetId) || (doc.groups[targetId] !== undefined && groups[targetId] === undefined);
+  const dropped = new Set(
+    Object.values(doc.animations)
+      .filter((animation) => orphaned(animation.targetId))
+      .map((animation) => animation.id),
+  );
+  return { animations: withoutKeys(doc.animations, dropped), dropped: dropped.size };
+}
+
 /**
  * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with fewer than 2 members are dissolved and
- * listed), and every constraint / joint / drive relation that referenced a removed entity (counted in `prunedReferences`).
+ * listed), and every constraint / joint / drive relation / animation that referenced a removed entity (counted in `prunedReferences`).
  */
 export function withoutEntities(
   doc: CadDocument,
@@ -109,7 +125,9 @@ export function withoutEntities(
       entities[id] = released;
     }
   const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
-  const { references, prunedReferences } = pruneReferences(doc, removed);
+  const { references, prunedReferences: prunedLinks } = pruneReferences(doc, removed);
+  const { animations, dropped } = pruneAnimations(doc, removed, nextGroups);
+  const prunedReferences = prunedLinks + dropped;
   const provenance = doc.exchange?.provenance;
   const stale = provenance === undefined ? [] : Object.keys(provenance).filter((id) => removed.has(id));
   const document: CadDocument = {
@@ -118,6 +136,7 @@ export function withoutEntities(
     order: doc.order.filter((id) => !removed.has(id)),
     selection: doc.selection.filter((id) => !removed.has(id)),
     groups: nextGroups,
+    ...(dropped === 0 ? {} : { animations }),
     ...references,
     // import provenance describes imported bodies: it leaves with them
     ...(provenance === undefined || stale.length === 0 ? {} : { exchange: { provenance: withoutKeys(provenance, new Set(stale)) } }),
@@ -142,5 +161,5 @@ export function referenceLossSuffix(before: CadDocument, after: CadDocument): st
 
 /** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */
 export function referenceSuffix(prunedReferences: number): string {
-  return prunedReferences > 0 ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.` : '';
+  return prunedReferences > 0 ? ` Also removed ${prunedReferences} constraint/joint/drive/animation record(s) that referenced it.` : '';
 }

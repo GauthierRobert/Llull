@@ -42,6 +42,8 @@ function revisionErrors(at: string, raw: unknown): string[] {
   if (['released', 'superseded', 'obsolete'].includes(String(raw['state'])) && (!isText(raw['contentHash']) || !isRecord(raw['snapshot'])))
     errors.push(`${at} is ${String(raw['state'])} and needs a contentHash and a snapshot`);
   const snapshot = raw['snapshot'];
+  if (isRecord(snapshot) && snapshot['kind'] === 'inline' && typeof snapshot['canonicalJson'] !== 'string')
+    errors.push(`${at}.snapshot.canonicalJson must be a string`);
   if (isRecord(snapshot) && snapshot['kind'] === 'vault' && snapshot['objectSha256'] !== raw['contentHash'])
     errors.push(`${at}.snapshot is a vault reference whose object is not the content hash`);
   return errors;

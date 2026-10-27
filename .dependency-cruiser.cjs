@@ -52,7 +52,7 @@ module.exports = {
       name: 'plugins-use-the-core-public-api',
       comment:
         'L10: plugins and kernels see core through its published surface — model, lib, geometry, ' +
-        'the plugin contract and the command-authoring API (schema, types, noop, derivation, ' +
+        'the plugin contract (plugin, sliceSchema) and the command-authoring API (schema, types, noop, derivation, ' +
         'registry). Composing another command goes through `execute`, never its module.',
       severity: 'error',
       from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+|design-lang|plm)/' },
@@ -61,7 +61,7 @@ module.exports = {
         pathNot:
           '^packages/core/src/(model|lib|geometry)/|' +
           '^packages/core/src/dynamics/physicsEngine\\.ts$|' +
-          '^packages/core/src/plugins/plugin\\.ts$|' +
+          '^packages/core/src/plugins/(plugin|sliceSchema)\\.ts$|' +
           '^packages/core/src/commands/(schema|types|noop|derivation|registry)\\.ts$',
       },
     },

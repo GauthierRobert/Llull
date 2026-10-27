@@ -46,7 +46,7 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 | Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema (`llull describe`) and runtime validation |
 | Geometry kernel| Native OCCT `llull-kernel` (default) / Manifold | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
-| Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
+| Lint / format  | oxlint + Prettier                        | Consistent, enforced by `npm run check` |
 | Local backend  | Node + Express                           | The desktop app's live document, exchange (STEP / DWG / CadQuery), exports; the `llull` CLI |
 
 ## Architecture in one picture

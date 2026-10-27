@@ -38,7 +38,7 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
 
 - One concern per file (SRP). Group commands by domain; split by concern when it grows; import
   from defining files — no re-export barrels (package `index.ts` excepted).
-- Max **500 code lines** per file (ESLint `max-lines`, no allowlist; disabling it is hook-blocked).
+- Max **500 code lines** per file (oxlint `max-lines`, no allowlist; disabling it is hook-blocked).
 - Open/closed: add a capability with a NEW command file + registration, a new domain with a new
   `CadPlugin`, a new entity kind with a union member + render branch (`add-entity-kind` skill) —
   not by growing a `switch` in every caller.

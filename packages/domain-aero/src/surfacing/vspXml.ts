@@ -11,11 +11,36 @@ const MAX_DEPTH = 256;
 const ENTITIES: Readonly<Record<string, string>> = { '&lt;': '<', '&gt;': '>', '&amp;': '&', '&quot;': '"', '&apos;': "'" };
 const decode = (text: string): string => text.replace(/&(?:lt|gt|amp|quot|apos);/g, (match) => ENTITIES[match] ?? match);
 
+const CONSTRUCTS = [
+  ['<!--', '-->', 'comment'],
+  ['<?', '?>', 'processing instruction'],
+  ['<![CDATA[', ']]>', 'CDATA section'],
+  ['<!DOCTYPE', '>', 'DOCTYPE'],
+] as const;
+
+/** Name of the first comment / instruction / CDATA / DOCTYPE without its closer, or null. One pass: each closer is searched once. */
+function unterminatedConstruct(text: string): string | null {
+  let at = text.indexOf('<');
+  while (at >= 0) {
+    const construct = CONSTRUCTS.find(([opener]) => text.startsWith(opener, at));
+    if (construct === undefined) at = text.indexOf('<', at + 1);
+    else {
+      const end = text.indexOf(construct[1], at + construct[0].length);
+      if (end < 0) return construct[2];
+      at = text.indexOf('<', end + construct[1].length);
+    }
+  }
+  return null;
+}
+
 /**
  * The element tree of `text`, or an error message. Comments, processing instructions and CDATA wrappers are skipped; attribute values may use
  * single or double quotes.
+ * @invariant linear in the text: an unterminated comment / instruction / CDATA / DOCTYPE is refused up front (no rescanning per opener)
  */
 export function parseXml(text: string): XmlNode | string {
+  const open = unterminatedConstruct(text);
+  if (open !== null) return `unterminated ${open}`;
   const root: XmlNode = { tag: '#document', attrs: {}, children: [], text: '' };
   const stack: XmlNode[] = [root];
   const token =

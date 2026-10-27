@@ -19,7 +19,11 @@ import { readsEntity } from './rederive';
 import { realiseField } from './realise';
 
 const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transform', 'tpms', 'struts', 'graph', 'voronoi', 'scalar']);
+const SHAPES = new Set(['sphere', 'box', 'cylinder', 'capsule', 'torus', 'cone', 'plane']);
+const TPMS_KINDS = new Set(['gyroid', 'schwarz_p', 'diamond', 'neovius', 'iwp', 'lidinoid', 'fischer_koch_s', 'split_p']);
+const STRUT_CELLS = new Set(['cubic', 'bcc', 'fcc', 'octet', 'kelvin', 'diamond', 'bccz', 'fccz', 'reentrant']);
 const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise']);
+const isFiniteNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
 const isLaw = (value: unknown): boolean => typeof value === 'number' || typeof value === 'string';
 const isVec3 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 3 && value.every((c) => typeof c === 'number' && Number.isFinite(c));
@@ -91,15 +95,36 @@ function nodeError(key: string, node: unknown): string | null {
   if (!isRecord(node) || node['id'] !== key || typeof node['op'] !== 'string' || !OPS.has(node['op']))
     return `field '${key}' is not a valid node`;
   const checks: Record<string, boolean> = {
-    primitive: isRecord(node['dims']) && isVec3(node['position']) && isVec3(node['rotation']),
+    primitive:
+      typeof node['shape'] === 'string' &&
+      SHAPES.has(node['shape']) &&
+      isRecord(node['dims']) &&
+      Object.values(node['dims']).every((dim) => isFiniteNumber(dim) || isVec3(dim)) &&
+      (node['rounding'] === undefined || isFiniteNumber(node['rounding'])) &&
+      isVec3(node['position']) &&
+      isVec3(node['rotation']),
     solid: typeof node['entityId'] === 'string',
     boolean: Array.isArray(node['operands']) && node['operands'].every((o) => typeof o === 'string'),
     offset: typeof node['source'] === 'string' && isLaw(node['distance']),
     shell: typeof node['source'] === 'string' && isLaw(node['thickness']),
     transform:
       typeof node['source'] === 'string' && isVec3(node['position']) && isVec3(node['rotation']) && typeof node['scale'] === 'number',
-    tpms: isVec3(node['cellSize']) && isVec3(node['origin']) && isRecord(node['control']),
-    struts: isVec3(node['cellSize']) && isVec3(node['origin']) && isLaw(node['radius']),
+    tpms:
+      typeof node['kind'] === 'string' &&
+      TPMS_KINDS.has(node['kind']) &&
+      isVec3(node['cellSize']) &&
+      isVec3(node['origin']) &&
+      isVec3(node['rotation']) &&
+      (node['form'] === 'sheet' || node['form'] === 'network') &&
+      (node['normalize'] === 'gradient' || node['normalize'] === 'none') &&
+      isRecord(node['control']),
+    struts:
+      typeof node['cell'] === 'string' &&
+      STRUT_CELLS.has(node['cell']) &&
+      isVec3(node['cellSize']) &&
+      isVec3(node['origin']) &&
+      isVec3(node['rotation']) &&
+      isLaw(node['radius']),
     graph:
       Array.isArray(node['sourceIds']) &&
       node['sourceIds'].every((o) => typeof o === 'string') &&

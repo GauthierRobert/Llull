@@ -6,7 +6,7 @@
  *   give the same bits
  */
 
-import { BUILTIN_CONSTANTS, BUILTIN_FUNCTIONS, tokenize, type Token } from './expression';
+import { BUILTIN_CONSTANTS, BUILTIN_FUNCTIONS, MAX_NESTING, tokenize, type Token } from './expression';
 
 type ProgramOp =
   | { readonly op: 'const'; readonly value: number }
@@ -22,6 +22,7 @@ const INEXACT_FUNCTIONS: ReadonlySet<string> = new Set(['sin', 'cos', 'tan', 'as
 interface Compiler {
   readonly tokens: readonly Token[];
   pos: number;
+  depth: number;
   readonly names: readonly string[];
   readonly out: ProgramOp[];
 }
@@ -40,7 +41,13 @@ function binary(c: Compiler, operators: string, operand: (c: Compiler) => string
   return null;
 }
 
-const expr = (c: Compiler): string | null => binary(c, '+-', term);
+function expr(c: Compiler): string | null {
+  if (c.depth >= MAX_NESTING) return `expression nested deeper than ${MAX_NESTING} levels`;
+  c.depth += 1;
+  const error = binary(c, '+-', term);
+  c.depth -= 1;
+  return error;
+}
 const term = (c: Compiler): string | null => binary(c, '*/', factor);
 
 function factor(c: Compiler): string | null {
@@ -108,7 +115,7 @@ export function compileExpression(expression: string, names: readonly string[]):
   const tokens = tokenize(expression);
   if (typeof tokens === 'string') return tokens;
   if (tokens.length === 0) return 'expression is empty';
-  const compiler: Compiler = { tokens, pos: 0, names, out: [] };
+  const compiler: Compiler = { tokens, pos: 0, depth: 0, names, out: [] };
   const error = expr(compiler);
   if (error !== null) return error;
   if (compiler.pos < tokens.length) return `unexpected token '${tokens[compiler.pos]?.text ?? ''}' after expression`;

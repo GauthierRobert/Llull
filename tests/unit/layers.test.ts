@@ -94,6 +94,12 @@ describe('layer commands', () => {
     expect(execute(single, 'delete_layer', { id: L }).summary).toContain('1 entity');
   });
 
+  it('replay_history keeps each layer listed once in layerOrder (the carried layers are re-created by their add_layer steps)', () => {
+    const replayed = execute(base, 'replay_history', {}).document;
+    expect(replayed.layerOrder).toEqual(base.layerOrder);
+    expect(replayed.layerOrder.filter((id) => id === L)).toHaveLength(1);
+  });
+
   it('the 4 layer commands are registered tools', () => {
     const names = listCommands().map((c) => c.name);
     const schemaNames = toToolSchemas().map((s) => s.name);

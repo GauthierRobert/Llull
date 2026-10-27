@@ -18,6 +18,7 @@ const TYPES = [
   'nonlinear_static',
   'frequency_response',
   'random_response',
+  'explicit_dynamics',
 ];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];

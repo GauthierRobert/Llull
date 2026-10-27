@@ -4,6 +4,7 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { plans } from '../golden/plans';
 import { runPlan } from '../golden/runPlan';
+import { pipingPlansV1b } from '../golden/pipingPlansV1b';
 
 /** Writer/loader drift guard: whatever a command produced must reload, and re-serialize identically. */
 function expectReloads(doc: CadDocument, includeDerived = false): void {
@@ -23,6 +24,14 @@ describe('golden corpus round trip', () => {
     const { document } = runPlan(plan);
     expectReloads(document);
     expectReloads(document, true);
+  });
+});
+
+describe('draw order of entities derived by several plugins', () => {
+  it('survives save and load: equipment, supports and pipe runs keep the order the live document had', () => {
+    const { document } = runPlan(pipingPlansV1b['piping_run_supports_stretch'] ?? []);
+    expect(document.order.length).toBeGreaterThan(10);
+    expect(deserializeDocument(serializeDocument(document)).order).toEqual(document.order);
   });
 });
 
