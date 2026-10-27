@@ -96,26 +96,29 @@ impl EditMesh {
         }
     }
 
-    /// Neighbour vertices of `v`, ascending.
-    pub fn ring(&self, v: u32) -> Vec<u32> {
-        let mut out: Vec<u32> = Vec::new();
+    /// Fills `ring` with the neighbour vertices of `v`, ascending; true when `v` is on the boundary (a neighbour shares a single face with it).
+    pub fn ring_into(&self, v: u32, ring: &mut Vec<u32>) -> bool {
+        ring.clear();
         for &f in &self.v_faces[v as usize] {
-            for w in self.corners(f) {
-                if w != v {
-                    out.push(w);
+            let others = self.corners(f).map(|w| (w != v).then_some(w));
+            for (k, w) in others.into_iter().enumerate() {
+                // a face holds each neighbour once, whatever its corners are (JavaScript Set semantics)
+                if let Some(w) = w.filter(|&w| !others[..k].contains(&Some(w))) {
+                    ring.push(w);
                 }
             }
         }
-        out.sort_unstable();
-        out.dedup();
-        out
+        ring.sort_unstable();
+        let boundary = ring.chunk_by(|x, y| x == y).any(|faces_on_edge| faces_on_edge.len() == 1);
+        ring.dedup();
+        boundary
     }
 
-    /// Faces using the edge `a`-`b`, ascending.
-    pub fn faces_on_edge(&self, a: u32, b: u32) -> Vec<u32> {
-        let mut out: Vec<u32> = self.v_faces[a as usize].iter().copied().filter(|f| self.v_faces[b as usize].contains(f)).collect();
-        out.sort_unstable();
-        out
+    /// Fills `faces` with the faces using the edge `a`-`b`, ascending.
+    pub fn faces_on_edge_into(&self, a: u32, b: u32, faces: &mut Vec<u32>) {
+        faces.clear();
+        faces.extend(self.v_faces[a as usize].iter().copied().filter(|f| self.v_faces[b as usize].contains(f)));
+        faces.sort_unstable();
     }
 
     /// Third vertex of face `f` besides `a` and `b`.
@@ -130,14 +133,6 @@ impl EditMesh {
         }
     }
 
-    pub fn is_boundary_edge(&self, a: u32, b: u32) -> bool {
-        self.faces_on_edge(a, b).len() == 1
-    }
-
-    pub fn is_boundary_vertex(&self, v: u32) -> bool {
-        self.ring(v).into_iter().any(|w| self.is_boundary_edge(v, w))
-    }
-
     pub fn face_normal(&self, f: u32) -> Vec3 {
         let [a, b, c] = self.corners(f);
         normal_of(self.p(a), self.p(b), self.p(c))
@@ -145,7 +140,7 @@ impl EditMesh {
 
     /// Remove vertex `u`, merging it into `v`: faces holding both vanish, the others swap `u` for `v`.
     pub fn collapse(&mut self, u: u32, v: u32) {
-        let snapshot = self.v_faces[u as usize].clone();
+        let snapshot = std::mem::take(&mut self.v_faces[u as usize]);
         for f in snapshot {
             if self.has_face(v, f) {
                 self.remove_face(f);
@@ -176,5 +171,45 @@ impl EditMesh {
             }
         }
         (positions, indices)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EditMesh;
+
+    /// Two triangles sharing the edge 1-2, and a lone face 4-5-6 apart.
+    fn pair() -> EditMesh {
+        EditMesh::new(&[0.0; 21], &[0, 1, 2, 1, 3, 2, 4, 5, 6])
+    }
+
+    #[test]
+    fn the_ring_is_ascending_and_flags_a_vertex_with_an_edge_of_one_face() {
+        let mesh = pair();
+        let mut ring = Vec::new();
+        assert!(mesh.ring_into(1, &mut ring));
+        assert_eq!(ring, [0, 2, 3]);
+        assert!(mesh.ring_into(0, &mut ring));
+        assert_eq!(ring, [1, 2]);
+        // a face that repeats a corner counts each neighbour once
+        let degenerate = EditMesh::new(&[0.0; 9], &[0, 1, 1]);
+        degenerate.ring_into(0, &mut ring);
+        assert_eq!(ring, [1]);
+        // a vertex inside a closed fan has no edge of one face
+        let fan = EditMesh::new(&[0.0; 15], &[0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1]);
+        assert!(!fan.ring_into(0, &mut ring));
+    }
+
+    #[test]
+    fn faces_on_an_edge_are_ascending_and_collapse_merges_the_vertex_into_the_other() {
+        let mut mesh = pair();
+        let mut faces = Vec::new();
+        mesh.faces_on_edge_into(2, 1, &mut faces);
+        assert_eq!(faces, [0, 1]);
+        mesh.faces_on_edge_into(0, 3, &mut faces);
+        assert!(faces.is_empty());
+        mesh.collapse(1, 2);
+        assert_eq!((mesh.live_faces, mesh.v_alive[1], mesh.f_alive.clone()), (1, false, vec![false, false, true]));
+        assert_eq!(mesh.to_mesh().1, [0, 1, 2]);
     }
 }

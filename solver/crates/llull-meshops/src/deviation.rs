@@ -1,8 +1,9 @@
 //! Symmetric deviation of two meshes (twin of `deviation.ts`): closest-surface distance from sample points of each mesh (the used vertices,
-//! then the triangle centroids, evenly strided down to `max_samples`) to the other. Bit-identical to the TypeScript engine.
+//! then the triangle centroids, evenly strided down to `max_samples`) to the other. Bit-identical to the TypeScript engine, on any thread count.
 
 use crate::geom::Vec3;
 use crate::surface::SurfaceIndex;
+use rayon::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -56,10 +57,11 @@ pub fn deviation(a: (&[f64], &[u32]), b: (&[f64], &[u32]), max_samples: usize) -
     if a.1.len() < 3 || b.1.len() < 3 {
         return None;
     }
-    let (index_a, index_b) = (SurfaceIndex::new(a.0, a.1), SurfaceIndex::new(b.0, b.1));
+    let (index_a, index_b) = rayon::join(|| SurfaceIndex::new(a.0, a.1), || SurfaceIndex::new(b.0, b.1));
     let (points_a, points_b) = (sample_points(a.0, a.1, max_samples), sample_points(b.0, b.1, max_samples));
-    let forward: Vec<f64> = points_a.iter().map(|&p| index_b.closest_distance(p)).collect();
-    let backward: Vec<f64> = points_b.iter().map(|&p| index_a.closest_distance(p)).collect();
+    // each distance depends on its point alone, so the order and the number of threads do not matter
+    let forward: Vec<f64> = points_a.par_iter().map(|&p| index_b.closest_distance(p)).collect();
+    let backward: Vec<f64> = points_b.par_iter().map(|&p| index_a.closest_distance(p)).collect();
     let all: Vec<f64> = forward.iter().chain(backward.iter()).copied().collect();
     let forward_max = forward.iter().fold(0.0f64, |m, &d| m.max(d));
     let backward_max = backward.iter().fold(0.0f64, |m, &d| m.max(d));

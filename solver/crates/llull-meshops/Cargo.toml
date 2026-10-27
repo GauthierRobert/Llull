@@ -10,6 +10,7 @@ publish.workspace = true
 llull-jsmath = { path = "../llull-jsmath" }
 llull-protocol = { path = "../llull-protocol" }
 llull-quadflow = { path = "../llull-quadflow", optional = true }
+rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

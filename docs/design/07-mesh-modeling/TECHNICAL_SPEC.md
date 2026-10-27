@@ -576,7 +576,7 @@ Lists are capped (`maxListed`, default 20) with totals.
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | --------------------------------------- |
 | `import_mesh_file` binary STL 1 M triangles | — (asset path)                                                                                                                                        | ≤ 2 s                | TBD measure                             |
 | `analyze_mesh` 200 k                        | ≤ 1 s                                                                                                                                                 | ≤ 0.2 s              | self-intersection broad phase dominates |
-| `decimate_mesh` 1.3 M → 100 k               | refuses (cap)                                                                                                                                         | ≤ 10 s               | TBD measure                             |
+| `decimate_mesh` 1.3 M → 100 k               | refuses (cap)                                                                                                                                         | ≤ 10 s               | 4.8 s measured (13.10)                            |
 | `remesh_mesh` 200 k, 5 iterations           | ≤ 10 s                                                                                                                                                | ≤ 2 s                |                                         |
 | `smooth_mesh` taubin 10 it, 1.3 M           | refuses (cap)                                                                                                                                         | ≤ 2 s                |                                         |
 | `minkowski_sum` cube ⊕ icosphere l2         | Manifold ≤ 0.5 s                                                                                                                                      | —                    | TBD                                     |
@@ -755,7 +755,7 @@ Plans (`node server/bin/llull.cjs run <plan> --continue`, cwd `docs/design/07-me
 ### 13.5.4 Left
 
 - **M6**: `quad_remesh` is built (13.6); `fit_subdivision_to_mesh`, `fit_surface_to_mesh` and the fit half of VC-22 are built (13.7).
-- `sculpt_mesh` `along` (curve stamps) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (COULD); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`; native decimate speed. (`--progress` events and the async native engine are built: 13.8.)
+- `sculpt_mesh` `along` (curve stamps) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (COULD); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`. (Native decimate speed: built, 13.10.) (`--progress` events and the async native engine are built: 13.8.)
 - The native mesh engine no longer blocks the backend: a job is awaited on the event loop (13.8), capped by `LLULL_MESH_OP_TIMEOUT_S` (600 s, `MESH_TIMEOUT`).
 - `mesh_to_brep` follows exact curves only for line, circle and ellipse chains; regions bounded by other intersections (cone-cylinder with tilted axes, free-form) stay triangles.
 
@@ -963,7 +963,7 @@ What still blocks is the command's own TypeScript work around the job, not the j
 
 - Done in 13.9: the steps of a plan executed inside one resolve are memoized, the command's own load / validation / packing is kept for its next run, and the deviation of a result is measured by the same native job. What is still synchronous in the final run is the work that has to happen once after the job (the checks of the result: 1.5 s on the 40 000-quad case).
 - The UI shows no progress yet: `/live` SSE does not carry job reports (a `progress` event keyed by `commandId` would). Viewport/shell lane.
-- `decimate_mesh` of 1.3M triangles still takes 16.6 s of native time (13.5.4); it no longer stops the backend.
+- Done in 13.10: `decimate_mesh` of 1.3M triangles takes 4.8 s of native time (was 16.6 s).
 - Native `remesh`, `analyze`, `cut`, `fill_holes`, `repair`, `sculpt` (the rest of DES-7c) report through `Progress` when they exist.
 - The raster, point-cloud, field and geometry-query ports still block on `runComputeSync`.
 
@@ -1038,3 +1038,68 @@ Executions are now 10 + the number of native steps for any plan (a native step r
 - A plan replayed inside a running step (a recorded `build_project` re-expanded by `replay_history`) is not memoized; the replay prefix cache covers it up to the first deferral.
 - The first run's preparation (1.2 s on 327k triangles) and the final run's result checks (1.5 s on 40 000 quads) are synchronous. Chunking them onto the event loop would remove the remaining stall; not needed for the keep-alive limit (5 s).
 - The memo shares objects between runs: a command must not mutate the mesh it loads or the result of a step (commands are pure, L3).
+
+## 13.10 As built (DES-7c step 5: native decimate speed, 2026-10-27)
+
+### 13.10.1 The problem (13.5.3, 13.8.5)
+
+`decimate_mesh` of 1,310,720 triangles to 100,000 took 16.6 s of native time against the 10 s budget. Measured again before the change on the same kind of input (icosphere level 8, radius 10, radial noise +-0.1, seed 42; `preserveBoundary`, `targetTriangles 100000`, `deviationSamples 20000`): decimate stage 21.1 s, in-job deviation 3.3 s, read and write about 0.1 s. Profile of the decimate stage: set-up 0.55 s (adjacency, quadrics, 2 M initial queue entries); the collapse loop 20.2 s, of which the queue was the bulk: 605,360 collapses pushed 24 M entries and popped 22.5 M (each collapse re-queued every edge at its 6 to 8 ring vertices and left the old entries to surface later as stale ones). The deviation stage took 3.3 s because building the closest-point tree over the 1.3 M input triangles sorted the whole range at every level (2.8 s); its 40,000 queries cost 0.3 s.
+
+### 13.10.2 Decision
+
+The output stays bit-identical to the previous native implementation, hence to the TypeScript engine (VC-MSH-32): the same candidate is collapsed at every step. Only the way the work is done changed.
+
+1. **One queue entry per edge** (`edge_heap.rs`): an indexed 4-ary min-heap ordered by (cost, a, b), an open-addressing table from the packed edge to its slot, `upsert` / `remove` / `pop`, and a bulk O(n) build for the initial queue. A collapse updates the edges at the surviving vertex, removes the edges of the removed vertex, and puts back the edges that were refused earlier (`refused` lists per vertex, listed under both ends) when a collapse changes a neighbourhood: exactly the entries that the versioned stream left valid. The edges between other ring vertices keep their entry (their cost depends on their two vertices only). 22.5 M pops become 0.6 M, 24 M pushes become 4.3 M updates.
+2. **No allocation per attempt** (`collapse_check.rs`, `edit.rs`): the link, fold-over and deviation tests use reusable buffers, merge the sorted rings instead of searching them, and read the boundary flag from the ring computation.
+3. **The closest-point tree** (`surface.rs`) is built with a selection (`select_nth_unstable_by`, the same total order: centre along the axis with -0 = +0, then index) instead of a full sort per level, stores 64-byte nodes (one cache line), builds its halves with `rayon::join` and answers queries without a heap allocation. The tree is a function of the mesh alone (same split axis and halves as the TypeScript tree), so the distances are the same on any thread count. `deviation` builds the two trees in parallel and runs its queries with `par_iter` (each distance depends on its point only; the sums stay sequential).
+4. **Parallel set-up** (`decimate.rs`): the boundary / feature edge scan and the initial costs run over chunks of 4096 vertices; the chunks are concatenated in vertex order, so the queue is the same on any thread count.
+5. **The deviation guard** (`maxDeviation`): a probe is satisfied by the first triangle within the bound (the nearest triangle is farther than the bound exactly when none is within it), the probes are tested before the original-surface queries (the tests are independent, the order only decides how early a refusal is found), and the original-surface query stops as soon as a triangle within the bound is known (`SurfaceIndex::farther_than`; the answer cannot change after that).
+
+Defined rules, the same in the TypeScript engine (`decimate.ts`) and the native one (review round 1 of this step changed the TypeScript side too):
+
+- **`stoppedBy` is a function of the final state**: `"target"` iff `targetTriangles > 0` and the result has at most that many triangles (also when the mesh already was at the target, or when the last collapse left no valid edge); else `"deviation_or_validity"` when a `maxDeviation` run ended with an empty queue after at least one deviation refusal; else `"exhausted"`. The old TypeScript loop decided it from whether the queue still held entries when the target was met, which depends on stale entries; it said `"exhausted"` for a concave flat fan that reached its 4-triangle target with its last collapse. No golden or snapshot of the repository changed.
+- **A NaN cost orders as +Infinity** (quadrics that overflow, from coordinates of about 3e153 and more): such edges are tried last and ties are settled by (a, b); the order is total, so it no longer depends on the shape of the heap. `maxCollapseCost` is `null` (type `number | null`) in both engines when a NaN-cost edge was collapsed, since JSON has no NaN; no adapter mapping is needed.
+- **A normal or an area that is not a number refuses the collapse** as a fold-over (`dot <= 0`, `area <= floor` and their NaN cases): with overflowing coordinates the fold-over test used to pass on NaN. A NaN cost alone cannot produce a non-finite position (the optimal position is used only when it is within twice the edge length of the midpoint, which fails for a NaN), and no collapse is accepted when the normals overflow (coordinates of about 1e155 and more: nothing collapses).
+- A candidate whose edge has no face any more is dropped without being counted (`Verdict::Gone`, as before).
+
+### 13.10.3 Rejected
+
+| Option | Why not |
+| ------ | ------- |
+| Keep the versioned stream and make it cheaper (smaller entries, arity 8, reserve) | The 24 M pushes and 22 M pops are the cost; arity 8 gained 3 %. |
+| Lazy deletion by edge generation | Needs the same edge table and still pops one stale entry per update; no fewer sifts than an indexed remove. |
+| Renumber vertices in space order for cache locality | The vertex ids decide ties (a, b), which vertex survives and the output order: the result would change. A storage permutation behind the logical ids would keep it and is the next step if the loop must go lower (it is memory bound: about 7 microseconds per collapse). |
+| Half-edge structure replacing the per-vertex face lists | Rewrites the mesh core for the loop's remaining quarter (rings, collapse); the non-manifold input the Rust side must survive needs a list per edge anyway. |
+| A different cost or tie rule for speed | Changes the output; quality (deviation, topology) was the constraint. |
+| Parallel collapses | The order of collapses is the algorithm. |
+| Approximate deviation (fewer samples, coarser tree) | The deviation must equal the `measure_deviation` definition; the exact tree is now cheap. |
+
+### 13.10.4 Measured (win32-x64, release build, 22 cores, one machine; `llull-compute meshops` on a job folder, wall clock of the process; the same input and parameters before and after)
+
+Icosphere l8 + noise, 1,310,720 triangles to 100,000, `deviationSamples 20000`:
+
+| | Before | After |
+| - | ------ | ----- |
+| Decimate stage | 21.1 s | 4.6 s |
+| Deviation stage (in job) | 3.3 s | 0.17 s |
+| Read / write | 0.1 s | 0.1 s |
+| Job wall time | 24.5 s | 4.8 s |
+| Collapses / triangles | 605,360 / 100,000 | 605,360 / 100,000 |
+| Rejected (link, fold-over, deviation) | 212, 1,014, 0 | 212, 1,014, 0 |
+| Deviation forward max / backward max / mean | 0.15497453646136367 / 0.06085093714670365 / 0.020897252523607364 | the same, bit for bit |
+| SHA-256 of positions, indices | feda4584..., 22b10e9b... (first 8 hex digits) | the same |
+
+Icosphere l6 + noise, 81,920 to 5,000 triangles: job 776 ms before, 174 ms after (decimate 660 to 161 ms, deviation 116 to 13 ms); same bytes, same report (forward max 0.1515, backward max 0.1320, mean 0.03362).
+
+With one thread (`RAYON_NUM_THREADS=1`) the 1.3 M job takes 5.6 s; 1, 3 and 22 threads give the same bytes. The same input with `maxDeviation 0.05` and no target (269,452 triangles, 945,831 deviation refusals): decimate 80.3 s before, 17.9 s after, same bytes and counts. That path is not under the 10 s budget; its remaining time is the probe checks (45 M probe tests over 1.5 M attempts) and the 520 k collapses; a witness triangle per probe would skip most of the tests and is left.
+
+The earlier 16.6 s (13.5.3) was measured on another machine and a real STL; on this one the same code measured 21.1 s, so the factors above are the comparable figures.
+
+### 13.10.5 Tests
+
+Cargo (`llull-meshops`): `edge_heap` (order by cost then ids, move both ways, bulk equals one-by-one, 50,000 random operations against a sorted map with ties); `surface` (distance equals the minimum over all triangles for 0 to 9,000 triangles, the early exit equals the full search around the bound to the ulp, node counts); `collapse_check` (gone, non-manifold edge, tetrahedron, bridge between boundaries, fold-over, deviation guard); `edit` and `quadric` units; `tests/decimate.rs` (closed sphere stays a closed manifold without fold-over, locked boundaries keep every loop and vertex, free boundary keeps its loops and Euler characteristic, slivers, tetrahedron, non-manifold edge and random soups do not panic, four results pinned to the digest of the previous implementation, same bytes on every run and on 1, 2 and 7 threads); `tests/job.rs` (a whole job with its deviation gives the same files on 1 and 6 threads); `tests/perf.rs` (ignored timing gate of 10 s for the 1.3 M case: `cargo test --release -p llull-meshops --test perf -- --ignored --nocapture`). Differential runs against the previous binary (not committed): 108 meshes x parameter sets and 450 random triangle soups, bytes and reports equal. Server: `meshopsNative.test.ts` (native equals the TypeScript engine when everything collapses, when the target exhausts the candidates, on the concave fan, and on grids scaled to 3e153, 1e154 and 1e155 where costs are NaN); TypeScript: `tests/unit/mesh/meshEditLibrary.test.ts` (stoppedBy from the final state, NaN costs). The pins of `tests/decimate_pins.rs` are the old binary's results (flat grid, locked region and bound + target included; how to redo them is in the file). `meshopsNative.test.ts` is skipped, with a logged reason, when `llull-compute` is not built (`cargo build --release -p llull-compute` in `solver/`; `npm --prefix server test` finds it in `solver/target/release`): it is the parity oracle against the TypeScript engine and runs wherever that binary exists (the full server suite of a dev machine with the release build); `native:check` does not build it (a clean release build of the workspace is minutes long), so the cargo pins are what `native:check` keeps.
+
+### 13.10.6 Left
+
+- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe.
+- Fewer cache misses in the collapse loop (it is memory bound): a storage permutation behind the logical ids.

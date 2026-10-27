@@ -182,6 +182,57 @@ describe('native decimate is bit-identical to the TypeScript engine (VC-MSH-32)'
     await expectIdentical(noisy(sphere, 0.05), decimate({ targetTriangles: 400, maxDeviation: 0.2 }));
   });
 
+  native('collapsing everything and a target that exhausts the candidates (the queue is one entry per edge, DES-7c)', async () => {
+    const everything = await expectIdentical(icosphere(10, 2), decimate({ preserveBoundary: false }));
+    expect((everything.nat.report as { trianglesAfter: number }).trianglesAfter).toBeLessThan(8);
+    const noisySphere = noisy(icosphere(10, 4), 0.05);
+    const small = await expectIdentical(noisySphere, decimate({ targetTriangles: 12, preserveBoundary: false }));
+    const report = small.nat.report as { trianglesAfter: number; rejected: { link: number; foldOver: number } };
+    expect(report.rejected.link + report.rejected.foldOver).toBeGreaterThan(0);
+    // quality: the one-sided distance to the input stays what the TypeScript engine reports for the same result
+    const bounded = await expectIdentical(noisySphere, decimate({ maxDeviation: 0.1 }));
+    expect((bounded.nat.report as { trianglesAfter: number }).trianglesAfter).toBeLessThan(5120);
+  });
+
+  native(
+    'stoppedBy follows the final state: a fan that reaches its target with nothing left to collapse, and one below it (DES-7c)',
+    async () => {
+      const fan: MeshData = {
+        positions: [0, -0.1, 0, 3, -1, 0, 4, 1, 0, 3, 2, 0, -3, 2, 0, -4, 1, 0, 0, 0, 0],
+        indices: [0, 1, 2, 0, 2, 3, 0, 3, 6, 0, 6, 4, 0, 4, 5, 0, 5, 1],
+      };
+      const met = await expectIdentical(fan, decimate({ targetTriangles: 4 }));
+      expect(met.nat.report).toMatchObject({ trianglesAfter: 4, reachedTarget: true, stoppedBy: 'target' });
+      const quad: MeshData = { positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], indices: [0, 1, 2, 0, 2, 3] };
+      expect((await expectIdentical(quad, decimate({ targetTriangles: 2 }))).nat.report).toMatchObject({
+        collapses: 0,
+        stoppedBy: 'target',
+      });
+      const below = await expectIdentical(fan, decimate({ targetTriangles: 3 }));
+      expect(below.nat.report).toMatchObject({ trianglesAfter: 4, reachedTarget: false, stoppedBy: 'exhausted' });
+    },
+  );
+
+  native(
+    'NaN costs (overflowing quadrics) order as +Infinity and overflowing normals refuse the collapse, the same in both engines (DES-7c)',
+    async () => {
+      for (const scale of [3e153, 1e154, 1e155]) {
+        const n = 30;
+        const positions: number[] = [];
+        for (let j = 0; j <= n; j++)
+          for (let i = 0; i <= n; i++)
+            positions.push(i * scale, j * scale, (Math.sin(i / 3) * Math.cos(j / 4) * 3 + ((i * 7 + j * 13) % 10) / 10) * scale);
+        const id = (i: number, j: number): number => j * (n + 1) + i;
+        const indices: number[] = [];
+        for (let j = 0; j < n; j++)
+          for (let i = 0; i < n; i++) indices.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
+        const { ts, nat } = await expectIdentical({ positions, indices }, decimate({ targetTriangles: 300, preserveBoundary: false }));
+        expect((nat.mesh as MeshData).positions.every(Number.isFinite)).toBe(true);
+        expect((ts.report as { collapses: number }).collapses > 0).toBe(scale < 1e155);
+      }
+    },
+  );
+
   native('refuses meshes the engine cannot edit, with the TypeScript codes', async () => {
     const open = {
       positions: icosphere(1, 1).positions,

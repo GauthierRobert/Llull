@@ -31,7 +31,8 @@ export interface DecimateReport {
   readonly reachedTarget: boolean | null;
   readonly stoppedBy: 'target' | 'deviation_or_validity' | 'exhausted';
   readonly rejected: { readonly link: number; readonly foldOver: number; readonly deviation: number };
-  readonly maxCollapseCost: number;
+  /** Largest cost of a collapse made; null when a NaN cost (overflowing quadrics) was collapsed (JSON has no NaN). */
+  readonly maxCollapseCost: number | null;
 }
 
 const PENALTY = 1000;
@@ -147,8 +148,10 @@ class Heap {
   get size(): number {
     return this.items.length;
   }
+  /** Lower cost first, then lower a, then lower b; a NaN cost (overflowing quadrics) counts as +Infinity, so the order is total and does not depend on the heap's shape. */
   private less(x: Candidate, y: Candidate): boolean {
-    return x.cost < y.cost || (x.cost === y.cost && (x.a < y.a || (x.a === y.a && x.b < y.b)));
+    const [cx, cy] = [Number.isNaN(x.cost) ? Infinity : x.cost, Number.isNaN(y.cost) ? Infinity : y.cost];
+    return cx < cy || (cx === cy && (x.a < y.a || (x.a === y.a && x.b < y.b)));
   }
   push(item: Candidate): void {
     const items = this.items;
@@ -322,7 +325,9 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
         const pos = (c: number): Vec3 => (swap(c) === keep ? at : mesh.p(c));
         const after = normalOf(pos(x), pos(y), pos(z));
         const dotNormals = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
-        if (dotNormals <= 0 || Math.hypot(...after) / 2 <= areaFloor) return 'foldOver';
+        // a normal or an area that is not a number (overflow) is no proof that the triangle survives: refused as a fold-over
+        const area = Math.hypot(...after) / 2;
+        if (!(dotNormals > 0) || !(area > areaFloor)) return 'foldOver';
         fan.push([swap(x), swap(y), swap(z)]);
       }
     }
@@ -362,12 +367,8 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
 
   let collapses = 0;
   let maxCost = 0;
-  let exhausted = true;
   while (heap.size > 0) {
-    if (target > 0 && mesh.liveFaces <= target) {
-      exhausted = false;
-      break;
-    }
+    if (target > 0 && mesh.liveFaces <= target) break;
     const item = heap.pop() as Candidate;
     const { a, b } = item;
     if (mesh.vAlive[a] !== true || mesh.vAlive[b] !== true) continue;
@@ -404,13 +405,14 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
       trianglesAfter,
       collapses,
       reachedTarget: reached,
-      stoppedBy: !exhausted
-        ? 'target'
-        : params.maxDeviation !== undefined && heap.size === 0 && rejected.deviation > 0
-          ? 'deviation_or_validity'
-          : 'exhausted',
+      stoppedBy:
+        target > 0 && trianglesAfter <= target
+          ? 'target'
+          : params.maxDeviation !== undefined && heap.size === 0 && rejected.deviation > 0
+            ? 'deviation_or_validity'
+            : 'exhausted',
       rejected,
-      maxCollapseCost: maxCost,
+      maxCollapseCost: Number.isNaN(maxCost) ? null : maxCost,
     },
   };
 }

@@ -7,6 +7,7 @@
 //!
 //! - `decimate`: `{ targetTriangles?, maxDeviation?, preserveBoundary, featureCos?, lockedRegion?: { center, radius } }`; the mesh must be
 //!   manifold, consistently wound and free of degenerate faces (the host checks, as the TypeScript engine does).
+//!   The collapse queue is one entry per edge and the closest-point tree and the set-up scans use rayon; the bytes of the result do not depend on the thread count.
 //! - `smooth`: `{ taubin, lambda, passBand, iterations, cotangent, fixBoundary, volumeCorrection, region? }`.
 //! - `quad_remesh` (feature `quad`): `{ targetFaces, preserveSharp, sharpCos, adaptive }`; the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
@@ -15,8 +16,10 @@
 //!   it as `deviation` in `report.json`, after a stage `deviation` before `write`. The host saves the separate `deviation` job that would follow.
 //! - `deviation`: `{ maxSamples }` between the mesh above and `positions_b.f64` / `indices_b.u32`; writes `report.json` only.
 
+mod collapse_check;
 pub mod decimate;
 pub mod deviation;
+mod edge_heap;
 mod edit;
 mod geom;
 mod progress;
@@ -24,6 +27,7 @@ mod progress;
 mod quad;
 #[cfg(feature = "quad")]
 pub mod quad_mesh;
+mod quadric;
 pub mod smooth;
 mod surface;
 

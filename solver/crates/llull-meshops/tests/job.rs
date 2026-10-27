@@ -374,3 +374,24 @@ fn quad_remesh_measures_the_outward_triangulated_quads_exactly_as_the_separate_j
 fn read_report(dir: &Path) -> Value {
     serde_json::from_slice(&fs::read(dir.join("report.json")).unwrap()).unwrap()
 }
+
+// 20,000 triangles and 10,201 vertices: above the sizes where the closest-point tree builds in parallel (8192) and the set-up scans split (4096 vertices)
+#[test]
+fn a_decimate_job_with_its_deviation_gives_the_same_files_on_every_run_and_thread_count() {
+    let (positions, indices) = grid(100, |x, y| (x / 2.0).sin() * (y / 3.0).cos());
+    let job = json!({ "op": "decimate", "params": { "targetTriangles": 500, "preserveBoundary": false }, "deviationSamples": 5000 });
+    let files = |name: &str, threads: usize| {
+        let dir = folder(name);
+        write_job(&dir, &job, &positions, &indices);
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+        let outputs = pool.install(|| run(&dir, &mut std::io::sink())).unwrap();
+        // report.json carries the elapsed milliseconds; the rest of it is compared through the parsed deviation and report
+        let report = read_report(&dir);
+        let mut digests: Vec<String> = outputs.iter().filter(|o| o.path != "report.json").map(|o| o.sha256.clone()).collect();
+        digests.push(format!("{}{}", report["report"], report["deviation"]));
+        digests
+    };
+    let first = files("det-1", 1);
+    assert_eq!(first, files("det-1-again", 1));
+    assert_eq!(first, files("det-6", 6));
+}

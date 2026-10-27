@@ -1158,6 +1158,7 @@ dependencies = [
  "llull-jsmath",
  "llull-protocol",
  "llull-quadflow",
+ "rayon",
  "serde",
  "serde_json",
 ]

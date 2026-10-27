@@ -365,6 +365,55 @@ describe('decimation (VC-MSH-06, 07)', () => {
     for (let i = 0; i < locked.mesh.positions.length; i += 3) resultVertices.add(locked.mesh.positions.slice(i, i + 3).join(','));
     for (const v of lockedVertices) expect(resultVertices.has(v)).toBe(true);
   });
+
+  it('reports stoppedBy from the final state: target iff the target is met (DES-7c)', () => {
+    // a concave flat fan: one collapse reaches 4 triangles and leaves the queue with nothing valid; no collapse goes below
+    const fan = {
+      positions: [0, -0.1, 0, 3, -1, 0, 4, 1, 0, 3, 2, 0, -3, 2, 0, -4, 1, 0, 0, 0, 0],
+      indices: [0, 1, 2, 0, 2, 3, 0, 3, 6, 0, 6, 4, 0, 4, 5, 0, 5, 1],
+    };
+    const met = decimateMesh(fan, { targetTriangles: 4, preserveBoundary: true });
+    expect([met.report.trianglesAfter, met.report.reachedTarget, met.report.stoppedBy]).toEqual([4, true, 'target']);
+    const below = decimateMesh(fan, { targetTriangles: 3, preserveBoundary: true });
+    expect([below.report.trianglesAfter, below.report.reachedTarget, below.report.stoppedBy]).toEqual([4, false, 'exhausted']);
+    const already = decimateMesh(fan, { targetTriangles: 10, preserveBoundary: true });
+    expect([already.report.collapses, already.report.stoppedBy]).toEqual([0, 'target']);
+    // every vertex of a single quad is on its boundary and locked: the queue starts empty, and a mesh already at its target stops by it
+    const quad = { positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], indices: [0, 1, 2, 0, 2, 3] };
+    const locked = decimateMesh(quad, { targetTriangles: 2, preserveBoundary: true });
+    expect([locked.report.collapses, locked.report.reachedTarget, locked.report.stoppedBy]).toEqual([0, true, 'target']);
+    const sphere = decimateMesh(icosphere(10, 2), { targetTriangles: 100, preserveBoundary: true });
+    expect([sphere.report.reachedTarget, sphere.report.stoppedBy]).toEqual([true, 'target']);
+  });
+
+  it('orders a NaN cost as +Infinity and refuses collapses whose normals overflow (DES-7c)', () => {
+    const wavy = (scale: number): { positions: number[]; indices: number[] } => {
+      const n = 30;
+      const positions: number[] = [];
+      for (let j = 0; j <= n; j++)
+        for (let i = 0; i <= n; i++)
+          positions.push(i * scale, j * scale, (Math.sin(i / 3) * Math.cos(j / 4) * 3 + ((i * 7 + j * 13) % 10) / 10) * scale);
+      const id = (i: number, j: number): number => j * (n + 1) + i;
+      const indices: number[] = [];
+      for (let j = 0; j < n; j++)
+        for (let i = 0; i < n; i++) indices.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
+      return { positions, indices };
+    };
+    // 3e153 and 1e154: the quadrics overflow, so costs are NaN, while the geometry still works; 1e155: the normals overflow too and nothing may collapse
+    for (const scale of [3e153, 1e154, 1e155]) {
+      const mesh = wavy(scale);
+      const first = decimateMesh(mesh, { targetTriangles: 300, preserveBoundary: false });
+      expect(decimateMesh(mesh, { targetTriangles: 300, preserveBoundary: false }).mesh).toEqual(first.mesh);
+      expect(first.mesh.positions.every(Number.isFinite)).toBe(true);
+      expect(first.report.rejected.foldOver).toBeGreaterThan(0);
+      if (scale < 1e155) {
+        expect(first.report.collapses).toBeGreaterThan(0);
+        expect(first.report.maxCollapseCost).toBeNull();
+      } else {
+        expect(first.report.collapses).toBe(0);
+      }
+    }
+  });
 });
 
 describe('smoothing (VC-MSH-08, 09)', () => {

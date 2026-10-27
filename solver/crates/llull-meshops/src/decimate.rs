@@ -1,10 +1,15 @@
 //! Quadric-error edge-collapse decimation (twin of `decimate.ts`, Garland and Heckbert 1997) with the 07 MSH stop rules: a triangle target
-//! and / or an absolute one-sided deviation bound. Every comparison, sum and tie-break follows the TypeScript order, so the result mesh
-//! is bit-identical to the TypeScript engine's (VC-MSH-32).
+//! and / or an absolute one-sided deviation bound. The result mesh is bit-identical to the TypeScript engine's (VC-MSH-32): the same candidate
+//! is collapsed at every step, with the same position and sums. The queue is one entry per edge (`edge_heap.rs`) instead of a stream of
+//! versioned pushes, which yields the same sequence of valid candidates with a fraction of the heap work.
 
+use crate::collapse_check::{valid_collapse, DeviationGuard, Scratch, Verdict};
+use crate::edge_heap::{Candidate, EdgeHeap};
 use crate::edit::EditMesh;
-use crate::geom::{diagonal, dot, length, normal_of, Sphere, Vec3};
+use crate::geom::{diagonal, length, normal_of, Sphere, Vec3};
+use crate::quadric::{add_into, optimal_position, plane_quadric, quadric_cost, Quadric};
 use crate::surface::SurfaceIndex;
+use rayon::prelude::*;
 use serde::Serialize;
 
 const PENALTY: f64 = 1000.0;
@@ -39,185 +44,19 @@ pub struct DecimateReport {
     pub stopped_by: &'static str,
     pub rejected: Rejected,
     #[serde(rename = "maxCollapseCost")]
-    pub max_collapse_cost: f64,
-}
-
-type Quadric = [f64; 10];
-
-fn plane_quadric(n: Vec3, point: Vec3, weight: f64) -> Quadric {
-    let d = -(n[0] * point[0] + n[1] * point[1] + n[2] * point[2]);
-    let p = [n[0], n[1], n[2], d];
-    let mut q = [0.0; 10];
-    let mut k = 0;
-    for i in 0..4 {
-        for j in i..4 {
-            q[k] = weight * p[i] * p[j];
-            k += 1;
-        }
-    }
-    q
-}
-
-fn add_into(target: &mut Quadric, source: &Quadric) {
-    for (t, s) in target.iter_mut().zip(source) {
-        *t += s;
-    }
-}
-
-fn quadric_cost(q: &Quadric, x: f64, y: f64, z: f64) -> f64 {
-    q[0] * x * x
-        + 2.0 * q[1] * x * y
-        + 2.0 * q[2] * x * z
-        + 2.0 * q[3] * x
-        + q[4] * y * y
-        + 2.0 * q[5] * y * z
-        + 2.0 * q[6] * y
-        + q[7] * z * z
-        + 2.0 * q[8] * z
-        + q[9]
-}
-
-fn optimal_position(q: &Quadric) -> Option<Vec3> {
-    let (a, b, c, d, e, f) = (q[0], q[1], q[2], q[4], q[5], q[7]);
-    let det = a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d);
-    let trace = a + d + f;
-    // `!(x > y)` in the TypeScript engine: also true for NaN.
-    if det.abs().partial_cmp(&(1e-12 * (trace * trace * trace))) != Some(std::cmp::Ordering::Greater) {
-        return None;
-    }
-    let rhs = [-q[3], -q[6], -q[8]];
-    let inv = [
-        [d * f - e * e, c * e - b * f, b * e - c * d],
-        [c * e - b * f, a * f - c * c, b * c - a * e],
-        [b * e - c * d, b * c - a * e, a * d - b * b],
-    ];
-    let solve = |row: [f64; 3]| (row[0] * rhs[0] + row[1] * rhs[1] + row[2] * rhs[2]) / det;
-    Some([solve(inv[0]), solve(inv[1]), solve(inv[2])])
-}
-
-/// Squared distance from `p` to triangle `abc` (Ericson 5.1.5).
-fn point_triangle_sq(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> f64 {
-    let (abx, aby, abz) = (b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    let (acx, acy, acz) = (c[0] - a[0], c[1] - a[1], c[2] - a[2]);
-    let (apx, apy, apz) = (p[0] - a[0], p[1] - a[1], p[2] - a[2]);
-    let d1 = abx * apx + aby * apy + abz * apz;
-    let d2 = acx * apx + acy * apy + acz * apz;
-    let sq = |x: f64, y: f64, z: f64| x * x + y * y + z * z;
-    if d1 <= 0.0 && d2 <= 0.0 {
-        return sq(apx, apy, apz);
-    }
-    let (bpx, bpy, bpz) = (p[0] - b[0], p[1] - b[1], p[2] - b[2]);
-    let d3 = abx * bpx + aby * bpy + abz * bpz;
-    let d4 = acx * bpx + acy * bpy + acz * bpz;
-    if d3 >= 0.0 && d4 <= d3 {
-        return sq(bpx, bpy, bpz);
-    }
-    let vc = d1 * d4 - d3 * d2;
-    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
-        let v = d1 / (d1 - d3);
-        return sq(apx - v * abx, apy - v * aby, apz - v * abz);
-    }
-    let (cpx, cpy, cpz) = (p[0] - c[0], p[1] - c[1], p[2] - c[2]);
-    let d5 = abx * cpx + aby * cpy + abz * cpz;
-    let d6 = acx * cpx + acy * cpy + acz * cpz;
-    if d6 >= 0.0 && d5 <= d6 {
-        return sq(cpx, cpy, cpz);
-    }
-    let vb = d5 * d2 - d1 * d6;
-    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
-        let w = d2 / (d2 - d6);
-        return sq(apx - w * acx, apy - w * acy, apz - w * acz);
-    }
-    let va = d3 * d6 - d5 * d4;
-    if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
-        let w = (d4 - d3) / (d4 - d3 + (d5 - d6));
-        return sq(bpx - w * (c[0] - b[0]), bpy - w * (c[1] - b[1]), bpz - w * (c[2] - b[2]));
-    }
-    let denominator = 1.0 / (va + vb + vc);
-    let v = vb * denominator;
-    let w = vc * denominator;
-    sq(apx - v * abx - w * acx, apy - v * aby - w * acy, apz - v * abz - w * acz)
-}
-
-/// A heap entry. The vertex kept and its position are not stored: they are a pure function of the two vertices' quadrics and positions, which
-/// are unchanged while the versions match, so `choose` recomputes the same answer when the entry is popped.
-#[derive(Clone, Copy)]
-struct Candidate {
-    cost: f64,
-    a: u32,
-    b: u32,
-    version_a: i32,
-    version_b: i32,
-}
-
-fn less(x: &Candidate, y: &Candidate) -> bool {
-    x.cost < y.cost || (x.cost == y.cost && (x.a < y.a || (x.a == y.a && x.b < y.b)))
-}
-
-#[derive(Default)]
-struct Heap {
-    items: Vec<Candidate>,
-}
-
-impl Heap {
-    fn push(&mut self, item: Candidate) {
-        self.items.push(item);
-        let mut i = self.items.len() - 1;
-        while i > 0 {
-            let parent = (i - 1) >> 1;
-            if !less(&self.items[i], &self.items[parent]) {
-                break;
-            }
-            self.items.swap(i, parent);
-            i = parent;
-        }
-    }
-
-    fn pop(&mut self) -> Option<Candidate> {
-        let top = self.items.first().cloned()?;
-        let last = self.items.pop()?;
-        if !self.items.is_empty() {
-            self.items[0] = last;
-            let mut i = 0;
-            loop {
-                let (l, r) = (2 * i + 1, 2 * i + 2);
-                let mut smallest = i;
-                if l < self.items.len() && less(&self.items[l], &self.items[smallest]) {
-                    smallest = l;
-                }
-                if r < self.items.len() && less(&self.items[r], &self.items[smallest]) {
-                    smallest = r;
-                }
-                if smallest == i {
-                    break;
-                }
-                self.items.swap(i, smallest);
-                i = smallest;
-            }
-        }
-        Some(top)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Verdict {
-    Ok,
-    Link,
-    FoldOver,
-    Deviation,
+    /// Largest cost of a collapse made; null when a NaN cost was collapsed.
+    pub max_collapse_cost: Option<f64>,
 }
 
 struct Decimator {
     mesh: EditMesh,
-    area_floor: f64,
-    max_deviation: Option<f64>,
     quadrics: Vec<Quadric>,
     locked: Vec<bool>,
-    probes: Vec<Vec3>,
-    owned: Vec<Vec<u32>>,
-    original: Option<SurfaceIndex>,
-    version: Vec<i32>,
-    heap: Heap,
+    guard: Option<DeviationGuard>,
+    heap: EdgeHeap,
+    /// Per vertex: neighbours whose edge was popped and refused and has not been queued again (listed under both ends). The TypeScript engine queues
+    /// every edge at a vertex again whenever a collapse changes that vertex's neighbourhood; the other edges are still in the queue.
+    refused: Vec<Vec<u32>>,
 }
 
 fn unit_normal(mesh: &EditMesh, f: u32) -> Option<Vec3> {
@@ -257,8 +96,8 @@ impl Decimator {
         } else {
             let (pa, pb) = (self.mesh.p(a), self.mesh.p(b));
             let mid = [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0, (pa[2] + pb[2]) / 2.0];
-            let edge_length = length([pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]]);
             if let Some(o) = optimal_position(&sum) {
+                let edge_length = length([pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]]);
                 if length([o[0] - mid[0], o[1] - mid[1], o[2] - mid[2]]) <= 2.0 * edge_length {
                     options[count] = (a, o);
                     count += 1;
@@ -281,116 +120,162 @@ impl Decimator {
         (best.0, best.1, best_cost)
     }
 
-    fn push(&mut self, a0: u32, b0: u32) {
-        let (a, b) = if a0 > b0 { (b0, a0) } else { (a0, b0) };
+    /// The cost the edge `a` < `b` is queued with; none for an edge between two locked vertices, which is never queued.
+    fn queue_cost(&self, a: u32, b: u32) -> Option<f64> {
         if self.locked[a as usize] && self.locked[b as usize] {
-            return;
+            return None;
         }
         let (_, _, best_cost) = self.choose(a, b);
         // JavaScript Math.max(0, x) is NaN for a NaN cost.
-        let cost = if best_cost.is_nan() { best_cost } else { best_cost.max(0.0) };
-        self.heap.push(Candidate { cost, a, b, version_a: self.version[a as usize], version_b: self.version[b as usize] });
+        Some(if best_cost.is_nan() { best_cost } else { best_cost.max(0.0) })
     }
 
-    fn valid_collapse(&self, u: u32, v: u32, keep: u32, at: Vec3) -> Verdict {
-        let mesh = &self.mesh;
-        let edge_faces = mesh.faces_on_edge(u, v);
-        if edge_faces.is_empty() || edge_faces.len() > 2 {
-            return Verdict::Link;
-        }
-        let (ring_u, ring_v) = (mesh.ring(u), mesh.ring(v));
-        let common: Vec<u32> = ring_u.iter().copied().filter(|w| ring_v.contains(w)).collect();
-        let mut apexes: Vec<u32> = edge_faces.iter().map(|&f| mesh.opposite(f, u, v)).collect();
-        apexes.sort_unstable();
-        if common.len() != apexes.len() || common.iter().zip(&apexes).any(|(w, x)| w != x) {
-            return Verdict::Link;
-        }
-        if !mesh.is_boundary_edge(u, v) && mesh.is_boundary_vertex(u) && mesh.is_boundary_vertex(v) {
-            return Verdict::Link;
-        }
-        let mut union: Vec<u32> = ring_u.iter().chain(ring_v.iter()).copied().collect();
-        union.sort_unstable();
-        union.dedup();
-        if edge_faces.len() == 2 && union.len() as i64 - 2 <= 3 {
-            return Verdict::Link;
-        }
-        let removed = if keep == u { v } else { u };
-        let mut fan: Vec<[u32; 3]> = Vec::new();
-        for w in [u, v] {
-            for &f in &mesh.v_faces[w as usize] {
-                if edge_faces.contains(&f) {
-                    continue;
-                }
-                let [x, y, z] = mesh.corners(f);
-                let swap = |c: u32| if c == removed { keep } else { c };
-                let before = normal_of(mesh.p(x), mesh.p(y), mesh.p(z));
-                let pos = |c: u32| if swap(c) == keep { at } else { mesh.p(c) };
-                let after = normal_of(pos(x), pos(y), pos(z));
-                if dot(before, after) <= 0.0 || length(after) / 2.0 <= self.area_floor {
-                    return Verdict::FoldOver;
-                }
-                fan.push([swap(x), swap(y), swap(z)]);
+    /// Queues the edge `a`-`b` with its current cost, or takes it out when it must not be queued.
+    fn queue(&mut self, a0: u32, b0: u32) {
+        let (a, b) = if a0 > b0 { (b0, a0) } else { (a0, b0) };
+        match self.queue_cost(a, b) {
+            Some(cost) => self.heap.upsert(a, b, cost),
+            None => {
+                self.heap.remove(a, b);
             }
         }
-        let Some(max_deviation) = self.max_deviation else { return Verdict::Ok };
-        let mut affected: Vec<u32> = vec![keep];
-        for &w in ring_u.iter().chain(ring_v.iter()) {
-            if !affected.contains(&w) {
-                affected.push(w);
+    }
+
+    fn refuse(&mut self, a: u32, b: u32) {
+        self.refused[a as usize].push(b);
+        self.refused[b as usize].push(a);
+    }
+
+    /// Empties the refused list of `v` and returns it, with `v` struck from the lists of its entries.
+    fn take_refused(&mut self, v: u32) -> Vec<u32> {
+        let list = std::mem::take(&mut self.refused[v as usize]);
+        for &x in &list {
+            self.refused[x as usize].retain(|&y| y != v);
+        }
+        list
+    }
+
+    /// After `removed` was merged into `kept` (whose quadric and position are already final): the queue holds exactly what the TypeScript
+    /// engine's would, i.e. every edge at `kept` or at one of its neighbours is queued with its current cost.
+    fn requeue_around(&mut self, removed: u32, kept: u32, ring: &mut Vec<u32>) {
+        self.take_refused(removed);
+        self.take_refused(kept);
+        self.mesh.ring_into(kept, ring);
+        for &x in ring.iter() {
+            self.queue(kept, x);
+        }
+        for &w in ring.iter() {
+            if self.refused[w as usize].is_empty() {
+                continue;
+            }
+            for x in self.take_refused(w) {
+                self.queue(w, x);
             }
         }
-        affected.retain(|&w| w != removed);
-        let limit = max_deviation * max_deviation;
-        let place = |c: u32| if c == keep { at } else { mesh.p(c) };
-        if let Some(original) = &self.original {
-            if original.closest_distance(at) > max_deviation {
-                return Verdict::Deviation;
-            }
-            for &[x, y, z] in &fan {
-                let (pa, pb, pc) = (place(x), place(y), place(z));
-                let centre = [(pa[0] + pb[0] + pc[0]) / 3.0, (pa[1] + pb[1] + pc[1]) / 3.0, (pa[2] + pb[2] + pc[2]) / 3.0];
-                if original.closest_distance(centre) > max_deviation {
-                    return Verdict::Deviation;
-                }
-            }
-        }
-        for &o in &affected {
-            let mut faces: Vec<[Vec3; 3]> = Vec::new();
-            for &f in &mesh.v_faces[o as usize] {
-                let [x, y, z] = mesh.corners(f);
-                if x == u || x == v || y == u || y == v || z == u || z == v {
-                    continue;
-                }
-                faces.push([mesh.p(x), mesh.p(y), mesh.p(z)]);
-            }
-            for triple in &fan {
-                if triple.contains(&o) {
-                    faces.push([place(triple[0]), place(triple[1]), place(triple[2])]);
-                }
-            }
-            let owners: Vec<u32> = if o == keep {
-                self.owned[keep as usize].iter().chain(self.owned[removed as usize].iter()).copied().collect()
-            } else {
-                self.owned[o as usize].clone()
-            };
-            for probe in owners {
-                let p = self.probes[probe as usize];
-                let mut nearest = f64::INFINITY;
-                for [a, b, c] in &faces {
-                    let d = point_triangle_sq(p, *a, *b, *c);
-                    nearest = if nearest.is_nan() || d.is_nan() { f64::NAN } else { nearest.min(d) };
-                }
-                if nearest > limit {
-                    return Verdict::Deviation;
-                }
-            }
-        }
-        Verdict::Ok
     }
 }
 
 /// Heap pops between two `progress` calls of [`decimate`].
 const PROGRESS_EVERY: u64 = 2048;
+
+/// Per-vertex quadrics of the planes of the live faces.
+fn face_quadrics(mesh: &EditMesh) -> Vec<Quadric> {
+    let mut quadrics: Vec<Quadric> = vec![[0.0; 10]; mesh.vertex_total()];
+    for f in 0..mesh.f_alive.len() as u32 {
+        let Some(n) = unit_normal(mesh, f) else { continue };
+        let [a, b, c] = mesh.corners(f);
+        let k = plane_quadric(n, mesh.p(a), 1.0);
+        for v in [a, b, c] {
+            add_into(&mut quadrics[v as usize], &k);
+        }
+    }
+    quadrics
+}
+
+/// Vertices handled by one parallel task of the set-up scans.
+const CHUNK: usize = 4096;
+
+/// Runs `per_chunk` over consecutive vertex ranges in parallel; the results come back in vertex order, so they do not depend on the thread count.
+fn over_vertices<T: Send>(vertex_total: usize, per_chunk: impl Fn(std::ops::Range<u32>) -> T + Sync) -> Vec<T> {
+    (0..vertex_total.div_ceil(CHUNK))
+        .into_par_iter()
+        .map(|chunk| per_chunk((chunk * CHUNK) as u32..((chunk + 1) * CHUNK).min(vertex_total) as u32))
+        .collect()
+}
+
+/// Edges the decimation treats apart, each once with a < b, in vertex order.
+struct SpecialEdges {
+    /// (a, b, its face)
+    boundary: Vec<(u32, u32, u32)>,
+    /// With a feature angle: sharp interior edges (a, b, their two faces).
+    features: Vec<(u32, u32, u32, u32)>,
+}
+
+fn special_edges(mesh: &EditMesh, feature_cos: Option<f64>) -> SpecialEdges {
+    let chunks = over_vertices(mesh.vertex_total(), |vertices| {
+        let (mut boundary, mut features) = (Vec::new(), Vec::new());
+        let (mut ring, mut shared) = (Vec::new(), Vec::new());
+        for a in vertices {
+            mesh.ring_into(a, &mut ring);
+            for &b in ring.iter().filter(|&&b| b > a) {
+                mesh.faces_on_edge_into(a, b, &mut shared);
+                if shared.len() == 1 {
+                    boundary.push((a, b, shared[0]));
+                } else if let (2, Some(cos_feature)) = (shared.len(), feature_cos) {
+                    if let (Some(n1), Some(n2)) = (unit_normal(mesh, shared[0]), unit_normal(mesh, shared[1])) {
+                        if n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2] < cos_feature {
+                            features.push((a, b, shared[0], shared[1]));
+                        }
+                    }
+                }
+            }
+        }
+        (boundary, features)
+    });
+    let (boundary, features): (Vec<_>, Vec<_>) = chunks.into_iter().unzip();
+    SpecialEdges { boundary: boundary.concat(), features: features.concat() }
+}
+
+/// Every edge that is queued at the start, with its cost, in (a, b) order.
+fn initial_edges(state: &Decimator) -> Vec<Candidate> {
+    over_vertices(state.mesh.vertex_total(), |vertices| {
+        let (mut ring, mut edges) = (Vec::new(), Vec::new());
+        for a in vertices {
+            state.mesh.ring_into(a, &mut ring);
+            for &b in ring.iter().filter(|&&b| b > a) {
+                if let Some(cost) = state.queue_cost(a, b) {
+                    edges.push(Candidate { cost, a, b });
+                }
+            }
+        }
+        edges
+    })
+    .concat()
+}
+
+/// The one-sided guard of `max_deviation`: a probe at every used vertex and every triangle centre of the original mesh.
+fn deviation_guard(mesh: &EditMesh, positions: &[f64], triangles: &[u32], max_deviation: f64) -> DeviationGuard {
+    let mut guard = DeviationGuard {
+        max_deviation,
+        probes: Vec::new(),
+        owned: vec![Vec::new(); mesh.vertex_total()],
+        original: SurfaceIndex::new(positions, triangles),
+    };
+    for v in 0..mesh.vertex_total() as u32 {
+        if mesh.v_faces[v as usize].is_empty() {
+            continue;
+        }
+        guard.probes.push(mesh.p(v));
+        guard.owned[v as usize].push((guard.probes.len() - 1) as u32);
+    }
+    for f in 0..mesh.f_alive.len() as u32 {
+        let [a, b, c] = mesh.corners(f).map(|v| mesh.p(v));
+        guard.probes.push([(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0]);
+        let first = mesh.corners(f)[0];
+        guard.owned[first as usize].push((guard.probes.len() - 1) as u32);
+    }
+    guard
+}
 
 /// Decimate a manifold, consistently wound, welded mesh; returns the canonical result and the report. `progress` is told the share of the collapse
 /// loop done (0 to 1) now and then; it never changes the result.
@@ -406,47 +291,16 @@ pub fn decimate(
     let area_floor = 1e-12 * diag * diag;
     let target = params.target_triangles.unwrap_or(0);
     let vertex_total = mesh.vertex_total();
-    let mut quadrics: Vec<Quadric> = vec![[0.0; 10]; vertex_total];
-    for f in 0..mesh.f_alive.len() as u32 {
-        let Some(n) = unit_normal(&mesh, f) else { continue };
-        let [a, b, c] = mesh.corners(f);
-        let k = plane_quadric(n, mesh.p(a), 1.0);
-        for v in [a, b, c] {
-            add_into(&mut quadrics[v as usize], &k);
-        }
-    }
-    let mut boundary_edges: Vec<(u32, u32, u32)> = Vec::new();
-    let mut feature_edges: Vec<(u32, u32, u32, u32)> = Vec::new();
-    for a in 0..vertex_total as u32 {
-        for b in mesh.ring(a) {
-            if b < a {
-                continue;
-            }
-            let shared = mesh.faces_on_edge(a, b);
-            if shared.len() == 1 {
-                boundary_edges.push((a, b, shared[0]));
-            } else if shared.len() == 2 {
-                if let Some(cos_feature) = params.feature_cos {
-                    if let (Some(n1), Some(n2)) = (unit_normal(&mesh, shared[0]), unit_normal(&mesh, shared[1])) {
-                        if n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2] < cos_feature {
-                            feature_edges.push((a, b, shared[0], shared[1]));
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let quadrics = face_quadrics(&mesh);
+    let SpecialEdges { boundary: boundary_edges, features: feature_edges } = special_edges(&mesh, params.feature_cos);
+    let guard = params.max_deviation.map(|bound| deviation_guard(&mesh, positions, triangles, bound));
     let mut state = Decimator {
         mesh,
-        area_floor,
-        max_deviation: params.max_deviation,
         quadrics,
         locked: vec![false; vertex_total],
-        probes: Vec::new(),
-        owned: vec![Vec::new(); vertex_total],
-        original: params.max_deviation.map(|_| SurfaceIndex::new(positions, triangles)),
-        version: vec![0; vertex_total],
-        heap: Heap::default(),
+        guard,
+        heap: EdgeHeap::default(),
+        refused: vec![Vec::new(); vertex_total],
     };
     for &(a, b, face) in &boundary_edges {
         if params.preserve_boundary {
@@ -467,106 +321,67 @@ pub fn decimate(
             }
         }
     }
-    if state.max_deviation.is_some() {
-        for v in 0..vertex_total as u32 {
-            if state.mesh.v_faces[v as usize].is_empty() {
-                continue;
-            }
-            state.probes.push(state.mesh.p(v));
-            state.owned[v as usize].push((state.probes.len() - 1) as u32);
-        }
-        for f in 0..state.mesh.f_alive.len() as u32 {
-            let [a, b, c] = state.mesh.corners(f).map(|v| state.mesh.p(v));
-            state.probes.push([(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0]);
-            let first = state.mesh.corners(f)[0];
-            state.owned[first as usize].push((state.probes.len() - 1) as u32);
-        }
-    }
-    for a in 0..vertex_total as u32 {
-        for b in state.mesh.ring(a) {
-            if a < b {
-                state.push(a, b);
-            }
-        }
-    }
+    state.heap = EdgeHeap::from_edges(&initial_edges(&state));
+    let mut ring = Vec::new();
     let mut rejected = Rejected { link: 0, fold_over: 0, deviation: 0 };
     let mut collapses: u64 = 0;
     let mut max_cost = 0.0f64;
-    let mut exhausted = true;
-    let initial_pairs = state.heap.items.len().max(1);
+    let initial_pairs = state.heap.len().max(1);
+    let mut scratch = Scratch::default();
     let mut pops: u64 = 0;
-    while !state.heap.items.is_empty() {
+    while !state.heap.is_empty() {
         pops += 1;
         if pops.is_multiple_of(PROGRESS_EVERY) {
             let done = if target > 0 && triangles_before > target {
                 (triangles_before - state.mesh.live_faces.min(triangles_before)) as f64 / (triangles_before - target) as f64
             } else {
-                1.0 - state.heap.items.len() as f64 / initial_pairs as f64
+                1.0 - state.heap.len() as f64 / initial_pairs as f64
             };
             progress(done.clamp(0.0, 1.0));
         }
         if target > 0 && state.mesh.live_faces <= target {
-            exhausted = false;
             break;
         }
         let Some(item) = state.heap.pop() else { break };
         let (a, b) = (item.a, item.b);
-        if !state.mesh.v_alive[a as usize] || !state.mesh.v_alive[b as usize] {
-            continue;
-        }
-        if state.version[a as usize] != item.version_a || state.version[b as usize] != item.version_b {
-            continue;
-        }
-        if state.mesh.faces_on_edge(a, b).is_empty() {
-            continue;
-        }
         let (keep, at, _) = state.choose(a, b);
-        match state.valid_collapse(a, b, keep, at) {
+        let verdict = valid_collapse(&state.mesh, area_floor, state.guard.as_ref(), &mut scratch, (a, b), keep, at);
+        match verdict {
             Verdict::Ok => {}
-            Verdict::Link => {
-                rejected.link += 1;
-                continue;
-            }
-            Verdict::FoldOver => {
-                rejected.fold_over += 1;
-                continue;
-            }
-            Verdict::Deviation => {
-                rejected.deviation += 1;
-                continue;
-            }
+            Verdict::Gone => continue,
+            Verdict::Link => rejected.link += 1,
+            Verdict::FoldOver => rejected.fold_over += 1,
+            Verdict::Deviation => rejected.deviation += 1,
+        }
+        if verdict != Verdict::Ok {
+            state.refuse(a, b);
+            continue;
         }
         let removed = if keep == a { b } else { a };
-        let kept = keep;
         let removed_quadric = state.quadrics[removed as usize];
-        add_into(&mut state.quadrics[kept as usize], &removed_quadric);
-        state.mesh.set_p(kept, at);
-        state.mesh.collapse(removed, kept);
-        let moved = std::mem::take(&mut state.owned[removed as usize]);
-        state.owned[kept as usize].extend(moved);
+        add_into(&mut state.quadrics[keep as usize], &removed_quadric);
+        state.mesh.set_p(keep, at);
+        state.mesh.ring_into(removed, &mut ring);
+        for &x in &ring {
+            state.heap.remove(removed.min(x), removed.max(x));
+        }
+        state.mesh.collapse(removed, keep);
+        if let Some(guard) = &mut state.guard {
+            let moved = std::mem::take(&mut guard.owned[removed as usize]);
+            guard.owned[keep as usize].extend(moved);
+        }
         if state.locked[removed as usize] {
-            state.locked[kept as usize] = true;
+            state.locked[keep as usize] = true;
         }
         collapses += 1;
         max_cost = if max_cost.is_nan() || item.cost.is_nan() { f64::NAN } else { max_cost.max(item.cost) };
-        let mut refresh: Vec<u32> = vec![kept];
-        refresh.extend(state.mesh.ring(kept));
-        for &w in &refresh {
-            state.version[w as usize] += 1;
-        }
-        for &w in &refresh {
-            for x in state.mesh.ring(w) {
-                if w < x || !refresh.contains(&x) {
-                    state.push(w, x);
-                }
-            }
-        }
+        state.requeue_around(removed, keep, &mut ring);
     }
     let triangles_after = state.mesh.live_faces;
     let reached = params.target_triangles.map(|t| triangles_after <= t);
-    let stopped_by = if !exhausted {
+    let stopped_by = if target > 0 && triangles_after <= target {
         "target"
-    } else if params.max_deviation.is_some() && state.heap.items.is_empty() && rejected.deviation > 0 {
+    } else if params.max_deviation.is_some() && state.heap.is_empty() && rejected.deviation > 0 {
         "deviation_or_validity"
     } else {
         "exhausted"
@@ -582,7 +397,7 @@ pub fn decimate(
             reached_target: reached,
             stopped_by,
             rejected,
-            max_collapse_cost: max_cost,
+            max_collapse_cost: (!max_cost.is_nan()).then_some(max_cost),
         },
     )
 }
