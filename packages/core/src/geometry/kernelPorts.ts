@@ -175,8 +175,10 @@ export interface BlendBuildNotes {
   /** Largest distance between a re-skinned face and its neighbour along their shared edges, and the limit it was held to (5e-6 x diagonal). */
   readonly gap?: number;
   readonly gapLimit?: number;
-  /** Largest angle (radians) between the normals of two blends of a chain along their junction; the build is refused above 0.0095 (0.95 x the check_blends default). */
+  /** Largest angle (radians) between the normals of two blends of a chain along their junction; the build is refused when a junction exceeds 0.0095 (0.95 x the check_blends default) plus its own crease. */
   readonly junctionG1?: number;
+  /** Largest angle (radians) between the normals of two blends of a chain at the ends of their junction, where each is tangent to its own support: the crease of the part the chain was mitred across (0 for a smooth chain). */
+  readonly creaseRad?: number;
   /** The step mixes convex and concave blends, so the volume check against the circular fillet was not applied. */
   readonly mixed?: boolean;
   /** The curvature profile fell back to the zero-curvature quartic: the unique edges it applies to and why. */

@@ -166,7 +166,7 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
   });
 
   it.each([64, 120])(
-    'a %d-sided prism top rim: OCCT chains every side edge across creases of up to 0.1 rad, whose mitre ends the rail builder cannot skin: refused, never a half-profiled chain',
+    'a %d-sided prism top rim: OCCT chains every side edge across creases of up to 0.1 rad, the profile blend mitres them, and every chain member reads as the conic profile in check_blends',
     (sides) => {
       const ring = (k: number): [number, number] => [50 * Math.cos((2 * Math.PI * k) / sides), 50 * Math.sin((2 * Math.PI * k) / sides)];
       const prism = made(createEmptyDocument(), 'extrude_profile', {
@@ -175,26 +175,50 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
       });
       const [a, b] = [ring(0), ring(1)];
       const near = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 20];
-      const refused = execute(prism.doc, 'fillet_edge', {
-        id: prism.id,
-        edgesNear: [near],
-        radius: 1,
-        profile: { type: 'conic', rho: 0.5 },
-      });
-      expect(refused.document).toBe(prism.doc);
-      expect(refused.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [prism.id] });
-      // the gap at the mitre is the radius times the turn between two sides
-      const gap = Number(/only to ([0-9.e-]+)/.exec(refused.summary)?.[1]);
-      expect(gap / ((2 * Math.PI) / sides)).toBeCloseTo(1, 1);
-      // the circular fillet of the same edge builds and chains every side edge
+      const done = execute(prism.doc, 'fillet_edge', { id: prism.id, edgesNear: [near], radius: 1, profile: { type: 'conic', rho: 0.5 } });
+      expect(done.error).toBeUndefined();
+      const turn = (2 * Math.PI) / sides;
+      const profile = (done.data as { profile: { builder: string; gap: number; gapLimit: number; creaseRad: number; junctionG1: number } })
+        .profile;
+      expect(profile.builder).toBe('rails');
+      expect(profile.gap).toBeLessThanOrEqual(profile.gapLimit);
+      expect(profile.creaseRad).toBeCloseTo(turn, 3);
+      expect(done.summary).toContain('mitred across creases');
+      // check_blends at its defaults reads every chain member as the profile (the kernel's chain: LawRecord.chain) and passes
+      const checked = execute(done.document, 'check_blends', { ids: [done.affected[0] as string] }).data as {
+        status: string;
+        unverified: number;
+        unverifiedJunctions: number;
+        findings: Array<{ severity: string }>;
+        blends: Array<{
+          kind: string;
+          profile: string;
+          contacts: unknown[];
+          junctions?: Array<{ creaseRad?: number; g1AngleRad: number }>;
+        }>;
+      };
+      expect(checked.status).toBe('pass');
+      // a conic is G1 only: its curvature jump against the supports is an info finding, never a warn or a fail
+      expect(checked.findings.filter((finding) => finding.severity !== 'info')).toEqual([]);
+      expect(checked.unverified + checked.unverifiedJunctions).toBe(0);
+      const rows = checked.blends.filter((blend) => blend.kind === 'edge');
+      expect(rows).toHaveLength(sides);
+      expect(rows.every((blend) => blend.profile === 'conic' && blend.contacts.length === 2)).toBe(true);
+      const junctions = rows.flatMap((blend) => blend.junctions ?? []);
+      expect(junctions).toHaveLength(sides);
+      for (const joint of junctions) {
+        expect(joint.creaseRad).toBeCloseTo(turn, 3);
+        expect(joint.g1AngleRad).toBeLessThanOrEqual(turn + 0.0095);
+      }
+      // the circular fillet of the same edge chains the same sides and reads as circular
       const circular = execute(prism.doc, 'fillet_edge', { id: prism.id, edgesNear: [near], radius: 1 });
       expect(circular.error).toBeUndefined();
-      const checked = execute(circular.document, 'check_blends', { ids: [circular.affected[0] as string] }).data as {
+      const plain = execute(circular.document, 'check_blends', { ids: [circular.affected[0] as string] }).data as {
         blends: Array<{ kind: string; profile: string }>;
       };
-      expect(checked.blends.filter((blend) => blend.kind === 'edge' && blend.profile === 'circular')).toHaveLength(sides);
+      expect(plain.blends.filter((blend) => blend.kind === 'edge' && blend.profile === 'circular')).toHaveLength(sides);
     },
-    120_000,
+    300_000,
   );
 
   it('BLD_RHO_RANGE and BLD_SHAPE_RANGE are refused before any build; the document is unchanged', () => {

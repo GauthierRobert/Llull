@@ -14,6 +14,7 @@ export interface ProfileData {
   readonly gap?: number;
   readonly gapLimit?: number;
   readonly junctionG1?: number;
+  readonly creaseRad?: number;
   readonly mixed?: boolean;
   readonly fallback?: { readonly edges: readonly string[]; readonly reason: string };
   readonly cornerSetbackFactor?: number;
@@ -50,6 +51,7 @@ export function describeProfileNotes(
     ...(notes.gap === undefined ? {} : { gap: notes.gap }),
     ...(notes.gapLimit === undefined ? {} : { gapLimit: notes.gapLimit }),
     ...(notes.junctionG1 === undefined ? {} : { junctionG1: notes.junctionG1 }),
+    ...(notes.creaseRad === undefined ? {} : { creaseRad: notes.creaseRad }),
     ...(notes.mixed === undefined ? {} : { mixed: notes.mixed }),
     ...(fallback === undefined ? {} : { fallback }),
     ...(notes.factor === undefined ? {} : { cornerSetbackFactor: notes.factor }),
@@ -62,7 +64,11 @@ export function describeProfileNotes(
     );
   if (notes.gap !== undefined && notes.gapLimit !== undefined)
     parts.push(`measured gap to the neighbouring faces ${notes.gap.toPrecision(3)} ${unit} (limit ${notes.gapLimit.toPrecision(3)})`);
-  if (notes.junctionG1 !== undefined && notes.junctionG1 > 0)
+  if (notes.creaseRad !== undefined && notes.creaseRad > 0)
+    parts.push(
+      `blends of a creased chain are mitred across creases of up to ${notes.creaseRad.toPrecision(3)} rad, so they meet at up to that angle where each touches its own support (limit 0.0095 beyond it)`,
+    );
+  else if (notes.junctionG1 !== undefined && notes.junctionG1 > 0)
     parts.push(`blends of a chain meet at up to ${notes.junctionG1.toPrecision(3)} rad (limit 0.0095)`);
   if (notes.factor !== undefined && notes.corners !== undefined)
     parts.push(`${notes.corners.length} corner patch(es), setback ${notes.factor} x the least distance`);

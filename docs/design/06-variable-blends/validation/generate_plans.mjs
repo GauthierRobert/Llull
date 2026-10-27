@@ -348,10 +348,29 @@ const revolvedSpandrel = (a, t, b, w) => {
 const rimRemoved = revolvedSpandrel([8, 20], [10, 20], [10, 18], 1);
 const bossAdded = revolvedSpandrel([12, 0], [10, 0], [10, 2], 0.4 / 0.6);
 const parabolaToCircle = 1 / 6 / (1 - Math.PI / 4);
+// A bar whose rim path is three segments of 30 turning left by 0.09 rad at both bends (creases OCCT still chains), square end walls, height 20.
+const barTurn = 0.09;
+const barAngles = [0, barTurn, 2 * barTurn];
+const barLower = barAngles.reduce(
+  (path, angle) => [...path, [path[path.length - 1][0] + 30 * Math.cos(angle), path[path.length - 1][1] + 30 * Math.sin(angle)]],
+  [[0, 0]],
+);
+const barNormal = (angle) => [-Math.sin(angle), Math.cos(angle)];
+const barUpper = barLower.map((point, k) => {
+  const n0 = barNormal(barAngles[Math.max(k - 1, 0)]);
+  const n1 = barNormal(barAngles[Math.min(k, barAngles.length - 1)]);
+  const m = 1 / (1 + n0[0] * n1[0] + n0[1] * n1[1]);
+  return [point[0] + 20 * (n0[0] + n1[0]) * m, point[1] + 20 * (n0[1] + n1[1]) * m];
+});
+const barOutline = [...barLower, ...barUpper.reverse()].map((point) => point.map((value) => Math.round(value * 1e9) / 1e9));
+const barMid = barLower[0].map((value, axis) => (value + barLower[1][axis]) / 2);
+// The conic rho 0.5 spandrel at a right angle with legs d = 1: area 1/6, first moment about the wall 1/30; a mitred sweep along the 90 mm rim path
+// that turns left twice removes A L - 2 M sum(tan(turn / 2)).
+const barRemoved = (1 / 6) * 90 - 2 * (1 / 30) * 2 * Math.tan(barTurn / 2);
 
 plan(
   'target_profiles_curved_variable',
-  'Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies and a cube whose twelve edges are profiled (G1 corner patches), each followed by check_blends.',
+  'Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies, a cube whose twelve edges are profiled (G1 corner patches) and a bent bar whose rim chain turns across two creases of 0.09 rad (mitred), each followed by check_blends.',
   [],
   [
     { command: 'add_cylinder', params: { radius: 10, height: 20, anchor: 'base-center' }, as: 'rim' },
@@ -432,6 +451,14 @@ plan(
     { command: 'fillet_edge', params: { id: '$cube', radius: 1, profile: { type: 'conic', rho: 0.5 } }, as: 'cubeC' },
     mass('$cubeC'),
     { command: 'check_blends', params: { ids: ['$cubeC'] } },
+    { command: 'extrude_profile', params: { profile: barOutline, depth: 10 }, as: 'bar' },
+    {
+      command: 'fillet_edge',
+      params: { id: '$bar', edgesNear: [[barMid[0], barMid[1], 10]], radius: 1, profile: { type: 'conic', rho: 0.5 } },
+      as: 'barMitred',
+    },
+    mass('$barMitred'),
+    { command: 'check_blends', params: { ids: ['$barMitred'] } },
   ],
 );
 
@@ -1178,6 +1205,18 @@ const cases = [
     plan: 'target_profiles_curved_variable',
     assert: 'check_blends($cubeC); mass_properties($cubeC); data.profile.corners',
     proves: ['FR-BLD-09', 'TR-BLD-06', 'TR-BLD-07'],
+  },
+  {
+    vc: 'VC-BLD-48',
+    what: 'conic profile (rho 0.5, r 1) on the rim of a bent bar whose three edges turn left by 0.09 rad at both bends (creases OCCT still chains): the blends are mitred in the bisector plane of their section planes, the removed volume is A L - 2 M sum(tan(turn / 2)) of the swept section (A = 1/6, M = 1/30, L = 90), check_blends passes and reports a junction crease of 0.09 rad',
+    value: { removedVolume: barRemoved, creaseRad: barTurn, profileBlends: 3, junctions: 2 },
+    tolerance: 1e-5,
+    unit: 'mm3 (relative)',
+    grade: 'A',
+    source: '(b) sweep of the section along the mitred path, generate_plans.mjs; TECHNICAL_SPEC 13.16',
+    plan: 'target_profiles_curved_variable',
+    assert: 'mass_properties($bar) - mass_properties($barMitred); check_blends($barMitred).data.blends[*].junctions[*].creaseRad',
+    proves: ['FR-BLD-06', 'TR-BLD-06'],
   },
   {
     vc: 'VC-BLD-40',

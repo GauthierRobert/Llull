@@ -433,6 +433,22 @@ describe('describeProfileNotes', () => {
     });
   });
 
+  it('a mitred chain reports its crease and says the blends meet at that angle where each touches its own support', () => {
+    const { text, data } = describeProfileNotes(
+      { builder: 'rails', gap: 4e-14, gapLimit: 6.8e-4, junctionG1: 0.0982, creaseRad: 0.0982 },
+      null,
+      'mm',
+    );
+    expect(data.creaseRad).toBe(0.0982);
+    expect(text).toContain('mitred across creases of up to 0.0982 rad');
+    expect(text).toContain('limit 0.0095 beyond it');
+    expect(text).not.toContain('(limit 0.0095)');
+    // a smooth chain keeps the plain sentence
+    expect(describeProfileNotes({ builder: 'rails', junctionG1: 0.004, creaseRad: 0 }, null, 'mm').text).toContain(
+      'meet at up to 0.00400 rad (limit 0.0095)',
+    );
+  });
+
   it('says nothing for a prism build and keeps a zero junction angle in data only; without a topology edges are numbered', () => {
     expect(describeProfileNotes({ builder: 'prism' }, TOPOLOGY, 'mm')).toEqual({ text: '', data: { builder: 'prism', unit: 'mm' } });
     const quiet = describeProfileNotes({ builder: 'rails', gap: 1e-9, gapLimit: 1e-6, junctionG1: 0 }, null, 'mm');

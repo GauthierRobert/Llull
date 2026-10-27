@@ -42,7 +42,7 @@
   },
   {
    "file": "plans/target_profiles_curved_variable.json",
-   "description": "Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies and a cube whose twelve edges are profiled (G1 corner patches), each followed by check_blends.",
+   "description": "Conic and curvature profiles on a cylinder rim, a sphere band, the concave ring of a boss, a rounded outline (tangent chain), a straight edge whose size varies, a cube whose twelve edges are profiled (G1 corner patches) and a bent bar whose rim chain turns across two creases of 0.09 rad (mitred), each followed by check_blends.",
    "unbuilt": []
   },
   {
@@ -1083,6 +1083,30 @@
    "cli": {
     "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
     "assert": "check_blends($cubeC); mass_properties($cubeC); data.profile.corners"
+   }
+  },
+  {
+   "vc": "VC-BLD-48",
+   "what": "conic profile (rho 0.5, r 1) on the rim of a bent bar whose three edges turn left by 0.09 rad at both bends (creases OCCT still chains): the blends are mitred in the bisector plane of their section planes, the removed volume is A L - 2 M sum(tan(turn / 2)) of the swept section (A = 1/6, M = 1/30, L = 90), check_blends passes and reports a junction crease of 0.09 rad",
+   "value": {
+    "removedVolume": 14.99399594671681,
+    "creaseRad": 0.09,
+    "profileBlends": 3,
+    "junctions": 2
+   },
+   "tolerance": 0.00001,
+   "unit": "mm3 (relative)",
+   "grade": "A",
+   "source": "(b) sweep of the section along the mitred path, generate_plans.mjs; TECHNICAL_SPEC 13.16",
+   "plan": "target_profiles_curved_variable",
+   "assert": "mass_properties($bar) - mass_properties($barMitred); check_blends($barMitred).data.blends[*].junctions[*].creaseRad",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_profiles_curved_variable.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($bar) - mass_properties($barMitred); check_blends($barMitred).data.blends[*].junctions[*].creaseRad"
    }
   },
   {

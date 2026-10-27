@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { recordsByFace } from '@core/commands/brep/blendChains';
-import { junctionsOf } from '@core/commands/brep/blendJunctions';
+import { CHAIN_CREASE_LIMIT, judgeJunction, junctionsOf, supportCrease } from '@core/commands/brep/blendJunctions';
 import { type LawRecord, lawIndex } from '@core/commands/brep/checkBlendRadius';
 import type { ShapeRecipe } from '@core/model/types';
 import { measureContact } from '@core/geometry/blend/continuity';
@@ -98,6 +98,80 @@ describe('junctionsOf', () => {
     expect(junctionsOf(named, graph, 4, always)).toEqual([]);
     expect(junctionsOf(named, graph, 3, always)).toEqual([]);
     expect(junctionsOf(named, graph, 9, always)).toEqual([]);
+  });
+});
+
+describe('the crease of a junction, read from the supports', () => {
+  // two blends over a rim: both touch the top face, each its own wall; the walls share a sharp edge (edge 0) that carries the crease
+  const faces = [face(0, 'blend(e(top|w1))'), face(1, 'blend(e(top|w2))'), face(2, 'w1'), face(3, 'w2'), face(4, 'top')];
+  const named = { solids: 1, faces, edges: [], vertices: 0, volume: 1 } as ShapeTopology;
+  const around = (edgeFaces: number[][]): FaceGraph => ({ faces: [], edgeFaces, edgeConvexity: [] }) as unknown as FaceGraph;
+  const samples = (...angles: number[]): Array<{ g1: number }> => angles.map((g1) => ({ g1 }));
+
+  it('is the angle between the two walls along their shared edge; 0 for a smooth chain, without such an edge, or with the same supports', () => {
+    const graph = around([
+      [2, 3],
+      [0, 2],
+      [0, 4],
+    ]);
+    expect(supportCrease(named, graph, 0, 1, 0, () => samples(0.098, 0.0981))).toBe(0.0981);
+    expect(supportCrease(named, graph, 0, 1, 0, () => samples(1e-6))).toBe(0);
+    expect(supportCrease(named, graph, 0, 1, 0, () => null)).toBe(0);
+    expect(supportCrease(named, around([[0, 2]]), 0, 1, 0, () => samples(0.098))).toBe(0);
+    // the same supports on both sides (a rim of one wall): nothing to measure
+    const same = {
+      ...named,
+      faces: [face(0, 'blend(e(top|w1))'), face(1, 'blend(e(top|w1))'), face(2, 'w1'), face(3, 'w2'), face(4, 'top')],
+    } as ShapeTopology;
+    expect(supportCrease(same, graph, 0, 1, 0, () => samples(0.098))).toBe(0);
+    expect(supportCrease(named, graph, 0, 9, 0, () => samples(0.098))).toBe(0);
+    expect(supportCrease(named, graph, 2, 3, 0, () => samples(0.098))).toBe(0);
+  });
+
+  it('reads the shared edge that touches the junction, not the first one found; a pair above the cap is skipped before the maximum', () => {
+    const at = (index: number, x: number): ShapeTopology['edges'][number] =>
+      ({ index, curve: 'line', length: 1, start: [x, 0, 0], end: [x, 1, 0], mid: [x, 0.5, 0], seam: false, degenerate: false }) as never;
+    // edge 0 is the junction (at x = 5); the walls also share edge 1 far away (x = 50, a crease of 0.5) and edge 2 at the junction (x = 5, 0.098)
+    const placed = { ...named, edges: [at(0, 5), at(1, 50), at(2, 5)] } as ShapeTopology;
+    const twice = around([
+      [0, 1],
+      [2, 3],
+      [2, 3],
+    ]);
+    const by = (edge: number): Array<{ g1: number }> => samples(edge === 1 ? 0.5 : 0.098);
+    expect(supportCrease(placed, twice, 0, 1, 0, by)).toBe(0.098);
+    // the pair of walls above the cap does not zero the allowance of another pair (top against the second wall) that is a fine crease
+    const mixed = around([
+      [2, 3],
+      [4, 3],
+    ]);
+    expect(supportCrease(named, mixed, 0, 1, 0, (edge) => samples(edge === 0 ? 0.2 : 0.05))).toBe(0.05);
+  });
+
+  it('a support crease above what OCCT chains (a corner of the part) gives no allowance', () => {
+    const graph = around([[2, 3]]);
+    expect(supportCrease(named, graph, 0, 1, 0, () => samples(CHAIN_CREASE_LIMIT + 0.01))).toBe(0);
+    expect(supportCrease(named, graph, 0, 1, 0, () => samples(CHAIN_CREASE_LIMIT - 0.01))).toBeCloseTo(CHAIN_CREASE_LIMIT - 0.01, 12);
+  });
+
+  // The verdict check_blends draws: the interior is held to g1AngleRad + the support crease, each end to 0 or the crease within g1AngleRad.
+  const fails = (measured: number[], crease: number): boolean => {
+    const verdict = judgeJunction(samples(...measured), crease, 0.01);
+    return Math.max(...measured) > verdict.limit || verdict.endsOff > 0.01;
+  };
+
+  it('a smooth chain keeps the plain rule: ends 0.005 with an interior of 0.012 fails, 0.009 passes', () => {
+    expect(fails([0.005, 0.012, 0.005], 0)).toBe(true);
+    expect(fails([0.005, 0.009, 0.005], 0)).toBe(false);
+  });
+
+  it('across a crease of 0.098 an interior of 0.12 fails, ends of 0 and 0.0982 pass, an end at 0.05 fails', () => {
+    expect(fails([0.0982, 0.12, 0], 0.098)).toBe(true);
+    expect(fails([0.0982, 0.05, 0], 0.098)).toBe(false);
+    expect(fails([0.0982, 0.098, 0.0001], 0.098)).toBe(false);
+    expect(fails([0.05, 0.05, 0.05], 0.098)).toBe(true);
+    // a blend whose own ends read a crease the supports do not have is not excused by it
+    expect(judgeJunction(samples(0.098, 0.098), 0, 0.01).limit).toBe(0.01);
   });
 });
 

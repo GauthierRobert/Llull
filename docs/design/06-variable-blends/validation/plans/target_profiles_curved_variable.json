@@ -395,6 +395,80 @@
      "$cubeC"
     ]
    }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      0,
+      0
+     ],
+     [
+      30,
+      0
+     ],
+     [
+      59.87858199,
+      2.696356476
+     ],
+     [
+      89.393892774,
+      8.067243679
+     ],
+     [
+      85.813301305,
+      27.744117534
+     ],
+     [
+      57.184048015,
+      22.534465796
+     ],
+     [
+      29.099392008,
+      20
+     ],
+     [
+      0,
+      20
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "bar"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bar",
+    "edgesNear": [
+     [
+      15,
+      0,
+      10
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "barMitred"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$barMitred"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$barMitred"
+    ]
+   }
   }
  ]
 }

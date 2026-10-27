@@ -29,6 +29,8 @@ mod blend_corner_tests;
 #[cfg(test)]
 mod blend_joint_tests;
 #[cfg(test)]
+mod blend_mitre_tests;
+#[cfg(test)]
 mod blend_rail_tests;
 #[cfg(test)]
 mod blend_tests;

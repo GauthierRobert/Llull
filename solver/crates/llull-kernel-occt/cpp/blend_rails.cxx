@@ -16,6 +16,8 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -26,6 +28,7 @@
 #include <BRepLib.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GC_MakeCircle.hxx>
 #include <GProp_GProps.hxx>
@@ -51,6 +54,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include "llull-kernel-occt/cpp/blend_rails.hxx"
 #include "llull-kernel-occt/cpp/blend_tool.hxx"
 #include "llull-kernel-occt/cpp/blends.hxx"
 #include "llull-kernel-occt/cpp/features.hxx"
@@ -61,6 +65,7 @@
 namespace llull {
 
 using namespace blend;
+using namespace blend::rails;
 
 namespace {
 
@@ -83,57 +88,10 @@ constexpr double kJunctionAngle = 0.0095;
 // Sewing tolerance (x the diagonal): the check_blends default g0; never less than twice the tolerance OCCT gave the edges of its own blend (its
 // approximation error: about 1e-6 in absolute terms, more than 1e-6 x the diagonal on a millimetre part) and never more than the cap.
 constexpr double kSewingFraction = 1e-6, kSewingCap = 1e-3;
-// A contact point moves onto its support face when it is that close (x the distance to the apex): OCCT's approximation error, not a different point.
-constexpr double kSnapFraction = 1e-3;
 // A face is tangent to its neighbour along a rail when the normals are within this angle (radians).
 constexpr double kRailAngle = 5e-3;
 // Parameter values closer than this fraction of the face's parameter range are the same iso-line.
 constexpr double kIsoFraction = 1e-6;
-
-struct Section {
-  gp_Pnt a, t, b;
-  gp_Pnt centre;  // of the section circle (the rolling ball)
-  gp_Vec bend_a{0, 0, 0}, bend_b{0, 0, 0};  // curvature-continuous sections: the offset of the 3rd / 4th pole of the quintic along the support normal
-};
-
-// The part of a rail over one support face: the face and the range of the along parameter it covers.
-struct RailPiece {
-  TopoDS_Face face;
-  double lo, hi;
-};
-
-// A blend face of the circular fillet and what bounds it.
-struct Blend {
-  TopoDS_Face face;
-  bool across_is_u = true;      // the section runs along u (the rails are u = const)
-  double across[2] = {0, 0};    // parameter of the rails
-  double lo = 0, hi = 0;        // parameter range along the blend
-  bool closed = false;          // a seam instead of ends (a rim)
-  TopoDS_Edge end[2];           // the section edge at lo / hi (null: none)
-  TopoDS_Face end_face[2];      // its neighbour when that is a flat end face to rebuild (null: another blend of the chain)
-  std::vector<RailPiece> supports[2];  // the support faces along each rail
-};
-
-// The support face of rail `side` at `along`.
-TopoDS_Face support_at(const Blend &blend, int side, double along) {
-  const RailPiece *best = nullptr;
-  double gap = 1e300;
-  for (const RailPiece &piece : blend.supports[side]) {
-    const double away = along < piece.lo ? piece.lo - along : (along > piece.hi ? along - piece.hi : 0.0);
-    if (away < gap) {
-      gap = away;
-      best = &piece;
-    }
-  }
-  return best == nullptr ? TopoDS_Face() : best->face;
-}
-
-std::string number(double value) {
-  std::ostringstream text;
-  text.precision(6);
-  text << value;
-  return text.str();
-}
 
 gp_Vec face_normal(const BRepAdaptor_Surface &surface, const gp_Pnt2d &uv) {
   gp_Pnt point;
@@ -150,63 +108,6 @@ bool mid_uv(const TopoDS_Edge &edge, const TopoDS_Face &face, gp_Pnt2d &uv) {
   const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(edge, face, first, last);
   if (pcurve.IsNull()) return false;
   uv = pcurve->Value(0.5 * (first + last));
-  return true;
-}
-
-// The section circle of a blend at `along`: contact points on both rails, the arc midpoint, and the apex of the two tangent lines.
-bool section_at(const BRepAdaptor_Surface &surface, const Blend &blend, double along, bool curved, double shape, Section &out, std::string &why) {
-  const auto at = [&](double across) {
-    return blend.across_is_u ? surface.Value(across, along) : surface.Value(along, across);
-  };
-  const gp_Pnt a = at(blend.across[0]), b = at(blend.across[1]), m = at(0.5 * (blend.across[0] + blend.across[1]));
-  GC_MakeCircle circle(a, m, b);
-  if (!circle.IsDone()) {
-    why = "a section of the circular blend is not a circle arc";
-    return false;
-  }
-  const gp_Pnt centre = circle.Value()->Location();
-  const double radius = circle.Value()->Radius();
-  gp_Vec to_a(centre, a), to_b(centre, b);
-  gp_Vec bisector = to_a / radius + to_b / radius;
-  if (bisector.Magnitude() < 1e-6) {
-    why = "a section of the circular blend is a half circle or more";
-    return false;
-  }
-  bisector.Normalize();
-  const double half_cos = to_a.Dot(bisector) / radius;
-  if (half_cos < 1e-3 || bisector.Dot(gp_Vec(centre, m)) <= 0) {
-    why = "a section of the circular blend turns through 180 degrees or more (no apex)";
-    return false;
-  }
-  // The circular blend's contact points carry OCCT's own approximation error (up to ~1e-6 in absolute terms, more than 1e-6 x the diagonal on a
-  // millimetre part): they are moved onto the support faces, so the profile meets them to the interpolation accuracy only.
-  out.a = a;
-  out.b = b;
-  out.centre = centre;
-  out.t = centre.Translated(bisector * (radius / half_cos));
-  const gp_Pnt contacts[2] = {a, b};
-  for (int side = 0; side < 2; ++side) {
-    gp_Pnt on;
-    const TopoDS_Face support = support_at(blend, side, along);
-    if (support.IsNull() || !project_on_face(support, contacts[side], on)) continue;
-    if (on.Distance(contacts[side]) <= kSnapFraction * out.t.Distance(contacts[side])) (side == 0 ? out.a : out.b) = on;
-  }
-  if (!curved) return true;
-  // G2: the section leaves each support with the support's own curvature along the section (the quintic of section_poles).
-  const gp_Pnt snapped[2] = {out.a, out.b};
-  for (int side = 0; side < 2; ++side) {
-    const gp_Pnt from = snapped[side], other = snapped[1 - side];
-    const double reach = from.Distance(out.t);
-    gp_Vec nu;
-    double kappa = 0;
-    if (!(reach > 0) || !support_curvature(support_at(blend, side, along), from, gp_Vec(from, out.t), gp_Vec(from, other), nu, kappa)) {
-      why = "the curvature of a support face could not be read at a contact point";
-      return false;
-    }
-    const double lead = 0.8 * shape * reach;
-    const double offset = std::max(-0.25 * reach, std::min(0.25 * reach, 1.25 * kappa * lead * lead));
-    (side == 0 ? out.bend_a : out.bend_b) = nu * offset;
-  }
   return true;
 }
 
@@ -306,7 +207,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
     if (known == values.end()) values.push_back(v);
     const double piece_lo = std::min(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
     const double piece_hi = std::max(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
-    if (cluster < 2) blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi});
+    if (cluster < 2) blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi, rail.edge});
     lo = std::min(lo, piece_lo);
     hi = std::max(hi, piece_hi);
   }
@@ -321,6 +222,20 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   for (const Item &other : others) {
     if (!iso(other, along_coordinate)) {
       why = "the blend ends obliquely on a neighbouring face (profile blends end on a face square to the blend, or on the next blend of a chain)";
+      if (BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane) {
+        // The end face against the direction of the blend: parallel to it (0 rad) is a crease of the picked contour that OCCT did not chain with the
+        // next edge (it chains them below about 0.1 rad), perpendicular is the square end the builder wants.
+        gp_Pnt at;
+        gp_Vec du, dv;
+        surface.D1(0.5 * (other.from.X() + other.to.X()), 0.5 * (other.from.Y() + other.to.Y()), at, du, dv);
+        const gp_Vec direction = blend.across_is_u ? dv : du;
+        if (direction.Magnitude() > 1e-14) {
+          const double crease = std::asin(std::min(1.0, std::fabs(direction.Normalized().Dot(normal_of(other.neighbour)))));
+          why += crease < 0.5 ? ": it runs out onto the next flat face at a crease of " + number(crease) +
+                                    " rad, which OCCT did not chain with it (OCCT chains the edges of a contour across creases of up to about 0.1 rad)"
+                              : ": its end is " + number(kPi / 2 - crease) + " rad away from square on a flat face";
+        }
+      }
       return false;
     }
     const double at = value(other.from, along_coordinate);
@@ -335,7 +250,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
       return false;
     }
     blend.end[side] = other.edge;
-    if (!other.is_blend) blend.end_face[side] = other.neighbour;
+    (other.is_blend ? blend.end_blend[side] : blend.end_face[side]) = other.neighbour;
   }
   blend.closed = blend.end[0].IsNull() && blend.end[1].IsNull();
   if (blend.closed && !seam) {
@@ -470,7 +385,9 @@ struct Measured {
   double gap = 0, limit = 0;
   bool mixed = false;      // convex and concave blends in one step: the volume window is not applied
   double junction = 0;     // largest angle between the normals of two blends of a chain along their junction (radians)
+  double crease = 0;       // mitred chains: the largest crease (turn between the end section planes) a junction was mitred across
   std::vector<int> chain;  // unique edges of the contours OCCT rounded (the picked edges and the rest of their tangent chains)
+  bool mitred = false;     // blends of a chain end on a crease: the result is read with the adaptive mass rule (the fixed rule is off by 1e-4 of the swept volume)
 };
 
 std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, int kind, double param,
@@ -523,6 +440,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     if (!analyse(TopoDS::Face(blends(b)), edge_faces, blends, faces[static_cast<size_t>(b - 1)], why)) return nullptr;
 
   // Convex blends have the rolling ball inside the material, concave ones outside: a step that mixes them is not checked against the circular volume.
+  BRepClass3d_SolidClassifier classifier(circular);
   bool any_convex = false, any_concave = false;
   for (const Blend &blend : faces) {
     const BRepAdaptor_Surface surface(blend.face, Standard_False);
@@ -531,21 +449,37 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     for (int j = blend.closed ? 0 : 1; j < kFirstStations; ++j) {
       Section station;
       if (!section_at(surface, blend, blend.lo + (blend.hi - blend.lo) * j / kFirstStations, false, 0.5, station, why)) return nullptr;
-      BRepClass3d_SolidClassifier classifier(circular, station.centre, 1e-9 * diagonal);
+      classifier.Perform(station.centre, 1e-9 * diagonal);
       if (classifier.State() == TopAbs_IN) any_convex = true;
       else if (classifier.State() == TopAbs_OUT) any_concave = true;
     }
   }
   const bool mixed = any_convex && any_concave;
 
-  // New blend faces and the end faces to rebuild around their section curves.
+  // Creases between blends of the chain: both blends end in the bisector plane of their end section planes (13.16).
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_faces;
+  TopExp::MapShapesAndAncestors(circular, TopAbs_VERTEX, TopAbs_FACE, vertex_faces);
+  // A mitre is exact for a constant size only (laws: start, end (NaN: none), straight flag, count of control points per edge).
+  bool constant_size = true;
+  for (size_t offset = 0; offset + 4 <= static_cast<size_t>(laws.size()); offset += 4 + 2 * static_cast<size_t>(laws[offset + 3]))
+    constant_size = constant_size && std::isnan(laws[offset + 1]) && laws[offset + 3] == 0;
+  if (!plan_mitres(faces, blends, vertex_faces, diagonal, constant_size, why)) return nullptr;
+
+  // New blend faces; the faces around them whose edges change (a flat end face, a support face re-trimmed at a mitre) are rebuilt.
   std::vector<TopoDS_Face> skinned;
-  struct End {
-    TopoDS_Edge old_edge;
-    Handle(Geom_Curve) curve;
-    TopoDS_Face face;
+  std::vector<FaceEdit> edits;
+  const auto edit_of = [&edits](const TopoDS_Face &face) -> FaceEdit & {
+    for (FaceEdit &edit : edits)
+      if (edit.face.IsSame(face)) return edit;
+    edits.push_back(FaceEdit{face, {}});
+    return edits.back();
   };
-  std::vector<End> ends;
+  struct Meeting {
+    TopoDS_Edge junction;
+    TopoDS_Face support;
+    TopoDS_Vertex vertex;
+  };
+  std::vector<Meeting> meetings;  // the vertex two rails of one support share at a mitre
   for (const Blend &blend : faces) {
     const Handle(Geom_BSplineSurface) surface = skin_blend(blend, kind, param, curved, kDeviationFraction * diagonal, why);
     if (surface.IsNull()) return nullptr;
@@ -558,53 +492,59 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     }
     skinned.push_back(made.Face());
     for (int side = 0; side < 2; ++side)
-      if (!blend.end_face[side].IsNull()) ends.push_back({blend.end[side], surface->VIso(side == 0 ? v0 : v1), blend.end_face[side]});
-  }
-
-  // End faces: the arc of the circular blend is replaced by the section curve.
-  std::vector<TopoDS_Face> rebuilt_ends;
-  std::vector<TopoDS_Shape> old_ends;
-  for (size_t e = 0; e < ends.size(); ++e) {
-    bool done = false;
-    for (const TopoDS_Shape &known : old_ends) done = done || known.IsSame(ends[e].face);
-    if (done) continue;
-    BRepTools_ReShape reshape;
-    std::vector<TopoDS_Edge> fresh;
-    for (const End &end : ends) {
-      if (!end.face.IsSame(ends[e].face)) continue;
-      const TopoDS_Edge forward = TopoDS::Edge(end.old_edge.Oriented(TopAbs_FORWARD));
-      TopoDS_Vertex first, last;
-      TopExp::Vertices(forward, first, last);
-      Handle(Geom_Curve) curve = end.curve;
-      const gp_Pnt head = BRep_Tool::Pnt(first);
-      if (curve->Value(curve->FirstParameter()).Distance(head) > curve->Value(curve->LastParameter()).Distance(head)) curve = curve->Reversed();
-      BRepBuilderAPI_MakeEdge edge(curve, first, last);
-      if (!edge.IsDone()) {
-        why = "the section curve could not be made an edge of the end face";
-        return nullptr;
+      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], surface->VIso(side == 0 ? v0 : v1), {}});
+    // The rails of a mitred blend end at new points: the support faces take the rail curves of the new surface between a shared vertex at each mitre.
+    for (int rail = 0; rail < 2; ++rail) {
+      bool moves[2];
+      for (int end = 0; end < 2; ++end)
+        moves[end] = blend.mitre[end].active && blend.mitre[end].shift[rail == 0 ? 0 : 2].Magnitude() > kStillFraction * diagonal;
+      if (!moves[0] && !moves[1]) continue;
+      const RailPiece &piece = blend.supports[rail][0];
+      Replacement replacement{piece.edge, surface->UIso(rail == 0 ? u0 : u1), {}};
+      for (int end = 0; end < 2; ++end) {
+        if (!moves[end]) continue;
+        auto known = std::find_if(meetings.begin(), meetings.end(), [&](const Meeting &meeting) {
+          return meeting.junction.IsSame(blend.end[end]) && meeting.support.IsSame(piece.face);
+        });
+        if (known == meetings.end()) {
+          BRep_Builder builder;
+          TopoDS_Vertex vertex;
+          builder.MakeVertex(vertex, replacement.curve->Value(end == 0 ? v0 : v1), kGapLimit * diagonal);
+          meetings.push_back({blend.end[end], piece.face, vertex});
+          known = meetings.end() - 1;
+        }
+        replacement.vertex[end] = known->vertex;
       }
-      reshape.Replace(forward, edge.Edge());
-      fresh.push_back(edge.Edge());
+      edit_of(piece.face).replacements.push_back(replacement);
     }
-    const TopoDS_Face face = TopoDS::Face(reshape.Apply(ends[e].face));
-    for (const TopoDS_Edge &edge : fresh) BRepLib::BuildPCurveForEdgeOnPlane(edge, face);
-    rebuilt_ends.push_back(face);
-    old_ends.push_back(ends[e].face);
+  }
+  std::vector<TopoDS_Face> rebuilt;
+  for (const FaceEdit &edit : edits) {
+    TopoDS_Face face;
+    if (!rebuild_face(edit, face, why)) return nullptr;
+    rebuilt.push_back(face);
   }
 
-  // Shell: every face that stays, the new blends and the rebuilt end faces, sewn.
+  // Shell: every face that stays, the new blends and the rebuilt faces, sewn. The tolerance OCCT gave the edges where two blends of a chain meet is
+  // not an input: those edges are made again.
   const TopTools_IndexedMapOfShape circular_faces = query::distinct(circular, TopAbs_FACE);
   double blend_tolerance = 0;
   for (int b = 1; b <= blends.Extent(); ++b)
-    for (TopExp_Explorer it(blends(b), TopAbs_EDGE); it.More(); it.Next()) blend_tolerance = std::max(blend_tolerance, BRep_Tool::Tolerance(TopoDS::Edge(it.Current())));
+    for (TopExp_Explorer it(blends(b), TopAbs_EDGE); it.More(); it.Next()) {
+      const TopoDS_Edge edge = TopoDS::Edge(it.Current());
+      bool between_blends = true;
+      for (TopTools_ListIteratorOfListOfShape owner(edge_faces.FindFromKey(edge)); owner.More(); owner.Next())
+        between_blends = between_blends && blends.Contains(owner.Value());
+      if (!between_blends) blend_tolerance = std::max(blend_tolerance, BRep_Tool::Tolerance(edge));
+    }
   BRepBuilderAPI_Sewing sewing(std::min(std::max(kSewingFraction * diagonal, 2.0 * blend_tolerance), kSewingCap * diagonal));
   std::vector<TopoDS_Face> members;
   std::vector<std::string> member_names;
-  const auto replaced_end = [&](const TopoDS_Shape &face) {
-    return std::any_of(old_ends.begin(), old_ends.end(), [&](const TopoDS_Shape &old) { return old.IsSame(face); });
+  const auto replaced = [&](const TopoDS_Shape &face) {
+    return std::any_of(edits.begin(), edits.end(), [&](const FaceEdit &edit) { return edit.face.IsSame(face); });
   };
   for (int f = 1; f <= circular_faces.Extent(); ++f) {
-    if (blends.Contains(circular_faces(f)) || replaced_end(circular_faces(f))) continue;
+    if (blends.Contains(circular_faces(f)) || replaced(circular_faces(f))) continue;
     members.push_back(TopoDS::Face(circular_faces(f)));
     member_names.push_back(circular_names[static_cast<size_t>(f - 1)]);
   }
@@ -617,16 +557,16 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     members.push_back(skinned[b]);
     member_names.push_back(circular_names[static_cast<size_t>(at - 1)]);
   }
-  for (size_t e = 0; e < rebuilt_ends.size(); ++e) {
-    const int at = circular_faces.FindIndex(old_ends[e]);
+  for (size_t e = 0; e < rebuilt.size(); ++e) {
+    const int at = circular_faces.FindIndex(edits[e].face);
     if (at < 1) {
-      why = "an end face of the circular fillet is not a face of its solid";
+      why = "a face the profile blend rebuilds is not a face of the circular fillet";
       return nullptr;
     }
-    members.push_back(rebuilt_ends[e]);
+    members.push_back(rebuilt[e]);
     member_names.push_back(circular_names[static_cast<size_t>(at - 1)]);
   }
-  const size_t reskinned = skinned.size() + rebuilt_ends.size();
+  const size_t reskinned = skinned.size() + rebuilt.size();
   for (const TopoDS_Face &face : members) sewing.Add(face);
   sewing.Perform();
   const TopoDS_Shape sewn = sewing.SewedShape();
@@ -660,7 +600,17 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   };
   // The section only changes the shape of the corner cut: the volume moves the same way as the circular fillet's, and by a bounded multiple of it
   // (the window and its derivation: kMinVolumeRatio / kMaxVolumeRatio above).
-  const double before = volume_of(shape), after = volume_of(solid), circular_change = before - volume_of(circular), change = before - after;
+  double circular_change = 0;
+  if (std::any_of(faces.begin(), faces.end(), [](const Blend &blend) { return blend.mitre[0].active || blend.mitre[1].active; })) {
+    for (const Blend &blend : faces) {
+      double section_volume = 0;
+      if (!circular_section_volume(blend, section_volume, why)) return nullptr;
+      circular_change += (any_convex ? 1.0 : -1.0) * section_volume;  // a sanity window on the mitred circular sections
+    }
+  } else {
+    circular_change = volume_of(shape) - volume_of(circular);
+  }
+  const double before = volume_of(shape), after = volume_of(solid), change = before - after;
   if (!(after > 0) || (!mixed && (!(circular_change * change > 0) || std::fabs(change) < kMinVolumeRatio * std::fabs(circular_change) ||
                                   std::fabs(change) > kMaxVolumeRatio * std::fabs(circular_change)))) {
     why = "the profile blend changed the volume by " + number(change) + " where the circular fillet changes it by " + number(circular_change) +
@@ -670,7 +620,11 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   // The real gap: along every edge a re-skinned face shares with a neighbour, the distance between the two surfaces at the pcurves of the edge (what
   // check_blends reads as g0), sampled at four times the knots of the blend surfaces there (at least 21 points); and, where both faces are blends of
   // the chain, the angle between their normals (a junction). The tolerance OCCT gives a sewn edge is only a bound and can be many times the gap.
-  double gap = 0, junction = 0;
+  const bool mitred = std::any_of(faces.begin(), faces.end(), [](const Blend &blend) { return blend.mitre[0].active || blend.mitre[1].active; });
+  double gap = 0, junction = 0, crease = 0;
+  struct Over {
+    double excess, largest, allowed;
+  } over{0, 0, 0};  // the junction that exceeds its limit by the most
   const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
   TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
   TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
@@ -679,8 +633,18 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     const TopoDS_Face &member = members[members.size() - reskinned + b];  // the faces that stay come first, then the blends, then the end faces
     blend_images.push_back(sewing.IsModified(member) ? sewing.Modified(member) : member);
   }
-  const auto is_blend = [&](const TopoDS_Face &face) {
-    return std::any_of(blend_images.begin(), blend_images.end(), [&](const TopoDS_Shape &image) { return image.IsSame(face); });
+  const auto blend_index = [&](const TopoDS_Face &face) {
+    for (size_t b = 0; b < blend_images.size(); ++b)
+      if (blend_images[b].IsSame(face)) return static_cast<int>(b);
+    return -1;
+  };
+  // The crease a junction of two blends runs across: the turn the mitre was planned for, 0 when the pair was not mitred (a smooth junction).
+  const auto planned_crease = [&](int one, int two) {
+    for (int side = 0; side < 2; ++side) {
+      const Mitre &mitre = faces[static_cast<size_t>(one)].mitre[side];
+      if (mitre.active && faces[static_cast<size_t>(one)].end_blend[side].IsSame(faces[static_cast<size_t>(two)].face)) return mitre.turn;
+    }
+    return 0.0;
   };
   const auto knots_of = [](const TopoDS_Face &face) {
     const Handle(Geom_BSplineSurface) surface = Handle(Geom_BSplineSurface)::DownCast(BRep_Tool::Surface(face));
@@ -709,32 +673,44 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
       const Handle(Geom2d_Curve) on_second = BRep_Tool::CurveOnSurface(edge, around[1], first2, last2);
       if (on_first.IsNull() || on_second.IsNull()) continue;
       const BRepAdaptor_Surface one(around[0], Standard_False), two(around[1], Standard_False);
-      const bool chain_junction = is_blend(around[0]) && is_blend(around[1]);
+      const int first_blend = blend_index(around[0]), second_blend = blend_index(around[1]);
+      const bool chain_junction = first_blend >= 0 && second_blend >= 0;
       const int samples = std::max(21, 4 * std::max(knots_of(around[0]), knots_of(around[1])));
+      double edge_largest = 0;
       for (int k = 0; k <= samples; ++k) {
         const double u = static_cast<double>(k) / samples;
         const gp_Pnt2d a = on_first->Value(first + (last - first) * u), b = on_second->Value(first2 + (last2 - first2) * u);
         gap = std::max(gap, one.Value(a.X(), a.Y()).Distance(two.Value(b.X(), b.Y())));
         if (!chain_junction) continue;
         const gp_Vec n1 = outward(one, around[0], a), n2 = outward(two, around[1], b);
-        if (n1.Magnitude() > 0.5 && n2.Magnitude() > 0.5) junction = std::max(junction, std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2)))));
+        if (!(n1.Magnitude() > 0.5 && n2.Magnitude() > 0.5)) continue;
+        const double angle = std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2))));
+        edge_largest = std::max(edge_largest, angle);
       }
+      // Where the chain turns (a mitre), the two blends are tangent to two different support faces at one end of their junction, so the angle there
+      // is the crease of the part (the turn the mitre was planned for, from the circular sections), not a defect: only what the junction adds beyond it
+      // is held to the limit. A smooth junction, mitred chain or not, keeps the plain limit.
+      if (!chain_junction) continue;
+      junction = std::max(junction, edge_largest);
+      const double allowance = std::max(planned_crease(first_blend, second_blend), planned_crease(second_blend, first_blend));
+      crease = std::max(crease, allowance);
+      if (edge_largest - allowance - kJunctionAngle > over.excess) over = {edge_largest - allowance - kJunctionAngle, edge_largest, kJunctionAngle + allowance};
     }
   }
   // The acceptance limit is relative to the smaller true box of the source and the result: a fillet that lowers an extreme shrinks the box, and
   // check_blends (mass-properties bounds of the result) must never read a larger gap than the builder accepted.
-  const double accepted = blend::kGapAccepted * kGapLimit * std::min(diagonal, std::max(blend::diagonal_of(solid), 1e-9));
+  const double accepted = blend::kGapAccepted * kGapLimit * std::min(diagonal, std::max(result_diagonal(solid, blend_images), 1e-9));
   if (gap > accepted) {
     why = "the profile faces meet their neighbours only to " + number(gap) + " (limit " + number(accepted) + " = 0.95 x 5e-6 x the smaller bounding-box diagonal of the source and the result): the circular blend OCCT gave is not accurate enough at this size";
     return nullptr;
   }
-  if (junction > kJunctionAngle) {
-    why = "two blends of the chain meet at " + number(junction) + " rad (limit " + number(kJunctionAngle) +
-          " rad, 0.95 x the check_blends default of 0.01): the apex of the section moves with the fold angle, whose derivative jumps where the curvature of a wall jumps";
+  if (over.excess > 0) {
+    why = "two blends of the chain meet at " + number(over.largest) + " rad (limit " + number(over.allowed) +
+          " rad, 0.95 x the check_blends default of 0.01 plus the crease angle of the part at that junction): the apex of the section moves with the fold angle, whose derivative jumps where the curvature of a wall jumps";
     stage = Stage::Junction;
     return nullptr;
   }
-  measured = {gap, accepted, mixed, junction, chain};
+  measured = {gap, accepted, mixed, junction, crease, chain, mitred};
   std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));
   for (size_t m = 0; m < members.size(); ++m) {
     const TopoDS_Shape image = sewing.IsModified(members[m]) ? sewing.Modified(members[m]) : members[m];
@@ -764,9 +740,9 @@ std::unique_ptr<Shape> blend::rails_blend(const Shape &source, rust::Slice<const
     }
   }
   if (!built) return nullptr;
-  if (has_straight_kink(laws)) built->refined_mass = true;
+  if (has_straight_kink(laws) || measured.mitred) built->refined_mass = true;
   JsonWriter out;
-  out.begin_object().key("builder").string("rails").key("gap").number(measured.gap).key("gapLimit").number(measured.limit).key("junctionG1").number(measured.junction).key("mixed").boolean(measured.mixed);
+  out.begin_object().key("builder").string("rails").key("gap").number(measured.gap).key("gapLimit").number(measured.limit).key("junctionG1").number(measured.junction).key("creaseRad").number(measured.crease).key("mixed").boolean(measured.mixed);
   if (!curved_reason.empty()) {
     out.key("fallback").begin_object().key("edges").begin_array();
     for (int index : measured.chain) out.integer(index);

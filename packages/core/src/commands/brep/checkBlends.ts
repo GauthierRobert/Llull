@@ -13,9 +13,10 @@ import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
 import { diagonalOf } from './shapeDiagonal';
 import { recordsByFace } from './blendChains';
-import { junctionsOf } from './blendJunctions';
+import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
 import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
+import { REMEDIATION, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 
 const sig = (value: number): number => roundSignificant(value, 10);
@@ -36,29 +37,6 @@ const FLAT_CURVATURE_FRACTION = 1e-8;
 /** A normal curvature below this fraction of the blend's own scale (1 / its width) is flat for the G2 reading: a curvature-continuous blend meets a plane to the noise of its rails, not exactly. */
 const BLEND_FLAT_FRACTION = 1e-3;
 
-type Severity = 'fail' | 'warn' | 'info';
-
-interface Finding {
-  readonly code: string;
-  readonly severity: Severity;
-  readonly entityId: string;
-  readonly face?: number;
-  readonly edge?: number;
-  readonly value?: number;
-  readonly limit?: number;
-  readonly unit: string;
-  readonly remediation: string;
-  readonly message: string;
-}
-
-interface Tolerances {
-  readonly g0: number;
-  readonly g1AngleRad: number;
-  readonly g2Rel: number;
-  /** Normal curvature (1/unit) below which a face is flat for the G2 reading: relative to the part, not absolute. */
-  readonly flatCurvature?: number;
-}
-
 interface Contact {
   readonly edge: number;
   readonly name?: string;
@@ -68,6 +46,8 @@ interface Contact {
   readonly g1EndAngleRad?: number;
   /** Junctions only: the blend face on the other side. */
   readonly neighbour?: string;
+  /** Junctions across a crease of the part only: the angle between the two blends' normals at the ends of the junction (each is tangent to its own support there); the junction is judged by what g1AngleRad allows beyond it. */
+  readonly creaseRad?: number;
   readonly g2Gap: number;
   readonly g2Rel: number;
   readonly order: string;
@@ -103,19 +83,6 @@ interface EntityCheck {
   /** Why nothing could be measured, when that is so. */
   readonly notRun?: string;
 }
-
-const REMEDIATION = {
-  BLD_CHECK_G0_GAP: 'the faces do not meet at the contact: use a smaller radius or fewer edges per step',
-  BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
-  BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
-  BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
-  BLD_CHECK_RADIUS_LAW:
-    'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',
-  BLD_CHECK_UNVERIFIED_PICK: 'use the native exact kernel (kernel_info), which keeps persistent names',
-  BLD_CHECK_UNVERIFIED_CONTACT: 'rebuild the blend with a smaller radius, or inspect_topology / check_continuity the blend by hand',
-  BLD_CHECK_TOLERANCE_DEFAULTED: 'pass g0, g1AngleRad and g2Rel explicitly to accept them',
-  BLD_CHECK_REVIEW: 'a release check needs a human review of the radii (stress-relevant): sign off through the PLM release',
-} as const;
 
 function checkEntity(
   kernel: GeometryKernel,
@@ -216,7 +183,21 @@ function checkEntity(
     let missed = 0;
     for (const junction of junctionsOf(topology, graph, face.index, chained)) {
       const across = kernel.faceQuery?.edgeContinuity(shape, junction.edge, samples) ?? null;
-      const joint = across === null ? null : measureContact(across, faceTolerances);
+      // Across a crease of the part (a mitre) each blend is tangent to its own support at one end of the junction, so the normals differ there by the
+      // crease of the SUPPORT faces (read from them, not from the blends under test): the junction is held to g1AngleRad beyond it, and each end to the
+      // crease of the supports it touches. A smooth chain has no crease and keeps the plain rule.
+      const neighbourFace = topology.faces.findIndex((candidate) => candidate.name === junction.neighbour);
+      const crease = supportCrease(
+        topology,
+        graph,
+        face.index,
+        neighbourFace,
+        junction.edge,
+        (edge) => kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null,
+      );
+      const verdict = judgeJunction(across ?? [], crease, faceTolerances.g1AngleRad);
+      const jointTolerances: Tolerances = { ...faceTolerances, g1AngleRad: verdict.limit };
+      const joint = across === null ? null : measureContact(across, jointTolerances);
       if (joint === null) {
         missed++;
         continue;
@@ -226,9 +207,23 @@ function checkEntity(
         edge: junction.edge,
         ...(name === undefined ? {} : { name }),
         neighbour: junction.neighbour,
+        ...(crease > 0 ? { creaseRad: sig(crease) } : {}),
         ...roundContact(joint),
       });
-      findings.push(...contactFindings(entityId, face.index, junction.edge, joint, faceTolerances, false, unit));
+      findings.push(...contactFindings(entityId, face.index, junction.edge, joint, jointTolerances, false, unit));
+      if (verdict.endsOff > faceTolerances.g1AngleRad)
+        findings.push({
+          entityId,
+          face: face.index,
+          edge: junction.edge,
+          code: 'BLD_CHECK_G1_ANGLE',
+          severity: 'fail',
+          value: sig(verdict.endsOff),
+          limit: sig(faceTolerances.g1AngleRad),
+          unit: 'rad',
+          remediation: REMEDIATION.BLD_CHECK_G1_ANGLE,
+          message: `an end of junction edge ${junction.edge} differs by ${sig(verdict.endsOff)} rad from the ${sig(crease)} rad crease of the supports there (blend face ${face.index})`,
+        });
     }
     unverifiedJunctions += missed;
     if (missed > 0)
@@ -351,60 +346,6 @@ const roundContact = (contact: ReturnType<typeof measureContact> & object): Omit
   order: contact.order,
 });
 
-function contactFindings(
-  entityId: string,
-  face: number,
-  edge: number,
-  contact: NonNullable<ReturnType<typeof measureContact>>,
-  tolerances: Tolerances,
-  requireG2: boolean,
-  unit: string,
-): Finding[] {
-  const found: Finding[] = [];
-  const at = { entityId, face, edge };
-  if (contact.g0Gap > tolerances.g0)
-    found.push({
-      ...at,
-      code: 'BLD_CHECK_G0_GAP',
-      severity: 'fail',
-      value: sig(contact.g0Gap),
-      limit: sig(tolerances.g0),
-      unit,
-      remediation: REMEDIATION.BLD_CHECK_G0_GAP,
-      message: `faces ${face} and its support are ${sig(contact.g0Gap)} ${unit} apart along edge ${edge}`,
-    });
-  if (contact.g1AngleRad > tolerances.g1AngleRad)
-    found.push({
-      ...at,
-      code: 'BLD_CHECK_G1_ANGLE',
-      severity: 'fail',
-      value: sig(contact.g1AngleRad),
-      limit: sig(tolerances.g1AngleRad),
-      unit: 'rad',
-      remediation: REMEDIATION.BLD_CHECK_G1_ANGLE,
-      message: `the normals differ by ${sig(contact.g1AngleRad)} rad along edge ${edge} (blend face ${face} is not tangent)`,
-    });
-  else if (contact.g2Rel > tolerances.g2Rel)
-    found.push({
-      ...at,
-      code: 'BLD_CHECK_G2_JUMP',
-      severity: requireG2 ? 'fail' : 'info',
-      value: sig(contact.g2Rel),
-      limit: sig(tolerances.g2Rel),
-      unit: 'ratio',
-      remediation: REMEDIATION.BLD_CHECK_G2_JUMP,
-      message: `curvature jumps by ${sig(contact.g2Gap)} 1/${unit} (relative ${sig(contact.g2Rel)}) across edge ${edge}: G1 only`,
-    });
-  return found;
-}
-
-const statusOf = (findings: readonly Finding[]): 'pass' | 'warn' | 'fail' =>
-  findings.some((finding) => finding.severity === 'fail')
-    ? 'fail'
-    : findings.some((finding) => finding.severity === 'warn')
-      ? 'warn'
-      : 'pass';
-
 /**
  * @affects none; data = { status, blends [{ entityId, face, name, kind, sourceEdges, source? (blend_union joints: "joints[i]" or "default"), contacts [{ edge, name?, g0Gap, g1AngleRad, g2Gap, g2Rel, order }], junctions? [{ edge, name?, neighbour, g0Gap, g1AngleRad, ... }] }], findings [{ code, severity, entityId, face?, edge?, value?, limit?, unit, remediation, message }], tolerances, unverified, reviewRequired, reviewReason?, unit, provenance }
  * @invariant kernel-optional: without a kernel, without exact face queries or with no filleted solid the result is status "not_run" (no error); status "fail" when any finding fails, "warn" when any warns, else "pass"; "not_run" without exact face queries; each blend row lists the contacts where it meets its two support faces; a corner patch (kind "corner") lists every edge it shares, measured on the open interior (g1AngleRad) and at its two end points (g1EndAngleRad)
@@ -418,7 +359,7 @@ export const checkBlends = defineCommand({
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +
     '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), ' +
     'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), BLD_CHECK_RADIUS_LAW (fail: the realised radius is off the radius asked for by more than 1e-4 relative; compared for fillet_edge radius laws and for every joint of a blend_union, whose radii are the default radius or the joints pick), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
-    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps). A setback corner patch is a row of kind "corner" listing every edge it shares: G0 over the whole contact against g0Corner, G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
+    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares: G0 over the whole contact against g0Corner, G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
   params: z.object({
     ids: z
       .array(z.string())
