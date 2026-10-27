@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -51,7 +51,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             server/package-lock.json
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: occt
         with:
           path: occt-7.9.2
@@ -61,7 +61,7 @@ jobs:
         run: |
           sudo apt-get install -y ninja-build
           node solver/scripts/build-occt.mjs
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: netgen
         with:
           path: netgen-6.2.2604
@@ -71,7 +71,7 @@ jobs:
         run: |
           sudo apt-get install -y ninja-build
           node solver/scripts/build-netgen.mjs
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -121,7 +121,7 @@ jobs:
             server/package-lock.json
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: occt
         with:
           path: occt-7.9.2
@@ -129,7 +129,7 @@ jobs:
       - name: Build OCCT 7.9.2 shared (cache miss only)
         if: steps.occt.outputs.cache-hit != 'true'
         run: node solver/scripts/build-occt.mjs
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: netgen
         with:
           path: netgen-6.2.2604
@@ -137,7 +137,7 @@ jobs:
       - name: Build Netgen 6.2.2604 shared (cache miss only)
         if: steps.netgen.outputs.cache-hit != 'true'
         run: node solver/scripts/build-netgen.mjs
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -174,7 +174,7 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       # tsc --incremental and prettier --cache state (restored after npm ci, which wipes node_modules).
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules/.cache
           key: static-gates-${{ hashFiles('package-lock.json', 'tsconfig*.json', '.oxlintrc.json', '.prettierrc*') }}-${{ github.sha }}
