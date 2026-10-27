@@ -5,6 +5,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isRecord } from '@lib/isRecord';
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -38,6 +39,102 @@ export async function requestJson(url: string, request: RestRequest = {}): Promi
     ...(hasBody ? { body: JSON.stringify(request.body) } : {}),
     ...(request.timeoutMs !== undefined ? { signal: AbortSignal.timeout(request.timeoutMs) } : {}),
   });
+  return readWhole(response);
+}
+
+export interface CommandStreamRequest {
+  /** Sent as JSON. */
+  readonly body: unknown;
+  readonly token?: string | undefined;
+  /** Longest silence (no progress line, no heartbeat, no byte) before the request is abandoned. */
+  readonly idleTimeoutMs: number;
+  /** Longest whole request, when the caller sets one (`--timeout`). */
+  readonly totalTimeoutMs?: number | undefined;
+  /** Aborting closes the connection: the server cancels the command and its native jobs. */
+  readonly signal?: AbortSignal | undefined;
+  readonly fetchImpl?: FetchLike | undefined;
+  /** Every `progress` line the server streams, parsed. */
+  readonly onProgress?: ((event: Readonly<Record<string, unknown>>) => void) | undefined;
+}
+
+const NDJSON = 'application/x-ndjson';
+
+/** Parse one NDJSON line: a record, or null. */
+function parseLine(line: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(line);
+    return isRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `POST` a command and read the answer as it streams (`Accept: application/x-ndjson`): progress lines go to `onProgress`, the `result` line is the
+ * body. A server (or proxy) that answers plain JSON is read as one body, as `requestJson` does. The idle timeout restarts at every byte, so a command
+ * that runs for minutes is fine while the server keeps reporting; timeouts reject with a `TimeoutError`, an aborted `signal` with an `AbortError`.
+ */
+export async function requestCommandStream(url: string, request: CommandStreamRequest): Promise<RestReply> {
+  const controller = new AbortController();
+  const fail = (name: 'TimeoutError' | 'AbortError', message: string): void => controller.abort(new DOMException(message, name));
+  const idleMessage = `no answer for ${request.idleTimeoutMs / 1000}s`;
+  let idle = setTimeout(() => fail('TimeoutError', idleMessage), request.idleTimeoutMs);
+  const touch = (): void => {
+    clearTimeout(idle);
+    idle = setTimeout(() => fail('TimeoutError', idleMessage), request.idleTimeoutMs);
+  };
+  const totalMs = request.totalTimeoutMs;
+  const total = totalMs === undefined ? undefined : setTimeout(() => fail('TimeoutError', `no answer in ${totalMs / 1000}s`), totalMs);
+  const onAbort = (): void => fail('AbortError', 'cancelled');
+  if (request.signal?.aborted === true) onAbort();
+  request.signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const response = await (request.fetchImpl ?? globalFetch)(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: `${NDJSON}, application/json`,
+        ...(request.token !== undefined ? { Authorization: `Bearer ${request.token}` } : {}),
+      },
+      body: JSON.stringify(request.body),
+      signal: controller.signal,
+    });
+    touch();
+    if (!(response.headers.get('content-type') ?? '').includes(NDJSON) || response.body === null) return await readWhole(response);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    let result: unknown;
+    const line = (text: string): void => {
+      if (text.trim() === '') return;
+      const event = parseLine(text);
+      if (event === null) return;
+      if (event['type'] === 'progress') request.onProgress?.(event);
+      else if (event['type'] === 'result') result = event['result'];
+    };
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      touch();
+      pending += decoder.decode(chunk.value, { stream: true });
+      const lines = pending.split('\n');
+      pending = lines.pop() ?? '';
+      for (const text of lines) line(text);
+    }
+    line(pending + decoder.decode());
+    return {
+      status: response.status,
+      ok: response.ok && result !== undefined,
+      body: result ?? { error: 'the server closed the stream without a result' },
+    };
+  } finally {
+    clearTimeout(idle);
+    if (total !== undefined) clearTimeout(total);
+    request.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+async function readWhole(response: Response): Promise<RestReply> {
   const text = await response.text();
   let body: unknown;
   try {

@@ -11,7 +11,7 @@
 
 use llull_protocol::{emit, Event, Output};
 use llull_raster::Produced;
-use std::io::{stdout, Write};
+use std::io::{stdin, stdout, ErrorKind, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -48,7 +48,7 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
             llull_cloud::job::run(task, Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
         }
         ("geomq", [folder, ..]) => llull_geomq::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
-        ("meshops", [folder, ..]) => llull_meshops::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
+        ("meshops", [folder, ..]) => llull_meshops::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("field", [folder, ..]) => llull_field::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("flow", [folder, ..]) => llull_flow_lbm::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud" | "geomq" | "meshops" | "flow" | "field", _) => {
@@ -58,7 +58,34 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
     }
 }
 
+/// Exit code of a job whose host died (its stdin pipe closed).
+const HOST_GONE_EXIT: i32 = 4;
+
+/// Parent-death watchdog, asked for by the host with `LLULL_EXIT_ON_STDIN_EOF=1`: the host starts the job with a stdin pipe it never writes to and never
+/// closes while it lives, so end of input on stdin means the host is gone (the pipe closes with the process, however it died: a hard kill, a crash,
+/// `process.exit`) and the job stops within milliseconds instead of running on, detached, for its whole timeout. Off by default: other callers give
+/// the job a null stdin, which is at end of input from the start.
+fn exit_when_host_dies() {
+    if std::env::var_os("LLULL_EXIT_ON_STDIN_EOF").is_none_or(|value| value != "1") {
+        return;
+    }
+    std::thread::spawn(|| {
+        let mut buffer = [0u8; 256];
+        let mut input = stdin().lock();
+        loop {
+            match input.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                Err(_) => break,
+            }
+        }
+        std::process::exit(HOST_GONE_EXIT);
+    });
+}
+
 fn main() -> ExitCode {
+    exit_when_host_dies();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) == Some("--version") {
         println!("llull-compute {}", env!("CARGO_PKG_VERSION"));

@@ -11,6 +11,7 @@ import { commandError } from '../noop';
 import { orphanState, withCarriedPmi } from './carry';
 import { kernelRefusal } from '../kernelRefusal';
 import { nextStateKey } from './replayCache';
+import { deferralCount } from '../../geometry/mesh/engine';
 import { hashText } from '../../lib/hash';
 import { remapIds } from './regenerate';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
@@ -167,6 +168,8 @@ export function replayHistory(
   let stateKey = cache
     ? hashText(`${context.feaArtifacts ? 'artifacts' : 'no-artifacts'}|${JSON.stringify({ ...doc, parameters: {}, featureHistory: [] })}`)
     : '';
+  // From the first deferred answer on, the states are placeholders (a native job is still running): none is memoized.
+  const deferralsAtStart = deferralCount();
   for (const step of history) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
@@ -215,7 +218,8 @@ export function replayHistory(
         else delete doc.display;
       }
       const mintedUid = uidBefore === undefined ? mintedIdentity(doc) : undefined;
-      if (mintedUid === undefined) {
+      const deferred = deferralCount() !== deferralsAtStart;
+      if (mintedUid === undefined && !deferred) {
         const state = {
           doc,
           idMap: new Map(idMap),
@@ -225,10 +229,13 @@ export function replayHistory(
         };
         cache?.set(key, state);
         if (parameterFingerprint !== undefined) cache?.set(variantKey, state);
+      } else if (cache && deferred && mintedUid === undefined) {
+        // An engine deferred this step or an earlier one (its result is still being computed): the state is a placeholder the host discards and re-runs. Never memoize it, and key every later state apart from the real one.
+        key = nextStateKey(key, 'deferred', String(deferralCount()), null);
       } else if (cache) {
         // The step minted a globally unique id (uniqueId): never memoize it, and key every later
         // state by that id so no other document is served this document's identity.
-        key = nextStateKey(key, 'minted-uid', mintedUid, null);
+        key = nextStateKey(key, 'minted-uid', mintedUid ?? String(deferralCount()), null);
       }
     }
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;

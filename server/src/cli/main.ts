@@ -9,6 +9,7 @@ import { booleanFlag, missingValueFlag, paramsSource, APP_SERVER, cliTarget, par
 import { createLocalBackend, createRemoteBackend, saveDocumentWithBackup, type CliBackend } from './backend';
 import { describeCommand, listCatalog, searchCatalog, suggestNames, toolsetCounts, type CatalogEntry } from './catalog';
 import { planAliases } from './aliases';
+import { deadlineFromEnv, withDeadline } from './deadline';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
 import { resolveFileRefs } from './fileParams';
@@ -41,6 +42,9 @@ export interface CliIo {
   readonly now?: () => number; // ms clock for step timing and `--timeout`
   readonly readPassphrase?: (prompt: string) => Promise<string | null>; // signing passphrase: an interactive no-echo prompt only (never env, flag or stdin)
   readonly stderrIsTty?: boolean; // stream per-step progress without `--progress`
+  readonly signal?: AbortSignal; // Ctrl-C: cancels the command in flight (local: kills its native mesh jobs; --server: closes the connection)
+  /** Starts listening for Ctrl-C (it aborts `signal`) and returns the stop: asked for only while the loop is free to hear it (a job or a request is awaited), never during a blocking step, where the default action must still end the process. */
+  readonly armInterrupt?: () => () => void;
 }
 
 /** 1 = the command failed or changed nothing (`withFailureStatus`); 2 = bad usage / unreadable input. */
@@ -73,16 +77,17 @@ function timeoutOf(args: ParsedArgv): number | undefined {
 }
 
 function observerOf(args: ParsedArgv, io: CliIo): StepObserver | undefined {
-  if (serverOf(args, io) !== undefined) {
-    if (booleanFlag(args, 'progress')) io.stderr('llull: --progress has no effect with --server (the server runs the plan).');
-    return undefined;
-  }
+  // --server: the server runs the plan, so only its native-job reports reach the observer (`note`); there are no plan steps to time.
   const timeoutSeconds = timeoutOf(args);
   return createStepObserver({
     now: io.now ?? Date.now,
     print: io.stderr,
     progress: booleanFlag(args, 'progress') || io.stderrIsTty === true,
     ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+    // the supervisor's deadline is epoch milliseconds: it is only comparable with the real clock
+    ...(timeoutSeconds !== undefined && io.now === undefined && deadlineFromEnv(io.env) !== undefined
+      ? { deadlineAt: deadlineFromEnv(io.env) as number }
+      : {}),
   });
 }
 
@@ -122,12 +127,19 @@ async function backendOf(args: ParsedArgv, io: CliIo, observer?: StepObserver): 
       token: target.token,
       ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
       ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
+      ...(observer !== undefined ? { onJobProgress: observer.note } : {}),
+      ...(io.signal !== undefined ? { signal: io.signal } : {}),
+      ...(io.armInterrupt !== undefined ? { armInterrupt: io.armInterrupt } : {}),
     });
   }
   await io.prepareKernel();
+  // the supervisor deadline is epoch milliseconds: only comparable with the real clock (as in observerOf)
+  const localSignal = withDeadline(io.signal, timeoutOf(args), io.now === undefined ? deadlineFromEnv(io.env) : undefined);
   return createLocalBackend(docPathOf(args, io), {
     dryRun: booleanFlag(args, 'dry-run'),
     ...(observer !== undefined ? { observer } : {}),
+    ...(localSignal !== undefined ? { signal: localSignal } : {}),
+    ...(io.armInterrupt !== undefined ? { armInterrupt: io.armInterrupt } : {}),
     exchangeOptions: io.exchangeOptions ?? (() => exchangeOptionsWithDwg({ ...io.env })),
   });
 }

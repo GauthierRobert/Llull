@@ -9,7 +9,8 @@ namespace llull_quadflow {
 
 struct QuadParams;
 struct QuadMesh;
+class StageSink;
 
-QuadMesh quad_remesh(rust::Slice<const double> positions, rust::Slice<const std::uint32_t> triangles, const QuadParams &params);
+QuadMesh quad_remesh(rust::Slice<const double> positions, rust::Slice<const std::uint32_t> triangles, const QuadParams &params, StageSink &sink);
 
 }  // namespace llull_quadflow

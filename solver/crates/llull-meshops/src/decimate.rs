@@ -389,8 +389,17 @@ impl Decimator {
     }
 }
 
-/// Decimate a manifold, consistently wound, welded mesh; returns the canonical result and the report.
-pub fn decimate(positions: &[f64], triangles: &[u32], params: &DecimateParams) -> (Vec<f64>, Vec<u32>, DecimateReport) {
+/// Heap pops between two `progress` calls of [`decimate`].
+const PROGRESS_EVERY: u64 = 2048;
+
+/// Decimate a manifold, consistently wound, welded mesh; returns the canonical result and the report. `progress` is told the share of the collapse
+/// loop done (0 to 1) now and then; it never changes the result.
+pub fn decimate(
+    positions: &[f64],
+    triangles: &[u32],
+    params: &DecimateParams,
+    progress: &mut dyn FnMut(f64),
+) -> (Vec<f64>, Vec<u32>, DecimateReport) {
     let mesh = EditMesh::new(positions, triangles);
     let triangles_before = mesh.live_faces;
     let diag = diagonal(positions);
@@ -484,7 +493,18 @@ pub fn decimate(positions: &[f64], triangles: &[u32], params: &DecimateParams) -
     let mut collapses: u64 = 0;
     let mut max_cost = 0.0f64;
     let mut exhausted = true;
+    let initial_pairs = state.heap.items.len().max(1);
+    let mut pops: u64 = 0;
     while !state.heap.items.is_empty() {
+        pops += 1;
+        if pops.is_multiple_of(PROGRESS_EVERY) {
+            let done = if target > 0 && triangles_before > target {
+                (triangles_before - state.mesh.live_faces.min(triangles_before)) as f64 / (triangles_before - target) as f64
+            } else {
+                1.0 - state.heap.items.len() as f64 / initial_pairs as f64
+            };
+            progress(done.clamp(0.0, 1.0));
+        }
         if target > 0 && state.mesh.live_faces <= target {
             exhausted = false;
             break;

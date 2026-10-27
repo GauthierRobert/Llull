@@ -228,13 +228,14 @@ fn free_vertices(positions: &[f64], triangles: &[u32], params: &SmoothParams) ->
 }
 
 /// Smooth `positions` (welded, `triangles`); returns the new positions and the report.
-pub fn smooth(positions: &[f64], triangles: &[u32], params: &SmoothParams) -> (Vec<f64>, SmoothReport) {
+pub fn smooth(positions: &[f64], triangles: &[u32], params: &SmoothParams, progress: &mut dyn FnMut(f64)) -> (Vec<f64>, SmoothReport) {
     let vertex_count = positions.len() / 3;
     let free = free_vertices(positions, triangles, params);
     let graph = if params.cotangent { cotangent_graph(positions, triangles) } else { uniform_graph(vertex_count, triangles) };
     let mu = params.taubin.then(|| 1.0 / (params.pass_band - 1.0 / params.lambda));
     let mut current = positions.to_vec();
-    for _ in 0..params.iterations {
+    for iteration in 0..params.iterations {
+        progress(iteration as f64 / params.iterations as f64);
         current = umbrella_step(&current, &graph, params.lambda, &free);
         if let Some(mu) = mu {
             current = umbrella_step(&current, &graph, mu, &free);

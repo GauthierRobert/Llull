@@ -11,6 +11,7 @@ import { type CommandRun, runCommandOutcome } from '@protocol/commandOutcome';
 import { fillHostParams } from '@protocol/hostParams';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
 import { serverContext } from '../fea/context';
+import { resolveDeferred, type Refusal, type ResolveOptions } from '../native/deferredRun';
 import { type AuditLog, appendSafely, auditDir, createAuditLog, paramsHash } from './auditChain';
 
 function hostUser(env: NodeJS.ProcessEnv): string {
@@ -51,34 +52,97 @@ export interface HostRunOptions {
   readonly onStep?: Parameters<typeof serverContext>[0];
 }
 
-/**
- * Run `name` on `prior` (returns the params as filled, signatures replaced by `{ verified: true }`: what live sync may log); every mutation and every
- * refusal reaches the audit chain (queries that succeed do not). An audit failure never fails the command.
- */
-export function runHostCommand(
-  prior: CadDocument,
-  name: string,
-  params: unknown,
-  options: HostRunOptions,
-): CommandRun & { readonly params: unknown } {
-  const env = options.env ?? process.env;
+export type HostRun = CommandRun & { readonly params: unknown };
+
+/** Audit-chain entry of a finished run: every mutation and every refusal (queries that succeed do not). An audit failure never fails the command. */
+function audit(name: string, loggable: unknown, outcome: CommandRun['outcome'], options: HostRunOptions): void {
   const now = options.now ?? ((): Date => new Date());
-  const filled = fillServerParams(name, params, now(), env);
-  const run = runCommandOutcome(prior, name, filled, serverContext(options.onStep));
-  const loggable = withoutConfirmations(filled);
   const readOnly = getCommand(name)?.annotations?.readOnly === true;
-  const log = !readOnly || run.outcome.isError ? auditLogOf() : null;
+  const log = !readOnly || outcome.isError ? auditLogOf() : null;
   if (log !== null)
     appendSafely(log, {
       ts: now().toISOString(),
       source: options.source,
       command: name,
       paramsSha256: paramsHash(loggable),
-      summary: run.outcome.summary.slice(0, 500),
-      changed: run.outcome.changed,
-      rejected: run.outcome.isError,
-      affectedCount: run.outcome.affected.length,
-      ...(run.outcome.error !== undefined ? { errorCode: run.outcome.error.code } : {}),
+      summary: outcome.summary.slice(0, 500),
+      changed: outcome.changed,
+      rejected: outcome.isError,
+      affectedCount: outcome.affected.length,
+      ...(outcome.error !== undefined ? { errorCode: outcome.error.code } : {}),
     });
+}
+
+function filledParams(name: string, params: unknown, options: HostRunOptions): unknown {
+  return fillServerParams(name, params, (options.now ?? ((): Date => new Date()))(), options.env ?? process.env);
+}
+
+/**
+ * Run `name` on `prior` (returns the params as filled, signatures replaced by `{ verified: true }`: what live sync may log); every mutation and every
+ * refusal reaches the audit chain (queries that succeed do not). An audit failure never fails the command.
+ * Synchronous: for the host's own fixed commands. A command that may ask for a native mesh job goes through `runHostCommandResolved`.
+ */
+export function runHostCommand(prior: CadDocument, name: string, params: unknown, options: HostRunOptions): HostRun {
+  const filled = filledParams(name, params, options);
+  const run = runCommandOutcome(prior, name, filled, serverContext(options.onStep));
+  const loggable = withoutConfirmations(filled);
+  audit(name, loggable, run.outcome, options);
   return { ...run, params: loggable };
+}
+
+/** The run of a resolve that ended without committing anything (cancelled, job limit, protocol bug): `document` unchanged, an error outcome that names the refusal. */
+export function refusedRun(document: CadDocument, refusal: Refusal): CommandRun {
+  return {
+    document,
+    outcome: {
+      summary: refusal.message,
+      affected: [],
+      isError: true,
+      changed: false,
+      error: { code: refusal.code, ids: [], paths: [], remediation: refusal.remediation },
+    },
+  };
+}
+
+export interface ResolvedRunOptions extends HostRunOptions, Omit<ResolveOptions, 'commit' | 'refuse'> {
+  /** Called synchronously with the run that stands, in the same tick as that run (no other command can change the document in between): the caller commits the new document here. */
+  readonly commit?: (run: HostRun & { readonly prior: CadDocument }) => void;
+}
+
+/**
+ * `runHostCommand` for a command that may need native mesh jobs (TECHNICAL_SPEC 13.8): the command runs against `priorOf()` (read afresh on every
+ * run, so the run that stands sees the document as it is when the jobs are done), the jobs it asks for are awaited without blocking the event
+ * loop (progress to `onProgress`, `signal` cancels), and only the run that asked for nothing is audited, committed (`commit`) and returned.
+ */
+export async function runHostCommandResolved(
+  priorOf: () => CadDocument,
+  name: string,
+  params: unknown,
+  options: ResolvedRunOptions,
+): Promise<HostRun & { readonly prior: CadDocument }> {
+  const filled = filledParams(name, params, options);
+  const loggable = withoutConfirmations(filled);
+  let prior = priorOf();
+  const settled = (run: CommandRun): HostRun & { readonly prior: CadDocument } => ({ ...run, params: loggable, prior });
+  return resolveDeferred(
+    () => {
+      prior = priorOf();
+      return runCommandOutcome(prior, name, filled, serverContext(options.onStep));
+    },
+    {
+      ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+      ...(options.maxJobs !== undefined ? { maxJobs: options.maxJobs } : {}),
+      ...(options.onWaitStart !== undefined ? { onWaitStart: options.onWaitStart } : {}),
+      ...(options.onWaitEnd !== undefined ? { onWaitEnd: options.onWaitEnd } : {}),
+      refuse: (refusal) => {
+        prior = priorOf();
+        return refusedRun(prior, refusal);
+      },
+      commit: (run) => {
+        audit(name, loggable, run.outcome, options);
+        options.commit?.(settled(run));
+      },
+    },
+  ).then(settled);
 }

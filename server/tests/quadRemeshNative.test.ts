@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import type { ExecutionContext } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { type CadDocument, type Entity, type MeshSolidEntity, type SubdivisionEntity } from '@core/model/types';
@@ -17,6 +17,7 @@ import { cuboid, docWithMeshes, icosphere, torus } from '../../tests/helpers/mes
 import { tessellatedBox } from '../../tests/helpers/quadFixtures';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
+import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
 import { describeNative, leaf, liveKernels } from './kernelTestSupport';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -24,6 +25,9 @@ if (BINARY === null) console.warn('quadRemeshNative: llull-compute not built (ca
 const native = BINARY === null ? it.skip : it;
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 const context = (): ExecutionContext => ({ ...defaultContext(), meshProcessing: engine });
+/** `execute` as the host runs it: the native job is awaited between two runs of the command (TECHNICAL_SPEC 13.8). */
+const exec = (doc: CadDocument, name: string, params: unknown, ctx: ExecutionContext = context()): Promise<CommandResult> =>
+  resolveDeferred(() => execute(doc, name, params, ctx));
 
 type Data = Record<string, unknown>;
 type Deviation = { hausdorff: number; mean: number };
@@ -33,10 +37,10 @@ const SPHERE_VOLUME = (4 / 3) * Math.PI * 1000;
 const SPHERE_AREA = 4 * Math.PI * 100;
 
 describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
-  native('icosphere l4 R10, 600 quads: all quads, eight corners, 15 % of the target, 0.1 mm from the source', () => {
+  native('icosphere l4 R10, 600 quads: all quads, eight corners, 15 % of the target, 0.1 mm from the source', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
     const started = performance.now();
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
     const seconds = (performance.now() - started) / 1000;
     expect(result.error).toBeUndefined();
     const cage = cageOf(result.document, result.affected[0] as string);
@@ -62,16 +66,16 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
 
   // The exact histogram is a property of the reference build only: floating-point code generation differs between compilers and CPUs.
   const reference = BINARY !== null && process.platform === 'win32' && process.arch === 'x64' ? it : it.skip;
-  reference('reference build (win32-x64, MSVC): the l4 icosphere at 600 quads has valence {3: 8, 4: 608}', () => {
+  reference('reference build (win32-x64, MSVC): the l4 icosphere at 600 quads has valence {3: 8, 4: 608}', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
     expect(dataOf(result)['quads']).toBe(614);
     expect(dataOf(result)['valence']).toEqual({ '3': 8, '4': 608 });
   });
 
-  native('adaptiveSize on (graded quads) passes the on-source check and stays a closed all-quad sphere', () => {
+  native('adaptiveSize on (graded quads) passes the on-source check and stays a closed all-quad sphere', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 5));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600, adaptiveSize: 50 }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600, adaptiveSize: 50 }, context());
     expect(result.error, result.summary).toBeUndefined();
     const data = dataOf(result);
     const valence = data['valence'] as Record<string, number>;
@@ -79,16 +83,16 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
     expect((data['deviation'] as Deviation).hausdorff).toBeLessThan(0.15);
   });
 
-  native('the same input and parameters give the same cage (replay)', () => {
+  native('the same input and parameters give the same cage (replay)', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 3));
-    const run = (): string =>
-      JSON.stringify(execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300 }, context()).document);
-    expect(run()).toBe(run());
+    const run = async (): Promise<string> =>
+      JSON.stringify((await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300 }, context())).document);
+    expect(await run()).toBe(await run());
   });
 
-  native('targetEdgeLength: 1.5 mm on R10 asks for area / 1.5^2 quads', () => {
+  native('targetEdgeLength: 1.5 mm on R10 asks for area / 1.5^2 quads', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetEdgeLength: 1.5, output: 'mesh' }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetEdgeLength: 1.5, output: 'mesh' }, context());
     expect(result.error).toBeUndefined();
     const data = dataOf(result);
     expect(data['targetQuads']).toBe(Math.round((data['areaBefore'] as number) / 2.25));
@@ -96,9 +100,9 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
     expect(data['targetRatio'] as number).toBeLessThan(1.15);
   });
 
-  native('output mesh: a closed triangle mesh of the quads, within 0.1 mm of the source', () => {
+  native('output mesh: a closed triangle mesh of the quads, within 0.1 mm of the source', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600, output: 'mesh' }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600, output: 'mesh' }, context());
     const mesh = result.document.entities[result.affected[0] as string] as MeshSolidEntity;
     expect(mesh.mesh.indices.length / 3).toBe(2 * (dataOf(result)['quads'] as number));
     const analysis = execute(result.document, 'analyze_mesh', { id: mesh.id, selfIntersections: false });
@@ -107,34 +111,34 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
     expect((dataOf(result)['deviation'] as Deviation).hausdorff).toBeLessThan(0.1);
   });
 
-  native('a box: hard edges become the 12 x n creases and the cage keeps the volume', () => {
+  native('a box: hard edges become the 12 x n creases and the cage keeps the volume', async () => {
     const { doc, ids } = docWithMeshes(cuboid([-5, -5, -5], [5, 5, 5]));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300, output: 'mesh' }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300, output: 'mesh' }, context());
     expect(result.error).toBeUndefined();
     const analysis = execute(result.document, 'analyze_mesh', { id: result.affected[0] as string, selfIntersections: false });
     expect(Math.abs((dataOf(analysis)['volume'] as number) / 1000 - 1)).toBeLessThan(0.005);
-    const cage = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300 }, context());
+    const cage = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300 }, context());
     const creases = cageOf(cage.document, cage.affected[0] as string).creases;
     expect(creases.length).toBeGreaterThanOrEqual(12 * 3);
     expect(dataOf(cage)['creases']).toBe(creases.length);
-    const smooth = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300, detectHardEdgesDeg: 0 }, context());
+    const smooth = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 300, detectHardEdgesDeg: 0 }, context());
     expect(cageOf(smooth.document, smooth.affected[0] as string).creases).toHaveLength(0);
   });
 
-  native('a finely tessellated box (20 x 20 per face) gets the same 12 x n creases as the 12-triangle box', () => {
+  native('a finely tessellated box (20 x 20 per face) gets the same 12 x n creases as the 12-triangle box', async () => {
     const coarse = docWithMeshes(cuboid([-5, -5, -5], [5, 5, 5]));
     const fine = docWithMeshes(tessellatedBox(5, 20));
-    const creasesOf = (setup: { doc: CadDocument; ids: string[] }): number => {
-      const result = execute(setup.doc, 'quad_remesh', { id: setup.ids[0] as string, targetQuadCount: 300 }, context());
+    const creasesOf = async (setup: { doc: CadDocument; ids: string[] }): Promise<number> => {
+      const result = await exec(setup.doc, 'quad_remesh', { id: setup.ids[0] as string, targetQuadCount: 300 }, context());
       expect(result.error).toBeUndefined();
       return cageOf(result.document, result.affected[0] as string).creases.length;
     };
-    const [coarseCreases, fineCreases] = [creasesOf(coarse), creasesOf(fine)];
+    const [coarseCreases, fineCreases] = [await creasesOf(coarse), await creasesOf(fine)];
     expect(coarseCreases).toBeGreaterThanOrEqual(12 * 3);
     expect(fineCreases).toBe(coarseCreases);
   });
 
-  native('two disjoint spheres, the second one inside out: two shells, both outward in the result', () => {
+  native('two disjoint spheres, the second one inside out: two shells, both outward in the result', async () => {
     const first = icosphere(5, 3, [0, 0, 0]);
     const second = icosphere(5, 3, [20, 0, 0]);
     const reversed = second.indices.flatMap((_, i, all) => (i % 3 === 0 ? [all[i], all[i + 2], all[i + 1]] : []));
@@ -144,7 +148,7 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
       indices: [...first.indices, ...reversed.map((i) => (i as number) + offset)],
     };
     const { doc, ids } = docWithMeshes(mesh);
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 200, output: 'mesh' }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 200, output: 'mesh' }, context());
     expect(result.error, result.summary).toBeUndefined();
     const analysis = dataOf(execute(result.document, 'analyze_mesh', { id: result.affected[0] as string, selfIntersections: false }));
     expect(analysis).toMatchObject({ closed: true, shellCount: 2 });
@@ -153,29 +157,30 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
     expect(valence['3'] ?? 0).toBeGreaterThanOrEqual(16);
   });
 
-  native('a torus (genus 1) gives vertices = quads (Euler characteristic 0) and no crease on a smooth surface', () => {
+  native('a torus (genus 1) gives vertices = quads (Euler characteristic 0) and no crease on a smooth surface', async () => {
     const { doc, ids } = docWithMeshes(torus(10, 3, 48, 24));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 400 }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 400 }, context());
     expect(result.error).toBeUndefined();
     const cage = cageOf(result.document, result.affected[0] as string);
     expect(cage.vertices.length).toBe(cage.faces.length);
     expect(cage.creases).toHaveLength(0);
   });
 
-  native('refuses what QuadriFlow cannot take, with the engine codes and the document untouched', () => {
+  native('refuses what QuadriFlow cannot take, with the engine codes and the document untouched', async () => {
     const flipped = icosphere(10, 3);
     [flipped.indices[0], flipped.indices[1]] = [flipped.indices[1] as number, flipped.indices[0] as number];
     const { doc, ids } = docWithMeshes(flipped);
-    const refused = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 100 }, context());
+    const refused = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 100 }, context());
     expect(refused.affected).toHaveLength(0);
     expect(refused.document).toBe(doc);
     expect(refused.error?.code).toBe('MESH_ORIENTATION_INCONSISTENT');
   });
 
-  native('LLULL_MESH_OP_TIMEOUT_S caps the job: MESH_TIMEOUT, document untouched', () => {
+  native('LLULL_MESH_OP_TIMEOUT_S caps the job: MESH_TIMEOUT, document untouched', async () => {
+    _clearResultCache(); // an earlier test made the same job: its kept result would answer before the timeout
     const impatient = createNativeMeshEngine({ binary: BINARY as string, env: { ...process.env, LLULL_MESH_OP_TIMEOUT_S: '0.001' } });
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
-    const result = execute(
+    const result = await exec(
       doc,
       'quad_remesh',
       { id: ids[0] as string, targetQuadCount: 600 },
@@ -187,10 +192,10 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
 
   native(
     'a mesh too small for the target (a tetrahedron asked for 6 quads) is a clean MESH_QUAD_REMESH_FAILED with a reason, never a dead job',
-    () => {
+    async () => {
       const tetrahedron = { positions: [1, 1, 1, 1, -1, -1, -1, 1, -1, -1, -1, 1], indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3] };
       const { doc, ids } = docWithMeshes(tetrahedron);
-      const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 6 }, context());
+      const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 6 }, context());
       expect(result.document).toBe(doc);
       expect(result.error?.code).toBe('MESH_QUAD_REMESH_FAILED');
       // The same four triangles reach the engine renumbered (the host welds into first-use vertex order and winds outward). The Rust call with the raw
@@ -204,9 +209,9 @@ describe('quad_remesh on the native engine (VC-MSH-22, quad part)', () => {
 describeNative('quad_remesh cage on the native OCC kernel (VC-MSH-22, B-spline part)', () => {
   const kernels = liveKernels();
 
-  native('the cage of the l4 icosphere becomes one bicubic B-spline face per refined quad, a closed solid near the sphere', () => {
+  native('the cage of the l4 icosphere becomes one bicubic B-spline face per refined quad, a closed solid near the sphere', async () => {
     const { doc, ids } = docWithMeshes(icosphere(10, 4));
-    const result = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
+    const result = await exec(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 600 }, context());
     const id = result.affected[0] as string;
     const cage = cageOf(result.document, id);
     const shape = kernels.occt.evaluate(leaf(cage as Entity));

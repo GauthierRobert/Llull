@@ -72,7 +72,7 @@ fn decimating_a_flat_grid_keeps_the_area_and_stops_at_the_locked_boundary() {
     let dir = folder("flat");
     let (positions, indices) = grid(12, |_, _| 0.0);
     write_job(&dir, &json!({ "op": "decimate", "params": { "targetTriangles": 40, "preserveBoundary": true } }), &positions, &indices);
-    let outputs = run(&dir).unwrap();
+    let outputs = run(&dir, &mut std::io::sink()).unwrap();
     assert_eq!(outputs.len(), 3);
     let (out_positions, out_indices, report) = read_result(&dir);
     assert!((area(&out_positions, &out_indices) - 100.0).abs() < 1e-9);
@@ -93,7 +93,7 @@ fn decimate_honours_a_target_a_deviation_bound_features_and_a_locked_region() {
         &positions,
         &indices,
     );
-    run(&dir).unwrap();
+    run(&dir, &mut std::io::sink()).unwrap();
     let (_, out_indices, report) = read_result(&dir);
     assert!(out_indices.len() < indices.len());
     assert!(report["report"]["collapses"].as_u64().unwrap() > 0);
@@ -106,7 +106,7 @@ fn smoothing_with_volume_correction_keeps_the_volume_of_a_closed_mesh() {
     let dir = folder("smooth");
     let params = json!({ "taubin": false, "lambda": 0.5, "passBand": 0.1, "iterations": 3, "cotangent": false, "fixBoundary": true, "volumeCorrection": true });
     write_job(&dir, &json!({ "op": "smooth", "params": params }), &positions, &indices);
-    run(&dir).unwrap();
+    run(&dir, &mut std::io::sink()).unwrap();
     let (out_positions, out_indices, report) = read_result(&dir);
     assert_eq!(out_indices, indices);
     assert_eq!(report["report"]["volumeCorrected"], json!(true));
@@ -127,7 +127,7 @@ fn smoothing_variants_run_on_an_open_patch() {
             "fixBoundary": fix, "volumeCorrection": true, "region": { "center": [5.0, 5.0, 0.0], "radius": 4.0 }
         });
         write_job(&dir, &json!({ "op": "smooth", "params": params }), &positions, &indices);
-        run(&dir).unwrap();
+        run(&dir, &mut std::io::sink()).unwrap();
         let (_, _, report) = read_result(&dir);
         assert_eq!(report["report"]["volumeCorrected"], json!(false));
         assert!(report["report"]["maxDisplacement"].as_f64().unwrap() >= 0.0);
@@ -140,19 +140,19 @@ fn jobs_refuse_bad_input_with_stable_codes() {
     let (positions, indices) = octahedron();
     let dir = folder("bad");
     write_job(&dir, &json!({ "op": "wrap", "params": {} }), &positions, &indices);
-    assert_eq!(run(&dir).unwrap_err().code, "NATIVE_JOB_INPUT");
+    assert_eq!(run(&dir, &mut std::io::sink()).unwrap_err().code, "NATIVE_JOB_INPUT");
     write_job(&dir, &json!({ "op": "decimate", "params": { "preserveBoundary": true } }), &positions, &[0, 1, 99, 0, 1, 2]);
-    assert!(run(&dir).unwrap_err().message.contains("not below"));
+    assert!(run(&dir, &mut std::io::sink()).unwrap_err().message.contains("not below"));
     let mut nan = positions.clone();
     nan[0] = f64::NAN;
     write_job(&dir, &json!({ "op": "decimate", "params": { "preserveBoundary": true } }), &nan, &indices);
-    assert!(run(&dir).unwrap_err().message.contains("non-finite"));
+    assert!(run(&dir, &mut std::io::sink()).unwrap_err().message.contains("non-finite"));
     write_job(&dir, &json!({ "op": "decimate", "params": {} }), &positions, &indices);
-    assert_eq!(run(&dir).unwrap_err().code, "NATIVE_JOB_INPUT");
+    assert_eq!(run(&dir, &mut std::io::sink()).unwrap_err().code, "NATIVE_JOB_INPUT");
     fs::write(dir.join("positions.f64"), [0u8; 7]).unwrap();
-    assert!(run(&dir).unwrap_err().message.contains("whole number"));
+    assert!(run(&dir, &mut std::io::sink()).unwrap_err().message.contains("whole number"));
     fs::remove_file(dir.join("job.json")).unwrap();
-    assert_eq!(run(&dir).unwrap_err().code, "NATIVE_JOB_IO");
+    assert_eq!(run(&dir, &mut std::io::sink()).unwrap_err().code, "NATIVE_JOB_IO");
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn deviation_of_parallel_grids_is_the_offset_both_ways() {
     write_job(&dir, &json!({ "op": "deviation", "params": { "maxSamples": 20000 } }), &positions, &indices);
     fs::write(dir.join("positions_b.f64"), lifted.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
     fs::write(dir.join("indices_b.u32"), indices.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
-    let outputs = run(&dir).unwrap();
+    let outputs = run(&dir, &mut std::io::sink()).unwrap();
     assert_eq!(outputs.len(), 1);
     let report: Value = serde_json::from_slice(&fs::read(dir.join("report.json")).unwrap()).unwrap();
     let d = &report["report"];
@@ -174,5 +174,50 @@ fn deviation_of_parallel_grids_is_the_offset_both_ways() {
     assert_eq!(d["histogram"][9], d["samples"]);
     // an empty second mesh is refused
     fs::write(dir.join("indices_b.u32"), []).unwrap();
-    assert!(run(&dir).unwrap_err().message.contains("without triangles"));
+    assert!(run(&dir, &mut std::io::sink()).unwrap_err().message.contains("without triangles"));
+}
+
+fn events(bytes: &[u8]) -> Vec<Value> {
+    String::from_utf8(bytes.to_vec()).unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect()
+}
+
+#[test]
+fn every_op_reports_read_then_its_stage_then_write_with_rising_fractions() {
+    let (positions, indices) = grid(40, |x, y| (x / 2.0).sin() * (y / 3.0).cos());
+    let smooth = json!({ "taubin": false, "lambda": 0.5, "passBand": 0.1, "iterations": 3, "cotangent": false, "fixBoundary": true, "volumeCorrection": false });
+    for (name, job, stage) in [
+        ("progress-decimate", json!({ "op": "decimate", "params": { "targetTriangles": 200, "preserveBoundary": true } }), "decimate"),
+        ("progress-smooth", json!({ "op": "smooth", "params": smooth }), "smooth"),
+        ("progress-deviation", json!({ "op": "deviation", "params": { "maxSamples": 1000 } }), "deviation"),
+    ] {
+        let dir = folder(name);
+        write_job(&dir, &job, &positions, &indices);
+        if stage == "deviation" {
+            fs::write(dir.join("positions_b.f64"), fs::read(dir.join("positions.f64")).unwrap()).unwrap();
+            fs::write(dir.join("indices_b.u32"), fs::read(dir.join("indices.u32")).unwrap()).unwrap();
+        }
+        let mut out = Vec::new();
+        run(&dir, &mut out).unwrap();
+        let seen = events(&out);
+        let stages: Vec<&str> = seen.iter().filter_map(|e| e["stage"].as_str()).collect();
+        assert_eq!(stages.first(), Some(&"read"), "{name}");
+        assert_eq!(stages.last(), Some(&"write"), "{name}");
+        assert!(stages.contains(&stage), "{name}: {stages:?}");
+        assert!(seen.iter().all(|e| e["type"] == "progress" && e["total"] == json!(3) && e["elapsedMs"].is_u64()), "{name}");
+        let fractions: Vec<f64> = seen.iter().map(|e| e["fraction"].as_f64().unwrap()).collect();
+        assert!(
+            fractions.windows(2).all(|pair| pair[0] <= pair[1]) && fractions.iter().all(|f| (0.0..=1.0).contains(f)),
+            "{name}: {fractions:?}"
+        );
+    }
+}
+
+#[test]
+fn a_failed_job_has_only_progress_events_before_its_error() {
+    let (positions, indices) = octahedron();
+    let dir = folder("progress-bad");
+    write_job(&dir, &json!({ "op": "wrap", "params": {} }), &positions, &indices);
+    let mut out = Vec::new();
+    assert_eq!(run(&dir, &mut out).unwrap_err().code, "NATIVE_JOB_INPUT");
+    assert!(events(&out).iter().all(|e| e["type"] == "progress"));
 }

@@ -47,6 +47,19 @@ export interface ProcessSpec {
   readonly tailBytes?: number;
   /** Sees every stdout chunk (the tail is then not kept); returning `false` kills the tree and ends the run with `aborted`. */
   readonly onStdout?: (chunk: Buffer) => boolean | void;
+  /** Aborting kills the tree and ends the run with `cancelled` (async runner only). */
+  readonly signal?: AbortSignal;
+  /**
+   * Windows: start the child detached (own process group, no console, still no window: windowsHide), so a console Ctrl-C reaches only this process and
+   * only `killProcessTree` stops the child. Elsewhere every child already leads its own group. Off by default: tools that expect a console keep it.
+   */
+  readonly ownProcessGroup?: boolean;
+  /**
+   * Start the child with a stdin pipe the host never writes to and never closes while it lives. A detached child is not in the host's kill-on-close job
+   * on Windows and outlives a hard kill of the host; the pipe closes with the host however it died, and a child that reads it (`llull-compute` with
+   * `LLULL_EXIT_ON_STDIN_EOF=1`) exits on that end of input.
+   */
+  readonly holdStdin?: boolean;
 }
 
 export interface ProcessOutcome extends ProcessResult {
@@ -54,6 +67,8 @@ export interface ProcessOutcome extends ProcessResult {
   readonly stderr: string;
   /** `onStdout` returned false (or the sync output cap was hit). */
   readonly aborted: boolean;
+  /** `signal` was aborted before the child ended on its own. */
+  readonly cancelled: boolean;
   /** `error.code` of a start failure (ENOENT, EACCES, ...). */
   readonly startErrorCode?: string;
 }
@@ -82,20 +97,27 @@ export interface ProcessRunnerHooks {
   readonly platform: NodeJS.Platform;
 }
 
-/** Kill the process tree rooted at `child` (never by image name). */
-function killProcessTree(child: ChildProcess, platform: NodeJS.Platform = process.platform): void {
-  const pid = child.pid;
-  if (pid === undefined) return;
+/**
+ * Kill the process tree rooted at `pid` (never by image name): `taskkill /T /F /PID` on Windows (the parent links find detached descendants too), the
+ * process group elsewhere. `fallback` runs when the tree kill cannot be done (no such group, taskkill missing).
+ */
+export function killPidTree(pid: number, fallback: () => void, platform: NodeJS.Platform = process.platform): void {
   if (platform === 'win32') {
     const killer = spawn('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
-    killer.on('error', () => child.kill('SIGKILL'));
+    killer.on('error', fallback);
     return;
   }
   try {
     process.kill(-pid, 'SIGKILL');
   } catch {
-    child.kill('SIGKILL');
+    fallback();
   }
+}
+
+/** Kill the process tree rooted at `child`. */
+export function killProcessTree(child: ChildProcess, platform: NodeJS.Platform = process.platform): void {
+  if (child.pid === undefined) return;
+  killPidTree(child.pid, () => void child.kill('SIGKILL'), platform);
 }
 
 const REAL_HOOKS: ProcessRunnerHooks = {
@@ -111,16 +133,23 @@ const REAL_HOOKS: ProcessRunnerHooks = {
   platform: process.platform,
 };
 
+/** `holdStdin` keeps the pipe open and unwritten; `input` writes and closes it: asking for both is a programming error. */
+function refuseHeldStdinWithInput(spec: { readonly input?: string | undefined; readonly holdStdin?: boolean | undefined }): void {
+  if (spec.holdStdin === true && spec.input !== undefined)
+    throw new Error('runProcess: holdStdin and input cannot be combined (input closes the pipe holdStdin keeps open)');
+}
+
 /** Run one tracked child to completion, timeout or abort; never rejects. */
 export function runProcess(spec: ProcessSpec, hooks: ProcessRunnerHooks = REAL_HOOKS): Promise<ProcessOutcome> {
+  refuseHeldStdinWithInput(spec);
   return new Promise((resolve) => {
     const tailBytes = spec.tailBytes ?? LOG_TAIL_BYTES;
     const child = trackChild(
       hooks.spawnProcess(spec.executable, spec.args, {
         cwd: spec.cwd,
         env: spec.env,
-        detached: hooks.platform !== 'win32',
-        pipeInput: spec.input !== undefined,
+        detached: hooks.platform !== 'win32' || spec.ownProcessGroup === true,
+        pipeInput: spec.input !== undefined || spec.holdStdin === true,
       }),
     );
     const onStdout = spec.onStdout;
@@ -128,6 +157,7 @@ export function runProcess(spec: ProcessSpec, hooks: ProcessRunnerHooks = REAL_H
     const stderr = captureTail(child.stderr, tailBytes);
     let timedOut = false;
     let aborted = false;
+    let cancelled = false;
     let settled = false;
     let drain: NodeJS.Timeout | undefined;
     const finish = (outcome: ProcessOutcome): void => {
@@ -135,6 +165,7 @@ export function runProcess(spec: ProcessSpec, hooks: ProcessRunnerHooks = REAL_H
       settled = true;
       clearTimeout(timer);
       clearTimeout(drain);
+      spec.signal?.removeEventListener('abort', onCancel);
       resolve(outcome);
     };
     const outcome = (code: number | null): ProcessOutcome => ({
@@ -144,11 +175,19 @@ export function runProcess(spec: ProcessSpec, hooks: ProcessRunnerHooks = REAL_H
       stderr: stderr(),
       timedOut,
       aborted,
+      cancelled,
     });
+    const onCancel = (): void => {
+      if (settled || cancelled) return;
+      cancelled = true;
+      hooks.killTree(child);
+    };
     const timer = setTimeout(() => {
       timedOut = true;
       hooks.killTree(child);
     }, spec.timeoutMs);
+    if (spec.signal?.aborted === true) onCancel();
+    else spec.signal?.addEventListener('abort', onCancel, { once: true });
     if (onStdout !== undefined)
       child.stdout.on('data', (chunk: Buffer) => {
         if (aborted || onStdout(chunk) !== false) return;
@@ -164,15 +203,17 @@ export function runProcess(spec: ProcessSpec, hooks: ProcessRunnerHooks = REAL_H
         stderr: '',
         timedOut: false,
         aborted: false,
+        cancelled: false,
         startError: error.message,
         ...(error.code !== undefined ? { startErrorCode: error.code } : {}),
       }),
     );
     child.on('exit', (code) => {
-      if (timedOut) finish(outcome(code));
+      if (timedOut || cancelled) finish(outcome(code));
       else drain = setTimeout(() => finish(outcome(code)), PIPE_DRAIN_GRACE_MS);
     });
     child.on('close', (code) => finish(outcome(code)));
+    if (spec.holdStdin === true) child.stdin?.on('error', () => undefined); // the child may exit first; the pipe is never written to
     if (spec.input !== undefined && child.stdin !== null) {
       child.stdin.on('error', () => undefined); // the exit handler reports the failure
       child.stdin.end(spec.input);
@@ -246,12 +287,14 @@ const failedSync = (startError: string, extra: Partial<SyncProcessOutcome> = {})
   stdoutBytes: Buffer.alloc(0),
   timedOut: false,
   aborted: false,
+  cancelled: false,
   startError,
   ...extra,
 });
 
 /** Blocking `runProcess` (same timeout, tree kill and tails) for the synchronous ports; never throws. */
 export function runProcessSync(spec: SyncProcessSpec): SyncProcessOutcome {
+  refuseHeldStdinWithInput(spec);
   const maxBuffer = spec.maxBuffer ?? DEFAULT_SYNC_MAX_BYTES;
   const tailBytes = spec.tailBytes ?? LOG_TAIL_BYTES;
   const request = {
@@ -298,6 +341,7 @@ export function runProcessSync(spec: SyncProcessSpec): SyncProcessOutcome {
     stdoutBytes,
     timedOut: reply['timedOut'] === true,
     aborted: reply['aborted'] === true,
+    cancelled: false,
     ...(typeof startError === 'string' ? { startError } : {}),
     ...(typeof startErrorCode === 'string' ? { startErrorCode } : {}),
   };

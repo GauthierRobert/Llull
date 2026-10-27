@@ -2,7 +2,10 @@
  * Mesh-processing port (07 MSH TR-MSH-02): commands pass triangle meshes and an operation, an installed engine answers. The default TypeScript
  * engine (`tsEngine.ts`) is always present; a host may add engines (Manifold in `packages/kernel-manifold`, native later) with
  * `setMeshProcessingEngine`. Commands read it from `ctx.meshProcessing` and resolve it with `resolveMeshEngine`. Synchronous, no native imports.
+ * A slow engine (the native `llull-compute` job) answers a synchronous `run` from a result table the host fills between two runs of the same
+ * command: until the result is there it calls `deferMeshOp`, the host awaits the job and runs the command again (TECHNICAL_SPEC 13.8).
  * @invariant a failure carries a stable MESH_* code; an engine never throws for bad input
+ * @invariant a deferred answer (code MESH_ENGINE_PENDING) is a refusal the host discards: it re-runs the command once the result exists; replay never memoizes a step that deferred
  * @invariant the composite asks engines in order and falls through only on MESH_ENGINE_UNSUPPORTED / over-cap
  */
 
@@ -39,6 +42,22 @@ export function composeMeshEngines(engines: ReadonlyArray<MeshProcessingEngine>)
       return refusal;
     },
   };
+}
+
+let deferrals = 0;
+
+/** Code of the refusal an engine answers while the result it was asked for is still being computed. */
+export const MESH_ENGINE_PENDING = 'MESH_ENGINE_PENDING';
+
+/** The answer of an engine whose result is not there yet (the host awaits it and runs the command again); counted by `deferralCount`. */
+export function deferMeshOp(op: MeshOpName): MeshEngineFailure {
+  deferrals += 1;
+  return { code: MESH_ENGINE_PENDING, message: `the '${op}' result is still being computed` };
+}
+
+/** How many answers were deferred so far: a caller that sees it change across a run knows that run saw a refusal it must not keep or memoize. */
+export function deferralCount(): number {
+  return deferrals;
 }
 
 let installed: MeshProcessingEngine | null = null;

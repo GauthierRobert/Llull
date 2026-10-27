@@ -37,6 +37,22 @@ describe('createComputeRunner', () => {
     expect(broken).toMatchObject({ ok: false, code: 'NATIVE_TOOL_MISSING' });
   });
 
+  it('exit code 4 without a final event is NATIVE_HOST_GONE (the host-death watchdog), never a protocol failure', async () => {
+    const runner = createComputeRunner({ ...process.env }, process.execPath);
+    const run = await runner.run(['-e', 'process.exit(4)'], dir, 20_000);
+    expect(run).toMatchObject({ ok: false, code: 'NATIVE_HOST_GONE' });
+    const other = await runner.run(['-e', 'process.exit(5)'], dir, 20_000);
+    expect(other).toMatchObject({ ok: false, code: 'NATIVE_PROTOCOL' });
+  });
+
+  it('ends a running job with NATIVE_CANCELLED when the signal aborts, not NATIVE_TIMEOUT', async () => {
+    const runner = createComputeRunner({ ...process.env }, process.execPath);
+    const controller = new AbortController();
+    const running = runner.run(['-e', 'setInterval(() => {}, 1000)'], dir, 20_000, undefined, controller.signal);
+    setTimeout(() => controller.abort(), 300);
+    expect(await running).toMatchObject({ ok: false, code: 'NATIVE_CANCELLED' });
+  });
+
   it.skipIf(posixOnly)('parses progress, warning and done events and checks output hashes', async () => {
     const binary = fake(
       'ok',

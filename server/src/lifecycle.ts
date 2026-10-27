@@ -22,12 +22,16 @@ let failing = false;
 
 /** Last words of the backend: a crash report (SC-D3), the autosave flushed, exit 1. A fault while doing so exits at once. */
 function onFatalError(source: CrashSource, error: unknown): void {
-  if (failing) process.exit(1);
+  if (failing) {
+    killAllChildren();
+    process.exit(1);
+  }
   failing = true;
   console.error(`[llull-server] ${source}:`, error);
   const report = reportServerCrash(source, error);
   if (report !== null) console.error(`[llull-server] crash report written to ${report} (llull crashes show latest)`);
   flushAutosave();
+  killAllChildren(); // a detached native job would outlive this process
   process.exit(1);
 }
 

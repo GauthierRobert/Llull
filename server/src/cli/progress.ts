@@ -6,6 +6,7 @@
 import type { PlanStepEvent } from '@core/commands/types';
 import { getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
+import type { JobProgress } from '../native/deferredRun';
 
 /** A step slower than this earns a warning line, whatever the progress setting. */
 const SLOW_STEP_MS = 10_000;
@@ -19,6 +20,8 @@ export interface StepObserverOptions {
   readonly progress: boolean;
   /** Stop starting new steps this many seconds after creation. */
   readonly timeoutSeconds?: number;
+  /** Stop starting new steps after this instant on the `now` clock instead (the supervisor's absolute deadline, counted from process start). */
+  readonly deadlineAt?: number;
   readonly slowMs?: number;
 }
 
@@ -48,9 +51,33 @@ export function formatDuration(ms: number): string {
   return `${minutes}m${String(Math.floor(seconds % 60)).padStart(2, '0')}s`;
 }
 
+/** The report line a server streamed (`{ type: 'progress', ...JobProgress }`) as a line of text; unreadable fields are left out. */
+export function formatStreamedProgress(event: Readonly<Record<string, unknown>>): string {
+  const number = (name: string): number => (typeof event[name] === 'number' ? event[name] : 0);
+  return formatJobProgress({
+    op: typeof event['op'] === 'string' ? event['op'] : 'native job',
+    stage: typeof event['stage'] === 'string' ? event['stage'] : '',
+    message: typeof event['message'] === 'string' ? event['message'] : 'running',
+    step: number('step'),
+    total: number('total'),
+    fraction: typeof event['fraction'] === 'number' ? event['fraction'] : null,
+    elapsedMs: number('elapsedMs'),
+    etaMs: typeof event['etaMs'] === 'number' ? event['etaMs'] : null,
+    heartbeat: event['heartbeat'] === true,
+  });
+}
+
+/** One stderr line of a native job report: `[quad_remesh] max flow 15% (stage 7/12) 16.5s elapsed, ~1m33s left`. */
+export function formatJobProgress(event: Omit<JobProgress, 'op'> & { readonly op: string }): string {
+  const share = event.fraction === null ? '' : ` ${Math.floor(event.fraction * 100)}%`;
+  const stage = event.total > 0 ? ` (stage ${event.step}/${event.total})` : '';
+  const left = event.etaMs === null ? '' : `, ~${formatDuration(event.etaMs)} left`;
+  return `[${event.op}] ${event.message}${share}${stage}, ${formatDuration(event.elapsedMs)} elapsed${left}`;
+}
+
 export function createStepObserver(options: StepObserverOptions): StepObserver {
   const { now, print, progress, timeoutSeconds, slowMs = SLOW_STEP_MS } = options;
-  const deadline = timeoutSeconds === undefined ? undefined : now() + timeoutSeconds * 1000;
+  const deadline = options.deadlineAt ?? (timeoutSeconds === undefined ? undefined : now() + timeoutSeconds * 1000);
   const startedAt = new Map<number, number>();
   const durations = new Map<number, number>();
   let stopped: TimeoutStop | undefined;

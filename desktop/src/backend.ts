@@ -7,6 +7,7 @@ import net from 'net';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
+import { killPidTree } from '@server/processRunner';
 import { isHealthy } from '@server/restClient';
 import { readJsonFile } from '@server/readJsonFile';
 import { writeFileAtomic } from '@server/writeFileAtomic';
@@ -59,6 +60,8 @@ export async function chooseBackendPort(userDataDir: string): Promise<number> {
 
 /** Fits Electron UtilityProcess and ChildProcess. */
 interface BackendProcess {
+  /** Set once the process started. */
+  readonly pid?: number | undefined;
   kill(): boolean;
   once(event: 'exit', listener: (code: number | null) => void): unknown;
 }
@@ -109,7 +112,9 @@ export async function startBackend(
     url,
     stop: async () => {
       if (exitReason !== null) return;
-      child.kill();
+      // the whole tree: the server's native jobs (llull-compute) run detached and would outlive a plain kill of the server on Windows
+      if (child.pid !== undefined) killPidTree(child.pid, () => void child.kill());
+      else child.kill();
       await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))]);
     },
   };

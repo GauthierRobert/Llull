@@ -4,19 +4,24 @@
  *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers).
  *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
- *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent
+ *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent. Answers JSON when the command is done; the event loop stays
+ *                        free while a native mesh job runs (TECHNICAL_SPEC 13.8). With `Accept: application/x-ndjson` it streams one `{ type: 'progress', ... }`
+ *                        line per job report (and a heartbeat when the job is silent) and ends with `{ type: 'result', result }`. Closing the connection cancels the command.
  *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
  */
 
 import { Router, type Request, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
-import { applyCommand, undo, redo } from './commandBus';
+import { applyCommandAsync, undo, redo } from './commandBus';
 import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
 import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
 import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 
 const KEEPALIVE_MS = 25_000;
+const NDJSON = 'application/x-ndjson';
+
+const ndjsonLine = (value: unknown): string => JSON.stringify(value) + '\n';
 
 /**
  * Per-client key for the /live stream cap, or null when the client cannot be told apart: behind a proxy every client
@@ -76,8 +81,33 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
       return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
-    const applied = applyCommand(name, params ?? {}, commandId, body.client === 'cli' ? 'cli' : 'rest');
-    res.status(200).json(isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied));
+    const streaming = String(req.headers['accept'] ?? '').includes(NDJSON);
+    const cancel = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) cancel.abort();
+    });
+    if (streaming) {
+      res.status(200);
+      res.setHeader('Content-Type', NDJSON);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.flushHeaders();
+    }
+    applyCommandAsync(name, params ?? {}, {
+      ...(commandId !== undefined ? { commandId } : {}),
+      source: body.client === 'cli' ? 'cli' : 'rest',
+      signal: cancel.signal,
+      ...(streaming ? { onProgress: (event) => void res.write(ndjsonLine({ type: 'progress', ...event })) } : {}),
+    })
+      .then((applied) => {
+        const answer = isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied);
+        if (streaming) res.end(ndjsonLine({ type: 'result', result: answer }));
+        else res.status(200).json(answer);
+      })
+      .catch((error: unknown) => {
+        const message = `Command ${name} failed: ${error instanceof Error ? error.message : String(error)}`;
+        if (streaming) res.end(ndjsonLine({ type: 'result', result: { summary: message, affected: [], isError: true, changed: false } }));
+        else res.status(500).json({ error: message });
+      });
   });
 
   router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo()));

@@ -102,13 +102,77 @@ describe('llull run — progress and timing', () => {
     expect(text.out[0]).toMatch(/#2 ok {3}split_body \[2\.5s\]:/);
   });
 
-  it('says --progress does nothing with --server', async () => {
+  it('with --server, --progress prints the native-job reports the server streams, in order, and the answer stays on stdout', async () => {
+    const reports = [
+      {
+        type: 'progress',
+        op: 'quad_remesh',
+        stage: 'max_flow',
+        message: 'max flow',
+        step: 7,
+        total: 12,
+        fraction: 0.15,
+        elapsedMs: 16_500,
+        etaMs: 93_000,
+        heartbeat: false,
+      },
+      {
+        type: 'progress',
+        op: 'quad_remesh',
+        stage: 'max_flow',
+        message: 'max flow',
+        step: 7,
+        total: 12,
+        fraction: 0.15,
+        elapsedMs: 21_500,
+        etaMs: 121_000,
+        heartbeat: true,
+      },
+      { type: 'result', result: { summary: 'quad_remesh ok', affected: ['subd-1.1'], changed: true } },
+    ];
+    const c = capture({
+      stdin: PLAN,
+      fetchImpl: (_url, init) => {
+        expect((init.headers as Record<string, string>)['Accept']).toContain('application/x-ndjson');
+        return Promise.resolve(
+          new Response(reports.map((line) => JSON.stringify(line)).join('\n') + '\n', {
+            headers: { 'Content-Type': 'application/x-ndjson' },
+          }),
+        );
+      },
+    });
+    expect(
+      await runCli(['exec', 'quad_remesh', 'id=mesh-1', 'targetQuadCount=6', '--progress', '--server', 'http://cad.local:3001'], c.io),
+    ).toBe(EXIT_OK);
+    expect(c.err).toEqual([
+      '[quad_remesh] max flow 15% (stage 7/12), 16.5s elapsed, ~1m33s left',
+      '[quad_remesh] max flow 15% (stage 7/12), 21.5s elapsed, ~2m01s left',
+    ]);
+    expect(c.out.join('\n')).toContain('quad_remesh ok');
+  });
+
+  it('with --server and no --progress, the reports are not printed', async () => {
+    const c = capture({
+      stdin: PLAN,
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response(
+            `${JSON.stringify({ type: 'progress', op: 'quad_remesh', message: 'x', fraction: 0.5 })}\n${JSON.stringify({ type: 'result', result: { summary: 'ok', affected: [], changed: true } })}\n`,
+            { headers: { 'Content-Type': 'application/x-ndjson' } },
+          ),
+        ),
+    });
+    expect(await runCli(['exec', 'add_box', 'size=[1,1,1]', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_OK);
+    expect(c.err).toEqual([]);
+  });
+
+  it('with --server, a server that answers plain JSON still works', async () => {
     const c = capture({
       stdin: PLAN,
       fetchImpl: () => Promise.resolve(new Response(JSON.stringify({ summary: 'ok', affected: [], changed: true }))),
     });
-    await runCli(['run', '-', '--progress', '--server', 'http://cad.local:3001'], c.io);
-    expect(c.err[0]).toMatch(/--progress has no effect with --server/);
+    expect(await runCli(['exec', 'add_box', 'size=[1,1,1]', '--progress', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_OK);
+    expect(c.err).toEqual([]);
   });
 });
 

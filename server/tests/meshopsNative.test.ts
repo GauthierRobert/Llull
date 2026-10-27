@@ -8,12 +8,13 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { composeMeshEngines } from '@core/geometry/mesh/engine';
-import type { MeshOp, MeshOpResult } from '@core/geometry/mesh/engineTypes';
+import type { MeshEngineFailure, MeshOp, MeshOpResult } from '@core/geometry/mesh/engineTypes';
 import { isEngineFailure } from '@core/geometry/mesh/engineTypes';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import type { MeshData } from '@core/model/types';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
+import { resolveDeferred } from '../src/native/deferredRun';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNative: llull-compute not built (cargo build in solver/): native runs skipped');
@@ -121,16 +122,20 @@ const hashOf = (mesh: MeshData): string =>
     .update(Buffer.from(Uint32Array.from(mesh.indices).buffer))
     .digest('hex');
 
-function both(mesh: MeshData, op: MeshOp): { ts: MeshOpResult; nat: MeshOpResult } {
+/** The native engine's answer, after the host awaited the job (TECHNICAL_SPEC 13.8). */
+const nativeRun = (input: { mesh: MeshData }, op: MeshOp): Promise<MeshOpResult | MeshEngineFailure> =>
+  resolveDeferred(() => (engine as NonNullable<typeof engine>).run(input, op));
+
+async function both(mesh: MeshData, op: MeshOp): Promise<{ ts: MeshOpResult; nat: MeshOpResult }> {
   const ts = tsMeshEngine.run({ mesh }, op);
-  const nat = (engine as NonNullable<typeof engine>).run({ mesh }, op);
+  const nat = await nativeRun({ mesh }, op);
   if (isEngineFailure(ts)) throw new Error(`ts: ${ts.code} ${ts.message}`);
   if (isEngineFailure(nat)) throw new Error(`native: ${nat.code} ${nat.message}`);
   return { ts, nat };
 }
 
-function expectIdentical(mesh: MeshData, op: MeshOp): { ts: MeshOpResult; nat: MeshOpResult } {
-  const result = both(mesh, op);
+async function expectIdentical(mesh: MeshData, op: MeshOp): Promise<{ ts: MeshOpResult; nat: MeshOpResult }> {
+  const result = await both(mesh, op);
   expect(hashOf(result.nat.mesh as MeshData)).toBe(hashOf(result.ts.mesh as MeshData));
   expect(result.nat.report).toEqual(result.ts.report);
   expect(result.nat.provenance).toMatchObject({ engine: 'native', deterministic: true });
@@ -152,98 +157,90 @@ const smooth = (extra: Partial<Extract<MeshOp, { op: 'smooth' }>>): MeshOp => ({
 });
 
 describe('native decimate is bit-identical to the TypeScript engine (VC-MSH-32)', () => {
-  native('VC-MSH-06 planar grids: flat and tilted, target 40, locked boundary', () => {
+  native('VC-MSH-06 planar grids: flat and tilted, target 40, locked boundary', async () => {
     for (const height of [() => 0, (x: number, y: number) => 0.3 * x + 0.2 * y]) {
-      const { nat } = expectIdentical(grid(10, 12, height), decimate({ targetTriangles: 40 }));
+      const { nat } = await expectIdentical(grid(10, 12, height), decimate({ targetTriangles: 40 }));
       expect((nat.report as { reachedTarget: boolean }).reachedTarget).toBe(false);
     }
   });
 
-  native('VC-MSH-07 icosphere with a triangle target and with a deviation bound', () => {
+  native('VC-MSH-07 icosphere with a triangle target and with a deviation bound', async () => {
     const sphere = icosphere(10, 3);
-    expectIdentical(sphere, decimate({ targetTriangles: 300 }));
-    const bounded = expectIdentical(icosphere(10, 4), decimate({ maxDeviation: 0.05 }));
+    await expectIdentical(sphere, decimate({ targetTriangles: 300 }));
+    const bounded = await expectIdentical(icosphere(10, 4), decimate({ maxDeviation: 0.05 }));
     expect((bounded.nat.report as { rejected: { deviation: number } }).rejected.deviation).toBeGreaterThan(0);
   });
 
-  native('feature angle, free boundary and a locked region', () => {
+  native('feature angle, free boundary and a locked region', async () => {
     const sphere = icosphere(10, 3);
-    expectIdentical(sphere, decimate({ targetTriangles: 200, featureAngleRad: Math.PI / 6 }));
-    expectIdentical(sphere, decimate({ targetTriangles: 200, lockedRegion: { center: [0, 0, 10], radius: 4 } }));
-    expectIdentical(
+    await expectIdentical(sphere, decimate({ targetTriangles: 200, featureAngleRad: Math.PI / 6 }));
+    await expectIdentical(sphere, decimate({ targetTriangles: 200, lockedRegion: { center: [0, 0, 10], radius: 4 } }));
+    await expectIdentical(
       grid(10, 12, (x, y) => Math.sin(x / 3) * Math.cos(y / 4)),
       decimate({ targetTriangles: 20, preserveBoundary: false }),
     );
-    expectIdentical(noisy(sphere, 0.05), decimate({ targetTriangles: 400, maxDeviation: 0.2 }));
+    await expectIdentical(noisy(sphere, 0.05), decimate({ targetTriangles: 400, maxDeviation: 0.2 }));
   });
 
-  native('refuses meshes the engine cannot edit, with the TypeScript codes', () => {
+  native('refuses meshes the engine cannot edit, with the TypeScript codes', async () => {
     const open = {
       positions: icosphere(1, 1).positions,
       indices: icosphere(1, 1).indices.map((v, i) => (i === 1 ? (icosphere(1, 1).indices[2] ?? v) : v)),
     };
-    const result = (engine as NonNullable<typeof engine>).run({ mesh: open }, decimate({ targetTriangles: 10 }));
+    const result = await nativeRun({ mesh: open }, decimate({ targetTriangles: 10 }));
     expect(isEngineFailure(result)).toBe(true);
     expect((result as { code: string }).code).toMatch(/MESH_(DEGENERATE|NON_MANIFOLD|ORIENTATION_INCONSISTENT)/);
-    expect((engine as NonNullable<typeof engine>).run({ mesh: open }, { op: 'hull', points: [] })).toMatchObject({
-      code: 'MESH_ENGINE_UNSUPPORTED',
-    });
+    expect(await nativeRun({ mesh: open }, { op: 'hull', points: [] })).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
   });
 });
 
 describe('native smooth is bit-identical to the TypeScript engine (VC-MSH-32)', () => {
-  native('VC-MSH-08 Laplacian and Taubin on the clean icosphere l4, 1 / 10 / 50 iterations', () => {
+  native('VC-MSH-08 Laplacian and Taubin on the clean icosphere l4, 1 / 10 / 50 iterations', async () => {
     const sphere = icosphere(10, 4);
     for (const iterations of [1, 10, 50]) {
-      expectIdentical(sphere, smooth({ method: 'laplacian', iterations }));
-      expectIdentical(sphere, smooth({ method: 'taubin', iterations }));
+      await expectIdentical(sphere, smooth({ method: 'laplacian', iterations }));
+      await expectIdentical(sphere, smooth({ method: 'taubin', iterations }));
     }
   });
 
-  native('volume correction (cbrt), cotangent weights, regions, free and fixed boundaries, noisy input', () => {
+  native('volume correction (cbrt), cotangent weights, regions, free and fixed boundaries, noisy input', async () => {
     const sphere = icosphere(10, 4);
-    const corrected = expectIdentical(sphere, smooth({ iterations: 50, volumeCorrection: true }));
+    const corrected = await expectIdentical(sphere, smooth({ iterations: 50, volumeCorrection: true }));
     expect((corrected.nat.report as { volumeCorrected: boolean }).volumeCorrected).toBe(true);
-    expectIdentical(noisy(sphere, 0.1), smooth({ iterations: 10, volumeCorrection: true }));
-    expectIdentical(icosphere(10, 3), smooth({ method: 'laplacian', weights: 'cotangent', iterations: 5 }));
-    expectIdentical(icosphere(10, 3), smooth({ weights: 'cotangent', iterations: 5, volumeCorrection: true }));
-    expectIdentical(sphere, smooth({ iterations: 5, region: { center: [0, 0, 10], radius: 3 } }));
+    await expectIdentical(noisy(sphere, 0.1), smooth({ iterations: 10, volumeCorrection: true }));
+    await expectIdentical(icosphere(10, 3), smooth({ method: 'laplacian', weights: 'cotangent', iterations: 5 }));
+    await expectIdentical(icosphere(10, 3), smooth({ weights: 'cotangent', iterations: 5, volumeCorrection: true }));
+    await expectIdentical(sphere, smooth({ iterations: 5, region: { center: [0, 0, 10], radius: 3 } }));
     const patch = noisy(
       grid(10, 10, () => 0),
       0.2,
     );
-    expectIdentical(patch, smooth({ iterations: 4 }));
-    expectIdentical(patch, smooth({ iterations: 4, fixBoundary: false, volumeCorrection: true }));
+    await expectIdentical(patch, smooth({ iterations: 4 }));
+    await expectIdentical(patch, smooth({ iterations: 4, fixBoundary: false, volumeCorrection: true }));
   });
 });
 
 describe('native deviation is bit-identical to the TypeScript engine (VC-MSH-25, 32)', () => {
-  native('sphere against its decimation, noisy against clean, strided samples, parallel grids', () => {
-    const run = (a: MeshData, b: MeshData, maxSamples: number): void => {
+  native('sphere against its decimation, noisy against clean, strided samples, parallel grids', async () => {
+    const run = async (a: MeshData, b: MeshData, maxSamples: number): Promise<void> => {
       const op: MeshOp = { op: 'deviation', other: { mesh: b }, maxSamples };
       const ts = tsMeshEngine.run({ mesh: a }, op);
-      const nat = (engine as NonNullable<typeof engine>).run({ mesh: a }, op);
+      const nat = await nativeRun({ mesh: a }, op);
       if (isEngineFailure(ts) || isEngineFailure(nat)) throw new Error('deviation failed');
       expect(nat.deviation).toEqual(ts.deviation);
       expect(nat.provenance.engine).toBe('native');
     };
     const sphere = icosphere(10, 4);
     const decimated = tsMeshEngine.run({ mesh: sphere }, decimate({ maxDeviation: 0.05 })) as MeshOpResult;
-    run(sphere, decimated.mesh as MeshData, 20_000);
-    run(sphere, decimated.mesh as MeshData, 500);
-    run(noisy(sphere, 0.1), sphere, 20_000);
+    await run(sphere, decimated.mesh as MeshData, 20_000);
+    await run(sphere, decimated.mesh as MeshData, 500);
+    await run(noisy(sphere, 0.1), sphere, 20_000);
     const flat = grid(10, 10, () => 0);
     const lifted = { positions: flat.positions.map((v, i) => (i % 3 === 2 ? v + 0.5 : v)), indices: flat.indices };
-    run(flat, lifted, 20_000);
-    const parallel = (engine as NonNullable<typeof engine>).run(
-      { mesh: flat },
-      { op: 'deviation', other: { mesh: lifted }, maxSamples: 20_000 },
-    );
+    await run(flat, lifted, 20_000);
+    const parallel = await nativeRun({ mesh: flat }, { op: 'deviation', other: { mesh: lifted }, maxSamples: 20_000 });
     expect((parallel as MeshOpResult).deviation?.hausdorff).toBe(0.5);
-    const empty = (engine as NonNullable<typeof engine>).run(
-      { mesh: flat },
-      { op: 'deviation', other: { mesh: { positions: [], indices: [] } }, maxSamples: 10 },
-    );
+    const empty = await nativeRun({ mesh: flat }, { op: 'deviation', other: { mesh: { positions: [], indices: [] } }, maxSamples: 10 });
     expect(isEngineFailure(empty)).toBe(true);
   });
 });

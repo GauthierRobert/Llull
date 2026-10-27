@@ -16,6 +16,7 @@ pub mod decimate;
 pub mod deviation;
 mod edit;
 mod geom;
+mod progress;
 #[cfg(feature = "quad")]
 mod quad;
 pub mod smooth;
@@ -23,10 +24,15 @@ mod surface;
 
 use geom::Sphere;
 use llull_protocol::{sha256_hex, Output};
+use progress::Progress;
 use serde::Deserialize;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
+
+/// Stages QuadriFlow reports (`kStages` in `llull-quadflow/cpp/facade.cxx`), for the `total` of the progress events of `quad_remesh`.
+const QUAD_STAGES: u64 = 10;
 
 /// A job failure: stable code + message.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,11 +133,14 @@ fn u32_bytes(values: &[u32]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_le_bytes()).collect()
 }
 
-/// Runs the job in `folder`; returns the written outputs.
-pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
+/// Runs the job in `folder`; returns the written outputs. `out` receives the `progress` events (a stage start, then throttled ticks inside long
+/// stages): `read`, the op's own stages, `write`.
+pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> {
     let started = Instant::now();
     let text = String::from_utf8(read(folder, "job.json")?).map_err(|error| input_error(format!("job.json: {error}")))?;
     let job: Job = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
+    let mut progress = Progress::new(out, if job.op == "quad_remesh" { 2 + QUAD_STAGES } else { 3 });
+    progress.stage("read", 0.0);
     let positions = f64s(&read(folder, "positions.f64")?, "positions.f64")?;
     let triangles = u32s(&read(folder, "indices.u32")?, positions.len() / 3)?;
     let items = triangles.len() / 3;
@@ -146,7 +155,8 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
                 feature_cos: p.feature_cos,
                 locked_region: p.locked_region.as_ref().map(Region::sphere),
             };
-            let (pos, idx, report) = decimate::decimate(&positions, &triangles, &params);
+            progress.stage("decimate", 0.05);
+            let (pos, idx, report) = decimate::decimate(&positions, &triangles, &params, &mut |done| progress.tick(0.05 + 0.9 * done));
             mesh_out = Some((pos, idx));
             serde_json::to_value(report).map_err(|error| input_error(error.to_string()))?
         }
@@ -162,7 +172,8 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
                 volume_correction: p.volume_correction,
                 region: p.region.as_ref().map(Region::sphere),
             };
-            let (pos, report) = smooth::smooth(&positions, &triangles, &params);
+            progress.stage("smooth", 0.05);
+            let (pos, report) = smooth::smooth(&positions, &triangles, &params, &mut |done| progress.tick(0.05 + 0.9 * done));
             mesh_out = Some((pos, triangles.clone()));
             serde_json::to_value(report).map_err(|error| input_error(error.to_string()))?
         }
@@ -170,7 +181,7 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
         "quad_remesh" => {
             let p: quad::QuadJob =
                 serde_json::from_value(job.params).map_err(|error| input_error(format!("quad_remesh params: {error}")))?;
-            let (pos, quads) = quad::quad_remesh(&positions, &triangles, &p)?;
+            let (pos, quads) = quad::quad_remesh(&positions, &triangles, &p, &mut |stage, done| progress.stage(stage, 0.05 + 0.9 * done))?;
             let report = serde_json::json!({ "quads": quads.len() / 4, "vertices": pos.len() / 3 });
             mesh_out = Some((pos, quads));
             report
@@ -178,6 +189,7 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
         #[cfg(not(feature = "quad"))]
         "quad_remesh" => return Err(input_error("quad_remesh needs llull-meshops built with the `quad` feature")),
         "deviation" => {
+            progress.stage("deviation", 0.05);
             let p: DeviationJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("deviation params: {error}")))?;
             let other_positions = f64s(&read(folder, "positions_b.f64")?, "positions_b.f64")?;
             let other_triangles = u32s(&read(folder, "indices_b.u32")?, other_positions.len() / 3)?;
@@ -189,6 +201,7 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
     };
     let summary = serde_json::json!({ "op": job.op, "items": items, "ms": started.elapsed().as_millis(), "report": report });
     let summary_bytes = serde_json::to_vec(&summary).map_err(|error| input_error(error.to_string()))?;
+    progress.stage("write", 0.97);
     let mut outputs = Vec::new();
     if let Some((out_positions, out_indices)) = mesh_out {
         outputs.push(write(folder, "result_positions.f64", &f64_bytes(&out_positions))?);

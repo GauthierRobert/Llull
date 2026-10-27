@@ -50,6 +50,83 @@ describe('runTrackedProcess', () => {
     expect(await run).toMatchObject({ exitCode: null, timedOut: true });
   });
 
+  it('kills the tree when the signal aborts, and says it was cancelled, not timed out', async () => {
+    const child = new FakeChild();
+    const killed: ChildProcess[] = [];
+    const controller = new AbortController();
+    const run = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, signal: controller.signal }, hooks(child, killed));
+    controller.abort();
+    expect(killed).toHaveLength(1);
+    child.emit('exit', null);
+    expect(await run).toMatchObject({ exitCode: null, timedOut: false, cancelled: true });
+  });
+
+  it('a console-style kill of the child (Ctrl-C exit code) after the abort is a cancellation, not a crash', async () => {
+    const child = new FakeChild();
+    const controller = new AbortController();
+    const run = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, signal: controller.signal }, hooks(child, []));
+    controller.abort();
+    child.emit('exit', 0xc000013a);
+    expect(await run).toMatchObject({ exitCode: 0xc000013a, timedOut: false, cancelled: true });
+  });
+
+  it('ownProcessGroup starts the child detached on Windows too (no console: a Ctrl-C reaches only the parent); the default keeps the console there', async () => {
+    const own = new FakeChild();
+    const ownHooks = hooks(own, [], 'win32');
+    const withGroup = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, ownProcessGroup: true }, ownHooks);
+    own.emit('close', 0);
+    await withGroup;
+    expect(ownHooks.options).toMatchObject([{ detached: true }]);
+    const plain = new FakeChild();
+    const plainHooks = hooks(plain, [], 'win32');
+    const without = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000 }, plainHooks);
+    plain.emit('close', 0);
+    await without;
+    expect(plainHooks.options).toMatchObject([{ detached: false }]);
+  });
+
+  it('holdStdin gives the child a stdin pipe nobody writes to or closes while it runs; without it stdin is null', async () => {
+    const held = new FakeChild();
+    const heldHooks = hooks(held);
+    const run = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, holdStdin: true }, heldHooks);
+    held.emit('close', 0);
+    await run;
+    expect(heldHooks.options).toMatchObject([{ pipeInput: true }]);
+    const plain = new FakeChild();
+    const plainHooks = hooks(plain);
+    const other = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000 }, plainHooks);
+    plain.emit('close', 0);
+    await other;
+    expect(plainHooks.options).toMatchObject([{ pipeInput: false }]);
+  });
+
+  it('holdStdin and input cannot be combined: input closes the pipe holdStdin keeps open', () => {
+    const spec = { executable: 'x', args: [], env: {}, timeoutMs: 1000, holdStdin: true, input: 'abc' };
+    expect(() => runProcess(spec, hooks(new FakeChild()))).toThrow(/holdStdin and input/);
+    expect(() => runProcessSync(spec)).toThrow(/holdStdin and input/);
+  });
+
+  it('a signal that is already aborted never lets the child run on', async () => {
+    const child = new FakeChild();
+    const killed: ChildProcess[] = [];
+    const run = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, signal: AbortSignal.abort() }, hooks(child, killed));
+    expect(killed).toHaveLength(1);
+    child.emit('exit', null);
+    expect((await run).cancelled).toBe(true);
+  });
+
+  it('a child that ends on its own is not cancelled by a later abort', async () => {
+    const child = new FakeChild();
+    const killed: ChildProcess[] = [];
+    const controller = new AbortController();
+    const run = runProcess({ executable: 'x', args: [], env: {}, timeoutMs: 60_000, signal: controller.signal }, hooks(child, killed));
+    child.emit('close', 0);
+    const outcome = await run;
+    controller.abort();
+    expect(killed).toHaveLength(0);
+    expect(outcome).toMatchObject({ exitCode: 0, cancelled: false });
+  });
+
   it('reports a start error', async () => {
     const child = new FakeChild();
     const run = runTrackedProcess('x', [], '.', 5000, {}, hooks(child));
@@ -142,6 +219,16 @@ describe('tree kill with real processes', () => {
       onStdout: () => false,
     });
     expect(aborted.aborted).toBe(true);
+    const slow = new AbortController();
+    const cancelled = runProcess({
+      executable: process.execPath,
+      args: ['-e', 'setInterval(()=>{},1000)'],
+      env: process.env,
+      timeoutMs: 20_000,
+      signal: slow.signal,
+    });
+    setTimeout(() => slow.abort(), 300);
+    expect(await cancelled).toMatchObject({ cancelled: true, timedOut: false });
     expect((await runProcess({ executable: 'llull-no-such-tool', args: [], env: process.env, timeoutMs: 5000 })).startErrorCode).toBe(
       'ENOENT',
     );

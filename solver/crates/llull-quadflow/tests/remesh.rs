@@ -1,7 +1,7 @@
 //! QuadriFlow on closed meshes (07 MSH M6): quad count against the target, valence, closedness, orientation, determinism, and a failure
 //! that must come back as an error instead of ending the process.
 
-use llull_quadflow::{quad_remesh, QuadMesh, QuadParams};
+use llull_quadflow::{quad_remesh, quad_remesh_with_stages, QuadMesh, QuadParams};
 use std::collections::HashMap;
 
 const RADIUS: f64 = 10.0;
@@ -190,6 +190,42 @@ fn the_result_is_reproducible() {
     let first = quad_remesh(&positions, &triangles, &params(200)).expect("remesh");
     let second = quad_remesh(&positions, &triangles, &params(200)).expect("remesh");
     assert_eq!((first.positions, first.quads), (second.positions, second.quads));
+}
+
+#[test]
+fn stages_come_in_order_with_rising_fractions_and_do_not_change_the_result() {
+    let (positions, triangles) = icosphere(3);
+    let mut stages: Vec<(String, f64)> = Vec::new();
+    let heard =
+        quad_remesh_with_stages(&positions, &triangles, &params(200), &mut |name, fraction| stages.push((name.to_string(), fraction)))
+            .expect("remesh");
+    let names: Vec<&str> = stages.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "prepare",
+            "orientation_field",
+            "scale",
+            "position_field",
+            "integer_constraints",
+            "max_flow",
+            "fix_flips",
+            "final_positions",
+            "extract_quads",
+            "fix_valence"
+        ]
+    );
+    assert!(stages.windows(2).all(|pair| pair[0].1 < pair[1].1) && stages[0].1 == 0.0 && stages[9].1 < 1.0);
+    let silent = quad_remesh(&positions, &triangles, &params(200)).expect("remesh");
+    assert_eq!((heard.positions, heard.quads), (silent.positions, silent.quads));
+}
+
+#[test]
+fn a_failure_still_reports_the_stages_it_reached() {
+    let (positions, triangles) = box_mesh(1, false);
+    let mut reached = 0;
+    let error = quad_remesh_with_stages(&positions, &triangles, &params(50), &mut |_, _| reached += 1).expect_err("a singular system");
+    assert!(!error.0.is_empty() && reached >= 1);
 }
 
 #[test]

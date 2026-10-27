@@ -27,6 +27,7 @@ void Parametrizer::ComputeIndexMap(int with_scale) {
     auto& S = hierarchy.mS[0];
     // ComputeOrientationSingularities();
 
+    if (stage_hook) stage_hook("integer_constraints");
     BuildEdgeInfo();
 
     if (flag_preserve_sharp) {
@@ -74,6 +75,7 @@ void Parametrizer::ComputeIndexMap(int with_scale) {
 #endif
     BuildIntegerConstraints();
 
+    if (stage_hook) stage_hook("max_flow");
     ComputeMaxFlow();
     // potential bug
 #ifdef LOG_OUTPUT
@@ -97,6 +99,7 @@ void Parametrizer::ComputeIndexMap(int with_scale) {
     printf("Fix flip advance...\n");
     int t1 = GetCurrentTime64();
 #endif
+    if (stage_hook) stage_hook("fix_flips");
     FixFlipHierarchy();
     subdivide_edgeDiff(F, V, N, Q, O, &hierarchy.mS[0], V2E, hierarchy.mE2E, boundary, nonManifold,
                        edge_diff, edge_values, face_edgeOrients, face_edgeIds, sharp_edges,
@@ -115,14 +118,17 @@ void Parametrizer::ComputeIndexMap(int with_scale) {
         }
     }
 
+    if (stage_hook) stage_hook("final_positions");
     Optimizer::optimize_positions_sharp(hierarchy, edge_values, edge_diff, sharp_edges,
                                         sharp_vertices, sharp_constraints, with_scale);
 
     Optimizer::optimize_positions_fixed(hierarchy, edge_values, edge_diff, sharp_vertices,
                                         sharp_constraints, flag_adaptive_scale);
 
+    if (stage_hook) stage_hook("extract_quads");
     AdvancedExtractQuad();
 
+    if (stage_hook) stage_hook("fix_valence");
     FixValence();
     // llull: a target too small for the mesh can leave no quad at all; the Eigen sparse LU of the position solve then divides by zero on the empty system
     if (O_compact.empty() || F_compact.empty()) QFLOW_FAIL("QuadriFlow extracted no quad: the requested quad count is too small for this mesh");

@@ -2,6 +2,7 @@
 #define PARAMETRIZER_H_
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #ifdef WITH_TBB
 #include <tbb/tbb.h>
 #endif
@@ -37,6 +38,8 @@ struct ExpandInfo {
 class Parametrizer {
    public:
     Parametrizer() {}
+    // llull: told the name of each stage of ComputeIndexMap when it starts (progress events); empty = silent.
+    std::function<void(const char*)> stage_hook;
     // Mesh Initialization
     void NormalizeMesh();
     void ComputeMeshStatus();

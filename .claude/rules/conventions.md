@@ -55,4 +55,7 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
 - The architecture laws still hold: non-TS code lives in its own workspace (e.g. `solver/<name>/`) or behind an
   injected port / host transport (L2, L6, L9), is bundled for offline desktop use (AF-41), and ships with its
   own tests in `npm run check` or a documented gate.
-- Prefer what the repo already uses when it is as good; do not switch a working part only to change technology.
+- **Rust is the default (owner rule 2026-10-27).** When Rust and TS are equivalent in performance and quality for a task, write
+  it in Rust (a `solver/` crate behind a sidecar / host transport). TS stays where the layer requires it: commands + zod schemas
+  (registry, L1/L5), the React UI, the Express host and the CLI glue.
+- Do not switch a working part only to change technology; port it when it is being substantially rewritten anyway.

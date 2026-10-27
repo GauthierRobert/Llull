@@ -4,6 +4,7 @@
  */
 
 import '../plugins';
+import { killAllChildren } from '../childProcesses';
 import { parseArgv, stringFlag } from './argv';
 import { runCli } from './main';
 import { ttyPassphrase } from './ttyPrompt';
@@ -62,6 +63,23 @@ function exitWhenDrained(code: number): void {
   setTimeout(() => process.exit(code), FORCED_EXIT_MS).unref();
 }
 
+// however the CLI ends (exit code, a fatal error, process.exit), no native job it started outlives it
+process.on('exit', () => void killAllChildren());
+
+/**
+ * Ctrl-C cancels the command in flight (its native mesh jobs are killed, nothing is saved); a second Ctrl-C ends the process at once. The handler is
+ * armed only while the loop awaits a job or a request: a JS handler is not heard during a blocking step, and it replaces the default action that ends the process.
+ */
+const interrupt = new AbortController();
+const onInterrupt = (): void => {
+  if (interrupt.signal.aborted) process.exit(130);
+  interrupt.abort();
+};
+const armInterrupt = (): (() => void) => {
+  process.on('SIGINT', onInterrupt);
+  return () => void process.off('SIGINT', onInterrupt);
+};
+
 runCli(process.argv.slice(2), {
   stdout: (text) => process.stdout.write(`${text}\n`),
   stderr: (text) => process.stderr.write(`${text}\n`),
@@ -70,6 +88,8 @@ runCli(process.argv.slice(2), {
   prepareKernel,
   stderrIsTty: process.stderr.isTTY === true,
   readPassphrase: ttyPassphrase,
+  signal: interrupt.signal,
+  armInterrupt,
 })
   .then((code) => exitWhenDrained(code))
   .catch((error: unknown) => {

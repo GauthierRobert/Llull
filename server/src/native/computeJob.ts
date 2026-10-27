@@ -19,6 +19,8 @@ const LOG_TAIL_BYTES = 64 * 1024;
 /** Named guard: longest stdout line accepted from the binary (an event is a few hundred bytes). */
 const MAX_LINE_BYTES = 1024 * 1024;
 const VERSION_TIMEOUT_MS = 10_000;
+/** Exit code of `llull-compute` when its host's stdin pipe closed (`HOST_GONE_EXIT` in bins/llull-compute). */
+const HOST_GONE_EXIT = 4;
 
 interface JobOutput {
   readonly path: string;
@@ -48,8 +50,8 @@ type ProgressSink = (event: Readonly<Record<string, unknown>>) => void;
 export interface ComputeRunner {
   /** Absolute path of `llull-compute`, or null when it is not installed. */
   readonly binary: string | null;
-  /** `onProgress` receives every `progress` event (parsed NDJSON record) while the job runs. */
-  run(args: readonly string[], folder: string, timeoutMs: number, onProgress?: ProgressSink): Promise<JobRun>;
+  /** `onProgress` receives every `progress` event (parsed NDJSON record) while the job runs; aborting `signal` kills the job (NATIVE_CANCELLED). */
+  run(args: readonly string[], folder: string, timeoutMs: number, onProgress?: ProgressSink, signal?: AbortSignal): Promise<JobRun>;
   /** "0.1.0" from `llull-compute --version`, or "unknown". */
   version(): Promise<string>;
 }
@@ -137,9 +139,13 @@ function settle(
   const fail = (code: string, message: string): JobRun => ({ ok: false, outputs: [], code, message, ...base });
   const done = parser.terminal();
   if (run.startError !== undefined) return fail('NATIVE_TOOL_MISSING', `cannot start ${binary}: ${run.startError}`);
+  if (run.cancelled) return fail('NATIVE_CANCELLED', 'llull-compute was cancelled');
   if (run.timedOut) return fail('NATIVE_TIMEOUT', `llull-compute timed out after ${timeoutMs} ms`);
   if (done !== null && done.ok && run.exitCode === 0) return { ok: true, outputs: done.outputs, ...base };
   if (done !== null && !done.ok) return fail(done.code ?? 'NATIVE_JOB_FAILED', done.message ?? 'the job failed');
+  // the watchdog of llull-compute (LLULL_EXIT_ON_STDIN_EOF) saw this process's stdin pipe close: not a crash of the job
+  if (done === null && run.exitCode === HOST_GONE_EXIT)
+    return fail('NATIVE_HOST_GONE', 'llull-compute stopped because its host process went away');
   const reason = run.aborted ? 'an output larger than the read buffer' : parser.protocolError();
   return fail('NATIVE_PROTOCOL', reason ?? `llull-compute exited with code ${String(run.exitCode)} without a final event`);
 }
@@ -151,10 +157,24 @@ async function execute(
   timeoutMs: number,
   env: NodeJS.ProcessEnv,
   onProgress?: ProgressSink,
+  signal?: AbortSignal,
 ): Promise<JobRun> {
   const started = Date.now();
   const parser = createEventParser(onProgress);
-  const run = await runProcess({ executable: binary, args, cwd, env, timeoutMs, tailBytes: LOG_TAIL_BYTES, onStdout: parser.feed });
+  const run = await runProcess({
+    executable: binary,
+    args,
+    cwd,
+    // the job exits when this process dies (its stdin pipe closes): a detached job would otherwise outlive a hard kill of the host
+    env: env['LLULL_TEST_NO_HOST_WATCHDOG'] === '1' ? env : { ...env, LLULL_EXIT_ON_STDIN_EOF: '1' },
+    timeoutMs,
+    tailBytes: LOG_TAIL_BYTES,
+    onStdout: parser.feed,
+    // a console Ctrl-C must reach only this process: the job is stopped by the signal below, never by the console
+    ownProcessGroup: true,
+    holdStdin: true,
+    ...(signal !== undefined ? { signal } : {}),
+  });
   return settle(parser, run, binary, timeoutMs, started);
 }
 
@@ -211,8 +231,8 @@ export function createComputeRunner(
 ): ComputeRunner {
   return {
     binary,
-    run: (args, folder, timeoutMs, onProgress) =>
-      binary === null ? Promise.resolve(missing()) : execute(binary, [...args, folder], folder, timeoutMs, env, onProgress),
+    run: (args, folder, timeoutMs, onProgress, signal) =>
+      binary === null ? Promise.resolve(missing()) : execute(binary, [...args, folder], folder, timeoutMs, env, onProgress, signal),
     version: () => (binary === null ? Promise.resolve('unknown') : probeVersion(binary)),
   };
 }

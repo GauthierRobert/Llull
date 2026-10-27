@@ -46,12 +46,15 @@ Flags
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success
-  --progress                  stream one stderr line per plan step ([12/189] boolean … 3.2s);
-                              automatic when stderr is a terminal. Steps over 10 s always warn, and
-                              every step's durationMs is in the --json report (local runs only)
+  --progress                  stream one stderr line per plan step ([12/189] boolean … 3.2s) and, for a long
+                              native mesh job (quad_remesh, decimate_mesh, smooth_mesh, deviation), its stage, share done and
+                              estimated time left ([quad_remesh] max flow 15% (stage 7/12), 16.5s elapsed, ~1m33s left;
+                              also with --app / --server); automatic when stderr is a terminal. Steps over 10 s always warn, and
+                              every step's durationMs is in the --json report (local runs only). Ctrl-C cancels the job and the
+                              command (nothing is applied); stdout stays clean JSON
   --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing
                               saved. Local: checked between plan steps, a hard kill 5 s later for a
-                              step that never ends; --server: per-request limit (default 120 s)
+                              step that never ends; --server: whole-request limit (default: 120 s without any report from the server)
   --kernel manifold|occt-native  geometry kernel for local runs (default: the native llull-kernel when found, else
                               Manifold with a warning; $LLULL_KERNEL; manifold is a diagnostic override)
 

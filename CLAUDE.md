@@ -25,7 +25,8 @@ kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (the exact k
 Rust workspace `solver/` (`llull-compute`, `llull-kernel`, `llull-mesh`: Netgen FE mesher, `llull-netgen` cxx facade, `llull-meshops`: mesh decimate / smooth / deviation job) · TypeScript 7 typecheck (`typescript-native`; TS 6 kept only for dependency-cruiser) · Vitest + Testing Library · oxlint (`.oxlintrc.json`) + Prettier + knip ·
 Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
 agents: `llull` CLI only (`--app` drives the desktop app); no MCP server.
-Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.
+Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers); Rust is the default when
+Rust and TS are equivalent — `conventions.md` C7.
 
 ## LAYER MAP (npm workspaces `packages/*`; web app + `server/` at root)
 
