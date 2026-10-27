@@ -3,6 +3,7 @@
  * (metres, case frame), built from the prepare report. Pure: the host writes the folder and runs the sidecar. Contract: `llull_flow_lbm::job`.
  */
 
+import { displayOnlyMeshIds, displayOnlyMessage } from '@core/geometry/mesh/displayOnly';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import type { CadDocument, Vec3 } from '@core/model/types';
@@ -216,6 +217,7 @@ const SLICE_FIELDS: Readonly<Record<string, FlowSliceField>> = {
 /**
  * Builds the job of `cfdCase`, or the first refusal.
  * @invariant the STL triangles are the welded, outward surface whose hash is `geometryHash`, reordered so each body's triangles are one range
+ * @failure an asset-backed body that the document holds only as its display mesh -> MESH_ASSET_LOD_ONLY
  * @failure unknown / failing preparation rows -> their code (first fail row); a compressible case -> CFD_REGIME_MISMATCH (the Euler solver is
  *   not built); memory above `deviceMemoryBytes` -> CFD_MEMORY_EXCEEDED
  */
@@ -225,6 +227,8 @@ export function buildFlowJob(
   kernel: GeometryKernel | null,
   options: FlowJobOptions = {},
 ): FlowJobBuild {
+  const lodOnly = displayOnlyMeshIds(doc, cfdCase.entityIds);
+  if (lodOnly.length > 0) return refuse('MESH_ASSET_LOD_ONLY', displayOnlyMessage(lodOnly), lodOnly);
   const { report, stage } = prepareCaseWithStage(doc, cfdCase, kernel, {
     quality: options.quality,
     deviceMemoryBytes: options.deviceMemoryBytes,

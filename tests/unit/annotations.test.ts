@@ -208,7 +208,7 @@ describe('annotations invariant', () => {
         idempotent === true ||
         metaHistory === true ||
         requiresKernel === true ||
-        readsMeshTriangles === true;
+        (readsMeshTriangles !== undefined && readsMeshTriangles !== false);
       expect(atLeastOne, `${cmd.name} has an annotations object but no flag is true`).toBe(true);
     }
   });

@@ -74,7 +74,7 @@ export const addKnurl = defineCommand({
       .optional()
       .describe('geometry only: included angle of the V groove, degrees in (0, 180). Default 90 (named default).'),
   }),
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
     const session = openFace(doc, ctx, 'add_knurl', params.id, params.face);
     if (isRejection(session)) return session;

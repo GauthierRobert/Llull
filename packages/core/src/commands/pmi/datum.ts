@@ -22,7 +22,7 @@ const labelsOn = (items: ReturnType<typeof pmiItems>, entityId: string): Readonl
  */
 export const addDatumFeature = defineCommand({
   name: 'add_datum_feature',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Define a datum feature (datum A, B, C ...) on faces of a 3D solid: a plane, cylinder, cone or sphere named by facesNear points on the ' +
     'face(s), re-found at every replay. Omit label to take the next free letter on that solid; labels are 1-2 capital letters, unique per ' +
@@ -87,7 +87,7 @@ export const addDatumFeature = defineCommand({
  */
 export const addDatumTarget = defineCommand({
   name: 'add_datum_target',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add a datum target (point, line or area contact) of an existing datum on faces of the same solid, shown as A1, A2 ... Area targets need ' +
     'areaSize (contact diameter, document units). Targets are used when a whole feature is too irregular to be the datum (castings, sheet). ' +

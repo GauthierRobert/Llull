@@ -76,7 +76,7 @@ const setFacesNear = (item: PmiItem, points: readonly (readonly [number, number,
  */
 export const updatePmi = defineCommand({
   name: 'update_pmi',
-  annotations: { idempotent: true },
+  annotations: { readsMeshTriangles: true, idempotent: true },
   description:
     'Edit one PMI item by id. Each kind takes only its own fields: datum_feature (label, facesNear), datum_target (targetNumber, areaSize, ' +
     'facesNear), size_dimension (tolerance, sizeModifiers, facesNear), location_dimension (tolerance), geometric_tolerance (zone, ' +

@@ -15,7 +15,7 @@ import { faceSetSchema, pickedFaces, runFaceBlend } from './faceBlendRun';
  */
 export const filletFullRound = defineCommand({
   name: 'fillet_full_round',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Full round of a rib or wall top: replace the center face by a half-cylinder tangent to the two side faces (radius = half the distance between them, document units) and to where the center face was, and replace the solid by the result. ' +
     'side1 / side2 are the two parallel faces facing away from each other, center the face between them (all picked by points on them and/or persistent names); the center face is consumed (data.consumedFaces). ' +

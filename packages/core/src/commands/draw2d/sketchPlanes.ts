@@ -93,6 +93,7 @@ function faceFrame(
  */
 export const createSketchPlane = defineCommand({
   name: 'create_sketch_plane',
+  annotations: { readsMeshTriangles: true },
   description:
     'Create a named sketch plane: a world plane (plane: "xy" | "xz" | "yz") or a planar FACE of a solid (face: { id, faceIndex | faceNear | faceName }), ' +
     'moved offset along its normal and turned spin degrees about it. Place 2D entities on it with place_on_sketch_plane, project solid edges into ' +
@@ -168,6 +169,7 @@ const placeable = (entity: Entity | undefined): entity is Entity => entity !== u
  */
 export const placeOnSketchPlane = defineCommand({
   name: 'place_on_sketch_plane',
+  annotations: { readsMeshTriangles: true },
   description:
     "Put 2D entities (sketches drawn in local coordinates) on a sketch plane: each entity's local plane becomes the sketch plane, its local " +
     'origin at the plane origin plus at (plane-local [x, y]). Extrude / revolve them afterwards as usual. Regeneration re-places them, so a ' +

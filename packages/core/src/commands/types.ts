@@ -99,9 +99,15 @@ export interface CommandAnnotations {
   readonly requiresKernel?: boolean;
   /**
    * Reads the triangles of mesh entities (measures, analyses, exports, kernel input). `execute` runs it on the full-resolution mesh of
-   * asset-backed entities (07 MSH FR-MSH-02) and refuses with MESH_ASSET_LOD_ONLY when the asset cannot be read. Not emitted in tool schemas.
+   * every asset-backed mesh the params reach, directly or through a group, layer, component, instance or record id, or all of them when none is named (07 MSH FR-MSH-02, TECHNICAL_SPEC 13.11); when an asset cannot be read, a readOnly query that is not `writesArtifact` answers from the display mesh with a named warning (`data.lodOnly`) and every other command refuses MESH_ASSET_LOD_ONLY; MESH_ASSET_TOO_LARGE above MESH_FULL_READ_TRIANGLE_CAP refuses all. 'document' = the scope is every solid of the document whatever the params name (a drawing view without entityIds). Not emitted in tool schemas.
    */
-  readonly readsMeshTriangles?: boolean;
+  readonly readsMeshTriangles?: boolean | 'document';
+  /** With `readsMeshTriangles`: false when, for these params on this document, the command reads no triangle (it only places what it copies), so the stored meshes are not read and an unheld asset does not matter. */
+  readonly readsMeshTrianglesWhen?: (doc: CadDocument, params: unknown) => boolean;
+  /** A readOnly command whose `data` is a file or a figure that leaves the document (an export): it refuses an unreadable mesh asset instead of answering from the display mesh. */
+  readonly writesArtifact?: boolean;
+  /** With `readsMeshTriangles: true`: true when, for these params on this document, the command's scope is the whole document (a drawing view without entityIds). */
+  readonly wholeDocumentWhen?: (doc: CadDocument, params: unknown) => boolean;
 }
 
 /** A registered command: enough metadata to generate the UI affordance and the AI / CLI tool schema. */
@@ -208,6 +214,8 @@ export interface ObjectStorePort {
 }
 
 export interface ExecutionContext {
+  /** Set by `runCommand` while a command runs: a command it executes in turn is nested (a query then refuses an unreadable mesh asset instead of degrading). */
+  readonly nested?: boolean;
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */

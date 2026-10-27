@@ -29,7 +29,7 @@ export interface HolePlanData extends FtrResultMeta {
  */
 export const holesFromRecognition = defineCommand({
   name: 'holes_from_recognition',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'Turn the holes recognised on an exact 3D solid (an imported STEP part, see recognize_features) into a build_project plan of add_hole ' +
     'steps: data.actions, one step per group of identical holes (same kind, diameters, depth, drill point and entrance plane) with their ' +

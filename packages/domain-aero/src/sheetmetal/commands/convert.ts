@@ -29,7 +29,7 @@ export const convertToSheetMetal = defineCommand({
     'stationaryFace is a world point on one planar skin face: that face is the fixed reference of the unfolding (material lies behind it). Lengths are in the document length unit. ' +
     'Refusals: FTR_NEEDS_EXACT_KERNEL (use --kernel occt-native and import_step_exact), FTR_RULE_NOT_FOUND, FTR_FACE_NOT_FOUND, FTR_FACE_NOT_PLANAR, FTR_NON_DEVELOPABLE (cone / torus / spline faces), ' +
     'FTR_NOT_SHEET_METAL (non-constant thickness or non-cylindrical bend: model it as a machined part). Joggles are recognised. Next: flat_pattern, check_sheet_metal.',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   params: z.object({
     id: z.string().describe('Id of an exact solid entity (mesh with a B-rep, e.g. from import_step_exact).'),
     stationaryFace: z

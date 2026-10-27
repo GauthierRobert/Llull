@@ -29,6 +29,7 @@ const withThread = (hole: HoleSpec, thread: ThreadSpec | null): HoleSpec => {
  */
 export const setThread = defineCommand({
   name: 'set_thread',
+  annotations: { readsMeshTriangles: true },
   description:
     'Set (or remove) the thread of a hole feature made by add_hole: a designation such as "MJ6x1-4H5H" or ".1900-32 UNJF-3B", ' +
     'checked against a light per-family grammar. By default it is a cosmetic attribute for drawings, hole_table and code export; the geometry ' +

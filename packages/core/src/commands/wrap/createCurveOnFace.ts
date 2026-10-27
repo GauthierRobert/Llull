@@ -54,7 +54,7 @@ export const createCurveOnFace = defineCommand({
         'Largest deviation of the fitted 3D curve from its exact image, document units. Default: 1e-6 x the solid diagonal (named default).',
       ),
   }),
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
     const session = openFace(doc, ctx, 'create_curve_on_face', params.id, params.face);
     if (isRejection(session)) return session;

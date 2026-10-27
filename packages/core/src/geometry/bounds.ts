@@ -62,8 +62,12 @@ function memoLocal(e: Entity, compute: () => Bounds): Bounds {
   return result;
 }
 
-/** Local-space AABB of a `mesh`: its vertices, which `position` / `rotation` place like any other entity's local geometry. */
+/**
+ * Local-space AABB of a `mesh`: its vertices, which `position` / `rotation` place like any other entity's local geometry. An asset-backed
+ * mesh answers from the bounds of its stored asset (exact, same frame), never from its display level of detail.
+ */
 function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
+  if (e.asset !== undefined) return bounds(e.asset.bounds.min, e.asset.bounds.max);
   const p = e.mesh.positions;
   if (p.length < 3) return bounds(ORIGIN, ORIGIN);
   const { min, max } = positionsExtent(p);

@@ -40,6 +40,7 @@ function worldPoint(
  */
 export const addSpring = defineCommand({
   name: 'add_spring',
+  annotations: { readsMeshTriangles: true },
   description:
     'Add a spring-damper force element (physics, for simulate_motion; NOT the add_coil solid geometry) between a point on one rigid body and a point on another body or the ground, for simulate_motion ' +
     '(a coil spring, a gas strut, a bungee, an engine-valve spring). Force along the line joining the two points: ' +

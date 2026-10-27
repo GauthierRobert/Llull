@@ -34,6 +34,7 @@ function blendMetrics(kind: 'quadratic' | 'exponential' | 'chamfer', k: number):
  */
 export const combineFields = defineCommand({
   name: 'combine_fields',
+  annotations: { readsMeshTriangles: true },
   description:
     'Boolean of implicit FIELD nodes (never fails geometrically, unlike B-rep booleans): union, intersect, or subtract (a minus every b). ' +
     'Optional blend turns the sharp junction into a smooth one: quadratic (parabolic arc that leaves each face at distance radius from the edge, deviation radius/4 on the bisector), ' +

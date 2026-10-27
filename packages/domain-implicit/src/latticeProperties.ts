@@ -126,7 +126,7 @@ export const latticeProperties = defineCommand({
     'TPMS: control range, wall thickness (declared and measured by the distance transform, +-resolution), largest pore diameter, specific surface (table for gyroid / P / diamond, measured mesh area for the others), cell stretch of a cylindrical / spherical map. ' +
     'estimateMechanics adds the affine stretch-only stiffness of a strut cell (exact for the octet truss, an upper bound for bending-dominated cells) and the Gibson-Ashby law E/Es = C rho^n with the exponent of the class and the coefficient YOU give in scaling; ' +
     'baseMaterial {youngModulusMpa, source} turns the ratio into MPa. Always unverified and reviewRequired: never a design value.',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     id: z.string().describe('Id of a lattice field (struts or tpms node).'),
     estimateMechanics: z.boolean().optional().describe('Add the stiffness estimate (opt-in; unverified, needs review).'),

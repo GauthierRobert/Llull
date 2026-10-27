@@ -36,6 +36,7 @@ const PLANE_NORMAL = { XY: 'z', XZ: 'y', YZ: 'x' } as const;
  */
 export const createTopologyStudy = defineCommand({
   name: 'create_topology_study',
+  annotations: { readsMeshTriangles: true },
   description:
     'Create a topology optimization study on an existing analysis (create_analysis + set_part_idealization + add_fea_constraint + add_fea_load; ' +
     'force, pressure and gravity loads) and return the study id in affected[0]. `voxel` is the grid spacing in document length units (e.g. 1 for ' +

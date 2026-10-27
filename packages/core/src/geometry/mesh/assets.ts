@@ -59,3 +59,6 @@ export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshD
   }
   return { positions, indices: mesh.indices };
 }
+
+/** Full-resolution triangles one command may load from the asset store (named, provisional: about 600 MB of arrays: memory, not policy; 07 TECHNICAL §13.11). */
+export const MESH_FULL_READ_TRIANGLE_CAP = 16_000_000;

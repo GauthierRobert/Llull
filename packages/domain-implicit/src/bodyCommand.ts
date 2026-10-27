@@ -52,6 +52,7 @@ function withLayer(doc: CadDocument, id: string, name: string, visible: boolean)
  */
 export const createImplicitBody = defineCommand({
   name: 'create_implicit_body',
+  annotations: { readsMeshTriangles: true },
   description:
     'Realise an implicit FIELD as a closed triangle mesh solid (derived and read-only: change the field nodes and run this again). voxel is the grid spacing in document units: error is second order (volume error ~ 0.6 (voxel/smallest feature radius)^2). ' +
     "Bounds default to the field's support box (primitives, clipped lattices); a bare lattice or plane needs `bounds` or a region. " +

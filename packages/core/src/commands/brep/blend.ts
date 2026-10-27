@@ -26,7 +26,7 @@ const MAX_BLEND_OPERANDS = 200;
  */
 export const blendUnion = defineCommand({
   name: 'blend_union',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Weld 2+ solids into ONE exact solid and round every joint where they meet with a fillet: ' +
     'the one-piece frame operation (bike frame tubes, lugs and dropouts; pipe tees; brackets welded to ' +

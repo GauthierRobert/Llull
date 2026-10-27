@@ -111,7 +111,7 @@ describe('restore', () => {
       selection: unknown;
     };
     expect(restored.entities[id]).toBeUndefined();
-    expect(restored.order).not.toContain(id);
+    expect(restored.order).toContain(id);
     expect(restored.selection).toBe('none');
     const stale = { ...doc, entities: {} } as CadDocument;
     expect(implicitDocument.afterLoad?.(stale)?.[0]).toContain('IMP_BODY_STALE');

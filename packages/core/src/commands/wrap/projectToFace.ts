@@ -89,7 +89,7 @@ export const projectToFace = defineCommand({
         'Largest deviation of a projected curve from its sampled points, document units. Default: 1e-6 x the solid diagonal (named default).',
       ),
   }),
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: string[] = [], paths: string[] = []): CommandResult =>
       wrapRejection(doc, 'project_to_face', code, message, ids, paths);

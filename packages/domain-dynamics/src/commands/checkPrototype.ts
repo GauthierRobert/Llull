@@ -111,7 +111,7 @@ function engineParts(context: ExecutionContext, doc: CadDocument): PrototypeChec
  */
 export const checkPrototype = defineCommand({
   name: NAME,
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'The functional-prototype review in one call: "is this model ready to build and does it work?". Runs, in order, check_assembly ' +
     '(solids, overlaps, floating parts, walls, joints realised), the mechanism mobility (inspect_dynamics rank DOF; check_mechanism for ' +

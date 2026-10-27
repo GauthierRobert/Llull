@@ -12,7 +12,7 @@ import { LOAD_LAYERS, bodyCentres, dynamicsLoads } from '../sim/dynamicsLoads';
  */
 export const listDynamicsLoads = defineCommand({
   name: 'list_dynamics_loads',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'List every load of the physics model at its design values: each body weight at its centre of mass (gravity layer), every joint axis and ' +
     'gear coupling (joints), motor drive torque (drives) and propeller thrust at the governed speed (thrust). Each load has a short SI value, ' +

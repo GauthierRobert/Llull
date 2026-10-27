@@ -89,7 +89,7 @@ function dataFindings(items: readonly PmiItem[], byId: Readonly<Record<string, P
  */
 export const checkPmi = defineCommand({
   name: 'check_pmi',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Check the PMI of the document (read-only). Re-resolves every feature on the CURRENT B-rep (so it catches PMI broken by a model edit: ' +
     'GDT_FEATURE_UNRESOLVED, GDT_SURFACE_TYPE_CHANGED) when an OCC kernel is present, else reports resolution "not_run". Built-in logical ' +

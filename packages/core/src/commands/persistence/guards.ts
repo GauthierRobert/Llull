@@ -1,4 +1,6 @@
 import { storedMaterialModelsProblem } from '../document/materialModelStored';
+import { getMeshAssetPort } from '../../geometry/mesh/assets';
+import type { MeshAssetRef } from '../../model/meshProvenance';
 import { storedModelsProblem } from '../document/propertyModelSchema';
 import { formHash } from '../document/propertyModels';
 import { recordProblem } from './materialRecordValidation';
@@ -289,6 +291,20 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
 const PRIMITIVE_TYPES: ReadonlySet<unknown> = new Set(['plane', 'cylinder', 'cone', 'sphere', 'freeform']);
 const MESH_SOURCE_FORMATS: ReadonlySet<unknown> = new Set(['stl-ascii', 'stl-binary', 'obj', 'ply', '3mf', 'generated']);
 
+const sameVec3 = (a: unknown, b: ReadonlyArray<number>): boolean =>
+  Array.isArray(a) && a.length === 3 && a.every((value, index) => value === b[index]);
+
+/** True when the validated asset reference `ref` states what `stored` (the store's manifest) states. */
+function sameAssetRef(ref: Record<string, unknown>, stored: MeshAssetRef): boolean {
+  const bounds = ref['bounds'] as Record<string, unknown>;
+  return (
+    ref['triangles'] === stored.triangles &&
+    ref['vertices'] === stored.vertices &&
+    sameVec3(bounds['min'], stored.bounds.min) &&
+    sameVec3(bounds['max'], stored.bounds.max)
+  );
+}
+
 /** `meshSource` (positive unit scale, known format) and `faceGroups` (ranges inside the triangle count) of a mesh entity (07 MSH). */
 function meshProvenanceProblem(v: Record<string, unknown>, triangleCount: number): string | null {
   const source = v['meshSource'];
@@ -317,6 +333,10 @@ function meshProvenanceProblem(v: Record<string, unknown>, triangleCount: number
       !isVec3(bounds['max'])
     )
       return 'asset must be { key (64 hex), triangles, vertices, bounds: { min, max } }';
+    // The reference is trusted for bounds and for the size limit; where this machine holds the asset its manifest is the truth.
+    const stored = getMeshAssetPort()?.manifest(asset['key']) ?? null;
+    if (stored !== null && !sameAssetRef(asset, stored))
+      return `MESH_ASSET_REF_MISMATCH: asset ${asset['key'].slice(0, 12)}... is recorded with other triangles, vertices or bounds than this machine's store holds`;
   }
   const groups = v['faceGroups'];
   if (groups === undefined) return null;

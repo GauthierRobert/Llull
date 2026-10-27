@@ -65,6 +65,7 @@ export const deleteField = defineCommand({
  */
 export const regenerateImplicitBodies = defineCommand({
   name: 'regenerate_implicit_bodies',
+  annotations: { readsMeshTriangles: true },
   description:
     'Re-derive implicit bodies from their field recipes: the meshes of bodies whose content hash no longer matches what the current engine would produce (e.g. after loading a document on another machine or engine, ' +
     'or after the source solids changed), or of the bodies you list. Bodies that are up to date are left alone. Replayable: the result depends only on the recipe, voxel and engine. Reports which bodies changed.',

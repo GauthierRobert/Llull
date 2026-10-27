@@ -60,6 +60,7 @@ function inertiaProblem(tensor: Symmetric3): string | null {
  */
 export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
+  annotations: { readsMeshTriangles: true },
   description:
     'Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). Mass, centre of mass and ' +
     "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +

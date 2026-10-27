@@ -12,18 +12,7 @@ import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
-import { runWithFullMeshes } from './meshAssetView';
-
-/** `def.run`, on full-resolution asset meshes when the command reads triangles (`annotations.readsMeshTriangles`). */
-function runCommand(
-  def: NonNullable<ReturnType<typeof getCommand>>,
-  doc: CadDocument,
-  params: unknown,
-  ctx: ExecutionContext,
-): CommandResult {
-  if (def.annotations?.readsMeshTriangles !== true) return def.run(doc, params, ctx);
-  return runWithFullMeshes(doc, def.name, params, ctx, def.annotations.readOnly === true, (view) => def.run(view, params, ctx));
-}
+import { runCommand } from './runCommand';
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
 /** Blob tables (immutable objects) already scanned per kernel: an unchanged table is not re-walked on every execute. */

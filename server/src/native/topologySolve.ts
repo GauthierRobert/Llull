@@ -8,6 +8,8 @@
  * The document is only ever changed by `record_topology_result`.
  */
 
+import { withFullResolution } from '@core/geometry/entityTriangles';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import type { FeTopologyArtifact, TopologyConstraint, TopologyHistoryRow, TopologyStudy } from '@core/model/topology';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
@@ -266,7 +268,11 @@ export async function runTopologySolve(
   const found = findStudy(doc, studyId);
   if (found === undefined) return failure('TOP_STUDY_NOT_FOUND', `no topology study '${studyId}': create_topology_study first`, [studyId]);
   const study: TopologyStudy = found.study;
-  const built = buildTopologyJob(doc, study);
+  // The job reads triangles: hand it the stored meshes of asset-backed bodies, not their display level of detail (it refuses what it cannot get).
+  const regionIds = [...study.keepIn, ...study.keepOut].flatMap((region) =>
+    region.kind === 'entity' ? [region.entityId] : region.kind === 'box' ? [] : [region.target.entityId],
+  );
+  const built = buildTopologyJob(withFullResolution(doc, [...study.designDomain, ...regionIds], defaultMeshAssetStore()), study);
   if (!built.ok) return failure(built.code, built.message, built.ids.length > 0 ? built.ids : [studyId]);
   const { job } = built;
 

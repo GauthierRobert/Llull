@@ -3,7 +3,7 @@
  * (./instanceExpansion) bakes one into world-space entities.
  */
 
-import { type Component, type Entity, type InstanceEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { UNIT_SCALE, expandInstance } from '../../geometry/instanceExpansion';
@@ -12,6 +12,8 @@ import { commitEntity } from '../entity/commitEntity';
 import { referenceLossSuffix, referenceSuffix, replaceEntities, withoutEntities } from '../entity/entityOps';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
+import { currentContext } from '../context';
+import { isStoreFailure, meshRejection, storeMesh } from '../mesh/meshCommon';
 import { EXTRUSION_COLOR } from '../solids/shared';
 import { ORIGIN } from '../../lib/vec3';
 
@@ -156,27 +158,51 @@ export const insertInstance = defineCommand({
   },
 });
 
+/** True unless `params.id` is an instance with scale [1,1,1]: only a scaled or mirrored instance reshapes (and so reads) the meshes of its component. */
+function reshapesChildren(doc: CadDocument, params: unknown): boolean {
+  const id = typeof params === 'object' && params !== null ? (params as { readonly id?: unknown }).id : undefined;
+  const entity = typeof id === 'string' && Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
+  return entity?.kind !== 'instance' || (entity.scale ?? UNIT_SCALE).some((factor) => factor !== 1);
+}
+
 /**
  * @affects [newEntityIds...] — the fresh concrete entities produced by the bake
  * @invariant instance is replaced in doc.entities/order by its expanded child entities
  * @invariant each produced entity has a fresh id; the component definition is unchanged
+ * @invariant a mesh child with a stored asset that the instance scale or mirror reshapes is baked at full resolution and written through `storeMesh` (a new asset,
+ *   a new display mesh); a child the instance only places keeps its asset
+ * @invariant an instance that only places its component (scale [1,1,1]) bakes position and rotation: it reads no stored mesh, and explodes wherever the document is
+ * @failure no asset store while a reshaped child needs one -> MESH_ASSET_UNAVAILABLE; an unreadable asset -> MESH_ASSET_LOD_ONLY
  * @failure id is not an instance -> no-op, affected:[]
  * @failure instance's componentId not found in doc.components -> no-op, affected:[]
  */
 export const explodeInstance = defineCommand({
   name: 'explode_instance',
+  annotations: { readsMeshTriangles: true, readsMeshTrianglesWhen: reshapesChildren },
   description:
     "Replace an InstanceEntity with concrete copies of its component's entities baked into world space. " +
     'Each produced entity receives a fresh id. The component definition is NOT removed. ' +
     'The instance entity is removed and its order position is filled with the produced entities. ' +
     'Returns the new entity ids in affected.',
   params: z.object({ id: z.string().describe('Id of an InstanceEntity to explode into its world-space component entities.') }),
-  run: (doc, { id }): CommandResult => {
+  run: (doc, { id }, ctx): CommandResult => {
     const entity = entityOfKind(doc, id, ['instance']);
     if (typeof entity === 'string') return noop(doc, `explode_instance: ${entity}.`);
     const component = doc.components[entity.componentId];
     if (!component) return noop(doc, `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`);
-    const bakedEntities = expandInstance(entity, component);
+    const prefix = `expanded::${id}::`;
+    const assets = (ctx ?? currentContext()).meshAssets;
+    const bakedEntities: Entity[] = [];
+    for (const baked of expandInstance(entity, component)) {
+      const source = component.entities[baked.id.slice(prefix.length)];
+      if (baked.kind !== 'mesh' || baked.asset !== undefined || source?.kind !== 'mesh' || source.asset === undefined) {
+        bakedEntities.push(baked);
+        continue;
+      }
+      const stored = storeMesh(baked.mesh, assets);
+      if (isStoreFailure(stored)) return meshRejection(doc, 'explode_instance', stored.code, stored.message, [id]);
+      bakedEntities.push({ ...baked, mesh: stored.mesh, ...(stored.asset === undefined ? {} : { asset: stored.asset }) });
+    }
     const bakedIds = bakedEntities.map((e) => e.id);
     const { document: rest, prunedReferences } = withoutEntities(doc, new Set([id]));
     const document = {

@@ -40,6 +40,7 @@ function target(doc: CadDocument, id: string): Entity | string {
  */
 export const addDecal = defineCommand({
   name: 'add_decal',
+  annotations: { readsMeshTriangles: true },
   description:
     'Paint a line of text onto a 3D solid as a decal (logo, brand, part number, sidewall lettering): ' +
     'it is projected along -normal onto the faces turned toward it within the decal box, keeps ' +

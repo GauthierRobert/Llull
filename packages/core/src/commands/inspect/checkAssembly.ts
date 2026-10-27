@@ -16,7 +16,7 @@ import { scopedIds } from '../../geometry/assemblyParts';
  */
 export const checkAssembly = defineCommand({
   name: 'check_assembly',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'Buildability gate of the 3D parts (solids and component instances): is every part a valid closed single-lump solid, do parts overlap ' +
     '(FPR_PAIR_HARD with overlap volume mm3, FPR_PAIR_CONTAINED), touch (info) or sit closer than the required clearance, is every part ' +

@@ -51,7 +51,7 @@ function lowestAlong(context: FaceOpContext, direction: Vec3): Vec3 | null {
  */
 export const draftFaces = defineCommand({
   name: 'draft_faces',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Draft (taper) faces of a 3D solid for mould release: each picked face is tilted by angle degrees about its intersection with the neutral ' +
     'plane so the part opens along pull. Pick faces by faceIndices, facesNear or faceNames. The neutral plane defaults to the plane normal to ' +
@@ -89,7 +89,7 @@ export const draftFaces = defineCommand({
  */
 export const pushPullFace = defineCommand({
   name: 'push_pull_face',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Push or pull ONE planar face of a 3D solid along its outward normal: distance > 0 adds material (the face moves out, its side faces ' +
     'follow), distance < 0 removes it. Pick the face by faceIndex, faceNear or faceName. Exact B-rep only (native OCC kernel); the source is consumed.',
@@ -128,7 +128,7 @@ function pushPullParams(context: FaceOpContext, distance: number): ReturnType<Pa
  */
 export const splitFace = defineCommand({
   name: 'split_face',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Split faces of a 3D solid along a plane (the body stays one solid; each picked face crossing the plane becomes two faces, e.g. to draft ' +
     'or push-pull only part of a face). Pick faces by faceIndices, facesNear or faceNames. Exact B-rep only (native OCC kernel).',
@@ -169,7 +169,7 @@ function replaceParams(context: FaceOpContext, target: PlaneSpec): ReturnType<Pa
  */
 export const replaceFace = defineCommand({
   name: 'replace_face',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Replace a planar face of a 3D solid by a parallel target plane: the face moves onto the plane and its side faces follow (e.g. bring a ' +
     'boss up to a datum, or flush a face with another part). The target is a plane { origin, normal } parallel to the face (copy it from ' +

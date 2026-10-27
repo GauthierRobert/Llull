@@ -123,7 +123,7 @@ export const splitFaceByCurves = defineCommand({
         'Largest distance a curve may lie from its face, and the fit tolerance of its face-parameter curve, document units. Default: 1e-5 x the solid diagonal (named default).',
       ),
   }),
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
     const session = openSolid(doc, ctx, 'split_face_by_curves', params.id);
     if (isRejection(session)) return session;

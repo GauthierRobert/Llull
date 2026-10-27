@@ -40,7 +40,7 @@ function halfSpace(origin: Vec3, normal: Vec3, size: number, side: 1 | -1, templ
  */
 export const splitBody = defineCommand({
   name: 'split_body',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Split a 3D solid in two along a plane: the source is replaced by two mesh entities, the half on the normal side first, then the other. ' +
     'Works on every kernel with booleans (exact B-rep halves on the native kernel). Refused when the plane misses the solid.',

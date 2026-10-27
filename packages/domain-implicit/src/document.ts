@@ -194,8 +194,58 @@ function coarseDisplay(realiseAt: (voxel: number) => ReturnType<typeof realiseFi
 }
 
 /**
+ * The raw `entities` and `components` with every asset-backed mesh that the solid sources `ids` read (themselves, or through the component of an instance, nested
+ * ones included) carrying its stored mesh; null when this machine does not hold one of the assets.
+ */
+function storedMeshes(
+  raw: Record<string, unknown>,
+  entities: Record<string, unknown>,
+  ids: readonly string[],
+  port: ReturnType<typeof getMeshAssetPort>,
+): { entities: Record<string, unknown>; components: Record<string, unknown> } | null {
+  const components = isRecord(raw['components']) ? raw['components'] : {};
+  const measured = { entities: { ...entities }, components: { ...components } };
+  const stored = (entity: Record<string, unknown>): unknown => {
+    const key = isRecord(entity['asset']) ? entity['asset']['key'] : undefined;
+    const full = typeof key === 'string' ? (port?.readMesh(key) ?? null) : null;
+    return full === null ? null : { ...entity, mesh: full };
+  };
+  const seen = new Set<string>();
+  const visitComponent = (componentId: string): boolean => {
+    const component = Object.hasOwn(components, componentId) ? components[componentId] : undefined;
+    if (!isRecord(component) || !isRecord(component['entities']) || seen.has(componentId)) return true;
+    seen.add(componentId);
+    const children = { ...component['entities'] };
+    for (const [childId, child] of Object.entries(component['entities'])) {
+      if (!isRecord(child)) continue;
+      if (child['kind'] === 'instance' && typeof child['componentId'] === 'string') {
+        if (!visitComponent(child['componentId'])) return false;
+      } else if (child['kind'] === 'mesh' && isRecord(child['asset'])) {
+        const full = stored(child);
+        if (full === null) return false;
+        children[childId] = full;
+      }
+    }
+    measured.components[componentId] = { ...component, entities: children };
+    return true;
+  };
+  for (const id of ids) {
+    const entity = entities[id];
+    if (!isRecord(entity)) continue;
+    if (entity['kind'] === 'instance' && typeof entity['componentId'] === 'string') {
+      if (!visitComponent(entity['componentId'])) return null;
+    } else if (entity['kind'] === 'mesh' && isRecord(entity['asset'])) {
+      const full = stored(entity);
+      if (full === null) return null;
+      measured.entities[id] = full;
+    }
+  }
+  return measured;
+}
+
+/**
  * Re-derive the omitted meshes of a raw document through the resolved field engine, in creation order against the entities restored so far (a body
- * may be built on another body). A body that the engine cannot realise is dropped from the draw order and selection and reported by `afterLoad`
+ * may be built on another body). A body that the engine cannot realise stays listed in the draw order (saving loses nothing; a load that can realise it does so in place), leaves the selection and is reported by `afterLoad`
  * (IMP_BODY_STALE); a mesh that realises with another content hash (other engine) is kept and its record updated.
  */
 function restore(raw: Record<string, unknown>): Record<string, unknown> {
@@ -222,7 +272,15 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
       restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(stored, MESH_LOD_TRIANGLES), body.asset);
       continue;
     }
-    const doc = { ...raw, units: typeof raw['units'] === 'string' ? raw['units'] : 'mm', entities: restored } as unknown as CadDocument;
+    // A solid node measures its entity's triangles: an asset-backed mesh (also one inside the component of an instance) is read at its stored
+    // resolution, never from its display mesh. Without the asset the body stays unrealised (IMP_BODY_STALE) and listed in the draw order: re-realising
+    // it from the display mesh would rewrite its content hash with a wrong geometry.
+    const measured = storedMeshes(raw, restored, sourcesOf(slice as unknown as ImplicitModel, body.field), port);
+    if (measured === null) {
+      dropped.add(body.id);
+      continue;
+    }
+    const doc = { ...raw, units: typeof raw['units'] === 'string' ? raw['units'] : 'mm', ...measured } as unknown as CadDocument;
     const realiseAt = (voxel: number): ReturnType<typeof realiseField> =>
       realiseField(
         doc,
@@ -258,12 +316,13 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
       };
   }
   const without = (value: unknown): unknown => (Array.isArray(value) ? value.filter((id) => !dropped.has(String(id))) : value);
-  return { ...raw, entities: restored, implicit: { ...slice, bodies }, order: without(raw['order']), selection: without(raw['selection']) };
+  return { ...raw, entities: restored, implicit: { ...slice, bodies }, order: raw['order'], selection: without(raw['selection']) };
 }
 
 export const implicitDocument: DocumentExtension = {
   validate: implicitErrors,
   derivedEntityIds: (doc) => new Set(Object.keys(implicitOf(doc).bodies)),
+  staleEntityIds: (doc) => new Set(Object.keys(implicitOf(doc).bodies).filter((id) => !Object.hasOwn(doc.entities, id))),
   restore,
   afterLoad: (doc) => {
     const port = getMeshAssetPort();
@@ -271,10 +330,15 @@ export const implicitDocument: DocumentExtension = {
     return [
       ...bodies
         .filter((body) => !Object.hasOwn(doc.entities, body.id))
-        .map(
-          (body) =>
-            `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`,
-        ),
+        .map((body) => {
+          const unheld = sourcesOf(implicitOf(doc), body.field).filter((id) => {
+            const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
+            return entity?.kind === 'mesh' && entity.asset !== undefined && (port === null || port.manifest(entity.asset.key) === null);
+          });
+          return unheld.length > 0
+            ? `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) is built from the mesh asset of ${unheld.map((id) => `'${id}'`).join(', ')}, which this machine does not hold; run regenerate_implicit_bodies on a machine that holds the asset`
+            : `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`;
+        }),
       ...bodies
         .filter(
           (body) =>

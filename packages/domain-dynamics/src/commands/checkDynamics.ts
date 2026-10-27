@@ -55,7 +55,7 @@ const dynamicsParams = z.object({
  */
 export const checkDynamics = defineCommand({
   name: NAME,
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Review check of the physics model (rigid bodies, joints, motors, propellers): are the inputs realistic and are the simulation numbers ' +
     'trustworthy? Returns the review envelope in data (status = worst item; not_run is never a pass; reviewRequired). Static items need no ' +

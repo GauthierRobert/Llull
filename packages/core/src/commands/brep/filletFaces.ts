@@ -102,7 +102,7 @@ function holdLineBlend(request: HoldRequest, context: BlendContext): BlendBuild 
  */
 export const filletFaces = defineCommand({
   name: 'fillet_faces',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Blend two sets of faces of a 3D solid that meet along edges, or, as one planar face per set with a constant radius and no shared edge, do not (a rolling ball of radius `radius` touching both, tangent to each) and replace the solid by the result; the faces between the contact lines (e.g. a chamfer between two walls) are consumed ' +
     '(data.consumedFaces lists them, data.blends the new blend face). facesA / facesB pick faces by points on them (near) and/or persistent names. ' +

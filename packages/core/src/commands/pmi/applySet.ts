@@ -286,7 +286,7 @@ export function withImportRecord(doc: CadDocument, record: PmiImportRecord): Cad
  */
 export const applyPmiSet = defineCommand({
   name: 'apply_pmi_set',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add many semantic PMI items to one 3D solid in one step: datum features, feature control frames (characteristic, zone, datum labels), size and ' +
     'location dimensions with tolerances. Each item names its faces by facesNear points (document units, one point ON each face; inspect_faces lists them), ' +

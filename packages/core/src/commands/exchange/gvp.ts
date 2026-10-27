@@ -122,7 +122,7 @@ export function gvpOfEntity(doc: CadDocument, entity: Entity, ctx: MassContext):
  */
 export const geometricValidationProperties = defineCommand({
   name: 'geometric_validation_properties',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Compute the CAx-IF geometric validation properties of 3D solids: volume, surface area, centre of volume (centroid) and bounding box, in document ' +
     'units (volume in units^3, area in units^2). These are the values export_step_ap242 embeds in a STEP file and verify_exchange_file compares with what ' +

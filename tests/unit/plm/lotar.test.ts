@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
+import { newEntity } from '@core/commands/entity/newEntity';
 import { type ValidationProperties, compareValidation, documentOfSnapshot, validationPropertiesOf } from '@plm/lotar/validation';
 import { inWork, releasedB, released } from './fixtures';
 import { run } from './scenarioRunner';
@@ -19,6 +20,31 @@ const properties = (doc: CadDocument, params: Record<string, unknown> = {}): { d
   expect(result.rejected, result.summary).toBeUndefined();
   return { data: result.data as Data, summary: result.summary };
 };
+
+describe('lotar_validation_properties with an asset this machine lacks', () => {
+  it('archives the body as unmeasured, never a figure computed from its display mesh', () => {
+    const base = inWork();
+    const ghost = newEntity(
+      'mesh',
+      'ghost',
+      {
+        mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3] },
+        asset: { key: 'a'.repeat(64), triangles: 99999, vertices: 4, bounds: { min: [0, 0, 0], max: [1, 1, 1] } },
+      },
+      [0, 0, 0],
+      '#cccccc',
+    );
+    const doc = { ...base, entities: { ...base.entities, ghost }, order: [...base.order, 'ghost'] };
+    const { data } = properties(doc);
+    expect(data.validation.solids.find((solid) => solid.id === 'ghost')).toMatchObject({
+      method: 'unmeasured',
+      volume: null,
+      area: null,
+      centroid: null,
+    });
+    expect(data.validation.solids.some((solid) => solid.volume !== null)).toBe(true);
+  });
+});
 
 describe('lotar_validation_properties', () => {
   it('measures the live definition of the open revision: volume, area, centroid and counts of every 3D entity', () => {

@@ -40,7 +40,7 @@ export const exportCode = defineCommand({
     name: z.string().optional().describe('Base file name without extension (sanitized). Default "model".'),
     confirmExportControlled,
   }),
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true, idempotent: true },
   run: (doc, params, ctx): CommandResult => {
     const { language, name } = params;
     const refused = exportRefusal(doc, 'export_code', 'code', params.confirmExportControlled, ctx);

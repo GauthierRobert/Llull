@@ -27,7 +27,7 @@ export function openLoopGaps(mobility: MobilityResult): Record<string, number> {
  */
 export const inspectDynamics = defineCommand({
   name: 'inspect_dynamics',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about ' +
     'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings (ratio, teeth, efficiency), motors, propellers (with their Ct / Cp table), cylinder pressures and engine losses (losses, only when set), and any problem that would stop ' +

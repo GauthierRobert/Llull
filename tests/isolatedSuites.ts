@@ -21,6 +21,7 @@ export const ISOLATED_SUITES: readonly string[] = [
   'tests/unit/contract/entityPropertiesPort.test.ts',
   'tests/unit/contract/plugins.test.ts',
   'tests/unit/contract/reconcile.test.ts',
+  'tests/unit/contract/staleEntities.test.ts',
   'tests/unit/contract/retiredCommands.test.ts',
   'tests/unit/contract/reviewFixes.test.ts',
   'tests/unit/physics/thermal/viewFactorReciprocity.test.ts',

@@ -80,7 +80,7 @@ function islandProblem(island: readonly Vec2[], outline: readonly Vec2[], earlie
  */
 export const addPocket = defineCommand({
   name: 'add_pocket',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Cut a pocket into a planar face of a 3D solid: a closed outline (rectangle or polygon) whose vertical corners are rounded by ' +
     'cornerRadius (exact arcs) and whose floor edges may carry a floorFillet (exact kernel only). Give exactly one of depth, through=true (cut ' +

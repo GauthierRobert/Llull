@@ -69,7 +69,7 @@ const ambiguity = (found: Recognition): FtrFinding[] =>
  */
 export const recognizeFeatures = defineCommand({
   name: 'recognize_features',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'Recognise the manufacturing features of an exact 3D solid from its B-rep: holes (simple, counterbore, countersink, through or blind with ' +
     'a drill point; per hole the axis point at the entrance, the axis pointing into the material, diameter, countersink diameter / included ' +

@@ -456,6 +456,7 @@ describe('a stored body this host can only show coarsely', () => {
     const recordB = { ...recordWithoutAsset, id: 'imp-b', field: 'fld-solid', voxel: 2, contentHash: 'hash-of-b-as-saved', name: 'B' };
     const withB: CadDocument = {
       ...created.document,
+      order: [...created.document.order, 'imp-b'],
       implicit: { ...model, fields: { ...model.fields, 'fld-solid': solid }, bodies: { ...model.bodies, 'imp-b': recordB } },
     };
     const text = serializeDocument(withB);
@@ -465,7 +466,7 @@ describe('a stored body this host can only show coarsely', () => {
     const coarse = deserializeDocument(text);
     expect((coarse.entities[idA] as MeshSolidEntity).asset?.key).toBe(recordA.asset?.key);
     expect(coarse.entities['imp-b']).toBeUndefined();
-    expect(coarse.order).not.toContain('imp-b');
+    expect(coarse.order).toContain('imp-b');
     expect(coarse.implicit?.bodies['imp-b']?.contentHash).toBe('hash-of-b-as-saved');
     const warnings = implicitDocument.afterLoad?.(coarse) ?? [];
     expect(warnings.some((w) => w.startsWith('IMP_BODY_STALE') && w.includes("'imp-b'"))).toBe(true);
@@ -478,5 +479,7 @@ describe('a stored body this host can only show coarsely', () => {
     const full = deserializeDocument(text);
     expect((full.entities[idA] as MeshSolidEntity).asset?.key).toBe(recordA.asset?.key);
     expect((implicitDocument.afterLoad?.(full) ?? []).filter((w) => w.includes("'" + idA + "'"))).toEqual([]);
+    // with the store, B is realised from the stored mesh of A (not from its coarse display mesh)
+    expect(full.entities['imp-b']).toBeDefined();
   }, 180_000);
 });

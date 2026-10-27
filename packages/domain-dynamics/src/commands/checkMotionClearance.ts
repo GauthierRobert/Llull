@@ -91,7 +91,7 @@ const clearanceParams = z.object({
  */
 export const checkMotionClearance = defineCommand({
   name: NAME,
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'Does the mechanism hit anything while it moves, and how close does it come? Runs the physics simulation (same engine and parameters ' +
     'as simulate_motion), carries every 3D part with its rigid body through the simulated poses and measures, for every pair with at least ' +

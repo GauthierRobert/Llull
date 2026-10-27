@@ -34,7 +34,7 @@ const datumField = z
  */
 export const addGeometricTolerance = defineCommand({
   name: 'add_geometric_tolerance',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add a feature control frame (geometric tolerance) to a 3D solid: characteristic (straightness, flatness, roundness, cylindricity, ' +
     'profile_line, profile_surface, angularity, perpendicularity, parallelism, position, concentricity, coaxiality, symmetry, circular_runout, ' +

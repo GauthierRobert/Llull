@@ -142,7 +142,7 @@ function buildElevationSheet(
  */
 export const exportElevationSheet = defineCommand({
   name: 'export_elevation_sheet',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: 'document', readOnly: true, writesArtifact: true, idempotent: true },
   description:
     'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) drawn as an ISO 128 line drawing ' +
     'from the 3D model with hidden lines removed (visible edges heavy, centre lines chain-dotted): north / south / east / west elevation ' +

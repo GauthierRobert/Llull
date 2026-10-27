@@ -99,6 +99,11 @@ export function derivedEntityIds(doc: CadDocument): Set<string> {
   return new Set(documentExtensions().flatMap((extension) => [...extension.derivedEntityIds(doc)]));
 }
 
+/** Derived entity ids that an installed plugin could not realise on this machine (see `DocumentExtension.staleEntityIds`). */
+export function staleEntityIds(doc: CadDocument): Set<string> {
+  return new Set(documentExtensions().flatMap((extension) => [...(extension.staleEntityIds?.(doc) ?? [])]));
+}
+
 /** The property providers of the installed plugins, in installation order. */
 export function entityPropertyProviders(): EntityPropertyProvider[] {
   return installed.flatMap((plugin) => (plugin.entityProperties ? [plugin.entityProperties] : []));

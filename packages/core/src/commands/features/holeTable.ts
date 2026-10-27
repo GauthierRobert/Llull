@@ -79,7 +79,7 @@ function faceDatum(positions: readonly number[], indices: readonly number[], hol
  */
 export const holeTable = defineCommand({
   name: 'hole_table',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'List the holes of a part as a table for drawings: one row per hole with its label (H1, H2, ... in table order), position x, y from the ' +
     'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink, counterdrill), ' +

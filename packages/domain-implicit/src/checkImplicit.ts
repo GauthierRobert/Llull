@@ -62,7 +62,7 @@ export const checkImplicit = defineCommand({
     'more than one solid component (IMP_DISCONNECTED), features thinner than 2 voxels (IMP_CHECK_RESOLUTION_COARSE: halve the voxel), and walls / struts below the process limits you give. ' +
     'llull ships NO printer table: pass process {minWallMm, minStrutMm, source} from your machine data sheet, otherwise IMP_CHECK_NO_PROCESS_LIMITS is always reported. ' +
     'purpose "release" marks the result reviewRequired: computed by llull, not approved, a qualified engineer must review. Returns status pass / warn / fail and a findings list.',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     id: z.string().describe('Id of the implicit body (the entity id returned by create_implicit_body).'),
     process: z

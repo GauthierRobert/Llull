@@ -31,7 +31,7 @@ const relativeChange = (a: number, b: number): number => (a !== 0 ? Math.abs(b -
  */
 export const checkTimestepConvergence = defineCommand({
   name: NAME,
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Solution verification of an engine run (FR-FPR-79): runs the engine governed at one speed at the solver timestep dt and again at dt/2, ' +
     'and reports the relative change of the mean BRAKE torque (indicated when there are no engine losses) and of the peak wrist-pin force. A ' +

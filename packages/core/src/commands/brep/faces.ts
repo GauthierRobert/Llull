@@ -55,7 +55,7 @@ function summaryOf(
  */
 export const inspectFaces = defineCommand({
   name: 'inspect_faces',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'List the faces of an exact 3D solid with located geometry: per face its index (the same index inspect_topology uses), surface type ' +
     '(plane, cylinder, cone, sphere, torus, bspline, …), area, centroid, outward unit normal (planes), axis and radius (cylinder, cone, ' +

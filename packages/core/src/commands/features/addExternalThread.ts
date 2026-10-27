@@ -27,7 +27,7 @@ const DIAMETER_TOLERANCE = 1e-3;
  */
 export const addExternalThread = defineCommand({
   name: 'add_external_thread',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Cut a modelled ISO metric EXTERNAL thread (M3-M64) into a cylinder: a real helical groove of the ISO 68-1 basic profile (H = 0.866025 P, ' +
     'pitch diameter d2 = d - 0.649519 P, groove bottom at the minor diameter d1 = d - 1.082532 P). target must be a cylinder entity (add_cylinder) ' +

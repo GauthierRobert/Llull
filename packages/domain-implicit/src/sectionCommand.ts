@@ -48,7 +48,7 @@ export const sectionField = defineCommand({
     'Cut an implicit field or body by a plane and report the section as numbers: closed boundary loops (outer loops positive area, holes negative), their perimeters, the solid area, and the solid fraction of the sampled square ' +
     '(the numeric version of a section view; use it to see the inside of a lattice). The plane is given by a point and a normal; the sampled square has side `size` (document units), is centred on the point and uses a resolution x resolution grid ' +
     '(resolution 8..400; the area error falls with its square). Loops are decimated to 2000 points each; svg true adds an SVG drawing of the section in data.svg (save it with --save).',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     id: z.string().describe('Id of a field node or of an implicit body.'),
     plane: z

@@ -126,7 +126,7 @@ function project(doc: CadDocument, ctx: ExecutionContext | undefined, request: P
  */
 export const projectEdgesToSketch = defineCommand({
   name: 'project_edges_to_sketch',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Bring edges of a 3D solid into a sketch plane as LINKED 2D geometry: mode "project" draws each edge projected onto the plane (an open ' +
     'polyline), mode "intersect" puts a point where each edge crosses the plane. Pick edges by edgeIndices / edgesNear / edgeNames (none = all). ' +

@@ -42,7 +42,7 @@ type Attempt =
  */
 export const simulateMotion = defineCommand({
   name: 'simulate_motion',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Run the rigid-body physics of the mechanism (bodies, joints, gears, motors, propellers) forward in time with a real physics ' +
     'engine (MuJoCo) and report what happens: final speed of every joint (rpm), when it settled, engine torque and power, propeller ' +

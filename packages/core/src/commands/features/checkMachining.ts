@@ -69,7 +69,7 @@ const missingThreshold = (rule: string): FtrFinding => ({
  */
 export const checkMachining = defineCommand({
   name: 'check_machining',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'Check the holes and pockets of a part against machining rules and return findings with stable codes: countersink knife edge ' +
     '(FTR_CSK_KNIFE_EDGE: cone depth >= local thickness), thin land (FTR_CSK_LAND_BELOW_MIN), hole depth / diameter ratio ' +

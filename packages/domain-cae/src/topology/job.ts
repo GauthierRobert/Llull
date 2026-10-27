@@ -6,6 +6,7 @@
 import type { FeaConstraint, UnitSystem } from '@core/model/analysis';
 import type { TopologyArtifactGrid, TopologyStudy, WorldAxis } from '@core/model/topology';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
+import { displayOnlyMeshIds, displayOnlyMessage } from '@core/geometry/mesh/displayOnly';
 import { toMetres } from '@core/model/units';
 import { is3D, type CadDocument } from '@core/model/types';
 import { analysisLengthMetres } from '../shared/defaults';
@@ -122,10 +123,16 @@ function extrusionAxis(grid: TopologyGrid, axis: WorldAxis): { readonly axis: Wo
 
 /**
  * Builds the job of `study` from the document.
+ * @failure an asset-backed solid of the domain or of a region that the document holds only as its display mesh -> MESH_ASSET_LOD_ONLY
  * @failure unknown analysis / invalid domain / grid above the cap / unmappable target / no supports or loads / unsupported load or constraint
  *   kind / mixed or missing material / min_volume without mma -> a coded refusal (TOP_*), never a throw
  */
 export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): TopologyJobResult {
+  const regionIds = [...study.keepIn, ...study.keepOut].flatMap((region) =>
+    region.kind === 'entity' ? [region.entityId] : region.kind === 'box' ? [] : [region.target.entityId],
+  );
+  const lodOnly = displayOnlyMeshIds(doc, [...study.designDomain, ...regionIds]);
+  if (lodOnly.length > 0) return refuse('MESH_ASSET_LOD_ONLY', displayOnlyMessage(lodOnly), lodOnly);
   const analysisCase = caseOf(doc, study.analysisId);
   if (analysisCase === undefined) return refuse('TOP_ANALYSIS_MISSING', `no analysis '${study.analysisId}'`, [study.analysisId]);
   const triangles = domainTriangles(doc, study.designDomain);

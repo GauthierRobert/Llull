@@ -59,7 +59,7 @@ export const wrapToFace = defineCommand({
         'Largest deviation of a fitted 3D curve from its exact image, document units. Default: 1e-6 x the solid diagonal (named default).',
       ),
   }),
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
     const session = openFace(doc, ctx, 'wrap_to_face', params.id, params.face);
     if (isRejection(session)) return session;

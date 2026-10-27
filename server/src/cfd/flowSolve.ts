@@ -7,6 +7,8 @@
  */
 
 import { defaultContext } from '@core/commands/context';
+import { withFullResolution } from '@core/geometry/entityTriangles';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import type { CfdResultArtifact } from '@core/model/cfdResult';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { buildFlowJob, cfdCaseOf, cfdSummary, flowResultArtifact, parseFlowResult, type FlowDevice, type FlowJob } from '@aero/index';
@@ -126,7 +128,8 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
     return failure('CFD_PARAM_INVALID', `maxSteps must be an integer >= 1, got ${options.maxSteps}`, [caseId]);
   if (options.latticeMach !== undefined && !(options.latticeMach > 0 && options.latticeMach <= 0.3))
     return failure('CFD_PARAM_INVALID', `latticeMach must be in (0, 0.3], got ${options.latticeMach}`, [caseId]);
-  const built = buildFlowJob(doc, cfdCase, defaultContext().kernel, {
+  // The job reads triangles: hand it the stored meshes of asset-backed bodies, not their display level of detail (it refuses what it cannot get).
+  const built = buildFlowJob(withFullResolution(doc, cfdCase.entityIds, defaultMeshAssetStore()), cfdCase, defaultContext().kernel, {
     device: options.device,
     maxSteps: options.maxSteps,
     latticeMach: options.latticeMach,

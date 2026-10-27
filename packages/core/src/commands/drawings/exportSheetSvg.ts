@@ -1,9 +1,20 @@
+import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, confirmExportControlled } from '../schema';
 import { report, exportRefusal } from '../noop';
 import { PAPER_MM } from '../../model/sheet';
 import { renderSheet } from './exportSheet';
 import { isRejection, requireSheet, scaleText } from './sheetOps';
+
+/** A view that shows "every visible solid" (no `entityIds`) puts the whole document in the sheet's reach. */
+function hasViewOfEverySolid(doc: CadDocument, params: unknown): boolean {
+  const sheetId = typeof params === 'object' && params !== null ? (params as { readonly sheetId?: unknown }).sheetId : undefined;
+  const sheet =
+    typeof sheetId === 'string' && doc.drawings !== undefined && Object.hasOwn(doc.drawings.sheets, sheetId)
+      ? doc.drawings.sheets[sheetId]
+      : undefined;
+  return sheet?.views.some((view) => view.kind !== 'detail' && view.entityIds === undefined) === true;
+}
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
@@ -12,7 +23,7 @@ import { isRejection, requireSheet, scaleText } from './sheetOps';
  */
 export const exportSheetSvg = defineCommand({
   name: 'export_sheet_svg',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, wholeDocumentWhen: hasViewOfEverySolid, readOnly: true, writesArtifact: true },
   description:
     'Export a drawing sheet as a self-contained SVG string (paper frame, title block, every view with ISO line weights, hatched ' +
     'sections, clipped details). Geometry is derived from the CURRENT model, so edits to the model show without touching the sheet. ' +

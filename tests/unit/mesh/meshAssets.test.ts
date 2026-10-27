@@ -1,18 +1,11 @@
 /** 07 MSH M3: the content-addressed mesh asset store seen from the commands (FR-MSH-02 / 27, VC-MSH-31): import by fileKey, attach, results above the inline cap, full-resolution reads and exports. */
 
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import type { ExecutionContext } from '@core/commands/types';
-import {
-  MESH_INLINE_TRIANGLE_CAP,
-  MESH_LOD_TRIANGLES,
-  type MeshAssetManifest,
-  type MeshAssetPort,
-  placeMesh,
-} from '@core/geometry/mesh/assets';
+import { MESH_INLINE_TRIANGLE_CAP, MESH_LOD_TRIANGLES, type MeshAssetPort, placeMesh } from '@core/geometry/mesh/assets';
 import { composeMeshEngines } from '@core/geometry/mesh/engine';
 import { fastMeasure } from '@core/geometry/mesh/fastMeasure';
 import { lodMesh } from '@core/geometry/mesh/lod';
@@ -21,41 +14,7 @@ import { analyzeIndexedMesh } from '@core/geometry/mesh/analysis';
 import { type CadDocument, createEmptyDocument, type MeshData, type MeshSolidEntity } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { icosphere, relativeError } from '../../helpers/meshFixtures';
-
-/** In-memory twin of the host store: keys are sha256 of a canonical JSON of the mesh. */
-function memoryAssets(): MeshAssetPort & {
-  readonly meshes: Map<string, MeshData>;
-  readonly files: Map<string, Uint8Array>;
-  putFile(bytes: Uint8Array): string;
-} {
-  const meshes = new Map<string, MeshData>();
-  const files = new Map<string, Uint8Array>();
-  const manifests = new Map<string, MeshAssetManifest>();
-  const key = (mesh: MeshData): string =>
-    createHash('sha256')
-      .update(JSON.stringify([mesh.positions, mesh.indices]))
-      .digest('hex');
-  return {
-    meshes,
-    files,
-    manifest: (k) => manifests.get(k) ?? null,
-    readMesh: (k) => meshes.get(k) ?? null,
-    writeMesh(mesh) {
-      const k = key(mesh);
-      const bounds = { min: [-1, -1, -1], max: [1, 1, 1] } as const;
-      const ref = { key: k, triangles: mesh.indices.length / 3, vertices: mesh.positions.length / 3, bounds };
-      meshes.set(k, mesh);
-      manifests.set(k, ref);
-      return ref;
-    },
-    readFile: (k) => files.get(k) ?? null,
-    putFile(bytes) {
-      const k = createHash('sha256').update(bytes).digest('hex');
-      files.set(k, bytes);
-      return k;
-    },
-  };
-}
+import { memoryMeshAssets } from '../../helpers/memoryMeshAssets';
 
 /** The TypeScript engine with its caps lifted: stands in for the native engine so big results exist. */
 const uncapped = {
@@ -91,7 +50,12 @@ function binaryStl(mesh: MeshData): Uint8Array {
 const big = icosphere(10, 7); // 327 680 triangles
 const small = icosphere(10, 2); // 320 triangles
 
-function bigScan(assets = memoryAssets()): { doc: CadDocument; id: string; assets: ReturnType<typeof memoryAssets>; fileKey: string } {
+function bigScan(assets = memoryMeshAssets()): {
+  doc: CadDocument;
+  id: string;
+  assets: ReturnType<typeof memoryMeshAssets>;
+  fileKey: string;
+} {
   const fileKey = assets.putFile(binaryStl(big));
   const result = run(createEmptyDocument(), 'import_mesh_file', { fileKey, units: 'mm', name: 'scan' }, assets);
   return { doc: result.document, id: result.affected[0] as string, assets, fileKey };
@@ -148,7 +112,7 @@ describe('import_mesh_file by fileKey (the document keeps 64 hex characters, not
   });
 
   it('keeps a small import inline and refuses a missing file, a missing store and ambiguous input', () => {
-    const assets = memoryAssets();
+    const assets = memoryMeshAssets();
     const fileKey = assets.putFile(binaryStl(small));
     const inline = run(createEmptyDocument(), 'import_mesh_file', { fileKey, units: 'mm' }, assets);
     expect((inline.document.entities[inline.affected[0] as string] as MeshSolidEntity).asset).toBeUndefined();
@@ -172,7 +136,7 @@ describe('import_mesh_file by fileKey (the document keeps 64 hex characters, not
 
 describe('attach_mesh_asset', () => {
   it('attaches a big asset with its LOD and a small one inline, carrying the importer provenance', () => {
-    const assets = memoryAssets();
+    const assets = memoryMeshAssets();
     const ref = assets.writeMesh(big);
     const doc = createEmptyDocument();
     const attached = run(doc, 'attach_mesh_asset', { assetKey: ref.key, name: 'scan', position: [1, 2, 3] }, assets);
@@ -190,7 +154,7 @@ describe('attach_mesh_asset', () => {
   });
 
   it('refuses an unknown key and a missing store', () => {
-    const assets = memoryAssets();
+    const assets = memoryMeshAssets();
     const doc = createEmptyDocument();
     const missing = run(doc, 'attach_mesh_asset', { assetKey: 'b'.repeat(64) }, assets);
     expectNoOp(missing, doc);
@@ -228,7 +192,9 @@ describe('commands read the full-resolution asset', () => {
     const missing = run(doc, 'cut_mesh', { id, plane }, assets);
     expect(missing.error?.code).toBe('MESH_ASSET_MISSING');
     expect(run(doc, 'analyze_mesh', { id }, assets).error?.code).toBe('MESH_ASSET_MISSING');
-    expect(run(doc, 'measure_deviation', { id, referenceId: id, symmetric: true }, assets).error?.code).toBe('MESH_ASSET_LOD_ONLY');
+    const lodOnly = run(doc, 'measure_deviation', { id, referenceId: id, symmetric: true }, assets);
+    // the query degrades to the display mesh, and the command's own check of an asset-backed input then refuses by name
+    expect(lodOnly.error?.code).toBe('MESH_ASSET_MISSING');
   });
 
   it('is pure', () => {
@@ -290,7 +256,7 @@ describe('persistence of the asset reference', () => {
 });
 
 describe('commands that read triangles see the full-resolution asset (MESH_ASSET_LOD_ONLY otherwise)', () => {
-  const counting = (assets: ReturnType<typeof memoryAssets>): { port: MeshAssetPort; reads: () => number } => {
+  const counting = (assets: ReturnType<typeof memoryMeshAssets>): { port: MeshAssetPort; reads: () => number } => {
     let count = 0;
     return {
       port: {
@@ -325,18 +291,22 @@ describe('commands that read triangles see the full-resolution asset (MESH_ASSET
     expect(counted.reads()).toBeGreaterThan(0);
     expect((result.data as { max: number }).max).toBeCloseTo(0.5, 2);
     const noStore = run(doc, 'measure_deviation', { id, points: [[0, 0, 10.5]] }, null);
-    expectNoOp(noStore, doc);
-    expect(noStore.error?.code).toBe('MESH_ASSET_LOD_ONLY');
-    const empty = memoryAssets();
+    expect(noStore.document).toBe(doc);
+    expect(noStore.error).toBeUndefined();
+    expect((noStore.data as { lodOnly?: string[] }).lodOnly).toEqual([id]);
+    expect(noStore.summary).toContain('MESH_ASSET_LOD_ONLY');
+    const empty = memoryMeshAssets();
     const missing = run(doc, 'mass_properties', { entityId: id }, empty);
-    expect(missing.error?.code).toBe('MESH_ASSET_LOD_ONLY');
+    expect(missing.error).toBeUndefined();
+    expect((missing.data as { lodOnly?: string[] }).lodOnly).toEqual([id]);
     expect(missing.document).toBe(doc);
   });
 
   it('a plugin consumer (frontal_area) refuses without the asset and measures with it', () => {
     const { doc, id, assets } = bigScan();
     const refused = run(doc, 'frontal_area', { entityIds: [id] }, null);
-    expect(refused.error?.code).toBe('MESH_ASSET_LOD_ONLY');
+    expect(refused.error).toBeUndefined();
+    expect((refused.data as { lodOnly?: string[] }).lodOnly).toEqual([id]);
     const counted = counting(assets);
     const measured = run(doc, 'frontal_area', { entityIds: [id] }, counted.port);
     expect(measured.error).toBeUndefined();
@@ -358,19 +328,19 @@ describe('runWithFullMeshes restores the display level of detail', () => {
     const { runWithFullMeshes } = await import('@core/commands/meshAssetView');
     const { doc, id, assets } = bigScan();
     const lod = (doc.entities[id] as MeshSolidEntity).mesh;
-    const named = runWithFullMeshes(doc, 'probe', { entityId: id }, ctxOf(assets), false, (view) => {
+    const named = runWithFullMeshes(doc, 'probe', { entityId: id }, ctxOf(assets), false, false, (view) => {
       expect((view.entities[id] as MeshSolidEntity).mesh).not.toBe(lod);
       return { document: { ...view, nextStepNumber: 99 }, summary: 'ok', affected: [id] };
     });
     expect(named.document.nextStepNumber).toBe(99);
     expect((named.document.entities[id] as MeshSolidEntity).mesh).toBe(lod);
-    const edited = runWithFullMeshes(doc, 'probe', {}, ctxOf(assets), true, (view) => ({
+    const edited = runWithFullMeshes(doc, 'probe', {}, ctxOf(assets), false, false, (view) => ({
       document: { ...view, entities: { ...view.entities, [id]: { ...(view.entities[id] as MeshSolidEntity), mesh: small } } },
       summary: 'ok',
       affected: [id],
     }));
     expect((edited.document.entities[id] as MeshSolidEntity).mesh).toBe(small);
-    const untouched = runWithFullMeshes(doc, 'probe', {}, ctxOf(assets), false, (view) => ({
+    const untouched = runWithFullMeshes(doc, 'probe', {}, ctxOf(assets), false, false, (view) => ({
       document: view,
       summary: 'ok',
       affected: [],

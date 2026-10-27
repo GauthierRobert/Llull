@@ -1,7 +1,7 @@
 /** Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity, instance expansion). */
 
 import { withCurve } from '../model/curveEntity';
-import type { Entity, Vec2, Vec3 } from '../model/types';
+import type { Entity, MeshSolidEntity, Vec2, Vec3 } from '../model/types';
 import type { SweepSection } from '../model/sweepOrientation';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
@@ -104,9 +104,12 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
     case 'mesh': {
       const positions = e.mesh.positions.map((v) => v * f);
       const brep = e.brep && ({ op: 'scale', source: e.brep, factor: f } as const);
+      // The stored asset describes the unscaled mesh: a scaled mesh keeps none (scale_entity writes a new asset for it).
+      const plain: MeshSolidEntity = { ...e };
+      delete plain.asset;
       return {
         scaled: {
-          ...e,
+          ...plain,
           mesh: { ...e.mesh, positions },
           ...(brep ? { brep } : {}),
           ...(e.faceColors ? { faceColors: e.faceColors.map((face) => ({ ...face, near: scale3(face.near, f) })) } : {}),

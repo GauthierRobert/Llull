@@ -243,6 +243,7 @@ function referencedIds(refs: readonly string[], params: Params): string[] {
  */
 export const editField = defineCommand({
   name: 'edit_field',
+  annotations: { readsMeshTriangles: true },
   description:
     'Change parameters of an existing implicit field node by id (design intent: radii, sizes, cell size, laws, blend radius...) and re-derive every implicit body built on it, so the bodies follow the edit. ' +
     '`changes` holds only what changes, named exactly as the parameters of the creating command: add_field_primitive (radius, size, height, ringRadius, tubeRadius, normal, offset, rounding, position, rotation), ' +

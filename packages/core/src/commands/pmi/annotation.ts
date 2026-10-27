@@ -14,7 +14,7 @@ import { REVIEW_REQUIRED, refuse, withItem } from './pmiOps';
  */
 export const addSurfaceTexture = defineCommand({
   name: 'add_surface_texture',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add a surface texture requirement (roughness) on faces of a 3D solid: parameter (Ra, Rz, Rq, Rsk, Rku, Rmax, Sa, Sz), value > 0 in ' +
     'micrometres (unit um, default) or microinches (uin), optional lay symbol text and process text (e.g. "ground"). Faces are named by ' +

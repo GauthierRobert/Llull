@@ -134,7 +134,7 @@ function standardPartRows(doc: CadDocument, rows: readonly BomRow[]): StandardPa
  */
 export const billOfMaterials = defineCommand({
   name: 'bill_of_materials',
-  annotations: { readOnly: true, metaHistory: true },
+  annotations: { readsMeshTriangles: 'document', readOnly: true, metaHistory: true },
   description:
     'Generate a bill of materials (BOM) from all InstanceEntity objects in the document. ' +
     'Groups instances by componentId; reports count per component and a breakdown of child entity kinds (perEntityKindCounts). ' +

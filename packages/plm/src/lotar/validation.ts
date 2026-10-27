@@ -47,7 +47,8 @@ export function validationPropertiesOf(doc: CadDocument): ValidationProperties {
     const entity = doc.entities[id];
     if (entity === undefined || !is3D(entity)) return [];
     const data: unknown = execute(doc, 'mass_properties', { entityId: id }).data;
-    const record = isRecord(data) ? data : {};
+    // A figure computed from a display mesh (data.lodOnly) is not archived: it would be compared with later as if it were measured.
+    const record = isRecord(data) && !(Array.isArray(data['lodOnly']) && data['lodOnly'].length > 0) ? data : {};
     return [
       {
         id,

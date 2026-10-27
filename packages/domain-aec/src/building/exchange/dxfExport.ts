@@ -170,7 +170,7 @@ function buildDxf(doc: CadDocument, levelId: string | undefined, includeDrafting
  */
 export const exportBuildingDxf = defineCommand({
   name: 'export_building_dxf',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: 'document', readOnly: true, writesArtifact: true, idempotent: true },
   description:
     'Export a BUILDING floor-plan DXF of one level (civil entities: use export_civil_dxf) (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at ' +
     '1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers ' +

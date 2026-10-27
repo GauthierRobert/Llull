@@ -85,7 +85,7 @@ function jointXml(doc: CadDocument, joint: UrdfJoint, parentOrigin: Vec3, travel
  */
 export const exportUrdf = defineCommand({
   name: 'export_urdf',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true },
   description:
     'Export the kinematic model as a URDF robot description (ROS, Gazebo, MuJoCo, PyBullet) with one STL mesh per link. ' +
     'source "dynamics" uses the rigid bodies and body joints (add_rigid_body, add_body_joint); "assembly" uses component instances connected ' +

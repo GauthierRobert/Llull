@@ -1,11 +1,11 @@
-import { type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/types';
+import { type CadDocument, type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/types';
 import { isStringArray } from '../../lib/isStringArray';
 import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { isReservedKey } from '../../lib/reservedKey';
-import { documentExtensions } from '../../plugins/host';
+import { documentExtensions, staleEntityIds } from '../../plugins/host';
 import { corruptionReason } from '../guard';
 import { getCommand, listCommands } from '../commandTable';
 import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
@@ -184,6 +184,15 @@ export function validateDocumentShape(v: unknown): v is Record<string, unknown> 
   );
 }
 
+/** The unrealised derived entity ids of a raw document, or none when an extension cannot read its slice (the slice is reported by its own validator). */
+function listedStaleIds(raw: Record<string, unknown>): ReadonlySet<string> {
+  try {
+    return staleEntityIds(raw as unknown as CadDocument);
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * Deep value validation of the document record. Returns an array of error strings. Integrity policy: dangling selection ids, entity key !=
  * entity.id, and duplicate order ids are REJECTED (not repaired). An empty array means the document is valid.
@@ -206,8 +215,12 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
       errors.push(`entity ${eid}: layerId '${layerIdVal}' does not reference a known layer`);
   }
   // Order must reference existing entities (renderers index entities[id] directly)
+  // (a derived entity that its extension reports as unrealised on this machine stays listed, so that saving the document loses nothing)
+  let stale: ReadonlySet<string> | undefined;
   for (const orderedId of v['order'] as string[]) {
-    if (!Object.hasOwn(entities, orderedId)) errors.push(`order: '${orderedId}' does not reference a known entity`);
+    if (Object.hasOwn(entities, orderedId)) continue;
+    stale ??= listedStaleIds(v);
+    if (!stale.has(orderedId)) errors.push(`order: '${orderedId}' does not reference a known entity`);
   }
   // `order` is exactly the entity key set: an entity missing from it would dodge every order-driven scan
   const ordered = new Set(v['order'] as string[]);

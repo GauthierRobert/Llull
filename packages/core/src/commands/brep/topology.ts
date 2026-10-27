@@ -44,7 +44,7 @@ function topologySummary(id: string, topology: ShapeTopology, precision: number)
  */
 export const inspectTopology = defineCommand({
   name: 'inspect_topology',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, requiresKernel: true },
   description:
     'List the exact B-rep topology of a 3D solid as the geometry kernel holds it: its faces (surface type, area) and ' +
     'its unique edges (curve type, length, start/end/mid points). The edge indices are the ones fillet_edge and ' +

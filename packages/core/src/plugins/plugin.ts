@@ -44,6 +44,13 @@ export interface DocumentExtension {
   /** Entity ids this domain regenerates from the definition. */
   derivedEntityIds(doc: CadDocument): ReadonlySet<string>;
   /**
+   * Derived entity ids that `restore` could not realise on this machine (a body whose mesh asset is not held): they stay listed in `order` with
+   * no entity, so saving the document loses nothing and a load that can realise them does so in place. Persistence accepts a dangling `order`
+   * entry only when an extension reports it here.
+   * @invariant pure; only ids the extension itself reports as derived; absent = the domain never leaves a derived entity unrealised
+   */
+  staleEntityIds?(doc: CadDocument): ReadonlySet<string>;
+  /**
    * Restore omitted geometry on a migrated, not-yet-validated raw document.
    * @invariant returns `raw` unchanged when the domain data is absent or invalid
    */

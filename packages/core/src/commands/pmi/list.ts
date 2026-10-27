@@ -16,7 +16,7 @@ const facesOf = (feature: PmiFeature | undefined): { entityId: string; faceIndic
  */
 export const listPmi = defineCommand({
   name: 'list_pmi',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'List the PMI items of the document (read-only): per item its id, kind, text rendering (e.g. "⌖ | Ø0.3 Ⓜ | A | B | C", "4X Ø6.6–6.9"), the ' +
     'solid and B-rep faces it is attached to (indices and surface type, as last resolved), review state (review.required true until a ' +

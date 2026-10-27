@@ -25,7 +25,7 @@ export const evaluateField = defineCommand({
     'Sample an implicit FIELD: signed value (negative inside, in document units; exact only if distanceQuality is "exact", otherwise a bound or approximation), optionally the gradient, ' +
     'at up to 10000 points or on a plane grid (up to 200x200). Use it to probe a thickness, check a blend tangent point or read a lattice law instead of rendering. ' +
     'Give exactly one of points or grid. data: values[], gradients[] (when gradient is true), distanceQuality, lipschitz, nonFiniteSamples.',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     field: z.string().describe('Id of the field node to sample.'),
     points: z

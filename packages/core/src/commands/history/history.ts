@@ -9,6 +9,7 @@ import type { ExecutionContext } from '../types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { kernelRefusal } from '../kernelRefusal';
+import { runCommand } from '../runCommand';
 import { noteReplayFailure, replayFailureError, replayFailuresNote, replayHistory, type ReplayFailure } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { changed, noop } from '../noop';
@@ -42,7 +43,8 @@ function regenerateWith(
     if (event.step.id === mustApplyStepId) {
       inertStep = event.step;
       // Re-run the step on its pre-state to surface the command's own refusal (schema path, etc.).
-      const refusal = context.registry(event.step.name)?.run(event.before, event.params, context);
+      const refuser = context.registry(event.step.name);
+      const refusal = refuser === undefined ? undefined : runCommand(refuser, event.before, event.params, context);
       if (refusal !== undefined && refusal.summary !== '') inertReason = refusal.summary;
     }
     // A step that used to affect entities but now changes nothing lost an input it depended on.

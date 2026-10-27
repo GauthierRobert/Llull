@@ -23,7 +23,7 @@ const DEFAULT_ANGLES = [0, 30, 60, 90, 120, 150, 180];
  */
 export const engineQuickCheck = defineCommand({
   name: 'engine_quick_check',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Sanity-check a slider-crank engine analytically in milliseconds, with no simulation: exact piston travel, rod angle, crank torque ' +
     'per newton of piston force, and with forceN the crank torque T = F·dx/dθ, rod force F/cos β and cylinder side thrust F·tan β at ' +

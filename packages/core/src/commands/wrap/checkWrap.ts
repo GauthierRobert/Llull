@@ -106,7 +106,7 @@ export const checkWrap = defineCommand({
         'Smallest stroke width the process can make, document units. No default: the stroke check runs only when you name the process limit.',
       ),
   }),
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   run: (doc, params, ctx): CommandResult => {
     const targets = params.ids ?? doc.order.filter((id) => doc.entities[id] !== undefined && isWrapResult(doc.entities[id] as Entity));
     for (const [index, id] of targets.entries()) {

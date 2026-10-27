@@ -86,7 +86,7 @@ export const unwrapFace = defineCommand({
       .optional()
       .describe('Also return the nurbs_curves lying on this face, as flat polylines (at most 200 points each). Default false.'),
   }),
-  annotations: { requiresKernel: true, readOnly: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true, readOnly: true },
   run: (doc, params, ctx): CommandResult => {
     const session = openFace(doc, ctx, 'unwrap_face', params.id, params.face);
     if (isRejection(session)) return session;

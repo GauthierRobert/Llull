@@ -214,7 +214,7 @@ export const importIges = defineCommand({
  */
 export const exportIges = defineCommand({
   name: 'export_iges',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true, requiresKernel: true },
   description:
     'Export 3D solids to IGES 5.3 from the exact kernel B-rep: mode brep (default) writes manifold solid B-rep objects (types 186 / 514 / 510 / 508 / 504 / 502), ' +
     'mode faces writes trimmed surfaces (144 + 128) for legacy CAM. Solids are written in world space (instances expanded) in the document unit (Global section ' +

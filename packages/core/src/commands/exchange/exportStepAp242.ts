@@ -233,7 +233,7 @@ const refusal = (doc: CadDocument, outcome: Extract<StepExportOutcome, { ok: fal
  */
 export const exportStepAp242 = defineCommand({
   name: 'export_step_ap242',
-  annotations: { readOnly: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true, requiresKernel: true },
   description:
     'Export 3D solids to STEP (ISO 10303-21) from the kernel exact B-rep through the XDE writer: AP242 by default (AP214 or AP203 on request), the document unit ' +
     'as the file length unit (numbers are not converted), real assembly structure (one PRODUCT per component, one placed NEXT_ASSEMBLY_USAGE_OCCURRENCE per ' +

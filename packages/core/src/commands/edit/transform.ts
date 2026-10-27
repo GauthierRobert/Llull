@@ -1,7 +1,9 @@
 /** Transform commands — rotate, scale, mirror, array_linear, array_polar. Each is a pure function over the document (no mutations). */
 
-import type { CadDocument, Entity, Vec3 } from '../../model/types';
+import type { CadDocument, Entity, MeshSolidEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
+import { currentContext } from '../context';
+import { isStoreFailure, meshRejection, storeMesh } from '../mesh/meshCommon';
 import { defineCommand, z, looseVec3 } from '../schema';
 import { changed, noop } from '../noop';
 import { idPrefixOf, nextId } from '../../lib/id';
@@ -85,21 +87,29 @@ export const rotateEntity = defineCommand({
 /**
  * @affects updates geometry dimensions on 1 entity (uniform scale)
  * @invariant factor > 0; box→size, cylinder→radius&height, sphere→radius, extrusion→profile&depth
- * @failure missing id or factor <= 0 -> no-op, affected:[]
+ * @invariant a mesh with a stored asset is scaled at full resolution and gets a new asset (and display mesh) for the scaled triangles
+ * @failure missing id or factor <= 0 -> no-op, affected:[]; asset-backed mesh without a store -> MESH_ASSET_UNAVAILABLE
  */
 export const scaleEntity = defineCommand({
   name: 'scale_entity',
+  annotations: { readsMeshTriangles: true },
   description:
     'Uniformly scale an entity by a positive factor. Scales geometry in-place for all kinds — 3D: box size, cylinder radius & height, sphere radius, extrusion profile & depth; 2D: line/polyline points, arc/circle/ellipse radii, rectangle width & height, spline points (about the local origin). Position is unchanged.',
   params: z.object({
     id: z.string().describe('Id of the entity to scale.'),
     factor: z.number().describe('Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.'),
   }),
-  run: (doc, { id, factor }): CommandResult => {
+  run: (doc, { id, factor }, ctx): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to scale.`);
     if (factor <= 0) return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
     const { scaled, dims } = scaleGeometry(target, factor);
+    if (target.kind === 'mesh' && target.asset !== undefined && scaled.kind === 'mesh') {
+      const stored = storeMesh(scaled.mesh, (ctx ?? currentContext()).meshAssets);
+      if (isStoreFailure(stored)) return meshRejection(doc, 'scale_entity', stored.code, stored.message, [id]);
+      const rescaled: MeshSolidEntity = { ...scaled, mesh: stored.mesh, ...(stored.asset === undefined ? {} : { asset: stored.asset }) };
+      return changed(replaceEntity(doc, rescaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
+    }
     return changed(replaceEntity(doc, scaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
   },
 });

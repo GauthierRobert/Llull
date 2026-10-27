@@ -71,7 +71,7 @@ function offsetTopologyProblem(context: FaceOpContext, distance: number): string
  */
 export const moveFaces = defineCommand({
   name: 'move_faces',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Move faces of an imported or built B-rep directly, without its history (direct editing). Pick the faces by faceIndices, facesNear or faceNames. mode ' +
     '"offset" (`distance`, document units): every picked face moves along its surface normal - a plane along its outward normal (positive adds material), a ' +
@@ -152,7 +152,7 @@ export const moveFaces = defineCommand({
  */
 export const deleteFaces = defineCommand({
   name: 'delete_faces',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Delete faces of a B-rep and heal the gap (defeaturing): a fillet or chamfer disappears and the edge is sharp again, a hole is filled, a boss or pocket ' +
     'vanishes - the neighbouring faces extend until they meet. Pick ALL faces of the feature (a fillet chain, a hole wall and its countersink) by faceIndices, ' +

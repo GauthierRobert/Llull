@@ -23,7 +23,7 @@ export const implicitProperties = defineCommand({
     'Measure an implicit body (id from create_implicit_body) or field (id from add_field_primitive / add_tpms_lattice...): volume with an error estimate, mesh area, relative density ' +
     '(volume / region volume; the region defaults to the support box), bounds, number of solid components and enclosed voids (volume and a point inside each). ' +
     'region (a field id) restricts the volume and the density to that region, e.g. the box a lattice fills. Volumes are in document units cubed. Strut lattices use a low-discrepancy quadrature (an aligned grid would alias with the struts).',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   params: z.object({
     id: z.string().describe('Id of an implicit body or of a field node.'),
     region: z.string().optional().describe('Field id restricting the measure (volume, density). Default: no restriction.'),

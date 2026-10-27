@@ -31,7 +31,7 @@ const SAME_PLANE = 1 - 1e-9;
  */
 export const addRib = defineCommand({
   name: 'add_rib',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Grow a rib from a planar face of a 3D solid: an OPEN polyline path (>= 2 points) is thickened by thickness (centred on the path when ' +
     'symmetric, else on its left), raised along the plane normal and fused to the part. plane = { origin: a point on the supporting face, normal: ' +

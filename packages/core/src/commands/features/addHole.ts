@@ -37,7 +37,7 @@ import type { MachinedHole } from '../../geometry/featureInstances';
  */
 export const addHole = defineCommand({
   name: 'add_hole',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Cut holes into a planar face of a 3D solid: simple, counterbore, countersink or counterdrill (countersink cone, then counterbore, then ' +
     'bore); through the whole part (through_all), through the first wall only (up_to_next), up to the plane of a parallel face below ' +

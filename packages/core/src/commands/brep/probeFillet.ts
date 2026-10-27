@@ -95,7 +95,7 @@ function probeEdge(
  */
 export const probeFillet = defineCommand({
   name: 'probe_fillet',
-  annotations: { readOnly: true, idempotent: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true, requiresKernel: true },
   description:
     'Largest constant fillet radius each edge of a 3D solid accepts, measured by bisection on exact kernel evaluations (each edge probed alone with fillet_edge semantics, ' +
     'results cached by the kernel). Use it BEFORE fillet_edge: pick a radius below maxRadius. Select edges like fillet_edge (edgeIndices from inspect_topology, edgesNear points, ' +

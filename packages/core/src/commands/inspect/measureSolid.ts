@@ -56,7 +56,7 @@ interface MeasureBoundingBoxData {
  */
 export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { readOnly: true },
   description:
     'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +

@@ -116,7 +116,7 @@ function modifyEdges(
  */
 export const filletEdge = defineCommand({
   name: 'fillet_edge',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
     'that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export ' +
@@ -234,7 +234,7 @@ export const filletEdge = defineCommand({
  */
 export const chamferEdge = defineCommand({
   name: 'chamfer_edge',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
     'that keeps the exact construction (its brep recipe). The source entity is consumed. ' +
@@ -404,7 +404,7 @@ export const chamferEdge = defineCommand({
  */
 export const shellSolid = defineCommand({
   name: 'shell_solid',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it ' +
     'with a new mesh entity. The source entity is consumed. ' +

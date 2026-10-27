@@ -41,6 +41,7 @@ function referenceProblem(
  */
 export const createScalarField = defineCommand({
   name: 'create_scalar_field',
+  annotations: { readsMeshTriangles: true },
   description:
     'Create a SCALAR field (a number at every point of space) to grade a lattice: pass its id as thickness / level (add_tpms_lattice), radius (add_strut_lattice), thickness (shell_field), distance (offset_field) or blend radius (combine_fields) instead of a number. ' +
     'kind coordinate: the x, y or z coordinate (axis). kind distance: distance in document units to a point (toPoint), a plane (toPlane, signed, positive on the normal side), the closed solid of an entity (toEntity, signed, negative inside) or the value of another field (toField); give exactly one. ' +

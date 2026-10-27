@@ -54,7 +54,7 @@ const bracketsNominal = (tolerance: PmiTolerance, nominal: number): boolean =>
  */
 export const addSizeDimension = defineCommand({
   name: 'add_size_dimension',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add a size dimension with tolerance on a feature of size of a 3D solid: a cylinder (hole / shaft, sizeKind diameter or radius), two ' +
     'opposite parallel planes (width of a slot or tab), or a sphere (spherical_diameter), named by facesNear points. The nominal is measured ' +
@@ -117,7 +117,7 @@ export const addSizeDimension = defineCommand({
  */
 export const addLocationDimension = defineCommand({
   name: 'add_location_dimension',
-  annotations: { requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true },
   description:
     'Add a location dimension between two features of one 3D solid: the distance between parallel planes, between parallel hole axes, or from ' +
     'a hole axis to a plane, or the angle (degrees) between normals / axes. Each side is named by facesNear points on ONE plane or ONE hole. ' +

@@ -53,6 +53,7 @@ interface Step {
  */
 export const infillSolid = defineCommand({
   name: 'infill_solid',
+  annotations: { readsMeshTriangles: true },
   description:
     'Lighten an existing closed 3D solid in one call: an inside skin of `wall` (document units) plus a lattice infill (TPMS or struts) clipped to the solid shrunk by the wall, realised as an implicit body at `voxel`. ' +
     'It runs field_from_solid, shell_field, offset_field, add_tpms_lattice / add_strut_lattice, combine_fields and create_implicit_body for you (their ids are in data.steps), hides the source solid, and reports the volumes. ' +
