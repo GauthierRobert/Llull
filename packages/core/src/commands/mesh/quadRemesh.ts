@@ -1,6 +1,7 @@
 /** quad_remesh — field-aligned quad remeshing of a closed mesh into a subdivision cage or a quad-based mesh (07 MSH FR-MSH-22, M6). */
 
 import { type Cage, cageProblem } from '../../geometry/subdivision';
+import { DEVIATION_MAX_SAMPLES } from '../../geometry/mesh/deviation';
 import { resolveMeshEngine } from '../../geometry/mesh/engine';
 import {
   hardEdgeCreases,
@@ -23,16 +24,13 @@ import {
   contextOf,
   engineOutcome,
   isCommandResult,
-  isLoadFailure,
   isStoreFailure,
-  loadSolidMesh,
-  measureMesh,
   meshRejection,
   namedDefault,
-  outwardMesh,
   storeMesh,
   withConventions,
 } from './meshCommon';
+import { prepareSolidMesh } from './preparedMesh';
 import { DEVIATION_BASIS, engineDeviation } from './runMeshOp';
 
 /** A closed quad surface has at least six faces (a cube). */
@@ -118,9 +116,9 @@ export const quadRemesh = defineCommand({
     if ((targetQuadCount === undefined) === (targetEdgeLength === undefined))
       return fail('MESH_PARAM_INVALID', 'give exactly one of targetQuadCount or targetEdgeLength', 'targetQuadCount');
     const assets = contextOf(ctx).meshAssets;
-    const loaded = loadSolidMesh(doc, id, undefined, assets);
-    if (isLoadFailure(loaded)) return meshRejection(doc, 'quad_remesh', loaded.code, loaded.message, loaded.ids);
-    const before = measureMesh(loaded.mesh);
+    const prepared = prepareSolidMesh(doc, ctx, id, { outward: true });
+    if ('code' in prepared) return meshRejection(doc, 'quad_remesh', prepared.code, prepared.message, prepared.ids);
+    const { loaded, before, input } = prepared;
     if (!before.closed) return fail('MESH_NOT_CLOSED', `entity '${id}' has open or non-manifold edges; quad_remesh needs a closed surface`);
     const target = targetQuadCount ?? Math.round(before.area / ((targetEdgeLength as number) * (targetEdgeLength as number)));
     if (!(target >= MIN_TARGET_QUADS && target <= MAX_TARGET_QUADS))
@@ -135,7 +133,6 @@ export const quadRemesh = defineCommand({
         `${target} quads at ${levels} levels refine to over ${MAX_REFINED_QUADS} quads; lower levels`,
         'levels',
       );
-    const input: MeshData = outwardMesh(loaded.mesh);
     const engine = resolveMeshEngine(contextOf(ctx).meshProcessing);
     const outcome = engineOutcome(
       doc,
@@ -147,6 +144,7 @@ export const quadRemesh = defineCommand({
           targetQuads: target,
           adaptive: (params.adaptiveSize ?? 0) > 0,
           ...(hardEdgeDeg > 0 ? { hardEdgeRad: (hardEdgeDeg * Math.PI) / 180 } : {}),
+          withDeviation: DEVIATION_MAX_SAMPLES,
         },
       ),
       [id],
@@ -187,7 +185,8 @@ export const quadRemesh = defineCommand({
       );
 
     const triangles: MeshData = { positions, indices: triangulateQuads(positions, quads) };
-    const measured = engineDeviation(engine, input, triangles);
+    // an engine that measured the quads in the same job (native) saves a second round; otherwise the separate deviation op
+    const measured = outcome.deviation ?? engineDeviation(engine, input, triangles);
     const deviation = 'code' in measured ? null : measured;
     const valence = quadValence(quads, vertices.length);
     const irregular = vertices.length - (valence['4'] ?? 0);

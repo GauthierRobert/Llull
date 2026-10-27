@@ -6,7 +6,8 @@
 
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getCommand } from '@core/commands/registry';
 import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import type { CadDocument } from '@core/model/types';
 import { cuboid, docWithMeshes } from '../../tests/helpers/meshFixtures';
@@ -107,6 +108,49 @@ describe('a plan of many native steps', () => {
     expect(answer).toMatchObject({ isError: false, changed: true });
     expect(fake.started()).toBe(19);
     expect(Object.keys(getLiveDoc().entities)).toHaveLength(20);
+  });
+
+  it('executes each step once, the native ones twice: 10 steps with native steps at 3, 6 and 9, and keeps nothing afterwards', async () => {
+    fake = createFakeEngine(2, 1);
+    setMeshProcessingEngine(fake.engine);
+    const spies = ['add_box', 'quad_remesh'].map((name) => vi.spyOn(getCommand(name) as unknown as { run: () => unknown }, 'run'));
+    const actions = Array.from({ length: 10 }, (_, i) =>
+      i === 3 || i === 6 || i === 9
+        ? { command: 'quad_remesh', params: remesh(6 + i) }
+        : { command: 'add_box', params: { size: [2 + i, 2, 2] } },
+    );
+    const answer = await applyCommandAsync('build_project', { actions });
+    const [boxRuns, quadRuns] = spies.map((spy) => spy.mock.calls.length);
+    vi.restoreAllMocks();
+    expect(answer).toMatchObject({ isError: false, changed: true });
+    expect(fake.started()).toBe(3);
+    expect([boxRuns, quadRuns]).toEqual([7, 6]);
+    expect(fake.memos()).toHaveLength(1);
+    expect(fake.memos()[0]?.size).toBe(0);
+  });
+
+  it('a cancel after the first job of a plan commits nothing and drops what the runs kept', async () => {
+    fake = createFakeEngine(400, 2);
+    setMeshProcessingEngine(fake.engine);
+    const before = getLiveDoc();
+    const undoable = canUndo();
+    const controller = new AbortController();
+    const actions = [
+      { command: 'add_box', params: { size: [3, 3, 3] } },
+      { command: 'quad_remesh', params: remesh(6) },
+      { command: 'add_box', params: { size: [4, 3, 3] } },
+      { command: 'quad_remesh', params: remesh(7) },
+    ];
+    const running = applyCommandAsync('build_project', { actions }, { signal: controller.signal });
+    for (let waited = 0; fake.started() < 2 && waited < 10_000; waited += 20) await sleep(20);
+    expect(fake.started()).toBe(2);
+    expect(fake.memos()[0]?.size).toBeGreaterThan(0);
+    controller.abort();
+    expect(await running).toMatchObject({ changed: false, isError: true, error: { code: 'MESH_CANCELLED' } });
+    expect(getLiveDoc()).toBe(before);
+    expect(canUndo()).toBe(undoable);
+    expect(fake.killed()).toBe(1);
+    expect(fake.memos()[0]?.size).toBe(0);
   });
 
   it('a replay with two native steps asks for one job at a time', async () => {

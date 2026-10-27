@@ -221,3 +221,156 @@ fn a_failed_job_has_only_progress_events_before_its_error() {
     assert_eq!(run(&dir, &mut out).unwrap_err().code, "NATIVE_JOB_INPUT");
     assert!(events(&out).iter().all(|e| e["type"] == "progress"));
 }
+
+/// The `deviation` report of a job that also measured it, the same pair measured by a separate `deviation` job, and the stages the first reported.
+fn measured_with_and_without(name: &str, job: Value, positions: &[f64], indices: &[u32]) -> (Value, Value, Vec<String>) {
+    let mut with = job.clone();
+    with["deviationSamples"] = json!(2000);
+    let dir = folder(&format!("{name}-with"));
+    write_job(&dir, &with, positions, indices);
+    let mut out = Vec::new();
+    run(&dir, &mut out).unwrap();
+    let (result_positions, result_indices, report) = read_result(&dir);
+    let stages = events(&out).iter().filter_map(|e| e["stage"].as_str().map(str::to_string)).collect();
+    let second = separate_deviation(name, positions, indices, &result_positions, &result_indices, 2000);
+    (report["deviation"].clone(), second, stages)
+}
+
+fn separate_deviation(
+    name: &str,
+    positions: &[f64],
+    indices: &[u32],
+    other_positions: &[f64],
+    other_indices: &[u32],
+    samples: usize,
+) -> Value {
+    let separate = folder(&format!("{name}-separate"));
+    write_job(&separate, &json!({ "op": "deviation", "params": { "maxSamples": samples } }), positions, indices);
+    fs::write(separate.join("positions_b.f64"), other_positions.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+    fs::write(separate.join("indices_b.u32"), other_indices.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+    run(&separate, &mut std::io::sink()).unwrap();
+    read_report(&separate)["report"].clone()
+}
+
+#[test]
+fn decimate_and_smooth_measure_their_own_deviation_exactly_as_the_separate_job_would() {
+    let (positions, indices) = grid(30, |x, y| (x / 2.0).sin() * (y / 3.0).cos());
+    let smooth = json!({ "taubin": false, "lambda": 0.5, "passBand": 0.1, "iterations": 3, "cotangent": false, "fixBoundary": true, "volumeCorrection": false });
+    for (name, job) in [
+        ("dev-decimate", json!({ "op": "decimate", "params": { "targetTriangles": 300, "preserveBoundary": true } })),
+        ("dev-smooth", json!({ "op": "smooth", "params": smooth })),
+    ] {
+        let (together, separate, stages) = measured_with_and_without(name, job, &positions, &indices);
+        assert!(together["hausdorff"].as_f64().unwrap() > 0.0, "{name}");
+        assert_eq!(together, separate, "{name}: one job gives the deviation of the separate one");
+        assert_eq!(stages.last().map(String::as_str), Some("write"), "{name}");
+        assert_eq!(stages.iter().rev().nth(1).map(String::as_str), Some("deviation"), "{name}: {stages:?}");
+    }
+}
+
+#[test]
+fn a_job_without_deviation_samples_reports_no_deviation_and_the_deviation_op_ignores_them() {
+    let (positions, indices) = grid(10, |_, _| 0.0);
+    let dir = folder("dev-absent");
+    write_job(&dir, &json!({ "op": "decimate", "params": { "targetTriangles": 50, "preserveBoundary": true } }), &positions, &indices);
+    run(&dir, &mut std::io::sink()).unwrap();
+    assert!(read_result(&dir).2.get("deviation").is_none());
+    let both = folder("dev-op");
+    write_job(&both, &json!({ "op": "deviation", "params": { "maxSamples": 100 }, "deviationSamples": 100 }), &positions, &indices);
+    fs::write(both.join("positions_b.f64"), fs::read(both.join("positions.f64")).unwrap()).unwrap();
+    fs::write(both.join("indices_b.u32"), fs::read(both.join("indices.u32")).unwrap()).unwrap();
+    run(&both, &mut std::io::sink()).unwrap();
+    assert!(read_report(&both).get("deviation").is_none());
+}
+
+/// Icosphere of radius 10 (subdivided `level` times), outward-wound.
+#[cfg(feature = "quad")]
+fn icosphere(level: usize) -> (Vec<f64>, Vec<u32>) {
+    let t = (1.0 + 5.0f64.sqrt()) / 2.0;
+    let mut positions: Vec<[f64; 3]> = vec![
+        [-1.0, t, 0.0],
+        [1.0, t, 0.0],
+        [-1.0, -t, 0.0],
+        [1.0, -t, 0.0],
+        [0.0, -1.0, t],
+        [0.0, 1.0, t],
+        [0.0, -1.0, -t],
+        [0.0, 1.0, -t],
+        [t, 0.0, -1.0],
+        [t, 0.0, 1.0],
+        [-t, 0.0, -1.0],
+        [-t, 0.0, 1.0],
+    ];
+    let mut faces: Vec<[u32; 3]> = vec![
+        [0, 11, 5],
+        [0, 5, 1],
+        [0, 1, 7],
+        [0, 7, 10],
+        [0, 10, 11],
+        [1, 5, 9],
+        [5, 11, 4],
+        [11, 10, 2],
+        [10, 7, 6],
+        [7, 1, 8],
+        [3, 9, 4],
+        [3, 4, 2],
+        [3, 2, 6],
+        [3, 6, 8],
+        [3, 8, 9],
+        [4, 9, 5],
+        [2, 4, 11],
+        [6, 2, 10],
+        [8, 6, 7],
+        [9, 8, 1],
+    ];
+    for _ in 0..level {
+        let mut cache = std::collections::HashMap::new();
+        let mut next = Vec::new();
+        let mut midpoint = |a: u32, b: u32, positions: &mut Vec<[f64; 3]>| -> u32 {
+            *cache.entry((a.min(b), a.max(b))).or_insert_with(|| {
+                let (p, q) = (positions[a as usize], positions[b as usize]);
+                positions.push([(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0, (p[2] + q[2]) / 2.0]);
+                positions.len() as u32 - 1
+            })
+        };
+        for f in &faces {
+            let (ab, bc, ca) =
+                (midpoint(f[0], f[1], &mut positions), midpoint(f[1], f[2], &mut positions), midpoint(f[2], f[0], &mut positions));
+            next.extend([[f[0], ab, ca], [f[1], bc, ab], [f[2], ca, bc], [ab, bc, ca]]);
+        }
+        faces = next;
+    }
+    let flat = positions
+        .iter()
+        .flat_map(|p| {
+            let n = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+            [p[0] / n * 10.0, p[1] / n * 10.0, p[2] / n * 10.0]
+        })
+        .collect();
+    (flat, faces.into_iter().flatten().collect())
+}
+
+#[cfg(feature = "quad")]
+#[test]
+fn quad_remesh_measures_the_outward_triangulated_quads_exactly_as_the_separate_job_on_them_would() {
+    use llull_meshops::quad_mesh::{outward_quads, triangulate_quads};
+    let (positions, indices) = icosphere(2);
+    let job = json!({ "op": "quad_remesh", "params": { "targetFaces": 60, "preserveSharp": false, "sharpCos": 0.0, "adaptive": false }, "deviationSamples": 3000 });
+    let dir = folder("dev-quad");
+    write_job(&dir, &job, &positions, &indices);
+    let mut out = Vec::new();
+    run(&dir, &mut out).unwrap();
+    let (result_positions, quads, report) = read_result(&dir);
+    assert_eq!(quads.len() % 4, 0);
+    let triangles = triangulate_quads(&result_positions, &outward_quads(&result_positions, &quads));
+    let separate = separate_deviation("dev-quad", &positions, &indices, &result_positions, &triangles, 3000);
+    assert_eq!(report["deviation"], separate);
+    assert!(report["deviation"]["hausdorff"].as_f64().unwrap() < 1.0);
+    let stages: Vec<String> = events(&out).iter().filter_map(|e| e["stage"].as_str().map(str::to_string)).collect();
+    assert_eq!(stages.last().map(String::as_str), Some("write"));
+    assert!(stages.contains(&"deviation".to_string()) && stages.contains(&"fix_valence".to_string()), "{stages:?}");
+}
+
+fn read_report(dir: &Path) -> Value {
+    serde_json::from_slice(&fs::read(dir.join("report.json")).unwrap()).unwrap()
+}

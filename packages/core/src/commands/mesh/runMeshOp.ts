@@ -12,21 +12,24 @@ import {
   contextOf,
   engineOutcome,
   isCommandResult,
-  isLoadFailure,
   isStoreFailure,
-  loadSolidMesh,
   measureMesh,
   meshRejection,
-  outwardMesh,
   storeMesh,
   withConventions,
 } from './meshCommon';
+import { prepareSolidMesh } from './preparedMesh';
 
 /** Symmetric deviation of two meshes through the installed engines (native for big meshes), or the engine's refusal. */
 export function engineDeviation(engine: MeshProcessingEngine, from: MeshData, to: MeshData): DeviationSummary | MeshEngineFailure {
   const result = engine.run({ mesh: from }, { op: 'deviation', other: { mesh: to }, maxSamples: DEVIATION_MAX_SAMPLES });
   if ('code' in result) return result;
   return result.deviation ?? { code: 'MESH_ENGINE_UNSUPPORTED', message: 'the engine returned no deviation' };
+}
+
+/** `op` asking its engine for the deviation of the result in the same job, for the ops that can (decimate, smooth); any other op unchanged. */
+function withDeviationRequest(op: MeshOp, wanted: boolean): MeshOp {
+  return wanted && (op.op === 'decimate' || op.op === 'smooth') ? { ...op, withDeviation: DEVIATION_MAX_SAMPLES } : op;
 }
 
 /** What the deviation samples are (the Hausdorff value is a lower bound of the exact one). */
@@ -70,18 +73,25 @@ export interface MeshOpSpec {
 /** Run `spec` on entity `spec.id`; returns the new document (source rewritten in place or kept) and the data conventions. */
 export function runMeshOp(doc: CadDocument, ctx: ExecutionContext | undefined, spec: MeshOpSpec): CommandResult {
   const assets = contextOf(ctx).meshAssets;
-  const loaded = loadSolidMesh(doc, spec.id, spec.weldTolerance, assets);
-  if (isLoadFailure(loaded)) return meshRejection(doc, spec.command, loaded.code, loaded.message, loaded.ids);
-  const before = measureMesh(loaded.mesh);
+  const prepared = prepareSolidMesh(doc, ctx, spec.id, {
+    outward: spec.requireClosed,
+    ...(spec.weldTolerance !== undefined ? { weldTolerance: spec.weldTolerance } : {}),
+  });
+  if ('code' in prepared) return meshRejection(doc, spec.command, prepared.code, prepared.message, prepared.ids);
+  const { loaded, before, input } = prepared;
   if (spec.requireClosed && !before.closed) {
     return meshRejection(doc, spec.command, 'MESH_NOT_CLOSED', `entity '${spec.id}' has open or non-manifold edges`, [spec.id]);
   }
   const problem = spec.precheck?.(loaded, before) ?? null;
   if (problem !== null)
     return meshRejection(doc, spec.command, problem.code, problem.message, [spec.id], problem.path !== undefined ? [problem.path] : []);
-  const input: MeshData = spec.requireClosed ? outwardMesh(loaded.mesh) : loaded.mesh;
   const engine = resolveMeshEngine(contextOf(ctx).meshProcessing);
-  const first = engineOutcome(doc, spec.command, engine.run({ mesh: input }, spec.op(loaded, before)), [spec.id]);
+  const first = engineOutcome(
+    doc,
+    spec.command,
+    engine.run({ mesh: input }, withDeviationRequest(spec.op(loaded, before), spec.deviation === true)),
+    [spec.id],
+  );
   if (isCommandResult(first)) return first;
   const outcome = spec.post === undefined ? first : engineOutcome(doc, spec.command, spec.post(first, loaded, input, engine), [spec.id]);
   if (isCommandResult(outcome)) return outcome;
@@ -95,7 +105,13 @@ export function runMeshOp(doc: CadDocument, ctx: ExecutionContext | undefined, s
   const stored = storeMesh(outcome.mesh, assets);
   if (isStoreFailure(stored)) return meshRejection(doc, spec.command, stored.code, stored.message, [spec.id]);
   const committed = commitMesh(doc, loaded.entity as Entity, stored, { keepSource: spec.keepSource, unverified: loaded.unverified });
-  const measured = spec.deviation === true ? engineDeviation(engine, input, outcome.mesh) : null;
+  // the engine measured it in the same job (no `post` step replaced the result since): no second round
+  const measured =
+    spec.deviation !== true
+      ? null
+      : spec.post === undefined && first.deviation !== undefined
+        ? first.deviation
+        : engineDeviation(engine, input, outcome.mesh);
   const deviation = measured === null || 'code' in measured ? null : measured;
   const deviationSkipped = measured !== null && 'code' in measured ? measured.code : null;
   const data = withConventions(

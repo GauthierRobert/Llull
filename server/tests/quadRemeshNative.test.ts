@@ -11,8 +11,12 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { MESH_ENGINE_PENDING, resolveMeshEngine } from '@core/geometry/mesh/engine';
+import type { MeshOpResult, MeshProcessingEngine } from '@core/geometry/mesh/engineTypes';
+import { outwardQuads, triangulateQuads } from '@core/geometry/mesh/quadCage';
+import { engineDeviation } from '@core/commands/mesh/runMeshOp';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
-import { type CadDocument, type Entity, type MeshSolidEntity, type SubdivisionEntity } from '@core/model/types';
+import { type CadDocument, type Entity, type MeshData, type MeshSolidEntity, type SubdivisionEntity } from '@core/model/types';
 import { cuboid, docWithMeshes, icosphere, torus } from '../../tests/helpers/meshFixtures';
 import { tessellatedBox } from '../../tests/helpers/quadFixtures';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
@@ -233,4 +237,106 @@ describeNative('quad_remesh cage on the native OCC kernel (VC-MSH-22, B-spline p
       setGeometryKernel(null);
     }
   });
+});
+
+describe('quad_remesh needs one native job round (TECHNICAL_SPEC 13.9)', () => {
+  native(
+    'the deviation comes with the quad job: two runs, one job, no separate deviation, and the number the separate measure gives',
+    async () => {
+      _clearResultCache(); // an earlier test may hold this very job
+      const { doc, ids } = docWithMeshes(icosphere(10, 4));
+      const asked: Record<string, number> = {};
+      const deferred: Record<string, number> = {};
+      const counting: MeshProcessingEngine = {
+        ...(engine as MeshProcessingEngine),
+        run(input, op) {
+          asked[op.op] = (asked[op.op] ?? 0) + 1;
+          const answer = (engine as MeshProcessingEngine).run(input, op);
+          if ('code' in answer && answer.code === MESH_ENGINE_PENDING) deferred[op.op] = (deferred[op.op] ?? 0) + 1;
+          return answer;
+        },
+      };
+      let runs = 0;
+      const result = await resolveDeferred(() => {
+        runs += 1;
+        return execute(
+          doc,
+          'quad_remesh',
+          { id: ids[0] as string, targetQuadCount: 600, output: 'mesh' },
+          { ...context(), meshProcessing: counting },
+        );
+      });
+      expect(result.error).toBeUndefined();
+      expect(runs).toBe(2);
+      expect(deferred).toEqual({ quad_remesh: 1 });
+      expect(asked['deviation']).toBeUndefined();
+      const reported = dataOf(result)['deviation'] as Deviation & Record<string, number>;
+      const separate = dataOf(
+        execute(result.document, 'measure_deviation', { id: result.affected[0] as string, referenceId: ids[0] as string, symmetric: true }),
+      );
+      // the maxima do not depend on the order of the samples; the sums differ in the last digits when the mesh is welded again
+      for (const key of ['forwardMax', 'backwardMax', 'hausdorff', 'samples'] as const) expect(reported[key]).toBe(separate[key]);
+      expect(Math.abs((reported.mean as number) / (separate['mean'] as number) - 1)).toBeLessThan(1e-9);
+      expect(Math.abs((reported['rms'] as number) / (separate['rms'] as number) - 1)).toBeLessThan(1e-9);
+    },
+  );
+});
+
+describe('the deviation measured inside the quad job is the one the TypeScript path measures (Rust twins of outwardQuads and triangulateQuads)', () => {
+  const twoShells = (): { positions: number[]; indices: number[] } => {
+    const first = icosphere(5, 3, [0, 0, 0]);
+    const second = icosphere(5, 3, [20, 0, 0]);
+    const reversed = second.indices.flatMap((_, i, all) => (i % 3 === 0 ? [all[i], all[i + 2], all[i + 1]] : []));
+    const offset = first.positions.length / 3;
+    return {
+      positions: [...first.positions, ...second.positions],
+      indices: [...first.indices, ...reversed.map((i) => (i as number) + offset)],
+    };
+  };
+  const cases: Array<[string, () => { positions: number[]; indices: number[] }, number]> = [
+    ['an icosphere', () => icosphere(10, 4), 600],
+    ['a box (square quads: ties between the two diagonals)', () => cuboid([-5, -5, -5], [5, 5, 5]), 300],
+    ['two shells, the second inside out', twoShells, 200],
+  ];
+
+  native.each(cases)(
+    '%s: the in-job deviation equals engineDeviation on the outward triangulated quads, also from the reversed quads',
+    async (_name, mesh, target) => {
+      _clearResultCache();
+      const { doc, ids } = docWithMeshes(mesh());
+      let input: MeshData | undefined;
+      let answer: MeshOpResult | undefined;
+      const spy: MeshProcessingEngine = {
+        ...(engine as MeshProcessingEngine),
+        run(given, op) {
+          const result = (engine as MeshProcessingEngine).run(given, op);
+          if (op.op === 'quad_remesh' && !('code' in result)) {
+            input = given.mesh;
+            answer = result;
+          }
+          return result;
+        },
+      };
+      const result = await resolveDeferred(() =>
+        execute(
+          doc,
+          'quad_remesh',
+          { id: ids[0] as string, targetQuadCount: target, output: 'mesh' },
+          { ...context(), meshProcessing: spy },
+        ),
+      );
+      expect(result.error, result.summary).toBeUndefined();
+      const quads = answer?.quads;
+      expect(quads).toBeDefined();
+      expect(answer?.deviation).toBeDefined();
+      const { positions, quads: raw } = quads as NonNullable<typeof quads>;
+      const reversed = raw.flatMap((_, i, all) => (i % 4 === 0 ? [all[i], all[i + 3], all[i + 2], all[i + 1]] : []));
+      for (const given of [raw, reversed as number[]]) {
+        const triangles = { positions, indices: triangulateQuads(positions, outwardQuads(positions, given)) };
+        const expected = engineDeviation(resolveMeshEngine(null), input as MeshData, triangles);
+        expect(expected).toEqual(answer?.deviation);
+      }
+    },
+    120_000,
+  );
 });

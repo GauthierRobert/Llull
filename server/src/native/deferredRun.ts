@@ -9,9 +9,11 @@
  * @invariant one job per content key runs at a time: concurrent commands wanting the same op on the same mesh share it; it is killed when its last waiter cancels
  * @invariant a failed job (timeout, crash) is remembered for the scope only, so the next run reports its named code instead of asking again
  * @invariant a resolve that was cancelled (signal aborted, or a job ended MESH_CANCELLED), hit the job limit or broke the protocol commits NOTHING: it ends in a refusal on the unchanged document
+ * @invariant the runs of one resolve share a memo (`DeferredScope.memo`, handed to commands through `ExecutionContext.resolveMemo`): plan steps before the first deferral and a command's mesh preparation are computed once (13.9); it is dropped when the resolve ends, however it ends
  * @invariant one run asks for at most one job; the resolve loops while each run asks for a key it does not hold yet, up to MAX_JOBS_PER_RESOLVE jobs
  */
 
+import { createResolveMemo, type ResolveMemo } from '@core/commands/resolveMemo';
 import { deferralCount } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshOpName, MeshOpResult } from '@core/geometry/mesh/engineTypes';
 import { isRecord } from '@lib/isRecord';
@@ -62,6 +64,8 @@ export interface DeferredScope {
   readonly cancelled: boolean;
   /** This run already asked for a job: every later miss defers without asking (its input is a placeholder). */
   readonly deferring: boolean;
+  /** Shared by every run of this resolve; dropped when it ends. */
+  readonly memo: ResolveMemo;
 }
 
 /** Why a resolve ended without committing a run. */
@@ -310,7 +314,9 @@ export async function resolveDeferred<T>(attempt: () => T, options: ResolveOptio
   const aborted = (): boolean => options.signal?.aborted === true;
   const results = new Map<string, JobOutcome>();
   const requested = new Map<string, DeferredJob>();
+  const memo = createResolveMemo();
   const scope: DeferredScope = {
+    memo,
     lookup: (key) => results.get(key) ?? resultCache.get(key),
     request: (job) => {
       if (requested.size === 0) requested.set(job.key, job);
@@ -331,47 +337,52 @@ export async function resolveDeferred<T>(attempt: () => T, options: ResolveOptio
     return outcome;
   };
   const stop = (refusal: Refusal): T => stand(options.refuse !== undefined ? options.refuse(refusal) : (last as T));
-  for (;;) {
-    requested.clear();
-    const before = deferralCount();
-    last = runInScope(scope, attempt);
-    const deferred = deferralCount() !== before;
-    if (requested.size === 0) {
-      if (deferred)
+  try {
+    for (;;) {
+      requested.clear();
+      memo.beginRun();
+      const before = deferralCount();
+      last = runInScope(scope, attempt);
+      const deferred = deferralCount() !== before;
+      if (requested.size === 0) {
+        if (deferred)
+          return stop({
+            code: 'MESH_DEFER_PROTOCOL',
+            message: 'an engine deferred a native mesh op without asking for a job',
+            remediation: 'This is a bug in the mesh engine; report it with the command that was run.',
+          });
+        if (aborted() || cancelledJob) return stop(cancelRefusal(options.signal));
+        return stand(last);
+      }
+      const job = [...requested.values()][0] as DeferredJob;
+      requested.clear();
+      if (results.has(job.key))
         return stop({
           code: 'MESH_DEFER_PROTOCOL',
-          message: 'an engine deferred a native mesh op without asking for a job',
+          message: `the '${job.op}' job was asked for again after it finished`,
           remediation: 'This is a bug in the mesh engine; report it with the command that was run.',
         });
+      if (jobs >= maxJobs)
+        return stop({
+          code: 'MESH_JOB_LIMIT',
+          message: `the command needs more than ${maxJobs} native mesh jobs`,
+          remediation: 'Split the plan into several runs, or decimate the meshes so the TypeScript engine can take them.',
+        });
+      if (aborted()) return stop(cancelRefusal(options.signal));
+      jobs += 1;
+      options.onWaitStart?.();
+      let outcome: JobOutcome;
+      try {
+        outcome = await acquire(job, options.signal, options.onProgress);
+      } finally {
+        options.onWaitEnd?.();
+      }
+      results.set(job.key, outcome);
+      if (isFailure(outcome) && outcome.code === 'MESH_CANCELLED') cancelledJob = true;
       if (aborted() || cancelledJob) return stop(cancelRefusal(options.signal));
-      return stand(last);
     }
-    const job = [...requested.values()][0] as DeferredJob;
-    requested.clear();
-    if (results.has(job.key))
-      return stop({
-        code: 'MESH_DEFER_PROTOCOL',
-        message: `the '${job.op}' job was asked for again after it finished`,
-        remediation: 'This is a bug in the mesh engine; report it with the command that was run.',
-      });
-    if (jobs >= maxJobs)
-      return stop({
-        code: 'MESH_JOB_LIMIT',
-        message: `the command needs more than ${maxJobs} native mesh jobs`,
-        remediation: 'Split the plan into several runs, or decimate the meshes so the TypeScript engine can take them.',
-      });
-    if (aborted()) return stop(cancelRefusal(options.signal));
-    jobs += 1;
-    options.onWaitStart?.();
-    let outcome: JobOutcome;
-    try {
-      outcome = await acquire(job, options.signal, options.onProgress);
-    } finally {
-      options.onWaitEnd?.();
-    }
-    results.set(job.key, outcome);
-    if (isFailure(outcome) && outcome.code === 'MESH_CANCELLED') cancelledJob = true;
-    if (aborted() || cancelledJob) return stop(cancelRefusal(options.signal));
+  } finally {
+    memo.dispose();
   }
 }
 

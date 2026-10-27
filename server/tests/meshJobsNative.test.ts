@@ -108,6 +108,7 @@ describe('a real native job does not block the backend', () => {
       'final_positions',
       'extract_quads',
       'fix_valence',
+      'deviation',
       'write',
     ]);
     const fractions = lines.filter((line) => typeof line['fraction'] === 'number').map((line) => line['fraction'] as number);

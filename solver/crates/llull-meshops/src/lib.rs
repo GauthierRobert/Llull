@@ -10,6 +10,9 @@
 //! - `smooth`: `{ taubin, lambda, passBand, iterations, cotangent, fixBoundary, volumeCorrection, region? }`.
 //! - `quad_remesh` (feature `quad`): `{ targetFaces, preserveSharp, sharpCos, adaptive }`; the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
+//! - decimate / smooth / quad_remesh with `"deviationSamples": N` beside `op` and `params`: the job also measures the symmetric deviation of its result from its input
+//!   (at most N samples per mesh; a quad result is measured as its outward-wound quads split along the shorter diagonal, which is what the host commits) and writes
+//!   it as `deviation` in `report.json`, after a stage `deviation` before `write`. The host saves the separate `deviation` job that would follow.
 //! - `deviation`: `{ maxSamples }` between the mesh above and `positions_b.f64` / `indices_b.u32`; writes `report.json` only.
 
 pub mod decimate;
@@ -19,6 +22,8 @@ mod geom;
 mod progress;
 #[cfg(feature = "quad")]
 mod quad;
+#[cfg(feature = "quad")]
+pub mod quad_mesh;
 pub mod smooth;
 mod surface;
 
@@ -26,6 +31,7 @@ use geom::Sphere;
 use llull_protocol::{sha256_hex, Output};
 use progress::Progress;
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -90,6 +96,9 @@ struct DeviationJob {
 struct Job {
     op: String,
     params: serde_json::Value,
+    /// decimate, smooth and quad_remesh: also measure the deviation of the result from the input in this job (at most this many samples per mesh).
+    #[serde(rename = "deviationSamples", default)]
+    deviation_samples: Option<usize>,
 }
 
 fn read(folder: &Path, name: &str) -> Result<Vec<u8>, JobError> {
@@ -133,13 +142,33 @@ fn u32_bytes(values: &[u32]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_le_bytes()).collect()
 }
 
+/// The triangles of an op's result for the deviation measurement: the result itself, or for `quad_remesh` its outward-wound quads split along the shorter
+/// diagonal (what the host commits). `None` when the result is not a mesh that can be measured (an index past the vertices, a non-finite coordinate, a
+/// quad count that is not whole): the job then reports no deviation and the host's own checks refuse the result by name.
+fn result_triangles<'a>(op: &str, positions: &[f64], indices: &'a [u32]) -> Option<Cow<'a, [u32]>> {
+    let vertices = positions.len() / 3;
+    if !positions.len().is_multiple_of(3) || !positions.iter().all(|v| v.is_finite()) || indices.iter().any(|&i| i as usize >= vertices) {
+        return None;
+    }
+    #[cfg(feature = "quad")]
+    if op == "quad_remesh" {
+        if !indices.len().is_multiple_of(4) {
+            return None;
+        }
+        return Some(Cow::Owned(quad_mesh::triangulate_quads(positions, &quad_mesh::outward_quads(positions, indices))));
+    }
+    let _ = op;
+    Some(Cow::Borrowed(indices))
+}
+
 /// Runs the job in `folder`; returns the written outputs. `out` receives the `progress` events (a stage start, then throttled ticks inside long
 /// stages): `read`, the op's own stages, `write`.
 pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> {
     let started = Instant::now();
     let text = String::from_utf8(read(folder, "job.json")?).map_err(|error| input_error(format!("job.json: {error}")))?;
     let job: Job = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
-    let mut progress = Progress::new(out, if job.op == "quad_remesh" { 2 + QUAD_STAGES } else { 3 });
+    let measures = job.deviation_samples.is_some() && job.op != "deviation";
+    let mut progress = Progress::new(out, if job.op == "quad_remesh" { 2 + QUAD_STAGES } else { 3 } + u64::from(measures));
     progress.stage("read", 0.0);
     let positions = f64s(&read(folder, "positions.f64")?, "positions.f64")?;
     let triangles = u32s(&read(folder, "indices.u32")?, positions.len() / 3)?;
@@ -199,7 +228,18 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
         }
         other => return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, deviation, quad_remesh)"))),
     };
-    let summary = serde_json::json!({ "op": job.op, "items": items, "ms": started.elapsed().as_millis(), "report": report });
+    let measured = match (&mesh_out, job.deviation_samples) {
+        (Some((out_positions, out_indices)), Some(samples)) if measures => {
+            progress.stage("deviation", 0.96);
+            result_triangles(&job.op, out_positions, out_indices)
+                .and_then(|result| deviation::deviation((&positions, &triangles), (out_positions, &result), samples))
+        }
+        _ => None,
+    };
+    let mut summary = serde_json::json!({ "op": job.op, "items": items, "ms": started.elapsed().as_millis(), "report": report });
+    if let Some(measured) = measured {
+        summary["deviation"] = serde_json::to_value(measured).map_err(|error| input_error(error.to_string()))?;
+    }
     let summary_bytes = serde_json::to_vec(&summary).map_err(|error| input_error(error.to_string()))?;
     progress.stage("write", 0.97);
     let mut outputs = Vec::new();
@@ -209,4 +249,29 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
     }
     outputs.push(write(folder, "report.json", &summary_bytes)?);
     Ok(outputs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::result_triangles;
+
+    #[test]
+    fn a_result_that_cannot_be_measured_gives_no_triangles_instead_of_a_panic() {
+        let square = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+        assert_eq!(result_triangles("decimate", &square, &[0, 1, 2]).as_deref(), Some(&[0u32, 1, 2][..]));
+        // an index past the vertices, a non-finite coordinate, positions that are not whole triples
+        assert!(result_triangles("decimate", &square, &[0, 1, 4]).is_none());
+        assert!(result_triangles("smooth", &[f64::NAN, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], &[0, 1, 2]).is_none());
+        assert!(result_triangles("decimate", &square[..10], &[0, 1, 2]).is_none());
+    }
+
+    #[cfg(feature = "quad")]
+    #[test]
+    fn a_malformed_quad_result_gives_no_triangles() {
+        let square = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+        assert_eq!(result_triangles("quad_remesh", &square, &[0, 1, 2, 3]).as_deref(), Some(&[0u32, 1, 2, 0, 2, 3][..]));
+        assert!(result_triangles("quad_remesh", &square, &[0, 1, 2, 9]).is_none());
+        assert!(result_triangles("quad_remesh", &square, &[0, 1, 2]).is_none());
+        assert!(result_triangles("quad_remesh", &[0.0, f64::INFINITY, 0.0], &[0, 0, 0, 0]).is_none());
+    }
 }

@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { DEVIATION_MAX_SAMPLES } from '@core/geometry/mesh/deviation';
 import { hardEdgeCreases, offSourceProblem, outwardQuads, quadValence, triangulateQuads } from '@core/geometry/mesh/quadCage';
 import type { QuadMeshData } from '@core/geometry/mesh/engineTypes';
 import type { SubdivisionEntity } from '@core/model/types';
@@ -42,7 +43,9 @@ describe('quad_remesh', () => {
     expect(cage.faces.every((face) => face.length === 4)).toBe(true);
     expect(cage.elementIds.vertices).toHaveLength(386);
     expect(cage.elementIds.faces).toHaveLength(384);
-    expect(seen).toEqual([{ op: 'quad_remesh', targetQuads: 400, adaptive: false, hardEdgeRad: (30 * Math.PI) / 180 }]);
+    expect(seen).toEqual([
+      { op: 'quad_remesh', targetQuads: 400, adaptive: false, hardEdgeRad: (30 * Math.PI) / 180, withDeviation: DEVIATION_MAX_SAMPLES },
+    ]);
     const data = dataOf(result);
     expect(data).toMatchObject({
       id,

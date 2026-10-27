@@ -4,6 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { ResolveMemo } from '@core/commands/resolveMemo';
 import { deferMeshOp } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshOpResult } from '@core/geometry/mesh/engineTypes';
 import {
@@ -14,9 +15,11 @@ import {
   currentScope,
   resolveDeferred,
   type DeferredJob,
+  type DeferredScope,
   type JobOutcome,
   type JobProgress,
 } from '../src/native/deferredRun';
+import { serverContext } from '../src/fea/context';
 
 const result = (vertices: number): MeshOpResult => ({
   mesh: { positions: new Array<number>(vertices * 3).fill(0), indices: [0, 1, 2] },
@@ -317,5 +320,102 @@ describe('progress', () => {
     expect(beats.map((event) => event.elapsedMs)).toEqual([...beats.map((event) => event.elapsedMs)].sort((a, b) => a - b));
     expect(late[0]?.elapsedMs).toBeGreaterThan(0);
     expect(quiet.starts()).toBe(1);
+  });
+});
+
+describe('the resolve memo (TECHNICAL_SPEC 13.9)', () => {
+  /** A command that keeps one value in the scope's memo and needs `jobs`; reports the memo it saw. */
+  const rememberingRun = (memos: ResolveMemo[], computed: { count: number }, ...jobs: DeferredJob[]) => {
+    const owner = {};
+    const run = needs(...jobs);
+    return (): JobOutcome | string => {
+      const scope = currentScope();
+      if (scope !== null) {
+        memos.push(scope.memo);
+        scope.memo.once(owner, 'value', () => ++computed.count);
+      }
+      return run();
+    };
+  };
+
+  it('is one memo for all the runs of a resolve: a value computed in the first run is served to the later ones', async () => {
+    const memos: ResolveMemo[] = [];
+    const computed = { count: 0 };
+    const a = fakeJob('memo-a', result(3));
+    const b = fakeJob('memo-b', result(4));
+    await resolveDeferred(rememberingRun(memos, computed, a.job, b.job));
+    expect(memos).toHaveLength(3);
+    expect(new Set(memos).size).toBe(1);
+    expect(computed.count).toBe(1);
+  });
+
+  it('is a new memo for each resolve, and nothing of one resolve reaches another', async () => {
+    const memos: ResolveMemo[] = [];
+    const computed = { count: 0 };
+    await resolveDeferred(rememberingRun(memos, computed));
+    await resolveDeferred(rememberingRun(memos, computed));
+    expect(memos[0]).not.toBe(memos[1]);
+    expect(computed.count).toBe(2);
+  });
+
+  it('keeps nothing from a run that deferred, and starts keeping again in the next run', async () => {
+    const sizes: number[] = [];
+    const a = fakeJob('memo-defer', result(3));
+    const owner = {};
+    let computed = 0;
+    const run = needs(a.job);
+    await resolveDeferred(() => {
+      const scope = currentScope() as DeferredScope;
+      const outcome = run();
+      // once a run asked for its job, an engine's answer is a refusal on a placeholder
+      if (outcome === 'pending') deferMeshOp('quad_remesh');
+      scope.memo.once(owner, 'after-the-deferral', () => ++computed);
+      sizes.push(scope.memo.size);
+      return outcome;
+    });
+    expect(sizes).toEqual([0, 1]);
+    expect(computed).toBe(2);
+  });
+
+  it('is dropped when the resolve ends: normally, cancelled, over the job limit and when the command throws', async () => {
+    const memos: ResolveMemo[] = [];
+    const keeping = (...jobs: DeferredJob[]): (() => JobOutcome | string) => rememberingRun(memos, { count: 0 }, ...jobs);
+    await resolveDeferred(keeping(fakeJob('drop-a', result(3)).job));
+    expect(memos.at(-1)?.size).toBe(0);
+
+    const controller = new AbortController();
+    const slow = fakeJob('drop-b', result(3), 5000);
+    const running = resolveDeferred(keeping(slow.job), { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(memos.at(-1)?.size).toBe(1);
+    controller.abort();
+    await running;
+    expect(memos.at(-1)?.size).toBe(0);
+
+    await resolveDeferred(keeping(fakeJob('drop-c', result(3)).job, fakeJob('drop-d', result(3)).job), { maxJobs: 1 });
+    expect(memos.at(-1)?.size).toBe(0);
+
+    await expect(
+      resolveDeferred(() => {
+        memos.push((currentScope() as DeferredScope).memo);
+        (currentScope() as DeferredScope).memo.once({}, 'x', () => 1);
+        throw new Error('the command threw');
+      }),
+    ).rejects.toThrow('the command threw');
+    expect(memos.at(-1)?.size).toBe(0);
+  });
+
+  it('reaches commands through the server context, and only inside a resolve', async () => {
+    expect(serverContext().resolveMemo).toBeNull();
+    let inside: ResolveMemo | null | undefined;
+    let scopeMemo: ResolveMemo | undefined;
+    await resolveDeferred(() => {
+      inside = serverContext().resolveMemo;
+      scopeMemo = currentScope()?.memo;
+      return 'done';
+    });
+    expect(inside).toBe(scopeMemo);
+    expect(inside).not.toBeNull();
+    expect(serverContext().resolveMemo).toBeNull();
   });
 });

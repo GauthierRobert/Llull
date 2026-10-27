@@ -13,7 +13,7 @@ import { isEngineFailure } from '@core/geometry/mesh/engineTypes';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import type { MeshData } from '@core/model/types';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
-import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
+import { createNativeMeshEngine, deviationFrom } from '../src/native/meshProcessingEngine';
 import { resolveDeferred } from '../src/native/deferredRun';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -253,5 +253,72 @@ describe('the composite engine routes by cap', () => {
     expect(composite.capabilities().get('smooth')).toBe(Infinity);
     expect(composite.capabilities().get('deviation')).toBe(Infinity);
     expect(createNativeMeshEngine({ env: { LLULL_COMPUTE: 'does-not-exist.exe' } })).toBeNull();
+  });
+});
+
+describe('a native job that measures the deviation of its own result (TECHNICAL_SPEC 13.9)', () => {
+  const MAX_SAMPLES = 20_000;
+  const deviationOp = (other: MeshData): MeshOp => ({ op: 'deviation', other: { mesh: other }, maxSamples: MAX_SAMPLES });
+
+  native.each([
+    ['decimate', icosphere(10, 4), decimate({ targetTriangles: 400 })],
+    ['smooth', icosphere(10, 3), smooth({ iterations: 5 })],
+  ] as const)('%s: the deviation in the answer is the one the separate job, and the TypeScript engine, give', async (_name, mesh, op) => {
+    const asked = { ...op, withDeviation: MAX_SAMPLES } as MeshOp;
+    const answer = await nativeRun({ mesh }, asked);
+    if (isEngineFailure(answer)) throw new Error(`${answer.code} ${answer.message}`);
+    const result = answer.mesh as MeshData;
+    const separate = await nativeRun({ mesh }, deviationOp(result));
+    const oracle = tsMeshEngine.run({ mesh }, deviationOp(result));
+    if (isEngineFailure(separate) || isEngineFailure(oracle)) throw new Error('the separate deviation failed');
+    expect(answer.deviation).toBeDefined();
+    expect(answer.deviation).toEqual(separate.deviation);
+    expect(answer.deviation).toEqual(oracle.deviation);
+    // the result itself and its report are those of the job without the request
+    const plain = await nativeRun({ mesh }, op);
+    if (isEngineFailure(plain)) throw new Error('the plain job failed');
+    expect(hashOf(plain.mesh as MeshData)).toBe(hashOf(result));
+    expect(plain.report).toEqual(answer.report);
+    expect(plain.deviation).toBeUndefined();
+  });
+
+  native('one job round: the request is a single deferral, and asking for the deviation is a different job than not asking', async () => {
+    const mesh = icosphere(10, 3);
+    const op = { ...decimate({ targetTriangles: 300 }), withDeviation: MAX_SAMPLES } as MeshOp;
+    let runs = 0;
+    const answer = await resolveDeferred(() => (runs++, (engine as NonNullable<typeof engine>).run({ mesh }, op)));
+    expect(isEngineFailure(answer)).toBe(false);
+    expect(runs).toBe(2);
+  });
+});
+
+describe('the deviation a job reports is checked before it is trusted', () => {
+  const good = {
+    forwardMax: 1,
+    backwardMax: 2,
+    hausdorff: 2,
+    mean: 0.5,
+    rms: 0.7,
+    samples: 10,
+    histogram: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    worst: { point: [0, 1, 2], mesh: 'b', distance: 2 },
+  };
+
+  it('keeps a well-formed summary and drops anything else, so the caller measures separately', () => {
+    expect(deviationFrom(good)).toEqual({ deviation: good });
+    for (const bad of [
+      undefined,
+      null,
+      'x',
+      {},
+      { ...good, mean: null },
+      { ...good, hausdorff: 'big' },
+      { ...good, histogram: [1, 2] },
+      { ...good, histogram: [1, 1, 1, 1, 1, 1, 1, 1, 1, null] },
+      { ...good, worst: { point: [0, 1], mesh: 'a', distance: 1 } },
+      { ...good, worst: { point: [0, 1, 2], mesh: 'c', distance: 1 } },
+      { ...good, worst: null },
+    ])
+      expect(deviationFrom(bad)).toEqual({});
   });
 });

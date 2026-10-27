@@ -104,6 +104,7 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
       PLAN_FIX.tooLarge,
     );
   if (validate) return validatePlan(doc, actions);
+  const context = currentContext();
   const run: PlanRun = {
     current: doc,
     // No prototype: an `as` such as "__proto__" or "constructor" is an ordinary alias.
@@ -115,7 +116,10 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
     loopIterations: 0,
     startedSteps: 0,
     totalSteps: estimatedSteps,
-    onStep: currentContext().onStep,
+    onStep: context.onStep,
+    // a plan replayed inside a running step mints from that step's id source: its inner steps are not independent, so nothing is shared
+    depth: context.projectDepth,
+    memo: context.stepKey === undefined ? (context.resolveMemo ?? null) : null,
   };
   const { steps } = run;
   let failedAt: number | null = null;
@@ -135,7 +139,7 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
   const affected = aborted ? [] : run.allAffected;
   const allOk = !aborted && steps.every((s) => s.ok);
   // Replaying a recorded plan step (inside a running step) needs no snapshot.
-  const scene = currentContext().stepKey === undefined ? computeSceneSnapshot(finalDoc) : undefined;
+  const scene = context.stepKey === undefined ? computeSceneSnapshot(finalDoc) : undefined;
   let summary: string;
   let error: CommandError | undefined;
   if (failedAt !== null) {

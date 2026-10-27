@@ -4,6 +4,7 @@
  * host (event loop, NDJSON, cancellation, idempotency, replay) use it so they run on any machine.
  */
 
+import type { ResolveMemo } from '@core/commands/resolveMemo';
 import { deferMeshOp } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshOpResult, MeshProcessingEngine } from '@core/geometry/mesh/engineTypes';
 import { currentScope, type JobOutcome } from '../src/native/deferredRun';
@@ -14,6 +15,8 @@ export interface FakeEngine {
   readonly calls: () => number;
   /** Jobs started. */
   readonly started: () => number;
+  /** The resolve memo of each resolve the engine was asked in (once per resolve, in order). */
+  readonly memos: () => ResolveMemo[];
   /** Jobs that saw their signal aborted. */
   readonly killed: () => number;
   /** What the next jobs answer instead of the quads (a named failure), or null for the quads. */
@@ -64,6 +67,7 @@ export function createFakeEngine(durationMs: number, stages = 4, heartbeatMs = 5
   let calls = 0;
   let killed = 0;
   let failure: MeshEngineFailure | null = null;
+  const memos: ResolveMemo[] = [];
   const engine: MeshProcessingEngine = {
     name: 'fake-native',
     capabilities: () => new Map([['quad_remesh', Infinity]]),
@@ -72,6 +76,7 @@ export function createFakeEngine(durationMs: number, stages = 4, heartbeatMs = 5
       calls += 1;
       const scope = currentScope();
       if (scope === null) return { code: 'MESH_ENGINE_NEEDS_HOST', message: 'fake engine outside resolveDeferred' };
+      if (!memos.includes(scope.memo)) memos.push(scope.memo);
       if (scope.deferring) return deferMeshOp('quad_remesh');
       const key = `fake:${op.targetQuads}:${input.mesh.positions.join(',')}`;
       const held = scope.lookup(key);
@@ -101,6 +106,7 @@ export function createFakeEngine(durationMs: number, stages = 4, heartbeatMs = 5
     engine,
     started: () => started,
     calls: () => calls,
+    memos: () => memos,
     killed: () => killed,
     failWith: (next) => {
       failure = next;

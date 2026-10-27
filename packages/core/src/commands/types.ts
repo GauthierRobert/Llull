@@ -20,6 +20,7 @@ import type { PointCloudPort } from '../model/pointCloud';
 import type { MeshAssetPort } from '../geometry/mesh/assets';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
+import type { ResolveMemo } from './resolveMemo';
 import type { ZodType } from 'zod';
 
 export interface CommandResult {
@@ -254,6 +255,8 @@ export interface ExecutionContext {
   readonly stepKey?: string;
   /** Replay prefix cache; null disables it. Results depend on the kernel, so the default context keeps one cache per installed kernel. */
   readonly replayCache: ReplayCache | null;
+  /** Memo shared by the runs of one host resolve (TECHNICAL_SPEC 13.9: plan steps and a command's mesh preparation); null/absent = nothing is shared. */
+  readonly resolveMemo?: ResolveMemo | null;
   /**
    * Observer of `build_project` execution (CLI progress, timeouts); a throw aborts the plan. Optional and side-effect only: it never
    * changes a result.

@@ -13,6 +13,14 @@ import type { RepairMode, SmallComponentRule } from './repair';
 import type { SculptParams } from './sculpt';
 import type { SmoothParams } from './smooth';
 
+/**
+ * Ask the engine to measure the symmetric deviation of the op's result from its input in the same job (TECHNICAL_SPEC 13.9): `maxSamples` as in the
+ * `deviation` op. An engine that can does so and answers it in `MeshOpResult.deviation`; one that cannot leaves it out and the caller measures separately.
+ */
+interface WithDeviation {
+  readonly withDeviation?: number;
+}
+
 export interface MeshInput {
   readonly mesh: MeshData;
 }
@@ -45,11 +53,11 @@ export type MeshOp =
       readonly refine: boolean;
       readonly alpha?: number;
     }
-  | ({ readonly op: 'decimate' } & DecimateParams)
+  | ({ readonly op: 'decimate' } & DecimateParams & WithDeviation)
   | ({ readonly op: 'remesh' } & RemeshParams)
-  | ({ readonly op: 'smooth' } & SmoothParams)
+  | ({ readonly op: 'smooth' } & SmoothParams & WithDeviation)
   | { readonly op: 'deviation'; readonly other: MeshInput; readonly maxSamples: number }
-  | {
+  | ({
       readonly op: 'quad_remesh';
       /** Wanted number of output quads (the engine lands within about 15 % of it). */
       readonly targetQuads: number;
@@ -57,7 +65,7 @@ export type MeshOp =
       readonly adaptive: boolean;
       /** Align the quads to edges whose faces meet at more than this angle; absent = no alignment. */
       readonly hardEdgeRad?: number;
-    }
+    } & WithDeviation)
   | ({ readonly op: 'segment' } & SegmentParams)
   | ({ readonly op: 'sculpt' } & SculptParams)
   | {
@@ -103,7 +111,7 @@ export interface MeshOpResult {
   readonly segmentation?: Segmentation;
   /** Result of op `quad_remesh` (instead of `mesh`). */
   readonly quads?: QuadMeshData;
-  /** Symmetric deviation of the input from `other` (op `deviation`, query). */
+  /** Symmetric deviation of the input from `other` (op `deviation`), or of the op's result from its input (decimate, smooth, quad_remesh asked with `withDeviation`). */
   readonly deviation?: DeviationSummary;
   /** Op-specific counts and parameters actually used (document units). */
   readonly report: Readonly<Record<string, unknown>>;

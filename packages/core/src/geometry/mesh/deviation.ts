@@ -103,3 +103,28 @@ export function symmetricDeviation(
     worst: { point: (fromA ? pointsA : pointsB)[worstIndex] as Vec3, mesh: fromA ? 'a' : 'b', distance: hausdorff },
   };
 }
+
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/** True when `value` has the shape of a `DeviationSummary` (finite numbers, ten histogram bins, a worst sample with a point): the check for a summary an engine hands back as parsed JSON. */
+export function isDeviationSummary(value: unknown): value is DeviationSummary {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const worst = v['worst'];
+  const worstOk =
+    typeof worst === 'object' &&
+    worst !== null &&
+    Array.isArray((worst as Record<string, unknown>)['point']) &&
+    ((worst as Record<string, unknown>)['point'] as unknown[]).length === 3 &&
+    ((worst as Record<string, unknown>)['point'] as unknown[]).every(finite) &&
+    ['a', 'b'].includes((worst as Record<string, unknown>)['mesh'] as string) &&
+    finite((worst as Record<string, unknown>)['distance']);
+  return (
+    ['forwardMax', 'backwardMax', 'hausdorff', 'mean', 'rms'].every((key) => finite(v[key])) &&
+    finite(v['samples']) &&
+    Array.isArray(v['histogram']) &&
+    v['histogram'].length === 10 &&
+    v['histogram'].every(finite) &&
+    worstOk
+  );
+}

@@ -923,8 +923,8 @@ The mechanism (server side; core gained `deferMeshOp` / `deferralCount` in `geom
 
 - `server/src/native/deferredRun.ts`: `resolveDeferred(attempt, { onProgress, signal, commit })` runs `attempt` (one synchronous run of the command) in a scope; the jobs a run requested are awaited concurrently, then `attempt` runs again, until a run requests nothing. That run is the only one committed (`commit` runs synchronously in the same tick as the run, so no other command can change the document between the run and its commit), audited and returned. A run that requested a job is discarded whatever it returned (a command may have swallowed the refusal into a success, as `deviationSkipped` does).
 - Jobs have a content key (sha256 of `job.json` and the mesh bytes). One job per key runs at a time and concurrent commands share it; its result is kept in a byte-bounded LRU (`LLULL_MESH_CACHE_MB`, default 512), so `replay_history`, undo, a retry and a plan that runs again find it. A failed job (`MESH_TIMEOUT`, crash, cancel) is remembered only for the resolve that saw it, so the next run reports its code instead of asking again.
-- Each run of the command asks for at most one job: the first native op it cannot answer. Later misses of the same run work on a placeholder input, so they defer without asking (and replay memoizes none of their states). The resolve loops while each run asks for a key it does not hold yet, and stops at 256 jobs (`MESH_JOB_LIMIT`, remediation: split the plan or decimate first). A run that defers without asking, or asks again for a result it holds, is an engine bug and is refused by name (`MESH_DEFER_PROTOCOL`). `quad_remesh` on a mesh over the TypeScript cap is three runs (the quad job, the deviation job, the final run); a plan of 19 native steps is 20 runs and 19 jobs (test).
-- Cost of running again: a plan re-runs from its first step in each round, so k native steps cost about (k + 1) / 2 times the plan. Measured with a 2 ms fake job: a 10-step `build_project` (7 `add_box`, 3 `quad_remesh` at steps 3, 6 and 9) is 4 runs, 28 step executions instead of 10, and 9 engine calls instead of 3; 44 to 72 ms cold against 4 to 9 ms with the results kept. History is cheaper: `replay_history` of the same 10 steps with the results cleared takes 9 engine calls (12 without the replay prefix cache: each round reuses the states before the first deferral), and the next replay takes 0 (the whole history is cached). On a 328k-triangle mesh one run of the command is 1 to 6 s, so a plan with many native steps on big meshes pays that per round; this is kept as a BOARD item (memoize the steps already executed inside one resolve) and `build_project` is not changed here.
+- Each run of the command asks for at most one job: the first native op it cannot answer. Later misses of the same run work on a placeholder input, so they defer without asking (and replay memoizes none of their states). The resolve loops while each run asks for a key it does not hold yet, and stops at 256 jobs (`MESH_JOB_LIMIT`, remediation: split the plan or decimate first). A run that defers without asking, or asks again for a result it holds, is an engine bug and is refused by name (`MESH_DEFER_PROTOCOL`). `quad_remesh` on a mesh over the TypeScript cap was three runs when this step was built (the quad job, the deviation job, the final run); it is two since 13.9 (the deviation comes with the quad job); a plan of 19 native steps is 20 runs and 19 jobs (test).
+- Cost of running again: a plan re-runs from its first step in each round, so k native steps cost about (k + 1) / 2 times the plan. Measured with a 2 ms fake job: a 10-step `build_project` (7 `add_box`, 3 `quad_remesh` at steps 3, 6 and 9) is 4 runs, 31 step executions instead of 10 (counted again in 13.9.4; 13 since 13.9), and 9 engine calls instead of 3; 44 to 72 ms cold against 4 to 9 ms with the results kept. History is cheaper: `replay_history` of the same 10 steps with the results cleared takes 9 engine calls (12 without the replay prefix cache: each round reuses the states before the first deferral), and the next replay takes 0 (the whole history is cached). On a 328k-triangle mesh one run of the command is 1 to 6 s, so a plan with many native steps on big meshes pays that per round; this was cut in 13.9 (steps executed once, the deviation in the job).
 - Replay (L8): a step that saw a deferred answer is not memoized in the replay prefix cache, and every later state is keyed apart (`replay.ts`, `deferralCount`); otherwise the placeholder state of the first run would be served after the job finished. Test: `tests/unit/mesh/deferredEngine.test.ts` (fails without the rule).
 - Live sync (`@protocol/liveSync`): a command takes effect when it finishes, against the document as it is then (a command that arrives meanwhile commits first; the job's command re-reads the document, and a job whose input changed is simply a new job). The log and `stateHash` see one ordinary `command` event. The renderer still re-runs the command without the native engine and resyncs from `/live/snapshot` (sync.md, unchanged).
 - Undo: the finished command is one history entry, like any other.
@@ -961,10 +961,80 @@ What still blocks is the command's own TypeScript work around the job, not the j
 
 ### 13.8.5 Left
 
-- Memoize the steps already executed inside one resolve (BOARD): the cost grows with the number of native steps in a plan, see 13.8.1.
-- Cut the repeated work: the second and third run of a command redo its synchronous validation (5.5 s on 328k triangles). A memo of the loaded and validated mesh inside the scope, or asking for the requests of one run together, would remove most of it.
-- The deviation of a 40 000-quad result is a second job (about 20 s with its repeated runs); the command could ask for it with the quad job's result already in hand.
+- Done in 13.9: the steps of a plan executed inside one resolve are memoized, the command's own load / validation / packing is kept for its next run, and the deviation of a result is measured by the same native job. What is still synchronous in the final run is the work that has to happen once after the job (the checks of the result: 1.5 s on the 40 000-quad case).
 - The UI shows no progress yet: `/live` SSE does not carry job reports (a `progress` event keyed by `commandId` would). Viewport/shell lane.
 - `decimate_mesh` of 1.3M triangles still takes 16.6 s of native time (13.5.4); it no longer stops the backend.
 - Native `remesh`, `analyze`, `cut`, `fill_holes`, `repair`, `sculpt` (the rest of DES-7c) report through `Progress` when they exist.
 - The raster, point-cloud, field and geometry-query ports still block on `runComputeSync`.
+
+## 13.9 As built (DES-7c step 4: less repeated work per resolve, 2026-10-27)
+
+### 13.9.1 The problem (13.8.3, 13.8.5)
+
+The host runs a command again after each native job and commits the last run. Three costs came from that, all measured before this step:
+
+1. every run repeated the command's own TypeScript work on the mesh (load, weld, measure, orient, the editable-mesh check, packing the job files, hashing the job key);
+2. the deviation of a `quad_remesh` result was a second job, so a command needed a second round;
+3. `build_project` ran again from step 1 after each native step: k native steps cost about (k + 1) / 2 times the plan, and an OCCT boolean in the prefix ran every time.
+
+### 13.9.2 Decision
+
+**A resolve-scoped memo, handed through the execution context** (`ExecutionContext.resolveMemo`, `commands/resolveMemo.ts`; no architecture law changes). `resolveDeferred` makes one per resolve (`DeferredScope.memo`), calls `beginRun()` before each run and `dispose()` when the resolve ends however it ends; `serverContext()` puts it in the context of the commands that run inside the scope (null outside). `once(owner, tag, compute, weight?)` keeps a value under (identity of `owner`, `tag`).
+
+- **Plan steps (`build_project`, every `onError` mode, loops, nested plans).** `execStep` runs `executeRecorded` through `memo.once(run.current, "step|<depth>|<command>|<params>|<recorded params>", ...)`. The key is the identity of the document the step starts from: a step that was served returns the very document object of the earlier run, so the next step finds its input by identity too, and the chain of steps before the first deferral is reused with no hashing of any document. The params go into the key through a JSON that tells `NaN` / `Infinity` from `null`. A step whose command is `build_project` is never served whole (it runs again so its inner steps report to `onStep` in every run; they are memoized one by one). Only plans that run as top-level recorded steps share (`ctx.stepKey` undefined): a plan replayed inside a running step mints ids from that step's id source, which a skipped step would not advance. A step that failed is shared like one that succeeded (the failure is a function of the same input).
+- **The command's mesh preparation (`quad_remesh`, and every `runMeshOp` command: decimate, smooth, remesh, repair, fill holes, ...).** `prepareSolidMesh` (load, weld, measure, orient) is kept under the *entity object* and the weld / orientation options. The entity, not the document, because `replay_history` and `edit_step_params` hand each run a new document object (the replay cache spreads it) that still holds the same entity objects; in a plan the entity is the same too. The native engine keeps, under the *input `MeshData` object* (which is now the same object in every run), its editable-mesh check and the packed job files with their SHA-256 digests; the job key is a hash of the file names and digests, so the mesh bytes are hashed once.
+- **The deviation in the same job.** Ops `decimate`, `smooth` and `quad_remesh` take `withDeviation: maxSamples` (`WithDeviation`, `engineTypes.ts`); `job.json` carries `deviationSamples`, `llull-meshops` measures the symmetric deviation of the result from the input after the op (stage `deviation`, before `write`) and writes it as `deviation` in `report.json`; the engine returns it in `MeshOpResult.deviation`. `runMeshOp` and `quad_remesh` use it and measure separately only when the engine gave none (the TypeScript engine, a stub, a native failure to measure). For `quad_remesh` the measured mesh is what the command commits (the quads wound outward per shell and split along the shorter diagonal), so the job carries Rust twins of `outwardQuads` and `triangulateQuads` (`quad_mesh.rs`, same operation order, `llull-jsmath` hypot): the deviation is the number the separate job on the committed triangles gives (tests below).
+
+What is NOT memoized, by rule (`ResolveMemo`): anything computed in a run after an engine deferred an answer in it (`deferralCount()` moved since `beginRun`): from there on a run works on placeholders, and the step that deferred is the one that runs again. Entries are bounded by count (1024) and by weight (32 million numbers, about 250 MB). The weight is exactly this: for a kept plan step the length of its key plus the numbers (positions and indices) of the meshes of the entities it created or replaced; for a kept mesh preparation the positions and indices of the loaded mesh plus the second index array of the outward copy. A step result otherwise shares structure with the documents around it (spread entity tables), and its `data` is not weighed: those are bounded by the entry count only. Beyond a bound a value is computed but not kept, and the earliest entries stay, because the next run reads the prefix first (an LRU would evict exactly that prefix).
+
+History (`replay_history`, `edit_step_params` and the other meta-commands) keeps its replay prefix cache, which already reused the states before the first deferral; what a native step repeated there was its own preparation, now kept by entity.
+
+### 13.9.3 Rejected
+
+| Option | Why not |
+| ------ | ------- |
+| Memoize at `execute` (document, command, params) | A nested `execute` inside a step shares that step's id source; skipping one would shift the ids of the next (L8). Only top-level recorded steps are independent. |
+| Hash-keyed prefix cache like `replay.ts` for plans | It needs the hash of the starting document and of each step's result; the identity chain costs nothing and cannot collide. The replay cache stays for history, where documents are rebuilt and identity is lost. |
+| Process-wide `WeakMap` for packed meshes | Lifetime follows the garbage collector, not the resolve; no budget; cannot be asserted. |
+| An ambient module slot for the memo | Breaks "a command reads its dependencies only from its context" (`context.ts`). The context field costs one line in `serverContext`. |
+| A second job for the deviation, asked in the same round | Its input (the committed triangles) is made from the first job's output; it cannot be asked before. |
+| Make the native job write the committed (outward, triangulated) result | Changes the engine contract and the cage the TypeScript checks see; only the measurement needs the outward triangles. |
+| Make `build_project` resumable (a generator) | Changes the `CommandResult` contract for one host feature. |
+
+`fit_subdivision_to_mesh` and `fit_surface_to_mesh` never called the engine (pure TypeScript, 13.7): one pass, nothing to fix. `decimate_mesh` and `smooth_mesh` had the same two-round pattern on a mesh above the TypeScript cap (native op, then native deviation) and are fixed by the same change. `remesh_mesh`, `repair_mesh` and `fill_mesh_holes` run in TypeScript and only the deviation can be native: one job, one extra round, unchanged.
+
+### 13.9.4 Measured (win32-x64, release build, one machine; `runHostCommandResolved` in process, no HTTP, event-loop stall sampled every 5 ms)
+
+`quad_remesh` of the 327 680-triangle sphere (icosphere level 7, R 10) to 40 000 quads (38 577 delivered):
+
+| | Before | After |
+| - | ------ | ----- |
+| Runs of the command | 3 | 2 |
+| Native jobs | 2 (quad, then deviation) | 1 |
+| Engine calls (quad / deviation) | 3 / 2 | 2 / 0 |
+| Longest event-loop stall | 5.82 s | 1.53 s |
+| Wall time | 126.4 s | 122.7 s |
+
+The wall time is the 110 s QuadriFlow job; the saving is the repeated TypeScript work and the deviation job. What is left in the stall is the work that must happen once: the first run's preparation (about 1.2 s) and the final run's checks of the result (cage validity, on-source check, creases).
+
+A 10-step `build_project` (7 `add_box`, 3 `quad_remesh` at steps 3, 6 and 9, fake 2 ms job, bus `applyCommandAsync`):
+
+| | Before | After |
+| - | ------ | ----- |
+| Runs | 4 | 4 |
+| `add_box` executions | 22 | 7 |
+| `quad_remesh` executions | 9 | 6 |
+| Step executions | 31 | 13 |
+| Wall time (one cold sample) | 102 ms | 58 ms |
+
+Executions are now 10 + the number of native steps for any plan (a native step runs once to ask for its job and once to use it); the unit test checks 1, 3 and 6 native steps in 10.
+
+### 13.9.5 Tests
+
+`tests/unit/resolveMemo.test.ts` (identity keys, throw, deferral rule, entry and weight bounds, dispose); `tests/unit/mesh/resolveMemoPlan.test.ts` (executions linear in the plan for 1, 3 and 6 native steps, the 10-step measurement plan, 24 seeded random plans in both error modes with refused and unknown steps: same document, ids, summary, report and jobs asked with and without the memo, a nested plan, another input document is a fresh execution, `edit_step_params` and `replay_history` over a native step: same document, and the engine gets the same prepared mesh object in every run); `tests/unit/mesh/withDeviation.test.ts` (the op asks with `withDeviation`, the engine's number is used and no separate deviation is asked, the fallback when the engine gave none, for `quad_remesh`, `decimate_mesh` and `smooth_mesh`); `server/tests/deferredRun.test.ts` (one memo per resolve shared by its runs, none from a deferred run, dropped after a normal end, a cancel, the job limit and a throw, `serverContext` hands it out only inside a resolve); `server/tests/meshJobsRefusals.test.ts` (bus: 7 + 6 executions for the measurement plan, memo empty afterwards; a cancel after the first job of a plan commits nothing and drops the memo); `server/tests/quadRemeshNative.test.ts` (real binary: two runs, one pending quad job, no deviation call, deviation equal to `measure_deviation` on the committed mesh); `server/tests/meshopsNative.test.ts` (decimate and smooth: the deviation in the answer equals the separate native job and the TypeScript engine, result bytes and report unchanged); `solver/crates/llull-meshops` cargo tests (decimate / smooth / quad deviation equal to the separate job, stages, absent without the request, the Rust twins of `outwardQuads` and `triangulateQuads`).
+
+### 13.9.6 Left
+
+- A plan replayed inside a running step (a recorded `build_project` re-expanded by `replay_history`) is not memoized; the replay prefix cache covers it up to the first deferral.
+- The first run's preparation (1.2 s on 327k triangles) and the final run's result checks (1.5 s on 40 000 quads) are synchronous. Chunking them onto the event loop would remove the remaining stall; not needed for the keep-alive limit (5 s).
+- The memo shares objects between runs: a command must not mutate the mesh it loads or the result of a step (commands are pure, L3).
