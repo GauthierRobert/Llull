@@ -74,14 +74,15 @@ export const bevelCageEdges = defineCommand({
     if (isBevelProblem(result)) return reject(result.code, result.message, ['params.edges']);
     const updated = finishedCage(doc, COMMAND, entity, state);
     if (isCommandResult(updated)) return updated;
+    const [oldVertices, oldFaces] = [new Set(entity.elementIds.vertices), new Set(entity.elementIds.faces)];
     return topologyResult(
       doc,
       COMMAND,
       updated,
       `${edges.size} edge(s) bevelled by ${width} in ${segments} segment(s); +${result.vertices} vertices, +${result.faces} faces`,
       {
-        newVertices: updated.elementIds.vertices.filter((id) => !entity.elementIds.vertices.includes(id)),
-        newFaces: updated.elementIds.faces.filter((id) => !entity.elementIds.faces.includes(id)),
+        newVertices: updated.elementIds.vertices.filter((id) => !oldVertices.has(id)),
+        newFaces: updated.elementIds.faces.filter((id) => !oldFaces.has(id)),
       },
       named.byIndex ? { edges: named.ids } : null,
     );

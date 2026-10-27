@@ -52,12 +52,15 @@ describe('add_subdivision_solid v2', () => {
   it('refuses with stable codes', () => {
     const box = boxCage([1, 1, 1], [1, 1, 1]);
     const open = { vertices: box.vertices, faces: box.faces.slice(1) };
+    const huge = boxCage([1, 1, 1], [100, 100, 100]);
+    const dense = boxCage([1, 1, 1], [40, 40, 40]); // 9602 vertices pass the vertex cap, 9600 faces x 4^4 refined quads do not
     const cases: Array<[object, string]> = [
       [{ box: { size: [1, 1, 1] }, edgeSharpness: [{ a: 0, b: 1, s: 12 }] }, 'DIR_SHARPNESS_RANGE'],
       [{ box: { size: [1, 1, 1] }, vertexSharpness: [{ v: 0, s: 0 }] }, 'DIR_SHARPNESS_RANGE'],
       [open, 'DIR_CAGE_OPEN'],
       [{ box: { size: [1, 1, 1] }, levels: 5 }, 'DIR_LEVELS_RANGE'],
-      [{ box: { size: [1, 1, 1], segments: [32, 32, 32] } }, 'DIR_CAGE_TOO_LARGE'],
+      [{ vertices: huge.vertices, faces: huge.faces }, 'DIR_CAGE_TOO_LARGE'],
+      [{ vertices: dense.vertices, faces: dense.faces, levels: 4 }, 'DIR_CAGE_TOO_LARGE'],
     ];
     for (const [params, expected] of cases) {
       const result = run(empty, 'add_subdivision_solid', params);

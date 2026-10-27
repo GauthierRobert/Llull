@@ -536,7 +536,7 @@ open cages, `move_faces`, `delete_faces`, `/preview`, bench), and the `freeform`
   records the edge in the caller's order; `symmetrize` follows the strongest-weighted image; an `ignore` edit that breaks the mirror clears `symmetry`; `check_subdivision` also reports
   `DIR_CHECK_SELF_INTERSECTION_PARTIAL`, `DIR_CHECK_LIMIT_VOLUME_UNAVAILABLE`, `DIR_CHECK_VOLUME_NON_FINITE`, `DIR_CHECK_PATCH_SEAM_GAP` / `_ANGLE`; `cageProblem` rejects duplicate / conflicting sharpness; codes
   `DIR_REGION_PINCH`, `DIR_LOOP_SELF_CROSS`. `previewCageCommand().triangles` are world space with the full placement; `pickCage` vertex / edge hits carry `t`.
-- Codes added to section 7.1: `DIR_ENTITY_NOT_FOUND`, `DIR_SELECTION_CONFLICT`, `DIR_NOTHING_TO_DO`, `DIR_FALLOFF_INVALID`, `DIR_LEVELS_RANGE`, `DIR_CAGE_TOO_LARGE` (2000 vertices), `DIR_DIRECTION_ZERO`,
+- Codes added to section 7.1: `DIR_ENTITY_NOT_FOUND`, `DIR_SELECTION_CONFLICT`, `DIR_NOTHING_TO_DO`, `DIR_FALLOFF_INVALID`, `DIR_LEVELS_RANGE`, `DIR_CAGE_TOO_LARGE` (2000 vertices; 50 000 since 07 MSH M6), `DIR_DIRECTION_ZERO`,
   `DIR_REGION_DEGENERATE`, `DIR_LOOP_CUTS_RANGE`, `DIR_SYMMETRY_BROKEN`, `DIR_CAGE_INVALID`, `DIR_EVAL_BUDGET`, `DIR_SELECTOR_INVALID`. `DIR_INSET_TOO_THICK` also covers thickness <= 0.
 
 ### 13.2 Measured (VC results)

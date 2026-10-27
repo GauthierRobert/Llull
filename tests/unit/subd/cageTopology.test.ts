@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type CadDocument, type SubdivisionEntity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { cageProblem } from '@core/geometry/subdivision';
+import { boxCage, cageProblem } from '@core/geometry/subdivision';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { volumeOf } from '../../helpers/fixtureDocument';
 
@@ -97,11 +97,22 @@ describe('extrude_cage_faces (VC-DIR-19)', () => {
     expect(code(run(cube.doc, 'extrude_cage_faces', { id: 'nope', faces: [0], distance: 1 }))).toBe('DIR_ENTITY_NOT_FOUND');
   });
   it('refuses a result above the cage size cap', () => {
-    const big = add({ box: { size: [14, 14, 14], segments: [14, 14, 14] }, levels: 0 });
-    const top = big.e.faces.flatMap((face, f) => (face.every((v) => (big.e.vertices[v] as Vec3)[2] === 7) ? [f] : []));
-    const bottom = big.e.faces.flatMap((face, f) => (face.every((v) => (big.e.vertices[v] as Vec3)[2] === -7) ? [f] : []));
-    const result = run(big.doc, 'extrude_cage_faces', { id: big.id, faces: [...top, ...bottom], distance: 1, individual: true });
+    const cage = boxCage([1, 1, 1], [60, 60, 60]);
+    const big = add({ vertices: cage.vertices, faces: cage.faces, levels: 0 });
+    const result = run(big.doc, 'extrude_cage_faces', { id: big.id, faces: big.e.faces.map((_, f) => f), distance: 1, individual: true });
     expect(code(result)).toBe('DIR_CAGE_TOO_LARGE');
+  });
+  it('refuses a result whose refined surface would pass the quad cap', () => {
+    const cage = boxCage([1, 1, 1], [20, 20, 20]);
+    const dense = add({ vertices: cage.vertices, faces: cage.faces, levels: 4 });
+    const result = run(dense.doc, 'extrude_cage_faces', {
+      id: dense.id,
+      faces: dense.e.faces.map((_, f) => f),
+      distance: 1,
+      individual: true,
+    });
+    expect(code(result), result.summary).toBe('DIR_CAGE_TOO_LARGE');
+    expect(result.summary).toContain('refine');
   });
   it('is pure', () => {
     expectPure(cube.doc, () => run(cube.doc, 'extrude_cage_faces', { id: cube.id, faces: [0], distance: 1 }));

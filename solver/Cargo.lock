@@ -1157,6 +1157,7 @@ version = "0.1.0"
 dependencies = [
  "llull-jsmath",
  "llull-protocol",
+ "llull-quadflow",
  "serde",
  "serde_json",
 ]
@@ -1199,6 +1200,14 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "llull-quadflow"
+version = "0.1.0"
+dependencies = [
+ "cxx",
+ "cxx-build",
 ]
 
 [[package]]

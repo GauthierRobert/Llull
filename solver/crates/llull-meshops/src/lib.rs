@@ -8,12 +8,16 @@
 //! - `decimate`: `{ targetTriangles?, maxDeviation?, preserveBoundary, featureCos?, lockedRegion?: { center, radius } }`; the mesh must be
 //!   manifold, consistently wound and free of degenerate faces (the host checks, as the TypeScript engine does).
 //! - `smooth`: `{ taubin, lambda, passBand, iterations, cotangent, fixBoundary, volumeCorrection, region? }`.
+//! - `quad_remesh` (feature `quad`): `{ targetFaces, preserveSharp, sharpCos, adaptive }`; the result is a quad mesh: `result_positions.f64`
+//!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
 //! - `deviation`: `{ maxSamples }` between the mesh above and `positions_b.f64` / `indices_b.u32`; writes `report.json` only.
 
 pub mod decimate;
 pub mod deviation;
 mod edit;
 mod geom;
+#[cfg(feature = "quad")]
+mod quad;
 pub mod smooth;
 mod surface;
 
@@ -162,6 +166,17 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
             mesh_out = Some((pos, triangles.clone()));
             serde_json::to_value(report).map_err(|error| input_error(error.to_string()))?
         }
+        #[cfg(feature = "quad")]
+        "quad_remesh" => {
+            let p: quad::QuadJob =
+                serde_json::from_value(job.params).map_err(|error| input_error(format!("quad_remesh params: {error}")))?;
+            let (pos, quads) = quad::quad_remesh(&positions, &triangles, &p)?;
+            let report = serde_json::json!({ "quads": quads.len() / 4, "vertices": pos.len() / 3 });
+            mesh_out = Some((pos, quads));
+            report
+        }
+        #[cfg(not(feature = "quad"))]
+        "quad_remesh" => return Err(input_error("quad_remesh needs llull-meshops built with the `quad` feature")),
         "deviation" => {
             let p: DeviationJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("deviation params: {error}")))?;
             let other_positions = f64s(&read(folder, "positions_b.f64")?, "positions_b.f64")?;
@@ -170,7 +185,7 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
                 .ok_or_else(|| input_error("a mesh without triangles has no surface to measure"))?;
             serde_json::to_value(result).map_err(|error| input_error(error.to_string()))?
         }
-        other => return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, deviation)"))),
+        other => return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, deviation, quad_remesh)"))),
     };
     let summary = serde_json::json!({ "op": job.op, "items": items, "ms": started.elapsed().as_millis(), "report": report });
     let summary_bytes = serde_json::to_vec(&summary).map_err(|error| input_error(error.to_string()))?;

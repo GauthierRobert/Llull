@@ -42,9 +42,12 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_ASSET_MISSING: 'This machine does not hold the asset: re-import the source file (its sha256 is in meshSource).',
   MESH_ASSET_UNAVAILABLE:
     'No mesh asset store is installed here (run through the llull CLI or the desktop backend), or reduce the mesh below the inline cap.',
-  MESH_ENGINE_UNSUPPORTED: 'Run in the desktop app or the `llull` CLI host, which install the Manifold mesh engine.',
+  MESH_ENGINE_UNSUPPORTED:
+    'Run in the desktop app or the `llull` CLI host, which install the Manifold mesh engine and the native llull-compute (quad_remesh needs the native one).',
   MESH_ENGINE_CAP_EXCEEDED:
-    'The input is above the TypeScript engine cap: use a host with the Manifold or native engine, or reduce the mesh.',
+    'The input is above the engine cap (TypeScript 200 000 triangles, native quad_remesh 500 000): use a host with the native engine for the first, decimate_mesh the input for the second.',
+  MESH_TIMEOUT:
+    'Raise LLULL_MESH_OP_TIMEOUT_S, ask for less (a lower targetQuadCount: the time grows faster than linearly), or decimate_mesh the input first.',
   MESH_OFFSET_RESOLUTION: 'Raise tolerance (or maxCells): the level-set grid would exceed the cell cap.',
   MESH_HULL_DEGENERATE: 'Give at least 4 points that are not coplanar.',
   MESH_BOOLEAN_FAILED: 'Run check_mesh purpose=boolean on the operands.',
@@ -60,6 +63,8 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_SCULPT_STAMP_OFF_SURFACE: 'Move the stamp centre within `radius` of the surface (analyze_mesh gives the bounds), or raise radius.',
   MESH_SEGMENT_NO_GROUPS: 'The mesh has no face to segment: check it with analyze_mesh.',
   MESH_KERNEL_UNSUPPORTED: 'Run on the native OCC kernel (the llull CLI / desktop app default); Manifold has no exact B-rep builder.',
+  MESH_QUAD_REMESH_FAILED:
+    'Run remesh_mesh first for an even triangulation, raise targetQuadCount (very few quads on a detailed surface), or repair_mesh the input.',
   MESH_CUT_MISSES: 'Move the plane so that the mesh has vertices on both sides.',
 };
 

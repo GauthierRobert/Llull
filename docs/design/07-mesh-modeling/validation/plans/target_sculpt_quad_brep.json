@@ -1,8 +1,7 @@
 {
  "id": "MSH-SCULPT-BREP",
- "status": "PARTIAL: steps 0-4 (add_grid_mesh, sculpt_mesh, import, remesh) run; steps 5-7 need quad_remesh and fit_subdivision_to_mesh (M6, not built)",
+ "status": "PARTIAL: steps 0-5 (add_grid_mesh, sculpt_mesh, import, remesh, quad_remesh) run; steps 6-7 need fit_subdivision_to_mesh (M6, not built)",
  "unbuilt": [
-  "quad_remesh",
   "fit_subdivision_to_mesh"
  ],
  "validates": [
@@ -22,6 +21,13 @@
   "step 2 data.symmetryError": {
    "value": 0,
    "tolerance": 1e-12
+  },
+  "step 5 data.quads": {
+   "range": [
+    510,
+    690
+   ],
+   "source": "target 600 within 15 %; measured 631 (the 80-triangle l1 STL remeshed to 1.5 mm); cage Hausdorff 0.344 against the faceted l1 remesh"
   },
   "step 6 data.maxDeviation": "TBD - measure with fit_subdivision_to_mesh on the icosphere l4 (target <= 0.05 mm)"
  },

@@ -9,8 +9,13 @@ publish.workspace = true
 [dependencies]
 llull-jsmath = { path = "../llull-jsmath" }
 llull-protocol = { path = "../llull-protocol" }
+llull-quadflow = { path = "../llull-quadflow", optional = true }
 serde.workspace = true
 serde_json.workspace = true
+
+[features]
+# `quad_remesh` (07 MSH M6): the vendored QuadriFlow (C++, built by llull-quadflow). Off here so the bit-exact ops build without a C++ compiler; llull-compute turns it on.
+quad = ["dep:llull-quadflow"]
 
 [lints]
 workspace = true

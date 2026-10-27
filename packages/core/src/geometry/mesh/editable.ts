@@ -25,6 +25,11 @@ export const DECIMATE_DESCRIPTION: Description = {
   reference: 'Garland and Heckbert, Surface Simplification Using Quadric Error Metrics, SIGGRAPH 1997',
 };
 
+export const QUAD_DESCRIPTION: Description = {
+  algorithm: 'QuadriFlow: 4-RoSy orientation field, position field, integer-grid map by max-flow, single thread and fixed seed',
+  reference: 'Huang, Zhou, Niessner, Shewchuk and Guibas, QuadriFlow: A Scalable and Robust Method for Quadrangulation, SGP 2018',
+};
+
 export const smoothDescription = (taubin: boolean): Description => ({
   algorithm: taubin ? 'Taubin lambda|mu umbrella smoothing' : 'Laplacian umbrella smoothing',
   reference: 'Taubin, A Signal Processing Approach to Fair Surface Design, SIGGRAPH 1995',

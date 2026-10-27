@@ -1,0 +1,16 @@
+[package]
+name = "llull-quadflow"
+description = "QuadriFlow (Huang et al., SGP 2018; BSD-3-Clause + Enhancements grant) quad remeshing, vendored with Eigen (MPL-2.0 only), LEMON (BSL-1.0) and pcg32 (Apache-2.0), behind a narrow cxx facade (07 MSH M6)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cxx = "1"
+
+[build-dependencies]
+cxx-build = "1"
+
+[lints]
+workspace = true

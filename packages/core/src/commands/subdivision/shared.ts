@@ -10,8 +10,11 @@ import { entityOfKind } from '../entity/entityOfKind';
 import type { CommandResult } from '../types';
 import { dirRejection } from './codes';
 
-/** Largest cage accepted (vertices); the surface grows x4 per level. */
-export const MAX_CAGE_VERTICES = 2000;
+/** Largest cage accepted (vertices); the surface grows x4 per level. 50 000 holds the cages of quad_remesh (07 MSH D5). */
+export const MAX_CAGE_VERTICES = 50_000;
+
+/** Most quads the refined surface may have: cage faces x 4^levels (a 50 000-vertex cage at level 4 would be 12.8 million). */
+export const MAX_REFINED_QUADS = 1_000_000;
 
 export const levelsField = z
   .number()
@@ -42,6 +45,12 @@ export function sizeProblem(cage: Cage, levels: number): { code: 'DIR_LEVELS_RAN
     return { code: 'DIR_LEVELS_RANGE', message: `levels must be an integer 0..${MAX_SUBDIVISION_LEVELS} (got ${levels})` };
   if (cage.vertices.length > MAX_CAGE_VERTICES)
     return { code: 'DIR_CAGE_TOO_LARGE', message: `the cage has ${cage.vertices.length} vertices (max ${MAX_CAGE_VERTICES})` };
+  const refined = cage.faces.length * 4 ** levels;
+  if (refined > MAX_REFINED_QUADS)
+    return {
+      code: 'DIR_CAGE_TOO_LARGE',
+      message: `${cage.faces.length} cage faces at ${levels} levels refine to ${refined} quads (max ${MAX_REFINED_QUADS})`,
+    };
   return null;
 }
 

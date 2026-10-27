@@ -282,19 +282,24 @@ const cases = [
   },
   {
     vc: 'VC-MSH-22',
-    what: 'quad_remesh + fit_subdivision_to_mesh + exact B-spline solid of an icosphere R 10',
+    what: 'quad_remesh + fit_subdivision_to_mesh + exact B-spline solid of an icosphere R 10 (quad_remesh and the B-spline solid of the unfitted cage are built and measured; the fit step is not)',
     expected: {
       allQuads: true,
-      quadCount: 'TBD - measure (report vs target 600)',
-      maxDeviation: '<= 0.05 (requested)',
-      bsplineFaces: '> 0 on the native kernel',
-      areaRelErrorVs4piR2: 'TBD - measure',
+      quadCount: '545..614 for targetQuadCount 600 (within 15 %; measured 614 on icosphere l4, 609 on l5, 545 through the float32 STL)',
+      valence:
+        'eight valence-3 vertices (cube topology), every other vertex valence 4 (l4: {3: 8, 4: 608}); the sum of (4 - valence) is 8 by Euler; one valence-5 vertex appears on l5',
+      cageHausdorffToSource: '<= 0.1 (measured 0.0663 l4, 0.0624 l5, 0.0824 through the STL; mean 0.029 / 0.031)',
+      bsplineFaces: 'quads x 4^(levels - 1) = 2456 for 614 quads at levels 2, all bspline, one closed solid, on the native kernel',
+      unfittedLimitVsSphere:
+        'volume 4097.719 (-2.17 % of 4188.790), area 1238.371 (-1.45 % of 1256.637): the Catmull-Clark limit of the cage lies inside it',
+      maxDeviationAfterFit: '<= 0.05 (requested; fit_subdivision_to_mesh not built)',
     },
-    tolerance: 'bounds / TBD',
-    source: '(c) TBD - measure with the implementation; QuadriFlow face count grows linearly with the requested resolution [S8]',
+    tolerance: 'bounds',
+    source:
+      '(c) measured with the implementation (server/tests/quadRemeshNative.test.ts); QuadriFlow face count grows linearly with the requested resolution [S8]',
     grade: 'C',
     proves: ['FR-MSH-22', 'FR-MSH-23', 'TR-MSH-10'],
-    cli: { run: `llull run plans/target_sculpt_quad_brep.json --kernel occt ${D}`, assert: 'steps[6].data.maxDeviation' },
+    cli: { run: `llull run plans/target_quad_remesh.json --kernel occt ${D}`, assert: 'steps[2].data.quads, steps[3].data.volume' },
   },
   {
     vc: 'VC-MSH-23',

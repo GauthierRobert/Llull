@@ -152,6 +152,7 @@ describe('add_subdivision_solid', () => {
     expect(e.rotation[2]).toBeCloseTo(Math.PI / 2);
     expect(solidTriangles(e)).toHaveLength(4);
   });
+  const hugeCage = boxCage([1, 1, 1], [100, 100, 100]);
   it.each([
     [{}, 'exactly one of box, cylinder'],
     [{ box: { size: [1, 1, 1] }, cylinder: { radius: 1, height: 1 } }, 'exactly one of'],
@@ -162,7 +163,7 @@ describe('add_subdivision_solid', () => {
     [{ cylinder: { radius: 1, height: 1, sides: 2 } }, 'sides must be 3..64'],
     [{ box: { size: [1, 1, 1] }, levels: 5 }, 'levels must be an integer 0..4'],
     [{ box: { size: [1, 1, 1] }, creases: [[0, 7]] }, 'not an edge'],
-    [{ box: { size: [1, 1, 1], segments: [32, 32, 32] } }, 'max 2000'],
+    [{ vertices: hugeCage.vertices, faces: hugeCage.faces }, 'max 50000'],
   ])('rejects bad input (%#)', (params, text) => {
     expectNoOp(run(empty, 'add_subdivision_solid', params), empty, text);
   });

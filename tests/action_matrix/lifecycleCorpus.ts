@@ -15,7 +15,10 @@ import { pipingPlans } from '../golden/pipingPlans';
 import { pipingPlansV1 } from '../golden/pipingPlansV1';
 import { pipingPlansV1b } from '../golden/pipingPlansV1b';
 import { plmPlans } from '../golden/plmPlans';
+import { execute } from '@core/commands/registry';
+import { icosphere, docWithMeshes } from '../helpers/meshFixtures';
 import { SLICE_SEEDS } from '../helpers/pluginSliceSeeds';
+import { contextWith, quadSphere, stubQuadEngine } from '../helpers/quadFixtures';
 import { loadDesigns } from './corpus';
 import { buildDesign } from './matrixRunner';
 import type { Design } from './types';
@@ -75,6 +78,26 @@ const planDesign = (design: Design): LifecycleDesign => ({
   },
 });
 
+/**
+ * quad_remesh (07 MSH M6) needs the native mesh engine, which no matrix host installs: a design with a stub engine puts its two outputs (a subdivision
+ * solid and a mesh, the source kept) through replay, undo, delete and clear. Always chosen, like the plugin seeds.
+ */
+function quadRemeshDesign(): LifecycleDesign {
+  const context = (): ExecutionContext => contextWith(stubQuadEngine(() => quadSphere(10, 5)));
+  return {
+    id: 'seed/quad_remesh',
+    commands: new Set(['import_mesh', 'quad_remesh']),
+    size: 0,
+    build: () => {
+      const { doc, ids } = docWithMeshes(icosphere(10, 3));
+      const first = execute(doc, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 150 }, context());
+      const second = execute(first.document, 'quad_remesh', { id: ids[0] as string, targetQuadCount: 150, output: 'mesh' }, context());
+      return second.document;
+    },
+    context,
+  };
+}
+
 /** Every lifecycle design, in a stable order. */
 export function lifecycleDesigns(): LifecycleDesign[] {
   const extra = Object.entries(EXTRA_SETS).flatMap(([set, plans]) =>
@@ -94,7 +117,7 @@ export function lifecycleDesigns(): LifecycleDesign[] {
     };
     return [design];
   });
-  return [...loadDesigns().map(planDesign), ...extra, ...seeds];
+  return [...loadDesigns().map(planDesign), ...extra, ...seeds, quadRemeshDesign()];
 }
 
 /** Plugins with a document extension and at least one command that no design exercises (a plugin without commands has no way to create its slice). */

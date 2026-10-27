@@ -1,0 +1,98 @@
+{
+ "id": "MSH-QUAD",
+ "status": "RUNNABLE: quad_remesh needs the native mesh engine (llull-compute built with QuadriFlow); step 3 (exact B-spline solid of the cage) also needs the native OCC kernel. fit_subdivision_to_mesh (the other half of VC-MSH-22) is a later step",
+ "unbuilt": [],
+ "validates": [
+  "VC-MSH-22"
+ ],
+ "description": "Quad-remesh the fine icosphere (R 10, level 5, 20480 triangles) into a 600-quad subdivision cage, take the exact B-spline solid of that cage (before any fit), then a quad-based triangle mesh by edge length, then one refusal.",
+ "expect": {
+  "stepIndexBase": 0,
+  "step 2 data.quads": {
+   "range": [
+    510,
+    690
+   ],
+   "source": "target 600 within 15 %; measured 545 through the float32 STL (609 on the in-memory l5, 614 on l4)"
+  },
+  "step 2 data.valence": {
+   "range": [
+    8,
+    10
+   ],
+   "of": "vertices with valence 3 (the corners); the rest is valence 4, one valence-5 vertex may appear",
+   "note": "measured {3: 9, 4: 537, 5: 1} through the STL"
+  },
+  "step 2 data.deviation.hausdorff": {
+   "max": 0.1,
+   "source": "measured 0.0824 (cage faces against the source)"
+  },
+  "step 3 data.volume": {
+   "value": 4096.5,
+   "tolerance": 0.02,
+   "relative": true,
+   "note": "limit surface of the cage, 2.2 % under the sphere 4188.79 until fit_subdivision_to_mesh"
+  },
+  "step 3 data.method": "exact",
+  "step 4 data.targetQuads": {
+   "value": 558,
+   "note": "round(area / 1.5^2) with the l5 polyhedral area 1255.6"
+  },
+  "step 5 data.closed": true,
+  "step 6": "CMD_INVALID_PARAMS (targetQuadCount 3 < 6)"
+ },
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "mm"
+   }
+  },
+  {
+   "command": "import_mesh_file",
+   "params": {
+    "format": "stl",
+    "file": "validation/data/icosphere_r10_l5_binary.stl",
+    "units": "mm"
+   },
+   "as": "sphere"
+  },
+  {
+   "command": "quad_remesh",
+   "params": {
+    "id": "$sphere",
+    "targetQuadCount": 600
+   },
+   "as": "cage"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$cage",
+    "surfaceModel": "limit_patches"
+   }
+  },
+  {
+   "command": "quad_remesh",
+   "params": {
+    "id": "$sphere",
+    "targetEdgeLength": 1.5,
+    "output": "mesh"
+   },
+   "as": "quadmesh"
+  },
+  {
+   "command": "analyze_mesh",
+   "params": {
+    "id": "$quadmesh"
+   }
+  },
+  {
+   "command": "quad_remesh",
+   "params": {
+    "id": "$sphere",
+    "targetQuadCount": 3
+   }
+  }
+ ]
+}

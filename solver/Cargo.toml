@@ -21,6 +21,7 @@ default-members = [
   "crates/llull-geomq",
   "crates/llull-field",
   "crates/llull-meshops",
+  "crates/llull-quadflow",
   "crates/llull-flow-core",
   "crates/llull-flow-lbm",
   "bins/llull-compute",
@@ -75,6 +76,10 @@ opt-level = 3
 
 # Field engine (05 IMP M4): the parity tests mesh 60-100 cube grids and measure 10^5-10^6 samples.
 [profile.dev.package.llull-field]
+opt-level = 3
+
+# Quad remeshing (07 MSH M6): the vendored QuadriFlow (Eigen templates) is C++ compiled by the build script; unoptimised it is ~30x slower.
+[profile.dev.package.llull-quadflow]
 opt-level = 3
 
 [profile.dev.package.llull-bvh]

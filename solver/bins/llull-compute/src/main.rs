@@ -4,7 +4,7 @@
 //! `llull-route`, plant 02 RTE V2 auto-router; contract in `llull_route::job`), `stats <folder>` (crate `llull-stats`,
 //! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer),
 //! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`), `geomq <folder>` (crate `llull-geomq`,
-//! RS-6 clearance / thickness / view-factor batches; contract in `llull_geomq`), `meshops <folder>` (crate `llull-meshops`, 07 MSH M3 decimate / smooth, bit-identical to the TypeScript mesh engine), `flow <folder>` (crate `llull-flow-lbm`, 12 CFD M2
+//! RS-6 clearance / thickness / view-factor batches; contract in `llull_geomq`), `meshops <folder>` (crate `llull-meshops`, 07 MSH M3 decimate / smooth, bit-identical to the TypeScript mesh engine, and M6 `quad_remesh` by the vendored QuadriFlow), `flow <folder>` (crate `llull-flow-lbm`, 12 CFD M2
 //! lattice-Boltzmann steady flow; one `progress` event per drag sample, contract in `llull_flow_lbm::job`), `field <folder>` (crate `llull-field`, 05 IMP M4 voxel meshing / measures of a FieldProgram tape, bit-identical to the TypeScript engine; contract in `llull_field`).
 //! An unknown job ends with an `error`
 //! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.

@@ -189,7 +189,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get mesh(): readonly string[] {
     return [
       ...words(
-        'import_mesh_file analyze_mesh check_mesh convex_hull minkowski_sum offset_mesh hollow_mesh repair_mesh subdivide_mesh fill_mesh_holes decimate_mesh remesh_mesh smooth_mesh cut_mesh segment_mesh mesh_to_brep sculpt_mesh add_grid_mesh add_icosphere_mesh attach_mesh_asset',
+        'import_mesh_file analyze_mesh check_mesh convex_hull minkowski_sum offset_mesh hollow_mesh repair_mesh subdivide_mesh fill_mesh_holes decimate_mesh remesh_mesh smooth_mesh cut_mesh segment_mesh mesh_to_brep sculpt_mesh add_grid_mesh add_icosphere_mesh attach_mesh_asset quad_remesh',
       ),
       ...nativeToolNames('mesh'),
     ];

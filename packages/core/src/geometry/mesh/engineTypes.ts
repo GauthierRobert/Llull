@@ -49,6 +49,15 @@ export type MeshOp =
   | ({ readonly op: 'remesh' } & RemeshParams)
   | ({ readonly op: 'smooth' } & SmoothParams)
   | { readonly op: 'deviation'; readonly other: MeshInput; readonly maxSamples: number }
+  | {
+      readonly op: 'quad_remesh';
+      /** Wanted number of output quads (the engine lands within about 15 % of it). */
+      readonly targetQuads: number;
+      /** Smaller quads where the surface curves more. */
+      readonly adaptive: boolean;
+      /** Align the quads to edges whose faces meet at more than this angle; absent = no alignment. */
+      readonly hardEdgeRad?: number;
+    }
   | ({ readonly op: 'segment' } & SegmentParams)
   | ({ readonly op: 'sculpt' } & SculptParams)
   | {
@@ -71,6 +80,12 @@ export type MeshOp =
 
 export type MeshOpName = MeshOp['op'];
 
+/** An indexed quad mesh: world-space positions (xyz per vertex) and four vertex indices per quad, counter-clockwise seen from outside. */
+export interface QuadMeshData {
+  readonly positions: readonly number[];
+  readonly quads: readonly number[];
+}
+
 export interface MeshProvenance {
   readonly engine: 'ts' | 'manifold' | 'native';
   /** Library/version string, e.g. `manifold-3d@3.5.4`. */
@@ -86,6 +101,8 @@ export interface MeshOpResult {
   readonly analysis?: MeshAnalysis;
   /** Regions and their primitives (op `segment`, query). */
   readonly segmentation?: Segmentation;
+  /** Result of op `quad_remesh` (instead of `mesh`). */
+  readonly quads?: QuadMeshData;
   /** Symmetric deviation of the input from `other` (op `deviation`, query). */
   readonly deviation?: DeviationSummary;
   /** Op-specific counts and parameters actually used (document units). */

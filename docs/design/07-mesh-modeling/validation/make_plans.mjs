@@ -190,8 +190,8 @@ save('target_defect_repair.json', {
 save('target_sculpt_quad_brep.json', {
   id: 'MSH-SCULPT-BREP',
   status:
-    'PARTIAL: steps 0-4 (add_grid_mesh, sculpt_mesh, import, remesh) run; steps 5-7 need quad_remesh and fit_subdivision_to_mesh (M6, not built)',
-  unbuilt: ['quad_remesh', 'fit_subdivision_to_mesh'],
+    'PARTIAL: steps 0-5 (add_grid_mesh, sculpt_mesh, import, remesh, quad_remesh) run; steps 6-7 need fit_subdivision_to_mesh (M6, not built)',
+  unbuilt: ['fit_subdivision_to_mesh'],
   validates: ['VC-MSH-19', 'VC-MSH-21', 'VC-MSH-22'],
   description:
     'Sculpt a symmetric bump on a flat patch (closed-form displaced volume), then quad-remesh an organic mesh, fit a subdivision cage to it and hand it to the exact kernel as B-spline faces.',
@@ -204,6 +204,11 @@ save('target_sculpt_quad_brep.json', {
       source: 'data/sculpt_cases.json smooth (discrete grid)',
     },
     'step 2 data.symmetryError': { value: 0, tolerance: 1e-12 },
+    'step 5 data.quads': {
+      range: [510, 690],
+      source:
+        'target 600 within 15 %; measured 631 (the 80-triangle l1 STL remeshed to 1.5 mm); cage Hausdorff 0.344 against the faceted l1 remesh',
+    },
     'step 6 data.maxDeviation': 'TBD - measure with fit_subdivision_to_mesh on the icosphere l4 (target <= 0.05 mm)',
   },
   actions: [
@@ -260,5 +265,51 @@ save('target_bad_plan_codes.json', {
     { command: 'minkowski_sum', params: { a: '$b', b: 'open-sheet-id', op: 'sum' } },
     { command: 'remesh_mesh', params: { id: '$b', targetEdgeLength: -1 } },
     { command: 'import_mesh_file', params: { format: 'stl', file: 'validation/data/icosphere_r10_l1_ascii.stl' } },
+  ],
+});
+
+save('target_quad_remesh.json', {
+  id: 'MSH-QUAD',
+  status:
+    'RUNNABLE: quad_remesh needs the native mesh engine (llull-compute built with QuadriFlow); step 3 (exact B-spline solid of the cage) also needs the native OCC kernel. fit_subdivision_to_mesh (the other half of VC-MSH-22) is a later step',
+  unbuilt: [],
+  validates: ['VC-MSH-22'],
+  description:
+    'Quad-remesh the fine icosphere (R 10, level 5, 20480 triangles) into a 600-quad subdivision cage, take the exact B-spline solid of that cage (before any fit), then a quad-based triangle mesh by edge length, then one refusal.',
+  expect: {
+    stepIndexBase: 0,
+    'step 2 data.quads': {
+      range: [510, 690],
+      source: 'target 600 within 15 %; measured 545 through the float32 STL (609 on the in-memory l5, 614 on l4)',
+    },
+    'step 2 data.valence': {
+      range: [8, 10],
+      of: 'vertices with valence 3 (the corners); the rest is valence 4, one valence-5 vertex may appear',
+      note: 'measured {3: 9, 4: 537, 5: 1} through the STL',
+    },
+    'step 2 data.deviation.hausdorff': { max: 0.1, source: 'measured 0.0824 (cage faces against the source)' },
+    'step 3 data.volume': {
+      value: 4096.5,
+      tolerance: 0.02,
+      relative: true,
+      note: 'limit surface of the cage, 2.2 % under the sphere 4188.79 until fit_subdivision_to_mesh',
+    },
+    'step 3 data.method': 'exact',
+    'step 4 data.targetQuads': { value: 558, note: 'round(area / 1.5^2) with the l5 polyhedral area 1255.6' },
+    'step 5 data.closed': true,
+    'step 6': 'CMD_INVALID_PARAMS (targetQuadCount 3 < 6)',
+  },
+  actions: [
+    { command: 'set_units', params: { units: 'mm' } },
+    {
+      command: 'import_mesh_file',
+      params: { format: 'stl', file: 'validation/data/icosphere_r10_l5_binary.stl', units: 'mm' },
+      as: 'sphere',
+    },
+    { command: 'quad_remesh', params: { id: '$sphere', targetQuadCount: 600 }, as: 'cage' },
+    { command: 'mass_properties', params: { entityId: '$cage', surfaceModel: 'limit_patches' } },
+    { command: 'quad_remesh', params: { id: '$sphere', targetEdgeLength: 1.5, output: 'mesh' }, as: 'quadmesh' },
+    { command: 'analyze_mesh', params: { id: '$quadmesh' } },
+    { command: 'quad_remesh', params: { id: '$sphere', targetQuadCount: 3 } },
   ],
 });

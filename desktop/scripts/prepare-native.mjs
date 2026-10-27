@@ -12,7 +12,7 @@
  *   build/native/occt/lib/             shared OCCT toolkits, LGPL-2.1 dynamic linking (Linux .so.<maj>.<min>, macOS .<maj>.<min>.dylib;
  *                                      Windows: the DLLs sit next to the executables instead, where the loader looks)
  *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, Netgen LGPL-2.1 + authors + zlib licence +
- *                                      source/relink notice, fdlibm/V8 notice, Rust crate licences
+ *                                      source/relink notice, fdlibm/V8 notice, QuadriFlow + Eigen + LEMON + pcg32 licences (quad_remesh), Rust crate licences
  *   build/native/LLULL_NATIVE.json     what was bundled (versions, features, OCCT source sha256)
  *
  * Build each OS on that OS. Env:
@@ -302,6 +302,11 @@ if (occtPrefix !== null) {
 const netgenLibraries = netgenPrefix === null ? 0 : stageNetgen(netgenPrefix);
 if (netgenPrefix !== null) writeFileSync(path.join(nativeDir, 'licenses', 'Netgen-NOTICE.txt'), netgenNotice(netgenPrefix));
 writeFileSync(path.join(nativeDir, 'licenses', 'fdlibm-V8-NOTICE.txt'), FDLIBM_NOTICE);
+// quad_remesh (07 MSH M6): the vendored QuadriFlow (BSD-3-Clause + Enhancements), Eigen (MPL-2.0 only), LEMON (BSL-1.0), pcg32 (Apache-2.0)
+cpSync(path.join(solver, 'crates', 'llull-quadflow', 'vendor', 'licenses'), path.join(nativeDir, 'licenses', 'quadflow'), {
+  recursive: true,
+});
+cpSync(path.join(solver, 'crates', 'llull-quadflow', 'vendor', 'README.md'), path.join(nativeDir, 'licenses', 'quadflow', 'SOURCES.md'));
 const rust = rustLicences();
 writeFileSync(path.join(nativeDir, 'licenses', 'THIRD-PARTY-RUST.txt'), rust.text);
 const versions = smokeTest();

@@ -12,7 +12,7 @@ export const DIR_REMEDIATION: Readonly<Record<string, string>> = {
   DIR_SCALE_NONPOSITIVE: 'Use scale factors > 0; mirror with symmetry instead.',
   DIR_FALLOFF_INVALID: 'falloff is a radius >= 0 in document units, or { radius, shape, metric }.',
   DIR_LEVELS_RANGE: 'levels is an integer 0..4.',
-  DIR_CAGE_TOO_LARGE: 'Reduce segments or edit a smaller cage: at most 2000 cage vertices.',
+  DIR_CAGE_TOO_LARGE: 'Lower levels or the cage size: at most 50000 cage vertices and 1000000 refined quads (cage faces x 4^levels).',
   DIR_SHARPNESS_RANGE: 'Sharpness is 0 (smooth) .. 10 (infinitely sharp).',
   DIR_CAGE_OPEN:
     'The cage must be closed (every edge shared by two faces), or pass `boundary` ("edge_and_corner" / "edge_only") to accept an open cage, or fill_cage_hole.',
