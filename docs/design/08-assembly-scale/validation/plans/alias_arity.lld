@@ -1,0 +1,10 @@
+# VC-ASC-14 baseline: a bare alias naming 4 ids passed to boolean b (string | string[]).
+# Today: only the first tool is used (3 tools survive, 1 hole cut, volume 274888.872 mm^3 = ring - one hole). Target: 4 holes, 0 tools left.
+# Exact volume with 4 holes (measured with b=[tools]): 270175.376 mm^3; ring alone: pi*(120^2-100^2)*20 = 276460.154 mm^3.
+design alias_arity units=mm
+revolve_profile ring profile=[[100,0],[120,0],[120,20],[100,20]] axis="x"
+add_cylinder c1 radius=5 height=60 axis=[0,0,1] position=[10,0,110]
+array_polar cs id=c1 count=4 center=[0,0,0] axis=[1,0,0]
+duplicate_entities tools ids=[c1,cs]
+boolean holed op=subtract a=ring b=tools
+check volume of=holed expect ~= 270175.376 ± 0.01%

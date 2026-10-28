@@ -1,0 +1,9 @@
+# VC-ASC-20/21 baseline.
+# rotated_ring: a 270 deg revolve (r 900..1060) rotated about X. True half-extent in Y/Z <= 1060.
+#   measure_bounding_box today: 1240.438 -> conservative x1.17 (measured 2026-10-28; the engine inlet with its own cutaway rotation gave 1445.255, x1.366).
+# pylon_loft: ruled loft through rectangles with a common flat underside at z = 960;
+#   a box whose top is z = 960 overlaps it today (check_assembly FPR_PAIR_HARD, penetration 0.206 mm, overlap 6587 mm^3).
+design fidelity units=mm
+revolve_profile rotated_ring profile=[[1058,-300],[1055,-550],[1042,-800],[1015,-1000],[980,-1105],[945,-1150],[905,-1165],[880,-1158],[862,-1135],[852,-1090],[851,-1000],[858,-800],[866,-550],[872,-300]] axis="x" angle=270deg rotation=[3.333579,0,0] segments=128
+loft_sections pylon_loft sections=[{"center":[300,0,960],"rotation":[0,1.5707963,0],"section":[[-330,-130],[0,-130],[0,130],[-330,130]]},{"center":[1500,0,960],"rotation":[0,1.5707963,0],"section":[[-520,-150],[0,-150],[0,150],[-520,150]]},{"center":[2600,0,960],"rotation":[0,1.5707963,0],"section":[[-460,-140],[0,-140],[0,140],[-460,140]]}] ruled=true
+add_box mount size=[200,160,25] position=[750,0,947.5]

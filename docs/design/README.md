@@ -37,8 +37,9 @@ thicken, curvature and continuity analysis; and solids from `extrude_profile`, `
 | 05 | Implicit and lattice: field program + engine port, SDF primitives, blended booleans, shell, TPMS, strut / graph lattices, graded and conformal fields, infill, 3MF beam lattice + implicit export, native `llull-field` | IMP | [spec](05-implicit-lattice/FUNCTIONAL_SPEC.md) | [spec](05-implicit-lattice/TECHNICAL_SPEC.md) | [pack](05-implicit-lattice/validation/README.md) | 46 | 17 | 50 | 9 | ≈ 28 eng-wk |
 | 06 | Variable blends: coded OCCT diagnostics, `probe_fillet`, `check_blends`, radius laws, conic / G2 / asymmetric profiles, setback corners, face fillets, hold lines, full round, chamfer variants | BLD | [spec](06-variable-blends/FUNCTIONAL_SPEC.md) | [spec](06-variable-blends/TECHNICAL_SPEC.md) | [pack](06-variable-blends/validation/README.md) | 30 | 18 | 33 | 5 | ≈ 24 eng-wk |
 | 07 | Mesh modelling: STL / OBJ / PLY / 3MF import, analyze / check / repair, fill holes, decimate, remesh, smooth, cut, hull, Minkowski, offset, hollow, sculpt, segment, mesh → B-rep, quad remesh + cage fit; native `llull-meshops` | MSH | [spec](07-mesh-modeling/FUNCTIONAL_SPEC.md) | [spec](07-mesh-modeling/TECHNICAL_SPEC.md) | [pack](07-mesh-modeling/validation/README.md) | 39 | 16 | 39 | 6 | ≈ 28 eng-wk |
+| 08 | Assembly scale: one-call / pattern-aware booleans with progress and cancel, instance patterns (render, STEP, glTF), check_assembly at 10,000 parts (BVH, mesh narrow phase, symmetry, cache), connection groups and fasteners, .lld v2 (arity typing, expression values, comprehensions, functions, scoped modules), exact bounds and ruled polygon lofts, viewport capture, installer fixes | ASC | [spec](08-assembly-scale/FUNCTIONAL_SPEC.md) | [spec](08-assembly-scale/TECHNICAL_SPEC.md) | [pack](08-assembly-scale/validation/README.md) | 26 | 17 | 23 | 4 | ≈ 35 agent-days |
 
-Total: **266 functional requirements, 111 technical requirements, 278 validation cases, 50 scenario plans**. Every pack has at least one
+Total: **292 functional requirements, 128 technical requirements, 301 validation cases, 54 scenario plans** (08 ASC added 2026-10-28 from the CFM56 turbofan build). Every pack has at least one
 baseline plan that runs on today's llull; all nine were run on 2026-10-22 (`llull run … --continue`, native kernel) and their volumes agree
 with the closed forms, with two findings written back into the packs:
 
@@ -79,6 +80,7 @@ with the closed forms, with two findings written back into the packs:
 | 05 | Saved files keep recipes, not meshes; new toolset `implicit`; no printer process-limit table until sourced; blocking spawnSync for long jobs | yes |
 | 06 | Extend `fillet_edge` for edge options, new commands only for face fillets and full rounds; rolling-ball corners by default; `check_blends purpose=release` sets `reviewRequired` | yes |
 | 07 | Content-addressed result assets; new toolset `mesh`; `boolean` keeps imported meshes as meshes (no one-face-per-triangle B-rep); raise the 2000 cage-vertex cap; pin the Manifold version in provenance | yes |
+| 08 | General Fuse multi-tool path with tree fallback; arrays stay copies by default until all commands take instances; symmetry-reduced checks on by default; touching faces never imply a connection (connection groups instead); .lld bare alias = all ids with no compatibility mode; module sources embedded in the recipe; viewport capture behind an injected port | yes |
 
 ## Validation plans and the rot gate
 

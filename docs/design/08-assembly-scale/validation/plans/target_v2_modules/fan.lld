@@ -1,0 +1,9 @@
+# Target syntax (M4b/M4c): fan module, exact NURBS sections through record.entity, wing from expression objects.
+module fan(tipR: length = 867.5, blades: int = 36, hubR: length = 311) {
+  revolve_profile disk profile=[[45, 60], [hubR, 60], [hubR, 230], [45, 230]] axis="x"
+  airfoil_from_naca af designation="6509" chord=170
+  airfoil_from_naca af2 designation="2504" chord=215
+  create_wing blade sections=[{airfoilId: af, span: 0, chord: 170, twistDeg: 12}, {airfoilId: af2, span: tipR - hubR - 4, chord: 215, twistDeg: 58}] origin=[60, 0, hubR]
+  array_polar blades id=blade count=blades center=[0,0,0] axis=[1,0,0] as="instances"
+  export disk, blade, blades
+}

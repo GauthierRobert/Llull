@@ -1,0 +1,31 @@
+{
+  "pack": "08-assembly-scale",
+  "gap": "ASC",
+  "machine": "owner Windows 11 workstation; native llull-kernel OCCT 7.9.2",
+  "baselineDate": "2026-10-28",
+  "cases": [
+    { "id": "VC-ASC-01", "metric": "unpackedAppGB", "baseline": 16, "target": { "op": "<=", "value": 1.5 }, "unit": "GB", "grade": "A" },
+    { "id": "VC-ASC-02", "metric": "pythonExtract", "baseline": "fail (Git tar)", "target": "ok", "grade": "A" },
+    { "id": "VC-ASC-03", "metric": "fuseSeconds", "baseline": { "n4": 1.7, "n12": 4.3, "n36": 26.4 }, "target": { "n36": { "op": "<=", "value": 10 } }, "unit": "s", "tolerance": "10%", "grade": "A" },
+    { "id": "VC-ASC-04", "metric": "rotorVolume", "expected": "V(disk) + 36 V(blade) - 36 V(disk ∩ blade)", "tolerance": "1e-6 rel", "grade": "A (closed form)" },
+    { "id": "VC-ASC-05", "metric": "timeoutCode", "baseline": "kernel returned null", "target": "KRN_TIMEOUT", "grade": "A" },
+    { "id": "VC-ASC-06", "metric": "patternFuseEquivalence", "target": "volume and face count equal to full fuse", "tolerance": "1e-6 rel", "grade": "target" },
+    { "id": "VC-ASC-07", "metric": "instanceReplayIds", "target": "identical", "grade": "target" },
+    { "id": "VC-ASC-08", "metric": "drawCalls", "target": { "op": "<=", "value": 200 }, "grade": "target" },
+    { "id": "VC-ASC-09", "metric": "stepOccurrences", "target": { "nauo": 80, "products": 1 }, "grade": "target" },
+    { "id": "VC-ASC-10", "metric": "checkAssemblySeconds", "baseline": { "parts175": [269, 283], "parts2450": "refused (>500)" }, "target": { "parts2450": { "op": "<=", "value": 60 } }, "findings": { "hard": 0, "floating": 0 }, "unit": "s", "grade": "A" },
+    { "id": "VC-ASC-11", "metric": "pairsPerPatternRow", "target": { "op": "<=", "value": 3 }, "grade": "target" },
+    { "id": "VC-ASC-12", "metric": "restingOnlyCount", "baseline": 174, "target": 0, "grade": "A" },
+    { "id": "VC-ASC-13", "metric": "fastenerThreadCode", "target": "FPR_FASTENER_THREAD", "grade": "target" },
+    { "id": "VC-ASC-14", "metric": "holedVolume", "expected": 270175.376, "unit": "mm3", "tolerance": "0.01%", "baseline": "first id only (1 hole, 274888.872 mm3)", "grade": "A" },
+    { "id": "VC-ASC-15", "metric": "wingFromExpressionSections", "baseline": "AERO_AIRFOIL_NOT_FOUND", "target": "3 sections resolved", "grade": "A" },
+    { "id": "VC-ASC-16", "metric": "exactAirfoilLoft", "baseline": "no entity airfoil-1.2", "target": "exact NURBS loft", "grade": "A" },
+    { "id": "VC-ASC-17", "metric": "platformOverlapMm3", "baseline": "0.29-28.5 (rounded literals)", "target": 0, "grade": "A" },
+    { "id": "VC-ASC-18", "metric": "modulesNamespaced", "target": ["fan", "hpc1", "hpc2"], "grade": "target" },
+    { "id": "VC-ASC-19", "metric": "replayWithoutFiles", "target": "identical document", "grade": "target" },
+    { "id": "VC-ASC-20", "metric": "rotatedRevolveHalfExtent", "baseline": 1240.438, "target": { "op": "<=", "value": 1060 }, "unit": "mm", "grade": "A" },
+    { "id": "VC-ASC-21", "metric": "pylonMountPair", "baseline": "FPR_PAIR_HARD (0.206 mm, 6587 mm3)", "target": "FPR_PAIR_TOUCH", "grade": "A" },
+    { "id": "VC-ASC-22", "metric": "captureSeconds", "target": { "op": "<=", "value": 3 }, "unit": "s", "grade": "target" },
+    { "id": "VC-ASC-23", "metric": "renderOverBudget", "baseline": "fragmented, no warning", "target": "GPU route or RENDER_BUDGET_EXCEEDED", "grade": "A" }
+  ]
+}

@@ -1,0 +1,15 @@
+# VC-ASC-03/04/06 baseline: one union of a disk with N lofted fan blades (61-point NACA sections, 3 stations).
+# Measured 2026-10-28, native OCCT 7.9.2, LLULL_OCC_TIMEOUT_MS raised: N=4 1.7 s, N=12 4.3 s, N=36 26.4 s
+# (with a 36-segment snubber ring as an extra tool: > 30 s, killed at the default timeout).
+# Run: llull apply_design source=@text:bladed_disk.lld 'set={"n":36}' --doc bd.llull.json
+design bladed_disk units=mm
+param n = 36
+param d2r = pi/180
+param fanR = 867.5
+revolve_profile disk profile=[[45,60],[311,60],[311,230],[45,230]] axis="x" segments=128
+airfoil_from_naca fs0 designation="6509" as="polyline" points=61 trailingEdge="closed" chord=170 incidenceDeg=-22 position=[145-85*cos(22*d2r),-85*sin(22*d2r),309.5]
+airfoil_from_naca fs1 designation="4506" as="polyline" points=61 trailingEdge="closed" chord=195 incidenceDeg=-42 position=[145-97.5*cos(42*d2r),-97.5*sin(42*d2r),586.5]
+airfoil_from_naca fs2 designation="2504" as="polyline" points=61 trailingEdge="closed" chord=215 incidenceDeg=-58 position=[145-107.5*cos(58*d2r),-107.5*sin(58*d2r),fanR-4]
+loft_sections blade sectionIds=[fs0,fs1,fs2]
+array_polar blades id=blade count=n center=[0,0,0] axis=[1,0,0]
+boolean rotor op=union a=disk b=[blade,blades]
