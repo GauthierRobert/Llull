@@ -1,0 +1,30 @@
+{
+  "what": "Keystroke-Level Model operator times used to predict expert, error-free task times (benchmark_tasks.json). Read by generate_refs.mjs.",
+  "source": "S1 Kieras 1993 tutorial (primary, downloaded, sha256 57e0bcde…1c02); S2 Wikipedia KLM table (secondary) agrees on K, P, B, H; S3 Card, Moran & Newell 1980 is the original (not read: paywalled). Grade A for K, P, B, BB, H (two independent sources agree); M differs between sources (1.2 s Kieras vs 1.35 s CMN as quoted by S2), so it is run at both values.",
+  "unit": "s",
+  "primary": {
+    "K": { "value": 0.28, "meaning": "one keystroke (each key, Shift and Ctrl count separately)", "quote": "K - Keystroke (.12 - 1.2 sec; .28 recommended for most users)", "source": "S1" },
+    "P": { "value": 1.1, "meaning": "point the mouse at a target (Fitts average)", "quote": "P - Point with mouse to a target on the display (1.1 sec)", "source": "S1" },
+    "B": { "value": 0.1, "meaning": "press OR release a mouse button (drag = P B P B)", "quote": "B - Press or release mouse button (.1 sec)", "source": "S1" },
+    "BB": { "value": 0.2, "meaning": "click = press + release", "quote": "BB - Click mouse button (.2 sec)", "source": "S1" },
+    "H": { "value": 0.4, "meaning": "home the hand between mouse and keyboard", "quote": "H - Home hands to keyboard or mouse (.4 sec)", "source": "S1" },
+    "M": { "value": 1.2, "meaning": "routine mental preparation", "quote": "M - Mental act of routine thinking or perception (.6 - 1.35 sec; use 1.2 sec)", "source": "S1" }
+  },
+  "sensitivity": [
+    { "name": "skilled-typist", "K": 0.2, "M": 1.2, "why": "S1: 'Average skilled typist (55 wpm): .20 sec'" },
+    { "name": "cmn-mental", "K": 0.28, "M": 1.35, "why": "S2 quotes the CMN M operator as 1.35 s" }
+  ],
+  "accuracy": { "rmsErrorPercent": 21, "source": "S2 (secondary, grade B): 'has a root-mean-square error of 21%'" },
+  "notation": {
+    "M|P|B|BB|H": "one operator",
+    "K:<text>": "one K per character; ⏎ Enter, ⇥ Tab, ␣ Space, ⇧ Shift, ^ Ctrl, ⎋ Esc, → arrow; {F8} is one key",
+    "x<n>": "a step suffix '*n' repeats the step n times, e.g. 'K:→*5'"
+  },
+  "placementRules": [
+    "R1 one M before each command start (recall the alias / find the tool)",
+    "R2 one M before each typed value (recall it from the task sheet)",
+    "R3 one M before each pick that needs a visual search (find the snap / the object); a pick that only gives a direction (ortho / polar) has no M",
+    "R4 two-handed posture: left hand on the keyboard, right hand on the mouse; aliases, Enter, Space, Esc, Shift, Ctrl and F-keys need no H; numbers and arrows need the right hand: H before them and H before the next pointing",
+    "R5 the same rules for every design (S1: 'Consistency in M placement is more important than absolute accuracy')"
+  ]
+}

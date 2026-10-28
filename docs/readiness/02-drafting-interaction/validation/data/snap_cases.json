@@ -1,0 +1,406 @@
+{
+ "what": "Closed-form expected snap / ortho / polar / tracking / view-cube results (FR-UXD-10, -14, -15, -39; TR-UXD-03, -04). 'expected' is computed by ../generate_refs.mjs from 'input'. The engine returns these points when the cursor is within the aperture of them (cursor given per case). Units mm, angles degrees CCW from +X.",
+ "tolerance": "1e-9 absolute",
+ "cases": [
+  {
+   "id": "SN-01",
+   "kind": "quadrant",
+   "mode": "quadrant",
+   "input": {
+    "center": [
+     500,
+     50
+    ],
+    "radius": 25
+   },
+   "cursor": [
+    524,
+    51
+   ],
+   "expected": [
+    [
+     525,
+     50
+    ],
+    [
+     500,
+     75
+    ],
+    [
+     475,
+     50
+    ],
+    [
+     500,
+     25
+    ]
+   ]
+  },
+  {
+   "id": "SN-02",
+   "kind": "midpoint",
+   "mode": "midpoint",
+   "input": {
+    "a": [
+     0,
+     0
+    ],
+    "b": [
+     300,
+     0
+    ]
+   },
+   "cursor": [
+    149,
+    1
+   ],
+   "expected": [
+    [
+     150,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "SN-03",
+   "kind": "intersection",
+   "mode": "intersection",
+   "input": {
+    "a": [
+     500,
+     -50
+    ],
+    "b": [
+     500,
+     150
+    ],
+    "c": [
+     400,
+     50
+    ],
+    "d": [
+     600,
+     50
+    ]
+   },
+   "cursor": [
+    501,
+    49
+   ],
+   "expected": [
+    [
+     500,
+     50
+    ]
+   ]
+  },
+  {
+   "id": "SN-04",
+   "kind": "perpendicular",
+   "mode": "perpendicular",
+   "input": {
+    "from": [
+     10,
+     40
+    ],
+    "a": [
+     0,
+     0
+    ],
+    "b": [
+     300,
+     0
+    ]
+   },
+   "cursor": [
+    11,
+    0
+   ],
+   "expected": [
+    [
+     10,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "SN-05",
+   "kind": "tangent",
+   "mode": "tangent",
+   "input": {
+    "from": [
+     600,
+     50
+    ],
+    "center": [
+     500,
+     50
+    ],
+    "radius": 25
+   },
+   "cursor": [
+    506,
+    74
+   ],
+   "expected": [
+    [
+     506.25,
+     74.2061459138
+    ],
+    [
+     506.25,
+     25.7938540862
+    ]
+   ]
+  },
+  {
+   "id": "SN-06",
+   "kind": "geometricCenter",
+   "mode": "geometricCenter",
+   "input": {
+    "polygon": [
+     [
+      800,
+      0
+     ],
+     [
+      900,
+      0
+     ],
+     [
+      900,
+      80
+     ],
+     [
+      800,
+      80
+     ]
+    ]
+   },
+   "cursor": [
+    851,
+    41
+   ],
+   "expected": [
+    [
+     850,
+     40
+    ]
+   ]
+  },
+  {
+   "id": "SN-07",
+   "kind": "geometricCenter",
+   "mode": "geometricCenter",
+   "input": {
+    "polygon": [
+     [
+      0,
+      0
+     ],
+     [
+      60,
+      0
+     ],
+     [
+      60,
+      20
+     ],
+     [
+      20,
+      20
+     ],
+     [
+      20,
+      60
+     ],
+     [
+      0,
+      60
+     ]
+    ]
+   },
+   "cursor": [
+    17,
+    17
+   ],
+   "note": "L-shape: centroid is not the bounding-box centre",
+   "expected": [
+    [
+     22,
+     22
+    ]
+   ]
+  },
+  {
+   "id": "SN-08",
+   "kind": "extension",
+   "mode": "extension",
+   "input": {
+    "a": [
+     0,
+     0
+    ],
+    "b": [
+     300,
+     0
+    ],
+    "distanceBeyondB": 37
+   },
+   "cursor": [
+    337,
+    1
+   ],
+   "expected": [
+    [
+     337,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "SN-09",
+   "kind": "ortho",
+   "mode": "ortho",
+   "input": {
+    "origin": [
+     0,
+     0
+    ],
+    "cursor": [
+     100,
+     30
+    ]
+   },
+   "expected": [
+    [
+     100,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "SN-10",
+   "kind": "ortho",
+   "mode": "ortho",
+   "input": {
+    "origin": [
+     0,
+     0
+    ],
+    "cursor": [
+     -20,
+     90
+    ]
+   },
+   "expected": [
+    [
+     0,
+     90
+    ]
+   ]
+  },
+  {
+   "id": "SN-11",
+   "kind": "polar",
+   "mode": "polar",
+   "input": {
+    "origin": [
+     0,
+     0
+    ],
+    "cursor": [
+     68.2,
+     73.1
+    ],
+    "incrementDeg": 15
+   },
+   "expected": [
+    [
+     70.6924677742,
+     70.6924677742
+    ]
+   ]
+  },
+  {
+   "id": "SN-12",
+   "kind": "polar",
+   "mode": "polar",
+   "input": {
+    "origin": [
+     10,
+     20
+    ],
+    "cursor": [
+     110,
+     70
+    ],
+    "incrementDeg": 22.5
+   },
+   "expected": [
+    [
+     113.2928718858,
+     62.7853084316
+    ]
+   ]
+  },
+  {
+   "id": "SN-13",
+   "kind": "trackingTwoPaths",
+   "mode": "tracking",
+   "input": {
+    "a": [
+     0,
+     0
+    ],
+    "angleADeg": 90,
+    "b": [
+     100,
+     50
+    ],
+    "angleBDeg": 0
+   },
+   "note": "vertical path from acquired A meets horizontal path from acquired B",
+   "expected": [
+    [
+     0,
+     50
+    ]
+   ]
+  },
+  {
+   "id": "SN-14",
+   "kind": "trackingTwoPaths",
+   "mode": "tracking",
+   "input": {
+    "a": [
+     0,
+     0
+    ],
+    "angleADeg": 45,
+    "b": [
+     100,
+     50
+    ],
+    "angleBDeg": 0
+   },
+   "note": "polar 45 deg path from A meets horizontal path from B",
+   "expected": [
+    [
+     50,
+     50
+    ]
+   ]
+  },
+  {
+   "id": "SN-15",
+   "kind": "viewCubeDirections",
+   "mode": "viewCube",
+   "input": {},
+   "note": "6 faces + 12 edges + 8 corners",
+   "expected": {
+    "count": 26
+   }
+  }
+ ]
+}

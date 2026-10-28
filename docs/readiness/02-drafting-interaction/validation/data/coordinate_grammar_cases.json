@@ -1,0 +1,352 @@
+{
+ "what": "Coordinate-entry grammar cases (FR-UXD-06, TR-UXD-02). 'meaning' is the independent statement of what the text must mean; 'expected' is computed from it by ../generate_refs.mjs (closed form). Angles CCW from +X in degrees (llull convention, same as draw_arc). Document units mm. dynamicInput = the on-cursor fields are on, so a plain x,y after the first point is relative (AutoCAD rule, sources R8).",
+ "tolerance": "1e-9 absolute",
+ "cases": [
+  {
+   "id": "CG-01",
+   "text": "100,50",
+   "firstPoint": true,
+   "dynamicInput": true,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "absolute",
+    "xy": [
+     100,
+     50
+    ]
+   },
+   "expected": [
+    100,
+    50
+   ]
+  },
+  {
+   "id": "CG-02",
+   "text": "@100,50",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "relative",
+    "dxy": [
+     100,
+     50
+    ]
+   },
+   "expected": [
+    110,
+    70
+   ]
+  },
+  {
+   "id": "CG-03",
+   "text": "120,80",
+   "firstPoint": false,
+   "dynamicInput": true,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "relative",
+    "dxy": [
+     120,
+     80
+    ]
+   },
+   "expected": [
+    130,
+    100
+   ]
+  },
+  {
+   "id": "CG-04",
+   "text": "#0,0",
+   "firstPoint": false,
+   "dynamicInput": true,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "absolute",
+    "xy": [
+     0,
+     0
+    ]
+   },
+   "expected": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "CG-05",
+   "text": "@100<30",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "polar-relative",
+    "distance": 100,
+    "angleDeg": 30
+   },
+   "expected": [
+    96.6025403784,
+    70
+   ]
+  },
+  {
+   "id": "CG-06",
+   "text": "100<30",
+   "firstPoint": true,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "polar-absolute",
+    "distance": 100,
+    "angleDeg": 30
+   },
+   "expected": [
+    86.6025403784,
+    50
+   ]
+  },
+  {
+   "id": "CG-07",
+   "text": "@50<-45",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "polar-relative",
+    "distance": 50,
+    "angleDeg": -45
+   },
+   "expected": [
+    45.3553390593,
+    -15.3553390593
+   ]
+  },
+  {
+   "id": "CG-08",
+   "text": "200",
+   "firstPoint": false,
+   "dynamicInput": true,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "cursorAngleDeg": 0,
+   "meaning": {
+    "kind": "direct-distance",
+    "distance": 200,
+    "cursorAngleDeg": 0
+   },
+   "expected": [
+    210,
+    20
+   ]
+  },
+  {
+   "id": "CG-09",
+   "text": "200",
+   "firstPoint": false,
+   "dynamicInput": true,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "cursorAngleDeg": 47,
+   "ortho": false,
+   "polarIncrementDeg": 15,
+   "meaning": {
+    "kind": "direct-distance",
+    "distance": 200,
+    "cursorAngleDeg": 45
+   },
+   "note": "polar tracking rounds 47 deg to 45 deg before the distance is applied",
+   "expected": [
+    151.4213562373,
+    161.4213562373
+   ]
+  },
+  {
+   "id": "CG-10",
+   "text": "@0,0",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "relative",
+    "dxy": [
+     0,
+     0
+    ]
+   },
+   "expected": [
+    10,
+    20
+   ]
+  },
+  {
+   "id": "CG-11",
+   "text": "@10,20,30",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    1,
+    2,
+    3
+   ],
+   "meaning": {
+    "kind": "relative",
+    "dxy": [
+     10,
+     20,
+     30
+    ]
+   },
+   "expected": [
+    11,
+    22,
+    33
+   ]
+  },
+  {
+   "id": "CG-12",
+   "text": "@(100/4)<(90-60)",
+   "firstPoint": false,
+   "dynamicInput": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "meaning": {
+    "kind": "polar-relative",
+    "distance": 25,
+    "angleDeg": 30
+   },
+   "expected": [
+    31.6506350946,
+    32.5
+   ]
+  },
+  {
+   "id": "CG-13",
+   "text": "1in,2in",
+   "firstPoint": true,
+   "dynamicInput": true,
+   "lastPoint": [
+    0,
+    0
+   ],
+   "documentUnits": "mm",
+   "meaning": {
+    "kind": "absolute",
+    "xy": [
+     25.4,
+     50.8
+    ]
+   },
+   "source": "R31: inch exactly equivalent to 25.4 mm",
+   "expected": [
+    25.4,
+    50.8
+   ]
+  },
+  {
+   "id": "CG-14",
+   "text": "=width,0",
+   "firstPoint": true,
+   "dynamicInput": true,
+   "lastPoint": [
+    0,
+    0
+   ],
+   "parameters": {
+    "width": 40
+   },
+   "meaning": {
+    "kind": "absolute",
+    "xy": [
+     40,
+     0
+    ]
+   },
+   "expected": [
+    40,
+    0
+   ]
+  },
+  {
+   "id": "CG-15",
+   "text": "@100<",
+   "firstPoint": false,
+   "lastPoint": [
+    10,
+    20
+   ],
+   "expectError": {
+    "code": "UXD_COORD_PARSE",
+    "column": 5
+   }
+  },
+  {
+   "id": "CG-16",
+   "text": "10,,5",
+   "firstPoint": true,
+   "lastPoint": [
+    0,
+    0
+   ],
+   "expectError": {
+    "code": "UXD_COORD_PARSE",
+    "column": 3
+   }
+  },
+  {
+   "id": "CG-17",
+   "text": "@1e400,0",
+   "firstPoint": false,
+   "lastPoint": [
+    0,
+    0
+   ],
+   "expectError": {
+    "code": "UXD_COORD_RANGE"
+   }
+  },
+  {
+   "id": "CG-18",
+   "text": "=missing,0",
+   "firstPoint": true,
+   "lastPoint": [
+    0,
+    0
+   ],
+   "parameters": {},
+   "expectError": {
+    "code": "UXD_COORD_UNKNOWN_PARAMETER"
+   }
+  }
+ ]
+}

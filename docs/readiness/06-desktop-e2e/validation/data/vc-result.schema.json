@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "llull/docs/readiness/06-desktop-e2e/validation/data/vc-result.schema.json",
+  "title": "Per-VC result written by a readiness runner (pack 06 harness for driver electron; same shape for the other drivers)",
+  "type": "object",
+  "required": ["id", "pack", "status", "artefacts", "durationMs", "machineProfile", "commit"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "pattern": "^VC-(PIL|UXD|PRF|DSF|INS|E2E|VNV|XCH|COM)-[0-9]{2,3}$" },
+    "pack": { "type": "string", "pattern": "^0[1-9]-[a-z0-9-]+$" },
+    "status": { "enum": ["pass", "fail", "known", "skipped"] },
+    "measured": { "description": "the value the test measured (number, string, object); absent when the case only asserts" },
+    "unit": { "type": "string" },
+    "target": { "description": "copied from expected_results.json (target or expected) for the reader's convenience" },
+    "artefacts": { "type": "array", "items": { "type": "string" }, "description": "paths relative to the repo root: traces, videos, screenshots, logs, crash folders" },
+    "durationMs": { "type": "number", "minimum": 0 },
+    "machineProfile": { "type": "string", "description": "id from docs/readiness/readiness_gate.json machineProfiles" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+    "mode": { "enum": ["dev", "twin", "shipped"] },
+    "attempts": { "type": "integer", "minimum": 1 },
+    "flaky": { "type": "boolean", "description": "passed only on a retry" },
+    "errorCode": { "type": ["string", "null"], "description": "E2E_* code (TECHNICAL_SPEC §8) or the pack's code observed" },
+    "reason": { "type": ["string", "null"], "description": "why skipped / known / failed, one line" },
+    "environment": { "type": "object", "description": "the harness environment record (TECHNICAL_SPEC §3 MachineProfile)" }
+  }
+}

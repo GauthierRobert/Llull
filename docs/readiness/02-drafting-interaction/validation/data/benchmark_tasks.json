@@ -1,0 +1,144 @@
+{
+  "what": "UXD task benchmark: 15 standard daily drafting / modelling tasks. Each task has the method an expert uses in the incumbent, the llull target method (after this pack), and the llull method that works today (null when the task cannot be done to spec precision in the UI today). KLM times are computed by ../generate_refs.mjs from klm_operators.json into klm_predictions.json; measured times come from the Electron harness (system latency, pack 06) and from pilot users (human time, pack 01).",
+  "fixture": "../plans/task_fixture.json",
+  "units": "mm, document units; angles in degrees for the task sheet",
+  "posture": "expert, error-free, two-handed (klm_operators.json R4); every task starts with nothing selected, no tool armed, the hand on the mouse, the view framed on the task region (2D tasks in the 2D view, 3D tasks in the 3D view)",
+  "incumbentNote": "Incumbent sequences use documented mechanisms (sources.md R1-R30). Aliases other than L, C, E, P, Z (quoted in R2) are assumed defaults of the shipped acad.pgp and marked grade C until read on an installed copy; the alias length changes the prediction by 0.28 s per character.",
+  "tasks": [
+    {
+      "id": "T01",
+      "title": "Rectangle 120 x 80 whose first corner is the right endpoint of line L1",
+      "domain": "2d",
+      "endState": { "command": "draw_rectangle", "params": { "width": 120, "height": 80, "position": [300, 0, 0] }, "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (Dynamic Input on, running osnap Endpoint on)", "steps": ["M", "K:REC⏎", "M", "P", "BB", "H", "M", "K:120,80⏎"], "notes": "Dynamic Input makes the second point relative by default (R8); REC alias grade C" },
+      "target": { "steps": ["M", "K:REC⏎", "M", "P", "BB", "H", "M", "K:120,80⏎"], "fr": ["FR-UXD-01", "FR-UXD-02", "FR-UXD-06", "FR-UXD-07", "FR-UXD-10"] },
+      "today": { "steps": null, "why": "draw tools take points from clicks only (src/ui/viewport/2d/drawToolTable.ts header); no typed size; the palette form needs the endpoint coordinates, which the UI does not display (no cursor readout)" }
+    },
+    {
+      "id": "T02",
+      "title": "Closed polyline 200 right, 100 up, 200 left, close, starting on the right endpoint of line L2 (ortho on)",
+      "domain": "2d",
+      "endState": { "command": "draw_polyline", "params": { "points": [[0, 300], [200, 300], [200, 400], [0, 400]], "closed": true }, "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (ortho F8 on, direct distance entry)", "steps": ["M", "K:PL⏎", "M", "P", "BB", "P", "H", "M", "K:200⏎", "H", "P", "H", "M", "K:100⏎", "H", "P", "H", "M", "K:200⏎", "M", "K:C⏎"], "notes": "PL alias grade C; 'C' = Close keyword" },
+      "target": { "steps": ["M", "K:PL⏎", "M", "P", "BB", "P", "H", "M", "K:200⏎", "H", "P", "H", "M", "K:100⏎", "H", "P", "H", "M", "K:200⏎", "M", "K:C⏎"], "fr": ["FR-UXD-01", "FR-UXD-06", "FR-UXD-14", "FR-UXD-42"] },
+      "today": { "steps": null, "why": "no direct distance entry; Shift-ortho exists but lengths can only be clicked (grid-quantised)" }
+    },
+    {
+      "id": "T03",
+      "title": "Circle radius 25 centred on the intersection of lines L3 and L4",
+      "domain": "2d",
+      "endState": { "command": "draw_arc", "params": { "center": [500, 50], "radius": 25 }, "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (running osnap Intersection on)", "steps": ["M", "K:C⏎", "M", "P", "BB", "H", "M", "K:25⏎"], "notes": "C alias quoted in R2 (grade A)" },
+      "target": { "steps": ["M", "K:C⏎", "M", "P", "BB", "H", "M", "K:25⏎"], "fr": ["FR-UXD-01", "FR-UXD-02", "FR-UXD-07", "FR-UXD-10"] },
+      "today": { "steps": null, "why": "the centre snaps to the intersection, but the radius is a click (no typed value); 'C' is already the circle key, so the arming part exists" }
+    },
+    {
+      "id": "T04",
+      "title": "Offset the closed polyline PG by 10 to the outside",
+      "domain": "2d",
+      "endState": { "command": "offset_2d", "params": { "distance": 10 }, "check": "new closed polyline whose bounding box is PG's grown by 10 on every side (790..910 x -10..90)", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD", "steps": ["M", "K:O⏎", "H", "M", "K:10⏎", "H", "M", "P", "BB", "P", "BB", "K:⏎"], "notes": "O alias grade C; side point is a direction pick (no M, rule R3)" },
+      "target": { "steps": ["M", "K:O⏎", "H", "M", "K:10⏎", "H", "M", "P", "BB", "P", "BB", "K:⏎"], "fr": ["FR-UXD-01", "FR-UXD-41"] },
+      "today": { "steps": ["M", "K:O", "M", "P", "BB", "H", "M", "K:10⏎"], "why": "useModifyTool offset: pick entity (pick point = side) then value; assumes the 2D modify palette is already open (else + M P BB)" }
+    },
+    {
+      "id": "T05",
+      "title": "Trim the right halves of three horizontal lines at the vertical boundary B",
+      "domain": "2d",
+      "endState": { "command": "trim", "check": "the three lines end at x = 1100: (1050,y)-(1100,y) for y = 40, 100, 160", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (TRIM Quick mode, every object is a cutting edge)", "steps": ["M", "K:TR⏎", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "K:⏎"], "notes": "TR alias grade C; Quick mode is the AutoCAD 2021+ default (grade C, not read)" },
+      "target": { "steps": ["M", "K:TR⏎", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "K:⏎"], "fr": ["FR-UXD-27", "FR-UXD-41"] },
+      "today": { "steps": ["M", "K:T", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB"], "why": "useModifyTool trim: pick target, then pick boundary, per line; tool stays armed" }
+    },
+    {
+      "id": "T06",
+      "title": "Fillet the lower-right corner of PG with radius 5",
+      "domain": "2d",
+      "endState": { "command": "fillet_2d", "params": { "radius": 5 }, "check": "PG gets an arc of radius 5 tangent to both edges at (900,0)", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD", "steps": ["M", "K:F⏎", "K:R⏎", "H", "M", "K:5⏎", "H", "M", "P", "BB", "M", "P", "BB"], "notes": "F alias grade C; R = Radius keyword" },
+      "target": { "steps": ["M", "K:F⏎", "K:R⏎", "H", "M", "K:5⏎", "H", "M", "P", "BB", "M", "P", "BB"], "fr": ["FR-UXD-01", "FR-UXD-42"] },
+      "today": { "steps": ["M", "K:F", "M", "P", "BB", "M", "P", "BB", "H", "M", "K:5⏎"], "why": "useModifyTool fillet: pick polyline, pick vertex, value" }
+    },
+    {
+      "id": "T07",
+      "title": "Move rectangle R7 and circle C7 (window selection) 50 along +X",
+      "domain": "2d",
+      "endState": { "command": "move_entities", "params": { "delta": [50, 0, 0] }, "check": "both entities moved by exactly (50,0); one undo step", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (click-click window, ortho on)", "steps": ["M", "P", "BB", "P", "BB", "M", "K:M⏎", "P", "BB", "P", "H", "M", "K:50⏎"], "notes": "M alias grade C; base point anywhere (no M)" },
+      "target": { "steps": ["M", "P", "BB", "P", "BB", "M", "K:M⏎", "P", "BB", "P", "H", "M", "K:50⏎"], "fr": ["FR-UXD-18", "FR-UXD-22", "FR-UXD-06", "FR-UXD-14"] },
+      "today": { "steps": ["M", "K:⇧", "P", "B", "P", "B", "H", "M", "K:⇧", "K:→*5"], "why": "Shift+drag window, then Shift+Arrow nudges 10 each (useKeyboardShortcuts NUDGE_STEP 1 x 10); five separate presses are five move_entities commands (only key auto-repeat folds into one undo step)" }
+    },
+    {
+      "id": "T08",
+      "title": "Three copies of rectangle R8 at 40, 80 and 120 along +X",
+      "domain": "2d",
+      "endState": { "check": "rectangles 30 x 20 at x = 0, 40, 80, 120 (y = 800)", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD COPY (multiple by default)", "steps": ["M", "P", "BB", "M", "K:CO⏎", "P", "BB", "P", "H", "M", "K:40⏎", "M", "K:80⏎", "M", "K:120⏎", "K:⏎"], "notes": "CO alias grade C" },
+      "target": { "steps": ["M", "P", "BB", "M", "K:CO⏎", "P", "BB", "P", "H", "M", "K:40⏎", "M", "K:80⏎", "M", "K:120⏎", "K:⏎"], "fr": ["FR-UXD-27", "FR-UXD-06"] },
+      "today": { "steps": ["M", "P", "BB", "M", "K:^D", "H", "K:⇧→→→→", "M", "K:^D", "K:⇧→→→→", "M", "K:^D", "K:⇧→→→→"], "why": "Ctrl+D duplicates in place, Shift+Arrow nudges 10; assumes the duplicate becomes the selection (verify on the harness)" }
+    },
+    {
+      "id": "T09",
+      "title": "Put the five short lines of region G on layer 'Hidden'",
+      "domain": "2d",
+      "endState": { "command": "set_entity_layer", "check": "the five lines have layerId of 'Hidden'; one undo step", "tolerance": 0 },
+      "incumbent": { "product": "AutoCAD (crossing click-click, Layer drop-down on the Home tab)", "steps": ["M", "P", "BB", "P", "BB", "M", "P", "BB", "M", "P", "BB", "K:⎋"] },
+      "target": { "steps": ["M", "P", "BB", "P", "BB", "M", "P", "BB", "M", "P", "BB", "K:⎋"], "fr": ["FR-UXD-18", "FR-UXD-30", "FR-UXD-32"] },
+      "today": { "steps": null, "why": "TBD — measure with the Electron harness: set_entity_layer is reachable from the palette; whether its form is pre-filled with the selection is not verified" }
+    },
+    {
+      "id": "T10",
+      "title": "Linear dimension between the endpoints of line L1, placed 20 below it",
+      "domain": "2d",
+      "endState": { "command": "add_dimension", "check": "one linear dimension reading 300", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD", "steps": ["M", "K:DLI⏎", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB"], "notes": "DLI alias grade C" },
+      "target": { "steps": ["M", "K:DLI⏎", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB"], "fr": ["FR-UXD-28", "FR-UXD-02"] },
+      "today": { "steps": null, "why": "no dimension click tool (drawTools.ts has none); add_dimension only from the palette with typed ids / points" }
+    },
+    {
+      "id": "T11",
+      "title": "Four circles radius 10 at the four intersections of region H (repeat last command)",
+      "domain": "2d",
+      "endState": { "check": "four circles r = 10 at (1400,0), (1500,0), (1400,100), (1500,100); four undo steps", "tolerance": 1e-9 },
+      "incumbent": { "product": "AutoCAD (Space repeats the last command; the radius prompt defaults to the last value)", "steps": ["M", "K:C⏎", "M", "P", "BB", "H", "M", "K:10⏎", "H", "K:␣", "M", "P", "BB", "K:␣", "K:␣", "M", "P", "BB", "K:␣", "K:␣", "M", "P", "BB", "K:␣"] },
+      "target": { "steps": ["M", "K:C⏎", "M", "P", "BB", "H", "M", "K:10⏎", "H", "K:␣", "M", "P", "BB", "K:␣", "K:␣", "M", "P", "BB", "K:␣", "K:␣", "M", "P", "BB", "K:␣"], "fr": ["FR-UXD-03", "FR-UXD-42"] },
+      "today": { "steps": null, "why": "no typed radius; no repeat-last; no default values" }
+    },
+    {
+      "id": "T12",
+      "title": "Extrude the closed profile P12 by 25",
+      "domain": "3d",
+      "endState": { "command": "extrude_profile", "params": { "depth": 25 }, "check": "solid volume 60 x 40 x 25 = 60000", "tolerance": 1e-6 },
+      "incumbent": { "product": "SOLIDWORKS / Fusion (select profile, Extrude tool, type depth)", "steps": ["M", "P", "BB", "M", "P", "BB", "H", "M", "K:25⏎"] },
+      "target": { "steps": ["M", "P", "BB", "M", "P", "BB", "H", "M", "K:25⏎"], "fr": ["FR-UXD-41", "FR-UXD-08"] },
+      "today": { "steps": ["M", "P", "BB", "M", "P", "BB", "H", "M", "K:25⏎"], "why": "Extrude chip + on-canvas ValueBox (docs/UI.md); assumes the ValueBox has focus when the handle appears (verify)" }
+    },
+    {
+      "id": "T13",
+      "title": "Fillet the four top edges of box B13 with radius 3",
+      "domain": "3d",
+      "endState": { "command": "fillet_edge", "params": { "radius": 3 }, "check": "one fillet_edge on exactly the four picked top edges (edge references equal to the picked ones); volume is not asserted (corner treatment is kernel-defined)", "tolerance": 0 },
+      "incumbent": { "product": "SOLIDWORKS (Ctrl-select edges, Fillet tool, radius)", "steps": ["M", "P", "BB", "K:^", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "H", "M", "K:3⏎"] },
+      "target": { "steps": ["M", "P", "BB", "K:^", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "M", "P", "BB", "H", "M", "K:3⏎"], "fr": ["FR-UXD-23", "FR-UXD-20"] },
+      "today": { "steps": null, "why": "3D selection is whole-entity (selectClick.ts); edges are pickable only inside face-edit mode; the Fillet chip applies to the solid" }
+    },
+    {
+      "id": "T14",
+      "title": "Change the depth of the earlier extrusion E14 from 25 to 40",
+      "domain": "3d",
+      "endState": { "command": "edit_step_params", "check": "E14 height 40, model regenerated, one undo step", "tolerance": 1e-9 },
+      "incumbent": { "product": "SOLIDWORKS (double-click feature, double-click dimension, type)", "steps": ["M", "P", "BB", "BB", "M", "P", "BB", "BB", "H", "M", "K:40⏎"], "notes": "rebuild step not counted (grade C)" },
+      "target": { "steps": ["M", "P", "BB", "M", "P", "BB", "H", "M", "K:40⏎"], "fr": ["FR-UXD-08", "FR-UXD-43"] },
+      "today": { "steps": ["M", "P", "BB", "M", "P", "BB", "H", "M", "K:40⏎"], "why": "DimensionLens shows step dimensions on the selected solid and commits edit_step_params (src/ui/viewport/3d/DimensionLens.tsx); verify on the harness" }
+    },
+    {
+      "id": "T15",
+      "title": "Switch to an isometric view and zoom to solid B13",
+      "domain": "3d",
+      "endState": { "check": "camera direction = iso preset; B13 bounding sphere fills the view (fitBounds)", "tolerance": 0 },
+      "incumbent": { "product": "SOLIDWORKS / Fusion (view cube corner, select, zoom to selection)", "steps": ["M", "P", "BB", "M", "P", "BB", "M", "P", "BB"] },
+      "target": { "steps": ["M", "P", "BB", "M", "P", "BB", "M", "K:F"], "fr": ["FR-UXD-39", "FR-UXD-33"] },
+      "today": { "steps": ["M", "P", "BB", "M", "P", "BB", "M", "P", "BB"], "why": "ViewPresets overlay: Iso button, click the solid, Fit selection button" }
+    }
+  ]
+}

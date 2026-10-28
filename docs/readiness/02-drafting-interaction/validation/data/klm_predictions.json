@@ -1,0 +1,735 @@
+{
+ "generated": "generate_refs.mjs",
+ "operatorValues": {
+  "K": 0.28,
+  "P": 1.1,
+  "B": 0.1,
+  "BB": 0.2,
+  "H": 0.4,
+  "M": 1.2
+ },
+ "rule": "seconds = sum(count x operator time); primary = Kieras values (K .28, P 1.1, B .1, BB .2, H .4, M 1.2)",
+ "totals": {
+  "incumbentAll": 159.34,
+  "targetAll": 157.92,
+  "completableToday": [
+   "T04",
+   "T05",
+   "T06",
+   "T07",
+   "T08",
+   "T12",
+   "T14",
+   "T15"
+  ],
+  "todayOnCompletable": 73.46,
+  "incumbentOnCompletable": 75.58
+ },
+ "tasks": [
+  {
+   "id": "T01",
+   "title": "Rectangle 120 x 80 whose first corner is the right endpoint of line L1",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 11
+    },
+    "formula": "3M + 1P + 0B + 1BB + 1H + 11K",
+    "seconds": {
+     "primary": 8.38,
+     "skilled-typist": 7.5,
+     "cmn-mental": 8.83
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 11
+    },
+    "formula": "3M + 1P + 0B + 1BB + 1H + 11K",
+    "seconds": {
+     "primary": 8.38,
+     "skilled-typist": 7.5,
+     "cmn-mental": 8.83
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T02",
+   "title": "Closed polyline 200 right, 100 up, 200 left, close, starting on the right endpoint of line L2 (ortho on)",
+   "incumbent": {
+    "counts": {
+     "M": 6,
+     "P": 4,
+     "B": 0,
+     "BB": 1,
+     "H": 5,
+     "K": 17
+    },
+    "formula": "6M + 4P + 0B + 1BB + 5H + 17K",
+    "seconds": {
+     "primary": 18.56,
+     "skilled-typist": 17.2,
+     "cmn-mental": 19.46
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 6,
+     "P": 4,
+     "B": 0,
+     "BB": 1,
+     "H": 5,
+     "K": 17
+    },
+    "formula": "6M + 4P + 0B + 1BB + 5H + 17K",
+    "seconds": {
+     "primary": 18.56,
+     "skilled-typist": 17.2,
+     "cmn-mental": 19.46
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T03",
+   "title": "Circle radius 25 centred on the intersection of lines L3 and L4",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 5
+    },
+    "formula": "3M + 1P + 0B + 1BB + 1H + 5K",
+    "seconds": {
+     "primary": 6.7,
+     "skilled-typist": 6.3,
+     "cmn-mental": 7.15
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 5
+    },
+    "formula": "3M + 1P + 0B + 1BB + 1H + 5K",
+    "seconds": {
+     "primary": 6.7,
+     "skilled-typist": 6.3,
+     "cmn-mental": 7.15
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T04",
+   "title": "Offset the closed polyline PG by 10 to the outside",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 2,
+     "K": 6
+    },
+    "formula": "3M + 2P + 0B + 2BB + 2H + 6K",
+    "seconds": {
+     "primary": 8.68,
+     "skilled-typist": 8.2,
+     "cmn-mental": 9.13
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 2,
+     "K": 6
+    },
+    "formula": "3M + 2P + 0B + 2BB + 2H + 6K",
+    "seconds": {
+     "primary": 8.68,
+     "skilled-typist": 8.2,
+     "cmn-mental": 9.13
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 3,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 4
+    },
+    "formula": "3M + 1P + 0B + 1BB + 1H + 4K",
+    "seconds": {
+     "primary": 6.42,
+     "skilled-typist": 6.1,
+     "cmn-mental": 6.87
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 0.7396
+  },
+  {
+   "id": "T05",
+   "title": "Trim the right halves of three horizontal lines at the vertical boundary B",
+   "incumbent": {
+    "counts": {
+     "M": 4,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 4
+    },
+    "formula": "4M + 3P + 0B + 3BB + 0H + 4K",
+    "seconds": {
+     "primary": 9.82,
+     "skilled-typist": 9.5,
+     "cmn-mental": 10.42
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 4,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 4
+    },
+    "formula": "4M + 3P + 0B + 3BB + 0H + 4K",
+    "seconds": {
+     "primary": 9.82,
+     "skilled-typist": 9.5,
+     "cmn-mental": 10.42
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 7,
+     "P": 6,
+     "B": 0,
+     "BB": 6,
+     "H": 0,
+     "K": 1
+    },
+    "formula": "7M + 6P + 0B + 6BB + 0H + 1K",
+    "seconds": {
+     "primary": 16.48,
+     "skilled-typist": 16.4,
+     "cmn-mental": 17.53
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 1.6782
+  },
+  {
+   "id": "T06",
+   "title": "Fillet the lower-right corner of PG with radius 5",
+   "incumbent": {
+    "counts": {
+     "M": 4,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 2,
+     "K": 6
+    },
+    "formula": "4M + 2P + 0B + 2BB + 2H + 6K",
+    "seconds": {
+     "primary": 9.88,
+     "skilled-typist": 9.4,
+     "cmn-mental": 10.48
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 4,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 2,
+     "K": 6
+    },
+    "formula": "4M + 2P + 0B + 2BB + 2H + 6K",
+    "seconds": {
+     "primary": 9.88,
+     "skilled-typist": 9.4,
+     "cmn-mental": 10.48
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 4,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "4M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 8.64,
+     "skilled-typist": 8.4,
+     "cmn-mental": 9.24
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 0.8745
+  },
+  {
+   "id": "T07",
+   "title": "Move rectangle R7 and circle C7 (window selection) 50 along +X",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 4,
+     "B": 0,
+     "BB": 3,
+     "H": 1,
+     "K": 5
+    },
+    "formula": "3M + 4P + 0B + 3BB + 1H + 5K",
+    "seconds": {
+     "primary": 10.4,
+     "skilled-typist": 10,
+     "cmn-mental": 10.85
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 4,
+     "B": 0,
+     "BB": 3,
+     "H": 1,
+     "K": 5
+    },
+    "formula": "3M + 4P + 0B + 3BB + 1H + 5K",
+    "seconds": {
+     "primary": 10.4,
+     "skilled-typist": 10,
+     "cmn-mental": 10.85
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 2,
+     "P": 2,
+     "B": 2,
+     "BB": 0,
+     "H": 1,
+     "K": 7
+    },
+    "formula": "2M + 2P + 2B + 0BB + 1H + 7K",
+    "seconds": {
+     "primary": 7.16,
+     "skilled-typist": 6.6,
+     "cmn-mental": 7.46
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 0.6885
+  },
+  {
+   "id": "T08",
+   "title": "Three copies of rectangle R8 at 40, 80 and 120 along +X",
+   "incumbent": {
+    "counts": {
+     "M": 5,
+     "P": 3,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 14
+    },
+    "formula": "5M + 3P + 0B + 2BB + 1H + 14K",
+    "seconds": {
+     "primary": 14.02,
+     "skilled-typist": 12.9,
+     "cmn-mental": 14.77
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 5,
+     "P": 3,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 14
+    },
+    "formula": "5M + 3P + 0B + 2BB + 1H + 14K",
+    "seconds": {
+     "primary": 14.02,
+     "skilled-typist": 12.9,
+     "cmn-mental": 14.77
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 4,
+     "P": 1,
+     "B": 0,
+     "BB": 1,
+     "H": 1,
+     "K": 21
+    },
+    "formula": "4M + 1P + 0B + 1BB + 1H + 21K",
+    "seconds": {
+     "primary": 12.38,
+     "skilled-typist": 10.7,
+     "cmn-mental": 12.98
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 0.883
+  },
+  {
+   "id": "T09",
+   "title": "Put the five short lines of region G on layer 'Hidden'",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 4,
+     "B": 0,
+     "BB": 4,
+     "H": 0,
+     "K": 1
+    },
+    "formula": "3M + 4P + 0B + 4BB + 0H + 1K",
+    "seconds": {
+     "primary": 9.08,
+     "skilled-typist": 9,
+     "cmn-mental": 9.53
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 4,
+     "B": 0,
+     "BB": 4,
+     "H": 0,
+     "K": 1
+    },
+    "formula": "3M + 4P + 0B + 4BB + 0H + 1K",
+    "seconds": {
+     "primary": 9.08,
+     "skilled-typist": 9,
+     "cmn-mental": 9.53
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T10",
+   "title": "Linear dimension between the endpoints of line L1, placed 20 below it",
+   "incumbent": {
+    "counts": {
+     "M": 4,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 4
+    },
+    "formula": "4M + 3P + 0B + 3BB + 0H + 4K",
+    "seconds": {
+     "primary": 9.82,
+     "skilled-typist": 9.5,
+     "cmn-mental": 10.42
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 4,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 4
+    },
+    "formula": "4M + 3P + 0B + 3BB + 0H + 4K",
+    "seconds": {
+     "primary": 9.82,
+     "skilled-typist": 9.5,
+     "cmn-mental": 10.42
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T11",
+   "title": "Four circles radius 10 at the four intersections of region H (repeat last command)",
+   "incumbent": {
+    "counts": {
+     "M": 6,
+     "P": 4,
+     "B": 0,
+     "BB": 4,
+     "H": 2,
+     "K": 11
+    },
+    "formula": "6M + 4P + 0B + 4BB + 2H + 11K",
+    "seconds": {
+     "primary": 16.28,
+     "skilled-typist": 15.4,
+     "cmn-mental": 17.18
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 6,
+     "P": 4,
+     "B": 0,
+     "BB": 4,
+     "H": 2,
+     "K": 11
+    },
+    "formula": "6M + 4P + 0B + 4BB + 2H + 11K",
+    "seconds": {
+     "primary": 16.28,
+     "skilled-typist": 15.4,
+     "cmn-mental": 17.18
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T12",
+   "title": "Extrude the closed profile P12 by 25",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.44,
+     "skilled-typist": 7.2,
+     "cmn-mental": 7.89
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.44,
+     "skilled-typist": 7.2,
+     "cmn-mental": 7.89
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.44,
+     "skilled-typist": 7.2,
+     "cmn-mental": 7.89
+    }
+   },
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": 1
+  },
+  {
+   "id": "T13",
+   "title": "Fillet the four top edges of box B13 with radius 3",
+   "incumbent": {
+    "counts": {
+     "M": 6,
+     "P": 5,
+     "B": 0,
+     "BB": 5,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "6M + 5P + 0B + 5BB + 1H + 3K",
+    "seconds": {
+     "primary": 14.94,
+     "skilled-typist": 14.7,
+     "cmn-mental": 15.84
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 6,
+     "P": 5,
+     "B": 0,
+     "BB": 5,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "6M + 5P + 0B + 5BB + 1H + 3K",
+    "seconds": {
+     "primary": 14.94,
+     "skilled-typist": 14.7,
+     "cmn-mental": 15.84
+    }
+   },
+   "today": null,
+   "targetOverIncumbent": 1,
+   "todayOverIncumbent": null
+  },
+  {
+   "id": "T14",
+   "title": "Change the depth of the earlier extrusion E14 from 25 to 40",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 4,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 4BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.84,
+     "skilled-typist": 7.6,
+     "cmn-mental": 8.29
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.44,
+     "skilled-typist": 7.2,
+     "cmn-mental": 7.89
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 1,
+     "K": 3
+    },
+    "formula": "3M + 2P + 0B + 2BB + 1H + 3K",
+    "seconds": {
+     "primary": 7.44,
+     "skilled-typist": 7.2,
+     "cmn-mental": 7.89
+    }
+   },
+   "targetOverIncumbent": 0.949,
+   "todayOverIncumbent": 0.949
+  },
+  {
+   "id": "T15",
+   "title": "Switch to an isometric view and zoom to solid B13",
+   "incumbent": {
+    "counts": {
+     "M": 3,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 0
+    },
+    "formula": "3M + 3P + 0B + 3BB + 0H + 0K",
+    "seconds": {
+     "primary": 7.5,
+     "skilled-typist": 7.5,
+     "cmn-mental": 7.95
+    }
+   },
+   "target": {
+    "counts": {
+     "M": 3,
+     "P": 2,
+     "B": 0,
+     "BB": 2,
+     "H": 0,
+     "K": 1
+    },
+    "formula": "3M + 2P + 0B + 2BB + 0H + 1K",
+    "seconds": {
+     "primary": 6.48,
+     "skilled-typist": 6.4,
+     "cmn-mental": 6.93
+    }
+   },
+   "today": {
+    "counts": {
+     "M": 3,
+     "P": 3,
+     "B": 0,
+     "BB": 3,
+     "H": 0,
+     "K": 0
+    },
+    "formula": "3M + 3P + 0B + 3BB + 0H + 0K",
+    "seconds": {
+     "primary": 7.5,
+     "skilled-typist": 7.5,
+     "cmn-mental": 7.95
+    }
+   },
+   "targetOverIncumbent": 0.864,
+   "todayOverIncumbent": 1
+  }
+ ]
+}

@@ -1,0 +1,805 @@
+{
+  "pack": "08-exchange-fidelity",
+  "gap": "XCH",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "defaultLevel": 3,
+  "idNote": "ids start at 101: aerospace 04 owns VC-XCH-01..26",
+  "cases": [
+    {
+      "id": "VC-XCH-101",
+      "proves": [
+        "FR-XCH-101",
+        "TR-XCH-101"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "dwgFilesOpened",
+      "inputs": "16 DWG of data/corpus.json (AC1014..AC1032), no converter on PATH, network disabled",
+      "baseline": "refused: converter required (M2)",
+      "target": {
+        "op": "==",
+        "value": 16
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "M2; spec budget",
+      "grade": "target",
+      "plan": "data/corpus.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-102",
+      "proves": [
+        "FR-XCH-101",
+        "FR-XCH-103",
+        "TR-XCH-114"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "censusEqualAcrossVersions",
+      "inputs": "acs-dwg-ac1015..ac1032 + acs-dxf-ac1032-ascii",
+      "expected": "identical per-type census for the 6 DWG versions, equal to the DXF oracle census",
+      "tolerance": "exact",
+      "source": "M3",
+      "grade": "A",
+      "plan": "plans/dxf_census.mjs",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-103",
+      "proves": [
+        "FR-XCH-102",
+        "TR-XCH-101"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "binaryDxfCensusEqualsAscii",
+      "inputs": "acs-dxf-ac1009-binary, acs-dxf-ac1032-binary",
+      "baseline": "refused: not an ASCII DXF (importDxf.ts)",
+      "target": "census equal to the ASCII twin",
+      "tolerance": "exact",
+      "source": "M3; spec budget",
+      "grade": "target",
+      "plan": "data/corpus.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-104",
+      "proves": [
+        "FR-XCH-103",
+        "FR-XCH-117",
+        "TR-XCH-102"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "mustClassRecordsAtL0",
+      "inputs": "acs-dxf-ac1032-ascii (169 entity records, 31 types)",
+      "baseline": {
+        "skippedRecords": 70,
+        "skippedTypes": 22
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "records",
+      "tolerance": "exact",
+      "source": "M1; M3",
+      "grade": "target",
+      "errorCode": "XCH_DRW_ENTITY_DROPPED",
+      "plan": "plans/dxf_census.mjs",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-105",
+      "proves": [
+        "FR-XCH-104",
+        "TR-XCH-103"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "blockInstancesKept",
+      "inputs": "acs-dxf-ac1032-ascii",
+      "baseline": "exploded (0 instances)",
+      "expected": 6,
+      "unit": "instances",
+      "tolerance": "exact",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-106",
+      "proves": [
+        "FR-XCH-105"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "attributesKept",
+      "inputs": "acs-dxf-ac1032-ascii",
+      "baseline": {
+        "attrib": 0,
+        "attdef": 0
+      },
+      "expected": {
+        "attrib": 4,
+        "attdef": 5
+      },
+      "unit": "records",
+      "tolerance": "exact (tags and values equal to oracle)",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-107",
+      "proves": [
+        "FR-XCH-108"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "dimensionsAssociative",
+      "inputs": "acs-dxf-ac1032-ascii + nested-dimensions-dxf",
+      "baseline": 0,
+      "expected": {
+        "dimensions": 11,
+        "dimStyles": 6,
+        "measurement": "equal to oracle"
+      },
+      "tolerance": "1e-9 rel (measurement)",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-108",
+      "proves": [
+        "FR-XCH-109"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "hatchesKept",
+      "inputs": "acs-dxf-ac1032-ascii (8 HATCH) + hatches-dxf",
+      "baseline": 0,
+      "expected": {
+        "hatches": 8,
+        "patternScaleAngle": "equal",
+        "boundaryArea": "equal to oracle"
+      },
+      "tolerance": "1e-6 rel (area)",
+      "source": "M3; R37",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-109",
+      "proves": [
+        "FR-XCH-110",
+        "TR-XCH-106"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "textContentEqual",
+      "inputs": "acs-dxf-ac1032-ascii (29 TEXT, 5 MTEXT)",
+      "baseline": "MTEXT formatting stripped (L1)",
+      "expected": {
+        "text": 29,
+        "mtext": 5,
+        "plainTextEqual": "100%"
+      },
+      "tolerance": "exact",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-110",
+      "proves": [
+        "FR-XCH-111",
+        "TR-XCH-106"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "missingFontsReported",
+      "inputs": "acs-dxf-ac1032-ascii, no SHX folder configured",
+      "target": "every unavailable STYLE font reported once with its substitute",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "errorCode": "XCH_DRW_SHX_MISSING",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-111",
+      "proves": [
+        "FR-XCH-111"
+      ],
+      "priority": "SHOULD",
+      "driver": "review",
+      "metric": "shxWidthDeviation",
+      "target": {
+        "op": "<=",
+        "value": 1
+      },
+      "unit": "%",
+      "tolerance": "record",
+      "source": "R40; spec budget",
+      "grade": "target",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-112",
+      "proves": [
+        "FR-XCH-112",
+        "FR-XCH-113"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "layerAndLinetypePropertiesEqual",
+      "inputs": "acs-dxf-ac1032-ascii (8 LTYPE, 19 LAYER)",
+      "baseline": "layer name + ACI only",
+      "expected": {
+        "lineTypes": 8,
+        "layers": 19,
+        "propertiesEqual": "100%"
+      },
+      "tolerance": "exact",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-113",
+      "proves": [
+        "FR-XCH-107"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "layoutsAsSheets",
+      "inputs": "acs-dxf-ac1032-ascii (4 LAYOUT incl. Model)",
+      "baseline": 0,
+      "expected": {
+        "sheets": 3,
+        "viewports": "equal to oracle per layout"
+      },
+      "tolerance": "exact; viewport scale 1e-9 rel",
+      "source": "M3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-114",
+      "proves": [
+        "FR-XCH-106"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "xrefResolution",
+      "inputs": "make_fixtures.py host/child/missing/cycle",
+      "expected": {
+        "resolvedEntities": 4,
+        "insertAt": [
+          1000,
+          0
+        ],
+        "missing": "XCH_DRW_XREF_UNRESOLVED",
+        "cycle": "XCH_DRW_XREF_CYCLE",
+        "cycleSecondsMax": 5
+      },
+      "tolerance": "exact",
+      "source": "derived: plans/make_fixtures.py",
+      "grade": "A",
+      "errorCode": "XCH_DRW_XREF_UNRESOLVED",
+      "plan": "plans/make_fixtures.py",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-115",
+      "proves": [
+        "FR-XCH-116",
+        "TR-XCH-104"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "untouchedObjectsPreservedPercent",
+      "inputs": "acs-dwg-ac1032, one LINE moved, save AC1032",
+      "target": {
+        "op": "==",
+        "value": 100
+      },
+      "unit": "%",
+      "tolerance": "exact (handle and data)",
+      "source": "M3; spec budget",
+      "grade": "target",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-116",
+      "proves": [
+        "FR-XCH-118",
+        "TR-XCH-105",
+        "TR-XCH-114"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "roundTripFidelity",
+      "inputs": "every DWG / DXF of data/corpus.json (P1)",
+      "baseline": "R12 writer rounds coordinates to 1e-6 units (lib/dxfWriter.ts)",
+      "target": {
+        "counts": "equal for types >= L3",
+        "values": "equal",
+        "maxCurveDeviation": "<= 1e-9 x extents diagonal"
+      },
+      "tolerance": "as stated",
+      "source": "spec budget",
+      "grade": "target",
+      "errorCode": "XCH_DRW_ROUNDTRIP_DELTA",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-117",
+      "proves": [
+        "FR-XCH-115",
+        "TR-XCH-101",
+        "TR-XCH-117"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "versionsWrittenAndReread",
+      "inputs": "acs-dxf-ac1032-ascii exported to DWG AC1015/AC1018/AC1024/AC1027/AC1032 and DXF of each + R12",
+      "baseline": "R12 DXF only",
+      "expected": "both oracles re-read every file; $ACADVER equals the version asked",
+      "tolerance": "exact",
+      "source": "R14",
+      "grade": "A",
+      "errorCode": "XCH_DRW_WRITE_SELFCHECK",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-118",
+      "proves": [
+        "FR-XCH-115",
+        "FR-XCH-118"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "trueViewAcceptance",
+      "target": "accept (no recovery prompt, layouts present, visual match)",
+      "tolerance": "record",
+      "source": "R15; spec budget",
+      "grade": "target",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-119",
+      "proves": [
+        "FR-XCH-117",
+        "TR-XCH-102"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "fidelityReportSumsToCensus",
+      "target": "sum(levels[t]) == census[t] for every type; every code in TECHNICAL_SPEC §7",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-120",
+      "proves": [
+        "FR-XCH-119"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "unitConversion",
+      "inputs": "acs-dxf-ac1032-ascii ($INSUNITS 1) into mm; acs-dxf-ac1009-ascii (no $INSUNITS)",
+      "baseline": "R12: 'mm (assumed)' in summary text, no code (M1)",
+      "expected": {
+        "lengthFactor": 25.4,
+        "r12Code": "XCH_DRW_UNITS_ASSUMED"
+      },
+      "tolerance": "1e-12 rel",
+      "source": "M1",
+      "grade": "A",
+      "errorCode": "XCH_DRW_UNITS_ASSUMED",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-121",
+      "proves": [
+        "FR-XCH-120",
+        "TR-XCH-115"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "hostileFileCrashes",
+      "inputs": "corpus DWG/DXF truncated at 50 % + 1,000 byte-flip mutants",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "crashes",
+      "tolerance": "exact; document unchanged; <= 30 s per file",
+      "source": "spec budget",
+      "grade": "target",
+      "errorCode": "XCH_DWG_CORRUPT",
+      "gating": true,
+      "level": 2
+    },
+    {
+      "id": "VC-XCH-122",
+      "proves": [
+        "FR-XCH-121",
+        "TR-XCH-115"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "openSecondsAc1032Sample",
+      "inputs": "acs-dwg-ac1032 (1,081,979 bytes)",
+      "target": {
+        "op": "<=",
+        "value": 2
+      },
+      "unit": "s",
+      "tolerance": "10%",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-123",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-122",
+        "TR-XCH-107",
+        "TR-XCH-117"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "stepExactDefault",
+      "inputs": "llull import_step as1-oc-214, syn-face-colors (quality corpus), native kernel",
+      "baseline": "mesh path; names and colours dropped (QUALITY_GATES #3, #14)",
+      "expected": {
+        "exactBodies": "all",
+        "placedParts": 18,
+        "names": [
+          "bolt",
+          "nut",
+          "plate",
+          "rod"
+        ],
+        "nonGreyColoursAtLeast": 1,
+        "faceColours": 6
+      },
+      "tolerance": "exact",
+      "source": "QG",
+      "grade": "A",
+      "errorCode": "XCH_STEP_FALLBACK_MESH",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-124",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-123",
+        "TR-XCH-108"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "importedBodyEditable",
+      "inputs": "red-cube-blue-cylinder exact; push_pull_face +5 mm; fillet_edge; chamfer_edge; shell_solid; boolean",
+      "expected": "deltaV = A_face x 5 mm; every command succeeds; check_model clean",
+      "tolerance": "1e-6 rel",
+      "source": "derived: closed form",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-125",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-123",
+        "TR-XCH-108"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "adoptedFeaturesReplay",
+      "inputs": "nist-ctc-02; recognize_features; adopt_features",
+      "target": "replayed volume equal to imported volume",
+      "tolerance": "1e-6 rel",
+      "source": "R19; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-126",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-124",
+        "TR-XCH-107"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "stepRoundTrip",
+      "inputs": "as1-oc-214, syn-unicode-names -> export STEP -> import exact",
+      "baseline": "CadQuery double-encodes non-ASCII names (QUALITY_GATES)",
+      "expected": "tree node count, exact Unicode names, colours equal; per-part bbox equal",
+      "tolerance": "1e-6 x diagonal",
+      "source": "QG",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-127",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-125"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "igesCasesOnPackagedBuild",
+      "inputs": "IGES cases of aerospace 04 expected_results.json",
+      "target": "all pass",
+      "tolerance": "as in aerospace 04",
+      "source": "R17; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-128",
+      "personas": [
+        "mechanical"
+      ],
+      "proves": [
+        "FR-XCH-126"
+      ],
+      "priority": "COULD",
+      "driver": "review",
+      "metric": "parasolidDecisionRecord",
+      "target": "record exists",
+      "tolerance": "record",
+      "source": "R4; spec budget",
+      "grade": "target",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-129",
+      "personas": [
+        "steel",
+        "plant",
+        "civil"
+      ],
+      "proves": [
+        "FR-XCH-127",
+        "TR-XCH-112"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "ifcReferenceImport",
+      "inputs": "plant 08 IFC4X3_ADD2_Infra-Plumbing.ifc, IFC4X3_ADD2_Building-Hvac.ifc; IFC4 and IFC2x3 samples to pin",
+      "target": "products per class = text census of IfcProduct subtypes; GlobalIds 100 % kept; property-set count equal",
+      "tolerance": "exact",
+      "source": "R36; spec budget",
+      "grade": "target",
+      "errorCode": "XCH_IFC_GEOMETRY_FAILED",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-130",
+      "proves": [
+        "FR-XCH-128",
+        "TR-XCH-109",
+        "TR-XCH-110"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "pdfScaleAndVector",
+      "expected": {
+        "mediaBoxPt": [
+          1190.551,
+          841.89
+        ],
+        "edgePt": 283.465,
+        "imageXObjects": 0
+      },
+      "unit": "pt",
+      "tolerance": "0.01 pt",
+      "source": "derived: 420*72/25.4, 297*72/25.4, 100*72/25.4",
+      "grade": "A",
+      "plan": "plans/sc-xch-pdf-scale.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-131",
+      "proves": [
+        "FR-XCH-128",
+        "TR-XCH-110"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "pdfLayersAsOcg",
+      "target": "one OCG per layer with content, names equal",
+      "tolerance": "exact",
+      "source": "R27; spec budget",
+      "grade": "target",
+      "plan": "plans/sc-xch-pdf-scale.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-132",
+      "proves": [
+        "FR-XCH-128",
+        "TR-XCH-110"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "pdfFontsEmbedded",
+      "target": "all fonts embedded and subset; title-block strings extractable",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "errorCode": "XCH_PDF_FONT_NOT_EMBEDDABLE",
+      "plan": "plans/sc-xch-pdf-scale.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-133",
+      "proves": [
+        "FR-XCH-129",
+        "TR-XCH-110"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "pdfa2bFailedRules",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "rules",
+      "tolerance": "exact",
+      "source": "R28; R29; spec budget",
+      "grade": "target",
+      "errorCode": "XCH_PDFA_NONCONFORMANT",
+      "plan": "plans/sc-xch-pdf-scale.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-134",
+      "proves": [
+        "FR-XCH-130",
+        "TR-XCH-111"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "printedEdgeMm",
+      "expected": 20,
+      "unit": "mm",
+      "tolerance": "0.2 mm",
+      "source": "derived: 1000 / 50",
+      "grade": "A",
+      "errorCode": "XCH_PLOT_CLIPPED",
+      "plan": "plans/sc-xch-print-1to50.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-135",
+      "proves": [
+        "FR-XCH-114",
+        "TR-XCH-111"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "ctbStrokeWidthPt",
+      "expected": 1.41732,
+      "unit": "pt",
+      "tolerance": "0.01 pt",
+      "source": "derived: 0.50*72/25.4; R30",
+      "grade": "A",
+      "errorCode": "XCH_CTB_UNREADABLE",
+      "plan": "plans/sc-xch-print-1to50.json",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-136",
+      "personas": [
+        "plant",
+        "civil"
+      ],
+      "proves": [
+        "FR-XCH-131",
+        "TR-XCH-113"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "underlaySnapDistanceMm",
+      "inputs": "PDF of VC-XCH-130 as underlay at 1:1",
+      "expected": 100,
+      "unit": "mm",
+      "tolerance": "0.01 mm",
+      "source": "derived: closed form",
+      "grade": "A",
+      "errorCode": "XCH_UNDERLAY_PDF_UNREADABLE",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-137",
+      "proves": [
+        "FR-XCH-132",
+        "TR-XCH-118"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "licenceInventoryAccepted",
+      "target": "accept: no GPL/AGPL in bundle; MPL/LGPL obligations met; counsel answers Q2, Q3",
+      "tolerance": "record",
+      "source": "R1; R33; R38; R39; spec budget",
+      "grade": "target",
+      "plan": "plans/procedures.md",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-138",
+      "proves": [
+        "FR-XCH-133",
+        "TR-XCH-119"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "fileMenuExchange",
+      "baseline": "File menu: New, Open, Save, Save As, Vault, data folder, trust keys (desktop/src/menu.ts)",
+      "target": "Open (dwg, dxf, step, iges, ifc), Save As DWG/DXF, Export PDF, Print each dispatch their registered command",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-139",
+      "proves": [
+        "FR-XCH-134",
+        "TR-XCH-116"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "deterministicOutputs",
+      "target": "byte-identical export_drawing / export_pdf; identical document JSON from open_drawing",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-XCH-140",
+      "proves": [
+        "FR-XCH-134",
+        "TR-XCH-120"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "errorCodeCoverage",
+      "target": "every TECHNICAL_SPEC §7 code emitted by >= 1 test; no aerospace 04 code redefined",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    }
+  ]
+}

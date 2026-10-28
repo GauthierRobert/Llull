@@ -1,0 +1,220 @@
+{
+  "track": "readiness",
+  "spec": "VALIDATION.md",
+  "caseSchema": "vc.schema.json",
+  "status": {
+    "date": "2026-10-28",
+    "commit": "f1351cff",
+    "levelReached": {
+      "overall": 0,
+      "civil": 0,
+      "steel": 0,
+      "plant": 0,
+      "mechanical": 0
+    },
+    "note": "gate not built (M-G1); PRL 0 = capable: npm run check + production gate green"
+  },
+  "levels": [
+    {
+      "level": 0,
+      "name": "Capable",
+      "packs": []
+    },
+    {
+      "level": 1,
+      "name": "Installable and observable",
+      "packs": [
+        "05-install-deploy",
+        "06-desktop-e2e"
+      ]
+    },
+    {
+      "level": 2,
+      "name": "Trustworthy",
+      "packs": [
+        "04-data-safety",
+        "03-large-model-performance"
+      ]
+    },
+    {
+      "level": 3,
+      "name": "Daily-capable",
+      "packs": [
+        "02-drafting-interaction",
+        "08-exchange-fidelity",
+        "07-engineering-vnv"
+      ]
+    },
+    {
+      "level": 4,
+      "name": "Adoptable",
+      "packs": [
+        "09-commercial-support"
+      ]
+    },
+    {
+      "level": 5,
+      "name": "Field-proven",
+      "packs": [
+        "01-field-validation"
+      ]
+    }
+  ],
+  "packs": [
+    {
+      "pack": "01-field-validation",
+      "gap": "PIL",
+      "defaultLevel": 5,
+      "index": "01-field-validation/validation/expected_results.json"
+    },
+    {
+      "pack": "02-drafting-interaction",
+      "gap": "UXD",
+      "defaultLevel": 3,
+      "index": "02-drafting-interaction/validation/expected_results.json"
+    },
+    {
+      "pack": "03-large-model-performance",
+      "gap": "PRF",
+      "defaultLevel": 2,
+      "index": "03-large-model-performance/validation/expected_results.json"
+    },
+    {
+      "pack": "04-data-safety",
+      "gap": "DSF",
+      "defaultLevel": 2,
+      "index": "04-data-safety/validation/expected_results.json"
+    },
+    {
+      "pack": "05-install-deploy",
+      "gap": "INS",
+      "defaultLevel": 1,
+      "index": "05-install-deploy/validation/expected_results.json"
+    },
+    {
+      "pack": "06-desktop-e2e",
+      "gap": "E2E",
+      "defaultLevel": 1,
+      "index": "06-desktop-e2e/validation/expected_results.json"
+    },
+    {
+      "pack": "07-engineering-vnv",
+      "gap": "VNV",
+      "defaultLevel": 3,
+      "index": "07-engineering-vnv/validation/expected_results.json"
+    },
+    {
+      "pack": "08-exchange-fidelity",
+      "gap": "XCH",
+      "defaultLevel": 3,
+      "index": "08-exchange-fidelity/validation/expected_results.json"
+    },
+    {
+      "pack": "09-commercial-support",
+      "gap": "COM",
+      "defaultLevel": 4,
+      "index": "09-commercial-support/validation/expected_results.json"
+    }
+  ],
+  "drivers": {
+    "unit": {
+      "runner": "vitest tests/readiness/<pack>/",
+      "owner": "each pack",
+      "cadence": "every commit"
+    },
+    "cli": {
+      "runner": "llull CLI scripts",
+      "owner": "each pack",
+      "cadence": "merge to main"
+    },
+    "electron": {
+      "runner": "06 E2E harness",
+      "owner": "06-desktop-e2e",
+      "cadence": "merge to main"
+    },
+    "fault": {
+      "runner": "04 DSF fault-injection runner",
+      "owner": "04-data-safety",
+      "cadence": "nightly"
+    },
+    "perf": {
+      "runner": "03 PRF perf corpus runner",
+      "owner": "03-large-model-performance",
+      "cadence": "nightly + release"
+    },
+    "install-vm": {
+      "runner": "05 INS clean-VM matrix",
+      "owner": "05-install-deploy",
+      "cadence": "release candidate"
+    },
+    "field": {
+      "runner": "01 PIL evidence importer",
+      "owner": "01-field-validation",
+      "cadence": "after each pilot"
+    },
+    "review": {
+      "runner": "review-record checker (VALIDATION.md §5)",
+      "owner": "gate",
+      "cadence": "when the review scope changes"
+    }
+  },
+  "machineProfiles": {
+    "ref-win11": {
+      "use": "baselines",
+      "os": "Windows 11 Home 10.0.26200",
+      "kernel": "native llull-kernel, OCCT 7.9.2",
+      "hardware": "Intel Core Ultra 9 185H (16C/22T), 31.4 GB RAM, NVIDIA RTX 4080 Laptop GPU + Intel Arc iGPU (read 2026-10-28)"
+    },
+    "office-min": {
+      "use": "budgets gate here",
+      "os": "Windows 11 64-bit",
+      "ram": "16 GB",
+      "gpu": "D3D11 / WebGL2, >= 4 GB video memory, driver <= 12 months old",
+      "cpu": "4 cores / 8 threads",
+      "storage": "SSD, >= 20 GB free",
+      "source": "03-large-model-performance/TECHNICAL_SPEC.md §8.1",
+      "status": "proposed; no physical reference machine yet: office-min perf cases are skipped and block PRL 2 until one exists"
+    },
+    "vm-images": {
+      "use": "install-vm driver",
+      "ids": [
+        "vm-win11-std",
+        "vm-win11-locked",
+        "vm-win11-min",
+        "vm-win10-std",
+        "vm-macos-arm",
+        "vm-macos-12-x64",
+        "vm-ubuntu-2204",
+        "vm-ubuntu-2404"
+      ],
+      "source": "05-install-deploy/validation/README.md § VM images"
+    }
+  },
+  "personas": [
+    "civil",
+    "steel",
+    "plant",
+    "mechanical"
+  ],
+  "gradePolicy": {
+    "gating": [
+      "A",
+      "target"
+    ],
+    "reportedOnly": [
+      "B",
+      "C"
+    ],
+    "skippedMustBlocks": true,
+    "staleReviewIsSkipped": true
+  },
+  "regression": {
+    "budgetWorseningPercent": 20,
+    "comparedOn": "same machine profile, previous report"
+  },
+  "knownIssues": [],
+  "idOffsets": {
+    "VNV": "101+ (docs/physics/00-vv-harness uses VNV-01..22)",
+    "XCH": "101+ (docs/aerospace/04-interop-ap242-jt-iges uses XCH-01..30)"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "SC-XCH-PLOT-1",
+  "validates": ["VC-XCH-134", "VC-XCH-135"],
+  "description": "A 1000 mm box edge on an A3 sheet at 1:50 printed to the Windows 'Microsoft Print to PDF' device with a CTB mapping ACI 7 to 0.50 mm: the printed edge is 20.0 mm and its stroke 1.417 pt",
+  "unbuilt": ["load_plot_style", "print_sheet"],
+  "actions": [
+    { "command": "add_box", "params": { "size": [1000, 100, 100], "position": [0, 0, 0] } },
+    { "command": "create_sheet", "params": { "name": "Plot check", "paper": "A3", "scale": 50, "title": "XCH plot check", "date": "2026-10-28", "views": ["front"] } },
+    { "command": "load_plot_style", "params": { "fileBase64": "@fixture:xch_test.ctb" } },
+    { "command": "print_sheet", "params": { "sheetId": "$sheet", "printer": "Microsoft Print to PDF", "paper": "A3", "orientation": "landscape", "scale": 50, "plotStyle": "xch_test.ctb" } }
+  ]
+}

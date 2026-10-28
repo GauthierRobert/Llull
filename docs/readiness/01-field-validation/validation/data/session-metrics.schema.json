@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "llull/docs/readiness/01-field-validation/session-metrics.schema.json",
+  "title": "llull session-metrics export (TR-PIL-07; target, M1)",
+  "type": "object",
+  "required": ["schema", "exportedAt", "appVersion", "os", "sessions", "report"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "appVersion": { "type": "string" },
+    "os": { "enum": ["win32", "darwin", "linux", "other"] },
+    "participantCode": { "type": "string", "pattern": "^P-(CIV|STL|PLT|MEC)-\\d{2}$" },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sessionId", "startedAt", "consentVersion", "records"],
+        "additionalProperties": false,
+        "properties": {
+          "sessionId": { "type": "string", "format": "uuid" },
+          "startedAt": { "type": "string", "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\dZ$", "description": "minute precision" },
+          "consentVersion": { "type": "string" },
+          "records": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["t", "kind", "name", "outcome", "durationMs", "source", "readOnly"],
+                  "properties": {
+                    "t": { "type": "number", "minimum": 0 },
+                    "kind": { "const": "command" },
+                    "name": { "type": "string", "pattern": "^([a-z][a-z0-9_]*|<unregistered>)$" },
+                    "outcome": { "enum": ["ok", "noop", "refused", "threw"] },
+                    "errorCode": { "type": "string", "pattern": "^([A-Z][A-Z0-9]*(_[A-Z0-9]+)+|<other>)$" },
+                    "durationMs": { "type": "number", "minimum": 0 },
+                    "source": { "enum": ["ui", "cli"] },
+                    "readOnly": { "type": "boolean" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["t", "kind", "applied"],
+                  "properties": { "t": { "type": "number", "minimum": 0 }, "kind": { "enum": ["undo", "redo"] }, "applied": { "type": "boolean" } }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["t", "kind", "taskId", "event"],
+                  "properties": {
+                    "t": { "type": "number", "minimum": 0 },
+                    "kind": { "const": "task" },
+                    "taskId": { "type": "string", "pattern": "^T-(CIV|STL|PLT|MEC)-\\d{2}$" },
+                    "event": { "enum": ["start", "end", "abandon"] }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "report": { "type": "object", "description": "MetricsReport (TECHNICAL_SPEC §3): perCommand, refusalsByCode, undo, redo, undoWithin10s, tasks, activeMinutes" }
+  }
+}

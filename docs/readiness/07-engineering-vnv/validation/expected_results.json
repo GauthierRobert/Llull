@@ -1,0 +1,774 @@
+{
+  "pack": "07-engineering-vnv",
+  "gap": "VNV",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "readinessLevel": "PRL3",
+  "idRange": "101+ (VC-VNV-01..22 belong to docs/physics/00-vv-harness)",
+  "cases": [
+    {
+      "id": "VC-VNV-101",
+      "proves": [
+        "FR-VNV-101",
+        "FR-VNV-116",
+        "TR-VNV-101"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "vnvRecordCoverage",
+      "baseline": "0 records (audit 2026-10-28)",
+      "target": "every engineeringCheck command has a VnvRecord; every cases[].vc exists in this index",
+      "tolerance": "exact",
+      "source": "spec budget; M1 audit",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-102",
+      "proves": [
+        "FR-VNV-102",
+        "TR-VNV-102"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "structuredClauseOnRows",
+      "baseline": "clause only in row label text (steelMemberRows.ts:36)",
+      "target": "clause {standard, edition, clause, annex} on every row",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-103",
+      "proves": [
+        "FR-VNV-103",
+        "TR-VNV-103"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "designBasisRequired",
+      "target": "refusal, document unchanged",
+      "errorCode": "VNV_DESIGN_BASIS_MISSING",
+      "tolerance": "exact",
+      "source": "spec budget; R12",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-104",
+      "proves": [
+        "FR-VNV-104",
+        "TR-VNV-104"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "ndpOverrideTraced",
+      "target": "override named with reason; NbRd of VC-VNV-121 scales by 1/1.1",
+      "errorCode": "VNV_NDP_OVERRIDDEN",
+      "tolerance": "1e-9 rel",
+      "source": "spec budget; AF-31",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-105",
+      "proves": [
+        "FR-VNV-105",
+        "TR-VNV-105"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "unverifiedNdpPropagates",
+      "target": "warning on every row and on the report, not filterable",
+      "errorCode": "VNV_NDP_UNVERIFIED",
+      "tolerance": "exact",
+      "source": "R10, R11; AF-32",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-106",
+      "proves": [
+        "FR-VNV-106",
+        "FR-VNV-108",
+        "TR-VNV-106",
+        "TR-VNV-108"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "reportIntermediateChain",
+      "expected": {
+        "lambdaBarLT": 1.678437,
+        "chiLT": 0.2841438,
+        "MbRd": 131.8385,
+        "utilisation": 0.86697
+      },
+      "unit": "1, kNm",
+      "tolerance": "1e-6 rel",
+      "source": "W1 Ex. 4a (derived)",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-107",
+      "proves": [
+        "FR-VNV-107",
+        "TR-VNV-107"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "reportDeterministicHash",
+      "target": "identical reportSha256 across runs and entity order; documentHash = document_content_hash; version + commit present",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-108",
+      "proves": [
+        "FR-VNV-109",
+        "TR-VNV-109"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "reportExportOffline",
+      "target": "self-contained HTML + PDF with network disabled; fixed sentence on page 1",
+      "tolerance": "exact",
+      "source": "spec budget; AF-41",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-109",
+      "proves": [
+        "FR-VNV-110",
+        "TR-VNV-110"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "reportSignatureHumanGate",
+      "target": "review signature stored with signedSha256 = reportSha256; agent approval refused",
+      "errorCode": "PLM_HUMAN_GATE",
+      "tolerance": "exact",
+      "source": "plm signature.ts:25 (exists); spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-110",
+      "proves": [
+        "FR-VNV-111",
+        "TR-VNV-111"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "reportStaleAfterEdit",
+      "target": "stale true after a 1 mm move; new report has a new hash",
+      "errorCode": "VNV_REPORT_STALE",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-111",
+      "proves": [
+        "FR-VNV-112",
+        "TR-VNV-112"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "outOfScopeRefusalCodes",
+      "baseline": "plain-text failure aborts the whole command (steelMembersCheck.ts:108-124)",
+      "target": [
+        "STL_SECTION_CLASS4",
+        "STL_TAPERED_MEMBER",
+        "STL_SECTION_UNSUPPORTED",
+        "DRN_PRESSURE_FLOW_UNSUPPORTED",
+        "ALN_SPEED_OUT_OF_TABLE"
+      ],
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-112",
+      "proves": [
+        "FR-VNV-113",
+        "TR-VNV-113",
+        "TR-VNV-115"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "regressionSuiteGatesCi",
+      "target": "suite green on main; injected alpha_v = 0.6 for class 6.8 fails VC-VNV-125 and CI",
+      "tolerance": "exact",
+      "source": "spec budget (test-must-fail)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-113",
+      "proves": [
+        "FR-VNV-114",
+        "TR-VNV-114"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "transcriptionReproducesPublished",
+      "target": "derived reproduces published within the stated rounding, or an erratum is recorded",
+      "tolerance": "per case",
+      "source": "W1, W2, W3",
+      "grade": "A",
+      "plan": "data/",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-114",
+      "proves": [
+        "FR-VNV-115",
+        "TR-VNV-116"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "reviewRequiredEverywhere",
+      "target": "reviewRequired true + reason on every check result and report; fixed sentence on page 1",
+      "tolerance": "exact",
+      "source": "AF-33",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-115",
+      "proves": [
+        "FR-VNV-116"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "vnvStatusReported",
+      "target": {
+        "check_steel_members": "validated for tension, flexural buckling, LTB; unvalidated for 6.3.3",
+        "check_crane_runways": "unvalidated"
+      },
+      "errorCode": "VNV_UNVALIDATED_CHECK",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-116",
+      "proves": [
+        "FR-VNV-117",
+        "TR-VNV-117"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "recordVersionBumpEnforced",
+      "target": "contract test fails",
+      "errorCode": "VNV_RECORD_VERSION_STALE",
+      "tolerance": "exact",
+      "source": "R5 (configuration management, reference)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-117",
+      "proves": [
+        "FR-VNV-118",
+        "TR-VNV-118"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "errataRegister",
+      "expected": [
+        "W1 2.1.8 alpha_v 0.6 vs 0.5 (verdict flips)",
+        "W1 Ex.5 fy / section typo and chi rounded up",
+        "W1 Ex.4b chi rounded up",
+        "W2 Ex.4.3 \"89 m3/s\" and area 43.36 vs 43.3"
+      ],
+      "tolerance": "exact",
+      "source": "W1, W2",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-118",
+      "proves": [
+        "FR-VNV-120"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "cliParity",
+      "target": "set_design_basis, calculation_report --save, vnv_record return the UI data on a file and with --app",
+      "tolerance": "exact",
+      "source": "AGENT_FIRST",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-119",
+      "proves": [
+        "FR-VNV-119"
+      ],
+      "priority": "SHOULD",
+      "driver": "review",
+      "metric": "qualifiedEngineerReview",
+      "target": {
+        "openMustFindings": {
+          "op": "==",
+          "value": 0
+        }
+      },
+      "tolerance": "exact",
+      "source": "spec budget; L1 (liability sits with the engineer)",
+      "grade": "target",
+      "plan": "README.md",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-120",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "steelTensionJrcEx2",
+      "expected": {
+        "NuRd_2L50": 157.248,
+        "NplRd_2L50": 225.6,
+        "NuRd_2L60": 235.0656,
+        "NplRd_2L60": 324.77,
+        "verdict_2L50": "fail",
+        "verdict_2L60": "pass"
+      },
+      "unit": "kN",
+      "tolerance": "0.1 %; verdict exact",
+      "source": "W1 pp. 40-42",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-121",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-102"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "steelColumnJrcEx3",
+      "expected": {
+        "lambdaBarY": 0.3872631,
+        "lambdaBarZ": 0.7534402,
+        "chiZ": 0.6913813,
+        "NcRd": 6066.95,
+        "NbRd": 4194.576
+      },
+      "unit": "kN",
+      "tolerance": "0.1 %",
+      "source": "W1 pp. 46-47",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-122",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-108"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "steelLtbJrcEx4a",
+      "expected": {
+        "McRd": 463.985,
+        "VplRd": 874.9714,
+        "lambdaBarLT": 1.678437,
+        "chiLT": 0.2841438,
+        "MbRd": 131.8385
+      },
+      "unit": "kNm, kN",
+      "tolerance": "0.1 %",
+      "source": "W1 pp. 57-58",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-123",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-108",
+        "FR-VNV-114"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "steelLtbJrcEx4b",
+      "expected": {
+        "lambdaBarLT": 0.5107265,
+        "chiLT": 0.8794334,
+        "MbRd": 408.0439
+      },
+      "unit": "kNm",
+      "tolerance": "0.1 %",
+      "source": "W1 p. 59 (published 412.9 rounded up, not matched)",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-124",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-114"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "steelLtbJrcEx5",
+      "expected": {
+        "VplRd": 807.3522,
+        "lambdaBarLT": 1.873131,
+        "chiLT": 0.2351618,
+        "MbRd": 110.0675,
+        "utilisation": 0.94669
+      },
+      "unit": "kNm, kN",
+      "tolerance": "0.1 %",
+      "source": "W1 pp. 59-61 (errata)",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-125",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-114",
+        "FR-VNV-118"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "boltGroupJrc218",
+      "expected": {
+        "FvRd": 117.6,
+        "FbRdEnd": 98.90909,
+        "FbRdInner": 132.2909,
+        "groupRd": 550.6182,
+        "netSection": 589.7232,
+        "verdict": "fail",
+        "utilisation": 1.0534
+      },
+      "unit": "kN",
+      "tolerance": "0.1 %; verdict exact",
+      "source": "W1 pp. 95-97 + W1 section 2.1 alpha_v table (erratum: printed 141.1 / 595.0 / pass)",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-126",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "filletWeldJrc226",
+      "expected": {
+        "Fw1": 108.5,
+        "Fw2": 291.5,
+        "l1": 65.25261,
+        "l2": 175.31
+      },
+      "unit": "kN, mm",
+      "tolerance": "0.1 %",
+      "source": "W1 p. 103",
+      "grade": "A",
+      "plan": "data/steel_en1993_jrc.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-130",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "weightedRunoffHec22Ex41",
+      "expected": {
+        "existing": 0.2353118,
+        "proposed": 0.3151039
+      },
+      "unit": "1",
+      "tolerance": "1e-6 rel",
+      "source": "W2 pp. 25-26",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-131",
+      "proves": [
+        "FR-VNV-113",
+        "TR-VNV-119"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "rationalMethodHec22Ex43",
+      "expected": {
+        "existing": 19.33345,
+        "proposed": 31.37085
+      },
+      "unit": "ft3/s",
+      "tolerance": "1e-6 rel",
+      "source": "W2 p. 31",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-132",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "triangularGutterHec22Ex51",
+      "expected": {
+        "T": 9.029873,
+        "Q": 1.401752
+      },
+      "unit": "ft, ft3/s",
+      "tolerance": "1e-6 rel",
+      "source": "W2 p. 48",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-133",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "compositeGutterHec22Ex52A",
+      "expected": {
+        "Sw": 0.1033333,
+        "Qs": 0.6644678,
+        "Eo": 0.7111353,
+        "Q": 2.300273
+      },
+      "unit": "ft/ft, ft3/s",
+      "tolerance": "1e-6 rel",
+      "source": "W2 pp. 49-50",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-134",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "manningChannelHec22Ex61",
+      "expected": {
+        "A": 11.84,
+        "R": 0.9308697,
+        "Q": 55.91245,
+        "V": 4.722335
+      },
+      "unit": "ft2, ft, ft3/s, ft/s",
+      "tolerance": "1e-6 rel",
+      "source": "W2 pp. 66-67",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-135",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "pipeCapacityHec22Ex91",
+      "expected": {
+        "DreqRcp": 1.691394,
+        "DreqCmp": 1.870399,
+        "DselRcp_in": 21,
+        "DselCmp_in": 24,
+        "QfullRcp": 19.40614,
+        "QfullCmp": 21.18745
+      },
+      "unit": "ft, in, ft3/s",
+      "tolerance": "1e-6 rel (exact Manning); 1 % vs published 19.3 / 21.1",
+      "source": "W2 pp. 140-141",
+      "grade": "A",
+      "plan": "data/drainage_hec22.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-140",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "ssdUsTxdotTable423",
+      "expected": {
+        "mph30": 196.6339,
+        "mph50": 423.7054,
+        "mph70": 727.5625,
+        "design_mph30": 200,
+        "design_mph50": 425,
+        "design_mph70": 730
+      },
+      "unit": "ft",
+      "tolerance": "0.1 ft; design exact",
+      "source": "W3 + W4",
+      "grade": "A",
+      "plan": "data/alignment_sight_distance.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-141",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "ssdMetricClosedForm",
+      "expected": {
+        "kmh50": 63.42647,
+        "kmh80": 129.0118,
+        "kmh100": 184.2059
+      },
+      "unit": "m",
+      "tolerance": "1e-6 rel",
+      "source": "W4 (closed form)",
+      "grade": "A",
+      "plan": "data/alignment_sight_distance.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-142",
+      "proves": [
+        "FR-VNV-113",
+        "FR-VNV-105"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "minRadiusTxdotTable47",
+      "expected": {
+        "Rmin": 758
+      },
+      "unit": "ft",
+      "tolerance": "3 significant figures",
+      "source": "W5 (f unsourced)",
+      "grade": "B",
+      "errorCode": "ALN_TABLE_UNSOURCED",
+      "plan": "data/alignment_sight_distance.json",
+      "gating": false
+    },
+    {
+      "id": "VC-VNV-143",
+      "proves": [
+        "FR-VNV-113"
+      ],
+      "priority": "COULD",
+      "driver": "unit",
+      "metric": "spiralLengthBarnett",
+      "expected": "TBD - locate a free published example",
+      "tolerance": "TBD",
+      "source": "none fetched",
+      "grade": "C",
+      "plan": "data/alignment_sight_distance.json",
+      "gating": false
+    },
+    {
+      "id": "VC-VNV-145",
+      "proves": [
+        "FR-VNV-101",
+        "FR-VNV-106"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "feaRecordCitesLe1",
+      "expected": {
+        "benchmark": "VC-FEA-30",
+        "value": 92.7
+      },
+      "unit": "MPa",
+      "tolerance": "exact citation (2 % in owner pack)",
+      "source": "W6",
+      "grade": "A",
+      "plan": "data/fea_reference_pointers.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-146",
+      "proves": [
+        "FR-VNV-101",
+        "FR-VNV-106"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "feaRecordCitesLe10",
+      "expected": {
+        "benchmark": "VC-FEA-31",
+        "value": -5.38
+      },
+      "unit": "MPa",
+      "tolerance": "exact citation (3 % in owner pack)",
+      "source": "W6",
+      "grade": "A",
+      "plan": "data/fea_reference_pointers.json",
+      "gating": true
+    },
+    {
+      "id": "VC-VNV-147",
+      "proves": [
+        "FR-VNV-101"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "thermoRecordCitesT1",
+      "expected": {
+        "benchmark": "VC-TMC-03",
+        "value": 50
+      },
+      "unit": "MPa",
+      "tolerance": "exact citation",
+      "source": "W7 (geometry unconfirmed here)",
+      "grade": "B",
+      "plan": "data/fea_reference_pointers.json",
+      "gating": false
+    },
+    {
+      "id": "VC-VNV-148",
+      "proves": [
+        "FR-VNV-101"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "thermalRecordCitesT3",
+      "expected": {
+        "benchmark": "VC-THM-03",
+        "value": 36.6
+      },
+      "unit": "degC",
+      "tolerance": "exact citation",
+      "source": "owner pack (not re-verified)",
+      "grade": "B",
+      "plan": "data/fea_reference_pointers.json",
+      "gating": false
+    }
+  ]
+}

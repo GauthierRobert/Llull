@@ -1,0 +1,65 @@
+{
+  "about": "Storm-drainage worked examples transcribed from FHWA HEC-22 Urban Drainage Design, 4th edition, FHWA-HIF-24-006, February 2024 (source W2 in ../sources.md; US federal work, public domain). Values in US customary units as printed (CU: ft, ft3/s, in/h, ac); the SI values printed in parentheses are rounded conversions and are NOT gated. 'derived' = the printed equation recomputed in double precision from the printed inputs (scratch script, node, 2026-10-28). llull works in SI: a case converts the inputs exactly (1 ft = 0.3048 m) and compares in SI against derived x conversion, with the CU constant replaced by its SI form (Ku 0.56 -> 0.376 gutter; 1.486 -> 1.0 Manning; KQ 0.46 -> 0.312 pipe, see TECHNICAL_SPEC 8.3).",
+  "source": "W2",
+  "pdf": { "url": "https://transportation.ky.gov/Highway-Design/Drainage%20Manual/HEC-22(2024-02).pdf", "sha256": "06fb11aa4c0fca2a66e9d7f01c592f5b07064be3a32de8b86647d1b4b165a49d", "bytes": 12932642, "licence": "US government work (public domain)" },
+  "cases": [
+    {
+      "vc": "VC-VNV-130",
+      "example": "Example 4.1 Calculation of the runoff coefficient (pp. 25-26), eq. 4.1",
+      "inputs": { "existing": [[22.1, 0.25], [21.2, 0.22]], "proposed": [[5.4, 0.90], [1.6, 0.15], [18.6, 0.25], [17.7, 0.22]], "A_ac": 43.3 },
+      "published": { "C_existing": 0.235, "C_proposed": 0.315 },
+      "derived": { "C_existing": 0.2353118, "C_proposed": 0.3151039 },
+      "tolerance": "1e-6 rel on derived; published to 3 decimals",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-131",
+      "example": "Example 4.3 Rational Method peak flow (p. 31), Q = C i A / Ku with Ku = 1 (CU)",
+      "inputs": { "existing": { "C": 0.235, "i_in_per_h": 1.9 }, "proposed": { "C": 0.315, "i_in_per_h": 2.3 }, "A_ac": 43.3, "i_note": "i read by the authors from the IDF curve of Figure 4.1 at tc = 88 / 66 min; the case gives i as an input, it does not test the curve read" },
+      "published": { "Q_existing_cfs": 19.3, "Q_proposed_cfs": 31.4 },
+      "derived": { "Q_existing_cfs": 19.33345, "Q_proposed_cfs": 31.37085 },
+      "errata": ["the solution prints the proposed flow as '31.4 ft3/s (89 m3/s)'; 31.4 ft3/s = 0.889 m3/s", "the 'Given' block states Area = 43.36 ac while the computation uses 43.3 ac (as Example 4.1)"],
+      "tolerance": "1e-6 rel on derived",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-132",
+      "example": "Example 5.1 Computation of triangular gutter flow (p. 48), eqs. 5.2 / 5.4, Ku = 0.56",
+      "inputs": { "SL": 0.010, "Sx": 0.020, "n": 0.016, "Q_for_spread_cfs": 1.8, "T_for_flow_ft": 8.2 },
+      "published": { "T_ft": 9.0, "Q_cfs": 1.4 },
+      "derived": { "T_ft": 9.029873, "Q_cfs": 1.401752 },
+      "tolerance": "1e-6 rel on derived; published within 0.5 %",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-133",
+      "example": "Example 5.2 part A Composite gutter flow at T = 8.2 ft (pp. 49-50), eqs. 5.2, 5.6, 5.7, 5.8",
+      "inputs": { "W_ft": 2.0, "SL": 0.01, "Sx": 0.02, "n": 0.016, "a_in": 2.0, "T_ft": 8.2 },
+      "published": { "Sw": 0.103, "Ts_ft": 6.2, "Qs_cfs": 0.66, "Eo": 0.70, "Q_cfs": 2.3 },
+      "derived": { "Sw": 0.1033333, "Qs_cfs": 0.6644678, "Eo": 0.7111353, "Q_cfs": 2.300273 },
+      "note": "part B (spread for Q = 4.2 ft3/s, iterative, published T = 11.1 ft) is recorded but not gated: the published iteration stops at a rounded Qs and its T depends on that stop",
+      "tolerance": "1e-6 rel on derived; published Q within 1 %",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-134",
+      "example": "Example 6.1 Application of Manning's equation, trapezoidal channel (pp. 66-67), eqs. 6.5, 6.7-6.9, Ku = 1.486",
+      "inputs": { "So": 0.01, "B_ft": 2.6, "z": 3, "d_ft": 1.6, "n": 0.030 },
+      "published": { "A_ft2": 11.8, "P_ft": 12.7, "R_ft": 0.93, "Q_cfs": 55.7, "V_fps": 4.7 },
+      "derived": { "A_ft2": 11.84, "P_ft": 12.71929, "R_ft": 0.9308697, "Q_cfs": 55.91245, "V_fps": 4.722335 },
+      "tolerance": "1e-6 rel on derived; published Q is 0.4 % low (A and R rounded before the product)",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-135",
+      "example": "Example 9.1 Pipe size alternative and capacity (pp. 140-141), eq. 9.2 D = [Q n / (KQ So^0.5)]^0.375 with KQ = 0.46, KV = 0.59 (CU)",
+      "inputs": { "Q_cfs": 17.6, "So": 0.015, "n_rcp": 0.013, "n_cmp": 0.017, "D_rcp_selected_ft": 1.75, "D_cmp_selected_ft": 2.0 },
+      "published": { "D_rcp_required_ft": 1.69, "D_rcp_selected_in": 21, "D_cmp_required_ft": 1.87, "D_cmp_selected_in": 24, "Qfull_rcp_cfs": 19.3, "Vfull_rcp_fps": 8.0, "Qfull_cmp_cfs": 21.1, "Vfull_cmp_fps": 6.8 },
+      "derived": { "D_rcp_required_ft": 1.691394, "D_cmp_required_ft": 1.870399, "Qfull_rcp_cfs": 19.30953, "Vfull_rcp_fps": 8.087044, "Qfull_cmp_cfs": 21.09136, "Vfull_cmp_fps": 6.762991,
+        "Qfull_rcp_exactManning_cfs": 19.40614, "Qfull_cmp_exactManning_cfs": 21.18745 },
+      "note": "KQ = 0.46 is (1.486 x pi/4 / 4^(2/3)) rounded: an implementation using the exact full-pipe Manning form gives 0.5 % more; the case gates on the exact form (llull computes geometry, not the rounded constant) with 1 % tolerance on the published values, and records the rounded-constant values",
+      "tolerance": "1 % vs published; 1e-6 rel vs exact Manning; selected standard size exact (21 in, 24 in)",
+      "grade": "A"
+    }
+  ]
+}

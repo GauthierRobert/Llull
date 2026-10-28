@@ -1,0 +1,46 @@
+{
+  "about": "Road alignment design-check references. Stopping sight distance closed form (sources W3, W4; >= 2 sources agree, grade A) and the TxDOT Table 4-23 rows that reproduce the AASHTO Green Book basis; minimum radius row from TxDOT Table 4-7 (single extract, grade B). The AASHTO Green Book itself is paywalled and was not read. llull's alignment checks are metric (km/h, m): US rows are converted exactly (1 mph = 1.609344 km/h, 1 ft = 0.3048 m) and compared to the formula in its metric form only where the metric constants are the formula's own (0.278, 0.039, a = 3.4 m/s2).",
+  "cases": [
+    {
+      "vc": "VC-VNV-140",
+      "what": "SSD on level grade, US customary, TxDOT Table 4-23 rows",
+      "formula": "SSD = 1.47 V t + 1.075 V^2 / a, t = 2.5 s, a = 11.2 ft/s2",
+      "rows": [
+        { "V_mph": 30, "published": { "reaction_ft": 110.3, "braking_ft": 86.4, "calculated_ft": 196.7, "design_ft": 200 }, "derived": { "reaction_ft": 110.25, "braking_ft": 86.38393, "calculated_ft": 196.6339 } },
+        { "V_mph": 50, "published": { "reaction_ft": 183.8, "braking_ft": 240.0, "calculated_ft": 423.8, "design_ft": 425 }, "derived": { "reaction_ft": 183.75, "braking_ft": 239.9554, "calculated_ft": 423.7054 } },
+        { "V_mph": 70, "published": { "reaction_ft": 257.3, "braking_ft": 470.3, "calculated_ft": 727.6, "design_ft": 730 }, "derived": { "reaction_ft": 257.25, "braking_ft": 470.3125, "calculated_ft": 727.5625 } }
+      ],
+      "tolerance": "calculated SSD within 0.1 ft of published; design SSD = calculated rounded up to the next 5 ft, exact",
+      "sources": ["W3", "W4"],
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-141",
+      "what": "SSD metric closed form at the speeds llull's SPEED_TABLE uses",
+      "formula": "SSD = 0.278 V t + 0.039 V^2 / a, V km/h, t = 2.5 s, a = 3.4 m/s2",
+      "rows": [ { "V_kmh": 50, "derived_m": 63.42647 }, { "V_kmh": 80, "derived_m": 129.0118 }, { "V_kmh": 100, "derived_m": 184.2059 } ],
+      "note": "the Green Book metric design values (rounded) were not read; only the closed form gates",
+      "tolerance": "1e-6 rel",
+      "sources": ["W4"],
+      "grade": "A (closed form)"
+    },
+    {
+      "vc": "VC-VNV-142",
+      "what": "Minimum radius at e_max = 8 %, 50 mph (TxDOT Table 4-7 e = 8.0 row)",
+      "published": { "V_mph": 50, "Rmin_ft": 758 },
+      "derived": { "formula": "Rmin = V^2 / (15 (e + f))", "assumed_f": 0.14, "Rmin_ft": 757.5758 },
+      "note": "f(50 mph) = 0.14 is NOT confirmed from a fetched source; the case is non-gating until f is sourced (owner question 2)",
+      "tolerance": "rounded to the table's 3 significant figures",
+      "sources": ["W5"],
+      "grade": "B"
+    },
+    {
+      "vc": "VC-VNV-143",
+      "what": "Minimum clothoid length by rate of change of lateral acceleration (Barnett / Shortt form), C = 0.6 m/s3 as in llull roadChecks.ts:17",
+      "published": null,
+      "llull": "Ls = V^3 / (46.656 C R), V km/h, R and Ls m, C = 0.6 m/s3 (packages/domain-aec/src/civil/road/roadChecks.ts:1-6, :17); 46.656 = 3.6^3",
+      "note": "no fetched public source states this criterion with its constant AND a worked example; TBD - locate a free state-DOT or FHWA example before gating. Also unsourced: SPEED_TABLE side friction f and minimum crest / sag K (roadChecks.ts:21-24)",
+      "grade": "C"
+    }
+  ]
+}

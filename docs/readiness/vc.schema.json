@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "llull/docs/readiness/vc.schema.json",
+  "title": "Readiness pack validation index (validation/expected_results.json)",
+  "type": "object",
+  "required": ["pack", "gap", "baselineDate", "cases"],
+  "additionalProperties": true,
+  "properties": {
+    "pack": { "type": "string", "pattern": "^0[1-9]-[a-z0-9-]+$" },
+    "gap": { "enum": ["PIL", "UXD", "PRF", "DSF", "INS", "E2E", "VNV", "XCH", "COM"] },
+    "baselineDate": { "type": "string", "format": "date" },
+    "machineProfile": { "type": "string", "description": "id of a profile in ../readiness_gate.json machineProfiles; default ref-win11" },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "proves", "priority", "driver", "metric", "grade", "gating"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^VC-(PIL|UXD|PRF|DSF|INS|E2E|VNV|XCH|COM)-[0-9]{2,3}$" },
+          "proves": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^(FR|TR)-[A-Z0-9]{3}-[0-9]{2,3}$" } },
+          "priority": { "enum": ["MUST", "SHOULD", "COULD"] },
+          "driver": {
+            "enum": ["unit", "cli", "electron", "fault", "install-vm", "perf", "field", "review"],
+            "description": "unit = vitest in npm run check; cli = llull CLI script; electron = pack 06 harness; fault = fault-injection runner (pack 04); install-vm = clean-VM matrix (pack 05); perf = perf corpus on a machine profile (pack 03); field = pilot evidence (pack 01); review = a recorded human review (e.g. legal, qualified engineer)"
+          },
+          "metric": { "type": "string" },
+          "inputs": {},
+          "baseline": { "description": "value measured today, with date in sources.md; omit when not measured" },
+          "expected": { "description": "reference value (quoted, derived or closed form)" },
+          "target": {
+            "description": "budget set by the spec: a literal, or { op, value } with op in <=, <, >=, >, ==",
+            "oneOf": [
+              { "type": ["string", "number", "boolean", "array"] },
+              {
+                "type": "object",
+                "properties": { "op": { "enum": ["<=", "<", ">=", ">", "=="] }, "value": {} },
+                "additionalProperties": true
+              }
+            ]
+          },
+          "unit": { "type": "string" },
+          "tolerance": { "type": "string" },
+          "source": { "type": "string", "description": "source ids from sources.md (R1, S3…) or 'derived: <where>' or 'spec budget'" },
+          "grade": { "enum": ["A", "B", "C", "target"] },
+          "gating": {
+            "type": "boolean",
+            "description": "true for grade A references, cited closed forms and spec budgets (grade target); false for grade B/C references"
+          },
+          "errorCode": { "type": "string", "description": "stable code asserted by the case, when it asserts a refusal or a finding" },
+          "plan": { "type": "string", "description": "existing file, path relative to validation/: the plan, task script or procedure" },
+          "test": { "type": "string", "description": "repo-relative path of the test or runner to build (may not exist yet)" },
+          "level": { "type": "integer", "minimum": 1, "maximum": 5, "description": "PRL this case gates when it differs from the pack's defaultLevel in ../readiness_gate.json" },
+          "personas": { "type": "array", "items": { "enum": ["civil", "steel", "plant", "mechanical"] }, "description": "absent = every persona" }
+        }
+      }
+    }
+  }
+}

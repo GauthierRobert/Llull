@@ -1,0 +1,281 @@
+{
+  "title": "CRA (Regulation (EU) 2024/2847) checklist for llull — VC-COM-33",
+  "status": "draft 2026-10-28; obligations quoted from the EUR-Lex text (R10, R11); whether and from when each applies to llull is for counsel",
+  "applicabilityQuestions": [
+    "Is llull a product with digital elements made available on the market in the course of a commercial activity today (public repository, pilots), or only from the first sale? (recital 18; FUNCTIONAL_SPEC §11 Q3)",
+    "Main establishment in Belgium: which CSIRT is designated as coordinator for Art 14(7)? (expected CCB, to verify)",
+    "Is llull outside Annex III and Annex IV (no CAD category found), so that module A internal control (Art 32(1)(a)) is available?",
+    "Is an update check enabled by default 'applicable' (Annex I Part I (2)(c)) for software whose directive is offline-first?"
+  ],
+  "keyDates": [
+    { "date": "2026-06-11", "what": "Chapter IV (notified bodies) applies", "ref": "Art 71(2)" },
+    {
+      "date": "2026-09-11",
+      "what": "Art 14 reporting obligations apply, also to products placed on the market before 2027-12-11",
+      "ref": "Art 71(2), Art 69(3)"
+    },
+    {
+      "date": "2027-12-11",
+      "what": "Regulation applies in full; products placed earlier are covered only if substantially modified afterwards",
+      "ref": "Art 71(2), Art 69(2)"
+    }
+  ],
+  "items": [
+    {
+      "id": "CRA-01",
+      "ref": "Art 13(8)",
+      "obligation": "support period reflects expected use time, at least five years unless use is shorter; rationale in technical documentation",
+      "llull": "FR-COM-14; docs/compliance/cra/support-period.md",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-02",
+      "ref": "Art 13(9)",
+      "obligation": "each security update stays available at least 10 years after issue or the remainder of the support period, whichever is longer",
+      "llull": "FR-COM-14; release archive",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-03",
+      "ref": "Art 13(8) last subpara; Annex I Part II (5)",
+      "obligation": "coordinated vulnerability disclosure policy put in place and enforced",
+      "llull": "FR-COM-20; SECURITY.md; docs/compliance/cra/vulnerability-handling.md",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-04",
+      "ref": "Art 13(10)",
+      "obligation": "for substantially modified successive versions, vulnerability handling (Annex I Part II (2)) may be limited to the last version if earlier users get it free of charge",
+      "llull": "FR-COM-14 LTS policy",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-05",
+      "ref": "Art 13(11)",
+      "obligation": "if historical versions are archived publicly, users are clearly informed of the risks of unsupported software",
+      "llull": "release archive page",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-06",
+      "ref": "Art 13(12), Art 31, Annex VII",
+      "obligation": "technical documentation drawn up before placing on the market",
+      "llull": "docs/compliance/cra/",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-07",
+      "ref": "Art 13(12), Art 32(1)(a), Annex VIII",
+      "obligation": "conformity assessment (internal control, module A, if not Annex III/IV)",
+      "llull": "FR-COM-34",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-08",
+      "ref": "Art 13(12), Art 28, Art 30, Annex V",
+      "obligation": "EU declaration of conformity and CE marking",
+      "llull": "FR-COM-34; declaration-of-conformity-<version>.md",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-09",
+      "ref": "Art 13(13)",
+      "obligation": "technical documentation and declaration kept at least 10 years after placing on the market or for the support period, whichever is longer",
+      "llull": "docs/compliance/cra/ retention note",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-10",
+      "ref": "Art 13(15)",
+      "obligation": "type, batch or serial number or other element allowing identification",
+      "llull": "version + commit in About and `llull version --json`",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-11",
+      "ref": "Art 14(1)(2)",
+      "obligation": "actively exploited vulnerability: early warning <= 24 h, notification <= 72 h, final report <= 14 days after a corrective measure, via the single reporting platform",
+      "llull": "FR-COM-21; reporting-runbook.md; VC-COM-22",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-12",
+      "ref": "Art 14(3)(4)(5)",
+      "obligation": "severe incident affecting product security: early warning <= 24 h, notification <= 72 h, final report within one month of the notification",
+      "llull": "FR-COM-21; reporting-runbook.md",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-13",
+      "ref": "Art 14(8)",
+      "obligation": "inform impacted users of the vulnerability / incident and mitigations, where appropriate in a machine-readable format",
+      "llull": "FR-COM-20 advisories",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-14",
+      "ref": "Annex I Part I (2)(a)",
+      "obligation": "no known exploitable vulnerabilities at release",
+      "llull": "dependency audit in release:check (npm, cargo, Python)",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-15",
+      "ref": "Annex I Part I (2)(b)",
+      "obligation": "secure by default configuration, with reset to original state",
+      "llull": "loopback-only backend, per-launch token (DEPLOYMENT §3); import_code off by default; FR-COM-36 reset",
+      "evidence": "docs/DEPLOYMENT.md §3",
+      "status": "partial"
+    },
+    {
+      "id": "CRA-16",
+      "ref": "Annex I Part I (2)(c)",
+      "obligation": "vulnerabilities addressable by security updates, where applicable automatic and on by default with opt-out, notification of updates, option to postpone",
+      "llull": "FR-COM-15; default is an owner/counsel decision",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-17",
+      "ref": "Annex I Part I (2)(d)",
+      "obligation": "protection from unauthorised access; report possible unauthorised access",
+      "llull": "bearer token, origin / Host allowlists, CSRF guard, rate limits (server/src/security.ts)",
+      "evidence": "docs/DEPLOYMENT.md §3",
+      "status": "partial"
+    },
+    {
+      "id": "CRA-18",
+      "ref": "Annex I Part I (2)(e)(f)",
+      "obligation": "confidentiality and integrity of stored / processed data; report corruptions",
+      "llull": "pack 04 DSF (integrity, recovery); licence state HMAC; signed releases",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-19",
+      "ref": "Annex I Part I (2)(g)",
+      "obligation": "data minimisation",
+      "llull": "FR-COM-04 hashed fingerprint; FR-COM-17 redacted bundle; no telemetry",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-20",
+      "ref": "Annex I Part I (2)(h)(i)",
+      "obligation": "availability of essential functions incl. after an incident; minimise impact on other services",
+      "llull": "read-only fallback never blocks data access (FR-COM-03); loopback-only",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-21",
+      "ref": "Annex I Part I (2)(j)(k)",
+      "obligation": "limit attack surfaces; exploitation mitigation",
+      "llull": "risk-assessment.md (Electron hardening, sidecars, Python bridge, DWG converter as separate process)",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-22",
+      "ref": "Annex I Part I (2)(l)",
+      "obligation": "record and monitor relevant internal security activity, with a user opt-out",
+      "llull": "local security log (backend auth refusals, licence events) — to specify",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-23",
+      "ref": "Annex I Part I (2)(m)",
+      "obligation": "users can securely and easily remove all data and settings permanently",
+      "llull": "FR-COM-36; VC-COM-34",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-24",
+      "ref": "Annex I Part II (1)",
+      "obligation": "identify and document vulnerabilities and components; SBOM in a commonly used machine-readable format covering at least top-level dependencies",
+      "llull": "FR-COM-16; VC-COM-18",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-25",
+      "ref": "Annex I Part II (2)",
+      "obligation": "remediate without delay incl. security updates; separate security updates from functionality updates where technically feasible",
+      "llull": "FR-COM-14 patch / LTS lines",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-26",
+      "ref": "Annex I Part II (3)",
+      "obligation": "effective and regular security tests and reviews",
+      "llull": "security review per release (existing /security-review skill + dependency audit + fuzz `llull fuzz`)",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-27",
+      "ref": "Annex I Part II (4)",
+      "obligation": "publicly disclose fixed vulnerabilities once an update is available (description, affected product, impact, severity, remediation)",
+      "llull": "FR-COM-20 advisories",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-28",
+      "ref": "Annex I Part II (6)",
+      "obligation": "facilitate sharing of vulnerability information incl. third-party components; contact address",
+      "llull": "FR-COM-20; security.txt; SECURITY.md",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-29",
+      "ref": "Annex I Part II (7)",
+      "obligation": "mechanisms to securely distribute updates; automatic where applicable for security updates",
+      "llull": "FR-COM-15; VC-COM-17",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-30",
+      "ref": "Annex I Part II (8)",
+      "obligation": "security updates disseminated without delay, free of charge, with advisory messages",
+      "llull": "FR-COM-14/15; EULA must not charge for security updates",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-31",
+      "ref": "Annex II (1)-(3)",
+      "obligation": "manufacturer name and contacts; single point of contact for vulnerabilities and CVD policy location; product identification",
+      "llull": "FR-COM-35 About + docs",
+      "evidence": null,
+      "status": "open"
+    },
+    {
+      "id": "CRA-32",
+      "ref": "Annex II (4) and following",
+      "obligation": "(4) intended purpose, security environment, essential functionalities, security properties; (5) foreseeable circumstances leading to significant cybersecurity risks; (6) address of the EU declaration of conformity where applicable; (7) type of technical security support and end-date of the support period; (8)(a)-(e) instructions for secure commissioning and use, effect of changes on data security, how to install security updates, secure decommissioning and data removal, how to turn off the default automatic installation of security updates; (9) where the SBOM can be accessed, if made available",
+      "llull": "FR-COM-35; docs/compliance/cra/annex-ii-user-information.md; note: (8)(e) presupposes the Annex I Part I (2)(c) default — counsel question on 'where applicable'",
+      "evidence": null,
+      "status": "open"
+    }
+  ]
+}

@@ -1,0 +1,503 @@
+{
+  "pack": "04-data-safety",
+  "gap": "DSF",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "readinessLevel": "PRL2",
+  "cases": [
+    {
+      "id": "VC-DSF-01",
+      "proves": [
+        "FR-DSF-01",
+        "TR-DSF-18"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "sharedHistoryUndoRedo",
+      "expected": "after 10 undos stateHash = empty document; after 10 redos = final; labels = command + source in order",
+      "tolerance": "exact",
+      "source": "L3 (shared history exists); labels: spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-02",
+      "proves": [
+        "FR-DSF-02",
+        "TR-DSF-18"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "undoDocumentBoundary",
+      "baseline": "Open is an undo entry: undo returns to document A (code read)",
+      "target": "Nothing to undo after Open; Save keeps history",
+      "tolerance": "exact",
+      "source": "L7, L3; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-03",
+      "proves": [
+        "FR-DSF-03",
+        "TR-DSF-20"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "undoAfterKernelOp",
+      "target": {
+        "op": "==",
+        "value": {
+          "hashAfterUndo": "hashBeforeFillet",
+          "hashAfterRedo": "hashAfterFillet",
+          "kernelCallsDuringUndoRedo": 0
+        }
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-04",
+      "proves": [
+        "FR-DSF-04",
+        "TR-DSF-19"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "undoRetainedBytes",
+      "baseline": "TBD — measure with this case",
+      "target": {
+        "op": "<=",
+        "value": "UNDO_BUDGET_BYTES (owner Q5, set from the first measurement)",
+        "minDepth": 20,
+        "estimateVsHeap": "within x2"
+      },
+      "unit": "bytes",
+      "tolerance": "estimate within factor 2 of heap delta",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_UNDO_TRIMMED"
+    },
+    {
+      "id": "VC-DSF-05",
+      "proves": [
+        "FR-DSF-05",
+        "FR-DSF-06",
+        "TR-DSF-01",
+        "TR-DSF-02",
+        "TR-DSF-03",
+        "TR-DSF-04"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "ackedWorkLostAfterKill",
+      "inputs": {
+        "runs": 200,
+        "rateHz": 10,
+        "procedure": "P1"
+      },
+      "baseline": "300 ms debounce autosave (L2); loss not measured",
+      "target": {
+        "op": "<=",
+        "value": 1000,
+        "violations": 0
+      },
+      "unit": "ms",
+      "tolerance": "0 violations",
+      "source": "spec budget; [S1] for incumbent default",
+      "grade": "target",
+      "gating": true,
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-06",
+      "proves": [
+        "FR-DSF-06",
+        "TR-DSF-02"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "ackedWorkLostAfterPowerCutShim",
+      "inputs": {
+        "cuts": 500,
+        "procedure": "P2"
+      },
+      "target": {
+        "op": "<=",
+        "value": 1000,
+        "violations": 0
+      },
+      "unit": "ms",
+      "tolerance": "0 violations",
+      "source": "spec budget; method [S40][S26]",
+      "grade": "target",
+      "gating": true,
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-07",
+      "proves": [
+        "FR-DSF-07",
+        "TR-DSF-05"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "recoveryDialogAndSlotRetention",
+      "baseline": "slot shown untitled without notice; overwritten after 2 edits of the next session (G1, G2, code read)",
+      "target": "slot listed with path, time, 12 changes; still listed after a second session; restore hash = recovered; restore time TBD — measure",
+      "tolerance": "exact",
+      "source": "L2, L4; [S3]",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_RECOVERY_AVAILABLE"
+    },
+    {
+      "id": "VC-DSF-08",
+      "proves": [
+        "FR-DSF-08",
+        "TR-DSF-04"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "partialRecoveryLine",
+      "expected": {
+        "tornLastLine": 49,
+        "flippedByteLine30": 29,
+        "badHashLine40": 39
+      },
+      "tolerance": "exact",
+      "source": "derived: journal construction (P3)",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_RECOVERY_PARTIAL",
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-09",
+      "proves": [
+        "FR-DSF-09",
+        "TR-DSF-06",
+        "TR-DSF-07"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "editsLostOnProcessCrash",
+      "baseline": "no render-process-gone handler; backend not restarted; local-mode edits discarded on reconnect (code read, L5, L6)",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "edits",
+      "tolerance": "exact",
+      "source": "L5, L6; [S32][S33]",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-10",
+      "proves": [
+        "FR-DSF-10",
+        "TR-DSF-11"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "incompleteFileAfterKillDuringSave",
+      "inputs": {
+        "runsSmall": 1000,
+        "runsLarge": 200,
+        "procedure": "P4"
+      },
+      "baseline": {
+        "runs": 25,
+        "failures": 0,
+        "docBytes": "~0.5 MB"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "failures",
+      "tolerance": "exact",
+      "source": "L10 (SC-D1)",
+      "grade": "A",
+      "gating": true,
+      "plan": "README.md#3-procedures",
+      "level": 1
+    },
+    {
+      "id": "VC-DSF-11",
+      "proves": [
+        "FR-DSF-10",
+        "TR-DSF-12"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "lastAckedSaveOnDiskAfterPowerOff",
+      "inputs": {
+        "cycles": 50,
+        "procedure": "P5"
+      },
+      "target": {
+        "op": "==",
+        "value": 0,
+        "of": "cycles where the file is incomplete or older than the last announced save"
+      },
+      "unit": "failures",
+      "tolerance": "exact",
+      "source": "spec budget; [S14][S18]",
+      "grade": "target",
+      "gating": true,
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-12",
+      "proves": [
+        "FR-DSF-11",
+        "TR-DSF-11"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "diskFullHandling",
+      "baseline": "console warning only, retried at shutdown (G11, code read)",
+      "target": "DSF_SAVE_DISK_FULL before any write; file sha256 unchanged; DSF_AUTOSAVE_FAILED shown within 1 s; DSF_SAVE_IO on EIO",
+      "tolerance": "exact",
+      "source": "spec budget; [S40]",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_SAVE_DISK_FULL",
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-13",
+      "proves": [
+        "FR-DSF-13",
+        "FR-DSF-14",
+        "TR-DSF-08",
+        "TR-DSF-10"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "lostUpdatesSamePc",
+      "baseline": "no lock (L7, L8); lost-update count TBD — measure with case (b) on today's build",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "silently lost commands",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_DOC_LOCKED",
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-14",
+      "proves": [
+        "FR-DSF-14",
+        "TR-DSF-08"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "doubleLockWinnersOnSmb",
+      "inputs": {
+        "attempts": 1000,
+        "procedure": "P8"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "double winners",
+      "tolerance": "exact",
+      "source": "spec budget; SMB atomicity of exclusive create not confirmed (sources.md); fallback [S39]",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_DOC_LOCKED",
+      "plan": "README.md#3-procedures"
+    },
+    {
+      "id": "VC-DSF-15",
+      "proves": [
+        "FR-DSF-15",
+        "TR-DSF-09"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "staleLockHandling",
+      "expected": {
+        "sameHost": "DSF_LOCK_BROKEN",
+        "otherHostBeforeStale": "DSF_DOC_LOCKED",
+        "otherHostAfterStale": "DSF_LOCK_STALE, lock kept"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; [S5]",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_LOCK_STALE"
+    },
+    {
+      "id": "VC-DSF-16",
+      "proves": [
+        "FR-DSF-16",
+        "TR-DSF-14",
+        "TR-DSF-15",
+        "TR-DSF-16"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "integrityVerify",
+      "inputs": {
+        "corpusFiles": 12
+      },
+      "expected": "12/12 v4 files verify ok with round-trip hash; changed digit -> DSF_HASH_MISMATCH (warn, opens); each damaged variant -> one DSF code, no throw",
+      "tolerance": "exact",
+      "source": "L11 (never-throws baseline); [S28]",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_HASH_MISMATCH"
+    },
+    {
+      "id": "VC-DSF-17",
+      "proves": [
+        "FR-DSF-12",
+        "FR-DSF-17",
+        "TR-DSF-13",
+        "TR-DSF-24"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "docUndoDepth",
+      "baseline": 1,
+      "target": {
+        "op": ">=",
+        "value": 5
+      },
+      "unit": "levels",
+      "tolerance": "exact (file bytes equal original after 5 undos)",
+      "source": "L8 baseline; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-18",
+      "proves": [
+        "FR-DSF-18",
+        "TR-DSF-17"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "salvagedEntities",
+      "inputs": {
+        "offsetsPerFile": 20,
+        "corpusFiles": 12
+      },
+      "expected": "derived: entities whose byte range lies wholly inside the prefix; each kept entity deep-equal to the original",
+      "tolerance": "exact",
+      "source": "derived: entity byte ranges of the original file",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_SALVAGE_DROPPED",
+      "level": 3
+    },
+    {
+      "id": "VC-DSF-19",
+      "proves": [
+        "FR-DSF-19",
+        "TR-DSF-21"
+      ],
+      "priority": "COULD",
+      "driver": "cli",
+      "metric": "undoAcrossRestart",
+      "target": {
+        "op": "==",
+        "value": "original document hash after 10 undos"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; [S24]",
+      "grade": "target",
+      "gating": true,
+      "level": 3
+    },
+    {
+      "id": "VC-DSF-20",
+      "proves": [
+        "FR-DSF-20",
+        "TR-DSF-22",
+        "TR-DSF-23"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "versionWindow",
+      "baseline": "v1-v3 read, newer refused with a message (L9)",
+      "expected": "v5 -> DSF_VERSION_NEWER, bytes unchanged; in-window older -> DSF_VERSION_OLDER_MIGRATED equal to .expected.json; first save writes <name>.v<N>.llull",
+      "tolerance": "exact",
+      "source": "L9; window per owner Q1",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DSF_VERSION_NEWER"
+    },
+    {
+      "id": "VC-DSF-21",
+      "proves": [
+        "FR-DSF-21",
+        "TR-DSF-03"
+      ],
+      "priority": "SHOULD",
+      "driver": "perf",
+      "metric": "checkpointLongTasksOver50ms",
+      "baseline": "TBD — measure (300 ms full-file autosave on the 44 MB document)",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "long tasks",
+      "tolerance": "exact count",
+      "source": "spec budget; pack 03 PRF document",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-22",
+      "proves": [
+        "FR-DSF-22"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "stableCodeCoverage",
+      "expected": "every emitted DSF code is in TECHNICAL_SPEC §7; every §7 code emitted by >= 1 test; network disabled",
+      "tolerance": "exact",
+      "source": "spec budget (AF-11, AF-41)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-DSF-23",
+      "proves": [
+        "FR-DSF-05",
+        "FR-DSF-06",
+        "TR-DSF-03"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "killDuringCheckpointRotation",
+      "inputs": {
+        "runs": 200,
+        "procedure": "P1 + checkpoint hooks"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "violations",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "README.md#3-procedures"
+    }
+  ]
+}

@@ -1,0 +1,832 @@
+{
+  "pack": "05-install-deploy",
+  "gap": "INS",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "readinessLevel": "PRL1",
+  "vmProfiles": [
+    "vm-win11-std",
+    "vm-win11-locked",
+    "vm-win11-min",
+    "vm-win10-std",
+    "vm-macos-arm",
+    "vm-macos-12-x64",
+    "vm-ubuntu-2404",
+    "vm-ubuntu-2204"
+  ],
+  "cases": [
+    {
+      "id": "VC-INS-01",
+      "proves": [
+        "FR-INS-01",
+        "FR-INS-03",
+        "FR-INS-08",
+        "TR-INS-10",
+        "TR-INS-16"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "perUserOfflineInstallDoctorExit",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "network": "off",
+        "mode": "per-user"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "expected": {
+        "uacPrompt": false,
+        "kernelStatus": "occt",
+        "occtVersion": "7.9.2"
+      },
+      "unit": "exit code",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-02",
+      "proves": [
+        "FR-INS-01",
+        "FR-INS-03"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "perUserOfflineInstallDoctorExit",
+      "inputs": {
+        "vm": "vm-win10-std",
+        "network": "off"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "exit code",
+      "tolerance": "exact; INS_PLATFORM_EOL warn allowed",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-03",
+      "proves": [
+        "FR-INS-01",
+        "FR-INS-11"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "macOfflineFirstLaunchGatekeeperAndDoctor",
+      "inputs": {
+        "vm": [
+          "vm-macos-arm",
+          "vm-macos-12-x64"
+        ],
+        "network": "off before first launch"
+      },
+      "target": "gatekeeper accepts; doctor exit 0; kernel occt",
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "R5, R6; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/posix-install-check.sh"
+    },
+    {
+      "id": "VC-INS-04",
+      "proves": [
+        "FR-INS-01",
+        "TR-INS-15"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "debLaunchWithSandbox",
+      "inputs": {
+        "vm": [
+          "vm-ubuntu-2404",
+          "vm-ubuntu-2204"
+        ],
+        "network": "off"
+      },
+      "baseline": "Electron AppImages fail on Ubuntu 24.04 without an AppArmor allowance (R18, grade B)",
+      "target": "window opens with sandbox on; doctor exit 0",
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "R18; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/posix-install-check.sh"
+    },
+    {
+      "id": "VC-INS-05",
+      "proves": [
+        "FR-INS-05",
+        "TR-INS-01",
+        "TR-INS-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "unresolvedImportsInRelease",
+      "inputs": {
+        "fixtures": [
+          "pe-missing-dll",
+          "elf-origin-runpath",
+          "macho-rpath"
+        ],
+        "tree": "staged release app"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "imports",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_NATIVE_DLL_MISSING"
+    },
+    {
+      "id": "VC-INS-06",
+      "proves": [
+        "FR-INS-05",
+        "TR-INS-03",
+        "TR-INS-04"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "nativeBinariesStartWithSystemPathOnly",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "vcRedist": "absent",
+        "PATH": "%SystemRoot%\\System32",
+        "plantedTKernelDll": true
+      },
+      "target": "every native exe starts; bundled TKernel.dll loaded despite a planted copy on PATH and in the current folder",
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "R16; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-07",
+      "proves": [
+        "FR-INS-07",
+        "TR-INS-05"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "installedCliHeadlessKernelAndStep",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "app": "closed"
+      },
+      "baseline": "code survey (not run): headless CLI gets no LLULL_NATIVE_DIR / LLULL_PYTHON",
+      "target": {
+        "kernelActive": "occt",
+        "stepWritten": true
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-08",
+      "proves": [
+        "FR-INS-06",
+        "FR-INS-08",
+        "TR-INS-07",
+        "TR-INS-09"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "kernelFallbackPolicy",
+      "inputs": {
+        "nativeStart": "injected failure",
+        "policies": [
+          "deny",
+          "allow"
+        ]
+      },
+      "baseline": "Manifold installed with one console.warn (server/src/geometryKernel.ts:80-96)",
+      "target": {
+        "deny": "no kernel; kernel_info.status unavailable; boolean refused with INS_KERNEL_START_FAILED",
+        "allow": "Manifold; INS_KERNEL_FALLBACK_OPTED in kernel_info and boolean summary"
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_KERNEL_START_FAILED"
+    },
+    {
+      "id": "VC-INS-09",
+      "proves": [
+        "FR-INS-06"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "missingOcctDllReported",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "deleted": "resources/native/TKBO.dll"
+      },
+      "target": "banner shown; doctor fail INS_NATIVE_DLL_MISSING llull-kernel.exe -> TKBO.dll; boolean refused; no Manifold result",
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_NATIVE_DLL_MISSING",
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-10",
+      "proves": [
+        "FR-INS-08",
+        "FR-INS-23",
+        "TR-INS-09"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "doctorContract",
+      "inputs": {
+        "probes": "fakes for every component and status",
+        "network": "stubbed to throw"
+      },
+      "target": {
+        "schema": "llull-doctor/1",
+        "everyNonPassHasCodeAndRemediation": true,
+        "exitOnMustFail": 1,
+        "networkCalls": 0
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-INS-11",
+      "proves": [
+        "FR-INS-10",
+        "TR-INS-12"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "dwgConverterAbsentAndConfigured",
+      "inputs": {
+        "converter": [
+          "none",
+          "libredwg via Settings",
+          "oda via Settings"
+        ]
+      },
+      "baseline": "desktop strips inherited LLULL_* (desktop/src/backendEnv.ts:50-54); 503 without converter",
+      "target": {
+        "none": "INS_DWG_CONVERTER_ABSENT naming LibreDWG, ODA and DXF",
+        "configured": "backend env carries the converter; doctor dwg pass; fixture entity count matches"
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_DWG_CONVERTER_ABSENT"
+    },
+    {
+      "id": "VC-INS-12",
+      "proves": [
+        "FR-INS-11",
+        "FR-INS-18",
+        "TR-INS-13"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "unsignedPeFiles",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "smartAppControl": "on"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "expected": {
+        "allTimestamped": true,
+        "smartAppControlBlocks": 0
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "R2; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-13",
+      "proves": [
+        "FR-INS-11",
+        "TR-INS-14"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "unsignedMachOFiles",
+      "inputs": {
+        "vm": "vm-macos-arm"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "expected": {
+        "codesignStrict": "pass",
+        "spctl": "accepted",
+        "stapler": "valid"
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "R5, R6; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/posix-install-check.sh"
+    },
+    {
+      "id": "VC-INS-14",
+      "proves": [
+        "FR-INS-12",
+        "TR-INS-18",
+        "TR-INS-19"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "signedUpdateOnlineAndOffline",
+      "inputs": {
+        "vm": [
+          "vm-win11-std",
+          "vm-win11-locked"
+        ],
+        "variants": [
+          "online generic",
+          "offline package",
+          "tampered installer",
+          "manifest signed by another key"
+        ]
+      },
+      "target": {
+        "dataIntact": true,
+        "tampered": "INS_UPDATE_SIGNATURE or INS_UPDATE_CHECKSUM, previous version untouched"
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact (sha256 of document and autosave)",
+      "source": "R7, R8; spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_UPDATE_SIGNATURE"
+    },
+    {
+      "id": "VC-INS-15",
+      "proves": [
+        "FR-INS-13",
+        "TR-INS-20"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "rollbackKeepsData",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "from": "N+1",
+        "to": "N"
+      },
+      "target": {
+        "backupSnapshot": true,
+        "dataIntact": true,
+        "newerDocument": "read-only with INS_DOCUMENT_NEWER",
+        "onlineDowngrade": "INS_UPDATE_DOWNGRADE_BLOCKED"
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_DOCUMENT_NEWER"
+    },
+    {
+      "id": "VC-INS-16",
+      "proves": [
+        "FR-INS-14",
+        "TR-INS-21"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "uninstallLeftovers",
+      "inputs": {
+        "vm": [
+          "vm-win11-std",
+          "vm-win11-locked"
+        ],
+        "variants": [
+          "per-user NSIS",
+          "per-machine MSI",
+          "per-user NSIS + remove data"
+        ]
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "paths and registry keys outside the documented kept list",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-17",
+      "proves": [
+        "FR-INS-15",
+        "TR-INS-06",
+        "TR-INS-22"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "sbomMissingComponents",
+      "inputs": {
+        "sbom": "release CycloneDX JSON",
+        "against": [
+          "closure.json",
+          "npm locks",
+          "Cargo metadata",
+          "pip inspect",
+          "staged file list"
+        ]
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "expected": {
+        "schemaValid": true,
+        "eachComponent": [
+          "version",
+          "sha256",
+          "SPDX licence"
+        ]
+      },
+      "unit": "components",
+      "tolerance": "exact",
+      "source": "R22, R23; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-INS-18",
+      "proves": [
+        "FR-INS-16",
+        "TR-INS-23"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "componentsWithoutNotice",
+      "inputs": {
+        "notices": "THIRD-PARTY-NOTICES.txt",
+        "cli": "llull licenses --json"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "expected": {
+        "occtNotice": "makes use of Open CASCADE Technology",
+        "psfNotice": true,
+        "llullLicence": true,
+        "unlistedSpdxIdFailsBuild": true
+      },
+      "unit": "components",
+      "tolerance": "exact",
+      "source": "R32, R36; spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_LICENSES_MISSING"
+    },
+    {
+      "id": "VC-INS-19",
+      "proves": [
+        "FR-INS-04",
+        "FR-INS-18"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "msiSilentUnderAppLocker",
+      "inputs": {
+        "vm": "vm-win11-locked",
+        "commands": [
+          "msiexec /i llull.msi /quiet /l*v install.log",
+          "msiexec /x {ProductCode} /quiet",
+          "llull-Setup.exe /S /allusers"
+        ]
+      },
+      "target": {
+        "exitCodes": 0,
+        "doctorExit": 0,
+        "policySource": "registry",
+        "leftovers": 0
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "R12, R13, R15; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1",
+      "level": 4
+    },
+    {
+      "id": "VC-INS-20",
+      "proves": [
+        "FR-INS-02",
+        "FR-INS-20",
+        "TR-INS-28"
+      ],
+      "priority": "SHOULD",
+      "driver": "install-vm",
+      "metric": "unpackedInstallGB",
+      "inputs": {
+        "vm": "all profiles",
+        "alsoRecorded": [
+          "installerMB",
+          "installSeconds",
+          "firstStartSeconds",
+          "doctorSeconds",
+          "vm-win11-min runs design/08-assembly-scale/validation/plans/fidelity.lld"
+        ]
+      },
+      "baseline": "16 GB unpacked (broken build, FR-ASC-01, 2026-10-28)",
+      "target": {
+        "op": "<=",
+        "value": 1.5
+      },
+      "unit": "GB",
+      "tolerance": "10% on recorded timings",
+      "source": "FR-ASC-01; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-INS-21",
+      "proves": [
+        "FR-INS-19",
+        "TR-INS-25"
+      ],
+      "priority": "SHOULD",
+      "driver": "install-vm",
+      "metric": "defenderDetections",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "scan": "MpCmdRun -Scan -ScanType 3 on installers and install folder"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "detections",
+      "tolerance": "exact",
+      "source": "spec budget; risk evidence R4, R19 (grade B/C)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-INS-22",
+      "proves": [
+        "FR-INS-22",
+        "TR-INS-27"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "privateItemsInSupportBundle",
+      "inputs": {
+        "fixtureProfile": [
+          ".llull document",
+          "autosave.json",
+          "vault object",
+          "desktop.json token"
+        ]
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "items",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-INS-23",
+      "proves": [
+        "FR-INS-23",
+        "FR-INS-08"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "outboundConnectionAttempts",
+      "inputs": {
+        "vm": "vm-win11-std",
+        "updates": "off",
+        "session": "start, doctor, model, save, quit"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "connections",
+      "tolerance": "exact",
+      "source": "AF-41; spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-24",
+      "proves": [
+        "FR-INS-16",
+        "FR-INS-17"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "legalReviewRecorded",
+      "inputs": {
+        "decisions": [
+          "llull licence (D2)",
+          "licence allowlist",
+          "DWG bundling (D3)",
+          "CRA applicability (D7)"
+        ]
+      },
+      "target": "signed and dated record in docs/decisions/",
+      "unit": "record",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "level": 4
+    },
+    {
+      "id": "VC-INS-25",
+      "proves": [
+        "FR-INS-17",
+        "TR-INS-24"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "craFileComplete",
+      "inputs": {
+        "items": [
+          "SECURITY.md",
+          "docs/CRA.md",
+          "support period in About and update manifest",
+          "Article 14 procedure",
+          "SBOM vulnerability scan in release workflow"
+        ]
+      },
+      "target": "every item of technical spec 5.7 present",
+      "unit": "checklist",
+      "source": "R20, R21, R22",
+      "grade": "target",
+      "gating": true,
+      "level": 4
+    },
+    {
+      "id": "VC-INS-26",
+      "proves": [
+        "FR-INS-21",
+        "TR-INS-26"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "policyEnforced",
+      "inputs": {
+        "policies": [
+          "updates off",
+          "dwg path",
+          "code execution off",
+          "invalid"
+        ]
+      },
+      "target": {
+        "userCannotOverride": true,
+        "invalid": "INS_POLICY_INVALID with updates off and code execution off"
+      },
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "INS_POLICY_INVALID",
+      "level": 4
+    },
+    {
+      "id": "VC-INS-27",
+      "proves": [
+        "FR-INS-09",
+        "TR-INS-11"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "stepRoundTripCubeVolume",
+      "inputs": {
+        "vm": [
+          "vm-win11-std",
+          "vm-macos-arm",
+          "vm-ubuntu-2404"
+        ],
+        "network": "off",
+        "solid": "cube 10 mm"
+      },
+      "expected": 1000,
+      "unit": "mm3",
+      "tolerance": "1e-6 rel",
+      "source": "closed form a^3",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "INS_STEP_ROUNDTRIP",
+      "plan": "plans/posix-install-check.sh"
+    },
+    {
+      "id": "VC-INS-28",
+      "proves": [
+        "FR-INS-06",
+        "TR-INS-08"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "kernelSelfTestVolume",
+      "inputs": {
+        "solid": "cube a=10 mm minus through cylinder r=3 mm"
+      },
+      "expected": 717.2566611769186,
+      "unit": "mm3",
+      "tolerance": "1e-9 rel",
+      "source": "derived: technical spec 5.3, V = a^3 - pi r^2 a = 1000 - 90 pi",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "INS_KERNEL_SELFTEST_FAILED"
+    },
+    {
+      "id": "VC-INS-29",
+      "proves": [
+        "FR-INS-18",
+        "TR-INS-17"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "writesUnderInstallFolder",
+      "inputs": {
+        "vm": "vm-win11-locked",
+        "session": "doctor, save, autosave, quit"
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/win-install-check.ps1"
+    },
+    {
+      "id": "VC-INS-30",
+      "proves": [
+        "FR-INS-01"
+      ],
+      "priority": "SHOULD",
+      "driver": "install-vm",
+      "metric": "appImageLaunch",
+      "inputs": {
+        "vm": [
+          "vm-ubuntu-2204 + libfuse2",
+          "vm-ubuntu-2404 + libfuse2t64"
+        ]
+      },
+      "target": "22.04 runs with sandbox; 24.04 runs or shows the documented AppArmor message",
+      "unit": "pass/fail",
+      "tolerance": "exact",
+      "source": "R18, R29 (grade B); spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/posix-install-check.sh"
+    }
+  ]
+}

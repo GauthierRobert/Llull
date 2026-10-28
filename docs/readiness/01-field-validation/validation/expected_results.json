@@ -1,0 +1,694 @@
+{
+  "pack": "01-field-validation",
+  "gap": "PIL",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "readinessLevelDefault": "PRL5",
+  "cases": [
+    {
+      "id": "VC-PIL-01",
+      "proves": [
+        "FR-PIL-01",
+        "FR-PIL-02"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "participantsPerProfilePerRound",
+      "target": {
+        "op": ">=",
+        "value": {
+          "R1": 5,
+          "R2": 5,
+          "F_offices": 2
+        },
+        "disjoint": "R1,R2"
+      },
+      "unit": "participants",
+      "tolerance": "exact",
+      "source": "derived: README D1; R4, R5",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/moderator-guide.md"
+    },
+    {
+      "id": "VC-PIL-02",
+      "proves": [
+        "FR-PIL-03",
+        "TR-PIL-05"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "consentReviewedAndSigned",
+      "expected": {
+        "legalReview": "approved",
+        "signedBeforeFirstMeasure": 1,
+        "defaultUnticked": true
+      },
+      "unit": "share",
+      "tolerance": "exact",
+      "source": "R8, R9, R10, R11",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/consent-form.md",
+      "level": 4
+    },
+    {
+      "id": "VC-PIL-03",
+      "proves": [
+        "FR-PIL-04",
+        "FR-PIL-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "taskScriptsValid",
+      "target": {
+        "op": ">=",
+        "value": 8,
+        "per": "profile core tasks",
+        "fields": [
+          "start",
+          "goal",
+          "oracle",
+          "timeLimitMin",
+          "critical"
+        ],
+        "goalHasNoCommandNames": true
+      },
+      "unit": "tasks",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/pilot-tasks.json"
+    },
+    {
+      "id": "VC-PIL-04",
+      "proves": [
+        "FR-PIL-07",
+        "TR-PIL-11"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "analysisWorkedExamples",
+      "expected": {
+        "susAllThree": 50,
+        "susBest": 100,
+        "adjustedWald9of10": {
+          "p": 0.789,
+          "lower": 0.574,
+          "upper": 1
+        },
+        "geometricMean_60_120_240": 120,
+        "minSuccesses": {
+          "n40": 37,
+          "n48": 44
+        }
+      },
+      "unit": "mixed",
+      "tolerance": "1e-3",
+      "source": "R6, R26, R27; derived: README D2",
+      "grade": "A",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-05",
+      "proves": [
+        "FR-PIL-09",
+        "FR-PIL-11"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "recorderOffByDefault",
+      "expected": {
+        "enabled": false,
+        "metricsFiles": 0,
+        "badgeVisible": false
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "R11",
+      "grade": "A",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-06",
+      "proves": [
+        "FR-PIL-10",
+        "TR-PIL-04"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "contentLeaksInLog",
+      "inputs": {
+        "plan": "production scenario civil-site-development (23 calls) via --app",
+        "sentinel": "ZZSENTINEL"
+      },
+      "expected": 0,
+      "unit": "occurrences",
+      "tolerance": "exact",
+      "source": "R8, R10",
+      "grade": "A",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-07",
+      "proves": [
+        "FR-PIL-11",
+        "TR-PIL-10"
+      ],
+      "priority": "MUST",
+      "driver": "fault",
+      "metric": "nonLoopbackConnections",
+      "expected": 0,
+      "unit": "connections",
+      "tolerance": "exact",
+      "source": "spec budget (product directive, AF-41)",
+      "grade": "target",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-08",
+      "proves": [
+        "FR-PIL-12",
+        "TR-PIL-02",
+        "TR-PIL-08"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "diagnosticsToolsRegisteredAndDispatched",
+      "expected": {
+        "tools": [
+          "session_metrics_status",
+          "set_session_metrics",
+          "session_metrics_report",
+          "export_session_metrics",
+          "clear_session_metrics",
+          "mark_pilot_task"
+        ],
+        "uiWritesOutsideDispatch": 0
+      },
+      "unit": "tools",
+      "tolerance": "exact",
+      "source": "spec budget (architecture laws 1 and 5)",
+      "grade": "target",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-09",
+      "proves": [
+        "FR-PIL-12",
+        "TR-PIL-01"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "refusalCodes",
+      "expected": [
+        "PIL_METRICS_UNAVAILABLE",
+        "PIL_METRICS_CONSENT_REQUIRED",
+        "PIL_TASK_NOT_STARTED"
+      ],
+      "unit": "code",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "PIL_METRICS_UNAVAILABLE",
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-10",
+      "proves": [
+        "FR-PIL-13",
+        "TR-PIL-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "reportAggregatesCorrect",
+      "expected": {
+        "undo": 2,
+        "undoWithin10s": 1,
+        "taskDurationS": 90,
+        "civilRunRecords": 23,
+        "sumDurationLeWallTime": true
+      },
+      "unit": "mixed",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-11",
+      "proves": [
+        "FR-PIL-11",
+        "TR-PIL-06",
+        "TR-PIL-07"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "exportClearWithdraw",
+      "expected": {
+        "exportSchemaValid": true,
+        "filesAfterClear": 0,
+        "recordsAfterDisable": 0,
+        "pastEndDateFilesDeleted": true
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "R8 Art 5(1)(e), R9 Art 7(3)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/session-metrics.schema.json",
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-12",
+      "proves": [
+        "FR-PIL-13",
+        "TR-PIL-15"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "recorderOverheadP95",
+      "target": {
+        "op": "<=",
+        "value": 2
+      },
+      "unit": "ms",
+      "tolerance": "10%",
+      "source": "derived: README D7 from R23 (K = 0.2 s x 1 %)",
+      "grade": "target",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-13",
+      "proves": [
+        "FR-PIL-14",
+        "TR-PIL-09"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "rendererCrashCapturedLocally",
+      "baseline": "no handler, no record (S1, 2026-10-28)",
+      "expected": {
+        "minidump": true,
+        "crashEntrySource": "desktop-renderer",
+        "uploadAttempts": 0
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "S1, R22",
+      "grade": "A",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PIL-14",
+      "proves": [
+        "FR-PIL-15",
+        "TR-PIL-12"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "intakeToBoardDryRun",
+      "target": {
+        "intakeRows": 10,
+        "boardLines": 10,
+        "triageWorkingDays": {
+          "op": "<=",
+          "value": 2
+        }
+      },
+      "unit": "defects",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "data/defect-intake.csv",
+      "level": 4
+    },
+    {
+      "id": "VC-PIL-15",
+      "proves": [
+        "FR-PIL-16",
+        "TR-PIL-13"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "pilotIssueTargetPrivate",
+      "baseline": "https://github.com/GauthierRobert/Llull/issues/new (src/ui/report/issueDraft.ts:7)",
+      "expected": {
+        "githubLinksRendered": 0,
+        "participantCodeFieldAppWide": true
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "S1, R9",
+      "grade": "A",
+      "gating": true,
+      "level": 4
+    },
+    {
+      "id": "VC-PIL-16",
+      "proves": [
+        "FR-PIL-06",
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "realJobDeliverablesWithinTolerance",
+      "expected": {
+        "share": 1,
+        "civilTolerances": {
+          "padVolumesPct": 2,
+          "padLevelM": 0.05,
+          "roadVolumesPct": 5,
+          "stationsM": 0.01,
+          "pipeSizes": "identical",
+          "hglM": 0.05,
+          "surfaceLevelsM": 0.01,
+          "surfaceAreaPct": 0.5
+        }
+      },
+      "unit": "share",
+      "tolerance": "per signed sheet",
+      "source": "S2 (PILOT.md, spec budget)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-17",
+      "proves": [
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX1_completionAdjWaldLower95",
+      "target": {
+        "op": ">=",
+        "value": 0.78
+      },
+      "unit": "proportion",
+      "tolerance": "statistical (README D2)",
+      "source": "R25, R26; derived: README D2",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-18",
+      "proves": [
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX3a_susLower90",
+      "target": {
+        "op": ">=",
+        "value": 68
+      },
+      "unit": "SUS points",
+      "tolerance": "statistical (README D3: n=20 needs mean >= 74.9)",
+      "source": "R6, R12; derived: README D3",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-19",
+      "proves": [
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX3b_susMeanPerProfile",
+      "target": {
+        "op": ">=",
+        "value": 68
+      },
+      "unit": "SUS points",
+      "tolerance": "none",
+      "source": "R6",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-20",
+      "proves": [
+        "FR-PIL-07",
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX3c_seqMeanPerCoreTask",
+      "target": {
+        "op": ">=",
+        "value": 5.3
+      },
+      "unit": "SEQ (1-7)",
+      "tolerance": "none",
+      "source": "R7",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-21",
+      "proves": [
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX2a_civilTimeToFirstDeliverableGeoMean",
+      "target": {
+        "op": "<=",
+        "value": 45
+      },
+      "unit": "min",
+      "tolerance": "none",
+      "source": "S2 (PILOT.md budget); R27 (geometric mean)",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/pilot-tasks.json"
+    },
+    {
+      "id": "VC-PIL-22",
+      "proves": [
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX2b_realJobTimeRatioGeoMean",
+      "target": {
+        "op": "<=",
+        "value": 1
+      },
+      "unit": "ratio llull/incumbent",
+      "tolerance": "90% interval reported",
+      "source": "spec budget (TECHNICAL_SPEC Q3); R27",
+      "grade": "target",
+      "gating": true,
+      "plan": "data/field-log.csv"
+    },
+    {
+      "id": "VC-PIL-23",
+      "proves": [
+        "FR-PIL-08",
+        "FR-PIL-17"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX5_riskEventsAndOpenDefects",
+      "expected": {
+        "dataLossEvents": 0,
+        "openS4": 0,
+        "openS3": 0,
+        "openWrongResult": 0
+      },
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "spec budget; R2 (freedom from risk); R28 (bound reported)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-24",
+      "proves": [
+        "FR-PIL-17",
+        "FR-PIL-22"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "EX6_fieldProof",
+      "target": {
+        "issuedDeliverablesPerProfile": {
+          "op": ">=",
+          "value": 1
+        },
+        "continuationIntentShare": {
+          "op": ">",
+          "value": 0.5
+        }
+      },
+      "unit": "mixed",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-25",
+      "proves": [
+        "FR-PIL-19",
+        "TR-PIL-14"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "EX7_agentTrialsAtBaseline",
+      "baseline": "not run (PRODUCTION_GATE.md Results 2026-10)",
+      "target": {
+        "op": ">=",
+        "value": 0.6,
+        "trials": 3,
+        "scenarios": 5
+      },
+      "unit": "job score",
+      "tolerance": "exact",
+      "source": "S3 (agentBaseline 0.6)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-26",
+      "proves": [
+        "FR-PIL-18"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "pilotReportComplete",
+      "expected": {
+        "everyVcReported": true,
+        "rawDataSha256": true,
+        "pilotMdUpdated": true,
+        "marketReadinessUpdated": true
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-27",
+      "proves": [
+        "FR-PIL-20"
+      ],
+      "priority": "SHOULD",
+      "driver": "review",
+      "metric": "advisoryGroupStarted",
+      "expected": {
+        "charter": true,
+        "membersPerProfile": 1,
+        "firstMeetingMonthsAfterF": 3
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "R18",
+      "grade": "C",
+      "gating": false
+    },
+    {
+      "id": "VC-PIL-28",
+      "proves": [
+        "FR-PIL-21"
+      ],
+      "priority": "SHOULD",
+      "driver": "field",
+      "metric": "longitudinalTimeRatioNonIncreasing",
+      "target": {
+        "op": "<=",
+        "value": "ratio at F week 1"
+      },
+      "unit": "ratio",
+      "tolerance": "none",
+      "source": "R19 (learning curve); spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PIL-29",
+      "proves": [
+        "FR-PIL-22"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "fieldSafetyPrerequisites",
+      "expected": {
+        "pinnedPreRelease": true,
+        "dsfGateGreen": true,
+        "insGateGreen": true,
+        "masterOfRecordClause": true
+      },
+      "unit": "state",
+      "tolerance": "exact",
+      "source": "R15",
+      "grade": "A",
+      "gating": true,
+      "level": 4
+    },
+    {
+      "id": "VC-PIL-30",
+      "proves": [
+        "FR-PIL-23"
+      ],
+      "priority": "COULD",
+      "driver": "field",
+      "metric": "klmRatioPerFragment",
+      "expected": "TBD — measure with scripts/pilot/analyse.mjs on R2 data",
+      "unit": "ratio",
+      "tolerance": "flag > 2",
+      "source": "R23",
+      "grade": "target",
+      "gating": false
+    },
+    {
+      "id": "VC-PIL-31",
+      "proves": [
+        "FR-PIL-08"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "severityRaterDisagreementsS3S4Unresolved",
+      "expected": 0,
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R21",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/defect-taxonomy.md",
+      "level": 4
+    },
+    {
+      "id": "VC-PIL-32",
+      "proves": [
+        "FR-PIL-07"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "instrumentCompleteness",
+      "expected": {
+        "tlxOnCriticalAttempts": 1,
+        "seqOnAttempts": 1
+      },
+      "unit": "share",
+      "tolerance": "exact",
+      "source": "R7, R13",
+      "grade": "target",
+      "gating": true
+    }
+  ]
+}

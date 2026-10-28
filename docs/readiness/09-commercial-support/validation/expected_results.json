@@ -1,0 +1,859 @@
+{
+  "pack": "09-commercial-support",
+  "gap": "COM",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "defaultLevel": 4,
+  "baseline": {
+    "registeredCommands": 865,
+    "toolsets": 33,
+    "commandsWithReferencePage": 0,
+    "uiTsxFiles": 240,
+    "literalUiStringsLowerBound": 615,
+    "licence": "none (removed LC1 step 3)",
+    "eula": "none",
+    "securityMd": "none",
+    "sbom": "none",
+    "source": "M1"
+  },
+  "cases": [
+    {
+      "id": "VC-COM-01",
+      "proves": [
+        "FR-COM-01",
+        "FR-COM-02",
+        "FR-COM-04",
+        "TR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "airGappedActivation",
+      "inputs": "VM network disabled; license request -> issuer elsewhere -> license import",
+      "target": {
+        "op": "==",
+        "value": "LIC_OK full mode"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; pattern R1 R5 R6",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_OK",
+      "plan": "plans/air_gapped_activation.md"
+    },
+    {
+      "id": "VC-COM-02",
+      "proves": [
+        "FR-COM-02",
+        "FR-COM-03",
+        "TR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "tamperedLicenceCode",
+      "inputs": "1 byte flipped in payload, then in signature",
+      "target": {
+        "op": "==",
+        "value": "LIC_INVALID_SIGNATURE / read-only"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_INVALID_SIGNATURE"
+    },
+    {
+      "id": "VC-COM-03",
+      "proves": [
+        "FR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "unknownKeyOrAlgRefused",
+      "inputs": "unknown keyId; extra alg field",
+      "target": {
+        "op": "==",
+        "value": "LIC_INVALID_SIGNATURE; alg ignored"
+      },
+      "tolerance": "exact",
+      "source": "R5",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_INVALID_SIGNATURE"
+    },
+    {
+      "id": "VC-COM-04",
+      "proves": [
+        "FR-COM-04"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "machineMismatchCode",
+      "inputs": "licence of VM A copied to VM B",
+      "target": {
+        "op": "==",
+        "value": "LIC_MACHINE_MISMATCH; request file holds only a 64-hex machine hash"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; R14 Art 25",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_MACHINE_MISMATCH",
+      "plan": "plans/air_gapped_activation.md"
+    },
+    {
+      "id": "VC-COM-05",
+      "proves": [
+        "FR-COM-06",
+        "TR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "clockSetBackHandling",
+      "inputs": "session at T, clock set to T-30d",
+      "target": {
+        "op": "==",
+        "value": "LIC_CLOCK_ANOMALY, full for 14 d grace, then read-only; data actions always allowed"
+      },
+      "unit": "days",
+      "tolerance": "clock tolerance 48 h",
+      "source": "spec budget (TECHNICAL_SPEC §8); R5",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_CLOCK_ANOMALY",
+      "plan": "plans/air_gapped_activation.md"
+    },
+    {
+      "id": "VC-COM-06",
+      "proves": [
+        "FR-COM-07",
+        "FR-COM-03",
+        "TR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "termExpiryStates",
+      "inputs": "clock at E-31d, E-30d, E+1d, E+14d, E+15d",
+      "expected": [
+        "LIC_OK",
+        "LIC_EXPIRING",
+        "LIC_GRACE",
+        "LIC_GRACE",
+        "LIC_EXPIRED"
+      ],
+      "target": {
+        "op": "==",
+        "value": "sequence as expected; read-only only at E+15d"
+      },
+      "unit": "days",
+      "tolerance": "exact (UTC day boundaries)",
+      "source": "spec budget (TECHNICAL_SPEC §8)",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_EXPIRED"
+    },
+    {
+      "id": "VC-COM-07",
+      "proves": [
+        "FR-COM-07",
+        "TR-COM-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "maintenanceVsBuildDate",
+      "inputs": "perpetual, maintenanceUntil M; builds M-1d, M+1d",
+      "target": {
+        "op": "==",
+        "value": "M-1: LIC_OK; M+1: LIC_MAINTENANCE_EXPIRED_FOR_BUILD read-only"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; model R1 R2",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_MAINTENANCE_EXPIRED_FOR_BUILD"
+    },
+    {
+      "id": "VC-COM-08",
+      "proves": [
+        "FR-COM-03",
+        "FR-COM-10",
+        "TR-COM-01"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "readOnlyMatrixAllCommands",
+      "inputs": "every registered command (865 at baseline) via backend route, CLI local, renderer local mode with a read-only entitlement port",
+      "target": {
+        "op": "==",
+        "value": "allowed = readOnly ∪ dataSafety on all 3 paths; others LIC_READ_ONLY, document unchanged, no featureHistory append"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_READ_ONLY",
+      "level": 2
+    },
+    {
+      "id": "VC-COM-09",
+      "proves": [
+        "FR-COM-08",
+        "TR-COM-13"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "licenceStatusParity",
+      "inputs": "each state of VC-COM-06",
+      "target": {
+        "op": "==",
+        "value": "CLI --json fields and Help > Licence show same code, daysLeft, remediation"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-10",
+      "proves": [
+        "FR-COM-05",
+        "TR-COM-09"
+      ],
+      "priority": "SHOULD",
+      "driver": "install-vm",
+      "metric": "floatingLeaseBehaviour",
+      "inputs": "server 2 seats, 3 clients; server stopped; borrow 7 d off-LAN",
+      "target": {
+        "op": "==",
+        "value": "3rd client LIC_SEATS_EXHAUSTED; full until lease TTL 15 min then read-only, no data loss; borrow full 7 d then LIC_BORROW_EXPIRED"
+      },
+      "unit": "min",
+      "tolerance": "TTL ± 1 min",
+      "source": "spec budget; R4 (30 d borrow cap comparable)",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_SEATS_EXHAUSTED"
+    },
+    {
+      "id": "VC-COM-11",
+      "proves": [
+        "FR-COM-09",
+        "TR-COM-01"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "entitlementRefusal",
+      "inputs": "edition without the analysis toolset",
+      "target": {
+        "op": "==",
+        "value": "mutating analysis commands LIC_NOT_ENTITLED; queries run; toToolSchemas byte-equal to full edition"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LIC_NOT_ENTITLED"
+    },
+    {
+      "id": "VC-COM-12",
+      "proves": [
+        "FR-COM-11",
+        "TR-COM-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "releaseCheckBump",
+      "inputs": "param removed; enum value removed; optional param added; new command; description edit",
+      "expected": [
+        "major",
+        "major",
+        "minor",
+        "minor",
+        "patch"
+      ],
+      "tolerance": "exact",
+      "source": "R17",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-13",
+      "proves": [
+        "FR-COM-12"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "compatCorpusReplayHash",
+      "inputs": "tests/golden/compat/<v>/ for every release >= 1.0.0",
+      "target": {
+        "op": "==",
+        "value": "load without warning; replay hash equal"
+      },
+      "tolerance": "exact",
+      "source": "spec budget (corpus starts at 1.0.0)",
+      "grade": "target",
+      "gating": true,
+      "level": 2
+    },
+    {
+      "id": "VC-COM-14",
+      "proves": [
+        "FR-COM-12"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "newerDocumentRefusal",
+      "inputs": "document version = current + 1",
+      "target": {
+        "op": "==",
+        "value": "DOC_NEWER_VERSION; nothing written; no down-conversion"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "DOC_NEWER_VERSION",
+      "level": 2
+    },
+    {
+      "id": "VC-COM-15",
+      "proves": [
+        "FR-COM-13",
+        "TR-COM-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "deprecationWindow",
+      "inputs": "deprecated in N; removal attempted in N+1 and in N+2 major after 6 months",
+      "target": {
+        "op": "==",
+        "value": "CMD_DEPRECATED with replacement; N+1 removal fails release:check; major passes"
+      },
+      "tolerance": "exact",
+      "source": "R17 + spec budget (2 minors, 6 months)",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "CMD_DEPRECATED"
+    },
+    {
+      "id": "VC-COM-16",
+      "proves": [
+        "FR-COM-14",
+        "FR-COM-35"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "supportPeriodYears",
+      "inputs": "llull version --json; About; docs",
+      "target": {
+        "op": ">=",
+        "value": 5
+      },
+      "unit": "years after first release of the major line",
+      "tolerance": "same date in all three places",
+      "source": "R11 Art 13(8)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-17",
+      "proves": [
+        "FR-COM-15",
+        "TR-COM-07"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "signedOfflineUpdate",
+      "inputs": "signed installer + manifest on LAN share, VM offline; altered byte; older version",
+      "target": {
+        "op": "==",
+        "value": "installs from share; altered REL_SIGNATURE_INVALID; older REL_DOWNGRADE"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; R11 Annex I Part II (7)(8)",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "REL_SIGNATURE_INVALID",
+      "level": 1
+    },
+    {
+      "id": "VC-COM-18",
+      "proves": [
+        "FR-COM-16",
+        "TR-COM-08"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "sbomCoverage",
+      "inputs": "release candidate SBOM vs direct deps of root, server/, desktop/, solver/ crates, bundled Python",
+      "target": {
+        "op": "==",
+        "value": "valid CycloneDX JSON; set equality with direct dependencies; notices list same components"
+      },
+      "tolerance": "exact set equality",
+      "source": "R11 Annex I Part II (1); R18",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-19",
+      "proves": [
+        "FR-COM-17",
+        "FR-COM-33",
+        "TR-COM-06"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "bundleRedactionLeaks",
+      "inputs": "bundle after forced failure, default options",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "occurrences of home path / user / host / e-mail / token / licence signature; plus no document/ by default; manifest hashes match; preview = saved bytes",
+      "tolerance": "exact",
+      "source": "spec budget; R14 Art 25",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-20",
+      "proves": [
+        "FR-COM-18",
+        "FR-COM-19"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "supportDrillTurnaround",
+      "inputs": "3 seeded defects S1, S2, S4 via bundle + draft",
+      "target": "each within the owner's tier targets (TBD — owner); each reproduced from the bundle alone",
+      "unit": "hours",
+      "tolerance": "per tier",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/support_drill.md"
+    },
+    {
+      "id": "VC-COM-21",
+      "proves": [
+        "FR-COM-20",
+        "FR-COM-35"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "securityTxtValid",
+      "inputs": "product-site security.txt, SECURITY.md, About",
+      "target": {
+        "op": "<",
+        "value": 365,
+        "field": "Expires days ahead"
+      },
+      "unit": "days",
+      "tolerance": "Contact present; Expires once; OpenPGP-signed; Canonical present; SPOC identical in 3 places",
+      "source": "R20; R11 Annex II (2)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-22",
+      "proves": [
+        "FR-COM-21"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "craReportingTabletop",
+      "inputs": "simulated actively exploited vulnerability at T0",
+      "expected": {
+        "earlyWarningHours": 24,
+        "notificationHours": 72,
+        "finalReportDaysAfterFix": 14
+      },
+      "target": {
+        "op": "<=",
+        "value": {
+          "earlyWarningHours": 24,
+          "notificationHours": 72,
+          "finalReportDaysAfterFix": 14
+        }
+      },
+      "unit": "h / d",
+      "tolerance": "exact limits",
+      "source": "R10 Art 14(2)",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/support_drill.md"
+    },
+    {
+      "id": "VC-COM-23",
+      "proves": [
+        "FR-COM-22",
+        "FR-COM-25",
+        "TR-COM-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "helpCoverage",
+      "inputs": "registry (865 commands at baseline)",
+      "baseline": 0,
+      "target": {
+        "op": "==",
+        "value": 100
+      },
+      "unit": "% commands with page, all params described, >= 1 valid example, failure codes declared; every toolset >= 1 how-to",
+      "tolerance": "exact",
+      "source": "spec budget; baseline M1",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "HELP_PAGE_MISSING"
+    },
+    {
+      "id": "VC-COM-24",
+      "proves": [
+        "FR-COM-22",
+        "FR-COM-24",
+        "TR-COM-04"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "offlineHelpAndF1",
+      "inputs": "network disabled; F1 on draw_polyline; search 'fillet'",
+      "target": {
+        "op": "==",
+        "value": "page opens offline; fillet commands ranked first"
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-25",
+      "proves": [
+        "FR-COM-23"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "diataxisSetPerPersona",
+      "inputs": "docs/user/en/ for civil, steel, plant, mechanical",
+      "target": {
+        "op": ">=",
+        "value": {
+          "tutorials": 1,
+          "howTo": 5,
+          "explanationTopics": 5
+        }
+      },
+      "unit": "pages per persona",
+      "tolerance": "presence exact",
+      "source": "R23 + spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-26",
+      "proves": [
+        "FR-COM-26",
+        "FR-COM-30",
+        "TR-COM-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "uiCatalogueCompleteness",
+      "inputs": "npm run i18n:check",
+      "baseline": {
+        "literalUiStrings": 615
+      },
+      "target": {
+        "op": "==",
+        "value": {
+          "literalUiStrings": 0,
+          "frCoveragePct": 100,
+          "nlCoveragePct": 100,
+          "placeholderMismatches": 0
+        }
+      },
+      "tolerance": "exact (de 100 % at V1)",
+      "source": "spec budget; baseline M1",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "I18N_KEY_MISSING"
+    },
+    {
+      "id": "VC-COM-27",
+      "proves": [
+        "FR-COM-30"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "pseudoLocaleDefects",
+      "inputs": "en-XA pseudo-locale, every dialog and panel",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "untranslated or clipped strings",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-28",
+      "proves": [
+        "FR-COM-27",
+        "TR-COM-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "localeNumberFormatParse",
+      "inputs": "formatNumber(12345.678, l, 3); parse '1,5' fr-BE, '1.5' fr-BE, '1,234' en-GB; saved document",
+      "expected": {
+        "en-GB": "12,345.678",
+        "fr-BE": "12 345,678",
+        "nl-BE": "12.345,678",
+        "de-BE": "12.345,678",
+        "parse_fr-BE_1,5": 1.5,
+        "parse_fr-BE_1.5": 1.5,
+        "parse_en-GB_1,234": "NUM_AMBIGUOUS_SEPARATOR",
+        "documentDecimal": "."
+      },
+      "tolerance": "exact strings",
+      "source": "R25 (measured Node 24.16.0, ICU 78.3, CLDR 48)",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "NUM_AMBIGUOUS_SEPARATOR"
+    },
+    {
+      "id": "VC-COM-29",
+      "proves": [
+        "FR-COM-28"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "jsonByteIdentityAcrossLanguages",
+      "inputs": "same failing command, LLULL_LANG=fr vs en, --json; UI locale fr",
+      "target": {
+        "op": "==",
+        "value": "stdout byte-identical; UI shows French message + unchanged code"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; AGENT_FIRST AF-11",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-30",
+      "proves": [
+        "FR-COM-29"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "helpTranslationCoverage",
+      "inputs": "help i18n coverage report (V1)",
+      "target": {
+        "op": "==",
+        "value": 100
+      },
+      "unit": "% fr and nl descriptions of commands in UI palette toolsets",
+      "tolerance": "exact; fallback marker shown when missing",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-31",
+      "proves": [
+        "FR-COM-31"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "licenceAgreementReviewed",
+      "inputs": "EULA or licence + support agreement in EN/FR/NL/DE; installer acceptance; LICENSE file and package.json license field",
+      "target": "counsel record accept; installer requires acceptance; files consistent",
+      "tolerance": "exact",
+      "source": "spec budget; owner + counsel",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-32",
+      "proves": [
+        "FR-COM-32",
+        "TR-COM-10"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "disclaimerInEveryReport",
+      "inputs": "every report exporter on a fixture",
+      "target": {
+        "op": "==",
+        "value": 100
+      },
+      "unit": "% exporters whose output carries the disclaimer in the UI locale",
+      "tolerance": "exact",
+      "source": "spec budget; R13 Art 15 context",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-33",
+      "proves": [
+        "FR-COM-34",
+        "FR-COM-35",
+        "FR-COM-14",
+        "FR-COM-16",
+        "FR-COM-20",
+        "FR-COM-21",
+        "TR-COM-11"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "craChecklistEvidence",
+      "inputs": "plans/cra_checklist.json",
+      "target": {
+        "op": "==",
+        "value": 100
+      },
+      "unit": "% items with evidence and counsel accept",
+      "tolerance": "exact",
+      "source": "R10 R11",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/cra_checklist.json"
+    },
+    {
+      "id": "VC-COM-34",
+      "proves": [
+        "FR-COM-36",
+        "TR-COM-12"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "residualFilesAfterReset",
+      "inputs": "full session then llull reset --all --yes",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "files left under user-data llull/ and ~/.llull/ (user documents excluded)",
+      "tolerance": "exact",
+      "source": "R11 Annex I Part I (2)(m)",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/air_gapped_activation.md"
+    },
+    {
+      "id": "VC-COM-35",
+      "proves": [
+        "FR-COM-37",
+        "FR-COM-38"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "accessibilityViolations",
+      "inputs": "axe-core on every dialog/panel; keyboard-only first-part tutorial; ACR review",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "serious/critical axe violations; tutorial completed without pointer; ACR reviewed",
+      "tolerance": "exact",
+      "source": "spec budget; R16 (clause text not read)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-36",
+      "proves": [
+        "FR-COM-39",
+        "FR-COM-40"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "examGrading",
+      "inputs": "exam set with reference answer and seeded wrong answer",
+      "target": {
+        "op": "==",
+        "value": "reference 100 %; wrong answer fails the broken item"
+      },
+      "tolerance": "exact",
+      "source": "spec budget; PRODUCTION_GATE oracles",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-37",
+      "proves": [
+        "FR-COM-41",
+        "FR-COM-01",
+        "FR-COM-15",
+        "TR-COM-07"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "outboundConnectionAttempts",
+      "inputs": "full COM session with outbound firewall log; no update source configured",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "connection attempts",
+      "tolerance": "exact",
+      "source": "spec budget; LC1; AF-41",
+      "grade": "target",
+      "gating": true,
+      "plan": "plans/air_gapped_activation.md",
+      "level": 1
+    },
+    {
+      "id": "VC-COM-38",
+      "proves": [
+        "FR-COM-32"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "pldLiabilityReview",
+      "inputs": "EULA warranty/liability + disclaimer vs PLD Art 2, 4, 6, 15 and Belgian contract law",
+      "target": "counsel record accept or accept-with-conditions",
+      "tolerance": "—",
+      "source": "R13 (text); interpretation counsel",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-39",
+      "proves": [
+        "FR-COM-33",
+        "FR-COM-04",
+        "FR-COM-17"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "gdprPrivacyReview",
+      "inputs": "privacy notice + data inventory (licence request/file, bundle items, support records)",
+      "target": "counsel record accept; inventory equals VC-COM-19 manifest fields",
+      "tolerance": "—",
+      "source": "R14 (text); interpretation counsel",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-COM-40",
+      "proves": [
+        "FR-COM-26"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "osLanguageDefault",
+      "inputs": "OS language nl-BE first run; switch to fr; restart",
+      "target": {
+        "op": "==",
+        "value": "Dutch UI first run; French after switch, persisted; codes unchanged"
+      },
+      "tolerance": "exact",
+      "source": "R24",
+      "grade": "target",
+      "gating": true
+    }
+  ]
+}

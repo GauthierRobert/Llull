@@ -1,0 +1,55 @@
+# 03 PRF — Sources
+
+Grades ([`../../../plant/TEMPLATE.md`](../../../plant/TEMPLATE.md)): **A** primary source read, reference code run, measured
+in llull, or ≥ 2 independent sources agree; **B** one secondary extract, or a primary page seen only through a search
+extract (JavaScript-rendered help pages); **C** located, numbers not confirmed. Accessed 2026-10-28. Only grade A values
+and closed forms gate pass / fail; budgets derived from them are spec budgets (`grade: target`).
+
+## External
+
+| Id | Source | URL | Taken | How checked | Grade |
+| -- | ------ | --- | ----- | ----------- | ----- |
+| S1 | RAIL model — web.dev | https://web.dev/articles/rail | perception: 0–16 ms smooth (60 fps), 0–100 ms immediate, 100–1000 ms natural, > 1 s focus lost, > 10 s abandon; goals: response within 100 ms (process input within 50 ms), frame in 10 ms (browser overhead), idle work in ≤ 50 ms chunks, interactive < 5 s, repeat load < 2 s | page read | A |
+| S2 | Response Times: The 3 Important Limits — NN/g | https://www.nngroup.com/articles/response-times-3-important-limits/ | 0.1 s instantaneous; 1 s flow of thought; 10 s attention limit; percent-done indicator for operations > ~10 s; busy cursor for 2–10 s | page read | A |
+| S3 | About Express Mode — Inventor 2025 Help | https://help.autodesk.com/cloudhelp/2025/ENU/Inventor-Help/files/GUID-34C9AE4C-EDA7-4E46-AD51-3383A67FF1B9.htm | Express loads "only component cached graphics"; "significantly faster (3-5x) file open times for large assemblies"; some commands excluded; threshold "Open Express when referenced unique files exceeds" | page read | A |
+| S4 | System Hardware and Large Assemblies — Inventor 2022 Help | https://help.autodesk.com/cloudhelp/2022/ENU/Inventor-Help/files/GUID-D6B5DFF4-7888-4A66-BCA4-380050EF8366.htm | "at least 24 GB RAM for a large assembly with more than 1000 unique parts"; "about 7000 [unique parts] … 64 GB"; "DirectX11 graphics card with at least 4GB of video RAM"; SSDs reduce open / save time | page read | A |
+| S5 | Large Assembly Mode — SOLIDWORKS Help | https://help.solidworks.com/2017/English/SolidWorks/sldworks/r_Large_Assembly_Mode_SWassy.htm | collection of settings applied above a user-set component threshold (System Options > Assemblies); lightweight components keep a subset of model data in memory | page is JavaScript-rendered; content from search extracts of the help pages | B |
+| S6 | Large Design Review — SOLIDWORKS Help; GoEngineer | https://help.solidworks.com/2017/English/SolidWorks/sldworks/HIDD_DIALOG_LDR_WARNING.htm ; https://www.goengineer.com/blog/open-large-assemblies-in-solidworks | review mode: measure, pan, rotate; mates / features not loaded; open as lightweight or resolved to edit | search extracts | B |
+| S7 | SOLIDWORKS 2025 hardware recommendations — Javelin; Solid Solutions | https://www.javelin-tech.com/blog/2024/09/solidworks-2025-hardware-recommendations/ ; https://www.solidsolutions.co.uk/the-best-hardware-for-solidworks-in-2025/ | 16 GB minimum, 32 GB recommended; SSD recommended | search extracts of two resellers (pages 403 / timeout; dassault page timed out) | B |
+| S8 | Hardware Recommendations for SOLIDWORKS — Puget Systems | https://www.pugetsystems.com/solutions/cad-workstations/solidworks/hardware-recommendations/ | aims for "smooth frame rates (>30fps)"; large assemblies "over 10 million triangles"; RAM ≈ 20 × largest assembly + 5 GB | page read (vendor) | B |
+| S9 | Navisworks Display page / Performance tab — Autodesk Help | https://help.autodesk.com/cloudhelp/2024/ENU/Navisworks/files/GUID-B470F105-8626-44FF-B531-8864FBD79CDA.htm | Guarantee Frame Rate: items ranked by size and distance, dropped during navigation, drawn when it stops; default 6 fps target, range 1–60; occlusion culling helps when much of the model is hidden | search extracts of the help pages | B |
+| S10 | Navisworks Native File Formats — Autodesk Help | https://help.autodesk.com/cloudhelp/2020/ENU/Navisworks/files/GUID-C6936A0B-1597-4880-83F9-7041894A4204.htm | NWD "compress the CAD data by up to 80% of the original size" | search extract | B |
+| S11 | -GRAPHICSCONFIG — AutoCAD Help | https://help.autodesk.com/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-0A5B89D1-0A3F-4895-8392-4FAF876D5048.htm | adaptive degradation turns off / minimizes display effects below a minimum fps | search extract | B |
+| S12 | Large assembly performance — Onshape blog / forum | https://www.onshape.com/en/blog/large-assembly-performance-cloud-native-cad-pdm | mate count drives slowdowns; instanced parts raise triangle counts | search extract; context only | C |
+| S13 | `BatchedMesh.js` — three.js (dev branch) | https://github.com/mrdoob/three.js/blob/dev/src/objects/BatchedMesh.js | "multi draw batch rendering"; `perObjectFrustumCulled = true`, `sortObjects = true` by default; constructor `(maxInstanceCount, maxVertexCount, maxIndexCount = maxVertexCount * 2, material)` | source read (raw file) | A |
+| S14 | InstancedMesh / BatchedMesh docs — three.js | https://threejs.org/docs/pages/InstancedMesh.html ; https://threejs.org/docs/pages/BatchedMesh.html | instancing API (`setMatrixAt`, `setColorAt`); as cited in 08 ASC R19 | 08 ASC sources | A |
+| S15 | three-mesh-bvh README | https://github.com/gkjohnson/three-mesh-bvh | BVH raycasting; "500 rays against an 80,000 polygon model at 60fps" (no conditions given); `computeBatchedBoundsTree` for BatchedMesh; `MeshBVH.serialize/deserialize`; `GenerateMeshBVHWorker`, `ParallelMeshBVHWorker` (needs SharedArrayBuffer) | page read | A |
+| S16 | meshoptimizer README | https://github.com/zeux/meshoptimizer | `meshopt_simplify` with target index count and relative `target_error` (fraction of mesh extents), returns resulting error; vertex cache / overdraw optimizers; quantization; MIT licence | page read | A |
+| S17 | EXT_meshopt_compression | https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_meshopt_compression/README.md | buffer-view compression; decoders "~1 GB/sec" with WASM SIMD (claim, no benchmark); output designed to be compressed further by general-purpose compressors | page read | A (claim reported as claim) |
+| S18 | KHR_draco_mesh_compression | https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_draco_mesh_compression/README.md | Draco in glTF; may change vertex order and count; `extensionsRequired` rules | page read | A |
+| S19 | glTF 2.0 specification — Khronos | https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html | buffers referenced by URI, or embedded as data URIs, or in a GLB binary chunk | first part of the page read | A |
+| S20 | RFC 8878 Zstandard — IETF | https://www.rfc-editor.org/rfc/rfc8878 | lossless; larger window improves ratio at a memory cost; dictionaries optional | abstract and sections read | A |
+| S21 | Mesh user guide — Open CASCADE 7.9 | https://occt3d.com/dev/doc/overview/html/occt_user_guides__mesh.html | linear deflection = curve–tessellation distance (absolute); angular deflection, 12–20° typical; relative mode scales by model size; parallel edge discretization; "small values may result in a too huge mesh"; example `Angle = 0.5`, `Relative = false`, `InParallel = true` | page read | A |
+| S22 | BRepMesh_IncrementalMesh reference — Open CASCADE | https://dev.opencascade.org/doc/refman/html/class_b_rep_mesh___incremental_mesh.html | `isRelative` scales linear deflection per edge size; 7.9 constructor takes `IMeshTools_Parameters` | search extract of reference pages | B |
+| S23 | Command line switches — Electron | https://www.electronjs.org/docs/latest/api/command-line-switches | `--js-flags` passes flags to V8 and must be given at startup; no heap-size statement | page read | A |
+| S24 | Electron and the V8 Memory Cage — Electron blog | https://www.electronjs.org/blog/v8-memory-cage | "the V8 heap is limited to a maximum size of 4GB" (pointer compression, Electron ≥ 14; memory cage Electron 21); ArrayBuffers must live inside the cage | page read | A |
+| S25 | `String::kMaxLength` — V8 `v8-primitive.h` (nodesource docs); MDN String length | https://v8docs.nodesource.com/node-24.1/d3/db9/v8-primitive_8h_source.html ; https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/length | 64-bit limit `(1 << 29) - 24` characters; MDN example agrees | search extracts of both (two sources agree; not opened) | B |
+| S26 | WebGL2RenderingContext.beginQuery — MDN | https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/beginQuery | `ANY_SAMPLES_PASSED(_CONSERVATIVE)` occlusion queries; asynchronous | page read | A |
+| S27 | NIST MBE PMI test models — NIST | https://www.nist.gov/el/systems-integration-division-73400/mbe-pmi-validation-and-conformance-testing/download-free-cad | FTC 06–11, STC, CTC 01–05 in STEP AP242 / AP203 and native CAD; "can be used without any restrictions", acknowledgement requested | page read | A |
+| S28 | ABC dataset — Koch et al., CVPR 2019 | https://openaccess.thecvf.com/content_CVPR_2019/html/Koch_ABC_A_Big_CAD_Model_Dataset_for_Geometric_Deep_Learning_CVPR_2019_paper.html | ~1 M CAD models (Onshape-sourced, parametric curves / surfaces); archive lists MIT licence, copyright with the creators | search extract of the abstract and archive page | B |
+
+Not found: an official Fusion large-design performance page, and the official SOLIDWORKS / Inventor 2026 system
+requirement pages (403 / timeout from this machine). No llull value is taken from a C source.
+
+## Measured or derived in llull
+
+| Id | What | Value | Where / how | Grade |
+| -- | ---- | ----- | ----------- | ----- |
+| M1 | `part-11752` STEP open | 12–21 s; 44 MB document; ≈ 350 B/triangle (≈ 125k triangles) | [`../../../QUALITY_GATES.md`](../../../QUALITY_GATES.md) proposed gate 2 | A |
+| M2 | Bytes per triangle of today's storage | 168.2 (step params) + 188.0 (entity) = 356.2 B/triangle | Node, 100,000 random triangles in ±100 mm, `JSON.stringify` of both shapes (2026-10-28; TECHNICAL_SPEC §1.2) | A (derived, reproducible) |
+| M3 | Large STEP imports fail | `kuka-kr600` (~860k triangles), `rc-buggy-suspension` (211 parts, ~1.2 M) fail `imports`: bridge reply > 128 MB at ~0.8 M triangles | QUALITY_GATES defect 2; `server/src/pythonExchange.ts:19` | A |
+| M4 | Fine tessellation kills the bridge | `syn-huge-sphere` (R 10 m, 0.05 mm) all checks fail; `fc-nema17-connector` 114 MB document, 79k triangles per M2.5 thread | QUALITY_GATES defect 13 | A |
+| M5 | Indexed glTF size | 15.9–17.5 B/triangle | [`../../../decisions/LIM1-scale.md`](../../../decisions/LIM1-scale.md) | A |
+| M6 | Asset-backed large mesh | 1,310,720-triangle mesh: document 1.8 MB (reference + 50k LOD), import 4.1 s | 07 MSH TECHNICAL_SPEC §13.5.3 | A |
+| M7 | Reference machine | Core Ultra 9 185H 16C/22T, 31.4 GB, RTX 4080 Laptop + Arc iGPU, Windows 11 10.0.26200 | `Get-CimInstance` 2026-10-28 | A |
+| M8 | Corpus pins | URLs, sha256, bytes, licences | [`../../../../quality/corpus.json`](../../../../quality/corpus.json), copied into `data/perf_corpus.json` | A |

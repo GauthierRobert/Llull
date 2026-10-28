@@ -1,0 +1,12 @@
+{
+  "id": "SC-XCH-PDF-1",
+  "validates": ["VC-XCH-130", "VC-XCH-131", "VC-XCH-132", "VC-XCH-133"],
+  "description": "A 100 x 10 x 10 mm box on an A3 sheet at 1:1, front view: the PDF must hold a 100 mm vector edge (283.465 pt), an A3 MediaBox, embedded fonts and one OCG per layer; with pdfa=2b it must validate",
+  "unbuilt": ["export_pdf"],
+  "actions": [
+    { "command": "add_box", "params": { "size": [100, 10, 10], "position": [0, 0, 0] } },
+    { "command": "create_sheet", "params": { "name": "Scale check", "paper": "A3", "scale": 1, "title": "XCH scale check", "date": "2026-10-28", "views": ["front"] } },
+    { "command": "export_pdf", "params": { "sheetIds": "all", "layers": true, "fonts": "embed" } },
+    { "command": "export_pdf", "params": { "sheetIds": "all", "layers": true, "fonts": "embed", "pdfa": "2b" } }
+  ]
+}

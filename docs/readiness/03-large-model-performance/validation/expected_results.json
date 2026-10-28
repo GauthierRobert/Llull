@@ -1,0 +1,715 @@
+{
+  "pack": "03-large-model-performance",
+  "gap": "PRF",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "office-min",
+  "baselineProfile": "ref-win11",
+  "defaultLevel": 2,
+  "corpus": "data/perf_corpus.json",
+  "cases": [
+    {
+      "id": "VC-PRF-01",
+      "proves": [
+        "FR-PRF-01",
+        "TR-PRF-01"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "corpusCoverage",
+      "target": "every (T1,T2) x persona cell has >= 1 model; every pinned sha256 matches",
+      "tolerance": "exact",
+      "source": "spec budget; M8",
+      "grade": "target",
+      "gating": true,
+      "plan": "data/perf_corpus.json"
+    },
+    {
+      "id": "VC-PRF-02",
+      "proves": [
+        "FR-PRF-02",
+        "TR-PRF-14"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "openFirstFrameMs.T1",
+      "inputs": [
+        "part-11752",
+        "as1-oc-214",
+        "fc-arduino-mega",
+        "kuka-kr600",
+        "gen-civil-t1"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 2000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: S1 repeat load < 2 s (TECHNICAL_SPEC 8.2)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-03",
+      "proves": [
+        "FR-PRF-02",
+        "TR-PRF-14"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "openFullResMs.T1",
+      "inputs": [
+        "part-11752",
+        "as1-oc-214",
+        "fc-arduino-mega",
+        "kuka-kr600",
+        "gen-civil-t1"
+      ],
+      "baseline": {
+        "part-11752": [
+          12000,
+          21000
+        ]
+      },
+      "target": {
+        "op": "<=",
+        "value": 5000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: S1 interactive < 5 s; baseline M1",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-04",
+      "proves": [
+        "FR-PRF-02",
+        "TR-PRF-14",
+        "TR-PRF-15"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "openFirstFrameMs.T2",
+      "inputs": [
+        "gen-mech-t2",
+        "gen-plant-t2",
+        "gen-steel-t2",
+        "gen-civil-t2",
+        "rc-buggy-suspension"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 5000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: S1 interactive < 5 s",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-05",
+      "proves": [
+        "FR-PRF-02",
+        "TR-PRF-14"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "openFullResMs.T2",
+      "inputs": [
+        "gen-mech-t2",
+        "gen-plant-t2",
+        "gen-steel-t2",
+        "gen-civil-t2",
+        "rc-buggy-suspension"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 10000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: S2 10 s limit",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-06",
+      "proves": [
+        "FR-PRF-03",
+        "TR-PRF-10",
+        "TR-PRF-11",
+        "TR-PRF-13"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "orbitFrameMsP95.T1",
+      "target": {
+        "op": "<=",
+        "value": 16.7
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs, >= 600 frames each, 1600x900 canvas",
+      "source": "derived: S1 60 fps = 1000/60",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-07",
+      "proves": [
+        "FR-PRF-03",
+        "TR-PRF-10",
+        "TR-PRF-11"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "orbitFrameMsP95.T2",
+      "target": {
+        "op": "<=",
+        "value": 33.3
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs, >= 600 frames each, 1600x900 canvas",
+      "source": "derived: 1000/30; S8 (> 30 fps, B) as rationale",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-08",
+      "proves": [
+        "FR-PRF-03",
+        "TR-PRF-10"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "drawCalls.T2",
+      "inputs": [
+        "gen-mech-t2"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 200
+      },
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "spec budget (same as 08 VC-ASC-08)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-09",
+      "proves": [
+        "FR-PRF-04",
+        "TR-PRF-12"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "pickToHighlightMsP95.T2",
+      "target": {
+        "op": "<=",
+        "value": 100
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs, 200 picks each",
+      "source": "derived: S1 response 100 ms; S2 0.1 s",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-10",
+      "proves": [
+        "FR-PRF-05"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "editToRepaintMsP95.T2",
+      "target": {
+        "op": "<=",
+        "value": 100
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs, 50 edits each",
+      "source": "derived: S1 response 100 ms",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-11",
+      "proves": [
+        "FR-PRF-06",
+        "TR-PRF-03"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "saveMs.T1",
+      "target": {
+        "op": "<=",
+        "value": 1000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: S2 1 s limit",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-12",
+      "proves": [
+        "FR-PRF-06",
+        "TR-PRF-03"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "saveMs.T2",
+      "target": {
+        "op": "<=",
+        "value": 5000
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "spec budget (TECHNICAL_SPEC 8.2)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-13",
+      "proves": [
+        "FR-PRF-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "longestMainThreadTaskDuringAutosaveMs",
+      "target": {
+        "op": "<=",
+        "value": 50
+      },
+      "unit": "ms",
+      "tolerance": "max over run",
+      "source": "derived: S1 idle chunks 50 ms",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-14",
+      "proves": [
+        "FR-PRF-07",
+        "TR-PRF-16",
+        "TR-PRF-19"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "rendererHeapBytes.T2",
+      "target": {
+        "op": "<=",
+        "value": 2147483648
+      },
+      "unit": "B",
+      "tolerance": "max sample",
+      "source": "derived: S24 4 GB cage, half",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-15",
+      "proves": [
+        "FR-PRF-07",
+        "TR-PRF-16"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "processRssBytes.T2",
+      "target": {
+        "op": "<=",
+        "value": 8589934592
+      },
+      "unit": "B",
+      "tolerance": "max sample",
+      "source": "spec budget: half of office-min 16 GB",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-16",
+      "proves": [
+        "FR-PRF-07",
+        "FR-PRF-19",
+        "TR-PRF-16"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "memoryBudgetRefusal",
+      "inputs": {
+        "model": "rc-buggy-suspension",
+        "injectedBudgetBytes": 268435456
+      },
+      "target": "refused before allocation; document unchanged; process alive",
+      "errorCode": "PRF_MEMORY_BUDGET",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-17",
+      "proves": [
+        "FR-PRF-08",
+        "TR-PRF-03",
+        "TR-PRF-04"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "documentBytesPerTriangle",
+      "inputs": [
+        "part-11752"
+      ],
+      "baseline": 350,
+      "expected": "24 (f64 indexed) + 6 (f32 LOD chain) = 30",
+      "target": {
+        "op": "<=",
+        "value": 32
+      },
+      "unit": "B/triangle",
+      "tolerance": "exact",
+      "source": "derived: TECHNICAL_SPEC 1.2, 8.2; baseline M1, M2",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-18",
+      "proves": [
+        "FR-PRF-08",
+        "TR-PRF-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "meshPayloadCopiesInDocument",
+      "expected": 1,
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "unit": "count",
+      "tolerance": "exact; step params <= 1 KiB per body",
+      "source": "closed form (count); baseline 2 copies (M2)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-19",
+      "proves": [
+        "FR-PRF-09",
+        "TR-PRF-06"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "openWithEmptyAssetCache",
+      "inputs": [
+        "gen-mech-t2"
+      ],
+      "baseline": "MESH_ASSET_MISSING possible (per-machine cache, 07 13.5)",
+      "target": "opens; volume and triangle count equal to the source; no MESH_ASSET_MISSING",
+      "tolerance": "exact",
+      "source": "spec budget; M6",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-20",
+      "proves": [
+        "FR-PRF-10",
+        "TR-PRF-07"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "hugeSphereImport",
+      "inputs": [
+        "syn-huge-sphere"
+      ],
+      "baseline": "bridge process killed (M4)",
+      "target": "process alive; body imported coarsened, triangles <= maxTrianglesPerBody (or refused with PRF_TESSELLATION_BUDGET under onBudget=refuse)",
+      "errorCode": "PRF_TESSELLATION_COARSENED",
+      "tolerance": "exact",
+      "source": "M4; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-21",
+      "proves": [
+        "FR-PRF-10",
+        "TR-PRF-07"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "coarsenedVolumeError",
+      "inputs": [
+        "fc-nema17-connector",
+        "syn-helical-spring"
+      ],
+      "baseline": {
+        "fc-nema17-connector": "114 MB document, 79k triangles per M2.5 thread",
+        "syn-helical-spring": "-2.3 % volume"
+      },
+      "target": {
+        "op": "<=",
+        "value": 1.5
+      },
+      "unit": "% of exact B-rep volume",
+      "tolerance": "QUALITY_GATES volume check",
+      "source": "QUALITY_GATES gate 1 volume tolerance (A); M4",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-22",
+      "proves": [
+        "FR-PRF-10",
+        "TR-PRF-07"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "tessellationEstimateSphere",
+      "inputs": {
+        "radiusMm": 10000,
+        "deflectionMm": 0.05,
+        "angularLimit": "off",
+        "k": 1
+      },
+      "expected": 725519.7457,
+      "unit": "triangles",
+      "tolerance": "1e-9 rel",
+      "source": "derived: closed form 4 pi R^2 / ((sqrt 3 / 4) 8 R d), TECHNICAL_SPEC 1.3, 5.1",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-23",
+      "proves": [
+        "FR-PRF-11",
+        "TR-PRF-08"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "largeStepImport",
+      "inputs": [
+        "kuka-kr600",
+        "rc-buggy-suspension",
+        "fc-raspberry-pi-4b"
+      ],
+      "baseline": "imports fail above ~0.8M triangles (M3)",
+      "target": "imports; QUALITY_GATES imports and surface-area checks green; >= 1 progress event per second; time TBD - measure then regression-gated",
+      "tolerance": "QUALITY_GATES checks",
+      "source": "M3; spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-24",
+      "proves": [
+        "FR-PRF-12",
+        "TR-PRF-09"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "cancelLeavesDocumentUnchanged",
+      "inputs": [
+        "rc-buggy-suspension import cancelled at 30 %",
+        "gen-mech-t2 open cancelled"
+      ],
+      "target": "documentHash unchanged; next command succeeds",
+      "errorCode": "PRF_CANCELLED",
+      "tolerance": "exact",
+      "source": "spec budget; architecture law 3 (purity)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-25",
+      "proves": [
+        "FR-PRF-13"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "lodInvariance",
+      "inputs": [
+        "gen-mech-t2"
+      ],
+      "expected": "measure_bounding_box, mass_properties, export_stl identical with LOD active and with full resolution forced",
+      "tolerance": "exact (byte-identical)",
+      "source": "closed form (same inputs); 07 MSH LOD invariant",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-26",
+      "proves": [
+        "FR-PRF-13",
+        "TR-PRF-11"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "simplifiedDisplayBadge",
+      "target": "badge visible exactly while viewport_stats.simplified > 0",
+      "errorCode": "PRF_DISPLAY_SIMPLIFIED",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-27",
+      "proves": [
+        "FR-PRF-14",
+        "TR-PRF-15"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "undoRedoSyncBytesRatioT2toT1",
+      "inputs": [
+        "gen-civil-t1",
+        "gen-mech-t2"
+      ],
+      "baseline": "full-document snapshot per undo / redo (code survey)",
+      "target": {
+        "op": "<=",
+        "value": 1.5
+      },
+      "unit": "ratio",
+      "tolerance": "exact; no snapshot event",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-28",
+      "proves": [
+        "FR-PRF-15",
+        "TR-PRF-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "regressionGateArithmetic",
+      "inputs": {
+        "baselineMs": 1000,
+        "measuredMs": [
+          1250,
+          1150
+        ]
+      },
+      "expected": {
+        "1150": "pass",
+        "1250": "PRF_BASELINE_REGRESSION"
+      },
+      "errorCode": "PRF_BASELINE_REGRESSION",
+      "tolerance": "exact",
+      "source": "readiness_gate.json regression.budgetWorseningPercent = 20",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-29",
+      "proves": [
+        "FR-PRF-16",
+        "TR-PRF-18"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "timingsPresent",
+      "target": "data.timings.totalMs on every command run with --timings; llull perf report lists every metric with baseline and verdict",
+      "tolerance": "exact",
+      "source": "spec budget (AF-11)",
+      "grade": "target",
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-PRF-30",
+      "proves": [
+        "FR-PRF-17",
+        "TR-PRF-20"
+      ],
+      "priority": "SHOULD",
+      "driver": "perf",
+      "metric": "pan2dFrameMsP95.T2",
+      "inputs": [
+        "gen-civil-t2"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 33.3
+      },
+      "unit": "ms",
+      "tolerance": "median of 5 runs",
+      "source": "derived: 1000/30 (T2 frame budget)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-31",
+      "proves": [
+        "FR-PRF-18",
+        "TR-PRF-21"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "largeModelModeAuto",
+      "inputs": [
+        "gen-mech-t2"
+      ],
+      "target": "auto-on above T1 limits, badge visible, override restores standard tier",
+      "errorCode": "PRF_LARGE_MODEL_MODE",
+      "tolerance": "exact",
+      "source": "spec budget; precedents S3, S5",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-32",
+      "proves": [
+        "FR-PRF-19",
+        "TR-PRF-17"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "codedLimitRefusals",
+      "inputs": {
+        "bodies": 10001,
+        "triangles": 2000001,
+        "inflatedBytes": 268435457
+      },
+      "expected": [
+        "PRF_LIMIT_IMPORT_BODIES",
+        "PRF_LIMIT_IMPORT_TRIANGLES",
+        "PRF_LIMIT_IMPORT_BYTES"
+      ],
+      "errorCode": "PRF_LIMIT_IMPORT_TRIANGLES",
+      "tolerance": "exact",
+      "source": "packages/core/src/commands/limits.ts (A)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-PRF-33",
+      "proves": [
+        "FR-PRF-20",
+        "TR-PRF-22"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "leakAfterFiveReopens",
+      "inputs": [
+        "gen-mech-t2"
+      ],
+      "target": {
+        "op": "<=",
+        "value": 5
+      },
+      "unit": "% change of geometries and heap vs first open",
+      "tolerance": "+/- 5 %",
+      "source": "spec budget; QUALITY_GATES proposed gate 3",
+      "grade": "target",
+      "gating": true
+    }
+  ]
+}

@@ -1,0 +1,1109 @@
+{
+  "pack": "02-drafting-interaction",
+  "gap": "UXD",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "notes": "Default level PRL3 (daily-capable); VC-UXD-54 is PRL1 (harness prerequisite). Grades: A primary source / closed form / measured; target = budget set by this spec; B/C never gate. Sources: validation/sources.md. Electron cases run on the pack 06 harness (act.* with declared commands, observe.commands, perf.measure); field cases import pilot timings (pack 01); perf cases run on the pack 03 perf runner. 'baseline' = state of origin/main f1351cff read on 2026-10-28 (code audit M2 or fixture run M1).",
+  "cases": [
+    {
+      "id": "VC-UXD-01",
+      "proves": [
+        "FR-UXD-06",
+        "TR-UXD-02"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "parsed point of every valid case in data/coordinate_grammar_cases.json equals 'expected'",
+      "inputs": "CG-01..CG-14",
+      "expected": "data/coordinate_grammar_cases.json expected[]",
+      "unit": "mm",
+      "tolerance": "1e-9 absolute",
+      "source": "derived: generate_refs.mjs (closed form); R5 (AutoCAD grammar), R31 (inch)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/coordinate_grammar_cases.json",
+      "baseline": "no parser exists (M2)"
+    },
+    {
+      "id": "VC-UXD-02",
+      "proves": [
+        "FR-UXD-06",
+        "TR-UXD-02",
+        "TR-UXD-15"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "invalid entries refused with the stable code and column, no point produced",
+      "inputs": "CG-15..CG-18",
+      "expected": "codes and columns in the cases",
+      "unit": "code",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": "all 4 refused with their code"
+      },
+      "gating": true,
+      "errorCode": "UXD_COORD_PARSE",
+      "plan": "data/coordinate_grammar_cases.json"
+    },
+    {
+      "id": "VC-UXD-03",
+      "proves": [
+        "FR-UXD-07",
+        "FR-UXD-06",
+        "TR-UXD-01"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "line tool + typed '@100<30' and dynamic-input '100 Tab 30 Enter' from (10,20) each dispatch one draw_polyline whose end is the CG-05 point",
+      "expected": [
+        96.6025403784,
+        70
+      ],
+      "unit": "mm",
+      "tolerance": "1e-9 absolute",
+      "source": "derived: CG-05",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/coordinate_grammar_cases.json",
+      "baseline": "impossible: clicks only (drawToolTable.ts)"
+    },
+    {
+      "id": "VC-UXD-04",
+      "proves": [
+        "FR-UXD-08"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "every numeric field (palette form, Properties, ValueBox, dynamic input) accepts '25+3*2' = 31, '1in' = 25.4 mm, '=width/2' with width = 40 -> 20",
+      "expected": [
+        31,
+        25.4,
+        20
+      ],
+      "unit": "mm",
+      "tolerance": "1e-12 absolute",
+      "source": "derived (arithmetic); R31",
+      "grade": "A",
+      "gating": true,
+      "baseline": "NumberField is type=number, no expressions (src/ui/components/NumberField.tsx)"
+    },
+    {
+      "id": "VC-UXD-05",
+      "proves": [
+        "FR-UXD-09"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "status-bar cursor readout equals the snapped point formatted at the document display precision, in absolute, relative and polar modes",
+      "inputs": "cursor on L1 endpoint (300,0), last point (0,0), precision 2",
+      "expected": [
+        "300.00, 0.00",
+        "@300.00, 0.00",
+        "@300.00 < 0.00°"
+      ],
+      "unit": "text",
+      "tolerance": "exact string",
+      "source": "derived (fixture coordinates)",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/task_fixture.json",
+      "baseline": "no readout; status bar shows units and precision only (StatusBar.tsx)"
+    },
+    {
+      "id": "VC-UXD-06",
+      "proves": [
+        "FR-UXD-02",
+        "TR-UXD-06"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "alias file in 'abbreviation, *command' syntax: comments ';' ignored, last definition wins, unknown command -> UXD_ALIAS_UNKNOWN_COMMAND, every default alias resolves to a registered command",
+      "inputs": "R2 example 'C, *CIRCLE / E, *ERASE / C, *COPY' mapped to llull names",
+      "expected": "C -> the COPY mapping (last wins)",
+      "unit": "mapping",
+      "tolerance": "exact",
+      "source": "R2",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "UXD_ALIAS_UNKNOWN_COMMAND",
+      "baseline": "no alias layer (paletteItems.ts fuzzy match only)"
+    },
+    {
+      "id": "VC-UXD-07",
+      "proves": [
+        "FR-UXD-01",
+        "FR-UXD-03",
+        "TR-UXD-01",
+        "TR-UXD-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "command line: 'REC' Enter, pick, '120,80' Enter -> exactly one draw_rectangle (T01 end state); then Space -> the same command restarts; right-click menu shows 'Repeat draw_rectangle'",
+      "expected": "observe.commands == [draw_rectangle{width:120,height:80,position:[300,0,0]}] then the prompt of draw_rectangle",
+      "unit": "commands",
+      "tolerance": "params 1e-9",
+      "source": "derived: T01; R9 (repeat convention)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/benchmark_tasks.json#T01"
+    },
+    {
+      "id": "VC-UXD-08",
+      "proves": [
+        "FR-UXD-04"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "mid-polyline (2 points placed): wheel zoom, middle-drag pan, view preset, F3/F8 toggles, then 2 more points + Enter -> one draw_polyline with 4 points; zero commands from the view actions",
+      "expected": "1 draw_polyline, 4 points; no other command",
+      "unit": "commands",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "gating": true,
+      "baseline": "left-drag pan disabled while a tool is armed (cameraControlsPolicy.ts); zoom works"
+    },
+    {
+      "id": "VC-UXD-09",
+      "proves": [
+        "FR-UXD-05",
+        "FR-UXD-46"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "after T01..T11 in the UI, 'Copy session as plan' replayed with `llull run` on the fixture gives a stateHash equal to the UI document",
+      "expected": "stateHash(UI) == stateHash(CLI replay)",
+      "unit": "hash",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": true
+      },
+      "gating": true,
+      "plan": "plans/task_fixture.json"
+    },
+    {
+      "id": "VC-UXD-10",
+      "proves": [
+        "FR-UXD-10",
+        "TR-UXD-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "snap engine returns the closed-form point for each mode case SN-01..SN-08 (expected[0] for SN-01 is the quadrant inside the aperture)",
+      "expected": "data/snap_cases.json expected[]",
+      "unit": "mm",
+      "tolerance": "1e-9 absolute",
+      "source": "derived: generate_refs.mjs; modes from R3",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/snap_cases.json",
+      "baseline": "9 types exist (endpoint, midpoint, center, intersection, perpendicular, tangent, extension, nearest, grid); quadrant, node, insertion, geometric center, apparent intersection, parallel missing (snapping/types.ts)"
+    },
+    {
+      "id": "VC-UXD-11",
+      "proves": [
+        "FR-UXD-10",
+        "FR-UXD-11"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "only enabled running modes are returned; master toggle off returns the raw (or grid) point; a one-pick override returns only the overridden mode and reverts after the pick",
+      "expected": "per-mode truth table of 14 modes x on/off",
+      "unit": "set",
+      "tolerance": "exact",
+      "source": "R3",
+      "grade": "A",
+      "gating": true,
+      "baseline": "all modes always on; extension/nearest always off (useSnap.ts / sharedCandidates.ts)"
+    },
+    {
+      "id": "VC-UXD-12",
+      "proves": [
+        "FR-UXD-12"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "cursor over the T03 intersection with endpoint, intersection and nearest candidates in the aperture: Tab cycles through them; tooltip names the active mode; aperture setting in px changes the pick radius",
+      "expected": "3 distinct candidates visited, tooltip text = mode name",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R3 (Tab cycles)",
+      "grade": "A",
+      "gating": true,
+      "baseline": "glyph only (SnapIndicator.tsx), no tooltip, no cycling, aperture fixed 12 px (useSnap.ts)"
+    },
+    {
+      "id": "VC-UXD-13",
+      "proves": [
+        "FR-UXD-13"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "grid snap off (F9) and no object snap in the aperture -> the returned point is the raw cursor",
+      "inputs": "cursor (13.37, 4.21), no geometry",
+      "expected": [
+        13.37,
+        4.21
+      ],
+      "unit": "mm",
+      "tolerance": "exact",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "baseline": "always rounded to the adaptive grid step (resolveSnap.ts snap(): gridSize > 0 for every zoom)"
+    },
+    {
+      "id": "VC-UXD-14",
+      "proves": [
+        "FR-UXD-14"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "ortho and polar results equal SN-09..SN-12; turning polar on turns ortho off and vice versa",
+      "expected": "data/snap_cases.json SN-09..SN-12",
+      "unit": "mm",
+      "tolerance": "1e-9 absolute",
+      "source": "derived; R4 (F8/F10 mutually exclusive, grade B: behaviour gated by the closed forms only)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/snap_cases.json",
+      "baseline": "ortho = held Shift only; polar coded in applyOrthoPolar but unreachable (useSnap.ts uses ORTHO_ONLY)"
+    },
+    {
+      "id": "VC-UXD-15",
+      "proves": [
+        "FR-UXD-15",
+        "TR-UXD-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "with points A and B acquired, the tracking engine offers the path intersections SN-13 and SN-14",
+      "expected": "data/snap_cases.json SN-13, SN-14",
+      "unit": "mm",
+      "tolerance": "1e-9 absolute",
+      "source": "derived; R3, R15 (tracking concept)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/snap_cases.json",
+      "baseline": "no tracking"
+    },
+    {
+      "id": "VC-UXD-16",
+      "proves": [
+        "FR-UXD-16",
+        "TR-UXD-05"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "3D gizmo snap on box B13 rotated 30 deg about Z: cursor near a true vertex returns that vertex; near a circular edge of a cylinder r 10 h 20 at (0,0,0) returns its centre (0,0,20)",
+      "expected": "vertex = rotated corner (closed form); centre [0,0,20]",
+      "unit": "mm",
+      "tolerance": "1e-6 absolute",
+      "source": "derived (rigid rotation)",
+      "grade": "A",
+      "gating": true,
+      "baseline": "AABB corners / face centres of the rotated bounds, not the solid's vertices (snap3d.ts)"
+    },
+    {
+      "id": "VC-UXD-17",
+      "proves": [
+        "FR-UXD-17"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "sketch mode: a line drawn within the inference band of horizontal commits draw_polyline + add_constraint{horizontal} as ONE undo step; with Ctrl held, no constraint",
+      "expected": "1 undo step; 1 / 0 constraints",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R18 (SOLIDWORKS automatic relations, Ctrl suppresses)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-18",
+      "proves": [
+        "FR-UXD-18"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "window (left->right) selects fully-inside entities, crossing (right->left) also touching ones, in 2D and in 3D (screen-space box over projected geometry)",
+      "inputs": "region G, box corners (15,990) and (125,1010)",
+      "expected": "window: G2 G3 G4 (3); crossing: G1..G5 (5)",
+      "unit": "ids",
+      "tolerance": "exact",
+      "source": "derived (fixture); semantics R6",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/task_fixture.json",
+      "baseline": "2D only, Shift+drag (boxSelect.ts); 3D has no box select"
+    },
+    {
+      "id": "VC-UXD-19",
+      "proves": [
+        "FR-UXD-18",
+        "FR-UXD-45"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "click-click window (no drag) selects the same ids as the drag window (WCAG 2.2 SC 2.5.7 single-pointer alternative)",
+      "expected": "same id set",
+      "unit": "ids",
+      "tolerance": "exact",
+      "source": "R32",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-20",
+      "proves": [
+        "FR-UXD-19"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "three coincident lines: Shift+Space (or the badge list) cycles the pick through all three; the committed set_selection holds the chosen one",
+      "expected": "3 distinct ids visited",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R7 (grade B; behaviour gated by the spec budget)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 3
+      },
+      "gating": true,
+      "baseline": "nearest outline only (SelectPickInteraction.tsx)"
+    },
+    {
+      "id": "VC-UXD-21",
+      "proves": [
+        "FR-UXD-20"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "Ctrl+A selects all visible unlocked entities; 'previous' restores the last set; invert; Shift/Ctrl click toggle; each change is one set_selection",
+      "expected": "set_selection ids per step as scripted",
+      "unit": "ids",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": "all steps match"
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-22",
+      "proves": [
+        "FR-UXD-21",
+        "TR-UXD-09"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "select_similar{id: G1, match:[kind,layer]} and select_by_filter{kind:'line', layer:'0'} return the expected ids and set the selection",
+      "expected": "G1..G5 for select_similar on the fixture",
+      "unit": "ids",
+      "tolerance": "exact",
+      "source": "derived (fixture)",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/task_fixture.json"
+    },
+    {
+      "id": "VC-UXD-23",
+      "proves": [
+        "FR-UXD-22",
+        "TR-UXD-01"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "verb-noun: arm Move with nothing selected -> prompt 'Select objects', pick R7, Enter, base, '@50,0' -> one move_entities{delta:[50,0,0]}",
+      "expected": [
+        50,
+        0,
+        0
+      ],
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "baseline": "move requires a preselection (drawToolTable requiresSelection)"
+    },
+    {
+      "id": "VC-UXD-24",
+      "proves": [
+        "FR-UXD-23",
+        "FR-UXD-44"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "hover highlight appears within one frame of the pointer reaching an entity; pick filter Edges/Faces/Bodies restricts the 3D pick",
+      "target": {
+        "op": "<=",
+        "value": 16.7
+      },
+      "unit": "ms",
+      "tolerance": "p95 over 200 hovers",
+      "source": "derived: 1000 ms / 60 Hz",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-25",
+      "proves": [
+        "FR-UXD-24",
+        "FR-UXD-25",
+        "TR-UXD-08"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "list_grips returns the closed-form grips: rectangle R7 corners (0,600) (40,600) (40,620) (0,620) + edge mids; circle C7 centre + 4 quadrants; line L1 ends + mid",
+      "expected": "closed form from the fixture",
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived (fixture); grip kinds R8",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/task_fixture.json",
+      "baseline": "no 2D grips, no command"
+    },
+    {
+      "id": "VC-UXD-26",
+      "proves": [
+        "FR-UXD-25",
+        "TR-UXD-08",
+        "TR-UXD-09",
+        "TR-UXD-15"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "edit_grip ops (move vertex, stretch end, lengthen, add vertex, remove vertex, circle radius by quadrant) give closed-form geometry; is pure; unknown grip -> UXD_GRIP_UNKNOWN; op not valid for the kind -> UXD_GRIP_OP_UNSUPPORTED",
+      "expected": "per-op closed form (e.g. quadrant of C7 dragged to (95,610) -> radius 15)",
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "UXD_GRIP_UNKNOWN"
+    },
+    {
+      "id": "VC-UXD-27",
+      "proves": [
+        "FR-UXD-24"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "drag the PG vertex grip (900,80) to the L-snap (900,100) -> exactly one edit_grip; Ctrl+Z restores a document deep-equal to before; hover menu offers Stretch / Add vertex / Remove vertex; Space on a hot grip cycles Move / Rotate / Scale / Mirror",
+      "expected": "1 command; undo stateHash equal",
+      "unit": "commands",
+      "tolerance": "exact",
+      "source": "R8 (grade B for the menu items; gated by the spec budget)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-28",
+      "proves": [
+        "FR-UXD-26"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "3D gizmo: typed '25' during a translate drag commits move_entities{delta} of exactly 25 along the axis; pivot can be moved to a snapped vertex first",
+      "expected": 25,
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "baseline": "typed values only on feature handles (ValueBox.tsx), not on TransformGizmo"
+    },
+    {
+      "id": "VC-UXD-29",
+      "proves": [
+        "FR-UXD-27",
+        "TR-UXD-09"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "stretch_2d, break_2d, join_2d, lengthen_2d on fixture geometry give closed-form results; each refuses bad input with its code",
+      "expected": "e.g. lengthen_2d L1 by 50 -> end (350,0); break_2d L1 at (100,0)-(200,0) -> 2 lines; join_2d of L1 and a collinear (300,0)-(400,0) -> one line (0,0)-(400,0)",
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "plan": "plans/task_fixture.json",
+      "baseline": "commands absent (registry audit M2)"
+    },
+    {
+      "id": "VC-UXD-30",
+      "proves": [
+        "FR-UXD-27"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "click flows: copy multiple (T08), rotate with reference, scale with reference, mirror by two points each end in their existing commands with closed-form params",
+      "expected": "T08 end state; rotate_entity delta = reference angle difference; scale_entity factor = new/reference length",
+      "unit": "commands",
+      "tolerance": "1e-9",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/benchmark_tasks.json#T08"
+    },
+    {
+      "id": "VC-UXD-31",
+      "proves": [
+        "FR-UXD-28",
+        "FR-UXD-29"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "3-point arc through (0,0) (50,50) (100,0) -> draw_arc centre (50,0) r 50; DLI on L1 -> add_dimension reading 300 (T10); LINE keeps chaining until Enter, 'C' closes, 'U' undoes the last segment",
+      "expected": {
+        "arcCenter": [
+          50,
+          0
+        ],
+        "radius": 50,
+        "dimension": 300
+      },
+      "unit": "mm",
+      "tolerance": "1e-9",
+      "source": "derived (circle through 3 points)",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/benchmark_tasks.json#T10",
+      "baseline": "no arc tool, no dimension tool, line ends after 2 clicks (drawToolTable.ts)"
+    },
+    {
+      "id": "VC-UXD-32",
+      "proves": [
+        "FR-UXD-30"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "5 lines selected: Properties shows common fields with 'varies' where different; setting layer = Hidden dispatches ONE set_entity_layer for the 5 ids; quick-properties popup appears on selection when enabled",
+      "expected": "1 command, 5 ids",
+      "unit": "commands",
+      "tolerance": "exact",
+      "source": "R10 (grade B; gated by the spec budget)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "gating": true,
+      "plan": "data/benchmark_tasks.json#T09",
+      "baseline": "multi-selection shows a count only (PropertiesPanel.tsx)"
+    },
+    {
+      "id": "VC-UXD-33",
+      "proves": [
+        "FR-UXD-31",
+        "TR-UXD-09"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "match_properties{source, targets, properties:[layer,color]} copies exactly those properties; empty targets -> UXD_MATCH_NO_TARGETS; is pure",
+      "expected": "targets' layer/color equal the source's, other fields unchanged",
+      "unit": "fields",
+      "tolerance": "exact",
+      "source": "R11 (concept, grade B); result derived",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "UXD_MATCH_NO_TARGETS"
+    },
+    {
+      "id": "VC-UXD-34",
+      "proves": [
+        "FR-UXD-32",
+        "TR-UXD-09"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "save_layer_state 'S1' -> change visibility/lock -> restore_layer_state 'S1' restores the saved fields; set_current_layer makes new draw_* entities land on it; unknown state -> UXD_LAYER_STATE_NOT_FOUND",
+      "expected": "layers deep-equal to the saved state",
+      "unit": "fields",
+      "tolerance": "exact",
+      "source": "R12 (concept); result derived",
+      "grade": "A",
+      "gating": true,
+      "errorCode": "UXD_LAYER_STATE_NOT_FOUND"
+    },
+    {
+      "id": "VC-UXD-35",
+      "proves": [
+        "FR-UXD-33",
+        "TR-UXD-07",
+        "TR-UXD-15"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "every registered command and UI action is bindable; binding a used chord -> UXD_KEYMAP_CONFLICT unless replaced; export -> import round-trips; ShortcutsDialog lists the live keymap (no hard-coded table)",
+      "expected": "bindable = listCommands().length + UI action count; round-trip deep-equal",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R21 (Onshape: every area customisable, reset all); R16",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": "all bindable"
+      },
+      "gating": true,
+      "errorCode": "UXD_KEYMAP_CONFLICT",
+      "baseline": "fixed table in hooks/shortcuts.ts; ~30 bindings; not editable"
+    },
+    {
+      "id": "VC-UXD-36",
+      "proves": [
+        "FR-UXD-34"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "F3 osnap, F8 ortho, F9 grid snap, F10 polar, F11 tracking, F12 dynamic input toggle their mode and the status-bar button state (and a click on the button does the same)",
+      "expected": "6 toggles x 2 entry paths",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R4 (grade B for the key assignment; the preset is a spec choice)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 12
+      },
+      "gating": true,
+      "baseline": "no F-key bindings (grep of src/ui: none)"
+    },
+    {
+      "id": "VC-UXD-37",
+      "proves": [
+        "FR-UXD-35",
+        "FR-UXD-36"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "S opens a context shortcut bar at the cursor with per-mode customisable content (2D, 3D, sketch, sheet); right-drag gesture guide with 4 / 8 directions runs the bound command",
+      "expected": "bar opens < 100 ms; gesture runs its command",
+      "target": {
+        "op": "<=",
+        "value": 100
+      },
+      "unit": "ms",
+      "tolerance": "p95",
+      "source": "R16, R17; R29 (0.1 s)",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-38",
+      "proves": [
+        "FR-UXD-37"
+      ],
+      "priority": "COULD",
+      "driver": "unit",
+      "metric": "every toolbar / menu item tooltip shows its key and alias; command recommendations computed from local usage only (no network call)",
+      "expected": "100 % of items; 0 network requests",
+      "target": {
+        "op": "==",
+        "value": 1
+      },
+      "unit": "ratio",
+      "tolerance": "exact",
+      "source": "R34, R36",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-39",
+      "proves": [
+        "FR-UXD-38"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "each navigation preset maps orbit / pan / zoom to its documented buttons (llull, SOLIDWORKS, Fusion, AutoCAD); middle-drag pans while a 2D tool is armed and keeps the collected points",
+      "expected": "mapping table in TECHNICAL_SPEC §5.9",
+      "unit": "mapping",
+      "tolerance": "exact",
+      "source": "R20 (grade B; the presets are spec choices)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": "all presets match"
+      },
+      "gating": true,
+      "baseline": "one fixed mapping per view; 2D pan off while a tool is armed (cameraControlsPolicy.ts)"
+    },
+    {
+      "id": "VC-UXD-40",
+      "proves": [
+        "FR-UXD-39"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "view cube offers every face, edge and corner direction; clicking each sets the camera to that direction; orbit centre = picked point; 'previous view' restores the camera",
+      "expected": {
+        "count": 26
+      },
+      "unit": "directions",
+      "tolerance": "camera direction 1e-6",
+      "source": "derived: SN-15",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/snap_cases.json",
+      "baseline": "axis triad (drei GizmoViewport) + Front/Top/Right/Iso buttons (ViewPresets.tsx)"
+    },
+    {
+      "id": "VC-UXD-41",
+      "proves": [
+        "FR-UXD-40",
+        "TR-UXD-11"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "3D mouse on a SpaceMouse: enabled by default, centre of rotation shown, Fit / Front / Top / Iso buttons and all exported commands work through the action interface, navigation frame rate within 10 % of 2D-mouse navigation",
+      "target": {
+        "op": ">=",
+        "value": 0.9
+      },
+      "unit": "fps ratio",
+      "tolerance": "median over 30 s",
+      "source": "R23",
+      "grade": "A",
+      "gating": true,
+      "baseline": "WebHID, buttons parsed but unused, not verified on hardware (docs/UI.md)"
+    },
+    {
+      "id": "VC-UXD-42",
+      "proves": [
+        "FR-UXD-41"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "every click-driven tool previews before commit: offset side ghost, trim highlights the segment to remove, fillet arc, move/copy ghost at cursor; previews never dispatch",
+      "expected": "0 commands during preview; preview visible",
+      "unit": "commands",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-43",
+      "proves": [
+        "FR-UXD-42",
+        "FR-UXD-45",
+        "TR-UXD-06",
+        "TR-UXD-14"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "the prompt line shows the current prompt, keyword options, the default in <> and the CLI equivalent; it is an aria-live region and the command line is a combobox (axe clean)",
+      "expected": "prompt text per step of T06; 0 axe violations",
+      "unit": "count",
+      "tolerance": "exact",
+      "source": "R32, R33",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "gating": true,
+      "baseline": "HintBar one-line hint, role=status (HintBar.tsx)"
+    },
+    {
+      "id": "VC-UXD-44",
+      "proves": [
+        "FR-UXD-43",
+        "TR-UXD-09"
+      ],
+      "priority": "SHOULD",
+      "driver": "cli",
+      "metric": "set_rollback{stepId} hides later steps' results; new steps insert at the marker; set_rollback{end:true} restores; the marker survives save/load",
+      "expected": "entities after rollback = replay of steps up to the marker",
+      "unit": "hash",
+      "tolerance": "exact",
+      "source": "R19 (concept)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": true
+      },
+      "gating": true,
+      "baseline": "reorder / suppress / delete only (FeatureHistoryPanel.tsx)"
+    },
+    {
+      "id": "VC-UXD-45",
+      "proves": [
+        "FR-UXD-44",
+        "TR-UXD-03",
+        "TR-UXD-13"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "snap query time (cursor -> SnapResult, all modes on) on drawings of 1k / 10k / 100k segments",
+      "target": {
+        "op": "<=",
+        "value": 2
+      },
+      "unit": "ms",
+      "tolerance": "p95 over 1000 random cursors, each size",
+      "source": "spec budget (12 % of a 16.7 ms frame)",
+      "grade": "target",
+      "gating": true,
+      "baseline": "TBD — measure with a vitest bench of resolveSnap + sharedSnapCandidates on generated drawings (today: full candidate scan, no spatial index; intersections all-pairs per document)"
+    },
+    {
+      "id": "VC-UXD-46",
+      "proves": [
+        "TR-UXD-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "indexed snap result equals the brute-force oracle (today's collectSnapCandidates + snap) on 10 000 seeded random cursors over 5 seeded random drawings",
+      "expected": "identical point and type",
+      "unit": "mismatches",
+      "tolerance": "0",
+      "source": "derived (oracle = current code)",
+      "grade": "A",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-47",
+      "proves": [
+        "FR-UXD-44",
+        "FR-UXD-41",
+        "TR-UXD-13"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "frame time while the rubber band follows the cursor (polyline tool, 10k-entity drawing)",
+      "target": {
+        "op": "<=",
+        "value": 16.7
+      },
+      "unit": "ms",
+      "tolerance": "p95 over 10 s of scripted pointer motion",
+      "source": "derived: 1000 / 60 Hz",
+      "grade": "target",
+      "gating": true,
+      "baseline": "TBD — measure with the pack 06 perf.measure frame statistics"
+    },
+    {
+      "id": "VC-UXD-48",
+      "proves": [
+        "FR-UXD-44",
+        "TR-UXD-13"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "commit-to-paint (Enter/click -> first frame showing the result, local backend) and key-to-armed (tool key -> prompt visible)",
+      "target": {
+        "op": "<=",
+        "value": 100
+      },
+      "unit": "ms",
+      "tolerance": "p95 over the T01..T11 runs",
+      "source": "R29 (0.1 s limit for instantaneous)",
+      "grade": "target",
+      "gating": true,
+      "baseline": "TBD — measure with the UX trace (TR-UXD-12)"
+    },
+    {
+      "id": "VC-UXD-49",
+      "proves": [
+        "FR-UXD-45",
+        "TR-UXD-14"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "WCAG 2.2 AA audit of the interaction surfaces (command line, prompts, snap / selection settings, keymap editor, grips): SC 2.1.1 every non-path function by keyboard, SC 2.5.7 single-pointer alternative for every drag, SC 2.4.11 focus not obscured",
+      "target": {
+        "op": "==",
+        "value": "accept"
+      },
+      "unit": "decision",
+      "tolerance": "exact",
+      "source": "R32, R33",
+      "grade": "target",
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-50",
+      "proves": [
+        "FR-UXD-46"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "static contract: every gesture table entry (draw, modify, grip, command-line alias, keymap action of kind 'command') names a command in listCommands(); no src/ui module writes document state outside dispatch",
+      "expected": "0 violations",
+      "unit": "violations",
+      "tolerance": "0",
+      "source": "spec budget (PRIME DIRECTIVE)",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-51",
+      "proves": [
+        "FR-UXD-47"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "KLM predictions in data/klm_predictions.json reproduce from data/*.json by generate_refs.mjs; for every task target <= incumbent (primary operator values)",
+      "inputs": [
+        "data/klm_operators.json",
+        "data/benchmark_tasks.json"
+      ],
+      "expected": "data/klm_predictions.json (incumbent total 159.34 s, target total 157.92 s)",
+      "unit": "s",
+      "tolerance": "0.001",
+      "source": "derived: R25 operator values",
+      "grade": "A",
+      "gating": true,
+      "plan": "generate_refs.mjs"
+    },
+    {
+      "id": "VC-UXD-52",
+      "proves": [
+        "FR-UXD-47",
+        "TR-UXD-01"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "each task T01..T15 performed by the harness with the target method reaches its end state, with keystroke and click counts <= the target method's K and BB/B counts",
+      "expected": "data/klm_predictions.json target.counts per task",
+      "unit": "operators",
+      "tolerance": "exact (<=)",
+      "source": "derived",
+      "grade": "A",
+      "gating": true,
+      "plan": "data/benchmark_tasks.json",
+      "baseline": "8 of 15 tasks completable today (T04 T05 T06 T07 T08 T12 T14 T15)"
+    },
+    {
+      "id": "VC-UXD-53",
+      "proves": [
+        "FR-UXD-47"
+      ],
+      "priority": "MUST",
+      "driver": "field",
+      "metric": "median measured expert time llull / incumbent per task (same users, same fixture, counterbalanced order)",
+      "target": {
+        "op": "<=",
+        "value": 1.2
+      },
+      "unit": "ratio",
+      "tolerance": "median over >= the pilot's user count per persona (pack 01)",
+      "source": "spec budget: within the KLM RMS error band of 21 % (R26, grade B) of parity",
+      "grade": "target",
+      "gating": true,
+      "plan": "data/benchmark_tasks.json",
+      "baseline": "TBD — measure with the pack 01 pilot protocol (incumbent and llull times both unmeasured)"
+    },
+    {
+      "id": "VC-UXD-54",
+      "proves": [
+        "TR-UXD-12"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "UX trace (LLULL_UX_TRACE) writes one JSONL event per key, pointer button, prompt change, dispatch and first paint, with monotonic timestamps; disabled by default; no network",
+      "expected": "events for a scripted T03 in order: key, key, pointer, key x3, dispatch, paint",
+      "unit": "events",
+      "tolerance": "exact order",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": true
+      },
+      "gating": true,
+      "level": 1
+    },
+    {
+      "id": "VC-UXD-55",
+      "proves": [
+        "TR-UXD-10",
+        "FR-UXD-46"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "interaction preferences (snap modes, aperture, keymap, aliases, navigation preset, dynamic input) live in the user profile, not in the document: changing them dispatches no command, adds no undo step, survives restart",
+      "expected": "0 commands; preference read back equal",
+      "unit": "commands",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "gating": true
+    },
+    {
+      "id": "VC-UXD-56",
+      "proves": [
+        "FR-UXD-47"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "parity checklist data/parity_checklist.json: every MUST row marked 'met' with the VC that proves it, reviewed by a drafter experienced in AutoCAD or BricsCAD and a modeller experienced in SOLIDWORKS or Fusion",
+      "target": {
+        "op": "==",
+        "value": "accept"
+      },
+      "unit": "decision",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "plan": "data/parity_checklist.json"
+    },
+    {
+      "id": "VC-UXD-57",
+      "proves": [
+        "FR-UXD-01",
+        "FR-UXD-44"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "command-line suggestion list update after each keystroke (registry + aliases + synonyms, prefix and mid-string)",
+      "target": {
+        "op": "<=",
+        "value": 50
+      },
+      "unit": "ms",
+      "tolerance": "p95 over 500 keystrokes",
+      "source": "spec budget (half of R29's 0.1 s)",
+      "grade": "target",
+      "gating": true
+    }
+  ]
+}

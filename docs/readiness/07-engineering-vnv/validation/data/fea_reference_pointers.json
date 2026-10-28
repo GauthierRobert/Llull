@@ -1,0 +1,9 @@
+{
+  "about": "FEA / thermal benchmarks are NOT re-transcribed here: their gating lives in the packs that own them (single source of truth). This pack's VCs check that each one is attached to the V&V record of the analysis check it validates and that calculation_report cites it with its status. Values copied from the owning packs for reference only.",
+  "cases": [
+    { "vc": "VC-VNV-145", "benchmark": "NAFEMS LE1 elliptic membrane", "target": { "quantity": "sigma_yy at D", "value": 92.7, "unit": "MPa" }, "tolerance": "2 %", "owner": "docs/aerospace/05-fea-cae-handoff VC-FEA-30 (nafems_benchmarks.json)", "grade": "A", "status2026-10-28": "plan exists, not yet in tests (quality:fea planned)" },
+    { "vc": "VC-VNV-146", "benchmark": "NAFEMS LE10 thick plate", "target": { "quantity": "sigma_yy at D", "value": -5.38, "unit": "MPa" }, "tolerance": "3 %", "owner": "docs/aerospace/05-fea-cae-handoff VC-FEA-31", "grade": "A", "status2026-10-28": "plan exists, not yet in tests" },
+    { "vc": "VC-VNV-147", "benchmark": "NAFEMS T1 membrane with hot-spot (thermal stress)", "target": { "quantity": "sigma_yy at D", "value": 50.0, "unit": "MPa" }, "tolerance": "2 % (owner pack)", "owner": "physics thermomech pack VC-TMC-03 (tests/unit/physics/thermomech)", "grade": "B here (target A in 2 vendor manuals, geometry not confirmed by this pack's fetches; see W7)", "status2026-10-28": "in tests" },
+    { "vc": "VC-VNV-148", "benchmark": "NAFEMS T3 one-dimensional transient heat transfer", "target": { "quantity": "temperature at the point and time defined by the owner pack", "value": 36.6, "unit": "degC" }, "tolerance": "2 % (owner pack)", "owner": "physics thermal pack VC-THM-03 (ccx-gated test)", "grade": "B here (not re-verified by this pack)", "status2026-10-28": "in tests when ccx is installed" }
+  ]
+}

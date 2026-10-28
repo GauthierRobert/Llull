@@ -1,0 +1,89 @@
+{
+  "about": "EN 1993-1-1 / EN 1993-1-8 worked examples transcribed from JRC report EUR 27346 (2015), 'Eurocodes: Background & Applications - Design of Steel Buildings - Worked examples' (source W1 in ../sources.md). 'published' = value printed in the report (comma decimals converted). 'derived' = the same formula recomputed in double precision from the published inputs (scratch script, node 2026-10-28); it is the gating reference because the report rounds intermediate factors (chi to 2 decimals) before the final product. Partial factors are those the report uses (gamma_M0 = gamma_M1 = 1.00, gamma_M2 = 1.25, the EN 1993-1-1 recommended values as the report states them); they are inputs of the case, not llull defaults.",
+  "source": "W1",
+  "pdf": { "url": "https://eurocodes.jrc.ec.europa.eu/sites/default/files/2021-12/jrc_steel_report_2015_07_22.pdf", "sha256": "7831dc49e15a3162e288d77b54aed81455c5a978179fa572c00099101d8d3506", "bytes": 14001654, "licence": "(c) European Union; numbers only, PDF not redistributed" },
+  "units": "kN, m, cm2, MPa unless stated",
+  "cases": [
+    {
+      "vc": "VC-VNV-120",
+      "example": "Example 2 b) - truss member AB, two equal angles, bolted in one leg (2 bolts), report pp. 40-42",
+      "clauses": ["EN 1993-1-1 6.2.3", "EN 1993-1-8 3.10.3(1)", "EN 1993-1-8 Table 3.8 (beta2)"],
+      "inputs": { "NEd": 220, "grade": "S235", "fy": 235, "fu": 360, "gammaM0": 1.0, "gammaM2": 1.25, "d0_mm": 18, "p1_mm": 100, "boltsInLine": 2,
+        "sections": { "2L50x50x5": { "A_cm2": 9.6, "Anet_cm2": 7.8 }, "2L60x60x6": { "A_cm2": 13.82, "Anet_cm2": 11.66 } } },
+      "published": { "beta2": 0.70, "2L50x50x5": { "NplRd": null, "NuRd": 157.2, "verdict": "fails (220 > 157.2)" }, "2L60x60x6": { "NplRd": 324.8, "NuRd": 235.1, "verdict": "passes; failure non-ductile (Npl > Nu) accepted" } },
+      "derived": { "2L50x50x5": { "NplRd": 225.6, "NuRd": 157.248 }, "2L60x60x6": { "NplRd": 324.77, "NuRd": 235.0656 } },
+      "tolerance": "0.1 % on derived; verdicts exact",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-121",
+      "example": "Example 3 - inner column E-3, HEB 340, S355, flexural buckling, report pp. 46-47",
+      "clauses": ["EN 1993-1-1 Table 5.2", "EN 1993-1-1 6.2.4", "EN 1993-1-1 6.3.1.2", "EN 1993-1-1 Table 6.2 (curves b/c)"],
+      "inputs": { "NEd": 3326.0, "L_cr_y_m": 4.335, "L_cr_z_m": 4.335, "A_cm2": 170.9, "h_mm": 340, "b_mm": 300, "tf_mm": 21.5, "tw_mm": 12, "r_mm": 27, "iy_cm": 14.65, "iz_cm": 7.53, "fy": 355, "E_GPa": 210, "gammaM0": 1.0, "gammaM1": 1.0 },
+      "published": { "class": 1, "web_c_over_t": 20.25, "flange_c_over_t": 5.44, "lambda1": 76.41, "lambdaBar_y": 0.39, "lambdaBar_z": 0.75, "curve_y": "b (alpha 0.34)", "curve_z": "c (alpha 0.49)", "Phi_z": 0.92, "chi_z": 0.69, "NcRd": 6067.0, "NbRd": 4186.2 },
+      "derived": { "lambda1": 76.40915, "lambdaBar_y": 0.3872631, "lambdaBar_z": 0.7534402, "chi_z": 0.6913813, "NcRd": 6066.95, "NbRd": 4194.576, "utilisation": 0.79294 },
+      "tolerance": "0.1 % on derived; published NbRd within 0.3 % (chi rounded to 0.69)",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-122",
+      "example": "Example 4 a) - IPE 400, S355, 6 m span braced at supports only, LTB general method, report pp. 57-58",
+      "clauses": ["EN 1993-1-1 6.2.5", "EN 1993-1-1 6.2.6", "EN 1993-1-1 6.3.2.2 (general case, alpha_LT 0.34, h/b > 2 rolled -> curve b per report)"],
+      "inputs": { "MEd": 114.3, "VEd": 75.9, "Wpl_y_cm3": 1307, "Av_cm2": 42.69, "fy": 355, "gammaM0": 1.0, "gammaM1": 1.0, "Mcr": 164.7, "Mcr_note": "report's Mcr from its eqn 1.45 with C1 1.80, C2 1.60, zg 200 mm, k = kw = 1; given here as an input so the case tests 6.3.2.2, not the Mcr formula" },
+      "published": { "class": 1, "McRd": 464.0, "VplRd": 875.0, "lambdaBar_LT": 1.68, "Phi_LT": 2.16, "chi_LT": 0.28, "MbRd": 129.9, "utilisation": 0.88 },
+      "derived": { "McRd": 463.985, "VplRd": 874.9714, "lambdaBar_LT": 1.678437, "chi_LT": 0.2841438, "MbRd": 131.8385, "utilisation": 0.86697 },
+      "tolerance": "0.1 % on derived; published MbRd 1.5 % low because chi rounded down (conservative)",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-123",
+      "example": "Example 4 b) - same beam braced at mid-span, 3 m segment, C1 = 2.60, report p. 59",
+      "clauses": ["EN 1993-1-1 6.3.2.2"],
+      "inputs": { "MEd": 114.3, "Wpl_y_cm3": 1307, "fy": 355, "gammaM1": 1.0, "Mcr": 1778.8 },
+      "published": { "lambdaBar_LT": 0.51, "Phi_LT": 0.68, "chi_LT": 0.89, "MbRd": 412.9, "utilisation": 0.28 },
+      "derived": { "lambdaBar_LT": 0.5107265, "chi_LT": 0.8794334, "MbRd": 408.0439, "utilisation": 0.28012 },
+      "tolerance": "0.1 % on derived; NOTE published MbRd is 1.2 % ABOVE the derived value (chi rounded up from 0.879): llull must not match it more closely than 1.5 %",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-124",
+      "example": "Example 5 - beam A-B, IPE 450, S275, L = 10 m, loads on top flange, report pp. 59-61",
+      "clauses": ["EN 1993-1-1 Table 5.2", "EN 1993-1-1 6.2.6", "EN 1993-1-1 6.3.2.2"],
+      "inputs": { "MEd": 104.2, "VEd": 70.0, "Wpl_y_cm3": 1702, "Av_cm2": 50.85, "fy": 275, "gammaM0": 1.0, "gammaM1": 1.0, "Mcr": 133.4 },
+      "published": { "class": 1, "VplRd": 807.4, "lambdaBar_LT": 1.87, "Phi_LT": 2.53, "chi_LT": 0.24, "MbRd": 112.3, "utilisation": 0.93 },
+      "derived": { "VplRd": 807.3522, "lambdaBar_LT": 1.873131, "chi_LT": 0.2351618, "MbRd": 110.0675, "utilisation": 0.94669 },
+      "errata": [
+        "the slenderness line prints fy = 355 (355 x 10^3) although S275 is used; the printed result 1.87 corresponds to fy = 275 (sqrt(1702e-6 x 275e3 / 133.4) = 1.873)",
+        "the conclusion reads 'IPE 400 in steel S 355'; the member checked is IPE 450 S275",
+        "published MbRd 112.3 uses chi rounded UP from 0.235 to 0.24: 2.0 % unconservative; utilisation 0.947, not 0.93"
+      ],
+      "tolerance": "0.1 % on derived; published values recorded, not gated",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-125",
+      "example": "Section 2.1.8 - bolted connection of double angle 2 L80x6, S355, M20 class 6.8 full-thread, 5 bolts, gusset 8 mm, NEd = 580 kN, report pp. 95-97",
+      "clauses": ["EN 1993-1-8 Table 3.4 (shear, bearing)", "EN 1993-1-8 3.10.3 (net section, per report 0.9 Anet fu / gammaM2)"],
+      "inputs": { "NEd": 580, "As_mm2": 245, "fub": 600, "fu_plate": 510, "d_mm": 20, "d0_mm": 22, "t_gusset_mm": 8, "e1_mm": 40, "e2_mm": 35, "p1_mm": 70, "shearPlanes": 2, "gammaM2": 1.25, "A_angle_mm2": 935, "t_angle_mm": 6 },
+      "published": { "NuRd_net": 589.7, "alpha_v_used": 0.6, "FvRd": 141.1, "k1": 2.5, "alpha_b_end": 0.606, "alpha_b_inner": 0.811, "FbRd_end": 98.9, "FbRd_inner": 132.4, "connection": 595.0, "verdict": "passes (595.0 > 580)" },
+      "derived": { "NuRd_net": 589.7232, "FbRd_end": 98.90909, "FbRd_inner": 132.2909, "FvRd_alpha_v_0_6": 141.12, "FvRd_alpha_v_0_5": 117.6, "connection_corrected": 550.6182, "verdict_corrected": "fails (550.6 < 580)" },
+      "errata": [
+        "the same report (section 2.1, reproducing EN 1993-1-8 Table 3.4) gives alpha_v = 0.5 for classes 4.8, 5.8, 6.8 and 10.9 when the shear plane passes through the thread; the example uses 0.6 for a class 6.8 full-thread bolt",
+        "with alpha_v = 0.5, FvRd = 117.6 kN < FbRd_inner = 132.3 kN: shear governs the 3 inner bolts and the 5-bolt group gives 2 x 98.9 + 3 x 117.6 = 550.6 kN < NEd = 580 kN - the published verdict flips"
+      ],
+      "expectedLlull": "FvRd 117.6 kN (alpha_v 0.5 named with its clause), group resistance 550.6 kN, verdict FAIL, utilisation 1.0534",
+      "tolerance": "0.1 % on derived; verdict exact",
+      "grade": "A"
+    },
+    {
+      "vc": "VC-VNV-126",
+      "example": "Section 2.2.6 - welded connection of double angle 2 L80x6, S235, fillet a = 4 mm, NEd = 400 kN, report p. 103",
+      "clauses": ["EN 1993-1-8 4.5.3.3 (simplified method: fvw,d = fu / (sqrt3 beta_w gammaM2))", "EN 1993-1-8 Table 4.1 (beta_w S235 = 0.8 as used by the report)"],
+      "inputs": { "NEd": 400, "e_mm": 21.7, "b_mm": 80, "a_mm": 4, "fu": 360, "beta_w": 0.8, "gammaM2": 1.25, "weldsPerLeg": 2 },
+      "published": { "Fw1": 108.5, "Fw2": 291.5, "l1_mm": 65.3, "l2_mm": 175.3, "chosen_mm": [70, 180] },
+      "derived": { "Fw1": 108.5, "Fw2": 291.5, "l1_mm": 65.25261, "l2_mm": 175.31 },
+      "tolerance": "0.1 %",
+      "grade": "A"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "llull-install-matrix/1",
+  "note": "Profiles are defined in ../README.md. Each row runs on a fresh snapshot; scenario names are the -Mode / first argument of the scripts.",
+  "rows": [
+    { "profile": "vm-win11-std", "script": "win-install-check.ps1", "scenarios": ["PerUser", "Closure", "Signatures", "CliHeadless", "MissingDll", "Offline", "Update", "Rollback", "Uninstall", "UninstallRemoveData"], "cases": ["VC-INS-01", "VC-INS-06", "VC-INS-07", "VC-INS-09", "VC-INS-11", "VC-INS-12", "VC-INS-14", "VC-INS-15", "VC-INS-16", "VC-INS-20", "VC-INS-21", "VC-INS-23", "VC-INS-27"] },
+    { "profile": "vm-win11-locked", "script": "win-install-check.ps1", "scenarios": ["Msi", "NsisAllUsers", "ReadOnlyInstall", "Update", "Uninstall"], "cases": ["VC-INS-14", "VC-INS-16", "VC-INS-19", "VC-INS-20", "VC-INS-29"] },
+    { "profile": "vm-win11-min", "script": "win-install-check.ps1", "scenarios": ["PerUser", "Measure"], "cases": ["VC-INS-20"] },
+    { "profile": "vm-win10-std", "script": "win-install-check.ps1", "scenarios": ["PerUser", "Signatures", "Uninstall"], "cases": ["VC-INS-02", "VC-INS-20"] },
+    { "profile": "vm-macos-arm", "script": "posix-install-check.sh", "scenarios": ["mac"], "cases": ["VC-INS-03", "VC-INS-13", "VC-INS-20", "VC-INS-27"] },
+    { "profile": "vm-macos-12-x64", "script": "posix-install-check.sh", "scenarios": ["mac"], "cases": ["VC-INS-03", "VC-INS-20"] },
+    { "profile": "vm-ubuntu-2404", "script": "posix-install-check.sh", "scenarios": ["deb", "appimage"], "cases": ["VC-INS-04", "VC-INS-20", "VC-INS-27", "VC-INS-30"] },
+    { "profile": "vm-ubuntu-2204", "script": "posix-install-check.sh", "scenarios": ["deb", "appimage"], "cases": ["VC-INS-04", "VC-INS-20", "VC-INS-30"] }
+  ]
+}

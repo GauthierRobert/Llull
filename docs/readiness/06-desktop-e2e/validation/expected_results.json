@@ -1,0 +1,677 @@
+{
+  "pack": "06-desktop-e2e",
+  "gap": "E2E",
+  "baselineDate": "2026-10-28",
+  "machineProfile": "ref-win11",
+  "executor": "this pack is the executor of driver \"electron\" for every readiness pack (TECHNICAL_SPEC §9)",
+  "cases": [
+    {
+      "id": "VC-E2E-01",
+      "proves": [
+        "FR-E2E-01",
+        "TR-E2E-01"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "devLaunchSeconds",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "op": "<=",
+        "value": 30
+      },
+      "unit": "s",
+      "tolerance": "hard limit; typical TBD — measure with this VC",
+      "source": "R1",
+      "errorCode": "E2E_LAUNCH_TIMEOUT",
+      "test": "tests/desktop/selftest/launch.spec.ts"
+    },
+    {
+      "id": "VC-E2E-02",
+      "proves": [
+        "FR-E2E-02",
+        "TR-E2E-02"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "twinFuseDiff",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "fusesDiffering": [
+          "EnableNodeCliInspectArguments"
+        ],
+        "asarSha256Equal": true,
+        "launches": true
+      },
+      "unit": "fuses",
+      "tolerance": "exact",
+      "source": "R7, R8, R9",
+      "errorCode": "E2E_FUSE_MISMATCH",
+      "test": "scripts/e2eTwin.mjs"
+    },
+    {
+      "id": "VC-E2E-03",
+      "proves": [
+        "FR-E2E-02"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "releaseFusesMatchConfig",
+      "grade": "A",
+      "gating": true,
+      "expected": {
+        "RunAsNode": true,
+        "EnableCookieEncryption": true,
+        "EnableNodeOptionsEnvironmentVariable": false,
+        "EnableNodeCliInspectArguments": false,
+        "EnableEmbeddedAsarIntegrityValidation": true,
+        "OnlyLoadAppFromAsar": true
+      },
+      "unit": "fuses",
+      "tolerance": "exact",
+      "source": "S2",
+      "errorCode": "E2E_FUSE_MISMATCH"
+    },
+    {
+      "id": "VC-E2E-04",
+      "proves": [
+        "FR-E2E-01"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "twinSelftestPass",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "selftests": "all pass",
+        "kernel": "occt-native",
+        "python": "ok"
+      },
+      "unit": "tests",
+      "tolerance": "exact",
+      "source": "spec budget"
+    },
+    {
+      "id": "VC-E2E-05",
+      "proves": [
+        "FR-E2E-01",
+        "FR-E2E-15"
+      ],
+      "priority": "MUST",
+      "driver": "install-vm",
+      "metric": "shippedSmoke",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "window": true,
+        "cliStatusApp": true,
+        "renderViewPng": "non-empty",
+        "leftoverProcesses": 0
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "test": "tests/desktop/selftest/shippedSmoke.spec.ts"
+    },
+    {
+      "id": "VC-E2E-06",
+      "proves": [
+        "FR-E2E-07",
+        "TR-E2E-07"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "screenshotDiffPixelsAcross20Launches",
+      "grade": "target",
+      "gating": true,
+      "inputs": {
+        "plan": "3d_box_cylinder_sphere",
+        "project": "dev-swiftshader",
+        "launches": 20
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "px",
+      "tolerance": "exact",
+      "source": "spec budget"
+    },
+    {
+      "id": "VC-E2E-07",
+      "proves": [
+        "FR-E2E-03",
+        "TR-E2E-04"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "dialogStub",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "openStubLoads": true,
+        "saveStubRoundTrip": "same stateHash",
+        "unstubbed": "E2E_UNSTUBBED_DIALOG"
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "R1",
+      "errorCode": "E2E_UNSTUBBED_DIALOG"
+    },
+    {
+      "id": "VC-E2E-08",
+      "proves": [
+        "FR-E2E-03"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "menuItemsReachable",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "itemsByIdHandled": "all",
+        "accelerators": [
+          "CmdOrCtrl+N",
+          "CmdOrCtrl+O",
+          "CmdOrCtrl+S",
+          "Shift+CmdOrCtrl+S"
+        ]
+      },
+      "unit": "items",
+      "tolerance": "exact",
+      "source": "S3"
+    },
+    {
+      "id": "VC-E2E-09",
+      "proves": [
+        "FR-E2E-04",
+        "TR-E2E-03"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "actionCommandMapping",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "declaredEqualsReceived": true,
+        "rendererHashEqualsBackend": true,
+        "wrongDeclaration": "E2E_COMMAND_MISMATCH"
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "S7",
+      "errorCode": "E2E_COMMAND_MISMATCH"
+    },
+    {
+      "id": "VC-E2E-10",
+      "proves": [
+        "FR-E2E-06",
+        "TR-E2E-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "rendererCrashDetected",
+      "grade": "target",
+      "gating": true,
+      "target": "E2E_RENDERER_GONE",
+      "unit": "code",
+      "tolerance": "exact",
+      "source": "R23",
+      "errorCode": "E2E_RENDERER_GONE"
+    },
+    {
+      "id": "VC-E2E-11",
+      "proves": [
+        "FR-E2E-06",
+        "TR-E2E-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "backendExitDetectionSeconds",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "op": "<=",
+        "value": 5
+      },
+      "unit": "s",
+      "tolerance": "exact code",
+      "source": "S4",
+      "errorCode": "E2E_BACKEND_EXIT"
+    },
+    {
+      "id": "VC-E2E-12",
+      "proves": [
+        "FR-E2E-06",
+        "TR-E2E-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "mainErrorDetected",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "code": "E2E_MAIN_ERROR",
+        "crashReportSource": "desktop-main"
+      },
+      "unit": "code",
+      "tolerance": "exact",
+      "source": "S5",
+      "errorCode": "E2E_MAIN_ERROR"
+    },
+    {
+      "id": "VC-E2E-13",
+      "proves": [
+        "FR-E2E-06",
+        "TR-E2E-06"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "hangDetectionSeconds",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "op": "<=",
+        "value": 30
+      },
+      "unit": "s",
+      "tolerance": "TBD — measure with this VC",
+      "source": "spec budget",
+      "errorCode": "E2E_RENDERER_HUNG"
+    },
+    {
+      "id": "VC-E2E-14",
+      "proves": [
+        "FR-E2E-03"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "secondInstanceHandOff",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "processTrees": 1,
+        "windows": 1,
+        "documentOpenedInFirst": true
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "S1"
+    },
+    {
+      "id": "VC-E2E-15",
+      "proves": [
+        "FR-E2E-09",
+        "TR-E2E-09"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "legacyE2eTestsPortedAndGreen",
+      "grade": "A",
+      "gating": true,
+      "baseline": {
+        "browserTests": 30,
+        "electronTests": 0
+      },
+      "expected": 30,
+      "unit": "tests",
+      "tolerance": "exact",
+      "source": "S6"
+    },
+    {
+      "id": "VC-E2E-16",
+      "proves": [
+        "FR-E2E-09"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "productionUiCriteriaPassed",
+      "grade": "A",
+      "gating": true,
+      "expected": {
+        "desmet-extraction-building": 27,
+        "desmet-extraction-revision-b": 30,
+        "desmet-pipe-rack": 28,
+        "civil-site-development": 11,
+        "knownIssuesUi": 0
+      },
+      "unit": "criteria",
+      "tolerance": "exact",
+      "source": "S8"
+    },
+    {
+      "id": "VC-E2E-17",
+      "proves": [
+        "FR-E2E-09"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "displayGateParity",
+      "grade": "A",
+      "gating": true,
+      "baseline": {
+        "documentsWithoutError": 52,
+        "runner": "browser"
+      },
+      "expected": "same pass / known set per case as the browser run of the same commit; 0 console / page / WebGL errors",
+      "unit": "cases",
+      "tolerance": "exact",
+      "source": "S9"
+    },
+    {
+      "id": "VC-E2E-18",
+      "proves": [
+        "FR-E2E-09"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "legacyBrowserPathRemoved",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "webServerConfigs": 0,
+        "testsE2eDir": false,
+        "browserConfigs": 0,
+        "ciBrowserJobs": 0
+      },
+      "unit": "items",
+      "tolerance": "exact",
+      "source": "spec budget"
+    },
+    {
+      "id": "VC-E2E-19",
+      "proves": [
+        "FR-E2E-10",
+        "TR-E2E-10"
+      ],
+      "priority": "MUST",
+      "driver": "review",
+      "metric": "ciLanesPresent",
+      "grade": "target",
+      "gating": true,
+      "target": [
+        "desktop-e2e (ubuntu, windows)",
+        "desktop-e2e-twin",
+        "desktop-quarantine"
+      ],
+      "unit": "lanes",
+      "tolerance": "exact",
+      "source": "R13, R17"
+    },
+    {
+      "id": "VC-E2E-20",
+      "proves": [
+        "FR-E2E-11",
+        "TR-E2E-11"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "suiteFlakeRate",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "op": "<=",
+        "value": 0.01
+      },
+      "unit": "ratio",
+      "tolerance": "over the last 50 CI runs; quarantine <= 5 % of tests, <= 14 days",
+      "source": "R16; spec budget",
+      "errorCode": "E2E_FLAKE_BUDGET"
+    },
+    {
+      "id": "VC-E2E-21",
+      "proves": [
+        "FR-E2E-08",
+        "TR-E2E-08"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "visualPolicyPerturbations",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "onePixelOverlay": "pass",
+        "brightness120": "E2E_VISUAL_DIFF"
+      },
+      "unit": "checks",
+      "tolerance": "threshold 0.2, maxDiffPixelRatio 0.005",
+      "source": "R15, S9",
+      "errorCode": "E2E_VISUAL_DIFF"
+    },
+    {
+      "id": "VC-E2E-22",
+      "proves": [
+        "FR-E2E-12",
+        "TR-E2E-12"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "vcResultFilesValid",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "schemaValid": "all",
+        "nonElectron": "skipped",
+        "unimplemented": "skipped E2E_VC_NOT_IMPLEMENTED",
+        "knownNowPassing": "fail"
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "errorCode": "E2E_VC_NOT_IMPLEMENTED",
+      "plan": "data/vc-result.schema.json"
+    },
+    {
+      "id": "VC-E2E-23",
+      "proves": [
+        "FR-E2E-05"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "observationComplete",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "renderViewPng": "non-empty",
+        "cliHashEqualsHarness": true,
+        "logSources": [
+          "main",
+          "backend",
+          "renderer"
+        ],
+        "externalFetch": "E2E_NETWORK_REQUEST"
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "errorCode": "E2E_NETWORK_REQUEST"
+    },
+    {
+      "id": "VC-E2E-24",
+      "proves": [
+        "FR-E2E-14",
+        "TR-E2E-14"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "faultApiDeclaredFaults",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "faults": [
+          "killBackend",
+          "crashRenderer",
+          "hangRenderer",
+          "crashGpu",
+          "killApp",
+          "corruptProfile"
+        ],
+        "recordedNotFailed": true,
+        "relaunchOk": true
+      },
+      "unit": "faults",
+      "tolerance": "exact",
+      "source": "R23",
+      "level": 2
+    },
+    {
+      "id": "VC-E2E-25",
+      "proves": [
+        "FR-E2E-07",
+        "FR-E2E-05",
+        "TR-E2E-07"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "environmentRecord",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "devicePixelRatio": 1,
+        "windowContent": [
+          1600,
+          1000
+        ],
+        "gpuRendererContains": "SwiftShader",
+        "fonts": [
+          "Hanken Grotesk",
+          "DM Mono"
+        ],
+        "unpinnedLaunch": "E2E_ENV_MISMATCH"
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "R11, S10",
+      "errorCode": "E2E_ENV_MISMATCH"
+    },
+    {
+      "id": "VC-E2E-26",
+      "proves": [
+        "FR-E2E-17",
+        "TR-E2E-16"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "parallelIsolation",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "collisions": 0,
+        "bothPass": true,
+        "outsideProcessAlive": true
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "spec budget"
+    },
+    {
+      "id": "VC-E2E-27",
+      "proves": [
+        "FR-E2E-13",
+        "TR-E2E-13"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "perfApi",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "perfettoFile": "non-empty, parseable",
+        "measureDocumentOpenMs": {
+          "op": ">",
+          "value": 0
+        },
+        "cdpMetrics": true
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "R19",
+      "level": 2
+    },
+    {
+      "id": "VC-E2E-28",
+      "proves": [
+        "FR-E2E-03",
+        "TR-E2E-05"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "downloadsDroppedOf78",
+      "grade": "A",
+      "gating": true,
+      "baseline": {
+        "browserChromiumBackToBack": 6
+      },
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "files",
+      "tolerance": "exact",
+      "source": "S8"
+    },
+    {
+      "id": "VC-E2E-29",
+      "proves": [
+        "FR-E2E-16",
+        "TR-E2E-15"
+      ],
+      "priority": "SHOULD",
+      "driver": "electron",
+      "metric": "axeSeriousCriticalNotInRatchet",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "op": "==",
+        "value": 0
+      },
+      "unit": "violations",
+      "tolerance": "exact; baseline TBD — measure with the first scan",
+      "source": "R20, S9",
+      "errorCode": "E2E_A11Y_VIOLATION",
+      "level": 3
+    },
+    {
+      "id": "VC-E2E-30",
+      "proves": [
+        "FR-E2E-10",
+        "FR-E2E-17"
+      ],
+      "priority": "MUST",
+      "driver": "electron",
+      "metric": "localRunReferenceMachine",
+      "grade": "target",
+      "gating": true,
+      "target": {
+        "pass": true,
+        "heavyLockTaken": true,
+        "userLlullHomeUntouched": true
+      },
+      "unit": "checks",
+      "tolerance": "exact",
+      "source": "spec budget"
+    },
+    {
+      "id": "VC-E2E-31",
+      "proves": [
+        "FR-E2E-18",
+        "TR-E2E-17"
+      ],
+      "priority": "COULD",
+      "driver": "electron",
+      "metric": "failureArtefacts",
+      "grade": "target",
+      "gating": true,
+      "target": [
+        "trace",
+        "video",
+        "logs",
+        "crash folder listing"
+      ],
+      "unit": "artefacts",
+      "tolerance": "exact",
+      "source": "R1"
+    }
+  ]
+}
