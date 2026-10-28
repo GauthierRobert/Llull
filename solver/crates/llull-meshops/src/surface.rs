@@ -65,6 +65,14 @@ pub fn closest_point_on_triangle(p: Vec3, [a, b, c]: [Vec3; 3]) -> Vec3 {
     add(a, add(scale(ab, vb * denominator), scale(ac, vc * denominator)))
 }
 
+/// The nearest point of a closest-point query: `face` is -1 (and `distance` infinite) for an empty mesh.
+#[derive(Clone, Copy, Debug)]
+pub struct Hit {
+    pub point: Vec3,
+    pub distance: f64,
+    pub face: i64,
+}
+
 /// A node: its box (min xyz, max xyz), its children (`NONE` for a leaf) and its range of `order`. 64 bytes: one cache line.
 #[derive(Clone, Copy, Default)]
 struct Node {
@@ -183,11 +191,20 @@ impl SurfaceIndex {
 
     /// The search of [`Self::closest_distance`], which returns early with the best distance so far when it is at most `stop_at`.
     fn nearest(&self, p: Vec3, stop_at: f64) -> f64 {
+        self.search(p, stop_at).distance
+    }
+
+    /// Nearest surface point to `p` (twin of `SurfaceIndex.closest`: distance infinity and face -1 for an empty mesh; the lower triangle wins a tie).
+    pub fn closest(&self, p: Vec3) -> Hit {
+        self.search(p, f64::NEG_INFINITY)
+    }
+
+    fn search(&self, p: Vec3, stop_at: f64) -> Hit {
+        let mut best = Hit { point: p, distance: f64::INFINITY, face: -1 };
         if self.face_count == 0 {
-            return f64::INFINITY;
+            return best;
         }
         let mut best_sq = f64::INFINITY;
-        let mut best_face: i64 = -1;
         // the tree is at most 32 deep (u32 triangle indices) and a visit leaves one more node on the stack than it took off
         let mut stack = [0u32; 64];
         let mut top = 1;
@@ -208,11 +225,11 @@ impl SurfaceIndex {
                         [[c[o], c[o + 1], c[o + 2]], [c[o + 3], c[o + 4], c[o + 5]], [c[o + 6], c[o + 7], c[o + 8]]],
                     );
                     let d_sq = (hit[0] - p[0]) * (hit[0] - p[0]) + (hit[1] - p[1]) * (hit[1] - p[1]) + (hit[2] - p[2]) * (hit[2] - p[2]);
-                    if d_sq < best_sq || (d_sq == best_sq && i64::from(t) < best_face) {
+                    if d_sq < best_sq || (d_sq == best_sq && i64::from(t) < best.face) {
                         best_sq = d_sq;
-                        best_face = i64::from(t);
-                        if best_sq.sqrt() <= stop_at {
-                            return best_sq.sqrt();
+                        best = Hit { point: hit, distance: best_sq.sqrt(), face: i64::from(t) };
+                        if best.distance <= stop_at {
+                            return best;
                         }
                     }
                 }
@@ -226,7 +243,24 @@ impl SurfaceIndex {
                 top += 2;
             }
         }
-        best_sq.sqrt()
+        best
+    }
+
+    /// Barycentric weights of `point` in triangle `face` (twin of `SurfaceIndex.barycentric`; assumes the point lies on it and `face` is a triangle of the mesh).
+    pub fn barycentric(&self, face: usize, point: Vec3) -> [f64; 3] {
+        let c = &self.corners[face * 9..face * 9 + 9];
+        let (a, b, d) = ([c[0], c[1], c[2]], [c[3], c[4], c[5]], [c[6], c[7], c[8]]);
+        let v0 = sub(b, a);
+        let v1 = sub(d, a);
+        let v2 = sub(point, a);
+        let (d00, d01, d11, d20, d21) = (dot(v0, v0), dot(v0, v1), dot(v1, v1), dot(v2, v0), dot(v2, v1));
+        let denominator = d00 * d11 - d01 * d01;
+        if denominator.abs() < 1e-300 {
+            return [1.0, 0.0, 0.0];
+        }
+        let v = (d11 * d20 - d01 * d21) / denominator;
+        let w = (d00 * d21 - d01 * d20) / denominator;
+        [1.0 - v - w, v, w]
     }
 }
 

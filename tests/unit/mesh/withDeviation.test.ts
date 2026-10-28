@@ -78,7 +78,7 @@ describe('quad_remesh with an engine that measures in the same job', () => {
   });
 });
 
-describe('decimate_mesh and smooth_mesh on a mesh above the TypeScript cap', () => {
+describe('decimate_mesh, smooth_mesh and remesh_mesh on a mesh above the TypeScript cap', () => {
   const triangles = MESH_TS_TRIANGLE_CAP + 4_800;
   const side = Math.ceil(Math.sqrt(triangles / 2));
   const big = docWithMeshes(gridMesh(100, side));
@@ -99,10 +99,23 @@ describe('decimate_mesh and smooth_mesh on a mesh above the TypeScript cap', () 
     maxCollapseCost: 0,
   };
   const smoothReport = { meanDisplacement: 0, maxDisplacement: 0, volumeCorrected: false };
+  const remeshReport = {
+    mode: 'isotropic',
+    iterations: 3,
+    trianglesBefore: triangles,
+    trianglesAfter: 128,
+    splits: 0,
+    collapses: 1,
+    flips: 0,
+    edgeLength: { min: 1, max: 2, mean: 1.5, p5: 1, p95: 2 },
+    fractionInBand: 0.9,
+    featureEdges: 0,
+  };
 
   it.each([
     ['decimate_mesh', { id, targetTriangles: 128 }, 'decimate', decimateReport],
     ['smooth_mesh', { id, iterations: 2 }, 'smooth', smoothReport],
+    ['remesh_mesh', { id, targetEdgeLength: 10 }, 'remesh', remeshReport],
   ] as const)(
     '%s: one engine call carries the deviation, and the command does not ask for it again',
     (command, params, op, report) => {

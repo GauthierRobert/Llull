@@ -4,7 +4,7 @@ import { decimateMesh } from './decimate';
 import { symmetricDeviation } from './deviation';
 import { segmentMesh } from './segment';
 import { sculptMesh } from './sculpt';
-import { DECIMATE_DESCRIPTION, editableProblem, smoothDescription } from './editable';
+import { DECIMATE_DESCRIPTION, REMESH_DESCRIPTION, editableProblem, smoothDescription } from './editable';
 import {
   MESH_TS_TRIANGLE_CAP,
   type MeshEngineFailure,
@@ -15,7 +15,7 @@ import {
 } from './engineTypes';
 import { fillHoles } from './holeFill';
 import { cutMeshByPlane } from './planeCut';
-import { remeshMesh } from './remesh';
+import { REMESH_MAX_TRIANGLES, remeshMesh } from './remesh';
 import { repairTriangles } from './repair';
 import { smoothMesh } from './smooth';
 
@@ -92,13 +92,15 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
       const problem = editableProblem(mesh, 'remesh_mesh');
       if (problem !== null) return problem;
       const result = remeshMesh(mesh, op);
+      if ('tooLarge' in result)
+        return failure(
+          'MESH_REMESH_RESULT_TOO_LARGE',
+          `the remeshed surface passed ${result.tooLarge} triangles (limit ${op.maxTriangles ?? REMESH_MAX_TRIANGLES}): use a longer target edge`,
+        );
       return {
         mesh: result.mesh,
         report: { ...result.report },
-        provenance: provenance(
-          'incremental remeshing: split 4/3 L, collapse 4/5 L, flip to valence 6, tangential relaxation, projection',
-          'Botsch and Kobbelt, A Remeshing Approach to Multiresolution Modeling, SGP 2004',
-        ),
+        provenance: provenance(REMESH_DESCRIPTION.algorithm, REMESH_DESCRIPTION.reference),
       };
     }
     case 'smooth': {

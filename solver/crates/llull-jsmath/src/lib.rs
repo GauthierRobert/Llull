@@ -7,7 +7,9 @@
 //! fdlibm notice (kept as its licence requires): Copyright (C) 1993-2004 by Sun Microsystems, Inc. All rights reserved.
 //! Permission to use, copy, modify, and distribute this software is freely granted, provided that this notice is preserved.
 
+mod acos;
 mod trig;
+pub use acos::acos;
 pub use trig::{atan2, cos, sin, take_platform_fallback};
 
 #[inline]

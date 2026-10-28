@@ -1,21 +1,26 @@
 //! `llull-compute meshops <folder>` (07 MSH M3, RS1 RS-9): triangle-mesh operations on meshes of any size, bit-identical to the TypeScript
 //! mesh engine (`packages/core/src/geometry/mesh`), which stays the oracle (`deterministic: true`, VC-MSH-32).
 //!
-//! Job folder: `job.json` = `{ "op": "decimate" | "smooth", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
+//! Job folder: `job.json` = `{ "op": "decimate" | "smooth" | "remesh" | "analyze" | "deviation" | "quad_remesh", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
 //! `indices.u32` (little-endian u32, 3 per triangle) of a welded, indexed mesh. Out: `result_positions.f64`, `result_indices.u32` (the canonical result)
 //! and `report.json` = `{ op, items, ms, report }` with the op-specific report of the TypeScript engine.
 //!
-//! - `decimate`: `{ targetTriangles?, maxDeviation?, preserveBoundary, featureCos?, lockedRegion?: { center, radius } }`; the mesh must be
+//! - `decimate`: `{ targetTriangles?, maxDeviation?, preserveBoundary, featureAngleRad?, lockedRegion?: { center, radius } }`; the mesh must be
 //!   manifold, consistently wound and free of degenerate faces (the host checks, as the TypeScript engine does).
 //!   The collapse queue is one entry per edge and the closest-point tree and the set-up scans use rayon; the bytes of the result do not depend on the thread count.
 //! - `smooth`: `{ taubin, lambda, passBand, iterations, cotangent, fixBoundary, volumeCorrection, region? }`.
-//! - `quad_remesh` (feature `quad`): `{ targetFaces, preserveSharp, sharpCos, adaptive }`; the result is a quad mesh: `result_positions.f64`
+//! - `remesh` (DES-7c step 7): `{ targetEdge? | minEdge + maxEdge + approxError, iterations, featureAngleRad, preserveBoundary, project, region?, maxTriangles? }`;
+//!   the same manifold / winding / degeneracy checks as decimate are the host's. A working mesh past `maxTriangles` (default 4 000 000) ends the job with code `REMESH_TOO_LARGE`.
+//! - `analyze` (DES-7c step 7): `{ maxListed, weldTolerance: 0, selfIntersections: false }` on any triangle soup: welds exact duplicates and writes `report.json` with
+//!   `report` = `{ weldTolerance, mergedVertices }` and `analysis` = the `MeshAnalysis` of the TypeScript engine (no result mesh). Coordinates above 1e100 are refused.
+//! - `quad_remesh` (feature `quad`): `{ targetFaces, hardEdgeRad?, adaptive }` (edges sharper than `hardEdgeRad` align the quads); the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
-//! - decimate / smooth / quad_remesh with `"deviationSamples": N` beside `op` and `params`: the job also measures the symmetric deviation of its result from its input
+//! - decimate / smooth / remesh / quad_remesh with `"deviationSamples": N` beside `op` and `params`: the job also measures the symmetric deviation of its result from its input
 //!   (at most N samples per mesh; a quad result is measured as its outward-wound quads split along the shorter diagonal, which is what the host commits) and writes
 //!   it as `deviation` in `report.json`, after a stage `deviation` before `write`. The host saves the separate `deviation` job that would follow.
 //! - `deviation`: `{ maxSamples }` between the mesh above and `positions_b.f64` / `indices_b.u32`; writes `report.json` only.
 
+pub mod analyze;
 mod collapse_check;
 pub mod decimate;
 pub mod deviation;
@@ -28,8 +33,13 @@ mod quad;
 #[cfg(feature = "quad")]
 pub mod quad_mesh;
 mod quadric;
+pub mod remesh;
+mod remesh_quality;
+mod remesh_types;
 pub mod smooth;
 mod surface;
+mod topology;
+mod weld;
 
 use geom::Sphere;
 use llull_protocol::{sha256_hex, Output};
@@ -43,6 +53,12 @@ use std::time::Instant;
 
 /// Stages QuadriFlow reports (`kStages` in `llull-quadflow/cpp/facade.cxx`), for the `total` of the progress events of `quad_remesh`.
 const QUAD_STAGES: u64 = 10;
+
+/// Largest coordinate `analyze` takes: above it the sums of squares and triple products overflow to infinity, which JSON cannot carry.
+const MAX_ANALYZE_COORDINATE: f64 = 1e100;
+
+/// Most remesh iterations a job runs (the command allows 50).
+const MAX_REMESH_ITERATIONS: usize = 1000;
 
 /// A job failure: stable code + message.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,7 +89,8 @@ struct DecimateJob {
     target_triangles: Option<usize>,
     max_deviation: Option<f64>,
     preserve_boundary: bool,
-    feature_cos: Option<f64>,
+    /// Edges whose faces turn by more than this angle (radians) are features; the cosine is computed here, by the V8 twin.
+    feature_angle_rad: Option<f64>,
     locked_region: Option<Region>,
 }
 
@@ -92,6 +109,31 @@ struct SmoothJob {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RemeshJob {
+    target_edge: Option<f64>,
+    min_edge: Option<f64>,
+    max_edge: Option<f64>,
+    approx_error: Option<f64>,
+    iterations: usize,
+    feature_angle_rad: f64,
+    preserve_boundary: bool,
+    project: bool,
+    region: Option<Region>,
+    max_triangles: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzeJob {
+    max_listed: usize,
+    #[serde(default)]
+    weld_tolerance: f64,
+    #[serde(default)]
+    self_intersections: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DeviationJob {
     max_samples: usize,
 }
@@ -103,6 +145,50 @@ struct Job {
     /// decimate, smooth and quad_remesh: also measure the deviation of the result from the input in this job (at most this many samples per mesh).
     #[serde(rename = "deviationSamples", default)]
     deviation_samples: Option<usize>,
+}
+
+/// The checked parameters of a remesh job: positive finite lengths, the three adaptive ones together when there is no target edge.
+/// `Math.cos` of an angle in [0, pi] radians, by the V8 twin; the other angles are refused (the commands bound them to 0..180 degrees).
+pub(crate) fn cosine_of(name: &str, angle: f64) -> Result<f64, JobError> {
+    if !(0.0..=std::f64::consts::PI + 1e-9).contains(&angle) {
+        return Err(input_error(format!("{name} must be an angle between 0 and pi radians, got {angle}")));
+    }
+    Ok(llull_jsmath::cos(angle))
+}
+
+fn remesh_params(p: &RemeshJob) -> Result<remesh::RemeshParams, JobError> {
+    let length = |name: &str, value: Option<f64>| match value {
+        Some(v) if v.is_finite() && v > 0.0 => Ok(Some(v)),
+        Some(v) => Err(input_error(format!("remesh {name} must be a positive number, got {v}"))),
+        None => Ok(None),
+    };
+    let (target_edge, min_edge, max_edge, approx_error) = (
+        length("targetEdge", p.target_edge)?,
+        length("minEdge", p.min_edge)?,
+        length("maxEdge", p.max_edge)?,
+        length("approxError", p.approx_error)?,
+    );
+    let adaptive = match (min_edge, max_edge, approx_error) {
+        (Some(min_edge), Some(max_edge), Some(approx_error)) => Some(remesh_quality::Adaptive { min_edge, max_edge, approx_error }),
+        _ => None,
+    };
+    if target_edge.is_none() && adaptive.is_none() {
+        return Err(input_error("remesh needs targetEdge, or minEdge + maxEdge + approxError"));
+    }
+    if p.iterations > MAX_REMESH_ITERATIONS {
+        return Err(input_error(format!("remesh iterations {} exceed {MAX_REMESH_ITERATIONS}", p.iterations)));
+    }
+    Ok(remesh::RemeshParams {
+        target_edge,
+        adaptive,
+        iterations: p.iterations,
+        feature_angle: p.feature_angle_rad,
+        feature_cos: cosine_of("featureAngleRad", p.feature_angle_rad)?,
+        preserve_boundary: p.preserve_boundary,
+        project: p.project,
+        region: p.region.as_ref().map(Region::sphere),
+        max_triangles: p.max_triangles.unwrap_or(remesh::MAX_TRIANGLES),
+    })
 }
 
 fn read(folder: &Path, name: &str) -> Result<Vec<u8>, JobError> {
@@ -178,14 +264,32 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
     let triangles = u32s(&read(folder, "indices.u32")?, positions.len() / 3)?;
     let items = triangles.len() / 3;
     let mut mesh_out: Option<(Vec<f64>, Vec<u32>)> = None;
+    let mut analysis = None;
     let report = match job.op.as_str() {
+        "analyze" => {
+            let p: AnalyzeJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("analyze params: {error}")))?;
+            if p.weld_tolerance != 0.0 || p.self_intersections {
+                return Err(input_error(
+                    "analyze welds exact duplicates only and does not search self-intersections (the TypeScript engine does)",
+                ));
+            }
+            if positions.iter().any(|v| v.abs() > MAX_ANALYZE_COORDINATE) {
+                return Err(input_error(format!(
+                    "analyze needs coordinates below {MAX_ANALYZE_COORDINATE:e}: the area and volume sums would overflow"
+                )));
+            }
+            progress.stage("analyze", 0.05);
+            let welded = weld::weld_exact(&positions, &triangles);
+            analysis = Some(analyze::analyze(&welded.positions, &welded.triangles, p.max_listed));
+            serde_json::json!({ "weldTolerance": 0, "mergedVertices": welded.merged })
+        }
         "decimate" => {
             let p: DecimateJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("decimate params: {error}")))?;
             let params = decimate::DecimateParams {
                 target_triangles: p.target_triangles,
                 max_deviation: p.max_deviation,
                 preserve_boundary: p.preserve_boundary,
-                feature_cos: p.feature_cos,
+                feature_cos: p.feature_angle_rad.map(|angle| cosine_of("featureAngleRad", angle)).transpose()?,
                 locked_region: p.locked_region.as_ref().map(Region::sphere),
             };
             progress.stage("decimate", 0.05);
@@ -210,6 +314,26 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             mesh_out = Some((pos, triangles.clone()));
             serde_json::to_value(report).map_err(|error| input_error(error.to_string()))?
         }
+        "remesh" => {
+            let p: RemeshJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("remesh params: {error}")))?;
+            let params = remesh_params(&p)?;
+            progress.stage("remesh", 0.05);
+            match remesh::remesh(&positions, &triangles, &params, &mut |done| progress.tick(0.05 + 0.9 * done)) {
+                remesh::Remeshed::Done(pos, idx, report) => {
+                    mesh_out = Some((pos, idx));
+                    serde_json::to_value(report).map_err(|error| input_error(error.to_string()))?
+                }
+                remesh::Remeshed::TooLarge(count) => {
+                    return Err(JobError {
+                        code: "REMESH_TOO_LARGE",
+                        message: format!(
+                            "the remeshed surface passed {count} triangles (limit {}): use a longer target edge",
+                            params.max_triangles
+                        ),
+                    })
+                }
+            }
+        }
         #[cfg(feature = "quad")]
         "quad_remesh" => {
             let p: quad::QuadJob =
@@ -230,7 +354,9 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
                 .ok_or_else(|| input_error("a mesh without triangles has no surface to measure"))?;
             serde_json::to_value(result).map_err(|error| input_error(error.to_string()))?
         }
-        other => return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, deviation, quad_remesh)"))),
+        other => {
+            return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, remesh, analyze, deviation, quad_remesh)")))
+        }
     };
     let measured = match (&mesh_out, job.deviation_samples) {
         (Some((out_positions, out_indices)), Some(samples)) if measures => {
@@ -241,6 +367,9 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
         _ => None,
     };
     let mut summary = serde_json::json!({ "op": job.op, "items": items, "ms": started.elapsed().as_millis(), "report": report });
+    if let Some(analysis) = analysis {
+        summary["analysis"] = serde_json::to_value(analysis).map_err(|error| input_error(error.to_string()))?;
+    }
     if let Some(measured) = measured {
         summary["deviation"] = serde_json::to_value(measured).map_err(|error| input_error(error.to_string()))?;
     }

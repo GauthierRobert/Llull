@@ -181,6 +181,33 @@ pub fn topology(indices: &[u32]) -> Topology {
     }
 }
 
+/// An empty job folder in the temp directory, named for the test and the process.
+pub fn folder(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("llull-meshops-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// `job.json`, `positions.f64` and `indices.u32` of a job in `dir`.
+pub fn write_job(dir: &std::path::Path, job: &serde_json::Value, mesh: &Mesh) {
+    std::fs::write(dir.join("job.json"), job.to_string()).unwrap();
+    std::fs::write(dir.join("positions.f64"), mesh.0.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+    std::fs::write(dir.join("indices.u32"), mesh.1.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+}
+
+/// The result mesh and the `report.json` of a finished job.
+pub fn read_result(dir: &std::path::Path) -> (Mesh, serde_json::Value) {
+    let positions = std::fs::read(dir.join("result_positions.f64"))
+        .unwrap()
+        .chunks_exact(8)
+        .map(|b| f64::from_le_bytes(b.try_into().unwrap()))
+        .collect();
+    let indices =
+        std::fs::read(dir.join("result_indices.u32")).unwrap().chunks_exact(4).map(|b| u32::from_le_bytes(b.try_into().unwrap())).collect();
+    ((positions, indices), serde_json::from_slice(&std::fs::read(dir.join("report.json")).unwrap()).unwrap())
+}
+
 /// Bytes of a result, for comparing two runs bit for bit.
 pub fn bytes(positions: &[f64], indices: &[u32]) -> Vec<u8> {
     positions.iter().flat_map(|v| v.to_le_bytes()).chain(indices.iter().flat_map(|v| v.to_le_bytes())).collect()

@@ -89,7 +89,7 @@ fn decimate_honours_a_target_a_deviation_bound_features_and_a_locked_region() {
     let dir = folder("bound");
     write_job(
         &dir,
-        &json!({ "op": "decimate", "params": { "maxDeviation": 0.05, "preserveBoundary": false, "featureCos": 0.9, "lockedRegion": { "center": [5.0, 5.0, 0.0], "radius": 2.0 } } }),
+        &json!({ "op": "decimate", "params": { "maxDeviation": 0.05, "preserveBoundary": false, "featureAngleRad": 0.9f64.acos(), "lockedRegion": { "center": [5.0, 5.0, 0.0], "radius": 2.0 } } }),
         &positions,
         &indices,
     );
@@ -355,7 +355,7 @@ fn icosphere(level: usize) -> (Vec<f64>, Vec<u32>) {
 fn quad_remesh_measures_the_outward_triangulated_quads_exactly_as_the_separate_job_on_them_would() {
     use llull_meshops::quad_mesh::{outward_quads, triangulate_quads};
     let (positions, indices) = icosphere(2);
-    let job = json!({ "op": "quad_remesh", "params": { "targetFaces": 60, "preserveSharp": false, "sharpCos": 0.0, "adaptive": false }, "deviationSamples": 3000 });
+    let job = json!({ "op": "quad_remesh", "params": { "targetFaces": 60, "adaptive": false }, "deviationSamples": 3000 });
     let dir = folder("dev-quad");
     write_job(&dir, &job, &positions, &indices);
     let mut out = Vec::new();

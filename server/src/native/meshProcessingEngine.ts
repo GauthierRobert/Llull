@@ -12,10 +12,26 @@
 
 import { createHash } from 'node:crypto';
 import type { MeshData } from '@core/model/types';
-import { deferMeshOp } from '@core/geometry/mesh/engine';
-import { DECIMATE_DESCRIPTION, QUAD_DESCRIPTION, editableProblem, smoothDescription } from '@core/geometry/mesh/editable';
+import { MESH_ENGINE_NEEDS_HOST, deferMeshOp } from '@core/geometry/mesh/engine';
+import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
+import { isMeshAnalysis } from '@core/geometry/mesh/analysis';
+import {
+  ANALYZE_DESCRIPTION,
+  DECIMATE_DESCRIPTION,
+  QUAD_DESCRIPTION,
+  REMESH_DESCRIPTION,
+  editableProblem,
+  smoothDescription,
+} from '@core/geometry/mesh/editable';
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
-import type { MeshEngineFailure, MeshOp, MeshOpName, MeshOpResult, MeshProcessingEngine } from '@core/geometry/mesh/engineTypes';
+import {
+  MESH_TS_TRIANGLE_CAP,
+  type MeshEngineFailure,
+  type MeshOp,
+  type MeshOpName,
+  type MeshOpResult,
+  type MeshProcessingEngine,
+} from '@core/geometry/mesh/engineTypes';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { positiveInteger } from '../env';
@@ -28,14 +44,40 @@ const DEFAULT_TIMEOUT_S = 600;
 const DEFAULT_HEARTBEAT_MS = 5000;
 /** Named guard: input triangles above which quad_remesh refuses (QuadriFlow memory and time grow with the mesh; decimate_mesh first). */
 const QUAD_REMESH_TRIANGLE_CAP = 500_000;
+/** Named guard: input triangles above which remesh refuses (the working mesh keeps per-vertex face lists: about 1 GB at this size; decimate_mesh first). */
+const REMESH_TRIANGLE_CAP = 2_000_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
 const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number>([
   ['decimate', Infinity],
   ['smooth', Infinity],
+  ['remesh', REMESH_TRIANGLE_CAP],
+  ['analyze', Infinity],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
+]);
+
+/** The ops this engine answers (the keys of CAPABILITIES). */
+const NATIVE_OPS: ReadonlySet<MeshOpName> = new Set(CAPABILITIES.keys());
+
+function isNativeOp(op: MeshOp): op is NativeOp {
+  return NATIVE_OPS.has(op.op);
+}
+
+/** The command name the editable-mesh refusals mention. */
+const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
+
+/**
+ * Input triangles above which the native engine is asked before the TypeScript one (TECHNICAL_SPEC 13.12.4): the smallest sizes at which a cold job
+ * (spawn, files, JSON; 25 to 45 ms on the reference machine) is no slower than the in-process answer, with a margin. `quad_remesh` has no TypeScript twin.
+ */
+const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number>([
+  ['decimate', 1_000],
+  ['remesh', 2_000],
+  ['deviation', 3_000],
+  ['smooth', 10_000],
+  ['analyze', 15_000],
 ]);
 
 const failure = (code: string, message: string): MeshEngineFailure => ({ code, message });
@@ -43,29 +85,38 @@ const failure = (code: string, message: string): MeshEngineFailure => ({ code, m
 const regionOf = (region: { readonly center: readonly number[]; readonly radius: number } | undefined): Record<string, unknown> =>
   region === undefined ? {} : { center: [...region.center], radius: region.radius };
 
-type NativeOp = Extract<MeshOp, { op: 'decimate' | 'smooth' | 'deviation' | 'quad_remesh' }>;
+type NativeOp = Extract<MeshOp, { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'deviation' | 'quad_remesh' }>;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
-  return op.op !== 'deviation' && op.withDeviation !== undefined ? { deviationSamples: op.withDeviation } : {};
+  return op.op !== 'deviation' && op.op !== 'analyze' && op.withDeviation !== undefined ? { deviationSamples: op.withDeviation } : {};
 }
 
 /** The job parameters (JSON) of a supported op; `Math.cos` of the feature angle is computed here, as the TypeScript engine does. */
 function jobParams(op: NativeOp): Record<string, unknown> {
   if (op.op === 'deviation') return { maxSamples: op.maxSamples };
+  if (op.op === 'analyze') return { maxListed: op.maxListed, weldTolerance: op.weldTolerance, selfIntersections: op.selfIntersections };
   if (op.op === 'quad_remesh')
+    return { targetFaces: op.targetQuads, adaptive: op.adaptive, ...(op.hardEdgeRad !== undefined ? { hardEdgeRad: op.hardEdgeRad } : {}) };
+  if (op.op === 'remesh')
     return {
-      targetFaces: op.targetQuads,
-      adaptive: op.adaptive,
-      preserveSharp: op.hardEdgeRad !== undefined,
-      sharpCos: op.hardEdgeRad === undefined ? 0 : Math.cos(op.hardEdgeRad),
+      ...(op.targetEdge !== undefined ? { targetEdge: op.targetEdge } : {}),
+      ...(op.minEdge !== undefined ? { minEdge: op.minEdge } : {}),
+      ...(op.maxEdge !== undefined ? { maxEdge: op.maxEdge } : {}),
+      ...(op.approxError !== undefined ? { approxError: op.approxError } : {}),
+      iterations: op.iterations,
+      featureAngleRad: op.featureAngleRad,
+      preserveBoundary: op.preserveBoundary,
+      project: op.project,
+      ...(op.region !== undefined ? { region: regionOf(op.region) } : {}),
+      ...(op.maxTriangles !== undefined ? { maxTriangles: op.maxTriangles } : {}),
     };
   if (op.op === 'decimate')
     return {
       preserveBoundary: op.preserveBoundary,
       ...(op.targetTriangles !== undefined ? { targetTriangles: op.targetTriangles } : {}),
       ...(op.maxDeviation !== undefined ? { maxDeviation: op.maxDeviation } : {}),
-      ...(op.featureAngleRad !== undefined ? { featureCos: Math.cos(op.featureAngleRad) } : {}),
+      ...(op.featureAngleRad !== undefined ? { featureAngleRad: op.featureAngleRad } : {}),
       ...(op.lockedRegion !== undefined ? { lockedRegion: regionOf(op.lockedRegion) } : {}),
     };
   return {
@@ -123,6 +174,16 @@ function unpackMesh(positions: Buffer, indices: Buffer): MeshData {
   return { positions: outPositions, indices: outIndices };
 }
 
+/** Why `mesh` cannot be a triangle mesh (positions not whole xyz triples, indices not whole triangles, an index past the vertices, a coordinate that is not finite), or null. */
+export function meshProblem(mesh: MeshData): string | null {
+  const vertices = mesh.positions.length / 3;
+  if (!Number.isInteger(vertices)) return `${mesh.positions.length} coordinates are not whole xyz triples`;
+  if (mesh.indices.length % 3 !== 0) return `${mesh.indices.length} indices are not whole triangles`;
+  if (!mesh.positions.every(Number.isFinite)) return 'a coordinate is not a finite number';
+  const past = mesh.indices.find((index) => index >= vertices);
+  return past === undefined ? null : `the index ${past} is not below the ${vertices} vertices`;
+}
+
 /** Content key of a job: the op, its parameters and the mesh bytes (through the digests of its files). */
 function keyOf(files: readonly JobFile[]): string {
   const hash = createHash('sha256');
@@ -135,6 +196,7 @@ function keyOf(files: readonly JobFile[]): string {
 function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFailure {
   if (run.code === 'NATIVE_TIMEOUT') return failure('MESH_TIMEOUT', `llull-compute meshops ${op.op} exceeded ${timeoutMs / 1000} s`);
   if (run.code === 'NATIVE_CANCELLED') return failure('MESH_CANCELLED', `llull-compute meshops ${op.op} was cancelled`);
+  if (run.code === 'REMESH_TOO_LARGE') return failure('MESH_REMESH_RESULT_TOO_LARGE', run.message ?? 'the remeshed surface is too large');
   if (op.op === 'quad_remesh')
     return failure('MESH_QUAD_REMESH_FAILED', `QuadriFlow: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
   return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
@@ -146,7 +208,7 @@ export function deviationFrom(value: unknown): { deviation?: DeviationSummary } 
 }
 
 /** Read the outputs of a finished job into the engine's result. */
-async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run: JobRun): Promise<MeshOpResult> {
+async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run: JobRun): Promise<MeshOpResult | MeshEngineFailure> {
   const summary: unknown = JSON.parse((await readOutput(folder, run, 'report.json')).toString('utf8'));
   const report = isRecord(summary) && isRecord(summary['report']) ? summary['report'] : {};
   const version = `llull-compute@${await runner.version()}`;
@@ -166,7 +228,16 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
         'bounding-volume closest point (Ericson 5.1.5)',
       ),
     };
+  if (op.op === 'analyze') {
+    const analysis = isRecord(summary) ? summary['analysis'] : undefined;
+    if (!isMeshAnalysis(analysis))
+      return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops analyze: the job returned no well-formed analysis');
+    return { analysis, report, provenance: provenance(ANALYZE_DESCRIPTION.algorithm, ANALYZE_DESCRIPTION.reference) };
+  }
   const mesh = unpackMesh(await readOutput(folder, run, 'result_positions.f64'), await readOutput(folder, run, 'result_indices.u32'));
+  const malformed = op.op === 'quad_remesh' ? null : meshProblem(mesh);
+  if (malformed !== null)
+    return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: the result mesh is malformed: ${malformed}`);
   // measured by the same job when the op asked for it (`withDeviation`)
   const measured = deviationFrom(isRecord(summary) ? summary['deviation'] : undefined);
   if (op.op === 'quad_remesh')
@@ -176,7 +247,8 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
       ...measured,
       provenance: provenance(QUAD_DESCRIPTION.algorithm, QUAD_DESCRIPTION.reference, QUADRIFLOW_LIBRARY),
     };
-  const description = op.op === 'decimate' ? DECIMATE_DESCRIPTION : smoothDescription(op.method === 'taubin');
+  const description =
+    op.op === 'decimate' ? DECIMATE_DESCRIPTION : op.op === 'remesh' ? REMESH_DESCRIPTION : smoothDescription(op.method === 'taubin');
   return { mesh, report, ...measured, provenance: provenance(description.algorithm, description.reference) };
 }
 
@@ -221,13 +293,24 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
   return {
     name: 'native',
     capabilities: () => CAPABILITIES,
+    preferredAbove: () => PREFERRED_ABOVE,
     run(input, op): MeshOpResult | MeshEngineFailure {
-      if (op.op !== 'decimate' && op.op !== 'smooth' && op.op !== 'deviation' && op.op !== 'quad_remesh')
-        return failure('MESH_ENGINE_UNSUPPORTED', `the native engine does not answer "${op.op}"`);
+      if (!isNativeOp(op)) return failure('MESH_ENGINE_UNSUPPORTED', `the native engine does not answer "${op.op}"`);
+      if (op.op === 'analyze' && op.weldTolerance !== 0)
+        return failure('MESH_ENGINE_UNSUPPORTED', 'the native analysis welds exact duplicates only');
+      const triangles = input.mesh.indices.length / 3;
+      // the pair search is not ported (slice 4): the TypeScript engine answers up to its cap, above it the command is refused by name
+      if (op.op === 'analyze' && op.selfIntersections)
+        return triangles <= MESH_TS_TRIANGLE_CAP
+          ? failure('MESH_ENGINE_UNSUPPORTED', 'the native analysis does not search self-intersections; the TypeScript engine does')
+          : failure(
+              'MESH_ENGINE_CAP_EXCEEDED',
+              `the self-intersection search is limited to ${MESH_TS_TRIANGLE_CAP} triangles: pass selfIntersections false for ${triangles}`,
+            );
       const scope = currentScope();
       const memo = scope?.memo;
-      if (op.op === 'decimate' || op.op === 'quad_remesh') {
-        const problem = editableProblemOf(input.mesh, op.op === 'decimate' ? 'decimate_mesh' : 'quad_remesh', memo);
+      if (op.op === 'decimate' || op.op === 'remesh' || op.op === 'quad_remesh') {
+        const problem = editableProblemOf(input.mesh, OP_COMMAND[op.op], memo);
         if (problem !== null) return problem;
       }
       // this run already asked for a job: its input is a placeholder, so no job is packed or asked for
@@ -243,8 +326,16 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       if (held !== undefined) return held;
       if (scope === null)
         return failure(
-          'MESH_ENGINE_NEEDS_HOST',
+          MESH_ENGINE_NEEDS_HOST,
           `the native "${op.op}" runs through the host's async command path (resolveDeferred), not inline`,
+        );
+      // the TypeScript engine takes it only if both meshes of a deviation fit its cap
+      const largest = op.op === 'deviation' ? Math.max(triangles, op.other.mesh.indices.length / 3) : triangles;
+      // a held result answers whatever the budget; with the budget spent, leave what the TypeScript engine can take to it (the composite falls through), so a long plan of small steps still runs
+      if (scope?.budgetSpent === true && (tsMeshEngine.capabilities().get(op.op) ?? 0) >= largest)
+        return failure(
+          MESH_ENGINE_NEEDS_HOST,
+          `the job budget of this command is spent: "${op.op}" on ${triangles} triangles is left to the TypeScript engine`,
         );
       if (scope.cancelled) return failure('MESH_CANCELLED', `the "${op.op}" job was cancelled`);
       scope.request({ key, op: op.op, heartbeatMs, start: (signal, report) => runJob(op, files, signal, report) });

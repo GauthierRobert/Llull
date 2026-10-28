@@ -8,11 +8,18 @@ import { symmetricDeviation } from '@core/geometry/mesh/deviation';
 import { EditMesh } from '@core/geometry/mesh/editMesh';
 import { fillHoles } from '@core/geometry/mesh/holeFill';
 import { cutMeshByPlane, crossesPlane } from '@core/geometry/mesh/planeCut';
-import { remeshMesh } from '@core/geometry/mesh/remesh';
+import { remeshMesh as remeshOrRefuse } from '@core/geometry/mesh/remesh';
 import { repairTriangles, type RepairMode } from '@core/geometry/mesh/repair';
 import { smoothMesh, taubinMu } from '@core/geometry/mesh/smooth';
 import { SurfaceIndex } from '@core/geometry/mesh/surfaceIndex';
 import { cuboid, gridMesh, icosphere, packJson, relativeError, type IndexedMesh } from '../../helpers/meshFixtures';
+
+/** `remeshMesh` of a case that stays within the triangle limit. */
+function remeshMesh(...args: Parameters<typeof remeshOrRefuse>): Exclude<ReturnType<typeof remeshOrRefuse>, { tooLarge: number }> {
+  const result = remeshOrRefuse(...args);
+  if ('tooLarge' in result) throw new Error(`remesh passed the triangle limit at ${result.tooLarge}`);
+  return result;
+}
 
 const measure = (
   mesh: IndexedMesh | { positions: ReadonlyArray<number>; indices: ReadonlyArray<number> },

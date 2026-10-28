@@ -53,3 +53,51 @@ impl Sphere {
         hypot(&[p[0] - self.center[0], p[1] - self.center[1], p[2] - self.center[2]]) <= self.radius
     }
 }
+
+/// V8 `Math.min(a, b)`: NaN when either is NaN, and -0 below +0.
+pub fn js_min(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_negative() {
+            a
+        } else {
+            b
+        }
+    } else if a < b {
+        a
+    } else {
+        b
+    }
+}
+
+/// V8 `Math.max(a, b)`: NaN when either is NaN, and +0 above -0.
+pub fn js_max(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_negative() {
+            b
+        } else {
+            a
+        }
+    } else if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+/// JavaScript `x || 1` for a number: 1 when `x` is 0 or NaN.
+pub fn or_one(x: f64) -> f64 {
+    if x == 0.0 || x.is_nan() {
+        1.0
+    } else {
+        x
+    }
+}
+
+/// Distance between two points (`Math.hypot` of the differences).
+pub fn dist(a: Vec3, b: Vec3) -> f64 {
+    hypot(&[a[0] - b[0], a[1] - b[1], a[2] - b[2]])
+}

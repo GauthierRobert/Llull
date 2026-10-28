@@ -16,7 +16,7 @@ const MAX_EDGE_FRACTION = 0.25;
 /**
  * @affects rewrites the mesh `id` with a regular triangulation of the same surface (or adds one mesh with keepSource)
  * @invariant after the closing split pass no edge exceeds 4/3 of its target length; never a fold-over or non-manifold edge; feature edges and (preserveBoundary) boundary vertices keep their place; the result is re-measured against the input in data.deviation
- * @failure unknown id / non-solid -> MESH_*; neither / both length modes -> MESH_PARAM_INVALID; target over 0.25 x bbox diagonal -> MESH_REMESH_EDGE_TOO_LARGE; non-manifold / inconsistently wound / degenerate input -> MESH_NON_MANIFOLD / MESH_ORIENTATION_INCONSISTENT / MESH_DEGENERATE
+ * @failure unknown id / non-solid -> MESH_*; neither / both length modes -> MESH_PARAM_INVALID; target over 0.25 x bbox diagonal -> MESH_REMESH_EDGE_TOO_LARGE; result over 4000000 triangles -> MESH_REMESH_RESULT_TOO_LARGE; input over the engine cap (TypeScript 200000, native 2000000) -> MESH_ENGINE_CAP_EXCEEDED; non-manifold / inconsistently wound / degenerate input -> MESH_NON_MANIFOLD / MESH_ORIENTATION_INCONSISTENT / MESH_DEGENERATE
  */
 export const remeshMesh = defineCommand({
   name: 'remesh_mesh',
@@ -31,7 +31,8 @@ export const remeshMesh = defineCommand({
     'faces (repair_mesh first). Reports data.edgeLength {min, max, mean, p5, p95}, fractionInBand (edges within 4/5..4/3 of the target) and ' +
     'the symmetric deviation from the input (document units). Reference: an icosphere of radius 10 remeshed to 1 gives edges <= 1.3333 and a ' +
     'surface deviation of a few hundredths. Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_REMESH_EDGE_TOO_LARGE, ' +
-    'MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE.',
+    'MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE, MESH_REMESH_RESULT_TOO_LARGE (the surface would pass 4000000 triangles), ' +
+    'MESH_ENGINE_CAP_EXCEEDED (input over 2000000 triangles: decimate_mesh first). Meshes above 200000 triangles run in the native engine.',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) to remesh.'),
     targetEdgeLength: z

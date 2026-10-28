@@ -5,7 +5,6 @@
  * Native runs need llull-compute (cargo build in solver/) and are skipped with a logged reason otherwise.
  */
 
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { composeMeshEngines } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshOp, MeshOpResult } from '@core/geometry/mesh/engineTypes';
@@ -14,113 +13,13 @@ import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import type { MeshData } from '@core/model/types';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeMeshEngine, deviationFrom } from '../src/native/meshProcessingEngine';
-import { resolveDeferred } from '../src/native/deferredRun';
+import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
+import { box, grid, hashOf, icosphere, noisy } from './meshopsNativeSupport';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNative: llull-compute not built (cargo build in solver/): native runs skipped');
 const native = BINARY === null ? it.skip : it;
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
-
-const PHI = (1 + Math.sqrt(5)) / 2;
-
-function icosphere(radius: number, level: number): MeshData {
-  const base: Array<[number, number, number]> = [
-    [-1, PHI, 0],
-    [1, PHI, 0],
-    [-1, -PHI, 0],
-    [1, -PHI, 0],
-    [0, -1, PHI],
-    [0, 1, PHI],
-    [0, -1, -PHI],
-    [0, 1, -PHI],
-    [PHI, 0, -1],
-    [PHI, 0, 1],
-    [-PHI, 0, -1],
-    [-PHI, 0, 1],
-  ];
-  let faces: number[][] = [
-    [0, 11, 5],
-    [0, 5, 1],
-    [0, 1, 7],
-    [0, 7, 10],
-    [0, 10, 11],
-    [1, 5, 9],
-    [5, 11, 4],
-    [11, 10, 2],
-    [10, 7, 6],
-    [7, 1, 8],
-    [3, 9, 4],
-    [3, 4, 2],
-    [3, 2, 6],
-    [3, 6, 8],
-    [3, 8, 9],
-    [4, 9, 5],
-    [2, 4, 11],
-    [6, 2, 10],
-    [8, 6, 7],
-    [9, 8, 1],
-  ];
-  const onSphere = (v: number[]): number[] => {
-    const n = Math.hypot(v[0] as number, v[1] as number, v[2] as number);
-    return v.map((x) => (x * radius) / n);
-  };
-  let positions: number[][] = base.map(onSphere);
-  for (let l = 0; l < level; l++) {
-    const cache = new Map<string, number>();
-    const next = positions.slice();
-    const mid = (a: number, b: number): number => {
-      const key = a < b ? `${a},${b}` : `${b},${a}`;
-      let m = cache.get(key);
-      if (m === undefined) {
-        const [pa, pb] = [positions[a] as number[], positions[b] as number[]];
-        m = next.length;
-        next.push(
-          onSphere([
-            ((pa[0] as number) + (pb[0] as number)) / 2,
-            ((pa[1] as number) + (pb[1] as number)) / 2,
-            ((pa[2] as number) + (pb[2] as number)) / 2,
-          ]),
-        );
-        cache.set(key, m);
-      }
-      return m;
-    };
-    const refined: number[][] = [];
-    for (const [a, b, c] of faces as Array<[number, number, number]>) {
-      const [ab, bc, ca] = [mid(a, b), mid(b, c), mid(c, a)];
-      refined.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]);
-    }
-    positions = next;
-    faces = refined;
-  }
-  return { positions: positions.flat(), indices: faces.flat() };
-}
-
-function grid(size: number, n: number, height: (x: number, y: number) => number): MeshData {
-  const h = size / n;
-  const positions: number[] = [];
-  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) positions.push(i * h, j * h, height(i * h, j * h));
-  const id = (i: number, j: number): number => j * (n + 1) + i;
-  const indices: number[] = [];
-  for (let j = 0; j < n; j++)
-    for (let i = 0; i < n; i++) indices.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
-  return { positions, indices };
-}
-
-function noisy(mesh: MeshData, amplitude: number): MeshData {
-  let state = 42;
-  const random = (): number => {
-    state = (state * 1103515245 + 12345) % 2147483648;
-    return state / 2147483648;
-  };
-  return { positions: mesh.positions.map((v) => v + (random() * 2 - 1) * amplitude), indices: mesh.indices };
-}
-
-const hashOf = (mesh: MeshData): string =>
-  createHash('sha256')
-    .update(Buffer.from(Float64Array.from(mesh.positions).buffer))
-    .update(Buffer.from(Uint32Array.from(mesh.indices).buffer))
-    .digest('hex');
 
 /** The native engine's answer, after the host awaited the job (TECHNICAL_SPEC 13.8). */
 const nativeRun = (input: { mesh: MeshData }, op: MeshOp): Promise<MeshOpResult | MeshEngineFailure> =>
@@ -271,6 +170,153 @@ describe('native smooth is bit-identical to the TypeScript engine (VC-MSH-32)', 
   });
 });
 
+const remesh = (extra: Partial<Extract<MeshOp, { op: 'remesh' }>>): MeshOp => ({
+  op: 'remesh',
+  iterations: 3,
+  featureAngleRad: (40 * Math.PI) / 180,
+  preserveBoundary: true,
+  project: true,
+  ...extra,
+});
+
+describe('native remesh is bit-identical to the TypeScript engine (VC-MSH-32, DES-7c)', () => {
+  native('isotropic: the icosphere to two edge lengths, noisy input, projection off, one and many iterations', async () => {
+    const sphere = icosphere(10, 3);
+    const split = await expectIdentical(sphere, remesh({ targetEdge: 0.9 }));
+    expect((split.nat.report as { splits: number }).splits).toBeGreaterThan(0);
+    const merged = await expectIdentical(sphere, remesh({ targetEdge: 3 }));
+    expect((merged.nat.report as { collapses: number }).collapses).toBeGreaterThan(0);
+    await expectIdentical(noisy(sphere, 0.05), remesh({ targetEdge: 1.2, iterations: 5 }));
+    await expectIdentical(sphere, remesh({ targetEdge: 1.2, project: false, iterations: 1 }));
+    await expectIdentical(noisy(icosphere(10, 4), 0.02), remesh({ targetEdge: 1, iterations: 4 }));
+  });
+
+  native('adaptive: edge length follows the curvature, clamped to the band', async () => {
+    const result = await expectIdentical(icosphere(10, 3), remesh({ minEdge: 0.5, maxEdge: 3, approxError: 0.02 }));
+    expect((result.nat.report as { mode: string }).mode).toBe('adaptive');
+    await expectIdentical(box(10, 6), remesh({ minEdge: 0.8, maxEdge: 4, approxError: 0.05 }));
+  });
+
+  native('feature edges of a box, a free boundary, a region and a low feature angle', async () => {
+    const cube = box(10, 6);
+    const kept = await expectIdentical(cube, remesh({ targetEdge: 2.5 }));
+    expect((kept.nat.report as { featureEdges: number }).featureEdges).toBeGreaterThan(0);
+    await expectIdentical(cube, remesh({ targetEdge: 1.5, featureAngleRad: (95 * Math.PI) / 180 }));
+    await expectIdentical(icosphere(10, 3), remesh({ targetEdge: 0.6, region: { center: [0, 0, 10], radius: 3 } }));
+    const patch = grid(10, 8, (x, y) => Math.sin(x / 3) * Math.cos(y / 4));
+    await expectIdentical(patch, remesh({ targetEdge: 2 }));
+    await expectIdentical(patch, remesh({ targetEdge: 2, preserveBoundary: false }));
+  });
+
+  native('the closing passes and the triangle limit refuse alike (MESH_REMESH_RESULT_TOO_LARGE)', async () => {
+    const sphere = icosphere(10, 2);
+    const limited = remesh({ targetEdge: 0.3, maxTriangles: 3000 });
+    const ts = tsMeshEngine.run({ mesh: sphere }, limited);
+    const nat = await nativeRun({ mesh: sphere }, limited);
+    expect(ts).toMatchObject({ code: 'MESH_REMESH_RESULT_TOO_LARGE' });
+    expect(nat).toMatchObject({ code: 'MESH_REMESH_RESULT_TOO_LARGE' });
+    expect((nat as MeshEngineFailure).message).toBe((ts as MeshEngineFailure).message);
+  });
+
+  native('refuses a mesh it cannot edit and a job without lengths, by name', async () => {
+    const open = { positions: icosphere(1, 1).positions, indices: icosphere(1, 1).indices.slice(3) };
+    // an open mesh is editable: the same bytes in both engines
+    await expectIdentical(open, remesh({ targetEdge: 0.5 }));
+    const soup = { positions: icosphere(1, 1).positions, indices: icosphere(1, 1).indices.map((v, i) => (i === 1 ? 0 : v)) };
+    const refused = tsMeshEngine.run({ mesh: soup }, remesh({ targetEdge: 0.5 }));
+    expect(refused).toMatchObject({ code: expect.stringMatching(/MESH_(DEGENERATE|NON_MANIFOLD)/) });
+    expect(await nativeRun({ mesh: soup }, remesh({ targetEdge: 0.5 }))).toEqual(refused);
+    const none = await nativeRun({ mesh: icosphere(1, 1) }, remesh({}));
+    expect(none).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('targetEdge') });
+  });
+});
+
+const analyze = (extra: Partial<Extract<MeshOp, { op: 'analyze' }>> = {}): MeshOp => ({
+  op: 'analyze',
+  weldTolerance: 0,
+  selfIntersections: false,
+  maxListed: 20,
+  ...extra,
+});
+
+/** Every field of the analysis and of the report, `+0` and `-0` apart: `toEqual` compares numbers with Object.is. */
+async function expectSameAnalysis(mesh: MeshData, op: MeshOp): Promise<MeshOpResult> {
+  const ts = tsMeshEngine.run({ mesh }, op);
+  const nat = await nativeRun({ mesh }, op);
+  if (isEngineFailure(ts) || isEngineFailure(nat))
+    throw new Error(`ts: ${JSON.stringify(ts).slice(0, 120)}; native: ${JSON.stringify(nat).slice(0, 120)}`);
+  expect(nat.analysis).toEqual(ts.analysis);
+  expect(nat.report).toEqual(ts.report);
+  expect(nat.provenance).toMatchObject({ engine: 'native', algorithm: ts.provenance.algorithm, reference: ts.provenance.reference });
+  return nat;
+}
+
+describe('native analyze is bit-identical to the TypeScript engine (VC-MSH-32, DES-7c)', () => {
+  const flipped = (mesh: MeshData, every: number): MeshData => ({
+    positions: mesh.positions,
+    indices: mesh.indices.map((v, i) =>
+      i % (every * 3) === 1 ? (mesh.indices[i + 1] as number) : i % (every * 3) === 2 ? (mesh.indices[i - 1] as number) : v,
+    ),
+  });
+
+  native('closed solids: the icosphere, a box and a noisy sphere, with the list length cut to 0, 1 and 1000', async () => {
+    for (const maxListed of [0, 1, 1000]) {
+      await expectSameAnalysis(icosphere(10, 3), analyze({ maxListed }));
+      await expectSameAnalysis(box(10, 5), analyze({ maxListed }));
+    }
+    const closed = await expectSameAnalysis(noisy(icosphere(10, 3), 0.2), analyze());
+    expect(closed.analysis).toMatchObject({ closed: true, manifold: true, shellCount: 1, genus: 0 });
+  });
+
+  native('open, multi-shell, flipped and damaged meshes: boundary loops, shells, orientation, degenerate and duplicate faces', async () => {
+    const patch = grid(10, 8, (x, y) => Math.sin(x / 3) * y);
+    expect((await expectSameAnalysis(patch, analyze())).analysis).toMatchObject({ closed: false, boundaryLoopCount: 1 });
+    const two = icosphere(3, 2);
+    const apart: MeshData = {
+      positions: [...two.positions, ...two.positions.map((v, i) => (i % 3 === 0 ? v + 10 : v))],
+      indices: [...two.indices, ...two.indices.map((v) => v + two.positions.length / 3)],
+    };
+    expect((await expectSameAnalysis(apart, analyze({ maxListed: 1 }))).analysis).toMatchObject({ shellCount: 2 });
+    expect((await expectSameAnalysis(flipped(icosphere(10, 2), 7), analyze())).analysis).toMatchObject({ orientationConsistent: false });
+    const sphere = icosphere(10, 2);
+    const damaged: MeshData = {
+      positions: sphere.positions,
+      indices: [...sphere.indices.slice(3), ...sphere.indices.slice(30, 33), 4, 4, 5, ...sphere.indices.slice(60, 63).reverse()],
+    };
+    const counted = await expectSameAnalysis(damaged, analyze());
+    expect(counted.analysis).toMatchObject({ degenerateFaces: 1, closed: false });
+    expect((counted.analysis as { duplicateFaces: number }).duplicateFaces).toBeGreaterThan(0);
+  });
+
+  native('an unwelded soup is welded first (mergedVertices), and unused vertices are dropped', async () => {
+    const sphere = icosphere(10, 2);
+    const soup: MeshData = {
+      positions: sphere.indices.flatMap((v) => sphere.positions.slice(v * 3, v * 3 + 3)),
+      indices: sphere.indices.map((_, i) => i),
+    };
+    const result = await expectSameAnalysis({ positions: [...soup.positions, 9, 9, 9], indices: soup.indices }, analyze());
+    expect(result.report).toEqual({ weldTolerance: 0, mergedVertices: soup.positions.length / 3 - sphere.positions.length / 3 });
+    expect(result.analysis).toMatchObject({ vertices: sphere.positions.length / 3, closed: true });
+  });
+
+  native('what it does not do is refused by name, so the composite falls back or reports the cap', async () => {
+    const sphere = icosphere(10, 2);
+    expect(await nativeRun({ mesh: sphere }, analyze({ weldTolerance: 0.1 }))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+    // up to the TypeScript cap the pair search is left to that engine; above it the command is refused by name
+    expect(await nativeRun({ mesh: sphere }, analyze({ selfIntersections: true }))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+    const beyondCap = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: new Array<number>(3 * 200_001).fill(0) };
+    expect(await nativeRun({ mesh: beyondCap }, analyze({ selfIntersections: true }))).toMatchObject({
+      code: 'MESH_ENGINE_CAP_EXCEEDED',
+      message: expect.stringContaining('selfIntersections false'),
+    });
+    const composite = composeMeshEngines([tsMeshEngine, engine as NonNullable<typeof engine>]);
+    expect(composite.capabilities().get('analyze')).toBe(Infinity);
+    expect(composite.capabilities().get('remesh')).toBe(2_000_000);
+    const huge = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: new Array<number>(2_000_001 * 3).fill(0) };
+    expect(composite.run({ mesh: huge }, remesh({ targetEdge: 1 }))).toMatchObject({ code: 'MESH_ENGINE_CAP_EXCEEDED' });
+  });
+});
+
 describe('native deviation is bit-identical to the TypeScript engine (VC-MSH-25, 32)', () => {
   native('sphere against its decimation, noisy against clean, strided samples, parallel grids', async () => {
     const run = async (a: MeshData, b: MeshData, maxSamples: number): Promise<void> => {
@@ -304,6 +350,51 @@ describe('the composite engine routes by cap', () => {
     expect(composite.capabilities().get('smooth')).toBe(Infinity);
     expect(composite.capabilities().get('deviation')).toBe(Infinity);
     expect(createNativeMeshEngine({ env: { LLULL_COMPUTE: 'does-not-exist.exe' } })).toBeNull();
+  });
+});
+
+describe('the composite engine prefers the native one above a per-op size (DES-7c step 7)', () => {
+  const composite = (): ReturnType<typeof composeMeshEngines> => composeMeshEngines([tsMeshEngine, engine as NonNullable<typeof engine>]);
+  const provenanceOf = (result: MeshOpResult | MeshEngineFailure): string => (result as MeshOpResult).provenance.engine;
+
+  native('decimate: the TypeScript engine below 1,000 triangles, the native one above, the same bytes either way', async () => {
+    const op = decimate({ targetTriangles: 100 });
+    const small = icosphere(10, 2);
+    expect(provenanceOf(composite().run({ mesh: small }, op))).toBe('ts');
+    const larger = noisy(icosphere(10, 3), 0.02);
+    const routed = await resolveDeferred(() => composite().run({ mesh: larger }, op));
+    expect(provenanceOf(routed)).toBe('native');
+    const oracle = tsMeshEngine.run({ mesh: larger }, op) as MeshOpResult;
+    expect(hashOf((routed as MeshOpResult).mesh as MeshData)).toBe(hashOf(oracle.mesh as MeshData));
+    expect((routed as MeshOpResult).report).toEqual(oracle.report);
+  });
+
+  native('analyze above 15,000 triangles goes native, below it stays in process', async () => {
+    const op = analyze();
+    expect(provenanceOf(composite().run({ mesh: icosphere(10, 4) }, op))).toBe('ts');
+    const routed = await resolveDeferred(() => composite().run({ mesh: icosphere(10, 5) }, op));
+    expect(provenanceOf(routed)).toBe('native');
+    expect((routed as MeshOpResult).analysis).toEqual((tsMeshEngine.run({ mesh: icosphere(10, 5) }, op) as MeshOpResult).analysis);
+  });
+
+  native(
+    'analyze with the pair search (the command default up to 200,000 triangles) is answered by the TypeScript engine, above the native threshold too',
+    async () => {
+      const mesh = icosphere(10, 5);
+      const op = analyze({ selfIntersections: true });
+      const routed = await resolveDeferred(() => composite().run({ mesh }, op));
+      expect(provenanceOf(routed)).toBe('ts');
+      expect((routed as MeshOpResult).analysis?.selfIntersectionPairs).toBe(0);
+      expect(await nativeRun({ mesh }, op)).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+    },
+  );
+
+  native('outside the resolving host path the native engine hands over, so the in-process answer still works', () => {
+    // a finished job answers without a scope, so start with none kept
+    _clearResultCache();
+    const answered = composite().run({ mesh: noisy(icosphere(10, 3), 0.02) }, decimate({ targetTriangles: 100 }));
+    expect(provenanceOf(answered)).toBe('ts');
+    expect(composite().capabilities().get('decimate')).toBe(Infinity);
   });
 });
 

@@ -5,6 +5,7 @@
  * vertices are fixed. The target length is constant (isotropic) or follows the local curvature (adaptive, chord error `approxError`).
  * @invariant the closing pass splits until no edge exceeds 4/3 L, so the maximum edge never exceeds the band
  * @invariant never creates a fold-over or non-manifold edge
+ * @invariant splitting stops once the working mesh passes `maxTriangles` (default REMESH_MAX_TRIANGLES): the result carries `tooLarge` and the caller refuses; the native twin applies the same rule
  */
 
 import type { MeshData } from '../../model/types';
@@ -23,7 +24,12 @@ export interface RemeshParams {
   readonly preserveBoundary: boolean;
   readonly project: boolean;
   readonly region?: SphereRegion;
+  /** Triangles the working mesh may reach (default REMESH_MAX_TRIANGLES); the commands never set it, tests do. */
+  readonly maxTriangles?: number;
 }
+
+/** Triangles the working mesh may reach before the splitting stops and the op is refused (a tiny target edge would otherwise fill the memory). */
+export const REMESH_MAX_TRIANGLES = 4_000_000;
 
 interface EdgeStats {
   readonly min: number;
@@ -123,6 +129,7 @@ class Remesher {
   splits = 0;
   collapses = 0;
   flips = 0;
+  exceeded = false;
   private readonly reference: SurfaceIndex;
   private readonly referenceMesh: MeshData;
   private readonly sizes: number[] | null;
@@ -215,6 +222,10 @@ class Remesher {
   splitLong(): number {
     let count = 0;
     for (const [a, b] of this.allEdges()) {
+      if (this.mesh.liveFaces > (this.params.maxTriangles ?? REMESH_MAX_TRIANGLES)) {
+        this.exceeded = true;
+        break;
+      }
       if (this.mesh.facesOnEdge(a, b).length === 0) continue;
       if (!this.movable(a) || !this.movable(b)) continue;
       const length = dist(this.mesh.p(a), this.mesh.p(b));
@@ -434,17 +445,24 @@ class Remesher {
   }
 }
 
+/** The working mesh passed the triangle limit: its size when splitting stopped. */
+export interface RemeshTooLarge {
+  readonly tooLarge: number;
+}
+
 /** Remesh a manifold, consistently wound, welded mesh. Parameters are validated by the caller (target or min/max/error present). */
-export function remeshMesh(input: MeshData, params: RemeshParams): { mesh: MeshData; report: RemeshReport } {
+export function remeshMesh(input: MeshData, params: RemeshParams): { mesh: MeshData; report: RemeshReport } | RemeshTooLarge {
   const remesher = new Remesher(input, params);
   const trianglesBefore = remesher.mesh.liveFaces;
   for (let i = 0; i < params.iterations; i++) {
     remesher.splitLong();
+    if (remesher.exceeded) break;
     remesher.collapseShort();
     remesher.flipEdges();
     remesher.relax();
   }
-  for (let pass = 0; pass < 12 && remesher.splitLong() > 0; pass++) remesher.flipEdges();
+  for (let pass = 0; pass < 12 && !remesher.exceeded && remesher.splitLong() > 0; pass++) remesher.flipEdges();
+  if (remesher.exceeded) return { tooLarge: remesher.mesh.liveFaces };
   const { stats, inBand } = remesher.edgeStats();
   return {
     mesh: remesher.mesh.toMeshData(),

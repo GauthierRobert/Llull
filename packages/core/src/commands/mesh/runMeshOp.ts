@@ -27,9 +27,11 @@ export function engineDeviation(engine: MeshProcessingEngine, from: MeshData, to
   return result.deviation ?? { code: 'MESH_ENGINE_UNSUPPORTED', message: 'the engine returned no deviation' };
 }
 
-/** `op` asking its engine for the deviation of the result in the same job, for the ops that can (decimate, smooth); any other op unchanged. */
+/** `op` asking its engine for the deviation of the result in the same job, for the ops that can (decimate, smooth, remesh); any other op unchanged. */
 function withDeviationRequest(op: MeshOp, wanted: boolean): MeshOp {
-  return wanted && (op.op === 'decimate' || op.op === 'smooth') ? { ...op, withDeviation: DEVIATION_MAX_SAMPLES } : op;
+  return wanted && (op.op === 'decimate' || op.op === 'smooth' || op.op === 'remesh')
+    ? { ...op, withDeviation: DEVIATION_MAX_SAMPLES }
+    : op;
 }
 
 /** What the deviation samples are (the Hausdorff value is a lower bound of the exact one). */

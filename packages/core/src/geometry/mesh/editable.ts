@@ -20,9 +20,19 @@ export function editableProblem(mesh: MeshData, op: string): MeshEngineFailure |
 
 type Description = Pick<MeshProvenance, 'algorithm' | 'reference'>;
 
+export const ANALYZE_DESCRIPTION: Description = {
+  algorithm: 'indexed-mesh analysis: edge map, union-find shells, boundary chains, Euler characteristic',
+  reference: 'Euler-Poincare: chi = 2 - 2g',
+};
+
 export const DECIMATE_DESCRIPTION: Description = {
   algorithm: 'quadric error metric edge collapse with link condition, fold-over test and probe-point deviation bound',
   reference: 'Garland and Heckbert, Surface Simplification Using Quadric Error Metrics, SIGGRAPH 1997',
+};
+
+export const REMESH_DESCRIPTION: Description = {
+  algorithm: 'incremental remeshing: split 4/3 L, collapse 4/5 L, flip to valence 6, tangential relaxation, projection',
+  reference: 'Botsch and Kobbelt, A Remeshing Approach to Multiresolution Modeling, SGP 2004',
 };
 
 export const QUAD_DESCRIPTION: Description = {

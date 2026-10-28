@@ -14,6 +14,7 @@ import {
   type MeshProcessingEngine,
   type MeshProvenance,
 } from './engineTypes';
+import { ANALYZE_DESCRIPTION } from './editable';
 import { convexHull } from './hull';
 import { findSelfIntersections } from './selfIntersection';
 import { subdivideMesh } from './subdivide';
@@ -136,10 +137,7 @@ function run(input: MeshInput, op: MeshOp): MeshOpResult | MeshEngineFailure {
           maxListed: op.maxListed,
         }),
         report: { weldTolerance: op.weldTolerance, mergedVertices: welded.mergedVertices },
-        provenance: provenance(
-          'indexed-mesh analysis: edge map, union-find shells, boundary chains, Euler characteristic',
-          'Euler-Poincare: chi = 2 - 2g',
-        ),
+        provenance: provenance(ANALYZE_DESCRIPTION.algorithm, ANALYZE_DESCRIPTION.reference),
       };
     }
     case 'hull': {

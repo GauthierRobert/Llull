@@ -214,6 +214,67 @@ export function analyzeIndexedMesh(
   };
 }
 
+const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isNullable =
+  (check: (value: unknown) => boolean) =>
+  (value: unknown): boolean =>
+    value === null || check(value);
+const isPair = (value: unknown): boolean => Array.isArray(value) && value.length === 2 && value.every(isCount);
+const isList2 = (value: unknown): boolean => Array.isArray(value) && value.every(isPair);
+const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isNumber);
+const isList = (value: unknown, item: (entry: Record<string, unknown>) => boolean): boolean =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'object' && entry !== null && item(entry as Record<string, unknown>));
+
+/** True when `value` (parsed JSON from a native job) has every field and type of a `MeshAnalysis`: the check before the engine hands it to a command. */
+export function isMeshAnalysis(value: unknown): value is MeshAnalysis {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const stats = (key: string, fields: readonly string[]): boolean => {
+    const entry = v[key];
+    return typeof entry === 'object' && entry !== null && fields.every((field) => isNumber((entry as Record<string, unknown>)[field]));
+  };
+  const extent = v['bounds'] as Record<string, unknown> | null;
+  return (
+    [
+      'vertices',
+      'edges',
+      'faces',
+      'boundaryEdges',
+      'boundaryLoopCount',
+      'nonManifoldEdgeCount',
+      'shellCount',
+      'degenerateFaces',
+      'duplicateFaces',
+    ].every((key) => isCount(v[key])) &&
+    ['eulerCharacteristic', 'area', 'minAngleDeg', 'diagonal'].every((key) => isNumber(v[key])) &&
+    ['closed', 'manifold', 'orientationConsistent'].every((key) => typeof v[key] === 'boolean') &&
+    isNullable(Number.isInteger)(v['genus']) &&
+    isNullable(isNumber)(v['volume']) &&
+    isNullable(isPoint)(v['centroid']) &&
+    isNullable(isCount)(v['selfIntersectionPairs']) &&
+    isList2(v['selfIntersections']) &&
+    isList(v['boundaryLoops'], (l) => isCount(l['edges']) && isNumber(l['length']) && isPoint(l['centroid'])) &&
+    isList(v['nonManifoldEdges'], (e) => isCount(e['a']) && isCount(e['b']) && isCount(e['uses'])) &&
+    isList(
+      v['shells'],
+      (s) =>
+        ['faces', 'vertices', 'edges'].every((key) => isCount(s[key])) &&
+        typeof s['closed'] === 'boolean' &&
+        isNumber(s['eulerCharacteristic']) &&
+        isNullable(Number.isInteger)(s['genus']) &&
+        isNumber(s['area']) &&
+        isNullable(isNumber)(s['volume']),
+    ) &&
+    stats('edgeLength', ['min', 'max', 'mean']) &&
+    stats('aspectRatio', ['max', 'mean']) &&
+    extent !== null &&
+    typeof extent === 'object' &&
+    isPoint(extent['min']) &&
+    isPoint(extent['max'])
+  );
+}
+
 function bounds(positions: ReadonlyArray<number>): { min: Vec3; max: Vec3 } {
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];

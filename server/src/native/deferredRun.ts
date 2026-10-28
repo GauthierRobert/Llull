@@ -64,6 +64,8 @@ export interface DeferredScope {
   readonly cancelled: boolean;
   /** This run already asked for a job: every later miss defers without asking (its input is a placeholder). */
   readonly deferring: boolean;
+  /** The job budget of this resolve is spent: an op the TypeScript engine can take should be left to it (answer MESH_ENGINE_NEEDS_HOST), only the others still ask for a job. */
+  readonly budgetSpent: boolean;
   /** Shared by every run of this resolve; dropped when it ends. */
   readonly memo: ResolveMemo;
 }
@@ -327,6 +329,9 @@ export async function resolveDeferred<T>(attempt: () => T, options: ResolveOptio
     get deferring() {
       return requested.size > 0;
     },
+    get budgetSpent() {
+      return jobs >= maxJobs;
+    },
   };
   const maxJobs = options.maxJobs ?? MAX_JOBS_PER_RESOLVE;
   let last: T | undefined;
@@ -366,7 +371,8 @@ export async function resolveDeferred<T>(attempt: () => T, options: ResolveOptio
         return stop({
           code: 'MESH_JOB_LIMIT',
           message: `the command needs more than ${maxJobs} native mesh jobs`,
-          remediation: 'Split the plan into several runs, or decimate the meshes so the TypeScript engine can take them.',
+          remediation:
+            'Split the plan into several runs. Once the budget is spent only the ops the TypeScript engine cannot take still count (quad_remesh, meshes above its 200000-triangle cap).',
         });
       if (aborted()) return stop(cancelRefusal(options.signal));
       jobs += 1;

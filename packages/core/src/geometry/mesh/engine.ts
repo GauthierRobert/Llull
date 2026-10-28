@@ -13,7 +13,14 @@ import type { MeshEngineFailure, MeshOpName, MeshProcessingEngine } from './engi
 import { isEngineFailure } from './engineTypes';
 import { tsMeshEngine } from './tsEngine';
 
-/** Engines asked in order; the first that lists the op (under its cap) answers, an UNSUPPORTED failure moves on. */
+/** Code of the refusal of an engine that only answers through the host's resolving path (the native one, outside `resolveDeferred`): the next engine may answer. */
+export const MESH_ENGINE_NEEDS_HOST = 'MESH_ENGINE_NEEDS_HOST';
+
+/**
+ * Engines asked in order; the first that lists the op (under its cap) answers, an UNSUPPORTED / NEEDS_HOST failure moves on. An engine that declares
+ * `preferredAbove` for the op goes first for inputs above that many triangles (the results are identical by the parity rule: only the speed changes).
+ * The refusal reported when nobody answers is the one of the last engine, in the listed order, that refused.
+ */
 export function composeMeshEngines(engines: ReadonlyArray<MeshProcessingEngine>): MeshProcessingEngine {
   return {
     name: engines.map((engine) => engine.name).join('+'),
@@ -24,22 +31,27 @@ export function composeMeshEngines(engines: ReadonlyArray<MeshProcessingEngine>)
     },
     run(input, op) {
       const triangles = op.op === 'hull' ? Math.floor(op.points.length / 3) : Math.floor(input.mesh.indices.length / 3);
-      let refusal: MeshEngineFailure = { code: 'MESH_ENGINE_UNSUPPORTED', message: `no installed mesh engine answers "${op.op}"` };
-      for (const engine of engines) {
+      const preferred = (engine: MeshProcessingEngine): boolean => (engine.preferredAbove?.().get(op.op) ?? Infinity) < triangles;
+      const order = [...engines.filter(preferred), ...engines.filter((engine) => !preferred(engine))];
+      const refusals = new Map<number, MeshEngineFailure>();
+      for (const engine of order) {
         const cap = engine.capabilities().get(op.op);
         if (cap === undefined) continue;
+        const position = engines.indexOf(engine);
         if (triangles > cap) {
-          refusal = {
+          refusals.set(position, {
             code: 'MESH_ENGINE_CAP_EXCEEDED',
             message: `"${op.op}" on ${triangles} triangles exceeds the ${engine.name} engine cap of ${cap}`,
-          };
+          });
           continue;
         }
         const result = engine.run(input, op);
-        if (!isEngineFailure(result) || result.code !== 'MESH_ENGINE_UNSUPPORTED') return result;
-        refusal = result;
+        if (!isEngineFailure(result) || (result.code !== 'MESH_ENGINE_UNSUPPORTED' && result.code !== MESH_ENGINE_NEEDS_HOST))
+          return result;
+        refusals.set(position, result);
       }
-      return refusal;
+      const last = Math.max(-1, ...refusals.keys());
+      return refusals.get(last) ?? { code: 'MESH_ENGINE_UNSUPPORTED', message: `no installed mesh engine answers "${op.op}"` };
     },
   };
 }

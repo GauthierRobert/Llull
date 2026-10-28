@@ -42,6 +42,7 @@ export const cutMesh = defineCommand({
     'and wound outward. keep "both" rewrites `id` as the positive half and adds the negative half as a new mesh (positive first). Reports ' +
     'data.volumes {positive, negative} (document units^3, closed results), capArea (units^2), section loops and the ids. ' +
     'Reference: the unit cube cut by x + y + z = 1.5 (normal [1,1,1]) keeps 0.5 below the plane with a hexagonal cap of area 1.299. ' +
+    'When data.uncapped is above 0 a section could not be capped (the input crosses itself near the plane): the summary says so; run check_mesh and repair_mesh, then cut again. ' +
     'Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_CUT_MISSES.',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) to cut.'),
@@ -133,11 +134,16 @@ export const cutMesh = defineCommand({
         defaults: [namedDefault('snapTolerance', epsilon, doc.units, 'llull default 1e-12 x bbox diagonal')],
       },
     );
+    const uncappedLoops = data['uncapped'] as number;
+    const warning =
+      capped && uncappedLoops > 0
+        ? ` WARNING: ${uncappedLoops} section loop(s) left uncapped: the input crosses itself near the plane (or the section is not a simple outline); run check_mesh, then repair_mesh, and cut again.`
+        : '';
     const volumeText = (name: string): string =>
       volumes[name] === undefined ? '' : ` ${name} volume ${volumes[name] === null ? 'open' : (volumes[name] as number).toPrecision(10)}`;
     return {
       document: next,
-      summary: `cut_mesh '${id}' -> ${ids.map((i) => `'${i}'`).join(', ')}:${Object.keys(volumes).map(volumeText).join(';')}${capped ? '' : ' (uncapped)'}.`,
+      summary: `cut_mesh '${id}' -> ${ids.map((i) => `'${i}'`).join(', ')}:${Object.keys(volumes).map(volumeText).join(';')}${capped ? '' : ' (uncapped)'}.${warning}`,
       affected: ids,
       data,
     };

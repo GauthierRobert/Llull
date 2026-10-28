@@ -1,0 +1,441 @@
+{
+  "analyze_damaged_soup": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 3201
+    },
+    "analysis": {
+      "vertices": 642,
+      "edges": 1920,
+      "faces": 1281,
+      "eulerCharacteristic": 2,
+      "genus": null,
+      "closed": false,
+      "manifold": false,
+      "orientationConsistent": false,
+      "boundaryEdges": 3,
+      "boundaryLoopCount": 1,
+      "boundaryLoops": [
+        {
+          "edges": 3,
+          "length": 4.5497767718457105,
+          "centroid": [
+            -4.466209383359763,
+            3.8058552849869574,
+            8.050930100949016
+          ]
+        }
+      ],
+      "nonManifoldEdgeCount": 3,
+      "nonManifoldEdges": [
+        {
+          "a": 71,
+          "b": 73,
+          "uses": 3
+        },
+        {
+          "a": 71,
+          "b": 74,
+          "uses": 3
+        },
+        {
+          "a": 73,
+          "b": 74,
+          "uses": 3
+        }
+      ],
+      "shellCount": 1,
+      "shells": [
+        {
+          "faces": 1280,
+          "vertices": 642,
+          "edges": 1920,
+          "closed": false,
+          "eulerCharacteristic": 2,
+          "genus": null,
+          "area": 1251.8120556240483,
+          "volume": null
+        }
+      ],
+      "degenerateFaces": 1,
+      "duplicateFaces": 1,
+      "area": 1251.8120556240483,
+      "volume": null,
+      "centroid": null,
+      "selfIntersectionPairs": null,
+      "selfIntersections": [],
+      "edgeLength": {
+        "min": 0,
+        "max": 1.6528193677469043,
+        "mean": 1.5011929616134525
+      },
+      "aspectRatio": {
+        "max": 1.1337430591685456,
+        "mean": 1.034736617809627
+      },
+      "minAngleDeg": 0,
+      "bounds": {
+        "min": [
+          -10.001600932954828,
+          -10.027596606097703,
+          -10.031356473069243
+        ],
+        "max": [
+          9.999358402999944,
+          10.049341579626235,
+          9.97351988975368
+        ]
+      },
+      "diagonal": 34.68885843558026
+    }
+  },
+  "analyze_open_with_holes": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 289,
+      "edges": 796,
+      "faces": 506,
+      "eulerCharacteristic": -1,
+      "genus": null,
+      "closed": false,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 74,
+      "boundaryLoopCount": 3,
+      "boundaryLoops": [
+        {
+          "edges": 64,
+          "length": 40.21165747649769,
+          "centroid": [
+            5,
+            5,
+            -0.005738925215304887
+          ]
+        },
+        {
+          "edges": 6,
+          "length": 3.7671457538688404,
+          "centroid": [
+            2.5,
+            2.1875,
+            0.17029175418373962
+          ]
+        }
+      ],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 1,
+      "shells": [
+        {
+          "faces": 506,
+          "vertices": 289,
+          "edges": 796,
+          "closed": false,
+          "eulerCharacteristic": -1,
+          "genus": null,
+          "area": 100.17244899167117,
+          "volume": null
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 100.17244899167117,
+      "volume": null,
+      "centroid": null,
+      "selfIntersectionPairs": null,
+      "selfIntersections": [],
+      "edgeLength": {
+        "min": 0.625,
+        "max": 0.8986426620583519,
+        "mean": 0.7160678326587149
+      },
+      "aspectRatio": {
+        "max": 1.4069049430984695,
+        "mean": 1.393503534409256
+      },
+      "minAngleDeg": 44.066577819624506,
+      "bounds": {
+        "min": [
+          0,
+          0,
+          -0.39810837398026083
+        ],
+        "max": [
+          10,
+          10,
+          0.398163183100706
+        ]
+      },
+      "diagonal": 14.164534880913532
+    }
+  },
+  "analyze_sphere": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 2562,
+      "edges": 7680,
+      "faces": 5120,
+      "eulerCharacteristic": 2,
+      "genus": 0,
+      "closed": true,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 0,
+      "boundaryLoopCount": 0,
+      "boundaryLoops": [],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 1,
+      "shells": [
+        {
+          "faces": 5120,
+          "vertices": 2562,
+          "edges": 7680,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1269.9094651037153,
+          "volume": 4179.509507919436
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 1269.9094651037153,
+      "volume": 4179.509507919436,
+      "centroid": [
+        0.0015895669084250686,
+        -0.0016692606190117588,
+        0.0025316771957035102
+      ],
+      "selfIntersectionPairs": null,
+      "selfIntersections": [],
+      "edgeLength": {
+        "min": 0.5728703126794685,
+        "max": 0.8450479919485426,
+        "mean": 0.7560221869566374
+      },
+      "aspectRatio": {
+        "max": 1.1553551279205339,
+        "mean": 1.032416841325739
+      },
+      "minAngleDeg": 51.135949967793124,
+      "bounds": {
+        "min": [
+          -10.085588444621552,
+          -10.067633033148411,
+          -10.015220257836205
+        ],
+        "max": [
+          10.081990548695059,
+          10.07085485655475,
+          10.039979127817682
+        ]
+      },
+      "diagonal": 34.84969095033295
+    }
+  },
+  "analyze_two_shells": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 804,
+      "edges": 2400,
+      "faces": 1600,
+      "eulerCharacteristic": 4,
+      "genus": 0,
+      "closed": true,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 0,
+      "boundaryLoopCount": 0,
+      "boundaryLoops": [],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 2,
+      "shells": [
+        {
+          "faces": 320,
+          "vertices": 162,
+          "edges": 480,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1232.9062788395042,
+          "volume": 4047.005367354516
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 2499.60660134335,
+      "volume": 8201.472357734272,
+      "centroid": [
+        15.201194243839328,
+        -0.0025813529705045937,
+        0.0025927063999362596
+      ],
+      "selfIntersectionPairs": null,
+      "selfIntersections": [],
+      "edgeLength": {
+        "min": 1.1717841584626956,
+        "max": 3.2491969623290644,
+        "mean": 1.8051092892706022
+      },
+      "aspectRatio": {
+        "max": 1.1517408493434365,
+        "mean": 1.0369735944808194
+      },
+      "minAngleDeg": 50.784396537915875,
+      "bounds": {
+        "min": [
+          -10,
+          -10.073529586463579,
+          -10.01841457452115
+        ],
+        "max": [
+          40.032971551348446,
+          10.072571438864465,
+          10.001403595590054
+        ]
+      },
+      "diagonal": 57.53222356510376
+    }
+  },
+  "remesh_adaptive": {
+    "digest": "59d82190112d43a8b5042fd8d0618de7654fce77c5a2a9a285422d00a552e607",
+    "report": {
+      "mode": "adaptive",
+      "iterations": 3,
+      "trianglesBefore": 1280,
+      "trianglesAfter": 2482,
+      "splits": 2443,
+      "collapses": 1842,
+      "flips": 402,
+      "edgeLength": {
+        "min": 0.37515976479026003,
+        "max": 1.462246002652624,
+        "mean": 1.0981424706436032,
+        "p5": 0.7265811545028252,
+        "p95": 1.3569155807625766
+      },
+      "fractionInBand": 0.8724147193123825,
+      "featureEdges": 0
+    }
+  },
+  "remesh_free_boundary": {
+    "digest": "632e7356b5e5f5c8b701faf27208791dbc3882076330fda3ada43a3c92aa15b4",
+    "report": {
+      "mode": "isotropic",
+      "iterations": 3,
+      "trianglesBefore": 508,
+      "trianglesAfter": 170,
+      "splits": 42,
+      "collapses": 227,
+      "flips": 11,
+      "edgeLength": {
+        "min": 0.3125137136393721,
+        "max": 1.5941970967246168,
+        "mean": 1.1868175357684552,
+        "p5": 0.7678180514174872,
+        "p95": 1.535636102834975
+      },
+      "fractionInBand": 0.8290909090909091,
+      "featureEdges": 0
+    }
+  },
+  "remesh_region": {
+    "digest": "c9e6b5b490ecaa5b59f4441843f125b708e1445cd86de6638c5234b6da24b58d",
+    "report": {
+      "mode": "isotropic",
+      "iterations": 3,
+      "trianglesBefore": 1280,
+      "trianglesAfter": 1442,
+      "splits": 140,
+      "collapses": 59,
+      "flips": 44,
+      "edgeLength": {
+        "min": 0.25214071843066965,
+        "max": 1.6688525554394231,
+        "mean": 1.3881238270004803,
+        "p5": 0.5190267950724207,
+        "p95": 1.630021145508051
+      },
+      "fractionInBand": 0.07397133610725844,
+      "featureEdges": 0
+    }
+  },
+  "remesh_ridge": {
+    "digest": "058ba83ac0dd5a830449409c3903ae2c21a4ed95f4f95b26994f7540d15e180f",
+    "report": {
+      "mode": "isotropic",
+      "iterations": 3,
+      "trianglesBefore": 200,
+      "trianglesAfter": 800,
+      "splits": 320,
+      "collapses": 0,
+      "flips": 200,
+      "edgeLength": {
+        "min": 0.4999999999999991,
+        "max": 0.8124038404635977,
+        "mean": 0.6483006081916379,
+        "p5": 0.5,
+        "p95": 0.8124038404635961
+      },
+      "fractionInBand": 0.6612903225806451,
+      "featureEdges": 20
+    }
+  },
+  "remesh_sphere_merge": {
+    "digest": "a432f29c289e74b06bd9c151c31b3aef2a2e24636758228c841264fbd4857ef8",
+    "report": {
+      "mode": "isotropic",
+      "iterations": 4,
+      "trianglesBefore": 5120,
+      "trianglesAfter": 436,
+      "splits": 102,
+      "collapses": 2444,
+      "flips": 67,
+      "edgeLength": {
+        "min": 1.278472326779768,
+        "max": 3.3327329991362213,
+        "mean": 2.603969407842577,
+        "p5": 1.7219593281898227,
+        "p95": 3.2007429435161656
+      },
+      "fractionInBand": 0.8853211009174312,
+      "featureEdges": 0
+    }
+  },
+  "remesh_sphere_split": {
+    "digest": "8b43897be7c6b9ed6586aa422a98d530c234f1d6c629c7ca7f3d4e023d856703",
+    "report": {
+      "mode": "isotropic",
+      "iterations": 3,
+      "trianglesBefore": 1280,
+      "trianglesAfter": 3848,
+      "splits": 2008,
+      "collapses": 724,
+      "flips": 959,
+      "edgeLength": {
+        "min": 0.4567752262482798,
+        "max": 1.1993663517442628,
+        "mean": 0.872825280716751,
+        "p5": 0.7410723207496829,
+        "p95": 1.0797708173714904
+      },
+      "fractionInBand": 0.9743589743589743,
+      "featureEdges": 0
+    }
+  }
+}

@@ -19,7 +19,7 @@ import {
 /**
  * @affects none (read-only); data = counts, topology, shells, loops, orientation, area, volume, quality, self-intersections
  * @invariant welding is the only preprocessing: the entity is not changed; every length is in document units
- * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over the engine cap -> MESH_ENGINE_CAP_EXCEEDED
+ * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over 200000 triangles without the native engine -> MESH_ENGINE_CAP_EXCEEDED; selfIntersections true above 200000 triangles -> MESH_ENGINE_CAP_EXCEEDED
  */
 export const analyzeMesh = defineCommand({
   name: 'analyze_mesh',
@@ -30,6 +30,8 @@ export const analyzeMesh = defineCommand({
     'degenerate and duplicate faces, crossing triangle pairs, area, volume and centroid (closed shells), edge-length and triangle-quality ' +
     '(aspect ratio, min angle) statistics. Vertices within weldTolerance are welded first (default 1e-6 x bounding-box diagonal, reported as a ' +
     'named default). Lengths in document units, areas in units^2, volumes in units^3. Next: check_mesh for a pass / fail verdict. ' +
+    'Meshes above 200000 triangles are analysed by the native engine (the desktop app and the llull CLI have it); without it they are refused with MESH_ENGINE_CAP_EXCEEDED. ' +
+    'The native engine does not search crossing pairs: selfIntersections true above 200000 triangles is refused. ' +
     'Refusals carry error.code MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_ENGINE_CAP_EXCEEDED.',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) to analyse.'),

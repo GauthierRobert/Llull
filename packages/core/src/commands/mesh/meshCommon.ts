@@ -45,7 +45,7 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_ENGINE_UNSUPPORTED:
     'Run in the desktop app or the `llull` CLI host, which install the Manifold mesh engine and the native llull-compute (quad_remesh needs the native one).',
   MESH_ENGINE_CAP_EXCEEDED:
-    'The input is above the engine cap (TypeScript 200 000 triangles, native quad_remesh 500 000): use a host with the native engine for the first, decimate_mesh the input for the second.',
+    'The input is above the engine cap (TypeScript 200 000 triangles; native: remesh_mesh 2 000 000, quad_remesh 500 000; the self-intersection search of analyze_mesh stays at 200 000, pass selfIntersections false above it): use a host with the native engine for the first, decimate_mesh the input for the others.',
   MESH_TIMEOUT:
     'Raise LLULL_MESH_OP_TIMEOUT_S, ask for less (a lower targetQuadCount: the time grows faster than linearly), or decimate_mesh the input first.',
   MESH_OFFSET_RESOLUTION: 'Raise tolerance (or maxCells): the level-set grid would exceed the cell cap.',
@@ -59,6 +59,8 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_HOLE_NO_TRIANGULATION: 'No valid triangulation of the loop exists: split it with repair_mesh mode=stitch, or use mode=wrap.',
   MESH_TARGET_UNREACHABLE: 'Raise maxDeviation, lower the target, or set preserveBoundary false.',
   MESH_REMESH_EDGE_TOO_LARGE: 'Lower the target edge length (at most 0.25 x the bounding-box diagonal).',
+  MESH_REMESH_RESULT_TOO_LARGE:
+    'The target edge is so short that the remeshed surface passes 4 000 000 triangles: raise targetEdgeLength (or minEdge), or remesh a region.',
   MESH_BREP_SEW_FAILED: 'Use mode=faceted, repair_mesh first, or raise fitTolerance.',
   MESH_SCULPT_STAMP_OFF_SURFACE: 'Move the stamp centre within `radius` of the surface (analyze_mesh gives the bounds), or raise radius.',
   MESH_SEGMENT_NO_GROUPS: 'The mesh has no face to segment: check it with analyze_mesh.',

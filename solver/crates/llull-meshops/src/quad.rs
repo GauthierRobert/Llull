@@ -10,9 +10,8 @@ use serde::Deserialize;
 pub struct QuadJob {
     /// Wanted number of output quads (the result lands within about 15 % of it).
     pub target_faces: i32,
-    pub preserve_sharp: bool,
-    /// Dihedral cosine below which an edge is sharp.
-    pub sharp_cos: f64,
+    /// Align the quads to edges whose faces turn by more than this angle (radians); absent = no alignment.
+    pub hard_edge_rad: Option<f64>,
     pub adaptive: bool,
 }
 
@@ -27,8 +26,13 @@ pub fn quad_remesh(
     if job.target_faces < 1 {
         return Err(JobError { code: "NATIVE_JOB_INPUT", message: format!("targetFaces {} must be at least 1", job.target_faces) });
     }
-    let params =
-        QuadParams { target_faces: job.target_faces, preserve_sharp: job.preserve_sharp, sharp_cos: job.sharp_cos, adaptive: job.adaptive };
+    let sharp_cos = job.hard_edge_rad.map(|angle| crate::cosine_of("hardEdgeRad", angle)).transpose()?;
+    let params = QuadParams {
+        target_faces: job.target_faces,
+        preserve_sharp: sharp_cos.is_some(),
+        sharp_cos: sharp_cos.unwrap_or(0.0),
+        adaptive: job.adaptive,
+    };
     let mesh = llull_quadflow::quad_remesh_with_stages(positions, triangles, &params, on_stage)
         .map_err(|error| JobError { code: "QUAD_REMESH_FAILED", message: error.0 })?;
     if mesh.quads.is_empty() {

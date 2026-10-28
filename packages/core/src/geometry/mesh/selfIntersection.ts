@@ -7,6 +7,8 @@ export interface SelfIntersections {
   readonly count: number;
   /** The first pairs found, as `[faceA, faceB]` with faceA < faceB. */
   readonly pairs: Array<readonly [number, number]>;
+  /** Pairs that went through the box test: each candidate pair once (a count, for tests of the de-duplication). */
+  readonly candidates: number;
 }
 
 /** Grid cells one triangle may occupy before it is treated as a large triangle. */
@@ -26,6 +28,7 @@ function trianglesCross(a: Corners, b: Corners): boolean {
 /**
  * Count the face pairs that cross each other.
  * @invariant pairs that share a vertex are skipped; the result is deterministic (ascending face order)
+ * @invariant a pair is a candidate once, without a table of the pairs seen: in the one grid cell that holds the lowest corner of the overlap of the two cell ranges (a Set of pairs fails with a RangeError past 2^24 entries)
  */
 export function findSelfIntersections(
   positions: ReadonlyArray<number>,
@@ -58,6 +61,9 @@ export function findSelfIntersections(
   const grid = new Map<string, number[]>();
   /** Triangles spanning too many cells (a big face among small ones) are tested against everything instead of filling the grid. */
   const large: number[] = [];
+  const isLarge = new Uint8Array(faceCount);
+  /** Lowest grid cell of each triangle (three integers per face). */
+  const lowCell = new Float64Array(faceCount * 3);
   for (let f = 0; f < faceCount; f++) {
     const range = [0, 1, 2].map((axis) => [
       Math.floor(((boxes[f * 6 + axis] as number) - (lo[axis] as number)) / cell),
@@ -70,8 +76,10 @@ export function findSelfIntersections(
       ((rz[1] as number) - (rz[0] as number) + 1);
     if (span > MAX_CELLS_PER_FACE) {
       large.push(f);
+      isLarge[f] = 1;
       continue;
     }
+    lowCell.set([rx[0] as number, ry[0] as number, rz[0] as number], f * 3);
     for (let i = rx[0] as number; i <= (rx[1] as number); i++) {
       for (let j = ry[0] as number; j <= (ry[1] as number); j++) {
         for (let k = rz[0] as number; k <= (rz[1] as number); k++) {
@@ -83,7 +91,7 @@ export function findSelfIntersections(
       }
     }
   }
-  const tested = new Set<number>();
+  let candidates = 0;
   const pairs: Array<readonly [number, number]> = [];
   let count = 0;
   const shares = (x: number, y: number): boolean => {
@@ -98,17 +106,28 @@ export function findSelfIntersections(
     );
   const consider = (first: number, second: number): void => {
     const [x, y] = first < second ? [first, second] : [second, first];
-    const id = x * faceCount + y;
-    if (tested.has(id)) return;
-    tested.add(id);
+    candidates++;
     if (shares(x, y) || !overlaps(x, y) || !trianglesCross(faces[x] as Corners, faces[y] as Corners)) return;
     count++;
     pairs.push([x, y]);
   };
-  for (const bucket of grid.values()) {
-    for (let i = 0; i < bucket.length; i++) for (let j = i + 1; j < bucket.length; j++) consider(bucket[i] as number, bucket[j] as number);
+  for (const [key, bucket] of grid) {
+    const [i, j, k] = key.split(',').map(Number) as [number, number, number];
+    for (let a = 0; a < bucket.length; a++) {
+      for (let b = a + 1; b < bucket.length; b++) {
+        const [x, y] = [bucket[a] as number, bucket[b] as number];
+        // the pair is tested in the lowest cell the two share
+        if (
+          i === Math.max(lowCell[x * 3] as number, lowCell[y * 3] as number) &&
+          j === Math.max(lowCell[x * 3 + 1] as number, lowCell[y * 3 + 1] as number) &&
+          k === Math.max(lowCell[x * 3 + 2] as number, lowCell[y * 3 + 2] as number)
+        )
+          consider(x, y);
+      }
+    }
   }
-  for (const big of large) for (let other = 0; other < faceCount; other++) if (other !== big) consider(big, other);
+  for (const big of large)
+    for (let other = 0; other < faceCount; other++) if (other !== big && !(isLarge[other] === 1 && other < big)) consider(big, other);
   pairs.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
-  return { count, pairs: pairs.slice(0, maxListed) };
+  return { count, pairs: pairs.slice(0, maxListed), candidates };
 }

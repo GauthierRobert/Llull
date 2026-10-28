@@ -48,7 +48,7 @@ fn pins() -> Vec<Pin> {
         Pin {
             name: "holes",
             mesh: grid(16, wavy, &HOLES),
-            job: decimation(json!({ "targetTriangles": 120, "preserveBoundary": true, "featureCos": 0.95 })),
+            job: decimation(json!({ "targetTriangles": 120, "preserveBoundary": true, "featureAngleRad": 0.95f64.acos() })),
             digest: "f4d01d56d2d3c69d9a4c31cdf9dad51c03f229f8b4088f0b6ae25f2bfd5f4bfe",
             report: r#"{"collapses":193,"maxCollapseCost":0.06552360778777455,"reachedTarget":true,"rejected":{"deviation":0,"foldOver":1,"link":0},"stoppedBy":"target","trianglesAfter":120,"trianglesBefore":506}"#,
         },

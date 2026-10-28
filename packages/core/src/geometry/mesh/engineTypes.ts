@@ -54,7 +54,7 @@ export type MeshOp =
       readonly alpha?: number;
     }
   | ({ readonly op: 'decimate' } & DecimateParams & WithDeviation)
-  | ({ readonly op: 'remesh' } & RemeshParams)
+  | ({ readonly op: 'remesh' } & RemeshParams & WithDeviation)
   | ({ readonly op: 'smooth' } & SmoothParams & WithDeviation)
   | { readonly op: 'deviation'; readonly other: MeshInput; readonly maxSamples: number }
   | ({
@@ -127,6 +127,11 @@ export interface MeshProcessingEngine {
   readonly name: string;
   /** Ops this engine answers and its input-triangle cap per op (Infinity = none). */
   capabilities(): ReadonlyMap<MeshOpName, number>;
+  /**
+   * Per op, the input size (triangles) above which this engine is asked BEFORE the engines listed earlier, because it is faster there even with its job round
+   * (the native engine; measured in TECHNICAL_SPEC 13.12). Absent = never preferred. The results must be identical to the engines it goes ahead of.
+   */
+  preferredAbove?(): ReadonlyMap<MeshOpName, number>;
   run(input: MeshInput, op: MeshOp): MeshOpResult | MeshEngineFailure;
 }
 
