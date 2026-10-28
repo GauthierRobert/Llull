@@ -78,7 +78,7 @@ describe('quad_remesh with an engine that measures in the same job', () => {
   });
 });
 
-describe('decimate_mesh, smooth_mesh and remesh_mesh on a mesh above the TypeScript cap', () => {
+describe('decimate_mesh, smooth_mesh, remesh_mesh, repair_mesh and fill_mesh_holes on a mesh above the TypeScript cap', () => {
   const triangles = MESH_TS_TRIANGLE_CAP + 4_800;
   const side = Math.ceil(Math.sqrt(triangles / 2));
   const big = docWithMeshes(gridMesh(100, side));
@@ -112,8 +112,27 @@ describe('decimate_mesh, smooth_mesh and remesh_mesh on a mesh above the TypeScr
     featureEdges: 0,
   };
 
+  const repairReport = {
+    mode: 'close_holes',
+    changes: {
+      welded: 0,
+      duplicatesRemoved: 0,
+      degenerateRemoved: 0,
+      flipped: 0,
+      stitched: 0,
+      holesFilled: 1,
+      componentsRemoved: 0,
+      facesRemovedWithComponents: 0,
+    },
+    notes: [],
+    skippedHoles: 0,
+  };
+  const fillReport = { totalLoops: 0, filled: [], skipped: [] };
+
   it.each([
     ['decimate_mesh', { id, targetTriangles: 128 }, 'decimate', decimateReport],
+    ['repair_mesh', { id, mode: 'close_holes' }, 'repair', repairReport],
+    ['fill_mesh_holes', { id }, 'fill_holes', fillReport],
     ['smooth_mesh', { id, iterations: 2 }, 'smooth', smoothReport],
     ['remesh_mesh', { id, targetEdgeLength: 10 }, 'remesh', remeshReport],
   ] as const)(

@@ -4,7 +4,14 @@ import { decimateMesh } from './decimate';
 import { symmetricDeviation } from './deviation';
 import { segmentMesh } from './segment';
 import { sculptMesh } from './sculpt';
-import { DECIMATE_DESCRIPTION, REMESH_DESCRIPTION, editableProblem, smoothDescription } from './editable';
+import {
+  DECIMATE_DESCRIPTION,
+  FILL_HOLES_DESCRIPTION,
+  REMESH_DESCRIPTION,
+  editableProblem,
+  repairDescription,
+  smoothDescription,
+} from './editable';
 import {
   MESH_TS_TRIANGLE_CAP,
   type MeshEngineFailure,
@@ -57,10 +64,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
       return {
         mesh: result.mesh,
         report: { mode: op.mode, changes: result.changes, notes: result.notes, skippedHoles: result.skippedHoles },
-        provenance: provenance(
-          `repair ${op.mode}: weld, clean (duplicate / degenerate faces), BFS orientation, boundary-vertex stitch, shell removal, Liepa fill`,
-          'Fusion Repair / Rhino MeshRepair / Magics Fix semantics; Liepa 2003',
-        ),
+        provenance: provenance(repairDescription(op.mode).algorithm, repairDescription(op.mode).reference),
       };
     }
     case 'fill_holes': {
@@ -72,10 +76,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
       return {
         mesh: result.mesh,
         report: { totalLoops: result.totalLoops, filled: result.filled, skipped: result.skipped },
-        provenance: provenance(
-          'Liepa hole filling: O(n^3) dihedral/area triangulation, centroid refinement with Delaunay relaxation, membrane / thin-plate fairing (CG)',
-          'Liepa, Filling Holes in Meshes, SGP 2003, pp. 200-206',
-        ),
+        provenance: provenance(FILL_HOLES_DESCRIPTION.algorithm, FILL_HOLES_DESCRIPTION.reference),
       };
     }
     case 'decimate': {

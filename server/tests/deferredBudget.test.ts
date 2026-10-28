@@ -37,6 +37,19 @@ describe('a plan of small steps longer than the job budget', () => {
     expect(engines.filter((engine) => engine === 'ts')).toHaveLength(3);
   });
 
+  it('the same for repair and fill_holes: 81,920 triangles are above their native preference, and past the budget the TypeScript engine takes them', async () => {
+    const maxJobs = 2;
+    const big = icosphere(10, 6);
+    const ops = (): MeshOp[] => [
+      ...[1, 2, 3].map((k): MeshOp => ({ op: 'repair', mode: 'clean', weldTolerance: k * 1e-9, maxGap: 1e-6, maxBoundaryEdges: 100 })),
+      ...[1, 2].map((k): MeshOp => ({ op: 'fill_holes', select: 'all', maxBoundaryEdges: 100 + k, fairing: 'none', refine: false })),
+    ];
+    const results = await resolveDeferred(() => ops().map((op) => composite.run({ mesh: big }, op)), { maxJobs });
+    expect(results.every((result) => !isEngineFailure(result))).toBe(true);
+    const engines = results.map((result) => (result as MeshOpResult).provenance.engine);
+    expect(engines).toEqual(['native', 'native', 'ts', 'ts', 'ts']);
+  }, 60_000);
+
   it('still refuses with MESH_JOB_LIMIT when what is left cannot be taken by the TypeScript engine', async () => {
     const quad: MeshOp = { op: 'quad_remesh', targetQuads: 100, adaptive: false };
     const refusals: string[] = [];

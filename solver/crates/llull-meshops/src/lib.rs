@@ -1,7 +1,7 @@
 //! `llull-compute meshops <folder>` (07 MSH M3, RS1 RS-9): triangle-mesh operations on meshes of any size, bit-identical to the TypeScript
 //! mesh engine (`packages/core/src/geometry/mesh`), which stays the oracle (`deterministic: true`, VC-MSH-32).
 //!
-//! Job folder: `job.json` = `{ "op": "decimate" | "smooth" | "remesh" | "analyze" | "deviation" | "quad_remesh", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
+//! Job folder: `job.json` = `{ "op": "decimate" | "smooth" | "remesh" | "analyze" | "repair" | "fill_holes" | "deviation" | "quad_remesh", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
 //! `indices.u32` (little-endian u32, 3 per triangle) of a welded, indexed mesh. Out: `result_positions.f64`, `result_indices.u32` (the canonical result)
 //! and `report.json` = `{ op, items, ms, report }` with the op-specific report of the TypeScript engine.
 //!
@@ -13,6 +13,7 @@
 //!   the same manifold / winding / degeneracy checks as decimate are the host's. A working mesh past `maxTriangles` (default 4 000 000) ends the job with code `REMESH_TOO_LARGE`.
 //! - `analyze` (DES-7c step 7): `{ maxListed, weldTolerance: 0, selfIntersections: false }` on any triangle soup: welds exact duplicates and writes `report.json` with
 //!   `report` = `{ weldTolerance, mergedVertices }` and `analysis` = the `MeshAnalysis` of the TypeScript engine (no result mesh). Coordinates above 1e100 are refused.
+//! - `repair` and `fill_holes` (DES-7c step 7, slice 2): see `repair_job.rs`; the result is the repaired / filled mesh and the report is the TypeScript engine's.
 //! - `quad_remesh` (feature `quad`): `{ targetFaces, hardEdgeRad?, adaptive }` (edges sharper than `hardEdgeRad` align the quads); the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
 //! - decimate / smooth / remesh / quad_remesh with `"deviationSamples": N` beside `op` and `params`: the job also measures the symmetric deviation of its result from its input
@@ -27,6 +28,10 @@ pub mod deviation;
 mod edge_heap;
 mod edit;
 mod geom;
+mod hole_fair;
+mod hole_fill;
+mod hole_refine;
+mod hole_triangulate;
 mod progress;
 #[cfg(feature = "quad")]
 mod quad;
@@ -36,6 +41,8 @@ mod quadric;
 pub mod remesh;
 mod remesh_quality;
 mod remesh_types;
+mod repair;
+mod repair_job;
 pub mod smooth;
 mod surface;
 mod topology;
@@ -67,7 +74,7 @@ pub struct JobError {
     pub message: String,
 }
 
-fn input_error(message: impl Into<String>) -> JobError {
+pub(crate) fn input_error(message: impl Into<String>) -> JobError {
     JobError { code: "NATIVE_JOB_INPUT", message: message.into() }
 }
 
@@ -283,6 +290,20 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             analysis = Some(analyze::analyze(&welded.positions, &welded.triangles, p.max_listed));
             serde_json::json!({ "weldTolerance": 0, "mergedVertices": welded.merged })
         }
+        "repair" => {
+            progress.stage("repair", 0.05);
+            let (pos, idx, report) =
+                repair_job::run_repair(&positions, &triangles, job.params, &mut |done| progress.tick(0.05 + 0.9 * done))?;
+            mesh_out = Some((pos, idx));
+            report
+        }
+        "fill_holes" => {
+            progress.stage("fill_holes", 0.05);
+            let (pos, idx, report) =
+                repair_job::run_fill(&positions, &triangles, job.params, &mut |done| progress.tick(0.05 + 0.9 * done))?;
+            mesh_out = Some((pos, idx));
+            report
+        }
         "decimate" => {
             let p: DecimateJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("decimate params: {error}")))?;
             let params = decimate::DecimateParams {
@@ -355,7 +376,9 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             serde_json::to_value(result).map_err(|error| input_error(error.to_string()))?
         }
         other => {
-            return Err(input_error(format!("unknown meshops op '{other}' (decimate, smooth, remesh, analyze, deviation, quad_remesh)")))
+            return Err(input_error(format!(
+                "unknown meshops op '{other}' (decimate, smooth, remesh, analyze, repair, fill_holes, deviation, quad_remesh)"
+            )))
         }
     };
     let measured = match (&mesh_out, job.deviation_samples) {

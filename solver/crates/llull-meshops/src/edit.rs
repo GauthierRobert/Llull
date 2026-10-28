@@ -146,6 +146,11 @@ impl EditMesh {
         faces.sort_unstable();
     }
 
+    /// True when at least one face uses the edge `a`-`b`.
+    pub fn has_edge(&self, a: u32, b: u32) -> bool {
+        self.v_faces[a as usize].iter().any(|f| self.v_faces[b as usize].contains(f))
+    }
+
     /// True when `v` is on the boundary (a neighbour shares a single face with it).
     pub fn is_boundary_vertex(&self, v: u32) -> bool {
         let mut ring = Vec::new();

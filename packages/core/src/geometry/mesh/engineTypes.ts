@@ -37,22 +37,22 @@ export type MeshOp =
       readonly maxCells: number;
     }
   | { readonly op: 'hollow'; readonly wall: number; readonly tolerance: number; readonly maxCells: number }
-  | {
+  | ({
       readonly op: 'repair';
       readonly mode: RepairMode;
       readonly weldTolerance: number;
       readonly maxGap: number;
       readonly smallComponents?: SmallComponentRule;
       readonly maxBoundaryEdges: number;
-    }
-  | {
+    } & WithDeviation)
+  | ({
       readonly op: 'fill_holes';
       readonly select: HoleSelect;
       readonly maxBoundaryEdges: number;
       readonly fairing: Fairing;
       readonly refine: boolean;
       readonly alpha?: number;
-    }
+    } & WithDeviation)
   | ({ readonly op: 'decimate' } & DecimateParams & WithDeviation)
   | ({ readonly op: 'remesh' } & RemeshParams & WithDeviation)
   | ({ readonly op: 'smooth' } & SmoothParams & WithDeviation)
@@ -111,7 +111,7 @@ export interface MeshOpResult {
   readonly segmentation?: Segmentation;
   /** Result of op `quad_remesh` (instead of `mesh`). */
   readonly quads?: QuadMeshData;
-  /** Symmetric deviation of the input from `other` (op `deviation`), or of the op's result from its input (decimate, smooth, quad_remesh asked with `withDeviation`). */
+  /** Symmetric deviation of the input from `other` (op `deviation`), or of the op's result from its input (decimate, smooth, remesh, repair, fill_holes, quad_remesh asked with `withDeviation`). */
   readonly deviation?: DeviationSummary;
   /** Op-specific counts and parameters actually used (document units). */
   readonly report: Readonly<Record<string, unknown>>;

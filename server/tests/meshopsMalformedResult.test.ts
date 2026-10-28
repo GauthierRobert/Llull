@@ -1,6 +1,7 @@
 /**
  * The native engine does not trust a result file (DES-7c step 7): a job that answers with a mesh whose indices point past its vertices, whose indices are not
- * whole triangles, whose positions are not whole triples or whose coordinate is not a number is refused by name, never handed to a command. The job is a
+ * whole triangles, whose positions are not whole triples or whose coordinate is not a number is refused by name, never handed to a command. The same for the
+ * report of `repair` and `fill_holes`, which the commands read field by field. The job is a
  * stand-in (`fixtures/fakeMeshopsJob.cjs`, node preloaded in place of `llull-compute`), so this runs without the Rust binary.
  */
 
@@ -18,6 +19,8 @@ const sphere = icosphere(10, 2);
 const ops: ReadonlyArray<[string, MeshOp]> = [
   ['decimate', { op: 'decimate', preserveBoundary: true, targetTriangles: 100 }],
   ['remesh', { op: 'remesh', targetEdge: 1, iterations: 1, featureAngleRad: 0.7, preserveBoundary: true, project: true }],
+  ['repair', { op: 'repair', mode: 'weld', weldTolerance: 1e-6, maxGap: 1e-4, maxBoundaryEdges: 100 }],
+  ['fill_holes', { op: 'fill_holes', select: 'all', maxBoundaryEdges: 100, fairing: 'curvature', refine: true }],
 ];
 
 const fakeEngine = (mode: string): NonNullable<ReturnType<typeof createNativeMeshEngine>> =>
@@ -42,6 +45,23 @@ describe('a result the host cannot trust', () => {
     const engine = fakeEngine(mode);
     const result = await resolveDeferred(() => engine.run({ mesh: sphere }, op));
     expect(result).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('the result mesh is malformed') });
+  });
+});
+
+describe('a report the host cannot trust (repair and fill_holes)', () => {
+  beforeEach(() => _clearResultCache());
+  const reported = ops.filter(([name]) => name === 'repair' || name === 'fill_holes');
+
+  it.each(reported)('%s: an empty report is refused by name', async (_name, op) => {
+    const engine = fakeEngine('bad_report');
+    const result = await resolveDeferred(() => engine.run({ mesh: sphere }, op));
+    expect(result).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('malformed report') });
+  });
+
+  it.each(ops.filter(([name]) => name === 'decimate' || name === 'remesh'))('%s: the report is not checked here', async (_name, op) => {
+    const engine = fakeEngine('bad_report');
+    const result = await resolveDeferred(() => engine.run({ mesh: sphere }, op));
+    expect(isEngineFailure(result)).toBe(false);
   });
 });
 

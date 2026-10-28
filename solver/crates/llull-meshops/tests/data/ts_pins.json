@@ -312,6 +312,93 @@
       "diagonal": 57.53222356510376
     }
   },
+  "fill_curvature_alpha_2": {
+    "digest": "aff8bd4a3293c9a22aaf54fa854bc0eb9b99f4cd99498014b2a84704e4a2913d",
+    "report": {
+      "totalLoops": 4,
+      "filled": [
+        {
+          "loop": 0,
+          "edges": 8,
+          "triangles": 16,
+          "addedVertices": 5,
+          "area": 1.1872640433369819,
+          "triangulation": "dp",
+          "fairing": "curvature"
+        },
+        {
+          "loop": 1,
+          "edges": 6,
+          "triangles": 10,
+          "addedVertices": 3,
+          "area": 0.9981431429018425,
+          "triangulation": "dp",
+          "fairing": "curvature"
+        },
+        {
+          "loop": 3,
+          "edges": 6,
+          "triangles": 8,
+          "addedVertices": 2,
+          "area": 0.8133716487578309,
+          "triangulation": "dp",
+          "fairing": "curvature"
+        }
+      ],
+      "skipped": [
+        {
+          "loop": 2,
+          "edges": 9,
+          "code": "MESH_HOLE_NON_SIMPLE"
+        }
+      ]
+    }
+  },
+  "fill_plain_loops": {
+    "digest": "ba2970977044e3ca1efc2df159ee90ba7797f1085bc90bceddb19ed31b01ee85",
+    "report": {
+      "totalLoops": 4,
+      "filled": [
+        {
+          "loop": 0,
+          "edges": 8,
+          "triangles": 6,
+          "addedVertices": 0,
+          "area": 1.1866192185828666,
+          "triangulation": "dp",
+          "fairing": "none"
+        },
+        {
+          "loop": 1,
+          "edges": 6,
+          "triangles": 4,
+          "addedVertices": 0,
+          "area": 0.9978784439961034,
+          "triangulation": "dp",
+          "fairing": "none"
+        }
+      ],
+      "skipped": []
+    }
+  },
+  "fill_tangent_near": {
+    "digest": "63f5d09d618aa92ec6c830049b26d8802247f10e4534731526b45375340275f4",
+    "report": {
+      "totalLoops": 2,
+      "filled": [
+        {
+          "loop": 1,
+          "edges": 56,
+          "triangles": 506,
+          "addedVertices": 226,
+          "area": 22.484240880407064,
+          "triangulation": "dp",
+          "fairing": "tangent"
+        }
+      ],
+      "skipped": []
+    }
+  },
   "remesh_adaptive": {
     "digest": "59d82190112d43a8b5042fd8d0618de7654fce77c5a2a9a285422d00a552e607",
     "report": {
@@ -436,6 +523,152 @@
       },
       "fractionInBand": 0.9743589743589743,
       "featureEdges": 0
+    }
+  },
+  "repair_clean_damaged": {
+    "digest": "3df076aab19d66c758898117890a58a87565980d39a825809e51f58b812e084a",
+    "report": {
+      "mode": "clean",
+      "changes": {
+        "welded": 3201,
+        "duplicatesRemoved": 1,
+        "degenerateRemoved": 1,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 0,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 0
+    }
+  },
+  "repair_close_holes": {
+    "digest": "5cb8e46d35e057f249c9ffc4276faaced3e30f2ac13b8a2bab9e183cc7bd0217",
+    "report": {
+      "mode": "close_holes",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 3,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 1
+    }
+  },
+  "repair_close_holes_greedy": {
+    "digest": "7a28a8d57438861d7e464e7492d2ab273859b7ac900026588bf688c692ae460d",
+    "report": {
+      "mode": "close_holes",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 2,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 0
+    }
+  },
+  "repair_orient_flipped": {
+    "digest": "f15f80918ae39385c036cfbf97e31deb9174fd82f791aa676cf9996362d589c8",
+    "report": {
+      "mode": "orient",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 325,
+        "stitched": 0,
+        "holesFilled": 0,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 0
+    }
+  },
+  "repair_small_shells": {
+    "digest": "7aa9e722f7785f274a26a01ed90930c6ed5113cbb37a4da0fead3693b2438e35",
+    "report": {
+      "mode": "clean",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 0,
+        "componentsRemoved": 2,
+        "facesRemovedWithComponents": 98
+      },
+      "notes": [],
+      "skippedHoles": 0
+    }
+  },
+  "repair_stitch_cracked": {
+    "digest": "7ee67b193ddf9585f44cee45582a04eb2b9d340671c58f1bba579cf6ad26fd17",
+    "report": {
+      "mode": "stitch",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 0,
+        "stitched": 9,
+        "holesFilled": 0,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 0
+    }
+  },
+  "repair_stitch_reverted": {
+    "digest": "cba2208faf2e805b3c5b138c591d69d67ca1aad89e63dc28e4f864eee1893044",
+    "report": {
+      "mode": "stitch",
+      "changes": {
+        "welded": 0,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 0,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 0,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [
+        "stitch reverted: merging the close boundary vertices would create non-manifold edges or more boundary"
+      ],
+      "skippedHoles": 0
+    }
+  },
+  "repair_weld_soup": {
+    "digest": "aa2428c40a3bba8e7ecd1c3f5bf9ee140a5cd07ac04aa16cc7bb1e42f2386c9c",
+    "report": {
+      "mode": "weld",
+      "changes": {
+        "welded": 798,
+        "duplicatesRemoved": 0,
+        "degenerateRemoved": 1,
+        "flipped": 0,
+        "stitched": 0,
+        "holesFilled": 0,
+        "componentsRemoved": 0,
+        "facesRemovedWithComponents": 0
+      },
+      "notes": [],
+      "skippedHoles": 0
     }
   }
 }
