@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { type HarmonicMap, harmonicMap } from '@core/geometry/mesh/harmonicMap';
+import { type HarmonicMap, harmonicMap, iterationBudget } from '@core/geometry/mesh/harmonicMap';
 import { evaluateSurface, surfaceDerivatives } from '@core/lib/nurbs/surface';
 import { type CadDocument, type NurbsSurfaceEntity, type Vec3 } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
@@ -77,7 +77,7 @@ describe('harmonicMap', () => {
       );
     }
     expect(worst).toBeLessThan(1e-9);
-    expect(map.cgResidual).toBeLessThan(1e-10);
+    expect(map.cgResidual).toBeLessThan(1e-9);
     expect(parameterAreas(grid, map).every((area) => area > 0)).toBe(true);
   });
 
@@ -109,11 +109,79 @@ describe('harmonicMap', () => {
     for (const seed of [1, 4, 10]) {
       const mesh = cShape(seed);
       const map = mapOf(mesh);
-      expect(map.weights, `seed ${seed}`).toBe('cotangent_clamped');
+      expect(map.weights, `seed ${seed}`).toBe('mean_value');
       expect(map.flippedFirst).toBeGreaterThan(0);
       expect(parameterAreas(mesh, map).every((area) => area >= -1e-12)).toBe(true);
-      expect(map.cgResidual).toBeLessThan(1e-10);
+      expect(map.cgResidual).toBeLessThan(1e-9);
     }
+  });
+
+  it('puts the four corners of the square on boundary vertices, at the corners of a 5 x 20 plate on a 20 x 20 grid', () => {
+    const strip: IndexedMesh = {
+      positions: gridMesh(20, 20).positions.map((v, i) => (i % 3 === 0 ? v / 4 : v)),
+      indices: gridMesh(20, 20).indices,
+    };
+    const map = mapOf(strip);
+    const parameters = [...map.uv.values()];
+    for (const corner of [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ])
+      expect(
+        parameters.some(([u, v]) => u === corner[0] && v === corner[1]),
+        `a vertex at ${corner}`,
+      ).toBe(true);
+    // the sharpest turns of the boundary are the four corners of the plate, so the sides are its sides and no triangle collapses
+    const at = (v: number): number[] => [strip.positions[3 * v], strip.positions[3 * v + 1]] as number[];
+    expect(map.corners.map(at)).toEqual([
+      [0, 0],
+      [5, 0],
+      [5, 20],
+      [0, 20],
+    ]);
+    expect(map.collapsedInParameters).toBe(0);
+    expect(map.flippedFirst).toBe(0);
+  });
+
+  it('puts the corners of a smooth boundary on the vertices nearest to the quarter points of its length', () => {
+    const mesh = hemisphere(4);
+    const map = mapOf(mesh);
+    const parameters = [...map.uv.values()];
+    for (const [u, v] of [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ])
+      expect(parameters.some((p) => p[0] === u && p[1] === v)).toBe(true);
+    expect(new Set(map.corners).size).toBe(4);
+  });
+
+  it('refuses a region with fewer than four boundary vertices (a single triangle), a triangle listed twice, and a duplicate triangle', () => {
+    const single = gridMesh(1, 1);
+    expect(refusalOf(single, [0])).toMatchObject({
+      code: 'MESH_FIT_NOT_DISK',
+      message: expect.stringMatching(/boundary of the region has 3 vertices.*at least 4/),
+    });
+    const grid = gridMesh(10, 4);
+    expect(refusalOf(grid, [...allFaces(grid), 0]).message).toMatch(/triangle 0 is listed twice/);
+    const doubled = { positions: grid.positions, indices: [...grid.indices, ...grid.indices.slice(0, 3)] };
+    expect(refusalOf(doubled).message).toMatch(/used twice in the same direction.*a duplicate or a flipped neighbour/);
+  });
+
+  it('has an iteration budget: a budget too small is refused by name with the figures, the default one solves a jittered grid', () => {
+    const mesh = cShape(1);
+    const starved = harmonicMap(mesh, allFaces(mesh), { maxIterations: 2 });
+    expect(starved).toMatchObject({
+      code: 'MESH_FIT_PARAM_FOLDED',
+      message: expect.stringMatching(/iteration budget.*budget 2 per coordinate/),
+    });
+    expect(harmonicMap(mesh, allFaces(mesh))).not.toHaveProperty('code');
+    expect(iterationBudget(0)).toBe(0);
+    expect(iterationBudget(100_000)).toBe(4000);
+    expect(iterationBudget(10_000)).toBe(400 + 1200);
   });
 
   it('refuses a region that is not a disk, naming why', () => {
@@ -243,6 +311,26 @@ describe('fit_surface_to_mesh parameterization', () => {
     expect(auto.error?.code).toBe('MESH_FIT_NOT_PROJECTABLE');
     expect(auto.summary).toContain('harmonic map needs a disk');
     expect(execute(ball.doc, 'fit_surface_to_mesh', { id: ballId, parameterization: 'spherical' }).error?.code).toBe('CMD_INVALID_PARAMS');
+  });
+
+  it('warns when triangles collapse in the parameters (a zigzag cut), and takes at most 25,000 triangles for the harmonic map', () => {
+    const ball = docWithMeshes(icosphere(10, 5));
+    const cap = execute(ball.doc, 'fit_surface_to_mesh', {
+      id: idOf(ball.doc),
+      region: { center: [0, 0, 10], radius: 20 * Math.sin((30 * Math.PI) / 360) },
+      parameterization: 'harmonic',
+      controlPoints: [8, 8],
+    });
+    expect(cap.error, cap.summary).toBeUndefined();
+    const warnings = dataOf(cap)['warnings'] as Array<{ code: string; message: string }>;
+    const collapsed = warnings.find((w) => w.code === 'MESH_FIT_PARAM_COLLAPSED');
+    expect(collapsed?.message).toMatch(/no area in the parameter square.*faceGroups/);
+    expect((dataOf(cap)['parameterization'] as { collapsedTriangles: number }).collapsedTriangles).toBeGreaterThan(0);
+    const huge = docWithMeshes(gridMesh(10, 200));
+    const refused = execute(huge.doc, 'fit_surface_to_mesh', { id: idOf(huge.doc), parameterization: 'harmonic' });
+    expectNoOp(refused, huge.doc);
+    expect(refused.error?.code).toBe('MESH_FIT_TOO_LARGE');
+    expect(refused.summary).toContain('at most 25000');
   });
 
   it('is pure and replays', () => {

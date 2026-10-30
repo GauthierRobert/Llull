@@ -39,7 +39,13 @@ export function runSegmentation(
     command,
     engine.run(
       { mesh },
-      { op: 'segment', featureAngleRad: (params.featureAngleDeg * Math.PI) / 180, fitTolerance: params.fitTolerance, kinds: params.kinds },
+      {
+        op: 'segment',
+        featureAngleRad: (params.featureAngleDeg * Math.PI) / 180,
+        fitTolerance: params.fitTolerance,
+        kinds: params.kinds,
+        command,
+      },
     ),
     [id],
   );

@@ -144,7 +144,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
       };
     }
     case 'segment': {
-      const problem = editableProblem(mesh, 'segment_mesh');
+      const problem = editableProblem(mesh, op.command ?? 'segment_mesh');
       if (problem !== null) return problem;
       return {
         segmentation: segmentMesh(mesh, op),

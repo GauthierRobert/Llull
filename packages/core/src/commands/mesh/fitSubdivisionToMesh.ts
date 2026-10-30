@@ -48,7 +48,7 @@ const STOP_TEXT: Readonly<Record<FitStop, string>> = {
 /**
  * @affects rewrites the vertex positions of 1 subdivision entity (topology, creases, sharpness and element ids unchanged; `levels` set when given); the target is not touched
  * @invariant the returned cage is the best of the input and every round on the fit samples, so the fit never worsens the surface it was given; the limit surface is sampled at the vertices of the level-`fitLevel` refinement (at least the levels the semi-sharp creases need to decay) and verified on level fitLevel + 1, in both directions; the closest-point work of a round is capped; no kernel or native engine is used
- * @failure unknown / wrong-kind ids, cage with symmetry, invalid or too large cage, too large target -> MESH_* / DIR_*; a cage far from the target, or one whose first closest-point round exceeds the work cap -> MESH_FIT_CAGE_FAR; the solve breaks down -> MESH_FIT_FAILED; maxDeviation not reached -> result applied, warning MESH_FIT_NOT_CONVERGED in data.warnings
+ * @failure unknown / wrong-kind ids, cage with symmetry, invalid or too large cage, too large target -> MESH_* / DIR_*; faceGroups: a stored name or segment id that does not exist, a stale stored group -> MESH_FIT_GROUP_NOT_FOUND, groups holding no triangle -> MESH_FIT_REGION_EMPTY, the segmentation's own refusals pass through (MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE, MESH_SEGMENT_NO_GROUPS, MESH_ENGINE_CAP_EXCEEDED); a cage far from the target, or one whose first closest-point round exceeds the work cap -> MESH_FIT_CAGE_FAR; the solve breaks down -> MESH_FIT_FAILED; maxDeviation not reached -> result applied, warning MESH_FIT_NOT_CONVERGED in data.warnings
  */
 export const fitSubdivisionToMesh = defineCommand({
   name: 'fit_subdivision_to_mesh',
@@ -76,7 +76,7 @@ export const fitSubdivisionToMesh = defineCommand({
     '10, centres within one target diagonal, and a first closest-point round within the work cap), else MESH_FIT_CAGE_FAR; the target ' +
     'may be open or closed. Pure TypeScript, no kernel needed (about 1 s for a 600-face cage at level 2); the exact B-spline faces come ' +
     'afterwards from the OCC kernel. Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, DIR_ENTITY_NOT_FOUND, MESH_FIT_SYMMETRY, ' +
-    'MESH_FIT_CAGE_INVALID, MESH_FIT_CAGE_FAR, MESH_FIT_TOO_LARGE, MESH_PARAM_INVALID, MESH_FIT_FAILED, MESH_FIT_GROUP_NOT_FOUND (a `faceGroups` name the mesh does not have, or a stale stored group), MESH_FIT_REGION_EMPTY (the groups hold no triangle).',
+    'MESH_FIT_CAGE_INVALID, MESH_FIT_CAGE_FAR, MESH_FIT_TOO_LARGE, MESH_PARAM_INVALID, MESH_FIT_FAILED, MESH_FIT_GROUP_NOT_FOUND (a `faceGroups` name the mesh does not have, or a stale stored group), MESH_FIT_REGION_EMPTY (the groups hold no triangle); from a faceGroups selection the segmentation refusals pass through (MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE, MESH_SEGMENT_NO_GROUPS, MESH_ENGINE_CAP_EXCEEDED); from the target load MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE.',
   params: z.object({
     cageId: z.string().describe('Id of the subdivision solid whose cage is moved (for example the result of quad_remesh).'),
     targetId: z
@@ -85,7 +85,7 @@ export const fitSubdivisionToMesh = defineCommand({
     faceGroups: faceGroupsParam
       .optional()
       .describe(
-        'Follow only part of the target: its triangles in these face groups (`stored` group names of the mesh, `segments` ids from segment_mesh). The rest of the target is ignored (and the target counts as open).',
+        'Follow only part of the target: its triangles in these face groups (`stored` group names of the mesh, `segments` ids from segment_mesh). The rest of the target is ignored: the target is the sub-mesh of those triangles (closed, and then oriented outward and folded-checked, only when they form a closed surface).',
       ),
     maxDeviation: z
       .number()

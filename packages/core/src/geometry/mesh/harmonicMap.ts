@@ -1,12 +1,14 @@
 /**
  * Harmonic-map parameterisation of a disk-topology region of a triangle mesh (07 MSH FR-MSH-24, TECHNICAL_SPEC 13.23): the boundary loop goes onto the boundary of the unit
- * parameter square by arc length (the quarter points of its length are the corners), every interior vertex is the weighted mean of its neighbours (the discrete Laplace
- * equation with the cotangent weights, solved by Jacobi-preconditioned conjugate gradient), and a result with a flipped triangle is solved again with clamped positive weights
- * (Tutte / Floater: positive symmetric weights and a convex boundary give an embedding) before the region is refused.
- * @invariant the region needs one connected, manifold, consistently wound surface with exactly one boundary loop and Euler characteristic 1; the parameters of the boundary
- *   run counter-clockwise when the triangles face the viewer, so du x dv follows the triangle normals
+ * parameter square, by arc length between four corner VERTICES (the sharpest turns of the boundary, else the vertices nearest to the quarter points of its length), every
+ * interior vertex is the weighted mean of its neighbours (the discrete Laplace equation with the cotangent weights, Jacobi-preconditioned conjugate gradient), and a result
+ * with a flipped triangle is solved again with Floater's mean-value weights (positive, so with a convex boundary an embedding; BiCGSTAB, warm-started from the first solve)
+ * before the region is refused. Every solve has an iteration budget and a stall check: a region the budget cannot solve is refused by name, never waited for.
+ * @invariant the region needs one connected, manifold, consistently wound surface with exactly one boundary loop of at least 4 vertices and Euler characteristic 1; the
+ *   parameters of the boundary run counter-clockwise when the triangles face the viewer, so du x dv follows the triangle normals; every corner of the square is the parameter of a vertex
  */
 
+import { biCgStab } from '../../lib/biCgStab';
 import { conjugateGradient } from '../../lib/conjugateGradient';
 import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
@@ -14,17 +16,19 @@ import type { Vec3 } from '../../model/vectors';
 export interface HarmonicMap {
   /** Parameters (u, v) in [0, 1] of every vertex of the region, by mesh vertex index. */
   readonly uv: Map<number, [number, number]>;
-  /** The weights of the accepted solve: the exact cotangent weights, or the same clamped to a positive floor after the exact ones flipped a triangle. */
-  readonly weights: 'cotangent' | 'cotangent_clamped';
+  /** The weights of the accepted solve: the exact cotangent weights, or Floater's mean-value weights after the exact ones flipped a triangle. */
+  readonly weights: 'cotangent' | 'mean_value';
   /** Triangles of the exact-cotangent solve whose parameter triangle had a negative area (0 when its result was accepted). */
   readonly flippedFirst: number;
   /** Triangles whose parameter triangle has no area (all three vertices on one side of the square): not flipped, counted. */
   readonly collapsedInParameters: number;
   readonly interiorVertices: number;
   readonly boundaryVertices: number;
-  /** Conjugate gradient iterations of the accepted solve (u and v together) and the worst final relative residual. */
+  /** Iterations of the accepted solve (u and v together) and the worst final relative residual. */
   readonly cgIterations: number;
   readonly cgResidual: number;
+  /** Boundary vertices put at the four corners of the square, in counter-clockwise order. */
+  readonly corners: readonly [number, number, number, number];
 }
 
 export interface HarmonicRefusal {
@@ -32,26 +36,34 @@ export interface HarmonicRefusal {
   readonly message: string;
 }
 
-/** Relative residual of the conjugate gradient solves. */
-const HARMONIC_TOLERANCE = 1e-10;
+export interface HarmonicOptions {
+  /** Iterations a solve may take per coordinate (default `iterationBudget`). */
+  readonly maxIterations?: number;
+}
+
+/** Relative residual of the solves. */
+const HARMONIC_TOLERANCE = 1e-9;
 /** A parameter triangle with a signed area below minus this (the square has area 1) is flipped. */
 const FLIP_AREA = -1e-12;
-/** The clamped weights are at least this share of the mean absolute cotangent weight. */
-const CLAMP_SHARE = 1e-3;
+/** A boundary vertex that turns by more than this (radians, about 20 degrees, over a window of 1/32 of the boundary on each side) is a corner candidate. */
+const CORNER_TURN = 0.35;
+/** Corners are at least this share of the boundary length apart. */
+const CORNER_SEPARATION = 1 / 16;
+/** Iterations between two stall checks (the residual must fall by 1 % in each). */
+const STALL_WINDOW = 400;
+/** Iterations per coordinate a solve may take at most. */
+const ITERATION_CAP = 4000;
+/** Boundary vertices a disk needs: one per corner of the square. */
+const MIN_BOUNDARY_VERTICES = 4;
+
+/** Iterations per coordinate a region of `n` interior vertices is given: the system is solved in about 1.5 sqrt(n) of them, with a margin. */
+export const iterationBudget = (n: number): number => Math.min(4 * n, ITERATION_CAP, 400 + Math.ceil(12 * Math.sqrt(n)));
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
 const notDisk = (message: string): HarmonicRefusal => ({ code: 'MESH_FIT_NOT_DISK', message });
-
-/** Position on the boundary of the unit square (counter-clockwise from (0, 0)) at the share `t` of the perimeter. */
-function onSquare(t: number): [number, number] {
-  const p = 4 * t;
-  const side = Math.min(3, Math.floor(p));
-  const f = p - side;
-  return side === 0 ? [f, 0] : side === 1 ? [1, f] : side === 2 ? [1 - f, 1] : [0, 1 - f];
-}
 
 interface Topology {
   readonly vertices: number[];
@@ -65,7 +77,10 @@ function diskTopology(mesh: MeshData, faces: ReadonlyArray<number>): Topology | 
   const vertexCount = mesh.positions.length / 3;
   const directed = new Set<number>();
   const seen = new Set<number>();
+  const listed = new Set<number>();
   for (const f of faces) {
+    if (listed.has(f)) return notDisk(`triangle ${f} is listed twice in the region`);
+    listed.add(f);
     for (let k = 0; k < 3; k++) {
       const a = mesh.indices[3 * f + k] as number;
       const b = mesh.indices[3 * f + ((k + 1) % 3)] as number;
@@ -74,7 +89,7 @@ function diskTopology(mesh: MeshData, faces: ReadonlyArray<number>): Topology | 
       const key = a * vertexCount + b;
       if (directed.has(key))
         return notDisk(
-          `the region is not a consistently wound manifold: the edge ${a}-${b} is used twice in the same direction (triangle ${f})`,
+          `the region is not a consistently wound manifold: the edge ${a}-${b} is used twice in the same direction (triangle ${f}, a duplicate or a flipped neighbour)`,
         );
       directed.add(key);
     }
@@ -142,8 +157,62 @@ function diskTopology(mesh: MeshData, faces: ReadonlyArray<number>): Topology | 
     );
   const euler = vertices.length - edges + faces.length;
   if (euler !== 1) return notDisk(`the region has Euler characteristic ${euler} with one boundary loop (a disk has 1): it has handles`);
+  if ((loops[0] as number[]).length < MIN_BOUNDARY_VERTICES)
+    return notDisk(
+      `the boundary of the region has ${(loops[0] as number[]).length} vertices: the four corners of the parameter square need at least ${MIN_BOUNDARY_VERTICES} (a single triangle cannot be mapped)`,
+    );
   return { vertices, loop: loops[0] as number[], edges };
 }
+
+/**
+ * The positions in `loop` of the four corners of the square, ascending: the boundary vertices that turn most (above CORNER_TURN, at least CORNER_SEPARATION of the
+ * length apart), the largest gaps then split at their middle (the vertex nearest to it) until there are four.
+ */
+function pickCorners(loop: ReadonlyArray<number>, point: (v: number) => Vec3, arc: ReadonlyArray<number>, perimeter: number): number[] {
+  const n = loop.length;
+  // the turn is measured over a window of about 1/32 of the vertices on each side: a zigzag boundary (the cut of a sphere) turns sharply at every vertex but not over a window
+  const window = Math.max(1, Math.round(n / 32));
+  const turning = loop.map((v, i) => {
+    const [before, here, ahead] = [point(loop[(i + n - (window % n)) % n] as number), point(v), point(loop[(i + window) % n] as number)];
+    const [a, b] = [sub(here, before), sub(ahead, here)];
+    return Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
+  });
+  const apart = (i: number, j: number): number => {
+    const d = Math.abs((arc[i] as number) - (arc[j] as number));
+    return Math.min(d, perimeter - d);
+  };
+  const chosen: number[] = [];
+  const sharp = turning.map((t, i) => [t, i] as const).filter(([t]) => t >= CORNER_TURN);
+  sharp.sort((x, y) => y[0] - x[0] || x[1] - y[1]);
+  for (const [, i] of sharp) if (chosen.length < 4 && chosen.every((c) => apart(i, c) >= CORNER_SEPARATION * perimeter)) chosen.push(i);
+  if (chosen.length === 0) chosen.push(0);
+  while (chosen.length < 4) {
+    const sorted = [...chosen].sort((x, y) => x - y);
+    let [gapStart, gap] = [0, -1];
+    sorted.forEach((c, k) => {
+      const nextArc = k + 1 < sorted.length ? (arc[sorted[k + 1] as number] as number) : perimeter + (arc[sorted[0] as number] as number);
+      if (nextArc - (arc[c] as number) > gap) [gapStart, gap] = [c, nextArc - (arc[c] as number)];
+    });
+    const target = ((arc[gapStart] as number) + gap / 2) % perimeter;
+    let best = -1;
+    for (let i = 0; i < n; i++) {
+      if (chosen.includes(i)) continue;
+      const d = Math.abs((arc[i] as number) - target);
+      if (
+        best < 0 ||
+        Math.min(d, perimeter - d) <
+          Math.min(Math.abs((arc[best] as number) - target), perimeter - Math.abs((arc[best] as number) - target))
+      )
+        best = i;
+    }
+    chosen.push(best);
+  }
+  return chosen.sort((x, y) => x - y);
+}
+
+/** Position on the boundary of the unit square (counter-clockwise from (0, 0)): side `side` (0..3), the share `f` of it. */
+const onSide = (side: number, f: number): [number, number] =>
+  side === 0 ? [f, 0] : side === 1 ? [1, f] : side === 2 ? [1 - f, 1] : [0, 1 - f];
 
 interface System {
   /** Interior vertices (mesh indices). */
@@ -157,14 +226,14 @@ interface System {
   readonly rhsV: Float64Array;
 }
 
+const pointOf =
+  (mesh: MeshData) =>
+  (v: number): Vec3 => [mesh.positions[3 * v] as number, mesh.positions[3 * v + 1] as number, mesh.positions[3 * v + 2] as number];
+
 /** Cotangent weight of every undirected edge of the region (half the sum of the cotangents of the angles opposite it), keyed `min * vertexCount + max`. */
 function cotangentWeights(mesh: MeshData, faces: ReadonlyArray<number>): Map<number, number> {
   const vertexCount = mesh.positions.length / 3;
-  const point = (v: number): Vec3 => [
-    mesh.positions[3 * v] as number,
-    mesh.positions[3 * v + 1] as number,
-    mesh.positions[3 * v + 2] as number,
-  ];
+  const point = pointOf(mesh);
   const weights = new Map<number, number>();
   for (const f of faces) {
     const ids = [0, 1, 2].map((k) => mesh.indices[3 * f + k] as number);
@@ -180,11 +249,38 @@ function cotangentWeights(mesh: MeshData, faces: ReadonlyArray<number>): Map<num
   return weights;
 }
 
+/** Floater's mean-value weight of every DIRECTED edge i -> j of the region (the tangents of the half angles at i of its two triangles over its length), keyed `i * vertexCount + j`. */
+function meanValueWeights(mesh: MeshData, faces: ReadonlyArray<number>): Map<number, number> {
+  const vertexCount = mesh.positions.length / 3;
+  const point = pointOf(mesh);
+  const weights = new Map<number, number>();
+  for (const f of faces) {
+    const ids = [0, 1, 2].map((k) => mesh.indices[3 * f + k] as number);
+    for (let k = 0; k < 3; k++) {
+      const [apex, a, b] = [ids[k] as number, ids[(k + 1) % 3] as number, ids[(k + 2) % 3] as number];
+      const [ea, eb] = [sub(point(a), point(apex)), sub(point(b), point(apex))];
+      const [la, lb, area2] = [Math.hypot(...ea), Math.hypot(...eb), Math.hypot(...cross(ea, eb))];
+      if (!(area2 > 0)) continue;
+      // tan(theta / 2) = |ea x eb| / (|ea| |eb| + ea . eb)
+      const half = area2 / (la * lb + dot(ea, eb));
+      for (const [other, length] of [
+        [a, la],
+        [b, lb],
+      ] as const) {
+        const key = apex * vertexCount + other;
+        weights.set(key, (weights.get(key) ?? 0) + half / length);
+      }
+    }
+  }
+  return weights;
+}
+
+/** The linear system of the interior vertices for the directed weights `weight(i, j)` (row i: sum_j w_ij (x_i - x_j) = 0, the boundary neighbours on the right). */
 function systemOf(
   mesh: MeshData,
   faces: ReadonlyArray<number>,
   topology: Topology,
-  weight: (a: number, b: number) => number,
+  weight: (i: number, j: number) => number,
   boundaryUv: Map<number, [number, number]>,
 ): System {
   const vertexCount = mesh.positions.length / 3;
@@ -192,8 +288,8 @@ function systemOf(
   const local = new Int32Array(vertexCount).fill(-1);
   interior.forEach((v, i) => (local[v] = i));
   const n = interior.length;
-  // the undirected edges once, with their weights
-  const [ends, weights]: [number[], number[]] = [[], []];
+  // the undirected edges once
+  const ends: number[] = [];
   const done = new Set<number>();
   for (const f of faces)
     for (let k = 0; k < 3; k++) {
@@ -203,29 +299,30 @@ function systemOf(
       if (done.has(key)) continue;
       done.add(key);
       ends.push(a, b);
-      weights.push(weight(a, b));
     }
   const degree = new Int32Array(n + 1);
-  for (let e = 0; e < weights.length; e++)
-    for (const v of [ends[2 * e] as number, ends[2 * e + 1] as number]) {
-      const other = v === ends[2 * e] ? (ends[2 * e + 1] as number) : (ends[2 * e] as number);
-      const [i, j] = [local[v] as number, local[other] as number];
-      if (i >= 0 && j >= 0) degree[i + 1] = (degree[i + 1] as number) + 1;
+  for (let e = 0; e < ends.length; e += 2) {
+    const [i, j] = [local[ends[e] as number] as number, local[ends[e + 1] as number] as number];
+    if (i >= 0 && j >= 0) {
+      degree[i + 1] = (degree[i + 1] as number) + 1;
+      degree[j + 1] = (degree[j + 1] as number) + 1;
     }
+  }
   const rowStart = new Int32Array(n + 1);
   for (let i = 0; i < n; i++) rowStart[i + 1] = (rowStart[i] as number) + (degree[i + 1] as number);
   const [cols, vals] = [new Int32Array(rowStart[n] as number), new Float64Array(rowStart[n] as number)];
   const fill = Int32Array.from(rowStart.subarray(0, n));
   const diagonal = new Float64Array(n);
   const [rhsU, rhsV] = [new Float64Array(n), new Float64Array(n)];
-  for (let e = 0; e < weights.length; e++) {
-    const w = weights[e] as number;
+  for (let e = 0; e < ends.length; e += 2) {
+    const [a, b] = [ends[e] as number, ends[e + 1] as number];
     for (const [v, other] of [
-      [ends[2 * e] as number, ends[2 * e + 1] as number],
-      [ends[2 * e + 1] as number, ends[2 * e] as number],
+      [a, b],
+      [b, a],
     ] as const) {
       const i = local[v] as number;
       if (i < 0) continue;
+      const w = weight(v, other);
       diagonal[i] = (diagonal[i] as number) + w;
       const j = local[other] as number;
       if (j >= 0) {
@@ -245,12 +342,21 @@ function systemOf(
 
 interface Solved {
   readonly uv: Map<number, [number, number]>;
+  readonly u: Float64Array;
+  readonly v: Float64Array;
   readonly iterations: number;
   readonly residual: number;
   readonly converged: boolean;
 }
 
-function solve(system: System, boundaryUv: Map<number, [number, number]>): Solved {
+/** Solves for u and v; `symmetric` systems by conjugate gradient, the others by BiCGSTAB; `start` the first guess (0.5 when absent). */
+function solve(
+  system: System,
+  boundaryUv: Map<number, [number, number]>,
+  symmetric: boolean,
+  budget: number,
+  start?: { u: Float64Array; v: Float64Array },
+): Solved {
   const n = system.interior.length;
   const { diagonal, rowStart, cols, vals } = system;
   const apply = (x: Float64Array, out: Float64Array): void => {
@@ -261,13 +367,16 @@ function solve(system: System, boundaryUv: Map<number, [number, number]>): Solve
       out[i] = sum;
     }
   };
-  const options = { maxIterations: Math.max(1000, 4 * n), tolerance: HARMONIC_TOLERANCE, diagonal };
-  const start = new Float64Array(n).fill(0.5);
-  const [u, v] = [conjugateGradient(apply, system.rhsU, start, options), conjugateGradient(apply, system.rhsV, start, options)];
+  const options = { maxIterations: budget, tolerance: HARMONIC_TOLERANCE, diagonal, stallWindow: STALL_WINDOW };
+  const method = symmetric ? conjugateGradient : biCgStab;
+  const guess = (): Float64Array => new Float64Array(n).fill(0.5);
+  const [u, v] = [method(apply, system.rhsU, start?.u ?? guess(), options), method(apply, system.rhsV, start?.v ?? guess(), options)];
   const uv = new Map(boundaryUv);
   system.interior.forEach((vertex, i) => uv.set(vertex, [u.x[i] as number, v.x[i] as number]));
   return {
     uv,
+    u: u.x,
+    v: v.x,
     iterations: u.iterations + v.iterations,
     residual: Math.max(u.relativeResidual, v.relativeResidual),
     converged: u.converged && v.converged && [...uv.values()].every(([p, q]) => Number.isFinite(p) && Number.isFinite(q)),
@@ -292,35 +401,41 @@ function flips(mesh: MeshData, faces: ReadonlyArray<number>, uv: Map<number, [nu
 
 /**
  * Harmonic map of the region `faces` of `mesh` onto the unit square.
- * @failure not one connected consistently wound manifold with one boundary loop and Euler characteristic 1 -> MESH_FIT_NOT_DISK; a solve that does not converge, or a triangle still flipped with the clamped weights -> MESH_FIT_PARAM_FOLDED
+ * @failure not one connected consistently wound manifold with one boundary loop of 4 vertices or more and Euler characteristic 1, or a triangle listed twice -> MESH_FIT_NOT_DISK;
+ *   a solve that does not reach the tolerance within its iteration budget (or stalls), or a triangle still flipped with the mean-value weights -> MESH_FIT_PARAM_FOLDED
  */
-export function harmonicMap(mesh: MeshData, faces: ReadonlyArray<number>): HarmonicMap | HarmonicRefusal {
+export function harmonicMap(mesh: MeshData, faces: ReadonlyArray<number>, options: HarmonicOptions = {}): HarmonicMap | HarmonicRefusal {
   if (faces.length === 0) return notDisk('the region has no triangle');
   const topology = diskTopology(mesh, faces);
   if ('code' in topology) return topology;
-  const point = (v: number): Vec3 => [
-    mesh.positions[3 * v] as number,
-    mesh.positions[3 * v + 1] as number,
-    mesh.positions[3 * v + 2] as number,
-  ];
+  const point = pointOf(mesh);
   const { loop } = topology;
   const lengths = loop.map((v, i) => Math.hypot(...sub(point(loop[(i + 1) % loop.length] as number), point(v))));
   const perimeter = lengths.reduce((sum, length) => sum + length, 0);
   if (!(perimeter > 0)) return notDisk('the boundary loop of the region has no length');
+  const arc: number[] = [];
+  lengths.reduce((sum, length) => (arc.push(sum), sum + length), 0);
+  const corners = pickCorners(loop, point, arc, perimeter);
   const boundaryUv = new Map<number, [number, number]>();
-  let along = 0;
-  loop.forEach((v, i) => {
-    boundaryUv.set(v, onSquare(along / perimeter));
-    along += lengths[i] as number;
+  corners.forEach((start, side) => {
+    const end = side === 3 ? (corners[0] as number) + loop.length : (corners[side + 1] as number);
+    const [from, to] = [arc[start] as number, end >= loop.length ? perimeter + (arc[end - loop.length] as number) : (arc[end] as number)];
+    for (let i = start; i < end; i++) {
+      const at = i % loop.length;
+      const here = i >= loop.length ? perimeter + (arc[at] as number) : (arc[at] as number);
+      boundaryUv.set(loop[at] as number, onSide(side, to > from ? (here - from) / (to - from) : 0));
+    }
   });
-  const cotangent = cotangentWeights(mesh, faces);
   const vertexCount = mesh.positions.length / 3;
+  const cotangent = cotangentWeights(mesh, faces);
   const key = (a: number, b: number): number => Math.min(a, b) * vertexCount + Math.max(a, b);
-  const exact = (a: number, b: number): number => cotangent.get(key(a, b)) ?? 0;
-  const mean = [...cotangent.values()].reduce((sum, w) => sum + Math.abs(w), 0) / Math.max(1, cotangent.size);
-  const floor = CLAMP_SHARE * mean;
-  const clamped = (a: number, b: number): number => Math.max(exact(a, b), floor);
-  const first = solve(systemOf(mesh, faces, topology, exact, boundaryUv), boundaryUv);
+  const budget = options.maxIterations ?? iterationBudget(topology.vertices.length - loop.length);
+  const first = solve(
+    systemOf(mesh, faces, topology, (i, j) => cotangent.get(key(i, j)) ?? 0, boundaryUv),
+    boundaryUv,
+    true,
+    budget,
+  );
   const firstFlips = first.converged ? flips(mesh, faces, first.uv) : { flipped: faces.length, collapsed: 0 };
   const accept = (
     solved: Solved,
@@ -336,21 +451,29 @@ export function harmonicMap(mesh: MeshData, faces: ReadonlyArray<number>): Harmo
     boundaryVertices: loop.length,
     cgIterations: solved.iterations,
     cgResidual: solved.residual,
+    corners: corners.map((c) => loop[c] as number) as unknown as HarmonicMap['corners'],
   });
   if (first.converged && firstFlips.flipped === 0) return accept(first, 'cotangent', firstFlips, 0);
-  const second = solve(systemOf(mesh, faces, topology, clamped, boundaryUv), boundaryUv);
+  const meanValue = meanValueWeights(mesh, faces);
+  const second = solve(
+    systemOf(mesh, faces, topology, (i, j) => meanValue.get(i * vertexCount + j) ?? 0, boundaryUv),
+    boundaryUv,
+    false,
+    budget,
+    first.converged ? { u: first.u, v: first.v } : undefined,
+  );
   if (!second.converged)
     return {
       code: 'MESH_FIT_PARAM_FOLDED',
-      message: `the harmonic map did not converge (relative residual ${second.residual.toExponential(2)} against ${HARMONIC_TOLERANCE}); the region's triangles are too degenerate`,
+      message: `the harmonic map did not reach its tolerance within the iteration budget (relative residual ${second.residual.toExponential(2)} against ${HARMONIC_TOLERANCE} after ${second.iterations} iterations, budget ${budget} per coordinate): the region's triangles are too degenerate or too many; decimate_mesh it, or pick a smaller region (faceGroups)`,
     };
   const secondFlips = flips(mesh, faces, second.uv);
   if (secondFlips.flipped > 0)
     return {
       code: 'MESH_FIT_PARAM_FOLDED',
-      message: `${secondFlips.flipped} of ${faces.length} triangles are flipped in the parameter square even with positive weights (the exact cotangent weights flipped ${firstFlips.flipped}): the region has degenerate or overlapping triangles; repair_mesh it first`,
+      message: `${secondFlips.flipped} of ${faces.length} triangles are flipped in the parameter square even with mean-value weights (the exact cotangent weights flipped ${firstFlips.flipped}): the region has degenerate or overlapping triangles; repair_mesh it first`,
     };
-  return accept(second, 'cotangent_clamped', secondFlips, firstFlips.flipped);
+  return accept(second, 'mean_value', secondFlips, firstFlips.flipped);
 }
 
 /**
@@ -362,11 +485,7 @@ export function parameterStretch(
   faces: ReadonlyArray<number>,
   uv: Map<number, [number, number]>,
 ): { u: number; v: number } {
-  const point = (v: number): Vec3 => [
-    mesh.positions[3 * v] as number,
-    mesh.positions[3 * v + 1] as number,
-    mesh.positions[3 * v + 2] as number,
-  ];
+  const point = pointOf(mesh);
   let [u, v, weight] = [0, 0, 0];
   for (const f of faces) {
     const [ia, ib, ic] = [0, 1, 2].map((k) => mesh.indices[3 * f + k] as number) as [number, number, number];

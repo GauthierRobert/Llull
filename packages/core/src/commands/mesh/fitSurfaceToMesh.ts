@@ -20,6 +20,8 @@ const MAX_FIT_VERTICES = 15_000;
 const MAX_MEASURED = 30_000;
 /** Most triangles in the region (a region is strided to MAX_FIT_VERTICES for the solve, but its measurement and area pass are linear in it). */
 const MAX_REGION_TRIANGLES = 200_000;
+/** Most triangles of a region the harmonic map solves (13.23.2: about 1 to 2 s at this size on a badly jittered mesh; the solve runs on the caller's thread). */
+const MAX_HARMONIC_TRIANGLES = 25_000;
 /** A region this folded (area fraction of triangles at or past vertical against its best-fit plane) cannot be one patch. */
 const MAX_FOLDED_FRACTION = 0.02;
 /** Pole counts tried, longest side, when maxDeviation drives the size. */
@@ -48,8 +50,8 @@ export const fitSurfaceToMesh = defineCommand({
     'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region` and/or in `faceGroups` (named groups of the mesh or segment_mesh regions). `parameterization` ' +
     '"projection" projects the region orthogonally onto its best-fit plane (it must look like a height field over that plane: gently curved, ' +
     'not folded back); "harmonic" maps a DISK-topology region (one connected manifold piece with exactly one boundary loop) onto the unit square ' +
-    'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-10, boundary by arc length, corners at the quarter points of its length; weights ' +
-    'clamped positive when the exact ones flip a triangle), which follows a strongly curved region (a hemisphere, a bowl) that projection ' +
+    'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-9 within an iteration budget, boundary by arc length between four corner vertices: the sharpest turns, else the vertices nearest the quarter points of its length; Floater mean-value weights when the exact ones flip a triangle; at most ' +
+    `${MAX_HARMONIC_TRIANGLES} triangles), which follows a strongly curved region (a hemisphere, a bowl) that projection` +
     'refuses; "auto" (default) uses projection when the region is projectable and the harmonic map otherwise. A closed body, a region with holes or in ' +
     'several pieces, or a vertical wall is refused (MESH_FIT_NOT_PROJECTABLE / MESH_FIT_NOT_DISK: pick a `region` or segment_mesh first). Rounds of ' +
     'least-squares pole fitting alternate with foot-point parameter correction, with a small second-difference fairing of the pole ' +
@@ -61,9 +63,10 @@ export const fitSurfaceToMesh = defineCommand({
     'Hausdorff distance, tight for a fine mesh); the patch covers the bounding rectangle of ' +
     'the region in its plane, so parts of it past a non-rectangular region are not measured. If `maxDeviation` is given and not reached ' +
     'the surface is still created and data.warnings holds MESH_FIT_NOT_CONVERGED. Pure TypeScript, no kernel. Refusals: ' +
-    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_GROUP_NOT_FOUND (a faceGroups name the mesh does not have, or a stale stored group), MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
-    `${MAX_REGION_TRIANGLES} triangles: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
-    'MESH_FIT_FAILED.',
+    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_GROUP_NOT_FOUND (a faceGroups name the mesh does not have, or a stale stored group), MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge within its iteration budget or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
+    `${MAX_REGION_TRIANGLES} triangles, ${MAX_HARMONIC_TRIANGLES} for the harmonic map: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
+    'MESH_FIT_FAILED. From a faceGroups selection the segmentation refusals pass through: MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE, MESH_SEGMENT_NO_GROUPS, MESH_ENGINE_CAP_EXCEEDED; ' +
+    'from the mesh load MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE.',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid, tessellated) to fit.'),
     region: z
@@ -170,6 +173,18 @@ export const fitSurfaceToMesh = defineCommand({
     const projectable = framed.foldedFraction <= MAX_FOLDED_FRACTION;
     let harmonic: HarmonicMap | null = null;
     if (wanted === 'harmonic' || (wanted === 'auto' && !projectable)) {
+      if (faces.length > MAX_HARMONIC_TRIANGLES)
+        return wanted === 'auto'
+          ? fail(
+              'MESH_FIT_NOT_PROJECTABLE',
+              `${foldedText}, and the region (${faces.length} triangles) is over the ${MAX_HARMONIC_TRIANGLES} of the harmonic map: pick a smaller region or faceGroups, or decimate_mesh`,
+              'region',
+            )
+          : fail(
+              'MESH_FIT_TOO_LARGE',
+              `the harmonic map takes at most ${MAX_HARMONIC_TRIANGLES} triangles, the region holds ${faces.length}: pick a smaller region or faceGroups, or decimate_mesh first`,
+              'region',
+            );
       const mapped = harmonicMap(mesh, faces);
       if ('code' in mapped)
         return wanted === 'auto' && mapped.code === 'MESH_FIT_NOT_DISK'
@@ -330,6 +345,7 @@ export const fitSurfaceToMesh = defineCommand({
                   collapsedTriangles: harmonic.collapsedInParameters,
                   interiorVertices: harmonic.interiorVertices,
                   boundaryVertices: harmonic.boundaryVertices,
+                  corners: harmonic.corners,
                   cgIterations: harmonic.cgIterations,
                   cgResidual: harmonic.cgResidual,
                 },
@@ -337,14 +353,24 @@ export const fitSurfaceToMesh = defineCommand({
             harmonic === null
               ? { origin: frame.origin, uAxis: frame.uAxis, vAxis: frame.vAxis, normal: frame.normal, longAxis: swapped ? 'v' : 'u' }
               : null,
-          warnings: converged
-            ? []
-            : [
-                {
-                  code: 'MESH_FIT_NOT_CONVERGED',
-                  message: `largest distance ${check.stats.max.toPrecision(4)} ${unit} > ${params.maxDeviation} with the largest grid tried (${last.size[0]} x ${last.size[1]}); the surface was still created`,
-                },
-              ],
+          warnings: [
+            ...(converged
+              ? []
+              : [
+                  {
+                    code: 'MESH_FIT_NOT_CONVERGED',
+                    message: `largest distance ${check.stats.max.toPrecision(4)} ${unit} > ${params.maxDeviation} with the largest grid tried (${last.size[0]} x ${last.size[1]}); the surface was still created`,
+                  },
+                ]),
+            ...(harmonic !== null && harmonic.collapsedInParameters > 0
+              ? [
+                  {
+                    code: 'MESH_FIT_PARAM_COLLAPSED',
+                    message: `${harmonic.collapsedInParameters} triangle(s) of the region have no area in the parameter square (all three vertices on one side of it: a zigzag boundary or a sliver at the boundary); the patch edge cannot follow them and the deviation is largest there; pick a region with a smoother boundary (faceGroups, a cleaner cut)`,
+                  },
+                ]
+              : []),
+          ],
         },
         { unverified: loaded.unverified, defaults },
       ),

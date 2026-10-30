@@ -14,6 +14,8 @@ export interface SegmentParams {
   /** Largest distance of a region's vertices to its primitive (document units). */
   readonly fitTolerance: number;
   readonly kinds: ReadonlyArray<PrimitiveKind>;
+  /** The command that asks (named in the refusals of a mesh that is not manifold, wound or clean); default segment_mesh. */
+  readonly command?: string;
 }
 
 interface SegmentGroup {

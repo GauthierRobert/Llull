@@ -9,6 +9,8 @@ export interface CgOptions {
   readonly tolerance: number;
   /** Diagonal of the operator (> 0 entries are used as the preconditioner); omitted: none. */
   readonly diagonal?: Float64Array | undefined;
+  /** Stop (not converged) when, every `stallWindow` iterations, the best residual so far has not fallen below 99 % of its value at the previous check; omitted: no check. */
+  readonly stallWindow?: number | undefined;
 }
 
 export interface CgResult {
@@ -50,6 +52,7 @@ export function conjugateGradient(
   let rz = dot(r, z);
   let residual = Math.sqrt(dot(r, r)) / norm;
   let iterations = 0;
+  let [checkpoint, best] = [residual, residual];
   while (residual > options.tolerance && iterations < options.maxIterations) {
     apply(p, ap);
     const curvature = dot(p, ap);
@@ -66,6 +69,11 @@ export function conjugateGradient(
     for (let i = 0; i < n; i++) p[i] = (z[i] as number) + beta * (p[i] as number);
     residual = Math.sqrt(dot(r, r)) / norm;
     iterations++;
+    best = Math.min(best, residual);
+    if (options.stallWindow !== undefined && iterations % options.stallWindow === 0) {
+      if (best >= 0.99 * checkpoint) break;
+      checkpoint = best;
+    }
   }
   return { x, iterations, relativeResidual: residual, converged: residual <= options.tolerance };
 }

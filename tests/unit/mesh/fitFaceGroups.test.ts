@@ -7,6 +7,7 @@ import { type CadDocument, type MeshSolidEntity, type NurbsSurfaceEntity, type S
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { docWithMeshes, gridMesh, icosphere, type IndexedMesh } from '../../helpers/meshFixtures';
 import { quadSphere } from '../../helpers/quadFixtures';
+import { scene } from '../../helpers/assetScene';
 
 type Data = Record<string, unknown>;
 const dataOf = (result: { data?: unknown }): Data => result.data as Data;
@@ -114,6 +115,9 @@ describe('fit_surface_to_mesh faceGroups', () => {
       );
       expect(spread[plane] as number, segment).toBeLessThan(1e-6);
       expect(dataOf(result)).toMatchObject({ faceGroups: { stored: 0, segments: 1 } });
+      // the triangles taken are the ones segment_mesh lists for that id
+      const listedFaces = (dataOf(listed)['groups'] as Array<{ id: string; faces: number }>).find((group) => group.id === segment)?.faces;
+      expect(dataOf(result)['regionTriangles'], segment).toBe(listedFaces);
     }
     // several segments: the union, here the whole L-shaped bend (a disk: the harmonic map takes it when asked)
     const both = execute(doc, 'fit_surface_to_mesh', {
@@ -134,6 +138,33 @@ describe('fit_surface_to_mesh faceGroups', () => {
     expect(merged.error, merged.summary).toBeUndefined();
     expect(dataOf(merged)['regionTriangles']).toBe(256);
     expect(dataOf(merged)['parameterization']).toMatchObject({ method: 'harmonic' });
+  });
+
+  it('reads the stored groups of an asset-backed mesh against the stored triangles, not the display level of detail', () => {
+    const stored = twoPlates();
+    const { doc, ctx } = scene([{ id: 'scan', fullMesh: stored, claimed: 256 }]);
+    const entity = doc.entities['scan'] as MeshSolidEntity;
+    expect(entity.mesh.indices.length / 3).toBe(12);
+    const grouped: CadDocument = {
+      ...doc,
+      entities: {
+        ...doc.entities,
+        scan: {
+          ...entity,
+          faceGroups: [
+            { id: 'right', faces: [[128, 256]] },
+            { id: 'left', faces: [[0, 128]] },
+          ],
+        },
+      },
+    };
+    const right = execute(grouped, 'fit_surface_to_mesh', { id: 'scan', faceGroups: { stored: ['right'] }, controlPoints: [5, 5] }, ctx);
+    expect(right.error, right.summary).toBeUndefined();
+    expect(dataOf(right)['regionTriangles']).toBe(128);
+    expect(polesOf(right.document, right.affected[0] as string).every((p) => Math.abs(p[2] - 3) < 1e-6)).toBe(true);
+    // without the asset the ranges are past the display mesh: the load refuses by name, the group is not silently cut
+    const lost = execute(grouped, 'fit_surface_to_mesh', { id: 'scan', faceGroups: { stored: ['right'] } });
+    expect(['MESH_ASSET_UNAVAILABLE', 'MESH_ASSET_MISSING']).toContain(codeOf(lost));
   });
 
   it('validates by name: unknown stored or segment ids list what exists, a stale group, an empty selector, groups of a mesh that stores none', () => {
