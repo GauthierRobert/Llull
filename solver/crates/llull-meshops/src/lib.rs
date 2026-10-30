@@ -1,7 +1,7 @@
 //! `llull-compute meshops <folder>` (07 MSH M3, RS1 RS-9): triangle-mesh operations on meshes of any size, bit-identical to the TypeScript
 //! mesh engine (`packages/core/src/geometry/mesh`), which stays the oracle (`deterministic: true`, VC-MSH-32).
 //!
-//! Job folder: `job.json` = `{ "op": "decimate" | "smooth" | "remesh" | "analyze" | "repair" | "fill_holes" | "sculpt" | "deviation" | "quad_remesh", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
+//! Job folder: `job.json` = `{ "op": "decimate" | "smooth" | "remesh" | "analyze" | "repair" | "fill_holes" | "sculpt" | "shrinkwrap" | "deviation" | "quad_remesh", "params": { ... } }`, `positions.f64` (little-endian f64, 3 per vertex) and
 //! `indices.u32` (little-endian u32, 3 per triangle) of a welded, indexed mesh. Out: `result_positions.f64`, `result_indices.u32` (the canonical result)
 //! and `report.json` = `{ op, items, ms, report }` with the op-specific report of the TypeScript engine.
 //!
@@ -14,6 +14,7 @@
 //! - `analyze` (DES-7c step 7): `{ maxListed, weldTolerance: 0, selfIntersections }` on any triangle soup: welds exact duplicates, runs the pair search (stage `self_intersections`) when asked, and writes `report.json` with
 //!   `report` = `{ weldTolerance, mergedVertices }` and `analysis` = the `MeshAnalysis` of the TypeScript engine (no result mesh). Coordinates above 1e100 are refused.
 //! - `repair` and `fill_holes` (DES-7c step 7, slice 2): see `repair_job.rs`; the result is the repaired / filled mesh and the report is the TypeScript engine's.
+//! - `shrinkwrap` (DES-7c native twins, 13.20): see `shrinkwrap_job.rs`; the target is `positions_b.f64` / `indices_b.u32`, the result is the wrapped mesh.
 //! - `sculpt` (DES-7c step 7, slice 3): see `sculpt_job.rs`; the result is the sculpted mesh and the report is the TypeScript engine's.
 //! - `quad_remesh` (feature `quad`): `{ targetFaces, hardEdgeRad?, adaptive }` (edges sharper than `hardEdgeRad` align the quads); the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
@@ -50,6 +51,8 @@ mod sculpt_job;
 mod sculpt_measure;
 mod sculpt_refine;
 pub mod self_intersect;
+mod shrinkwrap;
+mod shrinkwrap_job;
 pub mod smooth;
 mod surface;
 mod topology;
@@ -338,6 +341,20 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             mesh_out = Some((pos, idx));
             report
         }
+        "shrinkwrap" => {
+            progress.stage("shrinkwrap", 0.05);
+            let target_positions = f64s(&read(folder, "positions_b.f64")?, "positions_b.f64")?;
+            let target_triangles = u32s(&read(folder, "indices_b.u32")?, target_positions.len() / 3)?;
+            let (pos, idx, report) = shrinkwrap_job::run_shrinkwrap(
+                &positions,
+                &triangles,
+                (&target_positions, &target_triangles),
+                job.params,
+                &mut |done| progress.tick(0.05 + 0.9 * done),
+            )?;
+            mesh_out = Some((pos, idx));
+            report
+        }
         "decimate" => {
             let p: DecimateJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("decimate params: {error}")))?;
             let params = decimate::DecimateParams {
@@ -411,7 +428,7 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
         }
         other => {
             return Err(input_error(format!(
-                "unknown meshops op '{other}' (decimate, smooth, remesh, analyze, repair, fill_holes, sculpt, deviation, quad_remesh)"
+                "unknown meshops op '{other}' (decimate, smooth, remesh, analyze, repair, fill_holes, sculpt, shrinkwrap, deviation, quad_remesh)"
             )))
         }
     };

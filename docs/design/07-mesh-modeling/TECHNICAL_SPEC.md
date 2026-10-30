@@ -1636,7 +1636,7 @@ The displace column is after compiling the expression once (before: 0.7 / 3.1 / 
 
 ### 13.18.5 Left, by name
 
-- Native Rust twin of `shrinkwrap` (closest point exists in `llull-meshops`; the ray query and the face-normal offset are new): the 200,000 cap lifts when it exists. `displace` stays in TypeScript unless a measurement says otherwise.
+- Native Rust twin of `shrinkwrap`: built in 13.20. `displace` stays in TypeScript (0.48 s at 328k triangles).
 - Shrink-wrap modes of Blender not offered: "target normal project", "nearest vertex", "above / below surface" as separate modes (`side` covers the offset case), smoothing of the wrapped result.
 - A displacement texture as an image file (PNG / JPEG) is not decoded: the map is raw grey bytes; `displace_mesh` with a colour image or a procedural texture needs an importer.
 
@@ -1659,3 +1659,39 @@ FR-MSH-18 and the table of 5.7 list "a stroke along a curve entity with spacing"
 ### 13.19.4 Left, by name
 
 A path whose points are projected onto the surface before spacing (the spacing is along the path, not along the surface), and view-dependent directions (the FR lists "view" next to normal and vector; there is no view in the command layer).
+
+## 13.20 As built (DES-7c native twins (1): the native `shrinkwrap` op, 2026-10-30)
+
+### 13.20.1 What it is
+
+`shrinkwrap` (13.18) now has a Rust twin in `llull-meshops` (`shrinkwrap.rs`, `shrinkwrap_job.rs`, `SurfaceIndex::ray` in `surface.rs`), bit-identical to `wrapDisplace.ts`: the closest point (the tree of 13.12), the ray query (the same tree: the box slab test, the left child first, the reach shrinking to each hit, the lower triangle on equal distances, Moller-Trumbore with the TypeScript tolerances), the angle-weighted vertex normals (V8 `Math.acos` and `Math.hypot` twins of `llull-jsmath`, summed in face order), the forward-on-a-tie choice between the two directions, the offset along the target face normal, and the report `{ moved, missed, maxMove, meanMove, residual }` folded in vertex order. The per-vertex answers are computed in parallel (a vertex does not depend on another); the folds are sequential, so the bytes do not depend on the thread count. Job: `op: "shrinkwrap"`, `{ mode, direction?, offset, side, maxDistance? }`, the mesh as `positions.f64` / `indices.u32` and the target as `positions_b.f64` / `indices_b.u32` (as `deviation`).
+
+### 13.20.2 Decisions
+
+- **Refusals.** The job refuses with `NATIVE_JOB_INPUT` (the host falls through to the TypeScript engine, which answers or refuses it with the same text as before) what it does not take: a target without triangles, an offset that is negative, not finite or above 1e100, a `maxDistance` that is not positive, a direction past 1e100, a coordinate of the mesh or the target that is not finite or past 1e100 (the products would overflow), a result that is not finite (JSON cannot carry it). The host refuses by name a source or a target over 4,000,000 triangles (`MESH_ENGINE_CAP_EXCEEDED`, `SHRINKWRAP_TRIANGLE_CAP`), the TypeScript cap staying at 200,000 for both.
+- **Report tied to the op** (`isShrinkwrapReport`, `reportChecks.ts`): whole counts that fit the vertex count, finite non-negative measures, a mean not above the maximum, a maximum move of 0 exactly when no vertex moved, no missed vertex for `nearest` without a `maxDistance`; the result must have the triangles and the vertex count of the input (a wrap moves vertices only). A report or result that is not that is `MESH_ENGINE_UNSUPPORTED` (stand-in tests in `meshopsMalformedResult.test.ts`).
+- **Preferred above 10,000 triangles** of the wrapped mesh (13.20.3). The command has no `withDeviation` for this op: the deviation of the result is the separate `deviation` job, as for `sculpt`.
+- **No oracle defect found.** Two numerical guards of the oracle (the slab tolerance of `SurfaceIndex.ray`, the barycentric tolerance of `rayTriangleDistance`) are ported as they are; no pinned or generated case depends on them (a ray through a lattice corner is also found by a neighbouring triangle), so they are not red-provable.
+
+### 13.20.3 Measured (win32-x64, 22 cores; noisy icosphere (+-0.05) wrapped onto a noisy icosphere (+-0.03); engine call through `resolveDeferred`, process start included; TypeScript straight to the engine, caps not applied; one run each; every native result had the TypeScript bytes and report)
+
+| Source / target triangles | nearest TypeScript / native | normal TypeScript / native |
+| ------------------------- | --------------------------- | -------------------------- |
+| 320 / 5,120 | 39 ms / 85 ms (cold start) | 22 ms / 39 ms |
+| 5,120 / 5,120 | 37 ms / 55 ms | 36 ms / 61 ms |
+| 5,120 / 81,920 | 289 ms / 76 ms | 249 ms / 65 ms |
+| 20,480 / 81,920 | 469 ms / 78 ms | 374 ms / 76 ms |
+| 81,920 / 81,920 | 1.27 s / 0.11 s (11x) | 0.58 s / 0.11 s (5x) |
+| 327,680 / 81,920 | 4.25 s / 0.20 s (21x) | 1.48 s / 0.19 s (8x) |
+| 327,680 / 327,680 | (TypeScript refuses: cap) / 0.31 s | / 0.26 s |
+| 1,310,720 / 327,680 | (41.7 s in 13.18.4) / 0.79 s (about 50x) | (8.0 s) / 0.68 s (12x) |
+
+The native job is no slower than the TypeScript one from a 5,000-triangle mesh with a target of the same size, and faster whenever the target is larger; the preference is set at 10,000 source triangles (`SHRINKWRAP_PREFERRED_ABOVE`) with the margin of 13.12.4.
+
+### 13.20.4 Tests
+
+Rust: `tests/ts_pins.rs` (12 new pinned cases, results of the TypeScript engine: nearest from outside and inside, offsets on each side with `keep` on both sides of the target, a reach that misses half the vertices (nearest and normal), normals of a damaged soup, oblique rays onto a sphere and a holed grid, rays through lattice corners, a source equidistant from two planes (forward wins), a mode `direction` without direction; `ts_pins.json` regenerated by the two documented steps, existing pins unchanged; the regeneration test now reads the second mesh of a folder) and `tests/shrinkwrap.rs` (exact wrap onto a plane, the reach, every refusal with its text). Server: `meshopsNativeShrinkwrap.test.ts` (bytes and reports of both engines for the three modes, offsets, sides, reaches, open, soup, damaged and unreferenced-vertex inputs, fall-through of what the job does not take, the target cap), `meshopsMalformedResult.test.ts` and `deferredBudget.test.ts` (report and result checks, the job budget), and `meshShrinkwrapNativeHost.test.ts`, the host test on a stored 327,680-triangle source and a stored 327,680-triangle target (both read at full resolution: the residual is 0 on the 327,680-triangle target, the 80-triangle display level would leave 0.2; the result is stored, its bytes and report are the TypeScript oracle's; the stage stream, the timeout, the preference size). Each fails without its fix (shown by disabling it): the forward tie, the lower triangle on a tie, the keep side, the reach of `nearest`, the angle weights, the mean over handled vertices (pins); the target not packed, the report check, the triangle-count check, the preference size, the target cap, the missed-vertex rule (server and unit tests). Not red-provable: the child order of the ray traversal (a result-neutral search order) and the two numerical guards above.
+
+### 13.20.5 Left, by name
+
+The Rust twin of `displace` (0.48 s at 328k triangles in TypeScript after the compiled expression, below the 13.12.2 threshold); lifting the TypeScript cap of `shrinkwrap` is not needed (the native engine answers above it).

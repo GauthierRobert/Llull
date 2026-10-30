@@ -189,6 +189,33 @@ fn far_cells() -> Mesh {
     (positions, (0..faces * 3).collect())
 }
 
+fn wrap(extra: Value) -> Value {
+    let mut params = json!({ "offset": 0.0, "side": "keep" });
+    params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    json!({ "op": "shrinkwrap", "params": params })
+}
+
+fn scaled(mesh: &Mesh, factor: f64) -> Mesh {
+    (mesh.0.iter().map(|c| c * factor).collect(), mesh.1.clone())
+}
+
+/// The target of a `shrinkwrap_*` pin: a noisy sphere of radius 10 (an open grid for the grid pin).
+fn target_of(name: &str) -> Option<Mesh> {
+    match name {
+        "shrinkwrap_direction_lattice_corners" => Some(grid(10, |_, _| 0.0, &[])),
+        "shrinkwrap_direction_equidistant_planes" => {
+            // two planes at z = +1 and z = -1: every vertex of the source (z = 0) is as near to both
+            let (up, down) = (grid(8, |_, _| 1.0, &[]), grid(8, |_, _| -1.0, &[]));
+            let offset = (up.0.len() / 3) as u32;
+            Some(([up.0, down.0].concat(), [up.1, down.1.iter().map(|i| i + offset).collect()].concat()))
+        }
+        "shrinkwrap_direction_oblique_grid" => Some(sphere(4, 0.0, 1)),
+        "shrinkwrap_direction_offset_outside_soup" => Some(grid(12, ridge, &[(4, 4)])),
+        n if n.starts_with("shrinkwrap_") => Some(sphere(4, 0.03, 7)),
+        _ => None,
+    }
+}
+
 fn pins() -> Vec<Pin> {
     vec![
         Pin { name: "remesh_sphere_split", mesh: sphere(3, 0.05, 7), job: remesh(json!({ "targetEdge": 0.9 })) },
@@ -377,6 +404,50 @@ fn pins() -> Vec<Pin> {
             mesh: sphere(5, 0.1, 19),
             job: decimate(json!({ "maxDeviation": 0.1, "targetTriangles": 3000, "preserveBoundary": false })),
         },
+        Pin { name: "shrinkwrap_nearest_sphere", mesh: scaled(&sphere(3, 0.02, 5), 1.3), job: wrap(json!({ "mode": "nearest" })) },
+        Pin {
+            name: "shrinkwrap_nearest_offset_outside",
+            mesh: scaled(&sphere(3, 0.02, 6), 1.2),
+            job: wrap(json!({ "mode": "nearest", "offset": 0.5, "side": "outside" })),
+        },
+        Pin {
+            name: "shrinkwrap_nearest_offset_keep_both_sides",
+            mesh: scaled(&sphere(3, 0.3, 8), 1.0),
+            job: wrap(json!({ "mode": "nearest", "offset": 0.4, "side": "keep" })),
+        },
+        Pin {
+            name: "shrinkwrap_nearest_inside_max_distance",
+            mesh: scaled(&sphere(3, 1.0, 9), 1.0),
+            job: wrap(json!({ "mode": "nearest", "offset": 0.3, "side": "inside", "maxDistance": 0.5 })),
+        },
+        Pin { name: "shrinkwrap_normal_inward", mesh: scaled(&sphere(3, 0.05, 10), 1.3), job: wrap(json!({ "mode": "normal" })) },
+        Pin {
+            name: "shrinkwrap_normal_max_distance",
+            mesh: scaled(&sphere(3, 0.8, 11), 1.0),
+            job: wrap(json!({ "mode": "normal", "maxDistance": 0.4, "offset": 0.1, "side": "keep" })),
+        },
+        Pin {
+            name: "shrinkwrap_direction_oblique_grid",
+            mesh: grid(14, wavy, &[(3, 3)]),
+            job: wrap(json!({ "mode": "direction", "direction": [0.3, 0.2, -1.0] })),
+        },
+        Pin {
+            name: "shrinkwrap_direction_offset_outside_soup",
+            mesh: soup(&sphere(2, 0.0, 1), 0.0, 3),
+            job: wrap(json!({ "mode": "direction", "direction": [1.0, 0.0, 0.0], "offset": 0.2, "side": "outside" })),
+        },
+        Pin { name: "shrinkwrap_normal_damaged_soup", mesh: damaged_sphere(), job: wrap(json!({ "mode": "normal" })) },
+        Pin {
+            name: "shrinkwrap_direction_lattice_corners",
+            mesh: grid(10, |_, _| 5.0, &[]),
+            job: wrap(json!({ "mode": "direction", "direction": [1.0, 1.0, -1.0] })),
+        },
+        Pin {
+            name: "shrinkwrap_direction_equidistant_planes",
+            mesh: grid(8, |_, _| 0.0, &[]),
+            job: wrap(json!({ "mode": "direction", "direction": [0.0, 0.0, 1.0], "offset": 0.1, "side": "keep" })),
+        },
+        Pin { name: "shrinkwrap_direction_missing_direction", mesh: sphere(2, 0.0, 1), job: wrap(json!({ "mode": "direction" })) },
         Pin {
             name: "remesh_free_boundary",
             mesh: grid(16, wavy, &[(3, 3), (10, 12)]),
@@ -398,6 +469,10 @@ fn same(a: &Value, b: &Value) -> bool {
 fn write_inputs(dir: &Path, pin: &Pin) {
     fs::create_dir_all(dir).unwrap();
     write_job(dir, &pin.job, &pin.mesh);
+    if let Some(target) = target_of(pin.name) {
+        fs::write(dir.join("positions_b.f64"), target.0.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+        fs::write(dir.join("indices_b.u32"), target.1.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>()).unwrap();
+    }
 }
 
 #[test]

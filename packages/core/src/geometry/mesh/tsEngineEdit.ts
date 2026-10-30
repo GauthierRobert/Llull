@@ -12,6 +12,7 @@ import {
   editableProblem,
   repairDescription,
   sculptDescription,
+  shrinkwrapDescription,
   smoothDescription,
 } from './editable';
 import {
@@ -197,10 +198,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
           meanMove: result.meanMove,
           residual: result.residual,
         },
-        provenance: provenance(
-          `shrink-wrap, mode ${op.mode}: each vertex put on the target surface (closest point, or the first hit along its normal / a fixed direction), offset along the target face normal`,
-          'Blender Shrinkwrap modifier (nearest surface point, project); closest point by bounding-volume tree (Ericson 5.1.5)',
-        ),
+        provenance: provenance(shrinkwrapDescription(op.mode).algorithm, shrinkwrapDescription(op.mode).reference),
       };
     }
     case 'displace': {

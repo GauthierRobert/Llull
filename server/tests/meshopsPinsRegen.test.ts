@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isEngineFailure, type MeshOp } from '@core/geometry/mesh/engineTypes';
@@ -15,10 +15,10 @@ import type { MeshData } from '@core/model/types';
 const dir = process.env['LLULL_PIN_DIR'];
 const target = process.env['LLULL_PIN_WRITE'];
 
-/** The mesh of a job folder (little-endian `positions.f64` and `indices.u32`). */
-function readMesh(folder: string): MeshData {
-  const positions = readFileSync(path.join(folder, 'positions.f64'));
-  const indices = readFileSync(path.join(folder, 'indices.u32'));
+/** The mesh of a job folder (little-endian `positions.f64` and `indices.u32`; `suffix` "_b" reads the second mesh of a two-mesh op). */
+function readMesh(folder: string, suffix = ''): MeshData {
+  const positions = readFileSync(path.join(folder, `positions${suffix}.f64`));
+  const indices = readFileSync(path.join(folder, `indices${suffix}.u32`));
   return {
     positions: Array.from({ length: positions.length / 8 }, (_, i) => positions.readDoubleLE(i * 8)),
     indices: Array.from({ length: indices.length / 4 }, (_, i) => indices.readUInt32LE(i * 4)),
@@ -41,7 +41,11 @@ describe('TypeScript engine pins for the native twins', () => {
     for (const name of readdirSync(dir as string).sort()) {
       const folder = path.join(dir as string, name);
       const job = JSON.parse(readFileSync(path.join(folder, 'job.json'), 'utf8')) as { op: string; params: Record<string, unknown> };
-      const result = tsMeshEngine.run({ mesh: readMesh(folder) }, { op: job.op, ...job.params } as MeshOp);
+      const result = tsMeshEngine.run({ mesh: readMesh(folder) }, {
+        op: job.op,
+        ...job.params,
+        ...(existsSync(path.join(folder, 'positions_b.f64')) ? { target: { mesh: readMesh(folder, '_b') } } : {}),
+      } as MeshOp);
       expect(isEngineFailure(result), name).toBe(false);
       if (isEngineFailure(result)) continue;
       pins[name] = {

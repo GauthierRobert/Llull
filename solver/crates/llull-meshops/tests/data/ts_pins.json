@@ -2031,5 +2031,125 @@
       "refinedEdges": 0,
       "stampsApplied": 3
     }
+  },
+  "shrinkwrap_direction_equidistant_planes": {
+    "digest": "fe35ecb32726cc7649d8cd9139544b5acc3d6e733d41ce0157fcc1bc11979e17",
+    "report": {
+      "moved": 81,
+      "missed": 0,
+      "maxMove": 0.9,
+      "meanMove": 0.8999999999999997,
+      "residual": 2.7755575615628914e-17
+    }
+  },
+  "shrinkwrap_direction_lattice_corners": {
+    "digest": "31a64a15d20a2ea7901dd6e3b0e4081160a09549a58abf70b90cdb35d12df0c5",
+    "report": {
+      "moved": 36,
+      "missed": 85,
+      "maxMove": 8.660254037844386,
+      "meanMove": 8.660254037844386,
+      "residual": 0
+    }
+  },
+  "shrinkwrap_direction_missing_direction": {
+    "digest": "a891c839e3552dca35b5b842955c0759bb45037f429c58635d32e457e8115113",
+    "report": {
+      "moved": 0,
+      "missed": 162,
+      "maxMove": 0,
+      "meanMove": 0,
+      "residual": 0
+    }
+  },
+  "shrinkwrap_direction_oblique_grid": {
+    "digest": "52442b8acf17aa3d19feb426f16f0189dab249075dc338f3efa402d9c8d32831",
+    "report": {
+      "moved": 182,
+      "missed": 42,
+      "maxMove": 9.99029845170507,
+      "meanMove": 4.903237678789477,
+      "residual": 2.5510982866352577e-15
+    }
+  },
+  "shrinkwrap_direction_offset_outside_soup": {
+    "digest": "737e9855413cf688d34d2f191cd7cf01bb5b43a8d111bcf5ff1dfd299cb17b56",
+    "report": {
+      "moved": 124,
+      "missed": 836,
+      "maxMove": 14.875880804667448,
+      "meanMove": 5.8467776232048285,
+      "residual": 0.15609756097561056
+    }
+  },
+  "shrinkwrap_nearest_inside_max_distance": {
+    "digest": "7aeb36c208ac0382bb500e5f916c54dc053d2dd83d3adc76f0c040f21b6e2833",
+    "report": {
+      "moved": 326,
+      "missed": 316,
+      "maxMove": 0.7960479422738692,
+      "meanMove": 0.3382270959004443,
+      "residual": 0.007822728897776576
+    }
+  },
+  "shrinkwrap_nearest_offset_keep_both_sides": {
+    "digest": "d209f428a191166616b506fb1dc6a5548af0adcca8a55fe141440753ae569fc1",
+    "report": {
+      "moved": 642,
+      "missed": 0,
+      "maxMove": 0.39907327768652445,
+      "meanMove": 0.2516004040360991,
+      "residual": 0.00797793031085725
+    }
+  },
+  "shrinkwrap_nearest_offset_outside": {
+    "digest": "d4d8bf898d56a11c3f2b4976b19ebcde7a3226816f97647efc3cf51988992cfe",
+    "report": {
+      "moved": 642,
+      "missed": 0,
+      "maxMove": 1.5494117424583753,
+      "meanMove": 1.5007485727448917,
+      "residual": 0.0014789177387825037
+    }
+  },
+  "shrinkwrap_nearest_sphere": {
+    "digest": "42e282cf5521f737349d6dc8ef43e35ae73f2cac46cd82fdefc0b0fb0ae4be45",
+    "report": {
+      "moved": 642,
+      "missed": 0,
+      "maxMove": 3.051401729522923,
+      "meanMove": 3.000321672205098,
+      "residual": 4.440892098500626e-16
+    }
+  },
+  "shrinkwrap_normal_damaged_soup": {
+    "digest": "d3b8a788251bb21c4f25fc8f2ee94fd090f5b505a0a6bbdb2c9f89edadddfb5f",
+    "report": {
+      "moved": 3840,
+      "missed": 3,
+      "maxMove": 0.07683597414930693,
+      "meanMove": 0.029002061093150528,
+      "residual": 9.930136612989092e-16
+    }
+  },
+  "shrinkwrap_normal_inward": {
+    "digest": "ceedc9f74938307a2e1c9ec289dd7a1284a99915861066c693aa645c1f68602c",
+    "report": {
+      "moved": 642,
+      "missed": 0,
+      "maxMove": 3.0902777101815406,
+      "meanMove": 3.0010345292583147,
+      "residual": 2.0350724194510405e-15
+    }
+  },
+  "shrinkwrap_normal_max_distance": {
+    "digest": "7360ed020154aff1e5c03a17426bdb80679910681de6c61285e8fb8af06b0f0a",
+    "report": {
+      "moved": 319,
+      "missed": 323,
+      "maxMove": 0.30478031147997886,
+      "meanMove": 0.13045571958343002,
+      "residual": 0.001760328022070795
+    }
   }
 }

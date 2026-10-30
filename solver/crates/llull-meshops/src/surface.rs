@@ -3,7 +3,7 @@
 //! The tree is built with a selection instead of a full sort per level and its two halves build in parallel; the tree is a function of the mesh
 //! alone, so the result does not depend on the number of threads.
 
-use crate::geom::Vec3;
+use crate::geom::{js_max, js_min, Vec3};
 use rayon::prelude::*;
 
 const LEAF: usize = 6;
@@ -63,6 +63,35 @@ pub fn closest_point_on_triangle(p: Vec3, [a, b, c]: [Vec3; 3]) -> Vec3 {
     }
     let denominator = 1.0 / (va + vb + vc);
     add(a, add(scale(ab, vb * denominator), scale(ac, vc * denominator)))
+}
+
+fn cross(a: Vec3, b: Vec3) -> Vec3 {
+    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
+
+/// Distance along `direction` to triangle `abc` from `origin` in [t_min, t_max]; twin of `rayTriangleDistance` (Moller-Trumbore, double-sided).
+// the comparisons are the TypeScript ones: a NaN barycentric coordinate is not out of range there, which a range test would turn around
+#[allow(clippy::manual_range_contains)]
+fn ray_triangle_distance(origin: Vec3, direction: Vec3, [a, b, c]: [Vec3; 3], t_min: f64, t_max: f64) -> Option<f64> {
+    let (edge1, edge2) = (sub(b, a), sub(c, a));
+    let h = cross(direction, edge2);
+    let determinant = dot(edge1, h);
+    if determinant.abs() < 1e-300 {
+        return None;
+    }
+    let inverse = 1.0 / determinant;
+    let s = sub(origin, a);
+    let u = inverse * dot(s, h);
+    if u < -1e-12 || u > 1.0 + 1e-12 {
+        return None;
+    }
+    let q = cross(s, edge1);
+    let v = inverse * dot(direction, q);
+    if v < -1e-12 || u + v > 1.0 + 1e-12 {
+        return None;
+    }
+    let t = inverse * dot(edge2, q);
+    (t >= t_min && t <= t_max).then_some(t)
 }
 
 /// The nearest point of a closest-point query: `face` is -1 (and `distance` infinite) for an empty mesh.
@@ -250,6 +279,67 @@ impl SurfaceIndex {
             } else {
                 stack[top] = left;
                 stack[top + 1] = right;
+                top += 2;
+            }
+        }
+        best
+    }
+
+    fn ray_hits_box(&self, node: u32, origin: Vec3, inverse: Vec3, t_max: f64) -> bool {
+        let bounds = &self.nodes[node as usize].bounds;
+        let (mut near, mut far) = (0.0_f64, t_max);
+        for a in 0..3 {
+            let lo = (bounds[a] - origin[a]) * inverse[a];
+            let hi = (bounds[a + 3] - origin[a]) * inverse[a];
+            if lo.is_nan() || hi.is_nan() {
+                continue;
+            }
+            near = js_max(near, js_min(lo, hi));
+            far = js_min(far, js_max(lo, hi));
+        }
+        near <= far * (1.0 + 1e-12) + 1e-12
+    }
+
+    /// The first hit of the ray `origin + t * direction` (`direction` a unit vector) with t in [0, t_max], as `(distance, face)`; twin of `SurfaceIndex.ray` (same traversal: the
+    /// left child first, the reach shrinking to each hit, the lower triangle on equal distances).
+    pub fn ray(&self, origin: Vec3, direction: Vec3, t_max: f64) -> Option<(f64, u32)> {
+        if self.face_count == 0 {
+            return None;
+        }
+        let inverse = [1.0 / direction[0], 1.0 / direction[1], 1.0 / direction[2]];
+        let mut best: Option<(f64, u32)> = None;
+        let mut reach = t_max;
+        let mut stack = [0u32; 64];
+        let mut top = 1;
+        while top > 0 {
+            top -= 1;
+            let node = stack[top];
+            if !self.ray_hits_box(node, origin, inverse, reach) {
+                continue;
+            }
+            let Node { left, right, start, end, .. } = self.nodes[node as usize];
+            if left == NONE {
+                for i in start as usize..end as usize {
+                    let t = self.order[i];
+                    let o = t as usize * 9;
+                    let c = &self.corners;
+                    let hit = ray_triangle_distance(
+                        origin,
+                        direction,
+                        [[c[o], c[o + 1], c[o + 2]], [c[o + 3], c[o + 4], c[o + 5]], [c[o + 6], c[o + 7], c[o + 8]]],
+                        0.0,
+                        reach,
+                    );
+                    if let Some(distance) = hit {
+                        if best.is_none_or(|(d, f)| distance < d || (distance == d && t < f)) {
+                            best = Some((distance, t));
+                            reach = distance;
+                        }
+                    }
+                }
+            } else {
+                stack[top] = right;
+                stack[top + 1] = left;
                 top += 2;
             }
         }
