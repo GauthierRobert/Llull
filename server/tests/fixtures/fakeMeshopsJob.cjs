@@ -1,9 +1,10 @@
 /**
  * A stand-in for `llull-compute meshops <folder>` that answers with a chosen result, for tests of what the host does with an answer it cannot trust.
- * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code:
+ * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved:
  * the preload writes the result files and the final `done` event, then exits before node looks for a script called `meshops`.
- * The report of `repair` and `fill_holes` is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
- * fairing, with a loop number past `totalLoops`); `hole_code` ends the job with an error event of a `MESH_HOLE_` code no command documents. The result mesh of those two ops is the input.
+ * The report of `repair`, `fill_holes` and `sculpt` is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
+ * fairing, with a loop number past `totalLoops`, or for a sculpt without symmetry that reports a symmetry error and more stamps applied than there are); `hole_code` ends the job
+ * with an error event of a `MESH_HOLE_` code no command documents; `sculpt_index` with `SCULPT_OFF_SURFACE` naming a stamp the op does not have. The result mesh of those ops is the input.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -31,6 +32,11 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
     fs.writeSync(1, `${JSON.stringify({ type: 'error', code: 'MESH_HOLE_UNDOCUMENTED', message: 'a code no command knows' })}\n`);
     process.exit(1);
   }
+  if (mode === 'sculpt_index' || mode === 'sculpt_blank_index') {
+    const message = mode === 'sculpt_index' ? '99' : ' ';
+    fs.writeSync(1, `${JSON.stringify({ type: 'error', code: 'SCULPT_OFF_SURFACE', message })}\n`);
+    process.exit(1);
+  }
   const changes = Object.fromEntries(
     [
       'welded',
@@ -56,6 +62,15 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
   const reports = {
     repair: { mode: other ? 'close_holes' : job.params.mode, changes, notes: [], skippedHoles: 0 },
     fill_holes: { totalLoops: 1, filled: [filled], skipped: [] },
+    sculpt: {
+      movedVertices: mode === 'sculpt_moved' ? 1e9 : 0,
+      maxDisplacement: 0,
+      displacedVolume: 0,
+      volumeBasis: 'height-field-sum',
+      symmetryError: other ? 1 : job.params.symmetry === undefined ? null : 0,
+      refinedEdges: 0,
+      stampsApplied: (other ? 3 : 1) * (job.params.stamps ?? []).length,
+    },
   };
   const report = mode === 'bad_report' ? {} : (reports[op] ?? {});
   const files = {

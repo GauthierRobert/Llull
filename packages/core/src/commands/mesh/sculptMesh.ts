@@ -9,7 +9,7 @@ import { runMeshOp } from './runMeshOp';
 /**
  * @affects rewrites the mesh `id` with moved (and, with refineEdge, split) vertices, or adds one mesh with keepSource
  * @invariant stamps apply in order; a stamp and its mirror are computed from the same positions and added, so a mirrored stroke is symmetric; only vertices closer than `radius` to a stamp (and inside maskRegion) move
- * @failure unknown id / non-solid -> MESH_*; a stamp farther than radius from the surface -> MESH_SCULPT_STAMP_OFF_SURFACE; grab without a direction vector -> MESH_PARAM_INVALID
+ * @failure unknown id / non-solid -> MESH_*; a stamp farther than radius from the surface -> MESH_SCULPT_STAMP_OFF_SURFACE; refineEdge so small that the mesh passes 4,000,000 triangles -> MESH_SCULPT_RESULT_TOO_LARGE; grab without a direction vector -> MESH_PARAM_INVALID
  */
 export const sculptMesh = defineCommand({
   name: 'sculpt_mesh',
@@ -25,7 +25,7 @@ export const sculptMesh = defineCommand({
     '`refineEdge` first splits edges longer than that inside the brush so detail is possible. Reports movedVertices, maxDisplacement (document ' +
     'units), displacedVolume (closed mesh: volume after - before; open height field: sum of triangle area x mean vertex displacement along the face ' +
     'normal) and symmetryError (largest distance between mirror vertex pairs). Connectivity is unchanged without refineEdge. ' +
-    'Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_SCULPT_STAMP_OFF_SURFACE.',
+    'Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_SCULPT_STAMP_OFF_SURFACE, MESH_SCULPT_RESULT_TOO_LARGE (refineEdge splits past 4,000,000 triangles: use a longer edge).',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) to sculpt.'),
     brush: z.enum(SCULPT_BRUSHES).describe('Brush: draw, inflate, grab, smooth, flatten, pinch, crease or layer.'),

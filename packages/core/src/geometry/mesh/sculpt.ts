@@ -29,6 +29,16 @@ export interface SculptParams {
   readonly mask?: SphereRegion;
   /** `flatten`: a point of the target plane; default the area-weighted centroid of the brush region at the start of each stamp. */
   readonly planePoint?: Vec3;
+  /** Triangles the refined working mesh may reach (default SCULPT_MAX_TRIANGLES); the command never sets it, tests do. */
+  readonly maxTriangles?: number;
+}
+
+/** Most triangles the mesh may have while `refineEdge` splits it: past it the refinement stops and the sculpt is refused (a tiny edge would fill the memory). */
+export const SCULPT_MAX_TRIANGLES = 4_000_000;
+
+/** `tooLarge`: the live triangles of the refined mesh when it passed the limit. */
+export interface SculptTooLarge {
+  readonly tooLarge: number;
 }
 
 export interface SculptResult {
@@ -298,25 +308,47 @@ function symmetryErrorOf(input: MeshData, positions: ReadonlyArray<Vec3>, plane:
   return worst;
 }
 
-function refine(mesh: MeshData, params: SculptParams, centres: ReadonlyArray<Vec3>): { mesh: MeshData; splits: number } {
+/**
+ * The edges of one refinement pass as (low, high): an edge once per live face that runs it from the lower to the higher index, in face order; an edge no face runs
+ * that way (a boundary edge traversed from the higher index) once, at its first face, so it is split too.
+ */
+function passEdges(edit: EditMesh): Array<[number, number]> {
+  const pairs = (f: number): Array<[number, number]> => {
+    const [a, b, c] = edit.corners(f);
+    return [
+      [a, b],
+      [b, c],
+      [c, a],
+    ];
+  };
+  const total = edit.vertexTotal;
+  const ascending = new Set<number>();
+  for (let f = 0; f < edit.faces.length / 3; f++)
+    if (edit.fAlive[f]) for (const [u, v] of pairs(f)) if (u < v) ascending.add(u * total + v);
+  const edges: Array<[number, number]> = [];
+  for (let f = 0; f < edit.faces.length / 3; f++) {
+    if (!edit.fAlive[f]) continue;
+    for (const [u, v] of pairs(f)) {
+      if (u < v) edges.push([u, v]);
+      else if (u > v && !ascending.has(v * total + u)) {
+        ascending.add(v * total + u);
+        edges.push([v, u]);
+      }
+    }
+  }
+  return edges;
+}
+
+function refine(mesh: MeshData, params: SculptParams, centres: ReadonlyArray<Vec3>): { mesh: MeshData; splits: number } | SculptTooLarge {
   const limit = params.refineEdge;
   if (limit === undefined) return { mesh, splits: 0 };
   const edit = new EditMesh(mesh.positions, mesh.indices);
   let splits = 0;
   for (let pass = 0; pass < 8; pass++) {
     let count = 0;
-    const edges: Array<[number, number]> = [];
-    for (let f = 0; f < edit.faces.length / 3; f++) {
-      if (!edit.fAlive[f]) continue;
-      const [a, b, c] = edit.corners(f);
-      for (const [u, v] of [
-        [a, b],
-        [b, c],
-        [c, a],
-      ] as Array<[number, number]>)
-        if (u < v) edges.push([u, v]);
-    }
+    const edges = passEdges(edit);
     for (const [u, v] of edges) {
+      if (edit.liveFaces > (params.maxTriangles ?? SCULPT_MAX_TRIANGLES)) return { tooLarge: edit.liveFaces };
       if (edit.facesOnEdge(u, v).length === 0) continue;
       const [pu, pv] = [edit.p(u), edit.p(v)];
       const length = Math.hypot(pu[0] - pv[0], pu[1] - pv[1], pu[2] - pv[2]);
@@ -333,7 +365,7 @@ function refine(mesh: MeshData, params: SculptParams, centres: ReadonlyArray<Vec
 }
 
 /** Apply every stamp in order; stamps farther than `radius` from the input surface are reported through `offSurface` (nothing is moved then). */
-export function sculptMesh(input: MeshData, params: SculptParams): SculptResult {
+export function sculptMesh(input: MeshData, params: SculptParams): SculptResult | SculptTooLarge {
   const tolerance = 1e-9 * Math.max(1, params.radius);
   const surface = new SurfaceIndex(input.positions, input.indices);
   const projected: Vec3[] = [];
@@ -345,6 +377,7 @@ export function sculptMesh(input: MeshData, params: SculptParams): SculptResult 
   const centres: Vec3[] = [...projected];
   if (params.symmetry !== undefined) for (const p of projected) centres.push(mirror(p, params.symmetry));
   const refined = refine(input, params, centres);
+  if ('tooLarge' in refined) return refined;
   const sculptor = new Sculptor(refined.mesh.positions, refined.mesh.indices, params);
   const base: Vec3[] = sculptor.position.map((p): Vec3 => [p[0], p[1], p[2]]);
   const original = base.map((p): Vec3 => [p[0], p[1], p[2]]);

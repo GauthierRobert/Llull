@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { packJson, relativeError } from '../../helpers/meshFixtures';
+import { sculptMesh } from '@core/geometry/mesh/sculpt';
+import { gridMesh, packJson, relativeError } from '../../helpers/meshFixtures';
 
 type Data = Record<string, unknown>;
 const dataOf = (result: { data?: unknown }): Data => result.data as Data;
@@ -207,5 +208,52 @@ describe('sculpt_mesh', () => {
     const kept = execute(doc, 'sculpt_mesh', { id, brush: 'draw', ...stroke, keepSource: true });
     expect(kept.document.order).toHaveLength(2);
     expectPure(doc, () => execute(doc, 'sculpt_mesh', { id, brush: 'draw', ...stroke }));
+  });
+});
+
+describe('refineEdge on an open mesh (TECHNICAL_SPEC 13.14.6)', () => {
+  it('splits every edge longer than the limit inside the brush, boundary edges traversed from the higher to the lower index included', () => {
+    const open = gridMesh(10, 4);
+    const result = sculptMesh(open, {
+      brush: 'draw',
+      stamps: [[0, 0, 0]],
+      radius: 100,
+      strength: 0,
+      falloff: 'constant',
+      direction: 'area_normal',
+      taubin: false,
+      refineEdge: 0.4,
+    });
+    if ('tooLarge' in result) throw new Error('unexpected refusal');
+    const { positions, indices } = result.mesh;
+    const lengths = new Map<string, number>();
+    for (let f = 0; f < indices.length; f += 3)
+      for (let k = 0; k < 3; k++) {
+        const a = indices[f + k] as number;
+        const b = indices[f + ((k + 1) % 3)] as number;
+        lengths.set(
+          a < b ? `${a}:${b}` : `${b}:${a}`,
+          Math.hypot(
+            ...([0, 1, 2].map((axis) => (positions[a * 3 + axis] as number) - (positions[b * 3 + axis] as number)) as [
+              number,
+              number,
+              number,
+            ]),
+          ),
+        );
+      }
+    // the 8 passes leave a few interior diagonals just above the limit (the longest here is 0.43); every boundary edge is below it
+    const uses = new Map<string, number>();
+    for (let f = 0; f < indices.length; f += 3)
+      for (let k = 0; k < 3; k++) {
+        const a = indices[f + k] as number;
+        const b = indices[f + ((k + 1) % 3)] as number;
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        uses.set(key, (uses.get(key) ?? 0) + 1);
+      }
+    const boundary = [...lengths].filter(([key]) => uses.get(key) === 1);
+    expect(boundary.length).toBeGreaterThan(40);
+    expect(boundary.filter(([, length]) => length > 0.4)).toEqual([]);
+    expect(Math.max(...lengths.values())).toBeLessThan(0.5);
   });
 });

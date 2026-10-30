@@ -1,4 +1,4 @@
-//! Results of the TypeScript mesh engine (the oracle of VC-MSH-32), pinned for the ops ported in DES-7c step 7 (remesh, analyze, repair, fill_holes): the SHA-256 of the result positions
+//! Results of the TypeScript mesh engine (the oracle of VC-MSH-32), pinned for the ops ported in DES-7c step 7 (remesh, analyze, repair, fill_holes, sculpt): the SHA-256 of the result positions
 //! (`result_positions.f64`) followed by the indices (`result_indices.u32`), the whole `report` of `report.json` and, for `analyze`, its `analysis`, from `data/ts_pins.json`.
 //! `native:check` runs cargo only, so these pins keep the bit-identity of the Rust code testable where the server suite does not run;
 //! `server/tests/meshopsNative.test.ts` is the live comparison.
@@ -58,6 +58,19 @@ fn fill(extra: Value) -> Value {
         json!({ "select": "all", "maxBoundaryEdges": 1000, "fairing": "curvature", "refine": true, "alpha": std::f64::consts::SQRT_2 });
     params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
     json!({ "op": "fill_holes", "params": params })
+}
+
+fn sculpt(brush: &str, extra: Value) -> Value {
+    let mut params = json!({
+        "brush": brush, "stamps": [[0.0, 0.0, 10.0]], "radius": 3.0, "strength": 0.4, "falloff": "smooth", "direction": "area_normal", "taubin": false
+    });
+    params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    json!({ "op": "sculpt", "params": params })
+}
+
+/// A stroke on the noisy sphere: three stamps along a meridian.
+fn stroke() -> Value {
+    json!([[0.0, 0.0, 10.0], [2.0, 1.0, 9.7], [4.0, 2.0, 9.0]])
 }
 
 /// `mesh` without the faces listed.
@@ -135,6 +148,12 @@ fn with_degenerate(mut mesh: Mesh) -> Mesh {
     mesh
 }
 
+/// The vertex 0 of the sphere that `with_degenerate` gives a face with a repeated corner (0, 0, 4).
+fn corner_stamp() -> Value {
+    let mesh = sphere(3, 0.03, 5);
+    json!(point(&mesh.0, 0))
+}
+
 fn pins() -> Vec<Pin> {
     vec![
         Pin { name: "remesh_sphere_split", mesh: sphere(3, 0.05, 7), job: remesh(json!({ "targetEdge": 0.9 })) },
@@ -188,6 +207,108 @@ fn pins() -> Vec<Pin> {
             job: fill(json!({ "fairing": "tangent", "alpha": 2.0, "select": { "near": [[5.0, 5.0, 0.0]] } })),
         },
         Pin { name: "fill_plain_loops", mesh: holey_sphere(), job: fill(json!({ "fairing": "none", "refine": false, "select": [1, 0] })) },
+        Pin { name: "sculpt_draw_stroke", mesh: sphere(4, 0.03, 3), job: sculpt("draw", json!({ "stamps": stroke() })) },
+        Pin {
+            name: "sculpt_draw_normal_mirror",
+            mesh: sphere(4, 0.03, 5),
+            job: sculpt("draw", json!({ "stamps": stroke(), "direction": "normal", "falloff": "sphere", "symmetry": "yz" })),
+        },
+        Pin {
+            name: "sculpt_inflate_masked",
+            mesh: sphere(4, 0.03, 6),
+            job: sculpt(
+                "inflate",
+                json!({ "stamps": stroke(), "falloff": "linear", "mask": { "center": [1.0, 0.0, 10.0], "radius": 2.5 } }),
+            ),
+        },
+        Pin {
+            name: "sculpt_grab_vector_mirror",
+            mesh: sphere(4, 0.03, 7),
+            job: sculpt("grab", json!({ "stamps": stroke(), "direction": [0.3, 0.2, 1.0], "symmetry": "xz", "falloff": "constant" })),
+        },
+        Pin {
+            name: "sculpt_smooth_taubin",
+            mesh: sphere(4, 0.05, 8),
+            job: sculpt("smooth", json!({ "stamps": stroke(), "strength": 0.6, "taubin": true, "radius": 3.5 })),
+        },
+        Pin {
+            name: "sculpt_flatten_open",
+            mesh: grid(30, wavy, &[(8, 8), (20, 3)]),
+            job: sculpt("flatten", json!({ "stamps": [[5.0, 5.0, 0.0], [6.0, 4.0, 0.1]], "strength": 0.7, "radius": 2.0 })),
+        },
+        Pin {
+            name: "sculpt_flatten_plane_point",
+            mesh: grid(30, wavy, &[]),
+            job: sculpt("flatten", json!({ "stamps": [[5.0, 5.0, 0.0]], "strength": 0.5, "radius": 2.5, "planePoint": [5.0, 5.0, 0.1] })),
+        },
+        Pin {
+            name: "sculpt_pinch_crease",
+            mesh: grid(30, ridge, &[]),
+            job: sculpt(
+                "crease",
+                json!({ "stamps": [[5.0, 5.0, 0.0], [5.0, 6.0, 0.0]], "strength": 0.3, "radius": 1.5, "symmetry": "xy" }),
+            ),
+        },
+        Pin {
+            name: "sculpt_pinch",
+            mesh: grid(30, wavy, &[]),
+            job: sculpt("pinch", json!({ "stamps": [[5.0, 5.0, 0.0]], "strength": 0.5, "radius": 2.0, "direction": "normal" })),
+        },
+        Pin {
+            name: "sculpt_layer_height",
+            mesh: grid(30, wavy, &[]),
+            job: sculpt(
+                "layer",
+                json!({ "stamps": [[4.0, 5.0, 0.0], [5.0, 5.0, 0.0], [6.0, 5.0, 0.0]], "strength": 0.5, "maxHeight": 0.3, "radius": 1.5 }),
+            ),
+        },
+        Pin {
+            name: "sculpt_refine_mask",
+            mesh: sphere(3, 0.0, 1),
+            job: sculpt(
+                "draw",
+                json!({ "stamps": [[0.0, 0.0, 10.0]], "refineEdge": 0.5, "radius": 2.5, "mask": { "center": [0.0, 0.0, 10.0], "radius": 2.0 } }),
+            ),
+        },
+        Pin {
+            name: "sculpt_damaged_soup",
+            mesh: damaged_sphere(),
+            job: sculpt(
+                "smooth",
+                json!({ "stamps": [[0.0, 0.0, 10.0], [10.0, 0.0, 0.0]], "radius": 6.0, "strength": 0.5, "direction": "normal" }),
+            ),
+        },
+        Pin {
+            name: "sculpt_damaged_inflate",
+            mesh: damaged_sphere(),
+            job: sculpt("inflate", json!({ "stamps": [[0.0, 0.0, 10.0], [10.0, 0.0, 0.0]], "radius": 6.0, "strength": 0.5 })),
+        },
+        Pin {
+            name: "sculpt_soup_mirror",
+            mesh: soup(&sphere(2, 0.0, 1), 0.0, 3),
+            job: sculpt(
+                "draw",
+                json!({ "stamps": [[0.0, 0.0, 10.0], [3.0, 2.0, 9.5]], "radius": 4.0, "direction": "normal", "symmetry": "yz" }),
+            ),
+        },
+        Pin {
+            name: "sculpt_repeated_corner_inflate",
+            mesh: with_degenerate(sphere(3, 0.03, 5)),
+            job: sculpt("inflate", json!({ "stamps": [corner_stamp()], "radius": 3.0, "strength": 0.5 })),
+        },
+        Pin {
+            name: "sculpt_repeated_corner_smooth",
+            mesh: with_degenerate(sphere(3, 0.03, 5)),
+            job: sculpt("smooth", json!({ "stamps": [corner_stamp()], "radius": 3.0, "strength": 0.5, "taubin": true })),
+        },
+        Pin {
+            name: "sculpt_refine_open_boundary",
+            mesh: grid(6, wavy, &[(2, 2)]),
+            job: sculpt(
+                "draw",
+                json!({ "stamps": [[5.0, 5.0, 0.0], [1.0, 9.0, 0.0]], "radius": 6.0, "refineEdge": 0.5, "symmetry": "xz" }),
+            ),
+        },
         Pin {
             name: "remesh_free_boundary",
             mesh: grid(16, wavy, &[(3, 3), (10, 12)]),
