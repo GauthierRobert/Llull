@@ -722,6 +722,19 @@ flowed from its own centreline onto a line is straightened with its cross-sectio
 - **Det J.** In base coordinates the map multiplies the volume element by ratio (1 − κt·o) / (1 − κb·o). The Jacobian pre-check and the analysis sample det J
   at the body's own vertices (`DeformPlan.samples`; the extent box is not the body for a curved base). The predicted volume is the section integral
   ∫ ratio (A(s) − kt1 Mx(s) − kt2 My(s)) ds over planes normal to the base (`predictedBaseFlow.ts`, area and moments by Green's theorem), independent of the surface.
+- **Samples (review round 1).** The vertices alone miss a fold of the target between them, so the pre-check, `analyze_deformation` and `check_deformation` also sample a
+  grid in the base frame (`baseFlowGrid.ts`): the corners of the body's offset range (x, y) at four arc lengths per interval of the target table, and every interval
+  whose turn times the widest offset reaches 0.25 (the sharpest 1000), since a table with a sharp corner has more stations than the uniform cap can sample.
+- **Base fold guard.** The base side of det J is 1 − k1 x − k2 y at each vertex's own signed offsets (`frameCurvatures`); `DEF_FOLDOVER` when it reaches the
+  Jacobian floor. A plate on the outer side of an arc, or wider than the radius across the plane of the arc, is valid. Reached only for a vertex at the centre of
+  curvature inside the base's sector (a unit test on `resolveBase`); a body past the centre leaves the sector and is `DEF_BASE_CURVE_SHORT` (pinned separately).
+- **Predicted volume past a half turn.** A base turning more than 180 degrees makes the normal plane at s also cut the far part of the body; only triangles whose
+  projected arc lengths bracket s belong to the section (a 270 degree test).
+- **Projection cost.** `projectOnBase` seeds Newton from the nearest of a coarse grid of every sqrt(count)-th station, refined within one stride (2 sqrt(count)
+  distances instead of count; mirrored in C++). On a 4096-station table and 327000 vertices the seed alone fell from 2.2 s (full scan) to about 0.1 s and the whole
+  projection costs 3.0 s (Newton now dominates); before it was about 5.1 s.
+- **Jacobian parity.** The cargo pack test now compares det J (forward-mode, `warp_determinants`, one Jet evaluation per axis) with the pack's det at 1e-6, so a
+  mis-scaled implicit derivative of the projection no longer passes on the images alone. `parse_spec` moved to `cpp/deform_spec.cxx` (`deform.cxx` was at its size limit).
 - **Default.** A base that is a straight line on the frame axis running toward +z is the default: it is dropped, so the node, the mesh and the summary are
   byte-identical to the call without `baseCurve` (the documents differ only in the recorded step params).
 - **Refusals.** Not a `nurbs_curve` or missing: `DEF_CURVE_NOT_FOUND` (`params.baseCurve`); zero length / tangent: `DEF_CURVE_INVALID`; the body starts before or
@@ -730,9 +743,11 @@ flowed from its own centreline onto a line is straightened with its cross-sectio
   codes. Only `nurbs_curve` bases (other curve kinds: convert first).
 - **Old sidecars.** The sidecar `info` lists `deform-base-curve`; `nativeSupportsDeform` requires it when the law has a base (the extra table after the target's
   is ignored by an older warp), as for `deform-infinite`.
-- **Frame fix found on the way.** The law maps local frame coordinates, but the target curve was passed in world coordinates, so with a frame other than the
+- **Frame fix found on the way (also in `flow_on_surface` and the default up vector).** The law maps local frame coordinates, but the target curve was passed in world coordinates, so with a frame other than the
   world one (a body away from the origin: the default frame origin is its start face centre) the result was moved by the frame origin. The curves are now
-  converted to local coordinates (`curveToLocal`, the up vector too); for a world-identity frame the numbers are unchanged (bit-identical).
+  converted to local coordinates (`curveToLocal`; the up vector is a world direction, default +z, always passed as its local components: without it, fixed_up fell
+  back to +z read in local coordinates and was refused on a body whose axis is not world z). `flow_on_surface` had the same bug: the sheet, `targetOrigin`, the
+  `uDirection` and the face normal are now read in the base frame before the table is tabulated (a base plane with an origin or a tilted normal landed shifted or turned); for a world-identity frame the numbers are unchanged (bit-identical).
 
 Tests: `tests/unit/deform/flowBase.test.ts` (frame fix, straight base == default byte-identical, arc base onto a line: extent, volume, det J range, predicted
 volume, refusals, recipe validation, the pack vectors), `server/tests/nativeKernelFlowBase.test.ts` (exact vs mesh path vs closed form on the native kernel,
@@ -743,18 +758,18 @@ the capability), cargo `deform_infinite_tests.rs` (`a_bent_rod_flowed_from_its_o
 The reference list of the validation pack (README VC table) holds the shapes the laws produce: torus (VC-08), cylinder (VC-03, VC-17), cone (VC-06), spheroid
 (VC-11) were already there. Added (`geometry/deform/referenceShape.ts`; every distance is unsigned, document units, over every vertex of the result):
 
-| kind               | fields                                          | distance                                                                                                | produced by                                                                                                                                                |
-| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sphere`           | `center`, `radius`                              | exact, \| \|p − c\| − r \|                                                                              | `scale_nonuniform` with equal factors of a sphere                                                                                                          |
-| `plane`            | `point`, `normal`                               | exact, \|(p − point)·n\|                                                                                | flat taper / stretch / morph of a plate (VC-34 plane z = 3), a pyramid face                                                                                |
-| `ellipticCylinder` | `point`, `axis`, `reference`, `radii` [a, b]    | first order, \|f\| / \|∇f\|, f = (x/a)² + (y/b)² − 1 in the plane across the axis                       | `scale_nonuniform` of a cylinder (VC-11: r 5 × [2, 1, 1])                                                                                                  |
-| `helicoid`         | `point`, `axis`, `reference`, `rate`, `offset`? | first order, \|g\| / \|∇g\|, g = x cos(k z) + y sin(k z) − offset (x along `reference`, z from `point`) | `twist_body` (constant rate: `region.infinite`, or inside a linear region): the image of the plane x = offset is this surface; offset 0 is a true helicoid |
+| kind               | fields                                          | distance                                                                                                                 | produced by                                                                                                                                                |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sphere`           | `center`, `radius`                              | exact, \| \|p − c\| − r \|                                                                                               | `scale_nonuniform` with equal factors of a sphere                                                                                                          |
+| `plane`            | `point`, `normal`                               | exact, \|(p − point)·n\|                                                                                                 | flat taper / stretch / morph of a plate (VC-34 plane z = 3), a pyramid face                                                                                |
+| `ellipticCylinder` | `point`, `axis`, `reference`, `radii` [a, b]    | first order, \|f\| / \|∇f\|, f = (x/a)² + (y/b)² − 1 in the plane across the axis (on the axis, where ∇f = 0: min(a, b)) | `scale_nonuniform` of a cylinder (VC-11: r 5 × [2, 1, 1])                                                                                                  |
+| `helicoid`         | `point`, `axis`, `reference`, `rate`, `offset`? | first order, \|g\| / \|∇g\|, g = x cos(k z) + y sin(k z) − offset (x along `reference`, z from `point`)                  | `twist_body` (constant rate: `region.infinite`, or inside a linear region): the image of the plane x = offset is this surface; offset 0 is a true helicoid |
 
 Decisions. The first-order distance is the same estimate the spheroid already uses (exact on the surface, within a few percent of the true distance for a
 deviation small against the radii of curvature); the exact distances (sphere, plane) are exact. A twisted box face is the helicoid with the face offset, so a
 twisted prism is checked face by face with `offset`; `rate` is the twist rate per unit length (a `twist_body` of Θ over L is Θ / L in radians). `maxDeviation`
-counts every vertex, so a body is only comparable when all its vertices lie on the shape (a thin plate for a plane or a helicoid; the Manifold cylinder has no cap
-centre vertex, the document's own cylinder mesh has). A pyramid and a frustum of planes are `plane` per face; the frustum of a round taper is the existing `cone`.
+counts every vertex, so a body is only comparable when all its vertices lie on the shape (a thin plate for a plane or a helicoid, which deviates by its half thickness; the Manifold cylinder has no cap
+centre vertex, the document's own cylinder mesh has). At zero gradient (the centre of an ellipse or spheroid) the distance is the shortest semi-axis, a length, not the unitless residual. A pyramid and a frustum of planes are `plane` per face; the frustum of a round taper is the existing `cone`.
 
 Tests: `tests/unit/deform/referenceShapes.test.ts`: closed forms on and off the surface per kind (including a helicoid point at a height, the elliptic cylinder in a
 tilted reference), and per law result: sphere scaled by 2 vs radius 20 (and 19.5: 0.5), plate stretched vs plane (and a plane shifted 0.3: 0.3), cylinder × [2, 1, 1]

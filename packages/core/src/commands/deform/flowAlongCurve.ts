@@ -4,6 +4,7 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { Vec3 } from '../../model/types';
 import { buildFlowLaw } from '../../geometry/deform/flow';
 import { resolveFrame } from '../../geometry/deform/frame';
+import { baseFlowGrid } from '../../geometry/deform/baseFlowGrid';
 import { curveToLocal, resolveBase } from './flowBase';
 import { cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { defineCommand, vec3, z } from '../schema';
@@ -116,7 +117,9 @@ export const flowAlongCurve = defineCommand({
         const lateral = Math.max(...[extent.min[0], extent.max[0], extent.min[1], extent.max[1]].map(Math.abs));
         // the law maps local frame coordinates: the curves are expressed in them (with another frame than the world one the result was moved by the frame origin)
         const curve = curveToLocal(worldCurveOf(entity), local);
-        const localUp = up === undefined ? undefined : ([dot3(up, local.x), dot3(up, local.y), dot3(up, local.z)] as Vec3);
+        // the up vector is a world direction (default +z): its components in the frame, whatever the frame
+        const worldUp = up ?? ([0, 0, 1] as Vec3);
+        const localUp: Vec3 = [dot3(worldUp, local.x), dot3(worldUp, local.y), dot3(worldUp, local.z)];
         const base =
           baseEntity?.kind === 'nurbs_curve'
             ? resolveBase(curveToLocal(worldCurveOf(baseEntity), local), local, target.mesh.positions, { tolerance, lateral, firstNormal })
@@ -148,7 +151,7 @@ export const flowAlongCurve = defineCommand({
           frame: resolved.frame,
           extent,
           defaulted: resolved.defaulted,
-          ...(table === undefined || base === undefined ? {} : { samples: base.samples }),
+          ...(table === undefined || base === undefined ? {} : { samples: base.samples, gridSamples: baseFlowGrid(law, base.samples) }),
         };
       },
     }),

@@ -2,9 +2,10 @@
 
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { Vec3 } from '../../model/types';
-import { type FrameTable, baseFrameAt, buildBaseTable, maxCurvature, projectOnBase } from '../../geometry/deform/flow';
+import { JACOBIAN_FLOOR } from '../../geometry/deform/bounds';
+import { type FrameTable, baseFrameAt, buildBaseTable, frameCurvatures, projectOnBase } from '../../geometry/deform/flow';
 import { type LocalFrame, toLocal } from '../../geometry/deform/frame';
-import { len3, sub3 } from '../../lib/vec3';
+import { dot3, len3, sub3 } from '../../lib/vec3';
 import type { Refusal } from './target';
 
 /** A curve (world poles) in the local coordinates of `frame`; an affine map of the poles maps the NURBS (weights are kept). */
@@ -77,25 +78,24 @@ export function resolveBase(
   });
   if (typeof built === 'string')
     return { code: 'DEF_CURVE_INVALID', message: 'the base curve has zero length or a zero tangent', paths: ['params.baseCurve'] };
-  const reach: Array<{ s: number; distance: number }> = [];
-  let [low, high] = [Infinity, -Infinity];
+  let [low, high, worst] = [Infinity, -Infinity, -Infinity];
   for (let i = 0; i + 2 < samples.length; i += 3) {
     const q: Vec3 = [samples[i] as number, samples[i + 1] as number, samples[i + 2] as number];
     const s = projectOnBase(built.table, q);
     low = Math.min(low, s);
     high = Math.max(high, s);
-    reach.push({ s, distance: len3(sub3(q, baseFrameAt(built.table, s).point)) });
+    // the base side of det J is 1 - k1 x - k2 y at the vertex's own offsets: it vanishes where the body reaches the centre of curvature on its inner side
+    const own = baseFrameAt(built.table, s);
+    const gap = sub3(q, own.point);
+    const { k1, k2 } = frameCurvatures(built.table, s);
+    worst = Math.max(worst, k1 * dot3(gap, own.n) + k2 * dot3(gap, own.b));
   }
   if (low < -slack || high > built.length + slack)
     return short(`the base is ${built.length} long, the body spans ${low} to ${high} along it`);
-  // inside the base's sector no point can be farther than the radius of curvature on the centre side (past the centre the projection leaves the base and is
-  // refused above); the guard is the exact-equality case, where the map is singular
-  const curvature = maxCurvature(built.table);
-  const wide = Math.max(...reach.map((r) => r.distance));
-  if (curvature * wide >= 1)
+  if (worst >= 1 - JACOBIAN_FLOOR)
     return {
       code: 'DEF_FOLDOVER',
-      message: `the body reaches ${wide} from the base curve, as far as its radius of curvature ${1 / curvature}: use a gentler base curve or a thinner body`,
+      message: `the body reaches the centre of curvature of the base curve on its inner side (1 - k·offset = ${(1 - worst).toPrecision(3)}): use a gentler base curve or a thinner body`,
       paths: ['params.baseCurve'],
     };
   return { table: built.table, z0: low, baseLength: high - low, samples, normal: baseFrameAt(built.table, low).n };

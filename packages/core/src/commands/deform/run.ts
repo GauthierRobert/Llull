@@ -98,7 +98,7 @@ function build(target: DeformTarget, node: DeformNode, useKernel: boolean): Buil
 }
 
 const rangeOfPlan = (node: DeformNode, plan: DeformPlan): ReturnType<typeof jacobianRange> =>
-  plan.samples === undefined ? jacobianRange(node, plan.extent) : sampledRangeAt(node, plan.samples);
+  plan.samples === undefined ? jacobianRange(node, plan.extent) : sampledRangeAt(node, plan.samples, plan.gridSamples);
 
 function foldRefusal(node: DeformNode, plan: DeformPlan): Refusal | null {
   if (node.law.kind === 'affine') return null;

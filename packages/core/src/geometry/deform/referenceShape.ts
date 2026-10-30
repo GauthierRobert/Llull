@@ -106,7 +106,8 @@ export function referenceDistance(reference: ReferenceShape): Distance | { reado
         const d = sub3(p, center);
         const f = d.reduce((sum, c, i) => sum + (c / (semiAxes[i] as number)) ** 2, 0) - 1;
         const gradient = Math.hypot(...d.map((c, i) => (2 * c) / (semiAxes[i] as number) ** 2));
-        return gradient === 0 ? Math.abs(f) : Math.abs(f) / gradient;
+        // the centre (zero gradient, f = -1): the nearest point of the surface is the end of the shortest semi-axis
+        return gradient === 0 ? Math.min(...semiAxes) : Math.abs(f) / gradient;
       };
     }
     case 'sphere': {
@@ -138,7 +139,7 @@ export function referenceDistance(reference: ReferenceShape): Distance | { reado
         const [x, y] = [dot3(d, frame.x), dot3(d, frame.y)];
         const f = (x / a) ** 2 + (y / b) ** 2 - 1;
         const gradient = Math.hypot((2 * x) / (a * a), (2 * y) / (b * b));
-        return gradient === 0 ? Math.abs(f) : Math.abs(f) / gradient;
+        return gradient === 0 ? Math.min(a, b) : Math.abs(f) / gradient;
       };
     }
     case 'helicoid': {

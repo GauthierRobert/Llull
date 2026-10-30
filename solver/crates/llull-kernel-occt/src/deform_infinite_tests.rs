@@ -80,6 +80,7 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             .flat_map(|p| p["in"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()))
             .collect();
         let images = crate::deform::warp_points(&spec, &points).unwrap();
+        let determinants = crate::deform::warp_determinants(&spec, &points).unwrap();
         for (k, point) in law["points"].as_array().unwrap().iter().enumerate() {
             // the pack's ffd vectors hold the identity outside the lattice box (TECHNICAL_SPEC §5.3), so every point is checked
             for axis in 0..3 {
@@ -89,6 +90,13 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                     "{name} point {k} axis {axis}: {} vs {expected}",
                     images[3 * k + axis]
                 );
+            }
+            // det J from the forward-mode derivatives (a mis-scaled implicit derivative of the base projection would pass the images); not on a kink of the map
+            let infinite = params["infinite"].as_bool().unwrap_or(false);
+            let on_kink = !infinite
+                && [number(params, "z0"), number(params, "z1")].iter().any(|z| (point["in"][2].as_f64().unwrap() - z).abs() < 1e-9);
+            if let (false, Some(expected)) = (on_kink, point["det"].as_f64()) {
+                assert!((determinants[k] - expected).abs() < 1e-6, "{name} point {k} det {} vs {expected}", determinants[k]);
             }
         }
         checked += 1;

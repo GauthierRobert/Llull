@@ -16,6 +16,7 @@ mod ffi {
         fn warp_shape(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn warp_report() -> String;
         fn warp_points(spec: &[f64], points: &[f64]) -> Result<Vec<f64>>;
+        fn warp_determinants(spec: &[f64], points: &[f64]) -> Result<Vec<f64>>;
     }
 }
 
@@ -205,4 +206,9 @@ pub fn warp(shape: &Shape, spec: &[f64]) -> OcctResult<Warped> {
 /// The law of `spec` applied to `points` (xyz triples), without any shape: the parity test against `validation/data/point_vectors.json`.
 pub fn warp_points(spec: &[f64], points: &[f64]) -> OcctResult<Vec<f64>> {
     occt(ffi::warp_points(spec, points))
+}
+
+/// det J of the law of `spec` at `points` (one per point), by forward-mode derivatives: the parity test of the Jacobian against the pack.
+pub fn warp_determinants(spec: &[f64], points: &[f64]) -> OcctResult<Vec<f64>> {
+    occt(ffi::warp_determinants(spec, points))
 }

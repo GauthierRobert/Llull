@@ -72,16 +72,23 @@ function sampleAt(law: FrameTable, s: number): Sample {
 export function projectOnBase(base: FrameTable, q: Vec3): number {
   const count = stationCount(base);
   const length = (count - 1) * base.step;
-  let s = 0;
+  // seed: the nearest station, found on a coarse grid of every `stride`-th station, then among the stations within one stride of the coarse winner
+  // (2 sqrt(count) distances instead of count; mirrored in cpp/deform_laws.hxx project_on_base)
+  const stride = Math.max(1, Math.ceil(Math.sqrt(count)));
+  let best = 0;
   let nearest = Infinity;
-  for (let k = 0; k < count; k++) {
+  const consider = (k: number): void => {
     const gap = sub3(q, at(base.stations, k, 0));
     const distance = dot3(gap, gap);
     if (distance < nearest) {
       nearest = distance;
-      s = k * base.step;
+      best = k;
     }
-  }
+  };
+  for (let k = 0; k < count; k += stride) consider(k);
+  const coarse = best;
+  for (let k = Math.max(0, coarse - stride); k <= Math.min(count - 1, coarse + stride); k++) consider(k);
+  let s = best * base.step;
   const h = 1e-4 * base.step;
   for (let iteration = 0; iteration < BASE_NEWTON_STEPS; iteration++) {
     const here = sampleAt(base, s);
@@ -132,7 +139,7 @@ export function flowDeterminant(law: FlowLaw, q: Vec3): number {
 }
 
 /** Largest curvature of the target over the table (1 / document units), from the change of the tangent between stations. */
-export function maxCurvature(law: FrameTable): number {
+function maxCurvature(law: FrameTable): number {
   let worst = 0;
   for (let k = 0; k + 1 < stationCount(law); k++)
     worst = Math.max(worst, len3(sub3(at(law.stations, k + 1, 3), at(law.stations, k, 3))) / law.step);

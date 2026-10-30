@@ -9,7 +9,7 @@ import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { dot3, sub3 } from '../../lib/vec3';
 import { orientOutward, signedMeshVolume } from '../meshVolume';
-import { type FlowLaw, baseFrameAt, frameCurvatures, projectOnBase } from './flow';
+import { baseFrameAt, frameCurvatures, projectOnBase } from './flow';
 import { resolveFrame, toLocal } from './frame';
 import type { DeformNode } from './laws';
 import { type PredictedVolume, sectionAt } from './predictedVolume';
@@ -39,7 +39,16 @@ export function predictedBaseFlowVolume(source: MeshData, node: Pick<DeformNode,
     points.push(
       toLocal(frame, [source.positions[v * 3] as number, source.positions[v * 3 + 1] as number, source.positions[v * 3 + 2] as number]),
     );
-  const [from, to] = spanOnBase(law, points);
+  const arcs = points.map((q) => projectOnBase(base, q));
+  const [from, to] = [Math.min(...arcs), Math.max(...arcs)];
+  // a base turning more than half a turn: the normal plane at s also cuts the far part of the body, whose vertices project elsewhere; only triangles
+  // whose projected arc lengths bracket s are in the section
+  const arcSpans = new Float64Array((indices.length / 3) * 2);
+  for (let t = 0; t < indices.length / 3; t++) {
+    const own = [0, 1, 2].map((k) => arcs[indices[t * 3 + k] as number] as number);
+    arcSpans[t * 2] = Math.min(...own);
+    arcSpans[t * 2 + 1] = Math.max(...own);
+  }
   const triangles = indices.length / 3;
   const perPiece = Math.max(2, Math.min(SUBINTERVALS, Math.floor(WORK_LIMIT / (count * 3 + triangles * 3))));
   const width = (to - from) / perPiece;
@@ -58,8 +67,9 @@ export function predictedBaseFlowVolume(source: MeshData, node: Pick<DeformNode,
       }
       for (let t = 0; t < triangles; t++) {
         const hs = [0, 1, 2].map((k) => heights[indices[t * 3 + k] as number] as number);
-        spans[t * 2] = Math.min(...hs);
-        spans[t * 2 + 1] = Math.max(...hs);
+        const brackets = (arcSpans[t * 2] as number) <= s && s <= (arcSpans[t * 2 + 1] as number);
+        spans[t * 2] = brackets ? Math.min(...hs) : Infinity;
+        spans[t * 2 + 1] = brackets ? Math.max(...hs) : Infinity;
       }
       const section = sectionAt(local, indices, heights, spans, 0);
       const target = frameCurvatures(law, law.ratio * (s - law.z0));
@@ -67,15 +77,4 @@ export function predictedBaseFlowVolume(source: MeshData, node: Pick<DeformNode,
         (GAUSS_WEIGHTS[g] as number) * width * law.ratio * (section.area - target.k1 * section.momentX - target.k2 * section.moment);
     }
   return { source: volume, predicted };
-}
-
-/** The arc lengths on the base between which the body lies (the extreme projections of its vertices). */
-function spanOnBase(law: FlowLaw, points: ReadonlyArray<Vec3>): [number, number] {
-  let [low, high] = [Infinity, -Infinity];
-  for (const q of points) {
-    const s = projectOnBase(law.base as NonNullable<FlowLaw['base']>, q);
-    low = Math.min(low, s);
-    high = Math.max(high, s);
-  }
-  return [low, high];
 }

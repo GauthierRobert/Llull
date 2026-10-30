@@ -19,4 +19,7 @@ rust::String warp_report();
 // against validation/data/point_vectors.json (TR-DEF-04).
 rust::Vec<double> warp_points(rust::Slice<const double> spec, rust::Slice<const double> points);
 
+// det J of the law of `spec` at `points` (xyz triples), one number per point, from the forward-mode derivatives of the exact map (not differences).
+rust::Vec<double> warp_determinants(rust::Slice<const double> spec, rust::Slice<const double> points);
+
 }  // namespace llull

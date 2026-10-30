@@ -68,6 +68,13 @@ describe('reference shape distances (closed forms)', () => {
     expect(surface(0)([0.4, 3, 0])).toBeCloseTo(0.4 / Math.hypot(1, rate * 3), 12);
   });
 
+  it('the centre of an ellipse or spheroid (zero gradient) is a length: the shortest semi-axis, not a unitless residual', () => {
+    expect(
+      distanceOf({ kind: 'ellipticCylinder', point: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0], radii: [10, 5] })([0, 0, 7]),
+    ).toBeCloseTo(5, 12);
+    expect(distanceOf({ kind: 'spheroid', center: [0, 0, 0], semiAxes: [3, 2, 4] })([0, 0, 0])).toBeCloseTo(2, 12);
+  });
+
   it('names the first missing field', () => {
     expect(referenceDistance({ kind: 'sphere', center: [0, 0, 0] })).toEqual({ missing: 'radius' });
     expect(referenceDistance({ kind: 'plane', point: [0, 0, 0], normal: [0, 0, 0] })).toEqual({ missing: 'normal' });
@@ -135,17 +142,6 @@ describe.each(KERNELS)('analyze_deformation compareTo the shape a law produces, 
     expect(compare(twisted.document, next, { ...aligned, rate: rate * 1.1 })).toBeGreaterThan(0.5);
   });
 
-  it('a cylinder scaled [2, 1, 1] is the elliptic cylinder 10 x 5 (the Manifold mesh has no cap centre vertex); a wrong semi-axis is the difference', async () => {
-    await installKernel('manifold');
-    const { doc, id } = addCylinder(5, 40);
-    const scaled = execute(doc, 'scale_nonuniform', { id, factors: [2, 1, 1], output: { tolerance: 0.01 } });
-    expect(scaled.error, scaled.summary).toBeUndefined();
-    const next = scaled.affected[0] as string;
-    const ellipse = { kind: 'ellipticCylinder', point: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] };
-    expect(compare(scaled.document, next, { ...ellipse, radii: [10, 5] })).toBeLessThan(0.02);
-    expect(compare(scaled.document, next, { ...ellipse, radii: [10.3, 5] })).toBeCloseTo(0.3, 1);
-  });
-
   it('refuses an incomplete reference of the new kinds by name', async () => {
     await installKernel(kind);
     const { doc, id } = addBox([10, 0.002, 100]);
@@ -157,5 +153,24 @@ describe.each(KERNELS)('analyze_deformation compareTo the shape a law produces, 
     });
     expectNoOp(wrong, stretched.document, 'compareTo.rate');
     expect(wrong.error?.code).toBe('DEF_COMPARE_INVALID');
+  });
+});
+
+describe('analyze_deformation compareTo an elliptic cylinder', () => {
+  const compare = (doc: Parameters<typeof execute>[0], id: string, compareTo: object): number => {
+    const result = execute(doc, 'analyze_deformation', { id, compareTo });
+    expect(result.error, result.summary).toBeUndefined();
+    return dataOf<{ compareTo: { maxDeviation: number } }>(result).compareTo.maxDeviation;
+  };
+
+  it('a cylinder scaled [2, 1, 1] is the elliptic cylinder 10 x 5 (the Manifold mesh has no cap centre vertex); a wrong semi-axis is the difference', async () => {
+    await installKernel('manifold');
+    const { doc, id } = addCylinder(5, 40);
+    const scaled = execute(doc, 'scale_nonuniform', { id, factors: [2, 1, 1], output: { tolerance: 0.01 } });
+    expect(scaled.error, scaled.summary).toBeUndefined();
+    const next = scaled.affected[0] as string;
+    const ellipse = { kind: 'ellipticCylinder', point: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] };
+    expect(compare(scaled.document, next, { ...ellipse, radii: [10, 5] })).toBeLessThan(0.02);
+    expect(compare(scaled.document, next, { ...ellipse, radii: [10.3, 5] })).toBeCloseTo(0.3, 1);
   });
 });

@@ -94,7 +94,7 @@ export const analyzeDeformation = defineCommand({
           .optional(),
       })
       .describe(
-        'Optional analytic reference surface: data.compareTo.maxDeviation is the largest distance of the result vertices to it, document units (every vertex counts, so give a result whose surface is the shape, e.g. a thin plate for a plane or helicoid). Fields needed: torus majorRadius, minorRadius, center, axis; cylinder radius, point, axis; cone apex, axis, halfAngleDeg; spheroid center, semiAxes (first-order distance); sphere center, radius; plane point, normal; ellipticCylinder point, axis, reference, radii (first-order distance); helicoid point, axis, reference, rate and optional offset (the twist_body surface: a plane offset from the axis twisted at the given rate; first-order distance).',
+        'Optional analytic reference surface: data.compareTo.maxDeviation is the largest distance of the result vertices to it, document units (every vertex counts, so give a result whose surface is the shape; a thin plate deviates from its plane or helicoid by its half thickness). Fields needed: torus majorRadius, minorRadius, center, axis; cylinder radius, point, axis; cone apex, axis, halfAngleDeg; spheroid center, semiAxes (first-order distance); sphere center, radius; plane point, normal; ellipticCylinder point, axis, reference, radii (first-order distance); helicoid point, axis, reference, rate and optional offset (the twist_body surface: a plane offset from the axis twisted at the given rate; first-order distance).',
       )
       .optional(),
   }),

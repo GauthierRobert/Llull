@@ -292,8 +292,11 @@ inline FlowSample flow_sample(const std::vector<double> &stations, double step, 
 inline double project_on_base(const std::vector<double> &stations, double step, const double q[3], double *derivative_out = nullptr) {
   const size_t count = stations.size() / 12;
   const double length = static_cast<double>(count - 1) * step;
-  double s = 0, nearest = 1e300;
-  for (size_t k = 0; k < count; ++k) {
+  // seed: the nearest station, on a coarse grid of every stride-th station and then within one stride of the coarse winner (flow.ts projectOnBase)
+  const size_t stride = std::max<size_t>(1, static_cast<size_t>(std::ceil(std::sqrt(static_cast<double>(count)))));
+  size_t best = 0;
+  double nearest = 1e300;
+  const auto consider = [&](size_t k) {
     double distance = 0;
     for (int a = 0; a < 3; ++a) {
       const double gap = q[a] - stations[k * 12 + static_cast<size_t>(a)];
@@ -301,9 +304,13 @@ inline double project_on_base(const std::vector<double> &stations, double step, 
     }
     if (distance < nearest) {
       nearest = distance;
-      s = static_cast<double>(k) * step;
+      best = k;
     }
-  }
+  };
+  for (size_t k = 0; k < count; k += stride) consider(k);
+  const size_t coarse = best;
+  for (size_t k = coarse > stride ? coarse - stride : 0; k <= std::min(count - 1, coarse + stride); ++k) consider(k);
+  double s = static_cast<double>(best) * step;
   const double h = 1e-4 * step;
   double derivative = -1;
   for (int iteration = 0; iteration < 40; ++iteration) {
