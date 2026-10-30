@@ -259,6 +259,13 @@
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
       "fit_steel_member"
+    ],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": [
+      "export_pdf"
+    ],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": [
+      "load_plot_style",
+      "print_sheet"
     ]
   }
 }
