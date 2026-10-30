@@ -142,6 +142,16 @@ export function initialValues(fields: readonly FormField[], selection: readonly 
   return values;
 }
 
+const BOOLEAN_LABELS: Readonly<Record<string, string>> = { true: 'Yes', false: 'No' };
+
+/**
+ * What a select shows for an option value: multi-word snake_case reads as words ("heat_steady" -> "Heat steady"), booleans as
+ * Yes / No; anything else verbatim (units "mm", axes "+x", codes "M10" keep their case). @pure
+ */
+export function optionLabel(option: string): string {
+  return BOOLEAN_LABELS[option] ?? (/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(option) ? humanizeName(option) : option);
+}
+
 /**
  * Option picked by typing into a select: an exact (case-insensitive) match wins over the first
  * prefix match, so "m" selects "m" rather than "mm". @pure
