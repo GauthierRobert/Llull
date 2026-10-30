@@ -14,6 +14,7 @@
 
 pub mod galerkin;
 pub mod grid;
+pub mod homogenize;
 pub mod ke;
 pub mod level;
 pub mod multigrid;

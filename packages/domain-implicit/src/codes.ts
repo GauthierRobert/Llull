@@ -28,6 +28,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   IMP_MAP_SEAM: 'use a whole number of cells around / polar',
   IMP_MAP_SINGULAR: 'pick a regular sheet (no collapsed edge or zero-area patch) or trim the sheet',
   IMP_MAP_TOO_LARGE: 'raise depth (the map grid spacing is depth / 4) or use a smaller sheet',
+  IMP_HOMOGENIZATION_TOO_LARGE: 'lower homogenize.resolution (the cap on voxels is in the message)',
+  IMP_HOMOGENIZATION_NEEDS_NATIVE: 'run it on the desktop app or the CLI with a backend (the native field engine, llull-compute)',
   IMP_DERIVED_READ_ONLY: 'edit the field nodes and run create_implicit_body again',
 };
 

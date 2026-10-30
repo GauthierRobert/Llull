@@ -16,6 +16,8 @@ import {
   type FieldProvenance,
   type FieldRefusal,
   type FieldSamples,
+  type HomogenizeAnswer,
+  type HomogenizeRequest,
   type MeasureRequest,
   type MeshOptions,
   gridCells,
@@ -144,11 +146,11 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
     voxel,
   });
 
-  const job = <T>(files: Files, body: (result: JobResult) => T): T =>
+  const job = <T>(files: Files, body: (result: JobResult) => T, name = 'field'): T =>
     withJobFolderSync(
       files,
       (folder) => {
-        const run = runComputeSync(binary, ['field', folder], folder, timeoutMs, env, MAX_OUTPUT_BYTES);
+        const run = runComputeSync(binary, [name, folder], folder, timeoutMs, env, MAX_OUTPUT_BYTES);
         if (!run.ok) throw new FieldJobFailure(run.code ?? 'NATIVE_JOB_FAILED', `${run.code ?? 'failed'}: ${run.message ?? ''}`.trim());
         const read = (name: string): Buffer => readOutputSync(folder, run, name);
         let report: unknown;
@@ -321,6 +323,43 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
         (r) => r,
       );
     },
+  };
+  engine.homogenize = (request: HomogenizeRequest): HomogenizeAnswer => {
+    const voxels = request.dims[0] * request.dims[1] * request.dims[2];
+    if (voxels > request.maxVoxels)
+      return { ok: false, code: 'IMP_HOMOGENIZATION_TOO_LARGE', message: `${voxels} voxels exceed the limit of ${request.maxVoxels}` };
+    try {
+      return job(
+        {
+          'density.u8': Buffer.from(request.density),
+          'job.json': JSON.stringify({
+            dims: [...request.dims],
+            h: request.h,
+            nu: request.nu,
+            eminRatio: request.eminRatio,
+            maxVoxels: request.maxVoxels,
+            density: 'density.u8',
+          }),
+        },
+        ({ report }) => {
+          const numbers = (value: unknown, length: number): number[] | null =>
+            Array.isArray(value) && value.length === length && value.every((v) => typeof v === 'number' && Number.isFinite(v))
+              ? (value as number[])
+              : null;
+          const [c, iterations, residuals] = [numbers(report['c'], 36), numbers(report['iterations'], 6), numbers(report['residuals'], 6)];
+          if (c === null || iterations === null || residuals === null || typeof report['converged'] !== 'boolean')
+            throw new FieldJobFailure('NATIVE_PROTOCOL', 'the homogenisation report is malformed');
+          return { ok: true, c, iterations, residuals, converged: report['converged'], voxels, provenance: provenance(request.h) } as const;
+        },
+        'homogenize',
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'IMP_ENGINE_FAILED',
+        message: `the native homogenisation failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   };
   return engine;
 }
