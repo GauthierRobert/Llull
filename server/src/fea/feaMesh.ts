@@ -9,6 +9,8 @@ import { isRecord } from '@lib/isRecord';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeCode, CaeHooks } from './caeHooks';
+import { fullResolutionView } from '@core/commands/meshHostView';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import { feaFailure, INSTALL_HINT } from './feaCommon';
 import { partFaces } from './faceRefs';
 import { partGeometry } from './feaGeometry';
@@ -92,6 +94,9 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   const doc = host.getDoc();
   const request = deps.hooks.meshRequest(doc, analysisId);
   if (isCode(request)) return feaFailure('fea_mesh', request.code, request.message, [analysisId]);
+  // the mesher is a native host path: it reads geometry without `execute`, so the stored meshes of asset-backed parts are handed to it here (or it is refused by name)
+  const full = fullResolutionView(doc, request.entityIds, defaultMeshAssetStore());
+  if ('code' in full) return feaFailure('fea_mesh', full.code, full.message, [analysisId, ...full.ids]);
   const parts: { entityId: string; geometry: unknown; faces?: unknown; defeature?: unknown }[] = [];
   const kernelFaces = new Map<string, ReturnType<typeof partFaces>>();
   const defeature = doc.analysis?.cases[analysisId]?.defeature ?? {};
@@ -106,9 +111,9 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       kernelFaces.set(entityId, null);
       continue;
     }
-    const geometry = partGeometry(doc, entityId, deps.kernel());
+    const geometry = partGeometry(full, entityId, deps.kernel());
     if ('code' in geometry) return feaFailure('fea_mesh', geometry.code, geometry.message, [analysisId, entityId]);
-    const faces = geometry.kind === 'step' && request.controls.bonding === undefined ? partFaces(doc, entityId, deps.kernel()) : null;
+    const faces = geometry.kind === 'step' && request.controls.bonding === undefined ? partFaces(full, entityId, deps.kernel()) : null;
     kernelFaces.set(entityId, faces);
     const removed = Object.hasOwn(defeature, entityId) ? defeature[entityId] : undefined;
     parts.push({

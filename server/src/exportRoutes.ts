@@ -9,6 +9,7 @@ import { BusyError, type ExchangeOptions } from './pythonExchange';
 import { safeFileName } from '@lib/safeFileName';
 import { guardRead } from './security';
 import { fileOfRecord } from './cli/saveFiles';
+import { serverContext } from './fea/context';
 
 function sendDownload(res: Response, fileName: string, contentType: string, body: string | Buffer): void {
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
@@ -57,7 +58,12 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
   // Without the Python bridge the exact kernel writes the STEP; 503 when neither is available.
   router.get('/step', (req, res) => {
     const port = exchange.port;
-    exportStepFile(getLiveDoc, port, { name: safeFileName(req.query['name'], 'model'), language: req.query['language'], save: false })
+    exportStepFile(getLiveDoc, port, {
+      name: safeFileName(req.query['name'], 'model'),
+      language: req.query['language'],
+      save: false,
+      context: serverContext(),
+    })
       .then((file) => {
         if ('error' in file) {
           if (!gateRefusal(res, undefined, file.error)) res.status(port === null ? 503 : 500).json({ error: file.error });

@@ -168,6 +168,8 @@ export interface XdeFakeSpec {
   readonly noMass?: boolean;
   readonly noWriter?: boolean;
   readonly noImporter?: boolean;
+  /** Called with every entity the kernel is asked to build a solid of (what a host path really hands the kernel). */
+  readonly onSolid?: (entity: Entity) => void;
 }
 
 export interface FakeXdeKernel {
@@ -191,7 +193,10 @@ export function fakeXdeKernel(spec: XdeFakeSpec = {}): FakeXdeKernel {
   const kernel = kernelFromOps<FakeNative>({
     name: 'occt',
     info: () => ({ capabilities: ['writeExchange', 'importExchange', 'igesExchange', 'brepBlobs', 'importShapes'], occtVersion: '7.9.2' }),
-    solid: (entity) => ({ mesh: TETRA, entity }),
+    solid: (entity) => {
+      spec.onSolid?.(entity);
+      return { mesh: TETRA, entity };
+    },
     boolean: () => null,
     fillet: () => null,
     blend: () => null,

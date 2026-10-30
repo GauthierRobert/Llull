@@ -1197,7 +1197,7 @@ Kernel commands (`requiresKernel`) that take a solid operand also feed its trian
 
 ### 13.11.6 Known limits and left, by name
 
-- **Native STEP / IGES paths in `server/src/native/`** take the document as it is: an asset-backed body is its display mesh there (the commands `export_step_ap242` / `export_iges` are annotated, the sidecar paths are not). Host work (Lane 4): hand them `withFullResolution` or refuse with `MESH_ASSET_LOD_ONLY`, as the CFD and topology solves now do.
+- **Native STEP / IGES host paths**: audited and closed in 13.21 (the FEA mesher read the display mesh; the `export_step` route and tool refused a held asset).
 - A reference spelled as a compound string (`<entityId>:face3`) is not split; only exact ids count.
 - A record that is not stored under its own id (a table entry whose key differs from its `id`, a record with no `id`) is not found; a command that names one gets the default scope only when nothing else resolves. Over-reach is by design: a record that mentions an unreadable asset makes the command refuse by name.
 - The cap is one number for every command.
@@ -1695,3 +1695,32 @@ Rust: `tests/ts_pins.rs` (12 new pinned cases, results of the TypeScript engine:
 ### 13.20.5 Left, by name
 
 The Rust twin of `displace` (0.48 s at 328k triangles in TypeScript after the compiled expression, below the 13.12.2 threshold); lifting the TypeScript cap of `shrinkwrap` is not needed (the native engine answers above it).
+
+## 13.21 As built (DES-7c native twins (2): the native STEP / IGES host paths at full resolution, 2026-10-30)
+
+### 13.21.1 The audit (13.11.6 left it as "Lane 4 host work")
+
+Every place of `server/` and `packages/protocol` that hands the geometry of a document body to a native consumer (the exact kernel sidecar, the mesher) was read. The note of 13.11.6 guessed at `server/src/native/`; what is there is not the gap.
+
+| Host path | Reads the document how | Before | Now |
+| --------- | ---------------------- | ------ | --- |
+| `export_step_ap242`, `export_iges` (commands; the kernel proxy of `kernelLeaves` / `kernelProtocol` sends what the recipe holds) | `execute` (annotated, `runWithFullMeshes`) with the server context | stored mesh; above the 20,000-triangle limit of the exact kernel a named refusal `XCH_NO_SOLIDS` whose note counts the stored triangles | unchanged, now tested on a stored mesh |
+| `GET /export/step`, tool `export_step` (`exportStepFile`, also the CLI `--doc` / `--app` / `--server`) | `execute(getDoc(), 'export_step_ap242' | 'export_code', …)` **without a context** | the default context has no asset store: a held asset was refused as `MESH_ASSET_LOD_ONLY` ("no asset store is installed") although this machine holds it | the route and the tool pass `serverContext()` (`ExchangeDeps.context`, `exportStepFile` option `context`): the stored mesh is exported |
+| FEA mesher (`runFeaMesh`: `partGeometry` STEP / STL, `partFaces`) | the document, no `execute` | **the display level of detail (80 triangles in the test) was meshed, silently** | `fullResolutionView` (below), or a named refusal |
+| CFD flow solve, topology solve | `withFullResolution` + `displayOnlyMeshIds` (13.11, steps before) | full resolution | unchanged |
+| `kernelLeaves` / `kernelProtocol` (`entityTrianglePositions`) | pyramids and subdivision solids only, never asset-backed | n/a | n/a |
+| `/preview`, `render_*` | display mesh by design (13.11.4) | display | unchanged |
+
+### 13.21.2 Decisions
+
+- **One helper for host paths**, `commands/meshHostView.ts` `fullResolutionView(doc, ids, assets)`: the reach of the commands (`reachedMeshes`, so an instance reaches its component and a mesh its construction-tree leaves), the cap of the commands (`MESH_FULL_READ_TRIANGLE_CAP`, distinct assets counted once), then `withFullResolution`, and `displayOnlyMeshIds` on the result: the document back, or a refusal `MESH_ASSET_TOO_LARGE` / `MESH_ASSET_LOD_ONLY` naming the ids. The mesher is never called on a refusal. The FEA mesh tool returns these codes as its own failure (`fea_mesh`).
+- **The exchange tools take the host's context.** `ExchangeDeps.context` (and the `context` option of `exportStepFile`) is how the protocol layer, which has no store, runs `export_step_ap242` / `export_code` with the asset store; the server's `exchangeDepsOf` and `GET /export/step` give it `serverContext()`.
+- **No cap lifted.** A stored mesh over the exact kernel's 20,000 triangles is still refused by name (`XCH_NO_SOLIDS`, a pre-existing policy); that refusal now demonstrably counts the stored triangles.
+
+### 13.21.3 Tests
+
+`tests/unit/mesh/hostFullResolution.test.ts` (the helper: the named parts only, an instance's component, the cap, a lost asset, purity) and `server/tests/hostExportFullResolution.test.ts` (real asset store; a scripted kernel that records what it is asked to build): `export_step_ap242`, `export_iges`, `exportStepFile`, `GET /export/step` and `POST /exchange export_step` hand the kernel the 5,120 stored triangles, never the 80 displayed; the 327,680-triangle stored mesh is refused by name with its triangle count in the note and the kernel never asked; a lost asset and a reach above the cap are `MESH_ASSET_LOD_ONLY` / `MESH_ASSET_TOO_LARGE` on every path; the FEA mesher gets the 327,680 facets of the stored mesh (STL, no kernel) and builds the kernel STEP from the stored mesh. Each fails without its fix (shown by disabling it): the FEA full-resolution view and its refusal, the context of the route, of the tool and of the exact STEP export, the cap and the display-only check of the helper.
+
+### 13.21.4 Left, by name
+
+Meshing a 327,680-triangle stored mesh through Netgen is a long job (the mesher gets the facets it is asked for); the FEA mesh tool has no decimation step, and `decimate_mesh` first is the remedy named by `MESH_ASSET_TOO_LARGE`. The CFD and topology solves keep their own copies of the same two lines (`withFullResolution` + `displayOnlyMeshIds`); moving them onto `fullResolutionView` is a refactor that changes their refusal text and is not done here.
