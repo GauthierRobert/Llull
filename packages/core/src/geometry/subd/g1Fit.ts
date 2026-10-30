@@ -15,9 +15,9 @@ import { buildTopology } from './topology';
 
 /** Stations along an edge (shares of its length) where the normals are compared. */
 const STATIONS = [1 / 8, 2 / 8, 3 / 8, 4 / 8, 5 / 8, 6 / 8, 7 / 8];
-/** Sweeps over the quads, and Levenberg-Marquardt iterations per quad per sweep: fixed, so the cost is linear in the number of quads and the result deterministic. */
-/** A step may raise the largest normal angle at the guard stations by 25 %, or up to this many radians (0.5 degrees), never more. */
+/** A quad may not end up with a largest normal angle at the guard stations above the one it had when first visited, or this many radians (0.5 degrees). */
 const FOLD_FLOOR = 0.0087;
+/** Sweeps over the quads, and Levenberg-Marquardt iterations per quad per sweep: fixed, so the cost is linear in the number of quads and the result deterministic. */
 const SWEEPS = 6;
 const BLOCK_ITERATIONS = 3;
 /** Weight of the pull of the interior poles towards the geometry patch (a distance divided by the extent of the cage) against the normal residual (dimensionless). */
@@ -108,7 +108,7 @@ function solveDense(a: number[][], b: number[]): number[] | null {
 /**
  * Patches with the interior poles of every quad that touches an extraordinary vertex fitted to the tangent plane of its neighbours; the others are returned as given.
  * Block Gauss-Seidel: a few sweeps over the quads, each quad solving its own 12 unknowns against the current poles of its neighbours, so the cost is linear in the
- * number of quads (a dense solve per connected star grew with its cube). The quads and edges that touch a crease vertex are left as the geometry patches make them: an intentional crease (and its end) is not a break to remove.
+ * number of quads (a dense solve per connected star grew with its cube). The quads that touch a crease vertex are left as the geometry patches make them (fitting them against a crease tripled the deviation); their smooth edges are still reported by the break measurement.
  * @invariant only interior poles (1,1), (2,1), (1,2), (2,2) of such quads change; the pull is scaled by the extent of the cage, so the result does not depend on units or position
  */
 export function fitTangentPlanes(refined: Cage, patches: readonly BezierPatch[], valence: ReadonlyArray<number>): BezierPatch[] {
@@ -142,6 +142,8 @@ export function fitTangentPlanes(refined: Cage, patches: readonly BezierPatch[],
     }
   const extent = Math.max(Math.hypot(...high.map((h, k) => h - (low[k] as number))), 1e-300);
   const step = 1e-6 * extent;
+  /** The largest normal angle of each quad at the guard stations when it is first visited: the bound of every later step (a per-step ratio would ratchet). */
+  const initialGuard = new Map<number, number>();
   for (let sweep = 0; sweep < SWEEPS; sweep++) {
     for (const f of [...star].sort((a, b) => a - b)) {
       const mine = seamsOf.get(f) ?? [];
@@ -183,7 +185,8 @@ export function fitTangentPlanes(refined: Cage, patches: readonly BezierPatch[],
       let r = [...rows(), ...pullRows(x)];
       let cost = r.reduce((sum, v) => sum + v * v, 0);
       let mu = 1e-3;
-      let guard = guardAngle();
+      if (!initialGuard.has(f)) initialGuard.set(f, guardAngle());
+      const bound = Math.max(initialGuard.get(f) as number, FOLD_FLOOR);
       for (let iteration = 0; iteration < BLOCK_ITERATIONS; iteration++) {
         const jacobian = r.map(() => new Array<number>(12).fill(0));
         for (let k = 0; k < 12; k++) {
@@ -216,8 +219,8 @@ export function fitTangentPlanes(refined: Cage, patches: readonly BezierPatch[],
           const rt = [...rows(), ...pullRows(trial)];
           const trialCost = rt.reduce((sum, v) => sum + v * v, 0);
           const trialGuard = trialCost < cost ? guardAngle() : Infinity;
-          if (trialCost < cost && trialGuard <= Math.max(1.25 * guard, FOLD_FLOOR)) {
-            [x, r, cost, mu, guard, accepted] = [trial, rt, trialCost, Math.max(mu / 3, 1e-12), trialGuard, true];
+          if (trialCost < cost && trialGuard <= bound) {
+            [x, r, cost, mu, accepted] = [trial, rt, trialCost, Math.max(mu / 3, 1e-12), true];
           } else mu *= 10;
         }
         if (!accepted) break;

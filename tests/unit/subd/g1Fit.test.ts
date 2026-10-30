@@ -137,23 +137,21 @@ describe('cageToNurbs with fitTangents', () => {
     }
   });
 
-  it('a creased cube: the fit leaves the creases alone (deviation equal to the plain patches) and the crease edges are not counted as breaks', () => {
+  it('a creased cube: the fit leaves the quads at the creases alone (deviation equal to the plain patches), crease edges are not counted but the smooth edges at a crease vertex still are', () => {
     const cube = boxCage([2, 2, 2], [1, 1, 1]);
-    const creased = {
-      ...cube,
-      creases: [
-        [0, 1],
-        [1, 2],
-        [2, 3],
-        [4, 5],
-        [0, 4],
-      ] as Array<[number, number]>,
-    };
+    const creases: Array<[number, number]> = [
+      [0, 1],
+      [1, 2],
+    ];
+    const creased = { ...cube, creases };
     const plain = cageToNurbs(creased, { packed: false, samples: 3 });
     const fit = cageToNurbs(creased, { packed: false, samples: 3, fitTangents: true });
+    const smooth = cageToNurbs(cube, { packed: false, samples: 3 });
     expect(fit.maxDeviation).toBeLessThanOrEqual(plain.maxDeviation * 1.01);
-    expect(fit.maxEvG1Deg).toBeLessThan(plain.maxEvG1Deg);
-    expect(fit.evEdges.length).toBeLessThan(cageToNurbs(cube, { packed: false, samples: 3, fitTangents: true }).evEdges.length);
+    // the two creases refine to four edges, which leave the list; every smooth edge (also those at the crease vertices) stays
+    expect(plain.evEdges.length).toBe(smooth.evEdges.length - 4);
+    expect(fit.evEdges.length).toBe(plain.evEdges.length);
+    expect(fit.maxEvG1Deg).toBeGreaterThan(0.2); // a real break remains beside the creases and is reported, not hidden
   });
 
   it('cost is linear in the quads: a 32-sided cylinder cage (320 patches) fits in seconds, not minutes, and never folds a patch', () => {
@@ -163,7 +161,7 @@ describe('cageToNurbs with fitTangents', () => {
     const fit = cageToNurbs(cage, { packed: false, samples: 2, fitTangents: true });
     expect(performance.now() - started).toBeLessThan(30_000);
     expect(fit.patchCount).toBe(plain.patchCount);
-    expect(fit.maxEvG1Deg).toBeLessThanOrEqual(plain.maxEvG1Deg);
+    expect(fit.maxEvG1Deg).toBeLessThanOrEqual(plain.maxEvG1Deg + 1e-9);
     expect(fit.maxEvG0).toBe(0);
   });
 });
