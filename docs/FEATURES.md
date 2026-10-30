@@ -956,7 +956,7 @@
 | `displace_mesh` | Displace the vertices of a mesh (or the triangles of any 3D solid) by a scalar field times `strength` (document units per unit of the field), along the vertex … |  |
 | `fill_mesh_holes` | Close holes (boundary loops) of a mesh (or the triangles of any 3D solid) with the method of Liepa (2003): the loop is triangulated by dynamic programming (sma… |  |
 | `fit_subdivision_to_mesh` | Move the vertices of a subdivision solid's cage so that its smooth Catmull-Clark limit surface follows a target mesh (typically the mesh quad_remesh was made f… |  |
-| `fit_surface_to_mesh` | Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region`. |  |
+| `fit_surface_to_mesh` | Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region` and/or in `faceGroups` (named groups o… |  |
 | `hollow_mesh` | Hollow a closed mesh (or 3D solid) into a shell of constant wall thickness with a sealed internal cavity (print preparation: saves resin / filament). |  |
 | `import_mesh_file` | Import a triangle mesh file as mesh entities: STL (ascii or binary), OBJ (polygons are fan-triangulated; groups become faceGroups), PLY (ascii / binary) or 3MF… |  |
 | `mesh_to_brep` | Convert a closed triangle mesh (or any 3D solid's triangles) into an exact B-rep solid on the native OCC kernel, so mass_properties is exact (method exact) and… | kernel |

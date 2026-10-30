@@ -21,6 +21,7 @@ import {
   outwardMesh,
   withConventions,
 } from './meshCommon';
+import { faceGroupSelection, faceGroupsParam, meshOfFaces } from './faceGroupRegion';
 
 const DEFAULT_ITERATIONS = 10;
 const MAX_ITERATIONS = 30;
@@ -75,12 +76,17 @@ export const fitSubdivisionToMesh = defineCommand({
     '10, centres within one target diagonal, and a first closest-point round within the work cap), else MESH_FIT_CAGE_FAR; the target ' +
     'may be open or closed. Pure TypeScript, no kernel needed (about 1 s for a 600-face cage at level 2); the exact B-spline faces come ' +
     'afterwards from the OCC kernel. Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, DIR_ENTITY_NOT_FOUND, MESH_FIT_SYMMETRY, ' +
-    'MESH_FIT_CAGE_INVALID, MESH_FIT_CAGE_FAR, MESH_FIT_TOO_LARGE, MESH_PARAM_INVALID, MESH_FIT_FAILED.',
+    'MESH_FIT_CAGE_INVALID, MESH_FIT_CAGE_FAR, MESH_FIT_TOO_LARGE, MESH_PARAM_INVALID, MESH_FIT_FAILED, MESH_FIT_GROUP_NOT_FOUND (a `faceGroups` name the mesh does not have, or a stale stored group), MESH_FIT_REGION_EMPTY (the groups hold no triangle).',
   params: z.object({
     cageId: z.string().describe('Id of the subdivision solid whose cage is moved (for example the result of quad_remesh).'),
     targetId: z
       .string()
       .describe('Id of the mesh (or any other 3D solid, tessellated) the limit surface should follow. Not the cage itself.'),
+    faceGroups: faceGroupsParam
+      .optional()
+      .describe(
+        'Follow only part of the target: its triangles in these face groups (`stored` group names of the mesh, `segments` ids from segment_mesh). The rest of the target is ignored (and the target counts as open).',
+      ),
     maxDeviation: z
       .number()
       .positive()
@@ -150,12 +156,20 @@ export const fitSubdivisionToMesh = defineCommand({
       );
     const loaded = loadSolidMesh(doc, targetId, undefined, contextOf(ctx).meshAssets);
     if (isLoadFailure(loaded)) return meshRejection(doc, 'fit_subdivision_to_mesh', loaded.code, loaded.message, loaded.ids);
-    const triangles = loaded.mesh.indices.length / 3;
+    let targetMesh: MeshData = loaded.mesh;
+    let groups: { stored: number; segments: number; triangles: number } | null = null;
+    if (params.faceGroups !== undefined) {
+      const selection = faceGroupSelection(doc, ctx, 'fit_subdivision_to_mesh', targetId, loaded, params.faceGroups, [cageId, targetId]);
+      if ('document' in selection) return selection;
+      targetMesh = meshOfFaces(loaded.mesh, selection.faces);
+      groups = { stored: selection.storedGroups, segments: selection.segmentGroups, triangles: selection.faces.length };
+    }
+    const triangles = targetMesh.indices.length / 3;
     if (triangles > MAX_TARGET_TRIANGLES)
       return fail('MESH_FIT_TOO_LARGE', `target '${targetId}' has ${triangles} triangles (max ${MAX_TARGET_TRIANGLES})`);
-    if (!loaded.mesh.positions.every(Number.isFinite)) return fail('MESH_FIT_FAILED', `target '${targetId}' has non-finite coordinates`);
-    const targetClosed = measureMesh(loaded.mesh).closed;
-    const world = targetClosed ? outwardMesh(loaded.mesh) : loaded.mesh;
+    if (!targetMesh.positions.every(Number.isFinite)) return fail('MESH_FIT_FAILED', `target '${targetId}' has non-finite coordinates`);
+    const targetClosed = measureMesh(targetMesh).closed;
+    const world = targetClosed ? outwardMesh(targetMesh) : targetMesh;
     const positions: number[] = [];
     for (let i = 0; i < world.positions.length; i += 3) {
       const point: Vec3 = [world.positions[i] as number, world.positions[i + 1] as number, world.positions[i + 2] as number];
@@ -211,6 +225,7 @@ export const fitSubdivisionToMesh = defineCommand({
     const fields = {
       cageId,
       targetId,
+      ...(groups === null ? {} : { faceGroups: groups }),
       ...cageData(updated),
       levels: updated.levels,
       fitLevel: fit.fitLevel,

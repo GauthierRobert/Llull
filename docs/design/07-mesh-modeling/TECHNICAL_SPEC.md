@@ -1784,3 +1784,26 @@ Cost of the map alone (hemisphere, the region cap is 200,000 triangles): 10,176 
 ### 13.23.4 Left, by name
 
 A circular parameter domain (a tensor B-spline patch has a square one); the boundary of a region cut out by a sphere is zigzag and sets the maximum deviation (use `faceGroups`, or a smoother cut); the free choice of the corner vertices (the corners are at the quarter points of the boundary length starting at the lowest vertex index of the loop); a native harmonic solve with a native fit.
+
+## 13.24 As built (DES-7c M6 leftovers (2): the `faceGroups` region of the fitting commands, 2026-10-30)
+
+### 13.24.1 What it is
+
+`fit_surface_to_mesh` took a sphere `region` (triangle centres inside) or the whole mesh; `fit_subdivision_to_mesh` always the whole target. Both now take `faceGroups`: the triangles of named groups of the mesh. `commands/mesh/faceGroupRegion.ts` (`faceGroupsParam`, `faceGroupSelection`, `meshOfFaces`):
+
+- `stored`: names (ids) of the face groups the mesh entity keeps (OBJ groups and 3MF objects from `import_mesh_file`, ranges `[start, end)` over the triangle order, which the load keeps: the weld never drops or reorders a triangle).
+- `segments`: ids `seg-<n>` of the regions `segment_mesh` lists. `segment_mesh` is read-only and stores nothing, so the command computes the same segmentation again through the same engines (`runSegmentation`: deterministic, the regions are numbered by their lowest face) with the `featureAngleDeg`, `fitTolerance` and `kinds` of the listing call, which the selector takes with the same defaults (30 degrees, 0.001 x the bounding-box diagonal, all four kinds). A different feature angle gives different regions: the message names the parameters used and lists the ids that exist.
+- Both lists together give the union. In `fit_surface_to_mesh` the groups and a sphere `region` give the intersection (the triangles in both; `MESH_FIT_REGION_EMPTY` names the groups when nothing is left). In `fit_subdivision_to_mesh` the target becomes the sub-mesh of the selected triangles (an open target, so the folded-limit check is off), and the cage-on-target rule, the size cap and the deviations are those of that sub-mesh: a group far from the cage is `MESH_FIT_CAGE_FAR` with its own size.
+- `data.faceGroups`: how many stored groups and segments were named and the triangles selected.
+
+### 13.24.2 Validation, by name
+
+`MESH_PARAM_INVALID` (neither `stored` nor `segments`; an empty list is `CMD_INVALID_PARAMS` from the schema), `MESH_FIT_GROUP_NOT_FOUND` (a stored name the mesh does not have: the message lists the ones it has, or "none"; a segment id the segmentation does not have, listing the ids and the parameters used; a stored group whose ranges pass the triangle count: "stale", the mesh was changed after the import), `MESH_FIT_REGION_EMPTY`; the segmentation's own refusals (non-manifold, inconsistent winding, degenerate: `segment_mesh` codes) pass through. Documented in the descriptions of both commands and in the remediation table.
+
+### 13.24.3 Tests
+
+`tests/unit/mesh/fitFaceGroups.test.ts` (7): two plates at different heights with stored groups (each group's patch is its plate's plane to 1e-6, the whole mesh is not), union and intersection with a region, the empty intersection; an inner corner (floor and wall) segmented: the wall's and the floor's segment ids each give their plane, two segments give the L (fitted with the harmonic map when asked), a feature angle of 120 degrees merges the two into one region; every refusal with its message (unknown stored name listing the stored ones, unknown segment id listing the ids, a stored name used as a segment, an empty selector, an empty list, a mesh without groups, a stale group); `fit_subdivision_to_mesh` of a sphere cage to a mesh of a ball and a far small ball (group "ball": converged to 0.05, the limit within 9.8 to 10.1 of the origin; group "small": `MESH_FIT_CAGE_FAR`), the unknown name, purity. Each fails without its fix (shown by disabling it): the stale-range check, the stored lookup, the segment lookup, the segmentation parameters, the union of segments, the empty selector, the face filter of `fit_surface_to_mesh`, the sub-mesh of `fit_subdivision_to_mesh`.
+
+### 13.24.4 Left, by name
+
+Stored groups of an asset-backed mesh are checked against the stored triangle count (the group ranges are over the full-resolution asset); `fit_subdivision_to_mesh` fits the cage to the group's triangles only (a cage whose far side has no target is not constrained there); group names are exact (no patterns); a segmentation re-computed with other parameters than the listing call names other regions: pass the same ones.

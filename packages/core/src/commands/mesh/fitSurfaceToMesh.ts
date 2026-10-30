@@ -8,6 +8,7 @@ import type { Vec3 } from '../../model/types';
 import { colorField, defineCommand, layerIdField, nameField, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
 import { DEFAULT_SURFACE_COLOR, commitSurface } from '../surface/surfaceShared';
+import { faceGroupSelection, faceGroupsParam } from './faceGroupRegion';
 import { contextOf, isLoadFailure, loadSolidMesh, meshRejection, namedDefault, withConventions } from './meshCommon';
 
 const DEFAULT_DEGREE = 3;
@@ -39,12 +40,12 @@ const round6 = (v: number): number => Math.round(v * 1e6) / 1e6;
 /**
  * @affects creates 1 nurbs_surface entity (poles in world coordinates, position zero); the mesh is not touched
  * @invariant a clamped uniform tensor-product B-spline of one degree; the parameters are the orthogonal projection onto the best-fit plane of the region, or the harmonic map of a disk region onto the unit square (data.parameterization); the surface normal (du x dv) faces the side the mesh triangles face; data.maxDeviation is the largest distance from region vertices, edge midpoints and triangle centres to the patch (a lower bound of the Hausdorff distance) (the patch may extend past a non-rectangular region)
- * @failure unknown id / not a solid -> MESH_*; region without triangles, over the region cap, folded against its best-fit plane (projection) or not a disk (harmonic) or its map folded, or too few samples for the pole grid -> MESH_FIT_*; degree/pole grid out of range -> MESH_PARAM_INVALID; maxDeviation not reached -> surface created, warning MESH_FIT_NOT_CONVERGED in data.warnings
+ * @failure unknown id / not a solid -> MESH_*; a faceGroups name or segment id that does not exist, or a stale stored group -> MESH_FIT_GROUP_NOT_FOUND; region without triangles, over the region cap, folded against its best-fit plane (projection) or not a disk (harmonic) or its map folded, or too few samples for the pole grid -> MESH_FIT_*; degree/pole grid out of range -> MESH_PARAM_INVALID; maxDeviation not reached -> surface created, warning MESH_FIT_NOT_CONVERGED in data.warnings
  */
 export const fitSurfaceToMesh = defineCommand({
   name: 'fit_surface_to_mesh',
   description:
-    'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region`. `parameterization` ' +
+    'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region` and/or in `faceGroups` (named groups of the mesh or segment_mesh regions). `parameterization` ' +
     '"projection" projects the region orthogonally onto its best-fit plane (it must look like a height field over that plane: gently curved, ' +
     'not folded back); "harmonic" maps a DISK-topology region (one connected manifold piece with exactly one boundary loop) onto the unit square ' +
     'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-10, boundary by arc length, corners at the quarter points of its length; weights ' +
@@ -60,7 +61,7 @@ export const fitSurfaceToMesh = defineCommand({
     'Hausdorff distance, tight for a fine mesh); the patch covers the bounding rectangle of ' +
     'the region in its plane, so parts of it past a non-rectangular region are not measured. If `maxDeviation` is given and not reached ' +
     'the surface is still created and data.warnings holds MESH_FIT_NOT_CONVERGED. Pure TypeScript, no kernel. Refusals: ' +
-    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
+    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_GROUP_NOT_FOUND (a faceGroups name the mesh does not have, or a stale stored group), MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
     `${MAX_REGION_TRIANGLES} triangles: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
     'MESH_FIT_FAILED.',
   params: z.object({
@@ -72,6 +73,11 @@ export const fitSurfaceToMesh = defineCommand({
       })
       .optional()
       .describe('Fit only the triangles whose centre lies inside this sphere. Default: the whole mesh.'),
+    faceGroups: faceGroupsParam
+      .optional()
+      .describe(
+        'Fit only the triangles of these face groups: `stored` names groups of the mesh, `segments` ids of segment_mesh regions (the same featureAngleDeg / fitTolerance / kinds). With `region` too, the triangles in both. A group is a natural disk for parameterization "harmonic".',
+      ),
     parameterization: z
       .enum(PARAMETERIZATIONS)
       .optional()
@@ -121,8 +127,17 @@ export const fitSurfaceToMesh = defineCommand({
       mesh.positions[3 * v + 1] as number,
       mesh.positions[3 * v + 2] as number,
     ];
+    let groupFaces: Set<number> | null = null;
+    let groups: { stored: number; segments: number } | null = null;
+    if (params.faceGroups !== undefined) {
+      const selection = faceGroupSelection(doc, ctx, 'fit_surface_to_mesh', id, loaded, params.faceGroups);
+      if ('document' in selection) return selection;
+      groupFaces = new Set(selection.faces);
+      groups = { stored: selection.storedGroups, segments: selection.segmentGroups };
+    }
     const faces: number[] = [];
     for (let f = 0; f < triangles; f++) {
+      if (groupFaces !== null && !groupFaces.has(f)) continue;
       if (region !== undefined) {
         const [a, b, c] = [
           vertex(mesh.indices[3 * f] as number),
@@ -134,7 +149,14 @@ export const fitSurfaceToMesh = defineCommand({
       }
       faces.push(f);
     }
-    if (faces.length === 0) return fail('MESH_FIT_REGION_EMPTY', 'no triangle centre lies inside the region', 'region');
+    if (faces.length === 0)
+      return fail(
+        'MESH_FIT_REGION_EMPTY',
+        groups === null
+          ? 'no triangle centre lies inside the region'
+          : 'no triangle of the named face groups has its centre inside the region',
+        'region',
+      );
     if (faces.length > MAX_REGION_TRIANGLES)
       return fail(
         'MESH_FIT_TOO_LARGE',
@@ -283,6 +305,7 @@ export const fitSurfaceToMesh = defineCommand({
           degree,
           controlPoints: last.size,
           regionTriangles: faces.length,
+          ...(groups === null ? {} : { faceGroups: { ...groups, triangles: groupFaces?.size ?? 0 } }),
           regionArea: framed.area,
           fitVertices: points.length,
           measuredPoints: everything.length,
