@@ -16,6 +16,7 @@ export interface ProfileData {
   readonly junctionG1?: number;
   readonly creaseRad?: number;
   readonly mixed?: boolean;
+  readonly circularFade?: { readonly ends: number; readonly reach: number; readonly reachChords: number };
   readonly fallback?: { readonly edges: readonly string[]; readonly reason: string };
   readonly cornerSetbackFactor?: number;
   readonly corners?: ReadonlyArray<{
@@ -53,6 +54,7 @@ export function describeProfileNotes(
     ...(notes.junctionG1 === undefined ? {} : { junctionG1: notes.junctionG1 }),
     ...(notes.creaseRad === undefined ? {} : { creaseRad: notes.creaseRad }),
     ...(notes.mixed === undefined ? {} : { mixed: notes.mixed }),
+    ...(notes.circularFade === undefined ? {} : { circularFade: notes.circularFade }),
     ...(fallback === undefined ? {} : { fallback }),
     ...(notes.factor === undefined ? {} : { cornerSetbackFactor: notes.factor }),
     ...(corners === undefined ? {} : { corners }),
@@ -61,6 +63,10 @@ export function describeProfileNotes(
   if (fallback !== undefined)
     parts.push(
       `curvature profile on ${fallback.edges.join(', ')} fell back to the G1 quartic (support curvature jumps at a chain junction; G2 does not hold there)`,
+    );
+  if (notes.circularFade !== undefined)
+    parts.push(
+      `the conic kinked at chain junctions (the wall curvature jumps there), so ${notes.circularFade.ends} blend end(s) fade to the circular arc over up to ${notes.circularFade.reach.toPrecision(3)} ${unit} (about ${notes.circularFade.reachChords} section chords): G1 across the junction, the profile weight is the circle's at the junction itself`,
     );
   if (notes.gap !== undefined && notes.gapLimit !== undefined)
     parts.push(`measured gap to the neighbouring faces ${notes.gap.toPrecision(3)} ${unit} (limit ${notes.gapLimit.toPrecision(3)})`);

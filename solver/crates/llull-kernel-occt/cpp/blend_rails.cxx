@@ -86,6 +86,9 @@ constexpr double kMinVolumeRatio = 0.01, kMaxVolumeRatio = 4.0;
 // Two blends of a chain may meet at this angle (radians) at most: 0.95 x the check_blends G1 default (0.01), a margin so that check_blends, which
 // samples the junction at other points, never reads above the default.
 constexpr double kJunctionAngle = 0.0095;
+// A conic that kinks at a chain junction fades to the circular arc over this many chords of the end section (13.19): the longer, the less of the
+// profile is changed per unit of weight; the shorter, the faster the weight turns.
+constexpr double kFadeReach = 3.0;
 // Sewing tolerance (x the diagonal): the check_blends default g0; never less than twice the tolerance OCCT gave the edges of its own blend (its
 // approximation error: about 1e-6 in absolute terms, more than 1e-6 x the diagonal on a millimetre part) and never more than the cap.
 constexpr double kSewingFraction = 1e-6, kSewingCap = 1e-3;
@@ -268,7 +271,9 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
 // The interpolated surface through `stations` sections (closed: the last section is not repeated); null with the reason in `why`.
 // `along` holds the parameter of each station (strictly increasing); a closed blend also takes the parameter where it closes, `period_end`.
 Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std::vector<double> &along, double period_end, bool closed, int kind,
-                                 double param, double tolerance, std::vector<Handle(Geom_BSplineCurve)> &rows_out, std::string &why) {
+                                 double param, double tolerance, const std::vector<double> &weights, std::vector<Handle(Geom_BSplineCurve)> &rows_out,
+                                 std::string &why) {
+  const bool varying = !weights.empty();  // a conic whose weight differs from station to station: the middle row is interpolated as w x P, with w beside it
   const int count = static_cast<int>(stations.size());
   const std::vector<std::vector<gp_Pnt>> poles = [&] {
     std::vector<std::vector<gp_Pnt>> out;
@@ -281,7 +286,11 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
   std::vector<Handle(Geom_BSplineCurve)> curves;
   for (int i = 0; i < rows; ++i) {
     Handle(TColgp_HArray1OfPnt) points = new TColgp_HArray1OfPnt(1, count);
-    for (int j = 0; j < count; ++j) points->SetValue(j + 1, poles[static_cast<size_t>(j)][static_cast<size_t>(i)]);
+    for (int j = 0; j < count; ++j) {
+      const gp_Pnt &pole = poles[static_cast<size_t>(j)][static_cast<size_t>(i)];
+      const double scale = varying && i == 1 ? weights[static_cast<size_t>(j)] : 1.0;
+      points->SetValue(j + 1, gp_Pnt(scale * pole.X(), scale * pole.Y(), scale * pole.Z()));
+    }
     GeomAPI_Interpolate interpolation(points, parameters, closed ? Standard_True : Standard_False, tolerance);
     interpolation.Perform();
     if (!interpolation.IsDone()) {
@@ -289,6 +298,20 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
       return nullptr;
     }
     curves.push_back(interpolation.Curve());
+  }
+  Handle(Geom_BSplineCurve) weight_curve;
+  if (varying) {
+    Handle(TColgp_HArray1OfPnt) values = new TColgp_HArray1OfPnt(1, count);
+    for (int j = 0; j < count; ++j) values->SetValue(j + 1, gp_Pnt(weights[static_cast<size_t>(j)], along[static_cast<size_t>(j)], 0));  // the station parameter keeps equal weights apart: the interpolation refuses coincident points
+    GeomAPI_Interpolate interpolation(values, parameters, closed ? Standard_True : Standard_False, tolerance);
+    interpolation.Perform();
+    if (!interpolation.IsDone()) {
+      why = "the section weights could not be interpolated along the blend";
+      return nullptr;
+    }
+    weight_curve = interpolation.Curve();
+    if (!positive_weights(weight_curve, why)) return nullptr;
+    curves.push_back(weight_curve);
   }
   rows_out = curves;
   const Handle(Geom_BSplineCurve) &first = curves.front();
@@ -300,7 +323,11 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
     }
   TColgp_Array2OfPnt grid(1, rows, 1, columns);
   for (int i = 0; i < rows; ++i)
-    for (int j = 1; j <= columns; ++j) grid.SetValue(i + 1, j, curves[static_cast<size_t>(i)]->Pole(j));
+    for (int j = 1; j <= columns; ++j) {
+      const gp_Pnt pole = curves[static_cast<size_t>(i)]->Pole(j);
+      const double divisor = varying && i == 1 ? weight_curve->Pole(j).X() : 1.0;
+      grid.SetValue(i + 1, j, gp_Pnt(pole.X() / divisor, pole.Y() / divisor, pole.Z() / divisor));
+    }
   TColStd_Array1OfReal u_knots(1, 2), v_knots(1, first->NbKnots());
   u_knots.SetValue(1, 0.0);
   u_knots.SetValue(2, 1.0);
@@ -312,21 +339,29 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
   if (kind == 1)
     return new Geom_BSplineSurface(grid, u_knots, v_knots, u_mults, v_mults, rows - 1, first->Degree(), Standard_False,
                                    first->IsPeriodic() ? Standard_True : Standard_False);
-  TColStd_Array2OfReal weights(1, rows, 1, columns);
+  TColStd_Array2OfReal pole_weights(1, rows, 1, columns);
   const double conic_weight = param / (1.0 - param);
   for (int j = 1; j <= columns; ++j) {
-    weights.SetValue(1, j, 1.0);
-    weights.SetValue(2, j, conic_weight);
-    weights.SetValue(3, j, 1.0);
+    pole_weights.SetValue(1, j, 1.0);
+    pole_weights.SetValue(2, j, varying ? weight_curve->Pole(j).X() : conic_weight);
+    pole_weights.SetValue(3, j, 1.0);
   }
-  return new Geom_BSplineSurface(grid, weights, u_knots, v_knots, u_mults, v_mults, rows - 1, first->Degree(), Standard_False,
+  return new Geom_BSplineSurface(grid, pole_weights, u_knots, v_knots, u_mults, v_mults, rows - 1, first->Degree(), Standard_False,
                                  first->IsPeriodic() ? Standard_True : Standard_False);
 }
 
 // The skin of `blend`, with stations inserted until its contact lines and section stay within `limit` of the circular blend's between two stations;
 // null with the reason in `why`.
-Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double param, bool curved, double limit, std::string &why) {
+Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double param, bool curved, double limit, const Fade &fade, std::string &why) {
   const BRepAdaptor_Surface source(blend.face, Standard_False);
+  // the weight of the conic at a station: the profile's, or (at a faded end) on its way to the circle's
+  const auto weight_of = [&](const Section &section, double at) { return faded_weight(fade, at, section.circle_weight, param / (1.0 - param)); };
+  const auto weights_of = [&](const std::vector<Section> &stations, const std::vector<double> &places) {
+    std::vector<double> out;
+    if (kind == 0 && fade.active)
+      for (size_t j = 0; j < stations.size(); ++j) out.push_back(weight_of(stations[j], places[j]));
+    return out;
+  };
   const double span = blend.hi - blend.lo;
   std::vector<double> along;
   std::vector<Section> stations;
@@ -339,7 +374,7 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
   }
   for (;;) {
     std::vector<Handle(Geom_BSplineCurve)> rows;
-    const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, rows, why);
+    const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
     if (surface.IsNull()) return nullptr;
     std::vector<double> added;
     std::vector<Section> added_sections;
@@ -352,8 +387,15 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
       if (!section_at(source, blend, at, curved, param, middle, why)) return nullptr;
       // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
       const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
+      const bool varying = kind == 0 && fade.active;
+      const double expected_weight = varying ? weight_of(middle, at) : 1.0;
       double gap = 0;
-      for (size_t row = 0; row < rows.size() && row < expected.size(); ++row) gap = std::max(gap, rows[row]->Value(at).Distance(expected[row]));
+      for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
+        const double scale = varying && row == 1 ? expected_weight : 1.0;  // the middle row of a faded conic is the pole times its weight
+        const gp_Pnt want(scale * expected[row].X(), scale * expected[row].Y(), scale * expected[row].Z());
+        gap = std::max(gap, rows[row]->Value(at).Distance(want));
+      }
+      if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
       worst = std::max(worst, gap);
       if (gap > limit) {
         if (to - from < 1e-9 * span) {
@@ -379,7 +421,7 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
 }
 
 // Where a pass failed: only a chain junction that does not sew in a curved pass is worth the zero-curvature pass.
-enum class Stage { Other, Junction };
+enum class Stage { Other, Junction, NothingToFade };
 
 // What a successful pass measured.
 struct Measured {
@@ -389,10 +431,12 @@ struct Measured {
   double crease = 0;       // mitred chains: the largest crease (turn between the end section planes) a junction was mitred across
   std::vector<int> chain;  // unique edges of the contours OCCT rounded (the picked edges and the rest of their tangent chains)
   bool mitred = false;     // blends of a chain end on a crease: the result is read with the adaptive mass rule (the fixed rule is off by 1e-4 of the swept volume)
+  int faded_ends = 0;      // ends of blends whose conic fades to the circular arc (13.19)
+  double fade_reach = 0;   // the longest fade (arc length of the ball centre)
 };
 
 std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, int kind, double param,
-                                  bool curved, Stage &stage, Measured &measured, std::string &why) {
+                                  bool curved, bool faded, Stage &stage, Measured &measured, std::string &why) {
   stage = Stage::Other;
   const TopoDS_Shape &shape = source.shape;
   // true box of the source: construction tolerances; the acceptance limits below use the smaller of this and the result's
@@ -481,8 +525,29 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     TopoDS_Vertex vertex;
   };
   std::vector<Meeting> meetings;  // the vertex two rails of one support share at a mitre
+  int faded_ends = 0;             // the ends of blends that fade to the circular arc (13.19)
+  double fade_reach = 0;          // the longest of those fades (arc length of the ball centre)
+  // a second pass has nothing to change when no blend end meets the next blend across a smooth (not mitred) junction: the first pass's reason stands
+  if (faded && kind == 0 &&
+      !std::any_of(faces.begin(), faces.end(), [](const Blend &blend) {
+        return (!blend.end_blend[0].IsNull() && !blend.mitre[0].active) || (!blend.end_blend[1].IsNull() && !blend.mitre[1].active);
+      })) {
+    stage = Stage::NothingToFade;
+    why = "no blend end meets the next blend of its chain across a smooth junction";
+    return nullptr;
+  }
   for (const Blend &blend : faces) {
-    const Handle(Geom_BSplineSurface) surface = skin_blend(blend, kind, param, curved, kDeviationFraction * diagonal, why);
+    Fade fade;
+    if (faded && kind == 0) {
+      const BRepAdaptor_Surface source(blend.face, Standard_False);
+      if (!plan_fade(source, blend, kFadeReach, fade, why)) return nullptr;
+      for (int end = 0; end < 2; ++end)
+        if (fade.at[end]) {
+          faded_ends += 1;
+          fade_reach = std::max(fade_reach, fade.reach[end]);
+        }
+    }
+    const Handle(Geom_BSplineSurface) surface = skin_blend(blend, kind, param, curved, kDeviationFraction * diagonal, fade, why);
     if (surface.IsNull()) return nullptr;
     double u0, u1, v0, v1;
     surface->Bounds(u0, u1, v0, v1);
@@ -710,7 +775,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     stage = Stage::Junction;
     return nullptr;
   }
-  measured = {gap, accepted, mixed, junction, crease, chain, mitred};
+  measured = {gap, accepted, mixed, junction, crease, chain, mitred, faded_ends, fade_reach};
   std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));
   for (size_t m = 0; m < members.size(); ++m) {
     const TopoDS_Shape image = sewing.IsModified(members[m]) ? sewing.Modified(members[m]) : members[m];
@@ -729,11 +794,24 @@ std::unique_ptr<Shape> blend::rails_blend(const Shape &source, rust::Slice<const
   // one), and the fallback is reported. Every other failure of the curved pass is the pass's own reason.
   Stage stage = Stage::Other;
   Measured measured;
-  std::unique_ptr<Shape> built = rails_once(source, edges, laws, kind, param, kind == 1, stage, measured, why);
+  std::unique_ptr<Shape> built = rails_once(source, edges, laws, kind, param, kind == 1, false, stage, measured, why);
+  bool faded = false;
+  if (!built && stage == Stage::Junction && kind == 0) {
+    // a conic whose junctions kink: the ends that meet the next blend fade to the circular arc (G1 across a junction whatever the walls' curvature does)
+    const std::string kinked = why;
+    built = rails_once(source, edges, laws, kind, param, false, true, stage, measured, why);
+    if (!built) {
+      if (stage == Stage::NothingToFade) why = kinked;
+      else if (stage == Stage::Junction) why = "the conic kinks at a chain junction (" + kinked + ") and still kinks with its ends faded to the circular arc (" + why + ")";
+      else why = "the conic kinks at a chain junction (" + kinked + ") and the build with its ends faded to the circular arc fails: " + why;
+      return nullptr;
+    }
+    faded = true;
+  }
   std::string curved_reason;
   if (!built && stage == Stage::Junction && kind == 1) {
     curved_reason = why;
-    built = rails_once(source, edges, laws, kind, param, false, stage, measured, why);
+    built = rails_once(source, edges, laws, kind, param, false, false, stage, measured, why);
     if (!built) {
       why = "the curvature-continuous pass failed (" + curved_reason + ") and so did the zero-curvature quartic (" + why + ")";
       return nullptr;
@@ -751,6 +829,8 @@ std::unique_ptr<Shape> blend::rails_blend(const Shape &source, rust::Slice<const
         .string("support curvature jumps at a chain junction: the curvature-continuous pass failed there (" + curved_reason + ")")
         .end_object();
   }
+  if (faded)
+    out.key("circularFade").begin_object().key("ends").integer(measured.faded_ends).key("reach").number(measured.fade_reach).key("reachChords").number(kFadeReach).end_object();
   notes = out.end_object().text();
   return built;
 }
@@ -775,7 +855,7 @@ rust::String rails_reason(const Shape &shape, rust::Slice<const uint32_t> edges,
   try {
     built = blend::rails_blend(shape, edges, laws, static_cast<int>(kind), param, notes, why);
   } catch (const Standard_Failure &error) {
-    why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    why = blend::occt_failure(error);
   }
   return rust::String(built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why));
 }

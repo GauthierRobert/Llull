@@ -449,6 +449,17 @@ describe('describeProfileNotes', () => {
     );
   });
 
+  it('a conic whose chain junctions kinked says its ends fade to the circular arc, in text and data', () => {
+    const { text, data } = describeProfileNotes(
+      { builder: 'rails', junctionG1: 2.3e-6, circularFade: { ends: 18, reach: 3.86, reachChords: 3 } },
+      null,
+      'mm',
+    );
+    expect(data.circularFade).toEqual({ ends: 18, reach: 3.86, reachChords: 3 });
+    expect(text).toContain('18 blend end(s) fade to the circular arc over up to 3.86 mm (about 3 section chords)');
+    expect(describeProfileNotes({ builder: 'rails', junctionG1: 0.004 }, null, 'mm').data).not.toHaveProperty('circularFade');
+  });
+
   it('says nothing for a prism build and keeps a zero junction angle in data only; without a topology edges are numbered', () => {
     expect(describeProfileNotes({ builder: 'prism' }, TOPOLOGY, 'mm')).toEqual({ text: '', data: { builder: 'prism', unit: 'mm' } });
     const quiet = describeProfileNotes({ builder: 'rails', gap: 1e-9, gapLimit: 1e-6, junctionG1: 0 }, null, 'mm');

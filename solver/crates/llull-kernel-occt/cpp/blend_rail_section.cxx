@@ -92,6 +92,7 @@ bool section_at(const BRepAdaptor_Surface &surface, const Blend &blend, double a
   raw.a = a;
   raw.b = b;
   raw.centre = centre;
+  raw.circle_weight = half_cos;
   raw.t = centre.Translated(bisector * (radius / half_cos));
   apply_mitre(blend, along, raw);
   out = raw;

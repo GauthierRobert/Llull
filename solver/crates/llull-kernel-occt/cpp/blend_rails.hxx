@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <Geom_Curve.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -22,6 +23,7 @@ namespace rails {
 struct Section {
   gp_Pnt a, t, b;
   gp_Pnt centre;  // of the section circle (the rolling ball)
+  double circle_weight = 0;  // the weight of the rational quadratic a, t, b that is the circular arc of the ball: cos of half the arc
   gp_Vec bend_a{0, 0, 0}, bend_b{0, 0, 0};  // curvature-continuous sections: the offset of the 3rd / 4th pole of the quintic along the support normal
 };
 
@@ -55,6 +57,27 @@ struct Blend {
   std::vector<RailPiece> supports[2];  // the support faces along each rail
   Mitre mitre[2];
 };
+
+// The conic of a blend that ends on the next blend of its chain fades to the circular arc at that end (TECHNICAL_SPEC 13.19): the weight of the
+// section goes from the profile's to the circle's, by a smooth quintic over `reach[end]` of arc length of the ball centre. The circular family is
+// G1 across a junction whatever the walls' curvature does, which is what the apex of a conic is not.
+struct Fade {
+  bool active = false;
+  bool at[2] = {false, false};
+  double reach[2] = {0, 0};
+  std::vector<double> along, arc;  // the ball centre's arc length at sampled stations of the blend
+};
+
+// The fade of `blend` at the ends that meet the next blend of the chain and are not mitred; `reach_factor` x the chord of the end section is the
+// length of the fade, at most 0.45 of the blend. False with the reason in `why`.
+bool plan_fade(const BRepAdaptor_Surface &surface, const Blend &blend, double reach_factor, Fade &fade, std::string &why);
+
+// The weight of the conic at `along`: the profile's `profile_weight` away from the faded ends, `circle_weight` at them.
+double faded_weight(const Fade &fade, double along, double circle_weight, double profile_weight);
+
+// Every pole of the interpolated weight curve of a faded blend must exceed this (a NURBS weight is positive); false with the reason in `why`.
+constexpr double kLeastWeight = 1e-9;
+bool positive_weights(const Handle(Geom_BSplineCurve) &weights, std::string &why);
 
 // A contact point whose mitre displacement is below this fraction of the diagonal does not move (no re-trimming, no pin test).
 constexpr double kStillFraction = 1e-6;
