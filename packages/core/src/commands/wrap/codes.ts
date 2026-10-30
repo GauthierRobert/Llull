@@ -49,6 +49,10 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
     'Pick a direction under which a cylinder, cone or sphere face shows an outline (a box seen along an axis has none); inspect_faces lists the faces and their surfaces.',
   WRP_SILHOUETTE_UNSUPPORTED:
     'Closed-form silhouettes exist for plane, cylinder, cone and sphere faces: split the torus or freeform face with curves of your own (create_curve_on_face, then split_face_by_curves), or cut the solid first (split_body).',
+  WRP_PULL_PARALLEL:
+    'Choose a pullDirection that crosses the face at every point of the sketch region (not along the face, and not folding over it); the angle to the face is in the message.',
+  WRP_DRAFT_CLOSES:
+    'Reduce draftDeg or the depth, or enlarge the profile: the walls would meet before reaching the full depth (data.maxDraftDeg is the largest angle that keeps the profile open).',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
   WRP_TEXT_TOO_LONG: 'Split the text; outline text is limited to 2000 characters per entity.',
   WRP_PARAM_INVALID: 'Fix the named parameter; see `llull describe <command>`.',

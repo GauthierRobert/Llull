@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; pull walls and draft (VC-WRP-25, 26); the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -672,3 +672,23 @@ codes). `split_face_by_curves` learned one thing: the azimuth of a cone apex sam
 
 **Measured (native kernel, `server/tests/nativeSilhouette.test.ts`).** Cylinder r 20 h 40 along x: 2 lines of length 40 at y = +-20, 3 -> 4 faces, the two halves 800 pi each, volume unchanged (1e-5); sphere r 25 along z: the equator 2 pi r = 157.08, two hemispheres of area 2 pi r^2 (1e-4), along (1, 2, 2) an oblique great
 circle (halves 1e-3); cone r 20 h 40 along x: 2 lines of the slant length 44.72, 2 -> 3 faces, halves pi r slant / 2; cylinder along y: the seam reported, one split; replay equal. Stub-port unit tests (`tests/unit/wrap/silhouette.test.ts`) cover the branches. Codes: `WRP_SILHOUETTE_NONE`, `WRP_SILHOUETTE_UNSUPPORTED`.
+
+### 14.8 Pull walls and draft (DES-3c, VC-WRP-25 / 26)
+
+`emboss_on_face` takes `walls: "normal" | "pull"`, `pullDirection` and `draftDeg` (files `embossPull.ts`, `embossRun.ts`). No native code changed: the relief is a recipe of exact booleans.
+
+**Construction.** The regions are mapped as usual. For `walls: "pull"` each region's boundary is sampled on the face (lines of a curved face 17 points, curves 33), projected along the pull into the plane perpendicular to it, simplified (collinear points removed, counter-clockwise)
+and extruded as a prism over a window along the pull that holds the whole layer; holes are subtracted prisms. The layer is the exact offset of the face: `emboss = source + (prism x (offset(source, +d) - source))`, `deboss = source - (prism x (source - offset(source, -d)))`
+where `offset` is the kernel's `moveFaces offset` (plane along its outward normal; cylinder, cone, sphere away from the axis / centre, sign by the face orientation). The walls are therefore parallel to the pull and the relief follows the offset surface (VC-25: shell of r to r + d, not a prism of constant height).
+The window is [lowest surface height over the parameter box of the region - margin, highest + d / cos(min)] along the feature axis (the side of the face opposite to the feature is never reached, so the far side of a cylinder is not embossed).
+
+**Draft.** A draft tilts the walls of each footprint prism with the native `BRepOffsetAPI_DraftAngle` (`faceOp draft`, one node per prism, all planar walls parallel to the pull) about the plane through the placement anchor perpendicular to the feature axis: the relief narrows by tan(draft) per unit of height
+away from the face (an emboss toward its top, a deboss toward its floor); hole prisms widen, so wall thickness follows. Drafting the prism, not the finished relief, was the fix for a native refusal of drafted deboss walls on a cylinder (the hinge touched the cavity edge); the window is padded by the widening. The hinge is part of the definition: on a plane perpendicular to the pull it is the face itself
+(V = w l d - (w + l) t d^2 + 4/3 t^2 d^3 for a rectangle), on a curved face it is the tangent plane at the anchor, and the footprint on that plane is the nominal one.
+
+**Refusals.** `WRP_PULL_PARALLEL`: the pull is within 0.57 degrees of the face at a sample (`|n . pull| < 0.01`), or crosses the face one way on part of the region and the other way on another (the face folds over the region); `WRP_DRAFT_CLOSES`: 2 x (reach from the hinge) x tan(draft) reaches the narrowest bounding side of a region (the message gives the largest draft);
+`WRP_PARAM_INVALID`: walls pull without a pull, draft or pull without walls pull, draft outside [0, 45), a torus face, scribe, engrave, a grid or a chain, more than 4000 footprint vertices. Deviation (never silent): the footprint is a polygon where the region's image along the pull is curved (a straight line of the cylinder projects exactly, a text outline to the sampling of 33 points per curve);
+`data.footprintVertices` reports it. `data.expectedVolumeDelta` is A d on a plane without draft, null elsewhere (the numbers below are the references).
+
+**Measured (native kernel, `server/tests/nativeWrapWalls.test.ts`).** VC-25 pull +x on r 20, rectangle 30 x 10: 149.562188 / 298.308583 / 593.663229 at depth 0.5 / 1 / 2 (1e-6), against 151.875 / 307.5 / 630 for normal walls. VC-26 plane 20 x 10, d 2, 10 degrees, emboss and deboss: 379.1724 (1e-6); cylinder, 5 degrees, d 1:
+318.0674 emboss (kernel 1e-4), 277.2150 deboss (1e-6); an oblique pull on a plane keeps A d; a sphere with the pull along its axis and a geodesic disc follows the cap integral (1e-3); text with a hole adds A d (1e-3); every refusal by code; replay equal. Fake-kernel unit tests: `tests/unit/wrap/walls.test.ts`.

@@ -54,6 +54,24 @@ export const embossOnFace = defineCommand({
       .describe(
         'Multi-face emboss: more faces (plane or cylinder) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces: WRP_CHAIN_EDGE_SHARP otherwise; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
       ),
+    walls: z
+      .enum(['normal', 'pull'])
+      .optional()
+      .describe(
+        'Wall form of emboss and deboss. normal (default): walls normal to the face. pull: walls parallel to pullDirection (the form a mould can release), the relief being the region prism along the pull cut to the layer between the face and its offset by depth; needs pullDirection, works on plane, cylinder, cone and sphere faces, emboss and deboss only.',
+      ),
+    pullDirection: z
+      .tuple([z.number(), z.number(), z.number()])
+      .optional()
+      .describe(
+        'walls pull only: direction [x, y, z] the mould opens along (world, not necessarily unit; its sign does not matter). It must cross the face at every point of the region (WRP_PULL_PARALLEL when it runs along the face).',
+      ),
+    draftDeg: z
+      .number()
+      .optional()
+      .describe(
+        'walls pull only: draft angle of the walls in degrees, [0, 45). The relief narrows away from the face (an emboss toward its top, a deboss toward its floor) by tan(draft) per unit of height, hinged on the plane through the placement anchor perpendicular to the feature axis. A draft that closes the profile refuses with WRP_DRAFT_CLOSES.',
+      ),
     maxLengthStrain: z
       .number()
       .positive()

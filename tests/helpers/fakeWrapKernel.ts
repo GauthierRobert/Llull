@@ -91,6 +91,8 @@ export interface FakeWrapOptions {
    */
   /** `faceContains` answers true everywhere (the kernel cannot tell which side of an edge a face lies on). */
   readonly sideBlind?: boolean;
+  /** An extrusion carries 4 planar walls parallel to z (the lateral faces of a pull prism), so a draft finds faces to tilt. */
+  readonly pullWalls?: boolean;
   readonly stadium?: boolean | 'cone-end' | 'torus-end' | 'unknown-edges';
 }
 
@@ -190,6 +192,15 @@ const STADIUM_CONVEXITY = [
   'smooth',
   'convex',
 ] as const;
+
+const wall = (index: number, normal: Vec3): FakeFace => ({
+  name: `wall${index}`,
+  surface: { type: 'plane', origin: [normal[0] * 100, normal[1] * 100, 0], normal, xDir: [0, 0, 1] },
+  area: 1,
+  sample: [normal[0] * 100, normal[1] * 100, 0],
+  contains: () => true,
+});
+const PULL_WALLS: readonly FakeFace[] = [wall(0, [1, 0, 0]), wall(1, [-1, 0, 0]), wall(2, [0, 1, 0]), wall(3, [0, -1, 0])];
 
 function stadiumShape(id: string, variant: boolean | 'cone-end' | 'torus-end' | 'unknown-edges'): FakeShape {
   const slab = (z: number, outward: Vec3): FakeFace => ({
@@ -436,7 +447,7 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                 0,
               ),
             ) / 2;
-          return { id: entity.id, volume: area * entity.depth, faces: [] };
+          return { id: entity.id, volume: area * entity.depth, faces: options.pullWalls === true ? PULL_WALLS : [] };
         }
         default:
           return null;
@@ -445,11 +456,17 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
     boolean: (op, a, b) =>
       options.refuseBoolean === true
         ? null
-        : op === 'union'
-          ? { ...a, volume: a.volume + b.volume }
-          : op === 'subtract'
-            ? { ...a, volume: a.volume - b.volume * (options.subtractSkew ?? 1) }
-            : null,
+        : op === 'intersect'
+          ? { ...a, volume: Math.min(a.volume, b.volume), faces: [] }
+          : op === 'union'
+            ? { ...a, volume: a.volume + b.volume, faces: [...a.faces, ...b.faces] }
+            : op === 'subtract'
+              ? { ...a, volume: a.volume - b.volume * (options.subtractSkew ?? 1), faces: [...a.faces, ...b.faces] }
+              : null,
+    faceOp: (shape, params) => ({
+      ...shape,
+      volume: shape.volume + (params.kind === 'moveFaces' && params.move.type === 'offset' ? 100 * Math.sign(params.move.distance) : 0),
+    }),
     fillet: () => null,
     blend: () => null,
     chamfer: () => null,
