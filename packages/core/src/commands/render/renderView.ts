@@ -12,6 +12,7 @@ import { escapeXml } from '../../lib/escapeXml';
 import type { ViewName } from './camera';
 import { renderDocument } from './scene';
 import { composeOverlays } from './overlays';
+import { OVERLAY_KINDS, appendCageNetOverlays } from './overlayCage';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
@@ -19,6 +20,7 @@ import { is2D } from '../../model/types';
 import { reviewRejection } from '../review/reviewModel';
 import { prepareView, viewParams } from './viewRequest';
 import type { CadDocument } from '../../model/types';
+import type { RenderViewData } from './types';
 import { clamp } from '../../lib/clamp';
 import { withExplodedPositions } from '../../geometry/explodedOffsets';
 
@@ -56,7 +58,7 @@ export const renderView = defineCommand({
     'and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. ' +
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
-    'showLabels (entity id/name labels + key-point markers, default off). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
+    'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
     'Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
@@ -168,6 +170,12 @@ export const renderView = defineCommand({
         'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
           'object placement relative to the world origin. Set to false to suppress.',
       ),
+    overlay: z
+      .union([z.enum(OVERLAY_KINDS), z.array(z.enum(OVERLAY_KINDS)).min(1)])
+      .optional()
+      .describe(
+        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. One kind or ["cage", "net"]. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective or viewpoint renders (the summary says so); data.overlays reports the entity ids and the counts of segments and dots.',
+      ),
     hide2D: z
       .boolean()
       .optional()
@@ -240,6 +248,16 @@ export const renderView = defineCommand({
       showGrid: !perspective && params.showGrid !== false,
       showLabels: !perspective && params.showLabels === true,
     });
-    return finish(doc, withNotes(summary), { ...base, svg: decorate(svg) });
+    const kinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+    let overlays: RenderViewData['overlays'];
+    if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
+    else if (kinds.length > 0) {
+      const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
+      const drawn = appendCageNetOverlays(svg, base, Object.values(scene.entities), kinds, isolated);
+      svg = drawn.svg;
+      overlays = drawn.stats;
+      summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
+    }
+    return finish(doc, withNotes(summary), { ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) });
   },
 });
