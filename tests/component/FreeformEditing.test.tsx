@@ -110,6 +110,22 @@ describe('face handle drag: backend preview, one command on release', () => {
     expect(useGhostStore.getState().ghostedIds.size).toBe(0);
   });
 
+  it('an offset drag previews move_faces with preview: true and commits it without', async () => {
+    const { calls } = stubFetch();
+    useFaceEditStore.setState({ op: 'offset' });
+    updateFaceDrag(1.5);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body.name).toBe('move_faces');
+    expect(calls[0]?.body.params).toMatchObject({ id: 'box-1', mode: 'offset', distance: 1.5, preview: true });
+    expect(commitFaceDrag()).toBe(true);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const [name, params] = dispatch.mock.calls[0] as [string, Record<string, unknown>];
+    expect(name).toBe('move_faces');
+    expect(params).toMatchObject({ id: 'box-1', mode: 'offset', distance: 1.5 });
+    expect(params).not.toHaveProperty('preview');
+  });
+
   it('cancel dispatches nothing and keeps the pick', async () => {
     stubFetch();
     updateFaceDrag(1);

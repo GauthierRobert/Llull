@@ -56,7 +56,7 @@ const trapezoid = [
 ];
 
 describeNative('offset of a planar face: the prism path against the whole-solid offset (DES-4c, native kernel)', () => {
-  it('square neighbours: the exact result of a box top, a 24-gon prism top and a bore-through top, in and out', () => {
+  it('square neighbours: the exact result of a box top (out and in) and a 24-gon prism top', () => {
     const cases: Array<[string, number[][], [number, number, number], number]> = [
       [
         'box top out',
@@ -191,6 +191,69 @@ describeNative('offset of a planar face: the prism path against the whole-solid 
       );
       expect(again.affected, `${label}: ${again.summary}`).toHaveLength(1);
     }
+  }, 180_000);
+
+  it('the prism must not reach anything but the neighbours: a pocket floor and a boss are in its way and the whole-solid offset decides (closed-form volumes)', () => {
+    const body = prism(
+      kernels.occt,
+      [
+        [0, 0],
+        [20, 0],
+        [20, 20],
+        [0, 20],
+      ],
+      10,
+    );
+    const pocketTool = execute(
+      body.doc,
+      'extrude_profile',
+      {
+        profile: [
+          [5, 5],
+          [15, 5],
+          [15, 15],
+          [5, 15],
+        ],
+        depth: 6,
+        position: [0, 0, 6],
+      },
+      context(kernels.occt),
+    );
+    const pocket = execute(
+      pocketTool.document,
+      'boolean',
+      { op: 'subtract', a: body.id, b: pocketTool.affected[0] as string, engine: 'kernel' },
+      context(kernels.occt),
+    );
+    const bossTool = execute(
+      body.doc,
+      'extrude_profile',
+      {
+        profile: [
+          [7, 7],
+          [13, 7],
+          [13, 13],
+          [7, 13],
+        ],
+        depth: 4,
+        position: [0, 0, 10],
+      },
+      context(kernels.occt),
+    );
+    const boss = execute(
+      bossTool.document,
+      'boolean',
+      { op: 'union', a: body.id, b: bossTool.affected[0] as string, engine: 'kernel' },
+      context(kernels.occt),
+    );
+    const volumeAfter = (made: typeof pocket, distance: number): number =>
+      offsetOn(kernels.occt, made.document, made.affected[0] as string, [2, 2, 10], distance).volume;
+    // pocket 10 x 10 from z 6 to 10 in a 20 x 20 x 10 block (3600): the top moves inside / through the floor
+    expect(volumeAfter(pocket, -2)).toBeCloseTo(400 * 8 - 100 * 2, 6);
+    expect(volumeAfter(pocket, -6)).toBeCloseTo(400 * 4, 6); // through the floor z = 6: the slab below it, not a boss in the pocket
+    // boss 6 x 6 from z 10 to 14 (4144): the top moves up past / below the boss height
+    expect(volumeAfter(boss, 2)).toBeCloseTo(400 * 12 + 36 * 2, 6);
+    expect(volumeAfter(boss, 6)).toBeCloseTo(400 * 16, 6); // above the boss top z = 14: the boss is swallowed, not a well
   }, 180_000);
 
   it('a slanted neighbour keeps the whole-solid offset: a trapezoid wall moves to the offset line (closed form)', () => {

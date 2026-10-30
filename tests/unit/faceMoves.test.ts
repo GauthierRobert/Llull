@@ -107,11 +107,13 @@ describe('move_faces', () => {
   });
 
   it('preview true builds the same node but skips the volume report and the exact-topology note', () => {
-    exactKernel();
+    const { ops } = exactKernel();
     const box = boxDoc();
     const id = box.affected[0];
     const full = execute(box.document, 'move_faces', { id, faceIndices: [1], mode: 'offset', distance: 1.5 });
+    expect(ops.at(-1)).not.toHaveProperty('unchecked');
     const dry = execute(box.document, 'move_faces', { id, faceIndices: [1], mode: 'offset', distance: 1.5, preview: true });
+    expect(ops.at(-1)).toMatchObject({ kind: 'moveFaces', unchecked: true });
     expect(full.summary).toMatch(/Volume 1000/);
     expect(full.summary).toContain('Exact B-rep kept');
     expect(dry.affected).toHaveLength(1);

@@ -6,8 +6,8 @@ import { useStore } from '@ui/store';
 import { useFaceEditStore } from '@ui/store/faceEditStore';
 import { faceCommand } from './faceEditModel';
 
-/** Face commands that take `preview: true` (a dry run that skips the exact volume report and topology note). */
-const PREVIEW_FLAGGED = new Set(['move_faces', 'delete_faces']);
+/** Face commands that the viewport previews with `preview: true` (a dry run that skips the exact volume report, the topology note and the prism route's validity check). */
+const PREVIEW_FLAGGED = new Set(['move_faces']);
 
 /** Set the drag value and refresh the ghost (an idle value clears it). */
 export function updateFaceDrag(value: number): void {

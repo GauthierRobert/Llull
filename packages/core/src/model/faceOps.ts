@@ -16,13 +16,14 @@ export interface PlaneSpec {
  * - moveFaces (04 DIR M6): `offset` moves each face by `distance` along its surface normal (a plane along its outward normal; a cylinder, cone, sphere
  *   or torus AWAY from its axis / centre, so a bore widens), `translate` / `rotate` move the face set rigidly (one planar face: its new plane, the
  *   neighbours extend; any other set is a feature that is removed and re-created at the new place).
+ *   `unchecked` (a dry run for a ghost) lets the prism route of a planar offset skip the validity check; a committed move never sets it.
  * - deleteFaces: remove the faces; the neighbouring faces extend to close the gap (a fillet or a hole disappears).
  */
 export type FaceOpParams =
   | { readonly kind: 'draft'; readonly faces: readonly number[]; readonly angle: number; readonly pull: Vec3; readonly neutral: PlaneSpec }
   | { readonly kind: 'pushPull'; readonly faces: readonly [number]; readonly distance: number }
   | { readonly kind: 'splitFace'; readonly faces: readonly number[]; readonly plane: PlaneSpec }
-  | { readonly kind: 'moveFaces'; readonly faces: readonly number[]; readonly move: FaceMove }
+  | { readonly kind: 'moveFaces'; readonly faces: readonly number[]; readonly move: FaceMove; readonly unchecked?: true }
   | { readonly kind: 'deleteFaces'; readonly faces: readonly number[] };
 
 /** How `moveFaces` moves its faces (angles in radians). */

@@ -37,10 +37,12 @@ impl Evaluator {
             Some("moveFaces") => {
                 let Some(move_spec) = recipe.get("move") else { return refused() };
                 let value = |field: &str| number(move_spec, field).unwrap_or(f64::NAN);
+                // `unchecked` (a dry run for a ghost) is the only way to skip the validity check of the prism route
+                let check = !recipe.get("unchecked").and_then(Value::as_bool).unwrap_or(false);
                 let built = match move_spec.get("type").and_then(Value::as_str) {
-                    Some("offset") => features::move_faces(&source, &faces, 0, &[], &[], value("distance")),
+                    Some("offset") => features::move_faces(&source, &faces, 0, &[], &[], value("distance"), check),
                     Some("translate") => match vec3(move_spec, "vector") {
-                        Some(vector) => features::move_faces(&source, &faces, 1, &vector, &[], 0.0),
+                        Some(vector) => features::move_faces(&source, &faces, 1, &vector, &[], 0.0, check),
                         None => return refused(),
                     },
                     Some("rotate") => {
@@ -50,7 +52,7 @@ impl Evaluator {
                         else {
                             return refused();
                         };
-                        features::move_faces(&source, &faces, 2, &origin, &direction, value("angle"))
+                        features::move_faces(&source, &faces, 2, &origin, &direction, value("angle"), check)
                     }
                     _ => return refused(),
                 };

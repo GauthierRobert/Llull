@@ -12,7 +12,9 @@
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
@@ -21,6 +23,7 @@
 #include <BRepTools.hxx>
 #include <GProp_GProps.hxx>
 #include <ShapeFix_Solid.hxx>
+#include <Standard_Failure.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
@@ -246,6 +249,38 @@ bool square_neighbours(const Shape &shape, const TopoDS_Face &face) {
   return true;
 }
 
+// True when the prism of `face` moved by `distance` along its normal touches no face that is neither the face nor one of its edge neighbours (bounding boxes, so
+// conservative): a pocket floor the face would be pushed through, a boss it would swallow, another part of the solid it would reach. The prism route is only
+// right when it just slides the neighbours; any overlap goes to the whole-solid offset.
+bool prism_clear(const Shape &shape, const TopoDS_Face &face, double distance) {
+  gp_Pnt point;
+  gp_Dir normal;
+  if (!planar_frame(face, point, normal)) return false;
+  Bnd_Box start;
+  BRepBndLib::Add(face, start, Standard_False);
+  gp_Trsf slide;
+  slide.SetTranslation(gp_Vec(normal) * distance);
+  Bnd_Box swept = start;
+  swept.Add(start.Transformed(slide));
+  swept.Enlarge(1e-6 * (1.0 + std::sqrt(swept.SquareExtent())));
+  TopTools_IndexedDataMapOfShapeListOfShape ancestors;
+  TopExp::MapShapesAndAncestors(shape.shape, TopAbs_EDGE, TopAbs_FACE, ancestors);
+  TopTools_IndexedMapOfShape adjacent;
+  adjacent.Add(face);
+  for (TopExp_Explorer edges(face, TopAbs_EDGE); edges.More(); edges.Next()) {
+    const int at = ancestors.FindIndex(edges.Current());
+    if (at <= 0) return false;
+    for (TopTools_ListIteratorOfListOfShape it(ancestors(at)); it.More(); it.Next()) adjacent.Add(it.Value());
+  }
+  for (TopExp_Explorer all(shape.shape, TopAbs_FACE); all.More(); all.Next()) {
+    if (adjacent.Contains(all.Current())) continue;
+    Bnd_Box other;
+    BRepBndLib::Add(all.Current(), other, Standard_False);
+    if (!swept.IsOut(other)) return false;
+  }
+  return true;
+}
+
 // Rotates the plane of one planar face about `axis` by `angle`: the new plane is all that matters (the neighbours extend), and it is the old plane
 // drafted about their common line, so DraftAngle does it. The sign of the draft angle is the one whose result has a face on the new plane.
 std::unique_ptr<Shape> rotate_planar_face(const Shape &shape, uint32_t index, const gp_Ax1 &axis, double angle) {
@@ -306,15 +341,20 @@ std::unique_ptr<Shape> delete_faces(const Shape &shape, rust::Slice<const uint32
 }
 
 std::unique_ptr<Shape> move_faces(const Shape &shape, rust::Slice<const uint32_t> faces, int32_t mode, rust::Slice<const double> a,
-                                  rust::Slice<const double> b, double value) {
+                                  rust::Slice<const double> b, double value, bool check) {
   const std::vector<TopoDS_Face> picked = picked_faces(shape.shape, faces);
   if (picked.empty() || picked.size() != faces.size() || !std::isfinite(value)) return nullptr;
   if (mode == 0) {
     if (value == 0) return nullptr;
     // one planar face with only square neighbours slides: the prism path (an order of magnitude cheaper than the whole-solid offset); a refusal falls back
-    if (picked.size() == 1 && square_neighbours(shape, picked[0])) {
-      std::unique_ptr<Shape> slid = push_pull(shape, faces[0], value);
-      if (slid && solid_count(slid->shape) == 1) return slid;
+    if (picked.size() == 1 && square_neighbours(shape, picked[0]) && prism_clear(shape, picked[0], value)) {
+      try {
+        std::unique_ptr<Shape> slid = push_pull(shape, faces[0], value);
+        // a committed move is checked like every other result (BRepCheck, positive volume); only a dry run for a ghost (check false) skips it
+        if (slid && solid_count(slid->shape) == 1 && (!check || (sound(slid->shape) && volume_of(slid->shape) > 0))) return slid;
+      } catch (const Standard_Failure &) {
+        // the prism route failed: the whole-solid offset decides
+      }
     }
     return offset_faces(shape, picked, value);
   }
