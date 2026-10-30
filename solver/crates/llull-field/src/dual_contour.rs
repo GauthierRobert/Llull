@@ -191,12 +191,6 @@ struct Mesher<'a> {
     nodes: [usize; 3],
 }
 
-#[derive(Clone, Copy)]
-struct Quad {
-    cells: [u64; 4],
-    edge: u64,
-}
-
 impl Mesher<'_> {
     fn node(&self, i: usize, j: usize, k: usize) -> u64 {
         (i + self.nodes[0] * (j + self.nodes[1] * k)) as u64
@@ -284,40 +278,59 @@ impl Mesher<'_> {
         (sheets[edge_index(ei - i, ej - j, ek - k, (edge % 3) as usize)].max(0) as u8, true)
     }
 
-    /// The quads of the three edge scans, in the order of the TypeScript mesher.
-    fn quads(&self) -> Vec<Quad> {
+    /// Ranges (i, j, k) of the grid edges along `axis` that get a quad: the edges whose four cells all exist.
+    fn scan(&self, axis: usize) -> [std::ops::Range<usize>; 3] {
         let [sx, sy, sz] = self.nodes;
-        let mut quads = Vec::new();
-        let mut push = |near: u64, far: u64, axis: u64, cells: [u64; 4]| {
-            if self.inside(near) != self.inside(far) {
-                quads.push(Quad { cells, edge: near * 3 + axis });
-            }
-        };
-        for k in 1..sz - 1 {
-            for j in 1..sy - 1 {
-                for i in 0..sx - 1 {
-                    let cells = [self.node(i, j - 1, k - 1), self.node(i, j, k - 1), self.node(i, j, k), self.node(i, j - 1, k)];
-                    push(self.node(i, j, k), self.node(i + 1, j, k), 0, cells);
+        match axis {
+            0 => [0..sx - 1, 1..sy - 1, 1..sz - 1],
+            1 => [1..sx - 1, 0..sy - 1, 1..sz - 1],
+            _ => [1..sx - 1, 1..sy - 1, 0..sz - 1],
+        }
+    }
+
+    fn crossed(&self, i: usize, j: usize, k: usize, axis: usize) -> bool {
+        let far = self.node(i + usize::from(axis == 0), j + usize::from(axis == 1), k + usize::from(axis == 2));
+        self.inside(self.node(i, j, k)) != self.inside(far)
+    }
+
+    /// Number of quads (crossed edges of the three scans), counted in parallel without storing anything.
+    fn quad_count(&self) -> u64 {
+        (0..3)
+            .map(|axis| {
+                let [is, js, ks] = self.scan(axis);
+                ks.into_par_iter()
+                    .map(|k| js.clone().map(|j| is.clone().filter(|&i| self.crossed(i, j, k, axis)).count() as u64).sum::<u64>())
+                    .sum::<u64>()
+            })
+            .sum()
+    }
+
+    /// The crossed edges (key = node * 3 + axis) of the three edge scans, in the order of the TypeScript mesher.
+    fn quad_edges(&self, capacity: usize) -> Vec<u64> {
+        let mut edges = Vec::with_capacity(capacity);
+        for axis in 0..3 {
+            let [is, js, ks] = self.scan(axis);
+            for k in ks {
+                for j in js.clone() {
+                    for i in is.clone() {
+                        if self.crossed(i, j, k, axis) {
+                            edges.push(self.node(i, j, k) * 3 + axis as u64);
+                        }
+                    }
                 }
             }
         }
-        for k in 1..sz - 1 {
-            for j in 0..sy - 1 {
-                for i in 1..sx - 1 {
-                    let cells = [self.node(i - 1, j, k - 1), self.node(i, j, k - 1), self.node(i, j, k), self.node(i - 1, j, k)];
-                    push(self.node(i, j, k), self.node(i, j + 1, k), 1, cells);
-                }
-            }
+        edges
+    }
+
+    /// The four cells around the crossed edge `edge`, in the order a, b, c, d of the TypeScript quad.
+    fn quad_cells(&self, edge: u64) -> [u64; 4] {
+        let (i, j, k) = self.decode(edge / 3);
+        match edge % 3 {
+            0 => [self.node(i, j - 1, k - 1), self.node(i, j, k - 1), self.node(i, j, k), self.node(i, j - 1, k)],
+            1 => [self.node(i - 1, j, k - 1), self.node(i, j, k - 1), self.node(i, j, k), self.node(i - 1, j, k)],
+            _ => [self.node(i - 1, j - 1, k), self.node(i, j - 1, k), self.node(i, j, k), self.node(i - 1, j, k)],
         }
-        for k in 0..sz - 1 {
-            for j in 1..sy - 1 {
-                for i in 1..sx - 1 {
-                    let cells = [self.node(i - 1, j - 1, k), self.node(i, j - 1, k), self.node(i, j, k), self.node(i - 1, j, k)];
-                    push(self.node(i, j, k), self.node(i, j, k + 1), 2, cells);
-                }
-            }
-        }
-        quads
     }
 }
 
@@ -339,19 +352,20 @@ pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triang
         return Ok(DualContoured { mesh: IsoMesh { positions: Vec::new(), indices: Vec::new() }, split_cells: 0 });
     }
     let mesher = Mesher { evaluator, grid, signs, nodes };
-    let quads = mesher.quads();
-    let triangles = 2 * quads.len() as u64;
+    let quad_count = mesher.quad_count();
+    let triangles = 2 * quad_count;
     if triangles > max_triangles {
         return Err(OverBudget(triangles));
     }
+    let quads = mesher.quad_edges(quad_count as usize);
     // Vertices (a cell and its sheet) in the order of first use (a, b, c, d of each quad), numbered like the TypeScript `vertexOf`.
     let mut index_of: HashMap<u64, u32, KeyBuild> = HashMap::with_hasher(KeyBuild::default());
     let mut verts: Vec<(u64, u8)> = Vec::new();
     let mut split: HashSet<u64, KeyBuild> = HashSet::with_hasher(KeyBuild::default());
     let mut corners: Vec<[u32; 4]> = Vec::with_capacity(quads.len());
-    for quad in &quads {
-        corners.push(quad.cells.map(|cell| {
-            let (sheet, ambiguous) = mesher.sheet_of(cell, quad.edge);
+    for &edge in &quads {
+        corners.push(mesher.quad_cells(edge).map(|cell| {
+            let (sheet, ambiguous) = mesher.sheet_of(cell, edge);
             if ambiguous {
                 split.insert(cell);
             }
@@ -388,8 +402,8 @@ pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triang
         hypot3(p[0] - q[0], p[1] - q[1], p[2] - q[2])
     };
     let mut indices: Vec<u32> = Vec::with_capacity(quads.len() * 6);
-    for (quad, &[a, b, c, d]) in quads.iter().zip(&corners) {
-        let n = datum(quad.edge).n;
+    for (&edge, &[a, b, c, d]) in quads.iter().zip(&corners) {
+        let n = datum(edge).n;
         let ring = if dist(a, c) <= dist(b, d) { [a, b, c, a, c, d] } else { [b, c, d, b, d, a] };
         let (p, q, r) = (vertices[ring[0] as usize], vertices[ring[1] as usize], vertices[ring[2] as usize]);
         let (u, w) = ([q[0] - p[0], q[1] - p[1], q[2] - p[2]], [r[0] - p[0], r[1] - p[1], r[2] - p[2]]);
@@ -493,6 +507,87 @@ mod tests {
         let contoured = dual_contour(&ev, &grid, &signs, u64::MAX).unwrap();
         assert!(contoured.split_cells > 0, "the faces along the shared edge are ambiguous");
         assert!(is_closed_manifold(contoured.mesh.positions.len() / 3, &contoured.mesh.indices));
+    }
+
+    fn pattern(bits: u32) -> [bool; 8] {
+        std::array::from_fn(|c| bits >> c & 1 == 1)
+    }
+
+    fn has_ambiguous_face(inside: &[bool; 8]) -> bool {
+        faces().iter().any(|(corners, _)| (0..4).all(|k| inside[corners[k]] != inside[corners[(k + 1) % 4]]))
+    }
+
+    #[test]
+    fn a_cell_has_sheets_exactly_when_a_face_is_ambiguous_over_all_256_sign_patterns() {
+        for bits in 0..256 {
+            let inside = pattern(bits);
+            let sheets = cell_sheets(&inside);
+            assert_eq!(sheets.is_some(), has_ambiguous_face(&inside), "pattern {bits:08b}");
+            if let Some(sheets) = sheets {
+                for (idx, &sheet) in sheets.iter().enumerate() {
+                    let (d, axis) = (idx / 3, idx % 3);
+                    let near = match axis {
+                        0 => [0, d >> 1, d & 1],
+                        1 => [d >> 1, 0, d & 1],
+                        _ => [d >> 1, d & 1, 0],
+                    };
+                    let mut far = near;
+                    far[axis] = 1;
+                    let bit = |c: [usize; 3]| c[0] + 2 * c[1] + 4 * c[2];
+                    assert_eq!(
+                        sheet >= 0,
+                        inside[bit(near)] != inside[bit(far)],
+                        "edge {idx} of pattern {bits:08b} is on a sheet iff crossed"
+                    );
+                    assert!(sheet <= idx as i8, "a sheet is named by its smallest edge");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_cell_across_an_ambiguous_face_pairs_the_same_physical_edges() {
+        // The mirror cell across the x = 1 plane: its corner (1 - cx, cy, cz) has the sign of the corner (cx, cy, cz).
+        let mut checked = 0;
+        for bits in 0..256 {
+            let a = pattern(bits);
+            let b: [bool; 8] = std::array::from_fn(|c| a[c ^ 1]);
+            let (Some(sa), Some(sb)) = (cell_sheets(&a), cell_sheets(&b)) else { continue };
+            let face = |x: usize| -> [usize; 4] {
+                [edge_index(x, 0, 0, 1), edge_index(x, 0, 0, 2), edge_index(x, 1, 0, 2), edge_index(x, 0, 1, 1)]
+            };
+            let (on_a, on_b) = (face(1), face(0));
+            for p in 0..4 {
+                for q in 0..4 {
+                    assert_eq!(sa[on_a[p]] == sa[on_a[q]], sb[on_b[p]] == sb[on_b[q]], "pattern {bits:08b}, edges {p} {q}");
+                }
+            }
+            checked += 1;
+        }
+        assert!(checked > 0);
+    }
+
+    #[test]
+    fn two_inside_corners_on_a_face_diagonal_are_one_sheet_the_inside_stays_connected() {
+        // corners 0 = (0,0,0) and 3 = (1,1,0) inside, the rest outside: the surface wraps both as one piece
+        let mut inside = [false; 8];
+        inside[0] = true;
+        inside[3] = true;
+        let sheets = cell_sheets(&inside).expect("the face z = 0 is ambiguous");
+        let crossed: Vec<i8> = sheets.iter().copied().filter(|&s| s >= 0).collect();
+        assert_eq!(crossed.len(), 6);
+        assert!(crossed.iter().all(|&s| s == crossed[0]), "one sheet, not two: {sheets:?}");
+    }
+
+    #[test]
+    fn the_budget_is_counted_before_any_quad_is_stored() {
+        // A checkerboard crosses every edge: 3 (n - 1) (n - 2)^2 = 79.6 million quads for n = 300, which as stored quads would take gigabytes.
+        let n: usize = 300;
+        let grid = Grid::new([0.0; 3], [(n - 1) as f64; 3], 1.0).unwrap();
+        let signs: Vec<u8> = (0..n * n * n).map(|id| ((id % n + id / n % n + id / (n * n)) % 2) as u8).collect();
+        let ev = cube(1.0);
+        let quads = 3 * (n as u64 - 1) * (n as u64 - 2).pow(2);
+        assert_eq!(dual_contour(&ev, &grid, &signs, 10).err(), Some(OverBudget(2 * quads)));
     }
 
     #[test]

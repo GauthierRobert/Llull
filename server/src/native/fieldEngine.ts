@@ -178,7 +178,6 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
     evaluate(program, points, withGradient): FieldSamples {
       if (programError(program) !== null) return tsFieldEngine.evaluate(program, points, withGradient);
       const count = Math.floor(points.length / 3);
-      const empty = { values: new Float64Array(0), gradients: null, nonFinite: 0 };
       return guarded<FieldSamples>(
         count,
         () => {
@@ -197,8 +196,8 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
         },
         () => tsFieldEngine.evaluate(program, points, withGradient),
         (r) => ({
-          ...empty,
           values: new Float64Array(count).fill(NaN),
+          gradients: withGradient ? new Float64Array(3 * count).fill(NaN) : null,
           nonFinite: count,
           failure: { code: 'IMP_ENGINE_FAILED', message: r.message },
         }),

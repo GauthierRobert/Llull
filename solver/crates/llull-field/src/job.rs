@@ -98,6 +98,14 @@ fn over_budget(job: &Job, grid: &Grid) -> Option<Value> {
         (_, Some(Request::Quantile { .. })) => (grid.cell_count(), job.max_samples.min(QUANTILE_CELLS)),
         _ => (grid.cell_count(), job.max_samples),
     };
+    if count > limit && job.op == "mesh" && job.mesher == "dual_contouring" && limit < job.max_samples {
+        return Some(refusal(
+            "IMP_GRID_BUDGET",
+            format!("{count} samples exceed the dual-contouring limit of {limit} grid nodes (2^29); use mesher tetra or a coarser voxel"),
+            Some(count),
+            Some(limit),
+        ));
+    }
     (count > limit)
         .then(|| refusal("IMP_GRID_BUDGET", format!("{count} samples exceed the llull-field limit of {limit}"), Some(count), Some(limit)))
 }
@@ -178,12 +186,18 @@ fn tetra_mesh(
 }
 
 /// Sign of every node (1 = value < 0, after the zero snap), x fastest, from the interval-pruned planes.
-fn sign_grid(evaluator: &Evaluator, tiles: &Tiles, grid: &Grid) -> (Vec<u8>, PlaneStats) {
+fn sign_grid(evaluator: &Evaluator, tiles: &Tiles, grid: &Grid, out: &mut impl Write) -> (Vec<u8>, PlaneStats) {
     let [sx, sy, sz] = grid.nodes();
     let mut signs = vec![0u8; sx * sy * sz];
     let mut plane = vec![0.0; sx * sy];
     let mut stats = PlaneStats::default();
+    let mut last = 0;
     for (k, slab) in signs.chunks_exact_mut(sx * sy).enumerate().take(sz) {
+        let percent = k * 20 / sz.max(1);
+        if percent != last {
+            last = percent;
+            let _ = emit(out, &Event::Progress { step: k as u64, total: sz as u64, message: "meshing", detail: None });
+        }
         stats = stats.add(fill_plane(evaluator, tiles, grid, k, &mut plane));
         slab.par_iter_mut().zip(plane.par_iter()).for_each(|(sign, &value)| *sign = u8::from(value < 0.0));
     }
@@ -200,8 +214,10 @@ fn mesh_job(
 ) -> Result<Value, JobError> {
     let tiles = Tiles::classify(evaluator, grid);
     let meshed = if job.mesher == "dual_contouring" {
-        let (signs, stats) = sign_grid(evaluator, &tiles, grid);
-        match dual_contour(evaluator, grid, &signs, job.max_triangles) {
+        let (signs, stats) = sign_grid(evaluator, &tiles, grid, out);
+        let contoured = dual_contour(evaluator, grid, &signs, job.max_triangles);
+        drop(signs);
+        match contoured {
             Err(OverBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
             Ok(contoured) if is_closed_manifold(contoured.mesh.positions.len() / 3, &contoured.mesh.indices) => {
                 Meshed { mesh: contoured.mesh, stats, mesher: "dual_contouring", fallback: false, split_cells: contoured.split_cells }

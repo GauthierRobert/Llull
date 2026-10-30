@@ -189,3 +189,86 @@ fn measures_the_node_sign_grid_for_thickness_analyses() {
     fs::remove_dir_all(&dir).unwrap();
     fs::remove_dir_all(&refused).unwrap();
 }
+
+fn saddle_program() -> Value {
+    json!({
+        "instructions": [{"op": "x", "args": []}, {"op": "y", "args": []}, {"op": "mul", "args": [0, 1]}],
+        "output": 2, "meshes": 0, "strutSets": []
+    })
+}
+
+fn dual_job(program: Value, patch: Value) -> Value {
+    let mut job = json!({
+        "op": "mesh", "program": program, "grid": grid(), "maxSamples": 1u64 << 30, "maxTriangles": 5_000_000,
+        "mesher": "dual_contouring", "maxDualContouringSamples": 1u64 << 29
+    });
+    job.as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+    job
+}
+
+#[test]
+fn evaluates_value_and_gradient_when_asked() {
+    let job = json!({"op": "evaluate", "program": sphere_program(), "points": 2, "gradient": true});
+    let dir = folder("gradient", &job);
+    fs::write(dir.join("points.f64"), f64s(&[2.0, 0.0, 0.0, 0.0, 3.0, 0.0])).unwrap();
+    let (outputs, _) = run_job(&dir);
+    let names: Vec<&str> = outputs.iter().map(|o| o.path.as_str()).collect();
+    assert_eq!(names, ["values.f64", "gradients.f64", "report.json"]);
+    let read = |name: &str| -> Vec<f64> {
+        fs::read(dir.join(name)).unwrap().chunks_exact(8).map(|b| f64::from_le_bytes(b.try_into().unwrap())).collect()
+    };
+    assert_eq!(read("values.f64"), [-2.0, -1.0]);
+    assert_eq!(read("gradients.f64"), [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], "three numbers per point, the unit direction away from the centre");
+    let plain = json!({"op": "evaluate", "program": sphere_program(), "points": 2});
+    let dir2 = folder("no-gradient", &plain);
+    fs::write(dir2.join("points.f64"), f64s(&[2.0, 0.0, 0.0, 0.0, 3.0, 0.0])).unwrap();
+    let (outputs, _) = run_job(&dir2);
+    assert!(outputs.iter().all(|o| o.path != "gradients.f64"));
+    fs::remove_dir_all(&dir).unwrap();
+    fs::remove_dir_all(&dir2).unwrap();
+}
+
+#[test]
+fn dual_contouring_reports_its_mesher_and_streams_progress() {
+    let dir = folder("dc", &dual_job(sphere_program(), json!({})));
+    let (_, events) = run_job(&dir);
+    let r = report(&dir);
+    assert_eq!(
+        (r["mesher"].as_str(), r["mesherFallback"].as_bool(), r["splitCells"].as_u64()),
+        (Some("dual_contouring"), Some(false), Some(0))
+    );
+    assert_eq!(r["closedManifold"], true);
+    assert!(r["triangles"].as_u64().unwrap() > 0);
+    assert!(events.contains("\"type\":\"progress\""), "the sign grid reports progress: {events}");
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_dual_contouring_mesh_that_stays_open_falls_back_to_the_tetrahedra_as_a_whole() {
+    let dir = folder("dc-fallback", &dual_job(saddle_program(), json!({})));
+    run_job(&dir);
+    let r = report(&dir);
+    assert_eq!((r["mesher"].as_str(), r["mesherFallback"].as_bool(), r["splitCells"].as_u64()), (Some("tetra"), Some(true), Some(0)));
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn dual_contouring_refuses_above_its_cap_by_name_and_above_the_triangle_budget() {
+    let refuse = |name: &str, patch: Value| {
+        let dir = folder(name, &dual_job(sphere_program(), patch));
+        run_job(&dir);
+        let r = report(&dir);
+        fs::remove_dir_all(&dir).unwrap();
+        r["refusal"].clone()
+    };
+    let capped = refuse("dc-cap", json!({"maxDualContouringSamples": 10}));
+    assert_eq!((capped["code"].as_str(), capped["limit"].as_u64()), (Some("IMP_GRID_BUDGET"), Some(10)));
+    let message = capped["message"].as_str().unwrap();
+    assert!(
+        message.contains("dual-contouring limit") && message.contains("mesher tetra") && message.contains("coarser voxel"),
+        "{message}"
+    );
+    let triangles = refuse("dc-tri", json!({"maxTriangles": 50}));
+    assert_eq!(triangles["code"], "IMP_TRIANGLE_BUDGET");
+    assert!(triangles["samples"].as_u64().unwrap() > 50, "the exact count of the crossed edges, before any datum is computed");
+}

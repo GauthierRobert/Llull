@@ -24,6 +24,7 @@ describe('dual contouring', () => {
     if (!dc.ok || !tet.ok) throw new Error('mesh refused');
     expect(dc.mesher).toBe('dual_contouring');
     expect(dc.mesherFallback).toBe(false);
+    expect(dc.splitCells).toBe(0);
     expect(dc.closedManifold).toBe(true);
     const errDc = Math.abs(meshMeasures(dc.mesh).volume - exact) / exact;
     const errTet = Math.abs(meshMeasures(tet.mesh).volume - exact) / exact;
@@ -40,6 +41,7 @@ describe('dual contouring', () => {
     const exact = (4 / 3) * Math.PI * 8;
     expect(Math.abs(meshMeasures(result.mesh).volume - exact) / exact).toBeLessThan(0.005);
     expect(result.closedManifold).toBe(true);
+    expect(result.splitCells).toBe(0);
   });
 
   it('falls back to the tetrahedra when the result is not a closed manifold surface', () => {

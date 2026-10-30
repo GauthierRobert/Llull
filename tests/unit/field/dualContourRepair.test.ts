@@ -150,6 +150,8 @@ describe('dual contouring: cells at ambiguous faces are repaired, everything els
     const result = meshOf(p, { min: [-2, -2, -2], max: [10, 10, 5], voxel: 1 }, 'dual_contouring');
     expect(result).toMatchObject({ mesher: 'dual_contouring', mesherFallback: false, closedManifold: true });
     expect(result.splitCells).toBeGreaterThan(0);
+    // pins the resolution of the ambiguous face (the outside corners are cut off, the inside stays connected): the opposite rule gives 196 vertices
+    expect([result.splitCells, result.mesh.indices.length / 3, result.mesh.positions.length / 3]).toEqual([5, 384, 194]);
   });
 
   it('a body that is still not a closed manifold after the repair falls back to the tetrahedra as a whole', () => {

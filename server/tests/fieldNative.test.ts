@@ -407,6 +407,18 @@ describe('native field engine without a working binary', () => {
     expect(props.data['volumeQuadrature']).toBeDefined();
   });
 
+  it('a refused evaluate with gradients answers NaN-filled values and gradients, like the TS engine', () => {
+    if (missing === null) throw new Error('an explicit binary path always builds an engine');
+    const b = new FieldBuilder('mm');
+    const program = b.finish(b.x(), { bounds: null, lipschitz: 1, quality: 'exact' });
+    const count = tsFieldEngine.limits.maxSamples + 1;
+    const refused = missing.evaluate(program, new Float64Array(3 * count), true);
+    expect(refused.failure?.code).toBe('IMP_ENGINE_FAILED');
+    expect([refused.values.length, refused.gradients?.length]).toEqual([count, 3 * count]);
+    expect([Number.isNaN(refused.values[0]), Number.isNaN(refused.gradients?.[0])]).toEqual([true, true]);
+    expect(missing.evaluate(program, new Float64Array(3 * count), false).gradients).toBeNull();
+  });
+
   it('delegates malformed programs to the TS engine', () => {
     if (missing === null) throw new Error('an explicit binary path always builds an engine');
     const bad = {
