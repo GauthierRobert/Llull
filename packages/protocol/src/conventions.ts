@@ -364,4 +364,42 @@ and fills the corner with a G1 patch. Profile blends, setback patches and \`blen
 
 Read \`check_blends\`: \`status\` pass / warn / fail, per blend face the contacts (gap, \`g1AngleRad\`, \`order\`) and the realised radius, and coded findings (BLD_CHECK_*). A circular
 fillet is G1 to a plane, never G2: ask for \`require: "G2"\` only with a curvature profile. Not offered (no param exists): partial fillets, cliff / trim modes of face blends, G3 blends.
+
+---
+
+## 15. Wrap, project and emboss on faces (toolset 3d, native kernel)
+
+Put flat 2D artwork (sketch curves, font text) onto a face of a solid. All need the native kernel; give the face by \`faceNear\` (a world point on it) or \`faceIndex\` (\`inspect_faces\`).
+
+| Goal | Command | Keeps |
+| ---- | ------- | ----- |
+| curves lying on a face | \`wrap_to_face\` (develop: plane / cylinder / cone; geodesic or parametric: sphere / torus, stretch reported) | every length (develop) |
+| curves dropped along a direction | \`project_to_face\` | nothing: a chord becomes a longer arc (data.curves[i].lengthStrain) |
+| raised / sunk / split / grooved lettering | \`emboss_on_face\` mode emboss, deboss, scribe or engrave (\`toolWidth\`) | the closed-form volume change (data.expectedVolumeDelta) |
+| the same profile repeated on a face | \`pattern_on_face\` | one exact operation |
+| paint only (never in STL / STEP) | \`add_decal\` (mapping "wrap" on cylinders / cones) | — |
+| knurl | \`add_knurl\` (cosmetic note; model \`geometry\` cuts straight grooves) | teeth close round: the pitch may be adjusted (warning) |
+
+Loop: sketch the profiles flat (z = 0), \`wrap_to_face\` or \`emboss_on_face\` with \`placement\` (anchor a sketch point on a face point, \`angleDeg\`, mirror), then \`check_wrap\`
+(length strain, volume against the closed form, deboss depth, \`minFeatureSize\` stroke width, unpinned fonts) and \`render_view\`. Reading the refusals: WRP_FACE_NOT_DEVELOPABLE
+(use geodesic / parametric, or a cylinder / cone face), WRP_WRAP_OVERLAP (wider than one turn: shrink or split), WRP_OUTSIDE_FACE (move the anchor), WRP_DISTORTION_EXCEEDED
+(smaller artwork or a larger \`maxLengthStrain\`), WRP_PROJECTION_MISSES_FACE (direction or faces). Fonts: \`import_font\` with \`sourceSha256\`, else results are marked unverified.
+
+---
+
+## 16. Implicit fields, lattices and infill (toolset implicit)
+
+An implicit body is a FIELD (signed distance: negative inside, document units) realised as a closed mesh. Fields never fail geometrically: combine freely, then realise once.
+
+1. Build fields: \`add_field_primitive\` (exact SDF shapes), \`field_from_solid\` (any closed solid), lattices \`add_tpms_lattice\` (gyroid, schwarz_p, diamond ...),
+   \`add_strut_lattice\`, \`add_graph_lattice\` (from sketched curves), \`add_voronoi_lattice\`; grade a thickness or level with \`create_scalar_field\`.
+2. Edit: \`combine_fields\` (union / intersect / subtract; optional \`blend\` quadratic, exponential or chamfer), \`offset_field\`, \`shell_field\`, \`transform_field\`, \`edit_field\` (change a node:
+   every body built on it is re-derived), \`delete_field\`.
+3. Realise: \`create_implicit_body\` (a derived, read-only mesh: change the field, not the mesh). Shortcut for "lighten this part": \`infill_solid\` (skin of \`wall\` + lattice core).
+4. Check: \`check_implicit\` (closed, manifold, IMP_TRAPPED_VOID, IMP_DISCONNECTED; walls and struts only against the \`process\` limits you pass: no printer
+   table ships), \`implicit_properties\` (volume with an error estimate, area, relative density, voids), \`lattice_properties\`,
+   \`section_field\` (a planar cut as numbers), \`evaluate_field\` (sample values).
+
+Bodies are re-derived on load from their field recipes (\`regenerate_implicit_bodies\` forces it). Resolution and cell size drive the triangle count: lower the
+resolution for a preview, raise it before export.
 `;

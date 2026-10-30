@@ -145,7 +145,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
   (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
-  - draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), llull guide WRP section (AF-03), UI render overlays
+  - draft (VC-25/26), silhouette split, STEP round trip of an embossed solid (VC-32), UI render overlays
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
@@ -154,7 +154,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **DES-5c** 05 IMP left after M0–M6 (M4–M6 done 2026-10-25, §14.7): surface-UV cell maps + maps for strut lattices;
   scalar kinds `topology_density` / `fea_result` (VC-IMP-29); numerical homogenisation on `llull-voxfe`; BVH for explicit strut sets (lift the
   5000-beam cap, faster Voronoi realise); native `gradient` + native dual contouring + per-cell DC fallback; 3MF file sink (export above the
-  ~8M-triangle base64 ceiling); GPU preview; `llull guide` implicit section; a plain field reading a body restored as a coarse proxy (no asset store) still evaluates the proxy. _Lane 1 + native_ _deps: —_
+  ~8M-triangle base64 ceiling); GPU preview; a plain field reading a body restored as a coarse proxy (no asset store) still evaluates the proxy. _Lane 1 + native_ _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
 

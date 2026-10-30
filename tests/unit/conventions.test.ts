@@ -146,3 +146,33 @@ describe('CONVENTIONS_GUIDE blends section (BLD, AF-03)', () => {
     expect(section).toMatch(/partial fillets, cliff \/ trim modes/);
   });
 });
+
+describe('CONVENTIONS_GUIDE wrap / emboss (03 WRP AF-03) and implicit (05 IMP) sections', () => {
+  const sectionOf = (title: string, next: string | null): string => {
+    const start = CONVENTIONS_GUIDE.indexOf(title);
+    expect(start).toBeGreaterThan(0);
+    return CONVENTIONS_GUIDE.slice(start, next === null ? undefined : CONVENTIONS_GUIDE.indexOf(next));
+  };
+
+  it('the wrap section names the wrap, projection, emboss, decal, knurl and check commands and the refusal codes', () => {
+    const section = sectionOf('## 15. Wrap, project and emboss on faces', '## 16.');
+    for (const word of ['wrap_to_face', 'project_to_face', 'emboss_on_face', 'pattern_on_face', 'add_decal', 'add_knurl', 'check_wrap'])
+      expect(section).toContain(word);
+    for (const code of ['WRP_FACE_NOT_DEVELOPABLE', 'WRP_WRAP_OVERLAP', 'WRP_OUTSIDE_FACE', 'WRP_DISTORTION_EXCEEDED'])
+      expect(section).toContain(code);
+  });
+
+  it('the implicit section walks fields, edits, realisation and checks', () => {
+    const section = sectionOf('## 16. Implicit fields, lattices and infill', null);
+    for (const word of [
+      'add_tpms_lattice',
+      'combine_fields',
+      'create_implicit_body',
+      'infill_solid',
+      'check_implicit',
+      'implicit_properties',
+    ])
+      expect(section).toContain(word);
+    expect(section).toContain('IMP_TRAPPED_VOID');
+  });
+});
