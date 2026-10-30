@@ -83,6 +83,7 @@ struct Stats {
   double min_determinant = 1;
   double curve_error = 0;
   int faces = 0;
+  long fit_points = 0;  // nodes of all the face fits
   int edges = 0;
   int split_faces = 0;
   bool ring = false;
@@ -102,6 +103,7 @@ void publish(const Stats &stats) {
   json.key("surfaceError").number(stats.surface_error);
   json.key("curveError").number(stats.curve_error);
   json.key("faces").integer(stats.faces);
+  json.key("fitPoints").number(static_cast<double>(stats.fit_points));
   json.key("edges").integer(stats.edges);
   json.key("splitFaces").integer(stats.split_faces);
   json.key("ring").boolean(stats.ring);
@@ -140,6 +142,7 @@ class WarpModification : public BRepTools_Modification {
     stats_.surface_error = std::max(stats_.surface_error, fit.error);
     stats_.min_determinant = std::min(stats_.min_determinant, fit.min_determinant);
     ++stats_.faces;
+    stats_.fit_points += fit.points;
     if (!fit.ok || fit.surface.IsNull()) {
       stats_.code = "DEF_APPROX_TOLERANCE";
       stats_.message = "a face approximation reaches " + std::to_string(fit.error) + " against the allowed " + std::to_string(wanted);

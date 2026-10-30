@@ -865,3 +865,22 @@ the chord rule never stops splitting until the 4 M triangle cap. The cap was the
 
 Tests: `tests/unit/deform/flowSheetBase.test.ts` (the focal check switched off by the test-only `focalCheck.enabled`; both kernels; refusal `DEF_APPROX_TOLERANCE` in seconds; red-proof: without the
 progress check it ends by the work bound with `DEF_BUDGET_EXCEEDED`, no longer within seconds), `server/tests/nativeKernelFlowSheet.test.ts` (the exact path).
+
+### 17.8 Non-uniform fit grid (the point push on a 100 mm slab)
+
+The exact warp fitted every face by a cubic C2 interpolant on a uniform grid whose segment count doubled until the deviation at the cell middles and quarter points was within the tolerance share.
+A push of radius 10 on a 100 x 100 x 20 slab therefore put a grid fine enough for the 10 mm support on the whole 100 mm face (263 294 nodes at tolerance 1e-3).
+
+- **Per-interval refinement** (`deform_fit.hxx`, `Axis`). Each direction keeps its own node list (parameters index / den). After a fit the deviation of every u interval, v interval and cell is measured; an interval above the
+  tolerance share is halved, the others keep their nodes. When only cell middles deviate, everything is halved in both directions. A direction where a quarter of the intervals or more deviate
+  is refined everywhere, exactly as the uniform doubling did (the node parameters are then bit-identical, so twists, bends and the VC-DEF numbers do not move); only a localised law (a point push, a
+  lattice cell, a narrow region) refines just where it acts. The limits are unchanged (512 segments per direction, 400 000 nodes, then `DEF_APPROX_TOLERANCE`).
+- **What changes.** The tolerance guarantee is the same (the deviation at every interval's quarter points is within the allowed share, checked on the final grid; `maxError` of the report is that
+  measurement). Where the push covers the whole face the result is the uniform grid. The achieved deviation sits closer to the tolerance than before (maxError 1.1e-5 -> 5.2e-5 for the 1e-3 push), still far
+  below it; the volume agrees with the uniform fit to 6e-9 relative (200235.6183 vs 200235.6195, closed form 200235.6194). The report gains `fitPoints` (nodes of all the face fits).
+- **Measured** (release, 100 x 100 x 20 slab, push r 10, d 3, smooth_c2): fit nodes 263 294 -> 22 926; the warp 914 ms -> 260 ms. Through the server (command + mass + analysis): 21.7 s -> 10.0 s at tolerance
+  1e-3, 24.8 s -> 20.5 s at 1e-4, 14.4 s -> 9.4 s for r 25 d 4. What is left is the mass integration of the many-knot B-spline faces (§17.9), tessellation and the analysis.
+- **Fix found on the way.** The `base_unconverged` flag of the base-sheet solve (§17.6) was a shared static: parallel warps (cargo tests) set it for each other. It is now thread-local.
+
+Tests: `deform_tests.rs` `a_local_push_on_a_wide_slab_refines_the_fit_only_where_it_acts` (fit nodes < 40 000, volume = box + cap, maxError within the tolerance; red-proof: forcing uniform refinement gives
+263 294 nodes and fails it). The 26 `deform` cargo tests and `nativeKernel*` suites keep their numbers.

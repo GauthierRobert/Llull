@@ -440,9 +440,9 @@ inline void base_residual(const FlowSurface &table, double x, double y, double w
 }
 
 // Set when a base solve ended with a large residual (a point past the table or at a centre of curvature): the warp then refuses instead of returning the
-// last iterate. The sidecar is single threaded.
+// last iterate. One per thread (the cargo tests run many warps in one process).
 inline bool &base_unconverged() {
-  static bool flag = false;
+  static thread_local bool flag = false;
   return flag;
 }
 

@@ -359,3 +359,18 @@ fn a_feature_on_a_deformed_body_keeps_the_adaptive_mass_rule() {
     }
     panic!("no edge of the twisted box fillets");
 }
+
+#[test]
+fn a_local_push_on_a_wide_slab_refines_the_fit_only_where_it_acts() {
+    // 01 DEF 17.8: the fit nodes concentrate in the push support (r 10) of a 100 mm slab; the volume stays dV = d pi r^2 / 4 of the cap
+    let slab = entity("box", json!({ "size": [100, 100, 20], "position": [0, 0, 10] }));
+    let push =
+        json!({ "kind": "point", "center": [0, 0, 20], "direction": [0, 0, 1], "distance": 3, "radius": 10, "falloff": "smooth_c2" });
+    let built = build(&node(&slab, push, None, 1e-3, [0.0; 3]));
+    let points = built.report["fitPoints"].as_f64().unwrap();
+    // the uniform fit of the same body needed 263294 nodes (maxError 1.1e-5)
+    assert!(points < 40000.0, "fit nodes {points}");
+    assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+    let cap = 3.0 * PI * 100.0 / 4.0;
+    assert!((built.volume - (200000.0 + cap)).abs() < 2e-3, "volume {}", built.volume);
+}
