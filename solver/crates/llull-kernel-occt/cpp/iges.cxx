@@ -3,6 +3,7 @@
 // without it `iges_available()` is false and the reader answers `unavailable`. IGES calls are not thread-safe in OCCT: the sidecar is
 // single-threaded, so they are serialised by construction.
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -46,7 +47,7 @@ double metres_per_unit(const std::string &unit) {
 class TemporaryFile {
  public:
   explicit TemporaryFile(const std::string &text) {
-    static unsigned counter = 0;
+    static std::atomic<unsigned> counter{0};
     std::error_code error;
     const std::string name = "llull-iges-" + std::to_string(++counter) + "-" + std::to_string(reinterpret_cast<std::uintptr_t>(this)) + ".igs";
     path_ = (std::filesystem::temp_directory_path(error) / name).string();

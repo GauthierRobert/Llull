@@ -1,6 +1,7 @@
 // B-spline fits of a deformed surface F(S) and a deformed curve F(C) within a tolerance (01 DEF §5.6 steps 4a, 4c). A fit is the cubic C2
-// interpolation (not-a-knot, BSplCLib::Interpolate) of F on a uniform parameter grid, refined per direction until the deviation at the cell middles
-// and quarter points is within the tolerance. The fitted geometry keeps the (u, v) / t parameterisation of the source, which is what keeps every
+// interpolation (not-a-knot, BSplCLib::Interpolate) of F on a tensor grid of parameter nodes, refined per direction INTERVAL by interval (an interval whose
+// deviation at its middle and quarter points exceeds the tolerance is halved, the others keep their nodes: a localised map is resolved where it acts and a
+// law that deviates everywhere refines everywhere, as the uniform doubling did) until every cell middle and quarter point deviates by less than the tolerance. The fitted geometry keeps the (u, v) / t parameterisation of the source, which is what keeps every
 // curve on surface of the face valid. (GeomConvert_ApproxSurface over an Adaptor3d_Surface was tried first: its own error estimate accepted fits
 // that were 0.1 mm off on a tapered cylinder, so it is no guarantee; GeomAPI_PointsToBSplineSurface::Interpolate returned garbage above 128 nodes.)
 #pragma once
@@ -30,6 +31,7 @@ namespace deform {
 
 struct SurfaceFit {
   Handle(Geom_BSplineSurface) surface;
+  long points = 0;  // nodes of the grid the surface interpolates
   double error = 0;
   // Smallest det J of the map found on the face (central differences on a coarse grid of the box): <= 0 means the map folds the body there.
   double min_determinant = 1;
@@ -69,14 +71,65 @@ constexpr long kMaxFitPoints = 400000;
 // The fit is refined to this share of the tolerance: the interpolation error is not zero-mean, and the integrals (volume, area) of the result stay closer to the closed form.
 constexpr double kOverFit = 0.125;
 
-// Not-a-knot cubic B-spline basis through n + 1 uniform nodes of [low, high]: the parameters, the flat and the distinct knots (n >= 4).
+// The nodes of one direction of a fit: the parameters index / den of [low, high] (den doubles when an interval is halved, so a fully refined direction is the uniform
+// grid with the same parameters, bit for bit, as the uniform doubling produced).
+struct Axis {
+  std::vector<long> index{0, 1, 2, 3, 4};
+  long den = kStartSegments;
+  int intervals() const { return static_cast<int>(index.size()) - 1; }
+  double at(double low, double high, long k) const { return low + (high - low) * static_cast<double>(k) / static_cast<double>(den); }
+  // fraction of [low, high] of the point a (0..1) inside interval i
+  double inside(int i, double a) const {
+    const long first = index[static_cast<size_t>(i)], last = index[static_cast<size_t>(i) + 1];
+    return (static_cast<double>(first) + a * static_cast<double>(last - first)) / static_cast<double>(den);
+  }
+  double node(int i) const { return static_cast<double>(index[static_cast<size_t>(i)]) / static_cast<double>(den); }
+  // Halve the intervals flagged in `split` (all indices double first, so the midpoints stay integers).
+  void refine(const std::vector<char> &split) {
+    den *= 2;
+    std::vector<long> next;
+    for (size_t i = 0; i < index.size(); ++i) {
+      next.push_back(2 * index[i]);
+      if (i < split.size() && split[i] != 0) next.push_back(index[i] + index[i + 1]);
+    }
+    index = next;
+    grade();
+  }
+  // 2:1 grading: an interval more than twice as long as a neighbour is halved (until none is), so that a second local feature between the samples of a coarse interval
+  // is met by a gradual change of the node spacing and found by the next check instead of falling between two far nodes.
+  void grade() {
+    for (bool changed = true; changed;) {
+      changed = false;
+      std::vector<long> next;
+      for (size_t i = 0; i + 1 < index.size(); ++i) {
+        next.push_back(index[i]);
+        const long size = index[i + 1] - index[i];
+        const long before = i == 0 ? size : index[i] - index[i - 1];
+        const long after = i + 2 < index.size() ? index[i + 2] - index[i + 1] : size;
+        if (size % 2 == 0 && (size > 2 * before || size > 2 * after)) {
+          next.push_back(index[i] + size / 2);
+          changed = true;
+        }
+      }
+      next.push_back(index.back());
+      index = next;
+    }
+  }
+};
+
+// Not-a-knot cubic B-spline basis through the nodes of `axis` over [low, high]: the parameters, the flat and the distinct knots (n >= 4 intervals).
 struct CubicBasis {
   TColStd_Array1OfReal parameters, flat, knots;
   TColStd_Array1OfInteger multiplicities, contact;
-  CubicBasis(int n, double low, double high)
-      : parameters(1, n + 1), flat(1, n + 5), knots(1, n - 1), multiplicities(1, n - 1), contact(1, n + 1) {
+  CubicBasis(const Axis &axis, double low, double high)
+      : parameters(1, axis.intervals() + 1),
+        flat(1, axis.intervals() + 5),
+        knots(1, axis.intervals() - 1),
+        multiplicities(1, axis.intervals() - 1),
+        contact(1, axis.intervals() + 1) {
+    const int n = axis.intervals();
     for (int i = 0; i <= n; ++i) {
-      parameters.SetValue(i + 1, low + (high - low) * i / n);
+      parameters.SetValue(i + 1, axis.at(low, high, axis.index[static_cast<size_t>(i)]));
       contact.SetValue(i + 1, 0);
     }
     // distinct knots: both ends and the nodes 2 .. n - 2
@@ -97,8 +150,9 @@ struct CubicBasis {
 
 // The cubic tensor-product surface through the (nu + 1) x (nv + 1) points `nodes` (row-major, u first): interpolation along v for each row, then
 // along u for every pole column (BSplCLib::Interpolate; the nodes are uniform on the box). Null on a solver failure.
-inline Handle(Geom_BSplineSurface) interpolate_grid(const std::vector<gp_Pnt> &nodes, int nu, int nv, double u0, double u1, double v0, double v1) {
-  const CubicBasis ub(nu, u0, u1), vb(nv, v0, v1);
+inline Handle(Geom_BSplineSurface) interpolate_grid(const std::vector<gp_Pnt> &nodes, const Axis &uaxis, const Axis &vaxis, double u0, double u1, double v0, double v1) {
+  const CubicBasis ub(uaxis, u0, u1), vb(vaxis, v0, v1);
+  const int nu = uaxis.intervals(), nv = vaxis.intervals();
   const size_t rows = static_cast<size_t>(nu) + 1, cols = static_cast<size_t>(nv) + 1, width = cols * 3;
   std::vector<double> poles(rows * width);
   for (size_t i = 0; i < rows; ++i) {
@@ -125,22 +179,24 @@ inline Handle(Geom_BSplineSurface) interpolate_grid(const std::vector<gp_Pnt> &n
   return new Geom_BSplineSurface(net, ub.knots, vb.knots, ub.multiplicities, vb.multiplicities, 3, 3);
 }
 
-// The surface through F(S) at the nodes of an nu x nv grid of the box, and its worst deviation at the cell middles / quarter points; the
-// deviation per direction decides which one to refine.
+// The surface through F(S) at the nodes of the tensor grid of the box, and its worst deviation at the middles / quarter points of the cells; the deviation of
+// each interval decides which intervals to halve.
 inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & base, double u0, double u1, double v0, double v1,
                               double allowed) {
   SurfaceFit best;
   const double tolerance = allowed * kOverFit;
-  int nu = kStartSegments, nv = kStartSegments;
+  Axis uaxis, vaxis;
   while (true) {
+    const int nu = uaxis.intervals(), nv = vaxis.intervals();
     std::vector<gp_Pnt> nodes;
     nodes.reserve(static_cast<size_t>(nu + 1) * static_cast<size_t>(nv + 1));
     for (int i = 0; i <= nu; ++i)
-      for (int j = 0; j <= nv; ++j) nodes.push_back(warped_point(warp, base->Value(u0 + (u1 - u0) * i / nu, v0 + (v1 - v0) * j / nv)));
-    best.surface = interpolate_grid(nodes, nu, nv, u0, u1, v0, v1);
+      for (int j = 0; j <= nv; ++j) nodes.push_back(warped_point(warp, base->Value(u0 + (u1 - u0) * uaxis.index[static_cast<size_t>(i)] / uaxis.den, v0 + (v1 - v0) * vaxis.index[static_cast<size_t>(j)] / vaxis.den)));
+    best.surface = interpolate_grid(nodes, uaxis, vaxis, u0, u1, v0, v1);
+    best.points = static_cast<long>(nodes.size());
     if (best.surface.IsNull()) return best;
-    // error at the cell middles: along u (between nodes, on node lines in v), along v, and in the cell centres
-    double error_u = 0, error_v = 0, error_c = 0;
+    // error of every u interval (between nodes, on node lines in v), v interval, and cell (middle and a quarter point)
+    std::vector<double> error_u(static_cast<size_t>(nu), 0.0), error_v(static_cast<size_t>(nv), 0.0), error_c(static_cast<size_t>(nu) * static_cast<size_t>(nv), 0.0);
     const auto deviation = [&](double fu, double fv) {
       const double u = u0 + (u1 - u0) * fu, v = v0 + (v1 - v0) * fv;
       return best.surface->Value(u, v).Distance(warped_point(warp, base->Value(u, v)));
@@ -148,17 +204,21 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
     for (int i = 0; i < nu; ++i)
       for (int j = 0; j < nv; ++j) {
         for (const double a : {0.25, 0.5, 0.75}) {
-          error_u = std::max(error_u, deviation((i + a) / nu, static_cast<double>(j) / nv));
-          error_v = std::max(error_v, deviation(static_cast<double>(i) / nu, (j + a) / nv));
+          error_u[static_cast<size_t>(i)] = std::max(error_u[static_cast<size_t>(i)], deviation(uaxis.inside(i, a), vaxis.node(j)));
+          error_v[static_cast<size_t>(j)] = std::max(error_v[static_cast<size_t>(j)], deviation(uaxis.node(i), vaxis.inside(j, a)));
         }
-        error_c = std::max({error_c, deviation((i + 0.5) / nu, (j + 0.5) / nv), deviation((i + 0.25) / nu, (j + 0.75) / nv)});
+        error_c[static_cast<size_t>(i) * static_cast<size_t>(nv) + static_cast<size_t>(j)] =
+            std::max(deviation(uaxis.inside(i, 0.5), vaxis.inside(j, 0.5)), deviation(uaxis.inside(i, 0.25), vaxis.inside(j, 0.75)));
       }
     // the last node lines
     for (int j = 0; j < nv; ++j)
-      for (const double a : {0.25, 0.5, 0.75}) error_v = std::max(error_v, deviation(1.0, (j + a) / nv));
+      for (const double a : {0.25, 0.5, 0.75}) error_v[static_cast<size_t>(j)] = std::max(error_v[static_cast<size_t>(j)], deviation(1.0, vaxis.inside(j, a)));
     for (int i = 0; i < nu; ++i)
-      for (const double a : {0.25, 0.5, 0.75}) error_u = std::max(error_u, deviation((i + a) / nu, 1.0));
-    best.error = std::max({error_u, error_v, error_c});
+      for (const double a : {0.25, 0.5, 0.75}) error_u[static_cast<size_t>(i)] = std::max(error_u[static_cast<size_t>(i)], deviation(uaxis.inside(i, a), 1.0));
+    const double worst_u = *std::max_element(error_u.begin(), error_u.end());
+    const double worst_v = *std::max_element(error_v.begin(), error_v.end());
+    const double worst_c = *std::max_element(error_c.begin(), error_c.end());
+    best.error = std::max({worst_u, worst_v, worst_c});
     const auto finish = [&]() {
       // within the allowed error (the loop aims lower; at the budget limit the allowed error is what counts)
       best.ok = best.error <= allowed;
@@ -174,11 +234,35 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
       finish();
       return best;
     }
-    const bool more_u = error_u > tolerance;
-    const bool more_v = error_v > tolerance;
-    if (more_u || !more_v) nu *= 2;
-    if (more_v || !more_u) nv *= 2;
-    if (nu > kMaxSegmentsPerDirection || nv > kMaxSegmentsPerDirection || static_cast<long>(nu + 1) * (nv + 1) > kMaxFitPoints) {
+    // halve the intervals that deviate: in u where the u error is high, in v where the v error is high
+    std::vector<char> split_u(static_cast<size_t>(nu), 0), split_v(static_cast<size_t>(nv), 0);
+    const bool more_u = worst_u > tolerance, more_v = worst_v > tolerance;
+    for (int i = 0; i < nu; ++i) split_u[static_cast<size_t>(i)] = more_u && error_u[static_cast<size_t>(i)] > tolerance;
+    for (int j = 0; j < nv; ++j) split_v[static_cast<size_t>(j)] = more_v && error_v[static_cast<size_t>(j)] > tolerance;
+    // only the cell middles deviate (the law bulges inside a cell between nodes that all agree): both intervals of each such cell; when an axis error explains the deviation the cells add nothing (a global law would refine the other direction too)
+    if (!more_u && !more_v)
+      for (int i = 0; i < nu; ++i)
+        for (int j = 0; j < nv; ++j)
+          if (error_c[static_cast<size_t>(i) * static_cast<size_t>(nv) + static_cast<size_t>(j)] > tolerance) split_u[static_cast<size_t>(i)] = split_v[static_cast<size_t>(j)] = 1;
+    // a law that deviates over much of the face (a quarter of the intervals or more) is refined everywhere, as the uniform doubling did: the integrals of the result
+    // (volume, area) then stay as close to the closed form as before; a localised one (a push, a lattice cell) only where it acts
+    const auto widen = [](std::vector<char> &split) {
+      const long flagged = std::count_if(split.begin(), split.end(), [](char f) { return f != 0; });
+      if (4 * flagged >= static_cast<long>(split.size())) std::fill(split.begin(), split.end(), static_cast<char>(1));
+      return flagged > 0;
+    };
+    bool any_u = widen(split_u);
+    bool any_v = widen(split_v);
+    // structural progress: an error above the tolerance that no flag explained refines both directions everywhere (the loop can never stand still)
+    if (!any_u && !any_v) {
+      std::fill(split_u.begin(), split_u.end(), static_cast<char>(1));
+      std::fill(split_v.begin(), split_v.end(), static_cast<char>(1));
+      any_u = any_v = true;
+    }
+    if (any_u) uaxis.refine(split_u);
+    if (any_v) vaxis.refine(split_v);
+    if (uaxis.den > kMaxSegmentsPerDirection || vaxis.den > kMaxSegmentsPerDirection ||
+        static_cast<long>(uaxis.intervals() + 1) * (vaxis.intervals() + 1) > kMaxFitPoints) {
       finish();
       return best;
     }

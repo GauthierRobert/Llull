@@ -846,3 +846,80 @@ native kernel, the capability), cargo pack vectors.
   a tiny residual and agrees with the closest-point coordinates (x modulo the period), else `DEF_FLOW_BASE_OUTSIDE`. The warp sets a flag when a base solve ends with a large residual
   and refuses with the same code instead of returning the last iterate (cargo test: a body running past the table is never built; the test also passes without the flag because the
   B-spline fit of the clamped table already throws, so the flag itself is not proven by it).
+
+### 17.7 The warp never hangs: progress and work bounds of the mesh refinement
+
+With the focal-point refusal of §17.6 bypassed, a body around the axis of a closed base sheet ran for hours: the triangle count grows ×3 per pass (12 → 1.7 M after 13 passes, the passes costing
+0.002 s, 1 s, 5 s, 11 s, 25 s, 41 s, 45 s) because a map that is discontinuous (or folded) across the body keeps a chord deviation the size of its jump however small the edges get, so
+the chord rule never stops splitting until the 4 M triangle cap. The cap was the only bound; each pass costs triangles × map evaluations, so it was no bound in time. Now (`meshWarp.ts`):
+
+- **Progress.** The chord rule reports, per pass, the worst deviation of the edges it splits and the worst deviation / edge length. A smooth map has a ratio that falls as the edges shrink, a kink one
+  that stays bounded; a jump or fold has a ratio that doubles with every pass. From the sixth pass, when the worst deviation is above ten tolerances, the ratio above 100 (an image edge a hundred times
+  longer than the edge: det J of 1e6 is not a body deformation) and more than four times its value three passes earlier, the refinement is refused with `DEF_APPROX_TOLERANCE` ("the map is
+  discontinuous or folded in the body"). A first criterion on the worst deviation alone refused `deform_by_point` (a localised bump is discovered late: its deviation does not fall while new regions
+  are found); the ratio, with its absolute level, does not. The same input now ends after about 8 passes, in seconds.
+- **Work.** Independently of the triangle count, the chord evaluations are counted (a map that solves for its argument, the base-frame laws, counts 20 each) and the mesh path refuses with
+  `DEF_BUDGET_EXCEEDED` beyond a work bound (4e8 at first, predicted per pass and 4e7 since §17.10; an honest infinite bend of a 157 mm cylinder at 1e-4 needs 2.9M triangles and 35 s: the first value, 4e7, refused it, caught by `nativeKernelDeform`). With the progress check disabled the same input stops by this bound after a few minutes instead of never.
+- **Native.** The exact warp's loops were already bounded by construction (a Newton solve of at most 40 steps, the fit by 512 segments per direction and 400 000 points, then
+  `DEF_APPROX_TOLERANCE`); the exact path of the same input ends with a refusal within the test bound.
+
+Tests: `tests/unit/deform/flowSheetBase.test.ts` (the focal check switched off by the test-only `focalCheck.enabled`; both kernels; refusal `DEF_APPROX_TOLERANCE` in seconds; red-proof: without the
+progress check it ends by the work bound with `DEF_BUDGET_EXCEEDED`, no longer within seconds), `server/tests/nativeKernelFlowSheet.test.ts` (the exact path).
+
+### 17.8 Non-uniform fit grid (the point push on a 100 mm slab)
+
+The exact warp fitted every face by a cubic C2 interpolant on a uniform grid whose segment count doubled until the deviation at the cell middles and quarter points was within the tolerance share.
+A push of radius 10 on a 100 x 100 x 20 slab therefore put a grid fine enough for the 10 mm support on the whole 100 mm face (263 294 nodes at tolerance 1e-3).
+
+- **Per-interval refinement** (`deform_fit.hxx`, `Axis`). Each direction keeps its own node list (parameters index / den). After a fit the deviation of every u interval, v interval and cell is measured; an interval above the
+  tolerance share is halved, the others keep their nodes. When only cell middles deviate, everything is halved in both directions. A direction where a quarter of the intervals or more deviate
+  is refined everywhere, exactly as the uniform doubling did (the node parameters are then bit-identical, so twists, bends and the VC-DEF numbers do not move); only a localised law (a point push, a
+  lattice cell, a narrow region) refines just where it acts. The limits are unchanged (512 segments per direction, 400 000 nodes, then `DEF_APPROX_TOLERANCE`).
+- **What changes.** The tolerance guarantee is the same (the deviation at every interval's quarter points is within the allowed share, checked on the final grid; `maxError` of the report is that
+  measurement). Where the push covers the whole face the result is the uniform grid. The achieved deviation sits closer to the tolerance than before (maxError 1.1e-5 -> 5.2e-5 for the 1e-3 push), still far
+  below it; the volume agrees with the uniform fit to 6e-9 relative (200235.6183 vs 200235.6195, closed form 200235.6194). The report gains `fitPoints` (nodes of all the face fits).
+- **Measured** (release, 100 x 100 x 20 slab, push r 10, d 3, smooth_c2): fit nodes 263 294 -> 22 926; the warp 914 ms -> 260 ms. Through the server (command + mass + analysis): 21.7 s -> 10.0 s at tolerance
+  1e-3, 24.8 s -> 20.5 s at 1e-4, 14.4 s -> 9.4 s for r 25 d 4. What is left is the mass integration of the many-knot B-spline faces (§17.9), tessellation and the analysis.
+- **Fix found on the way.** The `base_unconverged` flag of the base-sheet solve (§17.6) was a shared static: parallel warps (cargo tests) set it for each other. It is now thread-local.
+
+Tests: `deform_tests.rs` `a_local_push_on_a_wide_slab_refines_the_fit_only_where_it_acts` (fit nodes < 40 000, volume = box + cap, maxError within the tolerance; red-proof: forcing uniform refinement gives
+263 294 nodes and fails it). The 26 `deform` cargo tests and `nativeKernel*` suites keep their numbers.
+
+### 17.9 Mass rule by face type: decided, measured, and what is carried through `blend_union`
+
+`refined_mass` (adaptive `BRepGProp` on the shapes a warp or a kinked blend built, 1e-9, accepted at 1e-5) was kept by transforms, booleans, unify, shell and fillets but not by `blend_union`, whose
+result went back to the fixed Gauss rule. A solid built by `blend_union` from a warped operand now asks for the rule too (`ShapeList.refined_mass`, set by `shape_list_add`).
+
+A rule by face type was tried and measured: the fixed rule for planar faces (exact there) and the adaptive one for all curved faces, integrated face by face from one apex. It gives the same numbers as the whole-shape
+adaptive rule to rounding (a plane is exact in both rules), so it changes nothing but the bookkeeping; and a rule that keeps the fixed rule on the elementary curved faces is wrong where it matters: the cone pieces
+of a straight-law blend lose 2.5e-3 of the removed volume (20 x 10 x 5 block, `a_linear_law_through_a_control_point...`) and the 120-gon mitre 2e-4. Whole-shape adaptive stays the rule of the flagged shapes. The NIST corpus
+is not flagged (nothing in it is a warp), so its numbers are untouched by construction (the `nativeKernel*` corpus suites are unchanged).
+
+Loosening the integration accuracy to buy time was measured too: Eps 1e-7 instead of 1e-9 saves 25-30 % of the 10 s push (8.0 s, 14.9 s, 6.6 s) but moves the mitre-blend volumes by 2e-6 relative and fails
+`a_ground_sphere_scaled...` (VC-DEF-11); kept at 1e-9. The remaining cost is the adaptive subdivision itself on faces with hundreds of knot spans.
+
+Tests: `blend_tests.rs` `the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands` (red-proof: without the propagation the fused blend is unflagged), `deform_infinite_tests.rs`
+`a_cut_warped_bar_mixes_the_fixed_rule_on_its_caps_with_the_adaptive_one_on_its_sides` (closed-form volume and centroid of a warped bar cut by a box).
+
+### 17.10 Review round on §17.7-§17.9: the time bound of the mesh refinement, the fit grid
+
+- **The mesh path ends in seconds, not only ends.** The bound is now PREDICTED before every pass (`warpMesh`): the triangles of the pass times (the bookkeeping of the pass, 4 units per triangle, plus the weighted map
+  evaluations of the pass, 5 per triangle, plus those of the final chord measure and move, 2 x 2.5 per triangle) is added to the units already spent, and the pass is refused when the sum exceeds 4e7 units
+  (`DEF_BUDGET_EXCEEDED`, with the remedy: output mode 'exact' or a coarser tolerance). Every map evaluation is counted (chord samples, vertex images, the final measure and the move); the cost weight of a base-frame
+  law is 10 + 0.2 x sqrt(table size) (the coarse search of the table). 4e7 units are about 10 s on the dev machine (3e6 units/s measured); the first value, 4e8, was minutes.
+- **The honest 157 mm infinite bend** (cylinder r 5, bend r 50, region infinite, tolerance 1e-4, mesh mode) needed 2.9M triangles and 35 s: it is now refused up front with the remedy; mode 'exact' builds it
+  (natively) and the mesh path at tolerance 1e-3 builds it (`nativeKernelDeform` asserts the three). The other server tests that compared the mesh path at 1e-4 with the exact path use 1e-3 for the mesh.
+- **Hostile seeds** (`meshWarp.test.ts`): a twist of 3 pi over 100 mm at tolerance 1e-4 is refused with the remedy by the work bound before a pass crosses it (red-proof: with the bound at 1e12 it warps 1.25M
+  triangles instead); a bend with a radius inside the body (a fold) is refused (`DEF_APPROX_TOLERANCE` or `DEF_BUDGET_EXCEEDED`) in seconds. A jump map evading the progress check cannot be built from the
+  catalogue laws (the region ends are cut by the plane rule, so a step never lies inside an edge); the work bound is what covers that class.
+- **One warp, not two.** A refusal is remembered per node and mesh (`WeakMap`, fingerprint of the coordinates): the host that warps through the Manifold kernel, gets null and re-warps to read the reason, no longer
+  warps twice.
+- **`focalCheck` is gone** (a mutable module global in core that disabled a refusal). The two tests that flipped it went with it; the exact path's bound is by construction (§17.7), the mesh path's by the above.
+- **Fit grid.** Intervals are graded 2:1 (an interval more than twice as long as a neighbour is halved), a cell whose middle deviates halves its own two intervals instead of everything, and an error that no flag
+  explains refines everything (the loop cannot stand still). Tests: a push of radius 4 hidden in the middle of a start cell (found by the cell middles), two separated lattice bumps (twice the volume of one).
+  The grading is not red-proven by these (the features of the catalogue laws are wide enough to be found at the first grid); it is kept as a guard against a narrow second feature.
+- `iges.cxx` file counter is `std::atomic`; the cut-bar test is named for what it checks (§17.9).
+
+**Bisect of the slow VC-DEF-17 (exact path).** Release sidecar, test alone: `feat/des-7d` base about 5 s (28 s file duration with transforms), 68eeabc2 (per-interval fit) about 5 s, 7d0616e8 as first committed about 63 s.
+Cause: the cell-middle rule ran whenever a cell deviated, also when an axis error already explained it, so a global law (the plate wrapped on a drum) refined the other direction too and the tensor grid grew.
+The rule now applies only when neither axis error exceeds the tolerance (the cell-only case), as before; the time is back to about 5 s (file 16 s), the 30 native server tests pass at the default timeouts (49 s against 113 s).

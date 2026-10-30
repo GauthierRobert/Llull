@@ -19,6 +19,8 @@ class ShapeList {
  public:
   std::vector<TopoDS_Shape> shapes;
   std::vector<std::vector<std::string>> names;
+  // some operand asks for the adaptive mass rule (Shape::refined_mass): the result keeps asking for it
+  bool refined_mass = false;
 };
 
 std::unique_ptr<ShapeList> new_shape_list();

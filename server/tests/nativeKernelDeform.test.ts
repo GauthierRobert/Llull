@@ -488,7 +488,7 @@ describeNativeWhen({ capabilities: ['gtransform', 'deform'], label: 'nativeKerne
       params: Record<string, unknown>,
     ): { exact: ReturnType<typeof execute>; meshed: ReturnType<typeof execute> } => ({
       exact: run(doc, name, { id, frame: FRAME, ...params, output: { mode: 'exact', tolerance: 1e-4 } }),
-      meshed: run(doc, name, { id, frame: FRAME, ...params, output: { mode: 'mesh', tolerance: 1e-4 } }),
+      meshed: run(doc, name, { id, frame: FRAME, ...params, output: { mode: 'mesh', tolerance: 1e-3 } }),
     });
     const twist = both('twist_body', { angleDeg: 36, region: { start: 0, end: 20, infinite: true } });
     const whole = run(doc, 'twist_body', {
@@ -519,13 +519,23 @@ describeNativeWhen({ capabilities: ['gtransform', 'deform'], label: 'nativeKerne
         radius: 50,
         region: { start: 0, end: quarter, infinite: true },
         frame: { origin: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] },
-        output: { mode, tolerance: 1e-4 },
+        output: { mode, tolerance: mode === 'mesh' ? 1e-3 : 1e-4 },
       });
     const [arcExact, arcMesh] = [bend('exact'), bend('mesh')];
     expect(arcExact.error, arcExact.summary).toBeUndefined();
     expect(rel(volumeOfEntity(arcExact.document, arcExact.affected[0] as string), Math.PI * 25 * Math.PI * 50)).toBeLessThan(1e-5);
     expect(extentMax(arcExact.document, arcExact.affected[0] as string, 0)).toBeCloseTo(105, 0);
     expect(extentMax(arcMesh.document, arcMesh.affected[0] as string, 0)).toBeCloseTo(105, 0);
+    // 01 DEF 17.7: the same bend by the mesh path at 1e-4 needs 2.9M triangles (35 s): refused up front with the remedy, the exact path does it
+    const fine = execute(rod.document, 'bend_body', {
+      id: rod.affected[0],
+      radius: 50,
+      region: { start: 0, end: quarter, infinite: true },
+      frame: { origin: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] },
+      output: { mode: 'mesh', tolerance: 1e-4 },
+    });
+    expect(fine.error?.code).toBe('DEF_BUDGET_EXCEEDED');
+    expect(fine.summary).toContain("output mode 'exact'");
   }, 240_000);
 
   it('a symmetric infinite bend on the exact path is the same arc moved: the sweep is +-0.5 rad about the region middle', () => {

@@ -110,6 +110,7 @@ describeNativeWhen({ capabilities: ['deform', 'deform-base-sheet'], label: 'nati
       expect(mass.method).toBe('exact');
       const closed = QUARTER * 20 * 2;
       expect(Math.abs(mass.volume - closed) / closed).toBeLessThan(2e-3);
+      expect(meshed.error, meshed.summary).toBeUndefined();
       expect(Math.abs((meshed.data as { volume: { value: number } }).volume.value - closed) / closed).toBeLessThan(2e-2);
       for (const result of [exact, meshed]) {
         const id = result.affected[0] as string;

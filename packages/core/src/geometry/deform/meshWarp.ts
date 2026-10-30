@@ -19,6 +19,44 @@ export const MAX_WARP_TRIANGLES = 4_000_000;
 /** Refinement passes before giving up (each pass at least halves the longest edge). */
 const MAX_PASSES = 40;
 
+/**
+ * The chord deviation of an edge of length h of a Lipschitz map is at most about (1 + Lip) h and, for a smooth one, of the order h² (a kink: h): deviation / h falls or stays
+ * bounded as the edges shrink. At a discontinuity or a fold the deviation stays the size of the jump, so deviation / h doubles with every pass and the triangle count grows without
+ * bound. After MIN_PASSES the worst deviation / h of the edges a pass splits must not exceed GROWTH times its value PROGRESS_WINDOW passes earlier (while the deviation is above
+ * ten tolerances and above SLOPE_LIMIT), else the refinement is refused.
+ */
+const PROGRESS_WINDOW = 3;
+const MIN_PASSES_BEFORE_PROGRESS_CHECK = 5;
+const GROWTH = 4;
+/** A deviation / edge length above this (an image edge a hundred times longer than its edge) is a jump or a fold, not a body deformation (det J of 1e6). */
+const SLOPE_LIMIT = 100;
+
+/**
+ * Work units (map evaluations, each weighted by the cost of the law's evaluation) the mesh path may spend, deterministic and independent of the clock: about 10 s on the dev machine (3e6 units per second measured).
+ * The cost of the next pass and of the final measure + move is PREDICTED from the triangle count and refused before the pass runs, so the bound is not crossed by a pass.
+ * A larger honest input (an infinite bend of a 157 mm cylinder at 1e-4 needs 2.9M triangles) is refused with the remedy: output mode 'exact' (native kernel) or a coarser tolerance.
+ */
+const MAX_EVALUATIONS = 4e7;
+/** Work units per triangle of one pass for the mesh bookkeeping itself (edge map, split, weld), which dominates the time of a cheap map. */
+const BOOKKEEPING_PER_TRIANGLE = 4;
+/** Map evaluations per triangle of one chord pass (3 samples per active edge, edges ~ 1.5 per triangle, plus the images of the vertices), and of the final chord measure + move. */
+const PASS_EVALUATIONS_PER_TRIANGLE = 5;
+const FINISH_EVALUATIONS_PER_TRIANGLE = 2.5;
+
+/** Closed-form evaluations that one Newton solve of a base-frame law is worth (the figure the flow tests were measured at). */
+const BASE_SOLVE_COST = 10;
+/** Closed-form evaluations that one cell of the coarse search of the base table is worth. */
+const SEARCH_CELL_COST = 0.2;
+
+/** Cost of one evaluation of a law relative to a closed-form one: the base-frame laws run a Newton solve per point after a coarse search of the table (about sqrt of its size). */
+function evaluationCost(node: DeformNode): number {
+  const { law } = node;
+  if (law.kind === 'flowCurve' && law.base !== undefined)
+    return BASE_SOLVE_COST + SEARCH_CELL_COST * Math.sqrt(law.base.stations.length / 12);
+  if (law.kind === 'flowSurface' && law.baseNodes !== undefined) return BASE_SOLVE_COST + SEARCH_CELL_COST * Math.sqrt(law.nx * law.ny);
+  return 1;
+}
+
 export interface WarpResult {
   readonly ok: true;
   readonly mesh: MeshData;
@@ -32,7 +70,7 @@ export interface WarpResult {
 
 export interface WarpFailure {
   readonly ok: false;
-  readonly code: 'DEF_BUDGET_EXCEEDED' | 'DEF_FRAME_DEGENERATE';
+  readonly code: 'DEF_BUDGET_EXCEEDED' | 'DEF_FRAME_DEGENERATE' | 'DEF_APPROX_TOLERANCE';
   readonly message: string;
 }
 
@@ -118,6 +156,12 @@ export function splitPass(soup: Soup, decide: EdgeSplit): boolean {
 /** Sample parameters along an edge at which the chordal deviation is measured. */
 const CHORD_SAMPLES = [0.25, 0.5, 0.75];
 
+/** What the chord rule of one pass saw: the largest deviation of an edge it split, the largest deviation / edge length,  */
+interface ChordTally {
+  worst: number;
+  slope: number;
+}
+
 /**
  * Split an edge (at its middle) when the deformed curve leaves its chord by more than the tolerance at a quarter, half or three quarters of the
  * edge; edges outside the zone the map acts in (the open region of an axis law, a lattice box, a push support) stay. This measures the deviation the bound maxEdgeLength only estimates.
@@ -127,6 +171,7 @@ function chordRule(
   active: (p: Vec3, q: Vec3) => boolean,
   tolerance: number,
   point: (p: Vec3) => Vec3,
+  tally: ChordTally,
 ): EdgeSplit {
   const images = new Map<number, Vec3>();
   const image = (vertex: number): Vec3 => {
@@ -147,7 +192,11 @@ function chordRule(
         onEdge[1] - (fp[1] + (fq[1] - fp[1]) * t),
         onEdge[2] - (fp[2] + (fq[2] - fp[2]) * t),
       );
-      if (deviation > tolerance) return 0.5;
+      if (deviation > tolerance) {
+        tally.worst = Math.max(tally.worst, deviation);
+        tally.slope = Math.max(tally.slope, deviation / distance(p, q));
+        return 0.5;
+      }
     }
     return null;
   };
@@ -214,9 +263,32 @@ function reversesOrientation(node: DeformNode): boolean {
 
 /**
  * Deform the triangles of `source` (world space, any indexing; welded here) by `node`.
- * @failure degenerate frame -> DEF_FRAME_DEGENERATE; more than `maxTriangles` after (or estimated before) refinement -> DEF_BUDGET_EXCEEDED
+ * @failure degenerate frame -> DEF_FRAME_DEGENERATE; more than `maxTriangles` after (or estimated before) refinement, or work above MAX_EVALUATIONS predicted before a pass -> DEF_BUDGET_EXCEEDED; deviation that does not fall with the edge length (jump, fold) -> DEF_APPROX_TOLERANCE
  */
 export function warpMesh(source: MeshData, node: DeformNode, options: WarpOptions): WarpResult | WarpFailure {
+  // a refused warp is asked again by the host to name the refusal (the mesh kernel warps, fails, then the command re-warps to read why): the refusal of the same node on the same mesh is remembered
+  const key = `${options.tolerance}|${options.maxTriangles ?? ''}|${fingerprint(source.positions)}`;
+  const known = refusals.get(node);
+  if (known?.key === key) return known.failure;
+  const result = warpUncached(source, node, options);
+  if (!result.ok) refusals.set(node, { key, failure: result });
+  return result;
+}
+
+const refusals = new WeakMap<DeformNode, { readonly key: string; readonly failure: WarpFailure }>();
+
+/** Length, sum and sum of squares of the coordinates: cheap and enough to tell two meshes of one node apart. */
+function fingerprint(positions: ReadonlyArray<number>): string {
+  let sum = 0;
+  let squares = 0;
+  for (const value of positions) {
+    sum += value;
+    squares += value * value;
+  }
+  return `${positions.length}:${sum}:${squares}`;
+}
+
+function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions): WarpResult | WarpFailure {
   const warp = warpOf(node);
   if (warp === null)
     return { ok: false, code: 'DEF_FRAME_DEGENERATE', message: 'the frame axis is zero or the reference is parallel to it' };
@@ -237,21 +309,54 @@ export function warpMesh(source: MeshData, node: DeformNode, options: WarpOption
   for (const z of splitHeights(node)) {
     if (z > extent.min[2] + gap && z < extent.max[2] - gap) splitPass(soup, planeRule(heightsOf(soup, node), z, gap));
   }
+  let evaluations = 0;
+  const cost = evaluationCost(node);
+  const counted = (p: Vec3): Vec3 => {
+    evaluations += cost;
+    return warp.point(p);
+  };
+  const spent = (): number => evaluations;
+  const overWork = (pass: number, triangles: number, predicted: number): WarpFailure => ({
+    ok: false,
+    code: 'DEF_BUDGET_EXCEEDED',
+    message: `refining pass ${pass + 1} (${triangles} triangles) would take the map evaluations to about ${Math.round(predicted)} work units, above the limit ${MAX_EVALUATIONS}: ask for output mode 'exact' (native kernel) or a coarser tolerance`,
+  });
   if (node.law.kind !== 'affine') {
     const active = edgeActive(node, warp.frame);
     const limit = featureEdgeLength(node);
+    const slopeByPass: number[] = [];
     for (let pass = 0; pass < MAX_PASSES; pass++) {
-      const chord = chordRule(soup.positions, active, options.tolerance, warp.point);
+      const tally: ChordTally = { worst: 0, slope: 0 };
+      const triangles = soup.indices.length / 3;
+      const predicted =
+        spent() + triangles * (BOOKKEEPING_PER_TRIANGLE + cost * (PASS_EVALUATIONS_PER_TRIANGLE + 2 * FINISH_EVALUATIONS_PER_TRIANGLE));
+      if (predicted > MAX_EVALUATIONS) return overWork(pass, triangles, predicted);
+      const chord = chordRule(soup.positions, active, options.tolerance, counted, tally);
       const feature = Number.isFinite(limit) ? featureRule(soup.positions, limit, active) : null;
       const decide: EdgeSplit = (low, high) => (feature === null ? null : feature(low, high)) ?? chord(low, high);
       if (!splitPass(soup, decide)) break;
       if (soup.indices.length / 3 > cap) return overBudget(soup.indices.length / 3);
+      evaluations += BOOKKEEPING_PER_TRIANGLE * triangles;
+      slopeByPass.push(tally.slope);
+      const earlier = slopeByPass[pass - PROGRESS_WINDOW];
+      if (
+        pass >= MIN_PASSES_BEFORE_PROGRESS_CHECK &&
+        earlier !== undefined &&
+        tally.worst > options.tolerance * 10 &&
+        tally.slope > SLOPE_LIMIT &&
+        tally.slope > GROWTH * earlier
+      )
+        return {
+          ok: false,
+          code: 'DEF_APPROX_TOLERANCE',
+          message: `refining the mesh does not reduce the chordal deviation of the map (still ${tally.worst.toPrecision(3)} after ${pass + 1} passes, ${soup.indices.length / 3} triangles; deviation per edge length ${tally.slope.toPrecision(3)}, growing): the map is discontinuous or folded in the body, so no tolerance can be met`,
+        };
     }
   }
-  const maxChordError = chordError(soup, warp.point);
+  const maxChordError = chordError(soup, counted);
   const moved: number[] = new Array<number>(soup.positions.length);
   for (let v = 0; v < soup.positions.length / 3; v++) {
-    const p = warp.point(at(soup.positions, v));
+    const p = counted(at(soup.positions, v));
     moved[v * 3] = p[0];
     moved[v * 3 + 1] = p[1];
     moved[v * 3 + 2] = p[2];
