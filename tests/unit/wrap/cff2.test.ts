@@ -146,7 +146,7 @@ describe('HVAR advances', () => {
 });
 
 describe('variation refusals (WRP_FONT_VARIATION)', () => {
-  it('an unknown axis, a value outside the range, a font without axes, a TrueType font and avar version 2', () => {
+  it('an unknown axis, a value outside the range, a font without axes, a TrueType font without gvar and an avar version 2 without its offsets', () => {
     const bytes = variableFont();
     expect(refusal(bytes, { slnt: 0 })).toMatchObject({ code: 'WRP_FONT_VARIATION', message: expect.stringContaining("no axis 'slnt'") });
     expect(refusal(bytes, { wght: 901 }).message).toContain('outside 100..900');
@@ -160,8 +160,8 @@ describe('variation refusals (WRP_FONT_VARIATION)', () => {
     expect(refusal(ttf, { wght: 500 }).message).toContain('only CFF2');
     expect(load(ttf, { wght: 400 }).instance).toEqual({});
     const v2 = buildCff2Font({ cff2: variableCff2(), axes: AXES, avar: [0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0] });
-    expect(refusal(v2, { wght: 500 }).message).toContain('avar version 2');
-    expect(load(v2).axes).toHaveLength(2);
+    // version 2 now follows its segment maps with the offsets of the axis index map and the delta store: a table that stops short is damaged
+    expect(refusal(v2, { wght: 500 }).code).toBe('WRP_FONT_PARSE');
   });
 
   it('damaged fvar / avar are WRP_FONT_PARSE', () => {

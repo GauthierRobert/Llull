@@ -36,7 +36,7 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_FONT_PARSE: 'Give a TrueType (.ttf), CFF OpenType (.otf) or CFF2 variable font file.',
   WRP_FONT_FORMAT_UNSUPPORTED: 'Use a TrueType (.ttf), CFF-outline OpenType (.otf) or CFF2 font; WOFF and collections are not supported.',
   WRP_FONT_VARIATION:
-    'Name only axes the font has (import_font returns data.axes with tag, min, default, max), keep each value inside its range, and use a CFF2 variable font: TrueType (gvar) fonts only have their default instance.',
+    'Name only axes the font has (import_font returns data.axes with tag, min, default, max), keep each value inside its range, and use a CFF2 or TrueType (gvar) variable font: a font without variation data only has its default instance.',
   WRP_FONT_EMBEDDING_RESTRICTED: 'Use a font licensed for embedding (the bundled fonts are SIL OFL).',
   WRP_FONT_TOO_LARGE: 'Subset the font to under 4 MB, or use a bundled one.',
   WRP_CHAIN_FACE_UNSUPPORTED:

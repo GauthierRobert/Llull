@@ -19,6 +19,7 @@ import { parseCommandResponse } from '@protocol/restProtocol';
 import { libraryFile } from '../../unit/materials/support';
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
+import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
 import { aliasedStoreFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
@@ -116,6 +117,18 @@ export const CORE_READERS: readonly HostileReader[] = [
       { name: 'an FDSelect whose ranges do not increase', input: () => manyRangesFont(100, true) },
       { name: '2000 glyphs of 70 000 operators each (font-wide operator budget)', input: () => operatorFanFont(2000) },
     ],
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });
+      return parsed.ok ? validateGlyphs(parsed.font) : parsed;
+    },
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: parseFont (variable TrueType at an instance: gvar tuples, avar 2 delta store, MVAR, HVAR)',
+    covers: ['core/src/lib/font/gvar.ts:readGvar', 'core/src/lib/font/mvar.ts:readMetricDeltas'],
+    input: 'bytes',
+    build: () => variableTrueTypeWithMetrics(),
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => {
       const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });
