@@ -186,9 +186,32 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     });
   }
 
-  it('a vertex of convex and concave edges is refused by name; a concave setback keeps the names of split faces and replays', () => {
+  it('a vertex of convex and concave edges takes a setback corner (06 BLD 13.18); a concave setback keeps the names of split faces and replays', () => {
     const { doc, id } = notched(1);
+    // the rim vertex (0, 0, 5) of the notch: two convex top edges and the concave edge down the notch, whose other end is the inner vertex (0, 0, 0)
     const mixed = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: [
+        [2.5, 0, 0],
+        [0, 2.5, 0],
+        [0, 0, 2.5],
+        [2.5, 0, 5],
+        [0, 2.5, 5],
+      ],
+      radius: 0.5,
+      corners: [
+        { near: [0, 0, 0], type: 'setback', setback: 1.2 },
+        { near: [0, 0, 5], type: 'setback', setback: 1.2 },
+      ],
+    });
+    expect(mixed.error, mixed.summary).toBeUndefined();
+    const mixedFaces = faces(mixed.document, mixed.affected[0] as string);
+    expect(mixedFaces.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(2);
+    expect(volume(mixed.document, mixed.affected[0] as string)).toBeGreaterThan(volume(doc, id));
+    const checked = execute(mixed.document, 'check_blends', { ids: [mixed.affected[0] as string] }).data as { status: string };
+    expect(checked.status).toBe('pass');
+    // a mixed vertex whose edge ends at a vertex that is neither a corner nor closed by one flat face is still refused by name
+    const open = execute(doc, 'fillet_edge', {
       id,
       edgesNear: [
         [0, 0, 2.5],
@@ -198,9 +221,8 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
       radius: 0.5,
       corners: [{ near: [0, 0, 5], type: 'setback', setback: 1.2 }],
     });
-    expect(mixed.document).toBe(doc);
-    expect(mixed.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
-    expect(mixed.summary).toContain('convex and concave edges meet');
+    expect(open.document).toBe(doc);
+    expect(open.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
     // split the face x = -5 (far from the notch) in two: its halves must come out of the concave setback with their names
     const split = execute(doc, 'split_face', { id, facesNear: [[-5, 0, 0]], plane: { origin: [0, 0, -2], normal: [0, 0, 1] } });
     expect(split.error).toBeUndefined();

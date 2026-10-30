@@ -275,16 +275,72 @@ fn concave_and_convex_corners_can_share_one_step() {
     assert!(worst_tangent_angle(&built) < 0.01);
 }
 
+/// BLD §13.18: a vertex of convex and concave edges. The rim of the notch of `notched_cube`: two convex top edges and the concave edge that goes down the notch meet at (5, 5, 10), where the top face is
+/// REFLEX (270 degrees); the hole is bounded by P_a -> Q -> P_b on it. The notch is symmetric about the plane x = y, so the centroid and the inertia must be.
 #[test]
-fn a_vertex_of_convex_and_concave_edges_is_named_not_faked() {
+fn a_vertex_of_convex_and_concave_edges_takes_a_setback_corner_through_the_contact_line_intersection() {
     let _serial = crate::serial_blends();
     let shape = notched_cube();
-    let rim = [5.0, 5.0, 10.0];
-    let meeting = edges_at(&shape, rim);
-    assert_eq!(meeting.len(), 3);
-    let (edges, corners) = spec(&shape, &meeting, 0.5, &[rim], 1.2);
-    let reason = setback_reason(&shape, &edges, &corners).unwrap();
-    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("convex and concave edges meet"), "{reason}");
+    let (rim, inner) = ([5.0, 5.0, 10.0], [5.0; 3]);
+    let mut rounded = edges_at(&shape, rim);
+    rounded.extend(edges_at(&shape, inner));
+    rounded.sort_unstable();
+    rounded.dedup();
+    assert_eq!(rounded.len(), 5, "two convex top edges, the concave vertical edge, two concave floor edges");
+    let (edges, mut corners) = spec(&shape, &rounded, 0.5, &[rim], 1.2);
+    corners.extend(spec(&shape, &rounded, 0.5, &[inner], 1.2).1);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 9 + 5 + 2, "9 planes, 5 blends, 2 corner patches");
+    // prisms: area r^2 (1 - pi / 4) over the 2.6 of the vertical edge and 3.8 of each floor edge (added), 3.8 of each top edge (removed); the inner patch adds 0.339 (13.10.3)
+    let area = 0.25 * (1.0 - std::f64::consts::FRAC_PI_4);
+    let prisms = area * (2.6 + 3.8 + 3.8) - area * (3.8 + 3.8);
+    let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
+    assert!(
+        change > prisms + 0.339 - 0.02 && change < prisms + 0.339 + 0.15,
+        "prisms {prisms} + the inner patch 0.339 + the rim patch: {change}"
+    );
+    assert!(worst_tangent_angle(&built) < 0.01, "blends, patches and faces are tangent");
+    let mass = mass_properties(&built).unwrap();
+    let centroid = (mass.centroid[0], mass.centroid[1]);
+    assert!((centroid.0 - centroid.1).abs() < 1e-6, "symmetric about x = y: {centroid:?}");
+    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-3 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
+}
+
+/// BLD §13.18: the foot of a boss on a plate. Each of the four foot vertices has two concave foot edges and the convex vertical edge of the boss; the plate face is reflex there. Four-fold symmetry:
+/// the centroid is the centre of the boss and Ixx = Iyy.
+#[test]
+fn the_four_foot_corners_of_a_boss_on_a_plate_are_mixed_vertices_and_build() {
+    let _serial = crate::serial_blends();
+    let plate = make_box([0.0; 3], [20.0, 20.0, 4.0]).unwrap().unwrap();
+    let boss = make_box([6.0, 6.0, 4.0], [8.0, 8.0, 6.0]).unwrap().unwrap();
+    let shape = boolean(BooleanOp::Union, &plate, &boss, true).unwrap().unwrap();
+    let feet = [[6.0, 6.0, 4.0], [14.0, 6.0, 4.0], [14.0, 14.0, 4.0], [6.0, 14.0, 4.0]];
+    let mut rounded: Vec<usize> = feet.iter().flat_map(|corner| edges_at(&shape, *corner)).collect();
+    rounded.sort_unstable();
+    rounded.dedup();
+    assert_eq!(rounded.len(), 8, "4 foot edges and 4 vertical edges of the boss");
+    let (edges, mut corners) = spec(&shape, &rounded, 0.5, &feet[..1], 1.2);
+    for corner in &feet[1..] {
+        corners.extend(spec(&shape, &rounded, 0.5, &[*corner], 1.2).1);
+    }
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 11 + 8 + 4, "11 planes, 8 blends, 4 corner patches");
+    let area = 0.25 * (1.0 - std::f64::consts::FRAC_PI_4);
+    let prisms = area * 4.0 * 5.6 - area * 4.0 * 4.8;
+    let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
+    // measured: the four patches take -0.180 together (-0.045 each), the notch rim's one patch adds +0.048: two convex and one concave edge there, two concave and one convex here
+    let patches = change - prisms;
+    assert!(patches > -0.3 && patches < -0.1, "prisms {prisms} + 4 corner patches: {change} (patches {patches})");
+    assert!(worst_tangent_angle(&built) < 0.01, "tangent {}", worst_tangent_angle(&built));
+    let mass = mass_properties(&built).unwrap();
+    assert!((mass.centroid[0] - 10.0).abs() < 1e-6 && (mass.centroid[1] - 10.0).abs() < 1e-6, "{:?}", mass.centroid);
+    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-3 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
 }
 
 #[test]

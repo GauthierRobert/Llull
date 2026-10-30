@@ -749,7 +749,7 @@ The taper takes about 3x the step time after review round 1 (8 to 16 s after rou
 ### 13.12.5 Left (exactly)
 
 - **The exact-boundary corner patch** (13.12.3): one Coons / Hermite quadrilateral per corner of the outline (n faces per corner), or a decision to keep the plate fit and `g0Corner`.
-- **Mixed-kind vertices**, smooth and multi-station radius laws, `size2` and profiles at a setback vertex, a rolling-ball neighbour on the same edge set, curved edges and faces: each is `BLD_CORNER_UNSUPPORTED` with the reason.
+- **Mixed-kind vertices** (built since §13.18), smooth and multi-station radius laws, `size2` and profiles at a setback vertex, a rolling-ball neighbour on the same edge set, curved edges and faces: each is `BLD_CORNER_UNSUPPORTED` with the reason.
 - **Profile corners on concave edges** (the automatic profile corner mode refuses them; the setback mode builds them).
 - **G2 corner patches**: `BRepFill_Filling` has no G2 order for these faces; needs the exact-boundary patch above.
 - **Corner time in the whole step** (tessellation of 8100-pole patches): a compact patch surface.
@@ -1053,3 +1053,70 @@ A solid with a void used to be refused by name ("several shells"): the profile a
   free-edge check (every piece is a closed shell).
 - Tests: `a_second_body_and_a_body_inside_a_void_are_refused_by_name` (a disjoint sphere in a compound; an island sphere in the pocket; red-proof: without the island check the profile path fails BRepCheck, the corner path would
   not), `a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket` (the corner builder: volume = the same corner on the solid cube less 4/3 pi 27).
+
+## 13.18 Mixed convex / concave vertices (DES-6c step 9, 2026-10-30): design
+
+Before this step a setback corner refused a vertex where convex and concave edges meet (`BLD_CORNER_UNSUPPORTED`, "a vertex of mixed kinds has no patch in this build"): the rim vertex of a notch (two convex
+top edges and the concave edge that goes down the notch), the foot of a rib on a plate edge, every re-entrant corner of a pocket or a step. The edge blends themselves are not the problem (the convex ones are
+cut, the concave ones fused, in one boolean, and the planner's algebra does not care which): the CORNER is, because of the faces at the vertex.
+
+### 13.18.1 What changes at a mixed vertex: a face can be reflex
+
+At a vertex of rounded planar edges every face F at V is bounded there by exactly two rounded edges a, b. Let s_a, s_b be their unit stubs (away from V), n the outward normal of F and w_a the unit
+inward direction of F perpendicular to edge a. Orient the pair so that F lies counterclockwise from a seen from outside (that is, (s_a x w_a) . n > 0) and let theta in (0, 2 pi) be the angle swept from s_a to s_b THROUGH F:
+cos theta = s_a . s_b and sin theta = (s_a x s_b) . n (signed). At an all-convex or all-concave vertex theta < pi for every face; at a mixed vertex a face can have theta > pi: the top face of a notch at its rim
+vertex has theta = 270 degrees (the two convex edges are 90 degrees apart, the face is the complement of the notch). theta = pi is two stubs along one line (refused already).
+
+Each blend leaves a contact line on F at the distance l_e(x) = off_e + slope_e x from its edge (x the distance from V along the edge; off_e, slope_e as in `plan_corner`, constant when the radius is). Put s_a on the
+x axis and F counterclockwise from it. The contact line of a is y = l_a(x); the contact line of b is {p : n_b . p = l_b}, with the inward normal n_b = (sin theta, -cos theta) of b, whatever theta is. Their intersection Q:
+
+    x_a = (l_b + l_a cos theta) / sin theta,   y = l_a            (and symmetrically x_b = (l_a + l_b cos theta) / sin theta along s_b)
+
+For theta < pi this is the existing `(leg_j + offset_i cos) / sine`: Q is in front of V and the setback d_a of a must exceed x_a for the contact point P_a = (d_a, l_a) to lie beyond Q (13.10.2). For theta > pi the same
+formula with the SIGNED sine gives x_a < 0: Q lies BEHIND V (270 degrees, l_a = l_b = l: Q = (-l, l)) and the face imposes no lower bound on a setback (the required value is clamped at 0). That is the sign change of the setback
+algebra: `plan_corner` used |sin theta|, which for a reflex face would have asked for a setback of |x_a| it does not need and, in the report of a too-short setback, for a minimum that does not exist; it now uses the signed
+value, ignores reflex pairs in the least-fixed-point report, and a slope c_1 = slope cos / sin that is negative cannot reach 1.
+
+### 13.18.2 The boundary of the hole on a reflex face: P_a -> Q -> P_b
+
+On a face with theta < pi the hole is bounded by the straight chord between the two contact points P_a, P_b (13.10): the chord cuts the corner off the face. On a reflex face that chord runs OUTSIDE the face
+(through the notch). The boundary is the path along the two contact lines to their intersection, P_a -> Q -> P_b: both segments are inside F (F contains the half plane beyond each contact line), Q is in the plane of F,
+and the part of F that is removed is the polygon V, W_a, P_a, Q, P_b, W_b (W the foot of the setback wall on the stub), a hexagon for 270 degrees. Q is computed in `plan_corner` for every reflex pair as the solution of the 2 x 2
+linear system "line a = line b" (constant or linearly varying radii alike) and is independent of the setbacks. The splitter then gets TWO tool edges for that face, (P_a, Q) and (Q, P_b), instead of one chord; a
+reflex face is recognised among the faces at the vertex of the cut solid by its plane (the cut faces are new shapes): Q lies in it and its normal is the recorded one.
+
+### 13.18.3 The patch: n-sided fill with more than 6 boundary curves
+
+The hole is bounded by one blend arc per edge (n of them) and one chord per wedge face or two segments per reflex face: 2n + r edges for r reflex faces (7 for the notch rim). `BRepOffsetAPI_MakeFilling` takes any number
+of constrained edges; each is added with its support face and G1, so the two segments of a reflex face are two constraints on the same support meeting at Q at an angle (a corner of the boundary, not a tangent
+continuation). The checks of the loop (`expected = 2 * edges`) count r more edges. The two checks that assume one kind of corner are replaced for a mixed vertex: the patch centre is not required to lie inside the
+source (convex) or outside (concave): a mixed corner has material on both sides, so the test is the volume sanity only for a step whose corners are all of one kind. What stays: validity, the gap of the patch to the
+blend ends (limit 5e-6 x diagonal, `g0Corner`), the angle to the supports (0.01 rad), tangency of the neighbouring blends.
+
+### 13.18.4 What is checked, with what, and what stays refused
+
+- Closed form / measured: the notched cube of 13.10 (10 mm cube minus the octant [5, 11]^3), the rim vertex (5, 5, 10): three edges, one concave and two convex, r = 1 (the top face, 270 degrees); the volume against the
+  sum of the spandrel prisms and a bounded patch region, the patch G1 to the faces and the blends (`worst_tangent_angle`), validity, face count (9 planes + 3 blends + 1 patch + ...), the polyline recorded in the notes.
+- Red-proof (13.18.5): with the straight chord on the reflex face the loop is not one loop (17 boundary edges). The signed sine of the algebra has no test of its own: a reflex pair asks for a setback
+  of |x_a| = l at most, below every setback these tests give, so |sin| builds the same corners; the sign matters for a setback shorter than the offset.
+  convex edges; the setback mode takes the mixed vertex).
+
+### 13.18.5 As built, measured
+
+- **Code** (`blend_corner.cxx`): `plan_corner` computes the signed sector per face (the edge from which the face lies counterclockwise, `sin theta = (s_a x s_b) . n`), skips a reflex pair in the setback algebra and in the least-fixed-point
+  report, and records for it the outward normal and Q (`Plan::Reflex`; the faces at a vertex are listed once per edge that meets it, so records are deduplicated by Q); `build_setback` gives the splitter the two edges
+  (P_a, Q), (Q, P_b) for a face whose plane contains a recorded Q, `expected` counts one more edge per reflex face, and the patch-side and volume sanity checks are skipped for a mixed corner (material on both sides).
+- **The notch rim** (`notched_cube` of 13.10, the rim vertex (5, 5, 10) and the inner vertex (5, 5, 5) together: two convex top edges, three concave edges): 16 faces (9 planes, 5 blends, 2 patches), valid,
+  worst tangent angle 0.0094, the volume change +0.5263 against the prisms (+0.1395 for the three added and two removed prism pieces) and the inner patch (+0.339, 13.10.3): the rim patch takes the rest, +0.048.
+  The notch is symmetric about x = y and the built solid is: centroid x = y and Ixx = Iyy to 1e-6 (the construction is not symmetric by itself: the polyline, the fill and the sewing are).
+  Test `a_vertex_of_convex_and_concave_edges_takes_a_setback_corner_through_the_contact_line_intersection`. Red-proof: with the straight chord on the reflex face the build stops with the 17 boundary edges of the first
+  experiment ("the hole at [5, 5, 10] is bounded by 17 edge(s) that do not close one loop (7 expected)").
+- **The foot of a boss** (`the_four_foot_corners_of_a_boss_on_a_plate_are_mixed_vertices_and_build`): a 8 x 8 x 6 boss on a 20 x 20 x 4 plate, the four foot edges (concave) and the four vertical edges of the boss (convex)
+  rounded, a setback corner at each foot vertex (two concave edges and a convex one: the opposite mix of the notch rim): 23 faces (11 planes, 8 blends, 4 patches), valid, centroid (10, 10), Ixx = Iyy, the patches take -0.180
+  together (-0.045 each; the rim patch of the notch, with the opposite mix, +0.048).
+- **Found while building it: `MakeFilling`'s G1Error is not what `check_blends` reads.** The first fit of the four feet reported a G1Error under the 0.01 limit and the built solid read 0.0107 rad across the chords of the walls.
+  A mixed corner is therefore judged by the angle MEASURED at 21 samples of every boundary edge (`boundary_angle`: the support normal from the edge's curve on the support, the patch normal from the patch edge that passes through the
+  middle of the loop edge, located by a 1D projection; a projection on the patch itself costs seconds on 8100 poles), limit 0.0095, and the next fit setting is tried above it: the same four feet read 0.0090 at most.
+  The cost: the first setting no longer passes, so a mixed corner takes two to three fills (about 4 s per corner on the boss against 1.4 s for a convex one). Corner speed is the next item.
+- **Left, refused by name as before:** a profile (conic / curvature) corner at a mixed vertex (the automatic profile corners round convex edges), a vertex with an unrounded third edge, curved edges or faces, `size2`, a varying size at
+  a mixed vertex has not been built or tested here (the algebra and Q handle a linear taper, no test), faces that are reflex at a vertex of four or more edges (the pairing is per face, so it should hold; untested).
