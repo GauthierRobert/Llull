@@ -412,3 +412,30 @@ fn the_job_reports_its_stage_with_rising_fractions() {
     assert!(fractions.windows(2).all(|pair| pair[0] <= pair[1]) && fractions.first() == Some(&0.0), "{fractions:?}");
     assert!(read_result(&dir).1.get("deviation").is_none());
 }
+
+#[test]
+fn refinement_splits_the_boundary_edges_of_an_open_mesh_whichever_way_a_face_runs_them() {
+    // a +Z grid: its top and left sides are run from the higher to the lower vertex index
+    let open = grid(4, |_, _| 0.0, &[]);
+    let (refined, report) = run_job(
+        "open-boundary",
+        &job("draw", json!({ "stamps": [[5.0, 5.0, 0.0]], "radius": 100.0, "strength": 0.0, "refineEdge": 0.4 })),
+        &open,
+    );
+    assert!(report["refinedEdges"].as_u64().unwrap() > 0);
+    let (positions, indices) = (&refined.0, &refined.1);
+    let mut uses = std::collections::BTreeMap::new();
+    for t in indices.chunks_exact(3) {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            *uses.entry((a.min(b), a.max(b))).or_insert(0) += 1;
+        }
+    }
+    let length = |a: u32, b: u32| {
+        let (p, q) = (point(positions, a), point(positions, b));
+        ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt()
+    };
+    let boundary: Vec<_> = uses.iter().filter(|(_, &n)| n == 1).map(|(&(a, b), _)| length(a, b)).collect();
+    assert!(boundary.len() > 40);
+    assert!(boundary.iter().all(|&l| l <= 0.4), "{boundary:?}");
+}

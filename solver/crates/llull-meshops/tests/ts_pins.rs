@@ -302,6 +302,14 @@ fn pins() -> Vec<Pin> {
             job: sculpt("smooth", json!({ "stamps": [corner_stamp()], "radius": 3.0, "strength": 0.5, "taubin": true })),
         },
         Pin {
+            name: "sculpt_refine_open_boundary",
+            mesh: grid(6, wavy, &[(2, 2)]),
+            job: sculpt(
+                "draw",
+                json!({ "stamps": [[5.0, 5.0, 0.0], [1.0, 9.0, 0.0]], "radius": 6.0, "refineEdge": 0.5, "symmetry": "xz" }),
+            ),
+        },
+        Pin {
             name: "remesh_free_boundary",
             mesh: grid(16, wavy, &[(3, 3), (10, 12)]),
             job: remesh(json!({ "targetEdge": 1.2, "preserveBoundary": false, "project": false })),

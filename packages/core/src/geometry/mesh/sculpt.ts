@@ -308,6 +308,37 @@ function symmetryErrorOf(input: MeshData, positions: ReadonlyArray<Vec3>, plane:
   return worst;
 }
 
+/**
+ * The edges of one refinement pass as (low, high): an edge once per live face that runs it from the lower to the higher index, in face order; an edge no face runs
+ * that way (a boundary edge traversed from the higher index) once, at its first face, so it is split too.
+ */
+function passEdges(edit: EditMesh): Array<[number, number]> {
+  const pairs = (f: number): Array<[number, number]> => {
+    const [a, b, c] = edit.corners(f);
+    return [
+      [a, b],
+      [b, c],
+      [c, a],
+    ];
+  };
+  const total = edit.vertexTotal;
+  const ascending = new Set<number>();
+  for (let f = 0; f < edit.faces.length / 3; f++)
+    if (edit.fAlive[f]) for (const [u, v] of pairs(f)) if (u < v) ascending.add(u * total + v);
+  const edges: Array<[number, number]> = [];
+  for (let f = 0; f < edit.faces.length / 3; f++) {
+    if (!edit.fAlive[f]) continue;
+    for (const [u, v] of pairs(f)) {
+      if (u < v) edges.push([u, v]);
+      else if (u > v && !ascending.has(v * total + u)) {
+        ascending.add(v * total + u);
+        edges.push([v, u]);
+      }
+    }
+  }
+  return edges;
+}
+
 function refine(mesh: MeshData, params: SculptParams, centres: ReadonlyArray<Vec3>): { mesh: MeshData; splits: number } | SculptTooLarge {
   const limit = params.refineEdge;
   if (limit === undefined) return { mesh, splits: 0 };
@@ -315,17 +346,7 @@ function refine(mesh: MeshData, params: SculptParams, centres: ReadonlyArray<Vec
   let splits = 0;
   for (let pass = 0; pass < 8; pass++) {
     let count = 0;
-    const edges: Array<[number, number]> = [];
-    for (let f = 0; f < edit.faces.length / 3; f++) {
-      if (!edit.fAlive[f]) continue;
-      const [a, b, c] = edit.corners(f);
-      for (const [u, v] of [
-        [a, b],
-        [b, c],
-        [c, a],
-      ] as Array<[number, number]>)
-        if (u < v) edges.push([u, v]);
-    }
+    const edges = passEdges(edit);
     for (const [u, v] of edges) {
       if (edit.liveFaces > (params.maxTriangles ?? SCULPT_MAX_TRIANGLES)) return { tooLarge: edit.liveFaces };
       if (edit.facesOnEdge(u, v).length === 0) continue;

@@ -815,6 +815,18 @@
       "stampsApplied": 1
     }
   },
+  "sculpt_refine_open_boundary": {
+    "digest": "3f98ca80550842c08198a95db5b4fa19eec14b60bc5e8bf1013d9db8e5ab2ad0",
+    "report": {
+      "movedVertices": 2241,
+      "maxDisplacement": 0.4820821279974765,
+      "displacedVolume": 20.49848805600321,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": 0.0012311969168542758,
+      "refinedEdges": 2201,
+      "stampsApplied": 4
+    }
+  },
   "sculpt_repeated_corner_inflate": {
     "digest": "a0e595cb43213ae49b87f5df6432cae1c065bbcf3e3bfe81e1a2e3de764812fc",
     "report": {
