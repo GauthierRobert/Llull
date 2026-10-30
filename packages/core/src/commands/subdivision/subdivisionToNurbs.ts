@@ -35,7 +35,7 @@ function starPoints(entity: SubdivisionEntity): Array<{ id: string; kind: 'verte
 
 /**
  * @affects sheets: removes 1 subdivision entity (unless keep), creates one nurbs_surface per patch (or per packed block); solid: creates 1 mesh entity carrying the exact B-rep recipe
- * @invariant regular quads convert exactly (deviation from the Catmull-Clark limit surface ~1e-15); quads next to extraordinary vertices are Loop-Schaefer geometry patches, G0 across every seam (data.maxEvG0 = 0); extraordinary 'G1' (sheets) first fits the four interior poles of every quad around an extraordinary vertex to the tangent planes of its neighbours (Levenberg-Marquardt on the normal mismatch at seven stations along every seam, boundary poles untouched so G0 stays exact: the measured break, at 32 stations the fit does not use, falls from 2.74 to about 0.17 degrees on a cube corner with the same 24 patches, deviation +6 %; scale and position independent; quads and edges touching a crease vertex are left alone), then refines until the measured tangent break along extraordinary-vertex edges is <= tangentToleranceDeg (the break shrinks ~0.43 per level) or 4096 patches are reached, so G1 is met to that tolerance, not exactly; kernel-optional: sheets need no kernel, solid needs the exact native kernel
+ * @invariant regular quads convert exactly (deviation from the Catmull-Clark limit surface ~1e-15); quads next to extraordinary vertices are Loop-Schaefer geometry patches, G0 across every seam (data.maxEvG0 = 0); extraordinary 'G1' (sheets) solves the linear tangent-plane conditions first (g1Solve 'exact', the default): the interior poles of the quads around an extraordinary vertex move, and where that has no solution (a valence-4 vertex beside one extraordinary vertex) the two inner poles of the edges between free quads move too, over as many rings of quads as it takes, same patch count and corner poles: every edge is then G1 to about 1e-8 rad (data.g1Method 'exact', data.g1Exact { method, freeQuads }); that costs position (maxDeviation: 3.3x the plain patches on a cube, 11 to 15x on boxes with several segments, 1.1x on cylinders), reported in data.maxDeviation; a star it cannot solve (data.exactG1Refused) and g1Solve 'fit' get the approximate tangent-plane fit (Levenberg-Marquardt on the normal mismatch, boundary poles untouched: about 0.1 to 0.5 degrees, deviation +6 to 40 %); then refines until the measured tangent break along extraordinary-vertex edges is <= tangentToleranceDeg or 4096 patches are reached; kernel-optional: sheets need no kernel, solid needs the exact native kernel
  * @failure missing id (DIR_ENTITY_NOT_FOUND), solid of an open cage (DIR_CAGE_OPEN), zero-area cage face (DIR_CONVERT_DEGENERATE), solid without an exact kernel (DIR_CONVERT_KERNEL), kernel refuses or returns no triangles (DIR_CONVERT_FAILED) -> no-op
  */
 export const subdivisionToNurbs = defineCommand({
@@ -44,10 +44,10 @@ export const subdivisionToNurbs = defineCommand({
     'Convert a subdivision solid to exact NURBS geometry for STEP, CAM and booleans. output "sheets" (default, no kernel needed): one bicubic nurbs_surface ' +
     'per patch of the once-refined cage (`faces` "unpacked") or one B-spline surface per maximal block of regular quads (`faces` "packed", fewer entities); ' +
     'regular quads are the exact Catmull-Clark limit surface, quads next to extraordinary vertices are geometry patches that meet G0 (no gaps) with a measured ' +
-    'tangent break, which `extraordinary` "G1" removes first, with the same patch count: it solves the linear tangent-plane conditions for the interior poles of those quads, which makes every edge EXACTLY G1 (about 1e-7 rad; data.g1Method "exact") when the conditions have a solution at this degree (hexahedral cages: the cube, sheared or with a corner moved) and otherwise (data.exactG1Refused lists the groups and the residual) fits the poles to the tangent planes of the neighbours (data.g1Method "fit", approximate: about 0.1 to 0.5 degrees on boxes and cylinders against 2.7 to 7), then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
+    'tangent break, which `extraordinary` "G1" removes first, with the same patch count and corner points: with `g1Solve` "exact" (default) it solves the linear tangent-plane conditions for the poles of those quads and of the edges between them, which makes every edge EXACTLY G1 (about 1e-8 rad, data.g1Method "exact", data.g1Exact { method, freeQuads }) on cubes, boxes, cylinders and prisms; the price is POSITION: the surface moves off the Catmull-Clark limit surface (data.maxDeviation: 3.3x the plain patches on a cube, 11 to 15x on boxes with several segments, about 1.1x on cylinders; compare it with the plain conversion) and the boundary curves between the quads near an extraordinary vertex change (G0 stays 0). A star it cannot solve is listed in data.exactG1Refused and gets the approximate tangent-plane fit (data.g1Method "fit": about 0.1 to 0.5 degrees, deviation +6 to 40 %); `g1Solve` "fit" asks for the fit only. Then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
     'one exact B-rep solid (patches sewn by the native kernel; needs it, always the G0 patches). The SubD is removed unless `keep`. Returns data { patchCount, ' +
     'sheets[] or solid, maxDeviation (document units, from the limit surface at `samples` x `samples` points per patch), evEdges[] { patches, valence, g0, g1Deg }, ' +
-    'maxEvG0, maxEvG1Deg, g1Method, exactG1Refused[], starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
+    'maxEvG0, maxEvG1Deg, g1Method, g1Exact, exactG1Refused[], starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
     '(DIR_CONVERT_KERNEL). Next: sew_surfaces, export_step_ap242, check_surface_quality.',
   params: z.object({
     id: z.string().describe('Id of the subdivision solid.'),
@@ -62,7 +62,13 @@ export const subdivisionToNurbs = defineCommand({
     extraordinary: z
       .enum(['G0', 'G1'])
       .describe(
-        'Treatment of patches around extraordinary vertices: "G0" (default, geometry patches) or "G1" (sheets only, approximate G1, not exact: first fit the interior poles of the quads around extraordinary vertices to the tangent planes of their neighbours, then refine further until the measured tangent break is <= tangentToleranceDeg or 4096 patches; edges at creases are not counted).',
+        'Treatment of patches around extraordinary vertices: "G0" (default, geometry patches) or "G1" (sheets only: exact where the linear tangent-plane conditions are solvable, see g1Solve and data.g1Method, otherwise the approximate fit; then refine further until the measured tangent break is <= tangentToleranceDeg or 4096 patches; edges at creases are not counted).',
+      )
+      .optional(),
+    g1Solve: z
+      .enum(['exact', 'fit'])
+      .describe(
+        'extraordinary "G1": "exact" (default) solves the linear G1 conditions (break about 1e-8 rad; the surface moves off the limit surface: data.maxDeviation, 3x the plain patches on a cube, more on boxes); "fit" is the approximate tangent-plane fit (break 0.1 to 0.5 degrees, a smaller position change).',
       )
       .optional(),
     tangentToleranceDeg: z
@@ -85,7 +91,15 @@ export const subdivisionToNurbs = defineCommand({
   run: (doc: CadDocument, params, ctx): CommandResult => {
     const entity = subdivisionOf(doc, params.id, COMMAND);
     if (!isEntity(entity)) return entity;
-    const { output = 'sheets', faces = 'unpacked', extraordinary = 'G0', keep = false, samples = 2, tangentToleranceDeg = 0.5 } = params;
+    const {
+      output = 'sheets',
+      faces = 'unpacked',
+      extraordinary = 'G0',
+      keep = false,
+      samples = 2,
+      tangentToleranceDeg = 0.5,
+      g1Solve = 'exact',
+    } = params;
     const reject = (code: string, message: string, path: string[] = []): CommandResult =>
       dirRejection(doc, COMMAND, code, message, [entity.id], path);
     const flat = entity.faces.findIndex((face) => faceArea(entity.vertices, face) < 1e-12);
@@ -103,6 +117,7 @@ export const subdivisionToNurbs = defineCommand({
       packed: faces === 'packed' && !solid,
       tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : undefined,
       fitTangents: effectiveG1,
+      exactG1: g1Solve === 'exact',
       samples,
     });
     const report = {
@@ -120,12 +135,25 @@ export const subdivisionToNurbs = defineCommand({
       tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : null,
       g1ToleranceMet: effectiveG1 ? converted.g1ToleranceMet : null,
       g1Method: effectiveG1 ? converted.g1Method : null,
+      g1Exact:
+        converted.exactMethod === null
+          ? null
+          : { method: converted.exactMethod, freeQuads: converted.exactFreeQuads, patchCount: converted.patchCount },
       exactG1Refused: converted.exactRefused.map((group) => ({ ...group, residual: sig(group.residual) })),
       warnings: effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : [],
       packedQuads: converted.packedQuads,
       packedBlocks: converted.packedBlocks,
       unit: doc.units,
     };
+    const g1Label = !effectiveG1
+      ? 'G0'
+      : converted.g1Method === 'exact'
+        ? 'G1 exact'
+        : converted.g1Method === 'fit'
+          ? converted.exactRefused.length > 0
+            ? `G1 fit (${converted.exactRefused.length} group(s) refused by the exact solve)`
+            : 'G1 fit'
+          : 'G1';
     const measured =
       `max deviation ${report.maxDeviation} ${doc.units} over ${report.deviationSamples} samples, EV seams: gap ${report.maxEvG0} ${doc.units}, tangent break ${report.maxEvG1Deg} deg` +
       (report.warnings.length > 0
@@ -160,7 +188,7 @@ export const subdivisionToNurbs = defineCommand({
     return {
       ...changed(
         withEntities(base, created),
-        `${COMMAND}: '${entity.id}' -> ${created.length} nurbs_surface sheet(s) from ${converted.patchCount} patches (${faces}, ${report.extraordinary}); ${measured}.`,
+        `${COMMAND}: '${entity.id}' -> ${created.length} nurbs_surface sheet(s) from ${converted.patchCount} patches (${faces}, ${g1Label}); ${measured}.`,
         ids,
       ),
       data: { ...report, output, sheets: ids },

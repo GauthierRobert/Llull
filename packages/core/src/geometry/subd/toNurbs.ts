@@ -9,13 +9,13 @@
  */
 
 import type { Vec3 } from '../../model/types';
-import { cross3, distance3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3';
+import { distance3, dot3 } from '../../lib/vec3';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
 import { edgeKey } from './edgeKey';
-import { type ExactG1Group, solveExactG1 } from './g1Exact';
-import { MEASURE_STATIONS, fitTangentPlanes } from './g1Fit';
+import { type ExactG1, type ExactG1Group, solveExactG1 } from './g1Exact';
+import { MEASURE_STATIONS, fitTangentPlanes, patchNormal } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
@@ -64,6 +64,10 @@ export interface ToNurbsResult {
   readonly g1Method: 'exact' | 'fit' | null;
   /** The groups of quads the exact solve could not make G1 (empty when the method is "exact"). */
   readonly exactRefused: ExactG1Group[];
+  /** With the exact method: "boundary-kept" (only interior poles moved) or "edges-freed" (the inner edge poles between free quads moved too); null otherwise. */
+  readonly exactMethod: ExactG1['method'];
+  /** Quads whose poles the exact solve was allowed to move (the patch count never changes); 0 without it. */
+  readonly exactFreeQuads: number;
 }
 
 /** A bicubic Bézier patch as a clamped bicubic NURBS surface with domain [0, 1]². */
@@ -79,14 +83,9 @@ export function patchSurface(patch: BezierPatch): NurbsSurfaceData {
   };
 }
 
-/** Surface point and unit normal of `patch` at (u, v). */
+/** Surface point and unit normal of `patch` at (u, v): the normal by analytic derivatives, so a break of 1e-8 rad is not drowned by differencing noise. */
 function patchFrame(patch: BezierPatch, u: number, v: number): { point: Vec3; normal: Vec3 } {
-  const h = 1e-6;
-  const [u0, u1] = [Math.max(0, u - h), Math.min(1, u + h)];
-  const [v0, v1] = [Math.max(0, v - h), Math.min(1, v + h)];
-  const du = sub3(patchPoint(patch, u1, v), patchPoint(patch, u0, v));
-  const dv = sub3(patchPoint(patch, u, v1), patchPoint(patch, u, v0));
-  return { point: patchPoint(patch, u, v), normal: normalize3OrZero(cross3(du, dv)) };
+  return { point: patchPoint(patch, u, v), normal: patchNormal(patch, u, v) };
 }
 
 /** Parameter of side `k` (directed v_k -> v_k+1) of a patch at fraction t along it. */
@@ -153,6 +152,8 @@ interface Build {
   readonly evEdges: EvEdgeReport[];
   readonly g1Method: 'exact' | 'fit' | null;
   readonly exactRefused: ExactG1Group[];
+  readonly exactMethod: ExactG1['method'];
+  readonly exactFreeQuads: number;
 }
 
 function buildLevel(cage: Cage, levels: number, fit: boolean, tryExact: boolean): Build {
@@ -165,10 +166,20 @@ function buildLevel(cage: Cage, levels: number, fit: boolean, tryExact: boolean)
   // the exact linear solve first; a cage whose groups it cannot make G1 (vertex enclosure at this degree) keeps the approximate fit
   const exact = fit && tryExact ? solveExactG1(refined, geometry, valence) : null;
   const exactHolds = exact !== null && exact.groups.length > 0 && exact.groups.every((group) => group.consistent);
+  const hasStar = valence.some((n) => n !== 4);
   const patches = exactHolds ? exact.patches : fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
-  const g1Method = !fit || (exact !== null && exact.groups.length === 0) ? null : exactHolds ? 'exact' : 'fit';
+  const g1Method = !fit || !hasStar ? null : exactHolds ? 'exact' : 'fit';
   const exactRefused = exact === null ? [] : exact.groups.filter((group) => !group.consistent);
-  return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence), g1Method, exactRefused };
+  return {
+    refined,
+    valence,
+    patches,
+    evEdges: evEdgeReports(refined, patches, valence),
+    g1Method,
+    exactRefused,
+    exactMethod: exactHolds ? exact.method : null,
+    exactFreeQuads: exactHolds ? exact.freeQuads : 0,
+  };
 }
 
 const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((edge) => edge.g1Deg));
@@ -207,5 +218,7 @@ export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult 
     g1ToleranceMet: tolerance === undefined ? null : worstBreak(build) <= tolerance,
     g1Method: build.g1Method,
     exactRefused: build.exactRefused,
+    exactMethod: build.exactMethod,
+    exactFreeQuads: build.exactFreeQuads,
   };
 }
