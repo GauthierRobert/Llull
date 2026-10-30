@@ -123,7 +123,8 @@ export const addText = defineCommand({
     if (height <= 0) return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
     if (position.length < 3) return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
     const id = nextId('text');
-    const reject = (code: string, message: string): CommandResult => wrapRejection(doc, 'add_text', code, message, [], ['font']);
+    const reject = (code: string, message: string): CommandResult =>
+      wrapRejection(doc, 'add_text', code, message, [], [code === 'WRP_FONT_VARIATION' ? 'variation' : 'font']);
     if (onCurve !== undefined) {
       if (font === undefined)
         return wrapRejection(doc, 'add_text', 'WRP_TEXT_NO_FONT', 'onCurve bends outline text: give a font', [], ['onCurve']);

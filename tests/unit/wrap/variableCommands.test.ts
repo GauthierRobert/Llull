@@ -76,6 +76,40 @@ describe('import_font with a variation', () => {
   });
 });
 
+describe('FontRecord.variation on load', () => {
+  const fontDocument = (): string => serializeDocument(imported({ wght: 900 }).doc);
+  const withVariation = (variation: unknown): string => {
+    const raw = JSON.parse(fontDocument()) as { document: { fonts: Record<string, { variation?: unknown }> } };
+    const record = Object.values(raw.document.fonts)[0] as { variation?: unknown };
+    record.variation = variation;
+    return JSON.stringify(raw);
+  };
+  const loadError = (json: string): string => {
+    try {
+      deserializeDocument(json);
+    } catch (error) {
+      return (error as Error).message;
+    }
+    return '';
+  };
+
+  it('loads a recorded instance, and refuses a variation that is not a record of 4-character tags to finite numbers, naming fonts.<id>.variation.<tag>', () => {
+    expect(loadError(fontDocument())).toBe('');
+    expect(loadError(withVariation(null))).toContain('.variation must be an object');
+    expect(loadError(withVariation('wght'))).toContain('.variation must be an object');
+    expect(loadError(withVariation([1]))).toContain('.variation must be an object');
+    expect(loadError(withVariation({ wght: 'bold' }))).toContain('variation.wght must be a finite number');
+    expect(loadError(withVariation({ wght: null }))).toContain('variation.wght must be a finite number');
+    expect(loadError(withVariation({ weight: 5 }))).toContain('variation.weight must be a finite number under a 4-character axis tag');
+    expect(
+      loadError(JSON.stringify(JSON.parse(withVariation({})), null, 0).replace('"variation":{}', '"variation":{"__proto__":1}')),
+    ).toContain('variation.__proto__');
+    expect(
+      loadError(withVariation(Object.fromEntries(Array.from({ length: 65 }, (_, k) => [`a${String(k).padStart(3, '0')}`, 1])))),
+    ).toContain('at most 64');
+  });
+});
+
 describe('text in an instance', () => {
   it('add_text variation picks the instance record of a font id or family name; text_outline, advance and kerning-free layout follow it', () => {
     const { doc, id } = imported();
@@ -111,6 +145,18 @@ describe('text in an instance', () => {
     expect(Object.keys(again.document.fonts ?? {})).toHaveLength(2);
   });
 
+  it('parses and scans an instance once: the same variation again finds the cached font (it does not read the bytes)', () => {
+    const { doc, id } = imported();
+    const params = { content: 'A', position: [0, 0, 0], height: 7, font: id, variation: { wght: 700 } };
+    const first = execute(doc, 'add_text', params);
+    expect(first.rejected, first.summary).toBeUndefined();
+    const sha = Object.keys(first.document.blobs ?? {})[0] as string;
+    const broken = { ...first.document, blobs: { [sha]: { ...(first.document.blobs?.[sha] as object), bytes: 'AAAA' } } } as CadDocument;
+    const again = execute(broken, 'add_text', params);
+    expect(again.rejected, again.summary).toBeUndefined();
+    expect((again.data as { font: string }).font).toBe((first.data as { font: string }).font);
+  });
+
   it('HVAR advances widen the text: BB at wdth 125 advances each B by 640 instead of 600', () => {
     const { doc, id } = imported();
     const plain = execute(doc, 'add_text', { content: 'BB', position: [0, 0, 0], height: 7, font: id });
@@ -119,14 +165,14 @@ describe('text in an instance', () => {
     expect(advance(wide) - advance(plain)).toBeCloseTo(2 * 40 * 0.01, 9);
   });
 
-  it('refuses a variation the font cannot take with the font parameter, and keeps the document unchanged', () => {
+  it('refuses a variation the font cannot take, naming the variation parameter, and keeps the document unchanged', () => {
     const { doc, id } = imported();
     expectRefusal(
       doc,
       'add_text',
       { content: 'A', position: [0, 0, 0], height: 7, font: id, variation: { wght: 9999 } },
       'WRP_FONT_VARIATION',
-      'font',
+      'variation',
     );
   });
 
@@ -151,7 +197,7 @@ describe('text in an instance', () => {
     expect(regular.rejected, regular.summary).toBeUndefined();
     expect(bold.rejected, bold.summary).toBeUndefined();
     expect(Object.keys(bold.document.fonts ?? {})).toHaveLength(2);
-    expectRefusal(box.document, 'add_decal', { ...params, variation: { wght: 1 } }, 'WRP_FONT_VARIATION', 'font');
+    expectRefusal(box.document, 'add_decal', { ...params, variation: { wght: 1 } }, 'WRP_FONT_VARIATION', 'variation');
   });
 });
 

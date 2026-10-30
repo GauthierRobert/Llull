@@ -11,6 +11,7 @@ import { type ByteView, FontError, parseError } from './reader';
 const MAX_AXES = 64;
 const MAX_REGIONS = 4096;
 const MAX_DATA = 4096;
+const MAX_REGION_INDEXES = 65_536;
 
 export interface VariationAxis {
   readonly tag: string;
@@ -189,11 +190,16 @@ export function readItemVariationStore(view: ByteView): ItemVariationStore {
     regions.push(region);
   }
   const subtables: DataSubtable[] = [];
+  let totalIndexes = 0;
   for (let d = 0; d < dataCount; d++) {
     const at = view.u32(8 + 4 * d);
     const itemCount = view.u16(at);
     const wordField = view.u16(at + 2);
     const indexCount = view.u16(at + 4);
+    if (indexCount > regionCount) throw parseError(`variation store: subtable ${d} lists ${indexCount} regions of ${regionCount}`);
+    totalIndexes += indexCount;
+    if (totalIndexes > MAX_REGION_INDEXES)
+      throw parseError(`variation store: more than ${MAX_REGION_INDEXES} region indexes over all subtables`);
     const regionIndexes = Array.from({ length: indexCount }, (_, k) => view.u16(at + 6 + 2 * k));
     if (regionIndexes.some((index) => index >= regionCount))
       throw parseError(`variation store: subtable ${d} names a region outside 0..${regionCount - 1}`);

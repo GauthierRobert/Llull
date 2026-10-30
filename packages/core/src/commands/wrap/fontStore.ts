@@ -7,6 +7,7 @@
 
 import { blobBytes, makeBinaryBlob, withBlob } from '../../model/blobs';
 import type { CadDocument } from '../../model/types';
+import type { DocumentBlob } from '../../model/types';
 import type { FontRecord } from '../../model/fonts';
 import { parseFont, validateGlyphs, type ParsedFont } from '../../lib/font/font';
 import type { AxisValues, VariationAxis } from '../../lib/font/variation';
@@ -24,6 +25,8 @@ export const isFontFailure = (value: unknown): value is FontFailure => typeof va
 
 const MAX_CACHED_FONTS = 16;
 const parsedByBlob = new Map<string, ParsedFont>();
+/** Fonts already parsed and scanned at a requested instance, so `add_text variation` does not re-validate the whole font each time. */
+const scannedInstances = new Map<string, ParsedFont>();
 
 const cacheKey = (sha256: string, instance: AxisValues | undefined): string => `${sha256}|${JSON.stringify(instance ?? {})}`;
 
@@ -84,12 +87,16 @@ export function registerFont(doc: CadDocument, bytes: Uint8Array, options: Regis
   if (!scan.ok) return { code: scan.code, message: scan.message };
   const blob = makeBinaryBlob(MEDIA_TYPE[parsed.font.format], bytes);
   remember(blob.sha256, parsed.font);
-  const instance = parsed.font.instance;
+  return addRecord(doc, blob, parsed.font, options);
+}
+
+/** The record of `font` (already parsed and scanned) in `doc`: the one of the same blob and instance, else a new one. */
+function addRecord(doc: CadDocument, blob: DocumentBlob, font: ParsedFont, options: RegisterOptions): Registered {
+  const instance = font.instance;
   const known = Object.values(doc.fonts ?? {}).find(
     (record) => record.blob === blob.sha256 && JSON.stringify(record.variation ?? {}) === JSON.stringify(instance),
   );
-  if (known !== undefined) return { document: doc, record: known, existing: true, glyphs: parsed.font.numGlyphs, axes: parsed.font.axes };
-  const { font } = parsed;
+  if (known !== undefined) return { document: doc, record: known, existing: true, glyphs: font.numGlyphs, axes: font.axes };
   const licence = options.licence ?? font.names.licence;
   const record: FontRecord = {
     id: nextId('font'),
@@ -146,15 +153,27 @@ function instanceOf(
   variation: AxisValues,
 ): { document: CadDocument; record: FontRecord } | FontFailure {
   const stored = doc.blobs?.[record.blob];
-  const bytes = stored === undefined ? null : blobBytes(stored);
-  if (bytes === null) return { code: 'WRP_FONT_UNAVAILABLE', message: `font '${record.id}' lost its bytes (blob ${record.blob})` };
-  const registered = registerFont(doc, bytes, {
+  const key = `${record.blob}|${JSON.stringify(Object.entries(variation).sort(([a], [b]) => (a < b ? -1 : 1)))}`;
+  let font = scannedInstances.get(key);
+  if (font === undefined) {
+    const bytes = stored === undefined ? null : blobBytes(stored);
+    if (stored === undefined || bytes === null)
+      return { code: 'WRP_FONT_UNAVAILABLE', message: `font '${record.id}' lost its bytes (blob ${record.blob})` };
+    const parsed = parseFont(bytes, variation);
+    if (!parsed.ok) return { code: parsed.code, message: parsed.message };
+    const scan = validateGlyphs(parsed.font);
+    if (!scan.ok) return { code: scan.code, message: scan.message };
+    if (scannedInstances.size >= MAX_CACHED_FONTS) scannedInstances.delete(scannedInstances.keys().next().value as string);
+    scannedInstances.set(key, parsed.font);
+    font = parsed.font;
+  }
+  if (stored === undefined) return { code: 'WRP_FONT_UNAVAILABLE', message: `font '${record.id}' lost its bytes (blob ${record.blob})` };
+  const added = addRecord(doc, stored, font, {
     licence: record.licence,
     verified: record.provenance.verified,
     source: record.provenance.source,
-    variation,
   });
-  return isFontFailure(registered) ? registered : { document: registered.document, record: registered.record };
+  return { document: added.document, record: added.record };
 }
 
 function resolveBase(

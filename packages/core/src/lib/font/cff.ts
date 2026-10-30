@@ -9,10 +9,10 @@
  */
 
 import { readCharset, STANDARD_ENCODING_SID } from './cffEncoding';
-import { readDict, readIndex } from './cffIndex';
+import { readDict, readIndex, type Index } from './cffIndex';
 import type { OutlineLoop, OutlineSegment } from './outline';
 import { type ByteView, parseError } from './reader';
-import { Machine, type Blender, type MachineSetup, type Subrs } from './type2';
+import { Machine, type Blender, type MachineSetup, type OperatorBudget, type Subrs } from './type2';
 import { readItemVariationStore, type ItemVariationStore } from './variation';
 
 const bias = (count: number): number => (count < 1240 ? 107 : count < 33900 ? 1131 : 32768);
@@ -42,15 +42,17 @@ const shifted = (loop: readonly OutlineSegment[], dx: number, dy: number): Outli
 export interface CffFont {
   readonly glyphCount: number;
   /** Closed loops of glyph `glyph` in font units (outer loops clockwise); throws `FontError` for a hostile charstring. */
-  readonly outline: (glyph: number) => readonly OutlineLoop[];
+  readonly outline: (glyph: number, budget?: OperatorBudget) => readonly OutlineLoop[];
 }
+
+const MAX_FONT_DICTS = 256;
 
 interface PrivateData {
   readonly locals: Subrs | null;
   readonly vsindex: number;
 }
 
-function readPrivate(table: ByteView, fontDict: Map<number, number[]>, version: 1 | 2): PrivateData {
+function readPrivate(table: ByteView, fontDict: Map<number, number[]>, version: 1 | 2, indexAt: (offset: number) => Index): PrivateData {
   const range = fontDict.get(18);
   if (range === undefined || range.length !== 2) return { locals: null, vsindex: 0 };
   const [size, offset] = range as [number, number];
@@ -58,35 +60,37 @@ function readPrivate(table: ByteView, fontDict: Map<number, number[]>, version: 
   const subrs = data.get(19)?.[0];
   const vsindex = data.get(22)?.[0] ?? 0;
   if (subrs === undefined) return { locals: null, vsindex };
-  const index = readIndex(table, offset + subrs, version === 2);
+  const index = indexAt(offset + subrs);
   return { locals: { index, bias: bias(index.count) }, vsindex };
 }
 
-/** The font dict number of each glyph from an FDSelect (formats 0 and 3 of CFF, and 4 of CFF2). */
-function readFdSelect(table: ByteView, at: number): (glyph: number) => number {
+/** The font dict number of each glyph from an FDSelect (formats 0 and 3 of CFF, and 4 of CFF2), read once. @failure unordered ranges, a sentinel short of the glyphs -> WRP_FONT_PARSE */
+function readFdSelect(table: ByteView, at: number, glyphCount: number): Uint16Array {
   const format = table.u8(at);
-  if (format === 0) return (glyph) => table.u8(at + 1 + glyph);
-  if (format === 3) {
-    const ranges = table.u16(at + 1);
-    return (glyph) => {
-      for (let r = 0; r < ranges; r++) {
-        const first = table.u16(at + 3 + 3 * r);
-        const next = table.u16(at + 3 + 3 * (r + 1));
-        if (glyph >= first && glyph < next) return table.u8(at + 5 + 3 * r);
-      }
-      throw parseError(`CFF: FDSelect has no font for glyph ${glyph}`);
-    };
+  const fonts = new Uint16Array(glyphCount);
+  if (format === 0) {
+    for (let glyph = 0; glyph < glyphCount; glyph++) fonts[glyph] = table.u8(at + 1 + glyph);
+    return fonts;
   }
-  if (format === 4) {
-    const ranges = table.u32(at + 1);
-    if (ranges > 65_536) throw parseError(`CFF2: FDSelect with ${ranges} ranges exceeds 65536`);
-    return (glyph) => {
-      for (let r = 0; r < ranges; r++)
-        if (glyph >= table.u32(at + 5 + 6 * r) && glyph < table.u32(at + 5 + 6 * (r + 1))) return table.u16(at + 9 + 6 * r);
-      throw parseError(`CFF2: FDSelect has no font for glyph ${glyph}`);
-    };
+  if (format !== 3 && format !== 4) throw parseError(`CFF: FDSelect format ${format} is not 0, 3 or 4`);
+  const wide = format === 4;
+  const ranges = wide ? table.u32(at + 1) : table.u16(at + 1);
+  if (ranges > 65_536) throw parseError(`CFF2: FDSelect with ${ranges} ranges exceeds 65536`);
+  const first = (r: number): number => (wide ? table.u32(at + 5 + 6 * r) : table.u16(at + 3 + 3 * r));
+  const fontOf = (r: number): number => (wide ? table.u16(at + 9 + 6 * r) : table.u8(at + 5 + 3 * r));
+  let previous = -1;
+  for (let r = 0; r < ranges; r++) {
+    const start = first(r);
+    const end = first(r + 1);
+    if (start <= previous || (r === 0 && start !== 0))
+      throw parseError(`${format === 4 ? 'CFF2' : 'CFF'}: FDSelect has no font for glyph ${r === 0 ? 0 : start}`);
+    previous = start;
+    const stop = Math.min(end, glyphCount);
+    for (let glyph = start; glyph < stop; glyph++) fonts[glyph] = fontOf(r);
   }
-  throw parseError(`CFF: FDSelect format ${format} is not 0, 3 or 4`);
+  if (ranges === 0 || first(ranges) < glyphCount)
+    throw parseError(`CFF: FDSelect has no font for glyph ${ranges === 0 ? 0 : first(ranges)}`);
+  return fonts;
 }
 
 interface Glyphs {
@@ -97,29 +101,56 @@ interface Glyphs {
   readonly accentGlyph: ((code: number) => number) | null;
 }
 
+/** An INDEX reader that parses each offset once (font dicts may share one Subrs INDEX). */
+const sharedIndexes = (table: ByteView, wide: boolean): ((offset: number) => Index) => {
+  const known = new Map<number, Index>();
+  return (offset) => {
+    let index = known.get(offset);
+    if (index === undefined) {
+      index = readIndex(table, offset, wide);
+      known.set(offset, index);
+    }
+    return index;
+  };
+};
+
+/** The Private DICT data of font dict `k`, read on first use. */
+function lazyValues<T>(count: number, make: (k: number) => T): (k: number) => T | undefined {
+  const made = new Map<number, T>();
+  return (k) => {
+    if (k >= count) return undefined;
+    let value = made.get(k);
+    if (value === undefined) {
+      value = make(k);
+      made.set(k, value);
+    }
+    return value;
+  };
+}
+
 function build(table: ByteView, glyphs: Glyphs): CffFont {
-  const draw = (glyph: number): Machine => {
+  const draw = (glyph: number, budget: OperatorBudget | null): Machine => {
     const [start, end] = glyphs.entryOf(glyph);
-    const machine = new Machine(table, glyphs.setupOf(glyph));
+    const machine = new Machine(table, glyphs.setupOf(glyph), budget);
     machine.run(start, end, 0);
     machine.finish();
     return machine;
   };
-  const component = (code: number): Machine => {
+  const component = (code: number, budget: OperatorBudget | null): Machine => {
     if (glyphs.accentGlyph === null) throw parseError('CFF: seac is only defined for name-keyed CFF 1.x fonts');
-    const part = draw(glyphs.accentGlyph(code));
+    const part = draw(glyphs.accentGlyph(code), budget);
     if (part.seac !== null) throw parseError('CFF: a seac component is itself an accented glyph');
     return part;
   };
   return {
     glyphCount: glyphs.glyphCount,
-    outline: (glyph) => {
-      const machine = draw(glyph);
+    outline: (glyph, budget = undefined) => {
+      const machine = draw(glyph, budget ?? null);
       let loops = machine.pen.loops;
       const { seac } = machine;
       if (seac !== null) {
-        const base = component(seac.base);
-        const accent = component(seac.accent);
+        const base = component(seac.base, budget ?? null);
+        const accent = component(seac.accent, budget ?? null);
         loops = [...loops, ...base.pen.loops, ...accent.pen.loops.map((loop) => shifted(loop, seac.adx, seac.ady))];
       }
       return loops.filter((loop) => loop.length > 0).map(reverseLoop);
@@ -142,13 +173,19 @@ function readCff1(table: ByteView): CffFont {
   const fdArray = top.get(1236)?.[0];
   const fdSelect = top.get(1237)?.[0];
   const cidKeyed = fdArray !== undefined && fdSelect !== undefined;
-  let privates: PrivateData[];
+  const indexAt = sharedIndexes(table, false);
+  let privateOf: (k: number) => PrivateData | undefined = lazyValues(1, () => readPrivate(table, top, 1, indexAt));
   let fdOf: (glyph: number) => number = () => 0;
   if (cidKeyed) {
     const fonts = readIndex(table, fdArray, false);
-    privates = fonts.entries.map(([start, end]) => readPrivate(table, readDict(table, start, end, 1), 1));
-    fdOf = readFdSelect(table, fdSelect);
-  } else privates = [readPrivate(table, top, 1)];
+    if (fonts.count > MAX_FONT_DICTS) throw parseError(`CFF: ${fonts.count} font dicts exceed ${MAX_FONT_DICTS}`);
+    privateOf = lazyValues(fonts.count, (k) => {
+      const [start, end] = fonts.entries[k] as readonly [number, number];
+      return readPrivate(table, readDict(table, start, end, 1), 1, indexAt);
+    });
+    const selected = readFdSelect(table, fdSelect, charStrings.count);
+    fdOf = (glyph) => selected[glyph] ?? 0;
+  }
   let charset: ReadonlyMap<number, number> | null = null;
   const accentGlyph = (code: number): number => {
     const sid = STANDARD_ENCODING_SID[code] as number;
@@ -165,7 +202,7 @@ function readCff1(table: ByteView): CffFont {
       if (entry === undefined) throw parseError(`CFF: glyph ${glyph} is outside 0..${charStrings.count - 1}`);
       return entry;
     },
-    setupOf: (glyph) => ({ version: 1, globals, locals: privates[fdOf(glyph)]?.locals ?? null, blender: null }),
+    setupOf: (glyph) => ({ version: 1, globals, locals: privateOf(fdOf(glyph))?.locals ?? null, blender: null }),
     accentGlyph: cidKeyed ? null : accentGlyph,
   });
 }
@@ -210,13 +247,17 @@ function readCff2(table: ByteView, coords: readonly number[]): CffFont {
     throw parseError(`CFF2: the variation store has ${store.axisCount} axes, the font's fvar has ${coords.length}`);
   const fonts = readIndex(table, fdArray, true);
   if (fonts.count === 0) throw parseError('CFF2: the FDArray is empty');
+  if (fonts.count > MAX_FONT_DICTS) throw parseError(`CFF2: ${fonts.count} font dicts exceed ${MAX_FONT_DICTS}`);
   const memo = new Map<number, readonly number[]>();
-  const setups: MachineSetup[] = fonts.entries.map(([start, end]) => {
-    const data = readPrivate(table, readDict(table, start, end, 2), 2);
+  const indexAt = sharedIndexes(table, true);
+  const setupOf = lazyValues<MachineSetup>(fonts.count, (k) => {
+    const [start, end] = fonts.entries[k] as readonly [number, number];
+    const data = readPrivate(table, readDict(table, start, end, 2), 2, indexAt);
     return { version: 2, globals, locals: data.locals, blender: blenderOf(store, coords, data.vsindex, memo) };
   });
   const fdSelect = top.get(1237)?.[0];
-  const fdOf = fdSelect === undefined ? (): number => 0 : readFdSelect(table, fdSelect);
+  const selected = fdSelect === undefined ? null : readFdSelect(table, fdSelect, charStrings.count);
+  const fdOf = (glyph: number): number => selected?.[glyph] ?? 0;
   return build(table, {
     glyphCount: charStrings.count,
     entryOf: (glyph) => {
@@ -225,8 +266,8 @@ function readCff2(table: ByteView, coords: readonly number[]): CffFont {
       return entry;
     },
     setupOf: (glyph) => {
-      const setup = setups[fdOf(glyph)];
-      if (setup === undefined) throw parseError(`CFF2: glyph ${glyph} names font dict ${fdOf(glyph)} of ${setups.length}`);
+      const setup = setupOf(fdOf(glyph));
+      if (setup === undefined) throw parseError(`CFF2: glyph ${glyph} names font dict ${fdOf(glyph)} of ${fonts.count}`);
       return setup;
     },
     accentGlyph: null,

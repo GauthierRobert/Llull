@@ -96,6 +96,18 @@ describe('CFF2 blend at an instance (the region scalars of the OpenType interpol
     expect(widthOfC({ wght: 650, wdth: 112.5 })).toBeCloseTo(480, 9);
   });
 
+  it('intermediate regions: the tent over wght 0 / 0.5 / 1 rises and falls, and invalid regions are ignored axes (scalar 1)', () => {
+    const widthOf = (variation: Record<string, number>, glyph: number): number => -area(load(variableFont(), variation), glyph) / 100;
+    const f = (wght: number): number => (widthOf({ wght }, 6) * 100) / 100;
+    expect(f(400)).toBeCloseTo(100, 9);
+    expect(f(525)).toBeCloseTo(120, 9);
+    expect(f(650)).toBeCloseTo(140, 9);
+    expect(f(775)).toBeCloseTo(120, 9);
+    expect(f(900)).toBeCloseTo(100, 9);
+    expect(f(250)).toBeCloseTo(100, 9);
+    for (const wght of [100, 400, 650, 900]) expect(-area(load(variableFont(), { wght }), 7)).toBeCloseTo((130 * 200) / 2, 6);
+  });
+
   it('a blend inside a local subroutine, and hint operators with a mask, draw the same glyph', () => {
     const font = load(variableFont(), { wght: 900 });
     expect(loopBox(font.outline(4)[0] as OutlineLoop)).toEqual({ min: [100, 0], max: [900, 700] });
@@ -185,6 +197,17 @@ describe('CFF2 table structure and hostile charstrings', () => {
     expect(refusal(font({ glyphs: glyphsOf(['dotsection']) })).message).toContain('operator 12 0 is not a CFF2 operator');
   });
 
+  it('refuses return (CFF2 subroutines end with their charstring) and a number whose bytes run past the end of its charstring', () => {
+    expect(refusal(font({ glyphs: glyphsOf([-107, 'callsubr']), fonts: [{ localSubrs: [['return']] }] })).message).toContain(
+      'return is not a CFF2 operator',
+    );
+    for (const raw of [[28, 0], [28], [247], [251], [255, 0, 0, 0]])
+      expect(refusal(font({ glyphs: glyphsOf([{ raw }]) })).message, `bytes ${raw.join(',')}`).toContain(
+        'runs past the end of its charstring',
+      );
+    expect(load(font({ glyphs: glyphsOf([{ raw: [28, 0, 5] }]) })).outline(1)).toEqual([]);
+  });
+
   it('refuses a bad vsindex, a blend without its operands and a negative blend count', () => {
     expect(refusal(font({ glyphs: glyphsOf([9, 'vsindex', 0, 0, 'rmoveto', 1, 1, 0, 1, 'blend']) })).message).toContain('subtable 9');
     expect(refusal(font({ glyphs: glyphsOf([0, 0, 'rmoveto', 1, 2, 3, 'blend', 5, 'hlineto']) })).message).toContain('needs 9 operands');
@@ -218,7 +241,7 @@ describe('CFF2 table structure and hostile charstrings', () => {
 
   it('reads every FDSelect format with two font dicts, each with its own local subroutines', () => {
     const call = [0, 0, 'rmoveto', -107, 'callsubr', 'hlineto'] as const;
-    const fonts = [{ localSubrs: [[40, 'return']] }, { localSubrs: [[60, 'return']] }];
+    const fonts = [{ localSubrs: [[40]] }, { localSubrs: [[60]] }];
     for (const selectFormat of [0, 3, 4] as const) {
       const parsed = load(font({ glyphs: glyphsOf([...call], [...call]), fonts, select: [0, 0, 1], selectFormat }));
       expect(loopBox(parsed.outline(1)[0] as OutlineLoop)?.max[0], `format ${selectFormat}`).toBe(40);
@@ -257,9 +280,9 @@ describe('CFF2 table structure and hostile charstrings', () => {
       buildCff2Font({ cff2: variableCff2(), cff2Bytes: patchStore(buildCff2(variableCff2()), patch), axes: AXES });
     expect(refusal(store((s) => (s[1] = 2))).message).toContain('format 2');
     expect(refusal(store((s) => (s[6] = 0x20))).message).toContain('data subtables exceed');
-    expect(refusal(store((s) => (s[22] = 0x20))).message).toContain('regions exceed');
-    expect(refusal(store((s) => (s[79] = 9))).message).toContain('names a region outside');
-    expect(refusal(store((s) => (s[75] = 5))).message).toContain('5 word deltas for 2 regions');
+    expect(refusal(store((s) => (s[30] = 0x20))).message).toContain('regions exceed');
+    expect(refusal(store((s) => (s[123] = 9))).message).toContain('names a region outside');
+    expect(refusal(store((s) => (s[119] = 5))).message).toContain('5 word deltas for 2 regions');
   });
 });
 

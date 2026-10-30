@@ -19,6 +19,7 @@ import { parseCommandResponse } from '@protocol/restProtocol';
 import { libraryFile } from '../../unit/materials/support';
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
+import { aliasedStoreFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
 import { asBytes, asText, orRefusal, repeated, type HostileReader } from './types';
@@ -106,6 +107,15 @@ export const CORE_READERS: readonly HostileReader[] = [
     ],
     input: 'bytes',
     build: () => variableFont({ avar: true, hvar: [3, 2, 1] }),
+    extra: [
+      { name: '4000 font dicts share one 262 144-entry Subrs INDEX', input: () => sharedSubrsFont(4000, 262_144, 1) },
+      { name: '256 font dicts, each used, share one 262 144-entry Subrs INDEX', input: () => sharedSubrsFont(256, 262_144, 256) },
+      { name: '4096 data subtables alias one subtable of 4096 region indexes', input: () => aliasedStoreFont(4096, 4096) },
+      { name: 'a subtable lists more regions than the store has', input: () => aliasedStoreFont(8, 1, 9) },
+      { name: 'an FDSelect of 20 000 one-glyph ranges', input: () => manyRangesFont(20_000) },
+      { name: 'an FDSelect whose ranges do not increase', input: () => manyRangesFont(100, true) },
+      { name: '2000 glyphs of 70 000 operators each (font-wide operator budget)', input: () => operatorFanFont(2000) },
+    ],
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => {
       const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });

@@ -101,7 +101,8 @@ export const addDecal = defineCommand({
     let family: string | undefined;
     if (font !== undefined) {
       const made = fontDecal(doc, ctx, font, text, height, variation);
-      if ('code' in made) return wrapRejection(doc, 'add_decal', made.code, made.message, [id], ['font']);
+      if ('code' in made)
+        return wrapRejection(doc, 'add_decal', made.code, made.message, [id], [made.code === 'WRP_FONT_VARIATION' ? 'variation' : 'font']);
       working = made.document;
       ink = { width: made.inkWidth, height: made.inkHeight };
       mask = made.mask;

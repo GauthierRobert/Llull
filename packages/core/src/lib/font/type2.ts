@@ -18,6 +18,13 @@ const MAX_POINTS = 20_000;
 const MAX_OPERAND = 2 ** 31;
 const STORAGE_CELLS = 32;
 
+/** Operators left for all glyphs of one scan of a font (import validates every glyph of a font; the per-glyph cap alone allows 65 535 x 200 000). */
+export interface OperatorBudget {
+  remaining: number;
+}
+
+export const FONT_OPERATOR_BUDGET = 20_000_000;
+
 export interface Subrs {
   readonly index: Index;
   readonly bias: number;
@@ -72,6 +79,7 @@ export class Machine {
   constructor(
     private readonly table: ByteView,
     private readonly setup: MachineSetup,
+    private readonly shared: OperatorBudget | null = null,
   ) {
     this.widthDone = setup.version === 2;
     this.vsindex = setup.blender?.defaultIndex ?? 0;
@@ -479,8 +487,12 @@ export class Machine {
     let i = start;
     while (i < end && !this.done) {
       if (++this.operators > MAX_OPERATORS) throw parseError(`CFF: more than ${MAX_OPERATORS} operators in one glyph`);
+      if (this.shared !== null && --this.shared.remaining < 0)
+        throw parseError(`CFF: more than ${FONT_OPERATOR_BUDGET} operators over the glyphs of one font`);
       const b0 = this.table.u8(i++);
       if (b0 >= 32 || b0 === 28) {
+        const operandBytes = b0 === 28 ? 2 : b0 === 255 ? 4 : b0 >= 247 ? 1 : 0;
+        if (i + operandBytes > end) throw parseError('CFF: a number runs past the end of its charstring');
         let value: number;
         if (b0 === 28) {
           value = this.table.i16(i);
@@ -495,6 +507,7 @@ export class Machine {
         this.push(value);
       } else if (b0 === 10) this.subroutine(this.setup.locals, depth);
       else if (b0 === 29) this.subroutine(this.setup.globals, depth);
+      else if (b0 === 11 && version === 2) throw parseError('CFF: return is not a CFF2 operator');
       else if (b0 === 11) return;
       else if (b0 === 15 && version === 2) this.vsindex = this.popInteger('vsindex');
       else if (b0 === 16 && version === 2) this.blend();

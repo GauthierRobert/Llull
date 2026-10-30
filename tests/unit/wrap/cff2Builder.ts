@@ -88,6 +88,8 @@ export interface Cff2Spec {
   readonly select?: readonly number[];
   readonly selectFormat?: 0 | 3 | 4;
   readonly store?: StoreSpec | null;
+  /** The variation store as raw bytes (aliased or oversized stores). */
+  readonly storeBytes?: readonly number[];
   /** Replace the FDSelect by these raw bytes. */
   readonly selectBytes?: readonly number[];
   /** Extra raw bytes in the Top DICT (an unknown operator, ...). */
@@ -117,7 +119,8 @@ export function buildCff2(spec: Cff2Spec): number[] {
   const fonts = spec.fonts ?? [{}];
   const globals = wideIndex((spec.globalSubrs ?? []).map(charstring));
   const charStrings = wideIndex(spec.glyphs.map((glyph) => charstring(glyph.tokens)));
-  const store = spec.store === undefined || spec.store === null ? null : buildStore(spec.store);
+  const store =
+    spec.storeBytes !== undefined ? [...spec.storeBytes] : spec.store === undefined || spec.store === null ? null : buildStore(spec.store);
   const storeBlock = store === null ? [] : [...u16(store.length), ...store];
   const select = spec.select === undefined && spec.selectBytes === undefined ? null : selectBytes(spec);
   const extraTop = spec.extraTop ?? [];

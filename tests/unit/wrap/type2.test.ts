@@ -211,6 +211,11 @@ describe('hint operators and their mask bytes', () => {
     expect(boxOf({ glyphs: glyphs(program) })).toEqual({ min: [0, 0], max: [50, 50] });
   });
 
+  it('refuses a number cut off by the end of its charstring instead of reading the next charstring', () => {
+    for (const raw of [[28, 0], [247], [255, 0, 0]])
+      expect(refusal({ glyphs: glyphs([{ raw }]) })).toContain('runs past the end of its charstring');
+  });
+
   it('counts the stems of a subroutine and refuses more than 96 stems and a mask that runs past the charstring', () => {
     const forty = [...numbers(80), 'hstemhm'] as Token[];
     expect(refusal({ glyphs: glyphs([...forty, ...forty, ...forty, ...triangle]) })).toContain('more than 96 stem hints');

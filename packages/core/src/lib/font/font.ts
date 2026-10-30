@@ -6,6 +6,7 @@
  */
 
 import { readCff } from './cff';
+import { FONT_OPERATOR_BUDGET } from './type2';
 import { buildCmap } from './cmap';
 import { glyphContours, type GlyphSource } from './glyf';
 import { buildGposKerning } from './gpos';
@@ -165,10 +166,11 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
     outline,
     scanGlyphs: () => {
       let points = 0;
+      const budget = { remaining: FONT_OPERATOR_BUDGET };
       for (let glyph = 0; glyph < header.numGlyphs; glyph++) {
         points +=
           cff !== null
-            ? cff.outline(glyph).reduce((sum, loop) => sum + loop.length, 0)
+            ? cff.outline(glyph, budget).reduce((sum, loop) => sum + loop.length, 0)
             : glyphContours(source as GlyphSource, glyph).reduce((sum, contour) => sum + contour.length, 0);
         if (points > MAX_FONT_POINTS) throw new FontError('WRP_FONT_PARSE', `glyf: more than ${MAX_FONT_POINTS} points in the whole font`);
       }
