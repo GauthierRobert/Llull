@@ -8,7 +8,7 @@
 
 import type { StrutBeam } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
-import type { GraphResult } from './graph';
+import { type GraphResult, MAX_GRAPH_BEAMS } from './graph';
 import type { VoronoiNode } from './model';
 
 /** Seeds beyond this are refused: the Bowyer-Watson pass is quadratic (6000 seeds, 55000 beams: 9-12 s; 10000 seeds: 32-43 s), and a seed adds about 9 beams (measured), so 6000 seeds stay under the 100000 beams of a graph lattice. */
@@ -168,5 +168,12 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
   }
   if (beams.length === 0)
     return { ok: false, code: 'IMP_GRAPH_EMPTY', message: 'the seeds produced no Voronoi edge inside the box', ids: [] };
+  if (beams.length > MAX_GRAPH_BEAMS)
+    return {
+      ok: false,
+      code: 'IMP_GRAPH_TOO_LARGE',
+      message: `${beams.length} beams exceed the limit of ${MAX_GRAPH_BEAMS}: lower the density`,
+      ids: [],
+    };
   return { ok: true, graph: { set: { periodic: null, nodes, beams }, dropped, totalLength, radiusMax: node.radius } };
 }

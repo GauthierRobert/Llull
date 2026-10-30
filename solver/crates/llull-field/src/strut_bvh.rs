@@ -10,7 +10,7 @@ use crate::struts::Segment;
 pub const BVH_MIN_SEGMENTS: usize = 32;
 const LEAF_SIZE: usize = 4;
 const STACK_SIZE: usize = 128;
-/// Relative slack on the bound (the brute `rho = sqrt(|p|^2 - s^2)` cancels to an error of about 3e-8 |p| near an axis).
+/// Relative slack on the bound, times (|p| + set scale + beam radius): `rho = sqrt(|p|^2 - s^2)` errs by about 3e-8 |p| near an axis, a butt edge by about eps r.
 const SLACK: f64 = 1e-6;
 const OVERFLOW: f64 = 1e300;
 
@@ -35,6 +35,16 @@ pub struct Bvh {
 fn is_unbounded(seg: &Segment) -> bool {
     let all = [seg.a[0], seg.a[1], seg.a[2], seg.d[0], seg.d[1], seg.d[2], seg.length];
     !all.iter().all(|v| v.is_finite()) || (seg.length > 0.0 && seg.length < 1e-100)
+}
+
+/// Total order of sort keys: numbers ascending, NaN after every number and equal to itself (`sort_by` panics on a broken total order).
+fn compare_keys(a: f64, b: f64) -> std::cmp::Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (true, true) => std::cmp::Ordering::Equal,
+        (true, false) => std::cmp::Ordering::Greater,
+        (false, true) => std::cmp::Ordering::Less,
+        (false, false) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+    }
 }
 
 fn end_of(seg: &Segment) -> [f64; 3] {
@@ -91,10 +101,7 @@ impl Bvh {
                 (widest, axis) = (h - l, candidate);
             }
         }
-        self.order[start..end].sort_by(|&p, &q| {
-            let by_axis = (centroid[p][axis] - centroid[q][axis]).partial_cmp(&0.0).unwrap_or(std::cmp::Ordering::Equal);
-            by_axis.then(p.cmp(&q))
-        });
+        self.order[start..end].sort_by(|&p, &q| compare_keys(centroid[p][axis], centroid[q][axis]).then(p.cmp(&q)));
         let middle = (start + end) >> 1;
         self.build(segments, centroid, start, middle);
         let right = self.build(segments, centroid, middle, end);
@@ -102,11 +109,11 @@ impl Bvh {
         node
     }
 
-    fn slack(&self, x: f64, y: f64, z: f64) -> f64 {
-        SLACK * (jmax(jmax(x.abs(), y.abs()), z.abs()) + self.scale)
+    fn point_scale(x: f64, y: f64, z: f64) -> f64 {
+        jmax(jmax(x.abs(), y.abs()), z.abs())
     }
 
-    fn bound(&self, node: usize, p: [f64; 3], radius: f64, slack: f64) -> f64 {
+    fn bound(&self, node: usize, p: [f64; 3], radius: f64, point_scale: f64) -> f64 {
         let n = &self.nodes[node];
         if n.unbounded {
             return f64::NEG_INFINITY;
@@ -117,7 +124,8 @@ impl Bvh {
         if sum.is_nan() || sum >= OVERFLOW {
             return f64::NEG_INFINITY;
         }
-        sum.sqrt() - if radius >= 0.0 { radius } else { n.reach } - slack
+        let r = if radius >= 0.0 { radius } else { n.reach };
+        sum.sqrt() - r - SLACK * (point_scale + self.scale + r)
     }
 
     /// Lower bound of the distance to every beam (-inf when not provable).
@@ -126,7 +134,7 @@ impl Bvh {
         if self.nodes.is_empty() {
             return f64::INFINITY;
         }
-        self.bound(0, [x, y, z], radius, self.slack(x, y, z))
+        self.bound(0, [x, y, z], radius, Self::point_scale(x, y, z))
     }
 
     /// Minimum of `distance_of(i)` over every beam, skipping the beams that provably cannot beat the best (NaN is never taken, as `d < best`).
@@ -136,13 +144,13 @@ impl Bvh {
             return best;
         }
         let mut best_index: Option<usize> = None;
-        let (p, slack) = ([x, y, z], self.slack(x, y, z));
+        let (p, scale) = ([x, y, z], Self::point_scale(x, y, z));
         let mut stack = [0usize; STACK_SIZE];
         let mut top = 1;
         while top > 0 {
             top -= 1;
             let node = stack[top];
-            if self.bound(node, p, radius, slack) > best {
+            if self.bound(node, p, radius, scale) > best {
                 continue;
             }
             let n = &self.nodes[node];
@@ -157,7 +165,7 @@ impl Bvh {
                 continue;
             }
             let (left, far) = (node + 1, n.right);
-            if self.bound(left, p, radius, slack) <= self.bound(far, p, radius, slack) {
+            if self.bound(left, p, radius, scale) <= self.bound(far, p, radius, scale) {
                 stack[top] = far;
                 stack[top + 1] = left;
             } else {
@@ -257,6 +265,53 @@ mod tests {
             let fast = bvh.nearest(19.0, 0.0, 0.0, -1.0, |i| distance_to_segments(&segments[i..=i], 19.0, 0.0, 0.0, -1.0));
             assert_eq!(brute, 0.0);
             assert_eq!(brute.to_bits(), fast.to_bits(), "swap {swap}: brute {brute:?} bvh {fast:?}");
+        }
+    }
+
+    #[test]
+    fn a_nan_node_in_a_fifth_of_the_beams_never_panics_the_sort_and_never_changes_the_result() {
+        for seed in 0..20 {
+            let mut rng = Rng(100 + seed);
+            let mut segments = random_segments(&mut rng, 240, 20.0);
+            for (i, seg) in segments.iter_mut().enumerate() {
+                if i % 5 == 0 {
+                    *seg = segment_of([f64::NAN; 3], [rng.next() * 20.0, 1.0, 2.0], 0.2, 0.2, true);
+                }
+            }
+            let points: Vec<[f64; 3]> = (0..60).map(|_| rng.point(22.0)).collect();
+            check(&segments, &points);
+        }
+    }
+
+    #[test]
+    fn every_beam_bound_stays_below_its_distance_including_the_corner_octant_and_wide_radii() {
+        let mut rng = Rng(3);
+        for seg in random_segments(&mut rng, 150, 30.0) {
+            let single = [seg];
+            let bvh = Bvh::new(&single);
+            for _ in 0..40 {
+                let p = rng.point(40.0);
+                for radius in [-1.0, 0.4] {
+                    let d = distance_to_segments(&single, p[0] - 5.0, p[1] - 5.0, p[2] - 5.0, radius);
+                    assert!(bvh.root_bound(p[0] - 5.0, p[1] - 5.0, p[2] - 5.0, radius) <= d);
+                }
+            }
+        }
+        for (reach, offset) in [(0.3, 0.0), (50.0, 0.0), (1e4, 3e3), (0.3, 1e5)] {
+            for sphere in [true, false] {
+                let a = [offset, offset, offset];
+                let b = [offset + 10.0, offset + 10.0, offset + 10.0];
+                let single = [segment_of(a, b, reach, reach, sphere)];
+                let bvh = Bvh::new(&single);
+                for step in 0..400 {
+                    let t = 0.01 + step as f64 * 0.37;
+                    let (x, y, z) = (b[0] + t / 3f64.sqrt(), b[1] + t / 3f64.sqrt(), b[2] + t / 3f64.sqrt());
+                    for radius in [-1.0, 0.5 * reach] {
+                        let d = distance_to_segments(&single, x, y, z, radius);
+                        assert!(bvh.root_bound(x, y, z, radius) <= d, "reach {reach} offset {offset} t {t} radius {radius}");
+                    }
+                }
+            }
         }
     }
 

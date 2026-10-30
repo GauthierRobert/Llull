@@ -28,7 +28,7 @@ export interface StrutBvh {
 export const BVH_MIN_SEGMENTS = 32;
 const LEAF_SIZE = 4;
 const STACK_SIZE = 128;
-/** Relative slack on the bound. The brute `rho = sqrt(|p|^2 - s^2)` cancels to an error of about sqrt(8 eps) |p| = 3e-8 |p| near an axis; 1e-6 covers it with a margin. */
+/** Relative slack on the bound, times (|p| + set scale + beam radius): the brute `rho = sqrt(|p|^2 - s^2)` cancels to an error of about 3e-8 |p| near an axis, a butt edge errs by about eps r; 1e-6 covers both. */
 const SLACK = 1e-6;
 const OVERFLOW = 1e300;
 
@@ -36,6 +36,12 @@ const OVERFLOW = 1e300;
 function isUnbounded(seg: BvhSegment): boolean {
   const { ax, ay, az, dx, dy, dz, length } = seg;
   return ![ax, ay, az, dx, dy, dz, length].every(Number.isFinite) || (length > 0 && length < 1e-100);
+}
+
+/** Total order of sort keys: numbers ascending, NaN after every number and equal to itself (a NaN centroid must not break the sort contract). */
+function compareKeys(a: number, b: number): number {
+  if (Number.isNaN(a) || Number.isNaN(b)) return Number.isNaN(a) === Number.isNaN(b) ? 0 : Number.isNaN(a) ? 1 : -1;
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export function buildStrutBvh(segments: readonly BvhSegment[]): StrutBvh {
@@ -93,7 +99,10 @@ export function buildStrutBvh(segments: readonly BvhSegment[]): StrutBvh {
     }
     const part = order
       .slice(start, end)
-      .sort((p, q) => ((centroid[p] as readonly number[])[axis] as number) - ((centroid[q] as readonly number[])[axis] as number) || p - q);
+      .sort(
+        (p, q) =>
+          compareKeys((centroid[p] as readonly number[])[axis] as number, (centroid[q] as readonly number[])[axis] as number) || p - q,
+      );
     part.forEach((value, k) => (order[start + k] = value));
     const middle = (start + end) >> 1;
     build(start, middle);
@@ -117,7 +126,7 @@ export function buildStrutBvh(segments: readonly BvhSegment[]): StrutBvh {
   const stack = new Int32Array(STACK_SIZE);
 
   /** Lower bound of the signed distance (computed arithmetic included) of every beam under `node`; -Infinity or NaN means "cannot skip". */
-  const bound = (node: number, x: number, y: number, z: number, radius: number, slack: number): number => {
+  const bound = (node: number, x: number, y: number, z: number, radius: number, pointScale: number): number => {
     if (unbounded[node] === 1) return -Infinity;
     const base = node * 3;
     const gx = Math.max((loA[base] as number) - x, x - (hiA[base] as number), 0);
@@ -125,18 +134,19 @@ export function buildStrutBvh(segments: readonly BvhSegment[]): StrutBvh {
     const gz = Math.max((loA[base + 2] as number) - z, z - (hiA[base + 2] as number), 0);
     const sum = gx * gx + gy * gy + gz * gz;
     if (!(sum < OVERFLOW)) return -Infinity;
-    return Math.sqrt(sum) - (radius >= 0 ? radius : (reach[node] as number)) - slack;
+    const r = radius >= 0 ? radius : (reach[node] as number);
+    return Math.sqrt(sum) - r - SLACK * (pointScale + scale + r);
   };
 
-  const slackAt = (x: number, y: number, z: number): number => SLACK * (Math.max(Math.abs(x), Math.abs(y), Math.abs(z)) + scale);
+  const pointScaleAt = (x: number, y: number, z: number): number => Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
 
   return {
-    rootBound: (x, y, z, radius) => (segments.length === 0 ? Infinity : bound(0, x, y, z, radius, slackAt(x, y, z))),
+    rootBound: (x, y, z, radius) => (segments.length === 0 ? Infinity : bound(0, x, y, z, radius, pointScaleAt(x, y, z))),
     nearest(x, y, z, radius, distanceOf) {
       let best = Infinity;
       let bestIndex = -1;
       if (segments.length === 0) return best;
-      const slack = slackAt(x, y, z);
+      const slack = pointScaleAt(x, y, z);
       let top = 0;
       stack[top++] = 0;
       while (top > 0) {

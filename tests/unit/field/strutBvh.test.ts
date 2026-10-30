@@ -120,6 +120,46 @@ describe('strut BVH (05 IMP §14.9)', () => {
     }
   });
 
+  it('keeps the brute result when a fifth of 240 beams has a NaN node (the sort key stays a total order)', () => {
+    for (let seed = 0; seed < 10; seed += 1) {
+      const set = randomSet(200 + seed, 240, 20);
+      const nodes = set.nodes.map((node, i): Vec3 => (i % 10 === 0 ? [Number.NaN, Number.NaN, Number.NaN] : node));
+      const hostile = { ...set, nodes };
+      const evaluator = prepareStrutSet(hostile);
+      const random = rng(seed);
+      for (let i = 0; i < 40; i += 1) {
+        const [x, y, z] = [random() * 22, random() * 22, random() * 22];
+        expect(sameBits(evaluator.distance(x, y, z, -1), bruteDistance(hostile, x, y, z, -1))).toBe(true);
+      }
+    }
+  });
+
+  it('bounds the corner octant past a beam end and wide radii: slack scales with the radius too', () => {
+    for (const [reach, offset] of [
+      [0.3, 0],
+      [50, 0],
+      [1e4, 3e3],
+      [0.3, 1e5],
+    ] as const) {
+      for (const cap of ['sphere', 'butt'] as const) {
+        const a: Vec3 = [offset, offset, offset];
+        const b: Vec3 = [offset + 10, offset + 10, offset + 10];
+        const beam: StrutBeam = { a: 0, b: 1, ra: reach, rb: reach, cap };
+        const set: StrutSet = { periodic: null, nodes: [a, b], beams: [beam] };
+        const bvh = buildStrutBvh([
+          { ax: a[0], ay: a[1], az: a[2], dx: 10, dy: 10, dz: 10, length: Math.hypot(10, 10, 10), ra: reach, rb: reach },
+        ]);
+        const single = prepareStrutSet(set);
+        for (let step = 0; step < 400; step += 1) {
+          const t = (0.01 + step * 0.37) / Math.sqrt(3);
+          const [x, y, z] = [b[0] + t, b[1] + t, b[2] + t];
+          for (const radius of [-1, 0.5 * reach])
+            expect(bvh.rootBound(x, y, z, radius)).toBeLessThanOrEqual(single.distance(x, y, z, radius));
+        }
+      }
+    }
+  });
+
   it('declines to bound a point that is not a number and an empty set', () => {
     const bvh = buildStrutBvh([{ ax: 0, ay: 0, az: 0, dx: 1, dy: 0, dz: 0, length: 1, ra: 0.1, rb: 0.1 }]);
     expect(Number.isNaN(bvh.rootBound(Number.NaN, 0, 0, -1)) || bvh.rootBound(Number.NaN, 0, 0, -1) === -Infinity).toBe(true);

@@ -10,7 +10,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { GraphNode } from './model';
 
 /** Hard cap of beams of an explicit set (05 IMP §14.9: a BVH skips the far beams; 107000 planar beams realise in 4 s natively, 9 s on the TS engine at 54000). */
-const MAX_GRAPH_BEAMS = 100_000;
+export const MAX_GRAPH_BEAMS = 100_000;
 
 interface GraphGeometry {
   readonly set: StrutSet;

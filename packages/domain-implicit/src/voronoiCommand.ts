@@ -19,7 +19,7 @@ export const addVoronoiLattice = defineCommand({
   annotations: { readsMeshTriangles: true },
   description:
     'Create a stochastic (Voronoi) strut lattice as an implicit FIELD: a seeded random point set with `density` seeds per document unit^3 fills the bounding box of `region`, and the beams run along the edges of its Voronoi diagram ' +
-    '(about 13 beams per seed), cut to that box and clipped by the region field. The same seed gives the same lattice on every machine. Beams have a constant radius; cap "sphere" rounds the joints. ' +
+    '(about 9 beams per seed), cut to that box and clipped by the region field. The same seed gives the same lattice on every machine. Beams have a constant radius; cap "sphere" rounds the joints. ' +
     'At most 6000 seeds (about 55000 beams, the Delaunay pass takes about 10 s there): lower the density or shrink the region otherwise. Next: create_implicit_body (voxel well below radius), export_3mf beamLattice for printers that read beams.',
   params: z.object({
     region: z
