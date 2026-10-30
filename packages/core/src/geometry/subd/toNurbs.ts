@@ -13,7 +13,7 @@ import { cross3, distance3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3'
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
-import { fitTangentPlanes } from './g1Fit';
+import { MEASURE_STATIONS, fitTangentPlanes } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
@@ -85,12 +85,13 @@ function patchFrame(patch: BezierPatch, u: number, v: number): { point: Vec3; no
 const sideParameter = (k: number, t: number): readonly [number, number] =>
   k === 0 ? [t, 0] : k === 1 ? [1, t] : k === 2 ? [1 - t, 1] : [0, 1 - t];
 
-/** Gap and normal angle along every edge that touches an extraordinary vertex. */
+/** Gap (at 5 stations, ends included) and normal angle (at `MEASURE_STATIONS`) along every smooth edge that touches an extraordinary vertex; an edge that touches a crease vertex is intentionally not G1 and is not listed. */
 function evEdgeReports(refined: Cage, patches: readonly BezierPatch[], valence: ReadonlyArray<number>): EvEdgeReport[] {
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const reports: EvEdgeReport[] = [];
+  const creased = new Set(refined.creases.flat());
   for (const edge of topology.edges) {
-    if (edge.faces.length !== 2 || (valence[edge.a] === 4 && valence[edge.b] === 4)) continue;
+    if (edge.faces.length !== 2 || (valence[edge.a] === 4 && valence[edge.b] === 4) || creased.has(edge.a) || creased.has(edge.b)) continue;
     const [f, g] = edge.faces as [number, number];
     const [from, to] = topology.directed.get(`${edge.a}>${edge.b}`) === f ? [edge.a, edge.b] : [edge.b, edge.a];
     const kf = (refined.faces[f] as ReadonlyArray<number>).indexOf(from);
@@ -101,6 +102,11 @@ function evEdgeReports(refined: Cage, patches: readonly BezierPatch[], valence: 
       const [u2, v2] = sideParameter(kg, 1 - t);
       const [first, second] = [patchFrame(patches[f] as BezierPatch, u1, v1), patchFrame(patches[g] as BezierPatch, u2, v2)];
       g0 = Math.max(g0, distance3(first.point, second.point));
+    }
+    for (const t of MEASURE_STATIONS) {
+      const [u1, v1] = sideParameter(kf, t);
+      const [u2, v2] = sideParameter(kg, 1 - t);
+      const [first, second] = [patchFrame(patches[f] as BezierPatch, u1, v1), patchFrame(patches[g] as BezierPatch, u2, v2)];
       const cosine = Math.min(1, Math.max(-1, dot3(first.normal, second.normal)));
       g1 = Math.max(g1, (Math.acos(cosine) * 180) / Math.PI);
     }
