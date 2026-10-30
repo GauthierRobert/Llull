@@ -595,7 +595,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
 **Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; a curved sheet as the base of
-`flow_on_surface`; `compareTo` for more shapes; fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
+`flow_on_surface`; `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
 ## 15. As built (DES-7d: deforming large meshes, 2026-10-30)
@@ -737,3 +737,25 @@ flowed from its own centreline onto a line is straightened with its cross-sectio
 Tests: `tests/unit/deform/flowBase.test.ts` (frame fix, straight base == default byte-identical, arc base onto a line: extent, volume, det J range, predicted
 volume, refusals, recipe validation, the pack vectors), `server/tests/nativeKernelFlowBase.test.ts` (exact vs mesh path vs closed form on the native kernel,
 the capability), cargo `deform_infinite_tests.rs` (`a_bent_rod_flowed_from_its_own_arc_onto_a_line_is_straight_again`, the pack).
+
+### 17.3 `analyze_deformation` `compareTo`: more reference shapes
+
+The reference list of the validation pack (README VC table) holds the shapes the laws produce: torus (VC-08), cylinder (VC-03, VC-17), cone (VC-06), spheroid
+(VC-11) were already there. Added (`geometry/deform/referenceShape.ts`; every distance is unsigned, document units, over every vertex of the result):
+
+| kind               | fields                                          | distance                                                                                                | produced by                                                                                                                                                |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sphere`           | `center`, `radius`                              | exact, \| \|p − c\| − r \|                                                                              | `scale_nonuniform` with equal factors of a sphere                                                                                                          |
+| `plane`            | `point`, `normal`                               | exact, \|(p − point)·n\|                                                                                | flat taper / stretch / morph of a plate (VC-34 plane z = 3), a pyramid face                                                                                |
+| `ellipticCylinder` | `point`, `axis`, `reference`, `radii` [a, b]    | first order, \|f\| / \|∇f\|, f = (x/a)² + (y/b)² − 1 in the plane across the axis                       | `scale_nonuniform` of a cylinder (VC-11: r 5 × [2, 1, 1])                                                                                                  |
+| `helicoid`         | `point`, `axis`, `reference`, `rate`, `offset`? | first order, \|g\| / \|∇g\|, g = x cos(k z) + y sin(k z) − offset (x along `reference`, z from `point`) | `twist_body` (constant rate: `region.infinite`, or inside a linear region): the image of the plane x = offset is this surface; offset 0 is a true helicoid |
+
+Decisions. The first-order distance is the same estimate the spheroid already uses (exact on the surface, within a few percent of the true distance for a
+deviation small against the radii of curvature); the exact distances (sphere, plane) are exact. A twisted box face is the helicoid with the face offset, so a
+twisted prism is checked face by face with `offset`; `rate` is the twist rate per unit length (a `twist_body` of Θ over L is Θ / L in radians). `maxDeviation`
+counts every vertex, so a body is only comparable when all its vertices lie on the shape (a thin plate for a plane or a helicoid; the Manifold cylinder has no cap
+centre vertex, the document's own cylinder mesh has). A pyramid and a frustum of planes are `plane` per face; the frustum of a round taper is the existing `cone`.
+
+Tests: `tests/unit/deform/referenceShapes.test.ts`: closed forms on and off the surface per kind (including a helicoid point at a height, the elliptic cylinder in a
+tilted reference), and per law result: sphere scaled by 2 vs radius 20 (and 19.5: 0.5), plate stretched vs plane (and a plane shifted 0.3: 0.3), cylinder × [2, 1, 1]
+vs 10 × 5 (and 10.3: 0.3), plate twisted at 36 degrees per 20 vs the helicoid (offset 0.2: 0.2; rate × 1.1: far), `DEF_COMPARE_INVALID` by field name.
