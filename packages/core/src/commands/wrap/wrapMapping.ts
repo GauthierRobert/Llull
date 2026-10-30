@@ -168,13 +168,38 @@ export function probePoints(chart: FaceChart, loops: readonly (readonly PlaneSeg
   return points;
 }
 
+/** Distance of `point` from the polyline through `line`. */
+function distanceToPolyline(point: Vec3, line: readonly Vec3[]): number {
+  let best = Infinity;
+  for (let k = 0; k + 1 < line.length; k++) {
+    const [a, b] = [line[k] as Vec3, line[k + 1] as Vec3];
+    const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const length2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+    const t =
+      length2 > 0
+        ? Math.max(0, Math.min(1, ((point[0] - a[0]) * ab[0] + (point[1] - a[1]) * ab[1] + (point[2] - a[2]) * ab[2]) / length2))
+        : 0;
+    best = Math.min(best, Math.hypot(point[0] - a[0] - t * ab[0], point[1] - a[1] - t * ab[1], point[2] - a[2] - t * ab[2]));
+  }
+  return best;
+}
+
 /**
  * Trimmed-face check: every probe point must lie on the picked face (`faceContains`).
  * @failure a probe point outside the face -> MappingFailure WRP_OUTSIDE_FACE
  */
-export function checkOnFace(session: FaceSession, points: readonly Vec3[], ids: readonly string[]): MappingFailure | null {
-  const tolerance = 1e-6 * session.diagonal + 1e-9;
+export function checkOnFace(
+  session: FaceSession,
+  points: readonly Vec3[],
+  ids: readonly string[],
+  relax?: { readonly slack: number; readonly joins: ReadonlyArray<readonly Vec3[]> },
+): MappingFailure | null {
+  const base = 1e-6 * session.diagonal + 1e-9;
   for (const [index, point] of points.entries()) {
+    // a join of geodesic charts places its edge only to the join mismatch: a probe within twice that of the joined stretch gets it as extra tolerance, every other probe keeps the exact one
+    const near =
+      relax !== undefined && relax.slack > 0 && relax.joins.some((polyline) => distanceToPolyline(point, polyline) <= 2 * relax.slack);
+    const tolerance = base + (near && relax !== undefined ? relax.slack : 0);
     const inside = session.query.faceContains(session.shape, session.face, point, tolerance);
     if (inside === false) {
       return {

@@ -6,20 +6,25 @@
  * @failure the refusals of `chainCharts.ts`, a piece leaving its face, a clip that does not close -> coded no-op
  */
 
-import type { BaseEntity, CadDocument, Entity, NurbsCurveEntity } from '../../model/types';
+import type { BaseEntity, CadDocument, Entity, NurbsCurveEntity, Vec2 } from '../../model/types';
 import { nextId } from '../../lib/id';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import type { CommandResult, ExecutionContext } from '../types';
+import { sampleSegment } from '../../geometry/planeSegments';
 import { buildChain } from './chainCharts';
 import { clipChains } from './clipRegions';
 import { wrapRejection } from './codes';
-import { namedDefault, wrapData } from './conventions';
+import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import type { FaceRefInput, FaceSession, PlacementInput, ResolvedChart } from './faceSession';
 import type { SketchOutline } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineCurves, probePoints, type MappedCurve } from './wrapMapping';
 
 const MAX_PROBES = 48;
+
+/** Sample polylines of sketch chains (chain coordinates), one per chain. */
+const sketchPoints = (chains: ReadonlyArray<ReadonlyArray<Parameters<typeof sampleSegment>[0]>>): Vec2[][] =>
+  chains.map((chain) => chain.flatMap((piece, k) => sampleSegment(piece, 5).slice(k === 0 ? 0 : 1)));
 
 export interface ChainWrap {
   readonly doc: CadDocument;
@@ -29,6 +34,7 @@ export interface ChainWrap {
     readonly entityIds: readonly string[];
     readonly placement?: PlacementInput | undefined;
     readonly fitTolerance?: number | undefined;
+    readonly maxLengthStrain?: number | undefined;
     readonly chain: readonly FaceRefInput[];
   };
   readonly session: FaceSession;
@@ -42,6 +48,7 @@ export function runWrapChain(input: ChainWrap): CommandResult {
   const { doc, ctx, params, session, resolved, outlines, tolerance } = input;
   const fail = (code: string, message: string, ids: readonly string[] = [params.id]): CommandResult =>
     wrapRejection(doc, 'wrap_to_face', code, message, [...ids], ['entityIds']);
+  const limit = params.maxLengthStrain ?? DEFAULT_MAX_LENGTH_STRAIN;
   const chain = buildChain(
     doc,
     ctx,
@@ -49,6 +56,8 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     { session, resolved, mirror: params.placement?.mirror ?? false },
     params.chain,
     tolerance,
+    limit,
+    sketchPoints(outlines.flatMap((outline) => [...outline.regions.flatMap((region) => [region.outer, ...region.holes]), ...outline.open])),
   );
   if ('summary' in chain) return chain;
   let next: CadDocument = doc;
@@ -86,7 +95,10 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     const pieces = mapped.map((curve) => curve.pieces);
     const overlap = checkWrapAround(face.chart, pieces, params.entityIds);
     if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, overlap.ids);
-    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds);
+    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds, {
+      slack: face.slack,
+      joins: face.joins,
+    });
     if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, outside.ids);
     let length = 0;
     for (const curve of mapped) {
@@ -129,6 +141,18 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     parts.push({ face: face.session.face, kind: face.session.surface.type, curves: mapped.length, length3d: length });
   }
   if (created.length === 0) return fail('WRP_OUTSIDE_FACE', 'the sketch lies on none of the chain faces', params.entityIds);
+  const curveStrain = Math.max(0, ...records.map((record) => record['maxLengthStrain'] as number));
+  const joinStrain = Math.max(0, ...chain.edges.map((edge) => edge.mismatch));
+  const strain = Math.max(curveStrain, joinStrain);
+  if (!chain.developable && curveStrain > limit)
+    return {
+      ...fail(
+        'WRP_DISTORTION_EXCEEDED',
+        `the geodesic charts of the chain stretch a curve by ${(100 * curveStrain).toPrecision(4)} % (limit ${(100 * limit).toPrecision(4)} %); use a smaller sketch or a larger maxLengthStrain`,
+        params.entityIds,
+      ),
+      data: { distortion: { maxLengthStrain: curveStrain, joinMismatch: joinStrain, limit, method: chain.method } },
+    };
   const unverified = outlines.some((outline) => outline.unverified);
   const data = wrapData(
     doc,
@@ -136,16 +160,35 @@ export function runWrapChain(input: ChainWrap): CommandResult {
       curves: records,
       faces: parts,
       chain: chain.faces.map((face) => face.session.face),
-      edges: chain.edges.map((edge) => ({ edge: edge.edge, faces: edge.faces, length: edge.length, convexity: edge.convexity })),
-      distortion: { maxLengthStrain: 0, meanLengthStrain: 0, areaRatio: 1, method: 'develop' },
-      method: 'develop',
+      edges: chain.edges.map((edge) => ({
+        edge: edge.edge,
+        faces: edge.faces,
+        length: edge.length,
+        convexity: edge.convexity,
+        mismatch: edge.mismatch,
+        windowLength: edge.windowLength,
+        cutGap: edge.cutGap,
+      })),
+      distortion: {
+        maxLengthStrain: strain,
+        curveStrain,
+        joinMismatch: joinStrain,
+        meanLengthStrain: 0,
+        areaRatio: 1,
+        method: chain.method,
+        limit,
+        limitDefaulted: params.maxLengthStrain === undefined,
+      },
+      method: chain.method,
       exact: records.every((record) => record['exact'] === true),
       anchor: { chart: resolved.anchorChart, on: resolved.anchorOn },
     },
     {
       unverified,
       provenance: {
-        method: 'develop across a chain of faces (length-preserving unfolding across the shared edges)',
+        method: chain.developable
+          ? 'develop across a chain of faces (length-preserving unfolding across the shared edges)'
+          : 'geodesic charts of the chain faces anchored on the shared edges (frame matched there; the stretch of every curve and the mismatch of every join are measured)',
         inputs: {
           id: params.id,
           face: session.face,
@@ -154,16 +197,20 @@ export function runWrapChain(input: ChainWrap): CommandResult {
           placement: params.placement ?? { method: 'develop' },
         },
       },
-      defaults:
-        params.fitTolerance === undefined
+      defaults: [
+        ...(params.fitTolerance === undefined
           ? [namedDefault('fitTolerance', tolerance, doc.units, 'llull WRP default (D-WRP-4): 1e-6 x the solid diagonal')]
-          : [],
+          : []),
+        ...(params.maxLengthStrain === undefined && !chain.developable
+          ? [namedDefault('maxLengthStrain', DEFAULT_MAX_LENGTH_STRAIN, '1', MAX_LENGTH_STRAIN_SOURCE)]
+          : []),
+      ],
     },
   );
   return {
     document: next,
     affected: created,
-    summary: `wrap_to_face: wrapped ${params.entityIds.length} entit${params.entityIds.length === 1 ? 'y' : 'ies'} across ${parts.length} faces of '${params.id}' (${parts.map((part) => `${part.kind} ${part.face}`).join(', ')}; develop, lengths kept): ${created.length} curve(s) ${created.join(', ')}${unverified ? '; unverified font' : ''}.`,
+    summary: `wrap_to_face: wrapped ${params.entityIds.length} entit${params.entityIds.length === 1 ? 'y' : 'ies'} across ${parts.length} faces of '${params.id}' (${parts.map((part) => `${part.kind} ${part.face}`).join(', ')}; ${chain.developable ? 'develop, lengths kept' : `${chain.method}, max stretch ${(100 * strain).toPrecision(4)} %`}): ${created.length} curve(s) ${created.join(', ')}${unverified ? '; unverified font' : ''}.`,
     data,
     ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}),
   };

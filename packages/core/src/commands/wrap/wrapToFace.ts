@@ -51,7 +51,7 @@ export const wrapToFace = defineCommand({
       .max(15)
       .optional()
       .describe(
-        'Multi-face wrap: more faces (plane or cylinder) adjacent to `face`, each sharing an edge with the faces before it. The faces are unfolded into one chart (develop, lengths kept, also across sharp edges), the curves are cut at the shared edges and each run becomes a curve on its own face (data.faces, curves[].face). Edges must develop to straight lines (WRP_CHAIN_EDGE_CURVED otherwise); WRP_CHAIN_FACE_UNSUPPORTED for cone, sphere, torus faces; WRP_CHAIN_NOT_ADJACENT when a face shares no edge.',
+        'Multi-face wrap: more faces (plane, cylinder, cone, sphere or torus) adjacent to `face`, each sharing an edge with the faces before it. The faces are unfolded into one chart (plane, cylinder, cone: develop, lengths kept, also across sharp edges; with a sphere or torus face use placement.method geodesic: the geodesic charts are anchored on the shared edge, the join mismatch and the stretch are measured and refused above maxLengthStrain with WRP_DISTORTION_EXCEEDED), the curves are cut at the shared edges and each run becomes a curve on its own face (data.faces, curves[].face). Developable edges must develop to straight lines (generatrices, cone rulings, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise), sphere and torus edges must be straight in the geodesic chart (meridians of a torus, great circles); WRP_CHAIN_FACE_UNSUPPORTED for freeform faces; WRP_CHAIN_NOT_ADJACENT when a face shares no edge.',
       ),
     maxLengthStrain: z
       .number()

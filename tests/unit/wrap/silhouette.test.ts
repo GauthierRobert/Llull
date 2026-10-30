@@ -9,6 +9,7 @@ import type { Vec2, Vec3 } from '@core/model/vectors';
 import type { FaceQueryPort, SurfaceParams } from '@core/geometry/kernelPorts';
 import type { SolidSession } from '@core/commands/wrap/faceSession';
 import { silhouettes } from '@core/commands/wrap/silhouette';
+import { evaluateCurve } from '@lib/nurbs/evaluate';
 
 interface Geometry {
   readonly surface: SurfaceParams;
@@ -38,6 +39,11 @@ function evaluate(surface: SurfaceParams, [u, v]: Vec2): { point: Vec3; normal: 
   if (surface.type === 'sphere') {
     const normal: Vec3 = [Math.cos(v) * Math.cos(u), Math.cos(v) * Math.sin(u), Math.sin(v)];
     return { point: add(surface.center, mul(normal, surface.radius)), normal };
+  }
+  if (surface.type === 'torus') {
+    const radial = add(mul(X, Math.cos(u)), mul(Y, Math.sin(u)));
+    const normal = add(mul(radial, Math.cos(v)), mul(Z, Math.sin(v)));
+    return { point: add(surface.center, add(mul(radial, surface.major), mul(normal, surface.minor))), normal };
   }
   return { point: [0, 0, 0], normal: Z };
 }
@@ -182,7 +188,7 @@ describe('silhouettes', () => {
     expect(silhouettes(session([cone]), [0.1, 0, 1]).curves).toEqual([]);
   });
 
-  it('a sphere gives the great circle (2 pi r), a sphere patch the circle leaves and a torus are refused by reason', () => {
+  it('a sphere gives the great circle (2 pi r), a sphere patch the circle leaves and a freeform face are refused by reason', () => {
     const sphere: Geometry = {
       surface: { type: 'sphere', center: [0, 0, 0], radius: 25 },
       uvBounds: [
@@ -198,14 +204,14 @@ describe('silhouettes', () => {
     expect(patch.curves).toEqual([]);
     expect(patch.unsupported[0]?.reason).toContain('leaves this sphere patch');
     const torus: Geometry = {
-      surface: { type: 'torus', center: [0, 0, 0], axis: Z, major: 30, minor: 8 },
+      surface: { type: 'other', kind: 'bspline' },
       uvBounds: [
         [0, 0],
         [1, 1],
       ],
     };
     expect(silhouettes(session([torus]), [0, 0, 1]).unsupported).toEqual([
-      { face: 0, surface: 'torus', reason: 'only plane, cylinder, cone and sphere faces have a closed-form silhouette' },
+      { face: 0, surface: 'other', reason: 'only plane, cylinder, cone, sphere and torus faces have a closed-form silhouette' },
     ]);
   });
 
@@ -217,5 +223,84 @@ describe('silhouettes', () => {
     const flipped: Geometry = { ...cylinder, surface: { ...(cylinder.surface as object), xDir: Y } as SurfaceParams };
     const mismatch = silhouettes(session([flipped]), [1, 0, 0]);
     expect(mismatch.unsupported[0]?.reason).toContain('azimuth convention');
+  });
+});
+
+describe('torus contours (spec 14.12)', () => {
+  const torus: Geometry = {
+    surface: { type: 'torus', center: [0, 0, 0], axis: Z, major: 10, minor: 3 },
+    uvBounds: [
+      [0, 0],
+      [2 * Math.PI, 2 * Math.PI],
+    ],
+  };
+  const normalAt = ([x, y, z]: Vec3): Vec3 => {
+    const rho = Math.hypot(x, y);
+    const n: Vec3 = [((rho - 10) * x) / rho, ((rho - 10) * y) / rho, z];
+    const length = Math.hypot(...n);
+    return [n[0] / length, n[1] / length, n[2] / length];
+  };
+  const nodesOf = (curve: { poles: readonly Vec3[] }): number => curve.poles.length - 3;
+
+  for (const d of [
+    [0.3, 0.2, 1],
+    [0.3, 0.2, -1],
+    [-0.4, 0.1, -2],
+  ] as Vec3[])
+    it(`seen along (${d.join(', ')}): two fitted closed curves with n . d = 0 at the fit nodes to 1e-9 and between them within the reported deviation, the pcurve one turn of u (either sign of d_a)`, () => {
+      const found = silhouettes(session([torus]), d, 1e-6);
+      expect(found.unsupported).toEqual([]);
+      expect(found.curves).toHaveLength(2);
+      for (const piece of found.curves) {
+        expect(piece.kind).toBe('fitted');
+        expect(piece.deviation).toBeLessThanOrEqual(1e-6);
+        const nodes = nodesOf(piece.curve);
+        expect(nodes).toBeGreaterThanOrEqual(8);
+        const at = (s: number): number => {
+          const n = normalAt(evaluateCurve(piece.curve, s / nodes));
+          return Math.abs((n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / Math.hypot(...d));
+        };
+        for (let k = 0; k < nodes; k++) {
+          expect(at(k)).toBeLessThan(1e-9);
+          expect(at(k + 0.5)).toBeLessThanOrEqual(piece.deviation);
+        }
+        const uv = piece.pcurve.poles as readonly Vec2[];
+        expect(Math.abs((uv[uv.length - 1] as Vec2)[0] - (uv[0] as Vec2)[0])).toBeCloseTo(2 * Math.PI, 6);
+        expect(piece.length).toBeGreaterThan(2 * Math.PI * 7);
+      }
+    });
+
+  it('seen from below along the axis (0, 0, -1) it is the same as from above: the outer equator on the seam, the inner circle of length 2 pi (R - r)', () => {
+    const found = silhouettes(session([torus]), [0, 0, -5], 1e-6);
+    expect(found.unsupported).toEqual([]);
+    expect(found.onEdge).toEqual([0]);
+    expect(found.curves).toHaveLength(1);
+    expect(found.curves[0]?.length).toBeCloseTo(2 * Math.PI * 7, 5);
+  });
+
+  it('seen along the axis the outer equator is the seam of the face (already an edge) and the inner equator is a circle of length 2 pi (R - r)', () => {
+    const found = silhouettes(session([torus]), [0, 0, 5], 1e-6);
+    expect(found.onEdge).toEqual([0]);
+    expect(found.curves).toHaveLength(1);
+    expect(found.curves[0]?.length).toBeCloseTo(2 * Math.PI * 7, 5);
+  });
+
+  it('seen in the equatorial plane, with a convention the surface frame does not follow, or leaving a patch, the torus is refused by reason', () => {
+    expect(silhouettes(session([torus]), [1, 0.5, 0]).unsupported[0]?.reason).toContain('equatorial plane');
+    expect(silhouettes(session([torus], { maxZ: 1 }), [0.3, 0.2, 1]).unsupported[0]?.reason).toContain('leaves this torus patch');
+    const wrong = session([torus]);
+    const evaluateFace = (wrong.query as unknown as { evaluateFace: (...args: unknown[]) => Array<{ point: Vec3; normal: Vec3 }> })
+      .evaluateFace;
+    const broken = {
+      ...wrong,
+      query: {
+        ...wrong.query,
+        evaluateFace: (shape: unknown, face: number, uv: readonly Vec2[]) =>
+          evaluateFace(shape, face, uv).map((hit, k) => (k > 2 ? { ...hit, normal: X } : hit)),
+      },
+    } as SolidSession;
+    expect(silhouettes(broken, [0.3, 0.2, 1]).unsupported[0]?.reason).toContain('parameter convention');
+    const failing = { ...wrong, query: { ...wrong.query, evaluateFace: () => null } } as unknown as SolidSession;
+    expect(silhouettes(failing, [0.3, 0.2, 1]).unsupported[0]?.reason).toContain('could not evaluate');
   });
 });

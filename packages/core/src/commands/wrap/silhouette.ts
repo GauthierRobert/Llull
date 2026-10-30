@@ -1,16 +1,19 @@
 /**
  * The silhouette (outline, parting line) of a solid seen along a direction, from its exact faces (03 WRP M5): where the face normal is perpendicular to the direction. Closed forms
  * on the analytic faces: a cylinder gives the two generatrices at +-(axis x direction), a cone the generatrices where cos(alpha) cos(phi - psi) d_p = sin(alpha) (axis . d), a sphere the
- * great circle perpendicular to the direction; a plane has none (it is edge-on or turned toward / away). Each curve is checked against the kernel (the face normals along it are
+ * great circle perpendicular to the direction, a torus (axis a, d = d_a a + d_p) the two closed curves v = atan(-d_p cos u / d_a) + k pi (u from the direction of d_p; atan, not atan2, so v is continuous for either sign of d_a); a plane has none (it is edge-on or turned toward / away). Each curve is checked against the kernel (the face normals along it are
  * perpendicular to the direction) and only the part inside its face is kept.
  * @invariant every curve returned lies on its face to the kernel's evaluation (points come from `evaluateFace` / are verified by `projectOnFace`), has |n . d| <= 1e-6 along it, and is
  *   strictly inside the face (the faces on both sides of it are the face itself); a silhouette that already is an edge of the solid is reported, not returned
- * @failure torus and freeform faces, a sphere patch the great circle leaves, a face whose silhouette is only partly inside it (a hole), a convention mismatch of the face
+ * @failure freeform faces, a torus seen along its equatorial plane (four crossing circles), a torus whose frame the kernel parametrises differently, a torus or sphere patch the contour leaves, a face whose silhouette is only partly inside it (a hole), a convention mismatch of the face
  *   parameters -> listed in `unsupported` with the reason
  */
 
 import type { Vec2, Vec3 } from '../../model/vectors';
 import { arc2, type NurbsCurve2Data } from '../../lib/nurbs/curve2d';
+import { fitBySampling, isMappingError } from '../../geometry/wrapCurves';
+import { curveDomain } from '../../lib/nurbs/evaluate';
+import { integrateCurve } from '../../lib/nurbs/integrate';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import type { SurfaceParams } from '../../geometry/kernelPorts';
@@ -19,11 +22,13 @@ import { continuousUv } from './splitChains';
 
 export interface SilhouetteCurve {
   readonly face: number;
-  readonly kind: 'line' | 'circle';
+  readonly kind: 'line' | 'circle' | 'fitted';
   readonly curve: NurbsCurveData;
   /** Pcurve in the kernel's own (u, v) of the face: a polyline through the projected samples. */
   readonly pcurve: NurbsCurve2Data;
   readonly length: number;
+  /** Largest distance of the 3D curve (and of the pcurve edge) from the exact contour, document units (0 for a line or a circle). */
+  readonly deviation: number;
 }
 
 export interface SilhouetteReport {
@@ -111,7 +116,7 @@ function generatrix(
   const snapped = query.projectOnFace(shape, face, probes);
   const inside = snapped?.map((hit) => hit !== null && query.faceContains(shape, face, hit.point, tolerance) === true) ?? [false, false];
   if (!inside.every(Boolean)) return 'edge';
-  return { face, kind: 'line', curve: lineCurve(lo, hi), pcurve: polylinePcurve([at(t0), at(t1)]), length };
+  return { face, kind: 'line', curve: lineCurve(lo, hi), pcurve: polylinePcurve([at(t0), at(t1)]), length, deviation: 0 };
 }
 
 function sphereCircle(
@@ -154,11 +159,105 @@ function sphereCircle(
   const continued = continuousUv([...raw, raw[0] as Vec2], [true, false]);
   const turn = TWO_PI * Math.floor(((continued[0] as Vec2)[0] - bounds[0][0]) / TWO_PI);
   const uv = continued.map(([u, v]): Vec2 => [u - turn, v]);
-  return { face, kind: 'circle', curve, pcurve: polylinePcurve(uv), length: TWO_PI * surface.radius };
+  return { face, kind: 'circle', curve, pcurve: polylinePcurve(uv), length: TWO_PI * surface.radius, deviation: 0 };
 }
 
-/** The silhouette curves of the solid's faces seen along `direction`. */
-export function silhouettes(session: SolidSession, direction: Vec3): SilhouetteReport {
+const TORUS_PROBES = 48;
+const wrapPi = (angle: number): number => angle - TWO_PI * Math.round(angle / TWO_PI);
+
+/**
+ * The two contour curves of a torus seen along `d` (see the module comment), as fitted cubic B-splines within `tolerance` with their pcurves in the kernel's own (u, v). The kernel's frame is
+ * read from three evaluations of the face (its azimuth origin and the direction of its axis), and the whole contour is verified against `evaluateFace`, `projectOnFace` and `faceContains`.
+ */
+function torusContours(
+  session: SolidSession,
+  face: number,
+  surface: Extract<SurfaceParams, { type: 'torus' }>,
+  bounds: readonly [Vec2, Vec2],
+  d: Vec3,
+  tolerance: number,
+): { readonly curves: SilhouetteCurve[]; readonly onEdge: boolean } | string {
+  const { query, shape, diagonal } = session;
+  const { center, major: R, minor: r } = surface;
+  const a = normalize3(surface.axis);
+  const da = dot3(d, a);
+  const perp = sub3(d, scale3(a, da));
+  const dp = len3(perp);
+  if (Math.abs(da) < 1e-9 * len3(d))
+    return 'seen along its equatorial plane a torus has four crossing contour circles (two parallels and two meridians): tilt the direction off the plane of the torus, or split the torus with a plane first';
+  const x = dp > 1e-12 ? scale3(perp, 1 / dp) : frameOf(a, Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]).x;
+  const y = cross3(a, x);
+  const probe = query.evaluateFace(shape, face, [
+    [0, 0],
+    [Math.PI / 2, 0],
+    [0, Math.PI / 2],
+  ]);
+  if (probe === null) return 'the kernel could not evaluate the torus face';
+  const [p00, p10, p01] = probe.map((hit) => sub3(hit.point, center)) as [Vec3, Vec3, Vec3];
+  const kx = normalize3(sub3(p00, scale3(a, dot3(p00, a))));
+  const ky = normalize3(sub3(p10, scale3(a, dot3(p10, a))));
+  const ka = scale3(sub3(p01, scale3(kx, R)), 1 / r);
+  const sigmaV = dot3(ka, a) >= 0 ? 1 : -1;
+  const theta0 = Math.atan2(dot3(x, ky), dot3(x, kx));
+  const sigmaU = wrapPi(Math.atan2(dot3(y, ky), dot3(y, kx)) - theta0) >= 0 ? 1 : -1;
+  const point = (u: number, v: number): Vec3 =>
+    add3(add3(center, scale3(add3(scale3(x, Math.cos(u)), scale3(y, Math.sin(u))), R + r * Math.cos(v))), scale3(a, r * Math.sin(v)));
+  const contourV = (u: number, branch: number): number => Math.atan(-(dp * Math.cos(u)) / da) + branch * Math.PI;
+  const turnU = TWO_PI * Math.floor((theta0 - bounds[0][0]) / TWO_PI);
+  const kernelUv = (s: number, branch: number): Vec2 => {
+    const v = sigmaV * contourV(TWO_PI * s, branch);
+    return [theta0 + sigmaU * TWO_PI * s - turnU, v - TWO_PI * Math.floor((sigmaV * contourV(0, branch) - bounds[0][1]) / TWO_PI)];
+  };
+  const out: SilhouetteCurve[] = [];
+  let onEdge = false;
+  for (const branch of [0, 1]) {
+    // along the axis a contour is a parallel (constant v): the outer equator is the seam of the face, already an edge
+    const seam = (value: number): boolean => Math.abs(wrapPi(value)) < 1e-9;
+    if (dp <= 1e-12 && (seam(sigmaV * contourV(0, branch) - bounds[0][1]) || seam(sigmaV * contourV(0, branch) - bounds[1][1]))) {
+      onEdge = true;
+      continue;
+    }
+    const checks = Array.from({ length: TORUS_PROBES }, (_, k) => (k + 0.37) / TORUS_PROBES);
+    const exact = checks.map((s) => point(TWO_PI * s, contourV(TWO_PI * s, branch)));
+    const evaluated = query.evaluateFace(
+      shape,
+      face,
+      checks.map((s) => kernelUv(s, branch)),
+    );
+    if (
+      evaluated === null ||
+      !evaluated.every(
+        (hit, k) => len3(sub3(hit.point, exact[k] as Vec3)) < 1e-7 * diagonal && Math.abs(dot3(hit.normal, d)) < 1e-6 * len3(d),
+      )
+    )
+      return 'the parameter convention of the torus face differs from its surface frame';
+    const hits = query.projectOnFace(shape, face, exact);
+    if (
+      hits === null ||
+      !hits.every(
+        (hit) => hit !== null && hit.distance < 1e-7 * diagonal && query.faceContains(shape, face, hit.point, 1e-7 * diagonal) === true,
+      )
+    )
+      return 'the contour of the torus leaves this torus patch';
+    const curve = fitBySampling((s) => point(TWO_PI * s, contourV(TWO_PI * s, branch)), tolerance, 'the torus contour cannot be fitted');
+    if (isMappingError(curve)) return curve.error;
+    const pcurve = fitBySampling((s) => [...kernelUv(s, branch), 0] as Vec3, tolerance / (R + r), 'the torus contour cannot be fitted');
+    if (isMappingError(pcurve)) return pcurve.error;
+    const [first, last] = curveDomain(curve.curve);
+    out.push({
+      face,
+      kind: 'fitted',
+      curve: curve.curve,
+      pcurve: { ...pcurve.curve, poles: pcurve.curve.poles.map(([u, v]): Vec2 => [u, v]) },
+      length: integrateCurve(curve.curve, first, last, (_point, derivative) => Math.hypot(derivative[0], derivative[1], derivative[2])),
+      deviation: Math.max(curve.deviation, pcurve.deviation * (R + r)),
+    });
+  }
+  return { curves: out, onEdge };
+}
+
+/** The silhouette curves of the solid's faces seen along `direction`; `tolerance` (document units) is the fit of the torus contours. */
+export function silhouettes(session: SolidSession, direction: Vec3, tolerance = 1e-6 * session.diagonal): SilhouetteReport {
   const d = normalize3(direction);
   const report: SilhouetteReport = { curves: [], edgeOn: [], onEdge: [], unsupported: [] };
   const faces = session.topology?.faces.length ?? 0;
@@ -197,11 +296,18 @@ export function silhouettes(session: SolidSession, direction: Vec3): SilhouetteR
       const spread = Math.acos(ratio);
       for (const sign of [1, -1]) record(generatrix(session, face, psi + sign * spread, uvBounds, d));
     } else if (surface.type === 'sphere') record(sphereCircle(session, face, surface, uvBounds, d));
-    else
+    else if (surface.type === 'torus') {
+      const found = torusContours(session, face, surface, uvBounds, d, tolerance);
+      if (typeof found === 'string') report.unsupported.push({ face, surface: 'torus', reason: found });
+      else {
+        report.curves.push(...found.curves);
+        if (found.onEdge && !report.onEdge.includes(face)) report.onEdge.push(face);
+      }
+    } else
       report.unsupported.push({
         face,
         surface: surface.type,
-        reason: 'only plane, cylinder, cone and sphere faces have a closed-form silhouette',
+        reason: 'only plane, cylinder, cone, sphere and torus faces have a closed-form silhouette',
       });
   }
   return report;

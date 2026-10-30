@@ -57,7 +57,7 @@ describe('emboss_on_face with a chain of faces (fake stadium)', () => {
     expect(relative(info['expectedVolumeDelta'] as number, 186)).toBeLessThan(1e-9);
     expect(relative(info['volumeDelta'] as number, 186)).toBeLessThan(1e-9);
     expect(info['chain']).toEqual([2, 1]);
-    expect(info['edges']).toEqual([{ edge: 6, faces: [2, 1], length: 10, convexity: 'smooth' }]);
+    expect(info['edges']).toEqual([{ edge: 6, faces: [2, 1], length: 10, windowLength: 10, cutGap: 0, convexity: 'smooth', mismatch: 0 }]);
     expect((info['distortion'] as { maxLengthStrain: number }).maxLengthStrain).toBe(0);
     expect(done.affected).toHaveLength(1);
     expect(done.summary).toContain('across 2 faces');
@@ -127,7 +127,7 @@ describe('emboss_on_face with a chain of faces (fake stadium)', () => {
 });
 
 describe('chain refusals that need another fixture', () => {
-  it('a cone face in the chain is WRP_CHAIN_FACE_UNSUPPORTED', () => {
+  it('a cone face joined along an edge that does not develop to the same line is WRP_CHAIN_EDGE_CURVED (cones chain along rulings only)', () => {
     withFakeKernelOnce({ stadium: 'cone-end' }, () => {
       const base = stadium();
       const sketch = rectangle(base.doc, 6, 30);
@@ -135,8 +135,8 @@ describe('chain refusals that need another fixture', () => {
         sketch.doc,
         'emboss_on_face',
         { id: base.id, face: FRONT, chain: [{ faceIndex: 1 }], profileIds: [sketch.id], mode: 'emboss', depth: 1, placement },
-        'WRP_CHAIN_FACE_UNSUPPORTED',
-        'chain.0',
+        'WRP_CHAIN_EDGE_CURVED',
+        'chain',
       );
     });
   });
