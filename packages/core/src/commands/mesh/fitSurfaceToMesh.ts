@@ -3,13 +3,15 @@
 import { cross3, dot3, sub3 } from '../../lib/vec3';
 import { MAX_SURFACE_POLES } from '../../lib/nurbs/surfaceTypes';
 import { type PatchFit, footPoints, fitPatch, regionFrame } from '../../geometry/mesh/surfaceLsq';
-import { type HarmonicMap, harmonicMap, parameterStretch } from '../../geometry/mesh/harmonicMap';
+import { type HarmonicMap, parameterStretch } from '../../geometry/mesh/harmonicMap';
+import { resolveMeshEngine } from '../../geometry/mesh/engine';
 import type { Vec3 } from '../../model/types';
 import { colorField, defineCommand, layerIdField, nameField, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
 import { DEFAULT_SURFACE_COLOR, commitSurface } from '../surface/surfaceShared';
 import { faceGroupSelection, faceGroupsParam } from './faceGroupRegion';
 import { contextOf, isLoadFailure, loadSolidMesh, meshRejection, namedDefault, withConventions } from './meshCommon';
+import { isRegionRefusal, regionHarmonic } from './harmonicRegion';
 
 const DEFAULT_DEGREE = 3;
 const DEFAULT_SMOOTHING = 1e-3;
@@ -20,8 +22,6 @@ const MAX_FIT_VERTICES = 15_000;
 const MAX_MEASURED = 30_000;
 /** Most triangles in the region (a region is strided to MAX_FIT_VERTICES for the solve, but its measurement and area pass are linear in it). */
 const MAX_REGION_TRIANGLES = 200_000;
-/** Most triangles of a region the harmonic map solves (13.23.2: about 1 to 2 s at this size on a badly jittered mesh; the solve runs on the caller's thread). */
-const MAX_HARMONIC_TRIANGLES = 25_000;
 /** A region this folded (area fraction of triangles at or past vertical against its best-fit plane) cannot be one patch. */
 const MAX_FOLDED_FRACTION = 0.02;
 /** Pole counts tried, longest side, when maxDeviation drives the size. */
@@ -50,8 +50,7 @@ export const fitSurfaceToMesh = defineCommand({
     'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region` and/or in `faceGroups` (named groups of the mesh or segment_mesh regions). `parameterization` ' +
     '"projection" projects the region orthogonally onto its best-fit plane (it must look like a height field over that plane: gently curved, ' +
     'not folded back); "harmonic" maps a DISK-topology region (one connected manifold piece with exactly one boundary loop) onto the unit square ' +
-    'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-9 within an iteration budget, boundary by arc length between four corner vertices: the sharpest turns, else the vertices nearest the quarter points of its length; Floater mean-value weights when the exact ones flip a triangle; at most ' +
-    `${MAX_HARMONIC_TRIANGLES} triangles), which follows a strongly curved region (a hemisphere, a bowl) that projection` +
+    'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-9 within an iteration budget, boundary by arc length between four corner vertices: the sharpest turns, else the vertices nearest the quarter points of its length; Floater mean-value weights when the exact ones flip a triangle; at most 25,000 triangles in the TypeScript engine, up to the cap of the native engine (a background job) on the desktop and the CLI), which follows a strongly curved region (a hemisphere, a bowl) that projection ' +
     'refuses; "auto" (default) uses projection when the region is projectable and the harmonic map otherwise. A closed body, a region with holes or in ' +
     'several pieces, or a vertical wall is refused (MESH_FIT_NOT_PROJECTABLE / MESH_FIT_NOT_DISK: pick a `region` or segment_mesh first). Rounds of ' +
     'least-squares pole fitting alternate with foot-point parameter correction, with a small second-difference fairing of the pole ' +
@@ -64,7 +63,7 @@ export const fitSurfaceToMesh = defineCommand({
     'the region in its plane, so parts of it past a non-rectangular region are not measured. If `maxDeviation` is given and not reached ' +
     'the surface is still created and data.warnings holds MESH_FIT_NOT_CONVERGED. Pure TypeScript, no kernel. Refusals: ' +
     'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_GROUP_NOT_FOUND (a faceGroups name the mesh does not have, or a stale stored group), MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge within its iteration budget or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
-    `${MAX_REGION_TRIANGLES} triangles, ${MAX_HARMONIC_TRIANGLES} for the harmonic map: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
+    `${MAX_REGION_TRIANGLES} triangles, 25,000 in the TypeScript engine (more with the native engine) for the harmonic map: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
     'MESH_FIT_FAILED. From a faceGroups selection the segmentation refusals pass through: MESH_NON_MANIFOLD, MESH_ORIENTATION_INCONSISTENT, MESH_DEGENERATE, MESH_SEGMENT_NO_GROUPS, MESH_ENGINE_CAP_EXCEEDED; ' +
     'from the mesh load MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE.',
   params: z.object({
@@ -173,19 +172,22 @@ export const fitSurfaceToMesh = defineCommand({
     const projectable = framed.foldedFraction <= MAX_FOLDED_FRACTION;
     let harmonic: HarmonicMap | null = null;
     if (wanted === 'harmonic' || (wanted === 'auto' && !projectable)) {
-      if (faces.length > MAX_HARMONIC_TRIANGLES)
+      const engine = resolveMeshEngine(contextOf(ctx).meshProcessing);
+      const harmonicCap = engine.capabilities().get('harmonic_map') ?? 0;
+      if (faces.length > harmonicCap)
         return wanted === 'auto'
           ? fail(
               'MESH_FIT_NOT_PROJECTABLE',
-              `${foldedText}, and the region (${faces.length} triangles) is over the ${MAX_HARMONIC_TRIANGLES} of the harmonic map: pick a smaller region or faceGroups, or decimate_mesh`,
+              `${foldedText}, and the region (${faces.length} triangles) is over the ${harmonicCap} of the harmonic map: pick a smaller region or faceGroups, or decimate_mesh`,
               'region',
             )
           : fail(
               'MESH_FIT_TOO_LARGE',
-              `the harmonic map takes at most ${MAX_HARMONIC_TRIANGLES} triangles, the region holds ${faces.length}: pick a smaller region or faceGroups, or decimate_mesh first`,
+              `the harmonic map takes at most ${harmonicCap} triangles, the region holds ${faces.length}: pick a smaller region or faceGroups, or decimate_mesh first`,
               'region',
             );
-      const mapped = harmonicMap(mesh, faces);
+      const mapped = regionHarmonic(engine, mesh, faces);
+      if ('code' in mapped && !isRegionRefusal(mapped)) return meshRejection(doc, 'fit_surface_to_mesh', mapped.code, mapped.message, [id]);
       if ('code' in mapped)
         return wanted === 'auto' && mapped.code === 'MESH_FIT_NOT_DISK'
           ? fail('MESH_FIT_NOT_PROJECTABLE', `${foldedText}, and the harmonic map needs a disk: ${mapped.message}`, 'region')

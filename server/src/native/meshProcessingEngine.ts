@@ -31,6 +31,7 @@ import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport, isShrinkw
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
+  type HarmonicResult,
   type MeshEngineFailure,
   type MeshOp,
   type MeshOpName,
@@ -57,6 +58,8 @@ const REPAIR_TRIANGLE_CAP = 4_000_000;
 const SCULPT_TRIANGLE_CAP = 4_000_000;
 /** Named guard: triangles above which shrinkwrap refuses, in the wrapped mesh and in the target (a closest-point tree of 100 bytes per triangle each, the normals and the per-vertex answers). */
 const SHRINKWRAP_TRIANGLE_CAP = 4_000_000;
+/** Named guard: region triangles above which the native harmonic map refuses (measured in TECHNICAL_SPEC 13.26.2; the command takes regions up to 200,000). */
+const HARMONIC_TRIANGLE_CAP = 200_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
@@ -69,6 +72,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['fill_holes', REPAIR_TRIANGLE_CAP],
   ['sculpt', SCULPT_TRIANGLE_CAP],
   ['shrinkwrap', SHRINKWRAP_TRIANGLE_CAP],
+  ['harmonic_map', HARMONIC_TRIANGLE_CAP],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
 ]);
@@ -82,6 +86,9 @@ function isNativeOp(op: MeshOp): op is NativeOp {
 
 /** The command name the editable-mesh refusals mention. */
 const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
+
+/** Measured in TECHNICAL_SPEC 13.26.2. */
+const HARMONIC_PREFERRED_ABOVE = 5_000;
 
 /** Measured in TECHNICAL_SPEC 13.20.3. */
 const SHRINKWRAP_PREFERRED_ABOVE = 10_000;
@@ -103,6 +110,7 @@ const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, num
   ['fill_holes', 30_000],
   ['sculpt', SCULPT_PREFERRED_ABOVE],
   ['shrinkwrap', SHRINKWRAP_PREFERRED_ABOVE],
+  ['harmonic_map', HARMONIC_PREFERRED_ABOVE],
 ]);
 
 /** The refusals of `fill_holes` a job may hand to the command as they are (`fill_mesh_holes` documents them); any other code is `MESH_ENGINE_UNSUPPORTED`. */
@@ -120,12 +128,30 @@ const regionOf = (region: { readonly center: readonly number[]; readonly radius:
 
 type NativeOp = Extract<
   MeshOp,
-  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'sculpt' | 'shrinkwrap' | 'deviation' | 'quad_remesh' }
+  {
+    op:
+      | 'decimate'
+      | 'smooth'
+      | 'remesh'
+      | 'analyze'
+      | 'repair'
+      | 'fill_holes'
+      | 'sculpt'
+      | 'shrinkwrap'
+      | 'harmonic_map'
+      | 'deviation'
+      | 'quad_remesh';
+  }
 >;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
-  return op.op !== 'deviation' && op.op !== 'analyze' && op.op !== 'sculpt' && op.op !== 'shrinkwrap' && op.withDeviation !== undefined
+  return op.op !== 'deviation' &&
+    op.op !== 'analyze' &&
+    op.op !== 'sculpt' &&
+    op.op !== 'shrinkwrap' &&
+    op.op !== 'harmonic_map' &&
+    op.withDeviation !== undefined
     ? { deviationSamples: op.withDeviation }
     : {};
 }
@@ -150,6 +176,7 @@ function jobParams(op: NativeOp): Record<string, unknown> {
       refine: op.refine,
       ...(op.alpha !== undefined ? { alpha: op.alpha } : {}),
     };
+  if (op.op === 'harmonic_map') return op.maxIterations === undefined ? {} : { maxIterations: op.maxIterations };
   if (op.op === 'shrinkwrap')
     return {
       mode: op.mode,
@@ -304,6 +331,8 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number, triangles: numb
   }
   if (op.op === 'sculpt' && run.code === 'SCULPT_TOO_LARGE')
     return failure('MESH_SCULPT_RESULT_TOO_LARGE', run.message ?? 'the refined surface is too large');
+  if (op.op === 'harmonic_map' && (run.code === 'MESH_FIT_NOT_DISK' || run.code === 'MESH_FIT_PARAM_FOLDED'))
+    return failure(run.code, run.message ?? run.code);
   if (run.code === 'REMESH_TOO_LARGE') return failure('MESH_REMESH_RESULT_TOO_LARGE', run.message ?? 'the remeshed surface is too large');
   if (op.op === 'quad_remesh')
     return failure('MESH_QUAD_REMESH_FAILED', `QuadriFlow: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
@@ -313,6 +342,53 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number, triangles: numb
 /** `{ deviation }` when `value` (parsed JSON of the job) is a well-formed summary; otherwise nothing, and the caller measures separately or reports no deviation. */
 export function deviationFrom(value: unknown): { deviation?: DeviationSummary } {
   return isDeviationSummary(value) ? { deviation: value } : {};
+}
+
+/**
+ * The harmonic map a `harmonic_map` job wrote, or null when it is malformed: (u, v, 0) per vertex in `result_positions.f64`, the ascending region vertices in
+ * `result_indices.u32` (all below `vertexCount`), a report with whole counts, a known weight kind, a finite residual and four corners that are region vertices.
+ */
+function harmonicFrom(report: Record<string, unknown>, positions: Buffer, indices: Buffer, vertexCount: number): HarmonicResult | null {
+  const n = indices.length / 4;
+  if (!Number.isInteger(n) || n < 4 || positions.length !== n * 24) return null;
+  const vertices = Array.from({ length: n }, (_, i) => indices.readUInt32LE(4 * i));
+  if (vertices.some((v, i) => v >= vertexCount || (i > 0 && v <= (vertices[i - 1] as number)))) return null;
+  const uv: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const [u, v, z] = [positions.readDoubleLE(24 * i), positions.readDoubleLE(24 * i + 8), positions.readDoubleLE(24 * i + 16)];
+    if (![u, v].every((c) => Number.isFinite(c) && c >= -1e-9 && c <= 1 + 1e-9) || z !== 0) return null;
+    uv.push(u, v);
+  }
+  const count = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+  const { weights, flippedFirst, collapsedInParameters, interiorVertices, boundaryVertices, cgIterations, cgResidual, corners } = report;
+  if (
+    (weights !== 'cotangent' && weights !== 'mean_value') ||
+    !count(flippedFirst) ||
+    !count(collapsedInParameters) ||
+    !count(interiorVertices) ||
+    !count(boundaryVertices) ||
+    interiorVertices + boundaryVertices !== n ||
+    !count(cgIterations) ||
+    typeof cgResidual !== 'number' ||
+    !Number.isFinite(cgResidual) ||
+    cgResidual < 0 ||
+    !Array.isArray(corners) ||
+    corners.length !== 4 ||
+    !corners.every((c) => count(c) && vertices.includes(c))
+  )
+    return null;
+  return {
+    vertices,
+    uv,
+    weights,
+    flippedFirst,
+    collapsedInParameters,
+    interiorVertices,
+    boundaryVertices,
+    cgIterations,
+    cgResidual,
+    corners: corners as unknown as HarmonicResult['corners'],
+  };
 }
 
 /** Read the outputs of a finished job into the engine's result. */
@@ -347,6 +423,24 @@ async function resultOf(
     if (!isMeshAnalysis(analysis) || !isPairSearchOf(analysis, op))
       return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops analyze: the job returned no well-formed analysis');
     return { analysis, report, provenance: provenance(ANALYZE_DESCRIPTION.algorithm, ANALYZE_DESCRIPTION.reference) };
+  }
+  if (op.op === 'harmonic_map') {
+    const harmonic = harmonicFrom(
+      report,
+      await readOutput(folder, run, 'result_positions.f64'),
+      await readOutput(folder, run, 'result_indices.u32'),
+      vertices,
+    );
+    if (harmonic === null)
+      return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops harmonic_map: the job returned a malformed result');
+    return {
+      harmonic,
+      report: { weights: harmonic.weights, cgIterations: harmonic.cgIterations },
+      provenance: provenance(
+        'harmonic map onto the unit square: cotangent Laplacian (Jacobi-preconditioned CG), Floater mean-value weights (BiCGSTAB) when a triangle flips',
+        'Eck et al. 1995 (harmonic maps); Floater 2003 (mean value coordinates)',
+      ),
+    };
   }
   const mesh = unpackMesh(await readOutput(folder, run, 'result_positions.f64'), await readOutput(folder, run, 'result_indices.u32'));
   const malformed = op.op === 'quad_remesh' ? null : meshProblem(mesh);
