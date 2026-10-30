@@ -16,6 +16,7 @@ import {
   snapQuadBoundary,
   symmetryProblem,
 } from '@core/geometry/mesh/quadOpen';
+import { realignBoundaryRow } from '@core/geometry/mesh/quadRow';
 import type { MeshSolidEntity } from '@core/model/types';
 import { docWithMeshes, gridMesh, icosphere } from '../../helpers/meshFixtures';
 import { type QuadOp, contextWith, quadSphere, stubQuadEngine } from '../../helpers/quadFixtures';
@@ -139,6 +140,25 @@ describe('snapQuadBoundary', () => {
     expect([result.positions[0], result.positions[1], result.positions[2]]).toEqual([0, 0, 0]);
     expect([result.positions[3 * 42], result.positions[3 * 42 + 1], result.positions[3 * 42 + 2]]).toEqual([0, 10, 0]);
     expect(result.loops).toBe(1);
+  });
+
+  it('the boundary row does the same with the plane: the rim points of the left side are exactly on it (x and z) and the corner A, a corner of the rim by the plane join alone, is a vertex', () => {
+    const { quads, source } = warped(6, 24);
+    const row = realignBoundaryRow(source, quads.positions, quads.quads, 0);
+    if ('cause' in row) throw new Error(row.message);
+    const onPlane: number[] = [];
+    for (let v = 0; v < row.positions.length; v += 3)
+      if (Math.abs(row.positions[v] as number) < 1e-2 && Math.abs(row.positions[v + 1] as number) < 10.01) onPlane.push(v / 3);
+    const rimPoints = onPlane.filter((v) => (row.positions[3 * v + 1] as number) >= 0);
+    expect(rimPoints.length).toBeGreaterThanOrEqual(5);
+    for (const v of rimPoints) {
+      expect(row.positions[3 * v]).toBe(0);
+      expect(row.positions[3 * v + 2]).toBe(0);
+    }
+    const hasVertex = (x: number, y: number): boolean =>
+      [...Array(row.positions.length / 3).keys()].some((v) => row.positions[3 * v] === x && row.positions[3 * v + 1] === y);
+    expect(hasVertex(0, 0)).toBe(true);
+    expect(hasVertex(0, 10)).toBe(true);
   });
 
   describe('refuses, with its cause and the exact reason', () => {
@@ -314,12 +334,51 @@ describe('quad_remesh of an open mesh and with symmetry (stub engine)', () => {
     expect(seen[0]).toMatchObject({ op: 'quad_remesh', targetQuads: 36, preserveBoundary: true });
     expect(seen[0]).not.toHaveProperty('withDeviation');
     const data = result.data as Record<string, unknown>;
-    expect(data).toMatchObject({ open: true, boundaryLoops: 1, quads: 36 });
-    expect(data['boundaryMove'] as number).toBeCloseTo(0.3, 9);
+    // the outermost layer of the 6 x 6 plate (20 quads) is replaced by one row of 16 on the rim (the inner boundary has 16 vertices)
+    expect(data).toMatchObject({
+      open: true,
+      boundaryLoops: 1,
+      quads: 32,
+      boundaryRow: 'realigned',
+      boundaryRowQuads: 16,
+      boundaryLayerRemoved: 20,
+    });
+    expect(data['boundaryMove'] as number).toBeGreaterThan(0);
     expect(result.summary).toContain('1 boundary loop(s) kept');
     const mesh = meshOf(result);
     // wound like the source (+z) and flat
     expect(mesh.positions.filter((_, i) => i % 3 === 2).every((z) => z === 0)).toBe(true);
+  });
+
+  it('gives the row up for the snap when the row cannot be made: a 2 x 2 answer has no quad left inside, and says so (boundaryRow "snapped", no row data)', () => {
+    const result = execute(
+      doc,
+      'quad_remesh',
+      { id, targetQuadCount: 6, output: 'mesh' },
+      contextWith(stubQuadEngine(() => plateQuads(2, 10, 0))),
+    );
+    expect(result.error, result.summary).toBeUndefined();
+    const data = result.data as Record<string, unknown>;
+    expect(data).toMatchObject({ open: true, boundaryLoops: 1, boundaryRow: 'snapped', quads: 4 });
+    expect(data).not.toHaveProperty('boundaryRowQuads');
+    expect(data).not.toHaveProperty('boundaryLayerRemoved');
+    expect(data).not.toHaveProperty('boundaryRowEvenness');
+  });
+
+  it('a closed answer without symmetry does not go through the boundary at all: its positions are those of the engine and no boundary data is reported', () => {
+    const { doc: ballDoc, ids: ballIds } = docWithMeshes(icosphere(10, 2));
+    const engineSphere = quadSphere(10, 3);
+    const result = execute(
+      ballDoc,
+      'quad_remesh',
+      { id: ballIds[0] as string, targetQuadCount: 54, output: 'mesh' },
+      contextWith(stubQuadEngine(() => engineSphere)),
+    );
+    expect(result.error, result.summary).toBeUndefined();
+    const data = result.data as Record<string, unknown>;
+    for (const key of ['boundaryRow', 'boundaryLoops', 'boundaryMove', 'boundaryRowQuads', 'boundaryLayerRemoved', 'boundaryRowEvenness'])
+      expect(data).not.toHaveProperty(key);
+    expect(meshOf(result).positions).toEqual(engineSphere.positions);
   });
 
   it('refuses output "subdivision" of an open mesh by name, and an engine that lost a loop, and is pure', () => {
@@ -372,7 +431,7 @@ describe('quad_remesh of an open mesh and with symmetry (stub engine)', () => {
     expect(result.error, result.summary).toBeUndefined();
     expect(seen[0]).toMatchObject({ targetQuads: 100, preserveBoundary: true });
     expect(meshes[0]?.positions.filter((_, i) => i % 3 === 0).every((x) => x >= 0)).toBe(true);
-    expect(result.data).toMatchObject({ symmetry: { plane: 'yz' }, open: false });
+    expect(result.data).toMatchObject({ symmetry: { plane: 'yz' }, open: false, boundaryRow: 'realigned' });
     const mesh = meshOf(result);
     const keys = new Set<string>();
     for (let v = 0; v < mesh.positions.length; v += 3) keys.add(`${mesh.positions[v]},${mesh.positions[v + 1]},${mesh.positions[v + 2]}`);
@@ -409,7 +468,7 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
     const result = execute(doc, 'quad_remesh', { id, targetQuadCount: 36, output: 'mesh' }, contextWith(engine));
     expect(result.error, result.summary).toBeUndefined();
     expect(seen.map((op) => op.targetQuads)).toEqual([36, 42]);
-    expect(result.data).toMatchObject({ attempts: 2, engineTargets: [36, 42], quads: 36 });
+    expect(result.data).toMatchObject({ attempts: 2, engineTargets: [36, 42], quads: 32 });
   });
 
   it('then asks at 0.87 x, and refuses by name when every answer fails: the loop count -> BOUNDARY_LOST, the shape -> SNAP_FAILED', () => {
@@ -433,15 +492,15 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
 
   it('asks once more for the count that would have given the target when the ratio is under 0.85, and keeps the closer result', () => {
     const seen: QuadOp[] = [];
-    // 36 quads for 100 asked (ratio 0.36): asked again for ceil(100 / 0.36) = 278, which answers with 100 quads
+    // 32 quads for 100 asked (ratio 0.32, the outer layer of 20 quads becomes a row of 16): asked again for ceil(100 / 0.32) = 313, which answers with 96 (a 10 x 10 plate: 64 inner quads and a row of 32)
     const better = execute(
       doc,
       'quad_remesh',
       { id, targetQuadCount: 100, output: 'mesh' },
       contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(10, 10, 0.3)), seen)),
     );
-    expect(seen.map((op) => op.targetQuads)).toEqual([100, 278]);
-    expect(better.data).toMatchObject({ attempts: 2, engineTargets: [100, 278], quads: 100, targetRatio: 1 });
+    expect(seen.map((op) => op.targetQuads)).toEqual([100, 313]);
+    expect(better.data).toMatchObject({ attempts: 2, engineTargets: [100, 313], quads: 96, targetRatio: 0.96 });
     // the second answer is worse (the ratio 0.1): the first is kept
     const worse = execute(
       doc,
@@ -449,7 +508,7 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
       { id, targetQuadCount: 100, output: 'mesh' },
       contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(3, 10, 0.3)))),
     );
-    expect(worse.data).toMatchObject({ attempts: 2, quads: 36 });
+    expect(worse.data).toMatchObject({ attempts: 2, quads: 32 });
     // a closed source is never asked twice by the ratio rule
     const sphere = docWithMeshes(icosphere(10, 3));
     const closedSeen: QuadOp[] = [];
