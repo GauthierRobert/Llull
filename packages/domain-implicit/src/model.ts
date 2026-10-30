@@ -301,6 +301,7 @@ export function inputsOf(node: FieldNode): readonly string[] {
 export function entitySources(node: FieldNode): readonly string[] {
   if (node.op === 'solid') return [node.entityId];
   if (node.op === 'graph') return node.sourceIds;
+  if ((node.op === 'tpms' || node.op === 'struts') && node.map?.kind === 'surface_uv') return [node.map.sheetId];
   if (node.op === 'scalar' && node.kind === 'distance' && 'entityId' in node.to) return [node.to.entityId];
   return [];
 }

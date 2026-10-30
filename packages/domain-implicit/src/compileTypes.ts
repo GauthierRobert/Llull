@@ -30,6 +30,7 @@ export interface CompileFailure {
     | 'IMP_INPUT_NOT_FOUND'
     | 'IMP_INPUT_TOO_LARGE'
     | 'IMP_MAP_SINGULAR'
+    | 'IMP_MAP_SEAM'
     | 'IMP_MAP_TOO_LARGE';
   readonly message: string;
   readonly ids: readonly string[];

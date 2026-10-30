@@ -3,12 +3,13 @@
  * lattices (constant or graded radius) and graph lattices. Distance quality: TPMS approximate, strut and graph sets bound (graded strut radius: approximate).
  */
 
+import type { GridSamples } from '@core/geometry/field/sampled';
 import type { Vec3 } from '@core/model/types';
 import { type CompileHost, Failure, type Part, degrade, worst } from './compileTypes';
 import { type Frame, axisFrame, growBox, placeFrame } from './frame';
 import { graphGeometry } from './graph';
 import type { CellMap, GraphNode, StrutsNode, TpmsNode, VoronoiNode } from './model';
-import { surfaceMapOf } from './surfaceMap';
+import { type PhaseGrids, surfaceMapOf } from './surfaceMap';
 import type { ScalarPart } from './scalar';
 import { strutGeometry } from './struts';
 import { voronoiGeometry } from './voronoi';
@@ -52,15 +53,20 @@ function cellCoordinates(host: CompileHost, node: Mappable, frame: Frame): CellC
   if (map.kind === 'surface_uv') {
     const made = surfaceMapOf(host.doc, map);
     if (!made.ok) throw new Failure({ ok: false, code: made.code, message: made.message, ids: [...made.ids, node.id] });
-    const { u, v, w, scales, stretch } = made.data;
-    if (stretch.max > STRETCH_WARNING * stretch.min)
+    const { u, v, w, scales, stretch, variation } = made.data;
+    if (stretch.max > STRETCH_WARNING * stretch.min || variation > STRETCH_WARNING)
       host.warnings.push({
         code: 'IMP_MAP_STRETCH',
         ids: [node.id, map.sheetId],
-        message: `the cells of '${node.id}' on sheet '${map.sheetId}' are stretched by up to ${stretch.max.toPrecision(3)} (shortest edge to longest): walls are not uniform where the sheet is far from developable`,
+        message: `the cells of '${node.id}' on sheet '${map.sheetId}' are stretched: longest to shortest edge up to ${stretch.max.toPrecision(3)}, a local cell ${variation.toPrecision(3)} times the mean one: walls are not uniform where the sheet is far from developable`,
       });
-    const phase = (grid: typeof u): number => host.b.scale(host.b.sampledField(grid, frame.x, frame.y, frame.z), TWO_PI);
-    return { coords: [phase(u), phase(v), phase(w)], scales: [b.constant(scales[0]), b.constant(scales[1]), b.constant(scales[2])] };
+    const sample = (grid: GridSamples): number => b.sampledField(grid, frame.x, frame.y, frame.z);
+    const phase = (grids: PhaseGrids): number =>
+      grids.kind === 'linear' ? b.scale(sample(grids.grid), TWO_PI) : b.op('atan2', sample(grids.sin), sample(grids.cos));
+    return {
+      coords: [phase(u), phase(v), b.scale(sample(w), TWO_PI)],
+      scales: [b.constant(scales[0]), b.constant(scales[1]), b.constant(scales[2])],
+    };
   }
   host.warnings.push({
     code: 'IMP_MAP_POLE',
@@ -73,6 +79,30 @@ function cellCoordinates(host: CompileHost, node: Mappable, frame: Frame): CellC
 const TWO_PI = 2 * Math.PI;
 /** Longest to shortest cell edge above which a surface map reports its stretch. */
 const STRETCH_WARNING = 2;
+
+/**
+ * The part of a surface-mapped lattice restricted to its support: the slab 0 <= w <= layers (distance (w) in cells of depth, negative inside) and the footprint of the sheet
+ * (lateral distance), in the box of the sheet grown by `layers * depth`. Other maps and rectangular lattices are returned as they are.
+ */
+function supported(host: CompileHost, node: Mappable, part: Part, frame: Frame): Part {
+  const map = node.map;
+  if (map?.kind !== 'surface_uv') return part;
+  const made = surfaceMapOf(host.doc, map);
+  if (!made.ok) throw new Failure({ ok: false, code: made.code, message: made.message, ids: [...made.ids, node.id] });
+  const { w, lateral, bounds } = made.data;
+  const b = host.b;
+  const normal = b.sampledField(w, frame.x, frame.y, frame.z);
+  const slab = b.scale(b.max(b.neg(normal), b.shift(normal, -map.layers)), map.depth);
+  const footprint = b.sampledField(lateral, frame.x, frame.y, frame.z);
+  return { ...part, reg: b.max(part.reg, b.max(slab, footprint)), box: bounds };
+}
+
+/** Lipschitz bound of the field on a surface map: twice the larger of the cell aspect and the local-to-mean cell size (other maps keep their own bounds). */
+function surfaceLipschitz(host: CompileHost, map: CellMap | undefined, fallback: number): number {
+  if (map?.kind !== 'surface_uv') return fallback;
+  const made = surfaceMapOf(host.doc, map);
+  return made.ok ? 2 * Math.max(made.data.stretch.max, made.data.variation) : fallback;
+}
 
 const sheetFeature = (value: ScalarPart): number => (Number.isFinite(value.lo) ? value.lo / 2 : Infinity);
 
@@ -94,8 +124,9 @@ export function tpmsPart(host: CompileHost, node: TpmsNode, frame: Frame): Part 
     reg = graded ? b.sub(b.abs(field), value.reg) : b.shift(b.abs(field), -value.lo);
     host.features.push(smallest / 8);
   }
-  const lipschitz = node.normalize === 'gradient' ? 2 : (2 * Math.PI * TPMS_FACTS[node.kind].gradBound) / smallest;
-  return clipToRegion(host, { reg, quality: 'approximate', lipschitz, box: null }, node.region, frame);
+  const flat = node.normalize === 'gradient' ? 2 : (2 * Math.PI * TPMS_FACTS[node.kind].gradBound) / smallest;
+  const lipschitz = surfaceLipschitz(host, node.map, flat);
+  return clipToRegion(host, supported(host, node, { reg, quality: 'approximate', lipschitz, box: null }, frame), node.region, frame);
 }
 
 /** Largest radius the periodic set may carry: the law's upper bound, else just under half the shortest strut. */
@@ -125,7 +156,8 @@ function mappedStruts(host: CompileHost, node: StrutsNode, frame: Frame): Part {
   if (Number.isFinite(value.lo) && value.lo > 0) host.features.push(value.lo);
   const radius = b.min(b.max(b.mul(value.reg, stretch), b.constant(0)), b.constant(reach));
   const reg = b.div(b.strutSet(set, mapped[0], mapped[1], mapped[2], radius), stretch);
-  return clipToRegion(host, { reg, quality: 'approximate', lipschitz: 2, box: null }, node.region, frame);
+  const lipschitz = surfaceLipschitz(host, node.map, 2);
+  return clipToRegion(host, supported(host, node, { reg, quality: 'approximate', lipschitz, box: null }, frame), node.region, frame);
 }
 
 export function strutsPart(host: CompileHost, node: StrutsNode, frame: Frame): Part {
