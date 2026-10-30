@@ -228,7 +228,7 @@
   font-weight: var(--weight-semibold);
 }
 
-/* "Ask or run a command" — the bar's one permanent control (opens the command palette). */
+/* "Search or run a command" — the bar's one permanent control (opens the command palette). */
 .dock-ask {
   display: inline-flex;
   align-items: center;

@@ -22,13 +22,33 @@ export type FormValues = Readonly<Record<string, string>>;
 
 type ParseResult = { ok: true; params: Record<string, unknown> } | { ok: false; errors: Readonly<Record<string, string>> };
 
-/** `add_box` -> "Add box"; `entityId` -> "Entity id". */
+/** Words written in capitals in labels: dimensions (`2d`) and the file formats / domain acronyms command names use. */
+const ACRONYMS: ReadonlySet<string> = new Set([
+  'bom',
+  'cfd',
+  'csv',
+  'dxf',
+  'fea',
+  'gltf',
+  'ifc',
+  'iges',
+  'naca',
+  'nurbs',
+  'pdf',
+  'pmi',
+  'stl',
+  'svg',
+  'tpms',
+]);
+
+/** `add_box` -> "Add box"; `entityId` -> "Entity id"; `fillet_2d` -> "Fillet 2D"; `export_stl` -> "Export STL". */
 export function humanizeName(name: string): string {
   const spaced = name
     .replace(/_/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
-    .trim();
+    .trim()
+    .replace(/\b[a-z0-9]+\b/g, (word) => (ACRONYMS.has(word) || /^\d+d$/.test(word) ? word.toUpperCase() : word));
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 

@@ -73,7 +73,8 @@ export function EmptyState(): React.ReactElement | null {
 
         <h2 className="empty-state__heading">Start your model</h2>
         <p className="empty-state__subheading">
-          <strong>Let AI build it:</strong> use <em>Connect agent</em> and describe the part to Claude. Or start by hand:
+          <strong>Let AI build it:</strong> ask Claude Code to model the part with <code>llull --app</code> and watch it appear here. Or
+          start by hand:
         </p>
 
         <div className="empty-state__starts">

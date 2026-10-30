@@ -43,15 +43,25 @@
 }
 
 .empty-state__subheading {
-  max-width: 34ch;
+  max-width: 44ch;
   margin: 0 0 var(--space-4);
   font-size: var(--text-base);
   color: var(--fg-muted);
+  text-wrap: balance;
 }
 
 .empty-state__subheading strong {
   color: var(--fg);
   font-weight: var(--weight-semibold);
+}
+
+.empty-state__subheading code {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--fg);
 }
 
 .empty-state__starts {

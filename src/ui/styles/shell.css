@@ -214,6 +214,12 @@
   flex-wrap: wrap;
 }
 
+/* Long format names ("STEP AP242 with PMI…") must not push the select past the card: it takes the row beside its button. */
+.more-menu__panel .project-io__select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .menu-item {
   display: flex;
   align-items: center;

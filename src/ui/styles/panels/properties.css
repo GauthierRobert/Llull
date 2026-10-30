@@ -151,16 +151,56 @@
   gap: var(--space-2);
 }
 
-.props-color-swatch {
-  width: 14px;
-  height: 14px;
+.props-color {
+  cursor: pointer;
+}
+
+.props-color-input {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  cursor: pointer;
+}
+
+.props-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.props-color-input::-webkit-color-swatch {
+  border: 0;
   border-radius: var(--radius-xs);
   box-shadow:
     inset 0 0 0 1px oklch(0 0 0 / 0.18),
     0 0 0 1px var(--border);
 }
 
+.props-color-input:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.props-expression {
+  color: var(--accent-text);
+}
+
+.props-refusal {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
 /* ---- Editable fields --------------------------------------------------------- */
+
+/* Read-only readouts must not look like inputs: no field chrome unless the value can be typed. */
+.axis-field:not(.axis-field--editable) {
+  padding-left: 0;
+  background: transparent;
+  border-color: transparent;
+}
 
 .axis-field--editable {
   cursor: text;
@@ -172,8 +212,12 @@
   box-shadow: 0 0 0 2px var(--accent-softer);
 }
 
-.axis-field__input {
+/* Child + :hover selectors outrank base.css `input:not([type])` (and its :hover), which drew a second box inside the field. */
+.axis-field > .axis-field__input,
+.axis-field > .axis-field__input:hover,
+.axis-field > .axis-field__input:focus-visible {
   width: 100%;
+  height: 100%;
   min-width: 0;
   padding: 0;
   font-family: var(--font-mono);
@@ -183,6 +227,7 @@
   background: transparent;
   border: none;
   outline: none;
+  box-shadow: none;
 }
 
 .props-text-input {
