@@ -1,6 +1,6 @@
 [package]
 name = "llull-voxfe"
-description = "Matrix-free voxel finite elements (Q4 plane stress, H8) with Jacobi / geometric-multigrid PCG, Rust CPU twin + wgpu kernels (RS1 §2)"
+description = "Matrix-free voxel finite elements (Q4 plane stress, H8) with Jacobi / geometric-multigrid PCG, periodic cell homogenisation, Rust CPU twin + wgpu kernels (RS1 §2)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,6 +14,9 @@ gpu = ["llull-gpu/wgpu"]
 [dependencies]
 llull-gpu = { path = "../llull-gpu" }
 rayon.workspace = true
+llull-protocol = { path = "../llull-protocol" }
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

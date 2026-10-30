@@ -14,6 +14,10 @@ const MAX_HOMOGENIZATION_VOXELS = 64 * 64 * 64;
 export const DEFAULT_HOMOGENIZATION_RESOLUTION = 32;
 const SUBSAMPLES = 2;
 const EMIN_RATIO = 1e-6;
+/** The two models agree when the largest relative change of E and G between them is at most this (and every solve converged); above it the result carries IMP_HOMOGENIZATION_UNCONVERGED. */
+const CONVERGED_WITHIN = 0.05;
+/** A modulus below this many times the stiffness of a void voxel is the floor of the model, not a load path: it is reported as null (void-dominated). */
+const VOID_FLOOR_FACTOR = 10;
 
 export interface HomogenizationOptions {
   /** Voxels along the smallest cell edge of the finer model (the coarser one has half). */
@@ -91,11 +95,11 @@ export interface Moduli {
 }
 
 /** Engineering moduli of the stiffness `c` from its compliance (null where the cell is a mechanism). */
-export function moduliOf(c: readonly number[]): Moduli {
+export function moduliOf(c: readonly number[], floor = 0): Moduli {
   const s = invert6(c);
   if (s === null) return { young: [null, null, null], shear: [null, null, null], poisson: [null, null, null] };
   const at = (r: number, q: number): number => s[r * 6 + q] as number;
-  const inverse = (v: number): number | null => (v > 0 ? 1 / v : null);
+  const inverse = (v: number): number | null => (v > 0 && 1 / v > floor ? 1 / v : null);
   return {
     young: [0, 1, 2].map((i) => inverse(at(i, i))),
     shear: [3, 4, 5].map((i) => inverse(at(i, i))),
@@ -168,7 +172,7 @@ function level(
     return {
       ok: false,
       code: 'IMP_HOMOGENIZATION_NEEDS_NATIVE',
-      message: `the ${engine.name} field engine has no homogenisation: it runs on the native engine (llull-compute, the desktop app and the CLI with a backend)`,
+      message: `the ${engine.name} field engine has no homogenisation: it runs on the native engine, which needs llull-compute installed (the desktop app and the CLI use it whenever it is present)`,
     };
   if (!answer.ok) return { ok: false, code: answer.code, message: answer.message };
   const fraction = density.reduce((sum, b) => sum + b, 0) / (255 * density.length);
@@ -181,7 +185,7 @@ function level(
       dims,
       volumeFraction: fraction,
       c: answer.c,
-      moduli: moduliOf(answer.c),
+      moduli: moduliOf(answer.c, VOID_FLOOR_FACTOR * EMIN_RATIO),
       iterations: answer.iterations,
       converged: answer.converged,
     },
@@ -213,8 +217,6 @@ export function relativeChange(fine: Moduli, coarse: Moduli): number | null {
 const SOURCE =
   'periodic numerical homogenisation on trilinear voxel elements (llull-voxfe), after Andreassen & Andreasen 2014 (Basic Optimization 5): six unit macro strains on the periodic cell, C = energy of the cell problem; screening estimate, not an allowable';
 
-const rounded = (values: readonly (number | null)[]): (number | null)[] => values.map((v) => (v === null ? null : v));
-
 /** The `homogenization` block of lattice_properties for a finished model pair. */
 export function homogenizationBlock(
   result: Extract<Homogenized, { ok: true }>,
@@ -225,6 +227,8 @@ export function homogenizationBlock(
   const { fine, coarse } = result;
   const cubic = Math.max(...cell) - Math.min(...cell) <= 1e-9 * Math.max(...cell);
   const change = relativeChange(fine.moduli, coarse.moduli);
+  const solverConverged = fine.converged && coarse.converged;
+  const converged = solverConverged && change !== null && change <= CONVERGED_WITHIN;
   const mpa = (values: readonly (number | null)[]): (number | null)[] | null =>
     baseMaterial === undefined ? null : values.map((v) => (v === null ? null : v * baseMaterial.youngModulusMpa));
   return {
@@ -236,16 +240,18 @@ export function homogenizationBlock(
     volumeFraction: { fine: fine.volumeFraction, coarse: coarse.volumeFraction },
     poissonRatioOfSolid: options.poissonRatio,
     stiffnessRatio: { voigtOrder: 'xx yy zz yz zx xy (engineering shear)', c: fine.c },
-    youngRatio: rounded(fine.moduli.young),
-    shearRatio: rounded(fine.moduli.shear),
-    poisson: rounded(fine.moduli.poisson),
+    youngRatio: fine.moduli.young,
+    shearRatio: fine.moduli.shear,
+    poisson: fine.moduli.poisson,
     youngModulusMpa: mpa(fine.moduli.young),
     shearModulusMpa: mpa(fine.moduli.shear),
     symmetry: { cubicCell: cubic, ...symmetryOf(fine.c, cubic) },
     convergence: {
-      coarse: { resolution: coarse.resolution, youngRatio: rounded(coarse.moduli.young), shearRatio: rounded(coarse.moduli.shear) },
+      coarse: { resolution: coarse.resolution, youngRatio: coarse.moduli.young, shearRatio: coarse.moduli.shear },
       relativeChange: change,
-      solverConverged: fine.converged && coarse.converged,
+      solverConverged,
+      converged,
+      convergedWithin: CONVERGED_WITHIN,
       iterations: { fine: fine.iterations, coarse: coarse.iterations },
       note:
         change === null
@@ -256,5 +262,18 @@ export function homogenizationBlock(
     unverified: true,
     reviewRequired: true,
     warning: 'IMP_MECHANICS_UNVERIFIED',
+    warnings: converged ? ['IMP_MECHANICS_UNVERIFIED'] : ['IMP_MECHANICS_UNVERIFIED', 'IMP_HOMOGENIZATION_UNCONVERGED'],
   };
+}
+
+/** The summary clause of a homogenisation: the first modulus along x, and whether the two models agree. */
+export function homogenizationSummary(block: Record<string, unknown>): string {
+  const young = block['youngRatio'] as (number | null)[];
+  const convergence = block['convergence'] as { converged: boolean; relativeChange: number | null };
+  const resolution = block['resolution'] as { fine: number; coarse: number };
+  const value = young[0] === null || young[0] === undefined ? 'n/a (void-dominated or a mechanism)' : young[0].toPrecision(4);
+  const change = convergence.relativeChange === null ? 'n/a' : `${(100 * convergence.relativeChange).toFixed(0)} %`;
+  return convergence.converged
+    ? `homogenised E/Es ${value} (agrees within ${100 * CONVERGED_WITHIN} % between ${resolution.coarse} and ${resolution.fine} voxels, unverified)`
+    : `homogenised E/Es ${value} (NOT converged: ${change} change ${resolution.coarse}->${resolution.fine} voxels, unverified)`;
 }

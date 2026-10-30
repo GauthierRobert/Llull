@@ -71,14 +71,19 @@ describe('voxel counts', () => {
 });
 
 /** A stand-in for the native solver: answers the stiffness of an isotropic solid scaled by the volume fraction of the density it is given. */
-function standIn(options: { fail?: string; mechanism?: boolean } = {}): FieldEngine {
+function standIn(options: { fail?: string; mechanism?: boolean; coarseSkew?: number; voidLevel?: number } = {}): FieldEngine {
   const homogenize = (request: HomogenizeRequest): HomogenizeAnswer => {
     if (options.fail !== undefined) return { ok: false, code: 'IMP_ENGINE_FAILED', message: options.fail };
     const fraction = request.density.reduce((sum, b) => sum + b, 0) / (255 * request.density.length);
     const voxels = request.dims[0] * request.dims[1] * request.dims[2];
     return {
       ok: true,
-      c: options.mechanism === true ? new Array<number>(36).fill(0) : isotropic(request.nu).map((v) => v * fraction),
+      c:
+        options.mechanism === true
+          ? new Array<number>(36).fill(0)
+          : isotropic(request.nu).map(
+              (v) => v * (options.voidLevel ?? fraction) * (request.dims[0] <= 4 ? 1 + (options.coarseSkew ?? 0) : 1),
+            ),
       iterations: [10, 10, 10, 12, 12, 12],
       residuals: [1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10],
       converged: true,
@@ -124,6 +129,32 @@ describe('lattice_properties homogenize through a stand-in engine', () => {
     expect(ask(standIn({ fail: 'the job crashed' })).error?.code).toBe('IMP_ENGINE_FAILED');
     expect(ask(tsFieldEngine).error?.code).toBe('IMP_HOMOGENIZATION_NEEDS_NATIVE');
     expect(ask(undefined).error?.code).toBe('IMP_HOMOGENIZATION_NEEDS_NATIVE');
+  });
+
+  it('says so when the two models do not agree: IMP_HOMOGENIZATION_UNCONVERGED in the block and the summary; an agreeing pair does not', () => {
+    const skewed = ask(standIn({ coarseSkew: 0.4 }));
+    const block = (skewed.data as Record<string, Block>)['homogenization'] as Block;
+    expect(block.convergence).toMatchObject({ converged: false, solverConverged: true, convergedWithin: 0.05 });
+    expect(block.convergence.relativeChange).toBeGreaterThan(0.06);
+    expect((block as unknown as { warnings: string[] }).warnings).toEqual(['IMP_MECHANICS_UNVERIFIED', 'IMP_HOMOGENIZATION_UNCONVERGED']);
+    expect(skewed.summary).toMatch(/homogenised E\/Es [\d.e-]+ \(NOT converged: \d+ % change 4->8 voxels, unverified\)/);
+    const agreed = ask(standIn({ voidLevel: 0.2 }));
+    expect(((agreed.data as Record<string, Block>)['homogenization'] as unknown as { warnings: string[] }).warnings).toEqual([
+      'IMP_MECHANICS_UNVERIFIED',
+    ]);
+    expect(agreed.summary).toContain('agrees within 5 % between 4 and 8 voxels, unverified');
+  });
+
+  it('a cell with no load path through the solid (only the floor of the model is left) has no moduli, not a modulus of 1e-6', () => {
+    const void_ = (ask(standIn({ voidLevel: 1e-6 })).data as Record<string, Block>)['homogenization'] as Block;
+    expect(void_.youngRatio).toEqual([null, null, null]);
+    expect(void_.convergence.relativeChange).toBeNull();
+    expect(
+      moduliOf(
+        isotropic(0.3).map((v) => v * 1e-4),
+        1e-5,
+      ).young[0],
+    ).toBeCloseTo(1e-4, 10);
   });
 
   it('refuses a finer model than the cap, and a resolution out of range', () => {

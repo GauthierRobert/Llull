@@ -1049,6 +1049,7 @@ dependencies = [
  "llull-route",
  "llull-stats",
  "llull-topopt",
+ "llull-voxfe",
 ]
 
 [[package]]
@@ -1262,7 +1263,10 @@ name = "llull-voxfe"
 version = "0.1.0"
 dependencies = [
  "llull-gpu",
+ "llull-protocol",
  "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

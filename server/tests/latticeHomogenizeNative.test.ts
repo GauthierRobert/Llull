@@ -46,35 +46,41 @@ function homogenized(doc: CadDocument, id: string, extra: object): { result: Ret
 }
 
 describe('lattice_properties homogenize (14.15)', () => {
-  native('the octet: cubic to rounding, above the closed-form stretch stiffness and converging towards it as the voxels shrink', () => {
-    const { doc, id } = lattice('octet', 0.5);
-    const coarse = homogenized(doc, id, { estimateMechanics: true, homogenize: { resolution: 16 } });
-    const fine = homogenized(doc, id, { estimateMechanics: true, homogenize: { resolution: 32 } });
-    const [low, high] = [coarse.data.homogenization as Homogenization, fine.data.homogenization as Homogenization];
-    const closed = (fine.data.mechanics as { affine: { youngRatio: number[] } }).affine.youngRatio[0] as number; // rho Es / 9
-    for (const h of [low, high]) {
-      expect(h.symmetry.cubicCell).toBe(true);
-      expect(h.symmetry.cubicDeviation as number).toBeLessThan(1e-12);
-      expect(h.symmetry.asymmetry).toBeLessThan(1e-12);
-      expect(h.youngRatio[0]).toBeCloseTo(h.youngRatio[1] as number, 12);
-      expect(h.youngRatio[1]).toBeCloseTo(h.youngRatio[2] as number, 12);
-      expect(h.convergence.solverConverged).toBe(true);
-    }
-    // the voxel model of thin struts is too stiff at a coarse resolution and approaches the pin-jointed value from above
-    expect(low.youngRatio[0]).toBeGreaterThan(high.youngRatio[0] as number);
-    expect(high.youngRatio[0]).toBeGreaterThan(closed);
-    expect((high.youngRatio[0] as number) / closed).toBeLessThan(1.6);
-    expect((low.youngRatio[0] as number) / closed).toBeLessThan(2.4);
-    expect(high.convergence.relativeChange).toBeGreaterThan(0.05); // 16 -> 32 is not yet converged and the block says so
-    expect(high.convergence.coarse.resolution).toBe(16);
-    expect(high.resolution).toEqual({ fine: 32, coarse: 16 });
-    expect(high).toMatchObject({ unverified: true, reviewRequired: true, warning: 'IMP_MECHANICS_UNVERIFIED' });
-    expect(fine.data['unverified']).toBe(true);
-    // the voxel volume fraction is the measured density (the voxels are partial volumes)
-    expect(Math.abs(high.volumeFraction.fine - (fine.data['rhoMeasured'] as number)) / (fine.data['rhoMeasured'] as number)).toBeLessThan(
-      0.1,
-    );
-  });
+  native(
+    'the octet: cubic to rounding, above the closed-form stretch stiffness, approaching from above a limit at or above it, and NOT converged at 16 -> 32: the warning and the summary say so',
+    () => {
+      const { doc, id } = lattice('octet', 0.5);
+      const coarse = homogenized(doc, id, { estimateMechanics: true, homogenize: { resolution: 16 } });
+      const fine = homogenized(doc, id, { estimateMechanics: true, homogenize: { resolution: 32 } });
+      const [low, high] = [coarse.data.homogenization as Homogenization, fine.data.homogenization as Homogenization];
+      const closed = (fine.data.mechanics as { affine: { youngRatio: number[] } }).affine.youngRatio[0] as number; // rho Es / 9
+      for (const h of [low, high]) {
+        expect(h.symmetry.cubicCell).toBe(true);
+        expect(h.symmetry.cubicDeviation as number).toBeLessThan(1e-12);
+        expect(h.symmetry.asymmetry).toBeLessThan(1e-12);
+        expect(h.youngRatio[0]).toBeCloseTo(h.youngRatio[1] as number, 12);
+        expect(h.youngRatio[1]).toBeCloseTo(h.youngRatio[2] as number, 12);
+        expect(h.convergence.solverConverged).toBe(true);
+      }
+      // the voxel model of thin struts is too stiff at a coarse resolution and approaches the pin-jointed value from above
+      expect(low.youngRatio[0]).toBeGreaterThan(high.youngRatio[0] as number);
+      expect(high.youngRatio[0]).toBeGreaterThan(closed);
+      expect((high.youngRatio[0] as number) / closed).toBeLessThan(1.6);
+      expect((low.youngRatio[0] as number) / closed).toBeLessThan(2.4);
+      expect(high.convergence.relativeChange).toBeGreaterThan(0.05); // 16 -> 32 is not yet converged and the block says so
+      expect(high.convergence).toMatchObject({ converged: false, solverConverged: true, convergedWithin: 0.05 });
+      expect((high as unknown as { warnings: string[] }).warnings).toEqual(['IMP_MECHANICS_UNVERIFIED', 'IMP_HOMOGENIZATION_UNCONVERGED']);
+      expect(fine.result.summary).toMatch(/homogenised E\/Es 0\.01\d+ \(NOT converged: \d+ % change 16->32 voxels, unverified\)/);
+      expect(high.convergence.coarse.resolution).toBe(16);
+      expect(high.resolution).toEqual({ fine: 32, coarse: 16 });
+      expect(high).toMatchObject({ unverified: true, reviewRequired: true, warning: 'IMP_MECHANICS_UNVERIFIED' });
+      expect(fine.data['unverified']).toBe(true);
+      // the voxel volume fraction is the measured density (the voxels are partial volumes)
+      expect(Math.abs(high.volumeFraction.fine - (fine.data['rhoMeasured'] as number)) / (fine.data['rhoMeasured'] as number)).toBeLessThan(
+        0.1,
+      );
+    },
+  );
 
   native('E, nu and G of a cubic cell follow its stiffness C11, C12, C44, and the MPa values scale the ratios', () => {
     const { doc, id } = lattice('octet', 1);

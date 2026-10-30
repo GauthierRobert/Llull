@@ -12,7 +12,7 @@ import { compileField } from './compile';
 import { latticeCut } from './beamLattice';
 import { bareCell, cellPhaseMeasures, measuredSpecificSurface, nodalSurfaceProgram, strutFacts, tpmsFacts } from './latticeFacts';
 import { lawRange } from './lawRange';
-import { DEFAULT_HOMOGENIZATION_RESOLUTION, homogenizationBlock, homogenizeCell } from './homogenization';
+import { DEFAULT_HOMOGENIZATION_RESOLUTION, homogenizationBlock, homogenizationSummary, homogenizeCell } from './homogenization';
 import { latticeMechanics } from './mechanics';
 import { quadratureVolume } from './measure';
 import { type CellMap, type FieldNode, type StrutsNode, type TpmsNode, fieldOf } from './model';
@@ -178,7 +178,7 @@ export const latticeProperties = defineCommand({
       })
       .optional()
       .describe(
-        'Periodic numerical homogenisation of the unit cell on the voxel FE solver (opt-in; native engine only): the effective stiffness tensor C_eff, E, G and nu along the cell axes, symmetry checks, and the convergence between two resolutions (data.homogenization). Unverified and reviewRequired. Capped at 64^3 voxels (IMP_HOMOGENIZATION_TOO_LARGE).',
+        'Periodic numerical homogenisation of the unit cell on the voxel FE solver (opt-in; native engine only): the effective stiffness tensor C_eff, E, G and nu along the cell axes, symmetry checks, and the convergence between two resolutions (data.homogenization). Unverified and reviewRequired. Capped at 64^3 voxels (IMP_HOMOGENIZATION_TOO_LARGE). Expect about 1 s at 16 voxels, 3 s at 32 and tens of seconds at 64 (both models are solved; the command holds the backend while it runs); a result whose two models differ by more than 5 % carries IMP_HOMOGENIZATION_UNCONVERGED.',
       ),
     resolution: z
       .number()
@@ -271,7 +271,7 @@ export const latticeProperties = defineCommand({
     };
     return report(
       doc,
-      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' && typeof described.facts['rho1'] === 'number' ? `, rho1 ${described.facts['rho1'].toPrecision(5)}, ${String(described.facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}.`,
+      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' && typeof described.facts['rho1'] === 'number' ? `, rho1 ${described.facts['rho1'].toPrecision(5)}, ${String(described.facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}${homogenization === undefined ? '' : `; ${homogenizationSummary(homogenization)}`}.`,
       data,
     );
   },

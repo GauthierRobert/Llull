@@ -14,7 +14,6 @@
 
 pub mod design;
 pub mod filter;
-pub mod homogenize_job;
 pub mod job;
 pub mod loads;
 pub mod mma;

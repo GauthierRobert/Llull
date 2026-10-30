@@ -6,8 +6,8 @@
 //! with `c` the 6 x 6 effective stiffness (row-major, Voigt `xx yy zz yz zx xy`) in units of the solid's Young modulus.
 //! Failures: `NATIVE_JOB_INPUT` (a bad size, a density file of the wrong length, more voxels than `maxVoxels` or than the hard limit of the job).
 
+use crate::homogenize::{homogenize, Cell, Refusal, Settings};
 use llull_protocol::{sha256_hex, Output};
-use llull_voxfe::homogenize::{homogenize, Cell, Refusal, Settings};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;

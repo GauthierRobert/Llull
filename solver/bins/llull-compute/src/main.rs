@@ -39,7 +39,7 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         }
         ("topopt", [folder, ..]) => llull_topopt::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("homogenize", [folder, ..]) => {
-            llull_topopt::homogenize_job::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message))
+            llull_voxfe::homogenize_job::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message))
         }
         ("route", [folder, ..]) => llull_route::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("stats", [folder, ..]) => llull_stats::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),

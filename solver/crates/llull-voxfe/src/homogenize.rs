@@ -363,6 +363,46 @@ mod tests {
         assert!(at(0, 0) < fraction * isotropic(0.3)[0] && at(0, 0) > 0.01, "C11 = {} at fraction {fraction}", at(0, 0));
     }
 
+    /// Layers normal to z, half stiffness 1 and half 0.4: the exact laminate (Voigt in the plane for the strain-compatible entries, Reuss through the thickness):
+    /// C33 = 1 / <1/C33>, C13 = <C13/C33> / <1/C33>, C11 = <C11> - <C13^2/C33> + <C13/C33>^2 / <1/C33>, C12 likewise, C44 = C55 = 1 / <1/C44>, C66 = <C66>.
+    /// Every entry of the 6 x 6 tensor is checked, so a swapped shear component (C44 against C66) or a transposed index cannot pass.
+    #[test]
+    fn a_two_layer_laminate_matches_the_exact_formulas_entry_by_entry() {
+        let (nx, ny, nz) = (4, 4, 8);
+        let emin = 1e-6;
+        let weak = 0.4;
+        let rho2 = (weak - emin) / (1.0 - emin);
+        let density: Vec<f64> = (0..nx * ny * nz).map(|e| if e / (nx * ny) < nz / 2 { 1.0 } else { rho2 }).collect();
+        let result = homogenize(&Cell { dims: [nx, ny, nz], h: 0.25, density: &density, nu: 0.3, emin }, Settings::default()).unwrap();
+        assert!(result.converged);
+        let base = isotropic(0.3);
+        let layers = [1.0, weak];
+        let mean = |f: &dyn Fn(f64) -> f64| layers.iter().map(|s| f(*s)).sum::<f64>() / 2.0;
+        let at = |r: usize, q: usize, s: f64| s * base[r * 6 + q];
+        let inverse_c33 = mean(&|s| 1.0 / at(2, 2, s));
+        let ratio = mean(&|s| at(0, 2, s) / at(2, 2, s));
+        let correction = mean(&|s| at(0, 2, s) * at(0, 2, s) / at(2, 2, s)) - ratio * ratio / inverse_c33;
+        let mut want = [0.0; 36];
+        want[0] = mean(&|s| at(0, 0, s)) - correction;
+        want[7] = want[0];
+        want[1] = mean(&|s| at(0, 1, s)) - correction;
+        want[6] = want[1];
+        want[14] = 1.0 / inverse_c33;
+        want[2] = ratio / inverse_c33;
+        want[12] = want[2];
+        want[8] = want[2];
+        want[13] = want[2];
+        want[21] = 1.0 / mean(&|s| 1.0 / at(3, 3, s));
+        want[28] = want[21];
+        want[35] = mean(&|s| at(5, 5, s));
+        for r in 0..6 {
+            for q in 0..6 {
+                let (got, expected) = (result.c[r * 6 + q], want[r * 6 + q]);
+                assert!((got - expected).abs() < 1e-8, "C[{r}][{q}] = {got}, the laminate says {expected}");
+            }
+        }
+    }
+
     #[test]
     fn the_result_does_not_depend_on_the_thread_count() {
         let n = 8;
