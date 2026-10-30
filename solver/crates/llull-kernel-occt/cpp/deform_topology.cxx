@@ -94,6 +94,7 @@ std::vector<Cut> cuts_of(const Warp &warp, const TopoDS_Shape &shape) {
     case LawKind::Taper:
     case LawKind::Stretch:
     case LawKind::Bend:
+      if (warp.region.infinite) break;  // no kink at the region ends: the law is one analytic map on the whole axis
       add(2, warp.region.start, margin);
       add(2, warp.region.end, margin);
       break;
@@ -107,6 +108,16 @@ std::vector<Cut> cuts_of(const Warp &warp, const TopoDS_Shape &shape) {
       break;
   }
   return cuts;
+}
+
+bool taper_scale_vanishes(const Warp &warp, const TopoDS_Shape &shape) {
+  const deform::Law &law = warp.law;
+  if (law.kind != LawKind::Taper || law.flat || !warp.region.infinite) return false;
+  double low = 0, high = 0;
+  span_along(shape, warp.frame, 2, low, high);
+  const double rate = (law.scale_end - 1) / (warp.region.end - warp.region.start);
+  const double s_low = 1 + rate * (low - warp.region.start), s_high = 1 + rate * (high - warp.region.start);
+  return s_low * s_high <= 0;
 }
 
 // `shape` with every face split along the planes of `cuts`; the shells are rebuilt from the split faces so the result stays one solid.
@@ -179,7 +190,7 @@ TopoDS_Shape split_faces(const TopoDS_Shape &shape, const Warp &warp, const std:
 TopoDS_Shape ring_without_caps(const TopoDS_Shape &shape, const Warp &warp, double tolerance, bool &full_turn) {
   full_turn = false;
   const deform::Law &law = warp.law;
-  if (law.kind != LawKind::Bend || law.symmetric) return TopoDS_Shape();
+  if (law.kind != LawKind::Bend || law.symmetric || warp.region.infinite) return TopoDS_Shape();
   double low = 0, high = 0;
   span_along(shape, warp.frame, 2, low, high);
   if (low < warp.region.start - tolerance || high > warp.region.end + tolerance) return TopoDS_Shape();

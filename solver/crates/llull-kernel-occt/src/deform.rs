@@ -159,15 +159,15 @@ pub fn spec_of(node: &Value) -> Option<Vec<f64>> {
     let (kind, numbers) = law_numbers(node.get("law")?)?;
     let frame = node.get("frame")?;
     let output = node.get("output")?;
-    let (start, end, falloff) = match node.get("region") {
-        Some(region) => (number(region, "start")?, number(region, "end")?, falloff_code(region)),
-        None => (0.0, 1.0, 2.0),
+    let (start, end, falloff, infinite) = match node.get("region") {
+        Some(region) => (number(region, "start")?, number(region, "end")?, falloff_code(region), flag(region, "infinite")),
+        None => (0.0, 1.0, 2.0, 0.0),
     };
     let mut spec = vec![kind, number(output, "tolerance")?];
     spec.extend(triple(frame.get("origin")?)?);
     spec.extend(triple(frame.get("axis")?)?);
     spec.extend(triple(frame.get("reference")?)?);
-    spec.extend([start, end, falloff, flag(output, "preserveAnalytic"), 0.0]);
+    spec.extend([start, end, falloff, flag(output, "preserveAnalytic"), infinite]);
     spec.extend(numbers);
     Some(spec)
 }

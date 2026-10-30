@@ -163,16 +163,18 @@ export interface RegionInput {
   readonly start?: number | undefined;
   readonly end?: number | undefined;
   readonly falloff?: 'smooth' | 'linear' | undefined;
+  readonly infinite?: boolean | undefined;
 }
 
 /**
  * The region of a deformation: caller values, else the body extent along the axis.
- * @failure end <= start or non-finite -> DEF_REGION_INVALID; the region does not overlap the body -> DEF_REGION_MISSES_BODY
+ * An `infinite` region keeps start and end as the rate only: it always meets the body and its ramp is linear.
+ * @failure end <= start or non-finite -> DEF_REGION_INVALID; infinite with falloff smooth -> DEF_REGION_INVALID; the region does not overlap the body -> DEF_REGION_MISSES_BODY
  */
 export function resolveRegion(
   extent: LocalExtent,
   input: RegionInput | undefined,
-  falloff: DeformRegion['falloff'] = 'smooth',
+  fallback: DeformRegion['falloff'] = 'smooth',
 ): DeformRegion | Refusal {
   const start = input?.start ?? extent.min[2];
   const end = input?.end ?? extent.max[2];
@@ -182,13 +184,22 @@ export function resolveRegion(
       message: `region start ${start} and end ${end} must be finite with end > start`,
       paths: ['params.region'],
     };
+  if (input?.infinite === true) {
+    if (input.falloff === 'smooth')
+      return {
+        code: 'DEF_REGION_INVALID',
+        message: 'an infinite region has a linear ramp: falloff "smooth" cannot continue along the whole axis (use "linear" or omit it)',
+        paths: ['params.region.falloff'],
+      };
+    return { start, end, falloff: fallback === 'none' ? 'none' : 'linear', beyond: 'rigid', infinite: true };
+  }
   if (end <= extent.min[2] || start >= extent.max[2])
     return {
       code: 'DEF_REGION_MISSES_BODY',
       message: `region ${start}..${end} does not meet the body, which spans ${extent.min[2]}..${extent.max[2]} along the axis`,
       paths: ['params.region'],
     };
-  return { start, end, falloff: input?.falloff ?? falloff, beyond: 'rigid' };
+  return { start, end, falloff: input?.falloff ?? fallback, beyond: 'rigid' };
 }
 
 /**

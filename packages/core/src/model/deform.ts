@@ -18,6 +18,11 @@ export interface DeformRegion {
   readonly falloff: 'none' | 'linear' | 'smooth';
   /** Past the end the body carries the end transform (the only continuous choice for a ramp that ends at its full value). */
   readonly beyond: 'rigid';
+  /**
+   * Present only when true: `start` and `end` fix the rate of the law (its full effect per `end − start`) and the law holds on the whole axis: t = (z − start)/(end − start)
+   * is not clamped, the ramp is linear, nothing is rigid and no height is a kink. Twist, taper, stretch and bend only.
+   */
+  readonly infinite?: true;
 }
 
 /** Laws of the axis-driven deformations, the affine map, the free-form lattice, the point push and the flow along a curve (local frame coordinates). */

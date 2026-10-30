@@ -94,6 +94,8 @@ inline bool resolve_frame(const double *origin, const double *axis, const double
 struct Region {
   double start = 0, end = 1;
   Falloff falloff = Falloff::Smooth;
+  // `infinite`: start and end only fix the rate; the law holds on the whole axis (linear ramp not clamped, no rigid continuation, no kink to split at).
+  bool infinite = false;
 };
 
 // A trivariate Bernstein lattice (deform_lattice): normalised coordinates inside `min`..`max` (frame coordinates), control points displaced by
@@ -148,6 +150,7 @@ struct Law {
 
 inline Jet ramp(const Region &region, const Jet &z) {
   const Jet t = (z - Jet(region.start)) * Jet(1 / (region.end - region.start));
+  if (region.infinite) return t;
   if (t.v <= 0) return Jet(0);
   if (t.v >= 1 || region.falloff == Falloff::None) return Jet(1);
   if (region.falloff == Falloff::Linear) return t;
@@ -159,7 +162,9 @@ inline Vec3J bend_map(const Law &law, const Region &region, const Vec3J &q) {
   const double start = region.start, end = region.end;
   const Jet &z = q[2];
   Jet clamped = z, over(0);
-  if (z.v < start) {
+  if (region.infinite) {
+    // theta = (z - start) / R on the whole axis: nothing is clamped, nothing continues rigidly
+  } else if (z.v < start) {
     clamped = Jet(start);
     over = z - Jet(start);
   } else if (z.v > end) {
@@ -345,6 +350,7 @@ inline Vec3J map_local(const Law &law, const Region &region, const Vec3J &q) {
       return {s * q[0], law.flat ? q[1] : s * q[1], q[2]};
     }
     case LawKind::Stretch: {
+      if (region.infinite) return {q[0], q[1], Jet(region.start) + Jet(law.factor) * (q[2] - Jet(region.start))};
       if (q[2].v <= region.start) return q;
       if (q[2].v <= region.end) return {q[0], q[1], Jet(region.start) + Jet(law.factor) * (q[2] - Jet(region.start))};
       return {q[0], q[1], q[2] + Jet((law.factor - 1) * (region.end - region.start))};

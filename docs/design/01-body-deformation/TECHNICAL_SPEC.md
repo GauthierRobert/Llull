@@ -594,7 +594,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; `baseCurve`, `infinite` regions, `allowMeshFallback`; a curved sheet as the base of
+**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; `baseCurve`; a curved sheet as the base of
 `flow_on_surface`; `compareTo` for more shapes; fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
@@ -629,6 +629,7 @@ triangle, sewn: measured on the native kernel (box minus a scan, `boolean` engin
 20,480 took 41 s. `mass_properties` on a raw scan is not affected (mesh integration, 0.21 s at 327,680).
 
 **Decision.**
+
 - One guard for every command (`commands/kernelMeshGuard.ts`): `execute` hands commands a view of the exact kernel (name `occt` or an OCCT version in its info;
   Manifold takes triangles natively and is left alone) whose `evaluate` refuses (null, the answer every caller already handles) a recipe with more than
   `KERNEL_MESH_LEAF_CAP` = 20,000 imported-mesh triangles (`meshLeafTriangles`: stored assets at full size, inline meshes by their triangles). The outermost
@@ -658,3 +659,39 @@ next execute.
 refusal with the faceted path and names the code in the summary and `data.exactRefused`) already reads "no silent fallback" as "never unannounced", and
 agents rely on it. The default stays `true` (that rule); `false` refuses with the exact code and its param path, so an exact body never becomes a mesh.
 Folds and rings refuse either way. Test: `tests/unit/deform/exactWarp.test.ts` (the `DEF_APPROX_TOLERANCE` refusal with the option false).
+
+### 17.1 `region.infinite` (FR-DEF-06, Rhino "Infinite")
+
+`region.infinite: true` (twist_body, taper_body, stretch_body, bend_body; the key is absent otherwise, so every existing recipe key and result is unchanged)
+makes `start` and `end` fix the **rate** only: t = (z − start) / (end − start) is not clamped and the law holds at every height of the axis, also beyond
+both ends. There is no end to be rigid past and no kink to split at (no face split, no crease finding). The native spec carries it in header slot 15
+(`cpp/deform.cxx`, formerly reserved); `Region.infinite` in `cpp/deform_laws.hxx` is read by `ramp`, `bend_map` and the stretch case.
+
+| Law     | Infinite map                                                                              | det J                  |
+| ------- | ----------------------------------------------------------------------------------------- | ---------------------- |
+| twist   | θ = Θ · t                                                                                 | 1                      |
+| taper   | s = 1 + (S − 1) · t, linear and not clamped                                               | s² (s when flat)       |
+| stretch | z' = start + factor · (z − start) for every z (uniform scale about `start`; `end` unused) | factor everywhere      |
+| bend    | θ = (z − start) / R for every z; nothing straight remains                                 | (R − y) / R everywhere |
+
+Decisions.
+
+- **Falloff.** The ramp is linear. `falloff: "smooth"` with `infinite` is refused with `DEF_REGION_INVALID` (a cubic blend has ends; the code's remediation
+  names it); omitted or `"linear"` is stored as `linear` (`none` for the stretch step). A recipe node with `infinite` on another law, `infinite: false`, or
+  a smooth ramp fails `validateShapeRecipe`. `beyond` has no user parameter (always `rigid`); it is ignored for an infinite region.
+- **Region checks.** `end > start` is still required; `DEF_REGION_MISSES_BODY` does not apply (the whole axis meets the body).
+- **Fold (taper).** s is linear in z, so det J = s² reaches 0 where s changes sign. `jacobianRange` takes the body extent (not the region): a sign change
+  inside the body gives min det J = 0 at the zero of s and the command refuses with `DEF_FOLDOVER` (flat taper: det J = s < 0 is caught at the ends). The
+  native warp samples det J on the surface only, which cannot see a double zero, so `taper_scale_vanishes` (`cpp/deform_topology.cxx`) refuses it with
+  `DEF_FOLDOVER` from the body span, before any modification: both paths refuse the same bodies.
+- **Bend.** `region` gives the rate (`length` or `start`/`end`, or `angleDeg` with `radius`) and where the arc begins (`start`); `symmetric` is kept: the
+  same arc moved rigidly so that the middle (start + end) / 2 stays in place. A body whose axial length / R is 2π or more is refused with
+  `DEF_SELF_INTERSECTION` (no ring: the closed-ring path of §14 needs a finite region and is skipped; no straight-part overlap test, nothing is straight).
+  The closed-form inverse (`unmapLocal`) measures angles with `atan2`, so a stored infinite bend is measured correctly for angles in (−π, π), as the finite one.
+- **Analysis.** `regionCreases` is empty and `splitHeights` is empty; `bendFibres` use the body length (neutral fibre = length along the axis); the predicted
+  volume integrates det J over the body without region breaks (exact for twist and stretch, converging for taper and bend as before); the mesh estimate
+  counts every triangle (no region filter).
+
+Tests: `tests/unit/deform/infinite.test.ts` (closed forms per law, both mesh kernels; refusals; purity; default recipes carry no key; check/analyze),
+`server/tests/nativeKernelDeform.test.ts` (exact path against the mesh path and the closed forms, fold refused on both), `solver` `deform_tests.rs`
+(`an_infinite_*`: twist area equal to the whole-body linear twist, stretch volume 15000, frustum volume, 180 degree torus segment).

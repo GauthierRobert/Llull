@@ -438,3 +438,63 @@ fn a_feature_on_a_deformed_body_keeps_the_adaptive_mass_rule() {
     }
     panic!("no edge of the twisted box fillets");
 }
+
+/// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).
+fn endless(start: f64, end: f64, falloff: &str) -> Value {
+    let mut region = span(start, end, falloff);
+    region["infinite"] = json!(true);
+    region
+}
+
+#[test]
+fn an_infinite_twist_keeps_its_rate_beyond_both_region_ends() {
+    // rate 36 deg per 20 units over a bar of 100: the same twist as 180 degrees linear over the whole bar, with no face split at the region ends
+    let law = |angle: f64| json!({ "kind": "twist", "angleRad": angle.to_radians() });
+    let endless_twist = build(&node(&bar(), law(36.0), Some(endless(-10.0, 10.0, "linear")), 1e-4, [0.0, 0.0, 50.0]));
+    let whole = build(&node(&bar(), law(180.0), Some(span(-50.0, 50.0, "linear")), 1e-4, [0.0, 0.0, 50.0]));
+    assert!(relative(endless_twist.volume, 10000.0) < 1e-6, "volume {}", endless_twist.volume);
+    assert!(relative(endless_twist.area, whole.area) < 1e-6, "area {} against {}", endless_twist.area, whole.area);
+    assert_eq!(endless_twist.report["faces"], json!(6));
+    assert_eq!(endless_twist.report["splitFaces"], json!(0));
+}
+
+#[test]
+fn an_infinite_stretch_scales_the_whole_body_about_the_region_start() {
+    let stretched = node(&bar(), json!({ "kind": "stretch", "factor": 1.5 }), Some(endless(-10.0, 10.0, "none")), 1e-3, [0.0, 0.0, 50.0]);
+    let built = build(&stretched);
+    assert!(relative(built.volume, 15000.0) < 1e-9, "volume {}", built.volume);
+    assert!(relative(built.area, 4.0 * 10.0 * 150.0 + 200.0) < 1e-9, "area {}", built.area);
+    assert_eq!(built.report["splitFaces"], json!(0));
+}
+
+#[test]
+fn an_infinite_taper_extends_its_slope_and_is_refused_where_it_folds() {
+    // r 5, h 40 from z = 0: s = 1 - 0.2 z / 80 reaches 0.9 at the top, a frustum of 5 and 4.5
+    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
+    let law = |scale_end: f64| json!({ "kind": "taper", "scaleEnd": scale_end, "flat": false });
+    let frustum = build(&node(&pin, law(0.8), Some(endless(0.0, 80.0, "linear")), 1e-4, [0.0, 0.0, -20.0]));
+    let expected = PI * 40.0 / 3.0 * (25.0 + 5.0 * 4.5 + 4.5 * 4.5);
+    assert!(relative(frustum.volume, expected) < 1e-5, "volume {} against {expected}", frustum.volume);
+    // s = 1 - 0.6 z / 20 is -0.2 at the top: a finite region would have stopped at 0.4
+    let report = refusal(&node(&pin, law(0.4), Some(endless(0.0, 20.0, "linear")), 1e-4, [0.0, 0.0, -20.0]));
+    assert_eq!(report["code"], json!("DEF_FOLDOVER"), "{report}");
+}
+
+#[test]
+fn an_infinite_bend_curves_a_rod_longer_than_its_region_into_one_arc() {
+    // R 50, rate pi / 2 per 78.54: the rod of twice that length is the 180 degree torus segment of VC-DEF-08, not a quarter arc and a straight tail
+    let quarter = 50.0 * FRAC_PI_2;
+    let rod = entity("cylinder", json!({ "radius": 5, "height": 2.0 * quarter }));
+    let bent = node(
+        &rod,
+        json!({ "kind": "bend", "radius": 50, "symmetric": false }),
+        Some(endless(0.0, quarter, "linear")),
+        1e-4,
+        [0.0, 0.0, -quarter],
+    );
+    let built = build(&bent);
+    assert!(relative(built.volume, 12337.0055) < 1e-6, "volume {}", built.volume);
+    assert!(relative(built.area, 4934.8022 + 2.0 * PI * 25.0) < 1e-6, "area {}", built.area);
+    assert_eq!(built.report["faces"], json!(3));
+    assert_eq!(built.report["ring"], json!(false));
+}

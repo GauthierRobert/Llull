@@ -463,4 +463,71 @@ describeNativeWhen({ capabilities: ['gtransform', 'deform'], label: 'nativeKerne
     const check = execute(exact.document, 'check_deformation', {});
     expect((check.data as { status: string }).status).not.toBe('fail');
   });
+
+  /** Largest coordinate of the result mesh along `axis`. */
+  const extentMax = (doc: CadDocument, id: string, axis: number): number => {
+    const { positions } = (doc.entities[id] as unknown as { mesh: { positions: number[] } }).mesh;
+    return positions.reduce((best, value, i) => (i % 3 === axis ? Math.max(best, value) : best), -Infinity);
+  };
+
+  it('region.infinite (01 DEF §17.1): twist, stretch and bend keep their rate beyond the region ends, exact path = mesh path', () => {
+    const { doc, id } = box([10, 10, 100], 'base-center');
+    const both = (
+      name: string,
+      params: Record<string, unknown>,
+    ): { exact: ReturnType<typeof execute>; meshed: ReturnType<typeof execute> } => ({
+      exact: run(doc, name, { id, frame: FRAME, ...params, output: { mode: 'exact', tolerance: 1e-4 } }),
+      meshed: run(doc, name, { id, frame: FRAME, ...params, output: { mode: 'mesh', tolerance: 1e-4 } }),
+    });
+    const twist = both('twist_body', { angleDeg: 36, region: { start: 0, end: 20, infinite: true } });
+    const whole = run(doc, 'twist_body', {
+      id,
+      angleDeg: 180,
+      frame: FRAME,
+      region: { start: 0, end: 100, falloff: 'linear' },
+      output: { mode: 'exact', tolerance: 1e-4 },
+    });
+    const twisted = twist.exact.affected[0] as string;
+    expect(twist.exact.error, twist.exact.summary).toBeUndefined();
+    expect((twist.exact.data as { path: string; region: { infinite: boolean } }).region.infinite).toBe(true);
+    expect(rel(volumeOfEntity(twist.exact.document, twisted), 10000)).toBeLessThan(1e-6);
+    expect(rel(areaOfEntity(twist.exact.document, twisted), areaOfEntity(whole.document, whole.affected[0] as string))).toBeLessThan(1e-9);
+    expect((twist.exact.data as { path: string }).path).toBe('exact');
+    expect(
+      rel(volumeOfEntity(twist.exact.document, twisted), (twist.meshed.data as { volume: { value: number } }).volume.value),
+    ).toBeLessThan(1e-3);
+    const stretch = both('stretch_body', { factor: 2, region: { start: 20, end: 30, infinite: true } });
+    expect(rel(volumeOfEntity(stretch.exact.document, stretch.exact.affected[0] as string), 20000)).toBeLessThan(1e-9);
+    expect(extentMax(stretch.exact.document, stretch.exact.affected[0] as string, 2)).toBeCloseTo(180, 6);
+    expect(extentMax(stretch.meshed.document, stretch.meshed.affected[0] as string, 2)).toBeCloseTo(180, 6);
+    const quarter = 25 * Math.PI;
+    const rod = execute(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 2 * quarter, anchor: 'base-center' });
+    const bend = (mode: string): ReturnType<typeof execute> =>
+      run(rod.document, 'bend_body', {
+        id: rod.affected[0],
+        radius: 50,
+        region: { start: 0, end: quarter, infinite: true },
+        frame: { origin: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] },
+        output: { mode, tolerance: 1e-4 },
+      });
+    const [arcExact, arcMesh] = [bend('exact'), bend('mesh')];
+    expect(arcExact.error, arcExact.summary).toBeUndefined();
+    expect(rel(volumeOfEntity(arcExact.document, arcExact.affected[0] as string), Math.PI * 25 * Math.PI * 50)).toBeLessThan(1e-5);
+    expect(extentMax(arcExact.document, arcExact.affected[0] as string, 0)).toBeCloseTo(105, 0);
+    expect(extentMax(arcMesh.document, arcMesh.affected[0] as string, 0)).toBeCloseTo(105, 0);
+  }, 240_000);
+
+  it('an infinite taper whose scale reaches 0 inside the body is refused as a fold on both paths', () => {
+    const cylinder = execute(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 40, anchor: 'base-center' });
+    for (const mode of ['exact', 'mesh']) {
+      const result = run(cylinder.document, 'taper_body', {
+        id: cylinder.affected[0],
+        scaleEnd: 0.4,
+        frame: FRAME,
+        region: { start: 0, end: 20, infinite: true },
+        output: { mode },
+      });
+      expect(result.error?.code).toBe('DEF_FOLDOVER');
+    }
+  });
 });

@@ -67,6 +67,7 @@ export function edgeActive(node: Pick<DeformNode, 'law' | 'region'>, frame: Loca
       default:
         return (p, q) => {
           if (region === undefined) return false;
+          if (region.infinite === true) return true;
           const [za, zb] = [toLocal(frame, p)[2], toLocal(frame, q)[2]];
           return !(Math.max(za, zb) <= region.start || Math.min(za, zb) >= region.end);
         };

@@ -120,7 +120,12 @@ function regionProblem(region: unknown, kind: unknown): string | null {
   // a step is the stretch law only; a ramp that jumped would tear the body
   const allowed = kind === 'stretch' ? ['none'] : ['linear', 'smooth'];
   if (!allowed.includes(String(region['falloff']))) return `region: falloff must be ${allowed.join(' or ')} for a ${String(kind)} law`;
-  return region['beyond'] === 'rigid' ? null : 'region: beyond must be rigid';
+  if (region['beyond'] !== 'rigid') return 'region: beyond must be rigid';
+  if (region['infinite'] === undefined) return null;
+  if (region['infinite'] !== true) return 'region: infinite must be true when present';
+  if (!AXIS_LAW_KINDS.includes(kind as DeformLawKind))
+    return `region: infinite applies to twist, taper, stretch and bend, not a ${String(kind)} law`;
+  return region['falloff'] === 'smooth' ? 'region: an infinite region has a linear ramp (falloff linear, or none for a stretch)' : null;
 }
 
 /** Why an untrusted deform node (source excluded) is unusable, or null (DEF_RECIPE_INVALID). */

@@ -1,7 +1,7 @@
 /**
  * Deformation laws (01 DEF §5.2, Barr 1984): maps from local frame coordinates q = (x, y, z) to q' and their Jacobian determinants, closed form.
  * @invariant lattice, point and flow maps: see lattice.ts, pointPush.ts, flow.ts; twist det J = 1; taper det J = s² (s when flat); stretch det J = factor inside the region; bend det J = (R − y) / R inside the
- *   region and 1 elsewhere (rigid continuation past the end); affine det J = det M
+ *   region and 1 elsewhere (rigid continuation past the end); an `infinite` region applies the finite-region formula at every height (no clamp, no rigid part); affine det J = det M
  */
 
 import type { DeformLaw, DeformRegion } from '../../model/deform';
@@ -34,9 +34,9 @@ export function determinant(rows: Rows): number {
 /** Bend of the region about the axis parallel to local x through (y = R, z = start), rigid past the end; `symmetric` keeps the region middle fixed. */
 function bendMap(radius: number, symmetric: boolean, region: DeformRegion, [x, y, z]: Vec3): Vec3 {
   const { start, end } = region;
-  const clamped = Math.min(Math.max(z, start), end);
+  const clamped = region.infinite === true ? z : Math.min(Math.max(z, start), end);
   const theta = (clamped - start) / radius;
-  const over = z < start ? z - start : z - clamped;
+  const over = region.infinite === true ? 0 : z < start ? z - start : z - clamped;
   const [sin, cos] = [Math.sin(theta), Math.cos(theta)];
   const dy = cos * (y - radius) + sin * over;
   const dz = -sin * (y - radius) + cos * over;
@@ -64,6 +64,7 @@ export function mapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 {
       return [s * x, law.flat ? y : s * y, z];
     }
     case 'stretch': {
+      if (region.infinite === true) return [x, y, region.start + law.factor * (z - region.start)];
       if (z <= region.start) return q;
       if (z <= region.end) return [x, y, region.start + law.factor * (z - region.start)];
       return [x, y, z + (law.factor - 1) * (region.end - region.start)];
@@ -95,9 +96,9 @@ export function localDeterminant(law: DeformLaw, region: DeformRegion, q: Vec3):
       return law.flat ? s : s * s;
     }
     case 'stretch':
-      return q[2] > region.start && q[2] <= region.end ? law.factor : 1;
+      return region.infinite === true || (q[2] > region.start && q[2] <= region.end) ? law.factor : 1;
     case 'bend':
-      return q[2] > region.start && q[2] <= region.end ? (law.radius - q[1]) / law.radius : 1;
+      return region.infinite === true || (q[2] > region.start && q[2] <= region.end) ? (law.radius - q[1]) / law.radius : 1;
     case 'lattice':
       return latticeDeterminant(law, q);
     case 'point':

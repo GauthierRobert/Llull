@@ -93,7 +93,7 @@ export function maxEdgeLength(node: Pick<DeformNode, 'law' | 'region'>, extent: 
 /** Local heights where the map has a kink (region ends), for laws that are not smooth there. */
 export function splitHeights(node: Pick<DeformNode, 'law' | 'region'>): number[] {
   const { law, region } = node;
-  if (region === undefined || law.kind === 'affine') return [];
+  if (region === undefined || region.infinite === true || law.kind === 'affine') return [];
   if (law.kind === 'stretch' || law.kind === 'bend' || region.falloff === 'linear') return [region.start, region.end];
   return [];
 }
@@ -107,8 +107,10 @@ export interface JacobianRange {
   readonly minAt: Vec3;
 }
 
-const overlaps = (region: DeformRegion, extent: LocalExtent): boolean => extent.max[2] > region.start && extent.min[2] <= region.end;
-const extendsOutside = (region: DeformRegion, extent: LocalExtent): boolean => extent.min[2] < region.start || extent.max[2] > region.end;
+const overlaps = (region: DeformRegion, extent: LocalExtent): boolean =>
+  region.infinite === true || (extent.max[2] > region.start && extent.min[2] <= region.end);
+const extendsOutside = (region: DeformRegion, extent: LocalExtent): boolean =>
+  region.infinite !== true && (extent.min[2] < region.start || extent.max[2] > region.end);
 
 /** Range of det J over `extent`, closed form per law (monotone ramps, linear (R − y)/R). */
 export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: LocalExtent): JacobianRange {
@@ -147,6 +149,12 @@ export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: 
       return law.flat ? s : s * s;
     };
     const [low, high] = [det(extent.min[2]), det(extent.max[2])];
+    const scaleAt = (z: number): number => 1 + (law.scaleEnd - 1) * rampAt(region, z).w;
+    if (region.infinite === true && !law.flat && scaleAt(extent.min[2]) * scaleAt(extent.max[2]) <= 0) {
+      // the section scale s is linear in z and changes sign inside the body: s² reaches 0 where s does
+      const zero = region.start + (region.end - region.start) / (1 - law.scaleEnd);
+      return { min: 0, max: Math.max(low, high), minAt: corner(zero) };
+    }
     return low <= high ? { min: low, max: high, minAt: corner(extent.min[2]) } : { min: high, max: low, minAt: corner(extent.max[2]) };
   }
   const inside = overlaps(region, extent);
@@ -201,7 +209,7 @@ export interface RegionCrease {
  */
 export function regionCreases(node: Pick<DeformNode, 'law' | 'region'>, extent: LocalExtent): RegionCrease[] {
   const { law, region } = node;
-  if (region === undefined || (law.kind !== 'twist' && law.kind !== 'taper')) return [];
+  if (region === undefined || region.infinite === true || (law.kind !== 'twist' && law.kind !== 'taper')) return [];
   const half = Math.max(extent.max[0], -extent.min[0], extent.max[1], -extent.min[1]);
   const total = law.kind === 'twist' ? Math.abs(law.angleRad) : Math.abs(law.scaleEnd - 1);
   const angleRad = Math.atan(total * rampRatesAtEnds(region) * half);
@@ -226,7 +234,7 @@ export interface BendFibres {
 export function bendFibres(node: Pick<DeformNode, 'law' | 'region'>, extent: LocalExtent): BendFibres | null {
   const { law, region } = node;
   if (law.kind !== 'bend' || region === undefined) return null;
-  const angle = (region.end - region.start) / law.radius;
+  const angle = (region.infinite === true ? extent.max[2] - extent.min[2] : region.end - region.start) / law.radius;
   return {
     neutral: law.radius * angle,
     inner: (law.radius - Math.max(extent.max[1], 0)) * angle,

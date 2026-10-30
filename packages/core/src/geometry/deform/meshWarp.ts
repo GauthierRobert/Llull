@@ -283,7 +283,7 @@ export function estimateWarp(source: MeshData, node: DeformNode, tolerance: numb
   for (let t = 0; t + 2 < source.indices.length; t += 3) {
     const corners = [0, 1, 2].map((k) => at(source.positions, source.indices[t + k] as number));
     const heights = corners.map((p) => toLocal(warp.frame, p)[2]);
-    if (Math.max(...heights) <= start || Math.min(...heights) >= end) continue;
+    if (node.region.infinite !== true && (Math.max(...heights) <= start || Math.min(...heights) >= end)) continue;
     const [a, b, c] = corners as [Vec3, Vec3, Vec3];
     const [u, w] = [sub(b, a), sub(c, a)];
     area += 0.5 * Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]);

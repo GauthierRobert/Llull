@@ -16,6 +16,7 @@ function unbend(radius: number, symmetric: boolean, region: DeformRegion, [x, y,
     [dy, dz] = [hc * dy + hs * dz, -hs * dy + hc * dz];
   }
   const angle = Math.atan2(dz, -dy);
+  if (region.infinite === true) return [x, radius - Math.hypot(dy, dz), start + radius * angle];
   if (angle <= 0) return [x, radius + dy, start + dz];
   if (angle <= total) return [x, radius - Math.hypot(dy, dz), start + radius * angle];
   const [sin, cos] = [Math.sin(total), Math.cos(total)];
@@ -41,6 +42,7 @@ export function unmapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 
       return [x / s, law.flat ? y : y / s, z];
     }
     case 'stretch': {
+      if (region.infinite === true) return [x, y, region.start + (z - region.start) / law.factor];
       if (z <= region.start) return q;
       const stretchedEnd = region.start + law.factor * (region.end - region.start);
       if (z <= stretchedEnd) return [x, y, region.start + (z - region.start) / law.factor];

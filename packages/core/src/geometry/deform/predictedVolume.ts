@@ -122,7 +122,11 @@ export function predictedVolume(source: MeshData, node: Pick<DeformNode, 'law' |
     if (z < low) low = z;
     if (z > high) high = z;
   }
-  const breaks = [low, ...(node.region === undefined ? [] : [region.start, region.end].filter((z) => z > low && z < high)), high];
+  const breaks = [
+    low,
+    ...(node.region === undefined || node.region.infinite === true ? [] : [region.start, region.end].filter((z) => z > low && z < high)),
+    high,
+  ];
   const perPiece = Math.max(2, Math.min(SUBINTERVALS, Math.floor(WORK_LIMIT / (triangles * 3 * Math.max(1, breaks.length - 1)))));
   let predicted = 0;
   for (let piece = 0; piece + 1 < breaks.length; piece++) {
