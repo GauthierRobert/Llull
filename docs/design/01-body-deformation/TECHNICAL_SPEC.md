@@ -597,3 +597,21 @@ Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo);
 **Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; `baseCurve`, `infinite` regions, `allowMeshFallback`; a curved sheet as the base of
 `flow_on_surface`; `compareTo` for more shapes; fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
+
+## 15. As built (DES-7d: deforming large meshes, 2026-10-30)
+
+**Problem.** `scale_nonuniform` on a stored 327,680-triangle scan (noisy icosphere, level 7) did not finish in 580 s on the desktop host. Not a quadratic step in the warp:
+with the native kernel installed a `mesh` entity without a B-rep went to the exact path, and `loadTarget` and `build` both asked the kernel to evaluate its `solid` leaf,
+which sews one OCCT face per stored triangle (1,280 triangles 1.9 s, 5,120 8.3 s, 20,480 41 s) to give back the same triangles. FR-DEF-08 already put these entities on
+the mesh path; the code did not.
+
+**Decision.** `DeformTarget.faceted` is true when the source recipe is a `solid` leaf of a `mesh` entity (no exact construction, including the `operandRecipe` fallback when
+the kernel lacks an op of the tree). A faceted target never reaches the kernel (`loadTarget` reads the entity's triangles; `useKernel` is false), the summary says why
+("The source is a mesh without an exact construction"), and `mode: "exact"` refuses with `DEF_EXACT_UNAVAILABLE` naming it. A deformed mesh (its `brep` is a `deform`
+recipe) is not faceted and keeps the exact path.
+
+**Measured** (desktop host, native kernel, stored 327,680-triangle noisy sphere, `POST /command` wall clock): `scale_nonuniform` 1.1 s, `twist_body` 2.3 s, `taper_body`
+2.0 s, `stretch_body` 1.7 s, `bend_body` 2.2 s (before: `scale_nonuniform` did not finish in 580 s). At 81,920 triangles 0.37 to 0.65 s.
+
+**Tests.** `tests/unit/deform/facetedSource.test.ts`: with an exact stub kernel whose `evaluate` is recorded, `scale_nonuniform` and `twist_body` on an imported mesh take
+the mesh path and never evaluate a mesh leaf; `mode: "exact"` refuses by name; a box and a deformed mesh still take the exact path. Both cases fail without the fix.

@@ -184,7 +184,8 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   const fold = foldRefusal(node, plan.extent);
   if (fold !== null) return reject(fold);
   const { kernel } = target;
-  const useKernel = kernel !== null && mode !== 'mesh' && kernel.supports('deform') && kernel.supportsDeform?.(plan.law) !== false;
+  const useKernel =
+    kernel !== null && !target.faceted && mode !== 'mesh' && kernel.supports('deform') && kernel.supportsDeform?.(plan.law) !== false;
   const estimate = estimateWarp(target.mesh, node, tolerance);
   if (estimate !== null && !useKernel && estimate.triangles > MAX_WARP_TRIANGLES)
     return reject({
@@ -195,7 +196,12 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   if (mode === 'exact' && !useKernel)
     return reject({
       code: 'DEF_EXACT_UNAVAILABLE',
-      message: kernel === null ? 'no geometry kernel is installed' : 'the installed kernel does not build this deformation exactly',
+      message:
+        kernel === null
+          ? 'no geometry kernel is installed'
+          : target.faceted
+            ? `'${target.entity.id}' is a mesh without an exact construction (its triangles are the source): mode "auto" or "mesh" deforms it`
+            : 'the installed kernel does not build this deformation exactly',
       paths: ['params.output.mode'],
     });
   const ringRefusal = (): CommandResult =>
@@ -235,13 +241,15 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   const why =
     built.exact || mode === 'mesh'
       ? ''
-      : fallback !== null
-        ? ` The exact warp refused (${fallback}), so the result is a faceted mesh (mode "exact" refuses instead).`
-        : kernel === null
-          ? ' No geometry kernel is installed, so the result is a faceted mesh.'
-          : !useKernel
-            ? ' The kernel does not build this law exactly, so the result is a faceted mesh (mode "exact" refuses instead).'
-            : ' The kernel is a mesh kernel, so the result is a faceted mesh.';
+      : target.faceted
+        ? ' The source is a mesh without an exact construction, so the result is a faceted mesh.'
+        : fallback !== null
+          ? ` The exact warp refused (${fallback}), so the result is a faceted mesh (mode "exact" refuses instead).`
+          : kernel === null
+            ? ' No geometry kernel is installed, so the result is a faceted mesh.'
+            : !useKernel
+              ? ' The kernel does not build this law exactly, so the result is a faceted mesh (mode "exact" refuses instead).'
+              : ' The kernel is a mesh kernel, so the result is a faceted mesh.';
   const describe = (newId: string, triangles: number): string =>
     `${command}: ${verb} '${id}' (kind '${target.entity.kind}') → mesh '${newId}' (${triangles} triangles, ${path} path, volume ${volume.value.toPrecision(8)} ${doc.units}^3 ${volume.method}).${why} ` +
     `Frame origin [${list(plan.frame.origin).join(', ')}] axis [${list(plan.frame.axis).join(', ')}]${plan.defaulted.length > 0 ? ` (defaulted: ${plan.defaulted.join(', ')})` : ''}. ${NEXT_STEP}`;

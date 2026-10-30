@@ -53,6 +53,7 @@ function targetOf(entity: Sheet): DeformTarget {
     kernel: null,
     source: { op: 'brep', blob: '0'.repeat(64), format: 'occt-brep-v1' },
     mesh: { positions: cloud, indices: [] },
+    faceted: false,
     min,
     max,
     diagonal: Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]),
