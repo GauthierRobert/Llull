@@ -32,7 +32,7 @@ const GROWTH = 4;
 const SLOPE_LIMIT = 100;
 
 /** Chord evaluations (one map evaluation each) before the mesh path gives up, whatever the triangle count: 4e7 for a cheap map, less for one that solves for its argument. */
-const MAX_EVALUATIONS = 4e7;
+const MAX_EVALUATIONS = 4e8;
 
 /** Cost of one evaluation of a law relative to a closed-form one (the base-frame laws run a Newton solve per point). */
 function evaluationCost(node: DeformNode): number {

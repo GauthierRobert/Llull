@@ -859,9 +859,9 @@ the chord rule never stops splitting until the 4 M triangle cap. The cap was the
   discontinuous or folded in the body"). A first criterion on the worst deviation alone refused `deform_by_point` (a localised bump is discovered late: its deviation does not fall while new regions
   are found); the ratio, with its absolute level, does not. The same input now ends after about 8 passes, in seconds.
 - **Work.** Independently of the triangle count, the chord evaluations are counted (a map that solves for its argument, the base-frame laws, counts 20 each) and the mesh path refuses with
-  `DEF_BUDGET_EXCEEDED` beyond 4e7 weighted evaluations. With the progress check disabled the same input stops by this bound after about 35 s instead of never.
+  `DEF_BUDGET_EXCEEDED` beyond 4e8 weighted evaluations (an honest infinite bend of a 157 mm cylinder at 1e-4 needs 2.9M triangles and 35 s: the first value, 4e7, refused it, caught by `nativeKernelDeform`). With the progress check disabled the same input stops by this bound after a few minutes instead of never.
 - **Native.** The exact warp's loops were already bounded by construction (a Newton solve of at most 40 steps, the fit by 512 segments per direction and 400 000 points, then
   `DEF_APPROX_TOLERANCE`); the exact path of the same input ends with a refusal within the test bound.
 
 Tests: `tests/unit/deform/flowSheetBase.test.ts` (the focal check switched off by the test-only `focalCheck.enabled`; both kernels; refusal `DEF_APPROX_TOLERANCE` in seconds; red-proof: without the
-progress check it ends by the work bound with `DEF_BUDGET_EXCEEDED` after about 35 s), `server/tests/nativeKernelFlowSheet.test.ts` (the exact path).
+progress check it ends by the work bound with `DEF_BUDGET_EXCEEDED`, no longer within seconds), `server/tests/nativeKernelFlowSheet.test.ts` (the exact path).
