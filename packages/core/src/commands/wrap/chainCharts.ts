@@ -34,14 +34,21 @@ export interface ChainFace {
   readonly clips: HalfPlane[];
   /** A point inside the face, to find it again in a solid changed by an earlier face of the chain. */
   readonly probe: Vec3;
+  /** How far (document units) the chain's chart of this face can put a point of a shared edge off the face: the mismatch of its geodesic joins, 0 for developable faces. */
+  readonly slack: number;
 }
 
 export interface ChainEdge {
-  /** Relative disagreement of the edge points between the two charts of the join (0 for developable faces). */
+  /** Disagreement of the two charts of the join over the window and at every point where the sketch crosses the edge, as a share of `windowLength` (0 for developable faces). */
   readonly mismatch: number;
   readonly edge: number;
   readonly faces: readonly [number, number];
+  /** The largest distance, document units, between the two charts' images of a point where the sketch crosses the edge (0 for developable faces or no crossing). */
+  readonly cutGap: number;
+  /** Length of the whole edge (sum of the chords of its samples), document units. */
   readonly length: number;
+  /** Length of the stretch of the edge the charts are joined over (its chord in the chain's coordinates). */
+  readonly windowLength: number;
   readonly convexity: 'convex' | 'concave' | 'smooth' | 'unknown';
 }
 
@@ -161,19 +168,22 @@ function childChart(
   handedness: 1 | -1,
   orientation: 1 | -1,
   method: ChartMethod,
+  /** Index of the edge sample the child chart is anchored on (the one nearest where the sketch crosses). */
+  at: number,
 ): Candidate[] {
   const preferredMirror = orientation !== handedness;
+  const pivot = chainPoints[at] as Vec2;
   const found: Candidate[] = [];
   for (const mirror of [preferredMirror, !preferredMirror]) {
-    const own = buildChart(session.surface, { anchorChart: [0, 0], anchorOn: points[0] as Vec3, angleDeg: 0, mirror }, method);
+    const own = buildChart(session.surface, { anchorChart: [0, 0], anchorOn: points[at] as Vec3, angleDeg: 0, mirror }, method);
     if ('error' in own) return [];
     const d = chartCoordinates(own, points, session.uvBounds);
     if (d === null) return [];
-    const v = chainPoints.map((p): Vec2 => [p[0] - (chainPoints[0] as Vec2)[0], p[1] - (chainPoints[0] as Vec2)[1]]);
+    const v = chainPoints.map((p): Vec2 => [p[0] - pivot[0], p[1] - pivot[1]]);
     let dot = 0;
     let cross = 0;
     for (const [k, vk] of v.entries()) {
-      const dk: Vec2 = [(d[k] as Vec2)[0] - (d[0] as Vec2)[0], (d[k] as Vec2)[1] - (d[0] as Vec2)[1]];
+      const dk: Vec2 = [(d[k] as Vec2)[0] - (d[at] as Vec2)[0], (d[k] as Vec2)[1] - (d[at] as Vec2)[1]];
       dot += dk[0] * vk[0] + dk[1] * vk[1];
       cross += dk[0] * vk[1] - dk[1] * vk[0];
     }
@@ -181,7 +191,7 @@ function childChart(
     for (const angle of [alpha, -alpha]) {
       const chart = buildChart(
         session.surface,
-        { anchorChart: chainPoints[0] as Vec2, anchorOn: points[0] as Vec3, angleDeg: (angle * 180) / Math.PI, mirror },
+        { anchorChart: pivot, anchorOn: points[at] as Vec3, angleDeg: (angle * 180) / Math.PI, mirror },
         method,
       );
       if ('error' in chart) continue;
@@ -210,7 +220,7 @@ export function buildChain(
   tolerance: number,
   limit: number,
   /** Points of the sketch in chain coordinates: when two faces share several edges the one the sketch crosses is unfolded. */
-  sketch: readonly Vec2[] = [],
+  sketch: ReadonlyArray<readonly Vec2[]> = [],
 ): Chain | CommandResult {
   const { session } = root;
   const fail = (code: string, message: string, path = 'chain'): CommandResult =>
@@ -260,6 +270,7 @@ export function buildChain(
     orientation: root.resolved.orientation,
     clips: [],
     probe: probeOf(session),
+    slack: 0,
   });
   const edges: ChainEdge[] = [];
   const pending = sessions.slice(1);
@@ -286,7 +297,7 @@ export function buildChain(
           if (flat.length < 2) continue;
           const [first, last] = [flat[0] as Vec2, flat[flat.length - 1] as Vec2];
           const side = (p: Vec2): number => (last[0] - first[0]) * (p[1] - first[1]) - (last[1] - first[1]) * (p[0] - first[0]);
-          const probes = sketch.length > 0 ? sketch : [candidate.parent.chart.anchorChart];
+          const probes = sketch.length > 0 ? sketch.flat() : [candidate.parent.chart.anchorChart];
           const crossing = probes.some((p) => side(p) > 0) && probes.some((p) => side(p) < 0);
           const near = Math.min(...probes.flatMap((p) => flat.map((c) => dist2(c, p))));
           const score = (crossing ? 0 : 1e9) + near;
@@ -309,9 +320,12 @@ export function buildChain(
         const c = coords[k];
         return c !== null && c !== undefined && dist2(c, origin) <= reach;
       };
+      // the window is seeded where the sketch comes nearest the edge (its crossing), else nearest the chart anchor
+      const targets = sketch.length > 0 ? sketch.flat() : [origin];
+      const nearTarget = (c: Vec2): number => Math.min(...targets.map((p) => dist2(c, p)));
       let seed = -1;
       for (const [k, c] of coords.entries())
-        if (reached(k) && (seed < 0 || dist2(c as Vec2, origin) < dist2(coords[seed] as Vec2, origin))) seed = k;
+        if (reached(k) && (seed < 0 || nearTarget(c as Vec2) < nearTarget(coords[seed] as Vec2))) seed = k;
       let low = seed;
       let high = seed;
       while (seed >= 0 && low > 0 && reached(low - 1)) low--;
@@ -333,6 +347,8 @@ export function buildChain(
       const points = all.slice(keep.low, keep.high + 1);
       const parentPoints = coords.slice(keep.low, keep.high + 1) as Vec2[];
       const length = dist2(parentPoints[0] as Vec2, parentPoints[parentPoints.length - 1] as Vec2);
+      const seedAt = seed - keep.low;
+      const edgeLength = all.reduce((sum, p, k) => (k === 0 ? 0 : sum + distance3(p, all[k - 1] as Vec3)), 0);
       const bend = straightness(parentPoints);
       const allowed = developableJoin ? Math.max(tolerance, 1e-9 * length) : limit * length;
       if (!(bend <= allowed))
@@ -342,11 +358,11 @@ export function buildChain(
             ? `edge ${join.edge} between faces ${join.parent.session.face} and ${child.face} develops to a curve${sharedNote(join.shared)} (${bend.toPrecision(4)} ${doc.units} off its chord): only edges that develop to straight lines (a generatrix of a cylinder, a ruling of a cone, a straight edge of a plane) join two faces into one chart`
             : `edge ${join.edge} between faces ${join.parent.session.face} and ${child.face} bends ${(bend / length).toPrecision(4)} of its length off its chord in the geodesic chart (limit ${limit}): a curved edge cannot be the cut line of two charts; use a smaller sketch or an edge along a geodesic (a meridian of a torus, a great circle)${sharedNote(join.shared)}`,
         );
-      const hit = child.query.projectOnFace(child.shape, child.face, [points[0] as Vec3])?.[0] ?? null;
+      const hit = child.query.projectOnFace(child.shape, child.face, [points[seedAt] as Vec3])?.[0] ?? null;
       if (hit === null) return fail('WRP_KERNEL_BUILD_FAILED', `edge ${join.edge} does not project onto face ${child.face}`);
       const natural = buildChart(
         child.surface,
-        { anchorChart: [0, 0], anchorOn: points[0] as Vec3, angleDeg: 0, mirror: false },
+        { anchorChart: [0, 0], anchorOn: points[seedAt] as Vec3, angleDeg: 0, mirror: false },
         methodOf(child.surface.type),
       );
       if ('error' in natural)
@@ -358,7 +374,7 @@ export function buildChain(
         0
           ? 1
           : -1;
-      const matches = childChart(child, points, parentPoints, handedness, orientation, methodOf(child.surface.type));
+      const matches = childChart(child, points, parentPoints, handedness, orientation, methodOf(child.surface.type), seedAt);
       const candidate = matches[0] ?? null;
       const mismatchLimit = developableJoin ? Math.max(tolerance, 1e-9 * length) : limit * length;
       if (candidate !== null && !developableJoin && candidate.residual > mismatchLimit)
@@ -377,8 +393,8 @@ export function buildChain(
       const direction: Vec2 = [(last[0] - first[0]) / length, (last[1] - first[1]) / length];
       const normal: Vec2 = [-direction[1], direction[0]];
       const middle: Vec2 = parentPoints[Math.floor(parentPoints.length / 2)] as Vec2;
-      const inside = (face: { readonly session: FaceSession }, chart: FaceChart, sign: 1 | -1): boolean | null => {
-        const offset = Math.max(1e-3 * length, 10 * tolerance);
+      const inside = (face: { readonly session: FaceSession }, chart: FaceChart, sign: 1 | -1, apart = 0): boolean | null => {
+        const offset = Math.max(1e-3 * length, 10 * tolerance, apart);
         const at: Vec2 = [middle[0] + sign * offset * normal[0], middle[1] + sign * offset * normal[1]];
         const uv = chart.uvAt(at);
         if (uv === null) return null;
@@ -395,22 +411,63 @@ export function buildChain(
       // the edge fixes the child chart only up to a reflection across it (the straight edge has the same residual both ways): the chart that puts the child on the other side
       // of the edge from the parent, by the kernel's point-in-face test, is the unfolding (not the orientation rule, which a cone's chart does not follow)
       const tied = matches.filter((match) => match.residual <= candidate.residual + Math.max(1e-9 * length, 1e-3 * candidate.residual));
-      const unfolded =
-        tied.find(
-          (match) =>
-            inside({ session: child }, match.chart, -parentSide as 1 | -1) === true &&
-            inside({ session: child }, match.chart, parentSide) !== true,
-        ) ?? candidate;
+      // the child chart puts the edge points where the parent chart does only to the mismatch of the join: step away from the edge by more than that
+      const apartChild = 4 * candidate.residual;
+      const unfolded = tied.find(
+        (match) =>
+          inside({ session: child }, match.chart, -parentSide as 1 | -1, apartChild) === true &&
+          inside({ session: child }, match.chart, parentSide, apartChild) !== true,
+      );
+      if (unfolded === undefined)
+        return fail(
+          'WRP_CHAIN_CLIP_FAILED',
+          `the kernel could not tell which side of edge ${join.edge} face ${child.face} lies on in any of the ${tied.length} charts that match its points: the faces cannot be unfolded into one chart`,
+        );
+      // where the sketch crosses the edge line: inside the stretch the charts are joined over, and the two charts must put those points together
+      let gap = 0;
+      if (!developableJoin) {
+        const side = (p: Vec2): number => (last[0] - first[0]) * (p[1] - first[1]) - (last[1] - first[1]) * (p[0] - first[0]);
+        for (const polyline of sketch)
+          for (let k = 0; k + 1 < polyline.length; k++) {
+            const [a, b] = [polyline[k] as Vec2, polyline[k + 1] as Vec2];
+            const [sa, sb] = [side(a), side(b)];
+            if (!(sa * sb < 0)) continue;
+            const t = sa / (sa - sb);
+            const cut: Vec2 = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+            const along = ((cut[0] - first[0]) * direction[0] + (cut[1] - first[1]) * direction[1]) / length;
+            if (along < -1e-6 || along > 1 + 1e-6)
+              return fail(
+                'WRP_DISTORTION_EXCEEDED',
+                `the sketch crosses edge ${join.edge} between faces ${join.parent.session.face} and ${child.face} outside the ${length.toPrecision(4)} ${doc.units} of it the geodesic charts are joined over (within the limit ${limit}): use a smaller sketch or anchor it nearer to where it crosses the edge`,
+              );
+            const uvParent = join.parent.chart.uvAt(cut);
+            const uvChild = unfolded.chart.uvAt(cut);
+            if (uvParent === null || uvChild === null)
+              return fail(
+                'WRP_DISTORTION_EXCEEDED',
+                `a point where the sketch crosses edge ${join.edge} has no image in the geodesic chart of face ${uvParent === null ? join.parent.session.face : child.face}`,
+              );
+            gap = Math.max(gap, distance3(join.parent.chart.pointAt(uvParent), unfolded.chart.pointAt(uvChild)));
+          }
+        if (gap > mismatchLimit)
+          return fail(
+            'WRP_DISTORTION_EXCEEDED',
+            `the geodesic charts of faces ${join.parent.session.face} and ${child.face} put a point where the sketch crosses edge ${join.edge} ${gap.toPrecision(4)} ${doc.units} apart (${(gap / length).toPrecision(4)} of the joined stretch, limit ${limit}); use a smaller sketch or a larger maxLengthStrain`,
+          );
+      }
       const parentClip: HalfPlane = { point: first, normal: [parentSide * normal[0], parentSide * normal[1]] };
       const childClip: HalfPlane = { point: first, normal: [-parentSide * normal[0], -parentSide * normal[1]] };
       const parent = join.parent;
-      placed.set(parent.session.face, { ...parent, clips: [...parent.clips, parentClip] });
-      placed.set(child.face, { session: child, chart: unfolded.chart, orientation, clips: [childClip], probe: probeOf(child) });
+      const slack = developableJoin ? 0 : Math.max(candidate.residual, gap);
+      placed.set(parent.session.face, { ...parent, clips: [...parent.clips, parentClip], slack: Math.max(parent.slack, slack) });
+      placed.set(child.face, { session: child, chart: unfolded.chart, orientation, clips: [childClip], probe: probeOf(child), slack });
       edges.push({
         edge: join.edge,
         faces: [parent.session.face, child.face],
-        length,
-        mismatch: developableJoin ? 0 : candidate.residual / length,
+        length: edgeLength,
+        windowLength: length,
+        cutGap: gap,
+        mismatch: developableJoin ? 0 : Math.max(candidate.residual, gap) / length,
         convexity: graph.edgeConvexity[join.edge] ?? 'unknown',
       });
       pending.splice(index, 1);

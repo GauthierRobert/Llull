@@ -57,7 +57,7 @@ describe('emboss_on_face with a chain of faces (fake stadium)', () => {
     expect(relative(info['expectedVolumeDelta'] as number, 186)).toBeLessThan(1e-9);
     expect(relative(info['volumeDelta'] as number, 186)).toBeLessThan(1e-9);
     expect(info['chain']).toEqual([2, 1]);
-    expect(info['edges']).toEqual([{ edge: 6, faces: [2, 1], length: 10, convexity: 'smooth', mismatch: 0 }]);
+    expect(info['edges']).toEqual([{ edge: 6, faces: [2, 1], length: 10, windowLength: 10, cutGap: 0, convexity: 'smooth', mismatch: 0 }]);
     expect((info['distortion'] as { maxLengthStrain: number }).maxLengthStrain).toBe(0);
     expect(done.affected).toHaveLength(1);
     expect(done.summary).toContain('across 2 faces');

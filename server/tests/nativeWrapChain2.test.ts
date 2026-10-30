@@ -1,5 +1,5 @@
 /**
- * 03 WRP chains across cone, sphere and torus faces on the native OCCT kernel (spec §14.12). A cone split along its rulings unrolls into the flat sector (develop, exact: the
+ * 03 WRP chains across cone, sphere and torus faces on the native OCCT kernel (spec §14.13). A cone split along its rulings unrolls into the flat sector (develop, exact: the
  * curve over the ruling keeps its chart length and ends where the development puts it); a torus split along two meridians is charted with geodesic charts anchored on the shared
  * edges, the mismatch of the join measured against the geodesic length of a band along the outer equator. Skipped without the llull-kernel binary (with `emboss`).
  */
@@ -201,7 +201,9 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chains 2' })(
       const tight = execute(line.document, 'wrap_to_face', { ...params, maxLengthStrain: 1e-12 });
       expect(tight.rejected).toBe(true);
       expect(tight.error?.code).toBe('WRP_DISTORTION_EXCEEDED');
-      expect(solidOf(wrapped.document === undefined ? split : split)).toBe(id);
+      expect(data.edges[0]?.mismatch).toBeGreaterThan(0);
+      expect(data.distortion.maxLengthStrain).toBeGreaterThanOrEqual(data.edges[0]?.mismatch as number);
+      expect(tight.document).toBe(line.document);
     });
   },
 );

@@ -1,5 +1,6 @@
 /** quad_remesh — field-aligned quad remeshing of a closed or open mesh, optionally mirror-symmetric, into a subdivision cage or a quad-based mesh (07 MSH FR-MSH-22, M6). */
 
+import { realignBoundaryRow } from '../../geometry/mesh/quadRow';
 import { type Cage, cageProblem } from '../../geometry/subdivision';
 import type { MeshOpResult } from '../../geometry/mesh/engineTypes';
 import {
@@ -46,7 +47,7 @@ import { DEVIATION_BASIS, engineDeviation } from './runMeshOp';
 
 /** A closed quad surface has at least six faces (a cube). */
 const MIN_TARGET_QUADS = 6;
-/** Largest quad count: the engine lands up to about 15 % over the target and a cage may have 50 000 vertices (D5); a 320-triangle input at 40 000 takes about two minutes. */
+/** Largest quad count: the engine lands up to about 15 % to 20 % over the target and a cage may have 50 000 vertices (D5); a 320-triangle input at 40 000 takes about two minutes. */
 const MAX_TARGET_QUADS = 40_000;
 const DEFAULT_HARD_EDGE_DEG = 30;
 const DEFAULT_LEVELS = 2;
@@ -62,7 +63,11 @@ const isRefusal = (value: object): value is CommandResult => 'document' in value
 interface Built {
   readonly positions: number[];
   readonly quads: number[];
-  readonly boundary: { readonly loops: number; readonly worstMove: number } | null;
+  readonly boundary: {
+    readonly loops: number;
+    readonly worstMove: number;
+    readonly row: { readonly stripQuads: number; readonly removedQuads: number; readonly evenness: number } | null;
+  } | null;
   readonly outcome: MeshOpResult;
   readonly engineTarget: number;
 }
@@ -79,13 +84,13 @@ export const quadRemesh = defineCommand({
     'Huang et al., SGP 2018: orientation field, position field, integer-grid map; nearly all vertices have 4 quads around them, a few ' +
     '3 or 5 mark where the flow turns). Give EITHER `targetQuadCount` (6..' +
     `${MAX_TARGET_QUADS}) OR \`targetEdgeLength\` (document units; the count is surface area / length squared); a closed result usually lands within ` +
-    '15 % of the count (coarse inputs and tiny targets can be further); an OPEN or SYMMETRIC result lands lower (0.7 to 0.85 of it measured): when it is under 0.85 the command asks the engine once more for the count that would have given the target and keeps the closer result (data.attempts and data.engineTargets: the counts sent; data.targetRatio says how close). `output` "subdivision" (default) creates a subdivision solid whose cage is the ' +
+    '15 % of the count (coarse inputs and tiny targets can be further); an OPEN or SYMMETRIC result is further off: the engine answers 0.7 to 0.85 of it and the boundary row changes the count by a few quads, so the first answer is under or over (measured 0.83 to 1.2); when it is under 0.85 or the boundary cannot be made the command asks the engine again (at 1.15 x and 0.87 x, or for the count that would have given the target) and keeps the closer result: the finished results measured 0.87 to 1.17 of the target (data.attempts and data.engineTargets: the counts sent; data.targetRatio is the exact ratio, check it). `output` "subdivision" (default) creates a subdivision solid whose cage is the ' +
     'quads (levels `levels`, default 2) with the hard edges as creases, ready for edit_subdivision_cage and an exact B-spline solid with the OCC ' +
     'kernel; "mesh" creates a triangle mesh whose triangles are the quads split along the shorter diagonal. `detectHardEdgesDeg` (default 30; 0 = ' +
     'off) aligns quads to edges of the source sharper than that angle and, for "subdivision", makes the cage edges along them creases (a smooth surface gets none). `adaptiveSize` > 0 turns on curvature-adaptive ' +
     'quad size (smaller quads where the surface bends; the engine has this one mode, so any value above 0 is the same). The source is kept ' +
     '(it is the target of a later fit). Needs a manifold, consistently wound mesh without degenerate faces (repair_mesh, fill_mesh_holes ' +
-    'first). An OPEN mesh (boundary loops) works with output "mesh" only: the quads keep its boundary, each boundary loop of the quads is moved onto exactly one boundary loop of the source (data.boundaryLoops, data.boundaryMove = the largest move); output "subdivision" needs a closed mesh. ' +
+    'first). An OPEN mesh (boundary loops) works with output "mesh" only: the quads keep its boundary, the outermost layer of the engine quads is replaced by ONE row of quads whose outer edge lies on the source boundary loop (no staircase: every boundary vertex has two quads but the corners of the rim, which are exact; data.boundaryRow "realigned", boundaryRowQuads, boundaryLayerRemoved, boundaryRowEvenness), or, when that row would fold, the vertices of the engine boundary are moved onto the rim ("snapped"); data.boundaryLoops; data.boundaryMove = how far the new boundary vertices are from the nearest vertex of the engine boundary (they are ON the source boundary, so it is not a deviation from it); output "subdivision" needs a closed mesh. ' +
     '`symmetry` {plane yz|xz|xy through the origin} makes the quads exactly mirror-symmetric: the source must already be symmetric about the plane (within 0.1 % of its diagonal, else MESH_QUAD_REMESH_NOT_SYMMETRIC), the half on the positive side is remeshed with its cut on the plane kept, and the half and its mirror image are welded on the plane (the count is the whole). A very uneven triangulation gives better quads after remesh_mesh. Runs on the native mesh engine (llull-compute); there is no ' +
     'TypeScript fallback. Reports quads, vertices, valence (vertices per number of quads around them), irregularVertices, creases, targetRatio and ' +
     'the symmetric deviation of the quad faces from the source (document units; for "subdivision" the smooth limit surface lies inside the cage ' +
@@ -226,14 +231,24 @@ export const quadRemesh = defineCommand({
       if (rawBox !== null) return fail('MESH_QUAD_REMESH_FAILED', rawBox);
       if (!keepsBoundary) return { positions: raw.slice(), quads: outcome.quads.quads.slice(), boundary: null, outcome, engineTarget };
       // an open surface (or the half of a symmetric one): the boundary loops are moved onto the source's and the pieces wound like the source
-      const snapped = snapQuadBoundary(engineInput, raw, outcome.quads.quads, axis);
+      // first the outermost layer is replaced by a row on the rim (no staircase); when that cannot be done the vertices of the engine's boundary are moved onto the rim
+      const realigned = realignBoundaryRow(engineInput, raw, outcome.quads.quads, axis);
+      if ('cause' in realigned && realigned.cause === 'source') return realigned;
+      // a row whose box is not the source's (a runaway vertex) is given up for the snap too
+      const row = 'cause' in realigned || resultBoxProblem(realigned.positions, engineInput) !== null ? null : realigned;
+      const snapped = row ?? snapQuadBoundary(engineInput, raw, outcome.quads.quads, axis);
       if ('cause' in snapped) return snapped;
+      const engineQuads = row !== null ? row.quads : outcome.quads.quads;
       const snappedBox = resultBoxProblem(snapped.positions, engineInput);
       if (snappedBox !== null) return fail('MESH_QUAD_REMESH_FAILED', snappedBox);
       return {
         positions: snapped.positions,
-        quads: orientQuadsToSource(engineInput, snapped.positions, outcome.quads.quads),
-        boundary: { loops: snapped.loops, worstMove: snapped.worstMove },
+        quads: orientQuadsToSource(engineInput, snapped.positions, engineQuads),
+        boundary: {
+          loops: snapped.loops,
+          worstMove: snapped.worstMove,
+          row: row === null ? null : { stripQuads: row.stripQuads, removedQuads: row.removedQuads, evenness: row.evenness },
+        },
         outcome,
         engineTarget,
       };
@@ -294,7 +309,7 @@ export const quadRemesh = defineCommand({
     if (size !== null)
       return fail(
         'MESH_PARAM_INVALID',
-        `${size.message}; lower targetQuadCount (the result can exceed it by about 15 %)`,
+        `${size.message}; lower targetQuadCount (the result can exceed it by 15 % to 20 %)`,
         'targetQuadCount',
       );
 
@@ -318,7 +333,20 @@ export const quadRemesh = defineCommand({
       creases: creases.length,
       open,
       ...(symmetry !== undefined ? { symmetry: { plane: symmetry } } : {}),
-      ...(boundary !== null ? { boundaryLoops: boundary.loops, boundaryMove: boundary.worstMove } : {}),
+      ...(boundary !== null
+        ? {
+            boundaryLoops: boundary.loops,
+            boundaryMove: boundary.worstMove,
+            boundaryRow: boundary.row === null ? 'snapped' : 'realigned',
+            ...(boundary.row === null
+              ? {}
+              : {
+                  boundaryRowQuads: boundary.row.stripQuads,
+                  boundaryLayerRemoved: boundary.row.removedQuads,
+                  boundaryRowEvenness: boundary.row.evenness,
+                }),
+          }
+        : {}),
       areaBefore: before.area,
       volumeBefore: before.volume,
       ...(output === 'subdivision' ? { levels } : {}),

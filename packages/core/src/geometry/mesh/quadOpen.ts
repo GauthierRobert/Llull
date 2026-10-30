@@ -33,7 +33,7 @@ const SYMMETRY_TOLERANCE_FRACTION = 1e-3;
 const ON_PLANE_FRACTION = 1e-9;
 
 /** The directed edges (along their face) used by exactly one face of `size`-gons. */
-function boundaryEdges(indices: ReadonlyArray<number>, size: 3 | 4): Edge[] {
+export function boundaryEdges(indices: ReadonlyArray<number>, size: 3 | 4): Edge[] {
   const uses = new Map<string, number>();
   const directed: Edge[] = [];
   for (let f = 0; f < indices.length / size; f++) {
@@ -49,7 +49,7 @@ function boundaryEdges(indices: ReadonlyArray<number>, size: 3 | 4): Edge[] {
 }
 
 /** Boundary edges chained into loops of vertices; null when a vertex has two boundary edges leaving it or a chain does not close. */
-function loopsOf(edges: ReadonlyArray<Edge>): number[][] | null {
+export function loopsOf(edges: ReadonlyArray<Edge>): number[][] | null {
   const next = new Map<number, number>();
   for (const [a, b] of edges) {
     if (next.has(a)) return null;
@@ -75,7 +75,7 @@ function loopsOf(edges: ReadonlyArray<Edge>): number[][] | null {
 }
 
 /** A boundary loop of the source as a closed polyline with arc-length positions. */
-interface RimLoop {
+export interface RimLoop {
   readonly points: Vec3[];
   /** Arc length at the start of each segment (segment k runs from points[k] to points[k + 1]). */
   readonly starts: number[];
@@ -87,7 +87,7 @@ interface RimLoop {
 /** A turn of the rim by more than this is a corner: a quad vertex is put exactly on it (a square plate keeps its four corners). */
 const RIM_CORNER_DEGREES = 60;
 
-function rimLoop(source: MeshData, loop: ReadonlyArray<number>, axis: number | null, scale: number): RimLoop {
+export function rimLoop(source: MeshData, loop: ReadonlyArray<number>, axis: number | null, scale: number): RimLoop {
   const points = loop.map((v) => at(source.positions, v));
   const starts: number[] = [];
   let length = 0;
@@ -124,7 +124,7 @@ function rimLoop(source: MeshData, loop: ReadonlyArray<number>, axis: number | n
 }
 
 /** The mean length of the edges of the quads. */
-function meanEdge(positions: ReadonlyArray<number>, quads: ReadonlyArray<number>): number {
+export function meanEdge(positions: ReadonlyArray<number>, quads: ReadonlyArray<number>): number {
   let sum = 0;
   for (let f = 0; f < quads.length / 4; f++)
     for (let k = 0; k < 4; k++) {
@@ -135,10 +135,16 @@ function meanEdge(positions: ReadonlyArray<number>, quads: ReadonlyArray<number>
 }
 
 /** The point of the rim at arc length `u` (any real: wrapped). A point of a segment with both ends on a coordinate plane has that coordinate exactly 0 (0 + s x 0). */
-function rimPointAt(rim: RimLoop, u: number): Vec3 {
+export function rimPointAt(rim: RimLoop, u: number): Vec3 {
   const wrapped = ((u % rim.length) + rim.length) % rim.length;
-  let k = rim.starts.length - 1;
-  while (k > 0 && (rim.starts[k] as number) > wrapped) k--;
+  // the last segment that starts at or before the point (binary search: the starts are ascending)
+  let [low, high] = [0, rim.starts.length - 1];
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if ((rim.starts[middle] as number) > wrapped) high = middle - 1;
+    else low = middle;
+  }
+  const k = low;
   const [p, q] = [rim.points[k] as Vec3, rim.points[(k + 1) % rim.points.length] as Vec3];
   const span = (rim.starts[k + 1] ?? rim.length) - (rim.starts[k] as number);
   const s = span === 0 ? 0 : (wrapped - (rim.starts[k] as number)) / span;
@@ -146,18 +152,29 @@ function rimPointAt(rim: RimLoop, u: number): Vec3 {
 }
 
 /** The arc length of the point of the rim nearest to `p`, and the distance. */
-function rimArc(rim: RimLoop, p: Vec3): { arc: number; distance: number } {
-  let best = { arc: 0, distance: Infinity };
-  rim.points.forEach((a, k) => {
-    const b = rim.points[(k + 1) % rim.points.length] as Vec3;
-    const ab = sub(b, a);
-    const length2 = dot(ab, ab);
-    const s = length2 === 0 ? 0 : Math.min(1, Math.max(0, dot(sub(p, a), ab) / length2));
-    const d = sub(p, [a[0] + s * ab[0], a[1] + s * ab[1], a[2] + s * ab[2]]);
-    const distance = Math.hypot(d[0], d[1], d[2]);
-    if (distance < best.distance) best = { arc: (rim.starts[k] as number) + s * Math.sqrt(length2), distance };
-  });
-  return best;
+export function rimArc(rim: RimLoop, p: Vec3): { arc: number; distance: number } {
+  // scalar arithmetic only: the loop runs once per segment of the rim for every vertex asked about
+  let bestSquared = Infinity;
+  let bestArc = 0;
+  const count = rim.points.length;
+  for (let k = 0; k < count; k++) {
+    const a = rim.points[k] as Vec3;
+    const b = rim.points[k + 1 < count ? k + 1 : 0] as Vec3;
+    const abx = b[0] - a[0];
+    const aby = b[1] - a[1];
+    const abz = b[2] - a[2];
+    const length2 = abx * abx + aby * aby + abz * abz;
+    const s = length2 === 0 ? 0 : Math.min(1, Math.max(0, ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby + (p[2] - a[2]) * abz) / length2));
+    const dx = p[0] - (a[0] + s * abx);
+    const dy = p[1] - (a[1] + s * aby);
+    const dz = p[2] - (a[2] + s * abz);
+    const squared = dx * dx + dy * dy + dz * dz;
+    if (squared < bestSquared) {
+      bestSquared = squared;
+      bestArc = (rim.starts[k] as number) + s * Math.sqrt(length2);
+    }
+  }
+  return { arc: bestArc, distance: Math.sqrt(bestSquared) };
 }
 
 /** Gaps between neighbouring snapped vertices are at least this fraction of the rim length over the number of vertices (so no quad is collapsed by the order fix). */

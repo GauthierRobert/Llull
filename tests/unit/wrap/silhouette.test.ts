@@ -226,7 +226,7 @@ describe('silhouettes', () => {
   });
 });
 
-describe('torus contours (spec 14.11)', () => {
+describe('torus contours (spec 14.12)', () => {
   const torus: Geometry = {
     surface: { type: 'torus', center: [0, 0, 0], axis: Z, major: 10, minor: 3 },
     uvBounds: [
@@ -242,25 +242,40 @@ describe('torus contours (spec 14.11)', () => {
   };
   const nodesOf = (curve: { poles: readonly Vec3[] }): number => curve.poles.length - 3;
 
-  it('seen along (0.3, 0.2, 1): two fitted closed curves with n . d = 0 at the fit nodes to 1e-9, the deviation within the tolerance, the pcurve one turn of u', () => {
-    const d: Vec3 = [0.3, 0.2, 1];
-    const found = silhouettes(session([torus]), d, 1e-6);
-    expect(found.unsupported).toEqual([]);
-    expect(found.curves).toHaveLength(2);
-    for (const piece of found.curves) {
-      expect(piece.kind).toBe('fitted');
-      expect(piece.deviation).toBeLessThanOrEqual(1e-6);
-      const nodes = nodesOf(piece.curve);
-      expect(nodes).toBeGreaterThanOrEqual(8);
-      const exactAt = (k: number): Vec3 => evaluateCurve(piece.curve, k / nodes);
-      for (let k = 0; k < nodes; k++) {
-        const n = normalAt(exactAt(k));
-        expect(Math.abs((n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / Math.hypot(...d))).toBeLessThan(1e-9);
+  for (const d of [
+    [0.3, 0.2, 1],
+    [0.3, 0.2, -1],
+    [-0.4, 0.1, -2],
+  ] as Vec3[])
+    it(`seen along (${d.join(', ')}): two fitted closed curves with n . d = 0 at the fit nodes to 1e-9 and between them within the reported deviation, the pcurve one turn of u (either sign of d_a)`, () => {
+      const found = silhouettes(session([torus]), d, 1e-6);
+      expect(found.unsupported).toEqual([]);
+      expect(found.curves).toHaveLength(2);
+      for (const piece of found.curves) {
+        expect(piece.kind).toBe('fitted');
+        expect(piece.deviation).toBeLessThanOrEqual(1e-6);
+        const nodes = nodesOf(piece.curve);
+        expect(nodes).toBeGreaterThanOrEqual(8);
+        const at = (s: number): number => {
+          const n = normalAt(evaluateCurve(piece.curve, s / nodes));
+          return Math.abs((n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / Math.hypot(...d));
+        };
+        for (let k = 0; k < nodes; k++) {
+          expect(at(k)).toBeLessThan(1e-9);
+          expect(at(k + 0.5)).toBeLessThanOrEqual(piece.deviation);
+        }
+        const uv = piece.pcurve.poles as readonly Vec2[];
+        expect(Math.abs((uv[uv.length - 1] as Vec2)[0] - (uv[0] as Vec2)[0])).toBeCloseTo(2 * Math.PI, 6);
+        expect(piece.length).toBeGreaterThan(2 * Math.PI * 7);
       }
-      const uv = piece.pcurve.poles as readonly Vec2[];
-      expect(Math.abs((uv[uv.length - 1] as Vec2)[0] - (uv[0] as Vec2)[0])).toBeCloseTo(2 * Math.PI, 6);
-      expect(piece.length).toBeGreaterThan(2 * Math.PI * 7);
-    }
+    });
+
+  it('seen from below along the axis (0, 0, -1) it is the same as from above: the outer equator on the seam, the inner circle of length 2 pi (R - r)', () => {
+    const found = silhouettes(session([torus]), [0, 0, -5], 1e-6);
+    expect(found.unsupported).toEqual([]);
+    expect(found.onEdge).toEqual([0]);
+    expect(found.curves).toHaveLength(1);
+    expect(found.curves[0]?.length).toBeCloseTo(2 * Math.PI * 7, 5);
   });
 
   it('seen along the axis the outer equator is the seam of the face (already an edge) and the inner equator is a circle of length 2 pi (R - r)', () => {

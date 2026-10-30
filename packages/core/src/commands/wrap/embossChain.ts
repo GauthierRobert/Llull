@@ -20,7 +20,7 @@ import { buildChain, type ChainFace } from './chainCharts';
 import { clipRegions } from './clipRegions';
 import { MIN_FIT_TOLERANCE, SEWING_RATIO } from './constants';
 import { wrapRejection } from './codes';
-import { DEFAULT_MAX_LENGTH_STRAIN, namedDefault, wrapData } from './conventions';
+import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import type { FaceRefInput, FaceSession, PlacementInput, ResolvedChart } from './faceSession';
 import type { ChartRegion } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineRegions, probePoints } from './wrapMapping';
@@ -75,7 +75,9 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     params.chain ?? [],
     tolerance,
     limit,
-    regions.flatMap((region) => [region.outer, ...region.holes]).flatMap((chain) => chain.flatMap((piece) => sampleSegment(piece, 5))),
+    regions
+      .flatMap((region) => [region.outer, ...region.holes])
+      .map((chain) => chain.flatMap((piece, k) => sampleSegment(piece, 5).slice(k === 0 ? 0 : 1))),
   );
   if ('summary' in chain) return chain;
   const sketchArea = regionsArea(regions);
@@ -110,7 +112,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       return fail(mapped.code, `face ${face.session.face}: ${mapped.message}`, ['profileIds'], params.profileIds);
     const overlap = checkWrapAround(face.chart, mapped.pieces, params.profileIds);
     if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, ['profileIds'], params.profileIds);
-    const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds);
+    const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds, face.slack);
     if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, ['profileIds'], params.profileIds);
     const recipeParams = {
       surface: face.chart.wire,
@@ -221,6 +223,8 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
         length: edge.length,
         convexity: edge.convexity,
         mismatch: edge.mismatch,
+        windowLength: edge.windowLength,
+        cutGap: edge.cutGap,
       })),
       distortion: {
         maxLengthStrain: Math.max(strain, joinStrain),
@@ -239,10 +243,14 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
         method: `${params.mode} across ${steps.length} faces of a chain ${chain.developable ? 'unfolded by develop (isometry, strain 0)' : 'charted by geodesic charts anchored on the shared edges (stretch measured)'}: the sketch is cut at the chain edges and each part is embossed on its face as one exact kernel step`,
         inputs: { id: params.id, face: session.face, chain: params.chain, profileIds: params.profileIds, mode: params.mode, depth },
       },
-      defaults:
-        params.fitTolerance === undefined
+      defaults: [
+        ...(params.fitTolerance === undefined
           ? [namedDefault('fitTolerance', tolerance, doc.units, 'llull WRP default (D-WRP-4): 1e-6 x the solid diagonal')]
-          : [],
+          : []),
+        ...(params.maxLengthStrain === undefined && !chain.developable
+          ? [namedDefault('maxLengthStrain', DEFAULT_MAX_LENGTH_STRAIN, '1', MAX_LENGTH_STRAIN_SOURCE)]
+          : []),
+      ],
     },
   );
   const committed = commitKernelResult(doc, session.kernel, result, [session.entity], (newId, triangles) => {
@@ -250,7 +258,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       volumeDelta === null
         ? 'volume change not measured'
         : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${expected.toPrecision(9)})`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}. Source solid consumed, profiles kept.`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}. Source solid consumed, profiles kept.`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }

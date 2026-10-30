@@ -22,9 +22,9 @@ import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineCurves, probe
 
 const MAX_PROBES = 48;
 
-/** Sample points of sketch chains (chain coordinates). */
-const sketchPoints = (chains: ReadonlyArray<ReadonlyArray<Parameters<typeof sampleSegment>[0]>>): Vec2[] =>
-  chains.flatMap((chain) => chain.flatMap((piece) => sampleSegment(piece, 5)));
+/** Sample polylines of sketch chains (chain coordinates), one per chain. */
+const sketchPoints = (chains: ReadonlyArray<ReadonlyArray<Parameters<typeof sampleSegment>[0]>>): Vec2[][] =>
+  chains.map((chain) => chain.flatMap((piece, k) => sampleSegment(piece, 5).slice(k === 0 ? 0 : 1)));
 
 export interface ChainWrap {
   readonly doc: CadDocument;
@@ -95,7 +95,7 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     const pieces = mapped.map((curve) => curve.pieces);
     const overlap = checkWrapAround(face.chart, pieces, params.entityIds);
     if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, overlap.ids);
-    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds);
+    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds, face.slack);
     if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, outside.ids);
     let length = 0;
     for (const curve of mapped) {
@@ -163,6 +163,8 @@ export function runWrapChain(input: ChainWrap): CommandResult {
         length: edge.length,
         convexity: edge.convexity,
         mismatch: edge.mismatch,
+        windowLength: edge.windowLength,
+        cutGap: edge.cutGap,
       })),
       distortion: {
         maxLengthStrain: strain,

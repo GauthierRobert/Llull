@@ -16,7 +16,7 @@ export interface ChartPlacement {
   readonly mirror: boolean;
 }
 
-type ChartKind = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus';
+type ChartKind = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'freeform';
 
 /** How a chart is built: develop (isometry, K = 0 faces), geodesic (exponential map about the anchor), parametric (arc-length scaled (u, v)). */
 export type ChartMethod = 'develop' | 'geodesic' | 'parametric';
@@ -44,8 +44,10 @@ export interface FaceChart {
   readonly uvOfPoint: (point: Vec3) => Vec2;
   /** Bound of the 3D length per unit of (u, v) change within `reach` (chart units) of the anchor: fit tolerances in (u, v) divide by it. */
   readonly metricBound: (reach: number) => number;
-  /** Antiderivative in v of the area element |Su x Sv|: a (u, v) region has the area of minus the counter-clockwise loop integral of areaG(v) du. */
-  readonly areaG: (v: number) => number;
+  /** Antiderivative in v of the area element |Su x Sv| (a freeform face: from the lower parameter bound, at the given u): a (u, v) region has the area of minus the counter-clockwise loop integral of areaG(v) du. */
+  readonly areaG: (v: number, u: number) => number;
+  /** Why a chart point has no (u, v), when the chart can tell (a freeform geodesic chart: a fold of the exponential map or the edge of the surface); null where it is defined. */
+  readonly diagnose?: (point: Vec2) => 'fold' | 'outside' | null;
 }
 
 export type ChartResult = FaceChart | { readonly error: string };

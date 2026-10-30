@@ -1,5 +1,5 @@
 /**
- * 03 WRP silhouette of a torus on the native OCCT kernel (spec §14.11): the contour generator n . d = 0 solved per meridian angle (v = atan2(-d_p cos u, d_a) + k pi) gives two closed
+ * 03 WRP silhouette of a torus on the native OCCT kernel (spec §14.12): the contour generator n . d = 0 solved per meridian angle (v = atan2(-d_p cos u, d_a) + k pi) gives two closed
  * curves; split_at_silhouette fits them (reported deviation), cuts the torus along them, and the pieces add up to the torus (area 4 pi^2 R r, volume 2 pi^2 R r^2). Skipped without the
  * llull-kernel binary (with the `emboss` capability).
  */
@@ -47,6 +47,23 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP torus silhouette' })(
     return n.map((x) => x / length);
   };
 
+  it('seen from below, along (0.3, 0.2, -1) and (0, 0, -1), the torus splits the same way (d_a < 0)', () => {
+    for (const direction of [
+      [0.3, 0.2, -1],
+      [0, 0, -1],
+    ]) {
+      const body = torus();
+      const done = execute(body.doc, 'split_at_silhouette', { id: body.id, direction, tolerance: 1e-5 });
+      expect(done.rejected, done.summary).toBeUndefined();
+      const found = (done.data as { silhouette: { curves: Array<{ deviation: number }> } }).silhouette;
+      expect(found.curves.length).toBeGreaterThanOrEqual(1);
+      for (const piece of found.curves) expect(piece.deviation).toBeLessThan(1e-6);
+      expect((done.data as { facesAfter: number; facesBefore: number }).facesAfter).toBeGreaterThan(
+        (done.data as { facesBefore: number }).facesBefore,
+      );
+    }
+  });
+
   it('seen along (0.3, 0.2, 1) the torus splits along two fitted contour curves: n . d = 0 at the fit nodes to 1e-9, the deviation is reported, the pieces keep the area and the volume', () => {
     const body = torus();
     const direction = [0.3, 0.2, 1];
@@ -63,7 +80,10 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP torus silhouette' })(
       expect(entity.onFace.fitTolerance).toBe(piece.deviation);
       const nodes = entity.curve.poles.length - 3;
       let worst = 0;
+      let between = 0;
       for (let k = 0; k < nodes; k++) {
+        const mid = normalAt([...evaluateCurve(entity.curve, (k + 0.5) / nodes)]);
+        between = Math.max(between, Math.abs((mid[0]! * direction[0]! + mid[1]! * direction[1]! + mid[2]! * direction[2]!) / length));
         const p = evaluateCurve(entity.curve, k / nodes);
         const n = normalAt([...p]);
         worst = Math.max(
@@ -72,6 +92,7 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP torus silhouette' })(
         );
       }
       expect(worst).toBeLessThan(1e-9);
+      expect(between).toBeLessThanOrEqual(piece.deviation);
     }
     const data = done.data as { facesBefore: number; facesAfter: number; volumeBefore: number; volumeAfter: number };
     expect(data.facesAfter).toBeGreaterThan(data.facesBefore);

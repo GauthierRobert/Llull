@@ -1,7 +1,7 @@
 /**
  * The silhouette (outline, parting line) of a solid seen along a direction, from its exact faces (03 WRP M5): where the face normal is perpendicular to the direction. Closed forms
  * on the analytic faces: a cylinder gives the two generatrices at +-(axis x direction), a cone the generatrices where cos(alpha) cos(phi - psi) d_p = sin(alpha) (axis . d), a sphere the
- * great circle perpendicular to the direction, a torus (axis a, d = d_a a + d_p) the two closed curves v = atan2(-d_p cos u, d_a) + k pi (u from the direction of d_p); a plane has none (it is edge-on or turned toward / away). Each curve is checked against the kernel (the face normals along it are
+ * great circle perpendicular to the direction, a torus (axis a, d = d_a a + d_p) the two closed curves v = atan2(-d_p cos u, d_a) + k pi (u from the direction of d_p; atan, not atan2, so v is continuous for either sign of d_a); a plane has none (it is edge-on or turned toward / away). Each curve is checked against the kernel (the face normals along it are
  * perpendicular to the direction) and only the part inside its face is kept.
  * @invariant every curve returned lies on its face to the kernel's evaluation (points come from `evaluateFace` / are verified by `projectOnFace`), has |n . d| <= 1e-6 along it, and is
  *   strictly inside the face (the faces on both sides of it are the face itself); a silhouette that already is an edge of the solid is reported, not returned
@@ -202,7 +202,7 @@ function torusContours(
   const sigmaU = wrapPi(Math.atan2(dot3(y, ky), dot3(y, kx)) - theta0) >= 0 ? 1 : -1;
   const point = (u: number, v: number): Vec3 =>
     add3(add3(center, scale3(add3(scale3(x, Math.cos(u)), scale3(y, Math.sin(u))), R + r * Math.cos(v))), scale3(a, r * Math.sin(v)));
-  const contourV = (u: number, branch: number): number => Math.atan2(-dp * Math.cos(u), da) + branch * Math.PI;
+  const contourV = (u: number, branch: number): number => Math.atan(-(dp * Math.cos(u)) / da) + branch * Math.PI;
   const turnU = TWO_PI * Math.floor((theta0 - bounds[0][0]) / TWO_PI);
   const kernelUv = (s: number, branch: number): Vec2 => {
     const v = sigmaV * contourV(TWO_PI * s, branch);
