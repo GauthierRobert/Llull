@@ -31,13 +31,13 @@ import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport, isShrinkw
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
-  type HarmonicResult,
   type MeshEngineFailure,
   type MeshOp,
   type MeshOpName,
   type MeshOpResult,
   type MeshProcessingEngine,
 } from '@core/geometry/mesh/engineTypes';
+import { harmonicFrom } from './harmonicResult';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { positiveInteger } from '../env';
@@ -88,7 +88,7 @@ function isNativeOp(op: MeshOp): op is NativeOp {
 const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
 
 /** Measured in TECHNICAL_SPEC 13.26.2. */
-const HARMONIC_PREFERRED_ABOVE = 5_000;
+const HARMONIC_PREFERRED_ABOVE = 8_000;
 
 /** Measured in TECHNICAL_SPEC 13.20.3. */
 const SHRINKWRAP_PREFERRED_ABOVE = 10_000;
@@ -344,60 +344,13 @@ export function deviationFrom(value: unknown): { deviation?: DeviationSummary } 
   return isDeviationSummary(value) ? { deviation: value } : {};
 }
 
-/**
- * The harmonic map a `harmonic_map` job wrote, or null when it is malformed: (u, v, 0) per vertex in `result_positions.f64`, the ascending region vertices in
- * `result_indices.u32` (all below `vertexCount`), a report with whole counts, a known weight kind, a finite residual and four corners that are region vertices.
- */
-function harmonicFrom(report: Record<string, unknown>, positions: Buffer, indices: Buffer, vertexCount: number): HarmonicResult | null {
-  const n = indices.length / 4;
-  if (!Number.isInteger(n) || n < 4 || positions.length !== n * 24) return null;
-  const vertices = Array.from({ length: n }, (_, i) => indices.readUInt32LE(4 * i));
-  if (vertices.some((v, i) => v >= vertexCount || (i > 0 && v <= (vertices[i - 1] as number)))) return null;
-  const uv: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const [u, v, z] = [positions.readDoubleLE(24 * i), positions.readDoubleLE(24 * i + 8), positions.readDoubleLE(24 * i + 16)];
-    if (![u, v].every((c) => Number.isFinite(c) && c >= -1e-9 && c <= 1 + 1e-9) || z !== 0) return null;
-    uv.push(u, v);
-  }
-  const count = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
-  const { weights, flippedFirst, collapsedInParameters, interiorVertices, boundaryVertices, cgIterations, cgResidual, corners } = report;
-  if (
-    (weights !== 'cotangent' && weights !== 'mean_value') ||
-    !count(flippedFirst) ||
-    !count(collapsedInParameters) ||
-    !count(interiorVertices) ||
-    !count(boundaryVertices) ||
-    interiorVertices + boundaryVertices !== n ||
-    !count(cgIterations) ||
-    typeof cgResidual !== 'number' ||
-    !Number.isFinite(cgResidual) ||
-    cgResidual < 0 ||
-    !Array.isArray(corners) ||
-    corners.length !== 4 ||
-    !corners.every((c) => count(c) && vertices.includes(c))
-  )
-    return null;
-  return {
-    vertices,
-    uv,
-    weights,
-    flippedFirst,
-    collapsedInParameters,
-    interiorVertices,
-    boundaryVertices,
-    cgIterations,
-    cgResidual,
-    corners: corners as unknown as HarmonicResult['corners'],
-  };
-}
-
 /** Read the outputs of a finished job into the engine's result. */
 async function resultOf(
   op: NativeOp,
   runner: ComputeRunner,
   folder: string,
   run: JobRun,
-  [triangles, vertices]: readonly [number, number],
+  [triangles, vertices, used]: readonly [number, number, number],
 ): Promise<MeshOpResult | MeshEngineFailure> {
   const summary: unknown = JSON.parse((await readOutput(folder, run, 'report.json')).toString('utf8'));
   const report = isRecord(summary) && isRecord(summary['report']) ? summary['report'] : {};
@@ -430,6 +383,7 @@ async function resultOf(
       await readOutput(folder, run, 'result_positions.f64'),
       await readOutput(folder, run, 'result_indices.u32'),
       vertices,
+      used,
     );
     if (harmonic === null)
       return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops harmonic_map: the job returned a malformed result');
@@ -502,7 +456,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
   /** Runs one job on the event loop; resolves with its result or a named failure, never rejects. */
   const runJob = async (
     op: NativeOp,
-    [triangles, vertices]: readonly [number, number],
+    [triangles, vertices, used]: readonly [number, number, number],
     files: readonly JobFile[],
     signal: AbortSignal,
     report: (event: Readonly<Record<string, unknown>>) => void,
@@ -512,7 +466,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         Object.fromEntries(files.map((file) => [file.name, file.data])),
         async (folder) => {
           const run = await runner.run(['meshops'], folder, timeoutMs, report, signal);
-          return run.ok ? await resultOf(op, runner, folder, run, [triangles, vertices]) : failedJob(op, run, timeoutMs, triangles);
+          return run.ok ? await resultOf(op, runner, folder, run, [triangles, vertices, used]) : failedJob(op, run, timeoutMs, triangles);
         },
         env,
       );
@@ -576,7 +530,14 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         key,
         op: op.op,
         heartbeatMs,
-        start: (signal, report) => runJob(op, [triangles, input.mesh.positions.length / 3], files, signal, report),
+        start: (signal, report) =>
+          runJob(
+            op,
+            [triangles, input.mesh.positions.length / 3, op.op === 'harmonic_map' ? new Set(input.mesh.indices).size : 0],
+            files,
+            signal,
+            report,
+          ),
       });
       return deferMeshOp(op.op);
     },

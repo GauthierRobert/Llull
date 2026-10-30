@@ -3,6 +3,18 @@
 
 const cancelers = new Map<string, () => void>();
 const cancelled = new Set<string>();
+const applied = new Set<string>();
+
+/** The `command` event of this client's own command `commandId` arrived over /live: the server applied it. */
+export function noteApplied(commandId: string): void {
+  applied.add(commandId);
+  if (applied.size > 512) applied.delete(applied.values().next().value as string);
+}
+
+/** True once, when the server applied the command before the cancel could reach it. */
+export function takeApplied(commandId: string): boolean {
+  return applied.delete(commandId);
+}
 
 /** Remember how to abort the command `commandId`; returns the function that forgets it (call when the request settles). */
 export function registerCommandCancel(commandId: string, abort: () => void): () => void {

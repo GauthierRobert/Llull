@@ -6,7 +6,7 @@ import type { LiveProgressEvent } from '@protocol/liveSync';
 import { isCancellable } from './commandCancel';
 
 export interface ActiveJob {
-  /** The sender's command id, or the command name when it sent none. */
+  /** The request (`jobId` of the event). */
   readonly key: string;
   readonly command: string;
   readonly commandId: string | undefined;
@@ -24,15 +24,15 @@ export interface ActiveJob {
 interface JobProgressState {
   jobs: readonly ActiveJob[];
   apply(event: LiveProgressEvent): void;
-  /** The command settled (its `command` event arrived). */
-  finish(key: string): void;
+  /** The command with this id settled (its `command` event arrived). */
+  finish(commandId: string): void;
   clear(): void;
 }
 
 export const useJobProgressStore = create<JobProgressState>()((set) => ({
   jobs: [],
   apply(event): void {
-    const key = event.commandId ?? event.command;
+    const key = event.jobId;
     if (event.state === 'ended') return set((state) => ({ jobs: state.jobs.filter((job) => job.key !== key) }));
     const job: ActiveJob = {
       key,
@@ -48,8 +48,10 @@ export const useJobProgressStore = create<JobProgressState>()((set) => ({
     };
     set((state) => ({ jobs: [...state.jobs.filter((other) => other.key !== key), job] }));
   },
-  finish(key): void {
-    set((state) => (state.jobs.some((job) => job.key === key) ? { jobs: state.jobs.filter((job) => job.key !== key) } : state));
+  finish(commandId): void {
+    set((state) =>
+      state.jobs.some((job) => job.commandId === commandId) ? { jobs: state.jobs.filter((job) => job.commandId !== commandId) } : state,
+    );
   },
   clear(): void {
     set({ jobs: [] });

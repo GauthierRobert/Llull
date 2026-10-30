@@ -7,7 +7,7 @@ import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCom
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId } from './liveOrigin';
-import { registerCommandCancel, takeCancelled } from './commandCancel';
+import { registerCommandCancel, takeApplied, takeCancelled } from './commandCancel';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -80,9 +80,11 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
     })
     .catch((err: unknown) => {
       if (takeCancelled(commandId)) {
-        const summary = `Command '${name}' cancelled.`;
+        // a cancel that lost the race: the server had applied the command (its `command` event arrived) before the request was aborted
+        const finished = takeApplied(commandId);
+        const summary = finished ? `Command '${name}' finished before the cancel.` : `Command '${name}' cancelled.`;
         set({ lastSummary: summary });
-        options?.onResult?.({ summary, changed: false });
+        options?.onResult?.({ summary, changed: finished });
         return;
       }
       handlePostFailure(

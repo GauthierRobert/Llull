@@ -27,6 +27,7 @@ import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 
 const KEEPALIVE_MS = 25_000;
+let requestCounter = 0;
 const NDJSON = 'application/x-ndjson';
 
 const ndjsonLine = (value: unknown): string => JSON.stringify(value) + '\n';
@@ -102,7 +103,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     }
     // a command that waits for a native job tells the live subscribers (a `progress` event, never a document change) and says so when it settles
     let reported = false;
-    const who = { command: name, ...(commandId !== undefined ? { commandId } : {}) };
+    const who = { command: name, jobId: commandId ?? `req-${(requestCounter += 1)}`, ...(commandId !== undefined ? { commandId } : {}) };
     const settle = (): void => {
       if (reported) publishLiveProgress({ ...who, state: 'ended' });
     };

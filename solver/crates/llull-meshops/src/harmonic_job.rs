@@ -18,8 +18,8 @@ type Done = (Vec<f64>, Vec<u32>, Value);
 
 pub fn run_harmonic(positions: &[f64], triangles: &[u32], params: Value, tick: &mut dyn FnMut(f64)) -> Result<Done, JobError> {
     let job: HarmonicJob = serde_json::from_value(params).map_err(|error| input_error(format!("harmonic_map params: {error}")))?;
-    tick(0.1);
-    let map = harmonic_map(positions, triangles, job.max_iterations)
+    tick(0.05);
+    let map = harmonic_map(positions, triangles, job.max_iterations, &mut |done| tick(0.05 + 0.9 * done))
         .map_err(|refusal| JobError { code: refusal.code, message: refusal.message })?;
     tick(1.0);
     let uv: Vec<f64> = map.uv.iter().flat_map(|[u, v]| [*u, *v, 0.0]).collect();

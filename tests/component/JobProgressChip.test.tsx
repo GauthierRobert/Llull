@@ -6,11 +6,12 @@ import type { LiveProgressEvent } from '@protocol/liveSync';
 import { StatusBar } from '@ui/components/StatusBar';
 import { useLiveDocument } from '@ui/hooks/useLiveDocument';
 import { useStore } from '@ui/store';
-import { cancelCommand, registerCommandCancel } from '@ui/store/commandCancel';
+import { cancelCommand, noteApplied, registerCommandCancel } from '@ui/store/commandCancel';
 import { useJobProgressStore } from '@ui/store/jobProgressStore';
 
 const running = (extra: Partial<Extract<LiveProgressEvent, { state: 'running' }>> = {}): LiveProgressEvent => ({
   epoch: 'e1',
+  jobId: 'c1',
   command: 'quad_remesh',
   commandId: 'c1',
   state: 'running',
@@ -35,7 +36,7 @@ describe('the progress chip', () => {
     act(() => useJobProgressStore.getState().apply(running({ fraction: 0.8, etaMs: 2000 })));
     expect(screen.getAllByRole('status', { name: /native job/i })).toHaveLength(1);
     expect(screen.getByRole('status', { name: /native job/i }).textContent).toContain('80% · 2 s left');
-    act(() => useJobProgressStore.getState().apply({ epoch: 'e1', command: 'quad_remesh', commandId: 'c1', state: 'ended' }));
+    act(() => useJobProgressStore.getState().apply({ epoch: 'e1', jobId: 'c1', command: 'quad_remesh', commandId: 'c1', state: 'ended' }));
     expect(screen.queryByRole('status', { name: /native job/i })).toBeNull();
   });
 
@@ -100,6 +101,29 @@ describe('/live wiring', () => {
     expect(useJobProgressStore.getState().jobs).toHaveLength(0);
   });
 
+  it('two jobs of one command name without a command id keep two chips (the jobId tells them apart), and a payload without its fields is ignored', () => {
+    render(<Harness />);
+    const source = FakeEventSource.instances[0] as FakeEventSource;
+    const { commandId: _drop, ...bare } = running();
+    void _drop;
+    source.emit('progress', { ...bare, jobId: 'req-1' });
+    source.emit('progress', { ...bare, jobId: 'req-2', fraction: 0.9 });
+    expect(useJobProgressStore.getState().jobs.map((job) => job.key)).toEqual(['req-1', 'req-2']);
+    source.emit('progress', { ...bare, jobId: 'req-1', state: 'ended' });
+    expect(useJobProgressStore.getState().jobs.map((job) => job.key)).toEqual(['req-2']);
+    source.emit('progress', { epoch: 'e1', command: 'x', state: 'running' });
+    source.emit('progress', { jobId: 'j', command: 'x', state: 'running', op: 1 });
+    expect(useJobProgressStore.getState().jobs).toHaveLength(1);
+  });
+
+  it('closing the page clears the chips', () => {
+    const view = render(<Harness />);
+    (FakeEventSource.instances[0] as FakeEventSource).emit('progress', running());
+    expect(useJobProgressStore.getState().jobs).toHaveLength(1);
+    view.unmount();
+    expect(useJobProgressStore.getState().jobs).toHaveLength(0);
+  });
+
   it('a dropped connection clears the chips (the job state is unknown until the stream is back)', () => {
     vi.useFakeTimers();
     try {
@@ -116,6 +140,35 @@ describe('/live wiring', () => {
 
 describe('a cancelled dispatch', () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it('a cancel that loses the race to the server says the command finished, with changed true', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    let sent: { commandId: string } | null = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init: RequestInit) => {
+        sent = JSON.parse(init.body as string) as { commandId: string };
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      }),
+    );
+    const results: Array<{ summary: string; changed: boolean }> = [];
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { onResult: (result) => void results.push(result) });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const commandId = (sent as unknown as { commandId: string }).commandId;
+    // the server applies it: the live command event of this client's command arrives, then the click reaches the abort
+    noteApplied(commandId);
+    act(() => void cancelCommand(commandId));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(results).toEqual([{ summary: "Command 'add_box' finished before the cancel.", changed: true }]);
+    expect(useStore.getState().lastSummary).toBe("Command 'add_box' finished before the cancel.");
+  });
 
   it('aborts its POST /command, says so in the status line and does not fall back to a local run', async () => {
     useStore.setState({ liveStatus: 'connected' });

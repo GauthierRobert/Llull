@@ -149,6 +149,7 @@ fn disk_topology(mesh: &Mesh, faces: usize) -> Result<Topology, Refusal> {
             one.push(v);
             v = match next.get(&v) {
                 Some(&w) => w,
+                // defensive: after the pinch and duplicate-edge checks the boundary edges are a permutation, so this arm cannot be reached (the TypeScript loop has no such arm)
                 None => return Err(not_disk(format!("the boundary of the region does not close at vertex {v}: it is not a disk"))),
             };
         }
@@ -424,7 +425,7 @@ fn inverse(diagonal: &[f64], i: usize) -> f64 {
 }
 
 /// `lib/conjugateGradient.ts` (Jacobi-preconditioned, stall window).
-fn conjugate_gradient(system: &System, b: &[f64], x0: &[f64], max_iterations: usize) -> Solve {
+fn conjugate_gradient(system: &System, b: &[f64], x0: &[f64], max_iterations: usize, tick: &mut dyn FnMut(f64)) -> Solve {
     let n = b.len();
     let mut x = x0.to_vec();
     let mut r = vec![0.0; n];
@@ -470,6 +471,7 @@ fn conjugate_gradient(system: &System, b: &[f64], x0: &[f64], max_iterations: us
         iterations += 1;
         best = best.min(residual);
         if iterations % STALL_WINDOW == 0 {
+            tick(iterations as f64 / max_iterations as f64);
             if best >= 0.99 * checkpoint {
                 break;
             }
@@ -480,7 +482,7 @@ fn conjugate_gradient(system: &System, b: &[f64], x0: &[f64], max_iterations: us
 }
 
 /// `lib/biCgStab.ts`.
-fn bi_cg_stab(system: &System, b: &[f64], x0: &[f64], max_iterations: usize) -> Solve {
+fn bi_cg_stab(system: &System, b: &[f64], x0: &[f64], max_iterations: usize, tick: &mut dyn FnMut(f64)) -> Solve {
     let n = b.len();
     let mut x = x0.to_vec();
     let norm_b = dot_v(b, b).sqrt();
@@ -545,6 +547,7 @@ fn bi_cg_stab(system: &System, b: &[f64], x0: &[f64], max_iterations: usize) -> 
         residual = dot_v(&r, &r).sqrt() / norm_b;
         best = best.min(residual);
         if iterations % STALL_WINDOW == 0 {
+            tick(iterations as f64 / max_iterations as f64);
             if best >= 0.99 * checkpoint {
                 break;
             }
@@ -572,12 +575,16 @@ struct Solved {
     converged: bool,
 }
 
-fn solve(system: &System, symmetric: bool, budget: usize, start: Option<(&[f64], &[f64])>) -> Solved {
+/// Both coordinates; `tick` gets the share of this solve done (iterations over the budget, u then v), now and then. Reporting changes no bit of the answer.
+fn solve(system: &System, symmetric: bool, budget: usize, start: Option<(&[f64], &[f64])>, tick: &mut dyn FnMut(f64)) -> Solved {
     let n = system.interior.len();
     let guess = || vec![0.5; n];
     let method = if symmetric { conjugate_gradient } else { bi_cg_stab };
-    let u = method(system, &system.rhs_u, start.map(|s| s.0.to_vec()).unwrap_or_else(guess).as_slice(), budget);
-    let v = method(system, &system.rhs_v, start.map(|s| s.1.to_vec()).unwrap_or_else(guess).as_slice(), budget);
+    let u =
+        method(system, &system.rhs_u, start.map(|s| s.0.to_vec()).unwrap_or_else(guess).as_slice(), budget, &mut |done| tick(done / 2.0));
+    let v = method(system, &system.rhs_v, start.map(|s| s.1.to_vec()).unwrap_or_else(guess).as_slice(), budget, &mut |done| {
+        tick(0.5 + done / 2.0)
+    });
     let finite = u.x.iter().all(|c| c.is_finite()) && v.x.iter().all(|c| c.is_finite());
     Solved {
         iterations: u.iterations + v.iterations,
@@ -621,7 +628,12 @@ fn uv_map(boundary: &Boundary, system: &System, solved: &Solved) -> HashMap<u32,
 
 /// Harmonic map of the whole mesh (`positions`, `triangles`) onto the unit square.
 /// `max_iterations` is the budget per coordinate (default `iteration_budget`).
-pub fn harmonic_map(positions: &[f64], triangles: &[u32], max_iterations: Option<usize>) -> Result<Harmonic, Refusal> {
+pub fn harmonic_map(
+    positions: &[f64],
+    triangles: &[u32],
+    max_iterations: Option<usize>,
+    tick: &mut dyn FnMut(f64),
+) -> Result<Harmonic, Refusal> {
     let faces = triangles.len() / 3;
     if faces == 0 {
         return Err(not_disk("the region has no triangle"));
@@ -657,7 +669,7 @@ pub fn harmonic_map(positions: &[f64], triangles: &[u32], max_iterations: Option
     let interior_count = topology.vertices.len() - loop_.len();
     let budget = max_iterations.unwrap_or_else(|| iteration_budget(interior_count));
     let first_system = system_of(&mesh, faces, &topology, &|i, j| *cotangent.get(&key(i, j)).unwrap_or(&0.0), &boundary);
-    let first = solve(&first_system, true, budget, None);
+    let first = solve(&first_system, true, budget, None, &mut |done| tick(0.5 * done));
     let first_uv = uv_map(&boundary, &first_system, &first);
     let first_converged = first.converged && first_uv.values().all(|[p, q]| p.is_finite() && q.is_finite());
     let first_flips = if first_converged { flips(&mesh, faces, &first_uv) } else { (faces, 0) };
@@ -682,7 +694,9 @@ pub fn harmonic_map(positions: &[f64], triangles: &[u32], max_iterations: Option
     }
     let mean_value = mean_value_weights(&mesh, faces);
     let second_system = system_of(&mesh, faces, &topology, &|i, j| *mean_value.get(&(i as u64 * vc + j as u64)).unwrap_or(&0.0), &boundary);
-    let second = solve(&second_system, false, budget, if first_converged { Some((&first.u, &first.v)) } else { None });
+    let second = solve(&second_system, false, budget, if first_converged { Some((&first.u, &first.v)) } else { None }, &mut |done| {
+        tick(0.5 + 0.5 * done)
+    });
     let second_uv = uv_map(&boundary, &second_system, &second);
     let second_converged = second.converged && second_uv.values().all(|[p, q]| p.is_finite() && q.is_finite());
     if !second_converged {
@@ -734,7 +748,7 @@ mod tests {
     #[test]
     fn a_square_grid_maps_onto_itself() {
         let (positions, triangles) = grid(8);
-        let map = harmonic_map(&positions, &triangles, None).expect("a grid is a disk");
+        let map = harmonic_map(&positions, &triangles, None, &mut |_| {}).expect("a grid is a disk");
         assert_eq!(map.weights, "cotangent");
         assert_eq!(map.flipped_first, 0);
         assert_eq!(map.vertices.len(), 81);
@@ -749,11 +763,11 @@ mod tests {
     fn the_refusals_carry_the_codes_of_the_command() {
         let (positions, mut triangles) = grid(4);
         triangles.extend_from_within(0..3);
-        assert_eq!(harmonic_map(&positions, &triangles, None).unwrap_err().code, "MESH_FIT_NOT_DISK");
+        assert_eq!(harmonic_map(&positions, &triangles, None, &mut |_| {}).unwrap_err().code, "MESH_FIT_NOT_DISK");
         let (positions, triangles) = grid(8);
-        let starved = harmonic_map(&positions, &triangles, Some(1)).unwrap_err();
+        let starved = harmonic_map(&positions, &triangles, Some(1), &mut |_| {}).unwrap_err();
         assert_eq!(starved.code, "MESH_FIT_PARAM_FOLDED");
         assert!(starved.message.contains("budget 1 per coordinate"), "{}", starved.message);
-        assert_eq!(harmonic_map(&positions, &[], None).unwrap_err().message, "the region has no triangle");
+        assert_eq!(harmonic_map(&positions, &[], None, &mut |_| {}).unwrap_err().message, "the region has no triangle");
     }
 }

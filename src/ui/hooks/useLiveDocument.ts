@@ -8,12 +8,28 @@ import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { LiveCommandEvent, LiveProgressEvent, LiveSnapshotEvent } from '@protocol/liveSync';
 import { useJobProgressStore } from '@ui/store/jobProgressStore';
+import { noteApplied } from '@ui/store/commandCancel';
 import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
+
+/** The fields the chip reads are there with the right types (a malformed or foreign payload is ignored). */
+function isProgressEvent(value: unknown): value is LiveProgressEvent {
+  if (typeof value !== 'object' || value === null) return false;
+  const e = value as Record<string, unknown>;
+  if (typeof e['jobId'] !== 'string' || typeof e['command'] !== 'string') return false;
+  if (e['state'] === 'ended') return true;
+  return (
+    e['state'] === 'running' &&
+    typeof e['op'] === 'string' &&
+    typeof e['message'] === 'string' &&
+    (e['fraction'] === null || typeof e['fraction'] === 'number') &&
+    (e['etaMs'] === null || typeof e['etaMs'] === 'number')
+  );
+}
 
 export function useLiveDocument(): void {
   const hydrateLiveDocument = useStore((s) => s.hydrateLiveDocument);
@@ -108,7 +124,10 @@ export function useLiveDocument(): void {
         } catch {
           return; // Malformed JSON from server — ignore, stay connected.
         }
-        useJobProgressStore.getState().finish(event.commandId ?? event.name);
+        if (event.commandId !== undefined) {
+          noteApplied(event.commandId);
+          useJobProgressStore.getState().finish(event.commandId);
+        }
         markLiveOrigin(isOwnCommandId(event.commandId) ? null : { kind: 'remote', name: event.name, source: event.source ?? 'rest' });
         const applied = applyLiveCommand(event);
         markLiveOrigin(null);
@@ -119,7 +138,8 @@ export function useLiveDocument(): void {
       // A native job of a running command reports here; an event type this client does not know is simply not listened to.
       es.addEventListener('progress', (e: Event) => {
         try {
-          useJobProgressStore.getState().apply(JSON.parse((e as MessageEvent<string>).data) as LiveProgressEvent);
+          const event: unknown = JSON.parse((e as MessageEvent<string>).data);
+          if (isProgressEvent(event)) useJobProgressStore.getState().apply(event);
         } catch {
           // Malformed JSON from server: ignore, stay connected.
         }
@@ -138,6 +158,7 @@ export function useLiveDocument(): void {
 
     return () => {
       disposed = true;
+      useJobProgressStore.getState().clear();
       if (retryTimer !== null) clearTimeout(retryTimer);
       source?.close();
     };

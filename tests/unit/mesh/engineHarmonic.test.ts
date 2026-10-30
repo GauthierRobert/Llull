@@ -6,7 +6,9 @@ import { MESH_TS_HARMONIC_CAP, isEngineFailure, type MeshProcessingEngine } from
 import { harmonicMap } from '@core/geometry/mesh/harmonicMap';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import { regionHarmonic } from '@core/commands/mesh/harmonicRegion';
-import { gridMesh, icosphere } from '../../helpers/meshFixtures';
+import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
+import { docWithMeshes, gridMesh, icosphere } from '../../helpers/meshFixtures';
 
 describe('harmonic_map in the TypeScript engine', () => {
   const grid = gridMesh(10, 10);
@@ -55,5 +57,39 @@ describe('regionHarmonic', () => {
     };
     expect(regionHarmonic(absent, sphere, all)).toEqual({ code: 'MESH_ENGINE_UNSUPPORTED', message: 'x' });
     expect(resolveMeshEngine(absent).capabilities().get('harmonic_map')).toBe(MESH_TS_HARMONIC_CAP);
+  });
+});
+
+describe('fit_surface_to_mesh when the engine fails the harmonic map', () => {
+  const { doc, ids } = docWithMeshes(gridMesh(10, 12));
+  const fail = (code: string): MeshProcessingEngine => ({
+    name: 'failing',
+    capabilities: () => new Map([['harmonic_map', 200_000]]),
+    preferredAbove: () => new Map([['harmonic_map', 0]]),
+    run: () => ({ code, message: `engine says ${code}` }),
+  });
+
+  it.each(['MESH_CANCELLED', 'MESH_TIMEOUT', 'MESH_ENGINE_PENDING'])('%s is the code of the command, the document is unchanged', (code) => {
+    const result = execute(
+      doc,
+      'fit_surface_to_mesh',
+      { id: ids[0], parameterization: 'harmonic' },
+      { ...defaultContext(), meshProcessing: fail(code) },
+    );
+    expect(result.error?.code).toBe(code);
+    expect(result.summary).toContain(`engine says ${code}`);
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+  });
+
+  it('an engine that does not support the op hands it over to the TypeScript engine, which answers', () => {
+    const result = execute(
+      doc,
+      'fit_surface_to_mesh',
+      { id: ids[0], parameterization: 'harmonic' },
+      { ...defaultContext(), meshProcessing: fail('MESH_ENGINE_UNSUPPORTED') },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.affected).toHaveLength(1);
   });
 });

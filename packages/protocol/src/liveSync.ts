@@ -39,7 +39,12 @@ export interface LiveCommandEvent {
  * cancelled; after its `command` event when it changed the document). NOT a document change: it carries no `seq`, is not in the command log and has no
  * `stateHash`, so a client that does not know the event type ignores it and a client that does shows a progress chip. Commands that need no native job send none.
  */
-export type LiveProgressReport = { readonly command: string; readonly commandId?: string } & (
+export type LiveProgressReport = {
+  readonly command: string;
+  readonly commandId?: string;
+  /** One per request (the sender's command id, else a counter of the server): concurrent jobs of one command name stay apart. */
+  readonly jobId: string;
+} & (
   | {
       readonly state: 'running';
       /** The native job (`quad_remesh`, ...). */

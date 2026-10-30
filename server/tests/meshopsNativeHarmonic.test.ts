@@ -6,7 +6,6 @@
 
 import { describe, expect, it } from 'vitest';
 import type { HarmonicResult, MeshEngineFailure, MeshOp } from '@core/geometry/mesh/engineTypes';
-import { isEngineFailure } from '@core/geometry/mesh/engineTypes';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import type { MeshData } from '@core/model/types';
 import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
@@ -60,6 +59,8 @@ function jittered(n: number): MeshData {
   return { positions: base.positions.map((v, i) => (i % 3 === 2 ? v : v + (random() - 0.5) * 0.25 * (10 / n))), indices: base.indices };
 }
 
+const isEngineFailure = (value: HarmonicResult | MeshEngineFailure): value is MeshEngineFailure => 'code' in value;
+
 async function both(
   mesh: MeshData,
   extra: Partial<HarmonicOp> = {},
@@ -67,22 +68,29 @@ async function both(
   _clearResultCache();
   const [ts, nat] = [tsMeshEngine.run({ mesh }, op(extra)), await resolveDeferred(() => nativeEngine().run({ mesh }, op(extra)))];
   const unwrap = (answer: typeof ts): HarmonicResult | MeshEngineFailure =>
-    isEngineFailure(answer) ? answer : (answer.harmonic as HarmonicResult);
+    'code' in answer ? answer : (answer.harmonic as HarmonicResult);
   return { ts: unwrap(ts), nat: unwrap(nat) };
 }
 
 describe('native harmonic_map is bit-identical to the TypeScript engine (13.26)', () => {
+  native('is preferred above 8,000 triangles (13.26.2) and capped at the 200,000 of the command', () => {
+    expect(nativeEngine().preferredAbove?.().get('harmonic_map')).toBe(8_000);
+    expect(nativeEngine().capabilities().get('harmonic_map')).toBe(200_000);
+  });
+
   native('cotangent weights: a jittered grid and a hemisphere give the same parameters bit for bit', async () => {
     for (const [label, mesh] of [
       ['jittered 24', jittered(24)],
       ['hemisphere 4', hemisphere(4)],
       ['grid 12', gridMesh(10, 12)],
+      ['jittered 70 (more iterations than one stall window of 400)', jittered(70)],
     ] as const) {
       const { ts, nat } = await both(mesh);
       expect(isEngineFailure(ts), label).toBe(false);
       expect(nat, label).toEqual(ts);
       expect((ts as HarmonicResult).weights, label).toBe('cotangent');
       expect((ts as HarmonicResult).cgIterations, label).toBeGreaterThan(10);
+      if (label.startsWith('jittered 70')) expect((ts as HarmonicResult).cgIterations, label).toBeGreaterThan(400);
     }
   });
 

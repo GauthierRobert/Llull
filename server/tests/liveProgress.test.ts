@@ -143,4 +143,23 @@ describe('the progress event of /live', () => {
     expect(ended[0]?.data['commandId']).toBe('job-2');
     expect(kinds.indexOf('progress')).toBeLessThan(kinds.lastIndexOf('progress'));
   });
+
+  it('two requests of one command without a command id get two job ids, each ended on its own', async () => {
+    const live = await subscribe();
+    await live.settled();
+    const bare = { name: 'quad_remesh', params: { id: source.id, targetQuadCount: 6 } };
+    await Promise.all([post(bare), post(bare)]);
+    await live.settled();
+    live.close();
+    const progress = live.frames.filter((frame) => frame.event === 'progress');
+    const jobs = new Set(progress.map((frame) => frame.data['jobId']));
+    expect(jobs.size).toBe(2);
+    expect([...jobs].every((job) => typeof job === 'string' && (job as string).startsWith('req-'))).toBe(true);
+    for (const job of jobs) {
+      const own = progress.filter((frame) => frame.data['jobId'] === job);
+      expect(own.at(-1)?.data['state']).toBe('ended');
+      expect(own.filter((frame) => frame.data['state'] === 'ended')).toHaveLength(1);
+      expect(own.every((frame) => frame.data['commandId'] === undefined)).toBe(true);
+    }
+  });
 });
