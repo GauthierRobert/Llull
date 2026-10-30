@@ -239,10 +239,11 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
     const bool more_u = worst_u > tolerance, more_v = worst_v > tolerance;
     for (int i = 0; i < nu; ++i) split_u[static_cast<size_t>(i)] = more_u && error_u[static_cast<size_t>(i)] > tolerance;
     for (int j = 0; j < nv; ++j) split_v[static_cast<size_t>(j)] = more_v && error_v[static_cast<size_t>(j)] > tolerance;
-    // a cell whose middle deviates (the law bulges inside it between nodes that all agree): both of its intervals
-    for (int i = 0; i < nu; ++i)
-      for (int j = 0; j < nv; ++j)
-        if (error_c[static_cast<size_t>(i) * static_cast<size_t>(nv) + static_cast<size_t>(j)] > tolerance) split_u[static_cast<size_t>(i)] = split_v[static_cast<size_t>(j)] = 1;
+    // only the cell middles deviate (the law bulges inside a cell between nodes that all agree): both intervals of each such cell; when an axis error explains the deviation the cells add nothing (a global law would refine the other direction too)
+    if (!more_u && !more_v)
+      for (int i = 0; i < nu; ++i)
+        for (int j = 0; j < nv; ++j)
+          if (error_c[static_cast<size_t>(i) * static_cast<size_t>(nv) + static_cast<size_t>(j)] > tolerance) split_u[static_cast<size_t>(i)] = split_v[static_cast<size_t>(j)] = 1;
     // a law that deviates over much of the face (a quarter of the intervals or more) is refined everywhere, as the uniform doubling did: the integrals of the result
     // (volume, area) then stay as close to the closed form as before; a localised one (a push, a lattice cell) only where it acts
     const auto widen = [](std::vector<char> &split) {

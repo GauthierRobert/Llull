@@ -919,3 +919,7 @@ Tests: `blend_tests.rs` `the_blend_union_keeps_the_adaptive_mass_rule_of_its_ope
   explains refines everything (the loop cannot stand still). Tests: a push of radius 4 hidden in the middle of a start cell (found by the cell middles), two separated lattice bumps (twice the volume of one).
   The grading is not red-proven by these (the features of the catalogue laws are wide enough to be found at the first grid); it is kept as a guard against a narrow second feature.
 - `iges.cxx` file counter is `std::atomic`; the cut-bar test is named for what it checks (§17.9).
+
+**Bisect of the slow VC-DEF-17 (exact path).** Release sidecar, test alone: `feat/des-7d` base about 5 s (28 s file duration with transforms), 68eeabc2 (per-interval fit) about 5 s, 7d0616e8 as first committed about 63 s.
+Cause: the cell-middle rule ran whenever a cell deviated, also when an axis error already explained it, so a global law (the plate wrapped on a drum) refined the other direction too and the tensor grid grew.
+The rule now applies only when neither axis error exceeds the tolerance (the cell-only case), as before; the time is back to about 5 s (file 16 s), the 30 native server tests pass at the default timeouts (49 s against 113 s).
