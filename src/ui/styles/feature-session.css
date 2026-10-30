@@ -1,10 +1,29 @@
 /* ---- Feature drag handles: start chips, value card, value box -------------- */
 
-.feature-start {
+/* Every edit mode's chip bar is a flex item of this row, so two bars offered at once (Fillet/Shell + Edit faces) sit side by
+   side instead of on one absolute spot. It spans the viewport and lets pointers through, so an absolutely placed active-mode
+   bar (.cage-bar) inside it keeps the viewport as its containing block. */
+.feature-start-stack {
   position: absolute;
-  top: calc(var(--vp-inset-top, var(--space-3)) + 4px);
-  right: calc(var(--vp-inset-right, var(--space-3)) + 52px);
+  inset: 0;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
+  gap: 6px;
+  padding: calc(var(--vp-inset-top, var(--space-3)) + 4px) calc(var(--vp-inset-right, var(--space-3)) + 52px) 0
+    var(--vp-inset-left, var(--space-3));
+  pointer-events: none;
+  z-index: 15;
+}
+
+.feature-start-stack > * {
+  pointer-events: auto;
+}
+
+.feature-start {
+  display: flex;
+  flex-shrink: 0;
   gap: 6px;
   padding: 5px;
   border: 1px solid var(--border-float);
@@ -12,10 +31,10 @@
   background: var(--surface-float);
   box-shadow: var(--shadow-float);
   backdrop-filter: blur(10px);
-  z-index: 15;
 }
 
 .feature-start__chip {
+  white-space: nowrap;
   padding: 4px 14px;
   border: 0;
   border-radius: var(--radius-full);

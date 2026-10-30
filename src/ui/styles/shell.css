@@ -458,7 +458,8 @@ button.rail-more__item:hover {
   right: var(--chrome-gap);
   z-index: 30;
   width: var(--inspector-w);
-  max-height: calc(100% - var(--vp-inset-top) - var(--chrome-gap) - 72px);
+  /* Ends above the axis gizmo (bottom-right, ~130px tall with its margin) instead of covering it. */
+  max-height: calc(100% - var(--vp-inset-top) - var(--chrome-gap) - 136px);
   overflow-y: auto;
   border-radius: var(--radius-float);
   background: var(--surface-1);
@@ -612,14 +613,9 @@ button.rail-more__item:hover {
   }
 }
 
-/* Tablet / narrow: floating cards overlap the viewport instead of reserving room for it. */
+/* Tablet / narrow: the cards start closed (drawer layout) and float with a deeper shadow. The viewport insets still follow
+   them, so the overlays anchored to the insets (view options, edit chips) never slide under an open card. */
 @media (max-width: 1024px) {
-  .app-layout[data-sidebar='open'],
-  .app-layout[data-inspector='open'] {
-    --vp-inset-left: calc(var(--chrome-gap) * 2 + var(--rail-w));
-    --vp-inset-right: var(--chrome-gap);
-  }
-
   .sidebar__body,
   .inspector {
     max-width: calc(100vw - var(--rail-w) - 4 * var(--chrome-gap));
