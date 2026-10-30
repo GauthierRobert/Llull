@@ -44,10 +44,10 @@ export const subdivisionToNurbs = defineCommand({
     'Convert a subdivision solid to exact NURBS geometry for STEP, CAM and booleans. output "sheets" (default, no kernel needed): one bicubic nurbs_surface ' +
     'per patch of the once-refined cage (`faces` "unpacked") or one B-spline surface per maximal block of regular quads (`faces` "packed", fewer entities); ' +
     'regular quads are the exact Catmull-Clark limit surface, quads next to extraordinary vertices are geometry patches that meet G0 (no gaps) with a measured ' +
-    'tangent break, which `extraordinary` "G1" reduces first by fitting the interior poles of those quads to the tangent planes of their neighbours (same patch count; about 0.17 degrees on a cube corner against 2.74, approximate not exact), then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
+    'tangent break, which `extraordinary` "G1" removes first, with the same patch count: it solves the linear tangent-plane conditions for the interior poles of those quads, which makes every edge EXACTLY G1 (about 1e-7 rad; data.g1Method "exact") when the conditions have a solution at this degree (hexahedral cages: the cube, sheared or with a corner moved) and otherwise (data.exactG1Refused lists the groups and the residual) fits the poles to the tangent planes of the neighbours (data.g1Method "fit", approximate: about 0.1 to 0.5 degrees on boxes and cylinders against 2.7 to 7), then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
     'one exact B-rep solid (patches sewn by the native kernel; needs it, always the G0 patches). The SubD is removed unless `keep`. Returns data { patchCount, ' +
     'sheets[] or solid, maxDeviation (document units, from the limit surface at `samples` x `samples` points per patch), evEdges[] { patches, valence, g0, g1Deg }, ' +
-    'maxEvG0, maxEvG1Deg, starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
+    'maxEvG0, maxEvG1Deg, g1Method, exactG1Refused[], starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
     '(DIR_CONVERT_KERNEL). Next: sew_surfaces, export_step_ap242, check_surface_quality.',
   params: z.object({
     id: z.string().describe('Id of the subdivision solid.'),
@@ -119,6 +119,8 @@ export const subdivisionToNurbs = defineCommand({
       starPoints: starPoints(entity),
       tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : null,
       g1ToleranceMet: effectiveG1 ? converted.g1ToleranceMet : null,
+      g1Method: effectiveG1 ? converted.g1Method : null,
+      exactG1Refused: converted.exactRefused.map((group) => ({ ...group, residual: sig(group.residual) })),
       warnings: effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : [],
       packedQuads: converted.packedQuads,
       packedBlocks: converted.packedBlocks,

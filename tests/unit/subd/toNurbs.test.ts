@@ -78,11 +78,21 @@ describe('subdivision_to_nurbs sheets (VC-DIR-08, 09)', () => {
     expect(fitted.patchCount).toBe(24);
     expect(fitted.maxEvG1Deg).toBeLessThan(0.2);
     expect(fitted.maxEvG0).toBe(0);
-    const tighter = dataOf<{ maxEvG1Deg: number; patchCount: number }>(
+    // the exact solve meets any tolerance on a cube with the same 24 patches (data.g1Method "exact")
+    const tighter = dataOf<{ maxEvG1Deg: number; patchCount: number; g1Method: string }>(
       run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 0.01 }),
     );
-    expect(tighter.patchCount).toBeGreaterThan(24);
+    expect(tighter).toMatchObject({ patchCount: 24, g1Method: 'exact' });
     expect(tighter.maxEvG1Deg).toBeLessThanOrEqual(0.01);
+    // a box 2 x 2 x 2 has no exact solution at this degree: the fit, then the refinement until the tolerance is met
+    const box = run(empty, 'add_subdivision_solid', { box: { size: [2, 2, 2], segments: [2, 2, 2] }, id: 'b' });
+    const refined = dataOf<{ maxEvG1Deg: number; patchCount: number; g1Method: string; exactG1Refused: unknown[] }>(
+      run(box.document, 'subdivision_to_nurbs', { id: 'b', extraordinary: 'G1', tangentToleranceDeg: 0.01 }),
+    );
+    expect(refined.g1Method).toBe('fit');
+    expect(refined.exactG1Refused.length).toBeGreaterThan(0);
+    expect(refined.patchCount).toBeGreaterThan(96);
+    expect(refined.maxEvG1Deg).toBeLessThanOrEqual(0.01);
   });
 
   it('keeps the SubD with keep and inherits placement', () => {

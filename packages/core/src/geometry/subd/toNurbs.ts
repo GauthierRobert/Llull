@@ -14,6 +14,7 @@ import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
 import { edgeKey } from './edgeKey';
+import { type ExactG1Group, solveExactG1 } from './g1Exact';
 import { MEASURE_STATIONS, fitTangentPlanes } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
@@ -28,6 +29,8 @@ export interface ToNurbsOptions {
   readonly samples: number;
   /** Fit the interior poles of the quads around extraordinary vertices to the tangent planes of their neighbours (`g1Fit.ts`). */
   readonly fitTangents?: boolean | undefined;
+  /** With `fitTangents`: try the exact linear G1 solve (`g1Exact.ts`) before the approximate fit; false = the fit only. Default true. */
+  readonly exactG1?: boolean | undefined;
 }
 
 interface EvEdgeReport {
@@ -57,6 +60,10 @@ export interface ToNurbsResult {
   readonly refineLevels: number;
   /** With a tangent tolerance: whether the refinement reached it before the patch budget ran out; null without one. */
   readonly g1ToleranceMet: boolean | null;
+  /** With a G1 request and extraordinary vertices: how the interior poles were found, "exact" (every group satisfies the linear G1 conditions) or "fit" (the tangent-plane fit); null otherwise. */
+  readonly g1Method: 'exact' | 'fit' | null;
+  /** The groups of quads the exact solve could not make G1 (empty when the method is "exact"). */
+  readonly exactRefused: ExactG1Group[];
 }
 
 /** A bicubic Bézier patch as a clamped bicubic NURBS surface with domain [0, 1]². */
@@ -144,17 +151,24 @@ interface Build {
   readonly valence: number[];
   readonly patches: BezierPatch[];
   readonly evEdges: EvEdgeReport[];
+  readonly g1Method: 'exact' | 'fit' | null;
+  readonly exactRefused: ExactG1Group[];
 }
 
-function buildLevel(cage: Cage, levels: number, fit: boolean): Build {
+function buildLevel(cage: Cage, levels: number, fit: boolean, tryExact: boolean): Build {
   const refined = subdivide(cage, levels);
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const valence = topology.vertexEdges.map((edges, v) =>
     edges.length === (topology.vertexFaces[v] as number[]).length ? edges.length : 4,
   );
   const geometry = quadCagePatches(refined);
-  const patches = fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
-  return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence) };
+  // the exact linear solve first; a cage whose groups it cannot make G1 (vertex enclosure at this degree) keeps the approximate fit
+  const exact = fit && tryExact ? solveExactG1(refined, geometry, valence) : null;
+  const exactHolds = exact !== null && exact.groups.length > 0 && exact.groups.every((group) => group.consistent);
+  const patches = exactHolds ? exact.patches : fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
+  const g1Method = !fit || (exact !== null && exact.groups.length === 0) ? null : exactHolds ? 'exact' : 'fit';
+  const exactRefused = exact === null ? [] : exact.groups.filter((group) => !group.consistent);
+  return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence), g1Method, exactRefused };
 }
 
 const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((edge) => edge.g1Deg));
@@ -163,11 +177,12 @@ const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((e
 export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult {
   let refineLevels = Math.max(1, settleLevels(cage));
   const fit = options.fitTangents === true;
-  let build = buildLevel(cage, refineLevels, fit);
+  const tryExact = options.exactG1 !== false;
+  let build = buildLevel(cage, refineLevels, fit, tryExact);
   const tolerance = options.tangentToleranceDeg;
   while (tolerance !== undefined && worstBreak(build) > tolerance && build.patches.length * 4 <= MAX_REFINED_PATCHES) {
     refineLevels++;
-    build = buildLevel(cage, refineLevels, fit);
+    build = buildLevel(cage, refineLevels, fit, tryExact);
   }
   const { refined, patches, evEdges } = build;
   const blocks = options.packed ? packedBlocks(prepare(refined)).filter((block) => block.quads.length > 1) : [];
@@ -190,5 +205,7 @@ export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult 
     maxEvG1Deg: worstBreak(build),
     refineLevels,
     g1ToleranceMet: tolerance === undefined ? null : worstBreak(build) <= tolerance,
+    g1Method: build.g1Method,
+    exactRefused: build.exactRefused,
   };
 }
