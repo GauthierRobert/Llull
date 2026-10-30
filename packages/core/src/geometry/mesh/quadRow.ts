@@ -19,7 +19,7 @@ const at = (positions: ReadonlyArray<number>, index: number): Vec3 => [
   positions[3 * index + 1] as number,
   positions[3 * index + 2] as number,
 ];
-const dist = (p: Vec3, q: Vec3): number => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+const dist = (p: Vec3, q: Vec3): number => Math.sqrt((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2);
 const dot = (p: Vec3, q: Vec3): number => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
 const problem = (cause: SnapProblem['cause'], message: string): SnapProblem => ({ cause, message });
 
@@ -33,7 +33,7 @@ export interface RowRealign {
   readonly positions: number[];
   readonly quads: number[];
   readonly loops: number;
-  /** The largest distance from a new boundary vertex to the nearest vertex of the boundary the engine made. */
+  /** The largest distance from a new boundary vertex (on the rim) to the nearest vertex of the boundary the engine made: how far the boundary moved, not a deviation from the source. */
   readonly worstMove: number;
   readonly stripQuads: number;
   readonly removedQuads: number;
@@ -81,9 +81,30 @@ function resample(rim: RimLoop, count: number): Resampled | null {
   return { arcs, cornerAt };
 }
 
+/** What does not depend on the share of even spacing, per boundary loop: the rim it follows, the partner of each inner vertex, the arcs the rim points are blended from. */
+interface LoopPlan {
+  readonly loop: number[];
+  readonly rim: RimLoop;
+  readonly n: number;
+  readonly direction: number;
+  readonly evenArc: number[];
+  /** The arc of the projection of each inner vertex onto the rim, unwrapped next to its even arc. */
+  readonly projected: number[];
+  /** Index in the loop -> index of the rim vertex, for the vertices that sit at a corner of the rim. */
+  readonly pinned: Map<number, number>;
+}
+
+/** The engine boundary loop whose vertices share a removed quad with a vertex of `loop`; null when none or several. */
+function engineLoopOf(loop: number[], touching: Map<number, number[]>, engineLoopOfVertex: Map<number, number>): number | null {
+  const found = new Set<number>();
+  for (const v of loop)
+    for (const w of touching.get(v) ?? []) if (engineLoopOfVertex.has(w)) found.add(engineLoopOfVertex.get(w) as number);
+  return found.size === 1 ? ([...found][0] as number) : null;
+}
+
 /**
  * Replace the outermost layer of quads by one row between the inner boundary and the rim, for every boundary loop. See the module comment for the contract.
- * Loops are paired with rim loops by nearness, one for one.
+ * An inner loop is paired with the engine boundary loop it shares removed quads with, and that one with the rim loop most of its vertices are nearest to, one for one.
  */
 export function realignBoundaryRow(
   source: MeshData,
@@ -100,13 +121,17 @@ export function realignBoundaryRow(
     return problem('loops', `the engine's quads have ${quadLoops.length} boundary loop(s) against ${sourceLoops.length} in the source`);
   const edge = meanEdge(positions, quads);
   const rims = sourceLoops.map((loop) => rimLoop(source, loop, axis, edge));
-  const onBoundary = new Set(quadLoops.flat());
+  const engineLoopOfVertex = new Map<number, number>();
+  quadLoops.forEach((loop, id) => loop.forEach((v) => engineLoopOfVertex.set(v, id)));
+  const touching = new Map<number, number[]>();
   const innerQuads: number[] = [];
   let removed = 0;
   for (let f = 0; f < quads.length / 4; f++) {
     const corners = [0, 1, 2, 3].map((k) => quads[4 * f + k] as number);
-    if (corners.some((v) => onBoundary.has(v))) removed++;
-    else innerQuads.push(...corners);
+    if (corners.some((v) => engineLoopOfVertex.has(v))) {
+      removed++;
+      for (const v of corners) touching.set(v, [...(touching.get(v) ?? []), ...corners]);
+    } else innerQuads.push(...corners);
   }
   if (innerQuads.length === 0) return problem('shape', 'no quad is left when the outermost layer is taken away');
   const innerLoops = loopsOf(boundaryEdges(innerQuads, 4));
@@ -115,75 +140,113 @@ export function realignBoundaryRow(
       'shape',
       'the outermost layer of quads cannot be taken away: the inner boundary is not one simple loop per boundary loop',
     );
-  // each inner loop goes with the rim it is nearest to, one for one
-  const paired = new Set<number>();
-  const rows: Array<{ loop: number[]; rim: RimLoop; rimId: number }> = [];
-  for (const loop of innerLoops) {
+  // engine boundary loop -> rim by the nearest rim of most of its vertices; inner loop -> engine boundary loop by the removed quads they share
+  const rimOfEngineLoop = quadLoops.map((loop) => {
     const votes = new Map<number, number>();
     for (const v of loop) {
-      const near = rims.map((rim, id) => ({ id, d: rimArc(rim, at(positions, v)).distance })).reduce((a, b) => (b.d < a.d ? b : a));
+      const near = rims.map((rim, id) => ({ id, d: rimArc(rim, at(positions, v)).distance })).reduce((x, y) => (y.d < x.d ? y : x));
       votes.set(near.id, (votes.get(near.id) ?? 0) + 1);
     }
-    const [rimId] = [...votes.entries()].sort((x, y) => y[1] - x[1])[0] as [number, number];
-    if (paired.has(rimId)) return problem('loops', "two boundary loops of the engine's quads follow the same boundary loop of the source");
-    paired.add(rimId);
-    rows.push({ loop, rim: rims[rimId] as RimLoop, rimId });
+    return ([...votes.entries()].sort((x, y) => y[1] - x[1])[0] as [number, number])[0];
+  });
+  if (new Set(rimOfEngineLoop).size !== rimOfEngineLoop.length)
+    return problem('loops', "two boundary loops of the engine's quads follow the same boundary loop of the source");
+  const rows: Array<{ loop: number[]; rim: RimLoop }> = [];
+  for (const loop of innerLoops) {
+    const engineLoop = engineLoopOf(loop, touching, engineLoopOfVertex);
+    if (engineLoop === null)
+      return problem('loops', 'an inner boundary loop does not border exactly one boundary loop of the engine quads');
+    rows.push({ loop, rim: rims[rimOfEngineLoop[engineLoop] as number] as RimLoop });
   }
   // vertices of the result: those of the inner quads, then the rim points
   const used = [...new Set(innerQuads)].sort((x, y) => x - y);
   const renumber = new Map(used.map((v, i) => [v, i]));
   const base: number[] = used.flatMap((v) => [...at(positions, v)]);
   const quadsOut = innerQuads.map((v) => renumber.get(v) as number);
-  const oldBoundary = [...onBoundary].map((v) => at(positions, v));
+  const oldBoundary = [...engineLoopOfVertex.keys()].map((v) => at(positions, v));
   const innerOfEdge = new Map<string, number>();
   for (let f = 0; f < quadsOut.length / 4; f++)
     for (let k = 0; k < 4; k++) innerOfEdge.set(`${quadsOut[4 * f + k]},${quadsOut[4 * f + ((k + 1) % 4)]}`, f);
-  const rowOf = rows.map(({ loop, rim }) => {
+
+  // the part of the work that does not depend on the share of even spacing: partners, strips, adjacency
+  const plans: LoopPlan[] = [];
+  const strips: number[] = [];
+  let first = base.length / 3;
+  for (const { loop, rim } of rows) {
     const n = loop.length;
     const even = resample(rim, n);
-    return { loop, rim, n, even };
-  });
-  if (rowOf.some((r) => r.even === null))
-    return problem('shape', 'a boundary loop has fewer vertices than the corners of the rim it follows');
+    if (even === null) return problem('shape', 'a boundary loop has fewer vertices than the corners of the rim it follows');
+    const { arcs, cornerAt } = even;
+    const rimPoints = arcs.map((arc) => rimPointAt(rim, arc));
+    const inner = loop.map((v) => at(positions, v));
+    // the partner of each inner vertex: the cyclic shift (and direction) of the evenly spaced points that brings them closest overall
+    let best = { cost: Infinity, shift: 0, reversed: false };
+    for (const reversed of [false, true])
+      for (let shift = 0; shift < n; shift++) {
+        let cost = 0;
+        for (let i = 0; i < n; i++) {
+          const d = dist(inner[i] as Vec3, rimPoints[reversed ? (((shift - i) % n) + n) % n : (shift + i) % n] as Vec3);
+          cost += d * d;
+        }
+        if (cost < best.cost) best = { cost, shift, reversed };
+      }
+    const partner = (i: number): number => (best.reversed ? (((best.shift - i) % n) + n) % n : (best.shift + i) % n);
+    const direction = best.reversed ? -1 : 1;
+    const evenArc: number[] = [arcs[partner(0)] as number];
+    for (let i = 1; i < n; i++) {
+      const step = (((arcs[partner(i)] as number) - (arcs[partner(i - 1)] as number)) % rim.length) * direction;
+      evenArc.push((evenArc[i - 1] as number) + direction * (((step % rim.length) + rim.length) % rim.length));
+    }
+    const wrap = (d: number): number => d - rim.length * Math.round(d / rim.length);
+    const pinned = new Map<number, number>();
+    const projected = evenArc.map((e, i) => {
+      const corner = cornerAt.get(partner(i));
+      if (corner !== undefined) pinned.set(i, corner);
+      return e + wrap(rimArc(rim, inner[i] as Vec3).arc - e);
+    });
+    plans.push({ loop, rim, n, direction, evenArc, projected, pinned });
+    for (let i = 0; i < n; i++) {
+      const [a, b] = [loop[i] as number, loop[(i + 1) % n] as number];
+      // the inner quad runs a -> b along this edge, so the strip quad runs b -> a
+      strips.push(renumber.get(b) as number, renumber.get(a) as number, first + i, first + ((i + 1) % n));
+    }
+    first += n;
+  }
+  const all = [...quadsOut, ...strips];
+  const index = new SurfaceIndex(source.positions, source.indices);
+  const neighbours = new Map<number, Set<number>>();
+  const link = (a: number, b: number): void => {
+    const known = neighbours.get(a);
+    if (known === undefined) neighbours.set(a, new Set([b]));
+    else known.add(b);
+  };
+  for (let f = 0; f < all.length / 4; f++)
+    for (let k = 0; k < 4; k++) {
+      const [a, b] = [all[4 * f + k] as number, all[4 * f + ((k + 1) % 4)] as number];
+      link(a, b);
+      link(b, a);
+    }
+  const sound = (coords: ReadonlyArray<number>): boolean => {
+    for (let f = 0; f < all.length / 4; f++) if (!(Math.hypot(...faceNormal(coords, all, f)) > 0)) return false;
+    for (let f = 0; f < quadsOut.length / 4; f++)
+      if (!(dot(faceNormal(base, quadsOut, f), faceNormal(coords, quadsOut, f)) > 0)) return false;
+    // each strip quad faces the way the inner quad it shares its edge with does (a staircase makes the strip quads non-convex, so no corner test)
+    for (let s = 0; s < strips.length / 4; s++) {
+      const strip = strips.slice(4 * s, 4 * s + 4);
+      const neighbour = innerOfEdge.get(`${strip[1]},${strip[0]}`);
+      if (neighbour !== undefined && !(dot(faceNormal(coords, strip, 0), faceNormal(coords, quadsOut, neighbour)) > 0)) return false;
+    }
+    return true;
+  };
+  const movable = plans.flatMap(({ loop }) => loop.map((v) => renumber.get(v) as number));
 
   /** The result for the share `lambda` of even spacing (1) against the projection of the inner vertices onto the rim (0), or why it fails. */
   const build = (lambda: number): RowRealign | string => {
     const out = base.slice();
-    const strips: number[] = [];
     const rimVertices: number[] = [];
-    for (const { loop, rim, n, even } of rowOf) {
-      const { arcs, cornerAt } = even as Resampled;
-      // the partner of each inner vertex: the cyclic shift (and direction) of the evenly spaced points that brings them closest overall
-      let best = { cost: Infinity, shift: 0, reversed: false };
-      for (const reversed of [false, true])
-        for (let shift = 0; shift < n; shift++) {
-          let cost = 0;
-          for (let i = 0; i < n; i++) {
-            const q = rimPointAt(rim, arcs[reversed ? (((shift - i) % n) + n) % n : (shift + i) % n] as number);
-            const d = dist(at(positions, loop[i] as number), q);
-            cost += d * d;
-          }
-          if (cost < best.cost) best = { cost, shift, reversed };
-        }
-      const partner = (i: number): number => (best.reversed ? (((best.shift - i) % n) + n) % n : (best.shift + i) % n);
-      const direction = best.reversed ? -1 : 1;
-      // the even arcs along the loop, unwrapped, and the projections near them, blended; the corners stay exactly where they are
-      const wrap = (d: number): number => d - rim.length * Math.round(d / rim.length);
-      const evenArc: number[] = [arcs[partner(0)] as number];
-      for (let i = 1; i < n; i++) {
-        const step = (((arcs[partner(i)] as number) - (arcs[partner(i - 1)] as number)) % rim.length) * direction;
-        evenArc.push((evenArc[i - 1] as number) + direction * (((step % rim.length) + rim.length) % rim.length));
-      }
-      const pinned = new Map<number, number>();
-      const arc = evenArc.map((e, i) => {
-        const corner = cornerAt.get(partner(i));
-        if (corner !== undefined) {
-          pinned.set(i, corner);
-          return e;
-        }
-        const projected = e + wrap(rimArc(rim, at(positions, loop[i] as number)).arc - e);
-        return lambda * e + (1 - lambda) * projected;
-      });
+    for (const { rim, n, direction, evenArc, projected, pinned } of plans) {
+      // the even arcs and the projections near them, blended; the corners stay exactly where they are
+      const arc = evenArc.map((e, i) => (pinned.has(i) ? e : lambda * e + (1 - lambda) * (projected[i] as number)));
       const gap = (1e-3 * rim.length) / n;
       const ordered = (a: number, b: number): boolean => (direction > 0 ? b - a >= gap : a - b >= gap);
       for (let pass = 0; pass < 2; pass++) {
@@ -194,50 +257,23 @@ export function realignBoundaryRow(
       }
       for (let i = 1; i < n; i++)
         if (!ordered(arc[i - 1] as number, arc[i] as number)) return 'the rim points cannot be put in order along the inner boundary';
-      const first = out.length / 3;
+      // once round the rim: the last point must stay a gap short of the first one
+      if (rim.length - direction * ((arc[n - 1] as number) - (arc[0] as number)) < gap)
+        return 'the rim points do not close once round the rim along the inner boundary';
+      const start = out.length / 3;
       for (let i = 0; i < n; i++) {
         const corner = pinned.get(i);
         out.push(...(corner !== undefined ? (rim.points[corner] as Vec3) : rimPointAt(rim, arc[i] as number)));
-        rimVertices.push(first + i);
-      }
-      for (let i = 0; i < n; i++) {
-        const [a, b] = [loop[i] as number, loop[(i + 1) % n] as number];
-        // the inner quad runs a -> b along this edge, so the strip quad runs b -> a
-        strips.push(renumber.get(b) as number, renumber.get(a) as number, first + i, first + ((i + 1) % n));
+        rimVertices.push(start + i);
       }
     }
-    const all = [...quadsOut, ...strips];
-    const index = new SurfaceIndex(source.positions, source.indices);
-    const neighbours = new Map<number, Set<number>>();
-    const link = (a: number, b: number): void => {
-      (neighbours.get(a) ?? neighbours.set(a, new Set()).get(a)!).add(b);
-    };
-    for (let f = 0; f < all.length / 4; f++)
-      for (let k = 0; k < 4; k++) {
-        const [a, b] = [all[4 * f + k] as number, all[4 * f + ((k + 1) % 4)] as number];
-        link(a, b);
-        link(b, a);
-      }
-    const sound = (coords: ReadonlyArray<number>): boolean => {
-      for (let f = 0; f < all.length / 4; f++) if (!(Math.hypot(...faceNormal(coords, all, f)) > 0)) return false;
-      for (let f = 0; f < quadsOut.length / 4; f++)
-        if (!(dot(faceNormal(base, quadsOut, f), faceNormal(coords, quadsOut, f)) > 0)) return false;
-      // each strip quad faces the way the inner quad it shares its edge with does (a staircase makes the strip quads non-convex, so no corner test)
-      for (let s = 0; s < strips.length / 4; s++) {
-        const strip = strips.slice(4 * s, 4 * s + 4);
-        const neighbour = innerOfEdge.get(`${strip[1]},${strip[0]}`);
-        if (neighbour !== undefined && !(dot(faceNormal(coords, strip, 0), faceNormal(coords, quadsOut, neighbour)) > 0)) return false;
-      }
-      return true;
-    };
     if (!sound(out)) return 'the row of quads between the inner boundary and the rim folds';
     // relax the inner boundary vertices on the surface; kept only when nothing folds
     let relaxed = out.slice();
-    const movable = rowOf.flatMap(({ loop }) => loop.map((v) => renumber.get(v) as number));
     for (let pass = 0; pass < RELAX_PASSES; pass++) {
       const next = relaxed.slice();
       for (const v of movable) {
-        const around = [...(neighbours.get(v) as Set<number>)];
+        const around = [...(neighbours.get(v) ?? [])];
         const mean = around.reduce<Vec3>(
           (sum, w) => [
             sum[0] + (relaxed[3 * w] as number) / around.length,

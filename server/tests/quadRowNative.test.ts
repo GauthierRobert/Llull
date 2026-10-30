@@ -61,6 +61,8 @@ describe('quad_remesh boundary row on the real engine (13.28)', () => {
       const result = await applyCommandAsync('quad_remesh', { id: 'm', targetQuadCount: 4000, output: 'mesh', symmetry: { plane: 'yz' } });
       expect(result.error, result.summary).toBeUndefined();
       expect(result.data).toMatchObject({ symmetry: { plane: 'yz' }, boundaryRow: 'realigned' });
+      // the even spacing of the rim points folds on this input: the row is the blend towards the projection (a share under 1)
+      expect((result.data as Record<string, number>)['boundaryRowEvenness']).toBeLessThan(1);
     },
     240_000,
   );

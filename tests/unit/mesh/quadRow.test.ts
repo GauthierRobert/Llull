@@ -100,6 +100,30 @@ describe('realignBoundaryRow', () => {
     for (const key of deep) expect(kept.has(key), key).toBe(true);
   });
 
+  it('moves the inner boundary vertices and keeps them on the source; with a symmetry plane the rim points on it are exactly on it and the junction is a vertex', () => {
+    const row = realignBoundaryRow(plate(10), engine.positions, engine.quads, 0);
+    if ('cause' in row) throw new Error(row.message);
+    const before = new Set<string>();
+    for (let v = 0; v < engine.positions.length; v += 3) before.add(`${engine.positions[v]},${engine.positions[v + 1]}`);
+    let moved = 0;
+    for (let v = 0; v < row.positions.length; v += 3) {
+      const [x, y, z] = [row.positions[v] as number, row.positions[v + 1] as number, row.positions[v + 2] as number];
+      expect(z).toBe(0);
+      expect(x >= 0 && x <= 10 && y >= 0 && y <= 10).toBe(true);
+      if (!before.has(`${x},${y}`)) moved++;
+    }
+    // the 24 inner boundary vertices are relaxed, the 24 rim points are new: none of them is a place of the engine's quads
+    expect(moved).toBeGreaterThanOrEqual(24 + 20);
+    // the rim points of the left side (the plane x = 0) are on it exactly, and the two ends of that side are vertices
+    const onPlane = [];
+    for (let v = 0; v < row.positions.length; v += 3)
+      if (Math.abs(row.positions[v] as number) < 1e-6) onPlane.push(row.positions[v + 1] as number);
+    expect(onPlane.length).toBeGreaterThanOrEqual(6);
+    for (let v = 0; v < row.positions.length; v += 3) if (Math.abs(row.positions[v] as number) < 1e-6) expect(row.positions[v]).toBe(0);
+    expect(onPlane).toContain(0);
+    expect(onPlane).toContain(10);
+  });
+
   it('refuses by cause: loops that do not pair, nothing left inside, a source whose boundary branches', () => {
     // the engine covered a hole the source has: loop counts differ
     const annulus = gridMesh(10, 6);
