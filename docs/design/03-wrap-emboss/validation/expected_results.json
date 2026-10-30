@@ -1006,23 +1006,55 @@
   },
   {
    "vc": "VC-WRP-36",
-   "what": "multi-face wrap across tangent faces (filleted box side): region continuity across the face boundary",
-   "metric": "data.distortion, face count",
-   "value": "TBD - golden on first run",
-   "tolerance": null,
-   "unit": null,
-   "source": "(c)",
-   "grade": "C",
+   "what": "multi-face wrap across tangent faces: stadium (box 40 x 20 x 10 + two r 10 cylinder ends), a 6 wide band 30 long from the front plane over the +x cylinder end, emboss depth 1: plane part A 60, cylinder part A 120 (arc length 20), volume A d + A d (1 + d / 2r); three faces (60 long band): 60 + 6 (10 pi) 1.05 + 6 (50 - 10 pi)",
+   "metric": "data.faces[].area, data.chainArea, data.volumeDelta",
+   "value": {
+    "twoFaces": {
+     "areas": [
+      60,
+      120
+     ],
+     "chainArea": 180,
+     "volumeDelta": 186,
+     "debossVolumeDelta": -174,
+     "edgeLength": 10,
+     "convexity": "smooth"
+    },
+    "threeFaces": {
+     "areas": [
+      60,
+      188.49555921538757,
+      111.50444078461241
+     ],
+     "volumeDelta": 369.4247779607694
+    },
+    "wrap": {
+     "lineLength": 40,
+     "lengths3d": [
+      10,
+      30
+     ],
+     "sharpEdgeCrossing": {
+      "lineLength": 8,
+      "lengths3d": [
+       5,
+       3
+      ]
+     }
+    }
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) develop is an isometry; plane A d, cylinder A d (1 + d / 2r); server/tests/nativeWrapChain.test.ts",
+   "grade": "A",
    "proves": [
     "FR-WRP-15"
    ],
    "cli": {
-    "run": "llull wrap_to_face '{\"faces\":[...]}' --doc t.llull.json --json",
-    "assert": "data"
-   },
-   "unbuiltCommands": [
-    "wrap_to_face"
-   ]
+    "run": "llull emboss_on_face '{\"id\":\"$stadium\",\"face\":{\"faceNear\":[0,-10,0]},\"chain\":[{\"faceNear\":[30,0,0]}],\"profileIds\":[\"$band\"],\"mode\":\"emboss\",\"depth\":1,\"placement\":{\"anchor\":{\"chart\":[0,0],\"on\":[10,-10,0]}}}' --doc t.llull.json --json",
+    "assert": "data.volumeDelta"
+   }
   },
   {
    "vc": "VC-WRP-37",

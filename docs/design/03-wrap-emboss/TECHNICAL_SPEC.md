@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps (VC-WRP-36); pull walls and draft (VC-WRP-25, 26); silhouette split; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; pull walls and draft (VC-WRP-25, 26); silhouette split; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -635,3 +635,25 @@ default and at an instance: always a font or a stable code, no internal error te
 **Measured.** One instance of the 6-glyph generated font parses and scans in 0.03 ms (2000 instances, node, this machine).
 
 **Left.** `gvar` (variable TrueType) and `avar` version 2, `MVAR` / `VVAR`, named-instance lookup by name, a pinned real CFF / CFF2 font in the validation pack.
+
+### 14.6 Multi-face wraps (DES-3c, VC-WRP-36)
+
+`emboss_on_face` and `wrap_to_face` take `chain`: more faces (face refs) the sketch runs over. Files (`packages/core/src/commands/wrap/`): `chainCharts.ts` (unfolding), `clipRegions.ts` (exact half-plane clipping), `embossChain.ts`, `wrapChain.ts`.
+No native code changed: the native `emboss` recipe is applied once per face, as steps of one recipe.
+
+**Unfolding.** The root face has the user's chart (placement, angle, mirror). A face that shares an edge with a placed face is placed by that edge: the edge is sampled (17 points), mapped through the parent's chart and through the child's own develop
+chart, both must be one straight line of the same length (else `WRP_CHAIN_EDGE_CURVED`: a circular cap edge does not develop to a line), and the child chart is anchored on the first edge point with the angle (and mirror) that makes its chart reproduce the parent's
+coordinates of every sample (residual held to the fit tolerance, all four mirror / sign candidates tried, the one whose handedness agrees with the root's preferred). Each chart is then a develop chart, so every length and angle is kept inside a face and
+across the edge: the strain is 0 by construction (`data.distortion`). The azimuth of a cylinder is taken in the turn that holds the face's own u range (a half-turn face makes a nearest-turn rule ambiguous; found and fixed with the stadium test).
+Supported faces: plane and cylinder (affine charts); cones, spheres, tori are `WRP_CHAIN_FACE_UNSUPPORTED`; a face with no edge to the chain is `WRP_CHAIN_NOT_ADJACENT`. At most 16 faces.
+
+**Clipping.** The line each shared edge develops to cuts the sketch: lines are cut at the crossing, NURBS segments by knot insertion at the crossing parameter (roots found by sampling and bisection), a region cut by the line is closed by a chord along it, a hole cut by
+it becomes part of the boundary (area 50 - 8 = 42 in the unit test), loops entirely on one side stay. The parts' areas add up to the sketch area (checked to 1e-9 relative; else `WRP_CHAIN_CLIP_FAILED`). A boundary tangent to an edge, or crossings that do not pair into chords, is
+`WRP_CHAIN_CLIP_FAILED` too. `wrap_to_face` keeps the runs without chords: each becomes a curve on its own face (`data.faces`, `curves[].face`), a loop crossing an edge becomes open pieces.
+
+**Emboss across the faces.** Each face's part is mapped by its chart, checked on the face and embossed in chain order: `recipe_k = emboss(source: recipe_{k-1}, face: the face found again by an interior probe point)`. Walls on a shared smooth edge are the same plane, so the pieces fuse.
+**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss (`WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
+native half-space cut of the tools). `scribe` and `wrap_to_face` cross sharp edges. `data.expectedVolumeDelta` is the sum of the closed forms per face.
+
+**Measured (native kernel, `server/tests/nativeWrapChain.test.ts`).** Stadium (box 40 x 20 x 10 + two r 10 cylinders), band 6 x 30, depth 1: areas 60 + 120, volume change 186 = 60 + 120 x 1.05 (1e-6 relative); three faces (band 60 long over plane, cylinder end, opposite plane) 369.4248;
+deboss -174; wrap of a 40 long line 10 + 30; across the sharp 90-degree edge 5 + 3; replay equal. Golden VC-WRP-36 in `validation/expected_results.json`. New codes: `WRP_CHAIN_FACE_UNSUPPORTED`, `WRP_CHAIN_NOT_ADJACENT`, `WRP_CHAIN_EDGE_CURVED`, `WRP_CHAIN_EDGE_SHARP`, `WRP_CHAIN_CLIP_FAILED`.

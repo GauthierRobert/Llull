@@ -17,6 +17,7 @@ import type { CommandResult, ExecutionContext } from '../types';
 import type { CadDocument } from '../../model/types';
 import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
+import { runEmbossChain } from './embossChain';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
 import {
@@ -53,6 +54,8 @@ export interface EmbossRequest {
   readonly fitTolerance?: number | undefined;
   readonly toolWidth?: number | undefined;
   readonly grid?: EmbossGrid | undefined;
+  /** More faces of the chain the sketch runs over (adjacent plane / cylinder faces, unfolded across their shared edges). */
+  readonly chain?: readonly FaceRefInput[] | undefined;
 }
 
 /** Volume of the exact solid and of its source: the kernel's exact mass properties, else its analysis. */
@@ -199,6 +202,23 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
         ? { ...outline, regions, open: [], area: outlines.reduce((sum, o) => sum + o.area, 0) * grid.countX * grid.countY }
         : { ...outline, regions: [], open: [], area: 0 },
     );
+  }
+  if (params.chain !== undefined && params.chain.length > 0) {
+    if (engrave || params.grid !== undefined)
+      return fail('WRP_PARAM_INVALID', 'chain works with emboss, deboss and scribe, not with engrave or a grid', ['chain']);
+    return runEmbossChain({
+      doc,
+      ctx,
+      command,
+      params,
+      session,
+      resolved,
+      regions,
+      unverified,
+      tolerance: params.fitTolerance ?? defaultFitTolerance(session.diagonal),
+      depth: scribe ? 0 : (params.depth as number),
+      volumeOf: (shape) => kernelVolume(session, shape),
+    });
   }
   const { chart } = resolved;
   const cutting = params.mode === 'deboss' || engrave;

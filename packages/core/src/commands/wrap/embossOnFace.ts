@@ -47,6 +47,13 @@ export const embossOnFace = defineCommand({
       .optional()
       .describe('engrave only: width of the flat tool, document units, > 0 (the groove is this wide with round ends).'),
     placement: placementField.optional(),
+    chain: z
+      .array(faceRefField)
+      .max(15)
+      .optional()
+      .describe(
+        'Multi-face emboss: more faces (plane or cylinder) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces: WRP_CHAIN_EDGE_SHARP otherwise; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
+      ),
     maxLengthStrain: z
       .number()
       .positive()
