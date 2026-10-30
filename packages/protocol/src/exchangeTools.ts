@@ -9,6 +9,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { execute } from '@core/commands/registry';
+import type { ExecutionContext } from '@core/commands/types';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
@@ -52,6 +53,8 @@ export interface ExchangeDeps {
   readonly getDoc: () => CadDocument;
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult; // the command bus (undo + broadcast)
   readonly allowCodeExecution: boolean; // import_code runs arbitrary Python
+  /** The execution context of the commands the exchange runs itself (export_step_ap242, export_code): the host's, which holds the mesh asset store (a stored mesh is exported at full resolution). */
+  readonly context?: () => ExecutionContext;
 }
 
 const LANGUAGE_SCHEMA = {
@@ -199,12 +202,18 @@ interface StepFile {
 const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt-native).';
 
 /** Without the Python bridge the exact kernel writes the STEP (`export_step_ap242`). */
-function exportStepExact(getDoc: () => CadDocument, name?: string, confirmation?: unknown): StepFile | { error: string } {
+function exportStepExact(
+  getDoc: () => CadDocument,
+  name?: string,
+  confirmation?: unknown,
+  context?: ExecutionContext,
+): StepFile | { error: string } {
   const simple = { schema: 'ap214', includeValidationProperties: false };
   const exact = execute(
     getDoc(),
     'export_step_ap242',
     confirmation === undefined ? simple : { ...simple, confirmExportControlled: confirmation },
+    context,
   );
   const data = exact.data as { step?: string; solidCount?: number } | undefined;
   if (data?.step === undefined) return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
@@ -238,16 +247,21 @@ function lastLine(message: string): string {
 export async function exportStepFile(
   getDoc: () => CadDocument,
   port: CadExchangePort | null,
-  options: { name?: string; language?: unknown; save?: boolean; confirmExportControlled?: unknown },
+  options: { name?: string; language?: unknown; save?: boolean; confirmExportControlled?: unknown; context?: ExecutionContext },
 ): Promise<StepFile | { error: string }> {
-  if (port === null) return exportStepExact(getDoc, options.name, options.confirmExportControlled);
+  if (port === null) return exportStepExact(getDoc, options.name, options.confirmExportControlled, options.context);
   const language = pythonLanguage(options.language);
   if (language === null) return { error: 'export_step: language must be "cadquery" or "build123d".' };
-  const code = execute(getDoc(), 'export_code', {
-    language,
-    name: options.name ?? 'model',
-    ...(options.confirmExportControlled !== undefined ? { confirmExportControlled: options.confirmExportControlled } : {}),
-  });
+  const code = execute(
+    getDoc(),
+    'export_code',
+    {
+      language,
+      name: options.name ?? 'model',
+      ...(options.confirmExportControlled !== undefined ? { confirmExportControlled: options.confirmExportControlled } : {}),
+    },
+    options.context,
+  );
   const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
   if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
@@ -258,7 +272,7 @@ export async function exportStepFile(
     // a sweep / loft the code could not build (the script's last line is "ValueError: SWG_CODEGEN_UNSUPPORTED: ..."): the native kernel still has its exact faces
     const failure = lastLine(error instanceof Error ? error.message : String(error));
     if (!/(^|\s)ValueError: SWG_CODEGEN_UNSUPPORTED: /.test(failure)) throw error;
-    const exact = exportStepExact(getDoc, options.name, options.confirmExportControlled);
+    const exact = exportStepExact(getDoc, options.name, options.confirmExportControlled, options.context);
     if ('error' in exact) return { error: `${exact.error} (the ${language} code failed first: ${failure})` };
     const savedTo =
       options.save !== false && port.writeExchangeFile !== undefined
@@ -290,6 +304,7 @@ async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args
   const file = await exportStepFile(deps.getDoc, port, {
     language: args.language,
     save: args.save !== false,
+    ...(deps.context !== undefined ? { context: deps.context() } : {}),
     ...(args['confirmExportControlled'] !== undefined ? { confirmExportControlled: args['confirmExportControlled'] } : {}),
     ...(name !== undefined ? { name } : {}),
   });

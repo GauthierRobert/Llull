@@ -87,6 +87,34 @@ export function isSculptReport(value: unknown, op: Pick<SculptParams, 'stamps' |
 }
 
 /**
+ * True when `value` is the shrink-wrap report of the op asked over a mesh of `vertices` vertices: whole counts that fit the mesh, finite non-negative measures, a move that
+ * is 0 exactly when no vertex moved, and no vertex missed by `nearest` without a `maxDistance` (the closest point of a target with triangles always exists).
+ */
+export function isShrinkwrapReport(
+  value: unknown,
+  op: { readonly mode: string; readonly maxDistance?: number | undefined },
+  vertices: number,
+): boolean {
+  if (!isRecord(value)) return false;
+  const { moved, missed, maxMove, meanMove, residual } = value;
+  return (
+    isCount(moved) &&
+    isCount(missed) &&
+    moved + missed <= vertices &&
+    missed <= vertices &&
+    isFiniteNumber(maxMove) &&
+    maxMove >= 0 &&
+    isFiniteNumber(meanMove) &&
+    meanMove >= 0 &&
+    meanMove <= maxMove &&
+    (moved === 0) === (maxMove === 0) &&
+    isFiniteNumber(residual) &&
+    residual >= 0 &&
+    (op.mode !== 'nearest' || op.maxDistance !== undefined || missed === 0)
+  );
+}
+
+/**
  * True when the pair-search fields of `analysis` are what the op asked for: no count and no pairs when it did not ask; otherwise a count, and exactly
  * `min(count, maxListed)` pairs `[low, high]` of faces of the mesh, ascending, with low below high (the `selfIntersectionPairs` / `selfIntersections` fields).
  */

@@ -1,8 +1,8 @@
 /**
  * A stand-in for `llull-compute meshops <folder>` that answers with a chosen result, for tests of what the host does with an answer it cannot trust.
- * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved | bad_pairs | pairs_costly:
+ * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved | wrap_missed | wrap_resized | bad_pairs | pairs_costly:
  * the preload writes the result files and the final `done` event, then exits before node looks for a script called `meshops`.
- * The report of `repair`, `fill_holes` and `sculpt` is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
+ * The report of `repair`, `fill_holes`, `sculpt` and `shrinkwrap` (`wrap_missed`: a vertex missed by a nearest wrap without a reach) is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
  * fairing, with a loop number past `totalLoops`, or for a sculpt without symmetry that reports a symmetry error and more stamps applied than there are); `hole_code` ends the job
  * with an error event of a `MESH_HOLE_` code no command documents; `sculpt_index` with `SCULPT_OFF_SURFACE` naming a stamp the op does not have. The result mesh of those ops is the input.
  */
@@ -21,6 +21,7 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
     resultIndices = Buffer.from(indices);
     resultIndices.writeUInt32LE(positions.length / 24 + 5, 0);
   } else if (mode === 'odd_indices') resultIndices = indices.subarray(0, indices.length - 4);
+  else if (mode === 'wrap_resized') resultIndices = indices.subarray(0, indices.length - 12);
   else if (mode === 'partial_positions') resultPositions = positions.subarray(0, positions.length - 8);
   else if (mode === 'nan') {
     resultPositions = Buffer.from(positions);
@@ -70,6 +71,7 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
   const reports = {
     repair: { mode: other ? 'close_holes' : job.params.mode, changes, notes: [], skippedHoles: 0 },
     fill_holes: { totalLoops: 1, filled: [filled], skipped: [] },
+    shrinkwrap: { moved: other ? 1e9 : 0, missed: mode === 'wrap_missed' ? 1 : 0, maxMove: 0, meanMove: 0, residual: 0 },
     sculpt: {
       movedVertices: mode === 'sculpt_moved' ? 1e9 : 0,
       maxDisplacement: 0,

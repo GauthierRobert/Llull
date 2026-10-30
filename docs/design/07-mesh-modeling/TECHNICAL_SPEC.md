@@ -1197,7 +1197,7 @@ Kernel commands (`requiresKernel`) that take a solid operand also feed its trian
 
 ### 13.11.6 Known limits and left, by name
 
-- **Native STEP / IGES paths in `server/src/native/`** take the document as it is: an asset-backed body is its display mesh there (the commands `export_step_ap242` / `export_iges` are annotated, the sidecar paths are not). Host work (Lane 4): hand them `withFullResolution` or refuse with `MESH_ASSET_LOD_ONLY`, as the CFD and topology solves now do.
+- **Native STEP / IGES host paths**: audited and closed in 13.21 (the FEA mesher read the display mesh; the `export_step` route and tool refused a held asset).
 - A reference spelled as a compound string (`<entityId>:face3`) is not split; only exact ids count.
 - A record that is not stored under its own id (a table entry whose key differs from its `id`, a record with no `id`) is not found; a command that names one gets the default scope only when nothing else resolves. Over-reach is by design: a record that mentions an unreadable asset makes the command refuse by name.
 - The cap is one number for every command.
@@ -1339,7 +1339,7 @@ Each fails without its fix (shown by disabling the fix): the platform `acos` fai
 - **The pair search no longer throws.** `findSelfIntersections` kept a `Set` of the pairs it had tested; on the 1,310,720-triangle noisy sphere it reached 2^24 entries and V8 threw a `RangeError` ("an engine never throws"). A pair is now a candidate once, in the lowest grid cell its two cell ranges share (the maximum of the two lowest cells per axis); two large triangles are paired once by order. Same count and same pairs as testing every pair (`tests/unit/mesh/selfIntersectionDedupe.test.ts`: four random soups with large triangles against a brute-force definition, the candidate count never above the number of pairs, and the 1.3M sphere: 20.4 million candidates, 1,219 crossing pairs, 2.5 s). Disabling the rule doubles the counts and fails the soups.
 - **`cut_mesh` of the 1.3M sphere left no cap, and that is correct.** The noise (+-0.02 on edges of about 0.047, about 0.4 edge) makes neighbouring triangles cross at the plane: the section is not a simple outline, the cap triangulator reports the loops as `uncapped` and adds no triangle. `cut_mesh` now says so in its summary ("N section loop(s) left uncapped: the input crosses itself near the plane ... run check_mesh, then repair_mesh") when a cap was asked for (`tests/unit/mesh/cutUncapped.test.ts`); `cap: false` and a clean section say nothing.
 - **One source of truth for the feature cosine.** The jobs take the angle (`featureAngleRad` for decimate and remesh, `hardEdgeRad` for `quad_remesh`) and compute its cosine with `llull_jsmath::cos`; `featureCos` and `sharpCos` are gone from the protocol, the host and the pins. An angle outside [0, pi] is refused by the job. The pins and the parity tests are unchanged.
-- **Prefer native above a per-op size.** Between 82k and 200k triangles the TypeScript engine answered `remesh` in about 25 s although the native engine was installed. `MeshProcessingEngine.preferredAbove()` lets an engine go first above a size; the composite then asks it before the earlier engines, still falls through on `MESH_ENGINE_UNSUPPORTED` and now on `MESH_ENGINE_NEEDS_HOST` (the synchronous host paths keep their in-process answer), and reports the refusal of the last listed engine that refused. Results are identical by the parity rule: only the speed changes. Measured on the reference machine, a cold native job (spawn, files, JSON) costs 25 to 45 ms, in-process TypeScript against the native job, noisy icosphere, milliseconds:
+- **Prefer native above a per-op size.** Between 82k and 200k triangles the TypeScript engine answered `remesh` in about 25 s although the native engine was installed. `MeshProcessingEngine.preferredAbove()` lets an engine go first above a size; the composite then asks it before the earlier engines, still falls through on `MESH_ENGINE_UNSUPPORTED` and now on `MESH_ENGINE_NEEDS_HOST` (the synchronous host paths keep their in-process answer), and reports the refusal of the last listed engine that refused. Results are identical by the parity rule: only the speed changes. **Correction (13.22): the preference was only honoured when the native engine was installed alone (the tests); the server installs a composite of native and Manifold, which declared no `preferredAbove`, so in production TypeScript answered every op up to its cap. The composite now declares the smallest preference of its members and the routing is tested on the real composition.** Measured on the reference machine, a cold native job (spawn, files, JSON) costs 25 to 45 ms, in-process TypeScript against the native job, noisy icosphere, milliseconds:
 
 | triangles | analyze | decimate (to a quarter) | smooth (Taubin, 10) | remesh | deviation |
 | --------- | ------- | ----------------------- | ------------------- | ------ | --------- |
@@ -1636,7 +1636,7 @@ The displace column is after compiling the expression once (before: 0.7 / 3.1 / 
 
 ### 13.18.5 Left, by name
 
-- Native Rust twin of `shrinkwrap` (closest point exists in `llull-meshops`; the ray query and the face-normal offset are new): the 200,000 cap lifts when it exists. `displace` stays in TypeScript unless a measurement says otherwise.
+- Native Rust twin of `shrinkwrap`: built in 13.20. `displace` stays in TypeScript (0.48 s at 328k triangles).
 - Shrink-wrap modes of Blender not offered: "target normal project", "nearest vertex", "above / below surface" as separate modes (`side` covers the offset case), smoothing of the wrapped result.
 - A displacement texture as an image file (PNG / JPEG) is not decoded: the map is raw grey bytes; `displace_mesh` with a colour image or a procedural texture needs an importer.
 
@@ -1659,3 +1659,90 @@ FR-MSH-18 and the table of 5.7 list "a stroke along a curve entity with spacing"
 ### 13.19.4 Left, by name
 
 A path whose points are projected onto the surface before spacing (the spacing is along the path, not along the surface), and view-dependent directions (the FR lists "view" next to normal and vector; there is no view in the command layer).
+
+## 13.20 As built (DES-7c native twins (1): the native `shrinkwrap` op, 2026-10-30)
+
+### 13.20.1 What it is
+
+`shrinkwrap` (13.18) now has a Rust twin in `llull-meshops` (`shrinkwrap.rs`, `shrinkwrap_job.rs`, `SurfaceIndex::ray` in `surface.rs`), bit-identical to `wrapDisplace.ts`: the closest point (the tree of 13.12), the ray query (the same tree: the box slab test, the left child first, the reach shrinking to each hit, the lower triangle on equal distances, Moller-Trumbore with the TypeScript tolerances), the angle-weighted vertex normals (V8 `Math.acos` and `Math.hypot` twins of `llull-jsmath`, summed in face order), the forward-on-a-tie choice between the two directions, the offset along the target face normal, and the report `{ moved, missed, maxMove, meanMove, residual }` folded in vertex order. The per-vertex answers are computed in parallel (a vertex does not depend on another); the folds are sequential, so the bytes do not depend on the thread count. Job: `op: "shrinkwrap"`, `{ mode, direction?, offset, side, maxDistance? }`, the mesh as `positions.f64` / `indices.u32` and the target as `positions_b.f64` / `indices_b.u32` (as `deviation`).
+
+### 13.20.2 Decisions
+
+- **Refusals.** The job refuses with `NATIVE_JOB_INPUT` (the host falls through to the TypeScript engine, which answers or refuses it with the same text as before) what it does not take: a target without triangles, an offset that is negative, not finite or above 1e100, a `maxDistance` that is not positive, a direction past 1e100, a coordinate of the mesh or the target that is not finite or past 1e100 (the products would overflow), a result that is not finite (JSON cannot carry it). The host refuses by name a source or a target over 4,000,000 triangles (`MESH_ENGINE_CAP_EXCEEDED`, `SHRINKWRAP_TRIANGLE_CAP`), the TypeScript cap staying at 200,000 for both.
+- **Report tied to the op** (`isShrinkwrapReport`, `reportChecks.ts`): whole counts that fit the vertex count, finite non-negative measures, a mean not above the maximum, a maximum move of 0 exactly when no vertex moved, no missed vertex for `nearest` without a `maxDistance`; the result must have the triangles and the vertex count of the input (a wrap moves vertices only). A report or result that is not that is `MESH_ENGINE_UNSUPPORTED` (stand-in tests in `meshopsMalformedResult.test.ts`).
+- **Preferred above 10,000 triangles** of the wrapped mesh (13.20.3). The command has no `withDeviation` for this op: the deviation of the result is the separate `deviation` job, as for `sculpt`.
+- **No oracle defect found.** Two numerical guards of the oracle (the slab tolerance of `SurfaceIndex.ray`, the barycentric tolerance of `rayTriangleDistance`) are ported as they are; no pinned or generated case depends on them (a ray through a lattice corner is also found by a neighbouring triangle), so they are not red-provable.
+
+### 13.20.3 Measured (win32-x64, 22 cores; noisy icosphere (+-0.05) wrapped onto a noisy icosphere (+-0.03); engine call through `resolveDeferred`, process start included; TypeScript straight to the engine, caps not applied; one run each; every native result had the TypeScript bytes and report)
+
+| Source / target triangles | nearest TypeScript / native | normal TypeScript / native |
+| ------------------------- | --------------------------- | -------------------------- |
+| 320 / 5,120 | 39 ms / 85 ms (cold start) | 22 ms / 39 ms |
+| 5,120 / 5,120 | 37 ms / 55 ms | 36 ms / 61 ms |
+| 5,120 / 81,920 | 289 ms / 76 ms | 249 ms / 65 ms |
+| 20,480 / 81,920 | 469 ms / 78 ms | 374 ms / 76 ms |
+| 81,920 / 81,920 | 1.27 s / 0.11 s (11x) | 0.58 s / 0.11 s (5x) |
+| 327,680 / 81,920 | 4.25 s / 0.20 s (21x) | 1.48 s / 0.19 s (8x) |
+| 327,680 / 327,680 | (TypeScript refuses: cap) / 0.31 s | / 0.26 s |
+| 1,310,720 / 327,680 | (41.7 s in 13.18.4) / 0.79 s (about 50x) | (8.0 s) / 0.68 s (12x) |
+
+The native job is no slower than the TypeScript one from a 5,000-triangle mesh with a target of the same size, and faster whenever the target is larger; the preference is set at 10,000 source triangles (`SHRINKWRAP_PREFERRED_ABOVE`) with the margin of 13.12.4.
+
+### 13.20.4 Tests
+
+Rust: `tests/ts_pins.rs` (12 new pinned cases, results of the TypeScript engine: nearest from outside and inside, offsets on each side with `keep` on both sides of the target, a reach that misses half the vertices (nearest and normal), normals of a damaged soup, oblique rays onto a sphere and a holed grid, rays through lattice corners, a source equidistant from two planes (forward wins), a mode `direction` without direction; `ts_pins.json` regenerated by the two documented steps, existing pins unchanged; the regeneration test now reads the second mesh of a folder) and `tests/shrinkwrap.rs` (exact wrap onto a plane, the reach, every refusal with its text). Server: `meshopsNativeShrinkwrap.test.ts` (bytes and reports of both engines for the three modes, offsets, sides, reaches, open, soup, damaged and unreferenced-vertex inputs, fall-through of what the job does not take, the target cap), `meshopsMalformedResult.test.ts` and `deferredBudget.test.ts` (report and result checks, the job budget), and `meshShrinkwrapNativeHost.test.ts`, the host test on a stored 327,680-triangle source and a stored 327,680-triangle target (both read at full resolution: the residual is 0 on the 327,680-triangle target, the 80-triangle display level would leave 0.2; the result is stored, its bytes and report are the TypeScript oracle's; the stage stream, the timeout, the preference size). Each fails without its fix (shown by disabling it): the forward tie, the lower triangle on a tie, the keep side, the reach of `nearest`, the angle weights, the mean over handled vertices (pins); the target not packed, the report check, the triangle-count check, the preference size, the target cap, the missed-vertex rule (server and unit tests). Not red-provable: the child order of the ray traversal (a result-neutral search order) and the two numerical guards above.
+
+### 13.20.5 Left, by name
+
+The Rust twin of `displace` (0.48 s at 328k triangles in TypeScript after the compiled expression, below the 13.12.2 threshold); lifting the TypeScript cap of `shrinkwrap` is not needed (the native engine answers above it).
+
+## 13.21 As built (DES-7c native twins (2): the native STEP / IGES host paths at full resolution, 2026-10-30)
+
+### 13.21.1 The audit (13.11.6 left it as "Lane 4 host work")
+
+Every place of `server/` and `packages/protocol` that hands the geometry of a document body to a native consumer (the exact kernel sidecar, the mesher) was read. The note of 13.11.6 guessed at `server/src/native/`; what is there is not the gap.
+
+| Host path | Reads the document how | Before | Now |
+| --------- | ---------------------- | ------ | --- |
+| `export_step_ap242`, `export_iges` (commands; the kernel proxy of `kernelLeaves` / `kernelProtocol` sends what the recipe holds) | `execute` (annotated, `runWithFullMeshes`) with the server context | stored mesh; above the 20,000-triangle limit of the exact kernel a named refusal `XCH_NO_SOLIDS` whose note counts the stored triangles | unchanged, now tested on a stored mesh |
+| `GET /export/step`, tool `export_step` (`exportStepFile`, also the CLI `--doc` / `--app` / `--server`) | `execute(getDoc(), 'export_step_ap242' | 'export_code', …)` **without a context** | the default context has no asset store: a held asset was refused as `MESH_ASSET_LOD_ONLY` ("no asset store is installed") although this machine holds it | the route and the tool pass `serverContext()` (`ExchangeDeps.context`, `exportStepFile` option `context`): the stored mesh is exported |
+| FEA mesher (`runFeaMesh`: `partGeometry` STEP / STL, `partFaces`) | the document, no `execute` | **the display level of detail (80 triangles in the test) was meshed, silently** | `fullResolutionView` (below), or a named refusal |
+| CFD flow solve, topology solve | `withFullResolution` + `displayOnlyMeshIds` (13.11, steps before) | full resolution | unchanged |
+| `kernelLeaves` / `kernelProtocol` (`entityTrianglePositions`) | pyramids and subdivision solids only, never asset-backed | n/a | n/a |
+| `/preview`, `render_*` | display mesh by design (13.11.4) | display | unchanged |
+
+### 13.21.2 Decisions
+
+- **One helper for host paths**, `commands/meshHostView.ts` `fullResolutionView(doc, ids, assets)`: the reach of the commands (`reachedMeshes`, so an instance reaches its component and a mesh its construction-tree leaves), the cap of the commands (`MESH_FULL_READ_TRIANGLE_CAP`, distinct assets counted once), then `withFullResolution`, and `displayOnlyMeshIds` on the result: the document back, or a refusal `MESH_ASSET_TOO_LARGE` / `MESH_ASSET_LOD_ONLY` naming the ids. The mesher is never called on a refusal. The FEA mesh tool returns these codes as its own failure (`fea_mesh`).
+- **The exchange tools take the host's context.** `ExchangeDeps.context` (and the `context` option of `exportStepFile`) is how the protocol layer, which has no store, runs `export_step_ap242` / `export_code` with the asset store; the server's `exchangeDepsOf` and `GET /export/step` give it `serverContext()`.
+- **No cap lifted.** A stored mesh over the exact kernel's 20,000 triangles is still refused by name (`XCH_NO_SOLIDS`, a pre-existing policy); that refusal now demonstrably counts the stored triangles.
+
+### 13.21.3 Tests
+
+`tests/unit/mesh/hostFullResolution.test.ts` (the helper: the named parts only, an instance's component, the cap, a lost asset, purity) and `server/tests/hostExportFullResolution.test.ts` (real asset store; a scripted kernel that records what it is asked to build): `export_step_ap242`, `export_iges`, `exportStepFile`, `GET /export/step` and `POST /exchange export_step` hand the kernel the 5,120 stored triangles, never the 80 displayed; the 327,680-triangle stored mesh is refused by name with its triangle count in the note and the kernel never asked; a lost asset and a reach above the cap are `MESH_ASSET_LOD_ONLY` / `MESH_ASSET_TOO_LARGE` on every path; the FEA mesher gets the 327,680 facets of the stored mesh (STL, no kernel) and builds the kernel STEP from the stored mesh. Each fails without its fix (shown by disabling it): the FEA full-resolution view and its refusal, the context of the route, of the tool and of the exact STEP export, the cap and the display-only check of the helper.
+
+### 13.21.4 Left, by name
+
+Meshing a 327,680-triangle stored mesh through Netgen is a long job (the mesher gets the facets it is asked for); the FEA mesh tool has no decimation step, and `decimate_mesh` first is the remedy named by `MESH_ASSET_TOO_LARGE`. The CFD and topology solves keep their own copies of the same two lines (`withFullResolution` + `displayOnlyMeshIds`); moving them onto `fullResolutionView` is a refactor that changes their refusal text and is not done here.
+
+## 13.22 Review round on 13.20 / 13.21: routing in production, two-mesh ops, host paths (2026-10-30)
+
+### 13.22.1 The preference sizes of 13.12.4 to 13.20 were not reached in production
+
+The server installs one engine, `composeMeshEngines([native, manifold])` (`installMeshEngine`), and `resolveMeshEngine` puts the TypeScript engine in front of it: `composeMeshEngines([ts, composite])`. A composite declared no `preferredAbove`, so the outer composite never saw the native preference and the TypeScript engine answered every op up to its cap (`sculpt`, `repair`, `fill_holes`, `smooth`, `decimate`, `remesh`, `analyze`, `shrinkwrap`: 10,000 to 200,000 triangles). The tests of 13.12 to 13.20 that claim "goes native above N" installed the native engine alone, where it worked. Every statement of 13.12.4, 13.13.3, 13.14.3, 13.15 and 13.20.3 about which engine answers between the preference size and the TypeScript cap held for that installation only; the measured speeds are those of the native engine and stand. Above the TypeScript cap the native engine was always the only taker, so nothing above 200,000 triangles was affected.
+
+**Fix.** `composeMeshEngines` exposes `preferredAbove()`: per op, the smallest preference of its members. A composite inside a composite then keeps the preference of the engines it holds. `server/tests/meshEngineRouting.test.ts` installs the real composition (`installGeometryKernel`) and asserts `provenance.engine`: at 81,920 triangles `sculpt`, `repair`, `fill_holes`, `decimate`, `analyze` and `shrinkwrap` are native, and `sculpt_mesh` / `repair_mesh` through `applyCommandAsync` report `engine: native`; below the preference (1,280 triangles) the TypeScript engine answers; the composite's merge is the minimum. Red: without `preferredAbove` on the composite eight of those tests fail.
+
+### 13.22.2 Two-mesh ops are routed by their larger mesh
+
+`shrinkwrap` (the target) and `deviation` (the other mesh) were sized by the source alone. A small cage wrapped onto a 327,680-triangle scan reached the TypeScript engine, which refused the target over its cap with `MESH_ENGINE_CAP_EXCEEDED`, and the composite treats that as final: the native engine was never asked. The composite now sizes such an op by `max(source, other)` for the caps and the preference alike (`opSize`), so the TypeScript engine is skipped by its cap and the native one answers; without a native engine the refusal is the same as before. Tests: the routing test (5,120-triangle cage and 1,280-triangle deviation source onto a 327,680-triangle target: native; TypeScript only: `MESH_ENGINE_CAP_EXCEEDED`) and the host test of `shrinkwrap_mesh` of an inline cage onto the stored 327,680-triangle target (native, residual under 1e-9).
+
+### 13.22.3 Host paths (13.21 follow-up)
+
+- `runFeaMesh` gives `partMidsurface` (shell and plane-stress idealisations) the full-resolution view too, not only `partGeometry` / `partFaces`. A shell or plane-stress part of a mesh needs the exact OCC kernel (`FEA_KERNEL_OCC_REQUIRED` here), so the test records the document the hook is given (327,680 triangles) rather than a midsurface.
+- `buildReleasePackage` ran `release_manifest` and `export_sheet_svg` without a context: a sheet that shows a stored mesh was dropped with a `MESH_ASSET_LOD_ONLY` note although this machine holds the asset. Both now run with `serverContext()`; the other `execute` calls of `server/` and `packages/protocol` were read and name no mesh reader. Test: `plmReleasePackageMesh.test.ts` (the sheet is written; an asset not held is a note).
+- `fullResolutionView` counts against the cap, and checks, only the meshes it swaps (the ids' own meshes and construction-tree leaves, the components of their instances), not every mesh reached through a field of some other entity.
+
+### 13.22.4 Smaller points
+
+The packed target of `shrinkwrap` and the other mesh of `deviation` are kept in the resolve memo like the packed mesh (`native:pack_b`); the shrinkwrap job reports progress after each of 64 chunks of vertices (a strictly rising share, tested); the description of `shrinkwrap_mesh` names both caps (200,000 in TypeScript, 4,000,000 with llull-compute).

@@ -24,9 +24,10 @@ import {
   editableProblem,
   repairDescription,
   sculptDescription,
+  shrinkwrapDescription,
   smoothDescription,
 } from '@core/geometry/mesh/editable';
-import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport, isShrinkwrapReport } from '@core/geometry/mesh/reportChecks';
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
@@ -54,6 +55,8 @@ const REMESH_TRIANGLE_CAP = 2_000_000;
 const REPAIR_TRIANGLE_CAP = 4_000_000;
 /** Named guard: input triangles above which sculpt refuses (the brushes keep per-vertex face lists and the closest-point tree 100 bytes per triangle, and the refinement works on a per-vertex face-list mesh capped at the same size). */
 const SCULPT_TRIANGLE_CAP = 4_000_000;
+/** Named guard: triangles above which shrinkwrap refuses, in the wrapped mesh and in the target (a closest-point tree of 100 bytes per triangle each, the normals and the per-vertex answers). */
+const SHRINKWRAP_TRIANGLE_CAP = 4_000_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
@@ -65,6 +68,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['repair', REPAIR_TRIANGLE_CAP],
   ['fill_holes', REPAIR_TRIANGLE_CAP],
   ['sculpt', SCULPT_TRIANGLE_CAP],
+  ['shrinkwrap', SHRINKWRAP_TRIANGLE_CAP],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
 ]);
@@ -78,6 +82,9 @@ function isNativeOp(op: MeshOp): op is NativeOp {
 
 /** The command name the editable-mesh refusals mention. */
 const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
+
+/** Measured in TECHNICAL_SPEC 13.20.3. */
+const SHRINKWRAP_PREFERRED_ABOVE = 10_000;
 
 /** Measured in TECHNICAL_SPEC 13.14.3. */
 const SCULPT_PREFERRED_ABOVE = 15_000;
@@ -95,6 +102,7 @@ const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, num
   ['repair', 50_000],
   ['fill_holes', 30_000],
   ['sculpt', SCULPT_PREFERRED_ABOVE],
+  ['shrinkwrap', SHRINKWRAP_PREFERRED_ABOVE],
 ]);
 
 /** The refusals of `fill_holes` a job may hand to the command as they are (`fill_mesh_holes` documents them); any other code is `MESH_ENGINE_UNSUPPORTED`. */
@@ -112,12 +120,12 @@ const regionOf = (region: { readonly center: readonly number[]; readonly radius:
 
 type NativeOp = Extract<
   MeshOp,
-  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'sculpt' | 'deviation' | 'quad_remesh' }
+  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'sculpt' | 'shrinkwrap' | 'deviation' | 'quad_remesh' }
 >;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
-  return op.op !== 'deviation' && op.op !== 'analyze' && op.op !== 'sculpt' && op.withDeviation !== undefined
+  return op.op !== 'deviation' && op.op !== 'analyze' && op.op !== 'sculpt' && op.op !== 'shrinkwrap' && op.withDeviation !== undefined
     ? { deviationSamples: op.withDeviation }
     : {};
 }
@@ -141,6 +149,14 @@ function jobParams(op: NativeOp): Record<string, unknown> {
       fairing: op.fairing,
       refine: op.refine,
       ...(op.alpha !== undefined ? { alpha: op.alpha } : {}),
+    };
+  if (op.op === 'shrinkwrap')
+    return {
+      mode: op.mode,
+      offset: op.offset,
+      side: op.side,
+      ...(op.direction !== undefined ? { direction: [...op.direction] } : {}),
+      ...(op.maxDistance !== undefined ? { maxDistance: op.maxDistance } : {}),
     };
   if (op.op === 'sculpt')
     return {
@@ -216,12 +232,12 @@ function packMesh(mesh: MeshData, suffix = ''): readonly JobFile[] {
 }
 
 /** The packed files of `mesh`: kept in the resolve memo by the mesh object, so the next run of the command (which gets the same object) packs and hashes nothing. */
-function packedMesh(mesh: MeshData, memo: ResolveMemo | undefined): readonly JobFile[] {
-  if (memo === undefined) return packMesh(mesh);
+function packedMesh(mesh: MeshData, memo: ResolveMemo | undefined, suffix = ''): readonly JobFile[] {
+  if (memo === undefined) return packMesh(mesh, suffix);
   return memo.once(
     mesh,
-    'native:pack',
-    () => packMesh(mesh),
+    `native:pack${suffix}`,
+    () => packMesh(mesh, suffix),
     (files) => files.reduce((sum, file) => sum + file.data.length / 8, 0),
   );
 }
@@ -300,7 +316,13 @@ export function deviationFrom(value: unknown): { deviation?: DeviationSummary } 
 }
 
 /** Read the outputs of a finished job into the engine's result. */
-async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run: JobRun): Promise<MeshOpResult | MeshEngineFailure> {
+async function resultOf(
+  op: NativeOp,
+  runner: ComputeRunner,
+  folder: string,
+  run: JobRun,
+  [triangles, vertices]: readonly [number, number],
+): Promise<MeshOpResult | MeshEngineFailure> {
   const summary: unknown = JSON.parse((await readOutput(folder, run, 'report.json')).toString('utf8'));
   const report = isRecord(summary) && isRecord(summary['report']) ? summary['report'] : {};
   const version = `llull-compute@${await runner.version()}`;
@@ -342,6 +364,10 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
   if (
     (op.op === 'repair' && !isRepairReport(report, op.mode)) ||
     (op.op === 'fill_holes' && !isFillReport(report, op.fairing)) ||
+    (op.op === 'shrinkwrap' &&
+      (!isShrinkwrapReport(report, op, mesh.positions.length / 3) ||
+        mesh.indices.length !== triangles * 3 ||
+        mesh.positions.length !== vertices * 3)) ||
     (op.op === 'sculpt' && (!isSculptReport(report, op) || (report as { movedVertices: number }).movedVertices > mesh.positions.length / 3))
   )
     return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: the job returned a malformed report`);
@@ -350,13 +376,15 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
       ? repairDescription(op.mode)
       : op.op === 'fill_holes'
         ? FILL_HOLES_DESCRIPTION
-        : op.op === 'sculpt'
-          ? sculptDescription(op.brush)
-          : op.op === 'decimate'
-            ? DECIMATE_DESCRIPTION
-            : op.op === 'remesh'
-              ? REMESH_DESCRIPTION
-              : smoothDescription(op.method === 'taubin');
+        : op.op === 'shrinkwrap'
+          ? shrinkwrapDescription(op.mode)
+          : op.op === 'sculpt'
+            ? sculptDescription(op.brush)
+            : op.op === 'decimate'
+              ? DECIMATE_DESCRIPTION
+              : op.op === 'remesh'
+                ? REMESH_DESCRIPTION
+                : smoothDescription(op.method === 'taubin');
   return { mesh, report, ...measured, provenance: provenance(description.algorithm, description.reference) };
 }
 
@@ -380,7 +408,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
   /** Runs one job on the event loop; resolves with its result or a named failure, never rejects. */
   const runJob = async (
     op: NativeOp,
-    triangles: number,
+    [triangles, vertices]: readonly [number, number],
     files: readonly JobFile[],
     signal: AbortSignal,
     report: (event: Readonly<Record<string, unknown>>) => void,
@@ -390,7 +418,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         Object.fromEntries(files.map((file) => [file.name, file.data])),
         async (folder) => {
           const run = await runner.run(['meshops'], folder, timeoutMs, report, signal);
-          return run.ok ? await resultOf(op, runner, folder, run) : failedJob(op, run, timeoutMs, triangles);
+          return run.ok ? await resultOf(op, runner, folder, run, [triangles, vertices]) : failedJob(op, run, timeoutMs, triangles);
         },
         env,
       );
@@ -408,6 +436,11 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       if (op.op === 'analyze' && op.weldTolerance !== 0)
         return failure('MESH_ENGINE_UNSUPPORTED', 'the native analysis welds exact duplicates only');
       const triangles = input.mesh.indices.length / 3;
+      if (op.op === 'shrinkwrap' && op.target.mesh.indices.length / 3 > SHRINKWRAP_TRIANGLE_CAP)
+        return failure(
+          'MESH_ENGINE_CAP_EXCEEDED',
+          `"shrinkwrap" onto ${op.target.mesh.indices.length / 3} triangles exceeds the native engine cap of ${SHRINKWRAP_TRIANGLE_CAP}`,
+        );
       const scope = currentScope();
       const memo = scope?.memo;
       if (op.op === 'decimate' || op.op === 'remesh' || op.op === 'quad_remesh') {
@@ -418,7 +451,8 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       if (scope?.deferring === true) return deferMeshOp(op.op);
       const files: readonly JobFile[] = [
         ...packedMesh(input.mesh, memo),
-        ...(op.op === 'deviation' ? packMesh(op.other.mesh, '_b') : []),
+        ...(op.op === 'deviation' ? packedMesh(op.other.mesh, memo, '_b') : []),
+        ...(op.op === 'shrinkwrap' ? packedMesh(op.target.mesh, memo, '_b') : []),
         jobFile('job.json', JSON.stringify({ op: op.op, params: jobParams(op), ...deviationRequest(op) })),
       ];
       const key = keyOf(files);
@@ -431,7 +465,12 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
           `the native "${op.op}" runs through the host's async command path (resolveDeferred), not inline`,
         );
       // the TypeScript engine takes it only if both meshes of a deviation fit its cap
-      const largest = op.op === 'deviation' ? Math.max(triangles, op.other.mesh.indices.length / 3) : triangles;
+      const largest =
+        op.op === 'deviation'
+          ? Math.max(triangles, op.other.mesh.indices.length / 3)
+          : op.op === 'shrinkwrap'
+            ? Math.max(triangles, op.target.mesh.indices.length / 3)
+            : triangles;
       // a held result answers whatever the budget; with the budget spent, leave what the TypeScript engine can take to it (the composite falls through), so a long plan of small steps still runs
       if (scope?.budgetSpent === true && (tsMeshEngine.capabilities().get(op.op) ?? 0) >= largest)
         return failure(
@@ -439,7 +478,12 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
           `the job budget of this command is spent: "${op.op}" on ${triangles} triangles is left to the TypeScript engine`,
         );
       if (scope.cancelled) return failure('MESH_CANCELLED', `the "${op.op}" job was cancelled`);
-      scope.request({ key, op: op.op, heartbeatMs, start: (signal, report) => runJob(op, triangles, files, signal, report) });
+      scope.request({
+        key,
+        op: op.op,
+        heartbeatMs,
+        start: (signal, report) => runJob(op, [triangles, input.mesh.positions.length / 3], files, signal, report),
+      });
       return deferMeshOp(op.op);
     },
   };

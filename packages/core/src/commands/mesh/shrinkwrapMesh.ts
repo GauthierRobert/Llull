@@ -10,7 +10,7 @@ import { runMeshOp } from './runMeshOp';
 /**
  * @affects rewrites the mesh `id` with moved vertices and the same triangles (or adds one mesh with keepSource); the target is not changed
  * @invariant connectivity is unchanged; a vertex that finds nothing (farther than maxDistance, or no hit along its ray) stays and is counted in data.missed; with offset 0 every moved vertex lies on the target surface (data.residual)
- * @failure unknown id / targetId or non-solid -> MESH_*; targetId equal to id, mode direction without a direction, a direction without length -> MESH_PARAM_INVALID; a target over 200,000 triangles -> MESH_ENGINE_CAP_EXCEEDED
+ * @failure unknown id / targetId or non-solid -> MESH_*; targetId equal to id, mode direction without a direction, a direction without length -> MESH_PARAM_INVALID; a source or target over 200,000 triangles without llull-compute, over 4,000,000 with it -> MESH_ENGINE_CAP_EXCEEDED
  */
 export const shrinkwrapMesh = defineCommand({
   name: 'shrinkwrap_mesh',
@@ -23,7 +23,7 @@ export const shrinkwrapMesh = defineCommand({
     '(nearest: farther from the target; rays: no hit within that distance). Reports data.moved, missed (vertices left in place), maxMove, meanMove ' +
     '(document units) and residual (largest |distance of the result to the target - offset|, 0 on the surface for offset 0) and the symmetric deviation of the result from the ' +
     'source. Reads the full-resolution target and source (never a level of detail). Refusals: MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_ENGINE_CAP_EXCEEDED ' +
-    '(the TypeScript engine handles up to 200000 triangles in each mesh; decimate_mesh first), MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE.',
+    '(the TypeScript engine handles up to 200000 triangles in each mesh, the native llull-compute engine up to 4000000; decimate_mesh first), MESH_ASSET_MISSING / MESH_ASSET_UNAVAILABLE.',
   annotations: { readsMeshTriangles: true },
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) whose vertices move.'),

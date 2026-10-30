@@ -56,6 +56,11 @@ export const sculptDescription = (brush: string): Description => ({
   reference: 'Blender sculpt brush definitions (draw, inflate, grab, smooth, flatten, pinch, crease, layer); TECHNICAL_SPEC 5.7',
 });
 
+export const shrinkwrapDescription = (mode: string): Description => ({
+  algorithm: `shrink-wrap, mode ${mode}: each vertex put on the target surface (closest point, or the first hit along its normal / a fixed direction), offset along the target face normal`,
+  reference: 'Blender Shrinkwrap modifier (nearest surface point, project); closest point by bounding-volume tree (Ericson 5.1.5)',
+});
+
 export const FILL_HOLES_DESCRIPTION: Description = {
   algorithm:
     'Liepa hole filling: O(n^3) dihedral/area triangulation, centroid refinement with Delaunay relaxation, membrane / thin-plate fairing (CG)',

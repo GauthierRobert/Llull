@@ -13,6 +13,7 @@ import type { ExchangeCommandResult } from '@protocol/exchangeTools';
 import type { ExchangeOptions } from './pythonExchange';
 import { isRecord } from '@lib/isRecord';
 import { runNativeTool } from './native/tools';
+import { serverContext } from './fea/context';
 
 const AFFECTED_LINE = /^Affected entity ids: (.+)$/;
 
@@ -51,6 +52,7 @@ function exchangeDepsOf(exchange: ExchangeOptions, host: ExchangeHost): Exchange
     getDoc: host.getDoc,
     applyCommand: host.applyCommand,
     allowCodeExecution: exchange.allowCodeExecution,
+    context: () => serverContext(),
   };
 }
 

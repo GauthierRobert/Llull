@@ -34,6 +34,7 @@ const ops: ReadonlyArray<[string, MeshOp]> = [
       taubin: false,
     },
   ],
+  ['shrinkwrap', { op: 'shrinkwrap', target: { mesh: icosphere(9, 2) }, mode: 'nearest', offset: 0, side: 'keep' }],
 ];
 
 const fakeEngine = (mode: string): NonNullable<ReturnType<typeof createNativeMeshEngine>> =>
@@ -61,9 +62,9 @@ describe('a result the host cannot trust', () => {
   });
 });
 
-describe('a report the host cannot trust (repair, fill_holes and sculpt)', () => {
+describe('a report the host cannot trust (repair, fill_holes, sculpt and shrinkwrap)', () => {
   beforeEach(() => _clearResultCache());
-  const reported = ops.filter(([name]) => name === 'repair' || name === 'fill_holes' || name === 'sculpt');
+  const reported = ops.filter(([name]) => name === 'repair' || name === 'fill_holes' || name === 'sculpt' || name === 'shrinkwrap');
 
   it.each(reported)('%s: an empty report is refused by name', async (_name, op) => {
     const engine = fakeEngine('bad_report');
@@ -95,6 +96,24 @@ describe('a report the host cannot trust (repair, fill_holes and sculpt)', () =>
       expect(await resolveDeferred(() => engine.run({ mesh: sphere }, asked))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
     _clearResultCache();
     expect(isEngineFailure(await resolveDeferred(() => fakeEngine('ok').run({ mesh: sphere }, mirrored)))).toBe(false);
+  });
+
+  it('shrinkwrap: a nearest wrap without a reach that reports a missed vertex is refused, with a reach it is accepted', async () => {
+    const op = ops[5]?.[1] as MeshOp;
+    expect(await resolveDeferred(() => fakeEngine('wrap_missed').run({ mesh: sphere }, op))).toMatchObject({
+      code: 'MESH_ENGINE_UNSUPPORTED',
+    });
+    _clearResultCache();
+    const reached = { ...op, maxDistance: 2 } as MeshOp;
+    expect(isEngineFailure(await resolveDeferred(() => fakeEngine('wrap_missed').run({ mesh: sphere }, reached)))).toBe(false);
+  });
+
+  it('shrinkwrap: a result that has not the triangles of the input is refused (a wrap moves vertices only)', async () => {
+    const op = ops[5]?.[1] as MeshOp;
+    expect(await resolveDeferred(() => fakeEngine('wrap_resized').run({ mesh: sphere }, op))).toMatchObject({
+      code: 'MESH_ENGINE_UNSUPPORTED',
+      message: expect.stringContaining('malformed report'),
+    });
   });
 
   it('sculpt: a stamp index the op does not have is not handed to the command', async () => {

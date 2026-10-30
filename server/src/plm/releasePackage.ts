@@ -13,6 +13,7 @@ import type { ObjectStorePort } from '@core/commands/types';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { SignatureRecord } from '@plm/index';
 import { jcsJson } from '@lib/jcs';
+import { serverContext } from '../fea/context';
 import { isRecord } from '@lib/isRecord';
 
 interface PackageMember {
@@ -92,7 +93,7 @@ export function buildReleasePackage(
     revision.snapshot.kind === 'inline' ? revision.snapshot.canonicalJson : (objects?.get(revision.snapshot.objectSha256) ?? null);
   if (snapshotJson === null)
     return `the snapshot of revision '${label}' is in the vault and no vault object is reachable (set LLULL_VAULT)`;
-  const manifestQuery = execute(doc, 'release_manifest', { revision: label });
+  const manifestQuery = execute(doc, 'release_manifest', { revision: label }, serverContext());
   const body = (manifestQuery.data as { body?: Manifest } | undefined)?.body;
   if (manifestQuery.rejected === true || body === undefined) return manifestQuery.summary;
   const stem = `${safeStem(plm.item.partNumber)}_${label}`;
@@ -111,7 +112,7 @@ export function buildReleasePackage(
   const notes: string[] = [];
   const frozen = frozenDocument(doc, label, snapshotJson);
   for (const [index, sheetId] of (frozen?.drawings?.order ?? []).entries()) {
-    const sheet = frozen === null ? undefined : execute(frozen, 'export_sheet_svg', { sheetId });
+    const sheet = frozen === null ? undefined : execute(frozen, 'export_sheet_svg', { sheetId }, serverContext());
     const svg = (sheet?.data as { svg?: string } | undefined)?.svg;
     if (svg === undefined) {
       notes.push(`sheet ${sheetId} not written: ${sheet?.summary ?? 'definition could not be rebuilt'}`);

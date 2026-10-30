@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeIndexedMesh, isMeshAnalysis, type MeshAnalysis } from '@core/geometry/mesh/analysis';
 import { isEngineFailure, type MeshOp } from '@core/geometry/mesh/engineTypes';
-import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport, isShrinkwrapReport } from '@core/geometry/mesh/reportChecks';
 import { SCULPT_MAX_TRIANGLES, sculptMesh } from '@core/geometry/mesh/sculpt';
 import { REMESH_MAX_TRIANGLES, remeshMesh } from '@core/geometry/mesh/remesh';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
@@ -320,5 +320,49 @@ describe('isPairSearchOf', () => {
     ],
   ])('refuses %s', (_name, analysis, op) => {
     expect(isPairSearchOf(analysis as MeshAnalysis, op)).toBe(false);
+  });
+});
+
+describe('isShrinkwrapReport', () => {
+  const op = { mode: 'nearest', maxDistance: undefined as number | undefined };
+  const good = { moved: 90, missed: 0, maxMove: 2, meanMove: 1.5, residual: 1e-15 };
+  const wrapped = tsMeshEngine.run(
+    { mesh: icosphere(12, 2) },
+    { op: 'shrinkwrap', target: { mesh: icosphere(10, 3) }, mode: 'nearest', offset: 0, side: 'keep' },
+  );
+
+  it('accepts what the TypeScript engine reports, also after a round trip through JSON', () => {
+    if (isEngineFailure(wrapped)) throw new Error('the oracle failed');
+    expect(isShrinkwrapReport(JSON.parse(JSON.stringify(wrapped.report)), op, 162)).toBe(true);
+    expect(isShrinkwrapReport(good, op, 90)).toBe(true);
+  });
+
+  it('refuses a report that cannot be the one of the op asked', () => {
+    const refused: Array<[string, unknown, typeof op]> = [
+      ['not a record', 'moved', op],
+      ['a count that is not whole', { ...good, moved: 1.5 }, op],
+      ['more moved and missed than vertices', { ...good, moved: 80, missed: 20 }, op],
+      ['a non-finite measure', { ...good, residual: Number.NaN }, op],
+      ['a negative measure', { ...good, maxMove: -1 }, op],
+      ['a mean above the maximum', { ...good, meanMove: 3 }, op],
+      ['vertices moved by a move of 0', { ...good, maxMove: 0, meanMove: 0 }, op],
+      ['a move without a vertex moved', { ...good, moved: 0 }, op],
+      ['a vertex missed by a nearest wrap without a reach', { ...good, moved: 80, missed: 10 }, op],
+    ];
+    for (const [label, report, asked] of refused) expect(isShrinkwrapReport(report, asked, 90), label).toBe(false);
+    // with a reach (or by rays) a vertex may be missed
+    expect(isShrinkwrapReport({ ...good, moved: 80, missed: 10 }, { mode: 'nearest', maxDistance: 1 }, 90)).toBe(true);
+    expect(isShrinkwrapReport({ ...good, moved: 80, missed: 10 }, { mode: 'normal', maxDistance: undefined }, 90)).toBe(true);
+  });
+});
+
+describe('the shrinkwrap triangle cap of the TypeScript engine', () => {
+  it('refuses a target over the cap by name', () => {
+    const big = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: new Array<number>(3 * 200_001).fill(0) };
+    const result = tsMeshEngine.run(
+      { mesh: icosphere(10, 1) },
+      { op: 'shrinkwrap', target: { mesh: big }, mode: 'nearest', offset: 0, side: 'keep' },
+    );
+    expect(result).toMatchObject({ code: 'MESH_ENGINE_CAP_EXCEEDED' });
   });
 });
