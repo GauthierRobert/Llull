@@ -42,10 +42,12 @@ function attemptChain(session: SolidSession, face: number, curve: NurbsCurveData
   if (projected === null || projected.some((hit) => hit === null || hit.distance > tolerance))
     return { code: 'WRP_SPLIT_CURVE_NOT_ON_FACE', message: `the curve leaves face ${face} by more than ${tolerance}` };
   const periodic: readonly [boolean, boolean] = [surface.type !== 'plane' && surface.type !== 'other', surface.type === 'torus'];
-  const uvs = continuousUv(
-    projected.map((hit) => (hit === null ? ([0, 0] as Vec2) : hit.uv)),
-    periodic,
-  );
+  const raw = projected.map((hit) => (hit === null ? ([0, 0] as Vec2) : hit.uv));
+  // the azimuth is undefined at a cone apex (a generatrix ends there): take it from the neighbouring sample
+  if (surface.type === 'cone')
+    for (const [k, point] of points.entries())
+      if (distance3(point, surface.apex) < tolerance) raw[k] = [(raw[k === 0 ? 1 : k - 1] as Vec2)[0], (raw[k] as Vec2)[1]];
+  const uvs = continuousUv(raw, periodic);
   // a loop closed in the face parameters ends exactly where it starts; one that winds round a periodic face stays open in (u, v)
   const [start, end] = [uvs[0] as Vec2, uvs[count] as Vec2];
   const loopClosed =

@@ -35,6 +35,20 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
     'Name only axes the font has (import_font returns data.axes with tag, min, default, max), keep each value inside its range, and use a CFF2 variable font: TrueType (gvar) fonts only have their default instance.',
   WRP_FONT_EMBEDDING_RESTRICTED: 'Use a font licensed for embedding (the bundled fonts are SIL OFL).',
   WRP_FONT_TOO_LARGE: 'Subset the font to under 4 MB, or use a bundled one.',
+  WRP_CHAIN_FACE_UNSUPPORTED:
+    'Chain only plane and cylinder faces (they unfold without stretch); cones, spheres and tori have no isometric chart across an edge: wrap each face separately.',
+  WRP_CHAIN_NOT_ADJACENT:
+    'List the faces of the chain so that each shares an edge with the faces before it (inspect_faces / inspect_topology show the adjacency).',
+  WRP_CHAIN_EDGE_CURVED:
+    'Only an edge that develops to a straight line on both faces joins them (a generatrix of a cylinder, a straight edge of a plane); leave out the face across a circular edge, or wrap each face separately.',
+  WRP_CHAIN_EDGE_SHARP:
+    'Raised walls cannot meet along a sharp edge without a mitre: blend or round the edge first (fillet_edge), or emboss each face separately; wrap_to_face and scribe cross sharp edges.',
+  WRP_CHAIN_CLIP_FAILED:
+    'The sketch outline touches a chain edge tangentially or the kernel could not orient it: move the sketch slightly (placement.anchor) or turn it (placement.angleDeg).',
+  WRP_SILHOUETTE_NONE:
+    'Pick a direction under which a cylinder, cone or sphere face shows an outline (a box seen along an axis has none); inspect_faces lists the faces and their surfaces.',
+  WRP_SILHOUETTE_UNSUPPORTED:
+    'Closed-form silhouettes exist for plane, cylinder, cone and sphere faces: split the torus or freeform face with curves of your own (create_curve_on_face, then split_face_by_curves), or cut the solid first (split_body).',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
   WRP_TEXT_TOO_LONG: 'Split the text; outline text is limited to 2000 characters per entity.',
   WRP_PARAM_INVALID: 'Fix the named parameter; see `llull describe <command>`.',

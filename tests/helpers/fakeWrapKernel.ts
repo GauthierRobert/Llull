@@ -5,7 +5,14 @@
  */
 
 import type { GeometryKernel, ShapeFace, ShapeTopology } from '@core/geometry/kernel';
-import type { CurveProjection, CurveProjectionRequest, FaceProjection, SurfaceParams } from '@core/geometry/kernelPorts';
+import type {
+  CurveProjection,
+  CurveProjectionRequest,
+  FaceQueryPort,
+  FaceGraph,
+  FaceProjection,
+  SurfaceParams,
+} from '@core/geometry/kernelPorts';
 import { embossClosedForm } from '@core/geometry/embossVolume';
 import { kernelFromOps } from '@core/geometry/shapeKernel';
 import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
@@ -19,12 +26,22 @@ interface FakeFace {
   /** A point on the face. */
   readonly sample: Vec3;
   readonly contains: (point: Vec3) => boolean;
+  /** Parameter bounds [uLow, vLow], [uHigh, vHigh] (default per surface type). */
+  readonly uvBounds?: readonly [Vec2, Vec2];
+  /** Outward normal of the solid on the face when it differs from the surface normal (a reversed face). */
+  readonly outward?: Vec3;
 }
 
 interface FakeShape {
   readonly id: string;
   readonly volume: number;
   readonly faces: readonly FakeFace[];
+  /** Adjacency of the faces: per edge the faces and its convexity, and the samples of the edges that have a curve. */
+  readonly graph?: {
+    readonly edgeFaces: readonly (readonly number[])[];
+    readonly edgeConvexity: readonly ('convex' | 'concave' | 'smooth' | 'unknown')[];
+    readonly edgePoints: Readonly<Record<number, (t: number) => Vec3>>;
+  };
 }
 
 export interface FakeWrapOptions {
@@ -68,7 +85,16 @@ export interface FakeWrapOptions {
   readonly noDistance?: boolean;
   /** `faceGeometry` reports every face as a freeform surface. */
   readonly freeform?: boolean;
+  /**
+   * `add_box` builds a stadium instead (a box 40 x 20 x 10 at the origin united with two r 10 cylinders, as the native kernel reports it: faces 0 top, 1 cylinder +x, 2 front plane y = -10,
+   * 3 back plane y = 10, 4 cylinder -x, 5 bottom; 4 smooth generatrix edges, the others convex). `'cone-end'` reports the +x end as a cone, `'torus-end'` as a torus, `'unknown-edges'` every edge as unverified.
+   */
+  /** `faceContains` answers true everywhere (the kernel cannot tell which side of an edge a face lies on). */
+  readonly sideBlind?: boolean;
+  readonly stadium?: boolean | 'cone-end' | 'torus-end' | 'unknown-edges';
 }
+
+type EdgeSample = NonNullable<ReturnType<FaceQueryPort['edgeSamples']>>[number];
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
 
@@ -134,6 +160,97 @@ function boxShape(entity: Extract<Entity, { kind: 'box' }>): FakeShape {
       });
     }
   return { id: entity.id, volume: entity.size[0] * entity.size[1] * entity.size[2], faces };
+}
+
+const STADIUM_EDGE_FACES: readonly (readonly number[])[] = [
+  [0, 1],
+  [0, 3],
+  [0, 4],
+  [0, 2],
+  [1, 5],
+  [1, 3],
+  [1, 2],
+  [2, 5],
+  [2, 4],
+  [3, 5],
+  [3, 4],
+  [4, 5],
+];
+const STADIUM_CONVEXITY = [
+  'convex',
+  'convex',
+  'convex',
+  'convex',
+  'convex',
+  'smooth',
+  'smooth',
+  'convex',
+  'smooth',
+  'convex',
+  'smooth',
+  'convex',
+] as const;
+
+function stadiumShape(id: string, variant: boolean | 'cone-end' | 'torus-end' | 'unknown-edges'): FakeShape {
+  const slab = (z: number, outward: Vec3): FakeFace => ({
+    name: `${id}:${z > 0 ? 'top' : 'bottom'}`,
+    surface: { type: 'plane', origin: [-20, -10, z], normal: [0, 0, 1], xDir: [1, 0, 0] },
+    area: 1114.159,
+    sample: [0, 0, z],
+    outward,
+    contains: (p) =>
+      near(p[2], z) && ((Math.abs(p[0]) <= 20 + 1e-6 && Math.abs(p[1]) <= 10 + 1e-6) || Math.hypot(Math.abs(p[0]) - 20, p[1]) <= 10 + 1e-6),
+  });
+  const side = (y: number, outward: Vec3): FakeFace => ({
+    name: `${id}:${y < 0 ? 'front' : 'back'}`,
+    surface: { type: 'plane', origin: [-20, y, -5], normal: [0, 1, 0], xDir: [0, 0, 1] },
+    area: 400,
+    sample: [0, y, 0],
+    outward,
+    uvBounds: [
+      [0, 0],
+      [10, 40],
+    ],
+    contains: (p) => near(p[1], y) && Math.abs(p[0]) <= 20 + 1e-6 && Math.abs(p[2]) <= 5 + 1e-6,
+  });
+  const end = (x: number, from: number, to: number): FakeFace => ({
+    name: `${id}:end${x > 0 ? '+' : '-'}`,
+    surface: { type: 'cylinder', origin: [x, 0, -5], axis: [0, 0, 1], xDir: [1, 0, 0], radius: 10 },
+    area: 314.159,
+    sample: [x + (x > 0 ? 10 : -10), 0, 0],
+    uvBounds: [
+      [from, 0],
+      [to, 10],
+    ],
+    contains: (p) => (x > 0 ? p[0] >= x - 1e-6 : p[0] <= x + 1e-6) && Math.abs(p[2]) <= 5 + 1e-6,
+  });
+  const plusEnd = end(20, 1.5 * Math.PI, 2.5 * Math.PI);
+  const faces: FakeFace[] = [
+    slab(5, [0, 0, 1]),
+    variant === 'cone-end'
+      ? { ...plusEnd, surface: { type: 'cone', apex: [20, 0, 5], axis: [0, 0, -1], xDir: [1, 0, 0], semiAngle: 0.4 } }
+      : variant === 'torus-end'
+        ? { ...plusEnd, surface: { type: 'torus', center: [20, 0, 0], axis: [0, 0, 1], major: 10, minor: 5 } }
+        : plusEnd,
+    side(-10, [0, -1, 0]),
+    side(10, [0, 1, 0]),
+    end(-20, 0.5 * Math.PI, 1.5 * Math.PI),
+    slab(-5, [0, 0, -1]),
+  ];
+  const line =
+    (x: number, y: number): ((t: number) => Vec3) =>
+    (t) => [x, y, -5 + 10 * t];
+  const arc = (t: number): Vec3 => [20 + 10 * Math.cos(-Math.PI / 2 + Math.PI * t), 10 * Math.sin(-Math.PI / 2 + Math.PI * t), 5];
+  return {
+    id,
+    volume: 40 * 20 * 10 + Math.PI * 100 * 10,
+    faces,
+    graph: {
+      edgeFaces: STADIUM_EDGE_FACES,
+      edgeConvexity: variant === 'unknown-edges' ? STADIUM_CONVEXITY.map(() => 'unknown' as const) : STADIUM_CONVEXITY,
+      edgePoints: { 0: arc, 3: (t) => [-20 + 40 * t, -10, 5], 5: line(20, 10), 6: line(20, -10), 8: line(-20, -10), 10: line(-20, 10) },
+    },
+  };
 }
 
 function sphereShape(entity: Extract<Entity, { kind: 'sphere' }>): FakeShape {
@@ -301,7 +418,7 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
         case 'cone':
           return coneShape(entity);
         case 'box':
-          return boxShape(entity);
+          return options.stadium === undefined || options.stadium === false ? boxShape(entity) : stadiumShape(entity.id, options.stadium);
         case 'sphere':
           return sphereShape(entity);
         case 'torus':
@@ -411,17 +528,33 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                   : {}),
               })),
             faceContains: (shape, face, point) => {
+              if (options.sideBlind === true) return true;
               const target = shape.faces[face];
               return (
                 options.containsNothing !== true && target !== undefined && target.contains(point) && options.outside?.(point) !== true
               );
             },
-            faceGraph: () => null,
+            faceGraph: (shape) =>
+              shape.graph === undefined
+                ? null
+                : ({
+                    faces: shape.faces.map((face, index) => ({
+                      index,
+                      surface: face.surface,
+                      reversed: face.outward !== undefined,
+                      area: face.area,
+                      loops: [],
+                      uvBounds: [0, 1, 0, 1],
+                    })),
+                    edgeFaces: shape.graph.edgeFaces,
+                    edgeConvexity: shape.graph.edgeConvexity,
+                  } as FaceGraph),
             faceGeometry: (shape, face) => {
               const target = shape.faces[face];
               if (target === undefined || options.noGeometry === true) return null;
-              const uvBounds: [Vec2, Vec2] =
-                target.surface.type === 'cylinder'
+              const uvBounds: readonly [Vec2, Vec2] =
+                target.uvBounds ??
+                (target.surface.type === 'cylinder'
                   ? [
                       [0, -20],
                       [2 * Math.PI, 20],
@@ -444,7 +577,7 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
                         : [
                             [-30, -30],
                             [30, 30],
-                          ];
+                          ]);
               return {
                 surface: options.freeform === true ? ({ type: 'other', kind: 'bspline' } as SurfaceParams) : target.surface,
                 uvBounds:
@@ -460,7 +593,10 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
               const target = shape.faces[face];
               return target === undefined || options.noProjectOnFace === true
                 ? null
-                : points.map((point) => projectOnSurface(target, point));
+                : points.map((point) => {
+                    const hit = projectOnSurface(target, point);
+                    return target.outward === undefined ? hit : { ...hit, normal: target.outward };
+                  });
             },
             evaluateFace: (shape, face, uv) => {
               const target = shape.faces[face];
@@ -507,7 +643,23 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
             },
             tessellateFace: () => null,
             faceSamples: () => null,
-            edgeSamples: () => null,
+            edgeSamples: (shape, edge, count) => {
+              const at = shape.graph?.edgePoints[edge];
+              if (at === undefined) return null;
+              return Array.from(
+                { length: count },
+                (_, k): EdgeSample => ({
+                  t: k / (count - 1),
+                  s: k / (count - 1),
+                  point: at(k / (count - 1)),
+                  tangent: [0, 0, 1],
+                  curvature: 0,
+                  dCurvatureDs: 0,
+                  torsion: 0,
+                  normal: [1, 0, 0],
+                }),
+              );
+            },
             edgeContinuity: () => null,
             distance: (shape, points) =>
               options.noDistance === true

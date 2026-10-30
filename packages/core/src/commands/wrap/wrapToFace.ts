@@ -11,6 +11,7 @@ import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrap
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { defaultFitTolerance, isRejection, openFace, resolveChart } from './faceSession';
 import { faceRefField, placementField } from './schemas';
+import { runWrapChain } from './wrapChain';
 import { isSketchFailure, sketchOutline, type SketchOutline } from './sketchProfiles';
 import { checkOnFace, checkWrapAround, isMappingFailure, mapOutlineCurves, probePoints, type MappedCurve } from './wrapMapping';
 
@@ -44,6 +45,13 @@ export const wrapToFace = defineCommand({
     face: faceRefField,
     entityIds: z.array(z.string()).min(1).max(MAX_ENTITIES).describe('Ids of the 2D sketch entities (or font texts) to wrap.'),
     placement: placementField.optional(),
+    chain: z
+      .array(faceRefField)
+      .max(15)
+      .optional()
+      .describe(
+        'Multi-face wrap: more faces (plane or cylinder) adjacent to `face`, each sharing an edge with the faces before it. The faces are unfolded into one chart (develop, lengths kept, also across sharp edges), the curves are cut at the shared edges and each run becomes a curve on its own face (data.faces, curves[].face). Edges must develop to straight lines (WRP_CHAIN_EDGE_CURVED otherwise); WRP_CHAIN_FACE_UNSUPPORTED for cone, sphere, torus faces; WRP_CHAIN_NOT_ADJACENT when a face shares no edge.',
+      ),
     maxLengthStrain: z
       .number()
       .positive()
@@ -73,6 +81,8 @@ export const wrapToFace = defineCommand({
       outlines.push(outline);
     }
     const tolerance = params.fitTolerance ?? defaultFitTolerance(session.diagonal);
+    if (params.chain !== undefined && params.chain.length > 0)
+      return runWrapChain({ doc, ctx, params: { ...params, chain: params.chain }, session, resolved, outlines, tolerance });
     const mapped: MappedCurve[] = [];
     for (const outline of outlines) {
       const curves = mapOutlineCurves(session, resolved.chart, outline, tolerance);

@@ -8,6 +8,7 @@ import { embossOnFace } from './embossOnFace';
 import { importFont, listFonts } from './importFont';
 import { patternOnFace } from './patternOnFace';
 import { projectToFace } from './projectToFace';
+import { splitAtSilhouette } from './splitAtSilhouette';
 import { splitFaceByCurves } from './splitFaceByCurves';
 import { textOutlineCommand } from './textOutlineCommand';
 import { unwrapFace } from './unwrapFace';
@@ -25,5 +26,6 @@ export const wrapCommands = commandCatalog(
   createCurveOnFace,
   addKnurl,
   splitFaceByCurves,
+  splitAtSilhouette,
   checkWrap,
 );
