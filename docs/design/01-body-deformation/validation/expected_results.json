@@ -749,6 +749,7 @@
    "toleranceKind": "relative volume change",
    "grade": "A",
    "source": "round trip",
+   "note": "Met at 2e-6, not 1e-6 (TECHNICAL_SPEC 17.13): the exchange keeps the geometry (a second round trip changes the volume by < 1e-9) but not the adaptive mass rule of a deformed shape, so the read solid is integrated by the fixed Gauss rule (+1.3e-6 on the VC-06 taper). Open: 1e-6 once the refined-mass flag travels through STEP. Not covered: the export_code half of FR-DEF-34.",
    "proves": [
     "FR-DEF-34",
     "FR-DEF-07",

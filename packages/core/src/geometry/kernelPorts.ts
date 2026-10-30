@@ -229,6 +229,8 @@ interface AnalyticFaces {
   /** Recognised but the rebuilt face was not a valid face: kept as fitted. */
   readonly rejected: number;
   readonly gap: number;
+  /** First BRepCheck status that made a rebuild invalid (face: 1000 + status); 0 when none did. */
+  readonly rejectedStatus: number;
 }
 
 /** One cross-section of a blend face (BLD M1): the contact points on both sides, the section mid point, and the circle through the three. */
@@ -274,6 +276,8 @@ interface NurbsSurfaceData {
   readonly multsV: readonly number[];
   readonly periodicU: boolean;
   readonly periodicV: boolean;
+  /** `faceQuery.bspline`: the face normal is the opposite of S_u x S_v. */
+  readonly reversed?: boolean;
 }
 
 /**

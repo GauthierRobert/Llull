@@ -17,6 +17,7 @@ struct Recognised {
   int cone = 0;
   int sphere = 0;
   int from_source = 0;  // recognised by the surface of the source face rather than by OCCT
+  double replaced_area = 0;  // area of the faces that were replaced (the bound of the volume they can move)
   double worst_gap = 0;  // largest distance between a replaced face and its fitted surface
   int total() const { return plane + cylinder + cone + sphere; }
 };

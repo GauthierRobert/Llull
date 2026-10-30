@@ -179,6 +179,65 @@ inline Handle(Geom_BSplineSurface) interpolate_grid(const std::vector<gp_Pnt> &n
   return new Geom_BSplineSurface(net, ub.knots, vb.knots, ub.multiplicities, vb.multiplicities, 3, 3);
 }
 
+// A point push is a feature of a known size (its support radius): a grid whose cells are wider than the support can hold it between its samples and never see it
+// (the error checks below only look at node lines, cell middles and quarter points). The base surface is sampled finely enough to meet the support, the parameter box of the
+// samples inside it is found, and both axes are refined until six intervals span that box.
+inline void resolve_support(const Warp &warp, const Handle(Geom_Surface) & base, double u0, double u1, double v0, double v1, Axis &uaxis, Axis &vaxis) {
+  const Law &law = warp.law;
+  if (law.kind != LawKind::Point || !(law.support > 0)) return;
+  const auto distance_to_center = [&](double u, double v) {
+    const gp_Pnt point = base->Value(u, v);
+    double sum = 0;
+    for (int r = 0; r < 3; ++r) {
+      const double *axis = r == 0 ? warp.frame.x : r == 1 ? warp.frame.y : warp.frame.z;
+      const double local = (point.X() - warp.frame.origin[0]) * axis[0] + (point.Y() - warp.frame.origin[1]) * axis[1] + (point.Z() - warp.frame.origin[2]) * axis[2];
+      sum += (local - law.center[r]) * (local - law.center[r]);
+    }
+    return std::sqrt(sum);
+  };
+  // the longest chord of the box along u and along v from a coarse grid: how many samples meet the support
+  double length_u = 0, length_v = 0;
+  for (int i = 0; i <= 8; ++i)
+    for (int j = 0; j <= 8; ++j) {
+      const double u = u0 + (u1 - u0) * i / 8.0, v = v0 + (v1 - v0) * j / 8.0;
+      if (i < 8) length_u = std::max(length_u, 8.0 * base->Value(u, v).Distance(base->Value(u0 + (u1 - u0) * (i + 1) / 8.0, v)));
+      if (j < 8) length_v = std::max(length_v, 8.0 * base->Value(u, v).Distance(base->Value(u, v0 + (v1 - v0) * (j + 1) / 8.0)));
+    }
+  const int nu = std::clamp(static_cast<int>(std::ceil(2.0 * length_u / law.support)) + 1, 9, 257);
+  const int nv = std::clamp(static_cast<int>(std::ceil(2.0 * length_v / law.support)) + 1, 9, 257);
+  double low[2] = {1, 1}, high[2] = {0, 0};
+  for (int i = 0; i < nu; ++i)
+    for (int j = 0; j < nv; ++j) {
+      const double fu = static_cast<double>(i) / (nu - 1), fv = static_cast<double>(j) / (nv - 1);
+      if (distance_to_center(u0 + (u1 - u0) * fu, v0 + (v1 - v0) * fv) > 1.1 * law.support) continue;
+      low[0] = std::min(low[0], fu);
+      high[0] = std::max(high[0], fu);
+      low[1] = std::min(low[1], fv);
+      high[1] = std::max(high[1], fv);
+    }
+  Axis *axes[2] = {&uaxis, &vaxis};
+  const double lengths[2] = {length_u, length_v};
+  for (int a = 0; a < 2; ++a) {
+    if (!(high[a] >= low[a])) continue;
+    // at least one sample step wide: the support sits between two samples
+    const double extent = std::max(high[a] - low[a], 2.0 * law.support / std::max(lengths[a], 1e-12));
+    const double target = extent / 6.0;
+    while (axes[a]->den <= kMaxSegmentsPerDirection / 2) {
+      std::vector<char> split(static_cast<size_t>(axes[a]->intervals()), 0);
+      bool any = false;
+      for (int i = 0; i < axes[a]->intervals(); ++i) {
+        const double first = axes[a]->node(i), last = axes[a]->node(i + 1);
+        if (last >= low[a] - extent && first <= high[a] + extent && last - first > target) {
+          split[static_cast<size_t>(i)] = 1;
+          any = true;
+        }
+      }
+      if (!any) break;
+      axes[a]->refine(split);
+    }
+  }
+}
+
 // The surface through F(S) at the nodes of the tensor grid of the box, and its worst deviation at the middles / quarter points of the cells; the deviation of
 // each interval decides which intervals to halve.
 inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & base, double u0, double u1, double v0, double v1,
@@ -186,6 +245,7 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
   SurfaceFit best;
   const double tolerance = allowed * kOverFit;
   Axis uaxis, vaxis;
+  resolve_support(warp, base, u0, u1, v0, v1, uaxis, vaxis);
   while (true) {
     const int nu = uaxis.intervals(), nv = vaxis.intervals();
     std::vector<gp_Pnt> nodes;

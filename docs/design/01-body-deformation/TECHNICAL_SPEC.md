@@ -521,7 +521,7 @@ lowers an affine `deform` node to the sidecar op `gtransform` (`BRepBuilderAPI_G
   (4.4e-4 relative volume, 0.4 % area on a GTransform-ed sphere r 10 → [1,1,2]; the surface is exact to 1e-15). New findings: `DEF_CHECK_NOT_CLOSED`.
   New refusal codes: `DEF_TOLERANCE_INVALID`, `DEF_SOURCE_UNAVAILABLE`.
 - Not in M1 (left for later milestones): `keepSource`, `ids` (multi-body), `infinite` regions, `beyond: fixed` in the commands (the law library supports it),
-  `analyze_deformation` `stepIndex` / `compareTo`, `topology` before/after, `allowMeshFallback`, `preserveAnalytic` (refused), curves and sheets (M3), the OCCT warp
+  `analyze_deformation` `stepIndex` / `compareTo`, `topology` before/after, `allowMeshFallback`, `preserveAnalytic` (refused then; built in §17.11), curves and sheets (M3), the OCCT warp
   (M2: `mode: "exact"` on a non-affine law refuses with `DEF_EXACT_UNAVAILABLE`; `auto` takes the mesh path and the summary says so), `compareTo`.
 - Defaults: origin = bounding-box centre, so explicit `region` numbers are measured from the centre (the bend uses the start-face centre). The VC-DEF-10 `cli.run`
   without a frame therefore needs `frame.origin` for the numbers 20..60 to mean body coordinates.
@@ -594,7 +594,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays;
+**Left.** UI overlays (`preserveAnalytic` is done, §17.11);
 `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
@@ -981,3 +981,21 @@ same: the difference is the MASS RULE. A shape built by a deformation carries `r
 geometry, and the STEP file does not carry it (the read solid is a fresh shape), so it is integrated by the fixed Gauss rule of its B-spline faces (+1.1e-6 from the closed form, the known
 error of that rule on a fitted face, §14). Carrying the flag through the exchange (a marker in the STEP product, read into the blob) is the missing piece; deriving it from the faces (adaptive on every imported B-spline
 face) would move the NIST corpus numbers (§17.9), so it is not done here. The test asserts the 2e-6 that the rule gap allows and the lossless second round trip.
+
+### 17.14 Review round on §17.11-§17.13
+
+- **The recognition check is one check for every candidate.** `deviation_from` (`deform_recognise.cxx`) measures how far the fitted B-spline lies from the candidate surface, whether it came from OCCT (whose `GetGap` is no longer
+  trusted) or from the source face: a plane by its poles (a non-rational B-spline lies in the convex hull of its poles, so the bound is rigorous and a local bump between two nodes moves a pole), every other surface at
+  the sample parameters of EVERY knot span (a quarter, a half, three quarters, the knots, the Greville points) against the analytic distance. The fixed 13 x 13 grid of the first version ignored the knots.
+- **A local push was lost before recognition even ran.** The negative test (a 40 x 40 slab, a push of radius 1.5 and height 0.05 centred between fit nodes) showed that the fit itself missed the bump: its error checks look at
+  node lines, cell middles and quarter points, so a feature smaller than a cell can sit between them. `resolve_support` (`deform_fit.hxx`) now reads the support radius of a point push, samples the base surface finely enough to
+  meet it, finds the parameter box of the samples inside it, and refines both axes until six intervals span that box. This changes the warp of every point push whose support is small against its face (the fit is finer
+  there, correctly); the 45 deform / query cargo tests and the 39 native server tests keep their numbers.
+- **Guard.** The volume of the rebuilt solid may differ by at most a quarter tolerance times the area of the REPLACED faces (+ 1e-9 of the volume), not half a tolerance times the whole area; the check runs after the
+  fold / positive-volume refusals; validity is computed once and the refusal says the volume change and the allowed bound.
+- **The rebuild does not touch the neighbours before it is accepted.** It is tried on a copy of the face (`BRepBuilderAPI_Copy`: copied edges), and the shared edges only get the new curves on surface when the copy stood.
+- **Tests.** `preserve_analytic_does_not_erase_a_small_local_push_between_the_nodes` (red-proof 1: a `deviation_from` that answers 0 gives six planes and fails; red-proof 2: without `resolve_support` the top face is flat and fails),
+  `tests/unit/deform/preserveAnalytic.test.ts` (an exact kernel without `deform-analytic` -> `DEF_EXACT_UNAVAILABLE` at `params.output.preserveAnalytic`; an exact warp refused in `auto` -> the fallback refusal; a scripted `analyticFaces`
+  report in the data), `nativeKernelFaceBspline.test.ts` (every sample of the whole parameter box on the untrimmed analytic surface, at least one sample on each face, `reversed` against `evaluateFace` on the six faces of a box).
+  Not tested: that a rejected rebuild leaves the neighbours' edge tolerances unchanged (no geometry in the catalogue provokes a rejection).
+- **VC-DEF-22 stated as it is:** met at 2e-6 (§17.13); 1e-6 is open until the refined-mass flag travels through STEP; the `export_code` half of FR-DEF-34 is not covered. `validation/README.md` and `expected_results.json` say so.

@@ -77,7 +77,7 @@ export const outputParam = z
     preserveAnalytic: z
       .boolean()
       .describe(
-        'true: after the exact warp, faces that are still a plane, cylinder, cone or sphere within the tolerance (a taper of a cylinder is a cone, a twist about its axis leaves it a cylinder) are stored as analytic faces again, and the data reports how many of each. Needs the exact path (native kernel): mesh mode or a mesh kernel is refused DEF_EXACT_UNAVAILABLE. Default false.',
+        'true: after the exact warp, faces that are still a plane, cylinder, cone or sphere within the tolerance (a taper of a cylinder is a cone, a twist about its axis leaves it a cylinder) are stored as analytic faces again, and the data reports how many of each. Needs the exact path (native kernel): mesh mode, a mesh kernel or a linear scale (scale_nonuniform) is refused DEF_EXACT_UNAVAILABLE. Default false.',
       )
       .optional(),
   })

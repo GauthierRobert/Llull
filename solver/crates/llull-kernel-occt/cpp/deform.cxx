@@ -139,13 +139,6 @@ std::unique_ptr<Shape> refuse(Stats &stats, const char *code, const std::string 
   return nullptr;
 }
 
-// Area of the faces of `shape` (default Gauss rule): bounds the volume a deviation of at most the tolerance can move.
-double surface_area(const TopoDS_Shape &shape) {
-  GProp_GProps properties;
-  BRepGProp::SurfaceProperties(shape, properties);
-  return properties.Mass();
-}
-
 class WarpModification : public BRepTools_Modification {
   DEFINE_STANDARD_RTTI_INLINE(WarpModification, BRepTools_Modification)
  public:
@@ -344,6 +337,11 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
   }
   stats.volume = volume;
   stats.preserve = preserve;
+  if (!(stats.min_determinant > kJacobianFloor))
+    return refuse(stats, "DEF_FOLDOVER", "the map folds the body: det J reaches " + std::to_string(stats.min_determinant) + " on its surface");
+  if (!(volume > 0)) return refuse(stats, "DEF_FOLDOVER", "the deformed shape has no positive volume (the map folds the body)");
+
+  // preserveAnalytic after the folds are refused: the faces that stayed analytic are rebuilt on their surface (deform_recognise.cxx)
   TopTools_DataMapOfShapeShape replaced;
   if (preserve) {
     TopTools_DataMapOfShapeShape origin;
@@ -356,17 +354,19 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
     const TopoDS_Shape analytic = deform::recognise_analytic(result, 0.25 * tolerance, origin, stats.recognised, replaced);
     if (stats.recognised.total() > 0) {
       BRepLib::SameParameter(analytic, tolerance, Standard_True);
+      const bool valid = BRepCheck_Analyzer(analytic, Standard_True).IsValid();
       const double rebuilt_volume = signed_volume(analytic);
-      if (!BRepCheck_Analyzer(analytic, Standard_True).IsValid() || !(std::abs(rebuilt_volume - volume) <= 0.5 * tolerance * surface_area(result) + 1e-9 * volume))
+      // each replaced face lies within a quarter of the tolerance of the fitted one: the volume can move by that much times their area
+      const double allowed = 0.25 * tolerance * stats.recognised.replaced_area + 1e-9 * volume;
+      if (!valid || !(std::abs(rebuilt_volume - volume) <= allowed))
         return refuse(stats, "DEF_KERNEL_REFUSED",
-                      "preserveAnalytic: valid=" + std::to_string(BRepCheck_Analyzer(analytic, Standard_True).IsValid()) + " v=" + std::to_string(rebuilt_volume) + " rebuilding " + std::to_string(stats.recognised.total()) + " recognised face(s) on their analytic surface gave an invalid B-rep or a volume change above the tolerance times the area");
+                      std::string("preserveAnalytic: rebuilding ") + std::to_string(stats.recognised.total()) + " recognised face(s) on their analytic surface " +
+                          (valid ? "changed the volume by " + std::to_string(rebuilt_volume - volume) + " against the allowed " + std::to_string(allowed)
+                                 : std::string("gave an invalid B-rep")));
       result = analytic;
       stats.volume = volume = rebuilt_volume;
     }
   }
-  if (!(stats.min_determinant > kJacobianFloor))
-    return refuse(stats, "DEF_FOLDOVER", "the map folds the body: det J reaches " + std::to_string(stats.min_determinant) + " on its surface");
-  if (!(volume > 0)) return refuse(stats, "DEF_FOLDOVER", "the deformed shape has no positive volume (the map folds the body)");
 
   // Names: images of the (split) source faces; the sewn ring has no history, so it keeps one name per face from the source order.
   Handle(BRepTools_History) history = new BRepTools_History();

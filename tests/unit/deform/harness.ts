@@ -11,12 +11,20 @@ import type { CommandResult } from '@core/commands/types';
 import type { DeformLawKind } from '@core/model/deform';
 import type { DeformReport } from '@core/geometry/kernelPorts';
 
-export type KernelKind = 'none' | 'manifold' | 'exact' | 'warp';
+export type KernelKind = 'none' | 'manifold' | 'exact' | 'warp' | 'analytic';
 
 /** The kernel installed for a test: none, the real Manifold kernel, or a stub exact kernel that builds affine deform nodes only. */
 export async function installKernel(kind: KernelKind): Promise<GeometryKernel | null> {
   const kernel =
-    kind === 'none' ? null : kind === 'manifold' ? await createManifoldKernel() : kind === 'warp' ? stubWarpKernel() : stubExactKernel();
+    kind === 'none'
+      ? null
+      : kind === 'manifold'
+        ? await createManifoldKernel()
+        : kind === 'warp'
+          ? stubWarpKernel()
+          : kind === 'analytic'
+            ? stubWarpKernel(['deform-analytic'])
+            : stubExactKernel();
   setGeometryKernel(kernel);
   return kernel;
 }
@@ -25,8 +33,12 @@ export async function installKernel(kind: KernelKind): Promise<GeometryKernel | 
 export const stubReport: { current: DeformReport | null; refuse: boolean } = { current: null, refuse: false };
 
 /** Exact-kernel stand-in with the native warp: every law builds (through the core mesh warp), faces and edges are reported, `deformReport` is scripted. */
-function stubWarpKernel(): GeometryKernel {
-  const base = stubExactKernel(new Set(['affine', 'twist', 'taper', 'stretch', 'bend', 'lattice', 'point', 'flowCurve']), true);
+function stubWarpKernel(capabilities: readonly string[] = []): GeometryKernel {
+  const base = stubExactKernel(
+    new Set(['affine', 'twist', 'taper', 'stretch', 'bend', 'lattice', 'point', 'flowCurve']),
+    true,
+    capabilities,
+  );
   return { ...base, deformReport: () => stubReport.current };
 }
 
@@ -35,13 +47,18 @@ interface StubShape {
 }
 
 /** Exact-kernel stand-in: B-rep topology present, `deform` builds the affine law only (like the native kernel in M1), volumes exact for the stored triangles. */
-function stubExactKernel(laws: ReadonlySet<DeformLawKind> = new Set(['affine']), warpAll = false): GeometryKernel {
+function stubExactKernel(
+  laws: ReadonlySet<DeformLawKind> = new Set(['affine']),
+  warpAll = false,
+  capabilities: readonly string[] = [],
+): GeometryKernel {
   const meshOf = (entityTriangles: number[]): MeshData => ({
     positions: entityTriangles,
     indices: Array.from({ length: entityTriangles.length / 3 }, (_, i) => i),
   });
   return kernelFromOps<StubShape>({
     name: 'occt',
+    info: () => ({ capabilities }),
     deformLaws: laws,
     solid: (entity) => ({ mesh: meshOf(entityToTriangles(entity, createEmptyDocument()).flatMap((triangle) => triangle.flat())) }),
     boolean: () => null,

@@ -475,3 +475,23 @@ fn preserve_analytic_keeps_a_twisted_cylinder_a_cylinder_and_leaves_the_twisted_
     ));
     assert!(relative(report["volume"].as_f64().unwrap(), plain.volume) < 1e-6);
 }
+
+#[test]
+fn preserve_analytic_does_not_erase_a_small_local_push_between_the_nodes() {
+    // review of 17.11: a push of radius 1.5 and height 0.05 on a 40 mm face, centred between fit nodes, is not the source plane: the top face stays free-form (the five others are planes)
+    let slab = entity("box", json!({ "size": [40, 40, 10], "position": [0, 0, 5] }));
+    let push = json!({ "kind": "point", "center": [7.3, 3.1, 10], "direction": [0, 0, 1], "distance": 0.05, "radius": 1.5, "falloff": "smooth_c2" });
+    let mut pushed = node(&slab, push, None, 1e-4, [0.0; 3]);
+    pushed["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&pushed);
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "plane").count(), 5, "{kinds:?} {report}");
+    assert_eq!(kinds.iter().filter(|k| **k == "other").count(), 1, "the pushed face stays a B-spline: {kinds:?}");
+    // the volume still carries the bump: the same body without the flag has the same exact volume (the top face was not flattened to the plane: that would lose the bump's volume)
+    let mut evaluator = Evaluator::new(16);
+    let with_flag = mass_properties(&evaluator.evaluate(&pushed).unwrap().unwrap()).unwrap().volume;
+    pushed["output"]["preserveAnalytic"] = json!(false);
+    let without = mass_properties(&evaluator.evaluate(&pushed).unwrap().unwrap()).unwrap().volume;
+    assert!((with_flag - without).abs() < 1e-6, "{with_flag} vs {without}");
+    assert!(without - 16000.0 > 0.05, "the bump adds volume: {without}");
+}
