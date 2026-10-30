@@ -141,7 +141,7 @@ describeNativeWhen({ capabilities: ['emboss', 'deform'], label: 'WRP freeform' }
       }
     });
 
-    it('a lattice-warped plate is genuinely freeform: the saddle strain is measured and the relief volume is near area x depth (5 percent: vertical walls)', () => {
+    it('a lattice-warped plate is genuinely freeform: the saddle strain is measured and the relief volume is area x depth (1e-3)', () => {
       const plate = must(base(), 'add_box', { size: [60, 60, 10] });
       const moves = [
         [1, 1, 10],
@@ -176,8 +176,24 @@ describeNativeWhen({ capabilities: ['emboss', 'deform'], label: 'WRP freeform' }
         placement: { method: 'geodesic', anchor: { chart: [0, 0], on: [0, 0, 5] } },
       });
       const data = done.data as Row;
-      expect(relative(data['volumeDelta'] as number, (data['regionArea'] as number) * 0.4)).toBeLessThan(0.06);
+      expect(relative(data['volumeDelta'] as number, (data['regionArea'] as number) * 0.4)).toBeLessThan(1e-3);
       expect(data['faceKind']).toBe('other');
+    });
+
+    it('a deboss deeper than the plate (6 along the normal) refuses with the depth it reaches, a shallower one cuts', () => {
+      const plate = bent();
+      const disk = circle(plate.doc, 3);
+      const params = {
+        id: plate.id,
+        face: { faceNear: at45(50) },
+        profileIds: [disk.id],
+        mode: 'deboss',
+        placement: { method: 'geodesic', anchor: { chart: [0, 0], on: at45(50) } },
+      };
+      const through = refused(disk.doc, 'emboss_on_face', { ...params, depth: 7 });
+      expect(codeOf(through)).toBe('WRP_DEPTH_EXCEEDS_SOLID');
+      expect(Math.abs(((through.data as Row)['maxDepth'] as number) - 6)).toBeLessThan(1e-3);
+      must(disk.doc, 'emboss_on_face', { ...params, depth: 2 });
     });
 
     it('refusals by name: a circle beyond the face edge, develop and scribe on a freeform face', () => {

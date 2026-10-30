@@ -213,3 +213,22 @@ describe('buildFreeformChart: named refusals', () => {
     });
   });
 });
+
+describe('buildFreeformChart: steps follow the curvature', () => {
+  it('a thin tube (radius 1, length 100: the face diagonal alone would give steps of 1) keeps the geodesic chart exact to 1e-7', () => {
+    const patch = cylinderPatch(1, -Math.PI / 4, Math.PI / 4, 100);
+    const surface = surfaceOfPort(patch);
+    const anchor = evaluateSurface(surface, 0.5, 0.5);
+    const chart = chartOf(buildFreeformChart(patch, [0.5, 0.5], placementAt(anchor), 'geodesic'));
+    const analytic = buildChart(
+      { type: 'cylinder', origin: [0, 0, 0], axis: [0, 0, 1], xDir: [1, 0, 0], radius: 1 },
+      placementAt(anchor),
+      'geodesic',
+    );
+    if ('error' in analytic) throw new Error(analytic.error);
+    const point: Vec2 = [0.6, 0.3];
+    const [a, b] = [chart.uvAt(point), analytic.uvAt(point)];
+    expect(a).not.toBeNull();
+    expect(distance(chart.pointAt(a as Vec2), analytic.pointAt(b as Vec2))).toBeLessThan(1e-7);
+  });
+});

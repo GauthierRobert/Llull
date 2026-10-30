@@ -14,6 +14,8 @@ import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
 import { fittedOutline, type Outline } from './footprintOutline';
 import { eulerFromAxes } from '../../lib/eulerRotation';
 import { cross3, dot3, normalize3, scale3 } from '../../lib/vec3';
+import type { ShapeHandle } from '../../geometry/kernel';
+import type { FaceQueryPort } from '../../geometry/kernelPorts';
 import { newEntity } from '../entity/newEntity';
 
 export interface FreeformFailure {
@@ -29,6 +31,47 @@ export interface FreeformBuild {
   readonly footprintSegments: number;
   /** Largest deviation of the fitted footprint outlines from the exact image of the regions, document units. */
   readonly footprintDeviation: number;
+}
+
+const DEPTH_BISECTIONS = 30;
+
+/**
+ * Whether a deboss of `depth` along the inward normal passes through the material at any of `points` (surface points of the footprint): the depth at which the thinnest probed place
+ * leaves the solid (signed distance of the point at that depth from the solid), or null when every probe stays inside.
+ */
+export function freeformDepthLimit(input: {
+  readonly query: FaceQueryPort;
+  readonly shape: ShapeHandle;
+  readonly chart: FaceChart;
+  readonly orientation: 1 | -1;
+  readonly points: readonly Vec3[];
+  readonly depth: number;
+}): number | null {
+  const { query, shape, chart, depth } = input;
+  const inward = input.points.map((point) => scale3(chart.normalAt(chart.uvOfPoint(point)), -input.orientation));
+  const at = (t: number): Vec3[] =>
+    input.points.map((point, k) => [0, 1, 2].map((c) => (point[c] as number) + t * ((inward[k] as Vec3)[c] as number)) as unknown as Vec3);
+  const outside = (t: number): boolean[] | null => query.distance(shape, at(t))?.map((hit) => !(hit.signed < 0)) ?? null;
+  const deep = outside(depth);
+  if (deep === null || !deep.some(Boolean)) return null;
+  let best = depth;
+  const offenders = deep.flatMap((flag, k) => (flag ? [k] : []));
+  for (const k of offenders) {
+    let [low, high] = [0, depth];
+    for (let step = 0; step < DEPTH_BISECTIONS; step++) {
+      const mid = (low + high) / 2;
+      const point = [
+        (input.points[k] as Vec3)[0] + mid * (inward[k] as Vec3)[0],
+        (input.points[k] as Vec3)[1] + mid * (inward[k] as Vec3)[1],
+        (input.points[k] as Vec3)[2] + mid * (inward[k] as Vec3)[2],
+      ] as Vec3;
+      const hit = query.distance(shape, [point])?.[0];
+      if (hit !== undefined && hit.signed < 0) low = mid;
+      else high = mid;
+    }
+    best = Math.min(best, low);
+  }
+  return best;
 }
 
 export const isFreeformFailure = (value: FreeformBuild | FreeformFailure): value is FreeformFailure => 'code' in value;
@@ -67,7 +110,15 @@ export function buildFreeformRecipe(input: {
   const { chart, mode, depth } = input;
   const e0 = normalize3(input.outward);
   const sampled = input.pieces.map((pieces) => coarseLoop(chart, pieces));
-  const cosines = sampled.flatMap((loop) => loop.uvs.map((uv) => dot3(scale3(chart.normalAt(uv), input.orientation), e0)));
+  // the box of the regions in (u, v): the surface can fold over the pull inside a loop whose boundary looks harmless
+  const boxUvs = sampled.flatMap((loop) => loop.uvs);
+  const [uLow, uHigh] = [Math.min(...boxUvs.map((p) => p[0])), Math.max(...boxUvs.map((p) => p[0]))];
+  const [vLow, vHigh] = [Math.min(...boxUvs.map((p) => p[1])), Math.max(...boxUvs.map((p) => p[1]))];
+  const boxGrid = Array.from(
+    { length: 121 },
+    (_, k): Vec2 => [uLow + ((uHigh - uLow) * (k % 11)) / 10, vLow + ((vHigh - vLow) * Math.floor(k / 11)) / 10],
+  );
+  const cosines = [...boxUvs, ...boxGrid].map((uv) => dot3(scale3(chart.normalAt(uv), input.orientation), e0));
   const cosMin = Math.min(...cosines.map(Math.abs));
   if (cosines.some((c) => c >= MIN_COSINE) && cosines.some((c) => c <= -MIN_COSINE))
     return {
@@ -84,13 +135,7 @@ export function buildFreeformRecipe(input: {
   const e1 = normalize3(cross3(e0, helper));
   const e2 = cross3(e0, e1);
   // heights of the surface over the whole parameter box of the regions (a dome rises between the points of its outline)
-  const uvs = sampled.flatMap((loop) => loop.uvs);
-  const [uLow, uHigh] = [Math.min(...uvs.map((p) => p[0])), Math.max(...uvs.map((p) => p[0]))];
-  const [vLow, vHigh] = [Math.min(...uvs.map((p) => p[1])), Math.max(...uvs.map((p) => p[1]))];
-  const box = Array.from(
-    { length: 121 },
-    (_, k): Vec3 => chart.pointAt([uLow + ((uHigh - uLow) * (k % 11)) / 10, vLow + ((vHigh - vLow) * Math.floor(k / 11)) / 10]),
-  );
+  const box = boxGrid.map((uv): Vec3 => chart.pointAt(uv));
   const heights = [...sampled.flatMap((loop) => loop.points), ...box].map((p) => dot3(p, e0));
   const margin = 1e-6 * input.diagonal;
   const extent = depth / cosMin;

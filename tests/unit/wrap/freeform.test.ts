@@ -10,9 +10,9 @@ import { buildFreeformChart, surfaceOfPort } from '@core/geometry/freeformChart'
 import { buildFreeformRecipe, isFreeformFailure } from '@core/commands/wrap/embossFreeform';
 import { newEntity } from '@core/commands/entity/newEntity';
 import { evaluateSurface } from '@core/lib/nurbs/surface';
-import type { CadDocument, NurbsCurveEntity, Vec2, Vec3 } from '@core/model/types';
+import type { CadDocument, MeshSolidEntity, NurbsCurveEntity, Vec2, Vec3 } from '@core/model/types';
 import { fakeFreeformKernel, type FakeFreeformOptions } from '../../helpers/fakeFreeformKernel';
-import { cylinderPatch, spherePatch, type PortSurface } from '../../helpers/freeformSurfaces';
+import { cylinderPatch, saddlePatch, spherePatch, type PortSurface } from '../../helpers/freeformSurfaces';
 import { emptyDoc, make } from './support';
 
 type Row = Record<string, unknown>;
@@ -97,6 +97,7 @@ describe('emboss_on_face on a freeform face', () => {
       expect(sign * (data['volumeDelta'] as number)).toBeGreaterThan(0);
       const freeform = data['freeform'] as Row;
       expect(freeform['walls']).toBe('pull');
+      expect(data['walls']).toBe('pull');
       const pull = freeform['pullDirection'] as Vec3;
       expect(pull[0]).toBeCloseTo(1, 9);
       expect(freeform['footprintDeviation'] as number).toBeLessThan(1e-3);
@@ -294,5 +295,158 @@ describe('the exponential map of a freeform face: named refusals', () => {
       tolerance: 1e-9,
     });
     expect(isFreeformFailure(built) ? built.code : 'built').toBe('WRP_PARAM_INVALID');
+  });
+});
+
+describe('freeform faces: the side of the sketch, the prism window, several regions and the other modes', () => {
+  const upright = (doc: CadDocument, id: string, patch: PortSurface): { end: Vec3 } => {
+    const line = make(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [0, 4],
+      ],
+    });
+    const on = centre(patch);
+    const done = execute(line.doc, 'wrap_to_face', {
+      id,
+      face: { faceNear: on },
+      entityIds: [line.id],
+      placement: placement('geodesic', on),
+    });
+    expect(done.rejected, done.summary).toBeUndefined();
+    const curve = done.document.entities[done.affected[0] as string] as NurbsCurveEntity;
+    const poles = curve.curve.poles;
+    return { end: poles[poles.length - 1] as Vec3 };
+  };
+
+  it('the sketch is seen from OUTSIDE the solid: north = outward x east, so a face whose solid lies on the Su x Sv side lands the sketch mirrored in z (reversed faces)', () => {
+    const upwards = scene(cylinderFace);
+    const normal = upright(upwards.doc, upwards.id, cylinderFace);
+    expect(normal.end[2]).toBeCloseTo(24, 6);
+    const bore = scene(cylinderFace, { reversed: true });
+    const mirrored = upright(bore.doc, bore.id, cylinderFace);
+    expect(mirrored.end[2]).toBeCloseTo(16, 6);
+  });
+
+  it('the prism window holds the relief: along the pull it spans the heights of the region (R cos(a / R) .. R) plus the depth, without reaching far beyond', () => {
+    const { doc, id } = scene(cylinderFace);
+    const disk = circle(doc, 5);
+    const done = execute(disk.doc, 'emboss_on_face', {
+      id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [disk.id],
+      mode: 'emboss',
+      depth: 0.5,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(done.rejected, done.summary).toBeUndefined();
+    const prisms: Array<{ low: number; high: number }> = [];
+    const walk = (node: unknown): void => {
+      if (typeof node !== 'object' || node === null) return;
+      const record = node as Record<string, unknown>;
+      const entity = (record['source'] as { entity?: { kind?: string; depth?: number } } | undefined)?.entity;
+      if (record['op'] === 'place' && entity?.kind === 'extrusion') {
+        const low = (record['position'] as Vec3)[0];
+        prisms.push({ low, high: low + (entity.depth as number) });
+      }
+      Object.values(record).forEach(walk);
+    };
+    walk((done.document.entities[done.affected[0] as string] as MeshSolidEntity).brep);
+    expect(prisms).toHaveLength(1);
+    const [prism] = prisms as [{ low: number; high: number }];
+    expect(prism.low).toBeLessThanOrEqual(20 * Math.cos(5 / 20));
+    expect(prism.high).toBeGreaterThanOrEqual(20.5);
+    expect(prism.low).toBeGreaterThan(17);
+    expect(prism.high).toBeLessThan(23.5);
+  });
+
+  it('two separate regions are united (one prism each), a clockwise outline is reversed to counter-clockwise, and a patch facing +z (other helper axis) works', () => {
+    const { doc, id } = scene(cylinderFace);
+    const left = make(doc, 'draw_arc', { center: [-8, 0], radius: 3 });
+    const right = make(left.doc, 'draw_arc', { center: [8, 0], radius: 3 });
+    const two = execute(right.doc, 'emboss_on_face', {
+      id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [left.id, right.id],
+      mode: 'emboss',
+      depth: 0.5,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(two.rejected, two.summary).toBeUndefined();
+    expect((two.data as Row)['regions']).toBe(2);
+    const clockwise = make(doc, 'draw_polyline', {
+      points: [
+        [-3, -3],
+        [-3, 3],
+        [3, 3],
+        [3, -3],
+      ],
+      closed: true,
+    });
+    const cw = execute(clockwise.doc, 'emboss_on_face', {
+      id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [clockwise.id],
+      mode: 'emboss',
+      depth: 0.5,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(cw.rejected, cw.summary).toBeUndefined();
+    const flat = saddlePatch(0.01, 20);
+    const top = scene(flat);
+    const disk = circle(top.doc, 4);
+    const onTop = execute(disk.doc, 'emboss_on_face', {
+      id: top.id,
+      face: { faceNear: centre(flat) },
+      profileIds: [disk.id],
+      mode: 'emboss',
+      depth: 0.5,
+      placement: placement('geodesic', centre(flat)),
+    });
+    expect(onTop.rejected, onTop.summary).toBeUndefined();
+    expect(((onTop.data as Row)['freeform'] as Row)['pullDirection']).toEqual([0, 0, 1]);
+  });
+
+  it('engrave cuts a groove along an open line on a freeform face, and a deboss deeper than the material refuses with the depth it reaches (WRP_DEPTH_EXCEEDS_SOLID)', () => {
+    const { doc, id } = scene(cylinderFace);
+    const line = make(doc, 'draw_polyline', {
+      points: [
+        [-6, 0],
+        [6, 0],
+      ],
+    });
+    const engraved = execute(line.doc, 'emboss_on_face', {
+      id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [line.id],
+      mode: 'engrave',
+      toolWidth: 1,
+      depth: 0.3,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(engraved.rejected, engraved.summary).toBeUndefined();
+    expect((engraved.data as Row)['mode']).toBe('engrave');
+    const thin = scene(cylinderFace, { thickness: 0.3 });
+    const disk = circle(thin.doc, 4);
+    const through = execute(disk.doc, 'emboss_on_face', {
+      id: thin.id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [disk.id],
+      mode: 'deboss',
+      depth: 0.5,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(codeOf(through)).toBe('WRP_DEPTH_EXCEEDS_SOLID');
+    expect(((through.data as Row)['maxDepth'] as number) / 0.3).toBeCloseTo(1, 5);
+    expect(through.document).toBe(disk.doc);
+    const shallow = execute(disk.doc, 'emboss_on_face', {
+      id: thin.id,
+      face: { faceNear: centre(cylinderFace) },
+      profileIds: [disk.id],
+      mode: 'deboss',
+      depth: 0.2,
+      placement: placement('geodesic', centre(cylinderFace)),
+    });
+    expect(shallow.rejected, shallow.summary).toBeUndefined();
   });
 });

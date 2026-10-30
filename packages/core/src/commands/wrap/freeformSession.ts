@@ -42,7 +42,7 @@ export function freeformChartOf(
       'WRP_METHOD_UNAVAILABLE',
       `face ${session.face} is a freeform surface and the kernel gives no B-spline for it, so no chart can be built`,
     );
-  const built = buildFreeformChart(data, hit.uv, placement, method);
+  const built = buildFreeformChart(data, hit.uv, placement, method, hit.normal);
   if ('error' in built) return fail('WRP_METHOD_UNAVAILABLE', `face ${session.face}: ${built.error}`);
   const at = built.pointAt(hit.uv);
   const deviation = Math.hypot(at[0] - hit.point[0], at[1] - hit.point[1], at[2] - hit.point[2]);

@@ -82,6 +82,8 @@ export function buildFreeformChart(
   anchorUv: Vec2,
   placement: ChartPlacement,
   method: 'geodesic' | 'parametric',
+  /** Outward unit normal of the solid at the anchor: the sketch is seen from outside (y = outward x east); default Su x Sv. */
+  outward?: Vec3,
 ): ChartResult {
   if (data.periodicU || data.periodicV)
     return { error: 'the freeform face is periodic in u or v; charts are built on non-periodic B-spline faces' };
@@ -91,12 +93,18 @@ export function buildFreeformChart(
   if (!(anchor.det > 1e-18 * (1 + anchor.e * anchor.g))) return { error: 'the surface is degenerate at the anchor (zero tangent area)' };
   const normal = normalize3(cross3(anchor.su, anchor.sv));
   const east = normalize3(anchor.su);
-  const north = cross3(normal, east);
+  const north = normalize3(cross3(outward === undefined ? normal : normalize3(outward), east));
   const poles: Vec3[] = data.poles.flat();
   const lo = [0, 1, 2].map((a) => Math.min(...poles.map((p) => p[a] as number)));
   const hi = [0, 1, 2].map((a) => Math.max(...poles.map((p) => p[a] as number)));
   const diagonal = Math.hypot(...[0, 1, 2].map((a) => (hi[a] as number) - (lo[a] as number)));
-  const stepLength = diagonal / STEPS_PER_DIAGONAL;
+  // the steps follow the sharpest curvature at the anchor as well as the size of the face: h <= 0.05 / |kappa|max (principal curvatures of the first and second forms)
+  const second = [dot3(anchor.suu, normal), dot3(anchor.suv, normal), dot3(anchor.svv, normal)] as const;
+  const trace = (anchor.e * second[2] - 2 * anchor.f * second[1] + anchor.g * second[0]) / anchor.det;
+  const gaussian = (second[0] * second[2] - second[1] * second[1]) / anchor.det;
+  const spread = Math.sqrt(Math.max(0, (trace * trace) / 4 - gaussian));
+  const curvature = Math.max(Math.abs(trace / 2 + spread), Math.abs(trace / 2 - spread));
+  const stepLength = Math.min(diagonal / STEPS_PER_DIAGONAL, curvature > 0 ? 0.05 / curvature : Infinity);
   const inBox = (u: number, v: number): boolean => {
     const [tu, tv] = [1e-9 * (u1 - u0), 1e-9 * (v1 - v0)];
     return u >= u0 - tu && u <= u1 + tu && v >= v0 - tv && v <= v1 + tv;
@@ -195,9 +203,17 @@ export function buildFreeformChart(
     metricBound,
     areaG: (v, u) => {
       let total = 0;
-      const pieces = Math.max(1, Math.ceil((Math.abs(v - v0) / (v1 - v0)) * 4));
-      for (let p = 0; p < pieces; p++) {
-        const [a, b] = [v0 + ((v - v0) * p) / pieces, v0 + ((v - v0) * (p + 1)) / pieces];
+      // the integrand is only C^(degree-1) across the knots in v: integrate span by span
+      const cuts = [v0, ...surface.knotsV.filter((knot) => knot > v0 && knot < v), v];
+      const spans = cuts.slice(0, -1).flatMap((from, k) => {
+        const to = cuts[k + 1] as number;
+        const parts = Math.max(1, Math.ceil(((to - from) / (v1 - v0)) * 4));
+        return Array.from({ length: parts }, (_, p): [number, number] => [
+          from + ((to - from) * p) / parts,
+          from + ((to - from) * (p + 1)) / parts,
+        ]);
+      });
+      for (const [a, b] of spans) {
         for (const [x, w] of GAUSS) {
           const q = differential(surface, u, a + ((x + 1) / 2) * (b - a));
           total += (w * (b - a) * Math.sqrt(Math.max(0, q.det))) / 2;

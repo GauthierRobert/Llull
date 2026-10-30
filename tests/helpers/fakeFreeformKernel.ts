@@ -29,6 +29,10 @@ export interface FakeFreeformOptions {
   readonly refuseBoolean?: boolean;
   /** Reports the result as not a valid closed solid. */
   readonly invalidResult?: boolean;
+  /** The solid lies on the Su x Sv side of the face (a bore): the outward normal of the solid is -(Su x Sv), and `bspline` says `reversed`. */
+  readonly reversed?: boolean;
+  /** Material thickness below the face, along the inward normal (default 10): the point deeper than this is outside the solid. */
+  readonly thickness?: number;
   /** Area of the freeform face (the fake does not integrate it). */
   readonly area?: number;
 }
@@ -46,6 +50,8 @@ export function fakeFreeformKernel(patch: PortSurface, options: FakeFreeformOpti
     if ('error' in built) throw new Error(built.error);
     return built;
   })();
+  const flip = options.reversed === true ? -1 : 1;
+  const outward = (n: Vec3): Vec3 => [flip * n[0], flip * n[1], flip * n[2]];
   const own = (u: number): number => (options.foreignParameters === true ? 1 - u : u);
   return kernelFromOps<FreeformShape>({
     name: 'fake-freeform',
@@ -129,12 +135,12 @@ export function fakeFreeformKernel(patch: PortSurface, options: FakeFreeformOpti
           const at = chart.pointAt(uv);
           return {
             point: at,
-            normal: chart.normalAt(uv),
+            normal: outward(chart.normalAt(uv)),
             uv: [own(uv[0]), uv[1]],
             distance: Math.hypot(at[0] - point[0], at[1] - point[1], at[2] - point[2]),
           };
         }),
-      evaluateFace: (_shape, _face, uv) => uv.map(([u, v]) => ({ point: chart.pointAt([u, v]), normal: chart.normalAt([u, v]) as Vec3 })),
+      evaluateFace: (_shape, _face, uv) => uv.map(([u, v]) => ({ point: chart.pointAt([u, v]), normal: outward(chart.normalAt([u, v])) })),
       tessellateFace: () => null,
       faceSamples: () => null,
       edgeSamples: () => null,
@@ -143,9 +149,12 @@ export function fakeFreeformKernel(patch: PortSurface, options: FakeFreeformOpti
         points.map((point) => {
           const at = chart.pointAt(chart.uvOfPoint(point));
           const distance = Math.hypot(at[0] - point[0], at[1] - point[1], at[2] - point[2]);
-          return { distance, signed: distance, face: 0 };
+          const n = outward(chart.normalAt(chart.uvOfPoint(point)));
+          const above = (point[0] - at[0]) * n[0] + (point[1] - at[1]) * n[1] + (point[2] - at[2]) * n[2];
+          const inside = above < 0 && distance <= (options.thickness ?? 10);
+          return { distance, signed: inside ? -distance : distance, face: 0 };
         }),
-      bspline: () => (options.noBspline === true ? null : patch),
+      bspline: () => (options.noBspline === true ? null : options.reversed === true ? { ...patch, reversed: true } : patch),
       projectCurves: () => null,
     },
   });

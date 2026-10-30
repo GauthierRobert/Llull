@@ -18,7 +18,7 @@ import type { CadDocument } from '../../model/types';
 import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import { runEmbossChain } from './embossChain';
-import { buildFreeformRecipe, isFreeformFailure } from './embossFreeform';
+import { buildFreeformRecipe, freeformDepthLimit, isFreeformFailure } from './embossFreeform';
 import { buildPullRecipe, isPullFailure, type PullBuild } from './embossPull';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
@@ -158,6 +158,20 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
   }
   const resolved = resolveChart(doc, session, params.placement, params.face.faceNear);
   if ('summary' in resolved) return resolved;
+  if (resolved.chart.kind === 'freeform') {
+    if (scribe)
+      return fail(
+        'WRP_METHOD_UNAVAILABLE',
+        'mode scribe is built for plane, cylinder, cone, sphere and torus faces, not for a freeform face',
+        ['mode'],
+      );
+    if (pulled)
+      return fail(
+        'WRP_PARAM_INVALID',
+        'walls "pull" and draftDeg are built for plane, cylinder, cone and sphere faces: the walls of a freeform relief always run along the outward normal at the anchor',
+        ['walls'],
+      );
+  }
   let outlines: SketchOutline[] = [];
   for (const [index, profileId] of params.profileIds.entries()) {
     const outline = sketchOutline(doc, profileId);
@@ -285,12 +299,6 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
           tolerance,
         })
       : null;
-  if (scribe && chart.kind === 'freeform')
-    return fail(
-      'WRP_METHOD_UNAVAILABLE',
-      'mode scribe is built for plane, cylinder, cone, sphere and torus faces, not for a freeform face',
-      ['mode'],
-    );
   if (freeform !== null && isFreeformFailure(freeform)) return fail(freeform.code, freeform.message, ['profileIds'], params.profileIds);
   const recipeParams: EmbossParams = {
     face: session.face,
@@ -302,12 +310,6 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     // the construction tolerance of the recipe: sewing, and the fit of the pcurves (the kernel builds the 3D edges of a fitted pcurve to about that)
     tolerance: Math.max(SEWING_RATIO * session.diagonal, MIN_FIT_TOLERANCE, tolerance),
   };
-  if (freeform !== null && pulled)
-    return fail(
-      'WRP_PARAM_INVALID',
-      'walls "pull" and draftDeg are built for plane, cylinder, cone and sphere faces: the walls of a freeform relief always run along the outward normal at the anchor',
-      ['walls'],
-    );
   let pull: PullBuild | null = null;
   if (pulled) {
     const built = buildPullRecipe({
@@ -338,7 +340,25 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       : pull === null || (session.surface.type === 'plane' && !((params.draftDeg ?? 0) > 0))
         ? embossClosedForm(recipeParams)
         : null;
-  const reach = debossLimit(session, mapped.pieces, closed?.convex ?? null);
+  const reach = freeform !== null ? null : debossLimit(session, mapped.pieces, closed?.convex ?? null);
+  if (cutting && freeform !== null) {
+    const through = freeformDepthLimit({
+      query: session.query,
+      shape: session.shape,
+      chart,
+      orientation: resolved.orientation,
+      points: [resolved.anchorOn, ...probePoints(chart, mapped.pieces, MAX_PROBES)],
+      depth,
+    });
+    if (through !== null) {
+      const result = fail(
+        'WRP_DEPTH_EXCEEDS_SOLID',
+        `depth ${depth} passes through the material: it ends ${through.toPrecision(6)} ${doc.units} below the freeform face at the thinnest probed place`,
+        ['depth'],
+      );
+      return { ...result, data: { maxDepth: through, unit: doc.units } };
+    }
+  }
   if (cutting && reach !== null && depth >= reach * (1 - 1e-9)) {
     const result = fail(
       'WRP_DEPTH_EXCEEDS_SOLID',
@@ -405,7 +425,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
           }),
       distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined),
       fullWrapChartWidth: chart.fullWrapWidth,
-      walls: pull === null ? 'normal' : 'pull',
+      walls: freeform !== null || pull !== null ? 'pull' : 'normal',
       ...(pull === null
         ? {}
         : {
@@ -438,7 +458,10 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     {
       unverified,
       provenance: {
-        method: `${params.mode} of regions wrapped by the ${chart.method} chart: one face-slab per region, fused / cut / split in a single exact operation`,
+        method:
+          freeform !== null
+            ? `${params.mode} of regions charted by the ${chart.method} chart of a freeform face: intersections of the footprint prisms along the outward normal with the exact offset layer of the face, fused / cut as exact booleans`
+            : `${params.mode} of regions wrapped by the ${chart.method} chart: one face-slab per region, fused / cut / split in a single exact operation`,
         ...(font !== null ? { font } : {}),
         inputs: {
           id: params.id,
@@ -464,7 +487,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       volumeDelta === null
         ? 'volume change not measured'
         : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${shownArea.toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${shownArea.toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${freeform !== null ? 'freeform' : session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }
