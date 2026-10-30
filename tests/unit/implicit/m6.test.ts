@@ -25,6 +25,7 @@ describe('mesher dual_contouring', () => {
       expect(dc.data['closedManifold']).toBe(true);
       expect(dc.data['mesher']).toBe('dual_contouring');
       expect(dc.data['mesherFallback']).toBe(false);
+      expect(dc.data['dualContouringSplitCells']).toBe(0);
     }
   });
 

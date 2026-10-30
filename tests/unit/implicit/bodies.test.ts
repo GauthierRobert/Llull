@@ -232,6 +232,24 @@ describe('persistence (D3, VC-IMP-48)', () => {
     expect(reloaded.implicit?.bodies[body.id]?.contentHash).toBe(body.data['contentHash']);
   });
 
+  it('hashes: a tetra body keeps its hash, a dual-contouring body carries the mesher revision, and a body stored with the old dual-contouring hash is stale and re-derives (05 IMP 14.10)', () => {
+    const sphere = ok(empty(), 'add_field_primitive', { shape: 'sphere', radius: 3 });
+    const tetra = ok(sphere.doc, 'create_implicit_body', { field: sphere.id, voxel: 0.5 });
+    expect(tetra.data['contentHash']).toBe('b18e8ccea66a86d6ba639135fa0455d590a8035cfcdfad820db7d6c95b559179');
+    const dc = ok(sphere.doc, 'create_implicit_body', { field: sphere.id, voxel: 0.5, mesher: 'dual_contouring' });
+    const legacy = 'cb157d3b2c66888860e3ff5383245213e6c6e840268613a38b69ab964e3fa8e6';
+    expect(dc.data['contentHash']).toBe('3c42f1123517b5db0785a74e875660c378adff65b7cb086ccd7a5294855e5615');
+    expect(dc.data['contentHash']).not.toBe(legacy);
+    const raw = JSON.parse(serializeDocument(dc.doc)) as {
+      document: Record<string, unknown> & { implicit: { bodies: Record<string, { contentHash: string }> } };
+    };
+    const record = raw.document.implicit.bodies[dc.id];
+    if (record === undefined) throw new Error('body record expected');
+    record.contentHash = legacy;
+    const reloaded = deserializeDocument(JSON.stringify(raw));
+    expect(reloaded.implicit?.bodies[dc.id]?.contentHash).toBe(dc.data['contentHash']);
+  });
+
   it('rejects a malformed implicit slice with named errors', () => {
     const { body } = sphereBody();
     const raw = JSON.parse(serializeDocument(body.doc)) as { document: Record<string, unknown> };

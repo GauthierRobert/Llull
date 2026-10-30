@@ -4,7 +4,7 @@
  * (V8-exact sin / cos / atan2 / exp / log / hypot, same scan and numbering orders), so `deterministic: true`, and it lifts the TS caps (`limits`).
  * Commands are synchronous, so a job BLOCKS the backend event loop for its duration (TECHNICAL_SPEC D9); the cap is the timeout below.
  * A job that cannot run (binary missing, crash, timeout, protocol) is answered by the TS engine when the request fits its caps, else refused
- * with IMP_ENGINE_FAILED naming the reason. Gradients are always answered by the TS engine.
+ * with IMP_ENGINE_FAILED naming the reason. Dual contouring runs natively too (`dual_contour.rs`, same mesh as `dualContour.ts`). Gradients (`evaluate` with `withGradient`) run natively too (05 IMP 14.10).
  * Environment: LLULL_COMPUTE / LLULL_NATIVE_DIR (binary), LLULL_FIELD_TIMEOUT_S (default 600), LLULL_NATIVE_KEEP=1.
  */
 
@@ -32,6 +32,9 @@ const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 
 /** Measured caps (TECHNICAL_SPEC 14.2): grid nodes the streamed mesher admits, and the triangle budget shared with the TS engine. */
 export const NATIVE_FIELD_LIMITS: FieldEngine['limits'] = { maxSamples: 2 ** 30, maxTriangles: 5_000_000, maxStoredTriangles: 20_000_000 };
+
+/** Grid nodes the native dual-contouring sign grid holds (one byte per node, 05 IMP 14.10); the streamed tetrahedra mesher goes up to `maxSamples`. */
+export const NATIVE_DUAL_CONTOURING_MAX_SAMPLES = 2 ** 29;
 
 type Files = Record<string, Buffer | string>;
 
@@ -173,26 +176,28 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
     name: 'llull-field',
     limits: NATIVE_FIELD_LIMITS,
     evaluate(program, points, withGradient): FieldSamples {
-      if (withGradient || programError(program) !== null) return tsFieldEngine.evaluate(program, points, withGradient);
+      if (programError(program) !== null) return tsFieldEngine.evaluate(program, points, withGradient);
       const count = Math.floor(points.length / 3);
-      const empty = { values: new Float64Array(0), gradients: null, nonFinite: 0 };
       return guarded<FieldSamples>(
         count,
         () => {
           const files: Files = {};
           const spec = packProgram(program, '', files);
           files['points.f64'] = f64Bytes(points.subarray(0, count * 3));
-          files['job.json'] = JSON.stringify({ op: 'evaluate', program: spec, points: count });
+          files['job.json'] = JSON.stringify({ op: 'evaluate', program: spec, points: count, gradient: withGradient });
           return job(files, ({ report, read }) => {
             const values = f64Values(read('values.f64'));
             if (values.length !== count) throw new FieldJobFailure('NATIVE_PROTOCOL', `${values.length} values for ${count} points`);
-            return { values, gradients: null, nonFinite: num(report['nonFiniteSamples']) };
+            const gradients = withGradient ? f64Values(read('gradients.f64')) : null;
+            if (gradients !== null && gradients.length !== 3 * count)
+              throw new FieldJobFailure('NATIVE_PROTOCOL', `${gradients.length} gradient numbers for ${count} points`);
+            return { values, gradients, nonFinite: num(report['nonFiniteSamples']) };
           });
         },
-        () => tsFieldEngine.evaluate(program, points, false),
+        () => tsFieldEngine.evaluate(program, points, withGradient),
         (r) => ({
-          ...empty,
           values: new Float64Array(count).fill(NaN),
+          gradients: withGradient ? new Float64Array(3 * count).fill(NaN) : null,
           nonFinite: count,
           failure: { code: 'IMP_ENGINE_FAILED', message: r.message },
         }),
@@ -200,7 +205,7 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
     },
 
     mesh(program, grid: FieldGrid, meshOptions: MeshOptions) {
-      if (meshOptions.mesher !== 'tetra' || programError(program) !== null) return tsFieldEngine.mesh(program, grid, meshOptions);
+      if (programError(program) !== null) return tsFieldEngine.mesh(program, grid, meshOptions);
       const [nx, ny, nz] = gridCells(grid);
       const nodes = (nx + 1) * (ny + 1) * (nz + 1);
       if (!(nodes <= Number.MAX_SAFE_INTEGER))
@@ -216,6 +221,8 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
             grid: { min: [...grid.min], max: [...grid.max], voxel: grid.voxel },
             maxSamples: NATIVE_FIELD_LIMITS.maxSamples,
             maxTriangles: meshOptions.maxTriangles,
+            mesher: meshOptions.mesher,
+            maxDualContouringSamples: NATIVE_DUAL_CONTOURING_MAX_SAMPLES,
           });
           return job(files, ({ report, read }) => {
             const refused = refusalOf(report);
@@ -234,8 +241,9 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
               prunedFraction: num(report['prunedFraction']),
               maxVertexResidual: num(report['maxVertexResidual']),
               nonFiniteSamples: num(report['nonFiniteSamples']),
-              mesher: 'tetra',
-              mesherFallback: false,
+              mesher: report['mesher'] === 'dual_contouring' ? ('dual_contouring' as const) : ('tetra' as const),
+              mesherFallback: report['mesherFallback'] === true,
+              splitCells: num(report['splitCells']),
               provenance: provenance(grid.voxel),
             };
           });

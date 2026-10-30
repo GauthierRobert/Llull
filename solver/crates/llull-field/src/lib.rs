@@ -11,13 +11,15 @@
 //! - `constants.f64`; `mesh<i>_positions.f64` + `mesh<i>_indices.u32`; `strut<i>_nodes.f64` (3 per node) + `strut<i>_beams.f64` (a, b, ra, rb, cap 1 =
 //!   sphere, 5 per beam); `points.f64` (3 per point) for `evaluate`.
 //! - Out: `report.json` always (`{ refusal: { code, message, samples, limit } }` on a budget refusal, else the op's figures); `positions.f64` +
-//!   `indices.u32` for `mesh`; `values.f64` for `evaluate`. One `progress` event per 5 % of the cell layers while meshing.
+//!   `indices.u32` for `mesh`; `values.f64` (+ `gradients.f64`) for `evaluate`. One `progress` event per 5 % of the cell layers while meshing.
 //!
-//! Gradients are not computed here: the host answers `evaluate` with gradients from the TypeScript engine.
+//! `evaluate` with `gradient: true` also writes `gradients.f64` (3 per point, `gradient.rs`, twin of `gradient.ts`).
 
 mod components;
+mod dual_contour;
 mod eval;
 mod files;
+mod gradient;
 mod interval;
 mod job;
 mod jsnum;

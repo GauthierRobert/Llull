@@ -69,7 +69,7 @@ export const createImplicitBody = defineCommand({
       .enum(['tetra', 'dual_contouring'])
       .optional()
       .describe(
-        'tetra (default): marching tetrahedra, always closed and manifold, cuts sharp edges and corners by up to a voxel. dual_contouring: one vertex per surface cell placed by a quadratic error fit on exact edge crossings and gradients, so box corners, clipped edges and blend creases stay sharp (volume error far below the tetrahedra on faceted bodies); the TS engine meshes it (up to its grid limit); when the result is not closed and manifold the body falls back to tetra and data.mesherFallback says so.',
+        'tetra (default): marching tetrahedra, always closed and manifold, cuts sharp edges and corners by up to a voxel. dual_contouring: one vertex per surface cell placed by a quadratic error fit on exact edge crossings and gradients, so box corners, clipped edges and blend creases stay sharp (volume error far below the tetrahedra on faceted bodies); both engines mesh it identically (the TS engine up to 2^21 grid nodes, the native engine up to 2^29); cells at ambiguous faces get one vertex per surface sheet (data.dualContouringSplitCells counts them), and only when the result is still not closed and manifold does the whole body fall back to tetra (data.mesherFallback says so).',
       ),
     maxTriangles: z
       .number()
@@ -156,6 +156,7 @@ export const createImplicitBody = defineCommand({
         closedManifold: result.closedManifold,
         mesher: result.mesher,
         mesherFallback: result.mesherFallback,
+        dualContouringSplitCells: result.splitCells ?? 0,
         bounds: realised.bounds,
         voxel: p.voxel,
         contentHash: realised.contentHash,

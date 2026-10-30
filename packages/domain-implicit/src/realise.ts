@@ -68,7 +68,10 @@ export function bodyGrid(bounds: { readonly min: Vec3; readonly max: Vec3 }, vox
   };
 }
 
-/** sha256 of (compiled program, grid, mesher, engine major version, determinism class): the content hash of a body; engines of one class share it. */
+/** Revision of the dual-contouring mesher, part of the hash of a dual-contouring body only: 2 = cells at ambiguous faces split by sheet (05 IMP 14.10); the tetra hash is unchanged. */
+const DUAL_CONTOURING_REVISION = 2;
+
+/** sha256 of (compiled program, grid, mesher, engine major version, determinism class; the dual-contouring revision for that mesher): the content hash of a body; engines of one class share it. */
 export function contentHashOf(
   program: FieldProgram,
   grid: FieldGrid,
@@ -76,7 +79,14 @@ export function contentHashOf(
   mesher: Mesher = 'tetra',
 ): string {
   return sha256Hex(
-    canonicalJson({ program, grid, mesher, engineMajor: ENGINE_MAJOR, determinism: engine.determinism ?? DEFAULT_DETERMINISM }),
+    canonicalJson({
+      program,
+      grid,
+      mesher,
+      engineMajor: ENGINE_MAJOR,
+      determinism: engine.determinism ?? DEFAULT_DETERMINISM,
+      ...(mesher === 'dual_contouring' ? { dualContouringRevision: DUAL_CONTOURING_REVISION } : {}),
+    }),
   );
 }
 
