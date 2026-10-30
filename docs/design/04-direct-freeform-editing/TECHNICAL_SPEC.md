@@ -691,3 +691,29 @@ claim exactness. Decision: keep one bicubic patch per quad and fit the free pole
 - Tests: `tests/unit/subd/g1Fit.test.ts` (boundary poles bit-identical, regular quads untouched, pure, cube/box/skewed/valence-5 numbers), `toNurbs.test.ts`.
   Red-proof: fit disabled -> 6 tests fail.
 - Left: Peters-style exact G1 (needs 3n patches per star), STEP of the fitted sheets needs no change (poles only).
+
+#### DES-4c (2026-10-30): the VC-DIR-18 bench and the 200-face preview timing
+
+No `tests/bench` harness exists; the repo's timing convention is a unit test with a reference-slack factor (`constraintPerf.test.ts`), so the bench is
+`tests/unit/subd/directEditPerf.test.ts` (p50 / p95, `LLULL_BENCH_LOG=<file>` appends the numbers) and, for the native kernel,
+`server/tests/faceMovePreviewTiming.test.ts` (skipped without the binary).
+
+Measured (this machine, node, one run): cage preview (`previewCageCommand`, `edit_subdivision_cage`, 3 vertices moved)
+
+| path | before | after | budget |
+| --- | --- | --- | --- |
+| 386 vertices, level 2 (12 288 triangles, world space) | p50 12.1 / p95 18.8 ms (MISSED) | p50 9.2 / p95 16.4 ms | p95 <= 16 ms |
+| 98 vertices, level 3 | p50 11.3 / p95 14.3 ms | p50 6.4 / p95 8.1 ms | p95 <= 16 ms |
+| `subdivision_to_nurbs`, 386 vertices | p50 166 / p95 247 ms | unchanged | <= 300 ms |
+| `check_subdivision`, 1946 vertices | p50 87 / p95 102 ms | unchanged | <= 1 s |
+
+Fix: `subdivisionTriangles` allocated three points per triangle (`add3` per corner) and the preview then transformed every corner again; it now places each
+surface vertex once (`place` parameter) and the triangles share the vertex points. `execute` itself is 1 ms of the 9. The 386-vertex p95 is within noise of
+the 16 ms budget (aim 10 ms met at p50): the rest is `refineOnce`.
+
+Kernel preview, native OCC, 198-sided prism = 200 faces, `move_faces` offset of the top face: first ghost 533 ms, repeats p50 477 ms (about 2 Hz): the budget
+(500 ms first, 5 Hz) is MISSED. Breakdown of a repeat (490 ms): `faceOp` evaluate 370 (whole-solid `BRepOffset_MakeOffset` with the intersection join),
+tessellate 47, topology 44, mass properties 32 (preview does not need them). The same move as `translate` (planar face, `push_pull` prism boolean) takes 135 ms
+(7 Hz), but it does not extend slanted neighbours, so it is not a drop-in for the offset; routing perpendicular-neighbour planar offsets to it, and skipping
+the volume report and the second topology in a preview, are the levers (not done: native change, offset semantics). Regression guards in the test: first
+< 1 s, repeats < 0.8 s.
