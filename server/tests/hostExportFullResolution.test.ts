@@ -153,6 +153,7 @@ describe('the FEA mesher (a host path without the choke point)', () => {
   async function meshWith(
     doc: CadDocument,
     kernel: ReturnType<typeof fakeXdeKernel>['kernel'] | null,
+    midsurfaceSeen: number[] = [],
   ): Promise<{ parts: Record<string, unknown>[]; code: string | undefined }> {
     const { doc: analysed, analysisId } = analysisOf(doc);
     const requests: Record<string, unknown>[] = [];
@@ -167,7 +168,14 @@ describe('the FEA mesher (a host path without the choke point)', () => {
         return Promise.resolve({ ok: true, nodes: [[1, 0, 0, 0]], blocks: [], nodeSets: {}, faceSets: {}, targets: {} });
       },
       store,
-      hooks: caeHooks,
+      hooks: {
+        ...caeHooks,
+        // shell and plane-stress parts are built from the geometry of the document the hook is given
+        partMidsurface: (view, ...rest) => {
+          midsurfaceSeen.push(trianglesOf(view.entities['scan'] as Entity));
+          return caeHooks.partMidsurface(view, ...rest);
+        },
+      },
       kernel: () => kernel,
     });
     return {
@@ -182,6 +190,12 @@ describe('the FEA mesher (a host path without the choke point)', () => {
     const geometry = parts[0]?.['geometry'] as { kind: string; stlBase64: string };
     expect(geometry.kind).toBe('stl');
     expect(Buffer.from(geometry.stlBase64, 'base64').readUInt32LE(80)).toBe(TRIANGLES);
+  });
+
+  it('gives the shell and plane-stress idealisation the stored mesh too (partMidsurface), not the display level of detail', async () => {
+    const seen: number[] = [];
+    await meshWith(scanDocument(), null, seen);
+    expect(seen).toEqual([TRIANGLES]);
   });
 
   it('builds the exact path (the kernel STEP) from the stored mesh too', async () => {

@@ -57,13 +57,11 @@ pub fn run_shrinkwrap(
         }
     }
     let params = Params { mode: job.mode, direction: job.direction, offset: job.offset, side: job.side, max_distance: job.max_distance };
-    tick(0.0);
-    let wrapped = shrinkwrap(positions, triangles, target, &params);
+    let wrapped = shrinkwrap(positions, triangles, target, &params, tick);
     let r = &wrapped.report;
     if ![r.max_move, r.mean_move, r.residual].iter().all(|n| n.is_finite()) || !wrapped.positions.iter().all(|c| c.is_finite()) {
         return Err(input_error("shrinkwrap: the result is not finite; the TypeScript engine answers it"));
     }
-    tick(1.0);
     let report = serde_json::to_value(&wrapped.report).map_err(|error| input_error(error.to_string()))?;
     Ok((wrapped.positions, triangles.to_vec(), report))
 }

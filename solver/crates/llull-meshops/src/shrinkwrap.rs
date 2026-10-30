@@ -96,7 +96,11 @@ pub struct Wrap {
 }
 
 /// Wrap `positions` (triangles `triangles`, used for the vertex normals of the `normal` mode) onto the target.
-pub fn shrinkwrap(positions: &[f64], triangles: &[u32], target: (&[f64], &[u32]), params: &Params) -> Wrap {
+/// Vertices answered between two progress ticks at most (the answers of a chunk are computed in parallel, the chunks one after the other).
+const CHUNKS: usize = 64;
+
+/// `tick` gets the share of the vertices done after each chunk.
+pub fn shrinkwrap(positions: &[f64], triangles: &[u32], target: (&[f64], &[u32]), params: &Params, tick: &mut dyn FnMut(f64)) -> Wrap {
     let index = SurfaceIndex::new(target.0, target.1);
     let normals = (params.mode == Mode::Normal).then(|| vertex_normals(positions, triangles));
     let axis = if params.mode == Mode::Direction { params.direction.and_then(unit_of) } else { None };
@@ -116,40 +120,41 @@ pub fn shrinkwrap(positions: &[f64], triangles: &[u32], target: (&[f64], &[u32])
         }
     };
     // every vertex is independent of the others: the per-vertex answers are computed in parallel and folded in vertex order, as the TypeScript loop does
-    let wrapped: Vec<Option<Wrapped>> = (0..count)
-        .into_par_iter()
-        .map(|v| {
-            let p = point(positions, v);
-            let (hit_point, face): (Vec3, i64) = if params.mode == Mode::Nearest {
-                let hit = index.closest(p);
-                if hit.face >= 0 && hit.distance <= reach {
-                    (hit.point, hit.face)
-                } else {
-                    return None;
-                }
+    let one = |v: usize| -> Option<Wrapped> {
+        let p = point(positions, v);
+        let (hit_point, face): (Vec3, i64) = if params.mode == Mode::Nearest {
+            let hit = index.closest(p);
+            if hit.face >= 0 && hit.distance <= reach {
+                (hit.point, hit.face)
             } else {
-                let direction = match &normals {
-                    Some(normals) => unit_of(normals[v]),
-                    None => axis,
-                }?;
-                let forward = index.ray(p, direction, reach);
-                let backward = index.ray(p, [-direction[0], -direction[1], -direction[2]], reach);
-                let use_forward = forward.is_some_and(|(f, _)| backward.is_none_or(|(b, _)| f <= b));
-                let (distance, face) = if use_forward { forward } else { backward }?;
-                let s = if use_forward { 1.0 } else { -1.0 };
-                (
-                    [p[0] + s * distance * direction[0], p[1] + s * distance * direction[1], p[2] + s * distance * direction[2]],
-                    i64::from(face),
-                )
-            };
-            let normal = face_normal(target.0, target.1, face as usize);
-            let s = if params.offset == 0.0 { 0.0 } else { sign(p, hit_point, normal) * params.offset };
-            let q = [hit_point[0] + s * normal[0], hit_point[1] + s * normal[1], hit_point[2] + s * normal[2]];
-            let mv = hypot(&[q[0] - p[0], q[1] - p[1], q[2] - p[2]]);
-            let off = (index.closest(q).distance - params.offset.abs()).abs();
-            Some(Wrapped { q, mv, off })
-        })
-        .collect();
+                return None;
+            }
+        } else {
+            let direction = match &normals {
+                Some(normals) => unit_of(normals[v]),
+                None => axis,
+            }?;
+            let forward = index.ray(p, direction, reach);
+            let backward = index.ray(p, [-direction[0], -direction[1], -direction[2]], reach);
+            let use_forward = forward.is_some_and(|(f, _)| backward.is_none_or(|(b, _)| f <= b));
+            let (distance, face) = if use_forward { forward } else { backward }?;
+            let s = if use_forward { 1.0 } else { -1.0 };
+            ([p[0] + s * distance * direction[0], p[1] + s * distance * direction[1], p[2] + s * distance * direction[2]], i64::from(face))
+        };
+        let normal = face_normal(target.0, target.1, face as usize);
+        let s = if params.offset == 0.0 { 0.0 } else { sign(p, hit_point, normal) * params.offset };
+        let q = [hit_point[0] + s * normal[0], hit_point[1] + s * normal[1], hit_point[2] + s * normal[2]];
+        let mv = hypot(&[q[0] - p[0], q[1] - p[1], q[2] - p[2]]);
+        let off = (index.closest(q).distance - params.offset.abs()).abs();
+        Some(Wrapped { q, mv, off })
+    };
+    let mut wrapped: Vec<Option<Wrapped>> = Vec::with_capacity(count);
+    let step = count.div_ceil(CHUNKS).max(1);
+    for start in (0..count).step_by(step) {
+        let end = (start + step).min(count);
+        wrapped.par_extend((start..end).into_par_iter().map(one));
+        tick(end as f64 / count as f64);
+    }
     let mut out = positions.to_vec();
     let (mut moved, mut missed, mut total, mut max_move, mut residual) = (0usize, 0usize, 0.0f64, 0.0f64, 0.0f64);
     for (v, item) in wrapped.iter().enumerate() {
@@ -168,4 +173,41 @@ pub fn shrinkwrap(positions: &[f64], triangles: &[u32], target: (&[f64], &[u32])
     let handled = count - missed;
     let mean_move = if handled == 0 { 0.0 } else { total / handled as f64 };
     Wrap { positions: out, report: Report { moved, missed, max_move, mean_move, residual } }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{shrinkwrap, Mode, Params, Side};
+
+    fn plane(n: usize, z: f64) -> (Vec<f64>, Vec<u32>) {
+        let mut positions = Vec::new();
+        for j in 0..=n {
+            for i in 0..=n {
+                positions.extend([i as f64, j as f64, z]);
+            }
+        }
+        let id = |i: usize, j: usize| (j * (n + 1) + i) as u32;
+        let mut indices = Vec::new();
+        for j in 0..n {
+            for i in 0..n {
+                indices.extend([id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1)]);
+            }
+        }
+        (positions, indices)
+    }
+
+    /// The share done is reported while the vertices are answered, not only at the ends: strictly rising, many ticks, ending at 1; the answer does not depend on the chunks.
+    #[test]
+    fn progress_rises_through_the_vertices() {
+        let (positions, indices) = plane(40, 1.0);
+        let target = plane(10, 0.0);
+        let params = Params { mode: Mode::Nearest, direction: None, offset: 0.0, side: Side::Keep, max_distance: None };
+        let mut ticks: Vec<f64> = Vec::new();
+        let wrapped = shrinkwrap(&positions, &indices, (&target.0, &target.1), &params, &mut |done| ticks.push(done));
+        assert!(ticks.len() >= 32, "{} ticks", ticks.len());
+        assert!(ticks.windows(2).all(|w| w[0] < w[1]), "rising");
+        assert_eq!(ticks.last(), Some(&1.0));
+        assert_eq!(wrapped.report.moved, 41 * 41);
+        assert!(wrapped.positions.chunks_exact(3).all(|p| p[2] == 0.0));
+    }
 }

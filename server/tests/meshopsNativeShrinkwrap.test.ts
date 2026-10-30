@@ -10,7 +10,7 @@ import type { MeshEngineFailure, MeshOp, MeshOpResult } from '@core/geometry/mes
 import { isEngineFailure } from '@core/geometry/mesh/engineTypes';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import type { MeshData } from '@core/model/types';
-import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
+import { _clearResultCache, currentScope, resolveDeferred } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { grid, hashOf, icosphere, noisy, withHoles } from './meshopsNativeSupport';
@@ -111,6 +111,19 @@ describe('native shrinkwrap is bit-identical to the TypeScript engine (13.20)', 
       if (mode === 'normal') expect(answer.report['missed'] as number).toBeGreaterThanOrEqual(1);
     }
     await expectSame(outer, wrap(withHoles(target, 8)), 'target with holes');
+  });
+
+  native('the packed target is kept in the resolve memo like the packed mesh (a re-run of the command packs neither again)', async () => {
+    _clearResultCache();
+    const sizes: number[] = [];
+    await resolveDeferred(() => {
+      const result = nativeEngine().run({ mesh: outer }, wrap(target));
+      sizes.push(currentScope()?.memo.size ?? -1);
+      return result;
+    });
+    // the mesh and its target: two entries, kept across the runs of the resolve
+    expect(sizes.length).toBeGreaterThanOrEqual(2);
+    expect(sizes.at(-1)).toBe(2);
   });
 
   native('a target past the native cap is refused by name before any job is packed', () => {

@@ -16,8 +16,25 @@ export interface HostViewRefusal {
   readonly ids: readonly string[];
 }
 
+/** The components an instance among `ids` stands for, nested instances included (what `withFullResolution` swaps for an instance). */
+function componentsOfInstances(doc: CadDocument, ids: readonly string[]): Set<string> {
+  const found = new Set<string>();
+  const visit = (componentId: string): void => {
+    const component = Object.hasOwn(doc.components, componentId) ? doc.components[componentId] : undefined;
+    if (component === undefined || found.has(componentId)) return;
+    found.add(componentId);
+    for (const entity of Object.values(component.entities)) if (entity.kind === 'instance') visit(entity.componentId);
+  };
+  for (const id of ids) {
+    const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
+    if (entity?.kind === 'instance') visit(entity.componentId);
+  }
+  return found;
+}
+
 /**
  * `doc` with every asset-backed mesh that `ids` reach (an entity, an instance's component, the leaves of a construction tree) at its stored triangles, or the refusal.
+ * Only what the view swaps is counted against the cap and checked: a mesh that some other entity of `ids` merely names is not part of the answer.
  * @invariant a document that reaches no asset-backed mesh is returned as it is (same object); the reach is the one of the commands (`reachedMeshes`)
  * @failure the distinct assets reached hold more than MESH_FULL_READ_TRIANGLE_CAP triangles -> MESH_ASSET_TOO_LARGE; an asset this machine cannot read -> MESH_ASSET_LOD_ONLY
  */
@@ -26,7 +43,11 @@ export function fullResolutionView(
   ids: readonly string[],
   assets: MeshAssetPort | null | undefined,
 ): CadDocument | HostViewRefusal {
-  const wanted = reachedMeshes(doc, ids, false);
+  // only what the view swaps and the display-only check looks at is counted: the ids' own meshes (and construction-tree leaves), the components of their instances
+  const components = componentsOfInstances(doc, ids);
+  const wanted = reachedMeshes(doc, ids, false).filter((mesh) =>
+    mesh.componentId === null ? ids.includes(mesh.id) : components.has(mesh.componentId),
+  );
   if (wanted.length === 0) return doc;
   const keys = new Map(wanted.flatMap((mesh) => mesh.assets).map((asset) => [asset.key, asset.triangles]));
   const total = [...keys.values()].reduce((sum, triangles) => sum + triangles, 0);

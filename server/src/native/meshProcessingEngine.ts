@@ -232,12 +232,12 @@ function packMesh(mesh: MeshData, suffix = ''): readonly JobFile[] {
 }
 
 /** The packed files of `mesh`: kept in the resolve memo by the mesh object, so the next run of the command (which gets the same object) packs and hashes nothing. */
-function packedMesh(mesh: MeshData, memo: ResolveMemo | undefined): readonly JobFile[] {
-  if (memo === undefined) return packMesh(mesh);
+function packedMesh(mesh: MeshData, memo: ResolveMemo | undefined, suffix = ''): readonly JobFile[] {
+  if (memo === undefined) return packMesh(mesh, suffix);
   return memo.once(
     mesh,
-    'native:pack',
-    () => packMesh(mesh),
+    `native:pack${suffix}`,
+    () => packMesh(mesh, suffix),
     (files) => files.reduce((sum, file) => sum + file.data.length / 8, 0),
   );
 }
@@ -451,8 +451,8 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       if (scope?.deferring === true) return deferMeshOp(op.op);
       const files: readonly JobFile[] = [
         ...packedMesh(input.mesh, memo),
-        ...(op.op === 'deviation' ? packMesh(op.other.mesh, '_b') : []),
-        ...(op.op === 'shrinkwrap' ? packMesh(op.target.mesh, '_b') : []),
+        ...(op.op === 'deviation' ? packedMesh(op.other.mesh, memo, '_b') : []),
+        ...(op.op === 'shrinkwrap' ? packedMesh(op.target.mesh, memo, '_b') : []),
         jobFile('job.json', JSON.stringify({ op: op.op, params: jobParams(op), ...deviationRequest(op) })),
       ];
       const key = keyOf(files);

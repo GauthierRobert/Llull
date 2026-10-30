@@ -58,3 +58,19 @@ describe('fullResolutionView', () => {
 function createPlain(): CadDocument {
   return scene([]).doc;
 }
+
+describe('fullResolutionView counts and checks what it swaps', () => {
+  it('a mesh that a named entity only refers to is outside the cap and the view (a dimension naming a huge scan does not make the part too large)', () => {
+    const { doc, ctx } = scene([{ id: 'scan', claimed: MESH_FULL_READ_TRIANGLE_CAP + 1, held: false }, { id: 'part' }]);
+    const note = execute(doc, 'add_box', { size: [1, 1, 1] }, ctx);
+    const box = note.affected[0] as string;
+    const withRef = {
+      ...note.document,
+      entities: { ...note.document.entities, [box]: { ...(note.document.entities[box] as object), entityIds: ['scan'] } },
+    } as CadDocument;
+    const view = fullResolutionView(withRef, ['part', box], ctx.meshAssets);
+    expect('code' in view).toBe(false);
+    expect(edgeOf(view as CadDocument, 'part')).toBe(10);
+    expect(edgeOf(view as CadDocument, 'scan')).toBe(1);
+  });
+});

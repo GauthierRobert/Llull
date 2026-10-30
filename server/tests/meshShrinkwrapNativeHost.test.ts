@@ -181,6 +181,22 @@ describe('shrinkwrap_mesh of a 327,680-triangle stored mesh onto a 327,680-trian
   );
 });
 
+describe('a small mesh onto a large stored target (the cage onto a scan)', () => {
+  native(
+    'a 5,120-triangle cage wrapped onto the 327,680-triangle stored target is answered natively: the target size routes the op, the TypeScript engine is not asked',
+    async () => {
+      const doc = documentOfStored();
+      const cage = newEntity('mesh', 'cage', { mesh: icosphere(12, 4) }, [0, 0, 0], '#cccccc');
+      _resetLiveDoc({ ...doc, entities: { ...doc.entities, cage }, order: [...doc.order, 'cage'] });
+      const result = await applyCommandAsync('shrinkwrap_mesh', { id: 'cage', targetId: 'ref' });
+      expect(result.error, result.summary).toBeUndefined();
+      expect(result.data).toMatchObject({ provenance: { engine: 'native' }, faces: 5_120, missed: 0 });
+      expect((result.data as { residual: number }).residual).toBeLessThan(1e-9);
+    },
+    120_000,
+  );
+});
+
 describe('between the native preference size and the TypeScript cap', () => {
   native(
     'a mesh the document holds inline goes native above 10,000 triangles and stays in process below',

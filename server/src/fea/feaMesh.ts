@@ -102,7 +102,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   const defeature = doc.analysis?.cases[analysisId]?.defeature ?? {};
   const warnings: string[] = [];
   for (const entityId of request.entityIds) {
-    const midsurface = deps.hooks.partMidsurface(doc, analysisId, entityId, deps.kernel());
+    const midsurface = deps.hooks.partMidsurface(full, analysisId, entityId, deps.kernel());
     if (midsurface !== null && 'code' in midsurface)
       return feaFailure('fea_mesh', midsurface.code, midsurface.message, [analysisId, entityId]);
     if (midsurface !== null) {

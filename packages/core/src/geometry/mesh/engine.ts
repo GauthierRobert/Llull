@@ -9,28 +9,46 @@
  * @invariant the composite asks engines in order and falls through only on MESH_ENGINE_UNSUPPORTED / over-cap
  */
 
-import type { MeshEngineFailure, MeshOpName, MeshProcessingEngine } from './engineTypes';
+import type { MeshEngineFailure, MeshInput, MeshOp, MeshOpName, MeshProcessingEngine } from './engineTypes';
 import { isEngineFailure } from './engineTypes';
 import { tsMeshEngine } from './tsEngine';
 
 /** Code of the refusal of an engine that only answers through the host's resolving path (the native one, outside `resolveDeferred`): the next engine may answer. */
 export const MESH_ENGINE_NEEDS_HOST = 'MESH_ENGINE_NEEDS_HOST';
 
+/** The size an op is routed by: the triangles of the input, the points of a hull, and for a two-mesh op (`shrinkwrap`, `deviation`) the larger of the two meshes. */
+function opSize(input: MeshInput, op: MeshOp): number {
+  const own = Math.floor(input.mesh.indices.length / 3);
+  if (op.op === 'hull') return Math.floor(op.points.length / 3);
+  if (op.op === 'shrinkwrap') return Math.max(own, Math.floor(op.target.mesh.indices.length / 3));
+  if (op.op === 'deviation') return Math.max(own, Math.floor(op.other.mesh.indices.length / 3));
+  return own;
+}
+
 /**
  * Engines asked in order; the first that lists the op (under its cap) answers, an UNSUPPORTED / NEEDS_HOST failure moves on. An engine that declares
  * `preferredAbove` for the op goes first for inputs above that many triangles (the results are identical by the parity rule: only the speed changes).
- * The refusal reported when nobody answers is the one of the last engine, in the listed order, that refused.
+ * The refusal reported when nobody answers is the one of the last engine, in the listed order, that refused. A two-mesh op (`shrinkwrap`, `deviation`) is sized by its larger
+ * mesh, for the caps and the preference alike (a small cage wrapped onto a large scan goes to the engine that can take the scan).
+ * The composite itself declares `preferredAbove` (per op, the smallest of its members), so a composite inside a composite (the host's native + Manifold engines
+ * inside `resolveMeshEngine`) keeps the preference of the engines it holds.
  */
 export function composeMeshEngines(engines: ReadonlyArray<MeshProcessingEngine>): MeshProcessingEngine {
   return {
     name: engines.map((engine) => engine.name).join('+'),
+    preferredAbove() {
+      const merged = new Map<MeshOpName, number>();
+      for (const engine of engines)
+        for (const [op, size] of engine.preferredAbove?.() ?? []) merged.set(op, Math.min(merged.get(op) ?? Infinity, size));
+      return merged;
+    },
     capabilities() {
       const merged = new Map<MeshOpName, number>();
       for (const engine of engines) for (const [op, cap] of engine.capabilities()) merged.set(op, Math.max(merged.get(op) ?? 0, cap));
       return merged;
     },
     run(input, op) {
-      const triangles = op.op === 'hull' ? Math.floor(op.points.length / 3) : Math.floor(input.mesh.indices.length / 3);
+      const triangles = opSize(input, op);
       const preferred = (engine: MeshProcessingEngine): boolean => (engine.preferredAbove?.().get(op.op) ?? Infinity) < triangles;
       const order = [...engines.filter(preferred), ...engines.filter((engine) => !preferred(engine))];
       const refusals = new Map<number, MeshEngineFailure>();
