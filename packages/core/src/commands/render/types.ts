@@ -1,6 +1,7 @@
 import type { Vec3 } from '../../model/types';
 import type { Bounds } from '../../geometry/bounds';
 import type { Camera, ViewName } from './camera';
+import type { OverlayKind, OverlayStats } from './overlayTypes';
 import type { RasterScene } from '../../model/raster';
 
 /** The `data` payload of render_view. */
@@ -28,6 +29,8 @@ export interface RenderViewData {
   skippedEntityIds: string[];
   /** Entities clipped by `cut` (empty without a cut). */
   cutEntityIds: string[];
+  /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */
+  overlays?: Partial<Record<OverlayKind, OverlayStats>>;
 }
 
 /** One cut plane; the side the normal points to (dot(normal, p) > offset) is the removed side. */
