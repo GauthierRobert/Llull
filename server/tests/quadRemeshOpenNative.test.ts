@@ -156,7 +156,9 @@ describe('quad_remesh of an open mesh on the native engine (13.17)', () => {
     }
     const { doc: holedDoc, ids: holedIds } = docWithMeshes({ positions: plate.positions, indices: kept });
     const result = await exec(holedDoc, { id: holedIds[0] as string, targetQuadCount: 200, output: 'mesh' });
-    expect(result.error?.code).toBe('MESH_QUAD_REMESH_BOUNDARY_LOST');
+    // the engine keeps the hole's loop at this count; the snap then folds quad 172 (a loop count mismatch is the stub test's BOUNDARY_LOST)
+    expect(result.error?.code).toBe('MESH_QUAD_REMESH_SNAP_FAILED');
+    expect(result.summary).toMatch(/folds or collapses quad \d+ \(engine counts tried: 200, 230, 174\)/);
     expect(holedDoc.entities[holedIds[0] as string]).toBeDefined();
     expect(result.document).toBe(holedDoc);
   });

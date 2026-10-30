@@ -163,6 +163,17 @@ function rimArc(rim: RimLoop, p: Vec3): { arc: number; distance: number } {
 /** Gaps between neighbouring snapped vertices are at least this fraction of the rim length over the number of vertices (so no quad is collapsed by the order fix). */
 const MIN_GAP_FRACTION = 1e-3;
 
+/**
+ * Why the boundary cannot be snapped: `source` the source's own boundary is not a set of simple loops (a pinch: repair it), `loops` the quads' boundary loops are not the source's
+ * one for one (a hole the engine covered, loops it merged), `shape` the loops are there but cannot be placed on the rim without folding or reordering quads.
+ */
+export interface SnapProblem {
+  readonly cause: 'source' | 'loops' | 'shape';
+  readonly message: string;
+}
+
+const problem = (cause: SnapProblem['cause'], message: string): SnapProblem => ({ cause, message });
+
 export interface BoundarySnap {
   readonly positions: number[];
   readonly loops: number;
@@ -182,13 +193,14 @@ export function snapQuadBoundary(
   positions: ReadonlyArray<number>,
   quads: ReadonlyArray<number>,
   axis: number | null,
-): BoundarySnap | string {
+): BoundarySnap | SnapProblem {
   const sourceLoops = loopsOf(boundaryEdges(source.indices, 3));
   const quadLoops = loopsOf(boundaryEdges(quads, 4));
-  if (sourceLoops === null) return 'the boundary of the source is not a set of simple loops (an edge chain branches or does not close)';
-  if (quadLoops === null) return "the boundary of the engine's quads is not a set of simple loops";
+  if (sourceLoops === null)
+    return problem('source', 'the boundary of the source is not a set of simple loops (an edge chain branches or does not close)');
+  if (quadLoops === null) return problem('shape', "the boundary of the engine's quads is not a set of simple loops");
   if (sourceLoops.length !== quadLoops.length)
-    return `the engine's quads have ${quadLoops.length} boundary loop(s) against ${sourceLoops.length} in the source`;
+    return problem('loops', `the engine's quads have ${quadLoops.length} boundary loop(s) against ${sourceLoops.length} in the source`);
   const rims = sourceLoops.map((loop) => rimLoop(source, loop, axis, meanEdge(positions, quads)));
   const moved = positions.slice();
   const owner = new Set<number>();
@@ -202,8 +214,8 @@ export function snapQuadBoundary(
     });
     const loopId = (nearest[0] as { id: number }).id;
     if (nearest.some((n) => n.id !== loopId))
-      return "a boundary loop of the engine's quads runs along more than one boundary loop of the source";
-    if (owner.has(loopId)) return "two boundary loops of the engine's quads follow the same boundary loop of the source";
+      return problem('loops', "a boundary loop of the engine's quads runs along more than one boundary loop of the source");
+    if (owner.has(loopId)) return problem('loops', "two boundary loops of the engine's quads follow the same boundary loop of the source");
     owner.add(loopId);
     const rim = rims[loopId] as RimLoop;
     const wrap = (d: number): number => d - rim.length * Math.round(d / rim.length);
@@ -215,7 +227,7 @@ export function snapQuadBoundary(
       wrap((nearest[0] as { arc: number }).arc - (nearest[nearest.length - 1] as { arc: number }).arc) -
       (unwrapped[0] as number);
     if (Math.abs(turn) < rim.length / 2)
-      return "a boundary loop of the engine's quads does not go once round the boundary loop of the source it follows";
+      return problem('shape', "a boundary loop of the engine's quads does not go once round the boundary loop of the source it follows");
     const direction = Math.sign(turn);
     const gap = (MIN_GAP_FRACTION * rim.length) / loop.length;
     // each corner of the rim gets the quad vertex nearest to it, exactly (two corners never share a vertex)
@@ -228,7 +240,10 @@ export function snapQuadBoundary(
         if (!pinned.has(i) && distance < bestDistance) [best, bestDistance] = [i, distance];
       });
       if (best < 0)
-        return `a boundary loop of the engine's quads has fewer vertices than the ${rim.corners.length} corners of the boundary loop it follows`;
+        return problem(
+          'shape',
+          `a boundary loop of the engine's quads has fewer vertices than the ${rim.corners.length} corners of the boundary loop it follows`,
+        );
       pinned.set(best, k);
       unwrapped[best] = (unwrapped[best] as number) + wrap(corner - (unwrapped[best] as number));
     }
@@ -244,9 +259,15 @@ export function snapQuadBoundary(
     }
     for (let i = 1; i < unwrapped.length; i++)
       if (!ordered(unwrapped[i - 1] as number, unwrapped[i] as number))
-        return "the corners of a boundary loop of the source cannot be given their own vertices of the engine's quads in order";
+        return problem(
+          'shape',
+          "the corners of a boundary loop of the source cannot be given their own vertices of the engine's quads in order",
+        );
     if (Math.abs((unwrapped[unwrapped.length - 1] as number) - (unwrapped[0] as number)) + gap >= rim.length)
-      return "the vertices of a boundary loop of the engine's quads do not fit once round the boundary loop of the source in order";
+      return problem(
+        'shape',
+        "the vertices of a boundary loop of the engine's quads do not fit once round the boundary loop of the source in order",
+      );
     loop.forEach((v, i) => {
       // a corner vertex sits exactly on the corner of the rim, the others at their arc length
       const corner = pinned.get(i);
@@ -268,7 +289,7 @@ export function snapQuadBoundary(
       continue;
     const before = faceNormal(positions, quads, f);
     const after = faceNormal(moved, quads, f);
-    if (!(dot(before, after) > 0)) return `snapping the boundary onto the source folds or collapses quad ${f}`;
+    if (!(dot(before, after) > 0)) return problem('shape', `snapping the boundary onto the source folds or collapses quad ${f}`);
   }
   return { positions: moved, loops: quadLoops.length, worstMove };
 }
@@ -318,12 +339,24 @@ export function symmetryProblem(source: MeshData, plane: SymmetryPlane, diagonal
     : `the source is not symmetric about the ${plane} plane: a vertex is ${worst.toPrecision(3)} from the surface of its mirror image (tolerance ${tolerance.toPrecision(3)}, ${SYMMETRY_TOLERANCE_FRACTION * 100} % of the diagonal)`;
 }
 
-/** The half of `source` on the positive side of the plane through the origin, clipped exactly at it, its vertices on the plane put on it; null when nothing is on that side. */
-export function halfOf(source: MeshData, plane: SymmetryPlane, diagonal: number): MeshData | null {
+/**
+ * The half of `source` on the positive side of the plane through the origin, clipped exactly at it, its vertices on the plane put on it; `empty` when nothing is on that
+ * side, or `flat` (with the count) when triangles lie in the plane (the half would be open along them, and which half they belong to is undefined).
+ */
+export function halfOf(source: MeshData, plane: SymmetryPlane, diagonal: number): MeshData | 'empty' | { readonly flat: number } {
   const axis = SYMMETRY_AXIS[plane];
   const normal: Vec3 = [axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0];
+  let flat = 0;
+  for (let t = 0; t < source.indices.length; t += 3)
+    if (
+      [0, 1, 2].every(
+        (k) => Math.abs(source.positions[3 * (source.indices[t + k] as number) + axis] as number) <= ON_PLANE_FRACTION * diagonal,
+      )
+    )
+      flat++;
+  if (flat > 0) return { flat };
   const half = cutMeshByPlane(source, [0, 0, 0], normal, 1, false, 1e-12 * diagonal).mesh;
-  if (half.indices.length === 0) return null;
+  if (half.indices.length === 0) return 'empty';
   const positions = half.positions.map((v, i) => (i % 3 === axis && Math.abs(v) <= ON_PLANE_FRACTION * diagonal ? 0 : v));
   return { positions, indices: half.indices };
 }

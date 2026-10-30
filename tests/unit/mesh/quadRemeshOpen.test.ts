@@ -6,7 +6,16 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { QuadMeshData } from '@core/geometry/mesh/engineTypes';
-import { SYMMETRY_AXIS, halfOf, mirrorWeld, orientQuadsToSource, snapQuadBoundary, symmetryProblem } from '@core/geometry/mesh/quadOpen';
+import {
+  type BoundarySnap,
+  SYMMETRY_AXIS,
+  type SnapProblem,
+  halfOf,
+  mirrorWeld,
+  orientQuadsToSource,
+  snapQuadBoundary,
+  symmetryProblem,
+} from '@core/geometry/mesh/quadOpen';
 import type { MeshSolidEntity } from '@core/model/types';
 import { docWithMeshes, gridMesh, icosphere } from '../../helpers/meshFixtures';
 import { type QuadOp, contextWith, quadSphere, stubQuadEngine } from '../../helpers/quadFixtures';
@@ -31,12 +40,73 @@ function plateQuads(n: number, size: number, jitter: number): QuadMeshData {
 
 const plate = (): ReturnType<typeof gridMesh> => gridMesh(10, 12);
 
+const solved = (result: BoundarySnap | SnapProblem): BoundarySnap => {
+  if ('cause' in result) throw new Error(`expected a snap, got ${result.cause}: ${result.message}`);
+  return result;
+};
+const problemOf = (result: BoundarySnap | SnapProblem): SnapProblem => {
+  if (!('cause' in result)) throw new Error('expected a problem');
+  return result;
+};
+
+/**
+ * A quadrilateral A (0, 0), B (2, -6), C (10, 9), D (0, 10) in z = 0: its left side DA lies in the plane x = 0 and turns by only 18 degrees at A into AB, so A is a corner of
+ * the rim only because the rim joins the plane there. `quads`: an n x n bilinear grid of it whose boundary vertices are off the rim (the left side by +-1e-3 in x and 1e-3 in z,
+ * the others pushed 0.2 inwards); `source`: the triangles of the m x m grid of the same map.
+ */
+function warped(n: number, m: number): { quads: QuadMeshData; source: MeshData } {
+  const [A, B, C, D] = [
+    [0, 0],
+    [2, -6],
+    [10, 9],
+    [0, 10],
+  ] as const;
+  const at = (u: number, v: number): [number, number] => [
+    (1 - u) * (1 - v) * A[0] + u * (1 - v) * B[0] + u * v * C[0] + (1 - u) * v * D[0],
+    (1 - u) * (1 - v) * A[1] + u * (1 - v) * B[1] + u * v * C[1] + (1 - u) * v * D[1],
+  ];
+  const grid = (count: number): number[] =>
+    Array.from({ length: (count + 1) ** 2 }, (_, k) => at((k % (count + 1)) / count, Math.floor(k / (count + 1)) / count)).flat();
+  const quadPositions: number[] = [];
+  for (let j = 0; j <= n; j++)
+    for (let i = 0; i <= n; i++) {
+      let [x, y] = at(i / n, j / n);
+      let z = 0;
+      const corner = (i === 0 || i === n) && (j === 0 || j === n);
+      if (!corner && (i === 0 || j === 0 || i === n || j === n)) {
+        z = 1e-3;
+        if (i === 0) x = j % 2 === 0 ? 1e-3 : -1e-3;
+        else [x, y] = [x + (5 - x) * 0.04, y + (3 - y) * 0.04];
+      }
+      // the corner A of the quads is off the rim too (inside it)
+      if (i === 0 && j === 0) [x, y] = [0.3, 0.4];
+      quadPositions.push(x, y, z);
+    }
+  const id = (i: number, j: number): number => j * (n + 1) + i;
+  const quads: number[] = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) quads.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j + 1));
+  const sourceIds = (i: number, j: number): number => j * (m + 1) + i;
+  const indices: number[] = [];
+  for (let j = 0; j < m; j++)
+    for (let i = 0; i < m; i++)
+      indices.push(
+        sourceIds(i, j),
+        sourceIds(i + 1, j),
+        sourceIds(i + 1, j + 1),
+        sourceIds(i, j),
+        sourceIds(i + 1, j + 1),
+        sourceIds(i, j + 1),
+      );
+  const positions = grid(m); // x, y pairs: z = 0 is added below
+  const source: number[] = [];
+  for (let k = 0; k < positions.length; k += 2) source.push(positions[k] as number, positions[k + 1] as number, 0);
+  return { quads: { positions: quadPositions, quads }, source: { positions: source, indices } };
+}
+
 describe('snapQuadBoundary', () => {
   it('moves the boundary vertices onto the source rim, keeps the corners exactly and reports loops and the largest move', () => {
     const quads = plateQuads(5, 10, 0.4);
-    const snapped = snapQuadBoundary(plate(), quads.positions, quads.quads, null);
-    expect(typeof snapped).not.toBe('string');
-    const result = snapped as Exclude<typeof snapped, string>;
+    const result = solved(snapQuadBoundary(plate(), quads.positions, quads.quads, null));
     expect(result.loops).toBe(1);
     expect(result.worstMove).toBeCloseTo(0.4, 12);
     for (let v = 0; v < result.positions.length / 3; v++) {
@@ -44,7 +114,6 @@ describe('snapQuadBoundary', () => {
       const boundary = x === 0 || x === 10 || y === 0 || y === 10;
       if (quads.positions[3 * v] !== x || quads.positions[3 * v + 1] !== y) expect(boundary, `vertex ${v} moved off the rim`).toBe(true);
     }
-    // the corners are vertices of the result
     for (const corner of [
       [0, 0],
       [10, 0],
@@ -56,35 +125,107 @@ describe('snapQuadBoundary', () => {
       ).toBe(true);
   });
 
-  it('puts the vertices that land on a segment lying in the plane exactly on it', () => {
-    const half = halfOf(icosphere(10, 3), 'yz', 17.3) as MeshData;
-    const quads = plateQuads(4, 10, 0);
-    // a plate that has its left side on x = 0 after moving it by the half's own shift: use the plate itself as a half with x = 0 on one side
-    const result = snapQuadBoundary(plate(), quads.positions, quads.quads, 0);
-    expect(typeof result).not.toBe('string');
-    const left = (result as { positions: number[] }).positions.filter((_, i) => i % 3 === 0).filter((x) => x === 0).length;
-    expect(left).toBeGreaterThan(4);
-    expect(half.indices.length).toBeGreaterThan(0);
+  it('puts the left side, which lies in the plane x = 0, exactly on it (x and z), and the corner where the rim joins the plane exactly on that corner', () => {
+    const { quads, source } = warped(6, 24);
+    // the jittered input is off the plane on every left vertex that is not a corner
+    const left = [...Array(7).keys()].map((j) => j * 7);
+    expect(left.slice(1, -1).every((v) => quads.positions[3 * v] !== 0 && quads.positions[3 * v + 2] !== 0)).toBe(true);
+    const result = solved(snapQuadBoundary(source, quads.positions, quads.quads, 0));
+    for (const v of left) {
+      expect(result.positions[3 * v], `left vertex ${v} x`).toBe(0);
+      expect(result.positions[3 * v + 2], `left vertex ${v} z`).toBe(0);
+    }
+    // A (0, 0) is a corner of the rim by the plane join alone (an 18 degree turn); D (0, 10) by its 85 degree turn
+    expect([result.positions[0], result.positions[1], result.positions[2]]).toEqual([0, 0, 0]);
+    expect([result.positions[3 * 42], result.positions[3 * 42 + 1], result.positions[3 * 42 + 2]]).toEqual([0, 10, 0]);
+    expect(result.loops).toBe(1);
   });
 
-  it('refuses by name what it cannot keep: a different number of loops, a loop that does not go round, quads folded by the snap', () => {
+  describe('refuses, with its cause and the exact reason', () => {
     const quads = plateQuads(5, 10, 0);
-    // a source with two loops (a plate and a far triangle) against quads with one
-    const far: MeshData = {
-      positions: [...plate().positions, 50, 0, 0, 51, 0, 0, 50, 1, 0],
-      indices: [...plate().indices, plate().positions.length / 3, plate().positions.length / 3 + 1, plate().positions.length / 3 + 2],
+    /** `plate()` and a second plate 30 to the right: a source of two loops. */
+    const twin = (): MeshData => {
+      const a = plate();
+      const offset = a.positions.length / 3;
+      return {
+        positions: [...a.positions, ...a.positions.map((v, i) => (i % 3 === 0 ? v + 30 : v))],
+        indices: [...a.indices, ...a.indices.map((v) => v + offset)],
+      };
     };
-    expect(snapQuadBoundary(far, quads.positions, quads.quads, null)).toMatch(/1 boundary loop\(s\) against 2/);
-    // the source boundary is not a set of simple loops: two triangles that only meet at a vertex
-    const bowtie: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0], indices: [0, 1, 2, 0, 3, 4] };
-    expect(snapQuadBoundary(bowtie, quads.positions, quads.quads, null)).toMatch(/not a set of simple loops/);
-    // a quad that the snap turns inside out: a vertex of the left side pushed far to the right of its neighbour
-    const bent = plateQuads(5, 10, 0);
-    const bentPositions = [...bent.positions];
-    bentPositions[3 * 6] = 7;
-    bentPositions[3 * 6 + 1] = 2;
-    const refused = snapQuadBoundary(plate(), bentPositions, bent.quads, null);
-    expect(typeof refused === 'string' ? refused : 'ok').toMatch(/folds or collapses|does not go once round|in order/);
+    const shifted = (mesh: QuadMeshData, dx: number, scale = 1): QuadMeshData => ({
+      positions: mesh.positions.map((v, i) => (i % 3 === 0 ? v * scale + dx : i % 3 === 1 ? v * scale : v)),
+      quads: mesh.quads,
+    });
+    const joined = (parts: QuadMeshData[]): QuadMeshData => {
+      let offset = 0;
+      const out: QuadMeshData = { positions: [], quads: [] };
+      for (const part of parts) {
+        (out.positions as number[]).push(...part.positions);
+        (out.quads as number[]).push(...part.quads.map((v) => v + offset));
+        offset += part.positions.length / 3;
+      }
+      return out;
+    };
+
+    it('loops: a different number of loops', () => {
+      const far: MeshData = {
+        positions: [...plate().positions, 50, 0, 0, 51, 0, 0, 50, 1, 0],
+        indices: [...plate().indices, plate().positions.length / 3, plate().positions.length / 3 + 1, plate().positions.length / 3 + 2],
+      };
+      const result = problemOf(snapQuadBoundary(far, quads.positions, quads.quads, null));
+      expect(result).toMatchObject({ cause: 'loops' });
+      expect(result.message).toMatch(/^the engine's quads have 1 boundary loop\(s\) against 2 in the source$/);
+    });
+
+    it('loops: a quad loop that runs along two source loops', () => {
+      // one grid over both plates (x 0 to 40) and a small grid on the second plate: two loops against two, the big one nearest to both
+      const wide = shifted(quads, 0);
+      const stretched: QuadMeshData = { positions: wide.positions.map((v, i) => (i % 3 === 0 ? v * 4 : v)), quads: wide.quads };
+      const small = shifted(plateQuads(2, 10, 0), 30);
+      const result = problemOf(snapQuadBoundary(twin(), joined([stretched, small]).positions, joined([stretched, small]).quads, null));
+      expect(result).toMatchObject({ cause: 'loops' });
+      expect(result.message).toMatch(/^a boundary loop of the engine's quads runs along more than one boundary loop of the source$/);
+    });
+
+    it('loops: two quad loops that follow the same source loop', () => {
+      const both = joined([quads, shifted(plateQuads(3, 10, 0), 0)]);
+      const result = problemOf(snapQuadBoundary(twin(), both.positions, both.quads, null));
+      expect(result).toMatchObject({ cause: 'loops' });
+      expect(result.message).toMatch(/^two boundary loops of the engine's quads follow the same boundary loop of the source$/);
+    });
+
+    it('shape: a loop that does not go once round the rim it follows', () => {
+      const corner = plateQuads(2, 2, 0);
+      const result = problemOf(snapQuadBoundary(plate(), corner.positions, corner.quads, null));
+      expect(result).toMatchObject({ cause: 'shape' });
+      expect(result.message).toMatch(/does not go once round the boundary loop of the source it follows$/);
+    });
+
+    it("source: a source boundary that branches (two triangles that only meet at a vertex) is the source's problem", () => {
+      const bowtie: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0], indices: [0, 1, 2, 0, 3, 4] };
+      const result = problemOf(snapQuadBoundary(bowtie, quads.positions, quads.quads, null));
+      expect(result).toMatchObject({ cause: 'source' });
+      expect(result.message).toMatch(/^the boundary of the source is not a set of simple loops/);
+    });
+
+    it('shape: a quad folded or collapsed by the snap with the order of the boundary intact', () => {
+      // random interior vertices of a 5 x 5 grid with its boundary pushed inwards: some pull a quad across a boundary vertex, which the snap then folds
+      let next = 12345;
+      const random = (): number => ((next = (next * 1103515245 + 12345) % 2147483648), next / 2147483648);
+      let found: SnapProblem | null = null;
+      for (let attempt = 0; attempt < 400 && found === null; attempt++) {
+        const grid = plateQuads(5, 10, 0.4);
+        const positions = grid.positions.map((v, i) => {
+          const [vi, axis] = [Math.floor(i / 3), i % 3];
+          const [column, row] = [vi % 6, Math.floor(vi / 6)];
+          return axis < 2 && column > 0 && column < 5 && row > 0 && row < 5 ? v + (random() - 0.5) * 6 : v;
+        });
+        const result = snapQuadBoundary(plate(), positions, grid.quads, null);
+        if ('cause' in result && /folds or collapses quad \d+$/.test(result.message)) found = result;
+      }
+      expect(found, 'a random interior reaches a fold within 400 tries').not.toBeNull();
+      expect(found).toMatchObject({ cause: 'shape' });
+    });
   });
 });
 
@@ -154,7 +295,7 @@ describe('mirrorWeld, halfOf and symmetryProblem', () => {
     }
     // nothing on the positive side
     const behind = { positions: icosphere(10, 2).positions.map((v, i) => (i % 3 === 0 ? v - 20 : v)), indices: icosphere(10, 2).indices };
-    expect(halfOf(behind, 'yz', 17.3)).toBeNull();
+    expect(halfOf(behind, 'yz', 17.3)).toBe('empty');
   });
 });
 
@@ -192,7 +333,8 @@ describe('quad_remesh of an open mesh and with symmetry (stub engine)', () => {
       { id, targetQuadCount: 36, output: 'mesh' },
       contextWith(stubQuadEngine(() => quadSphere(10, 3))),
     );
-    expect(['MESH_QUAD_REMESH_BOUNDARY_LOST', 'MESH_QUAD_REMESH_FAILED']).toContain(lost.error?.code);
+    expect(lost.error?.code).toBe('MESH_QUAD_REMESH_BOUNDARY_LOST');
+    expect(lost.summary).toContain('engine counts tried: 36, 42, 32');
     expect(lost.document).toBe(doc);
   });
 
@@ -253,5 +395,84 @@ describe('quad_remesh of an open mesh and with symmetry (stub engine)', () => {
     );
     expect(refused.error?.code).toBe('MESH_QUAD_REMESH_NOT_SYMMETRIC');
     expect(refused.document).toBe(shifted.doc);
+  });
+});
+
+describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
+  const { doc, ids } = docWithMeshes(plate());
+  const id = ids[0] as string;
+
+  it('asks again at 1.15 x when the first answer lost a loop, and reports the counts sent', () => {
+    const seen: QuadOp[] = [];
+    // the first answer is a closed sphere (no boundary loop at all), the second a plate that fits
+    const engine = stubQuadEngine((op) => (op.targetQuads === 36 ? quadSphere(10, 3) : plateQuads(6, 10, 0.3)), seen);
+    const result = execute(doc, 'quad_remesh', { id, targetQuadCount: 36, output: 'mesh' }, contextWith(engine));
+    expect(result.error, result.summary).toBeUndefined();
+    expect(seen.map((op) => op.targetQuads)).toEqual([36, 42]);
+    expect(result.data).toMatchObject({ attempts: 2, engineTargets: [36, 42], quads: 36 });
+  });
+
+  it('then asks at 0.87 x, and refuses by name when every answer fails: the loop count -> BOUNDARY_LOST, the shape -> SNAP_FAILED', () => {
+    const seen: QuadOp[] = [];
+    const lost = execute(
+      doc,
+      'quad_remesh',
+      { id, targetQuadCount: 36, output: 'mesh' },
+      contextWith(stubQuadEngine(() => quadSphere(10, 3), seen)),
+    );
+    expect(lost.error?.code).toBe('MESH_QUAD_REMESH_BOUNDARY_LOST');
+    expect(seen.map((op) => op.targetQuads)).toEqual([36, 42, 32]);
+    expect(lost.summary).toContain('engine counts tried: 36, 42, 32');
+    expect(lost.document).toBe(doc);
+    // loops are there but the loop is a corner of the rim only: it cannot be placed
+    const corner = plateQuads(2, 2, 0);
+    const shape = execute(doc, 'quad_remesh', { id, targetQuadCount: 36, output: 'mesh' }, contextWith(stubQuadEngine(() => corner)));
+    expect(shape.error?.code).toBe('MESH_QUAD_REMESH_SNAP_FAILED');
+    expect(shape.summary).toContain('engine counts tried: 36, 42, 32');
+  });
+
+  it('asks once more for the count that would have given the target when the ratio is under 0.85, and keeps the closer result', () => {
+    const seen: QuadOp[] = [];
+    // 36 quads for 100 asked (ratio 0.36): asked again for ceil(100 / 0.36) = 278, which answers with 100 quads
+    const better = execute(
+      doc,
+      'quad_remesh',
+      { id, targetQuadCount: 100, output: 'mesh' },
+      contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(10, 10, 0.3)), seen)),
+    );
+    expect(seen.map((op) => op.targetQuads)).toEqual([100, 278]);
+    expect(better.data).toMatchObject({ attempts: 2, engineTargets: [100, 278], quads: 100, targetRatio: 1 });
+    // the second answer is worse (the ratio 0.1): the first is kept
+    const worse = execute(
+      doc,
+      'quad_remesh',
+      { id, targetQuadCount: 100, output: 'mesh' },
+      contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(3, 10, 0.3)))),
+    );
+    expect(worse.data).toMatchObject({ attempts: 2, quads: 36 });
+    // a closed source is never asked twice by the ratio rule
+    const sphere = docWithMeshes(icosphere(10, 3));
+    const closedSeen: QuadOp[] = [];
+    execute(
+      sphere.doc,
+      'quad_remesh',
+      { id: sphere.ids[0] as string, targetQuadCount: 400 },
+      contextWith(stubQuadEngine(() => quadSphere(10, 3), closedSeen)),
+    );
+    expect(closedSeen).toHaveLength(1);
+  });
+
+  it('refuses a symmetry plane that triangles lie in, by name, with the count', () => {
+    const half = halfOf(plate(), 'xy', 14.2);
+    expect(half).toEqual({ flat: 288 });
+    const refused = execute(
+      doc,
+      'quad_remesh',
+      { id, targetQuadCount: 36, output: 'mesh', symmetry: { plane: 'xy' } },
+      contextWith(stubQuadEngine(() => plateQuads(6, 10, 0))),
+    );
+    expect(refused.error?.code).toBe('MESH_PARAM_INVALID');
+    expect(refused.summary).toContain('288 triangle(s) lie in the xy plane');
+    expect(refused.document).toBe(doc);
   });
 });

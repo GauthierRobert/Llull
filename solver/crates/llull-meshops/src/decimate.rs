@@ -363,6 +363,7 @@ pub fn decimate(
         }
         if let Some(guard) = &mut state.guard {
             guard.touch(&state.mesh, keep, removed);
+            guard.prune_blame(removed, &ring);
         }
         state.mesh.collapse(removed, keep);
         if let Some(guard) = &mut state.guard {
@@ -399,4 +400,152 @@ pub fn decimate(
             max_collapse_cost: (!max_cost.is_nan()).then_some(max_cost),
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decimate, DecimateParams, DecimateReport};
+    use crate::collapse_check::CACHES_OFF;
+    use std::collections::HashMap;
+
+    fn stream(seed: u64) -> impl FnMut() -> f64 {
+        let mut state = seed;
+        move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        }
+    }
+
+    /// An icosphere of radius 10, `level` times subdivided, every vertex pushed along its radius by up to `noise`.
+    fn noisy_sphere(level: usize, noise: f64, seed: u64) -> (Vec<f64>, Vec<u32>) {
+        let t = (1.0 + 5.0f64.sqrt()) / 2.0;
+        let mut points: Vec<[f64; 3]> = vec![
+            [-1.0, t, 0.0],
+            [1.0, t, 0.0],
+            [-1.0, -t, 0.0],
+            [1.0, -t, 0.0],
+            [0.0, -1.0, t],
+            [0.0, 1.0, t],
+            [0.0, -1.0, -t],
+            [0.0, 1.0, -t],
+            [t, 0.0, -1.0],
+            [t, 0.0, 1.0],
+            [-t, 0.0, -1.0],
+            [-t, 0.0, 1.0],
+        ];
+        let mut faces: Vec<[u32; 3]> = vec![
+            [0, 11, 5],
+            [0, 5, 1],
+            [0, 1, 7],
+            [0, 7, 10],
+            [0, 10, 11],
+            [1, 5, 9],
+            [5, 11, 4],
+            [11, 10, 2],
+            [10, 7, 6],
+            [7, 1, 8],
+            [3, 9, 4],
+            [3, 4, 2],
+            [3, 2, 6],
+            [3, 6, 8],
+            [3, 8, 9],
+            [4, 9, 5],
+            [2, 4, 11],
+            [6, 2, 10],
+            [8, 6, 7],
+            [9, 8, 1],
+        ];
+        for _ in 0..level {
+            let mut cache: HashMap<(u32, u32), u32> = HashMap::new();
+            let mut next = Vec::new();
+            for f in &faces {
+                let mut mid = [0u32; 3];
+                for k in 0..3 {
+                    let (a, b) = (f[k], f[(k + 1) % 3]);
+                    mid[k] = *cache.entry((a.min(b), a.max(b))).or_insert_with(|| {
+                        let (p, q) = (points[a as usize], points[b as usize]);
+                        points.push([(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0, (p[2] + q[2]) / 2.0]);
+                        points.len() as u32 - 1
+                    });
+                }
+                next.extend([[f[0], mid[0], mid[2]], [f[1], mid[1], mid[0]], [f[2], mid[2], mid[1]], [mid[0], mid[1], mid[2]]]);
+            }
+            faces = next;
+        }
+        let mut random = stream(seed);
+        let positions = points
+            .iter()
+            .flat_map(|p| {
+                let n = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+                let r = 10.0 + (random() * 2.0 - 1.0) * noise;
+                [p[0] / n * r, p[1] / n * r, p[2] / n * r]
+            })
+            .collect();
+        (positions, faces.into_iter().flatten().collect())
+    }
+
+    /// A wavy open grid of `n` x `n` cells on [0, 10]^2 with some cells left out (holes), noise added to z.
+    fn noisy_grid(n: usize, noise: f64, seed: u64) -> (Vec<f64>, Vec<u32>) {
+        let mut random = stream(seed);
+        let h = 10.0 / n as f64;
+        let mut positions = Vec::new();
+        for j in 0..=n {
+            for i in 0..=n {
+                let (x, y) = (i as f64 * h, j as f64 * h);
+                positions.extend([x, y, 0.4 * (x / 1.5).sin() * (y / 2.0).cos() + (random() - 0.5) * noise]);
+            }
+        }
+        let id = |i: usize, j: usize| (j * (n + 1) + i) as u32;
+        let mut indices = Vec::new();
+        for j in 0..n {
+            for i in 0..n {
+                if (i * 7 + j * 3) % 29 != 0 {
+                    indices.extend([id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1)]);
+                }
+            }
+        }
+        (positions, indices)
+    }
+
+    fn run(mesh: &(Vec<f64>, Vec<u32>), params: &DecimateParams, caches_off: bool) -> (Vec<f64>, Vec<u32>, String) {
+        CACHES_OFF.with(|flag| flag.set(caches_off));
+        let (positions, indices, report): (Vec<f64>, Vec<u32>, DecimateReport) = decimate(&mesh.0, &mesh.1, params, &mut |_| {});
+        CACHES_OFF.with(|flag| flag.set(false));
+        (positions, indices, serde_json::to_string(&report).unwrap())
+    }
+
+    /// 13.16.4: the witnesses, the blamed probe and the hints are caches, so decimating with and without them gives the same bytes and the same report (the counts of every kind
+    /// of refusal included, which fixes the sequence of verdicts), whatever the bound, the target, the boundary rule and the feature angle.
+    #[test]
+    fn the_deviation_caches_change_neither_the_bytes_nor_the_refusals() {
+        let mut random = stream(2026);
+        let mut deviations_refused = 0;
+        for case in 0..50 {
+            let mesh = if case % 3 == 2 {
+                noisy_grid(12 + case % 9, 0.05 * (1 + case % 3) as f64, 100 + case as u64)
+            } else {
+                noisy_sphere(1 + case % 3, 0.1 * (1 + case % 4) as f64, 200 + case as u64)
+            };
+            let bound = [0.02, 0.05, 0.1, 0.3, 0.8][(random() * 5.0) as usize];
+            let triangles = mesh.1.len() / 3;
+            let params = DecimateParams {
+                target_triangles: (case % 2 == 0).then(|| (triangles as f64 * (0.2 + 0.5 * random())) as usize),
+                max_deviation: Some(bound),
+                preserve_boundary: case % 4 != 1,
+                feature_cos: (case % 5 == 0).then_some(0.9),
+                locked_region: None,
+            };
+            let with = run(&mesh, &params, false);
+            let without = run(&mesh, &params, true);
+            assert_eq!(with.2, without.2, "case {case}: the report differs");
+            assert!(with.0 == without.0 && with.1 == without.1, "case {case}: the bytes differ");
+            deviations_refused += serde_json::from_str::<serde_json::Value>(&with.2).unwrap()["rejected"]["deviation"].as_u64().unwrap();
+        }
+        assert!(
+            deviations_refused > 500,
+            "the cases refuse {deviations_refused} collapses by the deviation guard: too few to test the caches"
+        );
+    }
 }

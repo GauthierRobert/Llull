@@ -67,6 +67,11 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_KERNEL_UNSUPPORTED: 'Run on the native OCC kernel (the llull CLI / desktop app default); Manifold has no exact B-rep builder.',
   MESH_QUAD_REMESH_FAILED:
     'Run remesh_mesh first for an even triangulation, raise targetQuadCount (very few quads on a detailed surface), or repair_mesh the input.',
+  MESH_QUAD_REMESH_BOUNDARY_LOST:
+    'The quads did not keep every boundary loop of the mesh (a hole they covered): close the holes with fill_mesh_holes, or cut the mesh along them, then remesh.',
+  MESH_QUAD_REMESH_SNAP_FAILED:
+    'The boundary of the quads could not be placed on the rim of the mesh without folding quads, also after retries at other counts: try another targetQuadCount (a little higher or lower), or run remesh_mesh first for an even rim.',
+  MESH_QUAD_REMESH_NOT_SYMMETRIC: 'Make the mesh symmetric about the plane first, or leave symmetry out.',
   MESH_FIT_SYMMETRY: 'Clear the cage symmetry first (set_cage_symmetry planes []): a fit moves the vertices independently.',
   MESH_FIT_CAGE_INVALID: 'Repair the cage (check_subdivision lists the problem), then fit again.',
   MESH_FIT_TOO_LARGE:

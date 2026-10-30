@@ -5,6 +5,7 @@ use crate::edit::EditMesh;
 use crate::geom::{dot, length, normal_of, Vec3};
 use crate::surface::SurfaceIndex;
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -14,6 +15,48 @@ pub enum Verdict {
     Link,
     FoldOver,
     Deviation,
+}
+
+/// FxHash (the multiply-rotate hash of rustc) for the blame table: its keys are packed vertex pairs and need no protection against a hostile input.
+#[derive(Default)]
+pub struct EdgeHasher(u64);
+
+impl Hasher for EdgeHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(u64::from(b));
+        }
+    }
+    fn write_u64(&mut self, word: u64) {
+        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+type BlameTable = HashMap<u64, (u32, u32), BuildHasherDefault<EdgeHasher>>;
+
+/// Packs the edge `a`-`b` as (low, high).
+fn edge_key(a: u32, b: u32) -> u64 {
+    (u64::from(a.min(b)) << 32) | u64::from(a.max(b))
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test switch (13.16.4): while set on a thread, `DeviationGuard` ignores its witnesses, blames and hints, so a test can run the same decimation with and without the caches.
+    pub static CACHES_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// True when the caches are bypassed (only ever in a test).
+#[cfg(test)]
+fn caches_off() -> bool {
+    CACHES_OFF.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+const fn caches_off() -> bool {
+    false
 }
 
 /// A probe of the one-sided deviation guard: a point of the original surface (an original vertex or a triangle centre) that must stay within the bound of the surface
@@ -50,7 +93,7 @@ pub struct DeviationGuard {
     /// Per vertex: the original triangle that last answered a query of a collapse that keeps it ([`NO_FACE`] when none).
     pub hint: Vec<u32>,
     /// Per refused edge (packed low, high): the vertex and the probe that made the last attempt fail.
-    pub blame: HashMap<u64, (u32, u32)>,
+    pub blame: BlameTable,
 }
 
 /// "No face" in the witness and hint tables.
@@ -59,7 +102,14 @@ pub const NO_FACE: u32 = u32::MAX;
 impl DeviationGuard {
     pub fn new(max_deviation: f64, owned: Vec<Vec<Probe>>, original: SurfaceIndex, faces: usize) -> Self {
         let hint = vec![NO_FACE; owned.len()];
-        Self { max_deviation, owned, original, face_stamp: vec![0; faces], hint, blame: HashMap::new() }
+        Self { max_deviation, owned, original, face_stamp: vec![0; faces], hint, blame: BlameTable::default() }
+    }
+
+    /// Call when `removed` was merged into another vertex: its edges (to `ring`, its neighbours) are gone, and so is what the blame table remembers about them.
+    pub fn prune_blame(&mut self, removed: u32, ring: &[u32]) {
+        for &x in ring {
+            self.blame.remove(&edge_key(removed, x));
+        }
     }
 
     /// Call when a collapse of `removed` into `kept` is applied: every face at either vertex changes (corner or position), so the witnesses naming it expire.
@@ -225,13 +275,16 @@ struct Check<'a, F: Fn(u32) -> Vec3> {
     face_ids: &'a mut Vec<u32>,
     /// The vertex whose faces `faces` holds ([`NO_FACE`] when none).
     loaded: u32,
+    /// False in a test that bypasses the witnesses.
+    witnesses: bool,
 }
 
 impl<F: Fn(u32) -> Vec3> Check<'_, F> {
     /// True when `probe`, owned by `o`, is within the bound of a face at `o` after the collapse.
     fn holds(&mut self, o: u32, probe: &mut Probe) -> bool {
         let (u, v) = self.edge;
-        if probe.face != NO_FACE
+        if self.witnesses
+            && probe.face != NO_FACE
             && self.face_stamp[probe.face as usize] == probe.stamp
             && probe.corners.contains(&o)
             && !probe.corners.contains(&u)
@@ -267,7 +320,7 @@ impl<F: Fn(u32) -> Vec3> Check<'_, F> {
         match found {
             Some(i) => {
                 let id = self.face_ids[i];
-                if id != NO_FACE {
+                if id != NO_FACE && self.witnesses {
                     *probe = Probe { face: id, stamp: self.face_stamp[id as usize], corners: self.mesh.corners(id), ..*probe };
                 }
                 true
@@ -299,14 +352,15 @@ fn deviation_verdict(
     // The three tests below fail independently of one another, so the order only decides how soon a refusal is found: the probes first (a probe
     // is satisfied by the first triangle within the bound), the queries on the original surface after.
     let DeviationGuard { owned, original, face_stamp, hint, blame, .. } = guard;
-    let edge = (u64::from(u.min(v)) << 32) | u64::from(u.max(v));
-    let mut check = Check { mesh, edge: (u, v), fan, limit, place: &place, face_stamp, faces, face_ids, loaded: NO_FACE };
+    let edge = edge_key(u, v);
+    let off = caches_off();
+    let mut check = Check { mesh, edge: (u, v), fan, limit, place: &place, face_stamp, faces, face_ids, loaded: NO_FACE, witnesses: !off };
     // the probes the removed vertex owned are the survivor's now; they are tested with its own
     let mut inherited = std::mem::take(&mut owned[removed as usize]);
     let mut nothing: Vec<Probe> = Vec::new();
     let failed: Option<(u32, u32)> = 'scan: {
         // the probe that failed the last attempt on this edge goes first (only one still owned by an affected vertex counts)
-        if let Some(&(o, id)) = blame.get(&edge) {
+        if let Some(&(o, id)) = blame.get(&edge).filter(|_| !off) {
             if affected.contains(&o) {
                 let extra: &mut [Probe] = if o == keep { &mut inherited } else { &mut nothing };
                 if let Some(probe) = owned[o as usize].iter_mut().chain(extra.iter_mut()).find(|probe| probe.id == id) {
@@ -328,11 +382,13 @@ fn deviation_verdict(
     };
     owned[removed as usize] = inherited;
     if let Some(blamed) = failed {
-        blame.insert(edge, blamed);
+        if !off {
+            blame.insert(edge, blamed);
+        }
         return Verdict::Deviation;
     }
     // the queries on the original surface start from the triangle that answered the last one of this vertex
-    let mut last = hint[keep as usize];
+    let mut last = if off { NO_FACE } else { hint[keep as usize] };
     let mut verdict = Verdict::Ok;
     let mut query = |p: Vec3| match original.within(p, max_deviation, last) {
         Some(face) => {
@@ -355,7 +411,9 @@ fn deviation_verdict(
             }
         }
     }
-    hint[keep as usize] = last;
+    if !off {
+        hint[keep as usize] = last;
+    }
     verdict
 }
 
