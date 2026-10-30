@@ -25,9 +25,9 @@ const add = (doc: CadDocument, name: string, params: object): { doc: CadDocument
   return { doc: result.document, id: result.affected[0] as string };
 };
 
-/** The `<g id="...">` blocks of an overlay layer in `svg`: [entity id, the markup inside]. */
+/** The `<g class="...">` blocks of an overlay layer in `svg`: [entity id, the markup inside]. */
 function groups(svg: string, id: 'cage-overlay' | 'net-overlay'): Array<[string, string]> {
-  return [...svg.matchAll(new RegExp(`<g id="${id}" data-entity="([^"]*)"[^>]*>([\\s\\S]*?)</g>`, 'g'))].map((m) => [
+  return [...svg.matchAll(new RegExp(`<g class="${id}" data-entity="([^"]*)"[^>]*>([\\s\\S]*?)</g>`, 'g'))].map((m) => [
     m[1] as string,
     m[2] as string,
   ]);
@@ -93,6 +93,42 @@ describe('render_view overlay "cage"', () => {
     // and it is not where the unmoved cage would be
     const unmoved = new Set(entity.vertices.map((p) => project(p).map(r2).join(',')));
     expect(dots(block).some(([x, y]) => unmoved.has(`${x},${y}`))).toBe(false);
+  });
+
+  it('is placed like the rendered mesh: the centre of the dots is the projected centre of the own world bounds of the render (an oracle that does not share the placement rule)', () => {
+    const entity = cageOf(cube.doc, cube.id);
+    for (const [position, rotation] of [
+      [
+        [10, 5, 0],
+        [0, 0, Math.PI / 6],
+      ],
+      [
+        [-4, 2, 3],
+        [0.3, 0, 0.5],
+      ],
+    ] as Array<[Vec3, Vec3]>) {
+      const placedDoc: CadDocument = { ...cube.doc, entities: { ...cube.doc.entities, [cube.id]: { ...entity, position, rotation } } };
+      const data = dataOf(render(placedDoc, { overlay: 'cage' }));
+      const project = makeProjector(data.camera, data.orthoHalf, data.width, data.height);
+      const bounds = (data as unknown as { bounds: { min: Vec3; max: Vec3 } }).bounds;
+      const middle = project(bounds.min.map((lo, k) => (lo + (bounds.max[k] as number)) / 2) as unknown as Vec3);
+      const points = dots(groups(data.svg, 'cage-overlay')[0]?.[1] as string);
+      const mean = [0, 1].map((k) => points.reduce((sum, p) => sum + p[k]!, 0) / points.length);
+      expect(Math.hypot((mean[0] as number) - (middle[0] as number), (mean[1] as number) - (middle[1] as number))).toBeLessThan(3);
+    }
+  });
+
+  it('two entities: one group each with distinct classes of a layer shared and no duplicate element ids; the order is the document order; a turntable says it draws no overlay', () => {
+    const second = add(cube.doc, 'add_subdivision_solid', { box: { size: [1, 1, 1] }, levels: 1, position: [5, 0, 0] });
+    const data = dataOf(render(second.doc, { overlay: 'cage' }));
+    expect(groups(data.svg, 'cage-overlay').map(([id]) => id)).toEqual([cube.id, second.id]);
+    const ids = [...data.svg.matchAll(/ id="([^"]*)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    const reordered: CadDocument = { ...second.doc, order: [second.id, cube.id] };
+    expect(groups(dataOf(render(reordered, { overlay: 'cage' })).svg, 'cage-overlay').map(([id]) => id)).toEqual([second.id, cube.id]);
+    const strip = render(cube.doc, { overlay: 'cage', turntable: { frames: 2 } });
+    expect(strip.summary).toContain('Overlay not drawn on a turntable strip');
+    expect(dataOf(strip).svg).not.toContain('cage-overlay');
   });
 });
 

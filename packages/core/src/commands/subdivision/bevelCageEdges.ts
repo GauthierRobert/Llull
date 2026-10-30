@@ -18,7 +18,7 @@ const MAX_SEGMENTS = 16;
 /**
  * @affects modifies 1 subdivision entity (each edge becomes a strip of `segments` quads; an end vertex with one bevelled edge splits in two; where bevelled edges meet (a chain, a corner) the vertex is replaced by one point per face around it and a patch face); surviving elements keep their ids
  * @invariant the strip edges lie `width` of the adjacent edges away from the old edge (between two bevelled edges: the parallelogram completion); a closed cage stays closed and manifold; on a symmetric cage the mirror edges are bevelled too
- * @failure missing id (DIR_ENTITY_NOT_FOUND), unknown / wrong-kind edge (DIR_REF_LOST / DIR_ELEMENT_KIND), width <= 0 (DIR_BEVEL_WIDTH_RANGE) or >= 0.5 (DIR_BEVEL_TOO_WIDE), a boundary edge (DIR_BEVEL_BOUNDARY), bevelled edges meeting at a vertex of valence over 4 or on the boundary (DIR_BEVEL_CORNER_UNSUPPORTED), segments / sharp out of range, cage cap (DIR_CAGE_TOO_LARGE), broken symmetry (DIR_SYMMETRY_BROKEN) -> no-op
+ * @failure missing id (DIR_ENTITY_NOT_FOUND), unknown / wrong-kind edge (DIR_REF_LOST / DIR_ELEMENT_KIND), width <= 0 (DIR_BEVEL_WIDTH_RANGE), >= 0.5 or so wide that a face collapses or turns inside out (DIR_BEVEL_TOO_WIDE), a boundary edge (DIR_BEVEL_BOUNDARY), bevelled edges meeting at a vertex of valence over 4 or on the boundary (DIR_BEVEL_CORNER_UNSUPPORTED), segments / sharp out of range, cage cap (DIR_CAGE_TOO_LARGE), broken symmetry (DIR_SYMMETRY_BROKEN) -> no-op
  */
 export const bevelCageEdges = defineCommand({
   name: COMMAND,
@@ -26,9 +26,9 @@ export const bevelCageEdges = defineCommand({
     'Bevel edges of a subdivision cage: each edge is replaced by a strip of `segments` quads, set back by `width` (a fraction 0 < width < 0.5 of the ' +
     'length of the adjacent edges) on both sides. A chamfer of a cage: the smooth surface gets a rounded edge where it was crisp, or with `sharp` a ' +
     'crisp chamfer. `edges` are ids ("e:<idA>|<idB>") or [a, b] vertex index pairs and must border two faces. Edges may share vertices: a chain of edges is one ' +
-    'strip, and where 2 or 3 bevelled edges meet at a vertex (a cube corner with all three edges) the vertex is replaced by one corner point per face around it and one ' +
-    'patch face (a triangle at a valence-3 corner with `segments` 1, a polygon of 3 x `segments` points otherwise); the other faces around it keep their ' +
-    'outline. A symmetric cage bevels the mirror edges too. Refuses width >= 0.5 (DIR_BEVEL_TOO_WIDE), boundary edges (DIR_BEVEL_BOUNDARY) and a corner it ' +
+    'strip, and where 2 to 4 bevelled edges meet at a vertex (a cube corner with all three edges) the vertex is replaced by one corner point per face around it and one ' +
+    'patch face (a triangle at a valence-3 corner with `segments` 1, a polygon of valence x `segments` points otherwise; none when the strips through the corner join the same two points); the other faces around it keep their ' +
+    'outline. A symmetric cage bevels the mirror edges too. Refuses width >= 0.5 and a width that makes a face collapse or invert where bevelled edges meet (DIR_BEVEL_TOO_WIDE), boundary edges (DIR_BEVEL_BOUNDARY) and a corner it ' +
     'cannot patch: valence over 4 or on the boundary (DIR_BEVEL_CORNER_UNSUPPORTED). Returns data { vertexCount, faceCount, vertices, vertexIds, faceIds, newVertices, newFaces }. ' +
     'Next: set_cage_crease, edit_subdivision_cage, check_subdivision.',
   params: z.object({
@@ -73,7 +73,8 @@ export const bevelCageEdges = defineCommand({
     }
     const state = cageState(entity);
     const result = bevelEdges(state, topology, [...edges.values()], width, segments, sharp);
-    if (isBevelProblem(result)) return reject(result.code, result.message, ['params.edges']);
+    if (isBevelProblem(result))
+      return reject(result.code, result.message, [result.code === 'DIR_BEVEL_TOO_WIDE' ? 'params.width' : 'params.edges']);
     const updated = finishedCage(doc, COMMAND, entity, state);
     if (isCommandResult(updated)) return updated;
     const [oldVertices, oldFaces] = [new Set(entity.elementIds.vertices), new Set(entity.elementIds.faces)];

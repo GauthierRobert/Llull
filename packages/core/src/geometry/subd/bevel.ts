@@ -8,15 +8,15 @@
  */
 
 import type { Vec3 } from '../../model/types';
-import { lerp3 } from '../../lib/vec3';
+import { add3, centroid3, dot3, len3, lerp3, sub3 } from '../../lib/vec3';
 import type { CageState } from './cageState';
 import { compactState } from './cageOps';
 import { edgeKey } from './edgeKey';
 import { mintElementId } from './elements';
-import type { CageTopology } from './topology';
+import { type CageTopology, newellVector } from './topology';
 
 export interface BevelProblem {
-  readonly code: 'DIR_BEVEL_BOUNDARY' | 'DIR_BEVEL_CORNER_UNSUPPORTED';
+  readonly code: 'DIR_BEVEL_BOUNDARY' | 'DIR_BEVEL_CORNER_UNSUPPORTED' | 'DIR_BEVEL_TOO_WIDE';
   readonly message: string;
 }
 
@@ -43,7 +43,7 @@ interface EdgeSplit {
 /**
  * Bevels `edges` (distinct cage edges) by `width` (fraction of the adjacent edge lengths, 0 < width < 0.5) into strips of `segments` quads; the two long
  * edges of each strip get `sharpness` (0 = smooth). Mutates `state`.
- * @failure an edge on the boundary; a vertex of valence over 4 or on the boundary where two picked edges meet -> BevelProblem
+ * @failure an edge on the boundary; a vertex of valence over 4 or on the boundary where two picked edges meet; a face whose polygon collapses or turns inside out (the corner points of several bevelled edges crossed) -> BevelProblem
  */
 export function bevelEdges(
   state: CageState,
@@ -70,6 +70,12 @@ export function bevelEdges(
   const edits: CornerEdit[] = [];
   const splitAt = new Map<string, EdgeSplit>();
   const newFaces: number[][] = [];
+  /** Per new face, the ORIGINAL faces it replaces the neighbourhood of: its normal must agree with theirs. */
+  const newRefs: number[][] = [];
+  const addFace = (face: number[], around: ReadonlyArray<number>): void => {
+    newFaces.push(face);
+    newRefs.push([...around]);
+  };
   const addVertex = (p: Vec3): number => {
     state.vertices.push(p);
     state.vertexIds.push(mintElementId('v', taken));
@@ -85,11 +91,19 @@ export function bevelEdges(
     if (dropped) split.dropped.add(v);
     splitAt.set(key, split);
   };
-  /** The `segments - 1` points between the vertices `from` and `to`. */
+  const betweenCache = new Map<string, number[]>();
+  /** The `segments - 1` points between the vertices `from` and `to`; the strips on both sides of a corner that joins the same two points share them (one set per unordered pair). */
   const between = (from: number, to: number): number[] => {
-    const out: number[] = [];
-    for (let k = 1; k < segments; k++) out.push(addVertex(lerp3(state.vertices[from] as Vec3, state.vertices[to] as Vec3, k / segments)));
-    return out;
+    const [low, high] = from < to ? [from, to] : [to, from];
+    const key = `${low}:${high}`;
+    let points = betweenCache.get(key);
+    if (points === undefined) {
+      points = [];
+      for (let k = 1; k < segments; k++)
+        points.push(addVertex(lerp3(state.vertices[low] as Vec3, state.vertices[high] as Vec3, k / segments)));
+      betweenCache.set(key, points);
+    }
+    return from < to ? points : [...points].reverse();
   };
 
   /** Splits the end v of the edge v-w (the only picked edge at v); returns the chain vP..vQ. */
@@ -114,7 +128,7 @@ export function bevelEdges(
       insertOn(v, s, vQ, false);
       if (inP !== undefined) edits.push({ face: inP, corner: (sources[inP] as number[]).indexOf(v), with: [v, vP] });
       if (inQ !== undefined) edits.push({ face: inQ, corner: (sources[inQ] as number[]).indexOf(v), with: [vQ, v] });
-      if (inP !== undefined || inQ !== undefined) newFaces.push([...chain].reverse().concat(v));
+      if (inP !== undefined || inQ !== undefined) addFace([...chain].reverse().concat(v), topology.vertexFaces[v] as number[]);
     }
     return chain;
   };
@@ -182,7 +196,7 @@ export function bevelEdges(
       if (outgoing) return [onEdge(i)];
       return null;
     });
-    const plain = replacement.flatMap((r, i) => (r === null ? [i] : []));
+    const plain = replacement.filter((r) => r === null).length;
     const chains = new Map<number, number[]>();
     cornerChains.set(v, chains);
     const loop: number[] = [];
@@ -200,7 +214,6 @@ export function bevelEdges(
       }
     });
     if (loop.length > 1 && loop[0] === loop[loop.length - 1]) loop.pop();
-    const keep = plain.length >= 2;
     const patch = [...loop].reverse();
     faces.forEach((f, i) => {
       const r = replacement[i];
@@ -209,17 +222,13 @@ export function bevelEdges(
         edits.push({ face: f, corner, with: r as number[] });
         return;
       }
-      if (keep) {
-        const [x0, x1] = [pointOnEdge.get(i), pointOnEdge.get((i + 1) % n)];
-        edits.push({ face: f, corner, with: [...(x0 === undefined ? [] : [x0]), v, ...(x1 === undefined ? [] : [x1])] });
-      } else {
-        // the only face between edges that are not picked takes the whole patch in place of v
-        const at = patch.indexOf(v);
-        edits.push({ face: f, corner, with: [...patch.slice(at + 1), ...patch.slice(0, at)] });
-      }
+      // at valence <= 4 at most one face lies between edges that are not picked: it takes the whole patch in place of v
+      const at = patch.indexOf(v);
+      edits.push({ face: f, corner, with: [...patch.slice(at + 1), ...patch.slice(0, at)] });
     });
-    if (plain.length !== 1 && patch.length >= 3) newFaces.push(patch);
-    for (const [j, p] of pointOnEdge) insertOn(v, ring[j] as number, p, !keep);
+    // a loop that visits a point twice (the two strips of a chain through the corner join the same two points) encloses nothing: no patch face
+    if (plain !== 1 && patch.length >= 3 && new Set(patch).size === patch.length) addFace(patch, faces);
+    for (const [j, p] of pointOnEdge) insertOn(v, ring[j] as number, p, true);
     return null;
   };
 
@@ -237,14 +246,43 @@ export function bevelEdges(
     // strips run F1 side -> F2 side: chainA = a1..a2 (P = F1 holds a->b), chainB = b2..b1
     const bFromF1 = [...chainB].reverse();
     for (let k = 0; k < segments; k++)
-      newFaces.push([bFromF1[k] as number, chainA[k] as number, chainA[k + 1] as number, bFromF1[k + 1] as number]);
+      addFace(
+        [bFromF1[k] as number, chainA[k] as number, chainA[k + 1] as number, bFromF1[k + 1] as number],
+        [topology.directed.get(`${a}>${b}`) as number, topology.directed.get(`${b}>${a}`) as number],
+      );
     longEdges.push([chainA[0] as number, bFromF1[0] as number], [chainA[segments] as number, bFromF1[segments] as number]);
   }
+  const collapsed: number[] = [];
+  const inverted: number[] = [];
   state.faces.forEach((_, f) => {
     const mine = edits.filter((edit) => edit.face === f);
     if (mine.length === 0) return;
     state.faces[f] = (sources[f] as number[]).flatMap((v, i) => mine.find((edit) => edit.corner === i)?.with ?? [v]);
+    const [before, now] = [newellVector(original, sources[f] as number[]), newellVector(state.vertices, state.faces[f] as number[])];
+    // a corner replaced by one point must stay on its own side of the face centre (corner points that cross turn a face inside out even when its area has the right sign)
+    const middle = centroid3((sources[f] as number[]).map((v) => original[v] as Vec3));
+    const crossed = mine.some(
+      (edit) =>
+        edit.with.length === 1 &&
+        dot3(
+          sub3(state.vertices[edit.with[0] as number] as Vec3, middle),
+          sub3(original[(sources[f] as number[])[edit.corner] as number] as Vec3, middle),
+        ) <= 0,
+    );
+    if (crossed || len3(now) <= 1e-9 * len3(before) || dot3(before, now) <= 0) collapsed.push(f);
   });
+  newFaces.forEach((face, i) => {
+    const reference = (newRefs[i] as number[]).reduce<Vec3>(
+      (sum, f) => add3(sum, newellVector(original, sources[f] as number[])),
+      [0, 0, 0],
+    );
+    if (dot3(reference, newellVector(state.vertices, face)) < 0) inverted.push(i);
+  });
+  if (collapsed.length > 0 || inverted.length > 0)
+    return {
+      code: 'DIR_BEVEL_TOO_WIDE',
+      message: `width ${width} makes the corner points of the bevelled edges cross (${collapsed.length} face(s) collapse, ${inverted.length} new face(s) turn inside out); use a smaller width`,
+    };
   for (const face of newFaces) {
     state.faces.push(face);
     state.faceIds.push(mintElementId('f', taken));

@@ -6,7 +6,7 @@ import { execute } from '@core/commands/registry';
 import { cageProblem } from '@core/geometry/subdivision';
 import { cageState } from '@core/geometry/subd/cageState';
 import { bevelEdges, isBevelProblem } from '@core/geometry/subd/bevel';
-import { buildTopology } from '@core/geometry/subd/topology';
+import { buildTopology, newellVector } from '@core/geometry/subd/topology';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 
 const run = (doc: CadDocument, name: string, params: object): ReturnType<typeof execute> =>
@@ -241,5 +241,187 @@ describe('bevel_cage_edges across vertex chains', () => {
         );
     expect(codes.has('DIR_BEVEL_CORNER_UNSUPPORTED')).toBe(true);
     expect([...codes].every((c) => c === 'DIR_BEVEL_CORNER_UNSUPPORTED' || c === 'DIR_BEVEL_BOUNDARY')).toBe(true);
+  });
+});
+
+/** Geometry of a bevelled cage against its source: every face has area, no two vertices coincide, every surviving face keeps the side it looked at. */
+function geometryProblem(
+  before: SubdivisionEntity,
+  after: { vertices: ReadonlyArray<Vec3>; faces: ReadonlyArray<ReadonlyArray<number>> },
+  flatEnds = false,
+): string | null {
+  const scale = Math.max(...before.vertices.flat().map(Math.abs), 1);
+  for (let a = 0; a < after.vertices.length; a++)
+    for (let b = a + 1; b < after.vertices.length; b++)
+      if (Math.hypot(...(after.vertices[a] as Vec3).map((x, k) => x - (after.vertices[b] as Vec3)[k]!)) < 1e-9 * scale)
+        return `vertices ${a} and ${b} coincide`;
+  for (let f = 0; f < after.faces.length; f++) {
+    const now = newellVector(after.vertices, after.faces[f] as number[]);
+    // a triangle that closes the end of a bevel on a straight cage edge is flat by the source geometry (its three points are collinear): only larger faces must have area
+    if (!flatEnds && (after.faces[f] as number[]).length > 3 && Math.hypot(...now) <= 1e-9 * scale * scale) return `face ${f} has no area`;
+    if (f < before.faces.length) {
+      const was = newellVector(before.vertices, before.faces[f] as number[]);
+      if (now[0] * was[0] + now[1] * was[1] + now[2] * was[2] <= 0) return `face ${f} turned inside out`;
+    }
+  }
+  return null;
+}
+
+describe('bevel_cage_edges geometry stays sound', () => {
+  const state0 = cageState(cube.e);
+  const topology = buildTopology(state0.vertices.length, state0.faces);
+  const edges = topology.edges.map((edge): [number, number] => [edge.a, edge.b]);
+
+  it('every subset of the 12 cube edges at widths 0.25 and 0.45 and 1 to 3 segments: no zero-area face, no coincident vertices, every face keeps its side', () => {
+    let failures = 0;
+    let first = '';
+    for (const width of [0.25, 0.45])
+      for (let mask = 1; mask < 1 << 12; mask++) {
+        const state = cageState(cube.e);
+        const result = bevelEdges(
+          state,
+          topology,
+          edges.filter((_, i) => (mask >> i) & 1),
+          width,
+          1 + (mask % 3),
+          0,
+        );
+        if (isBevelProblem(result)) {
+          failures++;
+          first ||= `width ${width} mask ${mask}: ${result.code} ${result.message}`;
+          continue;
+        }
+        const problem = geometryProblem(cube.e, state);
+        if (problem !== null) {
+          failures++;
+          first ||= `width ${width} mask ${mask}: ${problem}`;
+        }
+      }
+    expect(failures, first).toBe(0);
+  });
+
+  it('a chain through a valence-3 vertex and two opposite spokes of a valence-4 vertex with 3 segments: the strips share their points, no patch face, closed manifold', () => {
+    const [a, b] = neighbours as [number, number, number];
+    const chain = bevel(
+      cube.doc,
+      cube.id,
+      [
+        [corner, a],
+        [corner, b],
+      ],
+      { segments: 3 },
+    );
+    const e = entityOf(chain.document, cube.id);
+    expect(shapeOf(e)).toMatchObject({ euler: 2, closed: true });
+    expect(geometryProblem(cube.e, e)).toBeNull();
+    const grid = add({ box: { size: [2, 2, 2], segments: [2, 2, 2] }, levels: 1 });
+    const centre = at(grid.e, [0, 0, 1]);
+    const opposite = bevel(
+      grid.doc,
+      grid.id,
+      [
+        [centre, at(grid.e, [1, 0, 1])],
+        [centre, at(grid.e, [-1, 0, 1])],
+      ],
+      { segments: 3 },
+    );
+    const g = entityOf(opposite.document, grid.id);
+    expect(shapeOf(g)).toMatchObject({ euler: 2, closed: true });
+    expect(geometryProblem(grid.e, g, true)).toBeNull();
+  });
+
+  const tetra = add({
+    vertices: [
+      [1, 1, 1],
+      [1, -1, -1],
+      [-1, 1, -1],
+      [-1, -1, 1],
+    ],
+    faces: [
+      [0, 2, 1],
+      [0, 1, 3],
+      [0, 3, 2],
+      [1, 2, 3],
+    ],
+    creases: [],
+    levels: 1,
+  });
+  const allEdges = (e: SubdivisionEntity): Array<[number, number]> =>
+    buildTopology(e.vertices.length, e.faces).edges.map((edge): [number, number] => [edge.a, edge.b]);
+
+  it('a tetrahedron with all 6 edges: width 0.3 is accepted and sound, 0.34 and 0.45 are refused DIR_BEVEL_TOO_WIDE with the document unchanged', () => {
+    const ok = bevel(tetra.doc, tetra.id, allEdges(tetra.e), { width: 0.3 });
+    expect(ok.error, ok.summary).toBeUndefined();
+    expect(geometryProblem(tetra.e, entityOf(ok.document, tetra.id))).toBeNull();
+    for (const width of [0.34, 0.45]) {
+      const refused = bevel(tetra.doc, tetra.id, allEdges(tetra.e), { width });
+      expectNoOp(refused, tetra.doc);
+      expect(code(refused), `${width}`).toBe('DIR_BEVEL_TOO_WIDE');
+    }
+  });
+
+  it('a triangle with three bevelled edges collapses at width 1/3: refused above it, accepted below', () => {
+    const wide = bevel(
+      tetra.doc,
+      tetra.id,
+      [
+        [0, 1],
+        [1, 2],
+        [0, 2],
+      ],
+      { width: 0.45 },
+    );
+    expectNoOp(wide, tetra.doc);
+    expect(code(wide)).toBe('DIR_BEVEL_TOO_WIDE');
+    const narrow = bevel(
+      tetra.doc,
+      tetra.id,
+      [
+        [0, 1],
+        [1, 2],
+        [0, 2],
+      ],
+      { width: 0.2 },
+    );
+    expect(narrow.error, narrow.summary).toBeUndefined();
+  });
+
+  it('a valence-4 grid with 4 spokes at widths 0.2 and 0.45 stays sound', () => {
+    const grid = add({ box: { size: [2, 2, 2], segments: [2, 2, 2] }, levels: 1 });
+    const centre = at(grid.e, [0, 0, 1]);
+    const spokes = (
+      [
+        [1, 0, 1],
+        [0, 1, 1],
+        [-1, 0, 1],
+        [0, -1, 1],
+      ] as Vec3[]
+    ).map((p): [number, number] => [centre, at(grid.e, p)]);
+    for (const width of [0.2, 0.45]) {
+      const result = bevel(grid.doc, grid.id, spokes, { width });
+      expect(result.error, `${width}: ${result.summary}`).toBeUndefined();
+      expect(geometryProblem(grid.e, entityOf(result.document, grid.id)), `${width}`).toBeNull();
+    }
+  });
+
+  it('the piece p-w of the non-bevelled edge corner-w that a chain splits keeps its infinite sharpness, and no crease refers to the removed corner', () => {
+    const creased = run(cube.doc, 'edit_subdivision_cage', { id: cube.id, crease: true });
+    const [a, b, c] = neighbours as [number, number, number];
+    const result = bevel(creased.document, cube.id, [
+      [corner, a],
+      [corner, b],
+    ]);
+    expect(result.error, result.summary).toBeUndefined();
+    const e = entityOf(result.document, cube.id);
+    expect(at(e, [1, 1, 1])).toBe(-1);
+    const near = at(e, [1, 1, 0.5]);
+    const far = at(e, [1, 1, -1]);
+    expect(near).toBeGreaterThanOrEqual(0);
+    expect(c).toBeGreaterThanOrEqual(0);
+    expect(e.creases.some(([p, q]) => (p === near && q === far) || (p === far && q === near))).toBe(true);
+    for (const [p, q] of e.creases) {
+      expect(p).toBeLessThan(e.vertices.length);
+      expect(q).toBeLessThan(e.vertices.length);
+    }
   });
 });

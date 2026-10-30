@@ -12,7 +12,9 @@ import { escapeXml } from '../../lib/escapeXml';
 import type { ViewName } from './camera';
 import { renderDocument } from './scene';
 import { composeOverlays } from './overlays';
-import { OVERLAY_KINDS, appendCageNetOverlays } from './overlayCage';
+import { appendCageNetOverlays } from './overlayCage';
+import { OVERLAY_KINDS } from './overlayTypes';
+import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
@@ -174,7 +176,7 @@ export const renderView = defineCommand({
       .union([z.enum(OVERLAY_KINDS), z.array(z.enum(OVERLAY_KINDS)).min(1)])
       .optional()
       .describe(
-        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. One kind or ["cage", "net"]. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective or viewpoint renders (the summary says so); data.overlays reports the entity ids and the counts of segments and dots.',
+        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. One kind or ["cage", "net"]. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
       ),
     hide2D: z
       .boolean()
@@ -224,7 +226,8 @@ export const renderView = defineCommand({
     if (params.turntable) {
       const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
-      return finish(doc, withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`), {
+      const dropped = params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.';
+      return finish(doc, withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`), {
         ...base,
         width: strip.width,
         svg: decorate(strip.svg),
@@ -253,7 +256,7 @@ export const renderView = defineCommand({
     if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
     else if (kinds.length > 0) {
       const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      const drawn = appendCageNetOverlays(svg, base, Object.values(scene.entities), kinds, isolated);
+      const drawn = appendCageNetOverlays(svg, base, orderedEntities(scene), kinds, isolated);
       svg = drawn.svg;
       overlays = drawn.stats;
       summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;

@@ -1,32 +1,15 @@
 /** render_view `overlay` = "cage" | "net" (04 DIR FR-DIR-40, AF-22): the subdivision cage and the NURBS control nets drawn over the picture, so an agent sees what it edits. */
 
 import { type Entity, type Vec3 } from '../../model/types';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, svgDot, svgLine } from './svg';
+import { OVERLAY_KINDS, type OverlayKind, type OverlayStats } from './overlayTypes';
 import type { RenderViewData } from './types';
-
-export const OVERLAY_KINDS = ['cage', 'net'] as const;
-export type OverlayKind = (typeof OVERLAY_KINDS)[number];
-
-/** What an overlay drew, for `data.overlays` (counts of the elements in the SVG, entity ids in document order). */
-export interface OverlayStats {
-  readonly entities: string[];
-  /** Cage: unique cage edges drawn. Net: control-net segments (rows and columns of surfaces, the polygon of curves). */
-  readonly lines: number;
-  /** Cage vertices, or net poles, drawn as dots. */
-  readonly points: number;
-}
 
 const CAGE_COLOR = '#ffd24a';
 const NET_COLOR = '#44ddff';
-
-/** World position of the entity-local point `p` (the rule of the mesh placement: translate, then rotate about the position). */
-function placed(entity: Entity, p: Vec3): Vec3 {
-  const moved: Vec3 = [p[0] + entity.position[0], p[1] + entity.position[1], p[2] + entity.position[2]];
-  return entity.rotation.every((angle) => angle === 0) ? moved : applyEulerXYZ(moved, entity.position, entity.rotation);
-}
 
 interface Layer {
   readonly svg: string[];
@@ -39,7 +22,7 @@ function cageLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
   let [lines, points] = [0, 0];
   for (const entity of entities) {
     if (entity.kind !== 'subdivision') continue;
-    const screen = entity.vertices.map((p) => project(placed(entity, p)));
+    const screen = entity.vertices.map((p) => project(entityLocalToWorld(entity, p)));
     const seen = new Set<string>();
     const body: string[] = [];
     for (const face of entity.faces)
@@ -52,7 +35,7 @@ function cageLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
       });
     for (const p of screen) body.push(`    ${svgDot(p, `fill="${CAGE_COLOR}" stroke="#1a1a2e" stroke-width="1"`)}`);
     svg.push(
-      `  <g id="cage-overlay" data-entity="${escapeXml(entity.id)}" stroke="${CAGE_COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.9">`,
+      `  <g class="cage-overlay" data-entity="${escapeXml(entity.id)}" stroke="${CAGE_COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.9">`,
       ...body,
       '  </g>',
     );
@@ -70,9 +53,9 @@ function netLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
   for (const entity of entities) {
     const grid: Vec3[][] | null =
       entity.kind === 'nurbs_surface'
-        ? entity.surface.poles.map((row) => row.map((p) => placed(entity, p)))
+        ? entity.surface.poles.map((row) => row.map((p) => entityLocalToWorld(entity, p)))
         : entity.kind === 'nurbs_curve'
-          ? [entity.curve.poles.map((p) => placed(entity, p))]
+          ? [entity.curve.poles.map((p) => entityLocalToWorld(entity, p))]
           : null;
     if (grid === null) continue;
     const screen = grid.map((row) => row.map((p) => project(p)));
@@ -91,7 +74,7 @@ function netLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
     );
     for (const p of screen.flat()) body.push(`    ${svgDot(p, `fill="${NET_COLOR}" stroke="#1a1a2e" stroke-width="1"`)}`);
     svg.push(
-      `  <g id="net-overlay" data-entity="${escapeXml(entity.id)}" stroke="${NET_COLOR}" stroke-width="1" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.9">`,
+      `  <g class="net-overlay" data-entity="${escapeXml(entity.id)}" stroke="${NET_COLOR}" stroke-width="1" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.9">`,
       ...body,
       '  </g>',
     );

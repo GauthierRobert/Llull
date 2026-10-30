@@ -1,7 +1,7 @@
 import type { Vec3 } from '../../model/types';
 import type { Bounds } from '../../geometry/bounds';
 import type { Camera, ViewName } from './camera';
-import type { OverlayKind, OverlayStats } from './overlayCage';
+import type { OverlayKind, OverlayStats } from './overlayTypes';
 import type { RasterScene } from '../../model/raster';
 
 /** The `data` payload of render_view. */
