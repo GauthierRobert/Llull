@@ -24,8 +24,8 @@ export const splitAtSilhouette = defineCommand({
     'Split the faces of a solid along its silhouette seen along `direction` (parallel view; the pull direction of a mould, so the cut is its parting line). The silhouette is where the face normal is ' +
     'perpendicular to the direction, found in closed form on the exact faces: a cylinder gives its two generatrices at +-(axis x direction), a cone the generatrices through its apex, a sphere the great circle ' +
     'perpendicular to the direction; a plane has none (it is parallel to the direction or turned toward / away from it: data.silhouette.edgeOn lists the parallel ones, whose boundary is the parting line). ' +
-    'Each piece is made a curve on its face (a nurbs_curve with onFace, kept in the document) and the faces are divided along them with split_face_by_curves, so the faces + the curves end up as ' +
-    'persistent names for draft_faces, emboss_on_face or colour. A silhouette that already is an edge of the solid (a cylinder seen along a seam) is reported in data.silhouette.onEdge and not split again. ' +
+    'Each piece is made a curve on its face (a nurbs_curve with onFace, kept in the document) and the faces are divided along them with split_face_by_curves (the divided faces get new persistent names). The curves are a record of the cut: ' +
+    'they reference the solid as it was before the split. A face whose silhouette is not built (torus, freeform, sphere patch) is left unsplit and named in the summary and in data.silhouette.unsupported: the parting line is then partial. A silhouette that already is an edge of the solid (a cylinder seen along a seam) is reported in data.silhouette.onEdge and not split again. ' +
     'Returns data { facesBefore, facesAfter, faces[], volumeBefore, volumeAfter, silhouette { direction, curves[{ id, face, kind, length }], edgeOn, onEdge, unsupported } }. Refuses with WRP_SILHOUETTE_NONE ' +
     '(nothing to split for this direction), WRP_SILHOUETTE_UNSUPPORTED (a torus or freeform face, or a sphere patch the great circle leaves: the reason is named), WRP_PARAM_INVALID (zero direction) and the ' +
     'split_face_by_curves codes. Needs the exact (native) kernel. Next: inspect_faces, draft_faces, emboss_on_face.',
@@ -106,7 +106,7 @@ export const splitAtSilhouette = defineCommand({
     return {
       ...split,
       affected: [...split.affected, ...ids],
-      summary: `split_at_silhouette: silhouette of '${params.id}' along [${params.direction.join(', ')}] = ${pieces.length} curve(s) (${pieces.map((p) => `${p.kind} on face ${p.face}`).join(', ')}); ${split.summary}`,
+      summary: `split_at_silhouette: silhouette of '${params.id}' along [${params.direction.join(', ')}] = ${pieces.length} curve(s) (${pieces.map((p) => `${p.kind} on face ${p.face}`).join(', ')}); ${split.summary}${report.unsupported.length === 0 ? '' : ` PARTIAL parting line: not split ${report.unsupported.map((u) => `face ${u.face} (${u.surface}: ${u.reason})`).join('; ')}.`}`,
       data: { ...(split.data ?? {}), silhouette: block({ curves: pieces }) },
     };
   },

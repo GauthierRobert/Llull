@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@core/model/vectors';
-import { arc2 } from '@core/lib/nurbs/curve2d';
+import { arc2, bezier2 } from '@core/lib/nurbs/curve2d';
 import { segmentArea, segmentEnd, segmentStart, type PlaneSegment } from '@core/geometry/planeSegments';
 import { clipChains, clipRegions, type HalfPlane } from '@core/commands/wrap/clipRegions';
 import type { ChartRegion } from '@core/commands/wrap/sketchProfiles';
@@ -98,6 +98,37 @@ describe('clipRegions', () => {
     const segment = 25 * Math.acos(3 / 5) - 3 * 4;
     expect(total(part)).toBeCloseTo(segment, 8);
     expect(closed(half[0]?.outer as PlaneSegment[])).toBe(true);
+  });
+
+  it('a boundary vertex exactly on the line is one crossing: a square -1..1 with a degree-1 NURBS bottom is cut in 2 + 2', () => {
+    const bottom: PlaneSegment = {
+      kind: 'nurbs',
+      curve: bezier2([
+        [-1, -1],
+        [1, -1],
+      ]),
+    };
+    const square2: ChartRegion = {
+      outer: [
+        bottom,
+        { kind: 'line', from: [1, -1], to: [1, 1] },
+        { kind: 'line', from: [1, 1], to: [-1, 1] },
+        { kind: 'line', from: [-1, 1], to: [-1, -1] },
+      ],
+      holes: [],
+    };
+    const keep = clipRegions([square2], right(0)) as ChartRegion[];
+    const drop = clipRegions([square2], left(0)) as ChartRegion[];
+    expect(total(keep)).toBeCloseTo(2, 9);
+    expect(total(drop)).toBeCloseTo(2, 9);
+    expect(keep).toHaveLength(1);
+  });
+
+  it('an edge lying ON the line belongs to the kept side: the square [0, 10]^2 clipped by x >= 0 comes back untouched (the same loop)', () => {
+    const kept = clipRegions([square], right(0)) as ChartRegion[];
+    expect(kept).toHaveLength(1);
+    expect(total(kept)).toBeCloseTo(100, 9);
+    expect(kept[0]?.outer).toBe(square.outer);
   });
 
   it('refuses boundaries whose crossings do not pair into chords (a hole wound like its outer)', () => {

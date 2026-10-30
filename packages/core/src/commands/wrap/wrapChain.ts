@@ -59,8 +59,11 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     const mapped: MappedCurve[] = [];
     for (const outline of outlines) {
       const pieces = [
-        ...outline.regions.flatMap((region) => [region.outer, ...region.holes].map((segments) => ({ segments, closed: true }))),
-        ...outline.open.map((segments) => ({ segments, closed: false })),
+        ...outline.regions.flatMap((region) => [
+          { segments: region.outer, closed: true, role: 'outer' as const },
+          ...region.holes.map((segments) => ({ segments, closed: true, role: 'hole' as const })),
+        ]),
+        ...outline.open.map((segments) => ({ segments, closed: false, role: 'open' as const })),
       ];
       let kept = pieces;
       for (const plane of face.clips) kept = clipChains(kept, plane);
@@ -72,7 +75,12 @@ export function runWrapChain(input: ChainWrap): CommandResult {
       };
       const curves = mapOutlineCurves(face.session, face.chart, clipped, tolerance);
       if (isMappingFailure(curves)) return fail(curves.code, `face ${face.session.face}: ${curves.message}`, curves.ids);
-      mapped.push(...curves);
+      // mapOutlineCurves lists the regions, then the open chains: the roles of the source loops (a hole stays a hole) are put back in that order
+      const roles = [
+        ...kept.filter((piece) => piece.closed).map((piece) => piece.role),
+        ...kept.filter((piece) => !piece.closed).map(() => 'open' as const),
+      ];
+      mapped.push(...curves.map((curve, index) => ({ ...curve, role: roles[index] ?? curve.role })));
     }
     if (mapped.length === 0) continue;
     const pieces = mapped.map((curve) => curve.pieces);

@@ -85,6 +85,9 @@ function straightness(points: readonly Vec2[]): number {
   return Math.max(...points.map((p) => Math.abs(d[0] * (p[1] - first[1]) - d[1] * (p[0] - first[0]))));
 }
 
+/** The refusal text when the two faces share more than one edge: only the first is unfolded. */
+const sharedNote = (shared: number): string => (shared > 1 ? ` (the faces share ${shared} edges; only the first is unfolded)` : '');
+
 interface Candidate {
   readonly chart: FaceChart;
   readonly mirror: boolean;
@@ -192,17 +195,18 @@ export function buildChain(
   while (pending.length > 0) {
     let progressed = false;
     for (const [index, child] of pending.entries()) {
-      let join: { edge: number; parent: ChainFace } | null = null;
+      let firstJoin: { edge: number; parent: ChainFace } | null = null;
+      let shared = 0;
       for (const [edge, faces] of graph.edgeFaces.entries()) {
         const distinct = [...new Set(faces)];
         if (distinct.length !== 2 || !distinct.includes(child.face)) continue;
         const other = placed.get(distinct.find((f) => f !== child.face) as number);
-        if (other !== undefined) {
-          join = { edge, parent: other };
-          break;
-        }
+        if (other === undefined) continue;
+        if (firstJoin === null) firstJoin = { edge, parent: other };
+        if (firstJoin.parent === other) shared++;
       }
-      if (join === null) continue;
+      if (firstJoin === null) continue;
+      const join = { ...(firstJoin as { edge: number; parent: ChainFace }), shared };
       const samples = session.query.edgeSamples(session.shape, join.edge, SAMPLES);
       if (samples === null || samples.length < 2) return fail('WRP_KERNEL_BUILD_FAILED', `the kernel gave no samples of edge ${join.edge}`);
       const points = samples.map((sample) => sample.point);
@@ -213,7 +217,7 @@ export function buildChain(
       if (!(bend <= Math.max(tolerance, 1e-9 * length)))
         return fail(
           'WRP_CHAIN_EDGE_CURVED',
-          `edge ${join.edge} between faces ${join.parent.session.face} and ${child.face} develops to a curve (${bend.toPrecision(4)} ${doc.units} off its chord): only edges that develop to straight lines (a generatrix of a cylinder, a straight edge of a plane) join two faces into one chart`,
+          `edge ${join.edge} between faces ${join.parent.session.face} and ${child.face} develops to a curve${sharedNote(join.shared)} (${bend.toPrecision(4)} ${doc.units} off its chord): only edges that develop to straight lines (a generatrix of a cylinder, a straight edge of a plane) join two faces into one chart`,
         );
       const hit = child.query.projectOnFace(child.shape, child.face, [points[0] as Vec3])?.[0] ?? null;
       if (hit === null) return fail('WRP_KERNEL_BUILD_FAILED', `edge ${join.edge} does not project onto face ${child.face}`);
@@ -234,7 +238,7 @@ export function buildChain(
       if (candidate === null || !(candidate.residual <= Math.max(tolerance, 1e-9 * length)))
         return fail(
           'WRP_CHAIN_EDGE_CURVED',
-          `edge ${join.edge} does not develop to the same line on faces ${join.parent.session.face} and ${child.face} (best match ${candidate?.residual.toPrecision(4) ?? 'none'} ${doc.units}): the faces cannot be unfolded into one chart`,
+          `edge ${join.edge} does not develop to the same line on faces ${join.parent.session.face} and ${child.face}${sharedNote(join.shared)} (best match ${candidate?.residual.toPrecision(4) ?? 'none'} ${doc.units}): the faces cannot be unfolded into one chart`,
         );
       // the side of the edge each face lies on, found with the kernel's own point-in-face test on points of the charts
       const first = parentPoints[0] as Vec2;

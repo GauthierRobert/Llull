@@ -35,16 +35,24 @@ function evaluate(surface: SurfaceParams, [u, v]: Vec2): { point: Vec3; normal: 
     const normal = add(mul(radial, Math.cos(surface.semiAngle)), mul(Z, -Math.sin(surface.semiAngle)));
     return { point: add(surface.apex, mul(generator, v)), normal };
   }
+  if (surface.type === 'sphere') {
+    const normal: Vec3 = [Math.cos(v) * Math.cos(u), Math.cos(v) * Math.sin(u), Math.sin(v)];
+    return { point: add(surface.center, mul(normal, surface.radius)), normal };
+  }
   return { point: [0, 0, 0], normal: Z };
 }
 
-function session(faces: readonly Geometry[], options: { onlyAzimuth?: [number, number]; patch?: boolean } = {}): SolidSession {
+function session(
+  faces: readonly Geometry[],
+  options: { onlyAzimuth?: [number, number]; patch?: boolean; maxZ?: number } = {},
+): SolidSession {
   const query = {
     faceGeometry: (_shape: unknown, face: number) => faces[face] ?? null,
     evaluateFace: (_shape: unknown, face: number, uv: readonly Vec2[]) => uv.map((p) => evaluate((faces[face] as Geometry).surface, p)),
     faceContains: (_shape: unknown, face: number, point: Vec3) => {
       const surface = (faces[face] as Geometry).surface;
       if (surface.type === 'sphere') return options.patch !== true || point[2] >= 0;
+      if (options.maxZ !== undefined && point[2] > options.maxZ) return false;
       const azimuth = (((Math.atan2(point[1], point[0]) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) as number;
       const [low, high] = options.onlyAzimuth ?? [0, 2 * Math.PI];
       return azimuth >= low - 1e-9 && azimuth <= high + 1e-9;
@@ -113,6 +121,50 @@ describe('silhouettes', () => {
     expect(found.onEdge).toEqual([0]);
   });
 
+  it('a generatrix is cut short where the face ends (a tilted top: the line is clipped at z = 10), and its pcurve azimuth lies in the face u range', () => {
+    const found = silhouettes(session([cylinder], { maxZ: 10 }), [1, 0, 0]);
+    expect(found.curves).toHaveLength(2);
+    for (const curve of found.curves) {
+      const [a, b] = [curve.curve.poles[0] as Vec3, curve.curve.poles[1] as Vec3];
+      expect(Math.max(a[2], b[2])).toBeCloseTo(10, 6);
+      expect(Math.min(a[2], b[2])).toBeCloseTo(-20, 9);
+      expect(curve.length).toBeCloseTo(30, 6);
+      for (const [u] of curve.pcurve.poles) {
+        expect(u).toBeGreaterThanOrEqual(0);
+        expect(u).toBeLessThan(2 * Math.PI);
+      }
+    }
+    expect(found.curves.map((c) => (c.pcurve.poles[0] as Vec2)[0].toFixed(6))).toEqual([
+      (Math.PI / 2).toFixed(6),
+      ((3 * Math.PI) / 2).toFixed(6),
+    ]);
+  });
+
+  it('a great circle through the poles (seen along x or y with the sphere axis z) is refused with the reason; its pcurve for an oblique direction is continuous in the u range', () => {
+    const sphere: Geometry = {
+      surface: { type: 'sphere', center: [0, 0, 0], radius: 25 },
+      uvBounds: [
+        [0, -Math.PI / 2],
+        [2 * Math.PI, Math.PI / 2],
+      ],
+    };
+    for (const direction of [
+      [1, 0, 0],
+      [0, 1, 0],
+      [1, 1, 0],
+    ] as Vec3[]) {
+      const found = silhouettes(session([sphere]), direction);
+      expect(found.curves).toEqual([]);
+      expect(found.unsupported[0]?.reason).toContain('passes through the poles');
+    }
+    const oblique = silhouettes(session([sphere]), [1, 2, 2]);
+    expect(oblique.curves).toHaveLength(1);
+    const us = (oblique.curves[0]?.pcurve.poles ?? []).map((p) => p[0]);
+    expect(us[0]).toBeGreaterThanOrEqual(0);
+    expect(us[0]).toBeLessThan(2 * Math.PI);
+    for (let k = 1; k < us.length; k++) expect(Math.abs((us[k] as number) - (us[k - 1] as number))).toBeLessThan(Math.PI);
+  });
+
   it('a cone seen along x: two generatrices through the apex (slant length minus the face start), seen along its axis none', () => {
     const slant = Math.hypot(20, 40);
     const cone: Geometry = {
@@ -142,7 +194,7 @@ describe('silhouettes', () => {
     expect(whole.curves.map((c) => c.kind)).toEqual(['circle']);
     expect(whole.curves[0]?.length).toBeCloseTo(2 * Math.PI * 25, 9);
     expect(whole.curves[0]?.pcurve.poles.length).toBe(25);
-    const patch = silhouettes(session([sphere], { patch: true }), [1, 0, 0]);
+    const patch = silhouettes(session([sphere], { patch: true }), [1, 2, 2]);
     expect(patch.curves).toEqual([]);
     expect(patch.unsupported[0]?.reason).toContain('leaves this sphere patch');
     const torus: Geometry = {

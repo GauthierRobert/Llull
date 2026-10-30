@@ -97,6 +97,35 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP silhouette' })('WRP s
     expect(halves).toHaveLength(2);
   });
 
+  it('a cylinder cut by a tilted plane: each generatrix is cut short where the slanted top edge crosses it, and the split still works', () => {
+    const body = must(base(), 'add_cylinder', { radius: 20, height: 40 });
+    const cutter = must(body.document, 'add_box', { size: [200, 200, 100], position: [0, 0, 70], rotation: [0, 0.349, 0] });
+    const cut = must(cutter.document, 'boolean', { op: 'subtract', a: body.affected[0], b: cutter.affected[0] });
+    const done = split(cut.document, cut.affected[0] as string, [1, 0, 0]);
+    const found = silhouette(done);
+    expect(found.curves).toHaveLength(2);
+    const [a, b] = found.curves.map((c) => c.length) as [number, number];
+    expect(Math.abs(a - b)).toBeLessThan(1e-6);
+    expect(a).toBeLessThan(40);
+    expect(a).toBeGreaterThan(20);
+    const counts = done.data as { facesBefore: number; facesAfter: number };
+    expect(counts.facesAfter).toBeGreaterThan(counts.facesBefore);
+    expect(relative(volume(done.document, solidOf(done)), volume(cut.document, cut.affected[0] as string))).toBeLessThan(1e-5);
+  });
+
+  it('a sphere seen along x or y (the great circle through the poles) is refused by reason', () => {
+    const body = must(base(), 'add_sphere', { radius: 25 });
+    for (const direction of [
+      [1, 0, 0],
+      [0, 1, 0],
+    ]) {
+      const refused = execute(body.document, 'split_at_silhouette', { id: body.affected[0], direction });
+      expect(refused.error?.code).toBe('WRP_SILHOUETTE_UNSUPPORTED');
+      expect(refused.summary).toContain('passes through the poles');
+      expect(refused.document).toBe(body.document);
+    }
+  });
+
   it('a silhouette that already is an edge (the seam, seen along y) is reported and not split again: one curve, 3 -> 4 faces', () => {
     const body = must(base(), 'add_cylinder', { radius: 20, height: 40 });
     const done = split(body.document, body.affected[0] as string, [0, 1, 0]);

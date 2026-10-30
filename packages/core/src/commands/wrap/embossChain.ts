@@ -73,13 +73,6 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     tolerance,
   );
   if ('summary' in chain) return chain;
-  const sharp = chain.edges.find((edge) => edge.convexity === 'convex' || edge.convexity === 'concave');
-  if (sharp !== undefined && !scribe)
-    return fail(
-      'WRP_CHAIN_EDGE_SHARP',
-      `edge ${sharp.edge} between faces ${sharp.faces.join(' and ')} is a ${sharp.convexity} edge: raised walls on its two sides would meet in a line, not a surface; use scribe, round the edge first (fillet_edge), or emboss each face separately`,
-      ['chain'],
-    );
   const sketchArea = regionsArea(regions);
   const steps: Array<{ face: ChainFace; recipeParams: Omit<EmbossParams, 'face'>; area: number; probes: number }> = [];
   let clippedArea = 0;
@@ -115,6 +108,15 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     steps.push({ face, recipeParams, area: embossClosedForm(recipeParams)?.area ?? 0, probes: mapped.pieces.length });
   }
   if (steps.length === 0) return fail('WRP_OUTSIDE_FACE', 'the sketch lies on none of the chain faces', ['profileIds'], params.profileIds);
+  // walls meet in a surface only along a smooth edge: an edge the sketch crosses (ink on both faces) must be smooth, a convex / concave / unverified one is refused
+  const inked = new Set(steps.map((step) => step.face.session.face));
+  const sharp = chain.edges.find((edge) => edge.faces.every((face) => inked.has(face)) && edge.convexity !== 'smooth');
+  if (sharp !== undefined && !scribe)
+    return fail(
+      'WRP_CHAIN_EDGE_SHARP',
+      `edge ${sharp.edge} between faces ${sharp.faces.join(' and ')} is a ${sharp.convexity} edge the sketch crosses: raised walls on its two sides would meet in a line, not a surface; use scribe, round the edge first (fillet_edge), or emboss each face separately`,
+      ['chain'],
+    );
   if (Math.abs(clippedArea - sketchArea) > 1e-9 * Math.max(sketchArea, 1e-12))
     return fail(
       'WRP_CHAIN_CLIP_FAILED',

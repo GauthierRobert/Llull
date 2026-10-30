@@ -98,6 +98,35 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
     expect(relative(data['volumeDelta'] as number, expected)).toBeLessThan(1e-6);
   });
 
+  it('face indices really shift when the chain starts on the cylinder end: the recipe steps re-find the plane faces (indices differ from data.faces), volume 369.4248', () => {
+    const { doc, id } = stadium();
+    const sketch = must(doc, 'draw_rectangle', { width: 60, height: 6, position: [-10, -3, 0] });
+    const done = must(sketch.document, 'emboss_on_face', {
+      id,
+      face: END,
+      chain: [FRONT, BACK],
+      profileIds: [sketch.affected[0]],
+      mode: 'emboss',
+      depth: 1,
+      placement: { anchor: { chart: [0, 0], on: [20, -10, 0] } },
+    });
+    const info = done.data as { faces: Array<{ face: number; faceKind: string }>; volumeDelta: number; expectedVolumeDelta: number };
+    expect(info.faces.map((f) => f.faceKind)).toEqual(['cylinder', 'plane', 'plane']);
+    const expected = 60 + 6 * 10 * Math.PI * 1.05 + 6 * (50 - 10 * Math.PI);
+    expect(relative(info.expectedVolumeDelta, expected)).toBeLessThan(1e-9);
+    expect(relative(info.volumeDelta, expected)).toBeLessThan(1e-6);
+    // the recipe of the result: one emboss step per face, innermost first
+    const steps: number[] = [];
+    for (
+      let node = (done.document.entities[done.affected[0] as string] as { brep?: { op: string; face?: number; source?: unknown } }).brep;
+      node?.op === 'emboss';
+      node = node.source as typeof node
+    )
+      steps.unshift(node.face as number);
+    expect(steps).toHaveLength(3);
+    expect(steps).not.toEqual(info.faces.map((f) => f.face));
+  });
+
   it('deboss across the same faces removes 60 + 120 x 0.95 = 174 mm3', () => {
     const { doc, id } = stadium();
     const sketch = band(doc, 30);
@@ -201,7 +230,14 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
     const base = { id, profileIds: [sketch.id], mode: 'emboss', depth: 1, placement };
     const codeOf = (extra: Record<string, unknown>): string | undefined =>
       execute(sketch.doc, 'emboss_on_face', { ...base, ...extra }).error?.code;
-    expect(codeOf({ face: FRONT, chain: [{ faceNear: [0, 0, 5] }] })).toBe('WRP_CHAIN_EDGE_SHARP');
+    const crossing = must(doc, 'draw_rectangle', { width: 6, height: 8, position: [2, 0, 0] });
+    const sharp = execute(crossing.document, 'emboss_on_face', {
+      ...base,
+      profileIds: [crossing.affected[0]],
+      face: FRONT,
+      chain: [{ faceNear: [0, 0, 5] }],
+    });
+    expect(sharp.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
     expect(codeOf({ face: FRONT, chain: [BACK] })).toBe('WRP_CHAIN_NOT_ADJACENT');
     expect(
       codeOf({ face: END, chain: [{ faceNear: [30, 0, 5] }].slice(0, 0).concat([{ faceNear: [20, 0, 5] }]), placement: undefined }),

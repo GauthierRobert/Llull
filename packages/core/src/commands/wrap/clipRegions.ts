@@ -44,21 +44,27 @@ const lifted = (
 function crossings(curve: NurbsCurve2Data, plane: HalfPlane): number[] {
   const [first, last] = curveDomain(lifted(curve));
   const at = (k: number): number => first + ((last - first) * k) / ROOT_SAMPLES;
+  const values = Array.from({ length: ROOT_SAMPLES + 1 }, (_, k) => signed(plane, pointAt2(curve, at(k))));
+  const eps = 1e-12 * Math.max(1, ...values.map(Math.abs));
+  const sign = (value: number): number => (Math.abs(value) <= eps ? 0 : Math.sign(value));
   const roots: number[] = [];
-  let previous = signed(plane, pointAt2(curve, at(0)));
   for (let k = 1; k <= ROOT_SAMPLES; k++) {
-    const value = signed(plane, pointAt2(curve, at(k)));
-    if (previous * value < 0) {
+    const before = sign(values[k - 1] as number);
+    const here = sign(values[k] as number);
+    if (before * here < 0) {
       let [lo, hi] = [at(k - 1), at(k)];
-      const lowSign = Math.sign(previous);
       for (let step = 0; step < 60; step++) {
         const mid = (lo + hi) / 2;
-        if (Math.sign(signed(plane, pointAt2(curve, mid))) === lowSign) lo = mid;
+        if (sign(signed(plane, pointAt2(curve, mid))) === before) lo = mid;
         else hi = mid;
       }
       roots.push((lo + hi) / 2);
+    } else if (here === 0 && before !== 0) {
+      // a sample exactly on the line: a crossing when the signs before it and after the run of zeros differ
+      let j = k;
+      while (j < ROOT_SAMPLES && sign(values[j] as number) === 0) j++;
+      if (before * sign(values[j] as number) < 0) roots.push(at(k));
     }
-    previous = value;
   }
   return roots;
 }
@@ -217,20 +223,24 @@ export function clipRegions(regions: readonly ChartRegion[], plane: HalfPlane): 
 
 /** The kept runs of open chains and of closed loops cut by the line (no chords): the curves of a wrap. Loops entirely kept stay closed (`closed`). */
 export function clipChains(
-  chains: ReadonlyArray<{ readonly segments: readonly PlaneSegment[]; readonly closed: boolean }>,
+  chains: ReadonlyArray<{
+    readonly segments: readonly PlaneSegment[];
+    readonly closed: boolean;
+    readonly role?: 'outer' | 'hole' | 'open';
+  }>,
   plane: HalfPlane,
-): Array<{ segments: PlaneSegment[]; closed: boolean }> {
-  const out: Array<{ segments: PlaneSegment[]; closed: boolean }> = [];
+): Array<{ segments: PlaneSegment[]; closed: boolean; role: 'outer' | 'hole' | 'open' }> {
+  const out: Array<{ segments: PlaneSegment[]; closed: boolean; role: 'outer' | 'hole' | 'open' }> = [];
   const scale = sizeOf(chains.map((chain) => chain.segments));
   for (const chain of chains) {
     const pieces = chain.segments.flatMap((segment) => cut(segment, plane, scale));
     if (pieces.every((piece) => piece.side === 1)) {
-      out.push({ segments: [...chain.segments], closed: chain.closed });
+      out.push({ segments: [...chain.segments], closed: chain.closed, role: chain.closed ? (chain.role ?? 'outer') : 'open' });
       continue;
     }
     let current: PlaneSegment[] = [];
     const flush = (): void => {
-      if (current.length > 0) out.push({ segments: current, closed: false });
+      if (current.length > 0) out.push({ segments: current, closed: false, role: 'open' });
       current = [];
     };
     // a closed loop that starts on a kept piece continues its last run into the first one

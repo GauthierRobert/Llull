@@ -15,6 +15,7 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import type { SurfaceParams } from '../../geometry/kernelPorts';
 import type { SolidSession } from './faceSession';
+import { continuousUv } from './splitChains';
 
 export interface SilhouetteCurve {
   readonly face: number;
@@ -70,14 +71,15 @@ function generatrix(
   // the generatrix is straight and linear in v: two interior samples give its ends exactly (a cone's apex end cannot be evaluated)
   const [vLow, vHigh] = [bounds[0][1], bounds[1][1]];
   const span = vHigh - vLow;
-  const at = (fraction: number): Vec2 => [phi, vLow + fraction * span];
+  // the parameter plane's own turn of the azimuth (a pcurve in the face's u range), the same line
+  const azimuth = bounds[0][0] + ((((phi - bounds[0][0]) % TWO_PI) + TWO_PI) % TWO_PI);
+  const at = (fraction: number): Vec2 => [azimuth, vLow + fraction * span];
   const samples = query.evaluateFace(shape, face, [at(0.1), at(0.9), at(0.5)]);
   if (samples === null) return 'the kernel could not evaluate the face';
   const [first, second, mid] = samples as [(typeof samples)[number], (typeof samples)[number], (typeof samples)[number]];
   const along = (fraction: number): Vec3 => add3(first.point, scale3(sub3(second.point, first.point), (fraction - 0.1) / 0.8));
-  const [lo, hi] = [along(0), along(1)];
-  const length = len3(sub3(hi, lo));
-  if (!(length > 1e-9 * diagonal)) return null;
+  const [full0, full1] = [along(0), along(1)];
+  if (!(len3(sub3(full1, full0)) > 1e-9 * diagonal)) return null;
   const tolerance = 1e-7 * diagonal;
   const contained = query.faceContains(shape, face, mid.point, tolerance);
   if (contained !== true) return null;
@@ -85,6 +87,23 @@ function generatrix(
   // on the seam or on a boundary of the face's u range the silhouette already is an edge
   const turns = (value: number): number => Math.abs(value - TWO_PI * Math.round(value / TWO_PI));
   if (turns(phi - bounds[0][0]) < 1e-9 || turns(phi - bounds[1][0]) < 1e-9) return 'edge';
+  // the part of the line inside the face (a tilted or curved boundary cuts the generatrix short of the v extremes): bisect from the middle
+  const pointAt = (t: number): Vec3 => add3(full0, scale3(sub3(full1, full0), t));
+  const reaches = (t: number): boolean => query.faceContains(shape, face, pointAt(t), tolerance) === true;
+  const boundary = (outer: number): number => {
+    if (reaches(outer)) return outer;
+    let [bad, good] = [outer, 0.5];
+    for (let step = 0; step < 50; step++) {
+      const middle = (bad + good) / 2;
+      if (reaches(middle)) good = middle;
+      else bad = middle;
+    }
+    return good;
+  };
+  const [t0, t1] = [boundary(0), boundary(1)];
+  const [lo, hi] = [pointAt(t0), pointAt(t1)];
+  const length = len3(sub3(hi, lo));
+  if (!(length > 1e-9 * diagonal)) return null;
   const tangent = normalize3(sub3(hi, lo));
   const side = normalize3(cross3(mid.normal, tangent));
   const offset = 1e-3 * diagonal;
@@ -92,17 +111,22 @@ function generatrix(
   const snapped = query.projectOnFace(shape, face, probes);
   const inside = snapped?.map((hit) => hit !== null && query.faceContains(shape, face, hit.point, tolerance) === true) ?? [false, false];
   if (!inside.every(Boolean)) return 'edge';
-  return { face, kind: 'line', curve: lineCurve(lo, hi), pcurve: polylinePcurve([at(0), at(1)]), length };
+  return { face, kind: 'line', curve: lineCurve(lo, hi), pcurve: polylinePcurve([at(t0), at(t1)]), length };
 }
 
 function sphereCircle(
   session: SolidSession,
   face: number,
   surface: Extract<SurfaceParams, { type: 'sphere' }>,
+  bounds: readonly [Vec2, Vec2],
   direction: Vec3,
 ): SilhouetteCurve | string {
   const { query, shape, diagonal } = session;
   const d = normalize3(direction);
+  // a great circle through the poles runs along the seam or through the singular points of the parameters: refused by reason
+  const pole = query.evaluateFace(shape, face, [[bounds[0][0], bounds[1][1]]])?.[0];
+  if (pole !== undefined && Math.abs(dot3(sub3(pole.point, surface.center), d)) < 1e-6 * surface.radius)
+    return 'the great circle passes through the poles of the sphere face, where its parameters are singular (and along its seam): turn the direction off the sphere axis, or split the sphere with a plane first';
   const helper: Vec3 = Math.abs(d[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const e1 = normalize3(cross3(d, helper));
   const e2 = cross3(d, e1);
@@ -126,8 +150,11 @@ function sphereCircle(
     )
   )
     return 'the great circle leaves this sphere patch';
-  const uv = hits.map((hit) => (hit as NonNullable<(typeof hits)[number]>).uv);
-  return { face, kind: 'circle', curve, pcurve: polylinePcurve([...uv, uv[0] as Vec2]), length: TWO_PI * surface.radius };
+  const raw = hits.map((hit) => (hit as NonNullable<(typeof hits)[number]>).uv);
+  const continued = continuousUv([...raw, raw[0] as Vec2], [true, false]);
+  const turn = TWO_PI * Math.floor(((continued[0] as Vec2)[0] - bounds[0][0]) / TWO_PI);
+  const uv = continued.map(([u, v]): Vec2 => [u - turn, v]);
+  return { face, kind: 'circle', curve, pcurve: polylinePcurve(uv), length: TWO_PI * surface.radius };
 }
 
 /** The silhouette curves of the solid's faces seen along `direction`. */
@@ -169,7 +196,7 @@ export function silhouettes(session: SolidSession, direction: Vec3): SilhouetteR
       const psi = Math.atan2(dot3(dPerp, y), dot3(dPerp, x));
       const spread = Math.acos(ratio);
       for (const sign of [1, -1]) record(generatrix(session, face, psi + sign * spread, uvBounds, d));
-    } else if (surface.type === 'sphere') record(sphereCircle(session, face, surface, d));
+    } else if (surface.type === 'sphere') record(sphereCircle(session, face, surface, uvBounds, d));
     else
       report.unsupported.push({
         face,
