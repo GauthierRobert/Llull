@@ -45,6 +45,10 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
     'Raised walls cannot meet along a sharp edge without a mitre: blend or round the edge first (fillet_edge), or emboss each face separately; wrap_to_face and scribe cross sharp edges.',
   WRP_CHAIN_CLIP_FAILED:
     'The sketch outline touches a chain edge tangentially or the kernel could not orient it: move the sketch slightly (placement.anchor) or turn it (placement.angleDeg).',
+  WRP_SILHOUETTE_NONE:
+    'Pick a direction under which a cylinder, cone or sphere face shows an outline (a box seen along an axis has none); inspect_faces lists the faces and their surfaces.',
+  WRP_SILHOUETTE_UNSUPPORTED:
+    'Closed-form silhouettes exist for plane, cylinder, cone and sphere faces: split the torus or freeform face with curves of your own (create_curve_on_face, then split_face_by_curves), or cut the solid first (split_body).',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
   WRP_TEXT_TOO_LONG: 'Split the text; outline text is limited to 2000 characters per entity.',
   WRP_PARAM_INVALID: 'Fix the named parameter; see `llull describe <command>`.',
