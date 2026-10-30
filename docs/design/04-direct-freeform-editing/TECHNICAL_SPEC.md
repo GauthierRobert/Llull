@@ -671,3 +671,23 @@ shell count, an invalid or empty result, the defeature or boolean step of a feat
 `runFaceOp` puts the reason in the summary: `... (refused: NATIVE_OCC_FAILURE: BRepOffset_MakeOffset failed: the moved faces do not meet their
 neighbours)`. Tests: `tests/unit/faceMoves.test.ts` (a stub reason reaches the summary), `tests/unit/brep/kernelMeshGuard.test.ts` (the guard's own
 reason, then the kernel's), `server/tests/faceMoveReason.test.ts` (native: an offset through a 10 mm box).
+
+#### DES-4c (2026-10-30): tangent-plane fit for `extraordinary: "G1"` (`geometry/subd/g1Fit.ts`)
+
+What "true G1" was blocked on: an exactly G1 patch set around a valence-n vertex with ONE bicubic patch per quad does not exist for n != 4 (the vertex
+enclosure problem); Peters (2000) needs about 3n patches per star, which would change the patch count and the packed/solid contracts. This step does not
+claim exactness. Decision: keep one bicubic patch per quad and fit the free poles.
+
+- Only the four interior poles (1,1), (2,1), (1,2), (2,2) of each quad that touches an extraordinary vertex move; boundary poles are shared with the
+  neighbours and never move, so G0 stays exactly 0 (tested bit-identical). Quads of one connected star group are one Levenberg-Marquardt problem: residual =
+  difference of the unit normals of the two patches of every seam at seven stations (analytic derivatives, central-difference Jacobian per quad, sparse J^T J),
+  plus a pull (weight 0.1 of the document extent) towards the geometry patch so the surface stays near the limit. 20 iterations at most, fixed order: deterministic.
+- `extraordinary: "G1"` (sheets) fits first, then keeps the old behaviour: refines until `tangentToleranceDeg` is met or 4096 patches. `fitTangents` is the option of
+  `cageToNurbs`; `output: "solid"` is unchanged (G0).
+- Measured (max normal angle along EV edges, before -> after, same patch count): cube corner stars (24 patches) 2.616 -> 0.050 deg; box 2x2x2 (96) 2.616 -> 0.019;
+  box 3x2x1 (88) 2.616 -> 0.042; max deviation from the limit surface 6.2e-3 -> 5.7e-3, 3.1e-3 (3x2x1) -> 2.9e-3. With weight 1e-3 the break reaches 1e-4 deg but the
+  deviation grows to 1.95e-2 (3x): the weight 0.1 is the chosen trade. Cost 0.2 - 0.5 s for these cages. Default tolerance 0.5 deg is now met without refining.
+- Still not exact: residual break is above 0; skewed cage and valence-5 star are tested to a looser bound (break < 0.2 deg / a tenth of the plain value).
+- Tests: `tests/unit/subd/g1Fit.test.ts` (boundary poles bit-identical, regular quads untouched, pure, cube/box/skewed/valence-5 numbers), `toNurbs.test.ts`.
+  Red-proof: fit disabled -> 6 tests fail.
+- Left: Peters-style exact G1 (needs 3n patches per star), STEP of the fitted sheets needs no change (poles only).

@@ -13,6 +13,7 @@ import { cross3, distance3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3'
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
+import { fitTangentPlanes } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
@@ -24,6 +25,8 @@ export interface ToNurbsOptions {
   readonly tangentToleranceDeg?: number | undefined;
   /** Deviation samples per patch side (a samples x samples grid of cell centres). */
   readonly samples: number;
+  /** Fit the interior poles of the quads around extraordinary vertices to the tangent planes of their neighbours (`g1Fit.ts`). */
+  readonly fitTangents?: boolean | undefined;
 }
 
 interface EvEdgeReport {
@@ -136,13 +139,14 @@ interface Build {
   readonly evEdges: EvEdgeReport[];
 }
 
-function buildLevel(cage: Cage, levels: number): Build {
+function buildLevel(cage: Cage, levels: number, fit: boolean): Build {
   const refined = subdivide(cage, levels);
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const valence = topology.vertexEdges.map((edges, v) =>
     edges.length === (topology.vertexFaces[v] as number[]).length ? edges.length : 4,
   );
-  const patches = quadCagePatches(refined);
+  const geometry = quadCagePatches(refined);
+  const patches = fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
   return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence) };
 }
 
@@ -151,11 +155,12 @@ const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((e
 /** The cage's patches as NURBS sheets with the conversion report. The cage may be open (boundary edges are creases) and may contain n-gons. */
 export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult {
   let refineLevels = Math.max(1, settleLevels(cage));
-  let build = buildLevel(cage, refineLevels);
+  const fit = options.fitTangents === true;
+  let build = buildLevel(cage, refineLevels, fit);
   const tolerance = options.tangentToleranceDeg;
   while (tolerance !== undefined && worstBreak(build) > tolerance && build.patches.length * 4 <= MAX_REFINED_PATCHES) {
     refineLevels++;
-    build = buildLevel(cage, refineLevels);
+    build = buildLevel(cage, refineLevels, fit);
   }
   const { refined, patches, evEdges } = build;
   const blocks = options.packed ? packedBlocks(prepare(refined)).filter((block) => block.quads.length > 1) : [];

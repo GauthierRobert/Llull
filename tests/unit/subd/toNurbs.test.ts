@@ -70,12 +70,19 @@ describe('subdivision_to_nurbs sheets (VC-DIR-08, 09)', () => {
     expect(dataOf<{ skippedSamples: number }>(result).skippedSamples).toBeGreaterThan(0);
   });
 
-  it('G1 refines until the tangent break is below the tolerance', () => {
-    const result = run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 1.5 });
-    const data = dataOf<{ maxEvG1Deg: number; patchCount: number; extraordinary: string }>(result);
-    expect(data.extraordinary).toBe('G1');
-    expect(data.maxEvG1Deg).toBeLessThanOrEqual(1.5);
-    expect(data.patchCount).toBeGreaterThan(24);
+  it('G1 fits the interior poles first (24 patches, break 2.6 -> 0.05 degrees), then refines only when the tolerance is still not met', () => {
+    const fitted = dataOf<{ maxEvG1Deg: number; maxEvG0: number; patchCount: number; extraordinary: string }>(
+      run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 1.5 }),
+    );
+    expect(fitted.extraordinary).toBe('G1');
+    expect(fitted.patchCount).toBe(24);
+    expect(fitted.maxEvG1Deg).toBeLessThan(0.06);
+    expect(fitted.maxEvG0).toBe(0);
+    const tighter = dataOf<{ maxEvG1Deg: number; patchCount: number }>(
+      run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 0.01 }),
+    );
+    expect(tighter.patchCount).toBeGreaterThan(24);
+    expect(tighter.maxEvG1Deg).toBeLessThanOrEqual(0.01);
   });
 
   it('keeps the SubD with keep and inherits placement', () => {
@@ -240,12 +247,11 @@ describe('subdivision_to_nurbs solid and failures', () => {
       run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 1.5 }),
     );
     expect(met).toMatchObject({ g1ToleranceMet: true, warnings: [] });
-    const missed = run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 0.01 });
-    expect(dataOf<{ g1ToleranceMet: boolean; warnings: string[] }>(missed)).toMatchObject({
-      g1ToleranceMet: false,
-      warnings: ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'],
-    });
-    expect(missed.summary).toContain('DIR_CONVERT_G1_TOLERANCE_NOT_MET');
+    // a tolerance below the schema minimum (0.01) that no refinement within 4096 patches reaches: the geometry says so
+    const missed = cageToNurbs(boxCage([2, 2, 2], [1, 1, 1]), { packed: false, samples: 2, tangentToleranceDeg: 1e-9, fitTangents: true });
+    expect(missed.g1ToleranceMet).toBe(false);
+    expect(missed.patchCount).toBeLessThanOrEqual(4096);
+    expect(missed.maxEvG1Deg).toBeLessThan(0.01);
     expect(dataOf<{ g1ToleranceMet: unknown }>(run(cube.document, 'subdivision_to_nurbs', { id: 'c' })).g1ToleranceMet).toBeNull();
   });
 
