@@ -96,7 +96,7 @@ describeNative('offset of a planar face: the prism path against the whole-solid 
           const old = offsetOn(reference, prism(reference, profile, 10).doc, id, near, distance);
           expect(Math.abs(old.volume - routed.volume) / old.volume, `${label} volume`).toBeLessThan(1e-9);
           expect(routed.faces, `${label} faces`).toBe(old.faces);
-          // the whole-solid offset renames EVERY face `<name>~offset`; the prism path keeps the names (the documented invariant: a moved face keeps its name), so the names equal the old ones without the suffix.
+          // the whole-solid offset of the reference build renames EVERY face `<name>~offset`; the current build keeps the names on both paths
           expect(routed.names, `${label} names`).toEqual(old.names.map((name) => name.replace(/~offset$/, '')).sort());
           expect(
             old.names.every((name) => name.endsWith('~offset')),
@@ -106,6 +106,90 @@ describeNative('offset of a planar face: the prism path against the whole-solid 
           reference.dispose();
         }
       }
+    }
+  }, 180_000);
+
+  it('a bore through the top (cylinder neighbour): stays on the whole-solid offset, closed-form volume, names kept, same solid as the reference build', () => {
+    const square = [
+      [0, 0],
+      [20, 0],
+      [20, 20],
+      [0, 20],
+    ];
+    const bored = (kernel: GeometryKernel): { doc: CadDocument; id: string } => {
+      const body = prism(kernel, square, 10);
+      const hole = execute(body.doc, 'add_cylinder', { radius: 3, height: 40, position: [10, 10, 5] }, context(kernel));
+      const cut = execute(
+        hole.document,
+        'boolean',
+        { op: 'subtract', a: body.id, b: hole.affected[0] as string, engine: 'kernel' },
+        context(kernel),
+      );
+      expect(cut.affected, cut.summary).toHaveLength(1);
+      return { doc: cut.document, id: cut.affected[0] as string };
+    };
+    const { doc, id } = bored(kernels.occt);
+    const area = 400 - 9 * Math.PI;
+    for (const distance of [2, -3]) {
+      const routed = offsetOn(kernels.occt, doc, id, [2, 2, 10], distance);
+      expect(Math.abs(routed.volume - area * (10 + distance)) / (area * (10 + distance)), `${distance}`).toBeLessThan(1e-9);
+      expect(routed.faces).toBe(7);
+      expect(routed.names.some((name) => name.endsWith('~offset'))).toBe(false);
+      if (referenceBinary !== undefined) {
+        const reference = createNativeKernel(referenceBinary, { callTimeoutMs: 120_000 });
+        expect(reference.start()).toBe(true);
+        try {
+          const other = bored(reference);
+          const old = offsetOn(reference, other.doc, other.id, [2, 2, 10], distance);
+          expect(Math.abs(old.volume - routed.volume) / old.volume).toBeLessThan(1e-9);
+          expect(routed.faces).toBe(old.faces);
+          expect(routed.names).toEqual(old.names.map((name) => name.replace(/~offset$/, '')).sort());
+        } finally {
+          reference.dispose();
+        }
+      }
+    }
+  }, 180_000);
+
+  it('both routes keep the face names: the names after the move are the names before, and a stored reference to an untouched face still resolves', () => {
+    const namesOf = (doc: CadDocument, id: string): string[] => {
+      const entity = doc.entities[id] as MeshSolidEntity;
+      const topology = kernels.occt.topology(kernels.occt.evaluate(entity.brep as never) as never);
+      return (topology?.faces ?? []).map((face) => face.name ?? '').sort();
+    };
+    for (const [label, profile, near] of [
+      [
+        'prism route (box top)',
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+        ],
+        [5, 5, 10],
+      ],
+      ['whole-solid offset route (trapezoid wall)', trapezoid, [9, 5, 5]],
+    ] as Array<[string, number[][], [number, number, number]]>) {
+      const { doc, id } = prism(kernels.occt, profile, 10);
+      const source = kernels.occt.topology(kernels.occt.evaluate({ op: 'solid', entity: doc.entities[id] as never }) as never);
+      const before = (source?.faces ?? []).map((face) => face.name ?? '').sort();
+      const moved = execute(doc, 'move_faces', { id, facesNear: [near], mode: 'offset', distance: 1 }, context(kernels.occt));
+      expect(moved.affected, moved.summary).toHaveLength(1);
+      const newId = moved.affected[0] as string;
+      const after = namesOf(moved.document, newId);
+      expect(after, label).toEqual(before);
+      expect(
+        after.some((name) => name.includes('~offset')),
+        label,
+      ).toBe(false);
+      const untouched = after.find((name) => name.endsWith('cap.start')) as string;
+      const again = execute(
+        moved.document,
+        'move_faces',
+        { id: newId, faceNames: [untouched], mode: 'offset', distance: 0.5 },
+        context(kernels.occt),
+      );
+      expect(again.affected, `${label}: ${again.summary}`).toHaveLength(1);
     }
   }, 180_000);
 

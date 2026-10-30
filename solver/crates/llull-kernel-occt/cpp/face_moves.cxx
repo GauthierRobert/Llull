@@ -167,7 +167,13 @@ std::unique_ptr<Shape> offset_faces(const Shape &shape, const std::vector<TopoDS
   if (!sound(result)) throw std::runtime_error("the offset solid is not valid (BRepCheck_Analyzer)");
   if (volume_of(result) <= 0) throw std::runtime_error("the offset solid has no volume left (the faces moved through each other)");
   const std::vector<naming::Named> inputs{naming::named(shape)};
-  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "offset"));
+  // OCC reports every offset wall as GENERATED from its face, which the naming would call `<name>~offset`: the moved faces (and the faces that follow them)
+  // keep their names, like the prism path of a planar move, so a reference by name does not depend on the routing
+  std::vector<std::string> names = naming::inherit(result, inputs, naming::history_of(inputs, maker), "offset");
+  const std::string suffix = "~offset";
+  for (std::string &name : names)
+    if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) name.resize(name.size() - suffix.size());
+  return naming::wrap_named(result, std::move(names));
 }
 
 // Moves the FEATURE made of `picked`: defeature it away, then cut back / fuse the removed / added volume moved by `motion`.
@@ -209,7 +215,7 @@ bool planar_frame(const TopoDS_Face &face, gp_Pnt &point, gp_Dir &normal) {
 }
 
 // True when moving `face` along its normal only has to slide its neighbours: it is planar and every face across one of its edges is a plane square to it
-// or a cylinder whose axis is its normal (a bore or a boss), so no neighbour is slanted and none has to be extended to a new line. The offset is then the
+// (a cylinder along its normal is NOT accepted: the prism leaves the bore wall in two faces, the offset keeps one), so no neighbour is slanted and none has to be extended to a new line. The offset is then the
 // prism of the face (push_pull), which BRepOffset_MakeOffset reproduces at 3x the cost on a 200-face solid.
 bool square_neighbours(const Shape &shape, const TopoDS_Face &face) {
   gp_Pnt point;
@@ -231,8 +237,6 @@ bool square_neighbours(const Shape &shape, const TopoDS_Face &face) {
         gp_Dir n;
         outward_frame(other, p, n);
         if (std::abs(n.Dot(normal)) > 1e-9) return false;
-      } else if (surface.GetType() == GeomAbs_Cylinder) {
-        if (std::abs(surface.Cylinder().Axis().Direction().Dot(normal)) < 1 - 1e-9) return false;
       } else {
         return false;
       }
