@@ -1030,7 +1030,53 @@ UNIFORM grid. The refinement is local, so the finest level says nothing about th
   closed form d (1 - s^2)^3 holds within 2e-3 at s = 0, 0.5, 0.95 and gives 0 beyond the support; radius 1e-3 builds; radius 1e-6 and below is refused by name (`DEF_APPROX_TOLERANCE`, "the push radius 1e-06 is below what the fit can
   resolve on a face or edge of length 1000 (it needs intervals of 1/2.7e9 ..., the finest grid is 1/2.7e8 ...)"). Test `a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump`;
   red-proof: with the old comparison (`den * 2 > 512`) the warp is refused and the test fails.
-- **Found: the adaptive mass rule does not see a narrow bump on a large B-spline face.** The same body reports an area of 2 011 999.9999999974 and a volume of 2 999 999.999999998 (the flat slab's, to 1e-9) although the
-  face carries the 0.5 mm bump (`evaluateFace` says so; the bump adds about 1.57 mm^3 and 0.4 mm^2): `BRepGProp` with `Eps` 1e-9 starts from a coarse sampling of the whole face, finds the two orders equal and stops
-  (`rel_error` 7e-16). `VolumePropertiesGK` with `IsUseSpan` gives the same. So the volume of a body with a bump much narrower than its faces cannot be asserted from `mass_properties` today; the test reads the
-  geometry. A mass rule that integrates per knot span is the follow-up (board).
+- **Found, and fixed in §17.16.1: the mass rule did not see a narrow bump on a large B-spline face.** The same body reported an area of 2 011 999.9999999974 and a volume of 2 999 999.999999998 (the flat slab's,
+  to 1e-9) although the face carries the 0.5 mm bump (`evaluateFace` says so; summing the height over a 5 x 5 mm window gives 1.5707635 mm^3, the closed form d pi R^2 / 4 is 1.5707963): `BRepGProp` with `Eps` 1e-9
+  starts from a coarse sampling of the whole face, finds the two orders equal and stops (`rel_error` 7e-16); `VolumePropertiesGK` with `IsUseSpan` gave the same.
+
+### 17.16.1 The mass rule by knot span
+
+`mass_spans.hxx` (`span_faces`): the rule is handed pieces of the face instead of the whole face. A face qualifies when it is a full-patch B-spline (one wire of four axis-aligned straight pcurves on the sides
+of its parameter box, no location: a fitted face of a warp of a box face, a lofted patch) and **graded** in a direction (its longest span more than 4 times the shortest: a LOCAL refinement puts slivers beside long
+spans, a uniform fit does not) with more than 4 spans there (the three of a blend face's profile direction stay whole). In a graded direction the spans are classified: FINE (at most 8 times the shortest: the
+slivers of the refinement, as wide as the feature that caused them) or COARSE (wider than any feature the fit holds); consecutive spans of one class form ONE piece. A push on a 1000 mm face is 3 pieces per
+direction (coarse, the fine run around the support, coarse), 9 per face. The pieces are `BRepBuilderAPI_MakeFace(surface, u, u', v, v')` with the orientation of the face, collected in ONE compound and
+integrated by one call: `BRepGProp` takes its reference point from what a call has accumulated, so separate calls per face (or per group) have different apexes and their open-cone volumes do not add (the first
+attempt, -1071 against -52 on a mitre test).
+
+- **What did not work, measured.** One piece per knot span: 450 microseconds each (a `MakeFace` and a rule start per piece), and a dense pushed 40 mm slab (tolerance 1e-4, 197 x 197 nodes) took 53 s in the
+  warp and 20 s per `mass_properties` call; runs of 6 spans: 5 ms per piece for the dense face. The classes make the piece count independent of the node count.
+- **Where:** `volume_props` and `surface_props` (`mass_properties`, `analyze`, the per-face and per-solid areas), `face_metric` (the face areas of `topology` / `faceDetails`), and the warp's own `signed_volume`
+  (the volume of the report and the folded-body refusal). The adaptive rule (shapes built by a deformation or a kinked blend) runs on the pieces; every other shape runs the FIXED rule on them, so an imported
+  plate with a bump is read right too. The fixed rule of the whole piece is computed only when needed (when the adaptive rule trips its guard, or no rule is adaptive): that also saved about a quarter of the time.
+- **Imported B-spline faces (STEP) get it.** The NIST corpus was measured first: with the fixed rule by span on every shape, VC-KRN-25 (`nativeKernelReferenceNist`, 29 tests against the OCP 7.9.3 reference) and the
+  reference, exchange, queries, primitives, features, sweeps, surfacing, leaves, feature-cut, ellipse, sheet and floor-fillet suites (about 260 tests) kept passing at their stated tolerances: the faces of an imported
+  file are trimmed (not full patches), so almost none is cut, and those that are agree with the whole-face rule to the tolerance.
+- **Measured** (release): the radius-2 push of height 0.5 on the 1000 x 1000 x 3 slab: volume 3 000 001.5707 (closed form 3e6 + 1.5707963), area 2 012 000.4562 against the closed-form bump area 0.4562
+  (Simpson on 2 pi int (sqrt(1 + z'^2) - 1) r dr), where it was 2 999 999.99999 and 2 011 999.99999. Test `a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump` (red-proof: with the
+  piece limit at 0 the volume gains -8e-6 and the test fails). The 40 mm and 100 mm push tests keep their numbers (the dense 197 x 197 fit of the 40 mm push is read by the whole-face rule: its features are as
+  wide as many spans; mass 2.0 s, warp 0.24 s).
+- **Time** (CHK1: `mass_properties` of the 64-gon conic rim, scale 1, release, alternated runs): 1.9 to 2.6 s before this change, 1.45 to 1.6 s after (the blend faces are not graded enough to be cut, so the volume is
+  bit-identical, 156775.295275133, and the gain is the fixed rule no longer computed first).
+- **Limits, stated.** A trimmed face (a hole, a circular boundary) is not cut: its pcurves are not the sides of the box, and a narrow bump on a large TRIMMED B-spline face is still integrated from a coarse
+  sampling. A graded face with more than 1024 pieces is not cut (not reachable with classes, kept as a bound). A feature wider than the fine run's share of a piece but narrower than the whole-face rule's
+  first samples would need a finer split.
+
+### 17.16.2 Review round on §17.16.1
+
+- **Volumes only on closed shells.** `span_faces(shape, cut, need_closed)`: a volume (`volume_props`, the warp's `signed_volume`) takes the pieces only when every face of the shape belongs to a closed shell
+  (`all_shells_closed`); an open shell, a sheet or a compound with a free face is integrated as before. The pieces are integrated with `OnlyClosed` off, and open cones from the apex of a call add up to a volume
+  only on a closed shell; the first version cut whenever a face qualified and made the sign of an open shell depend on the barycentre of its vertices. Areas (`surface_props`, `face_metric`) need no closure.
+- **A piece that cannot be made keeps the whole face** (all pieces of a face are built first; if one `MakeFace` fails the face is added as it was and not counted as cut): the first version skipped the piece and lost its area.
+- **Located faces are cut too** (an instance of an assembly part): the surface is read with the location applied (`BRep_Tool::Surface(face)`), so an instance measures like the part.
+- **No cache.** The pieces are built per call: 9 per face at most, and a cache keyed on the shape kept the last shape alive and ignored orientation.
+- **Whole-face consumers, on purpose.** These measure deltas, windows or sanity values of a blend or a move, not the volume a user reads, and none of them holds a bump narrower than its face: the chamfer and blend volume
+  windows (`blend_chamfer.cxx`, `blend_corner.cxx`, `blend_rails.cxx`: volume before / after a blend, a ratio of 0.01 to 4 against the circular fillet), the face moves (`face_moves.cxx`), the feature cuts
+  (`features.cxx`), the replaced area of the analytic recognition (`deform_recognise.cxx`: a bound for a tolerance), the mesh-B-rep report (`mesh_brep.cxx`) and the Netgen meshing shape (`llull-netgen`). A blend
+  rebuild on a pushed body would be judged by the whole-face rule: a window of a factor of 400 does not see the difference.
+- **Tests added.** `every_volume_and_area_the_kernel_reports_agrees_on_a_narrow_bump` (the topology volume and the sum of the face areas agree with `mass_properties` to 1e-9, the warp's own volume to 1e-8: its fixed rule on
+  the pieces is 0.6 % off the bump, 3e-9 of the volume), `a_narrow_push_out_of_the_bottom_face_adds_the_same_volume` (the pieces of a reversed face), `a_trimmed_bspline_face_is_not_cut` (a slab with a hole: the
+  trimmed faces are not cut, `span_cut_count` 0: they are integrated as before), and in `deformStepRoundTrip.test.ts` the narrow bump after the STEP round trip: the imported plate reads 1.5800 mm^3 of bump
+  against 1.5708 before the exchange and the closed form 1.5708 (the fixed rule on the pieces), not flat. `nativeKernelQueries.test.ts` keeps a positive assertion for `bspline`: a box face is a bilinear patch (degree 1 x 1,
+  2 x 2 poles; the test used to expect null and was stale since the native `bspline`).
+- **Not tested:** an open shell warped (no catalogue geometry gives a graded open B-spline shell), a `MakeFace` failure of a piece.

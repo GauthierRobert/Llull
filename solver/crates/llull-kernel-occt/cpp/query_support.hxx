@@ -24,6 +24,7 @@
 #include <gp_Pnt2d.hxx>
 
 #include "llull-kernel-occt/cpp/json_writer.hxx"
+#include "llull-kernel-occt/cpp/mass_spans.hxx"
 
 namespace llull {
 namespace query {
@@ -106,11 +107,16 @@ inline FaceMetric face_metric(const TopoDS_Face &face, bool refined = false, dou
   GProp_GProps props;
   if (refined) {
     GProp_GProps adaptive;
-    const double error = BRepGProp::SurfaceProperties(face, adaptive, kRefinedFaceEps, Standard_False);
+    int cut = 0;
+    const TopoDS_Compound spans = span_faces(face, cut, false);
+    const double error = BRepGProp::SurfaceProperties(cut > 0 ? static_cast<TopoDS_Shape>(spans) : static_cast<TopoDS_Shape>(face), adaptive, kRefinedFaceEps, Standard_False);
     if (error <= kRefinedFaceDrift) return {adaptive.Mass(), adaptive.CentreOfMass()};
     if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
   }
-  BRepGProp::SurfaceProperties(face, props, Standard_False, Standard_False);
+  // the fixed rule too: by knot span when the face is a graded full B-spline patch (mass_spans.hxx)
+  int cut = 0;
+  const TopoDS_Compound spans = span_faces(face, cut, false);
+  BRepGProp::SurfaceProperties(cut > 0 ? static_cast<TopoDS_Shape>(spans) : static_cast<TopoDS_Shape>(face), props, Standard_False, Standard_False);
   return {props.Mass(), props.CentreOfMass()};
 }
 

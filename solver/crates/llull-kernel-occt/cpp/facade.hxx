@@ -65,6 +65,8 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
 bool adaptive_rule(const Shape &shape);
 // `shape.refined_mass`, for the test-only view in src/test_bridge.rs.
 bool refined_mass_flag(const Shape &shape);
+// Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
+int32_t span_cut_count(const Shape &shape);
 
 void init_runtime();
 rust::String occt_version();

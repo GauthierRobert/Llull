@@ -97,6 +97,22 @@ describeNative('STEP round trip of an exact deformation (VC-DEF-22, native kerne
     }
   }, 300_000);
 
+  it('a narrow bump on a large plate is read by the mass rule after the exchange too (01 DEF 17.16.1)', () => {
+    const { doc, id } = deformed(['add_box', { size: [1000, 1000, 3], anchor: 'base-center' }], 'deform_by_point', {
+      point: [123.4, 56.7, 3],
+      direction: [0, 0, 1],
+      radius: 2,
+      distance: 0.5,
+      falloff: 'smooth_c2',
+      output: { mode: 'exact', tolerance: 1e-3 },
+    });
+    const bump = (Math.PI * 0.5 * 4) / 4;
+    const { back, imported } = roundTrip(doc, id);
+    // the imported plate is read too (its top face is cut into pieces like the original's): the bump is there, not flat; the fixed rule of the pieces is within 0.6 % of the bump (3e-9 of the volume)
+    expect(volumeOf(doc, id) - 3e6).toBeCloseTo(bump, 3);
+    expect(Math.abs(volumeOf(back, imported) - 3e6 - bump)).toBeLessThan(0.02);
+  }, 300_000);
+
   it('with preserveAnalytic the cone and the planes stay analytic through STEP', () => {
     const { doc, id } = deformed(['add_cylinder', { radius: 5, height: 40, anchor: 'base-center' }], 'taper_body', {
       scaleEnd: 0.4,
