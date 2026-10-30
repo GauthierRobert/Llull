@@ -57,8 +57,19 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                 numbers.extend([number(params, "distance"), number(params, "radius"), 0.0]);
                 [header(6.0, params, region), numbers].concat()
             }
-            "ffd" => {
-                let take = |key: &str| params[key].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
+            "ffd" | "ffd_spline" | "ffd_oriented" | "ffd_spline_oriented" => {
+                let take = |key: &str| -> Vec<f64> {
+                    let key = if key == "splineDegrees_or_zero" {
+                        if params.get("splineDegrees").is_some() {
+                            "splineDegrees"
+                        } else {
+                            return vec![0.0; 3];
+                        }
+                    } else {
+                        key
+                    };
+                    params[key].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>()
+                };
                 let (min, max, degrees) = (take("min"), take("max"), take("degrees"));
                 let counts: Vec<usize> = degrees.iter().map(|d| *d as usize + 1).collect();
                 let mut offsets = vec![0.0; 3 * counts[0] * counts[1] * counts[2]];
@@ -69,7 +80,19 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                         offsets[3 * slot + axis] += moved["delta"][axis].as_f64().unwrap();
                     }
                 }
-                [header(5.0, params, region), min, max, degrees, offsets].concat()
+                // the optional trailer: spline degrees (0: Bernstein), an oriented flag, the box axes (rows)
+                let mut trailer = Vec::new();
+                if params.get("splineDegrees").is_some() || params.get("axes").is_some() {
+                    let spline = take("splineDegrees_or_zero");
+                    trailer.extend(spline);
+                    let rows: Vec<f64> = params["axes"]
+                        .as_array()
+                        .map(|rows| rows.iter().flat_map(|row| row.as_array().unwrap().iter().map(|v| v.as_f64().unwrap())).collect())
+                        .unwrap_or_default();
+                    trailer.push(if rows.is_empty() { 0.0 } else { 1.0 });
+                    trailer.extend(if rows.is_empty() { vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0] } else { rows });
+                }
+                [header(5.0, params, region), min, max, degrees, offsets, trailer].concat()
             }
             _ => continue,
         };
@@ -101,7 +124,7 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
         }
         checked += 1;
     }
-    assert_eq!(checked, 18, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
+    assert_eq!(checked, 21, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
 }
 
 /// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).

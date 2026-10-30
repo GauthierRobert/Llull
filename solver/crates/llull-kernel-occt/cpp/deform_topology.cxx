@@ -68,10 +68,9 @@ int count_faces(const TopoDS_Shape &shape) {
 }
 
 // Corners of the shape's bounding box projected on the frame axis `axis` (0 x, 1 y, 2 z): the range [low, high] the body spans there.
-void span_along(const TopoDS_Shape &shape, const deform::Frame &frame, int axis, double &low, double &high) {
+void span_along_direction(const TopoDS_Shape &shape, const deform::Frame &frame, const double *direction, double &low, double &high) {
   Bnd_Box box;
   BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
-  const double *direction = axis == 0 ? frame.x : axis == 1 ? frame.y : frame.z;
   low = std::numeric_limits<double>::infinity();
   high = -low;
   const gp_Pnt a = box.CornerMin(), b = box.CornerMax();
@@ -81,6 +80,10 @@ void span_along(const TopoDS_Shape &shape, const deform::Frame &frame, int axis,
     low = std::min(low, t);
     high = std::max(high, t);
   }
+}
+
+void span_along(const TopoDS_Shape &shape, const deform::Frame &frame, int axis, double &low, double &high) {
+  span_along_direction(shape, frame, axis == 0 ? frame.x : axis == 1 ? frame.y : frame.z, low, high);
 }
 
 // Places where the law is not analytic and a face must not straddle: region ends for the axis laws, lattice box faces.
@@ -101,12 +104,30 @@ std::vector<Cut> cuts_of(const Warp &warp, const TopoDS_Shape &shape) {
       add(2, warp.region.start, margin);
       add(2, warp.region.end, margin);
       break;
-    case LawKind::Lattice:
+    case LawKind::Lattice: {
+      const deform::Lattice &lattice = warp.law.lattice;
+      if (!lattice.oriented) {
+        for (int a = 0; a < 3; ++a) {
+          add(a, lattice.min[a], margin);
+          add(a, lattice.max[a], margin);
+        }
+        break;
+      }
       for (int a = 0; a < 3; ++a) {
-        add(a, warp.law.lattice.min[a], margin);
-        add(a, warp.law.lattice.max[a], margin);
+        // the face c_a = min / max of the oriented box: normal = row a of the axes in local coordinates, as a world vector for the span
+        double world[3];
+        for (int k = 0; k < 3; ++k)
+          world[k] = lattice.axes[3 * a] * warp.frame.x[k] + lattice.axes[3 * a + 1] * warp.frame.y[k] + lattice.axes[3 * a + 2] * warp.frame.z[k];
+        double low = 0, high = 0;
+        span_along_direction(shape, warp.frame, world, low, high);
+        for (const double offset : {lattice.min[a], lattice.max[a]}) {
+          if (!(offset > low + margin && offset < high - margin)) continue;
+          Cut cut{a, offset, true, {lattice.axes[3 * a], lattice.axes[3 * a + 1], lattice.axes[3 * a + 2]}};
+          cuts.push_back(cut);
+        }
       }
       break;
+    }
     default:
       break;
   }
@@ -148,7 +169,10 @@ TopoDS_Shape split_faces(const TopoDS_Shape &shape, const Warp &warp, const std:
   TopExp::MapShapes(shape, TopAbs_FACE, distinct);
   for (int f = 1; f <= distinct.Extent(); ++f) faces.Append(distinct(f));
   for (const Cut &cut : cuts) {
-    const double *direction = cut.axis == 0 ? warp.frame.x : cut.axis == 1 ? warp.frame.y : warp.frame.z;
+    double oriented[3];
+    for (int k = 0; k < 3; ++k)
+      oriented[k] = cut.direction[0] * warp.frame.x[k] + cut.direction[1] * warp.frame.y[k] + cut.direction[2] * warp.frame.z[k];
+    const double *direction = cut.oriented ? oriented : (cut.axis == 0 ? warp.frame.x : cut.axis == 1 ? warp.frame.y : warp.frame.z);
     const gp_Pnt at(warp.frame.origin[0] + direction[0] * cut.offset, warp.frame.origin[1] + direction[1] * cut.offset,
                     warp.frame.origin[2] + direction[2] * cut.offset);
     const gp_Pln plane(at, gp_Dir(direction[0], direction[1], direction[2]));

@@ -100,9 +100,14 @@ struct Region {
 
 // A trivariate Bernstein lattice (deform_lattice): normalised coordinates inside `min`..`max` (frame coordinates), control points displaced by
 // `offsets` (triples laid out i-major, then j, then k).
+// `spline` (per axis; 0 = Bernstein): a uniform clamped B-spline basis of that degree on the same control net (local control, Greville rest positions).
+// `oriented`: `min`..`max` are measured along the rows of `axes` (box coordinates c = A q about the frame origin); the offsets stay displacements in frame coordinates.
 struct Lattice {
   double min[3] = {0, 0, 0}, max[3] = {1, 1, 1};
   int degree[3] = {1, 1, 1};
+  int spline[3] = {0, 0, 0};
+  bool oriented = false;
+  double axes[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   std::vector<double> offsets;
 };
 
@@ -201,27 +206,66 @@ inline Jet bernstein(int n, int i, const Jet &t) {
   return r;
 }
 
+// Knot j of the uniform clamped vector of `count` control points and degree p (lattice.ts knotAt).
+inline double lattice_knot(int count, int p, int j) { return j <= p ? 0.0 : (j >= count ? 1.0 : static_cast<double>(j - p) / static_cast<double>(count - p)); }
+
+// The nonzero basis functions of one lattice axis at s: first control index and the values (Bernstein: all net + 1; B-spline: the p + 1 of the span, Piegl & Tiller A2.2).
+struct AxisBasisJ {
+  int first = 0;
+  std::vector<Jet> values;
+};
+
+inline AxisBasisJ lattice_axis_basis(int net, int p, const Jet &s) {
+  AxisBasisJ out;
+  if (p == 0) {
+    out.values.resize(static_cast<size_t>(net) + 1);
+    for (int i = 0; i <= net; ++i) out.values[static_cast<size_t>(i)] = bernstein(net, i, s);
+    return out;
+  }
+  const int count = net + 1;
+  const int k = std::min(count - 1, p + static_cast<int>(std::floor(s.v * (count - p))));
+  std::vector<Jet> left(static_cast<size_t>(p) + 1), right(static_cast<size_t>(p) + 1);
+  out.first = k - p;
+  out.values.assign(static_cast<size_t>(p) + 1, Jet(0));
+  out.values[0] = Jet(1);
+  for (int j = 1; j <= p; ++j) {
+    left[static_cast<size_t>(j)] = s - Jet(lattice_knot(count, p, k + 1 - j));
+    right[static_cast<size_t>(j)] = Jet(lattice_knot(count, p, k + j)) - s;
+    Jet saved(0);
+    for (int r = 0; r < j; ++r) {
+      const Jet temp = out.values[static_cast<size_t>(r)] / (right[static_cast<size_t>(r) + 1] + left[static_cast<size_t>(j - r)]);
+      out.values[static_cast<size_t>(r)] = saved + right[static_cast<size_t>(r) + 1] * temp;
+      saved = left[static_cast<size_t>(j - r)] * temp;
+    }
+    out.values[static_cast<size_t>(j)] = saved;
+  }
+  return out;
+}
+
 inline Vec3J lattice_map(const Lattice &lattice, const Vec3J &q) {
   // Points outside the box are not moved (the lattice must enclose the deformed part, 01 DEF §5.3).
+  Vec3J c = q;
+  if (lattice.oriented)
+    for (size_t a = 0; a < 3; ++a)
+      c[a] = Jet(lattice.axes[3 * a]) * q[0] + Jet(lattice.axes[3 * a + 1]) * q[1] + Jet(lattice.axes[3 * a + 2]) * q[2];
   Jet s[3];
   for (int a = 0; a < 3; ++a) {
     const double size = lattice.max[a] - lattice.min[a];
-    if (!(q[a].v >= lattice.min[a] && q[a].v <= lattice.max[a]) || !(size > 0)) return q;
-    s[a] = (q[a] - Jet(lattice.min[a])) * Jet(1 / size);
+    if (!(c[a].v >= lattice.min[a] && c[a].v <= lattice.max[a]) || !(size > 0)) return q;
+    s[a] = (c[a] - Jet(lattice.min[a])) * Jet(1 / size);
   }
   const int l = lattice.degree[0], m = lattice.degree[1], n = lattice.degree[2];
-  std::vector<Jet> bi(static_cast<size_t>(l) + 1), bj(static_cast<size_t>(m) + 1), bk(static_cast<size_t>(n) + 1);
-  for (int i = 0; i <= l; ++i) bi[static_cast<size_t>(i)] = bernstein(l, i, s[0]);
-  for (int j = 0; j <= m; ++j) bj[static_cast<size_t>(j)] = bernstein(m, j, s[1]);
-  for (int k = 0; k <= n; ++k) bk[static_cast<size_t>(k)] = bernstein(n, k, s[2]);
+  const AxisBasisJ bi = lattice_axis_basis(l, lattice.spline[0], s[0]);
+  const AxisBasisJ bj = lattice_axis_basis(m, lattice.spline[1], s[1]);
+  const AxisBasisJ bk = lattice_axis_basis(n, lattice.spline[2], s[2]);
   Vec3J out = q;
-  for (int i = 0; i <= l; ++i)
-    for (int j = 0; j <= m; ++j)
-      for (int k = 0; k <= n; ++k) {
-        const size_t at = (static_cast<size_t>(i) * (static_cast<size_t>(m) + 1) + static_cast<size_t>(j)) * (static_cast<size_t>(n) + 1) +
-                          static_cast<size_t>(k);
+  for (size_t i = 0; i < bi.values.size(); ++i)
+    for (size_t j = 0; j < bj.values.size(); ++j)
+      for (size_t k = 0; k < bk.values.size(); ++k) {
+        const size_t at = ((static_cast<size_t>(bi.first) + i) * (static_cast<size_t>(m) + 1) + static_cast<size_t>(bj.first) + j) * (static_cast<size_t>(n) + 1) +
+                          static_cast<size_t>(bk.first) + k;
         if (3 * at + 2 >= lattice.offsets.size()) continue;
-        const Jet weight = bi[static_cast<size_t>(i)] * bj[static_cast<size_t>(j)] * bk[static_cast<size_t>(k)];
+        const Jet weight = bi.values[i] * bj.values[j] * bk.values[k];
         for (int a = 0; a < 3; ++a) out[static_cast<size_t>(a)] = out[static_cast<size_t>(a)] + weight * Jet(lattice.offsets[3 * at + static_cast<size_t>(a)]);
       }
   return out;

@@ -105,6 +105,63 @@ export function ffd(p, { min, max, degrees: [l, m, n], points }) {
   return out;
 }
 
+/**
+ * Uniform clamped knot vector of `count` control points and degree `p` (p + 1 zeros, count - p - 1 interior knots, p + 1 ones) and the textbook Cox-de Boor
+ * recursion N_{i,p}(u) on it (0/0 = 0; u = 1 belongs to the last span), independent of the span-based algorithm of the production code.
+ */
+export function clampedKnots(count, p) {
+  return Array.from({ length: count + p + 1 }, (_, j) => (j <= p ? 0 : j >= count ? 1 : (j - p) / (count - p)));
+}
+export function splineN(i, p, u, knots) {
+  if (p === 0) return (knots[i] <= u && u < knots[i + 1]) || (u === 1 && knots[i] < 1 && knots[i + 1] === 1) ? 1 : 0;
+  const left = knots[i + p] - knots[i];
+  const right = knots[i + p + 1] - knots[i + 1];
+  return (
+    (left > 0 ? ((u - knots[i]) / left) * splineN(i, p - 1, u, knots) : 0) +
+    (right > 0 ? ((knots[i + p + 1] - u) / right) * splineN(i + 1, p - 1, u, knots) : 0)
+  );
+}
+
+/**
+ * FFD on a B-spline lattice and/or an oriented box (TECHNICAL_SPEC §17.4). Net degrees [l, m, n] (control points l + 1, m + 1, n + 1), spline degrees
+ * `splineDegrees` (omitted: Bernstein), box [min, max] in box coordinates c = A p (`axes` rows; omitted: the frame), control points at rest on the Greville
+ * abscissae and displaced by `moved` (frame coordinates). Points outside the box do not move.
+ */
+export function ffdGeneral(p, { min, max, degrees, splineDegrees, axes, moved }) {
+  const c = axes ? axes.map((row) => row[0] * p[0] + row[1] * p[1] + row[2] * p[2]) : p;
+  const s = [0, 1, 2].map((a) => (c[a] - min[a]) / (max[a] - min[a]));
+  if (s.some((t) => !(t >= 0 && t <= 1))) return p;
+  const basis = (a, i) => {
+    const net = degrees[a];
+    if (!splineDegrees) return bernstein(net, i, s[a]);
+    return splineN(i, splineDegrees[a], s[a], clampedKnots(net + 1, splineDegrees[a]));
+  };
+  const rest = (a, i) => {
+    const net = degrees[a];
+    if (!splineDegrees) return i / net;
+    const knots = clampedKnots(net + 1, splineDegrees[a]);
+    let sum = 0;
+    for (let j = 1; j <= splineDegrees[a]; j++) sum += knots[i + j];
+    return sum / splineDegrees[a];
+  };
+  const delta = new Map(moved.map(({ index, delta: d }) => [index.join(','), d]));
+  const out = [0, 0, 0];
+  for (let i = 0; i <= degrees[0]; i++)
+    for (let j = 0; j <= degrees[1]; j++)
+      for (let k = 0; k <= degrees[2]; k++) {
+        const w = basis(0, i) * basis(1, j) * basis(2, k);
+        const box = [
+          min[0] + rest(0, i) * (max[0] - min[0]),
+          min[1] + rest(1, j) * (max[1] - min[1]),
+          min[2] + rest(2, k) * (max[2] - min[2]),
+        ];
+        const frame = axes ? [0, 1, 2].map((a) => axes[0][a] * box[0] + axes[1][a] * box[1] + axes[2][a] * box[2]) : box;
+        const d = delta.get([i, j, k].join(',')) ?? [0, 0, 0];
+        for (let a = 0; a < 3; a++) out[a] += w * (frame[a] + d[a]);
+      }
+  return out;
+}
+
 /** Undisplaced lattice points of the box. */
 export function latticeOf(min, max, [l, m, n]) {
   const pts = [];

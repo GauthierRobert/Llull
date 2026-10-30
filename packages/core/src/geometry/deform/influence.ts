@@ -6,6 +6,7 @@
 import type { Vec3 } from '../../model/vectors';
 import { type DeformNode } from './laws';
 import { type LocalFrame, toLocal } from './frame';
+import { toBoxCoordinates } from './lattice';
 import { rbfFeatureSize } from './rbf';
 
 type Segment = (p: Vec3, q: Vec3, margin?: number) => boolean;
@@ -57,7 +58,7 @@ export function edgeActive(node: Pick<DeformNode, 'law' | 'region'>, frame: Loca
         return (p, q, margin = 0) => distanceToSegment(law.center, toLocal(frame, p), toLocal(frame, q)) < law.radius + margin;
       case 'lattice':
         return (p, q, margin = 0) => {
-          const [a, b] = [toLocal(frame, p), toLocal(frame, q)];
+          const [a, b] = [toBoxCoordinates(law, toLocal(frame, p)), toBoxCoordinates(law, toLocal(frame, q))];
           return [0, 1, 2].every(
             (axis) =>
               Math.max(a[axis] as number, b[axis] as number) > (law.box.min[axis] as number) - margin &&

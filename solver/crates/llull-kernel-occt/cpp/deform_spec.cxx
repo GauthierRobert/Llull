@@ -95,6 +95,19 @@ bool parse_spec(rust::Slice<const double> spec, Warp &warp, double &tolerance, b
                            static_cast<size_t>(lattice.degree[2] + 1);
       if (!need(9 + count)) return false;
       lattice.offsets.assign(p + 9, p + 9 + count);
+      // the optional trailer: spline degrees p, q, r (0: Bernstein), an oriented flag and the nine entries of the box axes (rows)
+      if (n >= 9 + count + 13) {
+        const double *trailer = p + 9 + count;
+        for (int a = 0; a < 3; ++a) {
+          lattice.spline[a] = static_cast<int>(trailer[a]);
+          if (lattice.spline[a] != 0 && (lattice.spline[a] < 2 || lattice.spline[a] > lattice.degree[a])) {
+            why = "lattice spline degree must be 0 or from 2 to the lattice degree";
+            return false;
+          }
+        }
+        lattice.oriented = trailer[3] != 0;
+        std::copy(trailer + 4, trailer + 13, lattice.axes);
+      }
       return true;
     }
     case LawKind::Point:

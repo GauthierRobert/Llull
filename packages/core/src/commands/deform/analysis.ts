@@ -15,6 +15,7 @@ import {
 import { type DeformNode, type Warp, warpOf } from '../../geometry/deform/laws';
 import { toLocal, toWorld } from '../../geometry/deform/frame';
 import { baseFlowGrid } from '../../geometry/deform/baseFlowGrid';
+import { fromBoxCoordinates } from '../../geometry/deform/lattice';
 import { storedChordError } from '../../geometry/deform/storedError';
 import { predictedVolumeOf } from '../../geometry/deform/predicted';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
@@ -70,6 +71,18 @@ const GRID = 21;
 /** World points of a regular grid over the part of the body extent the law acts in (point push: its support sphere box; lattice: its box; flow: all). */
 function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions: ReadonlyArray<number>): number[] {
   const { law } = node;
+  if (law.kind === 'lattice' && law.axes !== undefined) {
+    const oriented: number[] = [];
+    for (let i = 0; i < GRID; i++)
+      for (let j = 0; j < GRID; j++)
+        for (let k = 0; k < GRID; k++) {
+          const c: Vec3 = [i, j, k].map(
+            (at, a) => (law.box.min[a] as number) + (((law.box.max[a] as number) - (law.box.min[a] as number)) * at) / (GRID - 1),
+          ) as unknown as Vec3;
+          oriented.push(...toWorld(warp.frame, fromBoxCoordinates(law, c)));
+        }
+    return oriented;
+  }
   if (law.kind === 'flowCurve' && law.base !== undefined) {
     const local: number[] = [];
     for (let i = 0; i + 2 < positions.length; i += 3)

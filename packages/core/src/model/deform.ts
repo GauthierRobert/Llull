@@ -37,12 +37,23 @@ export type DeformLaw =
   | { readonly kind: 'stretch'; readonly factor: number }
   /** Bend of the region onto a circle of `radius` toward local +y; `symmetric` keeps the region middle in place. */
   | { readonly kind: 'bend'; readonly radius: number; readonly symmetric: boolean }
-  /** Free-form deformation (Sederberg & Parry 1986): Bernstein lattice of degrees [l, m, n] over `box` (frame coordinates); control point (i, j, k) is displaced by its offset; points outside the box stay. */
+  /** Free-form deformation (Sederberg & Parry 1986): Bernstein (or B-spline, oriented) lattice of degrees [l, m, n] over `box` (frame coordinates, or box coordinates when `axes`); control point (i, j, k) is displaced by its offset; points outside the box stay. */
   | {
       readonly kind: 'lattice';
       readonly box: { readonly min: Vec3; readonly max: Vec3 };
       readonly degrees: readonly [number, number, number];
       readonly offsets: ReadonlyArray<{ readonly index: readonly [number, number, number]; readonly delta: Vec3 }>;
+      /**
+       * Present: a uniform clamped B-SPLINE lattice of these degrees [p, q, r] (2 <= p <= l, ...) instead of the Bernstein one: the net keeps (l + 1)(m + 1)(n + 1)
+       * control points, each acting only on the span(s) it supports (local control), at rest on the Greville abscissae so that zero offsets are the identity; p = l is the
+       * Bernstein lattice. Absent: Bernstein.
+       */
+      readonly splineDegrees?: readonly [number, number, number];
+      /**
+       * Present: an oriented box. The rows are the box's own axes (orthonormal, frame coordinates); `box` is then measured in the box coordinates c = A q (about
+       * the frame origin) and the offsets stay displacements in frame coordinates. Absent: the box is aligned with the frame.
+       */
+      readonly axes?: readonly [Vec3, Vec3, Vec3];
     }
   /** Push of the points within `radius` of `center` (frame coordinates) along the unit `direction` by `distance` x falloff(|p - center| / radius). */
   | {

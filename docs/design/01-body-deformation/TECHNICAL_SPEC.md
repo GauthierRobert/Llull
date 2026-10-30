@@ -594,7 +594,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; a curved sheet as the base of
+**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; a curved sheet as the base of
 `flow_on_surface`; `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
@@ -774,3 +774,28 @@ centre vertex, the document's own cylinder mesh has). At zero gradient (the cent
 Tests: `tests/unit/deform/referenceShapes.test.ts`: closed forms on and off the surface per kind (including a helicoid point at a height, the elliptic cylinder in a
 tilted reference), and per law result: sphere scaled by 2 vs radius 20 (and 19.5: 0.5), plate stretched vs plane (and a plane shifted 0.3: 0.3), cylinder × [2, 1, 1]
 vs 10 × 5 (and 10.3: 0.3), plate twisted at 36 degrees per 20 vs the helicoid (offset 0.2: 0.2; rate × 1.1: far), `DEF_COMPARE_INVALID` by field name.
+
+### 17.4 `deform_lattice`: B-spline lattices and oriented boxes (FR-DEF-13)
+
+Two optional extensions of the lattice law (`lattice.ts`; both absent: the Bernstein, frame-aligned lattice of §5.3, bit-identical results).
+
+- **`splineDegrees` [p, q, r]** (each 2..the axis degree): the basis along each axis is a uniform clamped B-spline of that degree on the same (l+1)(m+1)(n+1) control net
+  (knots: p+1 zeros, l−p interior knots at i/(l+1−p), p+1 ones). A control point acts only on the p+1 knot spans around it (local control); points rest on the
+  Greville abscissae g*i = (t*{i+1}+…+t\_{i+p})/p, so zero offsets are the identity and an affine displacement of every point is that affine map (linear precision).
+  p equal to the lattice degree is the Bernstein lattice. `index` and `near` use the Greville positions. Degree 1 is refused (`DEF_LATTICE_DEGREE`): the interior knots
+  would be kinks the exact warp would have to split at; p ≥ 2 is C¹.
+- **`orientation` {uAxis, vAxis}** → `axes` (orthonormal rows, frame coordinates): the box is measured in c = A q about the frame origin (`box.min/max` in those
+  coordinates, default `"bounds"` = the body bounds along them); points outside it do not move; the offsets stay displacements in frame coordinates. The Jacobian is
+  I + (∂D/∂c) A. Degenerate axes: `DEF_FRAME_DEGENERATE` (`params.orientation`).
+- **Bounds.** The det J enclosure is the Bernstein-coefficient bound over each knot span (degree 3p−1 per axis), extremes over the spans; the sampled values are those of the
+  span nodes. An oriented Bernstein lattice uses the whole-box bound with the points mapped back from the box.
+- **Native.** The spec gets a 13-number trailer after the offsets (spline degrees, oriented flag, the nine axes entries; absent = Bernstein, aligned). The warp splits faces
+  at the oriented box faces (`Cut` with a direction) as at the aligned ones; interior knot planes are not split (C¹). The sidecar `info` lists `deform-lattice-spline`;
+  `nativeSupportsDeform` requires it when the law has a trailer. Predicted volume: the divergence-theorem chord integral cuts the chord at the oriented box and, for a B-spline
+  lattice, integrates the Gauss pieces between knot planes.
+- **Pack.** `ffd_spline`, `ffd_oriented`, `ffd_spline_oriented` in `point_vectors.json`, from an independent reference (`ffdGeneral`: textbook Cox-de Boor recursion on explicit
+  knots, Greville rest positions, the box mapped by the axes), checked by TS and cargo (images 1e-9, det J 1e-6 away from the box faces).
+
+Tests: `tests/unit/deform/latticeSpline.test.ts` (pack, Greville positions, linear precision, local control support, enclosure, command: local control of the body, oriented
+affine map = 1.2 x the volume, default oriented box, refusals), `server/tests/nativeKernelLattice.test.ts` (exact vs mesh vs closed form on the native kernel, the capability,
+fold on both paths), cargo pack vectors.
