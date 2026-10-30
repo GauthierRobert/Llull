@@ -9,7 +9,13 @@ import { serializeDocument, deserializeDocument } from '@core/commands/persisten
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { errorMessage } from '@lib/errorMessage';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
-import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@protocol/liveSync';
+import {
+  type LiveCommandEvent,
+  type LiveCommandSource,
+  type LiveProgressReport,
+  type LiveSnapshotEvent,
+  documentHash,
+} from '@protocol/liveSync';
 import { isTestRun, positiveInteger } from './env';
 import { logLiveCommand, rebaseCommandLog } from './liveCommandLog';
 
@@ -117,7 +123,7 @@ function writeSseFrame(res: Response, frame: string): boolean {
   }
 }
 
-function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
+function broadcast(eventType: 'snapshot' | 'command' | 'progress', payload: unknown): void {
   if (_subscribers.size === 0) return;
   let frame: string;
   try {
@@ -159,6 +165,14 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
   };
   broadcast('command', event);
+}
+
+/**
+ * Tell the live subscribers about a native job of a running command (`progress` event, `@protocol/liveSync`). Touches neither the document, `seq`, the command log
+ * nor the state hash: a subscriber that ignores the event type loses nothing.
+ */
+export function publishLiveProgress(event: LiveProgressReport): void {
+  broadcast('progress', { epoch: _epoch, ...event });
 }
 
 /** Register an SSE `Response` and send it the opening snapshot; returns the unsubscribe function. */

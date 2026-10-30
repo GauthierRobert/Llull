@@ -1807,3 +1807,21 @@ A circular parameter domain (a tensor B-spline patch has a square one); the boun
 ### 13.24.4 Left, by name
 
 Stored groups of an asset-backed mesh are checked against the stored triangle count (the group ranges are over the full-resolution asset); `fit_subdivision_to_mesh` fits the cage to the group's triangles only (a cage whose far side has no target is not constrained there); group names are exact (no patterns); a segmentation re-computed with other parameters than the listing call names other regions: pass the same ones.
+
+## 13.25 As built (DES-7c: native job progress on `/live`, UI chip with Cancel, 2026-10-30)
+
+### 13.25.1 What it is
+
+A command that waits for a native mesh job (13.8) now also tells the live subscribers: SSE event `progress` (`@protocol/liveSync` `LiveProgressEvent`): `{ epoch, command, commandId?, state: 'running', op, stage, message, fraction, elapsedMs, etaMs, heartbeat }` for every report of the job (the same reports the NDJSON stream and the CLI `--progress` get, heartbeats included), and `{ epoch, command, commandId?, state: 'ended' }` once the command settles (applied, refused, failed or cancelled). It is NOT a document change: no `seq`, no `stateHash`, nothing in the command log, so `documentHash`, replay and live sync are untouched, and a client that does not listen for the type simply never sees it (an `EventSource` only delivers the types it registered). A command that needs no native job emits nothing (no `ended` either). Order for one command: the `running` events, then its `command` event (when it changed the document), then `ended`.
+
+### 13.25.2 UI
+
+`useLiveDocument` listens for `progress` into `jobProgressStore` (UI-only); the status bar shows one chip per job: `<op>: <message> <percent>% · <n> s left`, a `<progress>` bar once the job reported a share, and a Cancel button for a command THIS client sent. Cancel is the existing path: `postDispatch` now keeps an `AbortController` per command (`commandCancel.ts`); aborting the request makes the server kill the native job nobody else waits for and apply nothing (13.8); the status line says "Command 'x' cancelled." and the run does not fall back to the local engine. A command of the CLI or another client shows the chip without Cancel (no request of this client to abort). The chip also leaves on the command's own `command` event and when the stream drops.
+
+### 13.25.3 Tests
+
+`server/tests/liveProgress.test.ts` (fake native engine: running events with the command id and op, monotone fractions, order running < command < ended, no `seq` / `stateHash` on a progress frame and the command still takes `seq + 1`; a TS command sends exactly `snapshot, command`; a cancelled job sends one `ended` and no `command`), `tests/component/JobProgressChip.test.tsx` (chip text, percent, ETA, bar, ended; no Cancel for a foreign command; Cancel aborts the registered request; the hook fills / clears the store, ignores malformed data and registers no listener for an unknown type; a dropped stream clears; a cancelled dispatch aborts its POST, sets the summary and runs nothing locally). Red-proofs (each disabled in turn): the `ended` publication (2 server tests fail), the clear on the command event, the cancelled-dispatch branch.
+
+### 13.25.4 Left, by name
+
+The CLI does not subscribe to `/live`; a second desktop window of the same backend sees the chip of the first (no Cancel there). `progress` frames of a job that finishes while a client is disconnected are not replayed (the stream reconnects with a snapshot and no chip).

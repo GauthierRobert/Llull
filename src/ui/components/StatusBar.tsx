@@ -4,6 +4,8 @@ import React from 'react';
 import { useStore } from '@ui/store';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
 import { useFailureStore } from '@ui/report/failureStore';
+import { useJobProgressStore, type ActiveJob } from '@ui/store/jobProgressStore';
+import { cancelCommand } from '@ui/store/commandCancel';
 
 function StatusItem({
   label,
@@ -50,6 +52,47 @@ function KernelIndicator(): React.ReactElement | null {
   );
 }
 
+/** The time left in words: "12 s", "2 min"; empty while the job has not said. */
+function etaText(etaMs: number | null): string {
+  if (etaMs === null) return '';
+  const seconds = Math.max(1, Math.round(etaMs / 1000));
+  return seconds < 90 ? ` · ${seconds} s left` : ` · ${Math.round(seconds / 60)} min left`;
+}
+
+function JobChip({ job }: { job: ActiveJob }): React.ReactElement {
+  const percent = job.fraction === null ? null : Math.round(job.fraction * 100);
+  const text = `${job.op}: ${job.message}${percent === null ? '' : ` ${percent}%`}${etaText(job.etaMs)}`;
+  return (
+    <span className="status-job" role="status" aria-label={`Native job: ${text}`} title={text}>
+      <span className="status-job__text">{text}</span>
+      {percent !== null && <progress className="status-job__bar" value={job.fraction ?? 0} max={1} aria-label={`${job.op} progress`} />}
+      {job.cancellable && job.commandId !== undefined && (
+        <button
+          type="button"
+          className="status-job__cancel"
+          onClick={() => cancelCommand(job.commandId as string)}
+          title={`Cancel ${job.command}`}
+        >
+          Cancel
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** One chip per native job the backend reports over /live (a command waiting for a mesh job): stage, share done, time left, Cancel for this client's own commands. */
+function JobProgress(): React.ReactElement | null {
+  const jobs = useJobProgressStore((s) => s.jobs);
+  if (jobs.length === 0) return null;
+  return (
+    <>
+      {jobs.map((job) => (
+        <JobChip key={job.key} job={job} />
+      ))}
+    </>
+  );
+}
+
 /** Offered only while the status text is the summary of an internal failure (not for invalid params, guards or "not supported"). */
 function ReportOffer(): React.ReactElement | null {
   const failure = useFailureStore((s) => s.failure);
@@ -80,6 +123,7 @@ export function StatusBar(): React.ReactElement {
       <div className="status-bar-bottom__items">
         <LiveIndicator />
         <KernelIndicator />
+        <JobProgress />
         {lastSummary !== null && (
           <span
             key={lastSummary}

@@ -7,6 +7,7 @@ import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCom
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId } from './liveOrigin';
+import { registerCommandCancel, takeCancelled } from './commandCancel';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -64,7 +65,9 @@ function responseChanged(response: ServerCommandResponse): boolean {
 export function postDispatch(set: StoreSet, get: StoreGet, name: string, params: unknown, options?: DispatchOptions): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
-  void postCommand(name, params, commandId)
+  const request = new AbortController();
+  const forget = registerCommandCancel(commandId, () => request.abort());
+  void postCommand(name, params, commandId, request.signal)
     .then((response) => {
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
@@ -76,6 +79,12 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
+      if (takeCancelled(commandId)) {
+        const summary = `Command '${name}' cancelled.`;
+        set({ lastSummary: summary });
+        options?.onResult?.({ summary, changed: false });
+        return;
+      }
       handlePostFailure(
         set,
         get,
@@ -84,7 +93,8 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
         () => runLocally(set, get, name, params, options),
         (summary) => options?.onResult?.({ summary, changed: false }),
       );
-    });
+    })
+    .finally(forget);
 }
 
 export function postHistoryStep(set: StoreSet, get: StoreGet, direction: 'undo' | 'redo'): void {

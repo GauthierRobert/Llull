@@ -1,12 +1,13 @@
 /**
  * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, `?ticket=` via liveTicketStreamUrl when a token is set). Events (`@protocol/liveSync`,
  * seq per server `epoch`): `snapshot` (connect, undo/redo) → hydrateLiveDocument; `command` → applyLiveCommand, and on a
- * seq gap / hash mismatch a `GET /live/snapshot` resync. onerror → 'disconnected', reconnect with 1s..30s backoff.
+ * seq gap / hash mismatch a `GET /live/snapshot` resync; `progress` goes to jobProgressStore (a status-bar chip, never the document). onerror → 'disconnected', reconnect with 1s..30s backoff.
  */
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@protocol/liveSync';
+import type { LiveCommandEvent, LiveProgressEvent, LiveSnapshotEvent } from '@protocol/liveSync';
+import { useJobProgressStore } from '@ui/store/jobProgressStore';
 import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
@@ -107,6 +108,7 @@ export function useLiveDocument(): void {
         } catch {
           return; // Malformed JSON from server — ignore, stay connected.
         }
+        useJobProgressStore.getState().finish(event.commandId ?? event.name);
         markLiveOrigin(isOwnCommandId(event.commandId) ? null : { kind: 'remote', name: event.name, source: event.source ?? 'rest' });
         const applied = applyLiveCommand(event);
         markLiveOrigin(null);
@@ -114,9 +116,19 @@ export function useLiveDocument(): void {
         resync();
       });
 
+      // A native job of a running command reports here; an event type this client does not know is simply not listened to.
+      es.addEventListener('progress', (e: Event) => {
+        try {
+          useJobProgressStore.getState().apply(JSON.parse((e as MessageEvent<string>).data) as LiveProgressEvent);
+        } catch {
+          // Malformed JSON from server: ignore, stay connected.
+        }
+      });
+
       // Close the native auto-retry (fixed ~3s, noisy) and back off exponentially instead.
       es.onerror = () => {
         es.close();
+        useJobProgressStore.getState().clear();
         setLiveStatus('disconnected');
         scheduleReconnect();
       };
