@@ -134,9 +134,6 @@ describe('bevel_cage_edges (VC-DIR-34)', () => {
     expect(code(run(cube.doc, 'bevel_cage_edges', { id: cube.id, edges: [edge], width: 0 }))).toBe('DIR_BEVEL_WIDTH_RANGE');
     expect(code(run(cube.doc, 'bevel_cage_edges', { id: cube.id, edges: [edge], width: 0.2, segments: 99 }))).toBe('DIR_BEVEL_WIDTH_RANGE');
     expect(code(run(cube.doc, 'bevel_cage_edges', { id: cube.id, edges: [edge], width: 0.2, sharp: 11 }))).toBe('DIR_SHARPNESS_RANGE');
-    const touching = run(cube.doc, 'bevel_cage_edges', { id: cube.id, edges: [edge, [edge[1], at(cube.e, [-1, 1, 1])]], width: 0.2 });
-    expect(code(touching)).toBe('DIR_BEVEL_ADJACENT');
-    expectNoOp(touching, cube.doc);
     expect(code(run(cube.doc, 'bevel_cage_edges', { id: cube.id, edges: [[0, 7]], width: 0.2 }))).toBe('DIR_REF_LOST');
     const open = run(cube.doc, 'delete_cage_faces', { id: cube.id, faces: [0] });
     const rim = run(open.document, 'bevel_cage_edges', { id: cube.id, edges: [edge], width: 0.2 });

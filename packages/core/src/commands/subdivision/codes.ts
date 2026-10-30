@@ -25,7 +25,8 @@ export const DIR_REMEDIATION: Readonly<Record<string, string>> = {
   DIR_SLIDE_LOOP_INVALID: 'Pick an edge whose loop has a face on the sliding side of every vertex (not on an open boundary).',
   DIR_BEVEL_TOO_WIDE: 'width is a fraction of the adjacent edges, at most just below 0.5: reduce width.',
   DIR_BEVEL_WIDTH_RANGE: 'width is a fraction 0 < width < 0.5 of the adjacent edge length.',
-  DIR_BEVEL_ADJACENT: 'Bevel edges that share no vertex in one call; bevel the others in a further call.',
+  DIR_BEVEL_CORNER_UNSUPPORTED:
+    'Bevelled edges can meet only at interior vertices of valence 3 or 4: bevel the edges of the other corners in a separate call, or loop-cut first.',
   DIR_BEVEL_BOUNDARY: 'Bevel interior edges (two faces); boundary edges cannot be bevelled.',
   DIR_BRIDGE_COUNT_MISMATCH: 'Select regions whose boundaries have the same number of vertices, or loop-cut one side.',
   DIR_BRIDGE_REGION:
