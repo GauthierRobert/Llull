@@ -144,7 +144,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   non-uniform fit grid (point push 5–8 s), native `faceQuery.bspline`, VC-22 STEP re-import, mass rule by face type
   (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
-  (diagonal / diamond) modeled knurl, knurl as AP242 PMI, CFF `seac` / arithmetic / CFF2 variable fonts, multi-face wraps (VC-36), pull walls
+  (diagonal / diamond) modeled knurl, knurl as AP242 PMI (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), multi-face wraps (VC-36), pull walls
   - draft (VC-25/26), silhouette split, UI render overlays
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
