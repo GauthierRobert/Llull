@@ -1101,7 +1101,7 @@ Cargo (`llull-meshops`): `edge_heap` (order by cost then ids, move both ways, bu
 
 ### 13.10.6 Left
 
-- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe.
+- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (done in 13.16: 13.4 s, not under 10 s).
 - Fewer cache misses in the collapse loop (it is memory bound): a storage permutation behind the logical ids.
 
 ## 13.11 As built (DES-7c step 6: full-resolution reads through every indirection, 2026-10-27)
@@ -1495,3 +1495,48 @@ Each fails without its fix (shown by disabling the fix): the shared-vertex test,
 - `maxDeviation`-only decimation and the memory-bound collapse loop (13.10.6) are unchanged.
 - The pair search keeps the TypeScript predicate (an edge of one face through the interior of the other, with `END_MARGIN`), so coplanar overlaps and contacts are not counted by either engine; a count of those is not planned.
 - The step-7 plan (13.12.2) is complete: `remesh`, `analyze` (with the pair search), `repair`, `fill_holes`, `sculpt` are native; `cut` is a lifted TypeScript cap.
+
+## 13.16 As built (DES-7c leftovers (1): the `maxDeviation`-only decimation, 2026-10-30)
+
+### 13.16.1 Profile (13.10.4 input: icosphere l8, radius 10, radial noise +-0.1, seed 42, 1,310,720 triangles, `maxDeviation 0.05`, no target, `preserveBoundary`)
+
+`tests/perf.rs` (ignored test `decimating_1_3_million_triangles_by_a_deviation_bound_alone_is_timed`) reproduces 13.10.4: 17.4 s, 521,051 collapses, 268,618 triangles, 1,686,216 queue pops, of which 130,994 refused by the link condition, 81,376 by the fold-over test and 952,795 by the deviation guard (positions digest `e59decaec9419492`, which is the digest every later build had to reproduce). The cost was NOT the deviation re-evaluated per queue entry or a rebuilt queue (the queue is the indexed heap of 13.10; set-up is 0.4 s). Timed inside the loop (an instrumented build, one machine, other lanes running so each figure is good to about 10 %):
+
+| Part of the loop | Seconds |
+| ---------------- | ------- |
+| the deviation guard, probe tests (`DeviationGuard`: 45.2 M probe checks, 85.6 M point-triangle tests over 1.47 M calls) | 6.0 |
+| the guard's queries on the original surface (`farther_than` at the survivor position and at the centre of each fan triangle; reached only by the 521 k attempts that passed every probe) | 3.8 |
+| the rest of `valid_collapse` (rings, link, fold-over), pops, `choose`, applying a collapse, re-queueing | about 7.5 |
+
+Every one of the 952,795 deviation refusals was a probe refusal (the surface queries never refused): an attempt walks the probes of the survivor and of its ring (the probes inherited from merged vertices make that list long: 26 probes per call on average, 40 to 70 for an accepted collapse), and a collapse that is accepted must check them all.
+
+### 13.16.2 What was changed (results unchanged, bit for bit)
+
+All three are caches of facts that the guard would recompute; none changes a verdict, and the order of the independent tests was already free (13.10.2 point 5).
+
+1. **A witness per probe** (`collapse_check.rs`, `Probe`): the face that last proved the probe within the bound, with its stamp and its corners. A face stamp (`DeviationGuard::touch`) counts the changes of the face (its corners and the positions of its corners: bumped for every face at the two vertices of an accepted collapse), so an unchanged stamp means the geometry the probe was measured against; the witness proves the probe again when its face is still one of the faces the test would use (a face at the owner that has neither end of the edge). The witness is stored in the probe, and the probes of a vertex are one contiguous list, so reading them is sequential.
+2. **A blamed probe per refused edge**: the probe whose test failed is remembered by edge; the next attempt on the edge tests it first (it only counts if an affected vertex still owns it). 508,600 of 534,243 retries were refused by it alone.
+3. **A hint per survivor for the original-surface queries**: the triangle that answered the last query of a collapse that keeps the vertex is tried before the tree (`SurfaceIndex::within(p, bound, hint)`; a triangle within the bound proves the answer, so the answer is the negation of the old `farther_than` for any hint, which is tested for hints that name any face or none).
+
+**Tried and dropped.** A memo of the refusals (an edge refused again when nothing within three edges of it changed since): 0 hits in 1.7 M pops, by construction (an edge is requeued exactly when a collapse changed its neighbourhood), and the marking cost made it slower (20 s). A second witness was not built: a probe owned by the survivor, a large share of the checks, can never use one (every face at the survivor has an end of the edge), and the other probes already hit 28 % of the time.
+
+### 13.16.3 Measured (win32-x64, 22 cores, other lanes running; the same job, one process; three runs)
+
+| | Before | After |
+| - | ------ | ----- |
+| `maxDeviation 0.05`, 1,310,720 triangles, no target | 17.3 to 17.9 s | 13.4 to 14.1 s (16.2 s once under load) |
+| collapses, triangles, rejections, positions digest | 521,051, 268,618, 130,994 / 81,376 / 952,795, `e59decaec9419492` | the same |
+| `targetTriangles 100000` (no guard), same input | 4.33 to 4.6 s | 4.33 s (4.47 s with the 0.14 s deviation measure) |
+
+The reduction is about 20 to 25 %: the witness and the locality take the probe tests from 6.0 s to about 4.4 s, the hint and the blame the surface queries from 3.8 s to about 1.4 s; the 7 to 8 s of the shared loop are unchanged. The path is still three times the target path and over the 10 s budget of 13.10: a guard that validates every probe of a neighbourhood for every accepted collapse (26 probes per attempt on average, more for an accepted collapse, growing as vertices merge) is O(probes) per collapse, and 521 k collapses with 953 k refused retries are what the quadric order asks for with this bound. The spec text of 13.10.4 ("a witness triangle per probe would skip most of the tests") was too optimistic: the witness skips 28 % of them.
+
+### 13.16.4 Tests
+
+Cargo: `collapse_check` unit tests (guard on a wheel, now through `Probe`), `surface` (`within` equals the old `farther_than` around the bound to the ulp, a hint names any face or none and never changes the answer, the face it returns is within the bound), `tests/decimate_pins.rs` (the old-implementation pins, including the `bounded` and `bound_and_target` ones), and 4 new TypeScript pins in `tests/ts_pins.rs` / `ts_pins.json` (regenerated with the two documented steps: 64 lines added, none changed): `decimate_deviation_sphere` (20,480 triangles, 16,265 deviation refusals), `decimate_deviation_free_boundary_features` (open grid with holes, free boundary, feature angle), `decimate_deviation_locked_region`, `decimate_deviation_and_target`. The server parity (`meshopsNative.test.ts`) and the 1.3 M job stay green.
+
+Each fails without its fix (shown by disabling the fix): stamps never bumped, a witness that ignores the two ends of the edge, a blamed probe that is not re-tested (refuses without testing), and a hint accepted without its distance test each fail `ts_pins` (the first also fails `decimate_pins`).
+
+### 13.16.5 Left, by name
+
+- The deviation path of a million triangles is 13.4 s, not under 10 s. What would be left to try, each a larger change: probes held in a spatial structure per surviving vertex so that a collapse re-tests only the probes near the changed faces (the survivor's own probes would still be re-tested), or the quadric order replaced by a cheaper bound check, which changes the result.
+- The memory-bound collapse loop of 13.10.6 (a storage permutation behind the logical ids) is unchanged.

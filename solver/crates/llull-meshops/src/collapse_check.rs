@@ -4,6 +4,7 @@
 use crate::edit::EditMesh;
 use crate::geom::{dot, length, normal_of, Vec3};
 use crate::surface::SurfaceIndex;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -15,13 +16,60 @@ pub enum Verdict {
     Deviation,
 }
 
+/// A probe of the one-sided deviation guard: a point of the original surface (an original vertex or a triangle centre) that must stay within the bound of the surface
+/// around the surviving vertex that owns it, with the **witness** that last proved it: the face (its stamp and its corners as they were) that was within the bound.
+#[derive(Clone, Copy)]
+pub struct Probe {
+    pub p: Vec3,
+    /// Identifies the probe (the blame table names it).
+    pub id: u32,
+    pub face: u32,
+    pub stamp: u32,
+    pub corners: [u32; 3],
+}
+
+impl Probe {
+    pub fn new(p: Vec3, id: u32) -> Self {
+        Self { p, id, face: NO_FACE, stamp: 0, corners: [NO_FACE; 3] }
+    }
+}
+
 /// The state of the one-sided deviation guard: every original vertex and triangle centre is a probe owned by a surviving vertex, and a collapse may
 /// not move the surface farther than `max_deviation` from the probes it touches or from the original surface.
+///
+/// Three caches make the guard cheaper without changing a verdict (13.16): a **witness** per probe (a face whose stamp is unchanged has the geometry it was measured
+/// with, so the probe is still within the bound as long as that face is among the faces the test would use; the witness lives in the probe, so a vertex's probes are
+/// read in order), a **blame** per refused edge, the probe that failed last time (an attempt on the same edge tests it first, and most are refused again), and a **hint** per
+/// vertex, the original triangle that last answered one of its queries.
 pub struct DeviationGuard {
     pub max_deviation: f64,
-    pub probes: Vec<Vec3>,
-    pub owned: Vec<Vec<u32>>,
+    pub owned: Vec<Vec<Probe>>,
     pub original: SurfaceIndex,
+    /// Per face: counts the changes of its corners or of their positions.
+    pub face_stamp: Vec<u32>,
+    /// Per vertex: the original triangle that last answered a query of a collapse that keeps it ([`NO_FACE`] when none).
+    pub hint: Vec<u32>,
+    /// Per refused edge (packed low, high): the vertex and the probe that made the last attempt fail.
+    pub blame: HashMap<u64, (u32, u32)>,
+}
+
+/// "No face" in the witness and hint tables.
+pub const NO_FACE: u32 = u32::MAX;
+
+impl DeviationGuard {
+    pub fn new(max_deviation: f64, owned: Vec<Vec<Probe>>, original: SurfaceIndex, faces: usize) -> Self {
+        let hint = vec![NO_FACE; owned.len()];
+        Self { max_deviation, owned, original, face_stamp: vec![0; faces], hint, blame: HashMap::new() }
+    }
+
+    /// Call when a collapse of `removed` into `kept` is applied: every face at either vertex changes (corner or position), so the witnesses naming it expire.
+    pub fn touch(&mut self, mesh: &EditMesh, kept: u32, removed: u32) {
+        for v in [kept, removed] {
+            for &f in &mesh.v_faces[v as usize] {
+                self.face_stamp[f as usize] = self.face_stamp[f as usize].wrapping_add(1);
+            }
+        }
+    }
 }
 
 /// Buffers reused by every [`valid_collapse`] call.
@@ -33,6 +81,7 @@ pub struct Scratch {
     fan: Vec<[u32; 3]>,
     affected: Vec<u32>,
     faces: Vec<[Vec3; 3]>,
+    face_ids: Vec<u32>,
 }
 
 /// Squared distance from `p` to triangle `abc` (Ericson 5.1.5).
@@ -106,7 +155,7 @@ fn common_count(x: &[u32], y: &[u32]) -> usize {
 pub fn valid_collapse(
     mesh: &EditMesh,
     area_floor: f64,
-    guard: Option<&DeviationGuard>,
+    guard: Option<&mut DeviationGuard>,
     scratch: &mut Scratch,
     (u, v): (u32, u32),
     keep: u32,
@@ -164,14 +213,78 @@ pub fn valid_collapse(
     }
 }
 
+/// The probe tests of one attempt: the faces of the vertex being tested after the collapse are gathered once, when a probe has no valid witness.
+struct Check<'a, F: Fn(u32) -> Vec3> {
+    mesh: &'a EditMesh,
+    edge: (u32, u32),
+    fan: &'a [[u32; 3]],
+    limit: f64,
+    place: &'a F,
+    face_stamp: &'a [u32],
+    faces: &'a mut Vec<[Vec3; 3]>,
+    face_ids: &'a mut Vec<u32>,
+    /// The vertex whose faces `faces` holds ([`NO_FACE`] when none).
+    loaded: u32,
+}
+
+impl<F: Fn(u32) -> Vec3> Check<'_, F> {
+    /// True when `probe`, owned by `o`, is within the bound of a face at `o` after the collapse.
+    fn holds(&mut self, o: u32, probe: &mut Probe) -> bool {
+        let (u, v) = self.edge;
+        if probe.face != NO_FACE
+            && self.face_stamp[probe.face as usize] == probe.stamp
+            && probe.corners.contains(&o)
+            && !probe.corners.contains(&u)
+            && !probe.corners.contains(&v)
+        {
+            return true;
+        }
+        if self.loaded != o {
+            self.loaded = o;
+            self.faces.clear();
+            self.face_ids.clear();
+            for &f in &self.mesh.v_faces[o as usize] {
+                let [x, y, z] = self.mesh.corners(f);
+                if x == u || x == v || y == u || y == v || z == u || z == v {
+                    continue;
+                }
+                self.faces.push([self.mesh.p(x), self.mesh.p(y), self.mesh.p(z)]);
+                self.face_ids.push(f);
+            }
+            for triple in self.fan {
+                if triple.contains(&o) {
+                    self.faces.push([(self.place)(triple[0]), (self.place)(triple[1]), (self.place)(triple[2])]);
+                    self.face_ids.push(NO_FACE);
+                }
+            }
+        }
+        // the nearest triangle is farther than the bound exactly when none is within it (a NaN distance counts as within, as in the TypeScript min)
+        let (p, limit) = (probe.p, self.limit);
+        let found = self.faces.iter().position(|[a, b, c]| {
+            let d = point_triangle_sq(p, *a, *b, *c);
+            d <= limit || d.is_nan()
+        });
+        match found {
+            Some(i) => {
+                let id = self.face_ids[i];
+                if id != NO_FACE {
+                    *probe = Probe { face: id, stamp: self.face_stamp[id as usize], corners: self.mesh.corners(id), ..*probe };
+                }
+                true
+            }
+            None => self.faces.is_empty() && limit.is_infinite() && limit > 0.0,
+        }
+    }
+}
+
 fn deviation_verdict(
     mesh: &EditMesh,
-    guard: &DeviationGuard,
+    guard: &mut DeviationGuard,
     (u, v): (u32, u32),
     (keep, at): (u32, Vec3),
     scratch: &mut Scratch,
 ) -> Verdict {
-    let Scratch { ring_u, ring_v, fan, affected, faces, .. } = scratch;
+    let Scratch { ring_u, ring_v, fan, affected, faces, face_ids, .. } = scratch;
     let removed = if keep == u { v } else { u };
     affected.clear();
     affected.push(keep);
@@ -185,54 +298,74 @@ fn deviation_verdict(
     let place = |c: u32| if c == keep { at } else { mesh.p(c) };
     // The three tests below fail independently of one another, so the order only decides how soon a refusal is found: the probes first (a probe
     // is satisfied by the first triangle within the bound), the queries on the original surface after.
-    for &o in affected.iter() {
-        faces.clear();
-        for &f in &mesh.v_faces[o as usize] {
-            let [x, y, z] = mesh.corners(f);
-            if x == u || x == v || y == u || y == v || z == u || z == v {
-                continue;
-            }
-            faces.push([mesh.p(x), mesh.p(y), mesh.p(z)]);
-        }
-        for triple in fan.iter() {
-            if triple.contains(&o) {
-                faces.push([place(triple[0]), place(triple[1]), place(triple[2])]);
-            }
-        }
-        let own = &guard.owned[o as usize];
-        let inherited: &[u32] = if o == keep { &guard.owned[removed as usize] } else { &[] };
-        for &probe in own.iter().chain(inherited) {
-            let p = guard.probes[probe as usize];
-            // the nearest triangle is farther than the bound exactly when none is within it (a NaN distance counts as within, as in the TypeScript min)
-            let within = faces.iter().any(|[a, b, c]| {
-                let d = point_triangle_sq(p, *a, *b, *c);
-                d <= limit || d.is_nan()
-            });
-            if !within && (!faces.is_empty() || f64::INFINITY > limit) {
-                return Verdict::Deviation;
+    let DeviationGuard { owned, original, face_stamp, hint, blame, .. } = guard;
+    let edge = (u64::from(u.min(v)) << 32) | u64::from(u.max(v));
+    let mut check = Check { mesh, edge: (u, v), fan, limit, place: &place, face_stamp, faces, face_ids, loaded: NO_FACE };
+    // the probes the removed vertex owned are the survivor's now; they are tested with its own
+    let mut inherited = std::mem::take(&mut owned[removed as usize]);
+    let mut nothing: Vec<Probe> = Vec::new();
+    let failed: Option<(u32, u32)> = 'scan: {
+        // the probe that failed the last attempt on this edge goes first (only one still owned by an affected vertex counts)
+        if let Some(&(o, id)) = blame.get(&edge) {
+            if affected.contains(&o) {
+                let extra: &mut [Probe] = if o == keep { &mut inherited } else { &mut nothing };
+                if let Some(probe) = owned[o as usize].iter_mut().chain(extra.iter_mut()).find(|probe| probe.id == id) {
+                    if !check.holds(o, probe) {
+                        break 'scan Some((o, id));
+                    }
+                }
             }
         }
-    }
-    if guard.original.farther_than(at, max_deviation) {
+        for &o in affected.iter() {
+            let extra: &mut [Probe] = if o == keep { &mut inherited } else { &mut nothing };
+            for probe in owned[o as usize].iter_mut().chain(extra.iter_mut()) {
+                if !check.holds(o, probe) {
+                    break 'scan Some((o, probe.id));
+                }
+            }
+        }
+        None
+    };
+    owned[removed as usize] = inherited;
+    if let Some(blamed) = failed {
+        blame.insert(edge, blamed);
         return Verdict::Deviation;
     }
-    for &[x, y, z] in fan.iter() {
-        let (pa, pb, pc) = (place(x), place(y), place(z));
-        let centre = [(pa[0] + pb[0] + pc[0]) / 3.0, (pa[1] + pb[1] + pc[1]) / 3.0, (pa[2] + pb[2] + pc[2]) / 3.0];
-        if guard.original.farther_than(centre, max_deviation) {
-            return Verdict::Deviation;
+    // the queries on the original surface start from the triangle that answered the last one of this vertex
+    let mut last = hint[keep as usize];
+    let mut verdict = Verdict::Ok;
+    let mut query = |p: Vec3| match original.within(p, max_deviation, last) {
+        Some(face) => {
+            if face >= 0 {
+                last = face as u32;
+            }
+            true
+        }
+        None => false,
+    };
+    if !query(at) {
+        verdict = Verdict::Deviation;
+    } else {
+        for &[x, y, z] in fan.iter() {
+            let (pa, pb, pc) = (place(x), place(y), place(z));
+            let centre = [(pa[0] + pb[0] + pc[0]) / 3.0, (pa[1] + pb[1] + pc[1]) / 3.0, (pa[2] + pb[2] + pc[2]) / 3.0];
+            if !query(centre) {
+                verdict = Verdict::Deviation;
+                break;
+            }
         }
     }
-    Verdict::Ok
+    hint[keep as usize] = last;
+    verdict
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{valid_collapse, DeviationGuard, Scratch, Verdict};
+    use super::{valid_collapse, DeviationGuard, Probe, Scratch, Verdict};
     use crate::edit::EditMesh;
     use crate::surface::SurfaceIndex;
 
-    fn verdict(mesh: &EditMesh, (u, v): (u32, u32), keep: u32, at: [f64; 3], guard: Option<&DeviationGuard>) -> Verdict {
+    fn verdict(mesh: &EditMesh, (u, v): (u32, u32), keep: u32, at: [f64; 3], guard: Option<&mut DeviationGuard>) -> Verdict {
         valid_collapse(mesh, 1e-12, guard, &mut Scratch::default(), (u, v), keep, at)
     }
 
@@ -283,11 +416,10 @@ mod tests {
     fn the_deviation_guard_refuses_a_move_off_the_original_surface_and_accepts_one_on_it() {
         let wheel = disc(12, true);
         let original = SurfaceIndex::new(&wheel.pos, &wheel.faces);
-        let probes: Vec<[f64; 3]> = (0..13).map(|v| wheel.p(v)).collect();
-        let owned: Vec<Vec<u32>> = (0..13).map(|v| vec![v]).collect();
-        let guard = DeviationGuard { max_deviation: 0.05, probes, owned, original };
-        assert_eq!(verdict(&wheel, (0, 1), 1, [1.0, 0.0, 0.0], Some(&guard)), Verdict::Ok);
+        let owned: Vec<Vec<Probe>> = (0..13).map(|v| vec![Probe::new(wheel.p(v), v)]).collect();
+        let mut guard = DeviationGuard::new(0.05, owned, original, wheel.f_alive.len());
+        assert_eq!(verdict(&wheel, (0, 1), 1, [1.0, 0.0, 0.0], Some(&mut guard)), Verdict::Ok);
         // lifting the survivor off the plane moves the surface away from the probes
-        assert_eq!(verdict(&wheel, (0, 1), 1, [1.0, 0.0, 0.3], Some(&guard)), Verdict::Deviation);
+        assert_eq!(verdict(&wheel, (0, 1), 1, [1.0, 0.0, 0.3], Some(&mut guard)), Verdict::Deviation);
     }
 }

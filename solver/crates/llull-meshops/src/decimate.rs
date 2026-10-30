@@ -3,7 +3,7 @@
 //! is collapsed at every step, with the same position and sums. The queue is one entry per edge (`edge_heap.rs`) instead of a stream of
 //! versioned pushes, which yields the same sequence of valid candidates with a fraction of the heap work.
 
-use crate::collapse_check::{valid_collapse, DeviationGuard, Scratch, Verdict};
+use crate::collapse_check::{valid_collapse, DeviationGuard, Probe, Scratch, Verdict};
 use crate::edge_heap::{Candidate, EdgeHeap};
 use crate::edit::EditMesh;
 use crate::geom::{diagonal, length, normal_of, Sphere, Vec3};
@@ -255,26 +255,22 @@ fn initial_edges(state: &Decimator) -> Vec<Candidate> {
 
 /// The one-sided guard of `max_deviation`: a probe at every used vertex and every triangle centre of the original mesh.
 fn deviation_guard(mesh: &EditMesh, positions: &[f64], triangles: &[u32], max_deviation: f64) -> DeviationGuard {
-    let mut guard = DeviationGuard {
-        max_deviation,
-        probes: Vec::new(),
-        owned: vec![Vec::new(); mesh.vertex_total()],
-        original: SurfaceIndex::new(positions, triangles),
-    };
+    let mut owned: Vec<Vec<Probe>> = vec![Vec::new(); mesh.vertex_total()];
+    let mut next = 0u32;
     for v in 0..mesh.vertex_total() as u32 {
         if mesh.v_faces[v as usize].is_empty() {
             continue;
         }
-        guard.probes.push(mesh.p(v));
-        guard.owned[v as usize].push((guard.probes.len() - 1) as u32);
+        owned[v as usize].push(Probe::new(mesh.p(v), next));
+        next += 1;
     }
     for f in 0..mesh.f_alive.len() as u32 {
         let [a, b, c] = mesh.corners(f).map(|v| mesh.p(v));
-        guard.probes.push([(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0]);
-        let first = mesh.corners(f)[0];
-        guard.owned[first as usize].push((guard.probes.len() - 1) as u32);
+        let centre = [(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0];
+        owned[mesh.corners(f)[0] as usize].push(Probe::new(centre, next));
+        next += 1;
     }
-    guard
+    DeviationGuard::new(max_deviation, owned, SurfaceIndex::new(positions, triangles), mesh.f_alive.len())
 }
 
 /// Decimate a manifold, consistently wound, welded mesh; returns the canonical result and the report. `progress` is told the share of the collapse
@@ -345,7 +341,7 @@ pub fn decimate(
         let Some(item) = state.heap.pop() else { break };
         let (a, b) = (item.a, item.b);
         let (keep, at, _) = state.choose(a, b);
-        let verdict = valid_collapse(&state.mesh, area_floor, state.guard.as_ref(), &mut scratch, (a, b), keep, at);
+        let verdict = valid_collapse(&state.mesh, area_floor, state.guard.as_mut(), &mut scratch, (a, b), keep, at);
         match verdict {
             Verdict::Ok => {}
             Verdict::Gone => continue,
@@ -364,6 +360,9 @@ pub fn decimate(
         state.mesh.ring_into(removed, &mut ring);
         for &x in &ring {
             state.heap.remove(removed.min(x), removed.max(x));
+        }
+        if let Some(guard) = &mut state.guard {
+            guard.touch(&state.mesh, keep, removed);
         }
         state.mesh.collapse(removed, keep);
         if let Some(guard) = &mut state.guard {

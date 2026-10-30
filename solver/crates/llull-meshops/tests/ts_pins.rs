@@ -53,6 +53,12 @@ fn repair(mode: &str, extra: Value) -> Value {
     json!({ "op": "repair", "params": params })
 }
 
+fn decimate(extra: Value) -> Value {
+    let mut params = json!({ "preserveBoundary": true });
+    params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    json!({ "op": "decimate", "params": params })
+}
+
 fn fill(extra: Value) -> Value {
     let mut params =
         json!({ "select": "all", "maxBoundaryEdges": 1000, "fairing": "curvature", "refine": true, "alpha": std::f64::consts::SQRT_2 });
@@ -354,6 +360,22 @@ fn pins() -> Vec<Pin> {
             name: "analyze_pairs_stakes_through_a_large_triangle",
             mesh: stakes(),
             job: analyze(json!({ "selfIntersections": true, "maxListed": 12 })),
+        },
+        Pin { name: "decimate_deviation_sphere", mesh: sphere(5, 0.1, 13), job: decimate(json!({ "maxDeviation": 0.05 })) },
+        Pin {
+            name: "decimate_deviation_free_boundary_features",
+            mesh: grid(40, wavy, &[(10, 10), (20, 5)]),
+            job: decimate(json!({ "maxDeviation": 0.03, "preserveBoundary": false, "featureAngleRad": 0.8 })),
+        },
+        Pin {
+            name: "decimate_deviation_locked_region",
+            mesh: sphere(4, 0.08, 17),
+            job: decimate(json!({ "maxDeviation": 0.08, "lockedRegion": { "center": [0.0, 0.0, 10.0], "radius": 4.0 } })),
+        },
+        Pin {
+            name: "decimate_deviation_and_target",
+            mesh: sphere(5, 0.1, 19),
+            job: decimate(json!({ "maxDeviation": 0.1, "targetTriangles": 3000, "preserveBoundary": false })),
         },
         Pin {
             name: "remesh_free_boundary",

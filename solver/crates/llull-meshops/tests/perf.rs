@@ -40,3 +40,28 @@ fn decimating_1_3_million_triangles_to_100_000_with_its_deviation_fits_the_budge
     assert_eq!(report.triangles_after, 100_000);
     assert!(total < BUDGET_SECONDS, "{total:.2} s against a budget of {BUDGET_SECONDS} s");
 }
+
+/// The `maxDeviation`-only path of 13.10.4 (no target): reported, not asserted, since it depends on the machine.
+#[test]
+#[ignore = "timing report: needs a release build (see the module doc)"]
+fn decimating_1_3_million_triangles_by_a_deviation_bound_alone_is_timed() {
+    let (positions, indices) = sphere(8, 0.1, 42);
+    let params = DecimateParams {
+        target_triangles: None,
+        max_deviation: Some(0.05),
+        preserve_boundary: true,
+        feature_cos: None,
+        locked_region: None,
+    };
+    let started = Instant::now();
+    let (out_positions, out_indices, report) = decimate(&positions, &indices, &params, &mut |_| {});
+    let seconds = started.elapsed().as_secs_f64();
+    let digest: u64 = out_positions.iter().fold(1469598103934665603u64, |h, v| (h ^ v.to_bits()).wrapping_mul(1099511628211));
+    eprintln!(
+        "decimate by maxDeviation 0.05: {seconds:.2} s; {} collapses, {} triangles ({} indices), rejected {:?}, positions digest {digest:016x}",
+        report.collapses,
+        report.triangles_after,
+        out_indices.len(),
+        report.rejected
+    );
+}

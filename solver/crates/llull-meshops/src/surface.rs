@@ -184,11 +184,6 @@ impl SurfaceIndex {
         self.nearest(p, f64::NEG_INFINITY)
     }
 
-    /// `closest_distance(p) > bound`, without the rest of the search once a triangle within `bound` is known (the answer cannot change after that).
-    pub fn farther_than(&self, p: Vec3, bound: f64) -> bool {
-        self.nearest(p, bound) > bound
-    }
-
     /// The search of [`Self::closest_distance`], which returns early with the best distance so far when it is at most `stop_at`.
     fn nearest(&self, p: Vec3, stop_at: f64) -> f64 {
         self.search(p, stop_at).distance
@@ -197,6 +192,21 @@ impl SurfaceIndex {
     /// Nearest surface point to `p` (twin of `SurfaceIndex.closest`: distance infinity and face -1 for an empty mesh; the lower triangle wins a tie).
     pub fn closest(&self, p: Vec3) -> Hit {
         self.search(p, f64::NEG_INFINITY)
+    }
+
+    /// `Some(face)` of a triangle within `bound` of `p` when the surface is not farther than `bound` (`face` is -1 for an empty mesh, where the distance is infinite); `None` when
+    /// it is: `closest_distance(p) > bound` negated, without the rest of the search once a triangle within `bound` is known (the answer cannot change after that). Triangle `hint` (a face of the mesh, or [`u32::MAX`]) is tried first: one within the bound proves the answer.
+    pub fn within(&self, p: Vec3, bound: f64, hint: u32) -> Option<i64> {
+        if (hint as usize) < self.face_count {
+            let c = &self.corners[hint as usize * 9..hint as usize * 9 + 9];
+            let hit = closest_point_on_triangle(p, [[c[0], c[1], c[2]], [c[3], c[4], c[5]], [c[6], c[7], c[8]]]);
+            let d_sq = (hit[0] - p[0]) * (hit[0] - p[0]) + (hit[1] - p[1]) * (hit[1] - p[1]) + (hit[2] - p[2]) * (hit[2] - p[2]);
+            if d_sq.sqrt() <= bound {
+                return Some(i64::from(hint));
+            }
+        }
+        let found = self.search(p, bound);
+        (found.distance.partial_cmp(&bound) != Some(std::cmp::Ordering::Greater)).then_some(found.face)
     }
 
     fn search(&self, p: Vec3, stop_at: f64) -> Hit {
@@ -308,8 +318,8 @@ mod tests {
                 let p = [next() * 4.0 - 2.0, next() * 4.0 - 2.0, next() * 4.0 - 2.0];
                 let expected = brute_force(&positions, &indices, p);
                 assert_eq!(index.closest_distance(p), expected, "{faces} triangles");
-                assert_eq!(index.farther_than(p, 0.3), expected > 0.3);
-                assert!(!index.farther_than(p, f64::NAN));
+                assert_eq!(index.within(p, 0.3, u32::MAX).is_none(), expected > 0.3);
+                assert!(index.within(p, f64::NAN, u32::MAX).is_some());
             }
         }
     }
@@ -323,7 +333,33 @@ mod tests {
             let p = [next() * 4.0 - 2.0, next() * 4.0 - 2.0, next() * 4.0 - 2.0];
             let d = index.closest_distance(p);
             for bound in [d, f64::from_bits(d.to_bits().saturating_sub(1)), f64::from_bits(d.to_bits() + 1)] {
-                assert_eq!(index.farther_than(p, bound), d > bound);
+                assert_eq!(index.within(p, bound, u32::MAX).is_none(), d > bound);
+            }
+        }
+    }
+
+    #[test]
+    fn a_hint_never_changes_the_answer_whichever_face_it_names() {
+        let (positions, indices) = soup(300, 21);
+        let index = SurfaceIndex::new(&positions, &indices);
+        let mut next = stream(8);
+        for _ in 0..300 {
+            let p = [next() * 4.0 - 2.0, next() * 4.0 - 2.0, next() * 4.0 - 2.0];
+            let d = index.closest_distance(p);
+            for bound in [d * 0.5, d, d * 1.5 + 0.01] {
+                let expected = index.within(p, bound, u32::MAX).is_some();
+                for hint in [0u32, 7, 299, 300, 100_000] {
+                    let answer = index.within(p, bound, hint);
+                    assert_eq!(answer.is_some(), expected, "hint {hint}");
+                    // a face it names is within the bound
+                    if let Some(face) = answer.filter(|&f| f >= 0) {
+                        let corner = |v: u32| [positions[v as usize * 3], positions[v as usize * 3 + 1], positions[v as usize * 3 + 2]];
+                        let t = &indices[face as usize * 3..face as usize * 3 + 3];
+                        let hit = closest_point_on_triangle(p, [corner(t[0]), corner(t[1]), corner(t[2])]);
+                        let dist = ((hit[0] - p[0]).powi(2) + (hit[1] - p[1]).powi(2) + (hit[2] - p[2]).powi(2)).sqrt();
+                        assert!(dist <= bound, "the face {face} is {dist} away, bound {bound}");
+                    }
+                }
             }
         }
     }

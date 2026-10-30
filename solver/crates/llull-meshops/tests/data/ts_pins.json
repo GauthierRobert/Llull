@@ -1405,6 +1405,70 @@
       "diagonal": 57.53222356510376
     }
   },
+  "decimate_deviation_and_target": {
+    "digest": "594610bbb726258e5e80a973dc39f2857c0fb11525dcf2557263cd26bde16a98",
+    "report": {
+      "trianglesBefore": 20480,
+      "trianglesAfter": 3000,
+      "collapses": 8740,
+      "reachedTarget": true,
+      "stoppedBy": "target",
+      "rejected": {
+        "link": 206,
+        "foldOver": 87,
+        "deviation": 5953
+      },
+      "maxCollapseCost": 1.0699283965132054
+    }
+  },
+  "decimate_deviation_free_boundary_features": {
+    "digest": "32651339d70051e3400da4c6da69f8b7ab97ae1fa906dcdaaaafc6d6958834c1",
+    "report": {
+      "trianglesBefore": 3196,
+      "trianglesAfter": 115,
+      "collapses": 1609,
+      "reachedTarget": null,
+      "stoppedBy": "deviation_or_validity",
+      "rejected": {
+        "link": 11,
+        "foldOver": 33,
+        "deviation": 781
+      },
+      "maxCollapseCost": 31.249884100208874
+    }
+  },
+  "decimate_deviation_locked_region": {
+    "digest": "9a6e4e61c8153d5dd78ee5537a6763eaeb56b0431e0bccc3d40c63121b5212f1",
+    "report": {
+      "trianglesBefore": 5120,
+      "trianglesAfter": 1002,
+      "collapses": 2059,
+      "reachedTarget": null,
+      "stoppedBy": "deviation_or_validity",
+      "rejected": {
+        "link": 37,
+        "foldOver": 138,
+        "deviation": 2607
+      },
+      "maxCollapseCost": 1.0192757437034743
+    }
+  },
+  "decimate_deviation_sphere": {
+    "digest": "414786080932330bbb152cafd385c25241ad644857ff2ecb548342ffc619236b",
+    "report": {
+      "trianglesBefore": 20480,
+      "trianglesAfter": 7812,
+      "collapses": 6334,
+      "reachedTarget": null,
+      "stoppedBy": "deviation_or_validity",
+      "rejected": {
+        "link": 383,
+        "foldOver": 569,
+        "deviation": 16265
+      },
+      "maxCollapseCost": 0.4452956181303307
+    }
+  },
   "fill_curvature_alpha_2": {
     "digest": "aff8bd4a3293c9a22aaf54fa854bc0eb9b99f4cd99498014b2a84704e4a2913d",
     "report": {
