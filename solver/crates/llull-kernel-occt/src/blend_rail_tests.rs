@@ -451,8 +451,10 @@ mod recipe_level {
     }
 }
 
+/// BLD §13.17: a void is kept. The rim of a cylinder with a spherical pocket is blended; the pocket's shell stays an inner shell of the result, so the volume is the blended
+/// cylinder's less the pocket (4/3 pi 3^3), and a pocket outside the body (a second body) is refused by name.
 #[test]
-fn a_solid_with_a_void_is_refused_by_name_not_rebuilt_without_its_void() {
+fn a_solid_with_a_void_keeps_its_void_through_a_profile_blend() {
     let _serial = crate::serial_blends();
     let cylinder = make_cylinder(10.0, 20.0).unwrap().unwrap();
     let mut pocket = make_sphere(3.0).unwrap().unwrap();
@@ -460,8 +462,20 @@ fn a_solid_with_a_void_is_refused_by_name_not_rebuilt_without_its_void() {
     let hollow = boolean(BooleanOp::Subtract, &cylinder, &pocket, true).unwrap().unwrap();
     let rim = circles_at_height(&hollow, 20.0, 1.0);
     assert_eq!(rim.len(), 1);
-    let why = blend(&hollow, &rim, &[2.0, NAN, 0.0, 0.0], 0.0, 0.5).err().unwrap();
-    assert!(why.contains("several shells"), "{why}");
+    let rounded = blend(&hollow, &rim, &[2.0, NAN, 0.0, 0.0], 0.0, 0.5).unwrap();
+    let solid_rim = circles_at_height(&cylinder, 20.0, 1.0);
+    let reference = blend(&cylinder, &solid_rim, &[2.0, NAN, 0.0, 0.0], 0.0, 0.5).unwrap();
+    let void = 4.0 / 3.0 * std::f64::consts::PI * 27.0;
+    let volume = |shape: &Shape| crate::mass_properties(shape).unwrap().volume;
+    assert!(
+        (volume(&rounded) - (volume(&reference) - void)).abs() < 1e-6 * volume(&reference),
+        "{} vs {}",
+        volume(&rounded),
+        volume(&reference) - void
+    );
+    assert!(crate::analyze(&rounded).unwrap().valid);
+    let shells = topology(&rounded).unwrap()["faces"].as_array().unwrap().len();
+    assert_eq!(shells, topology(&reference).unwrap()["faces"].as_array().unwrap().len() + 1, "the pocket's face is kept");
 }
 
 fn notes_of(shape: &Shape) -> Value {
