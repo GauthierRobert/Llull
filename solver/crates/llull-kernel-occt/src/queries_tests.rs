@@ -166,3 +166,84 @@ fn imports_its_own_step_export() {
     assert!(close(mass_properties(&back).unwrap().volume, 6.0));
     assert_eq!(import_step("garbage", options).unwrap()["error"], json!("unreadable"));
 }
+
+/// A tensor B-spline surface of the `faceQuery.bspline` answer, evaluated with Cox-de Boor and checked against `evaluate_face` at the same (u, v): the surface IS the face's.
+fn point_of(surface: &Value, u: f64, v: f64) -> [f64; 3] {
+    let degree = |key: &str| surface[key].as_u64().unwrap() as usize;
+    let numbers = |key: &str| -> Vec<f64> { surface[key].as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect() };
+    let flat_knots = |knots: &str, mults: &str| -> Vec<f64> {
+        let (k, m) = (numbers(knots), numbers(mults));
+        k.iter().zip(&m).flat_map(|(knot, count)| std::iter::repeat_n(*knot, *count as usize)).collect()
+    };
+    let basis = |knots: &[f64], degree: usize, x: f64| -> Vec<f64> {
+        let count = knots.len() - degree - 1;
+        let last = knots[count];
+        let span = (degree..count).rev().find(|&i| knots[i] <= x && knots[i] < last).unwrap_or(count - 1);
+        let mut table = vec![0.0; count];
+        let mut left = vec![0.0; degree + 1];
+        let mut right = vec![0.0; degree + 1];
+        let mut n = vec![0.0; degree + 1];
+        n[0] = 1.0;
+        for j in 1..=degree {
+            left[j] = x - knots[span + 1 - j];
+            right[j] = knots[span + j] - x;
+            let mut saved = 0.0;
+            for r in 0..j {
+                let temp = n[r] / (right[r + 1] + left[j - r]);
+                n[r] = saved + right[r + 1] * temp;
+                saved = left[j - r] * temp;
+            }
+            n[j] = saved;
+        }
+        for (k, value) in n.iter().enumerate() {
+            table[span - degree + k] = *value;
+        }
+        table
+    };
+    let (ku, kv) = (flat_knots("knotsU", "multsU"), flat_knots("knotsV", "multsV"));
+    let (bu, bv) = (basis(&ku, degree("degreeU"), u), basis(&kv, degree("degreeV"), v));
+    let poles = surface["poles"].as_array().unwrap();
+    let weights = surface.get("weights").and_then(Value::as_array);
+    let (mut sum, mut total) = ([0.0; 3], 0.0);
+    for (i, row) in poles.iter().enumerate() {
+        for (j, pole) in row.as_array().unwrap().iter().enumerate() {
+            let w = weights.map_or(1.0, |all| all[i][j].as_f64().unwrap()) * bu[i] * bv[j];
+            total += w;
+            for axis in 0..3 {
+                sum[axis] += w * pole[axis].as_f64().unwrap();
+            }
+        }
+    }
+    [sum[0] / total, sum[1] / total, sum[2] / total]
+}
+
+#[test]
+fn faceq_bspline_is_the_face_surface_for_planes_cylinders_and_spheres() {
+    for shape in [unit_box(), make_cylinder(2.0, 5.0).unwrap().unwrap(), crate::make_sphere(3.0).unwrap().unwrap()] {
+        let count = topology(&shape).unwrap()["faces"].as_array().unwrap().len();
+        for face in 0..count {
+            let surface = face_bspline(&shape, face as f64).unwrap();
+            assert!(surface["poles"].is_array(), "face {face}: {surface}");
+            assert_eq!([surface["periodicU"].clone(), surface["periodicV"].clone()], [json!(false), json!(false)]);
+            // a rational conversion (cylinder, sphere) keeps the surface, not the parameters: every point of the B-spline lies ON the face (distance to it ~ 0) and its corners are the face's corners
+            let knots = |key: &str| -> (f64, f64) {
+                let all = surface[key].as_array().unwrap();
+                (f(&all[0]), f(&all[all.len() - 1]))
+            };
+            let ((u0, u1), (v0, v1)) = (knots("knotsU"), knots("knotsV"));
+            let mut inside = 0;
+            for (a, b) in [(0.1, 0.1), (0.5, 0.5), (0.9, 0.3), (0.3, 0.8)] {
+                let mine = point_of(&surface, u0 + a * (u1 - u0), v0 + b * (v1 - v0));
+                // the parameter box of a disc or a sphere cap is wider than the face: only the points that fall on the face are checked
+                if face_contains(&shape, face as f64, mine, 1e-6).unwrap() != json!(true) {
+                    continue;
+                }
+                inside += 1;
+                let projected = project_on_face(&shape, face as f64, &mine).unwrap();
+                assert!(f(&projected[0]["distance"]) < 1e-9, "face {face}: {mine:?} is {} from the face", projected[0]["distance"]);
+            }
+            assert!(inside >= 1, "face {face}: no sample landed on the face");
+        }
+    }
+    assert_eq!(face_bspline(&unit_box(), 9.0).unwrap(), Value::Null);
+}

@@ -9,6 +9,10 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepTools.hxx>
+#include <BRep_Tool.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Wire.hxx>
@@ -245,6 +249,57 @@ rust::String face_contains_json(const Shape &shape, int32_t face, rust::Slice<co
   const auto nearest = query::nearest_on(*target, gp_Pnt(point[0], point[1], point[2]));
   if (!nearest) return rust::String("null");
   return rust::String(nearest->distance <= tolerance ? "true" : "false");
+}
+
+// The surface of a face as one B-spline over the face's parameter box: a B-spline face is cut to the box, an elementary surface (plane, cylinder, cone, sphere, torus, revolution, extrusion)
+// becomes its exact rational B-spline. `reversed`: the face's normal is the opposite of S_u x S_v.
+rust::String face_bspline_json(const Shape &shape, int32_t face) {
+  const auto target = face_at(shape.shape, face);
+  if (!target) return rust::String("null");
+  const Handle(Geom_Surface) surface = BRep_Tool::Surface(*target);
+  if (surface.IsNull()) return rust::String("null");
+  const BRepAdaptor_Surface adaptor(*target, Standard_True);
+  const auto [u_min, u_max, v_min, v_max] = query::uv_range(adaptor);
+  Handle(Geom_BSplineSurface) bspline;
+  try {
+    bspline = GeomConvert::SurfaceToBSplineSurface(new Geom_RectangularTrimmedSurface(surface, u_min, u_max, v_min, v_max));
+  } catch (const Standard_Failure &) {
+    return rust::String("null");
+  }
+  if (bspline.IsNull()) return rust::String("null");
+  // the clamped, non-periodic form: a consumer needs no wrap-around knots (a cylinder's seam is then a doubled pole line)
+  if (bspline->IsUPeriodic()) bspline->SetUNotPeriodic();
+  if (bspline->IsVPeriodic()) bspline->SetVNotPeriodic();
+  JsonWriter out;
+  out.begin_object().key("degreeU").integer(bspline->UDegree()).key("degreeV").integer(bspline->VDegree());
+  out.key("poles").begin_array();
+  for (int i = 1; i <= bspline->NbUPoles(); ++i) {
+    out.begin_array();
+    for (int j = 1; j <= bspline->NbVPoles(); ++j) out.point(bspline->Pole(i, j));
+    out.end_array();
+  }
+  out.end_array();
+  if (bspline->IsURational() || bspline->IsVRational()) {
+    out.key("weights").begin_array();
+    for (int i = 1; i <= bspline->NbUPoles(); ++i) {
+      out.begin_array();
+      for (int j = 1; j <= bspline->NbVPoles(); ++j) out.number(bspline->Weight(i, j));
+      out.end_array();
+    }
+    out.end_array();
+  }
+  const auto knots = [&out](const char *key_knots, const char *key_mults, const TColStd_Array1OfReal &knot_values, const TColStd_Array1OfInteger &mults) {
+    out.key(key_knots).begin_array();
+    for (int k = knot_values.Lower(); k <= knot_values.Upper(); ++k) out.number(knot_values(k));
+    out.end_array().key(key_mults).begin_array();
+    for (int k = mults.Lower(); k <= mults.Upper(); ++k) out.integer(mults(k));
+    out.end_array();
+  };
+  knots("knotsU", "multsU", bspline->UKnots(), bspline->UMultiplicities());
+  knots("knotsV", "multsV", bspline->VKnots(), bspline->VMultiplicities());
+  out.key("periodicU").boolean(bspline->IsUPeriodic()).key("periodicV").boolean(bspline->IsVPeriodic());
+  out.key("reversed").boolean(query::is_reversed(*target)).end_object();
+  return text_of(out);
 }
 
 rust::String face_geometry_json(const Shape &shape, int32_t face) {

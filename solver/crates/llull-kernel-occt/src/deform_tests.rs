@@ -409,3 +409,117 @@ fn two_separated_local_features_are_both_resolved_with_graded_nodes() {
     assert!(gain_one > 1.0, "the first bump adds volume {gain_one}");
     assert!(relative(gain_two, 2.0 * gain_one) < 1e-4, "two bumps {gain_two} vs twice one {}", 2.0 * gain_one);
 }
+
+/// The faces of the exact warp of `tree`, as (surface kind, face geometry): `preserveAnalytic` asked.
+fn faces_of(tree: &Value) -> (Value, Vec<(String, Value)>) {
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(tree).expect("evaluates").expect("the warp builds");
+    let report = evaluator.deform_report(tree).expect("report");
+    let count = crate::queries::topology(&shape).unwrap()["faces"].as_array().unwrap().len();
+    let faces = (0..count).map(|i| {
+        let geometry = crate::queries::face_geometry(&shape, i as f64).unwrap();
+        (geometry["surface"]["type"].as_str().unwrap_or("").to_string(), geometry)
+    });
+    (report, faces.collect())
+}
+
+#[test]
+fn preserve_analytic_turns_the_tapered_cylinder_back_into_a_cone() {
+    // VC-DEF-23: the VC-06 frustum (r 5 -> 2 over h 40) is one cone face of half angle atan(3 / 40) with two planar caps
+    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
+    let mut tapered =
+        node(&pin, json!({ "kind": "taper", "scaleEnd": 0.4, "flat": false }), Some(span(0.0, 40.0, "linear")), 1e-4, [0.0, 0.0, -20.0]);
+    tapered["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&tapered);
+    assert_eq!(report["ok"], json!(true), "{report}");
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "cone").count(), 1, "{kinds:?} {report}");
+    assert_eq!(kinds.iter().filter(|k| **k == "plane").count(), 2, "{kinds:?}");
+    assert_eq!(report["analyticFaces"]["cone"], json!(1));
+    let cone = faces.iter().find(|(kind, _)| kind == "cone").unwrap();
+    let angle = cone.1["surface"]["semiAngle"].as_f64().unwrap().to_degrees();
+    assert!((angle - 4.28915332882).abs() < 1e-6, "half angle {angle}");
+}
+
+#[test]
+fn preserve_analytic_keeps_a_twisted_cylinder_a_cylinder_and_leaves_the_twisted_box_sides_free_form() {
+    // VC-DEF-23: a twist about the axis of a cylinder is a rotation of every circle: one cylinder face, two planar caps
+    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
+    let mut twisted = node(&pin, json!({ "kind": "twist", "angleRad": 1.2 }), Some(span(0.0, 40.0, "linear")), 1e-4, [0.0, 0.0, -20.0]);
+    twisted["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&twisted);
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "cylinder").count(), 1, "{kinds:?} {report}");
+    assert_eq!(report["analyticFaces"]["cylinder"], json!(1));
+    // the sides of a twisted box are not planes: only the caps are recognised, the report says what it looked at
+    let mut bar = node(
+        &entity("box", json!({ "size": [10, 10, 40], "position": [0, 0, 20] })),
+        json!({ "kind": "twist", "angleRad": 1.2 }),
+        Some(span(0.0, 40.0, "linear")),
+        1e-4,
+        [0.0; 3],
+    );
+    bar["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&bar);
+    let planes = faces.iter().filter(|(kind, _)| kind == "plane").count();
+    assert_eq!(planes, 2, "{report}");
+    assert_eq!(report["analyticFaces"]["plane"], json!(2));
+    assert_eq!(report["analyticFaces"]["tried"], json!(6));
+    // the same body without the flag keeps B-spline faces only, and the volumes agree
+    let plain = build(&node(
+        &entity("box", json!({ "size": [10, 10, 40], "position": [0, 0, 20] })),
+        json!({ "kind": "twist", "angleRad": 1.2 }),
+        Some(span(0.0, 40.0, "linear")),
+        1e-4,
+        [0.0; 3],
+    ));
+    assert!(relative(report["volume"].as_f64().unwrap(), plain.volume) < 1e-6);
+}
+
+#[test]
+fn preserve_analytic_does_not_erase_a_small_local_push_between_the_nodes() {
+    // review of 17.11: a push of radius 1.5 and height 0.05 on a 40 mm face, centred between fit nodes, is not the source plane: the top face stays free-form (the five others are planes)
+    let slab = entity("box", json!({ "size": [40, 40, 10], "position": [0, 0, 5] }));
+    let push = json!({ "kind": "point", "center": [7.3, 3.1, 10], "direction": [0, 0, 1], "distance": 0.05, "radius": 1.5, "falloff": "smooth_c2" });
+    let mut pushed = node(&slab, push, None, 1e-4, [0.0; 3]);
+    pushed["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&pushed);
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "plane").count(), 5, "{kinds:?} {report}");
+    assert_eq!(kinds.iter().filter(|k| **k == "other").count(), 1, "the pushed face stays a B-spline: {kinds:?}");
+    // the volume still carries the bump: the same body without the flag has the same exact volume (the top face was not flattened to the plane: that would lose the bump's volume)
+    let mut evaluator = Evaluator::new(16);
+    let with_flag = mass_properties(&evaluator.evaluate(&pushed).unwrap().unwrap()).unwrap().volume;
+    pushed["output"]["preserveAnalytic"] = json!(false);
+    let without = mass_properties(&evaluator.evaluate(&pushed).unwrap().unwrap()).unwrap().volume;
+    assert!((with_flag - without).abs() < 1e-6, "{with_flag} vs {without}");
+    // smooth_c2: phi(s) = (1 - s^2)^3, the bump of a push centred on the face adds d 2 pi R^2 int phi(t) t dt = d pi R^2 / 4
+    let closed = 0.05 * PI * 1.5 * 1.5 / 4.0;
+    assert!((without - 16000.0 - closed).abs() < 1e-5, "the bump adds {} against the closed form {closed}", without - 16000.0);
+}
+
+#[test]
+fn a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost() {
+    // review of 17.14: a radius of 1e-3 on a 1000 mm face is between the samples of any grid the fit may use; it used to come back as a flat face
+    let slab = entity("box", json!({ "size": [1000, 1000, 10], "position": [0, 0, 5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 1e-3, "falloff": "smooth_c2" });
+    let report = refusal(&node(&slab, push, None, 1e-4, [0.0; 3]));
+    assert_eq!(report["code"], json!("DEF_APPROX_TOLERANCE"), "{report}");
+    assert!(report["message"].as_str().unwrap().contains("below what the fit can resolve"), "{report}");
+    // a radius the fit can resolve on a 200 mm face builds, and carries the bump's volume
+    let small = entity("box", json!({ "size": [200, 200, 10], "position": [0, 0, 5] }));
+    let wide = json!({ "kind": "point", "center": [23.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 10, "falloff": "smooth_c2" });
+    let built = build(&node(&small, wide, None, 1e-3, [0.0; 3]));
+    assert!(built.volume > 200.0 * 200.0 * 10.0 + 10.0, "the bump adds volume: {}", built.volume);
+}
+
+#[test]
+fn a_push_centred_on_an_edge_keeps_the_edge_and_the_faces_together() {
+    // review of 17.14: the edge curve is refined where the push crosses it, like the faces: the edge / face gap stays within the tolerance and nothing is left to SameParameter
+    let slab = entity("box", json!({ "size": [40, 40, 10], "position": [0, 0, 5] }));
+    let push =
+        json!({ "kind": "point", "center": [20, 3.75, 10], "direction": [0, 0, 1], "distance": 0.05, "radius": 1, "falloff": "smooth_c2" });
+    let built = build(&node(&slab, push, None, 1e-3, [0.0; 3]));
+    assert!(built.report["shapeTolerance"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+    assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+}

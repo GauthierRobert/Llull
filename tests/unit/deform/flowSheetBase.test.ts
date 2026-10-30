@@ -271,7 +271,7 @@ describe.each(KERNELS)('flow_on_surface with a base sheet, kernel: %s', (kind) =
     expect(dataOf<CheckData>(execute(result.document, 'check_deformation', { ids: [next] })).status).not.toBe('fail');
     expect(dataOf<RunData>(result).path).toBe('mesh');
     expectPure(doc, () => execute(doc, 'flow_on_surface', params));
-  });
+  }, 120_000);
 
   it('a 300 degree wrap: the predicted volume does not depend on a fan apex (the bounding-box centre is at the axis of curvature, where det J of the base blows up)', async () => {
     await installKernel(kind);

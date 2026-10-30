@@ -170,12 +170,6 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
       message: `tolerance ${tolerance} must be finite and > 0`,
       paths: ['params.output.tolerance'],
     });
-  if (output?.preserveAnalytic === true)
-    return reject({
-      code: 'DEF_EXACT_UNAVAILABLE',
-      message: 'preserveAnalytic needs the exact warp of a later milestone',
-      paths: ['params.output.preserveAnalytic'],
-    });
   const mode = output?.mode ?? 'auto';
   const node: DeformNode = {
     op: 'deform',
@@ -183,7 +177,7 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
     law: plan.law,
     frame: plan.frame,
     ...(plan.region === undefined ? {} : { region: plan.region }),
-    output: { mode, tolerance, preserveAnalytic: false },
+    output: { mode, tolerance, preserveAnalytic: output?.preserveAnalytic === true },
   };
   const fold = foldRefusal(node, plan);
   if (fold !== null) return reject(fold);
@@ -200,6 +194,16 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
       code: 'DEF_BUDGET_EXCEEDED',
       message: `refining to edges of ${estimate.edgeLength.toPrecision(3)} would need about ${Math.round(estimate.triangles)} triangles (limit ${MAX_WARP_TRIANGLES})`,
       paths: ['params.output.tolerance'],
+    });
+  if (
+    output?.preserveAnalytic === true &&
+    (!useKernel || plan.law.kind === 'affine' || kernel?.info?.().capabilities.includes('deform-analytic') !== true)
+  )
+    return reject({
+      code: 'DEF_EXACT_UNAVAILABLE',
+      message:
+        'preserveAnalytic rebuilds analytic faces of the exact result: it needs the native kernel and its exact warp (mode "auto" or "exact", a B-rep source, a law the kernel warps, so not a linear scale; a kernel with the deform-analytic capability)',
+      paths: ['params.output.preserveAnalytic'],
     });
   if (mode === 'exact' && !useKernel)
     return reject({
@@ -240,6 +244,12 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   }
   if (isRefusal(built)) return reject(built);
   if (plan.ring === true && (!built.exact || kernel?.deformReport?.(node)?.ring !== true)) return ringRefusal();
+  if (output?.preserveAnalytic === true && !built.exact)
+    return reject({
+      code: 'DEF_EXACT_UNAVAILABLE',
+      message: `preserveAnalytic needs the exact result, and the exact warp refused${fallback === null ? '' : ` (${fallback})`}: no analytic face to rebuild on a faceted mesh`,
+      paths: ['params.output.preserveAnalytic'],
+    });
   if (mode === 'exact' && !built.exact)
     return reject({ code: 'DEF_EXACT_UNAVAILABLE', message: 'the installed kernel is a mesh kernel', paths: ['params.output.mode'] });
   if ((plan.checkOverlap === true || OVERLAP_LAWS.has(plan.law.kind)) && built.mesh.indices.length / 3 <= OVERLAP_CHECK_LIMIT) {
@@ -288,6 +298,7 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
     volume: { ...volume, unit: `${doc.units}^3` },
     edgeLength: built.edgeLength,
     chordError: built.chordError,
+    ...(output?.preserveAnalytic === true && built.exact ? { analyticFaces: kernel?.deformReport?.(node)?.analyticFaces ?? null } : {}),
     ...plan.report,
     unit: doc.units,
   });
