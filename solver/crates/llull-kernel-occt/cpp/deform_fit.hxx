@@ -8,10 +8,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <vector>
 
 #include <BSplCLib.hxx>
 #include <GeomAPI_Interpolate.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_Curve.hxx>
@@ -36,12 +39,17 @@ struct SurfaceFit {
   // Smallest det J of the map found on the face (central differences on a coarse grid of the box): <= 0 means the map folds the body there.
   double min_determinant = 1;
   bool ok = false;
+  // A point push whose support the grid cannot resolve (see resolve_support): the fit stops and says why, the warp is refused by name.
+  bool unresolved = false;
+  std::string note;
 };
 
 struct CurveFit {
   Handle(Geom_BSplineCurve) curve;
   double error = 0;
   bool ok = false;
+  bool unresolved = false;
+  std::string note;
 };
 
 // The deformed point of a source point.
@@ -179,63 +187,68 @@ inline Handle(Geom_BSplineSurface) interpolate_grid(const std::vector<gp_Pnt> &n
   return new Geom_BSplineSurface(net, ub.knots, vb.knots, ub.multiplicities, vb.multiplicities, 3, 3);
 }
 
-// A point push is a feature of a known size (its support radius): a grid whose cells are wider than the support can hold it between its samples and never see it
-// (the error checks below only look at node lines, cell middles and quarter points). The base surface is sampled finely enough to meet the support, the parameter box of the
-// samples inside it is found, and both axes are refined until six intervals span that box.
-inline void resolve_support(const Warp &warp, const Handle(Geom_Surface) & base, double u0, double u1, double v0, double v1, Axis &uaxis, Axis &vaxis) {
+// The centre of a point push in world coordinates, and its support radius (0 for any other law).
+inline gp_Pnt push_centre(const Warp &warp) {
   const Law &law = warp.law;
-  if (law.kind != LawKind::Point || !(law.support > 0)) return;
-  const auto distance_to_center = [&](double u, double v) {
-    const gp_Pnt point = base->Value(u, v);
-    double sum = 0;
-    for (int r = 0; r < 3; ++r) {
-      const double *axis = r == 0 ? warp.frame.x : r == 1 ? warp.frame.y : warp.frame.z;
-      const double local = (point.X() - warp.frame.origin[0]) * axis[0] + (point.Y() - warp.frame.origin[1]) * axis[1] + (point.Z() - warp.frame.origin[2]) * axis[2];
-      sum += (local - law.center[r]) * (local - law.center[r]);
-    }
-    return std::sqrt(sum);
-  };
-  // the longest chord of the box along u and along v from a coarse grid: how many samples meet the support
-  double length_u = 0, length_v = 0;
-  for (int i = 0; i <= 8; ++i)
-    for (int j = 0; j <= 8; ++j) {
-      const double u = u0 + (u1 - u0) * i / 8.0, v = v0 + (v1 - v0) * j / 8.0;
-      if (i < 8) length_u = std::max(length_u, 8.0 * base->Value(u, v).Distance(base->Value(u0 + (u1 - u0) * (i + 1) / 8.0, v)));
-      if (j < 8) length_v = std::max(length_v, 8.0 * base->Value(u, v).Distance(base->Value(u, v0 + (v1 - v0) * (j + 1) / 8.0)));
-    }
-  const int nu = std::clamp(static_cast<int>(std::ceil(2.0 * length_u / law.support)) + 1, 9, 257);
-  const int nv = std::clamp(static_cast<int>(std::ceil(2.0 * length_v / law.support)) + 1, 9, 257);
-  double low[2] = {1, 1}, high[2] = {0, 0};
-  for (int i = 0; i < nu; ++i)
-    for (int j = 0; j < nv; ++j) {
-      const double fu = static_cast<double>(i) / (nu - 1), fv = static_cast<double>(j) / (nv - 1);
-      if (distance_to_center(u0 + (u1 - u0) * fu, v0 + (v1 - v0) * fv) > 1.1 * law.support) continue;
-      low[0] = std::min(low[0], fu);
-      high[0] = std::max(high[0], fu);
-      low[1] = std::min(low[1], fv);
-      high[1] = std::max(high[1], fv);
-    }
-  Axis *axes[2] = {&uaxis, &vaxis};
-  const double lengths[2] = {length_u, length_v};
-  for (int a = 0; a < 2; ++a) {
-    if (!(high[a] >= low[a])) continue;
-    // at least one sample step wide: the support sits between two samples
-    const double extent = std::max(high[a] - low[a], 2.0 * law.support / std::max(lengths[a], 1e-12));
-    const double target = extent / 6.0;
-    while (axes[a]->den <= kMaxSegmentsPerDirection / 2) {
-      std::vector<char> split(static_cast<size_t>(axes[a]->intervals()), 0);
-      bool any = false;
-      for (int i = 0; i < axes[a]->intervals(); ++i) {
-        const double first = axes[a]->node(i), last = axes[a]->node(i + 1);
-        if (last >= low[a] - extent && first <= high[a] + extent && last - first > target) {
-          split[static_cast<size_t>(i)] = 1;
-          any = true;
-        }
+  const Frame &f = warp.frame;
+  return gp_Pnt(f.origin[0] + law.center[0] * f.x[0] + law.center[1] * f.y[0] + law.center[2] * f.z[0],
+                f.origin[1] + law.center[0] * f.x[1] + law.center[1] * f.y[1] + law.center[2] * f.z[1],
+                f.origin[2] + law.center[0] * f.x[2] + law.center[1] * f.y[2] + law.center[2] * f.z[2]);
+}
+
+// The words of a refusal: a push whose support is narrower than the finest grid the fit may use cannot be seen by it.
+inline std::string unresolvable(double support, double length, int intervals) {
+  return "the push radius " + std::to_string(support) + " is below what the fit can resolve on a face or edge of length " + std::to_string(length) +
+         " (it needs " + std::to_string(intervals) + " intervals across the support, the fit uses at most " + std::to_string(kMaxSegmentsPerDirection) +
+         " per direction): the bump would be lost, so the deformation is refused; use a larger radius or split the body";
+}
+
+// Refine `axis` (nodes at fractions of the parameter range) until every interval overlapping [low, high] is at most (high - low) / 6 long. False when that would
+// take more than kMaxSegmentsPerDirection intervals across the range.
+inline bool refine_across(Axis &axis, double low, double high) {
+  const double target = (high - low) / 6.0;
+  while (true) {
+    std::vector<char> split(static_cast<size_t>(axis.intervals()), 0);
+    bool any = false;
+    for (int i = 0; i < axis.intervals(); ++i)
+      if (axis.node(i + 1) >= low && axis.node(i) <= high && axis.node(i + 1) - axis.node(i) > target * (1 + 1e-9)) {
+        split[static_cast<size_t>(i)] = 1;
+        any = true;
       }
-      if (!any) break;
-      axes[a]->refine(split);
-    }
+    if (!any) return true;
+    if (axis.den * 2 > kMaxSegmentsPerDirection) return false;
+    axis.refine(split);
   }
+}
+
+// A point push is a feature of a known size (its support radius): a grid whose cells are wider than the support can hold it between its samples and never see it
+// (the error checks below only look at node lines, cell middles and quarter points). The centre of the push is projected on the base surface (the nearest point of
+// the parameter box); when the support reaches the face, the parameter box of the support is that point grown by support / |S_u|, support / |S_v|, and both axes are
+// refined until six intervals span it. False, with the reason in `note`, when the axes cannot get there: the bump would be lost, and a lost bump is refused, not returned.
+inline bool resolve_support(const Warp &warp, const Handle(Geom_Surface) & base, double u0, double u1, double v0, double v1, Axis &uaxis, Axis &vaxis,
+                            std::string &note) {
+  const Law &law = warp.law;
+  if (law.kind != LawKind::Point || !(law.support > 0)) return true;
+  const GeomAPI_ProjectPointOnSurf projection(push_centre(warp), base, u0, u1, v0, v1);
+  if (projection.NbPoints() < 1 || projection.LowerDistance() > 1.1 * law.support) return true;
+  double uc = 0, vc = 0;
+  projection.LowerDistanceParameters(uc, vc);
+  gp_Pnt at;
+  gp_Vec du, dv;
+  base->D1(uc, vc, at, du, dv);
+  const double reach = 1.1 * law.support;
+  const double half_u = reach / std::max(du.Magnitude(), 1e-300) / (u1 - u0), half_v = reach / std::max(dv.Magnitude(), 1e-300) / (v1 - v0);
+  const double fu = (uc - u0) / (u1 - u0), fv = (vc - v0) / (v1 - v0);
+  const double length_u = du.Magnitude() * (u1 - u0), length_v = dv.Magnitude() * (v1 - v0);
+  if (!refine_across(uaxis, std::max(0.0, fu - half_u), std::min(1.0, fu + half_u))) {
+    note = unresolvable(law.support, length_u, static_cast<int>(std::ceil(6.0 / (2 * half_u))));
+    return false;
+  }
+  if (!refine_across(vaxis, std::max(0.0, fv - half_v), std::min(1.0, fv + half_v))) {
+    note = unresolvable(law.support, length_v, static_cast<int>(std::ceil(6.0 / (2 * half_v))));
+    return false;
+  }
+  return true;
 }
 
 // The surface through F(S) at the nodes of the tensor grid of the box, and its worst deviation at the middles / quarter points of the cells; the deviation of
@@ -245,7 +258,10 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
   SurfaceFit best;
   const double tolerance = allowed * kOverFit;
   Axis uaxis, vaxis;
-  resolve_support(warp, base, u0, u1, v0, v1, uaxis, vaxis);
+  if (!resolve_support(warp, base, u0, u1, v0, v1, uaxis, vaxis, best.note)) {
+    best.unresolved = true;
+    return best;
+  }
   while (true) {
     const int nu = uaxis.intervals(), nv = vaxis.intervals();
     std::vector<gp_Pnt> nodes;
@@ -351,12 +367,48 @@ inline CurveFit fit_curve(const Warp &warp, const Handle(Geom_Curve) & base, dou
     const double step = inward * 1e-6 * (last - first);
     return tangent_at(t + step) * 2.0 - tangent_at(t + 2 * step);
   };
-  int n = kStartSegments;
+  // Node parameters as fractions of [first, last]: uniform, with a point push's support resolved the same way as on a face (the centre projected on the curve, grown by
+  // support / |C'|, six intervals across it); an error above the tolerance then halves every interval.
+  std::vector<double> fractions;
+  for (int i = 0; i <= kStartSegments; ++i) fractions.push_back(static_cast<double>(i) / kStartSegments);
+  const Law &law = warp.law;
+  if (law.kind == LawKind::Point && law.support > 0) {
+    const GeomAPI_ProjectPointOnCurve projection(push_centre(warp), base, first, last);
+    if (projection.NbPoints() >= 1 && projection.LowerDistance() <= 1.1 * law.support) {
+      gp_Pnt at;
+      gp_Vec d1;
+      const double tc = projection.LowerDistanceParameter();
+      base->D1(tc, at, d1);
+      const double half = 1.1 * law.support / std::max(d1.Magnitude(), 1e-300) / (last - first);
+      const double centre = (tc - first) / (last - first);
+      const double low = std::max(0.0, centre - half), high = std::min(1.0, centre + half), target = (high - low) / 6.0;
+      while (true) {
+        std::vector<double> next;
+        bool any = false;
+        for (size_t i = 0; i + 1 < fractions.size(); ++i) {
+          next.push_back(fractions[i]);
+          if (fractions[i + 1] >= low && fractions[i] <= high && fractions[i + 1] - fractions[i] > target * (1 + 1e-9)) {
+            next.push_back(0.5 * (fractions[i] + fractions[i + 1]));
+            any = true;
+          }
+        }
+        next.push_back(fractions.back());
+        if (!any) break;
+        fractions = next;
+        if (fractions.size() > static_cast<size_t>(4 * kMaxSegmentsPerDirection)) {
+          best.unresolved = true;
+          best.note = unresolvable(law.support, d1.Magnitude() * (last - first), static_cast<int>(std::ceil(6.0 / (2 * half))));
+          return best;
+        }
+      }
+    }
+  }
   while (true) {
+    const int n = static_cast<int>(fractions.size()) - 1;
     Handle(TColgp_HArray1OfPnt) nodes = new TColgp_HArray1OfPnt(1, n + 1);
     Handle(TColStd_HArray1OfReal) parameters = new TColStd_HArray1OfReal(1, n + 1);
     for (int i = 0; i <= n; ++i) {
-      const double t = first + (last - first) * i / n;
+      const double t = first + (last - first) * fractions[static_cast<size_t>(i)];
       nodes->SetValue(i + 1, warped_point(warp, base->Value(t)));
       parameters->SetValue(i + 1, t);
     }
@@ -368,7 +420,7 @@ inline CurveFit fit_curve(const Warp &warp, const Handle(Geom_Curve) & base, dou
     double error = 0;
     for (int i = 0; i < n; ++i)
       for (const double a : {0.25, 0.5, 0.75}) {
-        const double t = first + (last - first) * (i + a) / n;
+        const double t = first + (last - first) * (fractions[static_cast<size_t>(i)] + a * (fractions[static_cast<size_t>(i) + 1] - fractions[static_cast<size_t>(i)]));
         error = std::max(error, best.curve->Value(t).Distance(warped_point(warp, base->Value(t))));
       }
     best.error = error;
@@ -376,8 +428,14 @@ inline CurveFit fit_curve(const Warp &warp, const Handle(Geom_Curve) & base, dou
       best.ok = true;
       return best;
     }
-    n *= 2;
-    if (n > 4 * kMaxSegmentsPerDirection) {
+    std::vector<double> next;
+    for (size_t i = 0; i + 1 < fractions.size(); ++i) {
+      next.push_back(fractions[i]);
+      next.push_back(0.5 * (fractions[i] + fractions[i + 1]));
+    }
+    next.push_back(fractions.back());
+    fractions = next;
+    if (static_cast<int>(fractions.size()) - 1 > 4 * kMaxSegmentsPerDirection) {
       best.ok = best.error <= allowed;
       return best;
     }

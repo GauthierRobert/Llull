@@ -213,6 +213,8 @@ export interface DeformReport {
   /** Smallest det J found on the surface of the body. */
   readonly minDeterminant: number;
   readonly volume: number;
+  /** The largest tolerance of any sub-shape of the result (document units). */
+  readonly shapeTolerance?: number;
   /** `output.preserveAnalytic`: what the rebuild of analytic faces found (01 DEF §17.11). Absent when it was not asked. */
   readonly analyticFaces?: AnalyticFaces;
 }

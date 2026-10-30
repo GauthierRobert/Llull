@@ -493,5 +493,33 @@ fn preserve_analytic_does_not_erase_a_small_local_push_between_the_nodes() {
     pushed["output"]["preserveAnalytic"] = json!(false);
     let without = mass_properties(&evaluator.evaluate(&pushed).unwrap().unwrap()).unwrap().volume;
     assert!((with_flag - without).abs() < 1e-6, "{with_flag} vs {without}");
-    assert!(without - 16000.0 > 0.05, "the bump adds volume: {without}");
+    // smooth_c2: phi(s) = (1 - s^2)^3, the bump of a push centred on the face adds d 2 pi R^2 int phi(t) t dt = d pi R^2 / 4
+    let closed = 0.05 * PI * 1.5 * 1.5 / 4.0;
+    assert!((without - 16000.0 - closed).abs() < 1e-5, "the bump adds {} against the closed form {closed}", without - 16000.0);
+}
+
+#[test]
+fn a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost() {
+    // review of 17.14: a radius of 1e-3 on a 1000 mm face is between the samples of any grid the fit may use; it used to come back as a flat face
+    let slab = entity("box", json!({ "size": [1000, 1000, 10], "position": [0, 0, 5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 1e-3, "falloff": "smooth_c2" });
+    let report = refusal(&node(&slab, push, None, 1e-4, [0.0; 3]));
+    assert_eq!(report["code"], json!("DEF_APPROX_TOLERANCE"), "{report}");
+    assert!(report["message"].as_str().unwrap().contains("below what the fit can resolve"), "{report}");
+    // a radius the fit can resolve on a 200 mm face builds, and carries the bump's volume
+    let small = entity("box", json!({ "size": [200, 200, 10], "position": [0, 0, 5] }));
+    let wide = json!({ "kind": "point", "center": [23.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 10, "falloff": "smooth_c2" });
+    let built = build(&node(&small, wide, None, 1e-3, [0.0; 3]));
+    assert!(built.volume > 200.0 * 200.0 * 10.0 + 10.0, "the bump adds volume: {}", built.volume);
+}
+
+#[test]
+fn a_push_centred_on_an_edge_keeps_the_edge_and_the_faces_together() {
+    // review of 17.14: the edge curve is refined where the push crosses it, like the faces: the edge / face gap stays within the tolerance and nothing is left to SameParameter
+    let slab = entity("box", json!({ "size": [40, 40, 10], "position": [0, 0, 5] }));
+    let push =
+        json!({ "kind": "point", "center": [20, 3.75, 10], "direction": [0, 0, 1], "distance": 0.05, "radius": 1, "falloff": "smooth_c2" });
+    let built = build(&node(&slab, push, None, 1e-3, [0.0; 3]));
+    assert!(built.report["shapeTolerance"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+    assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
 }

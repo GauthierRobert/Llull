@@ -999,3 +999,21 @@ face) would move the NIST corpus numbers (§17.9), so it is not done here. The t
   report in the data), `nativeKernelFaceBspline.test.ts` (every sample of the whole parameter box on the untrimmed analytic surface, at least one sample on each face, `reversed` against `evaluateFace` on the six faces of a box).
   Not tested: that a rejected rebuild leaves the neighbours' edge tolerances unchanged (no geometry in the catalogue provokes a rejection).
 - **VC-DEF-22 stated as it is:** met at 2e-6 (§17.13); 1e-6 is open until the refined-mass flag travels through STEP; the `export_code` half of FR-DEF-34 is not covered. `validation/README.md` and `expected_results.json` say so.
+
+### 17.15 Review round on §17.14: support resolution, curves, the guard, the cost
+
+- **The support box comes from a projection, not a scan.** `resolve_support` projects the push centre on the base surface (`GeomAPI_ProjectPointOnSurf`, nearest point of the parameter box) and, when it is within 1.1 x the support
+  of the face, grows that point by 1.1 x support / |S_u| and / |S_v|; both axes are refined until six intervals span the box (`refine_across`). When the axes cannot get there inside 512 intervals the warp is REFUSED, not returned
+  with a flat face: `DEF_APPROX_TOLERANCE`, "the push radius R is below what the fit can resolve on a face or edge of length L (it needs N intervals ..., at most 512 per direction)". A push of radius 1e-3 on a 1000 mm face
+  was lost silently before (no sample landed in the support); it is refused now. Radius 2 on 1000 mm needs 1500 intervals and is refused too; radius 10 on a 200 mm face builds. Test
+  `a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost`.
+- **The edges are refined the same way.** `fit_curve` took uniform parameters: a push crossing an edge left the edge off the faces by up to the push height, which `SameParameter` absorbed as a tolerance. The curve is
+  projected the same way (`GeomAPI_ProjectPointOnCurve`) and refined to six intervals across the support. The report gains `shapeTolerance` (the largest tolerance of any sub-shape of the result); test
+  `a_push_centred_on_an_edge_keeps_the_edge_and_the_faces_together` (a push of radius 1 height 0.05 on a top edge, between its samples: `shapeTolerance` <= the tolerance; red-proof: without the curve refinement it is 0.0505).
+- **The volume guard is rigorous for planes only.** A plane is judged by its poles (convex hull) and its replaced area bounds the volume it can move by a quarter tolerance times that area; the other surfaces are sampled
+  (3 x 3 per span + the Greville points), which bounds the deviation between the samples only to the smoothness of the fit. Errors of opposite sign can cancel in the signed volume: the guard bounds each face, not their sum.
+- **Cost of the copy-then-apply rebuild.** Every recognised face is rebuilt twice (the probe on a copy, then on the shared edges). Measured on a 100 x 100 x 20 slab with a push of radius 10 (release, 5 planes recognised): the
+  warp 53 ms, with `preserveAnalytic` 123 to 138 ms: about 70 to 85 ms for the recognition, most of it validity checks, `SameParameter` and the copies. Accepted: the second rebuild is what keeps a rejected probe from touching the neighbours.
+- `deform_recognise.cxx` skips a face with a location (the fitted faces of the warp have none), so both kinds of candidate are in one frame.
+- The bump volume of the review test is asserted against the closed form of `smooth_c2`: phi(s) = (1 - s^2)^3, a push centred on the face adds d x 2 pi R^2 x int phi(t) t dt = d pi R^2 / 4 (0.0883573 mm^3 for d 0.05, R 1.5),
+  within 1e-5.

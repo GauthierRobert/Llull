@@ -91,6 +91,7 @@ struct Stats {
   bool fixed = false;  // ShapeFix_Shape repaired the result; its largest sub-shape tolerance was measured again
   double fixed_tolerance = 0;
   double volume = 0;
+  double shape_tolerance = 0;  // the largest tolerance of any sub-shape of the result
   bool failed = false;  // an approximation failed inside the modification
   bool preserve = false;  // preserveAnalytic was asked: the report says what was recognised
   deform::Recognised recognised;
@@ -114,6 +115,7 @@ void publish(const Stats &stats) {
   json.key("fixedTolerance").number(stats.fixed_tolerance);
   json.key("minDeterminant").number(stats.min_determinant);
   json.key("volume").number(stats.volume);
+  json.key("shapeTolerance").number(stats.shape_tolerance);
   if (stats.preserve) {
     json.key("analyticFaces").begin_object();
     json.key("tried").integer(stats.recognised.tried);
@@ -155,6 +157,12 @@ class WarpModification : public BRepTools_Modification {
     if (!(u1 > u0) || !(v1 > v0)) return fail("a face has an empty parameter box");
     const double wanted = kSurfaceShare * tolerance_;
     const deform::SurfaceFit fit = deform::fit_surface(warp_, base, u0, u1, v0, v1, wanted);
+    if (fit.unresolved) {
+      stats_.code = "DEF_APPROX_TOLERANCE";
+      stats_.message = fit.note;
+      stats_.failed = true;
+      return Standard_False;
+    }
     stats_.surface_error = std::max(stats_.surface_error, fit.error);
     stats_.min_determinant = std::min(stats_.min_determinant, fit.min_determinant);
     ++stats_.faces;
@@ -184,6 +192,12 @@ class WarpModification : public BRepTools_Modification {
     if (base.IsNull()) return Standard_False;
     const double wanted = kCurveShare * tolerance_;
     const deform::CurveFit fit = deform::fit_curve(warp_, base, first, last, wanted);
+    if (fit.unresolved) {
+      stats_.code = "DEF_APPROX_TOLERANCE";
+      stats_.message = fit.note;
+      stats_.failed = true;
+      return Standard_False;
+    }
     stats_.curve_error = std::max(stats_.curve_error, fit.error);
     ++stats_.edges;
     if (!fit.ok || fit.curve.IsNull()) {
@@ -337,6 +351,7 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
   }
   stats.volume = volume;
   stats.preserve = preserve;
+  stats.shape_tolerance = ShapeAnalysis_ShapeTolerance().Tolerance(result, 1);
   if (!(stats.min_determinant > kJacobianFloor))
     return refuse(stats, "DEF_FOLDOVER", "the map folds the body: det J reaches " + std::to_string(stats.min_determinant) + " on its surface");
   if (!(volume > 0)) return refuse(stats, "DEF_FOLDOVER", "the deformed shape has no positive volume (the map folds the body)");

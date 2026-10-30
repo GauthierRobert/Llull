@@ -220,6 +220,8 @@ TopoDS_Shape recognise_analytic(const TopoDS_Shape &result, double tolerance, co
     TopLoc_Location location;
     const Handle(Geom_Surface) surface = BRep_Tool::Surface(face, location);
     if (surface.IsNull() || Handle(Geom_BSplineSurface)::DownCast(surface).IsNull()) continue;
+    // the fitted surfaces of the warp carry no location: both kinds of candidate (OCCT's, read from the located face, and the source face's, copied located) are then in one frame
+    if (!location.IsIdentity()) continue;
     ++counts.tried;
     const Handle(Geom_BSplineSurface) fitted = Handle(Geom_BSplineSurface)::DownCast(surface);
     // OCCT's own gap is not trusted: every candidate, its or the source face's, is measured by deviation_from over the knot spans
