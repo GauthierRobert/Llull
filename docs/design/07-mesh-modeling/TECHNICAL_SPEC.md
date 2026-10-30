@@ -1101,7 +1101,7 @@ Cargo (`llull-meshops`): `edge_heap` (order by cost then ids, move both ways, bu
 
 ### 13.10.6 Left
 
-- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (done in 13.16: 13.4 s, not under 10 s).
+- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (13.16: 13.4 s), checks made ahead in parallel (13.27: under 10 s on four or more cores).
 - Fewer cache misses in the collapse loop (it is memory bound): a storage permutation behind the logical ids.
 
 ## 13.11 As built (DES-7c step 6: full-resolution reads through every indirection, 2026-10-27)
@@ -1856,3 +1856,37 @@ The solve is memory-bound sparse algebra: the native job is only 1.4 to 2.3 time
 ### 13.26.4 Left, by name
 
 The job reads the region as its own mesh, so a very large mesh with a small region pays only for the region; the command still loads the whole mesh first. A native region over 200,000 triangles is refused by the command's region cap (`MESH_FIT_TOO_LARGE`); the matrix assembly uses hash maps (about a third of the 200,000-triangle time), a sorted-edge assembly would be faster but changes nothing observable.
+
+## 13.27 As built (DES-7c: the `maxDeviation`-only decimation of a million triangles under 10 s, 2026-10-30)
+
+### 13.27.1 Profile (13.16.1 input, win32-x64, 22 logical cores, other lanes running; an instrumented build, so each figure is good to about 10 %)
+
+14.1 s in all (digest `e59decaec9419492`, 521,051 collapses, 1,686,216 pops). The loop: `valid_collapse` 10.0 s (the probe tests 4.5, the queries on the original surface 2.8, link / fold-over / set-up of the check 2.6), applying collapses 1.3, re-queueing 1.9, pops 0.75, `choose` 0.4. Of the 38.5 M probe checks 10.7 M were witness hits; 11.9 M were probes of the surviving vertex (which can never use a witness: all its faces change) and 26.6 M of its neighbours; 4.4 M queries on the original surface, half answered by the hint, half by the tree. The collapse loop is a chain of dependent decisions, but the check of a candidate (10 of the 14 seconds) only READS the mesh, so it is the part to run ahead.
+
+### 13.27.2 What was built (results unchanged, bit for bit; the semantics of the guard are untouched)
+
+1. **Checks made ahead in parallel** (`decimate.rs`: `Spec`, `speculate`, `take_spec`). The check of a candidate is split into a pure function of the state (`collapse_check::check_collapse`: it reads the mesh and the guard and RETURNS what `valid_collapse` used to store, the witnesses, the blamed probe and the hint of the survivor, in an `Outcome` and `Scratch::updates`; `DeviationGuard::apply` stores them). When the popped edge has no check ahead, the 1,024 cheapest edges of the queue (`EdgeHeap::smallest`, best-first over the heap, nothing taken out) that have none are checked in one rayon batch against the frozen state, together with `choose` for their survivor and position. The queue is then consumed exactly as before: pop in queue order, take the check made ahead if it is still good, else check at once (an edge the last collapse just re-queued), store its caches, apply. A refill happens when fewer than 256 checks are left or after 1,024 pops.
+2. **Invalidation** (`touched`, `mark_changed`, `reads_of`). A check reads the faces (corners and positions) of the vertices of the 1-ring of its edge, their probes and the stamps of their faces. A collapse of `removed` into `kept` changes the faces of the vertices next to either and moves `kept`; a vertex whose position a check reads is next to a vertex of that 1-ring, so a check is stale exactly when a collapse touched (`kept`, `removed` and their neighbours after the merge, stamped with the number of the collapse) a vertex of its 1-ring. 1-ring only: the 2-ring that first seemed necessary reduces to it (`kept` is next to every 1-ring vertex that is next to it). A check of a vertex with more than 24 neighbours is not kept. Everything else (witnesses, blames, hints) is a cache of facts that are re-derived, as in 13.16.
+3. **A refused edge keeps its cost** (`refuse(a, b, cost)`): the cost of an edge cannot change until a collapse keeps one of its ends, which empties the lists of that end, so `requeue_around` queues the refused edges at the neighbours again with the cost they were popped with instead of recomputing the optimal position (about 0.5 s).
+4. The checks ahead are only made with at least three threads (`rayon::current_num_threads`); with fewer the loop is the sequential one of 13.16.
+
+### 13.27.3 Measured (the same job, one process, `--test-threads=1`; the counts and the positions digest are asserted by the test)
+
+| | time |
+| - | ---- |
+| before (13.16, same machine, same day) | 14.1 s |
+| 22 threads | 7.8 to 8.1 s |
+| 8 threads | 8.8 s |
+| 4 threads | 10.0 s |
+| 1 thread (`RAYON_NUM_THREADS=1`, checks ahead forced on in that run, to show the bytes) | 18.1 s |
+| `targetTriangles 100000` (no guard) | 4.1 to 4.2 s (4.33 before: the cost kept by refused edges) |
+
+Collapses 521,051, triangles 268,618, rejected 130,994 / 81,376 / 952,795 and the digest are the same on 1, 4, 8 and 22 threads. Where the time goes now (22 threads): the checks ahead about 1.5 s of wall (15 s of thread time: they scale 12 times on 22 logical cores), the 555 k edges that the last collapse re-queued and that are checked at once 1.3 s, the rest is the sequential loop (pops, applying, re-queueing) that stays, about 4 s. The 10 s budget needs four or more cores; with fewer the sequential loop (14 s) runs.
+
+### 13.27.4 Tests and red-proofs
+
+`decimate.rs`: checking ahead (batches of 1,024, 40 and 8) against not checking ahead, with the caches on and off, and on 1, 3 and 8 threads, on 14 spheres and holed grids with every combination of target, boundary rule, feature angle and bound; a 20,480-triangle sphere with batches of 64 (many checks go stale). `tests/perf.rs` asserts the 1.3 M counts, the positions digest and a digest that also folds the indices (`acf101d6ef1f816a`, the same with the checks ahead off). In tests and debug builds every check taken ahead carries a hash of everything it read (the quadrics and lock flags of its ends and, for the 1-ring, the faces, their corners and the position bits of the corners, the probe ids) and the loop asserts it is unchanged when the check is used. Red-proof: **not stamping the neighbours of a collapse** fails all three small tests at once through that assertion (it used to change only the 1.3 M result, digest `a5ec6f7cb8a84b27`). The refill is skipped while four batches are held (the peak is printed by the perf test); the batch variants run on pools of 3 and 8 threads.
+
+### 13.27.5 What stays, and the smallest semantic change that would go further
+
+The sequential loop (4 s) and the 555 k checks of re-queued edges (1.3 s) bound what the parallel checks can give: about 6 s on this machine is the floor of this design. Going below it takes a change of the SEMANTICS: the guard validates every probe of the neighbourhood for every accepted collapse; testing only the probes whose witness the collapse removes would skip about 70 % of them but misses probes whose best face got worse without being the witness, i.e. it can accept a collapse the full guard refuses (a bound overshoot of at most the movement of the collapse). **Decision (coordinator, 2026-10-30): rejected.** `maxDeviation` is a guarantee to the user; an overshoot, even one bounded by the movement of a collapse, breaks it. The guard keeps testing every probe.

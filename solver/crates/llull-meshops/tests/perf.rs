@@ -56,12 +56,20 @@ fn decimating_1_3_million_triangles_by_a_deviation_bound_alone_is_timed() {
     let started = Instant::now();
     let (out_positions, out_indices, report) = decimate(&positions, &indices, &params, &mut |_| {});
     let seconds = started.elapsed().as_secs_f64();
-    let digest: u64 = out_positions.iter().fold(1469598103934665603u64, |h, v| (h ^ v.to_bits()).wrapping_mul(1099511628211));
+    let positions_digest: u64 = out_positions.iter().fold(1469598103934665603u64, |h, v| (h ^ v.to_bits()).wrapping_mul(1099511628211));
+    // the triangles too (13.27): the same fold over the indices, from the digest of the positions
+    let digest: u64 = out_indices.iter().fold(positions_digest, |h, v| (h ^ u64::from(*v)).wrapping_mul(1099511628211));
     eprintln!(
-        "decimate by maxDeviation 0.05: {seconds:.2} s; {} collapses, {} triangles ({} indices), rejected {:?}, positions digest {digest:016x}",
+        "decimate by maxDeviation 0.05: {seconds:.2} s; {} collapses, {} triangles ({} indices), rejected {:?}, positions digest {positions_digest:016x}, with indices {digest:016x}, most checks held ahead {}",
         report.collapses,
         report.triangles_after,
         out_indices.len(),
-        report.rejected
+        report.rejected,
+        llull_meshops::decimate::PEAK_SPECS.load(std::sync::atomic::Ordering::Relaxed)
+    );
+    // the bytes of every build since 13.10: the checks made ahead (13.27) and every cache change the time only
+    assert_eq!(
+        (report.collapses, report.triangles_after, positions_digest, digest),
+        (521_051, 268_618, 0xe59d_ecae_c941_9492, 0xacf1_01d6_ef1f_816a)
     );
 }

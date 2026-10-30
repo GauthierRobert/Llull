@@ -3,7 +3,7 @@
 //! is collapsed at every step, with the same position and sums. The queue is one entry per edge (`edge_heap.rs`) instead of a stream of
 //! versioned pushes, which yields the same sequence of valid candidates with a fraction of the heap work.
 
-use crate::collapse_check::{valid_collapse, DeviationGuard, Probe, Scratch, Verdict};
+use crate::collapse_check::{check_collapse, valid_collapse, DeviationGuard, Outcome, Probe, ProbeUpdate, Scratch, Verdict};
 use crate::edge_heap::{Candidate, EdgeHeap};
 use crate::edit::EditMesh;
 use crate::geom::{diagonal, length, normal_of, Sphere, Vec3};
@@ -11,6 +11,7 @@ use crate::quadric::{add_into, optimal_position, plane_quadric, quadric_cost, Qu
 use crate::surface::SurfaceIndex;
 use rayon::prelude::*;
 use serde::Serialize;
+use std::collections::HashMap;
 
 const PENALTY: f64 = 1000.0;
 
@@ -48,6 +49,41 @@ pub struct DecimateReport {
     pub max_collapse_cost: Option<f64>,
 }
 
+/// The most checks held ahead at once so far in this process (reported by the perf test; the refill is skipped at four batches).
+pub static PEAK_SPECS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Candidates checked ahead in one parallel batch (13.27).
+const SPECULATION_BATCH: usize = 1024;
+
+/// A check of a candidate made ahead of its turn, on the state as it was at `epoch`.
+struct Spec {
+    keep: u32,
+    at: Vec3,
+    outcome: Outcome,
+    updates: Vec<ProbeUpdate>,
+    epoch: u32,
+    #[cfg(any(test, debug_assertions))]
+    fp: u64,
+    /// Every vertex whose faces or probes the check read: the 1-ring of the edge. A collapse changes the vertices at or next to the two it merges (`touched`).
+    reads: Reads,
+}
+
+/// Up to [`Reads::CAPACITY`] vertices, inline (a check of a vertex of a higher valence is not kept: it is made again when its turn comes).
+#[derive(Clone, Copy)]
+struct Reads {
+    list: [u32; Reads::CAPACITY],
+    len: u8,
+    overflow: bool,
+}
+
+impl Reads {
+    const CAPACITY: usize = 24;
+
+    fn iter(&self) -> impl Iterator<Item = u32> + '_ {
+        self.list[..self.len as usize].iter().copied()
+    }
+}
+
 struct Decimator {
     mesh: EditMesh,
     quadrics: Vec<Quadric>,
@@ -56,7 +92,12 @@ struct Decimator {
     heap: EdgeHeap,
     /// Per vertex: neighbours whose edge was popped and refused and has not been queued again (listed under both ends). The TypeScript engine queues
     /// every edge at a vertex again whenever a collapse changes that vertex's neighbourhood; the other edges are still in the queue.
-    refused: Vec<Vec<u32>>,
+    refused: Vec<Vec<(u32, f64)>>,
+    /// Collapses applied so far, and per vertex the number of the last one that changed it or one of its neighbours.
+    epoch: u32,
+    touched: Vec<u32>,
+    /// The checks made ahead, by edge (13.27).
+    specs: HashMap<u64, Spec, std::hash::BuildHasherDefault<crate::collapse_check::EdgeHasher>>,
 }
 
 fn unit_normal(mesh: &EditMesh, f: u32) -> Option<Vec3> {
@@ -141,16 +182,18 @@ impl Decimator {
         }
     }
 
-    fn refuse(&mut self, a: u32, b: u32) {
-        self.refused[a as usize].push(b);
-        self.refused[b as usize].push(a);
+    /// The edge `a`-`b` was popped with `cost` and refused. Its cost cannot change until a collapse keeps one of its ends (which empties the lists of that end), so it is
+    /// remembered with it and the edge is queued again with the same cost instead of a recomputed one.
+    fn refuse(&mut self, a: u32, b: u32, cost: f64) {
+        self.refused[a as usize].push((b, cost));
+        self.refused[b as usize].push((a, cost));
     }
 
     /// Empties the refused list of `v` and returns it, with `v` struck from the lists of its entries.
-    fn take_refused(&mut self, v: u32) -> Vec<u32> {
+    fn take_refused(&mut self, v: u32) -> Vec<(u32, f64)> {
         let list = std::mem::take(&mut self.refused[v as usize]);
-        for &x in &list {
-            self.refused[x as usize].retain(|&y| y != v);
+        for &(x, _) in &list {
+            self.refused[x as usize].retain(|&(y, _)| y != v);
         }
         list
     }
@@ -168,9 +211,116 @@ impl Decimator {
             if self.refused[w as usize].is_empty() {
                 continue;
             }
-            for x in self.take_refused(w) {
-                self.queue(w, x);
+            for (x, cost) in self.take_refused(w) {
+                self.heap.upsert(w.min(x), w.max(x), cost);
             }
+        }
+    }
+}
+
+/// The vertices whose faces a check of the edge `u`-`v` reads: the edge and its rings (the 1-ring). A collapse of `removed` into `kept` changes the faces of exactly the vertices next
+/// to either of them and moves `kept`; a vertex that check reads the position of is next to one of these, so a check is stale exactly when a collapse touched (`mark_changed`) one of them.
+fn reads_of(mesh: &EditMesh, u: u32, v: u32) -> Reads {
+    let mut reads = Reads { list: [0; Reads::CAPACITY], len: 0, overflow: false };
+    for w in [u, v] {
+        for &f in &mesh.v_faces[w as usize] {
+            for c in mesh.corners(f) {
+                if !reads.list[..reads.len as usize].contains(&c) {
+                    if reads.len as usize == Reads::CAPACITY {
+                        reads.overflow = true;
+                    } else {
+                        reads.list[reads.len as usize] = c;
+                        reads.len += 1;
+                    }
+                }
+            }
+        }
+    }
+    reads
+}
+
+/// Everything a check of the edge `a`-`b` reads, hashed: the quadrics and lock flags of its ends and, for every vertex of its 1-ring, its faces, their corners and the position bits of the
+/// corners, and the ids of the probes it owns. A check taken ahead must find this unchanged when its turn comes (debug builds and tests assert it: a stale check taken is a wrong answer).
+#[cfg(any(test, debug_assertions))]
+fn fingerprint(state: &Decimator, a: u32, b: u32) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    state.quadrics[a as usize].map(f64::to_bits).hash(&mut h);
+    state.quadrics[b as usize].map(f64::to_bits).hash(&mut h);
+    (state.locked[a as usize], state.locked[b as usize]).hash(&mut h);
+    for w in reads_of(&state.mesh, a, b).iter() {
+        w.hash(&mut h);
+        for &f in &state.mesh.v_faces[w as usize] {
+            f.hash(&mut h);
+            for c in state.mesh.corners(f) {
+                c.hash(&mut h);
+                state.mesh.p(c).map(f64::to_bits).hash(&mut h);
+            }
+        }
+        if let Some(guard) = &state.guard {
+            for probe in &guard.owned[w as usize] {
+                probe.id.hash(&mut h);
+            }
+        }
+    }
+    h.finish()
+}
+
+impl Decimator {
+    /// The check of the edge `a`-`b` made ahead of its turn, when nothing it read has changed since.
+    fn take_spec(&mut self, a: u32, b: u32) -> Option<Spec> {
+        let spec = self.specs.remove(&(((a as u64) << 32) | b as u64))?;
+        (!spec.reads.overflow && spec.reads.iter().all(|w| self.touched[w as usize] <= spec.epoch)).then_some(spec)
+    }
+
+    /// Checks `first` and the cheapest edges of the queue in parallel against the current state (read only: the caches they would store come back with the check and are stored
+    /// when it is used, in queue order, so the result does not depend on the number of threads).
+    fn speculate(&mut self, first: (u32, u32), area_floor: f64, off: bool) {
+        let epoch = self.epoch;
+        let touched = std::mem::take(&mut self.touched);
+        self.specs.retain(|_, spec| !spec.reads.overflow && spec.reads.iter().all(|w| touched[w as usize] <= spec.epoch));
+        self.touched = touched;
+        let mut ahead = Vec::new();
+        self.heap.smallest(speculation_batch(), &mut ahead);
+        let mut edges: Vec<(u32, u32)> = vec![first];
+        edges.extend(
+            ahead
+                .iter()
+                .map(|c| (c.a, c.b))
+                .filter(|&(a, b)| (a, b) != first && !self.specs.contains_key(&(((a as u64) << 32) | b as u64))),
+        );
+        PEAK_SPECS.fetch_max(self.specs.len(), std::sync::atomic::Ordering::Relaxed);
+        let state: &Decimator = self;
+        let checked: Vec<Spec> = edges
+            .par_iter()
+            .map_init(Scratch::default, |scratch, &(a, b)| {
+                let (keep, at, _) = state.choose(a, b);
+                let outcome = check_collapse(&state.mesh, area_floor, state.guard.as_ref(), scratch, (a, b), keep, at, off);
+                Spec {
+                    keep,
+                    at,
+                    outcome,
+                    updates: scratch.updates.clone(),
+                    epoch,
+                    #[cfg(any(test, debug_assertions))]
+                    fp: fingerprint(state, a, b),
+                    reads: reads_of(&state.mesh, a, b),
+                }
+            })
+            .collect();
+        for (&(a, b), spec) in edges.iter().zip(checked) {
+            self.specs.insert(((a as u64) << 32) | b as u64, spec);
+        }
+    }
+
+    /// Marks what the collapse of `removed` into `kept` changed: both and every vertex next to either.
+    fn mark_changed(&mut self, removed: u32, kept: u32, ring: &mut Vec<u32>) {
+        self.epoch += 1;
+        self.touched[removed as usize] = self.epoch;
+        self.touched[kept as usize] = self.epoch;
+        self.mesh.ring_into(kept, ring);
+        for &w in ring.iter() {
+            self.touched[w as usize] = self.epoch;
         }
     }
 }
@@ -297,6 +447,9 @@ pub fn decimate(
         guard,
         heap: EdgeHeap::default(),
         refused: vec![Vec::new(); vertex_total],
+        epoch: 0,
+        touched: vec![0; vertex_total],
+        specs: HashMap::default(),
     };
     for &(a, b, face) in &boundary_edges {
         if params.preserve_boundary {
@@ -325,6 +478,8 @@ pub fn decimate(
     let initial_pairs = state.heap.len().max(1);
     let mut scratch = Scratch::default();
     let mut pops: u64 = 0;
+    let speculate = state.guard.is_some() && !speculation_disabled() && rayon::current_num_threads() > 2;
+    let mut since_batch = 0usize;
     while !state.heap.is_empty() {
         pops += 1;
         if pops.is_multiple_of(PROGRESS_EVERY) {
@@ -340,8 +495,32 @@ pub fn decimate(
         }
         let Some(item) = state.heap.pop() else { break };
         let (a, b) = (item.a, item.b);
-        let (keep, at, _) = state.choose(a, b);
-        let verdict = valid_collapse(&state.mesh, area_floor, state.guard.as_mut(), &mut scratch, (a, b), keep, at);
+        let mut ahead = None;
+        if speculate {
+            // the cheapest edges are checked ahead in parallel when fewer than a quarter of a batch are left; an edge the queue just got (a requeued one) is checked alone
+            since_batch += 1;
+            if state.specs.len() < 4 * speculation_batch()
+                && (state.specs.len() < speculation_batch() / 4 || since_batch >= speculation_batch())
+            {
+                since_batch = 0;
+                state.speculate((a, b), area_floor, crate::collapse_check::caches_off());
+            }
+            ahead = state.take_spec(a, b);
+            #[cfg(any(test, debug_assertions))]
+            if let Some(spec) = &ahead {
+                assert_eq!(spec.fp, fingerprint(&state, a, b), "the check of {a}-{b} was taken ahead though something it read had changed");
+            }
+        }
+        let (keep, at, verdict) = match (ahead, state.guard.as_mut()) {
+            (Some(spec), Some(guard)) => {
+                guard.apply((a, b), spec.keep, &spec.updates, &spec.outcome);
+                (spec.keep, spec.at, spec.outcome.verdict)
+            }
+            _ => {
+                let (keep, at, _) = state.choose(a, b);
+                (keep, at, valid_collapse(&state.mesh, area_floor, state.guard.as_mut(), &mut scratch, (a, b), keep, at))
+            }
+        };
         match verdict {
             Verdict::Ok => {}
             Verdict::Gone => continue,
@@ -350,7 +529,7 @@ pub fn decimate(
             Verdict::Deviation => rejected.deviation += 1,
         }
         if verdict != Verdict::Ok {
-            state.refuse(a, b);
+            state.refuse(a, b, item.cost);
             continue;
         }
         let removed = if keep == a { b } else { a };
@@ -375,6 +554,9 @@ pub fn decimate(
         }
         collapses += 1;
         max_cost = if max_cost.is_nan() || item.cost.is_nan() { f64::NAN } else { max_cost.max(item.cost) };
+        if speculate {
+            state.mark_changed(removed, keep, &mut ring);
+        }
         state.requeue_around(removed, keep, &mut ring);
     }
     let triangles_after = state.mesh.live_faces;
@@ -400,6 +582,36 @@ pub fn decimate(
             max_collapse_cost: (!max_cost.is_nan()).then_some(max_cost),
         },
     )
+}
+
+// Test switches: while set on a thread, the checks are not made ahead (`SPECULATION_OFF`), or in batches of this many (`BATCH_OVERRIDE`, 0 = the default) (13.27), so a test can run the same decimation with and without them.
+#[cfg(test)]
+thread_local! {
+    pub static SPECULATION_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    pub static BATCH_OVERRIDE: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn speculation_batch() -> usize {
+    match BATCH_OVERRIDE.with(std::cell::Cell::get) {
+        0 => SPECULATION_BATCH,
+        n => n,
+    }
+}
+
+#[cfg(not(test))]
+const fn speculation_batch() -> usize {
+    SPECULATION_BATCH
+}
+
+#[cfg(test)]
+fn speculation_disabled() -> bool {
+    SPECULATION_OFF.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+const fn speculation_disabled() -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -547,5 +759,95 @@ mod tests {
             deviations_refused > 500,
             "the cases refuse {deviations_refused} collapses by the deviation guard: too few to test the caches"
         );
+    }
+
+    /// 13.27: checking the cheapest candidates ahead, in parallel, is a cache of verdicts that are re-made when anything they read changed, so decimating with and without it, on one
+    /// thread and on several, gives the same bytes and the same report.
+    #[test]
+    fn checking_ahead_changes_neither_the_bytes_nor_the_refusals_whatever_the_thread_count() {
+        use crate::decimate::{BATCH_OVERRIDE, SPECULATION_OFF};
+        let pools: Vec<rayon::ThreadPool> =
+            [1, 3, 8].iter().map(|&threads| rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap()).collect();
+        let mut random = stream(77);
+        let mut deviations_refused = 0;
+        for case in 0..14 {
+            let mesh = match case % 3 {
+                0 => noisy_sphere(4, 0.1, 300 + case as u64),
+                1 => noisy_grid(40 + case % 7, 0.06, 400 + case as u64),
+                _ => noisy_sphere(3, 0.2, 500 + case as u64),
+            };
+            let triangles = mesh.1.len() / 3;
+            let params = DecimateParams {
+                target_triangles: (case % 4 == 1).then(|| (triangles as f64 * (0.2 + 0.5 * random())) as usize),
+                max_deviation: Some([0.03, 0.08, 0.4][(random() * 3.0) as usize]),
+                preserve_boundary: case % 4 != 3,
+                feature_cos: (case % 5 == 0).then_some(0.9),
+                locked_region: None,
+            };
+            SPECULATION_OFF.with(|flag| flag.set(true));
+            let plain = run(&mesh, &params, false);
+            SPECULATION_OFF.with(|flag| flag.set(false));
+            let ahead = run(&mesh, &params, false);
+            assert_eq!(plain.2, ahead.2, "case {case}: the report differs");
+            assert!(plain.0 == ahead.0 && plain.1 == ahead.1, "case {case}: the bytes differ");
+            for pool in &pools {
+                let on_pool = pool.install(|| run(&mesh, &params, false));
+                assert!(
+                    on_pool.0 == plain.0 && on_pool.1 == plain.1 && on_pool.2 == plain.2,
+                    "case {case}: {} threads differ",
+                    pool.current_num_threads()
+                );
+            }
+            for batch in [8, 40] {
+                // inside a pool of 3 and of 8 threads (the flags are thread-local: set on the worker that runs the loop)
+                for pool in &pools[1..] {
+                    let small = pool.install(|| {
+                        BATCH_OVERRIDE.with(|flag| flag.set(batch));
+                        let r = run(&mesh, &params, false);
+                        BATCH_OVERRIDE.with(|flag| flag.set(0));
+                        r
+                    });
+                    assert!(
+                        small.0 == plain.0 && small.1 == plain.1 && small.2 == plain.2,
+                        "case {case}: batches of {batch} on {} threads differ",
+                        pool.current_num_threads()
+                    );
+                }
+            }
+            let no_caches = pools[1].install(|| run(&mesh, &params, true));
+            assert!(
+                no_caches.0 == plain.0 && no_caches.1 == plain.1 && no_caches.2 == plain.2,
+                "case {case}: ahead without the caches differs"
+            );
+            deviations_refused += serde_json::from_str::<serde_json::Value>(&plain.2).unwrap()["rejected"]["deviation"].as_u64().unwrap();
+        }
+        assert!(deviations_refused > 1000, "the cases refuse {deviations_refused} collapses by the deviation guard: too few");
+    }
+
+    /// 13.27: a sphere of 20,480 triangles with a bound that refuses thousands of collapses, checked ahead in batches of 64 (many checks go stale) and of 1,024: the same bytes as without.
+    #[test]
+    fn stale_checks_are_made_again_on_a_larger_sphere() {
+        use crate::decimate::{BATCH_OVERRIDE, SPECULATION_OFF};
+        let mesh = noisy_sphere(5, 0.1, 9);
+        let params = DecimateParams {
+            target_triangles: None,
+            max_deviation: Some(0.06),
+            preserve_boundary: true,
+            feature_cos: None,
+            locked_region: None,
+        };
+        SPECULATION_OFF.with(|flag| flag.set(true));
+        let plain = run(&mesh, &params, false);
+        SPECULATION_OFF.with(|flag| flag.set(false));
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap();
+        for batch in [0, 64] {
+            let ahead = pool.install(|| {
+                BATCH_OVERRIDE.with(|flag| flag.set(batch));
+                let r = run(&mesh, &params, false);
+                BATCH_OVERRIDE.with(|flag| flag.set(0));
+                r
+            });
+            assert!(ahead.0 == plain.0 && ahead.1 == plain.1 && ahead.2 == plain.2, "batches of {batch} differ");
+        }
     }
 }
