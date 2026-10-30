@@ -11,6 +11,7 @@ import type { SegmentParams, Segmentation } from './segment';
 import type { RemeshParams } from './remesh';
 import type { RepairMode, SmallComponentRule } from './repair';
 import type { SculptParams } from './sculpt';
+import type { DisplaceParams, ShrinkwrapParams } from './wrapDisplace';
 import type { SmoothParams } from './smooth';
 
 /**
@@ -70,6 +71,8 @@ export type MeshOp =
     } & WithDeviation)
   | ({ readonly op: 'segment' } & SegmentParams)
   | ({ readonly op: 'sculpt' } & SculptParams)
+  | ({ readonly op: 'shrinkwrap'; readonly target: MeshInput } & ShrinkwrapParams)
+  | ({ readonly op: 'displace' } & DisplaceParams)
   | {
       readonly op: 'cut';
       readonly origin: Vec3;

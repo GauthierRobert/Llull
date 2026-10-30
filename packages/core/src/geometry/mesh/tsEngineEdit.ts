@@ -4,6 +4,7 @@ import { decimateMesh } from './decimate';
 import { symmetricDeviation } from './deviation';
 import { segmentMesh } from './segment';
 import { SCULPT_MAX_TRIANGLES, sculptMesh } from './sculpt';
+import { DISPLACE_MAX_TRIANGLES, displaceMesh, shrinkwrapMesh } from './wrapDisplace';
 import {
   DECIMATE_DESCRIPTION,
   FILL_HOLES_DESCRIPTION,
@@ -41,7 +42,9 @@ const failure = (code: string, message: string): MeshEngineFailure => ({ code, m
 
 type EditOp = Extract<
   MeshOp,
-  { op: 'repair' | 'fill_holes' | 'decimate' | 'remesh' | 'smooth' | 'cut' | 'deviation' | 'segment' | 'sculpt' }
+  {
+    op: 'repair' | 'fill_holes' | 'decimate' | 'remesh' | 'smooth' | 'cut' | 'deviation' | 'segment' | 'sculpt' | 'shrinkwrap' | 'displace';
+  }
 >;
 
 /** Ops answered by `runEditOp`. */
@@ -55,6 +58,8 @@ export const EDIT_OPS: ReadonlyArray<EditOp['op']> = [
   'deviation',
   'segment',
   'sculpt',
+  'shrinkwrap',
+  'displace',
 ];
 
 export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngineFailure {
@@ -173,6 +178,52 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
           stampsApplied: result.stampsApplied,
         },
         provenance: provenance(sculptDescription(op.brush).algorithm, sculptDescription(op.brush).reference),
+      };
+    }
+    case 'shrinkwrap': {
+      if (op.target.mesh.indices.length / 3 > MESH_TS_TRIANGLE_CAP)
+        return failure(
+          'MESH_ENGINE_CAP_EXCEEDED',
+          `"shrinkwrap" onto ${op.target.mesh.indices.length / 3} triangles exceeds the ts engine cap of ${MESH_TS_TRIANGLE_CAP}`,
+        );
+      if (op.target.mesh.indices.length === 0) return failure('MESH_NOT_A_MESH', 'the target has no triangles to wrap onto');
+      const result = shrinkwrapMesh(mesh, op.target.mesh, op);
+      return {
+        mesh: result.mesh,
+        report: {
+          moved: result.moved,
+          missed: result.missed,
+          maxMove: result.maxMove,
+          meanMove: result.meanMove,
+          residual: result.residual,
+        },
+        provenance: provenance(
+          `shrink-wrap, mode ${op.mode}: each vertex put on the target surface (closest point, or the first hit along its normal / a fixed direction), offset along the target face normal`,
+          'Blender Shrinkwrap modifier (nearest surface point, project); closest point by bounding-volume tree (Ericson 5.1.5)',
+        ),
+      };
+    }
+    case 'displace': {
+      const result = displaceMesh(mesh, op);
+      if ('failure' in result) return failure('MESH_DISPLACE_FIELD', result.failure);
+      if ('tooLarge' in result)
+        return failure(
+          'MESH_DISPLACE_RESULT_TOO_LARGE',
+          `the refined surface passed ${result.tooLarge} triangles (limit ${op.maxTriangles ?? DISPLACE_MAX_TRIANGLES}): use a longer refineEdge`,
+        );
+      return {
+        mesh: result.mesh,
+        report: {
+          movedVertices: result.movedVertices,
+          maxDisplacement: result.maxDisplacement,
+          displacedVolume: result.displacedVolume,
+          volumeBasis: result.volumeBasis,
+          refinedEdges: result.refinedEdges,
+        },
+        provenance: provenance(
+          'displacement of every vertex by strength x a scalar field (expression of x, y, z and the normal, or a bilinear height map) along its normal or a fixed direction, after global edge refinement',
+          'Blender Displace modifier (texture, strength, midlevel, direction)',
+        ),
       };
     }
     case 'cut': {

@@ -5,7 +5,7 @@
  */
 
 import type { Vec3 } from '../../model/vectors';
-import { closestPointOnTriangle } from '../triangleQueries';
+import { closestPointOnTriangle, rayTriangleDistance } from '../triangleQueries';
 
 const LEAF = 6;
 
@@ -123,6 +123,55 @@ export class SurfaceIndex {
         if (dl <= dr) stack.push(r, l);
         else stack.push(l, r);
       }
+    }
+    return best;
+  }
+
+  private rayHitsBox(node: number, origin: Vec3, inverse: Vec3, tMax: number): boolean {
+    let near = 0;
+    let far = tMax;
+    for (let a = 0; a < 3; a++) {
+      const lo = ((this.boxes[node * 6 + a] as number) - (origin[a] as number)) * (inverse[a] as number);
+      const hi = ((this.boxes[node * 6 + a + 3] as number) - (origin[a] as number)) * (inverse[a] as number);
+      if (Number.isNaN(lo) || Number.isNaN(hi)) continue;
+      near = Math.max(near, Math.min(lo, hi));
+      far = Math.min(far, Math.max(lo, hi));
+    }
+    return near <= far * (1 + 1e-12) + 1e-12;
+  }
+
+  /** The first surface hit of the ray `origin + t * direction` (`direction` a unit vector) with t in [0, tMax]: its distance and triangle, or null (ties go to the lower triangle index). */
+  ray(origin: Vec3, direction: Vec3, tMax: number): { readonly distance: number; readonly face: number } | null {
+    if (this.faceCount === 0) return null;
+    const inverse: Vec3 = [1 / direction[0], 1 / direction[1], 1 / direction[2]];
+    let best: { distance: number; face: number } | null = null;
+    let reach = tMax;
+    const stack = [0];
+    while (stack.length > 0) {
+      const node = stack.pop() as number;
+      if (!this.rayHitsBox(node, origin, inverse, reach)) continue;
+      if ((this.left[node] as number) < 0) {
+        for (let i = this.start[node] as number; i < (this.end[node] as number); i++) {
+          const t = this.order[i] as number;
+          const o = t * 9;
+          const c = this.corners;
+          const distance = rayTriangleDistance(
+            origin,
+            direction,
+            [
+              [c[o] as number, c[o + 1] as number, c[o + 2] as number],
+              [c[o + 3] as number, c[o + 4] as number, c[o + 5] as number],
+              [c[o + 6] as number, c[o + 7] as number, c[o + 8] as number],
+            ],
+            0,
+            reach,
+          );
+          if (distance !== null && (best === null || distance < best.distance || (distance === best.distance && t < best.face))) {
+            best = { distance, face: t };
+            reach = distance;
+          }
+        }
+      } else stack.push(this.right[node] as number, this.left[node] as number);
     }
     return best;
   }

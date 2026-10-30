@@ -220,7 +220,22 @@ export function evaluateExpression(expression: string, env: Readonly<Record<stri
   if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
   const tokensOrError = tokenize(expression);
   if (typeof tokensOrError === 'string') return { ok: false, error: tokensOrError };
-  const state: ParseState = { tokens: tokensOrError, pos: 0, depth: 0, env };
+  return evaluateTokens(tokensOrError, env);
+}
+
+/**
+ * The expression tokenized once, for evaluating it many times (per vertex): the returned function parses the tokens against `env` and answers as `evaluateExpression`
+ * does (same results); an expression that does not tokenize gives the error on every call.
+ */
+export function compileExpression(expression: string): (env: Readonly<Record<string, number>>) => EvalResult {
+  if (expression.trim() === '') return () => ({ ok: false, error: 'expression is empty' });
+  const tokensOrError = tokenize(expression);
+  if (typeof tokensOrError === 'string') return () => ({ ok: false, error: tokensOrError });
+  return (env) => evaluateTokens(tokensOrError, env);
+}
+
+function evaluateTokens(tokens: Token[], env: Readonly<Record<string, number>>): EvalResult {
+  const state: ParseState = { tokens, pos: 0, depth: 0, env };
   const result = parseExpr(state);
   if (!result.ok) return result;
   // Ensure the entire input was consumed.

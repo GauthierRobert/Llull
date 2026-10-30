@@ -755,7 +755,7 @@ Plans (`node server/bin/llull.cjs run <plan> --continue`, cwd `docs/design/07-me
 ### 13.5.4 Left
 
 - **M6**: `quad_remesh` is built (13.6); `fit_subdivision_to_mesh`, `fit_surface_to_mesh` and the fit half of VC-22 are built (13.7).
-- `sculpt_mesh` `along` (curve stamps) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (COULD); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`. (Native decimate speed: built, 13.10.) (`--progress` events and the async native engine are built: 13.8.)
+- `sculpt_mesh` `along` (curve stamps: built, 13.19) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (built in TypeScript, 13.18); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`. (Native decimate speed: built, 13.10.) (`--progress` events and the async native engine are built: 13.8.)
 - The native mesh engine no longer blocks the backend: a job is awaited on the event loop (13.8), capped by `LLULL_MESH_OP_TIMEOUT_S` (600 s, `MESH_TIMEOUT`).
 - `mesh_to_brep` follows exact curves only for line, circle and ellipse chains; regions bounded by other intersections (cone-cylinder with tilted axes, free-form) stay triangles.
 
@@ -1606,3 +1606,56 @@ Each fails without its fix (shown by disabling the fix): the corner pins (the co
 - A symmetric remesh lands at 0.7 to 0.8 of the target (the half's boundary rows count twice at the seam); the command says "usually within 15 %" only for the closed, non-symmetric case and states the retry.
 - Two of twelve measured inputs are refused by the boundary rule (a hemisphere of 20,480 triangles at 1,000 quads, a closed l6 sphere at 4,000 quads with symmetry); lowering or raising the target usually passes.
 - The symmetry plane passes through the origin (as in `sculpt_mesh`); a plane elsewhere is not offered.
+
+## 13.18 As built (DES-7c leftovers (3): `shrinkwrap_mesh` and `displace_mesh`, 2026-10-30)
+
+### 13.18.1 What they are
+
+FR-MSH-38: `shrinkwrap_mesh { id, targetId, mode, direction?, offset, side, maxDistance? }` moves every vertex of a mesh onto another mesh or solid, connectivity unchanged. `nearest` puts a vertex on the closest point of the target; `normal` casts a ray along the vertex normal and `direction` along a fixed vector, both ways, and the nearest hit wins; a ray that misses leaves the vertex (counted in `data.missed`). `offset` keeps a distance from the target along the target FACE normal at the hit, on the side the vertex was on (`keep`, default), or `outside` / `inside`; `maxDistance` leaves farther vertices in place. FR-MSH-39: `displace_mesh { id, expression | heightMap, strength, midlevel, direction, refineEdge }` moves every vertex by `strength` x a scalar field along its vertex normal or a fixed direction. The field is an expression of `x, y, z, nx, ny, nz` (the project's expression language, `lib/expression.ts`: operators + - * /, no `^` (use `pow(a, b)`), constants pi and tau, functions sin cos tan asin acos atan atan2 sqrt abs floor ceil round trunc sign exp ln log10 pow hypot mod min max; at most 4,096 characters; names other than x, y, z, nx, ny, nz are refused before the engine runs; the expression is tokenized once per command, `compileExpression`) or an 8-bit grey map (base64 of width x height bytes, laid on the xy / yz / xz plane at `origin` and `size`, bilinear between pixel centres, 0 outside its rectangle, value grey / 255 - `midlevel`). `refineEdge` first splits every edge longer than it (the sculpt refinement, applied to the whole mesh, at most 8 passes; 1,000,000 triangles in the TypeScript engine, `DISPLACE_MAX_TRIANGLES`: refining a 100 x 100 grid to that limit takes 1.1 s, so the bound costs about a second). `geometry/mesh/wrapDisplace.ts` holds both; `SurfaceIndex.ray` (box-slab traversal of the same tree, ties to the lower triangle) is the new query.
+
+### 13.18.2 Decisions
+
+- **Engine ops, TypeScript only.** `shrinkwrap` and `displace` are `MeshOp` variants answered by `tsEngineEdit.ts` (cap 200,000 triangles for the input, and for the shrink-wrap target: `MESH_ENGINE_CAP_EXCEEDED`); both commands run through `runMeshOp` with `deviation: true` (the symmetric deviation of the result from the source is reported). They read the full-resolution mesh (`readsMeshTriangles`, the target through `loadSolidMesh`, the contract test of 13.11).
+- **Offset along the face normal.** The distance from the result to the target is the offset exactly only on a flat hit; at a facet edge or vertex of a polyhedral target the face normal of the hit triangle gives a point a little nearer (measured 0.44 % of the offset on an icosphere at offset 1). `data.residual` is the largest |distance to the target - offset| and is under 1e-12 for offset 0.
+- **Displaced volume** as the sculpt: a closed mesh reports the volume after minus before (`closed-volume-difference`), an open one the sum of triangle area x mean vertex displacement along the face normal (`height-field-sum`).
+- **Refusals by name.** `MESH_PARAM_INVALID` (an unknown name, an expression over 4,096 characters or nested past 200 levels, pixel text that is not the padded base64 of width x height bytes, neither or both of `expression` / `heightMap`, expression syntax, `direction` without length or missing for mode `direction`, `targetId` equal to `id`, a map over 4,000,000 pixels), `MESH_DISPLACE_FIELD` (the expression fails, or strength x field is not finite, at a vertex, naming it), `MESH_DISPLACE_RESULT_TOO_LARGE`, the load refusals for either entity.
+
+### 13.18.3 Verification (VC-MSH-38, VC-MSH-39)
+
+VC-MSH-38: an icosphere of radius 12 (level 3) wrapped `nearest` onto an icosphere of radius 10 (level 4): every result vertex is at distance <= 1e-12 from the target (computed with an independent `SurfaceIndex`), `residual` <= 1e-12, 0 missed, the largest radius <= 10. VC-MSH-39: the 20 x 20 grid displaced by 0.5: `displacedVolume` 200 within relative 1e-12, every vertex at z = 0.5. Tests: `tests/unit/mesh/wrapDisplace.test.ts` (16: both VC checks, offsets on both sides, the ray modes with an oblique direction and a parallel miss, `maxDistance`, the ray query, the expression environment, the closed volume against an independent volume formula, the height map (pixel-centre interpolation, midlevel, outside), refinement to an edge limit, purity, every refusal with its code, the triangle limit through the geometry and the engine). Each fails without its fix (shown by disabling it): the nearest projection, `maxDistance`, the nearest-of-two-directions rule (planes at z = +1 and z = -3, then swapped), the lower triangle on a tie (a ray exactly on a shared diagonal), the `keep` side, the closed-volume basis, the midlevel, the refinement, the unknown-name, length and pixel-count checks and the non-finite check. `compileExpression` is tested to answer exactly as `evaluateExpression` for several sources and environments. Not red-provable: the shrinking reach of `SurfaceIndex.ray` (a search optimisation) and the 1,000,000 default (the limit tests pass `maxTriangles`).
+
+### 13.18.4 Measured cost (win32-x64, geometry functions on a sphere source, 22 cores, single thread; no engine round trip)
+
+| Source triangles | shrinkwrap nearest (target 82k / 82k / 328k) | shrinkwrap normal | displace expression |
+| ---------------- | -------------------------------------------- | ----------------- | ------------------- |
+| 81,920 | 1.7 s | 0.8 s | 0.13 s |
+| 327,680 | 5.9 s | 1.9 s | 0.48 s |
+| 1,310,720 | 41.7 s | 8.0 s | 2.7 s |
+
+The displace column is after compiling the expression once (before: 0.7 / 3.1 / 13.3 s, tokenizing per vertex). By the 13.12.2 rule (a native twin is due when the TypeScript cost passes about 1 s at 327k triangles) a native `shrinkwrap` is justified (5.9 s nearest) and stays on the board; `displace` at 0.48 s is not. The TypeScript engine's cap of 200,000 triangles refuses larger inputs by name (`MESH_ENGINE_CAP_EXCEEDED`, remedy: `decimate_mesh` first). 
+
+### 13.18.5 Left, by name
+
+- Native Rust twin of `shrinkwrap` (closest point exists in `llull-meshops`; the ray query and the face-normal offset are new): the 200,000 cap lifts when it exists. `displace` stays in TypeScript unless a measurement says otherwise.
+- Shrink-wrap modes of Blender not offered: "target normal project", "nearest vertex", "above / below surface" as separate modes (`side` covers the offset case), smoothing of the wrapped result.
+- A displacement texture as an image file (PNG / JPEG) is not decoded: the map is raw grey bytes; `displace_mesh` with a colour image or a procedural texture needs an importer.
+
+## 13.19 As built (DES-7c leftovers (3): `sculpt_mesh` `along`, 2026-10-30)
+
+### 13.19.1 What it is
+
+FR-MSH-18 and the table of 5.7 list "a stroke along a curve entity with spacing". `sculpt_mesh` now takes EITHER `stamps` (as before) OR `along: { curveId | points, spacing }`: a stamp every `spacing` of arc length from the start of the path. The path is a `nurbs_curve` entity in its world placement (`curveId`; sampled into 2,000 chords of equal arc length by `samplesByArcLength`, the same sampler `flow_along_curve` uses) or a polyline `points` (2 or more points). The first stamp is at the start of the path; the end is a stamp only when it falls on a multiple of `spacing`. `geometry/mesh/strokePath.ts` (`stampsAlong`, pure) does the placement.
+
+### 13.19.2 Decisions
+
+- **The path is expanded by the command, before the engine is asked.** The op the engines get is the existing `sculpt` op with explicit `stamps`: each stamp is projected onto the surface by the engine like any other (a stamp farther than `radius` from the surface is `MESH_SCULPT_STAMP_OFF_SURFACE`, naming its index), and the slice 3 native twin needs no change. The bit-identity of TypeScript and native engines is therefore the one of slice 3, and `server/tests/sculptAlongNative.test.ts` shows it for two strokes along a 30-point polyline on an 81,920-triangle sphere (the native engine is asked, the bytes equal the TypeScript engine's, also mirrored and refined). `along` and the explicit stamps it stands for give the same bytes (`sculptAlong.test.ts`).
+- **A stroke is at most 10,000 stamps** (`MAX_STROKE_STAMPS`): each stamp visits every vertex, so a path of a million stamps would not end; a path without length or too many stamps is `MESH_PARAM_INVALID` (path `along.spacing`) with the remedy "raise the spacing". Exactly one of `stamps` / `along` and, inside `along`, exactly one of `curveId` / `points`: else `MESH_PARAM_INVALID`. A `curveId` that is not a `nurbs_curve` gets the surfacing refusals (`SRF_ENTITY_NOT_FOUND`, `SRF_NOT_NURBS`), as `loft` does.
+- `data.stamps` is the number of stamps placed; the summary says `x<count>`.
+
+### 13.19.3 Tests
+
+`tests/unit/mesh/sculptAlong.test.ts` (placement round corners and at the multiples, zero-length segments, the limit at 10,000 and 10,001; `along` equals the explicit stamps to the bit; a `nurbs_curve` with a placement equals the polyline stroke to 1e-6 (the curve sampling); the refusals with exact codes; purity) and `server/tests/sculptAlongNative.test.ts` (native bytes equal TypeScript bytes). Each fails without its fix (shown by disabling the fix): the end stamp on a multiple, the limit comparison, the corner walk of the path and the "exactly one of stamps / along" check each fail named tests.
+
+### 13.19.4 Left, by name
+
+A path whose points are projected onto the surface before spacing (the spacing is along the path, not along the surface), and view-dependent directions (the FR lists "view" next to normal and vector; there is no view in the command layer).
