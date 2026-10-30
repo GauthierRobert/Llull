@@ -11,21 +11,14 @@ import type { GeometryKernel } from '../../geometry/kernel';
 import { closestOnSurface } from '../../lib/nurbs/closest';
 import { surfaceDerivatives } from '../../lib/nurbs/surface';
 import { interpolateGrid } from '../../lib/nurbs/surfaceFit';
-import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
-import { cross3, dot3, len3, normalize3 } from '../../lib/vec3';
+import { cross3, dot3 } from '../../lib/vec3';
 import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
 import { bodyParams, outputParam, targetIds } from './schema';
 import type { DeformPlan } from './request';
 import { runDeform } from './run';
+import { type TargetSurface, orientationAt, planSheetBase } from './flowSheetBase';
 import { type Refusal, defaultTolerance, resolveTargetFrame } from './target';
-
-/** The target surface in world coordinates and which side its normal points to. */
-interface TargetSurface {
-  readonly surface: NurbsSurfaceData;
-  /** +1: the normal is S_u x S_v, -1: the opposite (a face of a solid: outward). */
-  readonly side: 1 | -1;
-}
 
 /** Samples per direction of the grid a face is read on (its exact points, interpolated by a bicubic patch: ~1e-7 relative on a circular arc). */
 const FACE_GRID = 65;
@@ -86,14 +79,15 @@ function faceTarget(doc: CadDocument, kernel: GeometryKernel | null, entityId: s
  * @invariant arc lengths along the iso-curves through the target origin are kept, w is the offset along the target normal, det J = (1 - w k1)(1 - w k2) x (area ratio):
  *   on a cylinder of radius R a plate of thickness t outside has volume W H (t + t^2 / (2 R)); kernel-optional: exact warp on the native kernel, mesh path otherwise;
  *   a face target needs the exact kernel
- * @failure target missing / not a sheet or a face / a face of a body built on an imported mesh -> DEF_FLOW_TARGET_INVALID; a face without the exact kernel -> DEF_TARGET_FACE_NEEDS_KERNEL; the body leaves a
+ * @invariant base.sheetId: the point is taken in the base sheet frame (q = P_b(x, y) + w N_b(x, y), solved by Newton on the tabulated base) and goes to P(x, y) + w N(x, y); the Jacobian pre-check samples the vertices and a base-coordinate grid
+ * @failure base neither / both of plane and sheetId, or a bad base sheet -> DEF_FLOW_BASE_INVALID; the body off the base sheet -> DEF_FLOW_BASE_OUTSIDE; target missing / not a sheet or a face / a face of a body built on an imported mesh -> DEF_FLOW_TARGET_INVALID; a face without the exact kernel -> DEF_TARGET_FACE_NEEDS_KERNEL; the body leaves a
  *   non-closed target -> DEF_FLOW_OUTSIDE_BASE; wraps past a closed target's period -> DEF_FLOW_OVERLAP; w inside the radius of curvature -> DEF_FOLDOVER
  */
 export const flowOnSurface = defineCommand({
   name: 'flow_on_surface',
   annotations: { readsMeshTriangles: true },
   description:
-    'Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface. The base is a plane (origin, normal, uDirection): the body x axis is uDirection, ' +
+    'Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface, or move a body laid out on a CURVED base sheet (base.sheetId: a plate bent on a drum, say) onto the target (x, y arc lengths and w the normal offset on both sheets). The base is a plane (origin, normal, uDirection): the body x axis is uDirection, ' +
     'y is normal x uDirection, w is the offset along the normal. The point (x, y, w) goes to S(u*, v*) + w N(u*, v*) on the target, where x and y are ARC LENGTHS on the target ' +
     'measured from targetOrigin along the surface direction closest to targetUDirection (x) and the perpendicular one (y), and N is the target normal (a face of a solid: pointing out of the solid; ' +
     'a sheet: S_u x S_v, reversed by flipNormal). Lengths are kept along both directions at the origin; the material is stretched or squeezed by (R + w) / R on a cylinder of radius R ' +
@@ -114,9 +108,27 @@ export const flowOnSurface = defineCommand({
             ),
             uDirection: vec3('Direction of the body x axis in the plane, unitless; its component perpendicular to normal is used.'),
           })
-          .describe('The base plane: origin, normal and uDirection.'),
+          .describe('The base plane: origin, normal and uDirection.')
+          .optional(),
+        sheetId: z
+          .string()
+          .describe(
+            'Id of a nurbs_surface entity the body is laid out on instead of a plane (give plane or sheetId). x and y are then arc lengths on the base sheet (from base.origin, along base.uDirection and across it), ' +
+              'w the offset along its normal; the point goes to the same (x, y, w) of the target. The body must lie within the base sheet (DEF_FLOW_BASE_OUTSIDE) and not reach its centre of curvature on the inner side (DEF_FOLDOVER).',
+          )
+          .optional(),
+        origin: vec3(
+          'Base sheet only: a world point whose projection onto the base sheet is the base origin. Default: the point of the sheet nearest the body bounding-box centre.',
+        ).optional(),
+        uDirection: vec3(
+          'Base sheet only: world direction the body x axis follows on the base sheet (its tangent component picks the iso-direction). Default: world x.',
+        ).optional(),
+        flipNormal: z
+          .boolean()
+          .describe('Base sheet only: true reverses the base normal (w measured to the other side). Default false.')
+          .optional(),
       })
-      .describe('The flat reference the body is laid out on: a plane. (A curved base sheet is not supported.)'),
+      .describe('The reference the body is laid out on: a plane (plane) or a curved sheet (sheetId).'),
     target: z
       .object({
         sheetId: z.string().describe('Id of a nurbs_surface entity to flow onto. Give this or entityId with faceNear.').optional(),
@@ -171,11 +183,11 @@ export const flowOnSurface = defineCommand({
           found = faceTarget(doc, target.kernel, where.entityId, where.faceNear);
         } else return invalid('give sheetId, or entityId with faceNear (not both)', '');
         if ('code' in found) return found;
-        const resolved = resolveTargetFrame(
-          target,
-          { origin: base.plane.origin, axis: base.plane.normal, reference: base.plane.uDirection },
-          'centre',
-        );
+        const { plane } = base;
+        if ((plane === undefined) === (base.sheetId === undefined))
+          return { code: 'DEF_FLOW_BASE_INVALID', message: 'give exactly one of base.plane and base.sheetId', paths: ['params.base'] };
+        if (plane === undefined) return planSheetBase(doc, target, found, base, targetOrigin, targetUDirection, output?.tolerance);
+        const resolved = resolveTargetFrame(target, { origin: plane.origin, axis: plane.normal, reference: plane.uDirection }, 'centre');
         if ('code' in resolved) return resolved;
         const local = resolveFrame(resolved.frame);
         if (local === null) return { code: 'DEF_FRAME_DEGENERATE', message: 'the base plane is degenerate', paths: ['params.base'] };
@@ -184,28 +196,16 @@ export const flowOnSurface = defineCommand({
         const side = found.side;
         const surface = mapSurfacePoles(found.surface, (pole) => toLocal(local, pole));
         const direction = (v: Vec3): Vec3 => [dot3(v, local.x), dot3(v, local.y), dot3(v, local.z)];
-        const origin = closestOnSurface(surface, toLocal(local, targetOrigin ?? base.plane.origin));
-        const derivatives = surfaceDerivatives(surface, origin.u, origin.v, 1);
-        const su = (derivatives[1] as Vec3[])[0] as Vec3;
-        const sv = (derivatives[0] as Vec3[])[1] as Vec3;
-        const normal = normalize3(cross3(su, sv));
-        if (len3(cross3(su, sv)) === 0) return invalid('the target has a degenerate tangent plane at the target origin', '');
-        const wanted = direction(targetUDirection ?? base.plane.uDirection);
-        const along = (tangent: Vec3): number => dot3(tangent, normalize3(wanted)) / len3(tangent);
-        const xAlong = Math.abs(along(su)) >= Math.abs(along(sv)) ? 'u' : 'v';
-        const tangentX = xAlong === 'u' ? su : sv;
-        const signX = along(tangentX) >= 0 ? 1 : -1;
-        const tangentY = cross3(side === 1 ? normal : [-normal[0], -normal[1], -normal[2]], normalize3(tangentX));
-        const across = xAlong === 'u' ? sv : su;
-        const signY = dot3(across, tangentY) * signX >= 0 ? 1 : -1;
+        const origin = closestOnSurface(surface, toLocal(local, targetOrigin ?? plane.origin));
+        const wanted = direction(targetUDirection ?? plane.uDirection);
+        const orientation = orientationAt(surface, side, [origin.u, origin.v], wanted);
+        if (orientation === null) return invalid('the target has a degenerate tangent plane at the target origin', '');
         const { extent } = resolved;
         const tolerance = output?.tolerance ?? defaultTolerance(target.diagonal);
         const law = buildFlowSurface({
           surface,
           origin: [origin.u, origin.v],
-          xAlong,
-          signX,
-          signY,
+          ...orientation,
           normalSign: side,
           xRange: [extent.min[0], extent.max[0]],
           yRange: [extent.min[1], extent.max[1]],

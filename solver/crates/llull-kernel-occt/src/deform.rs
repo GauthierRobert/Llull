@@ -153,6 +153,15 @@ fn law_numbers(law: &Value) -> Option<(f64, Vec<f64>)> {
             }
             let mut numbers = vec![number(law, "x0")?, number(law, "y0")?, number(law, "hx")?, number(law, "hy")?, nx, ny];
             numbers.extend(nodes);
+            // the base sheet table on the same grid, when the body is laid out on a curved base
+            if let Some(base) = law.get("baseNodes") {
+                let table: Vec<f64> =
+                    base.as_array()?.iter().map(|value| value.as_f64().filter(|number| number.is_finite())).collect::<Option<_>>()?;
+                if table.len() as f64 != 6.0 * nx * ny {
+                    return None;
+                }
+                numbers.extend(table);
+            }
             Some((FLOW_SURFACE, numbers))
         }
         "rbf" => {

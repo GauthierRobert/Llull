@@ -594,8 +594,8 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; a curved sheet as the base of
-`flow_on_surface`; `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
+**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays;
+`compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
 ## 15. As built (DES-7d: deforming large meshes, 2026-10-30)
@@ -799,3 +799,31 @@ Two optional extensions of the lattice law (`lattice.ts`; both absent: the Berns
 Tests: `tests/unit/deform/latticeSpline.test.ts` (pack, Greville positions, linear precision, local control support, enclosure, command: local control of the body, oriented
 affine map = 1.2 x the volume, default oriented box, refusals), `server/tests/nativeKernelLattice.test.ts` (exact vs mesh vs closed form on the native kernel, the capability,
 fold on both paths), cargo pack vectors.
+
+### 17.5 `flow_on_surface` from a curved base sheet (FR-DEF-15)
+
+`base: {sheetId, origin?, uDirection?, flipNormal?}` replaces `base.plane` (exactly one; both or neither: `DEF_FLOW_BASE_INVALID`). The body is laid out on a curved `nurbs_surface`:
+a point q is taken in the base sheet frame, q = P_b(x, y) + w N_b(x, y), with x and y arc lengths on the base sheet (from `origin`, along `uDirection` and across it, built exactly
+like the target's) and w the offset along its normal, and goes to P(x, y) + w N(x, y) of the target. The plane base is the special case (x, y, w) = q.
+
+- **Law.** `flowSurface.baseNodes`: P_b and N_b of the base on the SAME (x, y) grid as the target table (one grid refinement checks both). Absent for a plane (every existing
+  node, key and result is unchanged; the plane path is the previous code). `solveBase` (`flowSurface.ts`) inverts the base: Newton on F = P_b + w N_b − q with central-difference
+  columns, seeded from the nearest of a coarse grid of base nodes (√count stride, then one stride around it); the C++ twin `flow_surface_base` runs the same iteration and takes
+  the implicit derivative d(x, y, w) = J⁻¹ dq along the Jet direction, so det J of the exact warp is forward-mode, not differenced.
+- **Frame.** The body and both sheets stay in world coordinates (the frame is the world one): there is no base plane to define one.
+- **Sizing.** The (x, y, w) ranges come from the body's vertices (a stride beyond 800) projected on the base sheet (closest point, then the arc lengths: `Target.coordinatesOf`). A
+  closed x direction takes the complement of the largest gap between the x values modulo the period (`wrappedRange`), so a wrap past a half turn is not folded onto the
+  wrong side. A vertex whose normal line misses the sheet by more than the tolerance (it lies past an edge) is `DEF_FLOW_BASE_OUTSIDE`; a body longer than a closed base or target turn is
+  `DEF_FLOW_OVERLAP`.
+- **Fold check.** The Jacobian pre-check samples the body's vertices and a base-coordinate grid (`baseSurfaceGrid`: two samples per table interval along x up to 801, five levels
+  across, at both extreme offsets), the same points in `analyze_deformation`, not the extent box (a curved base's box is not the body).
+- **Predicted volume.** The existing tetrahedral quadrature of the flow onto a surface applies: its fan from the vertex centroid stays inside the tube of the base for the cases
+  tried, including a 300 degree wrap (test); a dedicated base-coordinate integral was written, found not to change any result, and removed.
+- **Old sidecars.** The sidecar `info` lists `deform-base-sheet`; `nativeSupportsDeform` requires it for a law with `baseNodes`; the spec carries the base table after the target's
+  (`6 nx ny` numbers, optional).
+- **Pack.** `flow_surface_base_plane`, `flow_surface_base_cylinder` (base cylinder R 50 onto a plane and onto a cylinder R 30), closed form from `flowSurfaceBase`; tables of
+  step 0.2 are built by the TS test and the cargo test from formulas; images agree to 2e-5 (Catmull-Rom on a circle) and det J to 2e-4 in TS and, forward-mode, in C++.
+
+Tests: `tests/unit/deform/flowSheetBase.test.ts` (pack, grid, recipe validation, a plate bent on R 50 unrolled onto a flat sheet: extents, volume, det J range 50/51..50/49, predicted
+volume; a 300 degree wrap; a flat base sheet equals `base.plane`; refusals by name; a target fold), `server/tests/nativeKernelFlowSheet.test.ts` (exact vs mesh vs closed form on the
+native kernel, the capability), cargo pack vectors.

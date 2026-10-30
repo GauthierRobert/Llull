@@ -12,6 +12,7 @@ import {
   scaleNonUniform,
   flowBaseArc,
   ffdGeneral,
+  flowSurfaceBase,
   ffd,
   latticeOf,
   pointPush,
@@ -645,6 +646,33 @@ for (const [name, params] of Object.entries(general))
         : {}),
     })),
   };
+// flow onto a surface from a base sheet: a base cylinder of radius 50 onto a plane and onto a cylinder of radius 30; points by (theta, w, y) so they stay inside the base
+for (const [name, params] of Object.entries({
+  flow_surface_base_plane: { baseRadius: 50, targetRadius: 0, length: 63, halfWidth: 12, step: 0.2 },
+  flow_surface_base_cylinder: { baseRadius: 50, targetRadius: 30, length: 63, halfWidth: 12, step: 0.2 },
+})) {
+  const points = [];
+  for (const theta of [0.1, 0.5, 0.9, 1.1])
+    for (const [w, y] of [
+      [-1.5, -6],
+      [0, 0],
+      [1.8, 7],
+    ]) {
+      const r = params.baseRadius + w;
+      points.push([params.baseRadius - r * Math.cos(theta), y, r * Math.sin(theta)]);
+    }
+  vectors[name] = {
+    params,
+    points: points.map((p) => ({
+      in: round(p),
+      out: round(flowSurfaceBase(p, params)),
+      det: round(
+        jacobianDet((q) => flowSurfaceBase(q, params), p),
+        9,
+      ),
+    })),
+  };
+}
 save('point_vectors.json', { note: 'frame = world (origin 0, axis +z, reference +x); tolerance 1e-9 absolute', laws: vectors });
 
 // ---------------------------------------------------------------- mesh path refinement budget

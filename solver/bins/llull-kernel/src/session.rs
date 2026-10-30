@@ -91,6 +91,8 @@ fn info() -> Value {
         "deform-base-curve",
         // lattice laws with spline degrees and / or box axes (the trailer after the offsets)
         "deform-lattice-spline",
+        // flowSurface laws with a base sheet table after the target's
+        "deform-base-sheet",
         "emboss",
     ]
     .into_iter()
@@ -354,6 +356,7 @@ mod tests {
             "deform-infinite",
             "deform-base-curve",
             "deform-lattice-spline",
+            "deform-base-sheet",
             "emboss",
         ] {
             assert!(capabilities.contains(&json!(name)), "{name}");

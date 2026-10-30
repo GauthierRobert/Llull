@@ -44,6 +44,17 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                 numbers.extend(base);
                 [header(7.0, params, region), numbers].concat()
             }
+            "flow_surface_base_plane" | "flow_surface_base_cylinder" => {
+                let (step, length, half) = (number(params, "step"), number(params, "length"), number(params, "halfWidth"));
+                let (x0, nx, y0, ny) =
+                    (-0.6, ((length + 1.2) / step).round() as usize + 1, -half, (2.0 * half / step).round() as usize + 1);
+                let target = sheet_nodes(number(params, "targetRadius"), (x0, step, nx), (y0, step, ny));
+                let base = sheet_nodes(number(params, "baseRadius"), (x0, step, nx), (y0, step, ny));
+                let mut numbers = vec![x0, y0, step, step, nx as f64, ny as f64];
+                numbers.extend(target);
+                numbers.extend(base);
+                [header(8.0, params, region), numbers].concat()
+            }
             "scale_nonuniform" => {
                 let f = params["factors"].as_array().unwrap();
                 let (x, y, z) = (f[0].as_f64().unwrap(), f[1].as_f64().unwrap(), f[2].as_f64().unwrap());
@@ -109,7 +120,14 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             for axis in 0..3 {
                 let expected = point["out"][axis].as_f64().unwrap();
                 assert!(
-                    (images[3 * k + axis] - expected).abs() < if name.starts_with("flow_base") { 1e-8 } else { 1e-9 },
+                    (images[3 * k + axis] - expected).abs()
+                        < if name.starts_with("flow_base") {
+                            1e-8
+                        } else if name.starts_with("flow_surface_base") {
+                            2e-5
+                        } else {
+                            1e-9
+                        },
                     "{name} point {k} axis {axis}: {} vs {expected}",
                     images[3 * k + axis]
                 );
@@ -119,12 +137,16 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             let on_kink = !infinite
                 && [number(params, "z0"), number(params, "z1")].iter().any(|z| (point["in"][2].as_f64().unwrap() - z).abs() < 1e-9);
             if let (false, Some(expected)) = (on_kink, point["det"].as_f64()) {
-                assert!((determinants[k] - expected).abs() < 1e-6, "{name} point {k} det {} vs {expected}", determinants[k]);
+                assert!(
+                    (determinants[k] - expected).abs() < if name.starts_with("flow_surface_base") { 2e-4 } else { 1e-6 },
+                    "{name} point {k} det {} vs {expected}",
+                    determinants[k]
+                );
             }
         }
         checked += 1;
     }
-    assert_eq!(checked, 21, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
+    assert_eq!(checked, 23, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
 }
 
 /// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).
@@ -270,4 +292,23 @@ fn a_bent_rod_flowed_from_its_own_arc_onto_a_line_is_straight_again() {
     // bounds [min x y z, max x y z]: a straight rod of radius 5 along the axis, z from the frame origin up
     assert!(straight.bounds[0] > -5.01 && straight.bounds[3] < 5.01, "{:?}", straight.bounds);
     assert!((straight.bounds[5] - straight.bounds[2] - quarter).abs() < 0.02, "{:?}", straight.bounds);
+}
+
+/// Nodes (P then N, i-major) of a sheet on the grid x0 + i hx, y0 + j hy: a cylinder of `radius` about an axis along y through (R, y, 0) with the arc from the origin
+/// in the xz plane (normal out of it), or the plane z = 0 (normal +z) for radius 0.
+fn sheet_nodes(radius: f64, (x0, hx, nx): (f64, f64, usize), (y0, hy, ny): (f64, f64, usize)) -> Vec<f64> {
+    let mut out = Vec::with_capacity(6 * nx * ny);
+    for i in 0..nx {
+        let x = x0 + i as f64 * hx;
+        for j in 0..ny {
+            let y = y0 + j as f64 * hy;
+            if radius == 0.0 {
+                out.extend([x, y, 0.0, 0.0, 0.0, 1.0]);
+            } else {
+                let t = x / radius;
+                out.extend([radius * (1.0 - t.cos()), y, radius * t.sin(), -t.cos(), 0.0, t.sin()]);
+            }
+        }
+    }
+    out
 }

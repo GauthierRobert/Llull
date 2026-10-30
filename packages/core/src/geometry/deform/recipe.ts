@@ -70,13 +70,13 @@ function surfaceFlowProblem(law: Record<string, unknown>): string | null {
   const { nx, ny, nodes } = law;
   if (!isFiniteNumber(law['x0']) || !isFiniteNumber(law['y0']) || !isPositiveNumber(law['hx']) || !isPositiveNumber(law['hy']))
     return 'flowSurface: x0, y0 finite and hx, hy > 0';
-  return isIntegerIn(nx, 2, 1000) &&
-    isIntegerIn(ny, 2, 1000) &&
-    Array.isArray(nodes) &&
-    nodes.length === 6 * (nx as number) * (ny as number) &&
-    nodes.every(isFiniteNumber)
+  const table = (value: unknown): boolean =>
+    Array.isArray(value) && value.length === 6 * (nx as number) * (ny as number) && value.every(isFiniteNumber);
+  if (!(isIntegerIn(nx, 2, 1000) && isIntegerIn(ny, 2, 1000) && table(nodes)))
+    return 'flowSurface: nodes must be 6 finite numbers for each of the nx by ny nodes';
+  return law['baseNodes'] === undefined || table(law['baseNodes'])
     ? null
-    : 'flowSurface: nodes must be 6 finite numbers for each of the nx by ny nodes';
+    : 'flowSurface: baseNodes must be 6 finite numbers for each of the nx by ny nodes';
 }
 
 function rbfProblem(law: Record<string, unknown>): string | null {

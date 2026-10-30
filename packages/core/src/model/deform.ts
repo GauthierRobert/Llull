@@ -94,6 +94,11 @@ export type DeformLaw =
       readonly nx: number;
       readonly ny: number;
       readonly nodes: ReadonlyArray<number>;
+      /**
+       * Present (flow_on_surface with a base sheet): P and N of the BASE sheet on the same grid, six numbers per node. A point q is then taken in the base frame,
+       * q = P_b(x, y) + w N_b(x, y), and goes to P(x, y) + w N(x, y); absent: the base is the plane (x, y, w) = q.
+       */
+      readonly baseNodes?: ReadonlyArray<number>;
     }
   /**
    * Displacement field fitted to curve pairs (deform_curve_to_curve): p goes to p + a0 + A p + Σ w_i |p - c_i|^3, the triharmonic spline through the displacements of the

@@ -93,6 +93,8 @@ export function nativeSupportsDeform(capabilities: readonly string[], law: Defor
   if (!capabilities.includes(law.kind === 'affine' ? 'gtransform' : 'deform')) return false;
   if (law.kind !== 'affine' && !NATIVE_WARP_LAWS.has(law.kind)) return false;
   if (law.kind === 'flowCurve' && law.base !== undefined && !capabilities.includes('deform-base-curve')) return false;
+  // a flow onto a surface from a base sheet: an older warp ignores the second table and would take the base as the plane
+  if (law.kind === 'flowSurface' && law.baseNodes !== undefined && !capabilities.includes('deform-base-sheet')) return false;
   // a B-spline or oriented lattice: an older warp ignores the trailer after the offsets and would build the Bernstein, frame-aligned lattice
   if (
     law.kind === 'lattice' &&

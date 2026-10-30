@@ -76,6 +76,21 @@ export function flowBaseArc([x, y, z], { baseRadius: R, targetRadius: Rt = 0, ra
   return [Rt * (1 - Math.cos(phi)) + offset * Math.cos(phi), y, Rt * Math.sin(phi) - offset * Math.sin(phi)];
 }
 
+/**
+ * Flow onto a surface from a base SHEET (flow_on_surface base.sheetId, TECHNICAL_SPEC §17.5), closed form for a base cylinder of radius `baseRadius` (axis along y
+ * through (R, y, 0), the arc from the origin in the xz plane, normal pointing out of the cylinder) onto a plane (`targetRadius` 0, normal +z) or a cylinder of
+ * `targetRadius` laid out the same way. A point q at polar angle theta about the base axis and radius r has base coordinates x = R theta, y, w = r - R.
+ */
+export function flowSurfaceBase([qx, y, qz], { baseRadius: R, targetRadius: R2 = 0 }) {
+  const dx = R - qx;
+  const theta = Math.atan2(qz, dx);
+  const w = Math.hypot(dx, qz) - R;
+  const x = R * theta;
+  if (R2 === 0) return [x, y, w];
+  const phi = x / R2;
+  return [R2 - (R2 + w) * Math.cos(phi), y, (R2 + w) * Math.sin(phi)];
+}
+
 /** Non-uniform scale about the frame origin. det = sx sy sz. */
 export const scaleNonUniform = ([x, y, z], { factors: [sx, sy, sz] }) => [sx * x, sy * y, sz * z];
 
