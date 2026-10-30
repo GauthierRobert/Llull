@@ -115,6 +115,31 @@ describe('native pair search is bit-identical to the TypeScript engine (DES-7c s
   });
 
   native(
+    'cells past 2^53: tiny faces beside faces far away end, and the count is the same (the oracle looped forever on them)',
+    async () => {
+      const next = stream(5);
+      for (const far of [1e11, 1e15, 1e17, 1e20, 1e30]) {
+        const positions: number[] = [];
+        for (let k = 0; k < 60; k++) {
+          const [x, y, z] = [next(), next(), next()];
+          positions.push(x, y, z, x + 1e-3, y, z, x, y + 1e-3, z + 1e-3 * next());
+        }
+        // far faces large enough to be resolved at that magnitude, and one pair crossing like a plus
+        const size = far * 1e-14;
+        for (let k = 0; k < 6; k++) {
+          const [x, y, z] = [far * (1 + next()), far * next(), far * next()];
+          positions.push(x, y, z, x + size, y, z, x, y + size, z + size * next());
+        }
+        const [x, s] = [far * 3, far * 1e-13];
+        positions.push(x, 0, 0, x + 2 * s, 0, 0, x + s, 0, 2 * s, x + s, -s, s / 2, x + s, s, s / 2, x + s, 0, 3 * s);
+        const indices = Array.from({ length: positions.length / 3 }, (_, i) => i);
+        expect(await expectSame({ positions, indices }, 10), `far ${far}`).toBe(1);
+      }
+    },
+    120_000,
+  );
+
+  native(
     '81,920 triangles: a noisy sphere beside a copy of itself',
     async () => {
       const [a, b] = [noisy(icosphere(10, 6), 0.05), noisy(icosphere(10, 5), 0.05)];

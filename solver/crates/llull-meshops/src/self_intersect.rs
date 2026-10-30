@@ -14,9 +14,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Grid cells one triangle may occupy before it is treated as a large triangle (tested against every other face instead of filling the grid).
 const MAX_CELLS_PER_FACE: f64 = 64.0;
-/// Candidate pairs (after the grid, before the box test) one search may examine: past it the search ends with [`Costly`] (about 20 s on 22 cores).
+/// Candidate pairs one search may examine, counted as the grid entries it scans (every cell of a face, before the filter of the faces below it) plus the large faces it tests: past it the search ends with [`Costly`] (about 20 s on 22 cores).
 pub const CANDIDATE_LIMIT: u64 = 40_000_000_000;
 /// `EPSILON` and `END_MARGIN` of `segmentTriangle.ts`.
+/// Largest cell index that can be counted up exactly in a double (2^53 - 1); a face beyond it is large, as in `selfIntersection.ts`.
+const MAX_SAFE_CELL: f64 = 9_007_199_254_740_991.0;
 const EPSILON: f64 = 1e-12;
 const END_MARGIN: f64 = 1e-9;
 /// Faces handled by one parallel task.
@@ -31,11 +33,9 @@ pub struct Found {
     pub pairs: Vec<[usize; 2]>,
 }
 
-/// The search would examine more than [`CANDIDATE_LIMIT`] candidate pairs.
+/// The search would examine more than the candidate limit.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Costly {
-    pub candidates: u64,
-}
+pub struct Costly;
 
 fn sub(a: Vec3, b: Vec3) -> Vec3 {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -131,8 +131,12 @@ fn build(positions: &[f64], triangles: &[u32]) -> Index {
         .par_iter()
         .map(|b| (std::array::from_fn(|a| ((b[a] - lo[a]) / cell).floor()), std::array::from_fn(|a| ((b[a + 3] - lo[a]) / cell).floor())))
         .collect();
-    let is_large: Vec<bool> =
-        spans.par_iter().map(|(l, h)| (h[0] - l[0] + 1.0) * (h[1] - l[1] + 1.0) * (h[2] - l[2] + 1.0) > MAX_CELLS_PER_FACE).collect();
+    let is_large: Vec<bool> = spans
+        .par_iter()
+        .map(|(l, h)| {
+            (h[0] - l[0] + 1.0) * (h[1] - l[1] + 1.0) * (h[2] - l[2] + 1.0) > MAX_CELLS_PER_FACE || h.iter().any(|&v| v > MAX_SAFE_CELL)
+        })
+        .collect();
     let large: Vec<u32> = (0..n as u32).filter(|&f| is_large[f as usize]).collect();
     // a small face spans at most 64 cells, so the casts below keep every difference of the range exact (a huge index saturates to the same cell)
     let ranges: Vec<([i64; 3], [i64; 3])> = spans.iter().map(|(l, h)| (l.map(|v| v as i64), h.map(|v| v as i64))).collect();
@@ -154,18 +158,30 @@ fn build(positions: &[f64], triangles: &[u32]) -> Index {
 }
 
 impl Index {
-    /// The grid faces (ascending, once each) that share a cell with the small face `x` and are above it.
-    fn above_in_grid(&self, x: usize, out: &mut Vec<u32>) {
-        out.clear();
+    /// The runs of grid entries (start, end in `entries`) of the cells of the small face `x`; returns the number of entries they hold, the work of scanning them.
+    fn runs(&self, x: usize, runs: &mut Vec<(usize, usize)>) -> u64 {
+        runs.clear();
         let (l, h) = self.ranges[x];
+        let mut scanned = 0u64;
         for i in l[0]..=h[0] {
             for j in l[1]..=h[1] {
                 for k in l[2]..=h[2] {
                     let key = cell_key([i, j, k]);
                     let start = self.entries.partition_point(|e| e.0 < key);
-                    out.extend(self.entries[start..].iter().take_while(|e| e.0 == key).map(|e| e.1).filter(|&y| y as usize > x));
+                    let end = start + self.entries[start..].iter().take_while(|e| e.0 == key).count();
+                    scanned += (end - start) as u64;
+                    runs.push((start, end));
                 }
             }
+        }
+        scanned
+    }
+
+    /// The grid faces (ascending, once each) of the runs of [`Self::runs`] that are above the face `x`.
+    fn above_in_grid(&self, x: usize, runs: &[(usize, usize)], out: &mut Vec<u32>) {
+        out.clear();
+        for &(start, end) in runs {
+            out.extend(self.entries[start..end].iter().map(|e| e.1).filter(|&y| y as usize > x));
         }
         out.sort_unstable();
         out.dedup();
@@ -194,21 +210,21 @@ pub fn find_self_intersections(positions: &[f64], triangles: &[u32], max_listed:
     // every small face meets every large one; two large faces meet once
     let work = index.large.len() as u64 * n as u64;
     if work > limit {
-        return Err(Costly { candidates: work });
+        return Err(Costly);
     }
     let examined = AtomicU64::new(0);
     let starts: Vec<usize> = (0..n).step_by(CHUNK).collect();
     let chunks: Vec<(usize, Vec<[usize; 2]>)> = starts
         .par_iter()
         .map(|&start| {
-            let (mut count, mut pairs, mut near) = (0usize, Vec::new(), Vec::new());
+            let (mut count, mut pairs, mut near, mut runs) = (0usize, Vec::new(), Vec::new(), Vec::new());
             for x in start..(start + CHUNK).min(n) {
                 if examined.load(Ordering::Relaxed) > limit {
                     break;
                 }
-                let mut tested = 0u64;
-                let mut test = |y: usize, pairs: &mut Vec<[usize; 2]>, count: &mut usize| {
-                    tested += 1;
+                let tested = std::cell::Cell::new(0u64);
+                let test = |y: usize, pairs: &mut Vec<[usize; 2]>, count: &mut usize| {
+                    tested.set(tested.get() + 1);
                     if index.crosses(x, y) {
                         *count += 1;
                         pairs.push([x.min(y), x.max(y)]);
@@ -219,7 +235,13 @@ pub fn find_self_intersections(positions: &[f64], triangles: &[u32], max_listed:
                         test(y as usize, &mut pairs, &mut count);
                     }
                 } else {
-                    index.above_in_grid(x, &mut near);
+                    // the work of the face is known before anything is gathered: a pile of faces ends here, not after gathering millions of entries
+                    let scanned = index.runs(x, &mut runs);
+                    let before = tested.replace(0) + scanned;
+                    if examined.fetch_add(before, Ordering::Relaxed) + before > limit {
+                        break;
+                    }
+                    index.above_in_grid(x, &runs, &mut near);
                     for &y in &near {
                         test(y as usize, &mut pairs, &mut count);
                     }
@@ -227,7 +249,7 @@ pub fn find_self_intersections(positions: &[f64], triangles: &[u32], max_listed:
                         test(y as usize, &mut pairs, &mut count);
                     }
                 }
-                examined.fetch_add(tested, Ordering::Relaxed);
+                examined.fetch_add(tested.get(), Ordering::Relaxed);
                 keep_lowest(&mut pairs, (2 * max_listed).max(16));
             }
             keep_lowest(&mut pairs, max_listed);
@@ -238,7 +260,7 @@ pub fn find_self_intersections(positions: &[f64], triangles: &[u32], max_listed:
         .collect();
     let total = examined.load(Ordering::Relaxed);
     if total > limit {
-        return Err(Costly { candidates: total });
+        return Err(Costly);
     }
     let count = chunks.iter().map(|c| c.0).sum();
     let mut pairs: Vec<[usize; 2]> = chunks.into_iter().flat_map(|c| c.1).collect();

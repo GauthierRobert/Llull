@@ -18,7 +18,7 @@ import {
 /**
  * @affects none (read-only); data = counts, topology, shells, loops, orientation, area, volume, quality, self-intersections
  * @invariant welding is the only preprocessing: the entity is not changed; every length is in document units
- * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over 200000 triangles without the native engine -> MESH_ENGINE_CAP_EXCEEDED ; a crossing-pair search that would examine more than 4e10 candidate pairs above 200000 triangles (a mesh whose triangles pile up on each other) -> MESH_ENGINE_CAP_EXCEEDED
+ * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over 200000 triangles without the native engine -> MESH_ENGINE_CAP_EXCEEDED; a crossing-pair search that would examine more than 4e10 candidate pairs above 200000 triangles (a mesh whose triangles pile up on each other) -> MESH_ENGINE_CAP_EXCEEDED
  */
 export const analyzeMesh = defineCommand({
   name: 'analyze_mesh',

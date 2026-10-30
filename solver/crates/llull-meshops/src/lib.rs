@@ -303,11 +303,10 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
                     p.max_listed,
                     p.max_candidates.unwrap_or(self_intersect::CANDIDATE_LIMIT),
                 )
-                .map_err(|costly| JobError {
+                .map_err(|_| JobError {
                     code: "SELF_INTERSECTION_TOO_COSTLY",
                     message: format!(
-                        "the pair search would examine {} candidate pairs (limit {}): the mesh has too many overlapping triangles",
-                        costly.candidates,
+                        "the pair search would examine more than {} candidate pairs: the mesh has too many overlapping triangles",
                         p.max_candidates.unwrap_or(self_intersect::CANDIDATE_LIMIT)
                     ),
                 })?;

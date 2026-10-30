@@ -100,9 +100,7 @@ fn interpenetrating_spheres_count_the_same_pairs_whatever_is_listed_or_how_many_
 fn a_search_past_the_candidate_limit_is_costly_and_a_generous_one_is_not() {
     let ball = sphere(3, 0.0, 1);
     let both = merged(&[ball.clone(), moved(&ball, [4.0, 0.0, 0.0])]);
-    let costly = find_self_intersections(&both.0, &both.1, 5, 100).unwrap_err();
-    assert!(costly.candidates > 100);
-    let Costly { .. } = costly;
+    assert_eq!(find_self_intersections(&both.0, &both.1, 5, 100).unwrap_err(), Costly);
     assert!(find_self_intersections(&both.0, &both.1, 5, 1_000_000).is_ok());
 }
 
@@ -142,7 +140,7 @@ fn the_job_refuses_a_search_past_its_candidate_limit_with_a_stable_code() {
     write_job(&dir, &analyze_job(json!({ "maxCandidates": 50 })), &both);
     let error = run(&dir, &mut std::io::sink()).unwrap_err();
     assert_eq!(error.code, "SELF_INTERSECTION_TOO_COSTLY");
-    assert!(error.message.contains("limit 50"), "{}", error.message);
+    assert!(error.message.contains("more than 50 candidate pairs"), "{}", error.message);
 }
 
 #[test]
@@ -218,4 +216,113 @@ fn a_search_whose_candidates_pass_the_limit_is_costly_even_without_large_faces()
     assert!(!both.1.is_empty());
     // no large face here: only the count of candidates examined can end it
     assert!(find_self_intersections(&both.0, &both.1, 5, 10).is_err());
+}
+
+/// `piled` faces of size `size` at the origin (each spans 27 to 64 grid cells) among four times as many tiny ones far apart, which fix the cell size.
+fn piled(piles: usize, size: f64) -> Mesh {
+    let (mut positions, mut indices) = (Vec::new(), Vec::new());
+    let mut add = |tri: [f64; 9]| {
+        let base = (positions.len() / 3) as u32;
+        positions.extend(tri);
+        indices.extend([base, base + 1, base + 2]);
+    };
+    for k in 0..piles {
+        let e = k as f64 * size * 1e-9;
+        add([e, 0.0, 0.0, size + e, 0.0, 0.0, 0.0, size + e, size]);
+    }
+    for k in 0..4 * piles {
+        let x = 100.0 * size + k as f64 * 10.0 * size;
+        add([x, 0.0, 0.0, x + 1e-9 * size, 0.0, 0.0, x, 1e-9 * size, 0.0]);
+    }
+    (positions, indices)
+}
+
+#[test]
+fn the_limit_counts_the_grid_entries_scanned_not_only_the_pairs_tested() {
+    // 100 piled faces: 4,950 pairs once deduplicated, but each face scans the whole pile in each of its 27 or more cells
+    let pile = piled(100, 1.0);
+    assert!(find_self_intersections(&pile.0, &pile.1, 5, 20_000).is_err(), "the scan of the cells passes 20,000 entries");
+    let found = find_self_intersections(&pile.0, &pile.1, 5, 100_000_000).unwrap();
+    assert_eq!(found.pairs.len().min(5), found.pairs.len());
+    // the job says so with the stable code
+    let dir = folder("scan-limit");
+    write_job(&dir, &analyze_job(json!({ "maxCandidates": 20_000 })), &pile);
+    assert_eq!(run(&dir, &mut std::io::sink()).unwrap_err().code, "SELF_INTERSECTION_TOO_COSTLY");
+}
+
+#[test]
+fn a_tiny_triangle_far_from_the_rest_ends_and_is_counted_like_any_other() {
+    // cell indices past 2^53 (the oracle looped forever on them): 200 tiny faces at the origin and a crossing pair at 1e17
+    let size = 100.0;
+    let mut mesh: Mesh = (Vec::new(), Vec::new());
+    for k in 0..200 {
+        let x = k as f64 * 1e-3;
+        mesh.0.extend([x, 0.0, 0.0, x + 1e-6, 0.0, 0.0, x, 1e-6, 0.0]);
+    }
+    let x = 1e17;
+    mesh.0.extend([x, 0.0, 0.0, x + 2.0 * size, 0.0, 0.0, x + size, 0.0, 2.0 * size]);
+    mesh.0.extend([x + size, -size, size / 2.0, x + size, size, size / 2.0, x + size, 0.0, 3.0 * size]);
+    mesh.1 = (0..606).collect();
+    assert_eq!(search(&mesh, 5), Found { count: 1, pairs: vec![[200, 201]] });
+    let three: Mesh = (
+        [
+            0.0,
+            0.0,
+            0.0,
+            1e-6,
+            0.0,
+            0.0,
+            0.0,
+            1e-6,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            1e-6,
+            0.0,
+            1.0 + 1e-6,
+            0.0,
+            0.0,
+            1e11,
+            0.0,
+            0.0,
+            1e11 + 1e-3,
+            0.0,
+            0.0,
+            1e11,
+            1e-3,
+            0.0,
+        ]
+        .to_vec(),
+        (0..9).collect(),
+    );
+    assert_eq!(search(&three, 5).count, 0);
+}
+
+#[test]
+fn meshes_that_mix_tiny_faces_with_far_ones_end_and_agree_with_a_search_made_in_pieces() {
+    // tiny faces near the origin beside tiny faces at 1e11 to 1e30: cells past 2^53 must neither hang nor change the count
+    let mut next = stream(5);
+    for case in 0..40 {
+        let far = [1e11, 1e15, 1e17, 1e20, 1e30][case % 5];
+        let mut positions = Vec::new();
+        for _ in 0..60 {
+            let (x, y, z) = (next(), next(), next());
+            positions.extend([x, y, z, x + 1e-3, y, z, x, y + 1e-3, z + 1e-3 * next()]);
+        }
+        // far faces large enough to be resolved at that magnitude (the spacing of doubles there is far * 2.2e-16)
+        let size = far * 1e-14;
+        for _ in 0..6 {
+            let (x, y, z) = (far * (1.0 + next()), far * next(), far * next());
+            positions.extend([x, y, z, x + size, y, z, x, y + size, z + size * next()]);
+        }
+        let faces = positions.len() / 9;
+        let mesh: Mesh = (positions, (0..faces as u32 * 3).collect());
+        let whole = search(&mesh, 10);
+        // the near faces and the far faces searched alone give their own pairs, and the mix adds none (they never touch)
+        let near_only: Mesh = (mesh.0[..60 * 9].to_vec(), (0..180).collect());
+        let far_only: Mesh = (mesh.0[60 * 9..].to_vec(), (0..18).collect());
+        assert_eq!(whole.count, search(&near_only, 10).count + search(&far_only, 10).count, "case {case}");
+    }
 }
