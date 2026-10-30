@@ -91,6 +91,15 @@ fn law_numbers(law: &Value) -> Option<(f64, Vec<f64>)> {
             }
             let mut numbers: Vec<f64> = min.into_iter().chain(max).chain(degrees).collect();
             numbers.extend(offsets);
+            // the optional trailer: spline degrees (0: Bernstein), an oriented flag, the box axes (rows)
+            let spline = law.get("splineDegrees").and_then(triple);
+            let axes = law.get("axes").and_then(Value::as_array).map(|rows| rows.iter().filter_map(triple).collect::<Vec<_>>());
+            if spline.is_some() || axes.is_some() {
+                numbers.extend(spline.unwrap_or([0.0; 3]));
+                let rows = axes.filter(|rows| rows.len() == 3);
+                numbers.push(if rows.is_some() { 1.0 } else { 0.0 });
+                numbers.extend(rows.unwrap_or_else(|| vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).into_iter().flatten());
+            }
             Some((LATTICE, numbers))
         }
         "point" => {
@@ -144,6 +153,15 @@ fn law_numbers(law: &Value) -> Option<(f64, Vec<f64>)> {
             }
             let mut numbers = vec![number(law, "x0")?, number(law, "y0")?, number(law, "hx")?, number(law, "hy")?, nx, ny];
             numbers.extend(nodes);
+            // the base sheet table on the same grid, when the body is laid out on a curved base
+            if let Some(base) = law.get("baseNodes") {
+                let table: Vec<f64> =
+                    base.as_array()?.iter().map(|value| value.as_f64().filter(|number| number.is_finite())).collect::<Option<_>>()?;
+                if table.len() as f64 != 6.0 * nx * ny {
+                    return None;
+                }
+                numbers.extend(table);
+            }
             Some((FLOW_SURFACE, numbers))
         }
         "rbf" => {

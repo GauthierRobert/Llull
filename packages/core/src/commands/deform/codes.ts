@@ -30,6 +30,9 @@ export const DEF_REMEDIATION: Readonly<Record<string, string>> = {
     'The curve has zero length or a zero tangent, or the up vector is parallel to its tangent: use another curve, up vector or orientation "minimal".',
   DEF_FLOW_TARGET_INVALID: 'target must be {sheetId} (a nurbs_surface) or {entityId, faceNear} (a face of a solid with an exact B-rep).',
   DEF_FLOW_OUTSIDE_BASE: 'The body reaches beyond the target surface: move targetOrigin, or shorten or narrow the body.',
+  DEF_FLOW_BASE_INVALID:
+    'Give exactly one of base.plane and base.sheetId; the base sheet must be a nurbs_surface with a non-degenerate normal where the body lies.',
+  DEF_FLOW_BASE_OUTSIDE: 'The body reaches beyond the edge of the base sheet: enlarge the base sheet or move the body onto it.',
   DEF_FLOW_OVERLAP: 'The body is longer than a closed turn of the target: shorten it or use a larger target.',
   DEF_TARGET_FACE_NEEDS_KERNEL: 'Run with the native kernel (llull --kernel occt, the desktop default) or use a sheet target.',
   DEF_CURVE_PAIR_INVALID:

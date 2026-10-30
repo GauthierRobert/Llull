@@ -13,6 +13,9 @@ namespace llull {
 struct Cut {
   int axis;  // 0 x, 1 y, 2 z of the deformation frame
   double offset;
+  // an oriented lattice box face: the plane c . direction = offset, direction in local frame coordinates (axis is ignored)
+  bool oriented = false;
+  double direction[3] = {0, 0, 1};
 };
 
 int count_faces(const TopoDS_Shape &shape);

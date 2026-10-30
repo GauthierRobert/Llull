@@ -594,8 +594,8 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays; B-spline lattices, oriented boxes; a curved sheet as the base of
-`flow_on_surface`; `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
+**Left.** `preserveAnalytic` (VC-DEF-23); UI overlays;
+`compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
 ## 15. As built (DES-7d: deforming large meshes, 2026-10-30)
@@ -774,3 +774,75 @@ centre vertex, the document's own cylinder mesh has). At zero gradient (the cent
 Tests: `tests/unit/deform/referenceShapes.test.ts`: closed forms on and off the surface per kind (including a helicoid point at a height, the elliptic cylinder in a
 tilted reference), and per law result: sphere scaled by 2 vs radius 20 (and 19.5: 0.5), plate stretched vs plane (and a plane shifted 0.3: 0.3), cylinder × [2, 1, 1]
 vs 10 × 5 (and 10.3: 0.3), plate twisted at 36 degrees per 20 vs the helicoid (offset 0.2: 0.2; rate × 1.1: far), `DEF_COMPARE_INVALID` by field name.
+
+### 17.4 `deform_lattice`: B-spline lattices and oriented boxes (FR-DEF-13)
+
+Two optional extensions of the lattice law (`lattice.ts`; both absent: the Bernstein, frame-aligned lattice of §5.3, bit-identical results).
+
+- **`splineDegrees` [p, q, r]** (each min(2, degree)..the axis degree): the basis along each axis is a uniform clamped B-spline of that degree on the same (l+1)(m+1)(n+1) control net
+  (knots: p+1 zeros, l−p interior knots at i/(l+1−p), p+1 ones). A control point acts only on the p+1 knot spans around it (local control); points rest on the
+  Greville abscissae g*i = (t*{i+1}+…+t\_{i+p})/p, so zero offsets are the identity and an affine displacement of every point is that affine map (linear precision).
+  p equal to the lattice degree is the Bernstein lattice. `index` and `near` use the Greville positions. Degree 1 on an axis whose lattice degree is larger is refused (`DEF_LATTICE_DEGREE`): the interior knots
+  would be kinks the exact warp would have to split at; p ≥ 2 is C¹.
+- **`orientation` {uAxis, vAxis}** → `axes` (orthonormal rows, frame coordinates): the box is measured in c = A q about the frame origin (`box.min/max` in those
+  coordinates, default `"bounds"` = the body bounds along them); points outside it do not move; the offsets stay displacements in frame coordinates. The Jacobian is
+  I + (∂D/∂c) A. Degenerate axes: `DEF_FRAME_DEGENERATE` (`params.orientation`).
+- **Bounds.** The det J enclosure is the Bernstein-coefficient bound over each knot span (degree 3p−1 per axis), extremes over the spans; the sampled values are those of the
+  span nodes. An oriented Bernstein lattice uses the whole-box bound with the points mapped back from the box.
+- **Native.** The spec gets a 13-number trailer after the offsets (spline degrees, oriented flag, the nine axes entries; absent = Bernstein, aligned). The warp splits faces
+  at the oriented box faces (`Cut` with a direction) as at the aligned ones; interior knot planes are not split (C¹). The sidecar `info` lists `deform-lattice-spline`;
+  `nativeSupportsDeform` requires it when the law has a trailer. Predicted volume: the divergence-theorem chord integral cuts the chord at the oriented box and, for a B-spline
+  lattice, integrates the Gauss pieces between knot planes.
+- **Pack.** `ffd_spline`, `ffd_oriented`, `ffd_spline_oriented` in `point_vectors.json`, from an independent reference (`ffdGeneral`: textbook Cox-de Boor recursion on explicit
+  knots, Greville rest positions, the box mapped by the axes), checked by TS and cargo (images 1e-9, det J 1e-6 away from the box faces).
+
+Tests: `tests/unit/deform/latticeSpline.test.ts` (pack, Greville positions, linear precision, local control support, enclosure, command: local control of the body, oriented
+affine map = 1.2 x the volume, default oriented box, refusals), `server/tests/nativeKernelLattice.test.ts` (exact vs mesh vs closed form on the native kernel, the capability,
+fold on both paths), cargo pack vectors.
+
+### 17.5 `flow_on_surface` from a curved base sheet (FR-DEF-15)
+
+`base: {sheetId, origin?, uDirection?, flipNormal?}` replaces `base.plane` (exactly one; both or neither: `DEF_FLOW_BASE_INVALID`). The body is laid out on a curved `nurbs_surface`:
+a point q is taken in the base sheet frame, q = P_b(x, y) + w N_b(x, y), with x and y arc lengths on the base sheet (from `origin`, along `uDirection` and across it, built exactly
+like the target's) and w the offset along its normal, and goes to P(x, y) + w N(x, y) of the target. The plane base is the special case (x, y, w) = q.
+
+- **Law.** `flowSurface.baseNodes`: P_b and N_b of the base on the SAME (x, y) grid as the target table (one grid refinement checks both). Absent for a plane (every existing
+  node, key and result is unchanged; the plane path is the previous code). `solveBase` (`flowSurface.ts`) inverts the base: Newton on F = P_b + w N_b − q with central-difference
+  columns, seeded from the nearest of a coarse grid of base nodes (√count stride, then one stride around it); the C++ twin `flow_surface_base` runs the same iteration and takes
+  the implicit derivative d(x, y, w) = J⁻¹ dq along the Jet direction, so det J of the exact warp is forward-mode, not differenced.
+- **Frame.** The body and both sheets stay in world coordinates (the frame is the world one): there is no base plane to define one.
+- **Sizing.** The (x, y, w) ranges come from the body's vertices (a stride beyond 800) projected on the base sheet (closest point, then the arc lengths: `Target.coordinatesOf`). A
+  closed x direction takes the complement of the largest gap between the x values modulo the period (`wrappedRange`), so a wrap past a half turn is not folded onto the
+  wrong side. A vertex whose normal line misses the sheet by more than the tolerance (it lies past an edge) is `DEF_FLOW_BASE_OUTSIDE`; a body longer than a closed base or target turn is
+  `DEF_FLOW_OVERLAP`.
+- **Fold check.** The Jacobian pre-check samples the body's vertices and a base-coordinate grid (`baseSurfaceGrid`: two samples per table interval along x up to 801, five levels
+  across, at both extreme offsets), the same points in `analyze_deformation`, not the extent box (a curved base's box is not the body).
+- **Predicted volume.** The existing tetrahedral quadrature of the flow onto a surface applies: its fan from the vertex centroid stays inside the tube of the base for the cases
+  tried, including a 300 degree wrap (test); a dedicated base-coordinate integral was written, found not to change any result, and removed.
+- **Old sidecars.** The sidecar `info` lists `deform-base-sheet`; `nativeSupportsDeform` requires it for a law with `baseNodes`; the spec carries the base table after the target's
+  (`6 nx ny` numbers, optional).
+- **Pack.** `flow_surface_base_plane`, `flow_surface_base_cylinder` (base cylinder R 50 onto a plane and onto a cylinder R 30), closed form from `flowSurfaceBase`; tables of
+  step 0.2 are built by the TS test and the cargo test from formulas; images agree to 2e-5 (Catmull-Rom on a circle) and det J to 2e-4 in TS and, forward-mode, in C++.
+
+Tests: `tests/unit/deform/flowSheetBase.test.ts` (pack, grid, recipe validation, a plate bent on R 50 unrolled onto a flat sheet: extents, volume, det J range 50/51..50/49, predicted
+volume; a 300 degree wrap; a flat base sheet equals `base.plane`; refusals by name; a target fold), `server/tests/nativeKernelFlowSheet.test.ts` (exact vs mesh vs closed form on the
+native kernel, the capability), cargo pack vectors.
+
+### 17.6 Review round on §17.4 and §17.5
+
+- **Oriented box nodes.** The det J bounds, the dense grid and the polish now evaluate the Jacobian at the normalised box coordinates directly (`determinantAtNormalised`):
+  a face node mapped to frame coordinates and back landed about 1e-16 outside an oriented box and read as outside (identity, det J = 1; 195 of 7938 face nodes wrong, the Bernstein
+  enclosure off by up to 11). An oriented box also gives a 1e-12 relative slack to a face in `normalised`. Test: an oriented lattice and its aligned twin (offsets turned by the axes)
+  have equal `determinantBounds` and equal det J at every node of a 9 x 9 x 9 grid of the box, faces included.
+- **B-spline sampled extremes.** A dense grid inside every knot span (7 per axis) and a pattern-search polish from the best points replace the interpolation nodes alone (test: the
+  sampled extremes are within 1e-9 of a 31³ grid of the lattice).
+- **Spline degree 1.** `splineDegrees` accepts min(2, degree)..degree per axis: 1 where the axis degree is 1 (that is the Bernstein degree), 2 or more elsewhere (TS command, recipe,
+  `parse_spec`).
+- **Centre of curvature of a base sheet.** det J of the base map tends to infinity there, never to the floor, so a closed base around its axis tore a body silently. `planSheetBase`
+  now finds the base sheet's focal points (P + N / kappa for both principal curvatures on a 41 x 41 grid, from the second fundamental form) and refuses `DEF_FOLDOVER` when one lies
+  inside the body (ray parity against the source mesh, `containsPoints.ts`). Test: a box straddling the axis of a closed base cylinder (without the check the table build does not
+  terminate in practical time).
+- **Unconverged base solve.** `solveBaseChecked` reports the residual of the last Newton iterate. After the table is built the plan checks that the solve at the sampled vertices has
+  a tiny residual and agrees with the closest-point coordinates (x modulo the period), else `DEF_FLOW_BASE_OUTSIDE`. The warp sets a flag when a base solve ends with a large residual
+  and refuses with the same code instead of returning the last iterate (cargo test: a body running past the table is never built; the test also passes without the flag because the
+  B-spline fit of the clamped table already throws, so the flag itself is not proven by it).

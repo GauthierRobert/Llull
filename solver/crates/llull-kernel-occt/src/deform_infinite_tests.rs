@@ -44,6 +44,17 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                 numbers.extend(base);
                 [header(7.0, params, region), numbers].concat()
             }
+            "flow_surface_base_plane" | "flow_surface_base_cylinder" => {
+                let (step, length, half) = (number(params, "step"), number(params, "length"), number(params, "halfWidth"));
+                let (x0, nx, y0, ny) =
+                    (-0.6, ((length + 1.2) / step).round() as usize + 1, -half, (2.0 * half / step).round() as usize + 1);
+                let target = sheet_nodes(number(params, "targetRadius"), (x0, step, nx), (y0, step, ny));
+                let base = sheet_nodes(number(params, "baseRadius"), (x0, step, nx), (y0, step, ny));
+                let mut numbers = vec![x0, y0, step, step, nx as f64, ny as f64];
+                numbers.extend(target);
+                numbers.extend(base);
+                [header(8.0, params, region), numbers].concat()
+            }
             "scale_nonuniform" => {
                 let f = params["factors"].as_array().unwrap();
                 let (x, y, z) = (f[0].as_f64().unwrap(), f[1].as_f64().unwrap(), f[2].as_f64().unwrap());
@@ -57,8 +68,19 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                 numbers.extend([number(params, "distance"), number(params, "radius"), 0.0]);
                 [header(6.0, params, region), numbers].concat()
             }
-            "ffd" => {
-                let take = |key: &str| params[key].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
+            "ffd" | "ffd_spline" | "ffd_oriented" | "ffd_spline_oriented" => {
+                let take = |key: &str| -> Vec<f64> {
+                    let key = if key == "splineDegrees_or_zero" {
+                        if params.get("splineDegrees").is_some() {
+                            "splineDegrees"
+                        } else {
+                            return vec![0.0; 3];
+                        }
+                    } else {
+                        key
+                    };
+                    params[key].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>()
+                };
                 let (min, max, degrees) = (take("min"), take("max"), take("degrees"));
                 let counts: Vec<usize> = degrees.iter().map(|d| *d as usize + 1).collect();
                 let mut offsets = vec![0.0; 3 * counts[0] * counts[1] * counts[2]];
@@ -69,7 +91,19 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                         offsets[3 * slot + axis] += moved["delta"][axis].as_f64().unwrap();
                     }
                 }
-                [header(5.0, params, region), min, max, degrees, offsets].concat()
+                // the optional trailer: spline degrees (0: Bernstein), an oriented flag, the box axes (rows)
+                let mut trailer = Vec::new();
+                if params.get("splineDegrees").is_some() || params.get("axes").is_some() {
+                    let spline = take("splineDegrees_or_zero");
+                    trailer.extend(spline);
+                    let rows: Vec<f64> = params["axes"]
+                        .as_array()
+                        .map(|rows| rows.iter().flat_map(|row| row.as_array().unwrap().iter().map(|v| v.as_f64().unwrap())).collect())
+                        .unwrap_or_default();
+                    trailer.push(if rows.is_empty() { 0.0 } else { 1.0 });
+                    trailer.extend(if rows.is_empty() { vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0] } else { rows });
+                }
+                [header(5.0, params, region), min, max, degrees, offsets, trailer].concat()
             }
             _ => continue,
         };
@@ -86,7 +120,14 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             for axis in 0..3 {
                 let expected = point["out"][axis].as_f64().unwrap();
                 assert!(
-                    (images[3 * k + axis] - expected).abs() < if name.starts_with("flow_base") { 1e-8 } else { 1e-9 },
+                    (images[3 * k + axis] - expected).abs()
+                        < if name.starts_with("flow_base") {
+                            1e-8
+                        } else if name.starts_with("flow_surface_base") {
+                            2e-5
+                        } else {
+                            1e-9
+                        },
                     "{name} point {k} axis {axis}: {} vs {expected}",
                     images[3 * k + axis]
                 );
@@ -96,12 +137,16 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             let on_kink = !infinite
                 && [number(params, "z0"), number(params, "z1")].iter().any(|z| (point["in"][2].as_f64().unwrap() - z).abs() < 1e-9);
             if let (false, Some(expected)) = (on_kink, point["det"].as_f64()) {
-                assert!((determinants[k] - expected).abs() < 1e-6, "{name} point {k} det {} vs {expected}", determinants[k]);
+                assert!(
+                    (determinants[k] - expected).abs() < if name.starts_with("flow_surface_base") { 2e-4 } else { 1e-6 },
+                    "{name} point {k} det {} vs {expected}",
+                    determinants[k]
+                );
             }
         }
         checked += 1;
     }
-    assert_eq!(checked, 18, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
+    assert_eq!(checked, 23, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
 }
 
 /// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).
@@ -247,4 +292,45 @@ fn a_bent_rod_flowed_from_its_own_arc_onto_a_line_is_straight_again() {
     // bounds [min x y z, max x y z]: a straight rod of radius 5 along the axis, z from the frame origin up
     assert!(straight.bounds[0] > -5.01 && straight.bounds[3] < 5.01, "{:?}", straight.bounds);
     assert!((straight.bounds[5] - straight.bounds[2] - quarter).abs() < 0.02, "{:?}", straight.bounds);
+}
+
+/// Nodes (P then N, i-major) of a sheet on the grid x0 + i hx, y0 + j hy: a cylinder of `radius` about an axis along y through (R, y, 0) with the arc from the origin
+/// in the xz plane (normal out of it), or the plane z = 0 (normal +z) for radius 0.
+fn sheet_nodes(radius: f64, (x0, hx, nx): (f64, f64, usize), (y0, hy, ny): (f64, f64, usize)) -> Vec<f64> {
+    let mut out = Vec::with_capacity(6 * nx * ny);
+    for i in 0..nx {
+        let x = x0 + i as f64 * hx;
+        for j in 0..ny {
+            let y = y0 + j as f64 * hy;
+            if radius == 0.0 {
+                out.extend([x, y, 0.0, 0.0, 0.0, 1.0]);
+            } else {
+                let t = x / radius;
+                out.extend([radius * (1.0 - t.cos()), y, radius * t.sin(), -t.cos(), 0.0, t.sin()]);
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn a_body_past_the_base_table_is_refused_not_warped_with_an_unconverged_solve() {
+    // identity flow on a 6 x 6 plane table of step 1 (x, y in [0, 5]): a body at x in [3, 8] runs past the base table, so the solve cannot converge there
+    let nodes = sheet_nodes(0.0, (0.0, 1.0, 6), (0.0, 1.0, 6));
+    let law = |with_base: bool| {
+        let mut law = json!({ "kind": "flowSurface", "x0": 0.0, "y0": 0.0, "hx": 1.0, "hy": 1.0, "nx": 6, "ny": 6, "nodes": nodes });
+        if with_base {
+            law["baseNodes"] = json!(nodes);
+        }
+        law
+    };
+    let body = entity("box", json!({ "size": [5, 2, 2], "position": [5.5, 2.5, 0] }));
+    // the plane base (no base table) builds it: only the unconverged base solve makes the difference
+    let tree = node(&body, law(true), None, 1e-3, [0.0; 3]);
+    let mut evaluator = crate::recipe::Evaluator::new(16);
+    let built = evaluator.evaluate(&tree);
+    assert!(!matches!(built, Ok(Some(_))), "an unconverged base solve must not build a shape");
+    if let Ok(None) = built {
+        assert_eq!(evaluator.deform_report(&tree).expect("report")["code"], json!("DEF_FLOW_BASE_OUTSIDE"));
+    }
 }

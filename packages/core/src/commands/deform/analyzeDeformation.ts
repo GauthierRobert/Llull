@@ -16,7 +16,8 @@ const FORMULAS: Readonly<Record<string, string>> = {
   twist: 'theta = Theta w(z); (x, y) rotated by theta, z kept; det J = 1',
   taper: "s = 1 + (S - 1) w(z); x' = s x, y' = s y (flat: y kept); det J = s^2 (s when flat)",
   stretch: "z' = start + f (z - start) inside the region, z + (f - 1) (end - start) past it; det J = f inside, 1 outside",
-  lattice: 'X(s, t, u) = sum B_i(s) B_j(t) B_k(u) P_ijk with P_ijk the lattice point displaced by its offset; identity outside the box',
+  lattice:
+    'X(s, t, u) = sum B_i(s) B_j(t) B_k(u) P_ijk with P_ijk the lattice point displaced by its offset, B Bernstein or (splineDegrees) uniform clamped B-spline functions, (s, t, u) the normalised box coordinates (c = A q for an oriented box); identity outside the box',
   point:
     'p + distance dir phi(|p - c| / r), phi = (1 - s^2)^3 (smooth_c2) or 1 - 3 s^2 + 2 s^3 (cubic); det J = 1 + distance dir . grad phi',
   flowCurve:

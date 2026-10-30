@@ -15,6 +15,8 @@ import {
 import { type DeformNode, type Warp, warpOf } from '../../geometry/deform/laws';
 import { toLocal, toWorld } from '../../geometry/deform/frame';
 import { baseFlowGrid } from '../../geometry/deform/baseFlowGrid';
+import { baseSurfaceGrid, solveBase } from '../../geometry/deform/flowSurface';
+import { fromBoxCoordinates } from '../../geometry/deform/lattice';
 import { storedChordError } from '../../geometry/deform/storedError';
 import { predictedVolumeOf } from '../../geometry/deform/predicted';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
@@ -70,6 +72,34 @@ const GRID = 21;
 /** World points of a regular grid over the part of the body extent the law acts in (point push: its support sphere box; lattice: its box; flow: all). */
 function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions: ReadonlyArray<number>): number[] {
   const { law } = node;
+  if (law.kind === 'lattice' && law.axes !== undefined) {
+    const oriented: number[] = [];
+    for (let i = 0; i < GRID; i++)
+      for (let j = 0; j < GRID; j++)
+        for (let k = 0; k < GRID; k++) {
+          const c: Vec3 = [i, j, k].map(
+            (at, a) => (law.box.min[a] as number) + (((law.box.max[a] as number) - (law.box.min[a] as number)) * at) / (GRID - 1),
+          ) as unknown as Vec3;
+          oriented.push(...toWorld(warp.frame, fromBoxCoordinates(law, c)));
+        }
+    return oriented;
+  }
+  if (law.kind === 'flowSurface' && law.baseNodes !== undefined) {
+    const coordinates: Vec3[] = [];
+    for (let i = 0; i + 2 < positions.length; i += 3)
+      coordinates.push(
+        solveBase(law, toLocal(warp.frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number])),
+      );
+    const range = (a: number): [number, number] => [
+      Math.min(...coordinates.map((c) => c[a] as number)),
+      Math.max(...coordinates.map((c) => c[a] as number)),
+    ];
+    const grid = baseSurfaceGrid(law, range(0), range(1), range(2));
+    const world: number[] = [];
+    for (let i = 0; i + 2 < grid.length; i += 3)
+      world.push(...toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
+    return world;
+  }
   if (law.kind === 'flowCurve' && law.base !== undefined) {
     const local: number[] = [];
     for (let i = 0; i + 2 < positions.length; i += 3)
@@ -198,7 +228,8 @@ export function analyzeDeformed(
     path,
     extent,
     range:
-      node.law.kind === 'flowCurve' && node.law.base !== undefined
+      (node.law.kind === 'flowCurve' && node.law.base !== undefined) ||
+      (node.law.kind === 'flowSurface' && node.law.baseNodes !== undefined)
         ? { min: sampling.sampled.min, max: sampling.sampled.max, minAt: sampling.sampled.minAt }
         : jacobianRange(node, extent),
     sampled: sampling.sampled,

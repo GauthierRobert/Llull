@@ -14,6 +14,7 @@ import { toLocal } from './frame';
 import { orientOutward, signedMeshVolume } from '../meshVolume';
 import { type Soup, splitPass } from './meshWarp';
 import { featureEdgeLength } from './influence';
+import { fromBoxCoordinates, toBoxCoordinates } from './lattice';
 import type { PredictedVolume } from './predictedVolume';
 import { localDeterminant } from './laws';
 
@@ -49,6 +50,8 @@ interface Zone {
   readonly chord: (y: number, z: number) => readonly [number, number] | null;
   /** Whether the yz shadow of the zone, grown by `margin`, meets the segment of local points p, q. */
   readonly shadow: (p: Vec3, q: Vec3, margin: number) => boolean;
+  /** x values inside the chord where the map changes polynomial piece (the knot planes of a B-spline lattice): the integral is split there. */
+  readonly breaks?: (y: number, z: number) => readonly number[];
 }
 
 function zoneOf(node: Pick<DeformNode, 'law'>): Zone | null {
@@ -70,6 +73,7 @@ function zoneOf(node: Pick<DeformNode, 'law'>): Zone | null {
   }
   if (law.kind !== 'lattice') return null;
   const { min, max } = law.box;
+  if (law.axes !== undefined || law.splineDegrees !== undefined) return orientedZone(law);
   return {
     chord: (y, z) => (y >= min[1] && y <= max[1] && z >= min[2] && z <= max[2] ? [min[0], max[0]] : null),
     shadow: (p, q, margin) =>
@@ -77,6 +81,49 @@ function zoneOf(node: Pick<DeformNode, 'law'>): Zone | null {
       Math.min(p[1], q[1]) < max[1] + margin &&
       Math.max(p[2], q[2]) > min[2] - margin &&
       Math.min(p[2], q[2]) < max[2] + margin,
+  };
+}
+
+/** The zone of an oriented or B-spline lattice: the line meets the oriented box in a slab interval, the shadow is the yz bounds of its corners (conservative). */
+function orientedZone(law: Extract<DeformNode['law'], { kind: 'lattice' }>): Zone {
+  const { min, max } = law.box;
+  const direction: Vec3 = law.axes === undefined ? [1, 0, 0] : [law.axes[0][0], law.axes[1][0], law.axes[2][0]];
+  const corners: Vec3[] = [];
+  for (const cx of [min[0], max[0]])
+    for (const cy of [min[1], max[1]]) for (const cz of [min[2], max[2]]) corners.push(fromBoxCoordinates(law, [cx, cy, cz]));
+  const yz = [1, 2].map((a) => [Math.min(...corners.map((c) => c[a] as number)), Math.max(...corners.map((c) => c[a] as number))] as const);
+  const [yRange, zRange] = [yz[0] as readonly [number, number], yz[1] as readonly [number, number]];
+  return {
+    chord: (y, z) => {
+      const origin = toBoxCoordinates(law, [0, y, z]);
+      let [lo, hi] = [-Infinity, Infinity];
+      for (const a of [0, 1, 2] as const) {
+        const d = direction[a];
+        if (Math.abs(d) < 1e-14) {
+          if (origin[a] < min[a] || origin[a] > max[a]) return null;
+          continue;
+        }
+        const [t1, t2] = [(min[a] - origin[a]) / d, (max[a] - origin[a]) / d];
+        lo = Math.max(lo, Math.min(t1, t2));
+        hi = Math.min(hi, Math.max(t1, t2));
+      }
+      return hi > lo ? [lo, hi] : null;
+    },
+    shadow: (p, q, margin) =>
+      Math.max(p[1], q[1]) > yRange[0] - margin &&
+      Math.min(p[1], q[1]) < yRange[1] + margin &&
+      Math.max(p[2], q[2]) > zRange[0] - margin &&
+      Math.min(p[2], q[2]) < zRange[1] + margin,
+    breaks: (y, z) => {
+      const origin = toBoxCoordinates(law, [0, y, z]);
+      const out: number[] = [];
+      for (const a of [0, 1, 2] as const) {
+        const spans = law.splineDegrees === undefined ? 1 : law.degrees[a] + 1 - (law.splineDegrees[a] as number);
+        if (Math.abs(direction[a]) < 1e-14) continue;
+        for (let i = 1; i < spans; i++) out.push((min[a] + ((max[a] - min[a]) * i) / spans - origin[a]) / direction[a]);
+      }
+      return out.sort((u, v) => u - v);
+    },
   };
 }
 
@@ -127,12 +174,17 @@ export function predictedLocalVolume(source: MeshData, node: Pick<DeformNode, 'l
     if (!(hi > lo)) return 0;
     const pieces = 4;
     let sum = 0;
-    for (let piece = 0; piece < pieces; piece++) {
-      const a = lo + ((hi - lo) * piece) / pieces;
-      const b = lo + ((hi - lo) * (piece + 1)) / pieces;
-      for (const [node5, weight] of GAUSS5) {
-        const t = (a + b) / 2 + ((b - a) / 2) * node5;
-        sum += weight * ((b - a) / 2) * (localDeterminant(node.law, PLACEHOLDER, [t, y, z]) - 1);
+    // split where the map changes polynomial piece (knot planes), each part in 4 Gauss pieces; one part for a Bernstein lattice
+    const cuts = [lo, ...(zone.breaks?.(y, z) ?? []).filter((t) => t > lo && t < hi), hi];
+    for (let part = 0; part + 1 < cuts.length; part++) {
+      const [from, to] = [cuts[part] as number, cuts[part + 1] as number];
+      for (let piece = 0; piece < pieces; piece++) {
+        const a = from + ((to - from) * piece) / pieces;
+        const b = from + ((to - from) * (piece + 1)) / pieces;
+        for (const [node5, weight] of GAUSS5) {
+          const t = (a + b) / 2 + ((b - a) / 2) * node5;
+          sum += weight * ((b - a) / 2) * (localDeterminant(node.law, PLACEHOLDER, [t, y, z]) - 1);
+        }
       }
     }
     return sum;

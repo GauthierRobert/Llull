@@ -27,6 +27,21 @@ function latticeProblem(law: Record<string, unknown>): string | null {
     return 'lattice: box needs finite min < max on every axis';
   if (!Array.isArray(degrees) || degrees.length !== 3 || !degrees.every((degree) => isIntegerIn(degree, 1, 8)))
     return 'lattice: degrees must be 3 integers in 1..8';
+  const { splineDegrees, axes } = law;
+  if (splineDegrees !== undefined) {
+    if (
+      !Array.isArray(splineDegrees) ||
+      splineDegrees.length !== 3 ||
+      !splineDegrees.every((p, a) => isIntegerIn(p, Math.min(2, (degrees as number[])[a] as number), (degrees as number[])[a] as number))
+    )
+      return 'lattice: splineDegrees must be 3 integers, each from min(2, degree) to the degree of its axis';
+  }
+  if (axes !== undefined) {
+    const rows = Array.isArray(axes) && axes.length === 3 && axes.every(isVec3) ? (axes as unknown as number[][]) : null;
+    const dot = (u: number[], v: number[]): number => u.reduce((sum, c, k) => sum + c * (v[k] as number), 0);
+    if (rows === null || !rows.every((u, i) => rows.every((v, j) => Math.abs(dot(u, v) - (i === j ? 1 : 0)) < 1e-6)))
+      return 'lattice: axes must be 3 orthonormal vectors';
+  }
   if (!Array.isArray(offsets)) return 'lattice: offsets must be an array';
   for (const entry of offsets) {
     if (!isRecord(entry) || !isVec3(entry['delta']) || !Array.isArray(entry['index']) || entry['index'].length !== 3)
@@ -55,13 +70,13 @@ function surfaceFlowProblem(law: Record<string, unknown>): string | null {
   const { nx, ny, nodes } = law;
   if (!isFiniteNumber(law['x0']) || !isFiniteNumber(law['y0']) || !isPositiveNumber(law['hx']) || !isPositiveNumber(law['hy']))
     return 'flowSurface: x0, y0 finite and hx, hy > 0';
-  return isIntegerIn(nx, 2, 1000) &&
-    isIntegerIn(ny, 2, 1000) &&
-    Array.isArray(nodes) &&
-    nodes.length === 6 * (nx as number) * (ny as number) &&
-    nodes.every(isFiniteNumber)
+  const table = (value: unknown): boolean =>
+    Array.isArray(value) && value.length === 6 * (nx as number) * (ny as number) && value.every(isFiniteNumber);
+  if (!(isIntegerIn(nx, 2, 1000) && isIntegerIn(ny, 2, 1000) && table(nodes)))
+    return 'flowSurface: nodes must be 6 finite numbers for each of the nx by ny nodes';
+  return law['baseNodes'] === undefined || table(law['baseNodes'])
     ? null
-    : 'flowSurface: nodes must be 6 finite numbers for each of the nx by ny nodes';
+    : 'flowSurface: baseNodes must be 6 finite numbers for each of the nx by ny nodes';
 }
 
 function rbfProblem(law: Record<string, unknown>): string | null {

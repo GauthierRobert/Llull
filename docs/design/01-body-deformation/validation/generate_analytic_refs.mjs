@@ -11,6 +11,8 @@ import {
   stretch,
   scaleNonUniform,
   flowBaseArc,
+  ffdGeneral,
+  flowSurfaceBase,
   ffd,
   latticeOf,
   pointPush,
@@ -545,6 +547,127 @@ for (const [name, params] of Object.entries({
       out: round(flowBaseArc(p, params)),
       det: round(
         jacobianDet((q) => flowBaseArc(q, params), p),
+        9,
+      ),
+    })),
+  };
+}
+// FFD on a B-spline lattice and / or an oriented box: points inside, near the faces and outside the box
+const tilt = (deg) => {
+  const [c, s] = [Math.cos((deg * PI) / 180), Math.sin((deg * PI) / 180)];
+  // rows: the box axes in frame coordinates (rotation about z by deg, then about the new x by 20 degrees)
+  const [c2, s2] = [Math.cos((20 * PI) / 180), Math.sin((20 * PI) / 180)];
+  return [
+    [c, s, 0],
+    [-s * c2, c * c2, s2],
+    [s * s2, -c * s2, c2],
+  ];
+};
+const general = {
+  ffd_spline: {
+    min: [0, 0, 0],
+    max: [10, 10, 100],
+    degrees: [4, 3, 5],
+    splineDegrees: [3, 2, 3],
+    moved: [
+      { index: [2, 1, 2], delta: [1.5, -1, 2] },
+      { index: [3, 2, 4], delta: [-0.7, 0.9, 1.2] },
+      { index: [0, 0, 5], delta: [0.4, 0.4, 0.4] },
+    ],
+  },
+  ffd_oriented: {
+    min: [-8, -8, -4],
+    max: [8, 8, 70],
+    degrees: [2, 2, 3],
+    axes: tilt(30),
+    moved: [
+      { index: [1, 1, 1], delta: [2, -1, 1.5] },
+      { index: [2, 0, 3], delta: [0.5, 0.5, -1] },
+    ],
+  },
+  ffd_spline_oriented: {
+    min: [-8, -8, -4],
+    max: [8, 8, 70],
+    degrees: [3, 3, 4],
+    splineDegrees: [2, 3, 3],
+    axes: tilt(-40),
+    moved: [
+      { index: [1, 2, 2], delta: [1, 1, 1] },
+      { index: [2, 1, 3], delta: [-1.2, 0.6, 0.3] },
+    ],
+  },
+};
+const ffdPoints = [
+  ...P,
+  [2.5, 7.5, 25],
+  [9, 1, 90],
+  [5, 5, 50],
+  [-3, 4, 12],
+  [1, -2, 33],
+  [4.2, 6.1, 61],
+  [-6, 2, 40],
+  [3, 3, 3],
+  [0.5, -7, 55],
+  [20, 20, 20],
+].map((point) => round(point));
+// points well inside the (oriented) box, given by their fractions of it
+const insidePoints = ({ min, max, axes }) =>
+  [
+    [0.5, 0.5, 0.5],
+    [0.2, 0.7, 0.35],
+    [0.8, 0.3, 0.9],
+    [0.4, 0.4, 0.15],
+    [0.65, 0.55, 0.6],
+    [0.1, 0.9, 0.5],
+    [0.33, 0.12, 0.72],
+    [0.9, 0.85, 0.28],
+  ].map((f) => {
+    const c = f.map((t, a) => min[a] + t * (max[a] - min[a]));
+    return round(axes ? [0, 1, 2].map((k) => axes[0][k] * c[0] + axes[1][k] * c[1] + axes[2][k] * c[2]) : c);
+  });
+const awayFromFaces = (p, { min, max, axes }) => {
+  const c = axes ? axes.map((row) => row[0] * p[0] + row[1] * p[1] + row[2] * p[2]) : p;
+  return c.every((v, a) => (v - min[a]) / (max[a] - min[a]) > 1e-3 && (max[a] - v) / (max[a] - min[a]) > 1e-3);
+};
+for (const [name, params] of Object.entries(general))
+  vectors[name] = {
+    params,
+    points: [...ffdPoints, ...insidePoints(params)].map((p) => ({
+      in: p,
+      out: round(ffdGeneral(p, params)),
+      // det J by central differences: not on a face of the box (the map is the identity outside) or within a step of a knot plane of the box
+      ...(awayFromFaces(p, params)
+        ? {
+            det: round(
+              jacobianDet((q) => ffdGeneral(q, params), p),
+              9,
+            ),
+          }
+        : {}),
+    })),
+  };
+// flow onto a surface from a base sheet: a base cylinder of radius 50 onto a plane and onto a cylinder of radius 30; points by (theta, w, y) so they stay inside the base
+for (const [name, params] of Object.entries({
+  flow_surface_base_plane: { baseRadius: 50, targetRadius: 0, length: 63, halfWidth: 12, step: 0.2 },
+  flow_surface_base_cylinder: { baseRadius: 50, targetRadius: 30, length: 63, halfWidth: 12, step: 0.2 },
+})) {
+  const points = [];
+  for (const theta of [0.1, 0.5, 0.9, 1.1])
+    for (const [w, y] of [
+      [-1.5, -6],
+      [0, 0],
+      [1.8, 7],
+    ]) {
+      const r = params.baseRadius + w;
+      points.push([params.baseRadius - r * Math.cos(theta), y, r * Math.sin(theta)]);
+    }
+  vectors[name] = {
+    params,
+    points: points.map((p) => ({
+      in: round(p),
+      out: round(flowSurfaceBase(p, params)),
+      det: round(
+        jacobianDet((q) => flowSurfaceBase(q, params), p),
         9,
       ),
     })),
