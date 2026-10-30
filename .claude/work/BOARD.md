@@ -143,9 +143,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   overlays (`infinite` regions, `allowMeshFallback`, `baseCurve`, `compareTo` shapes, B-spline lattices / oriented boxes, curved-sheet base for `flow_on_surface` DONE 2026-10-30, §17-§17.6),
   (`preserveAnalytic` VC-23, native `faceQuery.bspline`, VC-22 STEP re-import at 2e-6 DONE 2026-10-30, §17.11-17.15; non-uniform fit grid, mesh-warp time bound, `refined_mass` through `blend_union` DONE 2026-10-30, §17.7-17.10; mass rule by face type measured and not kept, §17.9)
   _Lane 1 + 2 + native_ _deps: —_
-- `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
-  (diagonal / diamond) modeled knurl, knurl as AP242 PMI (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), (multi-face wraps VC-36 and `split_at_silhouette` DONE 2026-10-30, §14.6-14.7; left: chains over cones / spheres / tori, mitred walls, torus / freeform silhouettes), pull walls
-  - draft (VC-25/26), UI render overlays
+- `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14; pull walls + draft VC-25/26 and modeled diagonal / diamond knurl DONE 2026-10-30, §14.8-14.9): freeform (B-spline) face charts + emboss (WIP),
+  knurl as AP242 PMI (WIP) (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), (multi-face wraps VC-36 and `split_at_silhouette` DONE 2026-10-30, §14.6-14.7; left: chains over cones / spheres / tori, mitred walls, torus / freeform silhouettes), pull walls
+  UI render overlays
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
