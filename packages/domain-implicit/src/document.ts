@@ -14,6 +14,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
 import { bodyEntity, triangleBudget } from './bodyCommand';
 import { storeBodyMesh } from './bodyMesh';
+import { compileField } from './compile';
 import { type ImplicitBody, type ImplicitModel, entitySources, implicitOf, inputsOf } from './model';
 import { readsEntity } from './rederive';
 import { realiseField } from './realise';
@@ -340,6 +341,9 @@ export const implicitDocument: DocumentExtension = {
             const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
             return entity?.kind === 'mesh' && entity.asset !== undefined && (port === null || port.manifest(entity.asset.key) === null);
           });
+          const compiled = unheld.length > 0 ? null : compileField(doc, body.field);
+          if (compiled !== null && !compiled.ok && (compiled.code === 'IMP_INPUT_NOT_FOUND' || compiled.code === 'IMP_INPUT_TOO_LARGE'))
+            return `${compiled.code}: implicit body '${body.id}' (field ${body.field}) reads a recorded analysis result that this machine cannot read (${compiled.message}); load the artifact store that holds it and run regenerate_implicit_bodies`;
           return unheld.length > 0
             ? `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) is built from the mesh asset of ${unheld.map((id) => `'${id}'`).join(', ')}, which this machine does not hold; run regenerate_implicit_bodies on a machine that holds the asset`
             : `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`;

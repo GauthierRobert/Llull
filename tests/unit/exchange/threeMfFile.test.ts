@@ -150,4 +150,31 @@ describe('export_3mf toFile', () => {
     const forcedMemory = execute(doc, 'export_3mf', { entityIds: [id], toFile: false }, context(portOf([], [])));
     expect(typeof (forcedMemory.data as { base64?: string }).base64).toBe('string');
   });
+
+  it('answers an I/O error of the host file with EXPORT_SINK_FAILED (document unchanged, partial file discarded), and an open that throws as unavailable', () => {
+    const events: string[] = [];
+    let writes = 0;
+    const failing: ExportFilePort = {
+      open: () => ({
+        write: () => {
+          writes += 1;
+          if (writes === 3) throw new Error('ENOSPC: no space left on device');
+        },
+        patch: () => undefined,
+        close: () => ({ path: '/never' }),
+        abort: () => events.push('abort'),
+      }),
+    };
+    const failed = execute(doc, 'export_3mf', { entityIds: [id], toFile: true }, context(failing));
+    expect(failed.error?.code).toBe('EXPORT_SINK_FAILED');
+    expect(failed.summary).toContain('ENOSPC');
+    expect(failed.document).toBe(doc);
+    expect(events).toEqual(['abort']);
+    const throwing: ExportFilePort = {
+      open: () => {
+        throw new Error('EACCES');
+      },
+    };
+    expect(execute(doc, 'export_3mf', { entityIds: [id], toFile: true }, context(throwing)).error?.code).toBe('EXPORT_SINK_UNAVAILABLE');
+  });
 });

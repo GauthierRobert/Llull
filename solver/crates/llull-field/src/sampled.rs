@@ -21,6 +21,8 @@ pub struct Grid {
     origin: [f64; 3],
     voxel: f64,
     values: Vec<f64>,
+    lo: f64,
+    hi: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -28,11 +30,18 @@ pub struct Tets {
     points: Vec<f64>,
     tets: Vec<usize>,
     values: Vec<f64>,
+    data_lo: f64,
+    data_hi: f64,
     low: [f64; 3],
     high: [f64; 3],
     resolution: usize,
     size: [f64; 3],
     buckets: Vec<Vec<usize>>,
+}
+
+/// Smallest and largest value (NaN-free data: `sampledFieldError` / the loader refuse the rest).
+fn extremes(values: &[f64]) -> (f64, f64) {
+    values.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| (if v < lo { v } else { lo }, if v > hi { v } else { hi }))
 }
 
 fn lerp(a: f64, b: f64, t: f64) -> f64 {
@@ -52,7 +61,8 @@ fn clamp_index(i: f64, n: usize) -> usize {
 
 impl Grid {
     pub fn new(nodes: [usize; 3], origin: [f64; 3], voxel: f64, values: Vec<f64>) -> Grid {
-        Grid { nodes, origin, voxel, values }
+        let (lo, hi) = extremes(&values);
+        Grid { nodes, origin, voxel, values, lo, hi }
     }
 
     fn at(&self, i: usize, j: usize, k: usize) -> f64 {
@@ -74,7 +84,7 @@ impl Grid {
         let c10 = lerp(self.at(ia, jb, ka), self.at(ib, jb, ka), t[0]);
         let c01 = lerp(self.at(ia, ja, kb), self.at(ib, ja, kb), t[0]);
         let c11 = lerp(self.at(ia, jb, kb), self.at(ib, jb, kb), t[0]);
-        lerp(lerp(c00, c10, t[1]), lerp(c01, c11, t[1]), t[2])
+        jmin(jmax(lerp(lerp(c00, c10, t[1]), lerp(c01, c11, t[1]), t[2]), self.lo), self.hi)
     }
 }
 
@@ -99,7 +109,8 @@ impl Tets {
         }
         let resolution = jmax(1.0, jmin(MAX_BUCKETS_PER_AXIS, cbrt(tet_count as f64).ceil())) as usize;
         let size = [0, 1, 2].map(|axis| jmax((high[axis] - low[axis]) / resolution as f64, 1e-300));
-        let mut built = Tets { points, tets, values, low, high, resolution, size, buckets: Vec::new() };
+        let (data_lo, data_hi) = extremes(&values);
+        let mut built = Tets { points, tets, values, data_lo, data_hi, low, high, resolution, size, buckets: Vec::new() };
         let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); resolution * resolution * resolution];
         for t in 0..tet_count {
             let mut lo = [f64::INFINITY; 3];
@@ -158,7 +169,7 @@ impl Tets {
             return None;
         }
         let v = |n: usize| self.values[n / 3];
-        Some(l0 * v(a) + l1 * v(b) + l2 * v(c) + l3 * v(d))
+        Some(jmin(jmax(l0 * v(a) + l1 * v(b) + l2 * v(c) + l3 * v(d), self.data_lo), self.data_hi))
     }
 
     fn nearest_node(&self, x: f64, y: f64, z: f64) -> f64 {
@@ -202,11 +213,10 @@ impl Sampled {
 
     /// Smallest and largest data value (the interval of every sample).
     pub fn range(&self) -> (f64, f64) {
-        let values = match self {
-            Sampled::Grid(g) => &g.values,
-            Sampled::Tets(t) => &t.values,
-        };
-        values.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| (if v < lo { v } else { lo }, if v > hi { v } else { hi }))
+        match self {
+            Sampled::Grid(g) => (g.lo, g.hi),
+            Sampled::Tets(t) => (t.data_lo, t.data_hi),
+        }
     }
 }
 
@@ -234,6 +244,17 @@ mod tests {
         assert_eq!(grid.value(9.0, 9.0, 9.0), values[values.len() - 1]);
         assert!(grid.value(f64::NAN, 0.0, 0.0).is_nan());
         assert_eq!(grid.range(), (values[0], values[values.len() - 1]));
+    }
+
+    #[test]
+    fn a_point_inside_the_face_tolerance_never_leaves_the_data_range() {
+        let tets = Sampled::Tets(Tets::new(
+            vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            vec![0, 1, 2, 3],
+            vec![0.0, 1.0, 1.0, 1.0],
+        ));
+        assert_eq!(tets.value(0.4, 0.3, 0.3 + 5e-10), 1.0);
+        assert_eq!(tets.range(), (0.0, 1.0));
     }
 
     #[test]

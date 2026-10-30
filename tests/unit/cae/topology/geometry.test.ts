@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { FeTopologyArtifact, SymmetryPlane } from '@core/model/topology';
 import type { MeshData } from '@core/model/types';
 import { contourLoops, marchingSquares, nodeGridOfVoxels, simplifyLoop, type Point } from '@cae/topology/contours';
-import { deriveTopologyMesh, symmetrise } from '@cae/topology/derive';
+import { deriveTopologyMesh } from '@cae/topology/derive';
+import { symmetrise } from '@core/model/topologyGrid';
 
 const signedArea = (loop: readonly Point[]): number =>
   loop.reduce((sum, p, i) => sum + (p[0] * (loop[(i + 1) % loop.length]?.[1] ?? 0) - (loop[(i + 1) % loop.length]?.[0] ?? 0) * p[1]), 0) /

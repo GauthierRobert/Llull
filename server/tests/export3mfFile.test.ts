@@ -3,11 +3,23 @@
  * 8 million triangle ceiling of the in-memory path exports without a single string. The slow test prints its time and memory.
  */
 
-import { closeSync, createReadStream, fstatSync, mkdtempSync, openSync, readFileSync, readSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  createReadStream,
+  fstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createInflateRaw } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
@@ -16,7 +28,7 @@ import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { CRC32_INIT, crc32Final, crc32Update } from '@lib/crc32';
 import { unzip } from '@lib/zipRead';
 import { saveDataFiles } from '../src/cli/saveFiles';
-import { exportFilePort } from '../src/exportFiles';
+import { EXPORT_FILE_MAX_AGE_MS, exportFilePort, isHostedExport, reapExportFiles } from '../src/exportFiles';
 
 interface GridMesh {
   readonly positions: Float64Array;
@@ -67,16 +79,27 @@ interface Exported {
 }
 
 describe('export_3mf toFile with the server file port', () => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'llull-export-test-'));
-  const context = (port: MeshAssetPort): ExecutionContext => ({
+  const folders: string[] = [];
+  const freshDirectory = (): string => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'llull-export-test-'));
+    folders.push(directory);
+    return directory;
+  };
+  const context = (port: MeshAssetPort, directory: string): ExecutionContext => ({
     ...defaultContext(),
     meshAssets: port,
     exportFiles: exportFilePort(directory),
   });
+  afterEach(() => {
+    delete process.env['LLULL_EXPORT_DIR'];
+    for (const directory of folders.splice(0)) rmSync(directory, { recursive: true, force: true });
+  });
 
   it('writes a package equal to the in-memory one, and --save moves it to its target', () => {
+    const directory = freshDirectory();
+    process.env['LLULL_EXPORT_DIR'] = directory;
     const { doc, id, port } = assetDoc(gridMesh(401));
-    const ctx = context(port);
+    const ctx = context(port, directory);
     const memory = execute(doc, 'export_3mf', { entityIds: [id], toFile: false }, ctx).data as Exported;
     const hosted = execute(doc, 'export_3mf', { entityIds: [id], toFile: true, name: 'plate' }, ctx);
     const data = hosted.data as Exported;
@@ -87,17 +110,39 @@ describe('export_3mf toFile with the server file port', () => {
     expect(Buffer.compare(written, Buffer.from(memory.base64 as string, 'base64'))).toBe(0);
     expect(data.file?.bytes).toBe(written.length);
     expect(unzip(written).map((entry) => entry.name)).toEqual(['[Content_Types].xml', '_rels/.rels', '3D/3dmodel.model']);
-    const target = path.join(directory, 'saved', 'plate.3mf');
+    const target = path.join(freshDirectory(), 'saved', 'plate.3mf');
     expect(saveDataFiles(hosted.data, target)).toEqual([{ path: target, bytes: written.length }]);
     expect(Buffer.compare(readFileSync(target), written)).toBe(0);
-    rmSync(directory, { recursive: true, force: true });
+    expect(readdirSync(directory)).toEqual([]);
   });
 
   it('names its refusals: a limit leaves no file behind', () => {
+    const directory = freshDirectory();
     const { doc, id, port } = assetDoc(gridMesh(401));
-    const refused = execute(doc, 'export_3mf', { entityIds: [id], toFile: true, maxBytes: 5000 }, context(port));
+    const refused = execute(doc, 'export_3mf', { entityIds: [id], toFile: true, maxBytes: 5000 }, context(port, directory));
     expect(refused.error?.code).toBe('EXPORT_MESH_TOO_LARGE');
     expect(refused.document).toBe(doc);
+    expect(readdirSync(directory)).toEqual([]);
+  });
+
+  it('reaps hosted files older than a day when a new one is opened, and --save moves only files of the export folder', () => {
+    const directory = freshDirectory();
+    const old = path.join(directory, 'old.3mf');
+    const fresh = path.join(directory, 'fresh.3mf');
+    writeFileSync(old, 'x');
+    writeFileSync(fresh, 'y');
+    const longAgo = new Date(Date.now() - 3 * EXPORT_FILE_MAX_AGE_MS);
+    utimesSync(old, longAgo, longAgo);
+    exportFilePort(directory).open('new.3mf')?.abort();
+    expect(readdirSync(directory).sort()).toEqual(['fresh.3mf']);
+    expect(reapExportFiles(directory, Date.now() + 2 * EXPORT_FILE_MAX_AGE_MS)).toBe(1);
+    process.env['LLULL_EXPORT_DIR'] = directory;
+    const elsewhere = path.join(freshDirectory(), 'precious.txt');
+    writeFileSync(elsewhere, 'do not move me');
+    expect(() => saveDataFiles({ file: { path: elsewhere, bytes: 14 } }, path.join(directory, 'target.bin'))).toThrow(/no file payload/);
+    expect(readFileSync(elsewhere, 'utf8')).toBe('do not move me');
+    expect(isHostedExport(path.join(directory, 'a.3mf'), directory)).toBe(true);
+    expect(isHostedExport(path.join(directory, '..', 'a.3mf'), directory)).toBe(false);
   });
 });
 

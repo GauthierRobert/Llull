@@ -10,7 +10,7 @@ import { toMm } from '@core/model/units';
 import { round6, significantNumber } from '@lib/compactNumber';
 import { refuseTopology } from './codes';
 import { COMPLIANCE_RATIO_TARGET, IOU_TARGET, MIN_LOOP_AREA_VOXELS } from './defaults';
-import { symmetrise } from './derive';
+import { symmetrise } from '@core/model/topologyGrid';
 import { findStudy } from './model';
 import { rebuildCompliance } from './rebuildCompliance';
 import { compareRebuild, contoursOf, mm2PerUnit2, placementOf, sectionOf } from './rebuild';

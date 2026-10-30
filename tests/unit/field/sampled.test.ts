@@ -66,6 +66,16 @@ describe('sampled tetrahedra', () => {
   });
 });
 
+describe('the data range bounds every sample', () => {
+  it('a point inside the 1e-9 tolerance of a tetrahedron face never leaves [lo, hi] (the interval of the pruner relies on it)', () => {
+    const single: TetSamples = { kind: 'tets', points: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], tets: [0, 1, 2, 3], values: [0, 1, 1, 1] };
+    const { lo, hi } = prepareSampledField(single);
+    const v = valueAt(single, 0.4, 0.3, 0.3 + 5e-10);
+    expect(v >= lo && v <= hi).toBe(true);
+    expect(v).toBe(1);
+  });
+});
+
 describe('sample_field on the tape', () => {
   it('evaluates, bounds an interval by the data range, differentiates, and is validated', () => {
     const grid = linearGrid();

@@ -216,11 +216,12 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
       const ts = tsFieldEngine.evaluate(program, points, true);
       const nat = engine.evaluate(program, points, true);
       expect(
-        Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
+        nat.values.length === ts.values.length && Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
         op + ' values',
       ).toBe(true);
       expect(
-        Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
+        (nat.gradients?.length ?? 0) === (ts.gradients?.length ?? 0) &&
+          Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
         op + ' gradients',
       ).toBe(true);
       expect(nat.gradients?.length).toBe(points.length);
@@ -345,11 +346,12 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
           const ts = tsFieldEngine.evaluate(program, Float64Array.from(probes), gradient);
           const nat = engine.evaluate(program, Float64Array.from(probes), gradient);
           expect(
-            Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
+            nat.values.length === ts.values.length && Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
             field.kind + ' values',
           ).toBe(true);
           expect(
-            Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
+            (nat.gradients?.length ?? 0) === (ts.gradients?.length ?? 0) &&
+              Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
             field.kind + ' gradients',
           ).toBe(true);
         }
@@ -361,7 +363,9 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
         if (!a.ok || !n.ok) throw new Error('mesh refused');
         expect(a.mesh.indices.length, field.kind).toBeGreaterThan(0);
         expect(a.mesh.indices.every((v, i) => v === n.mesh.indices[i]) && a.mesh.indices.length === n.mesh.indices.length).toBe(true);
-        expect(a.mesh.positions.every((v, i) => Object.is(v, n.mesh.positions[i]))).toBe(true);
+        expect(
+          a.mesh.positions.length === n.mesh.positions.length && a.mesh.positions.every((v, i) => Object.is(v, n.mesh.positions[i])),
+        ).toBe(true);
         expect(n.evaluatedSamples).toBe(a.evaluatedSamples);
       }
     },

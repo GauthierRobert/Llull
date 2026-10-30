@@ -3,17 +3,26 @@
  * analysis (`fea_result`: von Mises stress or displacement magnitude on the tetrahedra of the recorded mesh). The plugin reads document data and the injected artifact
  * port only (L10): `doc.analysis.cases[..]` records and `ExecutionContext.feaArtifacts`, never the `topology` or `cae` plugins.
  * @invariant the sampled data is a pure function of (document records, artifacts), so a changed or re-recorded result gives another program and another content hash (stale body)
- * @invariant the port of the running command is ambient (`withArtifacts`) because the compiler has no context: set by `catalog.ts` around every command, absent elsewhere (then the input is "not found")
+ * @invariant the compiler has no context, so the port is resolved like the field engine: the port of the running command or hook (`withArtifacts`, set by `catalog.ts` and the plugin hooks from `ctx.feaArtifacts`), else the one the host installed (`installArtifactPort`, used by the load-time re-derivation); with neither the input is "not found"
  */
 
 import type { FeArtifactPort, UnitSystem } from '@core/model/analysis';
 import type { GridSamples, SampledField, TetSamples } from '@core/geometry/field/sampled';
+import { axesOfGrid, symmetrise } from '@core/model/topologyGrid';
 import type { FeTopologyArtifact } from '@core/model/topology';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { base64ToUint8Array } from '@lib/base64';
 
 let current: FeArtifactPort | null = null;
+let installed: FeArtifactPort | null = null;
+
+/** The artifact store of this host, read when no running command or hook supplies one (load-time re-derivation of bodies on a recorded result). */
+export function installArtifactPort(port: FeArtifactPort | null): void {
+  installed = port;
+}
+
+const store = (): FeArtifactPort | null => current ?? installed;
 
 /** Runs `body` with `port` as the artifact store the field compiler reads (restored afterwards). */
 export function withArtifacts<T>(port: FeArtifactPort | null | undefined, body: () => T): T {
@@ -39,8 +48,6 @@ const missing = (message: string, ids: readonly string[]): SampledInput => ({ ok
 
 /** Tetrahedra the FE input holds at most (the data travels inside the field program and its content hash). */
 const MAX_TETRAHEDRA = 500_000;
-
-const PLANE_AXES = { XY: [0, 1, 2], XZ: [0, 2, 1], YZ: [1, 2, 0] } as const;
 
 /** The float32 density field of a topology artifact, or null when it is not `nx * ny * nz` values in [0, 1]. */
 function decodeDensity(artifact: FeTopologyArtifact): number[] | null {
@@ -70,13 +77,15 @@ export function topologyDensityInput(doc: CadDocument, studyId: string): Sampled
   const result = study.result;
   if (result === undefined || result.verified === false)
     return missing(`topology study '${studyId}' has no verified result: run the study (topology_solve) and record it first`, [studyId]);
-  const artifact = current?.get(result.fieldHash) ?? null;
+  const artifact = store()?.get(result.fieldHash) ?? null;
   if (artifact === null || artifact.kind !== 'fe_topology')
     return missing(`the artifact store holds no density field ${result.fieldHash.slice(0, 12)} of study '${studyId}'`, [studyId]);
-  const density = decodeDensity(artifact);
-  if (density === null) return missing(`the density field of study '${studyId}' is not nx*ny*nz values in [0, 1]`, [studyId]);
+  const decoded = decodeDensity(artifact);
+  if (decoded === null) return missing(`the density field of study '${studyId}' is not nx*ny*nz values in [0, 1]`, [studyId]);
   const { grid } = artifact;
-  const axes = grid.plane === undefined ? [0, 1, 2] : PLANE_AXES[grid.plane];
+  const symmetry = study.manufacturing.symmetry;
+  const density = Array.from(symmetrise(Float32Array.from(decoded), grid, symmetry));
+  const axes = axesOfGrid(grid);
   const sizes = [grid.nx, grid.ny, grid.nz];
   const worldNodes: [number, number, number] = [1, 1, 1];
   axes.forEach((world, a) => (worldNodes[world] = sizes[a] as number));
@@ -127,8 +136,8 @@ export function feResultInput(doc: CadDocument, caseId: string, quantity: FeQuan
   const meshSummary = analysisCase.meshSummary;
   if (results === undefined || results.verified === false || meshSummary === undefined || meshSummary.verified === false)
     return missing(`analysis '${caseId}' has no verified mesh and results: mesh and solve it first`, [caseId]);
-  const mesh = current?.get(meshSummary.meshHash) ?? null;
-  const set = current?.get(results.resultsHash) ?? null;
+  const mesh = store()?.get(meshSummary.meshHash) ?? null;
+  const set = store()?.get(results.resultsHash) ?? null;
   if (mesh === null || mesh.kind !== 'fe_mesh' || set === null || set.kind !== 'fe_results')
     return missing(`the artifact store holds no mesh and results of analysis '${caseId}'`, [caseId]);
   const { field: fieldName, scalar } = QUANTITIES[quantity];
@@ -174,6 +183,7 @@ export function feResultInput(doc: CadDocument, caseId: string, quantity: FeQuan
       corners.push(at);
     }
   }
-  const tetField: TetSamples = { kind: 'tets', points, tets: corners, values };
+  const source = `fea_result:${meshSummary.meshHash}:${results.resultsHash}:${quantity}:${wanted}:${toDocument}`;
+  const tetField: TetSamples = { kind: 'tets', points, tets: corners, values, source };
   return { ok: true, field: tetField, unverified: set.binding === 'imported-unbound' };
 }

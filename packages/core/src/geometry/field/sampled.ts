@@ -3,7 +3,7 @@
  * node values read by barycentric interpolation. Domain-free: the implicit plugin turns a topology result or an FE result into one of these.
  * @invariant a grid is cell-centred (value i at origin + (i + 1/2) voxel) and holds its edge values outside (nearest); a tetrahedral mesh gives the
  *   barycentric blend inside the first tetrahedron (lowest index) that contains the point and the value of the nearest node (lowest index on a tie) outside
- * @invariant every value is a convex combination of the data, so [lo, hi] (the extreme data values) bounds every sample; a non finite coordinate gives NaN
+ * @invariant every value is a convex combination of the data, clamped to [lo, hi] (the extreme data values: the tolerance of the point location and rounding cannot leave it), so [lo, hi] bounds every sample; a non finite coordinate gives NaN
  * @invariant only + - * / floor and comparisons: the native twin (`solver/crates/llull-field/src/sampled.rs`) is bit-identical
  */
 
@@ -18,6 +18,8 @@ export interface GridSamples {
   readonly voxel: number;
   /** x fastest, then y, then z. */
   readonly values: readonly number[];
+  /** Identity of the data (the content hashes of the artifacts it was read from and the choices that shaped it): the content hash of a body takes it instead of the numbers. */
+  readonly source?: string;
 }
 
 export interface TetSamples {
@@ -28,6 +30,8 @@ export interface TetSamples {
   readonly tets: readonly number[];
   /** One value per node. */
   readonly values: readonly number[];
+  /** Identity of the data, as for a grid. */
+  readonly source?: string;
 }
 
 export type SampledField = GridSamples | TetSamples;
@@ -45,6 +49,11 @@ const MAX_BUCKETS_PER_AXIS = 64;
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clampIndex = (i: number, n: number): number => (i < 0 ? 0 : i > n - 1 ? n - 1 : i);
 
+/** Smallest and largest data value of `field` (no evaluator is built). */
+export function sampledRange(field: SampledField): { lo: number; hi: number } {
+  return extremes(field.values);
+}
+
 function extremes(values: readonly number[]): { lo: number; hi: number } {
   let [lo, hi] = [Infinity, -Infinity];
   for (const v of values) {
@@ -58,8 +67,10 @@ function prepareGrid(grid: GridSamples): SampledEvaluator {
   const [nx, ny, nz] = grid.nodes;
   const { origin, voxel, values } = grid;
   const at = (i: number, j: number, k: number): number => values[i + nx * (j + ny * k)] as number;
+  const { lo, hi } = extremes(values);
   return {
-    ...extremes(values),
+    lo,
+    hi,
     value(x, y, z) {
       const [ux, uy, uz] = [(x - origin[0]) / voxel - 0.5, (y - origin[1]) / voxel - 0.5, (z - origin[2]) / voxel - 0.5];
       if (!(Number.isFinite(ux) && Number.isFinite(uy) && Number.isFinite(uz))) return NaN;
@@ -72,13 +83,14 @@ function prepareGrid(grid: GridSamples): SampledEvaluator {
       const c10 = lerp(at(ia, jb, ka), at(ib, jb, ka), tx);
       const c01 = lerp(at(ia, ja, kb), at(ib, ja, kb), tx);
       const c11 = lerp(at(ia, jb, kb), at(ib, jb, kb), tx);
-      return lerp(lerp(c00, c10, ty), lerp(c01, c11, ty), tz);
+      return Math.min(Math.max(lerp(lerp(c00, c10, ty), lerp(c01, c11, ty), tz), lo), hi);
     },
   };
 }
 
 function prepareTets(mesh: TetSamples): SampledEvaluator {
   const { points, tets, values } = mesh;
+  const { lo: dataLo, hi: dataHi } = extremes(values);
   const tetCount = tets.length / 4;
   const low = [Infinity, Infinity, Infinity];
   const high = [-Infinity, -Infinity, -Infinity];
@@ -144,7 +156,7 @@ function prepareTets(mesh: TetSamples): SampledEvaluator {
     const l0 = 1 - l1 - l2 - l3;
     if (!(l0 >= OUTSIDE_TOLERANCE && l1 >= OUTSIDE_TOLERANCE && l2 >= OUTSIDE_TOLERANCE && l3 >= OUTSIDE_TOLERANCE)) return null;
     const v = (n: number): number => values[n / 3] as number;
-    return l0 * v(a as number) + l1 * v(b as number) + l2 * v(c as number) + l3 * v(d as number);
+    return Math.min(Math.max(l0 * v(a as number) + l1 * v(b as number) + l2 * v(c as number) + l3 * v(d as number), dataLo), dataHi);
   };
   const nearestNode = (x: number, y: number, z: number): number => {
     let [best, bestD] = [0, Infinity];
@@ -156,7 +168,8 @@ function prepareTets(mesh: TetSamples): SampledEvaluator {
     return values[best] as number;
   };
   return {
-    ...extremes(values),
+    lo: dataLo,
+    hi: dataHi,
     value(x, y, z) {
       if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) return NaN;
       const inside =

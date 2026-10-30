@@ -7,7 +7,8 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
-import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { FeArtifactPort } from '@core/model/analysis';
 import type { FeTopologyArtifact } from '@core/model/topology';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { base64ToUint8Array } from '@lib/base64';
@@ -81,9 +82,6 @@ describe('topology_density (VC-IMP-29: a lattice follows the recorded density)',
     const axisPoints: Array<[number, number, number]> = [];
     for (let n = 0; n < 40; n += 1) axisPoints.push([2 + n * 1.4, 4 * (1 + (n % 4)), 0]);
     const values = tsFieldEngine.evaluate(compiled.program, Float64Array.from(axisPoints.flat()), false).values;
-    process.stderr.write(
-      'DBG ' + JSON.stringify(axisPoints.slice(0, 6)) + ' ' + JSON.stringify(Array.from(values.slice(0, 6))) + String.fromCharCode(10),
-    );
     axisPoints.forEach(([x, y], n) => expect(values[n]).toBeCloseTo(-(0.1 + 0.35 * densityAt(solved.artifact, x, y)), 9));
   });
 
@@ -108,10 +106,17 @@ describe('topology_density (VC-IMP-29: a lattice follows the recorded density)',
       ...solved.artifact,
       xPhys: solved.artifact.xPhys.replace(/^.{40}/, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'),
     };
-    const otherPort: FeArtifactPort = { get: (hash) => (hash === solved.hash ? changed : solved.store.port.get(hash)) };
-    const moved = step(body.document, 'regenerate_implicit_bodies', {}, contextWith(otherPort));
+    // a re-run study: another artifact (content-addressed under its own hash) recorded on the same study
+    const rerunHash = solved.store.put(changed);
+    const rerecorded = step(
+      body.document,
+      'record_topology_result',
+      { studyId: model.studyId, fieldHash: rerunHash },
+      contextWith(solved.store.port),
+    );
+    const moved = step(rerecorded.document, 'regenerate_implicit_bodies', {}, contextWith(solved.store.port));
     expect(moved.data).toMatchObject({ rederived: [body.affected[0]] });
-    expect(execute(body.document, 'regenerate_implicit_bodies', {}, contextWith(null)).error?.code).toBe('IMP_INPUT_NOT_FOUND');
+    expect(execute(rerecorded.document, 'regenerate_implicit_bodies', {}, contextWith(null)).error?.code).toBe('IMP_INPUT_NOT_FOUND');
   });
 
   it('refuses by name: unknown study, a study without result, no artifact store, bad parameters', () => {

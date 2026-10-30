@@ -8,7 +8,7 @@
  */
 
 import { FieldBuilder } from '@core/geometry/field/build';
-import { prepareSampledField } from '@core/geometry/field/sampled';
+import { sampledRange } from '@core/geometry/field/sampled';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument } from '@core/model/types';
 import { graphPart, strutsPart, tpmsPart } from './compileLattice';
@@ -118,7 +118,7 @@ class Compiler implements CompileHost {
         : feResultInput(this.doc, node.caseId, node.quantity, node.step);
     if (!input.ok) throw new Failure({ ok: false, code: input.code, message: input.message, ids: [...input.ids, node.id] });
     this.unverified ||= input.unverified;
-    const { lo, hi } = prepareSampledField(input.field);
+    const { lo, hi } = sampledRange(input.field);
     return { reg: this.b.sampledField(input.field, frame.x, frame.y, frame.z), lo, hi };
   }
 

@@ -80,7 +80,10 @@ export function contentHashOf(
 ): string {
   return sha256Hex(
     canonicalJson({
-      program,
+      program:
+        program.sampled === undefined
+          ? program
+          : { ...program, sampled: program.sampled.map((field) => (field.source === undefined ? field : { source: field.source })) },
       grid,
       mesher,
       engineMajor: ENGINE_MAJOR,

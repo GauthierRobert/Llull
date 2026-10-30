@@ -6,6 +6,7 @@ import { implicitCommands } from './catalog';
 import { implicitDocument, implicitGuard } from './document';
 import { levelSetOf } from './levelSet';
 import { bodyOf } from './model';
+import { withArtifacts } from './sampledInputs';
 
 export const implicitPlugin: CadPlugin = {
   name: 'implicit',
@@ -13,8 +14,8 @@ export const implicitPlugin: CadPlugin = {
   commands: implicitCommands,
   guards: [implicitGuard],
   document: implicitDocument,
-  beamLattice: beamLatticeOf,
-  levelSet: levelSetOf,
+  beamLattice: (doc, entityId, ctx) => withArtifacts(ctx?.feaArtifacts, () => beamLatticeOf(doc, entityId, ctx)),
+  levelSet: (doc, entityId, ctx) => withArtifacts(ctx?.feaArtifacts, () => levelSetOf(doc, entityId)),
   stepSkip: (doc, entityId) =>
     bodyOf(doc, entityId) === undefined
       ? null

@@ -1,6 +1,6 @@
 /** export_3mf: read-only export of the 3D bodies as a 3MF package (document returned unchanged, output in `data`). */
 
-import type { CommandResult } from '../types';
+import type { CommandResult, ExportFilePort } from '../types';
 import { currentContext } from '../context';
 import { exportAssetRefusal } from '../mesh/meshCommon';
 import { confirmExportControlled, defineCommand, z } from '../schema';
@@ -93,6 +93,7 @@ function latticeInMm(lattice: BeamLatticeExport, representation: readonly Triang
  *   the in-memory package is one base64 string, so its deflated model part is capped at 375000000 bytes (about 8 million triangles of a gyroid-like mesh); streamed vertices are not welded
  * @invariant toFile (or, when it is not given, a host file sink and over 4000000 streamed triangles) writes the package to a host file in chunks (data.file = { path, bytes }, no base64): the cap is then 4000000000 bytes of archive or 2000000000 bytes of XML (about 20 million triangles)
  * @failure EXPORT_SINK_UNAVAILABLE (coded rejection, document unchanged) -> toFile true and the host has no file sink (or it could not open one)
+ * @failure EXPORT_SINK_FAILED (coded rejection, document unchanged) -> the host file could not be written (I/O error); the partial file is discarded
  * @failure no exportable 3D body -> no-op, no data; 2D and unknown ids skipped
  * @failure EXPORT_MESH_TOO_LARGE (coded rejection, document unchanged) -> the deflated model passes the cap (maxBytes, at most 375000000), or a non-indexed body has over 2000000 triangles
  * @failure EXPORT_MESH_INVALID (coded rejection, document unchanged) -> a streamed mesh has a triangle naming a vertex that does not exist
@@ -234,7 +235,12 @@ export const export3mf = defineCommand({
     let payload: { readonly base64: string } | { readonly file: { readonly path: string; readonly bytes: number } };
     let archiveBytes: number;
     if (toFile) {
-      const writer = sink?.open(fileName) ?? null;
+      let writer: ReturnType<ExportFilePort['open']> = null;
+      try {
+        writer = sink?.open(fileName) ?? null;
+      } catch {
+        writer = null;
+      }
       if (writer === null)
         return codedRejection(
           doc,
@@ -250,8 +256,20 @@ export const export3mf = defineCommand({
         archiveBytes = written.bytes;
         payload = { file: { path: writer.close().path, bytes: archiveBytes } };
       } catch (error) {
-        writer.abort();
-        return refuseError(error);
+        try {
+          writer.abort();
+        } catch {
+          // the partial file stays on the host; the refusal below is the answer
+        }
+        if (error instanceof ThreeMfInvalidMeshError || error instanceof ThreeMfTooLargeError) return refuseError(error);
+        return codedRejection(
+          doc,
+          'export_3mf',
+          'EXPORT_SINK_FAILED',
+          `the host file could not be written: ${error instanceof Error ? error.message : String(error)}`,
+          'check the free space and the permissions of the export folder of the host (LLULL_EXPORT_DIR for the llull CLI), then retry',
+          allIds,
+        );
       }
     } else {
       try {
