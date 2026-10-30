@@ -167,6 +167,7 @@ export interface ItemVariationStore {
   /** The scalar of each region of subtable `data` at `coords`. */
   readonly scalars: (data: number, coords: readonly number[]) => number[];
   /** The interpolated delta of row `inner` of subtable `outer`. */
+  /** The interpolated delta of row `inner` of subtable `outer` (0 for the no-variation index 0xFFFF / 0xFFFF). */
   readonly delta: (outer: number, inner: number, coords: readonly number[]) => number;
 }
 
@@ -233,6 +234,7 @@ export function readItemVariationStore(view: ByteView): ItemVariationStore {
     regionCount: (data) => subtable(data).regionIndexes.length,
     scalars,
     delta: (outer, inner, coords) => {
+      if (outer === 0xffff && inner === 0xffff) return 0;
       const data = subtable(outer);
       if (inner >= data.itemCount)
         throw parseError(`variation store: row ${inner} is outside the ${data.itemCount} rows of subtable ${outer}`);

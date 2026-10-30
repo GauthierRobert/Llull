@@ -1,6 +1,6 @@
 /**
  * Font-wide metrics variations (`MVAR`, 03 WRP, TECHNICAL_SPEC §14.14): value records (a four-letter tag and a row of an ItemVariationStore) whose deltas at the instance are
- * added to the ascender (`hasc`), descender (`hdsc`), line gap (`hlgp`) and cap height (`cpht`) the layout reads, and to the x-height (`xhgt`).
+ * added to the ascender (`hasc`), descender (`hdsc`), line gap (`hlgp`) and cap height (`cpht`) the layout reads; the other tags are read and not used.
  * @invariant at most 256 value records of the declared size, every offset checked by `ByteView`, the store bounded like `HVAR`'s
  * @failure a damaged table -> WRP_FONT_PARSE
  */

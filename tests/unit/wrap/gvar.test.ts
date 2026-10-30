@@ -10,6 +10,7 @@ import { parseFont, validateGlyphs, type ParsedFont } from '@lib/font/font';
 import { readGvar } from '@lib/font/gvar';
 import { ByteView } from '@lib/font/reader';
 import { loopBox, type OutlineLoop } from '@lib/font/outline';
+import { gvarTupleFanFont } from './hostileFonts';
 import type { StoreSpec } from './cff2Builder';
 import { buildGvar, buildAvar2, buildMvar, packDeltas, packPoints } from './gvarBuilder';
 import { BASE_SQUARE, NAMED, SHARED, SQUARE, TRIANGLE, TUPLES, t, variable } from './variableTrueType';
@@ -345,7 +346,6 @@ describe('gvar: hostile tables', () => {
     // 4000 tuple headers claimed, almost no data behind them
     const claimed = patch(base, dataAt + 0, 0x0f, 0xa0);
     expect(refusal(withGvar(claimed), { wght: 900 }).code).toBe('WRP_FONT_PARSE');
-    void dataAt;
   });
 
   it('long offsets (flags bit 0) and a glyph count short of the font are read', () => {
@@ -353,25 +353,93 @@ describe('gvar: hostile tables', () => {
     expectPoints(font, 1, squareAt(1));
   });
 
-  it('delta runs overflowing their count and point runs overflowing theirs are refused', () => {
-    const view = (bytes: number[]): ByteView => new ByteView(new Uint8Array(bytes), 0, bytes.length, 'gvar');
-    const make = (body: number[]): ByteView => {
-      const table = buildGvar({ axisCount: 1, glyphs: [{ tuples: [] }] });
-      void table;
-      return view(body);
-    };
-    void make;
-    // a glyph whose single tuple lists 3 points but carries a delta run of 5
-    const runs = buildGvar({
+  it('a point-number run past its count, and deltas past the own variationDataSize of a tuple (not just the data of the glyph), are refused', () => {
+    const single = (dx: number[], dy: number[], points: number[]): number[] =>
+      buildGvar({ axisCount: 2, shared: SHARED, glyphs: [null, { tuples: [t({ shared: 0, points, dx, dy })] }, null, null, null] });
+    const table = single([1, 2, 3], [4, 5, 6], [0, 1, 2]);
+    const runAt = table.findIndex((byte, k) => byte === 3 && table[k + 1] === 2 && table[k + 2] === 0);
+    expect(runAt).toBeGreaterThan(0);
+    // a run control of 5 (6 points) for a count of 3
+    expect(refusal(withGvar(patch(table, runAt + 1, 5)), { wght: 900 }).message).toContain('point-number run');
+    // the tuple header says one byte less than its body needs: the y deltas run past the tuple's own data
+    const dataStart =
+      (table[16] as number) * 16777216 + (table[17] as number) * 65536 + (table[18] as number) * 256 + (table[19] as number);
+    const sizeAt = dataStart + 4;
+    const size = (table[sizeAt] as number) * 256 + (table[sizeAt + 1] as number);
+    const shortened = patch(table, sizeAt, (size - 1) >> 8, (size - 1) & 0xff);
+    const refused = refusal(withGvar(shortened), { wght: 900 });
+    expect(refused.code).toBe('WRP_FONT_PARSE');
+    expect(refused.message).toContain('runs past');
+    // the honest table reads
+    expect(parseFont(withGvar(table), { wght: 900 }).ok).toBe(true);
+  });
+
+  it('a glyph of 20 000 points with 4095 tuples is refused before any tuple is read, within a time bound (the fan font)', () => {
+    const started = Date.now();
+    const refused = refusal(gvarTupleFanFont(4095), { wght: 900 });
+    expect(refused.code).toBe('WRP_FONT_PARSE');
+    expect(refused.message).toContain('more than');
+    expect(Date.now() - started).toBeLessThan(2000);
+    // fewer tuples is cheap enough to be read
+    expect(parseFont(gvarTupleFanFont(8), { wght: 900 }).ok).toBe(true);
+  });
+
+  it('the no-variation index 0xFFFF / 0xFFFF is a delta of 0, not a damaged table', () => {
+    const store: StoreSpec = {
       axisCount: 2,
-      shared: SHARED,
-      glyphs: [null, { tuples: [t({ shared: 0, points: [0, 1, 2], dx: [], dy: [] })] }, null, null, null],
+      regions: [
+        [
+          [0, 1, 1],
+          [0, 0, 0],
+        ],
+      ],
+      data: [{ regionIndexes: [0], rows: [[50]] }],
+    };
+    const bytes = variable({
+      tables: {
+        MVAR: buildMvar(
+          [
+            ['hasc', 0xffff, 0xffff],
+            ['hdsc', 0, 0],
+          ],
+          store,
+        ),
+      },
     });
-    const tail = runs.slice(0, runs.length);
-    const hostile = [...tail.slice(0, -2), 0x04, 1, 2, 3, 4, 5];
-    expect(parseFont(withGvar(hostile), { wght: 900 }).ok).toBe(true);
-    const parsed = parseFont(withGvar(hostile), { wght: 900 });
-    if (parsed.ok) expect(validateGlyphs(parsed.font).ok).toBe(false);
+    const font = load(bytes, { wght: 900 });
+    expect(font.ascender).toBe(900);
+    expect(font.descender).toBe(-250 + 50);
+  });
+
+  it('the origin of the root glyph stays at phantom point 1: its x delta moves the whole outline the other way, and the advance is pp2 - pp1', () => {
+    // triangle: 3 points, so pp1 = 3 and pp2 = 4; at wght 900 pp1 moves by +10 and pp2 by +30
+    const bytes = variable({
+      gvar: { glyphs: [null, TUPLES[1] as never, { tuples: [t({ shared: 0, points: [3, 4], dx: [10, 30], dy: [0, 0] })] }, null, null] },
+    });
+    const font = load(bytes, { wght: 900 });
+    expectPoints(font, 2, [
+      [-10, 0],
+      [90, 0],
+      [40, 100],
+    ]);
+    expect(font.advance(2)).toBe(720);
+    // the root composite: pp1 is point 2 (after its two components); its delta of +7 moves both components the other way
+    const root = variable({
+      gvar: { glyphs: [null, TUPLES[1] as never, null, { tuples: [t({ shared: 0, points: [2], dx: [7], dy: [0] })] }, null] },
+    });
+    const loops = load(root, { wght: 900 }).outline(3);
+    expect(loopBox(loops[0] as OutlineLoop)).toEqual({ min: [-7, 0], max: [133, 100] });
+    expect(loopBox(loops[1] as OutlineLoop)).toEqual({ min: [193, 0], max: [333, 100] });
+    // a component of a composite keeps its own offsets: only the root's pp1 shifts the composite
+    const composite = variable({
+      gvar: { glyphs: [null, { tuples: [t({ shared: 0, points: [8], dx: [5], dy: [0] })] }, null, null, null] },
+    });
+    expectPoints(
+      load(composite, { wght: 900 }),
+      1,
+      BASE_SQUARE.map(([x, y]) => [x - 5, y] as const),
+    );
+    expect(loopBox(load(composite, { wght: 900 }).outline(3)[1] as OutlineLoop)).toEqual({ min: [200, 0], max: [300, 100] });
   });
 
   it('the work of a font is charged to a shared budget: one tuple of every point of a glyph costs its points', () => {
@@ -384,6 +452,8 @@ describe('gvar: hostile tables', () => {
     expect(gvar.deltas(1, [1, 0], geometry, roomy)).not.toBeNull();
     expect(roomy.remaining).toBeLessThan(1000);
     expect(gvar.deltas(1, [0, 0], geometry)).toBeNull();
+    // a tuple whose scalar is 0 still costs the points of the glyph: four of them exhaust a budget of 40
+    expect(() => gvar.deltas(1, [0, 0], geometry, { remaining: 40 })).toThrow(/more tuple work/);
     expect(gvar.deltas(40, [1, 0], geometry)).toBeNull();
   });
 

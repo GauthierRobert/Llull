@@ -611,7 +611,7 @@ the character codes go through the CFF Standard Encoding to a string id, the cha
 3. CFF2 refuses what CFF2 removed (`endchar`, arithmetic, `dotsection`); a CFF2 charstring has no width and closes its last contour implicitly.
 4. CFF2 outlines and (since §14.14) TrueType `gvar` outlines can be instanced; `avar` version 2 and `MVAR` are read too. A font with neither refuses a non-default `variation` with `WRP_FONT_VARIATION`.
 5. Normalised coordinates are rounded to 2.14 fixed point (as fontTools does), `avar` segment maps apply to the rounded value, region scalars follow the OpenType interpolation algorithm. Advances come from `HVAR`
-   (rounded to a font unit); a CFF2 font without `HVAR` keeps its `hmtx` advances. Cap height stays the default instance's (`OS/2`; `MVAR` is not read).
+   (rounded to a font unit); a CFF2 font without `HVAR` keeps its `hmtx` advances. Cap height follows `MVAR` (`cpht`) when the font has one (§14.14).
 6. Real fonts: none is pinned in the repository (only Fira Sans, TrueType) and the machine is offline, so the references are generated fonts whose outlines follow from the charstring programs (`tests/unit/wrap/variableFonts.ts`).
    Pin a real CFF2 font (for example Source Serif Variable, OFL) in `validation/sources.md` before relying on this reader for production fonts.
 

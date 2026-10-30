@@ -12,7 +12,7 @@ import { regionScalar } from './variation';
 
 const MAX_AXES = 64;
 const MAX_SHARED_TUPLES = 4096;
-/** Tuples x points a single glyph may cost, and the cap on a whole font (shared with the CFF operator budget). */
+/** Tuples x (points + axes) a single glyph may cost; a whole font is bounded by the budget shared with the CFF operators. */
 const MAX_GLYPH_WORK = 2_000_000;
 const PHANTOM_POINTS = 4;
 
@@ -198,23 +198,28 @@ export function readGvar(view: ByteView, numGlyphs: number, axisCount: number): 
       const dx = new Array<number>(pointCount).fill(0);
       const dy = new Array<number>(pointCount).fill(0);
       let any = false;
+      // every tuple costs about the points of the glyph (arrays are filled, inferred, accumulated), also one whose scalar is 0 or that names few points
+      if (tuples.length * (pointCount + axisCount) > MAX_GLYPH_WORK)
+        throw parseError(`gvar: glyph ${glyph} has ${tuples.length} tuples over ${pointCount} points, more than ${MAX_GLYPH_WORK} steps`);
       for (const tuple of tuples) {
+        if (budget !== undefined && (budget.remaining -= pointCount + axisCount) < 0)
+          throw parseError('gvar: more tuple work than a font may cost');
         const scalar = tupleScalar(tuple, shared, coords);
         const body = cursor;
         cursor += tuple.size;
         if (scalar === 0) continue;
+        // the tuple's own variationDataSize bounds what its point numbers and deltas may read
+        const own = data.sub(body, tuple.size, 'gvar tuple data');
         let named = sharedPoints;
-        let position = body;
+        let position = 0;
         if (tuple.privatePoints) {
-          const read = packedPoints(data, position, pointCount);
+          const read = packedPoints(own, position, pointCount);
           named = read.points;
           position = read.next;
         }
         const count = named === null ? pointCount : named.length;
-        if (budget !== undefined && (budget.remaining -= count + 1) < 0) throw parseError('gvar: more tuple work than a font may cost');
-        if (count * tuples.length > MAX_GLYPH_WORK) throw parseError(`gvar: glyph ${glyph} costs more than ${MAX_GLYPH_WORK} delta reads`);
-        const xs = packedDeltas(data, position, count);
-        const ys = packedDeltas(data, xs.next, count);
+        const xs = packedDeltas(own, position, count);
+        const ys = packedDeltas(own, xs.next, count);
         let tx = new Array<number>(pointCount).fill(0);
         let ty = new Array<number>(pointCount).fill(0);
         const touched = new Array<boolean>(pointCount).fill(named === null);

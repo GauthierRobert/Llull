@@ -20,7 +20,7 @@ import { libraryFile } from '../../unit/materials/support';
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
-import { aliasedStoreFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
+import { aliasedStoreFont, gvarTupleFanFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
 import { asBytes, asText, orRefusal, repeated, type HostileReader } from './types';
@@ -129,6 +129,10 @@ export const CORE_READERS: readonly HostileReader[] = [
     covers: ['core/src/lib/font/gvar.ts:readGvar', 'core/src/lib/font/mvar.ts:readMetricDeltas'],
     input: 'bytes',
     build: () => variableTrueTypeWithMetrics(),
+    extra: [
+      { name: 'a glyph of 20 000 points with 4095 size-0 tuples over one run of zero deltas', input: () => gvarTupleFanFont(4095) },
+      { name: 'the same glyph with 90 tuples (just under the per-glyph cap: read within the time budget)', input: () => gvarTupleFanFont(90) },
+    ],
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => {
       const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });

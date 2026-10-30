@@ -123,8 +123,10 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   const hvar = varying ? tables.table('HVAR') : null;
   const advanceDelta = hvar === null || !moved ? null : readAdvanceDeltas(hvar, coords);
   const mvar = varying && moved ? tables.table('MVAR') : null;
-  const metric = (tag: string): number =>
-    Math.round((mvar === null ? new Map<string, number>() : readMetricDeltas(mvar, coords)).get(tag) ?? 0);
+  const metricDeltas = mvar === null ? new Map<string, number>() : readMetricDeltas(mvar, coords);
+  const metric = (tag: string): number => Math.round(metricDeltas.get(tag) ?? 0);
+  const advances = new Map<number, number>();
+  const advanceWork = { remaining: FONT_OPERATOR_BUDGET };
   const source: GlyphSource | null =
     cff === null
       ? {
@@ -176,10 +178,18 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
     names: readNames(tables),
     glyphIndex,
     advance: (glyph) => {
+      const known = advances.get(glyph);
+      if (known !== undefined) return known;
       const base = advanceOf(tables, header, glyph);
-      if (advanceDelta !== null) return Math.round(base + advanceDelta(glyph));
-      // a variable TrueType font without HVAR varies the advance through the phantom points of its glyph variations
-      return source?.variation === undefined ? base : Math.round(base + phantomAdvanceDelta(source, glyph));
+      // a variable TrueType font without HVAR varies the advance through the phantom points of its glyph variations (charged to one budget for the font)
+      const advance =
+        advanceDelta !== null
+          ? Math.round(base + advanceDelta(glyph))
+          : source?.variation === undefined
+            ? base
+            : Math.round(base + phantomAdvanceDelta(source, glyph, advanceWork));
+      advances.set(glyph, advance);
+      return advance;
     },
     axes: space?.axes ?? [],
     instance,
