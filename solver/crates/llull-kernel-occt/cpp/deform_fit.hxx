@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,9 @@ inline double determinant_at(const Warp &warp, const gp_Pnt &p) {
 constexpr int kStartSegments = 4;
 constexpr int kMaxSegmentsPerDirection = 512;
 constexpr long kMaxFitPoints = 400000;
+// The finest grid a direction may use is 1 / kMaxDenominator of its range (the node indices are integers of that denominator; a push narrower than that is below what a double resolves on the face).
+// The 512 above counts the NODES of a direction, not the finest level: a local feature is resolved by a few dozen nodes however fine its level.
+constexpr long kMaxDenominator = 1L << 28;  // long is 32 bits on Windows: den * 2 must stay below 2^31
 // The fit is refined to this share of the tolerance: the interpolation error is not zero-mean, and the integrals (volume, area) of the result stay closer to the closed form.
 constexpr double kOverFit = 0.125;
 
@@ -197,14 +201,20 @@ inline gp_Pnt push_centre(const Warp &warp) {
 }
 
 // The words of a refusal: a push whose support is narrower than the finest grid the fit may use cannot be seen by it.
-inline std::string unresolvable(double support, double length, int intervals) {
-  return "the push radius " + std::to_string(support) + " is below what the fit can resolve on a face or edge of length " + std::to_string(length) +
-         " (it needs " + std::to_string(intervals) + " intervals across the support, the fit uses at most " + std::to_string(kMaxSegmentsPerDirection) +
-         " per direction): the bump would be lost, so the deformation is refused; use a larger radius or split the body";
+inline std::string unresolvable(double support, double length, double finest) {
+  const auto shown = [](double value) {
+    std::ostringstream text;
+    text.precision(6);
+    text << value;
+    return text.str();
+  };
+  return "the push radius " + shown(support) + " is below what the fit can resolve on a face or edge of length " + shown(length) +
+         " (it needs intervals of 1/" + std::to_string(static_cast<long long>(std::ceil(finest))) + " of its length across the support, the finest grid is 1/" +
+         std::to_string(kMaxDenominator) + ", with at most " + std::to_string(kMaxSegmentsPerDirection) + " nodes per direction): the bump would be lost, so the deformation is refused; use a larger radius or split the body";
 }
 
 // Refine `axis` (nodes at fractions of the parameter range) until every interval overlapping [low, high] is at most (high - low) / 6 long. False when that would
-// take more than kMaxSegmentsPerDirection intervals across the range.
+// a grid finer than 1 / kMaxDenominator or more than kMaxSegmentsPerDirection nodes (a local refinement needs a few dozen).
 inline bool refine_across(Axis &axis, double low, double high) {
   const double target = (high - low) / 6.0;
   while (true) {
@@ -216,7 +226,7 @@ inline bool refine_across(Axis &axis, double low, double high) {
         any = true;
       }
     if (!any) return true;
-    if (axis.den * 2 > kMaxSegmentsPerDirection) return false;
+    if (axis.den > kMaxDenominator / 2 || axis.intervals() >= kMaxSegmentsPerDirection) return false;
     axis.refine(split);
   }
 }
@@ -241,11 +251,11 @@ inline bool resolve_support(const Warp &warp, const Handle(Geom_Surface) & base,
   const double fu = (uc - u0) / (u1 - u0), fv = (vc - v0) / (v1 - v0);
   const double length_u = du.Magnitude() * (u1 - u0), length_v = dv.Magnitude() * (v1 - v0);
   if (!refine_across(uaxis, std::max(0.0, fu - half_u), std::min(1.0, fu + half_u))) {
-    note = unresolvable(law.support, length_u, static_cast<int>(std::ceil(6.0 / (2 * half_u))));
+    note = unresolvable(law.support, length_u, 6.0 / (2 * half_u));
     return false;
   }
   if (!refine_across(vaxis, std::max(0.0, fv - half_v), std::min(1.0, fv + half_v))) {
-    note = unresolvable(law.support, length_v, static_cast<int>(std::ceil(6.0 / (2 * half_v))));
+    note = unresolvable(law.support, length_v, 6.0 / (2 * half_v));
     return false;
   }
   return true;
@@ -337,7 +347,7 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
     }
     if (any_u) uaxis.refine(split_u);
     if (any_v) vaxis.refine(split_v);
-    if (uaxis.den > kMaxSegmentsPerDirection || vaxis.den > kMaxSegmentsPerDirection ||
+    if (uaxis.intervals() > kMaxSegmentsPerDirection || vaxis.intervals() > kMaxSegmentsPerDirection || uaxis.den >= kMaxDenominator || vaxis.den >= kMaxDenominator ||
         static_cast<long>(uaxis.intervals() + 1) * (vaxis.intervals() + 1) > kMaxFitPoints) {
       finish();
       return best;
@@ -383,6 +393,11 @@ inline CurveFit fit_curve(const Warp &warp, const Handle(Geom_Curve) & base, dou
       const double centre = (tc - first) / (last - first);
       const double low = std::max(0.0, centre - half), high = std::min(1.0, centre + half), target = (high - low) / 6.0;
       while (true) {
+        if (target < 1e-12) {
+          best.unresolved = true;
+          best.note = unresolvable(law.support, d1.Magnitude() * (last - first), 6.0 / (2 * half));
+          return best;
+        }
         std::vector<double> next;
         bool any = false;
         for (size_t i = 0; i + 1 < fractions.size(); ++i) {
@@ -397,7 +412,7 @@ inline CurveFit fit_curve(const Warp &warp, const Handle(Geom_Curve) & base, dou
         fractions = next;
         if (fractions.size() > static_cast<size_t>(4 * kMaxSegmentsPerDirection)) {
           best.unresolved = true;
-          best.note = unresolvable(law.support, d1.Magnitude() * (last - first), static_cast<int>(std::ceil(6.0 / (2 * half))));
+          best.note = unresolvable(law.support, d1.Magnitude() * (last - first), 6.0 / (2 * half));
           return best;
         }
       }

@@ -11,8 +11,7 @@
 import type { ShapeRecipe, Vec2, Vec3 } from '../../model/types';
 import type { FaceChart } from '../../geometry/chartFrame';
 import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
-import { pointAt2 } from '../../lib/nurbs/curve2d';
-import type { CurveSegment } from '../../model/curve';
+import { fittedOutline, type Outline } from './footprintOutline';
 import { eulerFromAxes } from '../../lib/eulerRotation';
 import { cross3, dot3, normalize3, scale3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
@@ -37,8 +36,6 @@ export const isFreeformFailure = (value: FreeformBuild | FreeformFailure): value
 const MAX_SEGMENTS = 2000;
 const MIN_COSINE = 0.01;
 const COARSE = 33;
-const MAX_SPLIT_DEPTH = 9;
-const CHECKS = [0.25, 0.5, 0.75];
 
 interface Coarse {
   readonly uvs: Vec2[];
@@ -49,111 +46,6 @@ interface Coarse {
 function coarseLoop(chart: FaceChart, pieces: readonly PlaneSegment[]): Coarse {
   const uvs = pieces.flatMap((piece) => sampleSegment(piece, COARSE).slice(0, -1));
   return { uvs, points: uvs.map((uv) => chart.pointAt(uv)) };
-}
-
-/** The (u, v) point at fraction `s` of a piece. */
-function uvOnPiece(piece: PlaneSegment, s: number): Vec2 {
-  if (piece.kind === 'line') return [piece.from[0] + s * (piece.to[0] - piece.from[0]), piece.from[1] + s * (piece.to[1] - piece.from[1])];
-  const from = piece.curve.knots[0] as number;
-  const to = piece.curve.knots[piece.curve.knots.length - 1] as number;
-  return pointAt2(piece.curve, from + s * (to - from));
-}
-
-interface Footprint {
-  readonly segments: CurveSegment<Vec2>[];
-  readonly profile: Vec2[];
-  readonly deviation: number;
-}
-
-const bezierAt = (p: readonly [Vec2, Vec2, Vec2, Vec2], s: number): Vec2 => {
-  const [a, b, c, d] = [(1 - s) ** 3, 3 * s * (1 - s) ** 2, 3 * s * s * (1 - s), s ** 3];
-  return [a * p[0][0] + b * p[1][0] + c * p[2][0] + d * p[3][0], a * p[0][1] + b * p[1][1] + c * p[2][1] + d * p[3][1]];
-};
-
-/**
- * The image of one piece projected along the pull onto the plane (e1, e2), as line and cubic Bezier segments (Hermite ends from the exact tangent), split until the
- * quarter points are within `tolerance` of the image.
- */
-function fitPiece(
-  chart: FaceChart,
-  piece: PlaneSegment,
-  e1: Vec3,
-  e2: Vec3,
-  tolerance: number,
-): { segments: CurveSegment<Vec2>[]; deviation: number } {
-  const image = (s: number): Vec2 => {
-    const p = chart.pointAt(uvOnPiece(piece, s));
-    return [dot3(p, e1), dot3(p, e2)];
-  };
-  const step = 1e-6;
-  const slope = (s: number): Vec2 => {
-    const [lo, hi] = [Math.max(0, s - step), Math.min(1, s + step)];
-    const [a, b] = [image(lo), image(hi)];
-    return [(b[0] - a[0]) / (hi - lo), (b[1] - a[1]) / (hi - lo)];
-  };
-  const segments: CurveSegment<Vec2>[] = [];
-  let deviation = 0;
-  const fit = (s0: number, s1: number, depth: number): void => {
-    const [p0, p1] = [image(s0), image(s1)];
-    const h = s1 - s0;
-    const [t0, t1] = [slope(s0), slope(s1)];
-    const control: readonly [Vec2, Vec2, Vec2, Vec2] = [
-      p0,
-      [p0[0] + (t0[0] * h) / 3, p0[1] + (t0[1] * h) / 3],
-      [p1[0] - (t1[0] * h) / 3, p1[1] - (t1[1] * h) / 3],
-      p1,
-    ];
-    let line = 0;
-    let curve = 0;
-    for (const q of CHECKS) {
-      const truth = image(s0 + q * h);
-      const onCurve = bezierAt(control, q);
-      curve = Math.max(curve, Math.hypot(truth[0] - onCurve[0], truth[1] - onCurve[1]));
-      const chord: Vec2 = [p0[0] + q * (p1[0] - p0[0]), p0[1] + q * (p1[1] - p0[1])];
-      line = Math.max(line, Math.hypot(truth[0] - chord[0], truth[1] - chord[1]));
-    }
-    if (line <= tolerance) {
-      deviation = Math.max(deviation, line);
-      segments.push({ type: 'line', points: [p0, p1] });
-    } else if (curve <= tolerance || depth >= MAX_SPLIT_DEPTH) {
-      deviation = Math.max(deviation, curve);
-      segments.push({ type: 'bezier', points: control });
-    } else {
-      fit(s0, s0 + h / 2, depth + 1);
-      fit(s0 + h / 2, s1, depth + 1);
-    }
-  };
-  fit(0, 1, 0);
-  return { segments, deviation };
-}
-
-const tessellated = (segments: readonly CurveSegment<Vec2>[]): Vec2[] =>
-  segments.flatMap((segment) =>
-    segment.type === 'line'
-      ? [segment.points[0]]
-      : segment.type === 'bezier'
-        ? [0, 0.25, 0.5, 0.75].map((s) => bezierAt(segment.points, s))
-        : [],
-  );
-
-const signedArea = (polygon: readonly Vec2[]): number =>
-  polygon.reduce((sum, p, k) => {
-    const next = polygon[(k + 1) % polygon.length] as Vec2;
-    return sum + p[0] * next[1] - next[0] * p[1];
-  }, 0);
-
-const reversedSegment = (segment: CurveSegment<Vec2>): CurveSegment<Vec2> =>
-  segment.type === 'line'
-    ? { type: 'line', points: [segment.points[1], segment.points[0]] }
-    : ({ type: 'bezier', points: [segment.points[3], segment.points[2], segment.points[1], segment.points[0]] } as CurveSegment<Vec2>);
-
-/** The footprint of one closed loop: counter-clockwise, its segments joined end to start. */
-function footprintOf(chart: FaceChart, pieces: readonly PlaneSegment[], e1: Vec3, e2: Vec3, tolerance: number): Footprint {
-  const fitted = pieces.map((piece) => fitPiece(chart, piece, e1, e2, tolerance));
-  const forward = fitted.flatMap((entry) => entry.segments);
-  const counterClockwise = signedArea(tessellated(forward)) >= 0;
-  const segments = counterClockwise ? forward : [...forward].reverse().map(reversedSegment);
-  return { segments, profile: tessellated(segments), deviation: Math.max(...fitted.map((entry) => entry.deviation)) };
 }
 
 /** Offset-layer / pull-prism relief of the mapped `pieces` (one closed loop per outer boundary and hole, regions in order) on `face` of `source`. */
@@ -203,14 +95,14 @@ export function buildFreeformRecipe(input: {
   const margin = 1e-6 * input.diagonal;
   const extent = depth / cosMin;
   const [low, high] = [Math.min(...heights) - extent - margin, Math.max(...heights) + extent + margin];
-  const prismOf = (outline: Footprint, tag: string): ShapeRecipe => ({
+  const prismOf = (outline: Outline, tag: string): ShapeRecipe => ({
     op: 'place',
     source: {
       op: 'solid',
       entity: newEntity(
         'extrusion',
         `freeform-${tag}`,
-        { profile: outline.profile, depth: high - low, curves: outline.segments },
+        { profile: outline.profile, depth: high - low, ...(outline.segments === undefined ? {} : { curves: outline.segments }) },
         [0, 0, 0],
         '#cccccc',
       ),
@@ -218,8 +110,8 @@ export function buildFreeformRecipe(input: {
     position: scale3(e0, low),
     rotation: eulerFromAxes(e1, e2, e0),
   });
-  const footprints = input.pieces.map((pieces) => footprintOf(chart, pieces, e1, e2, input.tolerance));
-  const segmentCount = footprints.reduce((sum, outline) => sum + outline.segments.length, 0);
+  const footprints = input.pieces.map((pieces) => fittedOutline((uv) => chart.pointAt(uv), pieces, e1, e2, input.tolerance));
+  const segmentCount = footprints.reduce((sum, outline) => sum + (outline.segments?.length ?? outline.profile.length), 0);
   if (segmentCount > MAX_SEGMENTS)
     return {
       code: 'WRP_PARAM_INVALID',
@@ -239,9 +131,9 @@ export function buildFreeformRecipe(input: {
   const tools: ShapeRecipe[] = [];
   let loop = 0;
   for (const [region, holes] of input.holesPerRegion.entries()) {
-    let prism = prismOf(footprints[loop++] as Footprint, `${region}`);
+    let prism = prismOf(footprints[loop++] as Outline, `${region}`);
     for (let hole = 0; hole < holes; hole++)
-      prism = { op: 'boolean', boolean: 'subtract', a: prism, b: prismOf(footprints[loop++] as Footprint, `${region}.${hole}`) };
+      prism = { op: 'boolean', boolean: 'subtract', a: prism, b: prismOf(footprints[loop++] as Outline, `${region}.${hole}`) };
     tools.push({ op: 'boolean', boolean: 'intersect', a: prism, b: layer });
   }
   const combined = tools

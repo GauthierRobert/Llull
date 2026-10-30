@@ -69,6 +69,12 @@ export type MeshOp =
       /** The input is an open surface (or the half of a symmetric one): keep its boundary, the quads follow it. */
       readonly preserveBoundary?: boolean;
     } & WithDeviation)
+  | {
+      /** Harmonic map of the WHOLE input mesh (one disk-topology region) onto the unit square (13.23 / 13.26); the answer is `MeshOpResult.harmonic`, not a mesh. */
+      readonly op: 'harmonic_map';
+      /** Iterations per coordinate a solve may take (default: the budget of the region). */
+      readonly maxIterations?: number;
+    }
   | ({ readonly op: 'segment' } & SegmentParams)
   | ({ readonly op: 'sculpt' } & SculptParams)
   | ({ readonly op: 'shrinkwrap'; readonly target: MeshInput } & ShrinkwrapParams)
@@ -99,6 +105,21 @@ export interface QuadMeshData {
   readonly quads: readonly number[];
 }
 
+/** The harmonic map of a region as the engines answer it (`harmonicMap.ts` shapes it as a `Map`). */
+export interface HarmonicResult {
+  /** The vertices of the region, ascending (vertex numbers of the input mesh), and their parameters (u, v) in the same order: two numbers each. */
+  readonly vertices: ReadonlyArray<number>;
+  readonly uv: ReadonlyArray<number>;
+  readonly weights: 'cotangent' | 'mean_value';
+  readonly flippedFirst: number;
+  readonly collapsedInParameters: number;
+  readonly interiorVertices: number;
+  readonly boundaryVertices: number;
+  readonly cgIterations: number;
+  readonly cgResidual: number;
+  readonly corners: readonly [number, number, number, number];
+}
+
 export interface MeshProvenance {
   readonly engine: 'ts' | 'manifold' | 'native';
   /** Library/version string, e.g. `manifold-3d@3.5.4`. */
@@ -112,6 +133,8 @@ export interface MeshOpResult {
   /** Result triangles, indexed (absent for query ops). */
   readonly mesh?: MeshData;
   readonly analysis?: MeshAnalysis;
+  /** Parameters of the region (op `harmonic_map`, query). */
+  readonly harmonic?: HarmonicResult;
   /** Regions and their primitives (op `segment`, query). */
   readonly segmentation?: Segmentation;
   /** Result of op `quad_remesh` (instead of `mesh`). */
@@ -150,6 +173,9 @@ export const MESH_TS_TRIANGLE_CAP = 200_000;
  * 1,310,720 triangles (TECHNICAL_SPEC 13.15.1), so it is lifted instead of ported. The loop is synchronous: a cut of 4,000,000 triangles holds the event loop for 3 to 10 s.
  */
 export const MESH_TS_CUT_CAP = 4_000_000;
+
+/** Largest region (triangles) the TypeScript engine maps harmonically: the solve runs on the caller's thread, about 1 to 2 s at this size on a badly jittered mesh (13.23.2). */
+export const MESH_TS_HARMONIC_CAP = 25_000;
 
 /** Most points one hull call takes (the cap of the `hull` op, which has no input mesh). */
 export const MESH_HULL_POINT_LIMIT = 1_000_000;

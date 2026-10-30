@@ -1101,7 +1101,7 @@ Cargo (`llull-meshops`): `edge_heap` (order by cost then ids, move both ways, bu
 
 ### 13.10.6 Left
 
-- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (done in 13.16: 13.4 s, not under 10 s).
+- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (13.16: 13.4 s), checks made ahead in parallel (13.27: under 10 s on four or more cores).
 - Fewer cache misses in the collapse loop (it is memory bound): a storage permutation behind the logical ids.
 
 ## 13.11 As built (DES-7c step 6: full-resolution reads through every indirection, 2026-10-27)
@@ -1807,3 +1807,86 @@ A circular parameter domain (a tensor B-spline patch has a square one); the boun
 ### 13.24.4 Left, by name
 
 Stored groups of an asset-backed mesh are checked against the stored triangle count (the group ranges are over the full-resolution asset); `fit_subdivision_to_mesh` fits the cage to the group's triangles only (a cage whose far side has no target is not constrained there); group names are exact (no patterns); a segmentation re-computed with other parameters than the listing call names other regions: pass the same ones.
+
+## 13.25 As built (DES-7c: native job progress on `/live`, UI chip with Cancel, 2026-10-30)
+
+### 13.25.1 What it is
+
+A command that waits for a native mesh job (13.8) now also tells the live subscribers: SSE event `progress` (`@protocol/liveSync` `LiveProgressEvent`): `{ epoch, command, commandId?, state: 'running', op, stage, message, fraction, elapsedMs, etaMs, heartbeat }` for every report of the job (the same reports the NDJSON stream and the CLI `--progress` get, heartbeats included), and `{ epoch, command, commandId?, state: 'ended' }` once the command settles (applied, refused, failed or cancelled). It is NOT a document change: no `seq`, no `stateHash`, nothing in the command log, so `documentHash`, replay and live sync are untouched, and a client that does not listen for the type simply never sees it (an `EventSource` only delivers the types it registered). A command that needs no native job emits nothing (no `ended` either). Order for one command: the `running` events, then its `command` event (when it changed the document), then `ended`.
+
+### 13.25.2 UI
+
+`useLiveDocument` listens for `progress` into `jobProgressStore` (UI-only); the status bar shows one chip per job: `<op>: <message> <percent>% · <n> s left`, a `<progress>` bar once the job reported a share, and a Cancel button for a command THIS client sent. Cancel is the existing path: `postDispatch` now keeps an `AbortController` per command (`commandCancel.ts`); aborting the request makes the server kill the native job nobody else waits for and apply nothing (13.8); the status line says "Command 'x' cancelled." and the run does not fall back to the local engine. A cancel that loses the race (the server applied the command, its `command` event had arrived before the abort) says "Command 'x' finished before the cancel." with changed true. Every event carries a `jobId` (the command id, else `req-<n>` of the server) that keys the chip, so concurrent requests of one command without an id keep their own chips; the chips also clear when the page is closed. A command of the CLI or another client shows the chip without Cancel (no request of this client to abort). The chip also leaves on the command's own `command` event and when the stream drops.
+
+### 13.25.3 Tests
+
+`server/tests/liveProgress.test.ts` (fake native engine: running events with the command id and op, monotone fractions, order running < command < ended, no `seq` / `stateHash` on a progress frame and the command still takes `seq + 1`; a TS command sends exactly `snapshot, command`; a cancelled job sends one `ended` and no `command`), `tests/component/JobProgressChip.test.tsx` (chip text, percent, ETA, bar, ended; no Cancel for a foreign command; Cancel aborts the registered request; the hook fills / clears the store, ignores malformed data and registers no listener for an unknown type; a dropped stream clears; a cancelled dispatch aborts its POST, sets the summary and runs nothing locally). Red-proofs (each disabled in turn): the `ended` publication (2 server tests fail), the clear on the command event, the cancelled-dispatch branch.
+
+### 13.25.4 Left, by name
+
+The CLI does not subscribe to `/live`; a second desktop window of the same backend sees the chip of the first (no Cancel there). `progress` frames of a job that finishes while a client is disconnected are not replayed (the stream reconnects with a snapshot and no chip).
+
+## 13.26 As built (DES-7c: native harmonic map, the 25,000-triangle cap lifted, 2026-10-30)
+
+### 13.26.1 What it is
+
+`harmonic_map` is a mesh-processing op (`MeshOp`, answer `MeshOpResult.harmonic`) with two engines. The TypeScript engine runs `harmonicMap` (13.23) on the whole input mesh, capped at 25,000 triangles (`MESH_TS_HARMONIC_CAP`: the solve holds the caller's thread). The native engine runs `llull-meshops harmonic_map` (`solver/crates/llull-meshops/src/harmonic.rs`, `harmonic_job.rs`), a Rust twin of the same function: the same topology and Euler checks and messages, the same corner choice, the same face-order accumulation of the cotangent / mean-value weights, the same row order of the matrix, the same Jacobi-preconditioned CG and BiCGSTAB with the same stall rule and iteration budget, `Math.hypot` / `Math.atan2` by the V8 twins of `llull-jsmath`. **The parameters are bit-identical to the TypeScript result**, so no tolerance-equivalence is needed; the refusals have the same codes and the same texts (`MESH_FIT_NOT_DISK`, `MESH_FIT_PARAM_FOLDED`, the latter with the JavaScript `toExponential(2)` form of the residual). The Rust loop over the boundary has a defensive refusal (`MESH_FIT_NOT_DISK`, "does not close at vertex v") where the TypeScript one has none; it cannot be reached on either engine, because the pinch and duplicate-edge checks run first and leave the boundary edges a permutation. The job also reports progress from its solvers (every 400 iterations: iterations over the budget, bits unchanged).
+
+`fit_surface_to_mesh` cuts the region out as a mesh of its own (its vertices ascending, renumbered: every ordering rule of the map is unchanged, tested bit for bit against the map of the same region inside the whole mesh; `commands/mesh/harmonicRegion.ts`), asks the installed engines, and maps the vertex numbers back. The cap it applies is the cap of the engines installed (`capabilities().get('harmonic_map')`: 25,000 with the TypeScript engine alone, the native engine's 200,000 with it; the region cap of the command is 200,000 as before). The native job runs through the host's async path (13.8): the event loop stays free, progress streams (stage `harmonic_map`, and over `/live` since 13.25), the request cancels it. The job takes the region mesh and `{ maxIterations? }`; it writes (u, v, 0) per vertex and the ascending vertex numbers (`result_positions.f64`, `result_indices.u32`: not a mesh) and the report; the host checks sizes, ascending order, range, the parameter range, the weight kind, whole counts, a finite residual and four corners that are region vertices before it believes the answer.
+
+### 13.26.2 Measured (win32-x64, release `llull-compute`; a jittered square grid, the hemisphere of an icosphere; the result is identical in every row where both ran)
+
+| region triangles | TypeScript (blocks the thread) | native job (spawn, files, solve) | iterations |
+| --- | --- | --- | --- |
+| 3,200 | 38 ms | 75 ms | 278 |
+| 9,800 | 92 ms | 68 ms | 468 |
+| 16,200 | 100 ms | 85 ms | 586 |
+| 25,088 | 194 ms | 139 ms | 711 |
+| 40,832 (hemisphere) | 279 ms | 169 ms | 598 |
+| 100,352 | 1,198 ms | 547 ms | 1,265 |
+| 199,712 | 4,066 ms | 1,759 ms | 1,794 |
+| 163,584 (hemisphere) | not run | 1,182 ms | 1,189 |
+
+The solve is memory-bound sparse algebra: the native job is only 1.4 to 2.3 times faster than V8 here, so the gain is that nothing blocks (the TypeScript solve held the thread 4 s at 200,000) and that the cap is gone. The break-even is about 7,000 triangles: the native engine is preferred above 8,000 (`HARMONIC_PREFERRED_ABOVE`), caps at 200,000 (`HARMONIC_TRIANGLE_CAP`, the region cap of the command; the 200,000-triangle row ran in 1.8 s with 1,794 iterations, well inside the 4,000 iteration cap).
+
+### 13.26.3 Tests
+
+`server/tests/meshopsNativeHarmonic.test.ts` (native against TypeScript: equal bytes of the whole answer for a jittered grid, a hemisphere and a plain grid; the mean-value fallback on six C-shaped seeds with at least one fallback; the same refusal code and text for a closed sphere, an annulus, two pieces, a duplicated triangle, a starved budget, one triangle), `server/tests/meshFitHarmonicNativeHost.test.ts` (a 40,832-triangle hemisphere through `fit_surface_to_mesh` with the stage reported; a region of 10,240 triangles gives the same surface JSON with and without the native engine; without it the 25000 cap is named in the refusal), `tests/unit/mesh/engineHarmonic.test.ts` (TypeScript op, cap, the region cut-out bit for bit, refusals and failures passed on), Rust unit tests in `harmonic.rs`. Red-proofs (shown by disabling): the BiCGSTAB update order (mean-value fallback test fails), `f64::hypot` instead of the V8 twin (the cotangent and the fallback tests fail).
+
+### 13.26.4 Left, by name
+
+The job reads the region as its own mesh, so a very large mesh with a small region pays only for the region; the command still loads the whole mesh first. A native region over 200,000 triangles is refused by the command's region cap (`MESH_FIT_TOO_LARGE`); the matrix assembly uses hash maps (about a third of the 200,000-triangle time), a sorted-edge assembly would be faster but changes nothing observable.
+
+## 13.27 As built (DES-7c: the `maxDeviation`-only decimation of a million triangles under 10 s, 2026-10-30)
+
+### 13.27.1 Profile (13.16.1 input, win32-x64, 22 logical cores, other lanes running; an instrumented build, so each figure is good to about 10 %)
+
+14.1 s in all (digest `e59decaec9419492`, 521,051 collapses, 1,686,216 pops). The loop: `valid_collapse` 10.0 s (the probe tests 4.5, the queries on the original surface 2.8, link / fold-over / set-up of the check 2.6), applying collapses 1.3, re-queueing 1.9, pops 0.75, `choose` 0.4. Of the 38.5 M probe checks 10.7 M were witness hits; 11.9 M were probes of the surviving vertex (which can never use a witness: all its faces change) and 26.6 M of its neighbours; 4.4 M queries on the original surface, half answered by the hint, half by the tree. The collapse loop is a chain of dependent decisions, but the check of a candidate (10 of the 14 seconds) only READS the mesh, so it is the part to run ahead.
+
+### 13.27.2 What was built (results unchanged, bit for bit; the semantics of the guard are untouched)
+
+1. **Checks made ahead in parallel** (`decimate.rs`: `Spec`, `speculate`, `take_spec`). The check of a candidate is split into a pure function of the state (`collapse_check::check_collapse`: it reads the mesh and the guard and RETURNS what `valid_collapse` used to store, the witnesses, the blamed probe and the hint of the survivor, in an `Outcome` and `Scratch::updates`; `DeviationGuard::apply` stores them). When the popped edge has no check ahead, the 1,024 cheapest edges of the queue (`EdgeHeap::smallest`, best-first over the heap, nothing taken out) that have none are checked in one rayon batch against the frozen state, together with `choose` for their survivor and position. The queue is then consumed exactly as before: pop in queue order, take the check made ahead if it is still good, else check at once (an edge the last collapse just re-queued), store its caches, apply. A refill happens when fewer than 256 checks are left or after 1,024 pops.
+2. **Invalidation** (`touched`, `mark_changed`, `reads_of`). A check reads the faces (corners and positions) of the vertices of the 1-ring of its edge, their probes and the stamps of their faces. A collapse of `removed` into `kept` changes the faces of the vertices next to either and moves `kept`; a vertex whose position a check reads is next to a vertex of that 1-ring, so a check is stale exactly when a collapse touched (`kept`, `removed` and their neighbours after the merge, stamped with the number of the collapse) a vertex of its 1-ring. 1-ring only: the 2-ring that first seemed necessary reduces to it (`kept` is next to every 1-ring vertex that is next to it). A check of a vertex with more than 24 neighbours is not kept. Everything else (witnesses, blames, hints) is a cache of facts that are re-derived, as in 13.16.
+3. **A refused edge keeps its cost** (`refuse(a, b, cost)`): the cost of an edge cannot change until a collapse keeps one of its ends, which empties the lists of that end, so `requeue_around` queues the refused edges at the neighbours again with the cost they were popped with instead of recomputing the optimal position (about 0.5 s).
+4. The checks ahead are only made with at least three threads (`rayon::current_num_threads`); with fewer the loop is the sequential one of 13.16.
+
+### 13.27.3 Measured (the same job, one process, `--test-threads=1`; the counts and the positions digest are asserted by the test)
+
+| | time |
+| - | ---- |
+| before (13.16, same machine, same day) | 14.1 s |
+| 22 threads | 7.8 to 8.1 s |
+| 8 threads | 8.8 s |
+| 4 threads | 10.0 s |
+| 1 thread (`RAYON_NUM_THREADS=1`, checks ahead forced on in that run, to show the bytes) | 18.1 s |
+| `targetTriangles 100000` (no guard) | 4.1 to 4.2 s (4.33 before: the cost kept by refused edges) |
+
+Collapses 521,051, triangles 268,618, rejected 130,994 / 81,376 / 952,795 and the digest are the same on 1, 4, 8 and 22 threads. Where the time goes now (22 threads): the checks ahead about 1.5 s of wall (15 s of thread time: they scale 12 times on 22 logical cores), the 555 k edges that the last collapse re-queued and that are checked at once 1.3 s, the rest is the sequential loop (pops, applying, re-queueing) that stays, about 4 s. The 10 s budget needs four or more cores; with fewer the sequential loop (14 s) runs.
+
+### 13.27.4 Tests and red-proofs
+
+`decimate.rs`: checking ahead (batches of 1,024, 40 and 8) against not checking ahead, with the caches on and off, and on 1, 3 and 8 threads, on 14 spheres and holed grids with every combination of target, boundary rule, feature angle and bound; a 20,480-triangle sphere with batches of 64 (many checks go stale). `tests/perf.rs` asserts the 1.3 M counts, the positions digest and a digest that also folds the indices (`acf101d6ef1f816a`, the same with the checks ahead off). In tests and debug builds every check taken ahead carries a hash of everything it read (the quadrics and lock flags of its ends and, for the 1-ring, the faces, their corners and the position bits of the corners, the probe ids) and the loop asserts it is unchanged when the check is used. Red-proof: **not stamping the neighbours of a collapse** fails all three small tests at once through that assertion (it used to change only the 1.3 M result, digest `a5ec6f7cb8a84b27`). The refill is skipped while four batches are held (the peak is printed by the perf test); the batch variants run on pools of 3 and 8 threads.
+
+### 13.27.5 What stays, and the smallest semantic change that would go further
+
+The sequential loop (4 s) and the 555 k checks of re-queued edges (1.3 s) bound what the parallel checks can give: about 6 s on this machine is the floor of this design. Going below it takes a change of the SEMANTICS: the guard validates every probe of the neighbourhood for every accepted collapse; testing only the probes whose witness the collapse removes would skip about 70 % of them but misses probes whose best face got worse without being the witness, i.e. it can accept a collapse the full guard refuses (a bound overshoot of at most the movement of the collapse). **Decision (coordinator, 2026-10-30): rejected.** `maxDeviation` is a guarantee to the user; an overshoot, even one bounded by the movement of a collapse, breaks it. The guard keeps testing every probe.

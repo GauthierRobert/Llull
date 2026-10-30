@@ -1,4 +1,4 @@
-//! Matrix-free voxel finite elements (RS1 §2 `crates/llull-voxfe`, PHY-17 TR-TOP-03 / 04 / 05).
+//! Matrix-free voxel finite elements (RS1 §2 `crates/llull-voxfe`, PHY-17 TR-TOP-03 / 04 / 05) and the periodic homogenisation of a unit cell ([`homogenize`], the `llull-compute homogenize` job in [`homogenize_job`]).
 //!
 //! - [`grid`]: regular voxel grid numbering (x fastest); inactive voxels are removed from the system, not set to Emin.
 //! - [`ke`]: Q4 plane-stress (top88) and H8 (2×2×2 Gauss) unit element matrices.
@@ -14,6 +14,8 @@
 
 pub mod galerkin;
 pub mod grid;
+pub mod homogenize;
+pub mod homogenize_job;
 pub mod ke;
 pub mod level;
 pub mod multigrid;

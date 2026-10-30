@@ -6,9 +6,9 @@
  */
 
 import type { EmbossParams } from '../../model/wrap';
-import type { ShapeRecipe, Vec2 } from '../../model/types';
+import type { ShapeRecipe, Vec2, Vec3 } from '../../model/types';
 import { selfIntersects } from '../../lib/polygon';
-import { scale3 } from '../../lib/vec3';
+import { dot3, len3, normalize3, scale3 } from '../../lib/vec3';
 import { embossClosedForm, regionsAreas } from '../../geometry/embossVolume';
 import { mapSegment2, sampleSegment, segmentArea, segmentLength, type PlaneSegment } from '../../geometry/planeSegments';
 import { strokeRegions } from '../../geometry/strokeRegions';
@@ -19,6 +19,7 @@ import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import { runEmbossChain } from './embossChain';
 import { buildFreeformRecipe, isFreeformFailure } from './embossFreeform';
+import { buildPullRecipe, isPullFailure, type PullBuild } from './embossPull';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
 import {
@@ -55,6 +56,10 @@ export interface EmbossRequest {
   readonly fitTolerance?: number | undefined;
   readonly toolWidth?: number | undefined;
   readonly grid?: EmbossGrid | undefined;
+  /** `pull`: walls parallel to `pullDirection` (the mould-friendly form), optionally tilted by `draftDeg`; default `normal` (walls normal to the face). */
+  readonly walls?: 'normal' | 'pull' | undefined;
+  readonly pullDirection?: Vec3 | undefined;
+  readonly draftDeg?: number | undefined;
   /** More faces of the chain the sketch runs over (adjacent plane / cylinder faces, unfolded across their shared edges). */
   readonly chain?: readonly FaceRefInput[] | undefined;
 }
@@ -135,6 +140,22 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     return fail('WRP_DEPTH_INVALID', `depth must be a finite number > 0 for ${params.mode} (got ${String(params.depth)})`, ['depth']);
   if (engrave && !(typeof params.toolWidth === 'number' && Number.isFinite(params.toolWidth) && params.toolWidth > 0))
     return fail('WRP_PARAM_INVALID', `mode engrave needs toolWidth > 0 (got ${String(params.toolWidth)})`, ['toolWidth']);
+  const pulled = params.walls === 'pull';
+  if (!pulled && (params.pullDirection !== undefined || params.draftDeg !== undefined))
+    return fail('WRP_PARAM_INVALID', 'pullDirection and draftDeg need walls "pull"', [
+      ...(params.pullDirection !== undefined ? ['pullDirection'] : []),
+      ...(params.draftDeg !== undefined ? ['draftDeg'] : []),
+    ]);
+  if (pulled) {
+    if (params.pullDirection === undefined || !(len3(params.pullDirection) > 1e-12))
+      return fail('WRP_PARAM_INVALID', 'walls "pull" needs a non-zero pullDirection [x, y, z]', ['pullDirection']);
+    if (engrave || scribe || params.grid !== undefined || (params.chain?.length ?? 0) > 0)
+      return fail('WRP_PARAM_INVALID', 'walls "pull" works with emboss and deboss on one face (not scribe, engrave, a grid or a chain)', [
+        'walls',
+      ]);
+    if (params.draftDeg !== undefined && !(params.draftDeg >= 0 && params.draftDeg < 45))
+      return fail('WRP_PARAM_INVALID', `draftDeg must be in [0, 45) degrees (got ${params.draftDeg})`, ['draftDeg']);
+  }
   const resolved = resolveChart(doc, session, params.placement, params.face.faceNear);
   if ('summary' in resolved) return resolved;
   let outlines: SketchOutline[] = [];
@@ -281,8 +302,42 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     // the construction tolerance of the recipe: sewing, and the fit of the pcurves (the kernel builds the 3D edges of a fitted pcurve to about that)
     tolerance: Math.max(SEWING_RATIO * session.diagonal, MIN_FIT_TOLERANCE, tolerance),
   };
-  const recipe: ShapeRecipe = freeform !== null ? freeform.recipe : { op: 'emboss', source: session.source, ...recipeParams };
-  const closed = freeform !== null ? null : embossClosedForm(recipeParams);
+  if (freeform !== null && pulled)
+    return fail(
+      'WRP_PARAM_INVALID',
+      'walls "pull" and draftDeg are built for plane, cylinder, cone and sphere faces: the walls of a freeform relief always run along the outward normal at the anchor',
+      ['walls'],
+    );
+  let pull: PullBuild | null = null;
+  if (pulled) {
+    const built = buildPullRecipe({
+      session,
+      chart,
+      orientation: resolved.orientation,
+      regions: mapped.regions,
+      pieces: mapped.pieces,
+      mode: cutting ? 'deboss' : 'emboss',
+      depth,
+      pull: params.pullDirection as Vec3,
+      draftDeg: params.draftDeg ?? 0,
+      anchorOn: resolved.anchorOn,
+      tolerance,
+    });
+    if (isPullFailure(built)) {
+      const refused = fail(built.code, built.message, [built.path ?? 'pullDirection']);
+      return built.data === undefined ? refused : { ...refused, data: built.data };
+    }
+    pull = built;
+  }
+  const recipe: ShapeRecipe =
+    freeform !== null ? freeform.recipe : (pull?.recipe ?? { op: 'emboss', source: session.source, ...recipeParams });
+  // walls along a pull: the closed form of the layer is known on a plane (A d); on curved faces the volume is the measured one
+  const closed =
+    freeform !== null
+      ? null
+      : pull === null || (session.surface.type === 'plane' && !((params.draftDeg ?? 0) > 0))
+        ? embossClosedForm(recipeParams)
+        : null;
   const reach = debossLimit(session, mapped.pieces, closed?.convex ?? null);
   if (cutting && reach !== null && depth >= reach * (1 - 1e-9)) {
     const result = fail(
@@ -322,19 +377,21 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
   const spanU =
     Math.max(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0]))) -
     Math.min(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0])));
+  const sketchArea = outlines.reduce((sum, outline) => sum + outline.area, 0);
+  const shownArea = closed?.area ?? (freeform !== null ? distortion.areaRatio * sketchArea : pull === null ? areas.uv : sketchArea);
   const instances = params.grid === undefined ? 1 : params.grid.countX * params.grid.countY;
   const data = wrapData(
     doc,
     {
       volumeDelta,
       expectedVolumeDelta: closed?.delta ?? null,
-      regionArea: closed?.area ?? (freeform === null ? areas.uv : distortion.areaRatio * outlines.reduce((sum, o) => sum + o.area, 0)),
+      regionArea: shownArea,
       regions: mapped.regions.length,
       loops: mapped.pieces.length,
       mode: params.mode,
       depth,
       method: chart.method,
-      exact: !engrave && freeform === null,
+      exact: !engrave && freeform === null && !(pull !== null && pull.footprintDeviation > 0),
       faceKind: session.surface.type,
       face: session.face,
       ...(session.faceName !== undefined ? { faceName: session.faceName } : {}),
@@ -348,6 +405,19 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
           }),
       distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined),
       fullWrapChartWidth: chart.fullWrapWidth,
+      walls: pull === null ? 'normal' : 'pull',
+      ...(pull === null
+        ? {}
+        : {
+            pullDirection: params.pullDirection,
+            draftDeg: params.draftDeg ?? 0,
+            obliqueShift:
+              depth * Math.tan(Math.acos(Math.min(1, Math.abs(dot3(normalize3(params.pullDirection as Vec3), resolved.outward))))),
+            footprintSize: pull.footprintSize,
+            footprintDeviation: pull.footprintDeviation,
+            draftedWalls: pull.draftFaces,
+            ...(pull.baseGrowth > 0 ? { draftBaseGrowth: pull.baseGrowth } : {}),
+          }),
       convex: closed?.convex ?? null,
       ...(freeform === null
         ? {}
@@ -394,7 +464,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       volumeDelta === null
         ? 'volume change not measured'
         : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${(closed?.area ?? areas.uv).toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${shownArea.toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }

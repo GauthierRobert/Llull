@@ -212,6 +212,25 @@ impl EdgeHeap {
         Some(Candidate { cost: top.cost, a, b })
     }
 
+    /// The `count` cheapest edges in queue order, without taking them out (best-first over the heap: the same order as popping, up to ties of the cost that the key breaks the same way).
+    pub fn smallest(&self, count: usize, out: &mut Vec<Candidate>) {
+        use std::cmp::Reverse;
+        out.clear();
+        let order = |at: usize| Reverse(((rank(self.nodes[at].cost) + 0.0).to_bits(), self.meta[self.nodes[at].id as usize].edge, at));
+        let mut frontier = std::collections::BinaryHeap::new();
+        if !self.nodes.is_empty() {
+            frontier.push(order(0));
+        }
+        while out.len() < count {
+            let Some(Reverse((_, edge, at))) = frontier.pop() else { break };
+            out.push(Candidate { cost: self.nodes[at].cost, a: (edge >> 32) as u32, b: edge as u32 });
+            let first = at * ARITY + 1;
+            for child in first..(first + ARITY).min(self.nodes.len()) {
+                frontier.push(order(child));
+            }
+        }
+    }
+
     fn restore(&mut self, at: usize) {
         if at > 0 && self.less(self.nodes[at], self.nodes[(at - 1) / ARITY]) {
             self.sift_up(at);

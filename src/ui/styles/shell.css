@@ -690,3 +690,28 @@ button.rail-more__item:hover {
 .project-io__status:empty {
   display: none;
 }
+
+.status-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fg-subtle);
+}
+
+.status-job__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-job__bar {
+  width: 80px;
+  height: 6px;
+}
+
+.status-job__cancel {
+  padding: 0 6px;
+  font: inherit;
+  cursor: pointer;
+}

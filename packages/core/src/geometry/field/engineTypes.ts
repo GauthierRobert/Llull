@@ -136,6 +136,32 @@ type FieldMeasures =
 /** Determinism class of the TS and the native engine (IEEE-754 doubles with V8's libm results). */
 export const DEFAULT_DETERMINISM = 'js-ieee754-v8';
 
+/** A unit cell to homogenise (05 IMP 14.15): `dims` cubic voxels of edge `h`, the partial volume of each voxel as a byte (0..255, x fastest). */
+export interface HomogenizeRequest {
+  readonly dims: readonly [number, number, number];
+  readonly h: number;
+  readonly density: Uint8Array;
+  /** Poisson ratio of the solid (its Young modulus is 1: the result is in units of it). */
+  readonly nu: number;
+  /** Stiffness factor of a void voxel. */
+  readonly eminRatio: number;
+  readonly maxVoxels: number;
+}
+
+export type HomogenizeAnswer =
+  | {
+      readonly ok: true;
+      /** 6 x 6 effective stiffness, row-major, Voigt xx yy zz yz zx xy (engineering shear), in units of the solid's Young modulus. */
+      readonly c: readonly number[];
+      /** CG iterations and final relative residual of the six load cases. */
+      readonly iterations: readonly number[];
+      readonly residuals: readonly number[];
+      readonly converged: boolean;
+      readonly voxels: number;
+      readonly provenance: FieldProvenance;
+    }
+  | { readonly ok: false; readonly code: 'IMP_ENGINE_FAILED' | 'IMP_HOMOGENIZATION_TOO_LARGE'; readonly message: string };
+
 export interface FieldEngine {
   /** 'ts' | 'llull-field'. */
   readonly name: string;
@@ -150,6 +176,8 @@ export interface FieldEngine {
   evaluate(program: FieldProgram, points: Float64Array, withGradient: boolean): FieldSamples;
   mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): FieldMeshResult | FieldRefusal;
   measure(program: FieldProgram, grid: FieldGrid, region: FieldProgram | null, request: MeasureRequest): FieldMeasures | FieldRefusal;
+  /** Periodic numerical homogenisation of a unit cell on the voxel FE solver; absent in an engine that has none (the TypeScript engine). */
+  homogenize?(request: HomogenizeRequest): HomogenizeAnswer;
 }
 
 /** Cells per axis of `grid` (at least 1). */

@@ -12,6 +12,7 @@ import { compileField } from './compile';
 import { latticeCut } from './beamLattice';
 import { bareCell, cellPhaseMeasures, measuredSpecificSurface, nodalSurfaceProgram, strutFacts, tpmsFacts } from './latticeFacts';
 import { lawRange } from './lawRange';
+import { DEFAULT_HOMOGENIZATION_RESOLUTION, homogenizationBlock, homogenizationSummary, homogenizeCell } from './homogenization';
 import { latticeMechanics } from './mechanics';
 import { quadratureVolume } from './measure';
 import { type CellMap, type FieldNode, type StrutsNode, type TpmsNode, fieldOf } from './model';
@@ -157,6 +158,28 @@ export const latticeProperties = defineCommand({
       .describe(
         'Your Gibson-Ashby scaling law; without a coefficient no E is computed. Required for TPMS lattices (no verified law is built in).',
       ),
+    homogenize: z
+      .object({
+        resolution: z
+          .number()
+          .int()
+          .min(8)
+          .max(64)
+          .optional()
+          .describe('Voxels along the smallest cell edge of the finer model (8..64, default 32); the coarser model has half.'),
+        poissonRatio: z
+          .number()
+          .min(-0.99)
+          .max(0.49)
+          .optional()
+          .describe(
+            'Poisson ratio of the solid (default 0.3); its Young modulus is 1, so the result is in units of it (or MPa with baseMaterial).',
+          ),
+      })
+      .optional()
+      .describe(
+        'Periodic numerical homogenisation of the unit cell on the voxel FE solver (opt-in; native engine only): the effective stiffness tensor C_eff, E, G and nu along the cell axes, symmetry checks, and the convergence between two resolutions (data.homogenization). Unverified and reviewRequired. Capped at 64^3 voxels (IMP_HOMOGENIZATION_TOO_LARGE). Expect about 1 s at 16 voxels, 3 s at 32 and tens of seconds at 64 (both models are solved; the command holds the backend while it runs); a result whose two models differ by more than 5 % carries IMP_HOMOGENIZATION_UNCONVERGED.',
+      ),
     resolution: z
       .number()
       .optional()
@@ -164,7 +187,7 @@ export const latticeProperties = defineCommand({
         'Samples along the smallest cell axis (integer 16..128, default 64) for rhoMeasured and the TPMS thickness analysis (nodes are capped by the engine: 2^21 for the TS engine); the error falls roughly with 1/resolution.',
       ),
   }),
-  run: (doc, { id, estimateMechanics, baseMaterial, scaling, resolution = 64 }, ctx): CommandResult => {
+  run: (doc, { id, estimateMechanics, baseMaterial, scaling, homogenize, resolution = 64 }, ctx): CommandResult => {
     const node: FieldNode | undefined = fieldOf(doc, id);
     if (node === undefined || (node.op !== 'struts' && node.op !== 'tpms'))
       return refuseImplicit(
@@ -220,6 +243,18 @@ export const latticeProperties = defineCommand({
             scaling,
           })
         : undefined;
+    let homogenization: Record<string, unknown> | undefined;
+    if (homogenize !== undefined) {
+      if (!cellProgram.ok)
+        return refuseImplicit(doc, 'lattice_properties', cellProgram.code, cellProgram.message, [id], ['params.homogenize']);
+      const options = {
+        resolution: homogenize.resolution ?? DEFAULT_HOMOGENIZATION_RESOLUTION,
+        poissonRatio: homogenize.poissonRatio ?? 0.3,
+      };
+      const solved = homogenizeCell(engine, cellProgram.program, node.origin, node.cellSize, options);
+      if (!solved.ok) return refuseImplicit(doc, 'lattice_properties', solved.code, solved.message, [id], ['params.homogenize']);
+      homogenization = homogenizationBlock(solved, node.cellSize, options, baseMaterial);
+    }
     const data = {
       id,
       op: node.op,
@@ -229,13 +264,14 @@ export const latticeProperties = defineCommand({
       rhoMeasuredNote:
         'solid fraction of one unrotated rectangular cell (rotation and any cell map ignored), low-discrepancy quadrature (struts) / midpoint (TPMS); includes node overlap',
       ...(mechanics === undefined ? {} : { mechanics }),
+      ...(homogenization === undefined ? {} : { homogenization }),
       unit: doc.units,
-      unverified: compiled.unverified || mechanics !== undefined,
+      unverified: compiled.unverified || mechanics !== undefined || homogenization !== undefined,
       provenance: { method: 'closed form + quadrature of one cell', engine: engine.name, voxel, deterministic: true },
     };
     return report(
       doc,
-      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' && typeof described.facts['rho1'] === 'number' ? `, rho1 ${described.facts['rho1'].toPrecision(5)}, ${String(described.facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}.`,
+      `lattice_properties: ${id} (${node.op === 'struts' ? node.cell : node.kind}) rho measured ${rhoMeasured === null ? 'n/a' : rhoMeasured.toPrecision(5)}${node.op === 'struts' && typeof described.facts['rho1'] === 'number' ? `, rho1 ${described.facts['rho1'].toPrecision(5)}, ${String(described.facts['beamsPerCell'])} beams/cell` : ''}${mechanics === undefined ? '' : '; mechanics estimate is computed by llull, not approved: needs a qualified engineer'}${homogenization === undefined ? '' : `; ${homogenizationSummary(homogenization)}`}.`,
       data,
     );
   },

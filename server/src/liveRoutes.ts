@@ -1,6 +1,6 @@
 /**
  * The live document over REST + SSE (protocol: `@protocol/liveSync`).
- *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
+ *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation; `progress` while a command waits for a native job (not a document change).
  *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers).
  *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
@@ -13,12 +13,21 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommandAsync, undo, redo } from './commandBus';
-import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
+import {
+  getLiveDoc,
+  publishLiveProgress,
+  subscribeLive,
+  getLiveSnapshot,
+  liveSubscriberCount,
+  MAX_LIVE_SUBSCRIBERS,
+  liveMaxPerClient,
+} from './liveDocument';
 import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
 import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 
 const KEEPALIVE_MS = 25_000;
+let requestCounter = 0;
 const NDJSON = 'application/x-ndjson';
 
 const ndjsonLine = (value: unknown): string => JSON.stringify(value) + '\n';
@@ -92,18 +101,40 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
       res.setHeader('Cache-Control', 'no-cache');
       res.flushHeaders();
     }
+    // a command that waits for a native job tells the live subscribers (a `progress` event, never a document change) and says so when it settles
+    let reported = false;
+    const who = { command: name, jobId: commandId ?? `req-${(requestCounter += 1)}`, ...(commandId !== undefined ? { commandId } : {}) };
+    const settle = (): void => {
+      if (reported) publishLiveProgress({ ...who, state: 'ended' });
+    };
     applyCommandAsync(name, params ?? {}, {
       ...(commandId !== undefined ? { commandId } : {}),
       source: body.client === 'cli' ? 'cli' : 'rest',
       signal: cancel.signal,
-      ...(streaming ? { onProgress: (event) => void res.write(ndjsonLine({ type: 'progress', ...event })) } : {}),
+      onProgress: (event) => {
+        reported = true;
+        publishLiveProgress({
+          ...who,
+          state: 'running',
+          op: event.op,
+          stage: event.stage,
+          message: event.message,
+          fraction: event.fraction,
+          elapsedMs: event.elapsedMs,
+          etaMs: event.etaMs,
+          heartbeat: event.heartbeat,
+        });
+        if (streaming) res.write(ndjsonLine({ type: 'progress', ...event }));
+      },
     })
       .then((applied) => {
+        settle();
         const answer = isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied);
         if (streaming) res.end(ndjsonLine({ type: 'result', result: answer }));
         else res.status(200).json(answer);
       })
       .catch((error: unknown) => {
+        settle();
         const message = `Command ${name} failed: ${error instanceof Error ? error.message : String(error)}`;
         if (streaming) res.end(ndjsonLine({ type: 'result', result: { summary: message, affected: [], isError: true, changed: false } }));
         else res.status(500).json({ error: message });

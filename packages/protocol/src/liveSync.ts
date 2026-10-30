@@ -34,6 +34,37 @@ export interface LiveCommandEvent {
   readonly commandId?: string;
 }
 
+/**
+ * SSE `progress` event: a native job of a running command reports (`state: 'running'`), and `state: 'ended'` follows when the command settles (applied, refused or
+ * cancelled; after its `command` event when it changed the document). NOT a document change: it carries no `seq`, is not in the command log and has no
+ * `stateHash`, so a client that does not know the event type ignores it and a client that does shows a progress chip. Commands that need no native job send none.
+ */
+export type LiveProgressReport = {
+  readonly command: string;
+  readonly commandId?: string;
+  /** One per request (the sender's command id, else a counter of the server): concurrent jobs of one command name stay apart. */
+  readonly jobId: string;
+} & (
+  | {
+      readonly state: 'running';
+      /** The native job (`quad_remesh`, ...). */
+      readonly op: string;
+      /** Machine name of the stage and the stage in words. */
+      readonly stage: string;
+      readonly message: string;
+      /** Share of the whole job done (0 to 1), null before the job reported one. */
+      readonly fraction: number | null;
+      readonly elapsedMs: number;
+      readonly etaMs: number | null;
+      /** Nothing new from the job: the last report again with the clock advanced. */
+      readonly heartbeat: boolean;
+    }
+  | { readonly state: 'ended' }
+);
+
+/** The `progress` event as the stream carries it: the report with the server epoch. */
+export type LiveProgressEvent = LiveProgressReport & { readonly epoch: string };
+
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */
 export interface LiveSnapshotEvent {
   readonly epoch: string;

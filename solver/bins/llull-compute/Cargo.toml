@@ -13,6 +13,7 @@ llull-protocol = { path = "../../crates/llull-protocol" }
 llull-raster = { path = "../../crates/llull-raster" }
 llull-route = { path = "../../crates/llull-route" }
 llull-topopt = { path = "../../crates/llull-topopt", default-features = false }
+llull-voxfe = { path = "../../crates/llull-voxfe", default-features = false }
 llull-stats = { path = "../../crates/llull-stats" }
 llull-panel = { path = "../../crates/llull-panel" }
 llull-explicit = { path = "../../crates/llull-explicit" }

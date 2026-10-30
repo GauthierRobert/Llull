@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the pull only, scribe is refused (see 14.10); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; pull walls and draft (VC-WRP-25, 26); the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -673,6 +673,55 @@ codes). `split_face_by_curves` learned one thing: the azimuth of a cone apex sam
 
 **Measured (native kernel, `server/tests/nativeSilhouette.test.ts`).** Cylinder r 20 h 40 along x: 2 lines of length 40 at y = +-20, 3 -> 4 faces, the two halves 800 pi each, volume unchanged (1e-5); sphere r 25 along z: the equator 2 pi r = 157.08, two hemispheres of area 2 pi r^2 (1e-4), along (1, 2, 2) an oblique great
 circle (halves 1e-3); cone r 20 h 40 along x: 2 lines of the slant length 44.72, 2 -> 3 faces, halves pi r slant / 2; cylinder along y: the seam reported, one split; replay equal. Stub-port unit tests (`tests/unit/wrap/silhouette.test.ts`) cover the branches. Codes: `WRP_SILHOUETTE_NONE`, `WRP_SILHOUETTE_UNSUPPORTED`.
+
+### 14.8 Pull walls and draft (DES-3c, VC-WRP-25 / 26)
+
+`emboss_on_face` takes `walls: "normal" | "pull"`, `pullDirection` and `draftDeg` (files `embossPull.ts`, `embossRun.ts`). No native code changed: the relief is a recipe of exact booleans.
+
+**Construction.** The regions are mapped as usual. For `walls: "pull"` each region's boundary is projected along the pull into the plane perpendicular to it and extruded as a prism over a window along the pull that holds the whole layer; holes are subtracted prisms.
+Without a draft the outline of each loop is the exact image of the (u, v) pieces fitted by lines and cubic Beziers (Hermite ends from the exact tangent) split until the quarter points are within `fitTolerance` of it (`footprintOutline.ts`; the `extrusion` keeps the exact `curves`), so a circle is a handful of
+Bezier faces, not a 480-sided polygon (a polygon prism made one native boolean 28 s long). With a draft the walls must be planar (the native draft reads planes, cylinders, cones), so the outline is a polygon whose chord sag against the image is within max(`fitTolerance`, 3e-5 x the diagonal) (at most 256 samples per piece).
+`data.footprintDeviation` reports the largest deviation, `data.footprintSize` the segments or vertices, and `data.exact` is false when the deviation is above 0 (a rectangle on a plane stays exact). The layer is the exact offset of the face: `emboss = source + (prism x (offset(source, +d) - source))`,
+`deboss = source - (prism x (source - offset(source, -d)))` where `offset` is the kernel's `moveFaces offset` (plane along its outward normal; cylinder, cone, sphere away from the axis / centre, sign by the face orientation). The walls are parallel to the pull and the relief follows the offset surface (VC-25: shell of r to r + d, not a prism of constant height).
+The window is [lowest surface height over the parameter box of the region - margin, highest + d / cos(min)] along the feature axis (the side of the face opposite to the feature is never reached, so the far side of a cylinder is not embossed).
+
+**Draft.** A draft tilts the walls of each footprint prism with the native `BRepOffsetAPI_DraftAngle` (`faceOp draft`, one node per prism, all planar walls parallel to the pull) about the HINGE: the plane through the placement anchor PERPENDICULAR TO THE PULL (it is the tangent plane of the face only when the pull is the face normal).
+The relief narrows by tan(draft) per unit of height away from the hinge (an emboss toward its top, a deboss toward its floor); hole prisms widen, so wall thickness follows. Drafting the prism, not the finished relief, was the fix for a native refusal of drafted deboss walls on a cylinder (the hinge touched the cavity edge); the window is padded by the widening.
+Consequences that are reported, not hidden: the footprint on the hinge plane is the nominal one, but the drafted prism is wider by reach x tan(draft) at the layer farthest from the hinge, so on a cylinder side or round a sphere pole the base of the relief grows past the sketch region (about 0.47 per side in VC-26);
+`data.draftBaseGrowth` is that growth. An oblique pull (angle phi to the face normal) shifts the relief sideways by up to d tan(phi) against the sketch footprint (`data.obliqueShift`). On a plane perpendicular to the pull the closed form is
+V = w l d - (w + l) t d^2 + 4/3 t^2 d^3 for a rectangle (t = d tan(draft)); on a curved face the volume is the measured one. The widened or sheared base is not re-checked against the trimmed face (a relief close to the face edge can leave it: the kernel's validity check is the guard).
+
+**Refusals.** `WRP_PULL_PARALLEL`: the pull is within 0.57 degrees of the face at a sample (`|n . pull| < 0.01`), or crosses the face one way on part of the region and the other way on another (the face folds over the region); path `pullDirection`. `WRP_DRAFT_CLOSES`: the draft moves the walls on the two sides of the thinnest place of the region
+(2 x reach x tan(draft), the reach being the height from the hinge to the far end of the prism) together; the THINNEST PLACE is the smallest distance between a boundary point and a boundary edge that is not local to it (`thinnestPlace`: the position along the loop is farther than 1.5 times that distance, so the neighbours of a sampled curve do not count,
+another loop always does, and a point near a tip sharper than 67 degrees is not counted: a draft eats a tip, it closes a stroke). A 20 x 1 bar turned 45 degrees closes at a few degrees at depth 5, not at the 14.8 of its bounding box; a drafted "O" closes by the thickness of its stroke. Path `draftDeg`, `data.maxDraftDeg` and `data.thinnestPlace`.
+`WRP_PARAM_INVALID`: walls pull without a pull, draft or pull without walls pull, draft outside [0, 45), a torus face, scribe, engrave, a grid or a chain, more than 4000 footprint segments or vertices (path `profileIds`). `data.expectedVolumeDelta` is A d on a plane without draft, null elsewhere (the numbers below are the references).
+`check_wrap` counts pull reliefs (they have no `emboss` node, the step `emboss_on_face walls pull` identifies them): `checked.reliefsWithoutClosedForm`, `volumesSkipped`, a `WRP_CHECK_VOLUME_SKIPPED` warning, and the direction of the volume change (emboss adds, deboss removes) is checked (`WRP_CHECK_VOLUME_MISMATCH` otherwise).
+
+**Measured (native kernel, `server/tests/nativeWrapWalls.test.ts`).** VC-25 pull +x on r 20, rectangle 30 x 10: 149.562188 / 298.308583 / 593.663229 at depth 0.5 / 1 / 2 (1e-6), against 151.875 / 307.5 / 630 for normal walls. VC-26 plane 20 x 10, d 2, 10 degrees, emboss and deboss: 379.1724 (1e-6); cylinder, 5 degrees, d 1:
+318.0674 emboss (kernel 1e-4), 277.2150 deboss (1e-6); an oblique pull on a plane keeps A d; a sphere with the pull along its axis and a geodesic disc follows the cap integral (1e-3); text with a hole adds A d (1e-3); every refusal by code; replay equal. Fake-kernel unit tests: `tests/unit/wrap/walls.test.ts`.
+
+### 14.9 Modeled diagonal and diamond knurl (DES-3c, FR-WRP-32)
+
+`add_knurl model: "geometry"` now cuts the helical patterns (files `knurlHelix.ts`, `knurlHelixCut.ts`; new param `hand`). No native code changed.
+
+**Construction.** One groove is one exact screw sweep: the helix is the native spine (`helixCurve`, radius r, lead 2 pi r / tan(beta), beta the helix angle from the axis), the section is a V in the plane through the axis (`orientation axis_plane`, as the rectangular wire of `add_coil`).
+The V is defined NORMAL to the groove (`toothAngleDeg` is the included angle of a knurling wheel, default 90): in the plane through the axis its half-width slope is k = tan(gamma) / sin(beta) per unit of depth (gamma half the tooth angle). The grooves of a hand start at N equally spaced angles
+(`HelixDefinition.startAngle`, N = round(pi d / pitch) so the teeth close), a diamond adds the grooves of the other hand; all are united (balanced) and subtracted in one boolean. The sweeps run from the face start minus the flank reach to the face end plus it, past free end caps.
+Default depth leaves a land of 10 % of the pitch: h = 0.9 p cos(beta) / (2 tan gamma) (circumferential land = p - 2 h tan(gamma) / cos(beta), at least 2 % of p: `WRP_KNURL_DEPTH_INVALID`).
+
+**Volume.** A screw motion keeps the transverse section, so one groove removes exactly A_t x (axial length), A_t = 2 tan(gamma) / (r cos beta) x [(r^3 - (r - h)^3) / 3 - (r - h)(r^2 - (r - h)^2) / 2] (-> h^2 tan(gamma) / cos(beta) for a shallow groove), independent of the lead:
+a diagonal removes N x length x A_t (closed form, data.expectedVolumeDelta). A diamond removes the union of the two hand families, integrated numerically over 1200 transverse sections of 360 polar samples (`expectedMethod`); the command checks the measured volume against it
+(1e-4 diagonal, 1e-3 diamond; measured 1e-5) and refuses otherwise.
+
+**Bounds and refusals (performance is the binding one).** An exact groove is a B-spline sweep intersected with the cylinder: measured on the native kernel (this machine, loaded) on a face 40 long of radius 20: 12.6 s for 6 grooves at 30 degrees, 30 s for 12, 45 s for 8 at 45 degrees, and more than 120 s for 8 grooves at 60 degrees with a 60 degree V,
+against the 60 s limit of one kernel call. The cost per groove grows with the helix angle, i.e. with the turns of a groove along the face (face length / lead): seconds = grooves x 2.3 x (turns / 0.184)^1.8 (13.8 / 27.6 / 49.6 / 133 for those four runs, about 10 % apart; the flank slope was not varied on its own: V angles between 60 and 90 degrees were measured).
+A cut whose estimate exceeds 50 s is refused with `WRP_KNURL_TOO_MANY_GROOVES` and the estimate in the message (`data.estimatedKernelSeconds` and `data.turns` report it on success); a kernel that times out nevertheless refuses with `WRP_KERNEL_BUILD_FAILED` ("could not cut N helical grooves"). Helical grooves run past both ends of the face, so each
+end must be a free cap: a shoulder or ring-shaped neighbour is `WRP_KNURL_GEOMETRY_UNSUPPORTED` (use the straight pattern or the cosmetic model). Real knurls (60 and more teeth at 30 degrees: 140 s and more) therefore stay cosmetic or straight until the kernel intersects such sweeps faster; a native tool that builds the knurled surface directly is the way forward.
+`depth` is measured from the OUTER radius of the face: the apex of the V lies `depth` below the surface, the tool rises half the depth above it. `hand` is refused (`WRP_PARAM_INVALID`) with any pattern but diagonal or with the cosmetic model.
+`check_wrap` counts a geometry knurl like a pull relief (skipped volume warning, removal direction checked).
+
+**Measured (native kernel, `server/tests/nativeKnurlHelix.test.ts`).** d 40, h 40, 8 teeth, helix 30 degrees, 90 degree V: removed volume = 8 x 40 x A_t (1e-5), lead 2 pi r / tan(beta), land 10 % of the pitch; the left hand removes the same as the right; a diamond of 4 teeth x 2 hands at 45 degrees lies between
+one and two single families and within 1e-3 of the numeric union (1.4e-5 measured: 4 teeth x 2 hands, depth 2, 15 s); refusals by code; replay equal. Fake-kernel unit tests: `tests/unit/wrap/knurlHelix.test.ts`.
 
 ### 14.10 Freeform (B-spline) face charts and emboss (DES-3c, VC-WRP-27)
 

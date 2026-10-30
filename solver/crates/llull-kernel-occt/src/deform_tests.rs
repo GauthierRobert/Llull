@@ -500,17 +500,44 @@ fn preserve_analytic_does_not_erase_a_small_local_push_between_the_nodes() {
 
 #[test]
 fn a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost() {
-    // review of 17.14: a radius of 1e-3 on a 1000 mm face is between the samples of any grid the fit may use; it used to come back as a flat face
+    // review of 17.14: a radius of 1e-9 on a 1000 mm face is below the finest grid (1 / 2^30 of its length): it used to come back as a flat face
     let slab = entity("box", json!({ "size": [1000, 1000, 10], "position": [0, 0, 5] }));
-    let push = json!({ "kind": "point", "center": [123.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 1e-3, "falloff": "smooth_c2" });
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 1e-9, "falloff": "smooth_c2" });
     let report = refusal(&node(&slab, push, None, 1e-4, [0.0; 3]));
     assert_eq!(report["code"], json!("DEF_APPROX_TOLERANCE"), "{report}");
     assert!(report["message"].as_str().unwrap().contains("below what the fit can resolve"), "{report}");
+    // a radius of 1e-3 on the same face is resolvable (a few dozen nodes, 22 halvings): it builds
+    let fine = json!({ "kind": "point", "center": [123.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 1e-3, "falloff": "smooth_c2" });
+    assert!(build(&node(&slab, fine, None, 1e-4, [0.0; 3])).report["ok"] == json!(true));
     // a radius the fit can resolve on a 200 mm face builds, and carries the bump's volume
     let small = entity("box", json!({ "size": [200, 200, 10], "position": [0, 0, 5] }));
     let wide = json!({ "kind": "point", "center": [23.4, 56.7, 10], "direction": [0, 0, 1], "distance": 0.5, "radius": 10, "falloff": "smooth_c2" });
     let built = build(&node(&small, wide, None, 1e-3, [0.0; 3]));
     assert!(built.volume > 200.0 * 200.0 * 10.0 + 10.0, "the bump adds volume: {}", built.volume);
+}
+
+/// A radius-2 push on a 1000 mm face is a LOCAL refinement: about log2(1000 / 2) halvings near the support, a few dozen nodes per direction, not the 1500 intervals a uniform grid would need.
+/// The bump is read off the face (height d phi(s) at three distances from the centre, flat beyond the support), not from a volume: the adaptive mass rule integrates a 2 mm bump on a
+/// 1000 mm B-spline face as flat (area and volume unchanged to 1e-9 although the face carries it), a finding recorded in 17.16.
+#[test]
+fn a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump() {
+    let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 3], "direction": [0, 0, 1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let tree = node(&slab, push, None, 1e-3, [0.0; 3]);
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(&tree).expect("evaluates").expect("the warp builds");
+    let report = evaluator.deform_report(&tree).unwrap();
+    assert!(report["fitPoints"].as_f64().unwrap() < 20000.0, "{report}");
+    // the top face (the plane's parameters start at the corner: u = x + 500, v = y + 500)
+    let top = |dx: f64, dy: f64| {
+        let evaluated = crate::queries::evaluate_face(&shape, 5.0, &[623.4 + dx, 556.7 + dy]).unwrap();
+        evaluated[0]["point"][2].as_f64().unwrap()
+    };
+    for (dx, expected) in
+        [(0.0, 0.5), (1.0, 0.5 * (1.0_f64 - 0.25).powi(3)), (1.9, 0.5 * (1.0_f64 - 0.9025).powi(3)), (2.5, 0.0), (30.0, 0.0)]
+    {
+        assert!((top(dx, 0.0) - 3.0 - expected).abs() < 2e-3, "height at {dx} from the centre: {} against {expected}", top(dx, 0.0) - 3.0);
+    }
 }
 
 #[test]

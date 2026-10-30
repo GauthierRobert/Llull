@@ -5,6 +5,7 @@ import type { Vec3 } from '../../model/vectors';
 import { analyzeIndexedMesh } from './analysis';
 import {
   MESH_HULL_POINT_LIMIT,
+  MESH_TS_HARMONIC_CAP,
   MESH_TS_CUT_CAP,
   MESH_TS_TRIANGLE_CAP,
   type MeshEngineFailure,
@@ -19,6 +20,7 @@ import { ANALYZE_DESCRIPTION } from './editable';
 import { convexHull } from './hull';
 import { findSelfIntersections } from './selfIntersection';
 import { subdivideMesh } from './subdivide';
+import { runHarmonicOp } from './tsEngineHarmonic';
 import { EDIT_OPS, runEditOp } from './tsEngineEdit';
 import { weldMesh } from './weld';
 
@@ -171,6 +173,8 @@ function run(input: MeshInput, op: MeshOp): MeshOpResult | MeshEngineFailure {
         ),
       };
     }
+    case 'harmonic_map':
+      return runHarmonicOp(input, op);
     case 'repair':
     case 'fill_holes':
     case 'decimate':
@@ -194,6 +198,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['minkowski', MESH_TS_TRIANGLE_CAP],
   ['offset', MESH_TS_TRIANGLE_CAP],
   ['subdivide', MESH_TS_TRIANGLE_CAP],
+  ['harmonic_map', MESH_TS_HARMONIC_CAP],
   ...EDIT_OPS.map((name): [MeshOpName, number] => [name, name === 'cut' ? MESH_TS_CUT_CAP : MESH_TS_TRIANGLE_CAP]),
 ]);
 

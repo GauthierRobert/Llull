@@ -168,11 +168,9 @@ describe('add_knurl model geometry (straight V-grooves)', () => {
     expect(deep.data).toMatchObject({ depth: 0.8, toothAngleDeg: 60 });
   });
 
-  it('refuses helical geometry, grooves that meet or reach too deep, a bad angle, and a kernel that cannot cut', () => {
+  it('refuses grooves that meet or reach too deep, a bad angle, and a kernel that cannot cut', () => {
     const { doc, id } = rod();
     const base = { id, face: FACE10, model: 'geometry' };
-    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: 1 }, 'WRP_KNURL_GEOMETRY_UNSUPPORTED', 'pattern');
-    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diamond', pitch: 1 }, 'WRP_KNURL_GEOMETRY_UNSUPPORTED');
     expectRefusal(doc, 'add_knurl', { ...base, pattern: 'straight', pitch: 1, depth: 0.6 }, 'WRP_KNURL_DEPTH_INVALID', 'depth');
     expectRefusal(doc, 'add_knurl', { ...base, pattern: 'straight', pitch: 20, depth: 6 }, 'WRP_DEPTH_EXCEEDS_SOLID', 'depth');
     expectRefusal(doc, 'add_knurl', { ...base, pattern: 'straight', pitch: 1, toothAngleDeg: 180 }, 'WRP_PARAM_INVALID', 'toothAngleDeg');
