@@ -7,6 +7,7 @@
 import type { FieldOp, FieldProgram } from './program';
 import { programError } from './program';
 import { type MeshSdf, prepareMeshSdf } from './meshSdf';
+import { type SampledEvaluator, prepareSampledField } from './sampled';
 import { type StrutEvaluator, prepareStrutSet } from './strutSet';
 
 export interface PreparedProgram {
@@ -16,6 +17,7 @@ export interface PreparedProgram {
   readonly operands: Int32Array;
   readonly struts: readonly StrutEvaluator[];
   readonly meshes: readonly MeshSdf[];
+  readonly sampled: readonly SampledEvaluator[];
 }
 
 export const OPS: readonly FieldOp[] = [
@@ -45,6 +47,7 @@ export const OPS: readonly FieldOp[] = [
   'chamfer_min',
   'mesh_sdf',
   'strut_set',
+  'sample_field',
 ];
 const CODE: Readonly<Record<FieldOp, number>> = Object.fromEntries(OPS.map((op, index) => [op, index])) as Record<FieldOp, number>;
 export const SLOTS = 5;
@@ -72,6 +75,7 @@ export function prepareProgram(program: FieldProgram): PreparedProgram {
     operands,
     struts: program.strutSets.map(prepareStrutSet),
     meshes: program.meshes.map((entry) => prepareMeshSdf(entry.mesh)),
+    sampled: (program.sampled ?? []).map(prepareSampledField),
   };
   cache.set(program, prepared);
   return prepared;
@@ -158,6 +162,7 @@ const OP_SIN = CODE.sin;
 const OP_COS = CODE.cos;
 const OP_MESH_SDF = CODE.mesh_sdf;
 const OP_STRUT_SET = CODE.strut_set;
+const OP_SAMPLE_FIELD = CODE.sample_field;
 
 /**
  * Value of the output register at (x, y, z); registers is scratch of at least one double per instruction.
@@ -236,6 +241,9 @@ export function evaluateAt(prepared: PreparedProgram, registers: Float64Array, x
           ) ?? Infinity;
         break;
       }
+      case OP_SAMPLE_FIELD:
+        registers[i] = prepared.sampled[operands[base + 3] as number]?.value(a, b, c) ?? NaN;
+        break;
       default:
         registers[i] = scalarOp(OPS[code] ?? 'const', a, b, c);
     }

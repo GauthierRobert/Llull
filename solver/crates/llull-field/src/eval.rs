@@ -2,6 +2,7 @@
 
 use crate::jsnum::{jmax, jmin};
 use crate::meshsdf::MeshSdf;
+use crate::sampled::Sampled;
 use crate::struts::StrutEval;
 use crate::tape::{Instr, Op, Program};
 use llull_jsmath::{atan2, cos, exp, log, sin};
@@ -12,6 +13,7 @@ pub struct Evaluator {
     pub constants: Vec<f64>,
     pub meshes: Vec<MeshSdf>,
     pub struts: Vec<StrutEval>,
+    pub sampled: Vec<Sampled>,
 }
 
 pub fn smooth_min_quad(a: f64, b: f64, k: f64) -> f64 {
@@ -76,6 +78,7 @@ impl Evaluator {
             constants: program.constants.clone(),
             meshes: program.meshes.iter().map(|soup| MeshSdf::new(soup.clone())).collect(),
             struts: program.struts.iter().map(StrutEval::new).collect(),
+            sampled: program.sampled.clone(),
         }
     }
 
@@ -95,6 +98,7 @@ impl Evaluator {
                     let radius = if sr >= 0 { reg(registers, sr) } else { -1.0 };
                     self.struts.get(sm as usize).map_or(f64::INFINITY, |s| s.distance(a, b, c, radius))
                 }
+                Op::SampleField => self.sampled.get(sm as usize).map_or(f64::NAN, |s| s.value(a, b, c)),
                 op => scalar_op(op, a, b, c),
             };
         }
@@ -108,7 +112,14 @@ mod tests {
     use crate::tape::SLOTS;
 
     fn tape(ops: &[(Op, [i64; SLOTS])], constants: Vec<f64>, output: usize) -> Evaluator {
-        Evaluator { instrs: ops.iter().map(|&(op, args)| Instr { op, args }).collect(), output, constants, meshes: vec![], struts: vec![] }
+        Evaluator {
+            instrs: ops.iter().map(|&(op, args)| Instr { op, args }).collect(),
+            output,
+            constants,
+            meshes: vec![],
+            struts: vec![],
+            sampled: vec![],
+        }
     }
 
     #[test]

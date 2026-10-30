@@ -25,6 +25,8 @@ export interface ScalarHost {
   fieldValue(id: string, frame: Frame): number;
   /** Register of the signed distance to the closed solid of an entity. */
   solidDistance(entityId: string, frame: Frame): number;
+  /** Register of the sampled result data of a `topology_density` / `fea_result` node at the frame point, with the range of the data. */
+  sampledInput(node: Extract<ScalarNode, { kind: 'topology_density' | 'fea_result' }>, frame: Frame): ScalarPart;
 }
 
 const UNBOUNDED = { lo: -Infinity, hi: Infinity } as const;
@@ -126,6 +128,9 @@ export function compileScalar(host: ScalarHost, node: ScalarNode, frame: Frame):
     }
     case 'arith':
       return arithmetic(b, node.operation, host.law(node.a, frame), host.law(node.b, frame));
+    case 'topology_density':
+    case 'fea_result':
+      return host.sampledInput(node, frame);
     case 'noise': {
       let sum = b.constant(0);
       let amplitudes = 0;

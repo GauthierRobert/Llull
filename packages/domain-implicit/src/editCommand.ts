@@ -224,6 +224,20 @@ function editorOf(node: FieldNode): Editor {
             keys: ['seed', 'frequency', 'octaves'],
             refs: [],
           };
+        case 'topology_density':
+          return {
+            creator: 'create_scalar_field',
+            params: () => compact({ kind: 'topology_density', studyId: node.studyId, name: node.name }),
+            keys: ['studyId'],
+            refs: [],
+          };
+        case 'fea_result':
+          return {
+            creator: 'create_scalar_field',
+            params: () => compact({ kind: 'fea_result', caseId: node.caseId, quantity: node.quantity, step: node.step, name: node.name }),
+            keys: ['caseId', 'quantity', 'step'],
+            refs: [],
+          };
       }
   }
 }

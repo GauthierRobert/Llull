@@ -66,10 +66,22 @@ function packProgram(program: FieldProgram, prefix: string, files: Files): Recor
       Float64Array.from(set.beams.flatMap((beam) => [beam.a, beam.b, beam.ra, beam.rb, beam.cap === 'sphere' ? 1 : 0])),
     );
   });
+  (program.sampled ?? []).forEach((field, index) => {
+    files[`${prefix}sampled${index}_values.f64`] = f64Bytes(Float64Array.from(field.values));
+    if (field.kind === 'tets') {
+      files[`${prefix}sampled${index}_points.f64`] = f64Bytes(Float64Array.from(field.points));
+      files[`${prefix}sampled${index}_tets.u32`] = u32Bytes(field.tets);
+    }
+  });
   return {
     instructions: program.instructions.map((instruction) => ({ op: instruction.op, args: [...instruction.args] })),
     output: program.output,
     meshes: program.meshes.length,
+    sampled: (program.sampled ?? []).map((field) =>
+      field.kind === 'grid'
+        ? { kind: 'grid', nodes: [...field.nodes], origin: [...field.origin], voxel: field.voxel }
+        : { kind: 'tets', points: field.points.length / 3, tets: field.tets.length / 4 },
+    ),
     strutSets: program.strutSets.map((set) => ({
       periodic: set.periodic === null ? null : { cell: [...set.periodic.cell], origin: [...set.periodic.origin] },
       nodes: set.nodes.length,

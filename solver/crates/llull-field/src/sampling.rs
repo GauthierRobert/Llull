@@ -192,6 +192,7 @@ mod tests {
             constants: vec![radius],
             meshes: vec![],
             struts: vec![],
+            sampled: vec![],
         }
     }
 

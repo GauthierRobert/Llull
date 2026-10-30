@@ -22,7 +22,7 @@ const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transf
 const SHAPES = new Set(['sphere', 'box', 'cylinder', 'capsule', 'torus', 'cone', 'plane']);
 const TPMS_KINDS = new Set(['gyroid', 'schwarz_p', 'diamond', 'neovius', 'iwp', 'lidinoid', 'fischer_koch_s', 'split_p']);
 const STRUT_CELLS = new Set(['cubic', 'bcc', 'fcc', 'octet', 'kelvin', 'diamond', 'bccz', 'fccz', 'reentrant']);
-const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise']);
+const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise', 'topology_density', 'fea_result']);
 const isFiniteNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
 const isLaw = (value: unknown): boolean => typeof value === 'number' || typeof value === 'string';
 const isVec3 = (value: unknown): boolean =>
@@ -139,7 +139,12 @@ function nodeError(key: string, node: unknown): string | null {
       node['density'] > 0 &&
       typeof node['seed'] === 'number' &&
       typeof node['radius'] === 'number',
-    scalar: typeof node['kind'] === 'string' && SCALAR_KINDS.has(node['kind']),
+    scalar:
+      typeof node['kind'] === 'string' &&
+      SCALAR_KINDS.has(node['kind']) &&
+      (node['kind'] !== 'topology_density' || typeof node['studyId'] === 'string') &&
+      (node['kind'] !== 'fea_result' ||
+        (typeof node['caseId'] === 'string' && (node['quantity'] === 'von_mises' || node['quantity'] === 'u_mag'))),
   };
   return checks[node['op']] === true ? null : `field '${key}' (${node['op']}) has malformed parameters`;
 }

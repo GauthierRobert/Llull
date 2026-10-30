@@ -20,7 +20,9 @@ export interface CompileFailure {
     | 'IMP_SOLID_NOT_CLOSED'
     | 'IMP_PARAM_RANGE'
     | 'IMP_GRAPH_EMPTY'
-    | 'IMP_GRAPH_TOO_LARGE';
+    | 'IMP_GRAPH_TOO_LARGE'
+    | 'IMP_INPUT_NOT_FOUND'
+    | 'IMP_INPUT_TOO_LARGE';
   readonly message: string;
   readonly ids: readonly string[];
 }

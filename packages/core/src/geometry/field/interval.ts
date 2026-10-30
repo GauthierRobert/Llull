@@ -162,6 +162,12 @@ export function evaluateInterval(prepared: PreparedProgram, box: FieldBox): [num
         else set(i, middle - slack, middle + slack);
         break;
       }
+      case 'sample_field': {
+        const field = prepared.sampled[operands[base + 3] as number];
+        if (field === undefined) set(i, -Infinity, Infinity);
+        else set(i, field.lo, field.hi);
+        break;
+      }
       default:
         set(i, -Infinity, Infinity);
     }

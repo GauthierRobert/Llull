@@ -2,6 +2,7 @@
 //! `validate` is the twin of `programError` in `packages/core/src/geometry/field/program.ts` (same messages).
 
 use crate::files::{input_error, read_f64, read_u32, JobError};
+use crate::sampled::{Grid, Sampled, Tets};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -33,9 +34,10 @@ pub enum Op {
     ChamferMin,
     MeshSdf,
     StrutSet,
+    SampleField,
 }
 
-const NAMES: [(&str, Op); 26] = [
+const NAMES: [(&str, Op); 27] = [
     ("const", Op::Const),
     ("x", Op::X),
     ("y", Op::Y),
@@ -62,6 +64,7 @@ const NAMES: [(&str, Op); 26] = [
     ("chamfer_min", Op::ChamferMin),
     ("mesh_sdf", Op::MeshSdf),
     ("strut_set", Op::StrutSet),
+    ("sample_field", Op::SampleField),
 ];
 
 impl Op {
@@ -73,7 +76,7 @@ impl Op {
         NAMES.iter().find(|(_, op)| *op == self).map_or("?", |(n, _)| n)
     }
 
-    /// Operand kinds: `r` register, `c` constant, `m` mesh, `s` strut set, `o` optional register (-1 = none).
+    /// Operand kinds: `r` register, `c` constant, `m` mesh, `s` strut set, `f` sampled field, `o` optional register (-1 = none).
     fn shape(self) -> &'static str {
         match self {
             Op::Const => "c",
@@ -83,6 +86,7 @@ impl Op {
             Op::Clamp | Op::Select | Op::SminQuad | Op::SminExp | Op::ChamferMin => "rrr",
             Op::MeshSdf => "rrrm",
             Op::StrutSet => "rrrso",
+            Op::SampleField => "rrrf",
         }
     }
 }
@@ -120,6 +124,7 @@ pub struct Program {
     /// Triangle soups, nine numbers per triangle.
     pub meshes: Vec<Vec<f64>>,
     pub struts: Vec<StrutSet>,
+    pub sampled: Vec<Sampled>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,8 +146,15 @@ pub struct StrutSpec {
     pub beams: usize,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum SampledSpec {
+    Grid { nodes: [usize; 3], origin: [f64; 3], voxel: f64 },
+    Tets { points: usize, tets: usize },
+}
+
 /// The JSON part of a program; the numbers of constants, meshes and struts are in files named `<prefix>constants.f64`, `<prefix>mesh<i>_positions.f64` /
-/// `_indices.u32`, `<prefix>strut<i>_nodes.f64` (3 per node), `<prefix>strut<i>_beams.f64` (a, b, ra, rb, cap 1 = sphere, 5 per beam).
+/// `_indices.u32`, `<prefix>strut<i>_nodes.f64` (3 per node), `<prefix>strut<i>_beams.f64` (a, b, ra, rb, cap 1 = sphere, 5 per beam), `<prefix>sampled<i>_values.f64` (+ `_points.f64`, `_tets.u32` for tetrahedra).
 #[derive(Debug, Deserialize)]
 pub struct ProgramSpec {
     pub instructions: Vec<InstrSpec>,
@@ -150,6 +162,8 @@ pub struct ProgramSpec {
     pub meshes: usize,
     #[serde(rename = "strutSets")]
     pub strut_sets: Vec<StrutSpec>,
+    #[serde(default)]
+    pub sampled: Vec<SampledSpec>,
 }
 
 fn triangle_soup(positions: &[f64], indices: &[u32]) -> Vec<f64> {
@@ -161,6 +175,29 @@ fn triangle_soup(positions: &[f64], indices: &[u32]) -> Vec<f64> {
         }
     }
     out
+}
+
+fn load_sampled(folder: &Path, prefix: &str, index: usize, spec: &SampledSpec) -> Result<Sampled, JobError> {
+    let values = read_f64(folder, &format!("{prefix}sampled{index}_values.f64"))?;
+    match spec {
+        SampledSpec::Grid { nodes, origin, voxel } => {
+            if values.len() != nodes[0] * nodes[1] * nodes[2] || nodes.contains(&0) {
+                return Err(input_error(format!("sampled field {index}: {} values for grid {nodes:?}", values.len())));
+            }
+            Ok(Sampled::Grid(Grid::new(*nodes, *origin, *voxel, values)))
+        }
+        SampledSpec::Tets { points, tets } => {
+            let coordinates = read_f64(folder, &format!("{prefix}sampled{index}_points.f64"))?;
+            let corners = read_u32(folder, &format!("{prefix}sampled{index}_tets.u32"))?;
+            if coordinates.len() != points * 3 || corners.len() != tets * 4 || values.len() != *points || *points == 0 {
+                return Err(input_error(format!("sampled field {index}: file sizes do not match {points} nodes / {tets} tetrahedra")));
+            }
+            if corners.iter().any(|&n| n as usize >= *points) {
+                return Err(input_error(format!("sampled field {index}: a tetrahedron names a node out of range")));
+            }
+            Ok(Sampled::Tets(Tets::new(coordinates, corners.iter().map(|&n| n as usize).collect(), values)))
+        }
+    }
 }
 
 fn load_struts(folder: &Path, prefix: &str, index: usize, spec: &StrutSpec) -> Result<StrutSet, JobError> {
@@ -206,8 +243,10 @@ impl Program {
         }
         let struts =
             spec.strut_sets.iter().enumerate().map(|(index, entry)| load_struts(folder, prefix, index, entry)).collect::<Result<_, _>>()?;
+        let sampled =
+            spec.sampled.iter().enumerate().map(|(index, entry)| load_sampled(folder, prefix, index, entry)).collect::<Result<_, _>>()?;
         let output = usize::try_from(spec.output).unwrap_or(usize::MAX);
-        Ok(Program { instrs, output, constants, meshes, struts })
+        Ok(Program { instrs, output, constants, meshes, struts, sampled })
     }
 
     /// Why the tape is malformed (the text of `programError`), or None.
@@ -224,6 +263,7 @@ impl Program {
                     'o' => (index, -1),
                     'c' => (self.constants.len(), 0),
                     'm' => (self.meshes.len(), 0),
+                    'f' => (self.sampled.len(), 0),
                     _ => (self.struts.len(), 0),
                 };
                 if value < lowest || value >= limit as i64 {
@@ -246,6 +286,7 @@ mod tests {
             output: 0,
             meshes: 0,
             strut_sets: vec![],
+            sampled: vec![],
         };
         let dir = std::env::temp_dir().join(format!("llull-field-tape-{}-{tag}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -274,14 +315,29 @@ mod tests {
 
     #[test]
     fn rejects_unknown_ops_and_wrong_operand_counts() {
-        let spec =
-            ProgramSpec { instructions: vec![InstrSpec { op: "wobble".into(), args: vec![] }], output: 0, meshes: 0, strut_sets: vec![] };
+        let spec = ProgramSpec {
+            instructions: vec![InstrSpec { op: "wobble".into(), args: vec![] }],
+            output: 0,
+            meshes: 0,
+            strut_sets: vec![],
+            sampled: vec![],
+        };
         assert!(Program::load(Path::new("."), "", &spec).unwrap_err().message.contains("unknown op wobble"));
-        let spec =
-            ProgramSpec { instructions: vec![InstrSpec { op: "x".into(), args: vec![0; 6] }], output: 0, meshes: 0, strut_sets: vec![] };
+        let spec = ProgramSpec {
+            instructions: vec![InstrSpec { op: "x".into(), args: vec![0; 6] }],
+            output: 0,
+            meshes: 0,
+            strut_sets: vec![],
+            sampled: vec![],
+        };
         assert!(Program::load(Path::new("."), "", &spec).unwrap_err().message.contains("6 operands"));
-        let spec =
-            ProgramSpec { instructions: vec![InstrSpec { op: "add".into(), args: vec![0] }], output: 0, meshes: 0, strut_sets: vec![] };
+        let spec = ProgramSpec {
+            instructions: vec![InstrSpec { op: "add".into(), args: vec![0] }],
+            output: 0,
+            meshes: 0,
+            strut_sets: vec![],
+            sampled: vec![],
+        };
         assert!(Program::load(Path::new("."), "", &spec).unwrap_err().message.contains("expected 2 operands"));
     }
 }

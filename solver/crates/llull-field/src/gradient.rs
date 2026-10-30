@@ -126,6 +126,13 @@ impl Evaluator {
                         (m, [bx, by, bz])
                     }
                 }
+                Op::SampleField => {
+                    let sample = |px: f64, py: f64, pz: f64| self.sampled.get(sm as usize).map_or(f64::NAN, |s| s.value(px, py, pz));
+                    let gxi = (sample(a + STEP, b, c) - sample(a - STEP, b, c)) / (2.0 * STEP);
+                    let gyi = (sample(a, b + STEP, c) - sample(a, b - STEP, c)) / (2.0 * STEP);
+                    let gzi = (sample(a, b, c + STEP) - sample(a, b, c - STEP)) / (2.0 * STEP);
+                    (sample(a, b, c), [gxi * ax + gyi * bx + gzi * cx, gxi * ay + gyi * by + gzi * cy, gxi * az + gyi * bz + gzi * cz])
+                }
                 Op::MeshSdf | Op::StrutSet => {
                     let radius = if sr >= 0 { reg(&s.v, sr) } else { -1.0 };
                     let sdf = |px: f64, py: f64, pz: f64| -> f64 {
@@ -163,6 +170,7 @@ mod tests {
             constants: vec![],
             meshes: vec![],
             struts: vec![],
+            sampled: vec![],
         }
     }
 

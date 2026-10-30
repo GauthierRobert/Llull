@@ -1,6 +1,8 @@
 /** Commands of the implicit plugin (toolset `implicit`). */
 
 import { commandCatalog } from '@core/commands/schema';
+import type { CommandDefinition } from '@core/commands/types';
+import { withArtifacts } from './sampledInputs';
 import { createImplicitBody } from './bodyCommand';
 import { checkImplicit } from './checkImplicit';
 import { editField } from './editCommand';
@@ -18,7 +20,7 @@ import { createScalarField } from './scalarCommand';
 import { sectionField } from './sectionCommand';
 import { fieldFromSolid } from './solidCommand';
 
-export const implicitCommands = commandCatalog(
+const bareCommands = commandCatalog(
   addFieldPrimitive,
   fieldFromSolid,
   combineFields,
@@ -40,4 +42,12 @@ export const implicitCommands = commandCatalog(
   latticeProperties,
   sectionField,
   checkImplicit,
+);
+
+/** Every command runs with the artifact store of its context available to the field compiler (`sampledInputs.ts`). */
+export const implicitCommands = bareCommands.map(
+  (command): CommandDefinition<unknown> => ({
+    ...command,
+    run: (doc, params, ctx) => withArtifacts(ctx?.feaArtifacts, () => command.run(doc, params, ctx)),
+  }),
 );

@@ -170,6 +170,17 @@ export function evaluateWithGradient(prepared: PreparedProgram, x: number, y: nu
         set(i, sdf(a, b, c), gxi * ax + gyi * bx + gzi * cx, gxi * ay + gyi * by + gzi * cy, gxi * az + gyi * bz + gzi * cz);
         break;
       }
+      case 'sample_field': {
+        const field = prepared.sampled[operands[base + 3] as number];
+        const sample = (px: number, py: number, pz: number): number => field?.value(px, py, pz) ?? NaN;
+        const [gxi, gyi, gzi] = [
+          (sample(a + STEP, b, c) - sample(a - STEP, b, c)) / (2 * STEP),
+          (sample(a, b + STEP, c) - sample(a, b - STEP, c)) / (2 * STEP),
+          (sample(a, b, c + STEP) - sample(a, b, c - STEP)) / (2 * STEP),
+        ];
+        set(i, sample(a, b, c), gxi * ax + gyi * bx + gzi * cx, gxi * ay + gyi * by + gzi * cy, gxi * az + gyi * bz + gzi * cz);
+        break;
+      }
       default:
         set(i, NaN, NaN, NaN, NaN);
     }
