@@ -365,6 +365,7 @@ std::unique_ptr<ShapeList> new_shape_list() { return std::make_unique<ShapeList>
 void shape_list_add(ShapeList &list, const Shape &shape) {
   list.shapes.push_back(shape.shape);
   list.names.push_back(naming::face_names(shape));
+  if (shape.refined_mass) list.refined_mass = true;
 }
 
 namespace {
@@ -618,6 +619,7 @@ std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius, rust::S
   try {
     std::unique_ptr<Shape> built = build_blend_union(list, radius, joints, notes, why);
     if (built) built->notes = notes;
+    if (built && list.refined_mass) built->refined_mass = true;
     return built;
   } catch (const Standard_Failure &) {
     return nullptr;

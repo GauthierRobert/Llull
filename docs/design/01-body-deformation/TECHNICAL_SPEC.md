@@ -884,3 +884,19 @@ A push of radius 10 on a 100 x 100 x 20 slab therefore put a grid fine enough fo
 
 Tests: `deform_tests.rs` `a_local_push_on_a_wide_slab_refines_the_fit_only_where_it_acts` (fit nodes < 40 000, volume = box + cap, maxError within the tolerance; red-proof: forcing uniform refinement gives
 263 294 nodes and fails it). The 26 `deform` cargo tests and `nativeKernel*` suites keep their numbers.
+
+### 17.9 Mass rule by face type: decided, measured, and what is carried through `blend_union`
+
+`refined_mass` (adaptive `BRepGProp` on the shapes a warp or a kinked blend built, 1e-9, accepted at 1e-5) was kept by transforms, booleans, unify, shell and fillets but not by `blend_union`, whose
+result went back to the fixed Gauss rule. A solid built by `blend_union` from a warped operand now asks for the rule too (`ShapeList.refined_mass`, set by `shape_list_add`).
+
+A rule by face type was tried and measured: the fixed rule for planar faces (exact there) and the adaptive one for all curved faces, integrated face by face from one apex. It gives the same numbers as the whole-shape
+adaptive rule to rounding (a plane is exact in both rules), so it changes nothing but the bookkeeping; and a rule that keeps the fixed rule on the elementary curved faces is wrong where it matters: the cone pieces
+of a straight-law blend lose 2.5e-3 of the removed volume (20 x 10 x 5 block, `a_linear_law_through_a_control_point...`) and the 120-gon mitre 2e-4. Whole-shape adaptive stays the rule of the flagged shapes. The NIST corpus
+is not flagged (nothing in it is a warp), so its numbers are untouched by construction (the `nativeKernel*` corpus suites are unchanged).
+
+Loosening the integration accuracy to buy time was measured too: Eps 1e-7 instead of 1e-9 saves 25-30 % of the 10 s push (8.0 s, 14.9 s, 6.6 s) but moves the mitre-blend volumes by 2e-6 relative and fails
+`a_ground_sphere_scaled...` (VC-DEF-11); kept at 1e-9. The remaining cost is the adaptive subdivision itself on faces with hundreds of knot spans.
+
+Tests: `blend_tests.rs` `the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands` (red-proof: without the propagation the fused blend is unflagged), `deform_infinite_tests.rs`
+`a_cut_warped_bar_mixes_the_fixed_rule_on_its_caps_with_the_adaptive_one_on_its_sides` (closed-form volume and centroid of a warped bar cut by a box).

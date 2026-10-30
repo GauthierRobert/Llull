@@ -537,3 +537,27 @@ fn a_sided_chamfer_is_refused_for_a_face_that_does_not_bound_the_edge_and_for_a_
         "a seam edge is refused, not skipped"
     );
 }
+
+/// 01 DEF §17.8: the adaptive mass rule is asked by a shape built by a deformation (or a kinked blend) and kept by the operations that rebuild it: also by the
+/// fused blend of several solids, one operand of which asks for it. Plain operands do not ask for it.
+#[test]
+fn the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands() {
+    let _serial = crate::serial_blends();
+    let block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let topo = topology(&block).unwrap();
+    let at = |edge: &Value, key: &str, axis: usize, value: f64| (f(&edge[key][axis]) - value).abs() < 1e-9;
+    let top = topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|e| ["start", "end"].iter().all(|key| at(e, key, 2, 5.0) && at(e, key, 1, 10.0)))
+        .unwrap() as u32;
+    let kinked = crate::features::fillet_laws(&block, &[top], &[1.0, 1.0, 1.0, 1.0, 0.5, 2.0]).unwrap().unwrap();
+    assert!(crate::test_bridge::refined_mass(&kinked));
+    let rib = make_box([8.0, -3.0, 1.0], [4.0, 16.0, 2.0]).unwrap().unwrap();
+    let fused = crate::features::blend(&[&kinked, &rib], 0.4, &[]).unwrap().unwrap();
+    assert!(crate::test_bridge::refined_mass(&fused), "the fused blend keeps asking for the adaptive rule");
+    let plain_block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let plain = crate::features::blend(&[&plain_block, &rib], 0.4, &[]).unwrap().unwrap();
+    assert!(!crate::test_bridge::refined_mass(&plain), "plain operands do not");
+}
