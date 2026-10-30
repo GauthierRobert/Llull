@@ -254,6 +254,9 @@ function keyOf(files: readonly JobFile[]): string {
   return hash.digest('hex');
 }
 
+/** A list position the job named in its message (digits only; anything else is no position, so the refusal is not reworded). */
+const indexIn = (message: string | undefined): number => (/^\d+$/.test(message ?? '') ? Number(message) : -1);
+
 /** The failure of a job that did not finish ok. */
 function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFailure {
   if (run.code === 'NATIVE_TIMEOUT') return failure('MESH_TIMEOUT', `llull-compute meshops ${op.op} exceeded ${timeoutMs / 1000} s`);
@@ -261,12 +264,12 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFail
   if (op.op === 'fill_holes' && run.code !== undefined && FILL_REFUSALS.has(run.code)) return failure(run.code, run.message ?? run.code);
   if (op.op === 'fill_holes' && run.code === 'HOLE_NEAR_NOT_FOUND') {
     // the job names the point by its position in the list; the text of a point is the JavaScript one
-    const point = typeof op.select === 'object' && 'near' in op.select ? op.select.near[Number(run.message)] : undefined;
+    const point = typeof op.select === 'object' && 'near' in op.select ? op.select.near[indexIn(run.message)] : undefined;
     if (point !== undefined) return failure('MESH_HOLE_NOT_FOUND', `no boundary loop near [${point.join(', ')}]: the mesh has none`);
   }
   if (op.op === 'sculpt' && run.code === 'SCULPT_OFF_SURFACE') {
     // the job names the stamp by its position in the list; the radius is worded here, as JavaScript prints it
-    const stamp = Number(run.message);
+    const stamp = indexIn(run.message);
     if (Number.isInteger(stamp) && stamp >= 0 && stamp < op.stamps.length)
       return failure('MESH_SCULPT_STAMP_OFF_SURFACE', `stamp ${stamp} is farther than the radius ${op.radius} from the mesh surface`);
   }
@@ -326,7 +329,7 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
   if (
     (op.op === 'repair' && !isRepairReport(report, op.mode)) ||
     (op.op === 'fill_holes' && !isFillReport(report, op.fairing)) ||
-    (op.op === 'sculpt' && !isSculptReport(report, op))
+    (op.op === 'sculpt' && (!isSculptReport(report, op) || (report as { movedVertices: number }).movedVertices > mesh.positions.length / 3))
   )
     return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: the job returned a malformed report`);
   const description =

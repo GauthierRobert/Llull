@@ -102,6 +102,15 @@ describe('a report the host cannot trust (repair, fill_holes and sculpt)', () =>
     expect(result).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('SCULPT_OFF_SURFACE') });
   });
 
+  it('sculpt: a blank stamp index is no stamp, and a report moving more vertices than the result has is refused', async () => {
+    const op = ops[4]?.[1] as MeshOp;
+    const blank = await resolveDeferred(() => fakeEngine('sculpt_blank_index').run({ mesh: sphere }, op));
+    expect(blank).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('SCULPT_OFF_SURFACE') });
+    _clearResultCache();
+    const moved = await resolveDeferred(() => fakeEngine('sculpt_moved').run({ mesh: sphere }, op));
+    expect(moved).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('malformed report') });
+  });
+
   it.each(ops.filter(([name]) => name === 'decimate' || name === 'remesh'))('%s: the report is not checked here', async (_name, op) => {
     const engine = fakeEngine('bad_report');
     const result = await resolveDeferred(() => engine.run({ mesh: sphere }, op));

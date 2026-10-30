@@ -1,6 +1,6 @@
 /**
  * A stand-in for `llull-compute meshops <folder>` that answers with a chosen result, for tests of what the host does with an answer it cannot trust.
- * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index:
+ * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved:
  * the preload writes the result files and the final `done` event, then exits before node looks for a script called `meshops`.
  * The report of `repair`, `fill_holes` and `sculpt` is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
  * fairing, with a loop number past `totalLoops`, or for a sculpt without symmetry that reports a symmetry error and more stamps applied than there are); `hole_code` ends the job
@@ -32,12 +32,9 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
     fs.writeSync(1, `${JSON.stringify({ type: 'error', code: 'MESH_HOLE_UNDOCUMENTED', message: 'a code no command knows' })}\n`);
     process.exit(1);
   }
-  if (mode === 'sculpt_index') {
-    fs.writeSync(
-      1,
-      `${JSON.stringify({ type: 'error', code: 'SCULPT_OFF_SURFACE', message: '99' })}
-`,
-    );
+  if (mode === 'sculpt_index' || mode === 'sculpt_blank_index') {
+    const message = mode === 'sculpt_index' ? '99' : ' ';
+    fs.writeSync(1, `${JSON.stringify({ type: 'error', code: 'SCULPT_OFF_SURFACE', message })}\n`);
     process.exit(1);
   }
   const changes = Object.fromEntries(
@@ -66,7 +63,7 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
     repair: { mode: other ? 'close_holes' : job.params.mode, changes, notes: [], skippedHoles: 0 },
     fill_holes: { totalLoops: 1, filled: [filled], skipped: [] },
     sculpt: {
-      movedVertices: 0,
+      movedVertices: mode === 'sculpt_moved' ? 1e9 : 0,
       maxDisplacement: 0,
       displacedVolume: 0,
       volumeBasis: 'height-field-sum',

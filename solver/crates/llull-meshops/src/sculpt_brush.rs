@@ -6,6 +6,9 @@ use crate::geom::{dot, js_min, length, Sphere, Vec3};
 use rayon::prelude::*;
 use serde::Deserialize;
 
+/// Taubin pass-band frequency of the smooth brush: the TypeScript oracle's `taubinMu(lambda, 0.1)` in `packages/core/src/geometry/mesh/sculpt.ts` (change both or neither).
+const TAUBIN_PASS_BAND: f64 = 0.1;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Brush {
@@ -284,7 +287,7 @@ impl<'a> Sculptor<'a> {
                 let lambda = js_min(1.0, s.strength * f);
                 let first = self.smooth_step(v, lambda, x);
                 if s.taubin && lambda > 0.0 {
-                    let mu = 1.0 / (0.1 - 1.0 / lambda);
+                    let mu = 1.0 / (TAUBIN_PASS_BAND - 1.0 / lambda);
                     let moved = [x[0] + first[0], x[1] + first[1], x[2] + first[2]];
                     let second = self.smooth_step(v, mu, moved);
                     [first[0] + second[0], first[1] + second[1], first[2] + second[2]]
