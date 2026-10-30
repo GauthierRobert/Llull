@@ -231,8 +231,13 @@ struct Plan {
   // per corner: the faces at the vertex that are reflex there (the sector of the face between its two rounded edges exceeds pi): the plane of the face
   // (outward normal) and the point Q where the contact lines of its two blends meet; the hole is bounded there by P_a -> Q -> P_b instead of a chord (13.18.2)
   struct Reflex {
+    TopoDS_Face face;       // the source face (identity of the record)
     gp_Vec normal;
     gp_Pnt q;
+    int edge_a, edge_b;     // the two rounded edges that bound the face at the vertex
+    double along_a, along_b;  // the position of Q along the stubs of a and b (negative: behind the vertex)
+    gp_Vec inward_a, inward_b;
+    double offset_a, offset_b, slope_a, slope_b;
   };
   std::vector<std::vector<Reflex>> reflex;
 };
@@ -332,14 +337,24 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       return false;
     }
     if (sine < 0) {
-      // a reflex face asks for no setback (Q lies behind the vertex): its pair adds no term and no least-setback constraint, the hole is bounded through Q
+      // a reflex face asks for no setback (Q lies behind the vertex): its pair adds no term and no least-setback constraint, the hole is bounded through Q (13.18.2)
       const gp_Vec u = stub[i] + inward_in(i) * slope.at(i), v = stub[j] + inward_in(j) * slope.at(j);
       const gp_Vec rhs = inward_in(j) * offset.at(j) - inward_in(i) * offset.at(i);
-      const double along = rhs.Crossed(v).Dot(normal) / u.Crossed(v).Dot(normal);
+      const double determinant = u.Crossed(v).Dot(normal);
+      if (!(std::fabs(determinant) > 1e-9 * u.Magnitude() * v.Magnitude())) {
+        why = std::string(kUnsupported) + "the contact lines of the two blends on the reflex face at " + where(corner.at) + " are parallel: no point Q to close the hole through";
+        return false;
+      }
+      const double along = rhs.Crossed(v).Dot(normal) / determinant;
+      const double along_b = -u.Crossed(rhs).Dot(normal) / determinant;
+      if (!std::isfinite(along) || !std::isfinite(along_b)) {
+        why = std::string(kUnsupported) + "the contact lines of the two blends on the reflex face at " + where(corner.at) + " meet nowhere that can be computed";
+        return false;
+      }
       const gp_Pnt through = corner.at.Translated(u * along + inward_in(i) * offset.at(i));
       // the faces at a vertex are listed once per edge that meets it: one record per face
-      if (std::none_of(plan.reflex.back().begin(), plan.reflex.back().end(), [&](const Plan::Reflex &known) { return known.q.Distance(through) <= plan.tolerance; }))
-        plan.reflex.back().push_back({normal.Normalized(), through});
+      if (std::none_of(plan.reflex.back().begin(), plan.reflex.back().end(), [&](const Plan::Reflex &known) { return known.face.IsSame(face); }))
+        plan.reflex.back().push_back({face, normal.Normalized(), through, i, j, along, along_b, inward_in(i), inward_in(j), offset.at(i), offset.at(j), slope.at(i), slope.at(j)});
       continue;
     }
     pairs.push_back({i, j, cosine, sine});
@@ -411,6 +426,21 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
             "; the distance along the edge its neighbours' blends reach)";
       return false;
     }
+  // Q must be where the construction assumes it: in the face, in front of the contact points along the edges (a taper can bring it forward of the setback), and the path P_a -> Q -> P_b
+  // inside the face. A narrow reflex face (the sector near 2 pi) sends Q to r / sin(phi / 2), far outside it.
+  for (const Plan::Reflex &record : plan.reflex.back()) {
+    const double reach_a = distance.at(record.edge_a), reach_b = distance.at(record.edge_b);
+    const gp_Pnt contact_a = corner.at.Translated(stub.at(record.edge_a) * reach_a + record.inward_a * (record.offset_a + record.slope_a * reach_a));
+    const gp_Pnt contact_b = corner.at.Translated(stub.at(record.edge_b) * reach_b + record.inward_b * (record.offset_b + record.slope_b * reach_b));
+    const auto midway = [](const gp_Pnt &x, const gp_Pnt &y) { return gp_Pnt(0.5 * (x.X() + y.X()), 0.5 * (x.Y() + y.Y()), 0.5 * (x.Z() + y.Z())); };
+    if (record.along_a >= reach_a || record.along_b >= reach_b || !inside(record.face, record.q) || !inside(record.face, midway(contact_a, record.q)) ||
+        !inside(record.face, midway(record.q, contact_b))) {
+      why = std::string(kUnsupported) + "the path across the reflex face at " + where(corner.at) + " (through the point " + where(record.q) +
+            " where the contact lines of its two blends meet) leaves the face or ends before the setback: " +
+            "this face is too narrow or the radius too steep for the corner patch";
+      return false;
+    }
+  }
   plan.stubs.push_back(stub);
   return true;
 }
@@ -523,12 +553,13 @@ bool edge_gap(const TopoDS_Edge &edge, const TopoDS_Face &face, double &worst) {
   return true;
 }
 
-// Largest angle between the normal of `patch` and the normal of the support face along each edge of `loop` (the hole boundary, `supports` aligned with `boundary`), at 21 samples of
-// the 3D curve. The patch edges are not the edges of the loop: each loop edge is matched to the patch edge that passes through its middle, and a sample is located on that edge by a 1D
-// projection, whose curve on the patch gives the parameters (a projection on the patch itself costs seconds on a patch of thousands of poles). This is the g1 that check_blends reads
-// across the edge, where MakeFilling's own G1Error is taken at its own sample points (0.0107 read against 0.0100 reported on the feet of a boss, 13.18).
-double boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Edge> &boundary,
-                      const std::vector<TopoDS_Face> &supports, double match_distance) {
+// Largest angle between the normal of `patch` and the normal of the support face along each edge of `loop` (the hole boundary, `supports` aligned with `boundary`), at
+// kGapSamples + 1 samples of the 3D curve (as many as check_blends reads). The patch edges are not the edges of the loop: each loop edge is matched to the patch edge that passes
+// through its middle, and a sample is located on that edge by a 1D projection, whose curve on the patch gives the parameters (a projection on the patch itself costs seconds on a
+// patch of thousands of poles). The angle is of the normal LINES (a fit that is tangent to the wrong side reads 0 here, and is caught by the oriented check after the sewing,
+// `oriented_patch_angle`). FAILS CLOSED: false unless every edge of the loop was matched and at least 95 % of its samples measured.
+bool boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Edge> &boundary,
+                    const std::vector<TopoDS_Face> &supports, double match_distance, double &worst) {
   const BRepAdaptor_Surface patch_surface(patch, Standard_False);
   struct PatchEdge {
     Handle(Geom_Curve) curve;
@@ -543,12 +574,13 @@ double boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &
     candidate.on_patch = BRep_Tool::CurveOnSurface(TopoDS::Edge(it.Current()), patch, pcurve_first, pcurve_last);
     if (!candidate.curve.IsNull() && !candidate.on_patch.IsNull()) candidates.push_back(candidate);
   }
-  double worst = 0;
+  worst = 0;
   for (const TopoDS_Edge &edge : loop) {
     const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) - boundary.begin());
+    if (at >= boundary.size()) return false;
     double first = 0, last = 0;
     const Handle(Geom2d_Curve) on_support = BRep_Tool::CurveOnSurface(edge, supports[at], first, last);
-    if (on_support.IsNull()) continue;
+    if (on_support.IsNull()) return false;
     const BRepAdaptor_Curve curve(edge);
     const BRepAdaptor_Surface support_surface(supports[at], Standard_False);
     const gp_Pnt middle = curve.Value(0.5 * (first + last));
@@ -561,9 +593,10 @@ double boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &
         match = &candidate;
       }
     }
-    if (match == nullptr) continue;
-    for (int k = 0; k <= 20; ++k) {
-      const double t = first + (last - first) * k / 20.0;
+    if (match == nullptr) return false;
+    int measured = 0;
+    for (int k = 0; k <= kGapSamples; ++k) {
+      const double t = first + (last - first) * k / static_cast<double>(kGapSamples);
       const GeomAPI_ProjectPointOnCurve located(curve.Value(t), match->curve, match->first, match->last);
       if (located.NbPoints() < 1) continue;
       const gp_Pnt2d uv_s = on_support->Value(t), uv_p = match->on_patch->Value(located.LowerDistanceParameter());
@@ -573,11 +606,63 @@ double boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &
       patch_surface.D1(uv_p.X(), uv_p.Y(), point, du, dv);
       const gp_Vec n = du.Crossed(dv), m = eu.Crossed(ev);
       if (n.Magnitude() < 1e-14 || m.Magnitude() < 1e-14) continue;
+      ++measured;
       const double angle = n.Angle(m);
       worst = std::max(worst, angle > kPi / 2 ? kPi - angle : angle);
     }
+    if (measured < 0.95 * (kGapSamples + 1)) return false;
   }
-  return worst;
+  return true;
+}
+
+// The ORIENTED check of a patch in the sewn solid: along every edge of the patch image the outward normals of the patch and of the face on the other side (the face orientation applied
+// to both) must agree within kMixedFillAngle. A patch folded to the wrong side, or a surface tangent to its neighbour but facing the other way, reads about pi here and fails; false with the
+// worst angle (pi for an unmeasured edge) otherwise.
+bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMapOfShapeListOfShape &edge_faces, double &worst) {
+  worst = 0;
+  for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
+    const TopoDS_Edge edge = TopoDS::Edge(it.Current());
+    if (BRep_Tool::Degenerated(edge)) continue;
+    if (!edge_faces.Contains(edge)) {
+      worst = kPi;
+      return false;
+    }
+    std::vector<TopoDS_Face> sides;
+    for (TopTools_ListIteratorOfListOfShape owner(edge_faces.FindFromKey(edge)); owner.More(); owner.Next()) sides.push_back(TopoDS::Face(owner.Value()));
+    if (sides.size() != 2) {
+      worst = kPi;
+      return false;
+    }
+    std::vector<std::pair<Handle(Geom2d_Curve), std::pair<double, double>>> curves;
+    for (const TopoDS_Face &side : sides) {
+      double first = 0, last = 0;
+      const Handle(Geom2d_Curve) on_side = BRep_Tool::CurveOnSurface(edge, side, first, last);
+      if (on_side.IsNull()) {
+        worst = kPi;
+        return false;
+      }
+      curves.push_back({on_side, {first, last}});
+    }
+    for (int k = 0; k <= kGapSamples; ++k) {
+      const double fraction = static_cast<double>(k) / kGapSamples;
+      gp_Vec normals[2];
+      for (size_t side = 0; side < 2; ++side) {
+        const gp_Pnt2d uv = curves[side].first->Value(curves[side].second.first + (curves[side].second.second - curves[side].second.first) * fraction);
+        gp_Pnt point;
+        gp_Vec du, dv;
+        BRepAdaptor_Surface(sides[side], Standard_False).D1(uv.X(), uv.Y(), point, du, dv);
+        gp_Vec normal = du.Crossed(dv);
+        if (normal.Magnitude() < 1e-14) {
+          worst = kPi;
+          return false;
+        }
+        normal.Normalize();
+        normals[side] = sides[side].Orientation() == TopAbs_REVERSED ? normal.Reversed() : normal;
+      }
+      worst = std::max(worst, normals[0].Angle(normals[1]));
+    }
+  }
+  return worst <= kMixedFillAngle;
 }
 
 // The diagonal of the box of `members` (the faces of the solid about to be sewn) where each of the last `patch_count` faces counts by its edges only. The
@@ -782,6 +867,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     current = naming::Named{unifier.Shape(), naming::inherit(unifier.Shape(), fused, unifier.History(), "unify")};
   }
 
+  const double volume_tools = volume_of(current.shape);
   // Corners: chords across the support faces between the contact points at the wall arcs, then the patch over the hole they bound.
   std::vector<std::vector<Wall>> walls(corners.size());
   for (size_t c = 0; c < corners.size(); ++c)
@@ -819,11 +905,18 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
       // a reflex face (13.18.2): the chord would run outside it, the boundary of the hole is P_a -> Q -> P_b along the two contact lines
       const BRepAdaptor_Surface plane(TopoDS::Face(it.Value()), Standard_True);
       const Plan::Reflex *through = nullptr;
+      int hits = 0;
       if (plane.GetType() == GeomAbs_Plane)
         for (const Plan::Reflex &candidate : plan.reflex[c])
           if (std::fabs(normal_of(TopoDS::Face(it.Value())).Dot(candidate.normal)) > 1 - 1e-9 &&
-              std::fabs(normal_of(TopoDS::Face(it.Value())).Dot(gp_Vec(plane.Plane().Location(), candidate.q))) < 1e-6 * std::max(diagonal, 1.0))
+              std::fabs(normal_of(TopoDS::Face(it.Value())).Dot(gp_Vec(plane.Plane().Location(), candidate.q))) < 1e-6 * std::max(diagonal, 1.0)) {
             through = &candidate;
+            ++hits;
+          }
+      if (hits > 1) {
+        why = std::string(kFailed) + "two reflex faces at " + where(corners[c].at) + " lie in one plane: the cut face cannot be told from its record";
+        return nullptr;
+      }
       if (through != nullptr) {
         BRepBuilderAPI_MakeVertex corner_vertex(through->q);
         BRepBuilderAPI_MakeEdge first(on_face[0], TopoDS::Vertex(corner_vertex.Shape())), second(TopoDS::Vertex(corner_vertex.Shape()), on_face[1]);
@@ -863,6 +956,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
 
   TopTools_IndexedMapOfShape dropped;
   std::vector<TopoDS_Face> patches;
+  std::vector<size_t> patch_corner;  // the corner of each patch
   std::vector<std::string> patch_names;
   for (size_t c = 0; c < corners.size(); ++c) {
     TopTools_IndexedMapOfShape removed;
@@ -930,7 +1024,11 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
         return false;
       }
       if (plan.mixed[c]) {
-        const double angle = boundary_angle(patch, loop, boundary, supports, 1e-4 * diagonal);
+        double angle = 0;
+        if (!boundary_angle(patch, loop, boundary, supports, 1e-4 * diagonal, angle)) {
+          problem = "has a boundary that could not be measured against its supports (an edge not matched, or too few samples)";
+          return false;
+        }
         if (angle > kMixedFillAngle) {
           problem = "leaves its supports by " + number(angle) + " rad at the boundary samples (limit " + number(kMixedFillAngle) + ")";
           return false;
@@ -971,6 +1069,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
       }
     }
     patches.push_back(patch);
+    patch_corner.push_back(c);
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
     patch_names.push_back("blend(v:" + joined_names(around) + ")");
@@ -1023,12 +1122,40 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   const double volume_after = volume_of(solid);
   // Convex corners remove material, concave ones add it; a step with both only has to leave a solid.
   const size_t concave_corners = static_cast<size_t>(std::count(plan.concave.begin(), plan.concave.end(), true));
+  // the direction of the change is only defined for a step whose corners are all of one kind (a mixed corner has material on both sides): the bound below covers every step
   const bool any_mixed = std::count(plan.mixed.begin(), plan.mixed.end(), true) != 0;
-  const bool moved_wrongly = any_mixed ? false : concave_corners == 0 ? !(volume_after < volume_before) : (concave_corners == plan.concave.size() ? !(volume_after > volume_before) : false);
+  const bool moved_wrongly = !any_mixed && (concave_corners == 0 ? !(volume_after < volume_before) : (concave_corners == plan.concave.size() ? !(volume_after > volume_before) : false));
   if (!(volume_after > 0) || moved_wrongly) {
     fill_failed = true;
     why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (source " + number(volume_before) + ")";
     return nullptr;
+  }
+  // Whatever the mix: the patches only replace the sharp stubs between the blend ends, which fit in a cube of the longest setback plus the longest offset of its edges at each corner,
+  // so the volume after the tools (the prisms exactly, closed form r^2 (1 - pi / 4) per length of a circular blend, + for concave, - for convex) moves by less than the sum of those cubes.
+  double bound = 0;
+  for (size_t c = 0; c < corners.size(); ++c) {
+    double reach = 0;
+    for (const auto &entry : corners[c].setbacks) reach = std::max(reach, entry.second + plan.leg_at(entry.first, 0.5 * plan.frames.at(entry.first).length));
+    bound += reach * reach * reach;
+  }
+  if (std::fabs(volume_after - volume_tools) > bound) {
+    why = std::string(kFailed) + "the corner patches changed the volume by " + number(volume_after - volume_tools) + " where the sharp corners they replace bound it at " + number(bound) +
+          ": a patch on the wrong side or folded";
+    return nullptr;
+  }
+  // The oriented G1 check of every patch of a mixed corner, on the sewn solid (outward normals, both faces' orientation applied).
+  {
+    TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
+    TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
+    for (size_t p = 0; p < patches.size(); ++p) {
+      if (!plan.mixed[patch_corner[p]]) continue;
+      double worst = 0;
+      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst)) {
+        why = std::string(kFailed) + "the corner patch at " + where(corners[patch_corner[p]].at) + " is not tangent to its neighbours across its boundary in the sewn solid (outward normals differ by " +
+              number(worst) + " rad, limit " + number(kMixedFillAngle) + (worst > kPi / 2 ? ": it faces the other way" : "") + ")";
+        return nullptr;
+      }
+    }
   }
   const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
   std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));

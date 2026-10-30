@@ -1115,7 +1115,7 @@ blend ends (limit 5e-6 x diagonal, `g0Corner`), the angle to the supports (0.01 
   rounded, a setback corner at each foot vertex (two concave edges and a convex one: the opposite mix of the notch rim): 23 faces (11 planes, 8 blends, 4 patches), valid, centroid (10, 10), Ixx = Iyy, the patches take -0.180
   together (-0.045 each; the rim patch of the notch, with the opposite mix, +0.048).
 - **Found while building it: `MakeFilling`'s G1Error is not what `check_blends` reads.** The first fit of the four feet reported a G1Error under the 0.01 limit and the built solid read 0.0107 rad across the chords of the walls.
-  A mixed corner is therefore judged by the angle MEASURED at 21 samples of every boundary edge (`boundary_angle`: the support normal from the edge's curve on the support, the patch normal from the patch edge that passes through the
+  A mixed corner is therefore judged by the angle MEASURED at 101 samples of every boundary edge (21 in the first version) (`boundary_angle`: the support normal from the edge's curve on the support, the patch normal from the patch edge that passes through the
   middle of the loop edge, located by a 1D projection; a projection on the patch itself costs seconds on 8100 poles), limit 0.0095, and the next fit setting is tried above it: the same four feet read 0.0090 at most.
   The cost: the first setting no longer passes, so a mixed corner takes two to three fills (about 4 s per corner on the boss against 1.4 s for a convex one). Corner speed is the next item.
 - **Left, refused by name as before:** a profile (conic / curvature) corner at a mixed vertex (the automatic profile corners round convex edges), a vertex with an unrounded third edge, curved edges or faces, `size2`, a varying size at
@@ -1157,3 +1157,30 @@ R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, con
 ### 13.19.5 Tests
 
 `a_chain_whose_curvature_blend_would_meet_at_more_than_the_g1_default_is_refused_and_a_conic_fades_to_the_circle` (`blend_rail_tests.rs`): the curvature refusal names both passes; the R 30 conic builds with the fade, junction below 1e-4 rad, contacts G1, volume ratio in (0.75, 1); the R 20 chain has no fade. Red-proof: with the fade disabled the same test fails with the 0.0182 rad refusal. `tests/unit/blendProfile.test.ts` (summary and data), tool-schema snapshot (description).
+
+### 13.18.6 Review round on §13.18
+
+- **The boundary measure fails closed.** `boundary_angle` (the fill-time angle, now at kGapSamples + 1 = 101 samples as `check_blends` reads) returns false, and the fill attempt fails ("a boundary that could not be measured
+  against its supports"), unless EVERY loop edge was matched to a patch edge and at least 95 % of its samples were measured; before, an unmatched edge or a failed projection read 0 and passed.
+- **The orientation is checked after the sewing.** The fill-time angle is of the normal LINES (`n.Angle(m)` folded into [0, pi/2]): a patch tangent to its support but facing the other way reads 0. The check that catches
+  that is `oriented_patch_angle`, on the sewn solid, for every patch of a mixed corner: along every edge of the patch image the outward normals of both faces (the face orientation applied) differ by less than
+  kMixedFillAngle (0.0095), sampled at 101 points; an anti-parallel pair reads pi and fails by name ("it faces the other way"); an edge with other than two faces, or without a curve on a face, fails as unmeasured.
+- **The volume check covers every step.** A step with a mixed corner used to skip the volume checks altogether. The sign test (convex steps lose volume, concave ones gain) is still only defined for a step of one kind,
+  but a bound applies to all: the patches only replace the sharp stubs between the blend ends, which fit in a cube of the longest setback plus the longest tangent distance of the edges of each corner, so the volume after
+  the tools (measured: the prisms exactly) moves by less than the sum of those cubes. Sensitivity checked by setting the bound to 0: the notch rim then fails with "changed the volume by 0.3868 where the sharp
+  corners they replace bound it at 0".
+- **Q is checked** (`plan_corner`, once the setbacks are final). It must be computable (|u x v . n| > 1e-9 |u||v| and finite: parallel contact lines refuse the corner naming the vertex), in front of nothing it should not
+  be (the position of Q along each stub must be below that edge's setback: a taper can bring it forward of the contact point), inside the source face, and the two tool segments (P_a, Q) and (Q, P_b) must have their midpoints
+  inside it. As the sector tends to 2 pi, Q goes to r cot(phi / 2): in plain geometry the notch edge's own tangent distance, r cot(phi / 2) too, outgrows the setback first (`a_reflex_face_too_narrow_for_its_path_is_refused_by_name`:
+  BLD_SETBACK_TOO_SHORT with 22.9 at the vertex), so the Q guard itself is not reached by a prism and is not tested alone. A reflex record is one per source face (`IsSame`); the cut face that carries it is
+  found by plane and Q, and two records in one plane at one vertex fail by name.
+- **Behaviour change, stated:** a face that is reflex at a vertex whose edges are all of one kind (a convex vertex of four edges whose face sweeps more than pi, say) now takes the Q path instead of the chord, which crossed the face
+  outside.
+- **Why the measured boundary angle is not applied to every corner.** For corners of one kind, `MakeFilling`'s G1Error was the criterion and the built solids read 0.0045 (the 10 mm cube, eight corners) to 0.0094 (the notch)
+  at the tangency check, under the 0.01 limit with a margin; only the mixed corners were seen above it (0.0107). Applying the measure to every corner costs a fill per rejected attempt (the first setting passes for
+  the cube corners today) and would change patches that are valid; it is the follow-up if a one-kind corner is found above the limit.
+- **Tests:** `a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmetry` (a prism of an outline with a 60 degree notch, the reflex top and bottom faces; the solid is mirror symmetric about y = 5, so the
+  centroid y is 5 and Ixy = Iyz = 0 to 1e-6), `a_taper_on_a_mixed_corner_builds_or_is_refused_by_name` (the rim with its two top edges tapering 0.5 -> 0.3), `worst_patch_angle` (never skips an edge of a patch: the old
+  helper skipped any edge with a sample above 0.5 rad, a fold-back included; 21 samples), the rim patch band is +0.03 to +0.07 (measured +0.048), Ixx = Iyy and Ixz = Iyz to 1e-6.
+  `nativeBlendCorners.test.ts` pins the reason of the remaining refusal ("the face closing the rounded edge at [0, 0, 0] is too oblique to the edge"). No test provokes an unmeasured boundary or a folded patch: neither is
+  reachable by a prism, the checks are closed by construction.

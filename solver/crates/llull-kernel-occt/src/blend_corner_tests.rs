@@ -66,6 +66,33 @@ fn cube_vertices(size: f64) -> Vec<[f64; 3]> {
     all
 }
 
+/// The largest angle (radians) between the outward normals across every edge of every corner patch (a face named `blend(v:...`), at 21 samples, WITHOUT the sharp-edge skip of
+/// `worst_tangent_angle` (a patch folded back against its neighbour reads pi there and was skipped as a sharp edge).
+fn worst_patch_angle(shape: &Shape) -> f64 {
+    let topo = topology(shape).unwrap();
+    let patches: Vec<usize> = topo["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:")))
+        .map(|(index, _)| index)
+        .collect();
+    assert!(!patches.is_empty(), "the shape has corner patches");
+    let graph = crate::queries::face_graph(shape).unwrap();
+    let mut worst: f64 = 0.0;
+    for (edge, faces) in graph["edgeFaces"].as_array().unwrap().iter().enumerate() {
+        if !faces.as_array().unwrap().iter().any(|face| patches.contains(&(face.as_u64().unwrap() as usize))) {
+            continue;
+        }
+        let samples = edge_continuity(shape, edge as f64, 21.0).unwrap();
+        for sample in samples.as_array().expect("a patch edge is measured") {
+            worst = worst.max(num(&sample["g1"]));
+        }
+    }
+    worst
+}
+
 /// The largest angle (radians) between the two face normals over the 9 samples of every edge whose faces are not at a sharp angle (> 0.5 rad).
 fn worst_tangent_angle(shape: &Shape) -> f64 {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
@@ -298,15 +325,14 @@ fn a_vertex_of_convex_and_concave_edges_takes_a_setback_corner_through_the_conta
     let area = 0.25 * (1.0 - std::f64::consts::FRAC_PI_4);
     let prisms = area * (2.6 + 3.8 + 3.8) - area * (3.8 + 3.8);
     let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
-    assert!(
-        change > prisms + 0.339 - 0.02 && change < prisms + 0.339 + 0.15,
-        "prisms {prisms} + the inner patch 0.339 + the rim patch: {change}"
-    );
-    assert!(worst_tangent_angle(&built) < 0.01, "blends, patches and faces are tangent");
+    let rim_patch = change - prisms - 0.339;
+    assert!(rim_patch > 0.03 && rim_patch < 0.07, "prisms + the inner patch 0.339 + the rim patch (measured +0.048): {rim_patch}");
+    assert!(worst_patch_angle(&built) < 0.0095, "every edge of a patch is tangent, oriented: {}", worst_patch_angle(&built));
     let mass = mass_properties(&built).unwrap();
     let centroid = (mass.centroid[0], mass.centroid[1]);
     assert!((centroid.0 - centroid.1).abs() < 1e-6, "symmetric about x = y: {centroid:?}");
-    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-3 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
+    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-6 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
+    assert!((mass.inertia[4] - mass.inertia[5]).abs() < 1e-6 * mass.inertia[0].abs(), "Ixz = Iyz: {:?}", mass.inertia);
 }
 
 /// BLD §13.18: the foot of a boss on a plate. Each of the four foot vertices has two concave foot edges and the convex vertical edge of the boss; the plate face is reflex there. Four-fold symmetry:
@@ -337,10 +363,84 @@ fn the_four_foot_corners_of_a_boss_on_a_plate_are_mixed_vertices_and_build() {
     // measured: the four patches take -0.180 together (-0.045 each), the notch rim's one patch adds +0.048: two convex and one concave edge there, two concave and one convex here
     let patches = change - prisms;
     assert!(patches > -0.3 && patches < -0.1, "prisms {prisms} + 4 corner patches: {change} (patches {patches})");
-    assert!(worst_tangent_angle(&built) < 0.01, "tangent {}", worst_tangent_angle(&built));
+    assert!(worst_patch_angle(&built) < 0.0095, "every edge of a patch is tangent, oriented: {}", worst_patch_angle(&built));
     let mass = mass_properties(&built).unwrap();
     assert!((mass.centroid[0] - 10.0).abs() < 1e-6 && (mass.centroid[1] - 10.0).abs() < 1e-6, "{:?}", mass.centroid);
-    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-3 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
+    assert!((mass.inertia[0] - mass.inertia[1]).abs() < 1e-6 * mass.inertia[0].abs(), "Ixx = Iyy: {:?}", mass.inertia);
+}
+
+/// BLD §13.18: a 300 degree reflex face. A prism of an outline with a 60 degree wedge notch (apex D = (4, 5), mirror symmetric about y = 5): at the top and the bottom vertex of the notch
+/// apex the top (bottom) face is 300 degrees and Q lies behind the vertex; the solid is symmetric, so the centroid is at y = 5 and the products of inertia with y vanish.
+#[test]
+fn a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmetry() {
+    let _serial = crate::serial_blends();
+    let reach = 6.0 * (std::f64::consts::PI / 6.0).tan();
+    let outline =
+        [0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0, 5.0 - reach, 0.0, 4.0, 5.0, 0.0, 10.0, 5.0 + reach, 0.0, 10.0, 10.0, 0.0, 0.0, 10.0, 0.0];
+    let shape = crate::make_prism(&outline, [0.0, 0.0, 6.0]).unwrap().unwrap();
+    let (top, bottom) = ([4.0, 5.0, 6.0], [4.0, 5.0, 0.0]);
+    let mut rounded = edges_at(&shape, top);
+    rounded.extend(edges_at(&shape, bottom));
+    rounded.sort_unstable();
+    rounded.dedup();
+    assert_eq!(rounded.len(), 5, "two top edges, two bottom edges, the reflex vertical edge");
+    let (edges, mut corners) = spec(&shape, &rounded, 0.4, &[top], 1.0);
+    corners.extend(spec(&shape, &rounded, 0.4, &[bottom], 1.0).1);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    assert!(worst_patch_angle(&built) < 0.0095, "oriented tangents: {}", worst_patch_angle(&built));
+    let mass = mass_properties(&built).unwrap();
+    assert!((mass.centroid[1] - 5.0).abs() < 1e-6, "mirror symmetry about y = 5: {:?}", mass.centroid);
+    assert!(
+        mass.inertia[3].abs() < 1e-6 * mass.inertia[0] && mass.inertia[5].abs() < 1e-6 * mass.inertia[0],
+        "Ixy = Iyz = 0 about the centroid: {:?}",
+        mass.inertia
+    );
+}
+
+/// BLD §13.18 review: a very narrow notch (2 degrees: the top face is 358 degrees, Q would be 0.4 x cot(1 degree) = 23 mm from the vertex) is refused by name at its vertex, never an
+/// infinity or a path across the notch. In plain geometry the tangent distance of the notch edge itself (r cot(1 degree), the same 23 mm) outgrows the setback first, so the refusal is
+/// BLD_SETBACK_TOO_SHORT; the guard on Q (in the face, in front of the contact points) is behind it and is not reachable here.
+#[test]
+fn a_reflex_face_too_narrow_for_its_path_is_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let reach = 6.0 * (std::f64::consts::PI / 180.0).tan();
+    let outline =
+        [0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0, 5.0 - reach, 0.0, 4.0, 5.0, 0.0, 10.0, 5.0 + reach, 0.0, 10.0, 10.0, 0.0, 0.0, 10.0, 0.0];
+    let shape = crate::make_prism(&outline, [0.0, 0.0, 6.0]).unwrap().unwrap();
+    let top = [4.0, 5.0, 6.0];
+    let rounded = edges_at(&shape, top);
+    let (edges, corners) = spec(&shape, &rounded, 0.4, &[top], 1.0);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_") && reason.contains("[4, 5, 6]") && reason.contains("22.9"), "{reason}");
+}
+
+/// BLD §13.18 review: a radius that varies along the edges of a mixed corner. The notch rim with its two top edges tapering 0.5 -> 0.3 builds, or is refused by name: never a NaN, never an
+/// invalid solid.
+#[test]
+fn a_taper_on_a_mixed_corner_builds_or_is_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let shape = notched_cube();
+    let (rim, inner) = ([5.0, 5.0, 10.0], [5.0; 3]);
+    let mut rounded = edges_at(&shape, rim);
+    rounded.extend(edges_at(&shape, inner));
+    rounded.sort_unstable();
+    rounded.dedup();
+    let top: Vec<usize> = edges_at(&shape, rim).into_iter().filter(|edge| !edges_at(&shape, inner).contains(edge)).collect();
+    let tapers: Vec<(usize, f64, f64)> =
+        rounded.iter().map(|&edge| if top.contains(&edge) { (edge, 0.5, 0.3) } else { (edge, 0.5, 0.5) }).collect();
+    let (edges, mut corners) = spec_tapered(&shape, &tapers, &[rim], 1.2);
+    corners.extend(spec_tapered(&shape, &tapers, &[inner], 1.2).1);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    if reason.is_empty() {
+        let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+        assert!(analyze(&built).unwrap().valid);
+        assert!(worst_patch_angle(&built) < 0.0095);
+        assert!(mass_properties(&built).unwrap().volume.is_finite());
+    } else {
+        assert!(reason.starts_with("[BLD_CORNER_") || reason.starts_with("[BLD_SETBACK_"), "{reason}");
+    }
 }
 
 #[test]

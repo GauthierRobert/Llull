@@ -210,7 +210,7 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     expect(volume(mixed.document, mixed.affected[0] as string)).toBeGreaterThan(volume(doc, id));
     const checked = execute(mixed.document, 'check_blends', { ids: [mixed.affected[0] as string] }).data as { status: string };
     expect(checked.status).toBe('pass');
-    // a mixed vertex whose edge ends at a vertex that is neither a corner nor closed by one flat face is still refused by name
+    // the same rim vertex without a corner at the inner vertex: the concave edge ends at (0, 0, 0), a vertex with no setback corner whose closing face is oblique to the edge
     const open = execute(doc, 'fillet_edge', {
       id,
       edgesNear: [
@@ -223,6 +223,7 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     });
     expect(open.document).toBe(doc);
     expect(open.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
+    expect(open.summary).toContain('the face closing the rounded edge at [0, 0, 0] is too oblique to the edge');
     // split the face x = -5 (far from the notch) in two: its halves must come out of the concave setback with their names
     const split = execute(doc, 'split_face', { id, facesNear: [[-5, 0, 0]], plane: { origin: [0, 0, -2], normal: [0, 0, 1] } });
     expect(split.error).toBeUndefined();
