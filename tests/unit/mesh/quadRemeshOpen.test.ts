@@ -314,8 +314,16 @@ describe('quad_remesh of an open mesh and with symmetry (stub engine)', () => {
     expect(seen[0]).toMatchObject({ op: 'quad_remesh', targetQuads: 36, preserveBoundary: true });
     expect(seen[0]).not.toHaveProperty('withDeviation');
     const data = result.data as Record<string, unknown>;
-    expect(data).toMatchObject({ open: true, boundaryLoops: 1, quads: 36 });
-    expect(data['boundaryMove'] as number).toBeCloseTo(0.3, 9);
+    // the outermost layer of the 6 x 6 plate (20 quads) is replaced by one row of 16 on the rim (the inner boundary has 16 vertices)
+    expect(data).toMatchObject({
+      open: true,
+      boundaryLoops: 1,
+      quads: 32,
+      boundaryRow: 'realigned',
+      boundaryRowQuads: 16,
+      boundaryLayerRemoved: 20,
+    });
+    expect(data['boundaryMove'] as number).toBeGreaterThan(0);
     expect(result.summary).toContain('1 boundary loop(s) kept');
     const mesh = meshOf(result);
     // wound like the source (+z) and flat
@@ -409,7 +417,7 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
     const result = execute(doc, 'quad_remesh', { id, targetQuadCount: 36, output: 'mesh' }, contextWith(engine));
     expect(result.error, result.summary).toBeUndefined();
     expect(seen.map((op) => op.targetQuads)).toEqual([36, 42]);
-    expect(result.data).toMatchObject({ attempts: 2, engineTargets: [36, 42], quads: 36 });
+    expect(result.data).toMatchObject({ attempts: 2, engineTargets: [36, 42], quads: 32 });
   });
 
   it('then asks at 0.87 x, and refuses by name when every answer fails: the loop count -> BOUNDARY_LOST, the shape -> SNAP_FAILED', () => {
@@ -433,15 +441,15 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
 
   it('asks once more for the count that would have given the target when the ratio is under 0.85, and keeps the closer result', () => {
     const seen: QuadOp[] = [];
-    // 36 quads for 100 asked (ratio 0.36): asked again for ceil(100 / 0.36) = 278, which answers with 100 quads
+    // 32 quads for 100 asked (ratio 0.32, the outer layer of 20 quads becomes a row of 16): asked again for ceil(100 / 0.32) = 313, which answers with 96 (a 10 x 10 plate: 64 inner quads and a row of 32)
     const better = execute(
       doc,
       'quad_remesh',
       { id, targetQuadCount: 100, output: 'mesh' },
       contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(10, 10, 0.3)), seen)),
     );
-    expect(seen.map((op) => op.targetQuads)).toEqual([100, 278]);
-    expect(better.data).toMatchObject({ attempts: 2, engineTargets: [100, 278], quads: 100, targetRatio: 1 });
+    expect(seen.map((op) => op.targetQuads)).toEqual([100, 313]);
+    expect(better.data).toMatchObject({ attempts: 2, engineTargets: [100, 313], quads: 96, targetRatio: 0.96 });
     // the second answer is worse (the ratio 0.1): the first is kept
     const worse = execute(
       doc,
@@ -449,7 +457,7 @@ describe('quad_remesh retries and the flat symmetry plane (13.17.6)', () => {
       { id, targetQuadCount: 100, output: 'mesh' },
       contextWith(stubQuadEngine((op) => (op.targetQuads === 100 ? plateQuads(6, 10, 0.3) : plateQuads(3, 10, 0.3)))),
     );
-    expect(worse.data).toMatchObject({ attempts: 2, quads: 36 });
+    expect(worse.data).toMatchObject({ attempts: 2, quads: 32 });
     // a closed source is never asked twice by the ratio rule
     const sphere = docWithMeshes(icosphere(10, 3));
     const closedSeen: QuadOp[] = [];

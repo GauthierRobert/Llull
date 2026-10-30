@@ -1890,3 +1890,35 @@ Collapses 521,051, triangles 268,618, rejected 130,994 / 81,376 / 952,795 and th
 ### 13.27.5 What stays, and the smallest semantic change that would go further
 
 The sequential loop (4 s) and the 555 k checks of re-queued edges (1.3 s) bound what the parallel checks can give: about 6 s on this machine is the floor of this design. Going below it takes a change of the SEMANTICS: the guard validates every probe of the neighbourhood for every accepted collapse; testing only the probes whose witness the collapse removes would skip about 70 % of them but misses probes whose best face got worse without being the witness, i.e. it can accept a collapse the full guard refuses (a bound overshoot of at most the movement of the collapse). **Decision (coordinator, 2026-10-30): rejected.** `maxDeviation` is a guarantee to the user; an overshoot, even one bounded by the movement of a collapse, breaks it. The guard keeps testing every probe.
+
+## 13.28 As built (DES-7c: the boundary-aligned quad row of `quad_remesh`, 2026-10-30)
+
+### 13.28.1 What it is
+
+13.17 left an open (or symmetric) result with the engine's staircase on its boundary: vertices of valence 1 and 2 in runs, and snapping them onto the rim (`snapQuadBoundary`) kept the staircase and refused two inputs (`SNAP_FAILED`). `quad_remesh` now first tries `realignBoundaryRow` (`packages/core/src/geometry/mesh/quadRow.ts`, pure): (1) the outermost layer of the engine's quads (every quad with a vertex on a boundary loop) is taken away, which leaves an inner boundary loop M per rim loop; (2) the rim is resampled to as many points as M has vertices, the corners of the rim exact (the rim's turns of more than 60 degrees and where it joins the symmetry plane), the rest by arc length between corners, and paired with M by the cyclic shift (and direction) that brings them closest; (3) one row of quads joins M to the rim points (`[b, a, rim a, rim b]` for the inner boundary edge a to b, so the winding follows the inner quads); (4) the vertices of M are relaxed three times (half-way to the mean of their neighbours, put back on the source surface) and kept only if nothing folds. The even spacing is tried first; when the row folds the rim points blend towards the projection of M onto the rim (shares of even spacing 1, 0.75, 0.5, 0.25, 0 in turn, the corners always exact), and `data.boundaryRowEvenness` names the share used. When no row works (the layer cannot be taken off, the loops do not pair, every share folds) the old snap runs, so nothing that worked before is refused for this. Closed meshes without symmetry never come here (byte-identical); a symmetric result mirrors the realigned half as before (the rim points on the plane are exactly on it).
+
+`data` of an open or symmetric result gains `boundaryRow` (`"realigned"` or `"snapped"`), `boundaryRowQuads`, `boundaryLayerRemoved`, `boundaryRowEvenness`.
+
+### 13.28.2 Measured (win32-x64, the real QuadriFlow job; the same engine answer through the old snap and through the row)
+
+| Case (engine answer, half for symmetry) | Boundary valence (vertices per number of quads around them), engine | after the snap | after the row | Largest distance of a boundary vertex to the rim: engine / snap / row | Quads: engine to row |
+| --- | --- | --- | --- | --- | --- |
+| hemisphere l4, 300 | {1: 19, 2: 23, 3: 15, 4: 1} | refused (shape) | {2: 52} | 0.79 / - / 4e-16 | 244 to 241 |
+| hemisphere l5, 1000 | {1: 29, 2: 38, 3: 27} | refused (shape) | {2: 90} | 0.41 / - / 9e-16 | 655 to 653 |
+| hemisphere l5, symmetry yz (half, 500) | {1: 20, 2: 51, 3: 17} | the same staircase | the row folds at every share: snap kept | 0.48 / 2e-16 / - | 414 |
+| square plate 10 x 10, 100 | {1: 10, 2: 24, 3: 6} | the same staircase | {2: 26} | 0.60 / 0 / 0 | 72 to 64 |
+| square plate, 400 | {1: 7, 2: 68, 3: 3} | the same staircase | {2: 70} | 0.23 / 2e-16 / 1e-16 | 360 to 356 |
+| closed l6, 4000, symmetry yz (half, 2000) | {1: 42, 2: 62, 3: 40} | refused (shape) | {2: 140} (evenness 0.25) | 0.38 / - / 4e-16 | 1847 to 1845 |
+
+No staircase on the boundary of any row result: every boundary vertex has two quads, the vertices lie on the rim to rounding, the corners of the plate are vertices. Through the command (including the retries of 13.17.3b): the two inputs that were refused now work: hemisphere l5 1000 gives 1,167 quads in three attempts (ratio 1.17; before: refused `SNAP_FAILED` after three), closed l6 4000 symmetry yz gives 3,690 (ratio 0.92, one attempt; before: refused after three). Symmetric results land closer to the target than the 0.7 to 0.8 of 13.17.3: closed l4 600 symmetry yz 692 (1.15, two attempts; was 432), hemisphere l4 300 symmetry yz 262 (0.87; was 236). Closed meshes: unchanged (closed l4 600: 614, closed l6 4000: 3,877). Time: the row is a few milliseconds; the command is dominated by QuadriFlow (closed l6 symmetric 5.4 s, one attempt where the refusal took 6.0 s over three).
+
+### 13.28.3 What it does not do
+
+- **Corners of the rim.** A corner vertex of the rim (a plate's corner) has two quads around it where an ideal cage has one: the row is strictly one quad per rim segment, so the corner quads are two half-width skinny quads (45 degrees each at a right angle). The corner is exact; making it a single quad would take a corner patch (not built).
+- **The second ring.** The inner boundary M keeps the engine's irregular vertices (its valences go up by two when the row is attached, so the valence-1/2/3 runs become 3/4/5); that is where the staircase moved to. It is relaxed on the surface, not remeshed (the engine's interior is untouched).
+- **The count.** Taking the outer layer and adding one row changes the count by a few quads (the layer's corner quads): -3 on a hemisphere, -8 on a 10 x 10 plate; the retry rule of 13.17.3b corrects the ratio.
+- **The symmetric hemisphere (half of l5 at 500)** still goes through the snap: the row folds at every share of even spacing. The vendored QuadriFlow boundary field was not touched (`flag_preserve_boundary` stays as 13.17).
+
+### 13.28.4 Tests
+
+`tests/unit/mesh/quadRow.test.ts` (a staircase 8 x 8 plate: boundary valences all 2 against the engine's runs of 1 and 3, every boundary vertex on the rim exactly, the four corners present, flat and facing +z, the vertices two quads in unmoved, the count 36 + 24; the refusals by cause: loop counts that do not pair, nothing left inside, a source whose boundary branches; purity), `tests/unit/mesh/quadRemeshOpen.test.ts` (the stub-engine counts updated: 36 quads become 32, the retry asks 313 instead of 278), `server/tests/quadRowNative.test.ts` (the two formerly refused inputs now work on the real engine, a closed result unchanged at 614). Red-proofs (shown by disabling): the exact corners (the staircase test fails), the winding of the strip (the same test fails: the neighbour check refuses the flipped rows).
