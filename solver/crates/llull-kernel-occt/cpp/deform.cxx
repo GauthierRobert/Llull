@@ -65,6 +65,8 @@ using deform::Falloff;
 using deform::LawKind;
 using deform::Warp;
 
+// Spec header (16 numbers, then the law numbers): kind, tolerance, origin[3], axis[3], reference[3], region start, region end, falloff code
+// (0 none, 1 linear, 2 smooth), preserveAnalytic, region.infinite (0 / 1: start and end only fix the rate, the law holds on the whole axis).
 constexpr int kSpecHeader = 16;
 // det J at or below this counts as folded (01 DEF §5.9 Jacobian floor).
 constexpr double kJacobianFloor = 1e-6;
@@ -146,6 +148,7 @@ bool parse_spec(rust::Slice<const double> spec, Warp &warp, double &tolerance, b
   warp.region.end = spec[12];
   warp.region.falloff = static_cast<Falloff>(static_cast<int>(spec[13]));
   preserve = spec[14] != 0;
+  warp.region.infinite = spec[15] != 0;
   if (!(warp.region.end > warp.region.start)) {
     why = "region end must exceed its start";
     return false;
@@ -382,6 +385,9 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
   if (input.shape.IsNull()) return refuse(stats, "DEF_KERNEL_REFUSED", "the source shape is empty");
   std::vector<naming::Named> named{naming::named(input)};
   TopoDS_Shape source = input.shape;
+
+  if (taper_scale_vanishes(warp, source))
+    return refuse(stats, "DEF_FOLDOVER", "the map folds the body: the infinite taper scale reaches 0 inside the body (det J = s^2 touches 0)");
 
   // A full-turn ring: drop the two coincident end caps; sewing closes it again after the warp.
   bool full_turn = false;

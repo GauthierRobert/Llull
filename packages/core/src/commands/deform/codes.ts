@@ -6,7 +6,8 @@ export const DEF_REMEDIATION: Readonly<Record<string, string>> = {
   DEF_ENTITY_NOT_FOUND: 'Run `llull describe_scene` to list entity ids.',
   DEF_TARGET_UNSUPPORTED: '2D shapes: extrude_profile first; instances: explode_instance first; a trimmed sheet only under an affine map.',
   DEF_FRAME_DEGENERATE: 'Give a non-zero axis and a reference direction that is not parallel to it.',
-  DEF_REGION_INVALID: 'Give region.end greater than region.start, both finite, in document units from the frame origin.',
+  DEF_REGION_INVALID:
+    'Give region.end greater than region.start, both finite, in document units from the frame origin; with region.infinite use falloff "linear" (or omit it).',
   DEF_REGION_MISSES_BODY:
     'The region does not meet the body: analyze_deformation or measure_bounding_box show its extent; move the region.',
   DEF_NO_EFFECT: 'The parameters are the identity (angle 0, factor 1): change them or skip the call.',

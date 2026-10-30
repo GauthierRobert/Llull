@@ -11,21 +11,25 @@ import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node with a twist law
  * @invariant det J = 1: volume unchanged, every cross-section keeps its shape and is rotated by angle × ramp(z); kernel-optional: exact warp
  *   on the native kernel, mesh path on Manifold and without a kernel
- * @failure unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; angle 0 -> DEF_NO_EFFECT; bad frame / region -> DEF_FRAME_DEGENERATE / DEF_REGION_INVALID / DEF_REGION_MISSES_BODY
+ * @failure infinite with falloff smooth -> DEF_REGION_INVALID; unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; angle 0 -> DEF_NO_EFFECT; bad frame / region -> DEF_FRAME_DEGENERATE / DEF_REGION_INVALID / DEF_REGION_MISSES_BODY
  */
 export const twistBody = defineCommand({
   name: 'twist_body',
   annotations: { readsMeshTriangles: true },
   description:
     'Twist a 3D solid or mesh about an axis: each cross-section perpendicular to the axis is rotated by angleDeg times a ramp that goes from 0 at region.start ' +
-    'to 1 at region.end (past the end the body keeps the full rotation). Volume is unchanged. Use it for twisted bars, drill flutes, blades, balusters. ' +
+    'to 1 at region.end (past the end the body keeps the full rotation); with region.infinite true the rate angleDeg per (end - start) holds along the whole axis, also beyond both ends. Volume is unchanged. Use it for twisted bars, drill flutes, blades, balusters. ' +
     'angleDeg is in degrees (positive = counter-clockwise looking down the axis toward the origin). The frame, region and tolerance default from the body ' +
     '(axis = longest direction, region = the whole body, falloff "smooth"); the defaults used are reported in data.frame. ' +
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe); the mesh is refined until the chordal deviation is within output.tolerance. ' +
     'Refuses angle 0 (DEF_NO_EFFECT) and regions that miss the body (DEF_REGION_MISSES_BODY). Then call analyze_deformation and check_deformation.',
   params: z.object({
     ...bodyParams,
-    angleDeg: z.number().describe('Total rotation reached at region.end, degrees; any non-zero value (360 and more are allowed).'),
+    angleDeg: z
+      .number()
+      .describe(
+        'Total rotation reached at region.end, degrees; any non-zero value (360 and more are allowed). With region.infinite: the rotation per (region.end - region.start) of length.',
+      ),
     frame: frameParam.optional(),
     region: regionParam.optional(),
     output: outputParam.optional(),

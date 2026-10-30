@@ -4,14 +4,14 @@ import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { type DeformNode, mapLocal } from './laws';
 import { resolveFrame, toLocal, toWorld } from './frame';
-import { unmapLocal } from './inverse';
+import { type SourceWindow, unmapLocal } from './inverse';
 
 /**
  * max over the unique edges (a, b) of |F((F⁻¹a + F⁻¹b) / 2) − (a + b) / 2|.
  * @invariant an affine law keeps straight lines straight: 0
  * @failure degenerate frame -> null
  */
-export function storedChordError(mesh: MeshData, node: Pick<DeformNode, 'law' | 'frame' | 'region'>): number | null {
+export function storedChordError(mesh: MeshData, node: Pick<DeformNode, 'law' | 'frame' | 'region'>, window?: SourceWindow): number | null {
   const frame = resolveFrame(node.frame);
   if (frame === null) return null;
   const { law, region } = node;
@@ -22,7 +22,7 @@ export function storedChordError(mesh: MeshData, node: Pick<DeformNode, 'law' | 
     const known = pulled.get(v);
     if (known !== undefined) return known;
     const q = toLocal(frame, [mesh.positions[v * 3] as number, mesh.positions[v * 3 + 1] as number, mesh.positions[v * 3 + 2] as number]);
-    const back = unmapLocal(law, region, q) ?? q;
+    const back = unmapLocal(law, region, q, window) ?? q;
     pulled.set(v, back);
     return back;
   };

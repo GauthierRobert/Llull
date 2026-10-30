@@ -16,11 +16,12 @@ const ONE: RampValue = { w: 1, d1: 0, d2: 0 };
 
 /**
  * Ramp at local height `z`: 0 below the start; past the end 1 (rigid); inside, `linear` clamp(t) or `smooth` 3t² − 2t³
- * with t = (z − start) / (end − start). `none` is a step at the start (stretch).
+ * with t = (z − start) / (end − start). `none` is a step at the start (stretch). An `infinite` region is the unclamped linear ramp w = t on the whole axis.
  */
 export function rampAt(region: DeformRegion, z: number): RampValue {
   const length = region.end - region.start;
   const t = (z - region.start) / length;
+  if (region.infinite === true) return { w: t, d1: 1 / length, d2: 0 };
   if (t <= 0) return ZERO;
   if (t >= 1) return ONE;
   if (region.falloff === 'none') return ONE;

@@ -4,8 +4,14 @@ import type { DeformLaw, DeformRegion } from '../../model/deform';
 import type { Vec3 } from '../../model/vectors';
 import { rampAt } from './region';
 
+/** Source heights (local z) the pulled-back points are expected in: picks the turn of an infinite bend that atan2 wraps. */
+export interface SourceWindow {
+  readonly min: number;
+  readonly max: number;
+}
+
 /** Inverse of the bend: polar coordinates around the centre of curvature inside the swept sector, a rigid rotation past it. */
-function unbend(radius: number, symmetric: boolean, region: DeformRegion, [x, y, z]: Vec3): Vec3 {
+function unbend(radius: number, symmetric: boolean, region: DeformRegion, [x, y, z]: Vec3, window?: SourceWindow): Vec3 {
   const { start, end } = region;
   const total = (end - start) / radius;
   let dy = y - radius;
@@ -16,6 +22,11 @@ function unbend(radius: number, symmetric: boolean, region: DeformRegion, [x, y,
     [dy, dz] = [hc * dy + hs * dz, -hs * dy + hc * dz];
   }
   const angle = Math.atan2(dz, -dy);
+  if (region.infinite === true) {
+    // atan2 wraps at ±π: take the turn whose source height is nearest the middle of the source window
+    const turns = window === undefined ? 0 : Math.round((((window.min + window.max) / 2 - start) / radius - angle) / (2 * Math.PI));
+    return [x, radius - Math.hypot(dy, dz), start + radius * (angle + 2 * Math.PI * turns)];
+  }
   if (angle <= 0) return [x, radius + dy, start + dz];
   if (angle <= total) return [x, radius - Math.hypot(dy, dz), start + radius * angle];
   const [sin, cos] = [Math.sin(total), Math.cos(total)];
@@ -23,10 +34,10 @@ function unbend(radius: number, symmetric: boolean, region: DeformRegion, [x, y,
 }
 
 /**
- * The local point that `mapLocal` sends to `q`.
+ * The local point that `mapLocal` sends to `q`; `window` (source heights) selects the turn of an infinite bend beyond ±π.
  * @failure the affine law (use its matrix inverse) -> null
  */
-export function unmapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 | null {
+export function unmapLocal(law: DeformLaw, region: DeformRegion, q: Vec3, window?: SourceWindow): Vec3 | null {
   const [x, y, z] = q;
   switch (law.kind) {
     case 'affine':
@@ -41,13 +52,14 @@ export function unmapLocal(law: DeformLaw, region: DeformRegion, q: Vec3): Vec3 
       return [x / s, law.flat ? y : y / s, z];
     }
     case 'stretch': {
+      if (region.infinite === true) return [x, y, region.start + (z - region.start) / law.factor];
       if (z <= region.start) return q;
       const stretchedEnd = region.start + law.factor * (region.end - region.start);
       if (z <= stretchedEnd) return [x, y, region.start + (z - region.start) / law.factor];
       return [x, y, z - (law.factor - 1) * (region.end - region.start)];
     }
     case 'bend':
-      return unbend(law.radius, law.symmetric, region, q);
+      return unbend(law.radius, law.symmetric, region, q, window);
     case 'lattice':
     case 'point':
     case 'flowCurve':

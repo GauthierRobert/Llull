@@ -17,14 +17,18 @@ export const taperBody = defineCommand({
   annotations: { readsMeshTriangles: true },
   description:
     'Taper a 3D solid or mesh along an axis: each cross-section is scaled about the axis by 1 + (scaleEnd - 1) times a ramp that goes from 0 at region.start ' +
-    'to 1 at region.end; past the end the body keeps scale scaleEnd. scaleEnd is unitless and > 0 (0.5 halves the end section, 2 doubles it). ' +
+    'to 1 at region.end; past the end the body keeps scale scaleEnd; with region.infinite true the scale 1 + (scaleEnd - 1) (z - start) / (end - start) continues along the whole axis (a body reaching scale <= 0 is refused with DEF_FOLDOVER). scaleEnd is unitless and > 0 (0.5 halves the end section, 2 doubles it). ' +
     'With flat true only the frame x direction is scaled (a wedge-like taper). Use it for tapered handles, pins, nozzles, columns. ' +
     'The frame, region and tolerance default from the body (axis = longest direction, region = the whole body, falloff "smooth"); the defaults used are reported in data.frame. ' +
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe). ' +
     'Refuses scaleEnd <= 0 (DEF_TAPER_DEGENERATE) and scaleEnd 1 (DEF_NO_EFFECT). Then call analyze_deformation and check_deformation.',
   params: z.object({
     ...bodyParams,
-    scaleEnd: z.number().describe('Section scale reached at region.end, unitless, > 0 (1 = no change).'),
+    scaleEnd: z
+      .number()
+      .describe(
+        'Section scale reached at region.end, unitless, > 0 (1 = no change). With region.infinite: the scale rate per (region.end - region.start) of length; the scale may not reach 0 inside the body.',
+      ),
     flat: z.boolean().describe('true: scale only along the frame x direction (flat taper); default false scales x and y.').optional(),
     frame: frameParam.optional(),
     region: regionParam.optional(),

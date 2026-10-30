@@ -2,14 +2,14 @@
 
 import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
-import { bodyParams, outputParam, targetIds } from './schema';
+import { bodyParams, infiniteParam, outputParam, targetIds } from './schema';
 import type { DeformPlan } from './request';
 import { runDeform } from './run';
 import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
 
 /**
  * @affects replaces the entity by a mesh entity whose brep recipe is a deform node (stretch law, or an affine law for preserveVolume)
- * @invariant det J = factor inside the region and 1 outside (the part past the region end is translated); preserveVolume is the whole-body
+ * @invariant det J = factor inside the region and 1 outside (the part past the region end is translated); region.infinite: z' = start + factor (z - start) and det J = factor at every height; preserveVolume is the whole-body
  *   affine map diag(1/√f, 1/√f, f) with det 1; kernel-optional: exact on the native kernel (preserveVolume as a GTransform, a region stretch as the exact warp), mesh path on Manifold and without a kernel
  * @failure unknown id / unsupported kind -> DEF_ENTITY_NOT_FOUND / DEF_TARGET_UNSUPPORTED; factor <= 0 -> DEF_STRETCH_FACTOR; factor 1 -> DEF_NO_EFFECT; preserveVolume with a region -> DEF_PRESERVE_VOLUME_REGION
  */
@@ -23,6 +23,7 @@ export const stretchBody = defineCommand({
     'across it by 1/sqrt(factor) so its volume is unchanged (no region allowed). The frame and region default from the body (axis = longest direction, region = the whole body). ' +
     'region.start and region.end are document units from the frame origin, which defaults to the body centre (so a 100-long body spans -50..50 by default). ' +
     'The result replaces the entity as a mesh entity that keeps the construction (brep recipe). ' +
+    'With region.infinite true the stretch is a uniform scale of the whole body along the axis about region.start (z -> start + factor (z - start), no rigid part, region.end is not used). ' +
     'Refuses factor <= 0 (DEF_STRETCH_FACTOR) and factor 1 (DEF_NO_EFFECT). Then call analyze_deformation and check_deformation.',
   params: z.object({
     ...bodyParams,
@@ -53,8 +54,13 @@ export const stretchBody = defineCommand({
           .number()
           .describe('Region end along the axis, document units from the frame origin; must exceed start. Default: where the body ends.')
           .optional(),
+        infinite: infiniteParam(
+          'region.start is the fixed point (z -> start + factor (z - start) for every z); region.end is not used by the map but must still exceed start.',
+        ),
       })
-      .describe('Part of the body along the axis that is stretched (a step: full stretch inside, none outside). Default: the whole body.')
+      .describe(
+        'Part of the body along the axis that is stretched (a step: full stretch inside, none outside). Default: the whole body. With infinite true the whole axis is stretched about start.',
+      )
       .optional(),
     output: outputParam.optional(),
   }),

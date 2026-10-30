@@ -185,7 +185,11 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   if (fold !== null) return reject(fold);
   const { kernel } = target;
   const useKernel =
-    kernel !== null && !target.faceted && mode !== 'mesh' && kernel.supports('deform') && kernel.supportsDeform?.(plan.law) !== false;
+    kernel !== null &&
+    !target.faceted &&
+    mode !== 'mesh' &&
+    kernel.supports('deform') &&
+    kernel.supportsDeform?.(plan.law, plan.region) !== false;
   const estimate = estimateWarp(target.mesh, node, tolerance);
   if (estimate !== null && !useKernel && estimate.triangles > MAX_WARP_TRIANGLES)
     return reject({

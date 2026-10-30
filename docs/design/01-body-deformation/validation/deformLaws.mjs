@@ -11,19 +11,20 @@ export const ramp = {
   },
 };
 
-const rampOf = (z, z0, z1, falloff) => ramp[falloff]((z - z0) / (z1 - z0));
+// infinite: z0 and z1 only fix the rate, the linear ramp is not clamped (TECHNICAL_SPEC §17.1)
+const rampOf = (z, z0, z1, falloff, infinite = false) => (infinite ? (z - z0) / (z1 - z0) : ramp[falloff]((z - z0) / (z1 - z0)));
 
 /** Barr twist: rotation about +z by theta(z) = angle * w(z). Jacobian determinant = 1 everywhere. */
-export function twist([x, y, z], { angleRad, z0, z1, falloff = 'linear' }) {
-  const th = angleRad * rampOf(z, z0, z1, falloff);
+export function twist([x, y, z], { angleRad, z0, z1, falloff = 'linear', infinite = false }) {
+  const th = angleRad * rampOf(z, z0, z1, falloff, infinite);
   const c = Math.cos(th);
   const s = Math.sin(th);
   return [c * x - s * y, s * x + c * y, z];
 }
 
 /** Barr taper: lateral scale s(z) = 1 + (scaleEnd - 1) w(z); flat = only x scales. det = s^2 (s when flat). */
-export function taper([x, y, z], { scaleEnd, z0, z1, falloff = 'linear', flat = false }) {
-  const s = 1 + (scaleEnd - 1) * rampOf(z, z0, z1, falloff);
+export function taper([x, y, z], { scaleEnd, z0, z1, falloff = 'linear', flat = false, infinite = false }) {
+  const s = 1 + (scaleEnd - 1) * rampOf(z, z0, z1, falloff, infinite);
   return [s * x, flat ? y : s * y, z];
 }
 
@@ -31,7 +32,17 @@ export function taper([x, y, z], { scaleEnd, z0, z1, falloff = 'linear', flat = 
  * Bend of the region z in [z0, z1] about an axis parallel to +x through (y = R, z = z0); fibre y = 0 is the neutral
  * fibre (length preserved). Beyond z1 the body follows rigidly (Barr). Below z0 unchanged. det = (R - y) / R in the region.
  */
-export function bend([x, y, z], { radius: R, z0, z1 }) {
+export function bend([x, y, z], { radius: R, z0, z1, infinite = false, symmetric = false }) {
+  if (infinite) {
+    // theta = (z - z0) / R at every z, no clamp, nothing rigid; symmetric: the same arc turned back by the half angle about its centre
+    // (y = R, z = z0) and moved up by half the region length, so the point of the neutral fibre at the region middle stays where it was
+    const th = (z - z0) / R;
+    const [ya, za] = [R - (R - y) * Math.cos(th), z0 + (R - y) * Math.sin(th)];
+    if (!symmetric) return [x, ya, za];
+    const h = (z1 - z0) / (2 * R);
+    const [dy, dz] = [ya - R, za - z0];
+    return [x, R + Math.cos(h) * dy - Math.sin(h) * dz, z0 + (z1 - z0) / 2 + Math.sin(h) * dy + Math.cos(h) * dz];
+  }
   if (z <= z0) return [x, y, z];
   const zc = Math.min(z, z1);
   const th = (zc - z0) / R;
@@ -42,7 +53,8 @@ export function bend([x, y, z], { radius: R, z0, z1 }) {
 }
 
 /** Piecewise stretch along z: factor f inside [z0, z1], translation beyond. det = f inside, 1 outside. */
-export function stretch([x, y, z], { factor: f, z0, z1 }) {
+export function stretch([x, y, z], { factor: f, z0, z1, infinite = false }) {
+  if (infinite) return [x, y, z0 + f * (z - z0)];
   if (z <= z0) return [x, y, z];
   if (z <= z1) return [x, y, z0 + f * (z - z0)];
   return [x, y, z + (f - 1) * (z1 - z0)];
