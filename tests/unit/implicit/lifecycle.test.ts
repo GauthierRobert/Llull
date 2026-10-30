@@ -473,6 +473,16 @@ describe('a stored body this host can only show coarsely', () => {
     expect(warnings.some((w) => w.startsWith('IMP_ASSET_MISSING') && w.includes("'" + idA + "'"))).toBe(true);
     expectRefused(coarse, run(coarse, 'implicit_properties', { id: 'imp-b' }), 'IMP_BODY_STALE');
     expectRefused(coarse, run(coarse, 'check_implicit', { id: 'imp-b' }), 'IMP_BODY_STALE');
+    // a plain field that reads A never answers silently from its coarse display mesh (DES-5c, 07 MSH 13.11): read-only queries say so
+    // (MESH_ASSET_LOD_ONLY warning), a new body from it is refused
+    const plane = { origin: [0, 0, 0], normal: [0, 0, 1] };
+    for (const [name, params] of [
+      ['evaluate_field', { field: 'fld-solid', points: [[0, 0, 0]] }],
+      ['section_field', { id: 'fld-solid', plane, size: 30, resolution: 16 }],
+      ['implicit_properties', { id: 'fld-solid' }],
+    ] as const)
+      expect(run(coarse, name, params).result.summary, name).toContain(`WARNING MESH_ASSET_LOD_ONLY: '${idA}'`);
+    expectRefused(coarse, run(coarse, 'create_implicit_body', { field: 'fld-solid', voxel: 2 }), 'MESH_ASSET_LOD_ONLY');
 
     setFieldEngine(null);
     setMeshAssetPort(store.port);

@@ -902,3 +902,10 @@ measured wall plus that band and says so in the finding.
 
 Surface-UV cell maps and maps for strut lattices; scalar kinds `topology_density` and `fea_result` (VC-IMP-29 stays open); numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a BVH for explicit strut sets
 (cap 5000 beams); native `gradient` evaluation and native dual contouring (both delegate to the TS engine); per-cell dual-contouring fallback (the whole body falls back); a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.
+
+### 14.8 A plain field over a coarsely shown body (DES-5c, 2026-10-30)
+
+The open item "a plain field reading a body restored as a coarse proxy still evaluates the proxy" was closed by the reach of 07 MSH 13.11: every command
+that reads mesh triangles reaches the bodies a field reads, so `evaluate_field`, `section_field` and `implicit_properties` on such a field answer with the
+warning `MESH_ASSET_LOD_ONLY` naming the body (the rule of every read-only query in llull), and `create_implicit_body` from it refuses with that code. Decision:
+keep the one cross-command rule rather than an implicit-only refusal. Locked by `tests/unit/implicit/lifecycle.test.ts` ("a stored body this host can only show coarsely").
