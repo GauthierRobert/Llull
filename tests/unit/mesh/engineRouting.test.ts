@@ -83,7 +83,7 @@ describe('preferredAbove', () => {
   });
 });
 
-describe('analyze_mesh and check_mesh keep the pair search between the preference size and the TypeScript cap', () => {
+describe('a native engine that cannot do the pair search leaves it to the TypeScript engine (analyze_mesh and check_mesh, fall-through)', () => {
   // a native-like engine: preferred above 15,000 triangles, answers like the TypeScript one except that it does not search crossing pairs
   const asked: string[] = [];
   const nativeLike: MeshProcessingEngine = {

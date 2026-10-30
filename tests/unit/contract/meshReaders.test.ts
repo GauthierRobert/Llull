@@ -152,9 +152,7 @@ describe('every reader of entity triangles is accounted for (TECHNICAL_SPEC 13.1
 
 /** Commands defined in a file that matches WIDE and that still do not read triangles, with the reason. */
 const NOT_READERS: Readonly<Record<string, string>> = {
-  analyze_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   attach_mesh_asset: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
-  check_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   convex_hull: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   cut_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   fill_mesh_holes: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',

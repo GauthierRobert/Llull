@@ -303,13 +303,6 @@ describe('native analyze is bit-identical to the TypeScript engine (VC-MSH-32, D
   native('what it does not do is refused by name, so the composite falls back or reports the cap', async () => {
     const sphere = icosphere(10, 2);
     expect(await nativeRun({ mesh: sphere }, analyze({ weldTolerance: 0.1 }))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
-    // up to the TypeScript cap the pair search is left to that engine; above it the command is refused by name
-    expect(await nativeRun({ mesh: sphere }, analyze({ selfIntersections: true }))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
-    const beyondCap = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: new Array<number>(3 * 200_001).fill(0) };
-    expect(await nativeRun({ mesh: beyondCap }, analyze({ selfIntersections: true }))).toMatchObject({
-      code: 'MESH_ENGINE_CAP_EXCEEDED',
-      message: expect.stringContaining('selfIntersections false'),
-    });
     const composite = composeMeshEngines([tsMeshEngine, engine as NonNullable<typeof engine>]);
     expect(composite.capabilities().get('analyze')).toBe(Infinity);
     expect(composite.capabilities().get('remesh')).toBe(2_000_000);
@@ -379,14 +372,15 @@ describe('the composite engine prefers the native one above a per-op size (DES-7
   });
 
   native(
-    'analyze with the pair search (the command default up to 200,000 triangles) is answered by the TypeScript engine, above the native threshold too',
+    'analyze with the pair search goes native above 15,000 triangles too, with the same pairs, and stays in process below',
     async () => {
-      const mesh = icosphere(10, 5);
       const op = analyze({ selfIntersections: true });
+      expect(provenanceOf(composite().run({ mesh: icosphere(10, 4) }, op))).toBe('ts');
+      const mesh = noisy(icosphere(10, 5), 0.2);
       const routed = await resolveDeferred(() => composite().run({ mesh }, op));
-      expect(provenanceOf(routed)).toBe('ts');
-      expect((routed as MeshOpResult).analysis?.selfIntersectionPairs).toBe(0);
-      expect(await nativeRun({ mesh }, op)).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+      expect(provenanceOf(routed)).toBe('native');
+      expect((routed as MeshOpResult).analysis?.selfIntersectionPairs).toBeGreaterThan(0);
+      expect((routed as MeshOpResult).analysis).toEqual((tsMeshEngine.run({ mesh }, op) as MeshOpResult).analysis);
     },
   );
 

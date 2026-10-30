@@ -11,7 +11,7 @@
 //! - `smooth`: `{ taubin, lambda, passBand, iterations, cotangent, fixBoundary, volumeCorrection, region? }`.
 //! - `remesh` (DES-7c step 7): `{ targetEdge? | minEdge + maxEdge + approxError, iterations, featureAngleRad, preserveBoundary, project, region?, maxTriangles? }`;
 //!   the same manifold / winding / degeneracy checks as decimate are the host's. A working mesh past `maxTriangles` (default 4 000 000) ends the job with code `REMESH_TOO_LARGE`.
-//! - `analyze` (DES-7c step 7): `{ maxListed, weldTolerance: 0, selfIntersections: false }` on any triangle soup: welds exact duplicates and writes `report.json` with
+//! - `analyze` (DES-7c step 7): `{ maxListed, weldTolerance: 0, selfIntersections }` on any triangle soup: welds exact duplicates, runs the pair search (stage `self_intersections`) when asked, and writes `report.json` with
 //!   `report` = `{ weldTolerance, mergedVertices }` and `analysis` = the `MeshAnalysis` of the TypeScript engine (no result mesh). Coordinates above 1e100 are refused.
 //! - `repair` and `fill_holes` (DES-7c step 7, slice 2): see `repair_job.rs`; the result is the repaired / filled mesh and the report is the TypeScript engine's.
 //! - `sculpt` (DES-7c step 7, slice 3): see `sculpt_job.rs`; the result is the sculpted mesh and the report is the TypeScript engine's.
@@ -49,6 +49,7 @@ mod sculpt_brush;
 mod sculpt_job;
 mod sculpt_measure;
 mod sculpt_refine;
+pub mod self_intersect;
 pub mod smooth;
 mod surface;
 mod topology;
@@ -143,6 +144,8 @@ struct AnalyzeJob {
     weld_tolerance: f64,
     #[serde(default)]
     self_intersections: bool,
+    /// Candidate pairs the pair search may examine (default `self_intersect::CANDIDATE_LIMIT`; a field that only tests set).
+    max_candidates: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -271,7 +274,8 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
     let text = String::from_utf8(read(folder, "job.json")?).map_err(|error| input_error(format!("job.json: {error}")))?;
     let job: Job = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
     let measures = job.deviation_samples.is_some() && job.op != "deviation";
-    let mut progress = Progress::new(out, if job.op == "quad_remesh" { 2 + QUAD_STAGES } else { 3 } + u64::from(measures));
+    let pair_search = job.op == "analyze" && job.params["selfIntersections"] == true;
+    let mut progress = Progress::new(out, if job.op == "quad_remesh" { 2 + QUAD_STAGES } else { 3 } + u64::from(measures || pair_search));
     progress.stage("read", 0.0);
     let positions = f64s(&read(folder, "positions.f64")?, "positions.f64")?;
     let triangles = u32s(&read(folder, "indices.u32")?, positions.len() / 3)?;
@@ -281,10 +285,8 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
     let report = match job.op.as_str() {
         "analyze" => {
             let p: AnalyzeJob = serde_json::from_value(job.params).map_err(|error| input_error(format!("analyze params: {error}")))?;
-            if p.weld_tolerance != 0.0 || p.self_intersections {
-                return Err(input_error(
-                    "analyze welds exact duplicates only and does not search self-intersections (the TypeScript engine does)",
-                ));
+            if p.weld_tolerance != 0.0 {
+                return Err(input_error("analyze welds exact duplicates only (the TypeScript engine welds with a tolerance)"));
             }
             if positions.iter().any(|v| v.abs() > MAX_ANALYZE_COORDINATE) {
                 return Err(input_error(format!(
@@ -293,7 +295,27 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             }
             progress.stage("analyze", 0.05);
             let welded = weld::weld_exact(&positions, &triangles);
-            analysis = Some(analyze::analyze(&welded.positions, &welded.triangles, p.max_listed));
+            let intersections = if p.self_intersections {
+                progress.stage("self_intersections", 0.3);
+                let found = self_intersect::find_self_intersections(
+                    &welded.positions,
+                    &welded.triangles,
+                    p.max_listed,
+                    p.max_candidates.unwrap_or(self_intersect::CANDIDATE_LIMIT),
+                )
+                .map_err(|costly| JobError {
+                    code: "SELF_INTERSECTION_TOO_COSTLY",
+                    message: format!(
+                        "the pair search would examine {} candidate pairs (limit {}): the mesh has too many overlapping triangles",
+                        costly.candidates,
+                        p.max_candidates.unwrap_or(self_intersect::CANDIDATE_LIMIT)
+                    ),
+                })?;
+                Some(found)
+            } else {
+                None
+            };
+            analysis = Some(analyze::analyze(&welded.positions, &welded.triangles, p.max_listed, intersections));
             serde_json::json!({ "weldTolerance": 0, "mergedVertices": welded.merged })
         }
         "repair" => {

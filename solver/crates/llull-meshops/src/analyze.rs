@@ -1,8 +1,9 @@
 //! Numeric inspector of an indexed triangle mesh (twin of `analyzeIndexedMesh` in `analysis.ts`, 07 MSH FR-MSH-03): counts, topology, shells, boundary loops,
 //! orientation, area, volume, quality. The sums run in the same order as the TypeScript ones (faces ascending, shells in their numbering), so the numbers are
-//! bit-identical; the per-face metrics are computed in parallel and reduced sequentially. The self-intersection search stays in TypeScript.
+//! bit-identical; the per-face metrics are computed in parallel and reduced sequentially. The self-intersection search is `self_intersect.rs`.
 
 use crate::geom::{diagonal, dot, js_max, js_min, length, Vec3};
+use crate::self_intersect::Found;
 use crate::topology::{build_topology, Topology, NO_SHELL};
 use llull_jsmath::{acos, hypot};
 use rayon::prelude::*;
@@ -77,7 +78,7 @@ pub struct Analysis {
     area: f64,
     volume: Option<f64>,
     centroid: Option<Vec3>,
-    /// Always null here: the pair search is not ported (the host refuses `selfIntersections` for this engine).
+    /// Null unless the pair search ran (`self_intersect.rs`).
     self_intersection_pairs: Option<usize>,
     self_intersections: Vec<[usize; 2]>,
     edge_length: EdgeLength,
@@ -153,7 +154,7 @@ fn bounds(positions: &[f64]) -> Bounds {
 }
 
 /// Analyse a welded mesh (`triangles` index `positions`); lists are capped at `max_listed`.
-pub fn analyze(positions: &[f64], triangles: &[u32], max_listed: usize) -> Analysis {
+pub fn analyze(positions: &[f64], triangles: &[u32], max_listed: usize, intersections: Option<Found>) -> Analysis {
     let vertex_count = positions.len() / 3;
     let topology = build_topology(vertex_count, triangles);
     let corner = |v: u32| -> Vec3 { [positions[v as usize * 3], positions[v as usize * 3 + 1], positions[v as usize * 3 + 2]] };
@@ -257,8 +258,8 @@ pub fn analyze(positions: &[f64], triangles: &[u32], max_listed: usize) -> Analy
         duplicate_faces: topology.duplicate_faces,
         volume,
         centroid,
-        self_intersection_pairs: None,
-        self_intersections: Vec::new(),
+        self_intersection_pairs: intersections.as_ref().map(|found| found.count),
+        self_intersections: intersections.map(|found| found.pairs).unwrap_or_default(),
         edge_length: EdgeLength {
             min: if edge_lengths.is_empty() { 0.0 } else { edge_lengths.iter().fold(f64::INFINITY, |m, &v| js_min(m, v)) },
             max: edge_lengths.iter().fold(0.0, |m, &v| js_max(m, v)),

@@ -4,9 +4,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { analyzeIndexedMesh, isMeshAnalysis } from '@core/geometry/mesh/analysis';
+import { analyzeIndexedMesh, isMeshAnalysis, type MeshAnalysis } from '@core/geometry/mesh/analysis';
 import { isEngineFailure, type MeshOp } from '@core/geometry/mesh/engineTypes';
-import { isFillReport, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
 import { SCULPT_MAX_TRIANGLES, sculptMesh } from '@core/geometry/mesh/sculpt';
 import { REMESH_MAX_TRIANGLES, remeshMesh } from '@core/geometry/mesh/remesh';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
@@ -278,5 +278,47 @@ describe('isSculptReport', () => {
         omit(op, 'refineEdge'),
       ),
     ).toBe(true);
+  });
+});
+
+describe('isPairSearchOf', () => {
+  const two = {
+    positions: [...icosphere(10, 2).positions, ...icosphere(10, 2).positions.map((v, i) => (i % 3 === 0 ? v + 7 : v))],
+    indices: [...icosphere(10, 2).indices, ...icosphere(10, 2).indices.map((v) => v + icosphere(10, 2).positions.length / 3)],
+  };
+  const analysisFor = (selfIntersections: boolean, maxListed: number): MeshAnalysis => {
+    const answer = tsMeshEngine.run({ mesh: two }, { op: 'analyze', weldTolerance: 0, selfIntersections, maxListed });
+    if (isEngineFailure(answer) || answer.analysis === undefined) throw new Error('the oracle failed');
+    return JSON.parse(JSON.stringify(answer.analysis)) as MeshAnalysis;
+  };
+  const asked = { selfIntersections: true, maxListed: 5 };
+
+  it('accepts what the TypeScript engine reports for the op asked, with and without the search', () => {
+    expect(analysisFor(true, 5).selfIntersectionPairs).toBeGreaterThan(5);
+    expect(isPairSearchOf(analysisFor(true, 5), asked)).toBe(true);
+    expect(isPairSearchOf(analysisFor(true, 0), { selfIntersections: true, maxListed: 0 })).toBe(true);
+    expect(isPairSearchOf(analysisFor(false, 5), { selfIntersections: false, maxListed: 5 })).toBe(true);
+  });
+
+  it.each([
+    ['pair fields although the search was not asked', analysisFor(true, 5), { selfIntersections: false, maxListed: 5 }],
+    ['no count although the search was asked', analysisFor(false, 5), asked],
+    ['a list longer than maxListed', analysisFor(true, 5), { selfIntersections: true, maxListed: 3 }],
+    ['a list shorter than min(count, maxListed)', analysisFor(true, 5), { selfIntersections: true, maxListed: 9 }],
+    ['a list longer than the count', { ...analysisFor(true, 5), selfIntersectionPairs: 2 }, asked],
+    ['a count above the number of face pairs', { ...analysisFor(true, 5), faces: 3 }, asked],
+    [
+      'a pair whose faces are not ascending',
+      { ...analysisFor(true, 5), selfIntersections: [[3, 3], ...analysisFor(true, 5).selfIntersections.slice(1)] },
+      asked,
+    ],
+    ['pairs out of order', { ...analysisFor(true, 5), selfIntersections: [...analysisFor(true, 5).selfIntersections].reverse() }, asked],
+    [
+      'a pair naming a face the mesh does not have',
+      { ...analysisFor(true, 5), selfIntersections: [[0, 1e9], ...analysisFor(true, 5).selfIntersections.slice(1)] },
+      asked,
+    ],
+  ])('refuses %s', (_name, analysis, op) => {
+    expect(isPairSearchOf(analysis as MeshAnalysis, op)).toBe(false);
   });
 });

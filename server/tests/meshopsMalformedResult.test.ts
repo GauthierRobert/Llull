@@ -118,6 +118,36 @@ describe('a report the host cannot trust (repair, fill_holes and sculpt)', () =>
   });
 });
 
+describe('the pair search of analyze (DES-7c step 7, slice 4)', () => {
+  beforeEach(() => _clearResultCache());
+  const asked: MeshOp = { op: 'analyze', weldTolerance: 0, selfIntersections: true, maxListed: 5 };
+  const notAsked: MeshOp = { ...asked, selfIntersections: false } as MeshOp;
+  const run = (mode: string, op: MeshOp, mesh = sphere): Promise<ReturnType<ReturnType<typeof fakeEngine>['run']>> =>
+    resolveDeferred(() => fakeEngine(mode).run({ mesh }, op));
+
+  it('accepts the pair fields the op asked for, and none when it did not (the control of the cases below)', async () => {
+    expect(await run('ok', asked)).toMatchObject({ analysis: { selfIntersectionPairs: 1, selfIntersections: [[0, 1]] } });
+    expect(await run('ok', notAsked)).toMatchObject({ analysis: { selfIntersectionPairs: null, selfIntersections: [] } });
+  });
+
+  it.each([
+    ['pair fields although the search was not asked', 'other_report', notAsked],
+    ['no pair fields although the search was asked', 'other_report', asked],
+    ['a count above the number of face pairs, and a pair naming a face the mesh does not have', 'bad_pairs', asked],
+  ] as const)('%s is refused by name', async (_what, mode, op) => {
+    expect(await run(mode, op)).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('analysis') });
+  });
+
+  it('a search the job found too costly is the TypeScript engine\x27s to answer up to its cap and refused by name above it', async () => {
+    expect(await run('pairs_costly', asked)).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+    const beyond = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: new Array<number>(3 * 200_001).fill(0) };
+    expect(await run('pairs_costly', asked, beyond)).toMatchObject({
+      code: 'MESH_ENGINE_CAP_EXCEEDED',
+      message: expect.stringContaining('selfIntersections false'),
+    });
+  });
+});
+
 describe('meshProblem', () => {
   it('names the first defect of a mesh and accepts a sound one', () => {
     expect(meshProblem({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] })).toBeNull();

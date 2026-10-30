@@ -3,6 +3,7 @@
  * `skipped`, `movedVertices`), so a report that is not what the TypeScript engine would give is refused by the host before a command sees it (as `isMeshAnalysis` does).
  */
 
+import type { MeshAnalysis } from './analysis';
 import type { Fairing } from './holeRefine';
 import type { RepairChanges, RepairMode } from './repair';
 import type { SculptParams } from './sculpt';
@@ -83,4 +84,18 @@ export function isSculptReport(value: unknown, op: Pick<SculptParams, 'stamps' |
     stampsApplied >= stamps &&
     stampsApplied <= (op.symmetry === undefined ? stamps : 2 * stamps)
   );
+}
+
+/**
+ * True when the pair-search fields of `analysis` are what the op asked for: no count and no pairs when it did not ask; otherwise a count, and exactly
+ * `min(count, maxListed)` pairs `[low, high]` of faces of the mesh, ascending, with low below high (the `selfIntersectionPairs` / `selfIntersections` fields).
+ */
+export function isPairSearchOf(analysis: MeshAnalysis, op: { readonly selfIntersections: boolean; readonly maxListed: number }): boolean {
+  const { selfIntersectionPairs: count, selfIntersections: pairs, faces } = analysis;
+  if (!op.selfIntersections) return count === null && pairs.length === 0;
+  if (count === null || count > (faces * (faces - 1)) / 2 || pairs.length !== Math.min(count, op.maxListed)) return false;
+  return pairs.every(([low, high], k) => {
+    const previous = pairs[k - 1];
+    return low < high && high < faces && (previous === undefined || previous[0] < low || (previous[0] === low && previous[1] < high));
+  });
 }

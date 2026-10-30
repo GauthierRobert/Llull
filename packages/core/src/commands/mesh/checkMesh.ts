@@ -2,7 +2,6 @@
 
 import type { MeshAnalysis } from '../../geometry/mesh/analysis';
 import { resolveMeshEngine } from '../../geometry/mesh/engine';
-import { MESH_TS_TRIANGLE_CAP } from '../../geometry/mesh/engineTypes';
 import { minimumWallThickness } from '../../geometry/mesh/wallThickness';
 import type { Vec3 } from '../../model/vectors';
 import { defineCommand, z } from '../schema';
@@ -219,14 +218,10 @@ export const checkMesh = defineCommand({
     for (const id of ids) {
       const loaded = loadSolidMesh(doc, id, weldTolerance, contextOf(ctx).meshAssets);
       if (isLoadFailure(loaded)) return meshRejection(doc, 'check_mesh', loaded.code, loaded.message, loaded.ids);
-      const triangles = loaded.mesh.indices.length / 3;
       const outcome = engineOutcome(
         doc,
         'check_mesh',
-        engine.run(
-          { mesh: loaded.mesh },
-          { op: 'analyze', weldTolerance: 0, selfIntersections: triangles <= MESH_TS_TRIANGLE_CAP, maxListed: 5 },
-        ),
+        engine.run({ mesh: loaded.mesh }, { op: 'analyze', weldTolerance: 0, selfIntersections: true, maxListed: 5 }),
         [id],
       );
       if (isCommandResult(outcome)) return outcome;
