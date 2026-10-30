@@ -22,7 +22,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   IMP_FIELD_IN_USE: 'delete the referrers first or pass cascade: true',
   IMP_GRAPH_EMPTY: 'pass lines, polylines, arcs, circles, splines or nurbs_curve ids that hold at least one beam',
   IMP_GRAPH_TOO_LARGE: 'raise chord (fewer samples on curved sources) or split the graph',
-  IMP_INPUT_NOT_FOUND: 'create the input first',
+  IMP_INPUT_NOT_FOUND:
+    'create the input first: run and record the topology study, or mesh and solve the analysis, on a host whose artifact store holds the result',
+  IMP_INPUT_TOO_LARGE: 'use a coarser analysis mesh (the limit is in the message)',
   IMP_MAP_SEAM: 'use a whole number of cells around / polar',
   IMP_DERIVED_READ_ONLY: 'edit the field nodes and run create_implicit_body again',
 };

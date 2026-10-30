@@ -30,6 +30,8 @@ async function prepareKernel(): Promise<void> {
     { setMeshAssetPort },
     { defaultMeshAssetStore },
     { installFontProvider },
+    { installArtifactPort },
+    { defaultFeArtifactStore },
   ] = await Promise.all([
     import('../geometryKernel'),
     import('../physicsEngine'),
@@ -39,11 +41,14 @@ async function prepareKernel(): Promise<void> {
     import('@core/geometry/mesh/assets'),
     import('../meshAssets/store'),
     import('../fontProvider'),
+    import('@implicit/index'),
+    import('../fea/artifactStore'),
   ]);
   installRasterPort();
   installGeometryQueryEngine();
   installFieldEngine();
   setMeshAssetPort(defaultMeshAssetStore());
+  installArtifactPort(defaultFeArtifactStore());
   installFontProvider();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
 }

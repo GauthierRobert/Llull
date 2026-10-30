@@ -7,6 +7,8 @@ import { installPhysicsEngine } from './physicsEngine';
 import { installRasterPort } from './native/rasterPort';
 import { installFontProvider } from './fontProvider';
 import { setMeshAssetPort } from '@core/geometry/mesh/assets';
+import { installArtifactPort } from '@implicit/index';
+import { defaultFeArtifactStore } from './fea/artifactStore';
 import { installFieldEngine } from './native/fieldEngine';
 import { defaultMeshAssetStore } from './meshAssets/store';
 import { installGeometryQueryEngine } from './native/geometryQueryEngine';
@@ -70,6 +72,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   installFontProvider();
   installGeometryQueryEngine();
   setMeshAssetPort(defaultMeshAssetStore());
+  installArtifactPort(defaultFeArtifactStore());
   installFieldEngine();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
   const server = app.listen(port, host);

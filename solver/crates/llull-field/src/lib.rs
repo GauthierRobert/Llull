@@ -9,7 +9,7 @@
 //!   a program is `{ instructions: [{op, args}], output, meshes: n, strutSets: [{periodic: {cell, origin} | null, nodes: n, beams: n}] }`;
 //!   `grid` = `{min, max, voxel}`; `request` = `{kind: "volume", sampling} | {kind: "quantile", probabilities, absolute} | {kind: "components"}`.
 //! - `constants.f64`; `mesh<i>_positions.f64` + `mesh<i>_indices.u32`; `strut<i>_nodes.f64` (3 per node) + `strut<i>_beams.f64` (a, b, ra, rb, cap 1 =
-//!   sphere, 5 per beam); `points.f64` (3 per point) for `evaluate`.
+//!   sphere, 5 per beam); `points.f64` (3 per point) for `evaluate`. `sampled<i>_values.f64` (+ `_points.f64`, `_tets.u32` for tetrahedra; program JSON `sampled: [{kind: grid, nodes, origin, voxel} | {kind: tets, points, tets}]`).
 //! - Out: `report.json` always (`{ refusal: { code, message, samples, limit } }` on a budget refusal, else the op's figures); `positions.f64` +
 //!   `indices.u32` for `mesh`; `values.f64` (+ `gradients.f64`) for `evaluate`. One `progress` event per 5 % of the cell layers while meshing.
 //!
@@ -25,6 +25,7 @@ mod job;
 mod jsnum;
 mod measure;
 mod meshsdf;
+mod sampled;
 mod sampling;
 mod strut_bvh;
 mod struts;

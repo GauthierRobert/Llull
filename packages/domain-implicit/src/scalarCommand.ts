@@ -47,10 +47,13 @@ export const createScalarField = defineCommand({
     'kind coordinate: the x, y or z coordinate (axis). kind distance: distance in document units to a point (toPoint), a plane (toPlane, signed, positive on the normal side), the closed solid of an entity (toEntity, signed, negative inside) or the value of another field (toField); give exactly one. ' +
     'kind ramp: maps an input scalar (input) from [inMin, inMax] to [outMin, outMax], clamped by default, easing linear or smoothstep (the nTop "ramp"). kind mix: a*(1-factor) + b*factor. kind arith: add, subtract, multiply, divide, min or max of a and b. ' +
     'kind noise: deterministic value noise in [0, 1) from seed, frequency (cells per document unit) and octaves 1..6. a, b, factor accept a number or a scalar field id. ' +
+    'kind topology_density: the recorded density (0..1) of a topology study (studyId), trilinear between voxel centres and the nearest voxel outside the design grid; grade a lattice by the recorded design (ramp it to a radius or thickness). ' +
+    'kind fea_result: a result of an analysis case (caseId) on its tetrahedral mesh: quantity von_mises (stress, in the analysis stress unit) or u_mag (displacement magnitude, in the analysis length unit), barycentric inside the tetrahedra and the nearest node outside, from solver step `step` (load case index + 1; default the first step with the field). ' +
+    'Both read the recorded result, so re-recording the result makes the bodies built on the field stale (regenerate_implicit_bodies). Refused with IMP_INPUT_NOT_FOUND when the study or case has no verified result or the host holds no artifact store. ' +
     'Next: add_tpms_lattice / add_strut_lattice with the id as the graded value; evaluate_field does not take scalars (probe them through the lattice).',
   params: z.object({
     kind: z
-      .enum(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise'])
+      .enum(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise', 'topology_density', 'fea_result'])
       .describe('Scalar kind; see the command description for the parameters of each.'),
     axis: z.enum(['x', 'y', 'z']).optional().describe('coordinate: which coordinate.'),
     toPoint: vec3('distance: measure to this point [x, y, z] in document units.').optional(),
@@ -80,6 +83,13 @@ export const createScalarField = defineCommand({
     seed: z.number().optional().describe('noise: integer seed (default 0); the same seed gives the same field.'),
     frequency: z.number().optional().describe('noise: noise cells per document unit (> 0).'),
     octaves: z.number().optional().describe('noise: octaves 1..6 (default 1); each doubles the frequency and halves the amplitude.'),
+    studyId: z.string().optional().describe('topology_density: id of the topology study whose recorded density is read.'),
+    caseId: z.string().optional().describe('fea_result: id of the analysis case whose results and mesh are read.'),
+    quantity: z.enum(['von_mises', 'u_mag']).optional().describe('fea_result: von_mises (stress) or u_mag (displacement magnitude).'),
+    step: z
+      .number()
+      .optional()
+      .describe('fea_result: solver step number (load case index + 1); default the lowest step that holds the field.'),
     name: z.string().optional().describe('Optional label for the node.'),
   }),
   run: (doc, p): CommandResult => {
@@ -150,6 +160,25 @@ export const createScalarField = defineCommand({
         if (p.a === undefined || p.b === undefined || p.operation === undefined)
           return fail('IMP_PARAM_RANGE', 'arith needs operation, a and b', 'operation');
         node = { id, op: 'scalar', kind: 'arith', operation: p.operation, a: p.a, b: p.b, ...label };
+        break;
+      case 'topology_density':
+        if (p.studyId === undefined) return fail('IMP_PARAM_RANGE', 'topology_density needs studyId', 'studyId');
+        node = { id, op: 'scalar', kind: 'topology_density', studyId: p.studyId, ...label };
+        break;
+      case 'fea_result':
+        if (p.caseId === undefined || p.quantity === undefined)
+          return fail('IMP_PARAM_RANGE', 'fea_result needs caseId and quantity (von_mises or u_mag)', 'caseId');
+        if (p.step !== undefined && !(Number.isInteger(p.step) && p.step >= 1))
+          return fail('IMP_PARAM_RANGE', `step must be an integer >= 1 (got ${p.step})`, 'step');
+        node = {
+          id,
+          op: 'scalar',
+          kind: 'fea_result',
+          caseId: p.caseId,
+          quantity: p.quantity,
+          ...(p.step === undefined ? {} : { step: p.step }),
+          ...label,
+        };
         break;
       case 'noise': {
         const octaves = p.octaves ?? 1;

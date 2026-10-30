@@ -7,6 +7,7 @@
 import type { MeshData } from '../../model/types';
 import { type FieldInstruction, type FieldOp, type FieldProgram, type FieldQuality, OP_ARITY, type StrutSet } from './program';
 import { scalarOp } from './interpret';
+import type { SampledField } from './sampled';
 
 export interface ProgramMeta {
   readonly bounds: FieldProgram['bounds'];
@@ -42,6 +43,7 @@ export class FieldBuilder {
   private readonly constants: number[] = [];
   private readonly meshes: { key: string; mesh: MeshData }[] = [];
   private readonly strutSets: StrutSet[] = [];
+  private readonly sampled: SampledField[] = [];
   private readonly shared = new Map<string, number>();
 
   constructor(private readonly unit: string) {}
@@ -133,6 +135,16 @@ export class FieldBuilder {
     return this.emit('strut_set', [x, y, z, this.strutSets.length - 1, radius ?? -1]);
   }
 
+  /** Register of `sample_field(x, y, z)` over sampled data (shared by identity). */
+  sampledField(field: SampledField, x: number, y: number, z: number): number {
+    let at = this.sampled.indexOf(field);
+    if (at < 0) {
+      this.sampled.push(field);
+      at = this.sampled.length - 1;
+    }
+    return this.emit('sample_field', [x, y, z, at]);
+  }
+
   /** The program whose output is register `output`; unreachable registers, constants, meshes and strut sets are dropped. */
   finish(output: number, meta: ProgramMeta): FieldProgram {
     const needed = new Set<number>([output]);
@@ -148,6 +160,7 @@ export class FieldBuilder {
     const constants: number[] = [];
     const meshes: { key: string; mesh: MeshData }[] = [];
     const strutSets: StrutSet[] = [];
+    const sampled: SampledField[] = [];
     const instructions: FieldInstruction[] = [];
     const remap = <T>(list: T[], source: readonly T[], index: number, cache: Map<number, number>): number => {
       const known = cache.get(index);
@@ -156,7 +169,12 @@ export class FieldBuilder {
       cache.set(index, list.length - 1);
       return list.length - 1;
     };
-    const [constantMap, meshMap, strutMap] = [new Map<number, number>(), new Map<number, number>(), new Map<number, number>()];
+    const [constantMap, meshMap, strutMap, sampledMap] = [
+      new Map<number, number>(),
+      new Map<number, number>(),
+      new Map<number, number>(),
+      new Map<number, number>(),
+    ];
     this.instructions.forEach((instruction, index) => {
       if (!needed.has(index)) return;
       const args = instruction.args.map((arg, slot) => {
@@ -164,6 +182,7 @@ export class FieldBuilder {
         if (kind === 'r' || kind === 'r?') return arg < 0 ? arg : (renumber.get(arg) ?? arg);
         if (kind === 'c') return remap(constants, this.constants, arg, constantMap);
         if (kind === 'm') return remap(meshes, this.meshes, arg, meshMap);
+        if (kind === 'f') return remap(sampled, this.sampled, arg, sampledMap);
         return remap(strutSets, this.strutSets, arg, strutMap);
       });
       instructions.push({ op: instruction.op, args });
@@ -176,6 +195,7 @@ export class FieldBuilder {
       constants,
       meshes,
       strutSets,
+      ...(sampled.length === 0 ? {} : { sampled }),
       bounds: meta.bounds,
       lipschitz: meta.lipschitz,
       quality: meta.quality,

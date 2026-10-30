@@ -11,6 +11,7 @@ import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { FieldBuilder } from '@core/geometry/field/build';
 import type { FieldOp } from '@core/geometry/field/program';
+import type { GridSamples, TetSamples } from '@core/geometry/field/sampled';
 import { getFieldEngine, setFieldEngine } from '@core/geometry/field/engine';
 import type { FieldEngine } from '@core/geometry/field/engineTypes';
 import { compileField } from '@implicit/compile';
@@ -215,11 +216,12 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
       const ts = tsFieldEngine.evaluate(program, points, true);
       const nat = engine.evaluate(program, points, true);
       expect(
-        Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
+        nat.values.length === ts.values.length && Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
         op + ' values',
       ).toBe(true);
       expect(
-        Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
+        (nat.gradients?.length ?? 0) === (ts.gradients?.length ?? 0) &&
+          Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
         op + ' gradients',
       ).toBe(true);
       expect(nat.gradients?.length).toBe(points.length);
@@ -291,6 +293,83 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
     const refused = engine.mesh(compiled.program, grid, { mesher: 'dual_contouring', maxTriangles: 1000 });
     expect(refused).toMatchObject({ ok: false, code: 'IMP_GRID_BUDGET', limit: NATIVE_DUAL_CONTOURING_MAX_SAMPLES });
   });
+
+  native(
+    'sampled data (grid and tetrahedra): values, gradients, interval-pruned meshes bit-identical to the TS engine (05 IMP 14.11)',
+    () => {
+      if (engine === null) return;
+      const meta = { bounds: null, lipschitz: 1, quality: 'approximate' } as const;
+      const random = (
+        (seed: number) => () =>
+          (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296
+      )(7);
+      const grid: GridSamples = {
+        kind: 'grid',
+        nodes: [7, 5, 4],
+        origin: [-0.3, 0.2, 0.1],
+        voxel: 0.37,
+        values: Array.from({ length: 7 * 5 * 4 }, () => random()),
+      };
+      const points: number[] = [];
+      const nodeAt = (i: number, j: number, k: number): number => i + 6 * (j + 6 * k);
+      for (let k = 0; k < 6; k += 1)
+        for (let j = 0; j < 6; j += 1)
+          for (let i = 0; i < 6; i += 1) points.push(i + 0.2 * random(), j + 0.2 * random(), k + 0.2 * random());
+      const tets: number[] = [];
+      for (let k = 0; k < 5; k += 1)
+        for (let j = 0; j < 5; j += 1)
+          for (let i = 0; i < 5; i += 1) {
+            const c = (dx: number, dy: number, dz: number): number => nodeAt(i + dx, j + dy, k + dz);
+            for (const path of [
+              [0, 1, 3, 7],
+              [0, 1, 5, 7],
+              [0, 2, 3, 7],
+              [0, 2, 6, 7],
+              [0, 4, 5, 7],
+              [0, 4, 6, 7],
+            ])
+              tets.push(...path.map((corner) => c(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1)));
+          }
+      const mesh: TetSamples = {
+        kind: 'tets',
+        points,
+        tets,
+        values: Array.from({ length: 216 }, (_, n) => Math.sin(n * 0.37) * 2 + (points[3 * n] as number)),
+      };
+      const probes: number[] = [];
+      for (let n = 0; n < 1500; n += 1) probes.push(-1 + 8 * random(), -1 + 8 * random(), -1 + 8 * random());
+      probes.push(0, 0, 0, 5.2, 5.2, 5.2, 1, 1, 1, 2.5, 2.5, 2.5);
+      for (const field of [grid, mesh]) {
+        const b = new FieldBuilder('mm');
+        const program = b.finish(b.shift(b.sampledField(field, b.x(), b.y(), b.z()), -0.5), meta);
+        for (const gradient of [false, true]) {
+          const ts = tsFieldEngine.evaluate(program, Float64Array.from(probes), gradient);
+          const nat = engine.evaluate(program, Float64Array.from(probes), gradient);
+          expect(
+            nat.values.length === ts.values.length && Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
+            field.kind + ' values',
+          ).toBe(true);
+          expect(
+            (nat.gradients?.length ?? 0) === (ts.gradients?.length ?? 0) &&
+              Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
+            field.kind + ' gradients',
+          ).toBe(true);
+        }
+        const bounds = { min: [-1, -1, -1], max: [7, 7, 7] } as const;
+        const meshOptions = { mesher: 'tetra', maxTriangles: 1_000_000 } as const;
+        const gridSpec = { min: [...bounds.min], max: [...bounds.max], voxel: 0.25 } as const;
+        const a = tsFieldEngine.mesh(program, gridSpec, meshOptions);
+        const n = engine.mesh(program, gridSpec, meshOptions);
+        if (!a.ok || !n.ok) throw new Error('mesh refused');
+        expect(a.mesh.indices.length, field.kind).toBeGreaterThan(0);
+        expect(a.mesh.indices.every((v, i) => v === n.mesh.indices[i]) && a.mesh.indices.length === n.mesh.indices.length).toBe(true);
+        expect(
+          a.mesh.positions.length === n.mesh.positions.length && a.mesh.positions.every((v, i) => Object.is(v, n.mesh.positions[i])),
+        ).toBe(true);
+        expect(n.evaluatedSamples).toBe(a.evaluatedSamples);
+      }
+    },
+  );
 
   native('randomized trigonometry parity: thousands of points at TPMS scale and in the V8 reduction range, bit for bit', () => {
     if (engine === null) return;

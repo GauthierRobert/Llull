@@ -6,7 +6,7 @@ import { eulerFromMat } from '@lib/axisRotation';
 import { toMm } from '@core/model/units';
 import { is3D, type CadDocument, type Vec3 } from '@core/model/types';
 import { contourLoops, nodeGridOfVoxels, padNodeGrid, type Contour, type NodeGrid } from './contours';
-import { axesOfGrid, symmetrise } from './derive';
+import { axesOfGrid, symmetrise } from '@core/model/topologyGrid';
 import { domainTriangles, insideMask, type TopologyGrid } from './voxel';
 
 const NORMAL_AXIS: Readonly<Record<SymmetryPlane, number>> = { XY: 2, XZ: 1, YZ: 0 };

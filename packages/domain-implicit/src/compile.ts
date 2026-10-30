@@ -8,14 +8,16 @@
  */
 
 import { FieldBuilder } from '@core/geometry/field/build';
+import { sampledRange } from '@core/geometry/field/sampled';
 import type { FieldProgram } from '@core/geometry/field/program';
 import type { CadDocument } from '@core/model/types';
 import { graphPart, strutsPart, tpmsPart } from './compileLattice';
 import { type CompileFailure, type CompileHost, type CompileWarning, Failure, type Part, degrade, worst } from './compileTypes';
 import { type Box, type Frame, growBox, intersectBox, placeBox, placeFrame, unionBox, worldFrame } from './frame';
-import { type BooleanNode, type FieldNode, type Law, fieldOf, inputsOf } from './model';
+import { type BooleanNode, type FieldNode, type Law, type ScalarNode, fieldOf, inputsOf } from './model';
 import { primitiveField } from './primitives';
 import { type ScalarPart, compileScalar } from './scalar';
+import { feResultInput, topologyDensityInput } from './sampledInputs';
 import { closedSolidMesh } from './solidMesh';
 
 export type { CompileFailure, CompileWarning } from './compileTypes';
@@ -107,6 +109,17 @@ class Compiler implements CompileHost {
     if (!solid.ok) throw new Failure({ ok: false, code: solid.code, message: solid.message, ids: [entityId] });
     this.unverified ||= solid.unpinned;
     return this.b.meshSdf(entityId, solid.mesh, frame.x, frame.y, frame.z);
+  }
+
+  sampledInput(node: Extract<ScalarNode, { kind: 'topology_density' | 'fea_result' }>, frame: Frame): ScalarPart {
+    const input =
+      node.kind === 'topology_density'
+        ? topologyDensityInput(this.doc, node.studyId)
+        : feResultInput(this.doc, node.caseId, node.quantity, node.step);
+    if (!input.ok) throw new Failure({ ok: false, code: input.code, message: input.message, ids: [...input.ids, node.id] });
+    this.unverified ||= input.unverified;
+    const { lo, hi } = sampledRange(input.field);
+    return { reg: this.b.sampledField(input.field, frame.x, frame.y, frame.z), lo, hi };
   }
 
   /** `reg + sign * law`; a constant law becomes a literal shift (the tape of a plain number). */

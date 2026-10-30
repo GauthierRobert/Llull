@@ -6,6 +6,7 @@
  */
 
 import type { MeshData, Vec3 } from '../../model/types';
+import { type SampledField, sampledFieldError } from './sampled';
 
 export type FieldOp =
   | 'const'
@@ -33,7 +34,8 @@ export type FieldOp =
   | 'smin_exp'
   | 'chamfer_min'
   | 'mesh_sdf'
-  | 'strut_set';
+  | 'strut_set'
+  | 'sample_field';
 
 /** One tape entry. `args` are register indices, except where the op table (`OP_ARITY`) names an operand index or a constant index. */
 export interface FieldInstruction {
@@ -69,6 +71,8 @@ export interface FieldProgram {
   readonly meshes: readonly { readonly key: string; readonly mesh: MeshData }[];
   /** Operands of `strut_set`. */
   readonly strutSets: readonly StrutSet[];
+  /** Operands of `sample_field` (absent when the program has none). */
+  readonly sampled?: readonly SampledField[];
   /** Conservative box containing {f <= 0}, or null when unbounded. */
   readonly bounds: { readonly min: Vec3; readonly max: Vec3 } | null;
   /** Global bound of |grad f| (1 for distance-like programs). */
@@ -79,13 +83,14 @@ export interface FieldProgram {
 }
 
 /**
- * Operand table. `r` = register, `c` = index into `constants`, `m` = index into `meshes`, `s` = index into `strutSets`, `r?` = register or -1.
+ * Operand table. `r` = register, `c` = index into `constants`, `m` = index into `meshes`, `s` = index into `strutSets`, `f` = index into `sampled`, `r?` = register or -1.
  * Semantics (f64): add/sub/mul/div IEEE; fract(a) = a - floor(a); atan2(y, x); clamp(v, lo, hi) = min(max(v, lo), hi);
  * select(c, a, b) = a if c < 0 else b; smin_quad(a, b, k) = min(a, b) - h^2 k / 4 with h = max(k - |a - b|, 0) / k (k <= 0: min);
  * smin_exp(a, b, k) = m - k ln(1 + exp(-|a - b| / k)) with m = min(a, b) (k <= 0: min);
  * chamfer_min(a, b, k) = min(min(a, b), (a + b - k) / sqrt 2); mesh_sdf(x, y, z, m) = signed distance to mesh m (generalised winding number
  * sign, negative inside); strut_set(x, y, z, s, radius) = distance to the nearest beam of set s minus its radius at the closest point (beam
- * radius interpolated along the axis; with `radius` >= 0 the register replaces it).
+ * radius interpolated along the axis; with `radius` >= 0 the register replaces it); sample_field(x, y, z, f) = the interpolated value of the
+ * sampled data f (trilinear on a cell-centred grid, barycentric on a tetrahedral mesh; `sampled.ts`).
  */
 export const OP_ARITY: Readonly<Record<FieldOp, readonly string[]>> = {
   const: ['c'],
@@ -114,6 +119,7 @@ export const OP_ARITY: Readonly<Record<FieldOp, readonly string[]>> = {
   chamfer_min: ['r', 'r', 'r'],
   mesh_sdf: ['r', 'r', 'r', 'm'],
   strut_set: ['r', 'r', 'r', 's', 'r?'],
+  sample_field: ['r', 'r', 'r', 'f'],
 };
 
 /** Why `program` is not a well-formed tape, or null. */
@@ -128,11 +134,29 @@ export function programError(program: FieldProgram): string | null {
     for (const [slot, kind] of shape.entries()) {
       const value = args[slot] ?? -1;
       const limit =
-        { r: index, 'r?': index, c: program.constants.length, m: program.meshes.length, s: program.strutSets.length }[kind] ?? 0;
+        {
+          r: index,
+          'r?': index,
+          c: program.constants.length,
+          m: program.meshes.length,
+          s: program.strutSets.length,
+          f: program.sampled?.length ?? 0,
+        }[kind] ?? 0;
       const lowest = kind === 'r?' ? -1 : 0;
       if (!Number.isInteger(value) || value < lowest || value >= limit)
         return `instruction ${index} (${op}): operand ${slot} = ${value} out of range`;
     }
   }
+  for (const [index, field] of (program.sampled ?? []).entries()) {
+    const reason = checkedSampled(field);
+    if (reason !== null) return `sampled field ${index}: ${reason}`;
+  }
   return null;
+}
+
+const sampledChecks = new WeakMap<SampledField, string | null>();
+
+function checkedSampled(field: SampledField): string | null {
+  if (!sampledChecks.has(field)) sampledChecks.set(field, sampledFieldError(field));
+  return sampledChecks.get(field) ?? null;
 }

@@ -9,9 +9,9 @@ export interface ZipEntry {
 }
 
 /** DOS date 1980-01-01 00:00: a fixed timestamp keeps archives byte-reproducible. */
-const DOS_TIME = 0;
-const DOS_DATE = (0 << 9) | (1 << 5) | 1;
-const UTF8_FLAG = 0x0800;
+export const DOS_TIME = 0;
+export const DOS_DATE = (0 << 9) | (1 << 5) | 1;
+export const UTF8_FLAG = 0x0800;
 
 function u16(view: DataView, offset: number, value: number): void {
   view.setUint16(offset, value, true);

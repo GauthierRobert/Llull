@@ -66,6 +66,13 @@ impl Tape {
     }
 
     pub fn finish(self, output: i64) -> Evaluator {
-        Evaluator { instrs: self.instrs, output: output as usize, constants: self.constants, meshes: vec![], struts: vec![] }
+        Evaluator {
+            instrs: self.instrs,
+            output: output as usize,
+            constants: self.constants,
+            meshes: vec![],
+            struts: vec![],
+            sampled: vec![],
+        }
     }
 }

@@ -175,6 +175,8 @@ export type ScalarNode = NodeBase & { readonly op: 'scalar' } & (
         readonly b: Law;
       }
     | { readonly kind: 'noise'; readonly seed: number; readonly frequency: number; readonly octaves: number }
+    | { readonly kind: 'topology_density'; readonly studyId: string }
+    | { readonly kind: 'fea_result'; readonly caseId: string; readonly quantity: 'von_mises' | 'u_mag'; readonly step?: number }
   );
 
 export type FieldNode =

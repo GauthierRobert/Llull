@@ -3,6 +3,7 @@
 
 use crate::eval::Evaluator;
 use crate::jsnum::{hypot3, jmax, jmax4, jmin, jmin4};
+use crate::sampled::Sampled;
 use crate::tape::Op;
 use llull_jsmath::sin;
 use std::f64::consts::{FRAC_1_SQRT_2, FRAC_PI_2, LN_2, PI, TAU};
@@ -118,6 +119,7 @@ impl Evaluator {
                     let slack = half_diagonal(lo, hi, [ia, ib, ic]);
                     (middle - slack, middle + slack)
                 }
+                Op::SampleField => self.sampled.get(im as usize).map_or((f64::NEG_INFINITY, f64::INFINITY), Sampled::range),
                 Op::StrutSet => {
                     let centre = |index: i64| (slot(lo, index) + slot(hi, index)) / 2.0;
                     let probe = if ir >= 0 { 0.0 } else { -1.0 };
@@ -149,7 +151,14 @@ mod tests {
     use crate::tape::{Instr, SLOTS};
 
     fn tape(ops: &[(Op, [i64; SLOTS])], constants: Vec<f64>, output: usize) -> Evaluator {
-        Evaluator { instrs: ops.iter().map(|&(op, args)| Instr { op, args }).collect(), output, constants, meshes: vec![], struts: vec![] }
+        Evaluator {
+            instrs: ops.iter().map(|&(op, args)| Instr { op, args }).collect(),
+            output,
+            constants,
+            meshes: vec![],
+            struts: vec![],
+            sampled: vec![],
+        }
     }
 
     fn one(op: Op, a: i64, b: i64, c: i64) -> Evaluator {

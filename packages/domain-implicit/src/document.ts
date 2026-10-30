@@ -14,6 +14,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { isRecord } from '@lib/isRecord';
 import { bodyEntity, triangleBudget } from './bodyCommand';
 import { storeBodyMesh } from './bodyMesh';
+import { compileField } from './compile';
 import { type ImplicitBody, type ImplicitModel, entitySources, implicitOf, inputsOf } from './model';
 import { readsEntity } from './rederive';
 import { realiseField } from './realise';
@@ -22,7 +23,7 @@ const OPS = new Set(['primitive', 'solid', 'boolean', 'offset', 'shell', 'transf
 const SHAPES = new Set(['sphere', 'box', 'cylinder', 'capsule', 'torus', 'cone', 'plane']);
 const TPMS_KINDS = new Set(['gyroid', 'schwarz_p', 'diamond', 'neovius', 'iwp', 'lidinoid', 'fischer_koch_s', 'split_p']);
 const STRUT_CELLS = new Set(['cubic', 'bcc', 'fcc', 'octet', 'kelvin', 'diamond', 'bccz', 'fccz', 'reentrant']);
-const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise']);
+const SCALAR_KINDS = new Set(['coordinate', 'distance', 'ramp', 'mix', 'arith', 'noise', 'topology_density', 'fea_result']);
 const isFiniteNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
 const isLaw = (value: unknown): boolean => typeof value === 'number' || typeof value === 'string';
 const isVec3 = (value: unknown): boolean =>
@@ -139,7 +140,12 @@ function nodeError(key: string, node: unknown): string | null {
       node['density'] > 0 &&
       typeof node['seed'] === 'number' &&
       typeof node['radius'] === 'number',
-    scalar: typeof node['kind'] === 'string' && SCALAR_KINDS.has(node['kind']),
+    scalar:
+      typeof node['kind'] === 'string' &&
+      SCALAR_KINDS.has(node['kind']) &&
+      (node['kind'] !== 'topology_density' || typeof node['studyId'] === 'string') &&
+      (node['kind'] !== 'fea_result' ||
+        (typeof node['caseId'] === 'string' && (node['quantity'] === 'von_mises' || node['quantity'] === 'u_mag'))),
   };
   return checks[node['op']] === true ? null : `field '${key}' (${node['op']}) has malformed parameters`;
 }
@@ -335,6 +341,9 @@ export const implicitDocument: DocumentExtension = {
             const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
             return entity?.kind === 'mesh' && entity.asset !== undefined && (port === null || port.manifest(entity.asset.key) === null);
           });
+          const compiled = unheld.length > 0 ? null : compileField(doc, body.field);
+          if (compiled !== null && !compiled.ok && (compiled.code === 'IMP_INPUT_NOT_FOUND' || compiled.code === 'IMP_INPUT_TOO_LARGE'))
+            return `${compiled.code}: implicit body '${body.id}' (field ${body.field}) reads a recorded analysis result that this machine cannot read (${compiled.message}); load the artifact store that holds it and run regenerate_implicit_bodies`;
           return unheld.length > 0
             ? `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) is built from the mesh asset of ${unheld.map((id) => `'${id}'`).join(', ')}, which this machine does not hold; run regenerate_implicit_bodies on a machine that holds the asset`
             : `IMP_BODY_STALE: implicit body '${body.id}' (field ${body.field}) could not be realised on this machine; run create_implicit_body again`;

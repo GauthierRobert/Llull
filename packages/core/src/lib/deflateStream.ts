@@ -63,6 +63,9 @@ export interface DeflateResult {
 
 export class DeflateStream {
   private readonly chunks: Uint8Array[] = [];
+
+  /** With `onChunk` the compressed bytes are handed over as they are produced and not kept (`finish().chunks` is then empty): a sink that writes them out holds no more than one buffer. */
+  constructor(private readonly onChunk?: (chunk: Uint8Array) => void) {}
   private out = new Uint8Array(OUT_CHUNK);
   private outAt = 0;
   private flushed = 0;
@@ -86,10 +89,15 @@ export class DeflateStream {
     this.bits(3, 3);
     this.bits(0, 7);
     if (this.bitCount > 0) this.bits(0, 8 - this.bitCount);
-    this.chunks.push(this.out.subarray(0, this.outAt));
+    this.emit(this.out.subarray(0, this.outAt));
     this.flushed += this.outAt;
     this.outAt = 0;
     return { chunks: this.chunks, size: this.flushed };
+  }
+
+  private emit(chunk: Uint8Array): void {
+    if (this.onChunk === undefined) this.chunks.push(chunk);
+    else this.onChunk(chunk);
   }
 
   private bits(value: number, count: number): void {
@@ -101,7 +109,7 @@ export class DeflateStream {
       this.acc >>>= 8;
       this.bitCount -= 8;
       if (this.outAt === OUT_CHUNK) {
-        this.chunks.push(this.out);
+        this.emit(this.out);
         this.flushed += OUT_CHUNK;
         this.out = new Uint8Array(OUT_CHUNK);
         this.outAt = 0;

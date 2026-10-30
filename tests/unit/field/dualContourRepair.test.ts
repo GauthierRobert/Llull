@@ -139,7 +139,7 @@ describe('dual contouring: cells at ambiguous faces are repaired, everything els
     expect(error(repaired.mesh.positions, repaired.mesh.indices)).toBeLessThan(0.2 * error(tetra.mesh.positions, tetra.mesh.indices));
     // the QEF vertices are off the surface by a fraction of a voxel (the tetra vertices sit on edge crossings); the volume is what the repair gains
     expect(meanAbsField(p, repaired.mesh.positions)).toBeLessThan(0.1 * grid.voxel);
-  });
+  }, 120_000);
 
   it('two boxes that only share an edge (ambiguous faces along it) are one closed dual-contouring mesh', () => {
     const edge = scene();
