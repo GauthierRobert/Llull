@@ -4,7 +4,7 @@
  * (V8-exact sin / cos / atan2 / exp / log / hypot, same scan and numbering orders), so `deterministic: true`, and it lifts the TS caps (`limits`).
  * Commands are synchronous, so a job BLOCKS the backend event loop for its duration (TECHNICAL_SPEC D9); the cap is the timeout below.
  * A job that cannot run (binary missing, crash, timeout, protocol) is answered by the TS engine when the request fits its caps, else refused
- * with IMP_ENGINE_FAILED naming the reason. Gradients are always answered by the TS engine.
+ * with IMP_ENGINE_FAILED naming the reason. Gradients (`evaluate` with `withGradient`) run natively too (05 IMP 14.10).
  * Environment: LLULL_COMPUTE / LLULL_NATIVE_DIR (binary), LLULL_FIELD_TIMEOUT_S (default 600), LLULL_NATIVE_KEEP=1.
  */
 
@@ -173,7 +173,7 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
     name: 'llull-field',
     limits: NATIVE_FIELD_LIMITS,
     evaluate(program, points, withGradient): FieldSamples {
-      if (withGradient || programError(program) !== null) return tsFieldEngine.evaluate(program, points, withGradient);
+      if (programError(program) !== null) return tsFieldEngine.evaluate(program, points, withGradient);
       const count = Math.floor(points.length / 3);
       const empty = { values: new Float64Array(0), gradients: null, nonFinite: 0 };
       return guarded<FieldSamples>(
@@ -182,14 +182,17 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
           const files: Files = {};
           const spec = packProgram(program, '', files);
           files['points.f64'] = f64Bytes(points.subarray(0, count * 3));
-          files['job.json'] = JSON.stringify({ op: 'evaluate', program: spec, points: count });
+          files['job.json'] = JSON.stringify({ op: 'evaluate', program: spec, points: count, gradient: withGradient });
           return job(files, ({ report, read }) => {
             const values = f64Values(read('values.f64'));
             if (values.length !== count) throw new FieldJobFailure('NATIVE_PROTOCOL', `${values.length} values for ${count} points`);
-            return { values, gradients: null, nonFinite: num(report['nonFiniteSamples']) };
+            const gradients = withGradient ? f64Values(read('gradients.f64')) : null;
+            if (gradients !== null && gradients.length !== 3 * count)
+              throw new FieldJobFailure('NATIVE_PROTOCOL', `${gradients.length} gradient numbers for ${count} points`);
+            return { values, gradients, nonFinite: num(report['nonFiniteSamples']) };
           });
         },
-        () => tsFieldEngine.evaluate(program, points, false),
+        () => tsFieldEngine.evaluate(program, points, withGradient),
         (r) => ({
           ...empty,
           values: new Float64Array(count).fill(NaN),

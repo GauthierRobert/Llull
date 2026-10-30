@@ -4,6 +4,7 @@
 use crate::components::{components, solid_nodes, Component};
 use crate::eval::Evaluator;
 use crate::files::{f64_bytes, input_error, read_f64, u32_bytes, write_file, JobError};
+use crate::gradient::GradientScratch;
 use crate::measure::{quantiles, volume};
 use crate::sampling::{fill_plane, Grid, PlaneStats, Tiles};
 use crate::tape::{Program, ProgramSpec};
@@ -53,6 +54,8 @@ struct Job {
     request: Option<Request>,
     #[serde(default)]
     points: usize,
+    #[serde(default)]
+    gradient: bool,
 }
 
 fn refusal(code: &str, message: String, samples: Option<u64>, limit: Option<u64>) -> Value {
@@ -193,11 +196,23 @@ fn evaluate_job(folder: &Path, job: &Job, evaluator: &Evaluator, outputs: &mut V
     if points.len() != job.points * 3 {
         return Err(input_error(format!("points.f64 holds {} numbers, expected {}", points.len(), job.points * 3)));
     }
+    let non_finite_of = |values: &[f64]| values.iter().filter(|v| !v.is_finite()).count();
+    if job.gradient {
+        let both: Vec<(f64, [f64; 3])> = points
+            .par_chunks_exact(3)
+            .map_init(|| GradientScratch::new(evaluator.instrs.len()), |scratch, p| evaluator.value_gradient_at(scratch, p[0], p[1], p[2]))
+            .collect();
+        let values: Vec<f64> = both.iter().map(|(v, _)| *v).collect();
+        let gradients: Vec<f64> = both.iter().flat_map(|(_, g)| *g).collect();
+        outputs.push(write_file(folder, "values.f64", &f64_bytes(&values))?);
+        outputs.push(write_file(folder, "gradients.f64", &f64_bytes(&gradients))?);
+        return Ok(json!({ "points": job.points, "nonFiniteSamples": non_finite_of(&values) }));
+    }
     let values: Vec<f64> = points
         .par_chunks_exact(3)
         .map_init(|| vec![0.0; evaluator.instrs.len()], |regs, p| evaluator.value_at(regs, p[0], p[1], p[2]))
         .collect();
-    let non_finite = values.iter().filter(|v| !v.is_finite()).count();
+    let non_finite = non_finite_of(&values);
     outputs.push(write_file(folder, "values.f64", &f64_bytes(&values))?);
     Ok(json!({ "points": job.points, "nonFiniteSamples": non_finite }))
 }

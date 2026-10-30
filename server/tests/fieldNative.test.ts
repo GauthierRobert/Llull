@@ -10,6 +10,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { FieldBuilder } from '@core/geometry/field/build';
+import type { FieldOp } from '@core/geometry/field/program';
 import { getFieldEngine, setFieldEngine } from '@core/geometry/field/engine';
 import type { FieldEngine } from '@core/geometry/field/engineTypes';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
@@ -149,6 +150,76 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
     },
   );
 
+  native(
+    'native gradient (evaluate_field gradient: true): value and gradient bit-identical for every field of the scene and a Voronoi set (05 IMP 14.10)',
+    () => {
+      if (engine === null) return;
+      const points = Array.from({ length: 300 }, (_, n) =>
+        [0, 1, 2].map((axis) => ((0.5 + (n + 1) * [0.8191725, 0.6710436, 0.5497004][axis]!) % 1) * 14 - 1),
+      );
+      const box = step(createEmptyDocument(), 'add_field_primitive', { shape: 'box', size: [10, 10, 10], position: [5, 5, 5] });
+      const voronoi = step(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.2, seed: 2, radius: 0.3 });
+      expect(voronoi.data['beams'] as number).toBeGreaterThan(40);
+      const same = (a: ArrayLike<number>, b: ArrayLike<number>): boolean =>
+        a.length === b.length && Array.from(a).every((v, i) => Object.is(v, b[i]));
+      for (const [doc, field] of [
+        ...Object.values(SCENE.fields).map((id) => [SCENE.doc, id] as const),
+        [voronoi.doc, voronoi.id] as const,
+      ]) {
+        const ts = step(doc, 'evaluate_field', { field, points, gradient: true });
+        const nat = step(doc, 'evaluate_field', { field, points, gradient: true }, engine);
+        expect(same(nat.data['values'] as number[], ts.data['values'] as number[]), field + ' values').toBe(true);
+        expect(same(nat.data['gradients'] as number[], ts.data['gradients'] as number[]), field + ' gradients').toBe(true);
+        expect((nat.data['provenance'] as Record<string, unknown>)['engine']).toBe('llull-field');
+      }
+    },
+  );
+
+  native('native gradient of every op, both sides of each condition (degenerate points included), bit for bit', () => {
+    if (engine === null) return;
+    const meta = { bounds: null, lipschitz: 1, quality: 'exact' } as const;
+    const arity: Record<string, number> = {
+      add: 2,
+      sub: 2,
+      mul: 2,
+      div: 2,
+      neg: 1,
+      abs: 1,
+      min: 2,
+      max: 2,
+      sqrt: 1,
+      square: 1,
+      sin: 1,
+      cos: 1,
+      atan2: 2,
+      floor: 1,
+      fract: 1,
+      clamp: 3,
+      select: 3,
+      smin_quad: 3,
+      smin_exp: 3,
+      chamfer_min: 3,
+    };
+    const ops = Object.keys(arity) as FieldOp[];
+    const grid = [-1.5, -1, -0.5, 0, 0.25, 0.5, 1, 2, 3];
+    const points = Float64Array.from(grid.flatMap((x) => grid.flatMap((y) => grid.flatMap((z) => [x, y, z]))));
+    for (const op of ops) {
+      const b = new FieldBuilder('mm');
+      const program = b.finish(b.op(op, ...[b.x(), b.y(), b.z()].slice(0, arity[op])), meta);
+      const ts = tsFieldEngine.evaluate(program, points, true);
+      const nat = engine.evaluate(program, points, true);
+      expect(
+        Array.from(nat.values).every((v, i) => Object.is(v, ts.values[i])),
+        op + ' values',
+      ).toBe(true);
+      expect(
+        Array.from(nat.gradients ?? []).every((v, i) => Object.is(v, ts.gradients?.[i])),
+        op + ' gradients',
+      ).toBe(true);
+      expect(nat.gradients?.length).toBe(points.length);
+    }
+  });
+
   native('randomized trigonometry parity: thousands of points at TPMS scale and in the V8 reduction range, bit for bit', () => {
     if (engine === null) return;
     let seed = 20260101;
@@ -264,7 +335,7 @@ describe('native field engine without a working binary', () => {
     expect(props.data['volumeQuadrature']).toBeDefined();
   });
 
-  it('delegates gradients and malformed programs to the TS engine', () => {
+  it('delegates malformed programs to the TS engine', () => {
     if (missing === null) throw new Error('an explicit binary path always builds an engine');
     const bad = {
       version: 1 as const,
