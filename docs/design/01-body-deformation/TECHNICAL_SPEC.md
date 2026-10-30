@@ -846,3 +846,22 @@ native kernel, the capability), cargo pack vectors.
   a tiny residual and agrees with the closest-point coordinates (x modulo the period), else `DEF_FLOW_BASE_OUTSIDE`. The warp sets a flag when a base solve ends with a large residual
   and refuses with the same code instead of returning the last iterate (cargo test: a body running past the table is never built; the test also passes without the flag because the
   B-spline fit of the clamped table already throws, so the flag itself is not proven by it).
+
+### 17.7 The warp never hangs: progress and work bounds of the mesh refinement
+
+With the focal-point refusal of §17.6 bypassed, a body around the axis of a closed base sheet ran for hours: the triangle count grows ×3 per pass (12 → 1.7 M after 13 passes, the passes costing
+0.002 s, 1 s, 5 s, 11 s, 25 s, 41 s, 45 s) because a map that is discontinuous (or folded) across the body keeps a chord deviation the size of its jump however small the edges get, so
+the chord rule never stops splitting until the 4 M triangle cap. The cap was the only bound; each pass costs triangles × map evaluations, so it was no bound in time. Now (`meshWarp.ts`):
+
+- **Progress.** The chord rule reports, per pass, the worst deviation of the edges it splits and the worst deviation / edge length. A smooth map has a ratio that falls as the edges shrink, a kink one
+  that stays bounded; a jump or fold has a ratio that doubles with every pass. From the sixth pass, when the worst deviation is above ten tolerances, the ratio above 100 (an image edge a hundred times
+  longer than the edge: det J of 1e6 is not a body deformation) and more than four times its value three passes earlier, the refinement is refused with `DEF_APPROX_TOLERANCE` ("the map is
+  discontinuous or folded in the body"). A first criterion on the worst deviation alone refused `deform_by_point` (a localised bump is discovered late: its deviation does not fall while new regions
+  are found); the ratio, with its absolute level, does not. The same input now ends after about 8 passes, in seconds.
+- **Work.** Independently of the triangle count, the chord evaluations are counted (a map that solves for its argument, the base-frame laws, counts 20 each) and the mesh path refuses with
+  `DEF_BUDGET_EXCEEDED` beyond 4e7 weighted evaluations. With the progress check disabled the same input stops by this bound after about 35 s instead of never.
+- **Native.** The exact warp's loops were already bounded by construction (a Newton solve of at most 40 steps, the fit by 512 segments per direction and 400 000 points, then
+  `DEF_APPROX_TOLERANCE`); the exact path of the same input ends with a refusal within the test bound.
+
+Tests: `tests/unit/deform/flowSheetBase.test.ts` (the focal check switched off by the test-only `focalCheck.enabled`; both kernels; refusal `DEF_APPROX_TOLERANCE` in seconds; red-proof: without the
+progress check it ends by the work bound with `DEF_BUDGET_EXCEEDED` after about 35 s), `server/tests/nativeKernelFlowSheet.test.ts` (the exact path).

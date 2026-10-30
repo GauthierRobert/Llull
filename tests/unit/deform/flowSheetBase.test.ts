@@ -22,6 +22,7 @@ import {
   volumeOf,
 } from './harness';
 import { packData } from './packPaths';
+import { focalCheck } from '@core/commands/deform/flowSheetBase';
 
 const KERNELS: KernelKind[] = ['none', 'manifold'];
 type SurfaceLaw = Extract<DeformLaw, { kind: 'flowSurface' }>;
@@ -355,6 +356,30 @@ describe.each(KERNELS)('flow_on_surface with a base sheet, kernel: %s', (kind) =
     expect(result.error?.code).toBe('DEF_FOLDOVER');
     expect(result.summary).toContain('centre of curvature');
   });
+
+  it('the warp itself never hangs: the focal check bypassed, a body around the axis ends with DEF_APPROX_TOLERANCE in seconds, not after millions of triangles', async () => {
+    await installKernel(kind);
+    const plate = execute(createEmptyDocument(), 'add_box', { size: [60, 20, 10], position: [20, -10, -5], anchor: 'min' });
+    const ring = fullCircleSheet(plate.document);
+    const target = flatSheet(ring.document, [-10, 400], [-30, 30], 0);
+    focalCheck.enabled = false;
+    const started = Date.now();
+    try {
+      const result = execute(target.doc, 'flow_on_surface', {
+        id: plate.affected[0],
+        base: { sheetId: ring.affected[0], origin: [0, 0, 0], uDirection: [0, 0, 1] },
+        target: { sheetId: target.id },
+        targetOrigin: [0, 0, 0],
+        targetUDirection: [1, 0, 0],
+        output: { mode: 'mesh' },
+      });
+      expect(result.error?.code).toBe('DEF_APPROX_TOLERANCE');
+      expect(result.summary).toContain('discontinuous or folded');
+    } finally {
+      focalCheck.enabled = true;
+    }
+    expect(Date.now() - started).toBeLessThan(60_000);
+  }, 120_000);
 
   it('refuses a base given twice or not at all, a non-sheet base, a body off the base sheet, and a target fold, by name', async () => {
     const { doc, plate, base, target } = await scene();

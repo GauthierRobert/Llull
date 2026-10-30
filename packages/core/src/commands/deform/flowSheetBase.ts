@@ -52,6 +52,9 @@ export function orientationAt(
   return { xAlong, signX, signY: dot3(across, tangentY) * signX >= 0 ? 1 : -1 };
 }
 
+/** Test-only switch: false skips the focal-point refusal so that a test can reach the warp with the input it shields. */
+export const focalCheck = { enabled: true };
+
 /** Samples per direction of the grid of the base sheet searched for its centres of curvature. */
 const FOCAL_GRID = 41;
 
@@ -153,7 +156,7 @@ export function planSheetBase(
   // a body that contains a centre of curvature of the base (an axis of a closed cylinder, say) is torn: det J of the base map vanishes there, it never reaches the floor
   const box = (a: number): [number, number] => [target.min[a] as number, target.max[a] as number];
   const near = focalPoints(sheet).filter((p) => [0, 1, 2].every((a) => (p[a] as number) >= box(a)[0] && (p[a] as number) <= box(a)[1]));
-  if (pointsInsideMesh(near, positions, target.mesh.indices).length > 0)
+  if (focalCheck.enabled && pointsInsideMesh(near, positions, target.mesh.indices).length > 0)
     return {
       code: 'DEF_FOLDOVER',
       message:
