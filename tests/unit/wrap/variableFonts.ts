@@ -112,7 +112,7 @@ export function seacSpec(extra: Partial<CffSpec> = {}, withCharset = true): CffS
   return {
     glyphs: [
       { tokens: ['endchar'] },
-      { tokens: [100, 0, 'rmoveto', 400, 700, -400, 'hlineto', 'endchar'] },
+      { tokens: [100, 0, 'rmoveto', 200, 'dup', 'add', 700, -400, 'hlineto', 'endchar'] },
       { tokens: [0, 0, 'rmoveto', 100, 100, 'hlineto', 'endchar'] },
       { tokens: [200, 750, 65, 194, 'endchar'] },
     ],

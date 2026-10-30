@@ -6,7 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
-import { parseFont } from '@lib/font/font';
+import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
 import { parseUnit } from '@lib/quantity';
@@ -18,6 +18,7 @@ import { parseQuery } from '@protocol/discoveryRank';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { libraryFile } from '../../unit/materials/support';
 import { firaBytes } from '../../unit/wrap/fixtures';
+import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
 import { asBytes, asText, orRefusal, repeated, type HostileReader } from './types';
@@ -92,6 +93,36 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: () => firaBytes(),
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => parseFont(asBytes(input)),
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: parseFont (CFF2 variable font at an instance: fvar, avar, variation store, blend, HVAR)',
+    covers: [
+      'core/src/lib/font/cffIndex.ts:readIndex',
+      'core/src/lib/font/cffIndex.ts:readDict',
+      'core/src/lib/font/variation.ts:readVariationSpace',
+      'core/src/lib/font/variation.ts:readItemVariationStore',
+      'core/src/lib/font/variation.ts:readAdvanceDeltas',
+    ],
+    input: 'bytes',
+    build: () => variableFont({ avar: true, hvar: [3, 2, 1] }),
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });
+      return parsed.ok ? validateGlyphs(parsed.font) : parsed;
+    },
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: parseFont (CFF with seac, an arithmetic operator and a charset)',
+    covers: ['core/src/lib/font/cffEncoding.ts:readCharset'],
+    input: 'bytes',
+    build: () => seacFont(),
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const parsed = parseFont(asBytes(input));
+      return parsed.ok ? validateGlyphs(parsed.font) : parsed;
+    },
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {
