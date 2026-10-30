@@ -893,15 +893,15 @@ measured wall plus that band and says so in the finding.
 - **Host without the mesh asset store.** A stored body this host cannot hold or realise at its voxel keeps a coarse display mesh (the field at 2 to 16 times the voxel) with its asset reference, and `afterLoad` reports `IMP_ASSET_MISSING`; measurements and exports refuse until the store is loaded. Only a body that cannot be realised at all is dropped (`IMP_BODY_STALE`). A body that reads a coarsely shown body through a solid, distance or graph node is not realised from the proxy either: it stays unrealised with its record and hash untouched, `afterLoad` reports `IMP_BODY_STALE`, and `implicit_properties` / `check_implicit` refuse it with the same code; loading with the store restores both. Streamed 3MF meshes are written unwelded (manifold is computed on the written triangles), an index outside the vertices is refused with `EXPORT_MESH_INVALID`, and `export_3mf` takes `maxBytes` to lower the 375 MB cap.
 - **Beam Lattice schemas** (`beamlattice.xsd`, `beamlattice-balls.xsd`, Appendix B of the extension document, only the network import removed) are pinned beside `implicit.xsd`; the JDK-gated test validates the `b:beamlattice` of a strut export with and without a representation mesh.
 - **Manifold test** (`isClosedManifold`) sorts packed edge keys in a typed array instead of a `Map` (a 6.9e6-triangle body has 20e6 edges, above the 2^24 entries of a `Map`).
-- **Voronoi** (`add_voronoi_lattice`): seeds from a mulberry32 generator over the region box grown by 1.2 mean spacings, Bowyer-Watson Delaunay tetrahedralisation, one beam per shared face, cut to the box; at most 700 seeds and 5000 beams (about 13 beams per seed).
-  Constant radius only. The explicit-set distance still tests every beam at every sample, so large Voronoi bodies are slow (a 20 mm cube at 0.04 seeds/mm3 is refused, `IMP_GRAPH_TOO_LARGE`).
+- **Voronoi** (`add_voronoi_lattice`): seeds from a mulberry32 generator over the region box grown by 1.2 mean spacings, Bowyer-Watson Delaunay tetrahedralisation, one beam per shared face, cut to the box; at most 6000 seeds (about 9 beams per seed, 55000 beams; it was 700 seeds and 5000 beams, see 14.9).
+  Constant radius only. The explicit-set distance goes through a BVH (14.9), so a 20 mm cube at 0.04 seeds/mm3 (787 seeds, 4769 beams) realises in 0.7 s natively; the Delaunay pass, quadratic in the seeds, is now the limit.
 - **Reentrant cell** is llull's own definition (the eight corners and six face nodes pushed a quarter cell inward, each face node bonded to the 4 corners of its face: 24 struts), not a catalogue lattice; **mechanics** are the affine stretch-only stiffness (exact for the octet) plus a Gibson-Ashby law whose coefficient the caller supplies.
 - Tolerance changes: none. VC-IMP-15's mesh gate (0.5 %) is met by dual contouring and not by the default tetrahedra; `create_implicit_body` keeps `tetra` as the default because it is always manifold.
 
 ### 14.7 Not built
 
-Surface-UV cell maps and maps for strut lattices; scalar kinds `topology_density` and `fea_result` (VC-IMP-29 stays open); numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a BVH for explicit strut sets
-(cap 5000 beams); native `gradient` evaluation and native dual contouring (both delegate to the TS engine); per-cell dual-contouring fallback (the whole body falls back); a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.
+Surface-UV cell maps and maps for strut lattices; scalar kinds `topology_density` and `fea_result` (VC-IMP-29 stays open); numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a faster than quadratic Delaunay pass for Voronoi (14.9);
+native `gradient` evaluation and native dual contouring (both delegate to the TS engine); per-cell dual-contouring fallback (the whole body falls back); a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.
 
 ### 14.8 A plain field over a coarsely shown body (DES-5c, 2026-10-30)
 
@@ -909,3 +909,38 @@ The open item "a plain field reading a body restored as a coarse proxy still eva
 that reads mesh triangles reaches the bodies a field reads, so `evaluate_field`, `section_field` and `implicit_properties` on such a field answer with the
 warning `MESH_ASSET_LOD_ONLY` naming the body (the rule of every read-only query in llull), and `create_implicit_body` from it refuses with that code. Decision:
 keep the one cross-command rule rather than an implicit-only refusal. Locked by `tests/unit/implicit/lifecycle.test.ts` ("a stored body this host can only show coarsely").
+
+### 14.9 BVH for explicit strut sets (DES-5c, 2026-10-30)
+
+**Code.** `packages/core/src/geometry/field/strutBvh.ts` (TS) and `solver/crates/llull-field/src/strut_bvh.rs` (Rust twin) build a bounding-volume hierarchy once per explicit (non periodic) strut set in
+`prepareStrutSet` / `StrutEval::new` (sets of 32 beams or more; periodic sets keep their bucket prefilter). `distanceToSegments` / `distance_to_segments` is unchanged and stays the reference.
+Median split by centroid on the widest axis (sort key a total order: NaN after every number and equal to itself, then beam index, because Rust `sort_by` panics otherwise on a NaN node), leaves of 4 beams, nearer child first. Graph lattices and Voronoi lattices are the users.
+
+**Decision.** The engines are bit-identical (`Math.hypot` twin, operation order), so the BVH only decides which beams are NOT evaluated; every evaluated beam runs the unchanged arithmetic.
+
+- Skip rule: a node is skipped only when `bound > best` (strict), `bound = dist(p, AABB of the axis segments) - r - slack`, `r = max(|ra|, |rb|)` over the node (the override `radius` when it is >= 0).
+- Proof that the bound is below the signed distance of every beam: in the beam frame the point is (s, rho) and the axis is [0, L] x {0}. Inside the frustum the value is `-edge >= rho - r(s) >= rho - r` (the slant edge is at most r(s) - rho away); outside, every point of the three tested edges lies within |rho| <= r of the axis, so by the triangle inequality `edge >= dist(p, axis) - r`; the sphere caps and the zero-length ball are `hypot - r` to a point of the axis; the override branch is `dist(p, axis) - radius`. The AABB contains the axis, so its distance is at most `dist(p, axis)`. (The signed distance is negative inside a beam, so the AABB distance alone would NOT be a bound: the radius term is what makes it one.)
+- Rounding: the brute loop computes `rho = sqrt(|p|^2 - s^2)`, which cancels to an error of about 3e-8 |p| near an axis. The slack is `1e-6 (max|p_i| + max|coordinate of the set| + r)`, thirty times that; the radius term covers the butt edge error (about eps r) when r is much larger than the coordinates. A node holding a non finite coordinate or a beam shorter than 1e-100 (where `s = dot / length` loses precision) is never skipped; a NaN or overflowing bound never skips (`NaN > best` is false), so a NaN point still returns what the brute loop returns.
+- Order independence: the result is a minimum of exact per-beam values; every skipped beam is strictly greater than the final best, so it can neither be the minimum nor tie with it. Ties among evaluated beams go to the lowest beam index (`d < best || (d === best && index < bestIndex)`), which reproduces the brute loop, whose first beam wins under `<`; this matters only for 0 against -0 (a point on the boundary of a butt beam gives -0, on a sphere cap +0). NaN values are never taken, as in the brute loop.
+- Caps (named): `MAX_GRAPH_BEAMS` 5000 -> 100000 (`graph.ts`); Voronoi `MAX_SEEDS` 700 -> 6000 (`voronoi.ts`; its beam check only guards `MAX_GRAPH_BEAMS`, which 6000 seeds (55000 beams) do not reach). Both refuse with `IMP_GRAPH_TOO_LARGE`. The Voronoi limit is the Bowyer-Watson pass (TS only, quadratic: 6000 seeds 9-12 s, 10000 seeds 32-43 s), not the field.
+- Side fix: `compileLattice` spread all beam radii into `Math.min(...)` and overflowed the stack above about 60000 beams; it reduces now.
+
+**Measured** (voxel 0.3 unless noted; body = `create_implicit_body`, add = building the beams, always on the TS side; Windows, release native, two other lanes running so times are indicative). Graph: serpentine polylines in a plane, radius 0.25, chord 0.3, pitch 0.9. Voronoi: cubes at 0.04 seeds/mm3, radius 0.3.
+
+| case | beams | native BVH | native brute | TS BVH | TS brute |
+| --- | --- | --- | --- | --- | --- |
+| graph 37 mm | 5166 | 0.40 s | 6.66 s (16x) | 1.22 s | 169 s (138x) |
+| Voronoi 20 mm cube | 4769 | 0.72 s | 23.7 s (33x) | 3.63 s | 448 s (123x) |
+| Voronoi 28 mm | 12825 | 1.52 s | 155.6 s (102x) | 11.3 s | - |
+| graph 75 mm | 21000 | 0.80 s | 100 s (125x) | 4.3 s | - |
+| Voronoi 40 mm | 36547 | 5.3 s (add 2.7 s) | - | over the TS grid budget (2.7e6 nodes) | - |
+| graph 120 mm | 53600 | 1.8 s (add 1.1 s) | - | 9.2 s | - |
+| Voronoi 46 mm, voxel 0.4 | 55029 | 10.4 s (add 12.2 s) | - | 37 s (add 9.0 s) | - |
+| graph 170 mm | 107163 | 4.0 s (add 2.9 s) | - | over the TS grid budget | - |
+| Voronoi 56 mm, voxel 0.4 | 98187 | add 32-43 s, then `IMP_TRIANGLE_BUDGET` | - | add 43 s, then `IMP_GRID_BUDGET` | - |
+
+The old 5000 beam case is 16x (graph) and 33x (Voronoi) faster natively and two orders of magnitude faster on the TS engine. The caps sit where realise stays under about 10 s natively at the default voxel: graph 107000 beams in 4 s (the cap is a safety limit), Voronoi limited by the Delaunay pass.
+
+**Tests.** `tests/unit/field/strutBvh.test.ts`: bit-identical to the brute loop on a random 300 beam set (about 1700 points inside beams, on caps, far away, with the radius override), NaN points, NaN / infinite / 1e-120 beams, 0 against -0 in both beam orders, the bound never above the true value (single beam sets, with and without override). `strut_bvh.rs` repeats the first three on the Rust twin and the empty set. Red without the fix: removing the tie rule fails the 0 / -0 tests (TS and Rust); shifting the bound by +0.5 fails the bit-identity and bound tests (TS and Rust). `tests/unit/implicit/gaps6.test.ts` (the 20 mm cube builds; a box above 6000 seeds is refused by name) and `lattices5.test.ts` (a 12566 beam ring builds and evaluates; 251000 beams are refused). TS to Rust parity: the existing `server/tests/fieldNative.test.ts`; the content hashes of existing bodies are unchanged (implicit lifecycle and golden suites).
+
+**Left.** A Delaunay pass faster than quadratic (it must keep the same tetrahedra for the hashes); a BVH inside the buckets of periodic sets with many beams per cell; a native Voronoi builder.

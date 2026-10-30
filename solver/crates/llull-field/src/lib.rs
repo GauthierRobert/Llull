@@ -24,6 +24,7 @@ mod jsnum;
 mod measure;
 mod meshsdf;
 mod sampling;
+mod strut_bvh;
 mod struts;
 mod tape;
 #[cfg(test)]

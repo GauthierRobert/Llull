@@ -128,6 +128,27 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
     expect(b.data['control']).toEqual(a.data['control']);
   });
 
+  native(
+    'an explicit strut set above the BVH threshold (Voronoi, 400+ beams): values, mesh and content hash are bit-identical (05 IMP 14.9)',
+    () => {
+      if (engine === null) return;
+      const box = step(createEmptyDocument(), 'add_field_primitive', { shape: 'box', size: [14, 14, 14], position: [7, 7, 7] });
+      const lattice = step(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.1, seed: 5, radius: 0.35 });
+      expect(lattice.data['beams'] as number).toBeGreaterThan(400);
+      const points = Array.from({ length: 600 }, (_, n) =>
+        [0, 1, 2].map((axis) => ((0.5 + (n + 1) * [0.8191725, 0.6710436, 0.5497004][axis]!) % 1) * 16 - 1),
+      );
+      const ts = step(lattice.doc, 'evaluate_field', { field: lattice.id, points });
+      const nat = step(lattice.doc, 'evaluate_field', { field: lattice.id, points }, engine);
+      expect(nat.data['values']).toEqual(ts.data['values']);
+      const params = { field: lattice.id, voxel: 0.3 };
+      const a = step(lattice.doc, 'create_implicit_body', params);
+      const b = step(lattice.doc, 'create_implicit_body', params, engine);
+      expect(b.data['contentHash']).toBe(a.data['contentHash']);
+      expect((b.doc.entities[b.id] as MeshSolidEntity).mesh.indices).toEqual((a.doc.entities[a.id] as MeshSolidEntity).mesh.indices);
+    },
+  );
+
   native('randomized trigonometry parity: thousands of points at TPMS scale and in the V8 reduction range, bit for bit', () => {
     if (engine === null) return;
     let seed = 20260101;

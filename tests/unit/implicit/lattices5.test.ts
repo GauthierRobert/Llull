@@ -253,7 +253,12 @@ describe('add_graph_lattice (VC-IMP-26)', () => {
       [{ sourceIds: [id], radiusStart: 1, region: 'nope' }, 'IMP_FIELD_NOT_FOUND'],
     ];
     for (const [params, code] of cases) expectRefused(box.doc, run(box.doc, 'add_graph_lattice', params), code);
-    const huge = ok(box.doc, 'draw_arc', { center: [0, 0], radius: 1000 });
+    const ring = ok(box.doc, 'draw_arc', { center: [0, 0], radius: 1000 });
+    const big = ok(ring.doc, 'add_graph_lattice', { sourceIds: [ring.id], radiusStart: 1, chord: 0.5 });
+    expect(big.data['beams'] as number).toBeGreaterThan(12000);
+    const probe = ok(big.doc, 'evaluate_field', { field: big.id, points: [[1003, 0, 0]] });
+    expect((probe.data['values'] as number[])[0]).toBeCloseTo(2, 6);
+    const huge = ok(box.doc, 'draw_arc', { center: [0, 0], radius: 20000 });
     expectRefused(
       huge.doc,
       run(huge.doc, 'add_graph_lattice', { sourceIds: [huge.id], radiusStart: 1, chord: 0.5 }),
