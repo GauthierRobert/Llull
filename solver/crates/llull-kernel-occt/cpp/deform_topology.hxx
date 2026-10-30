@@ -20,8 +20,8 @@ int count_faces(const TopoDS_Shape &shape);
 // Places where the law is not analytic and a face must not straddle: region ends for the axis laws, lattice box faces.
 std::vector<Cut> cuts_of(const deform::Warp &warp, const TopoDS_Shape &shape);
 
-// An infinite round taper whose linear section scale s(z) is zero or changes sign inside the body (det J = s^2 touches 0 there, which sampling the
-// surface can miss): true when the body spans such a height. Always false for any other deformation.
+// An infinite non-flat taper whose linear section scale s(z) is <= 0 anywhere on the body (det J = s^2 hides the sign and touches 0 at a zero, which sampling the
+// surface can miss): true when the body spans such a height, measured in the frame. Always false for any other deformation.
 bool taper_scale_vanishes(const deform::Warp &warp, const TopoDS_Shape &shape);
 
 // `shape` with every face split along the planes of `cuts`; null shape when the split fails. `split_count` receives the faces added.

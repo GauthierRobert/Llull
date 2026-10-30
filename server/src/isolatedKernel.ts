@@ -6,7 +6,7 @@
  */
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import { debugWarn } from './debugLog';
-import type { DeformLaw } from '@core/model/deform';
+import type { DeformLaw, DeformRegion } from '@core/model/deform';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { BlendReport, DeformReport, ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
@@ -84,6 +84,16 @@ const FACE_QUERY_METHODS = [
   'bspline',
   'projectCurves',
 ] as const satisfies readonly (keyof FaceQueryPort)[];
+
+/**
+ * Whether a sidecar with `capabilities` builds a deform node of `law` exactly. An `infinite` region needs the capability `deform-infinite`: a sidecar
+ * built before it ignores the flag (header slot 15) and would silently build the clamped warp, a different body.
+ */
+export function nativeSupportsDeform(capabilities: readonly string[], law: DeformLaw, region?: DeformRegion): boolean {
+  if (!capabilities.includes(law.kind === 'affine' ? 'gtransform' : 'deform')) return false;
+  if (law.kind !== 'affine' && !NATIVE_WARP_LAWS.has(law.kind)) return false;
+  return region?.infinite !== true || capabilities.includes('deform-infinite');
+}
 
 /** Law kinds the sidecar's exact warp (capability `deform`) builds; the others take the mesh path. */
 const NATIVE_WARP_LAWS: ReadonlySet<string> = new Set([
@@ -271,9 +281,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     return describedAs ?? { capabilities: [] };
   };
 
-  const supportsDeform = (law: DeformLaw): boolean =>
-    info().capabilities.includes(law.kind === 'affine' ? 'gtransform' : 'deform') &&
-    (law.kind === 'affine' || NATIVE_WARP_LAWS.has(law.kind));
+  const supportsDeform = (law: DeformLaw, region?: DeformRegion): boolean => nativeSupportsDeform(info().capabilities, law, region);
 
   return {
     name: 'occt',

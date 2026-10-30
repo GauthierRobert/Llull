@@ -27,6 +27,14 @@ const FORMULAS: Readonly<Record<string, string>> = {
   bend: "theta = (z - start) / R; y' = R - (R - y) cos theta; z' = start + (R - y) sin theta; det J = (R - y) / R, rigid past the end",
 };
 
+/** Formulas of an `infinite` region: the law holds on the whole axis (no clamp, nothing rigid). */
+const INFINITE_FORMULAS: Readonly<Record<string, string>> = {
+  twist: 'theta = Theta t, t = (z - start) / (end - start) not clamped; (x, y) rotated by theta, z kept; det J = 1',
+  taper: "s = 1 + (S - 1) t, t not clamped; x' = s x, y' = s y (flat: y kept); det J = s^2 (s when flat)",
+  stretch: "z' = start + f (z - start) at every z; det J = f everywhere",
+  bend: "theta = (z - start) / R at every z; y' = R - (R - y) cos theta; z' = start + (R - y) sin theta; det J = (R - y) / R everywhere, nothing rigid",
+};
+
 /**
  * @affects none (read-only); data = law, frame, region, path, jacobian, volume check, maxDisplacement, approximation, regionCrease, fibres, unverified, provenance
  * @invariant everything is computed on read from the recipe's outermost deform node, nothing is stored; fields only the exact kernel knows are null
@@ -132,7 +140,7 @@ export const analyzeDeformation = defineCommand({
       unverified: analysis.unverified,
       provenance: {
         method: 'closed-form Jacobian; predicted volume = integral of det J over the source cross-sections',
-        formula: FORMULAS[law.kind] ?? law.kind,
+        formula: (node.region?.infinite === true ? INFINITE_FORMULAS[law.kind] : undefined) ?? FORMULAS[law.kind] ?? law.kind,
         reference: 'Barr 1984, Global and local deformations of solid primitives, SIGGRAPH 18(3)',
         kernel: kernel?.name ?? null,
         inputs: { sourceTriangles: analysis.sourceTriangles },

@@ -7,7 +7,7 @@ import { meshRecipeOf, recipeOf } from './shapeRecipe';
 /** The first op of `recipe` this kernel cannot perform at all, or null. */
 export function unsupportedOp(kernel: Pick<GeometryKernel, 'supports' | 'supportsDeform'>, recipe: ShapeRecipe): ShapeRecipe['op'] | null {
   if (!kernel.supports(recipe.op)) return recipe.op;
-  if (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law) === false) return recipe.op;
+  if (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law, recipe.region) === false) return recipe.op;
   switch (recipe.op) {
     case 'solid':
     case 'brep':

@@ -11,6 +11,7 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument, type Entity, type ShapeRecipe } from '@core/model/types';
 import { nativeRecipe } from '../src/native/kernelProtocol';
+import { nativeSupportsDeform } from '../src/isolatedKernel';
 import type { IsolatedKernel } from '../src/isolatedKernel';
 import { common, createNativeTestKernel, describeNativeWhen, leaf } from './kernelTestSupport';
 
@@ -34,6 +35,16 @@ const affine = (rows: [number, number, number][], translation: [number, number, 
 });
 
 describe('native recipe lowering of deform nodes (no sidecar needed)', () => {
+  it('an infinite region needs the sidecar capability deform-infinite: an older sidecar would build the clamped warp', () => {
+    const twist = { kind: 'twist', angleRad: 1 } as const;
+    const infinite = { start: 0, end: 1, falloff: 'linear', beyond: 'rigid', infinite: true } as const;
+    expect(nativeSupportsDeform(['deform'], twist, infinite)).toBe(false);
+    expect(nativeSupportsDeform(['deform', 'deform-infinite'], twist, infinite)).toBe(true);
+    expect(nativeSupportsDeform(['deform'], twist, { ...infinite, infinite: undefined } as never)).toBe(true);
+    expect(nativeSupportsDeform(['deform'], twist)).toBe(true);
+    expect(nativeSupportsDeform(['deform-infinite'], twist, infinite)).toBe(false);
+  });
+
   it('an affine law becomes one gtransform node in world coordinates', () => {
     const lowered = nativeRecipe(
       affine(
@@ -515,6 +526,25 @@ describeNativeWhen({ capabilities: ['gtransform', 'deform'], label: 'nativeKerne
     expect(rel(volumeOfEntity(arcExact.document, arcExact.affected[0] as string), Math.PI * 25 * Math.PI * 50)).toBeLessThan(1e-5);
     expect(extentMax(arcExact.document, arcExact.affected[0] as string, 0)).toBeCloseTo(105, 0);
     expect(extentMax(arcMesh.document, arcMesh.affected[0] as string, 0)).toBeCloseTo(105, 0);
+  }, 240_000);
+
+  it('a symmetric infinite bend on the exact path is the same arc moved: the sweep is +-0.5 rad about the region middle', () => {
+    const rod = execute(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 100, anchor: 'base-center' });
+    const bend = (symmetric: boolean): ReturnType<typeof execute> =>
+      run(rod.document, 'bend_body', {
+        id: rod.affected[0],
+        radius: 100,
+        length: 100,
+        symmetric,
+        region: { infinite: true },
+        frame: { origin: [0, 0, 0], axis: [0, 0, 1], reference: [1, 0, 0] },
+        output: { mode: 'exact', tolerance: 1e-3 },
+      });
+    const [plain, moved] = [bend(false), bend(true)];
+    expect(moved.error, moved.summary).toBeUndefined();
+    expect(extentMax(plain.document, plain.affected[0] as string, 0)).toBeCloseTo(100 - 95 * Math.cos(1), 0);
+    expect(extentMax(moved.document, moved.affected[0] as string, 0)).toBeCloseTo(100 - 95 * Math.cos(0.5), 0);
+    expect(rel(volumeOfEntity(moved.document, moved.affected[0] as string), Math.PI * 25 * 100)).toBeLessThan(1e-4);
   }, 240_000);
 
   it('an infinite taper whose scale reaches 0 inside the body is refused as a fold on both paths', () => {

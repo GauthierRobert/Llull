@@ -125,7 +125,7 @@ function sampleJacobian(positions: ReadonlyArray<number>, warp: Warp): { sampled
 function exactShape(kernel: GeometryKernel | null, entity: Entity): ReturnType<GeometryKernel['evaluate']> {
   if (kernel === null || !kernel.supports('deform')) return null;
   const recipe = recipeOf(entity);
-  if (hasMeshLeaf(recipe) || (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law) === false)) return null;
+  if (hasMeshLeaf(recipe) || (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law, recipe.region) === false)) return null;
   const shape = kernel.evaluate(recipe);
   return shape !== null && kernel.topology(shape) !== null ? shape : null;
 }
@@ -180,7 +180,7 @@ export function analyzeDeformed(
     built !== null
       ? built.maxError
       : path === 'mesh' && stored !== null && stored.indices.length / 3 <= MESH_TS_TRIANGLE_CAP
-        ? storedChordError(stored, node)
+        ? storedChordError(stored, node, { min: extent.min[2], max: extent.max[2] })
         : null;
   return {
     node,

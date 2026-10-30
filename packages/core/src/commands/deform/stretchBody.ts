@@ -54,7 +54,9 @@ export const stretchBody = defineCommand({
           .number()
           .describe('Region end along the axis, document units from the frame origin; must exceed start. Default: where the body ends.')
           .optional(),
-        infinite: infiniteParam,
+        infinite: infiniteParam(
+          'region.start is the fixed point (z -> start + factor (z - start) for every z); region.end is not used by the map but must still exceed start.',
+        ),
       })
       .describe(
         'Part of the body along the axis that is stretched (a step: full stretch inside, none outside). Default: the whole body. With infinite true the whole axis is stretched about start.',

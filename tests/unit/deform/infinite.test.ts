@@ -323,3 +323,68 @@ describe.each(KERNELS)('infinite deformation commands, kernel: %s', (kind) => {
     expect(linear.affected).toHaveLength(1);
   });
 });
+
+describe('a kernel without the infinite flag', () => {
+  it('is not asked to build an infinite region: auto answers with the mesh path, exact refuses', async () => {
+    const warp = (await installKernel('warp')) as NonNullable<Awaited<ReturnType<typeof installKernel>>>;
+    setGeometryKernel({ ...warp, supportsDeform: (_law, region) => region?.infinite !== true });
+    const { doc, id } = addBox();
+    const params = { id, angleDeg: 36, frame: WORLD_Z, region: { start: 0, end: 20, infinite: true } };
+    expect(dataOf<RunData>(execute(doc, 'twist_body', params)).path).toBe('mesh');
+    expectNoOp(execute(doc, 'twist_body', { ...params, output: { mode: 'exact' } }), doc, 'DEF_EXACT_UNAVAILABLE');
+    const bounded = execute(doc, 'twist_body', { id, angleDeg: 36, frame: WORLD_Z, output: { mode: 'exact' } });
+    expect(dataOf<RunData>(bounded).path).toBe('exact');
+  });
+});
+
+describe('the body wholly past the zero of an infinite taper, and an infinite bend beyond a half turn', () => {
+  it.each(KERNELS)('taper_body refuses s <= 0 anywhere on the body, kernel: %s', async (kind) => {
+    await installKernel(kind);
+    const { doc, id } = addCylinder(5, 40);
+    const result = execute(doc, 'taper_body', { id, scaleEnd: 3, frame: WORLD_Z, region: { start: 50, end: 60, infinite: true } });
+    expectNoOp(result, doc, 'DEF_FOLDOVER');
+  });
+
+  it.each(KERNELS)('a 270 degree infinite bend is measured without a false approximation error, kernel: %s', async (kind) => {
+    await installKernel(kind);
+    const length = 1.5 * Math.PI * 50;
+    const { doc, id } = addCylinder(5, length);
+    const bent = execute(doc, 'bend_body', {
+      id,
+      radius: 50,
+      angleDeg: 270,
+      region: { infinite: true },
+      frame: BEND_Z,
+      output: { tolerance: 0.05 },
+    });
+    expect(bent.affected).toHaveLength(1);
+    const next = bent.affected[0] as string;
+    const analysis = dataOf<AnalysisData>(execute(bent.document, 'analyze_deformation', { id: next }));
+    expect(analysis.approximation?.maxError ?? 0).toBeLessThan(0.1);
+    expect(dataOf<CheckData>(execute(bent.document, 'check_deformation', { ids: [next] })).status).not.toBe('fail');
+  });
+
+  it.each(KERNELS)('symmetric on an infinite bend reaches the result (the same arc, moved), kernel: %s', async (kind) => {
+    await installKernel(kind);
+    const { doc, id } = addCylinder(5, 100);
+    const call = (symmetric: boolean): ReturnType<typeof execute> =>
+      execute(doc, 'bend_body', {
+        id,
+        radius: 100,
+        length: 100,
+        symmetric,
+        region: { infinite: true },
+        frame: BEND_Z,
+        output: { tolerance: 0.01 },
+      });
+    const [plain, moved] = [call(false), call(true)];
+    const recipe = (r: typeof plain): { law: { symmetric: boolean } } => meshEntity(r.document, r.affected[0] as string).brep as never;
+    expect(recipe(plain).law.symmetric).toBe(false);
+    expect(recipe(moved).law.symmetric).toBe(true);
+    // 1 radian arc: the plain one starts at z = 0, the symmetric one is turned back by half of it (0.5 rad) about its centre, so the furthest x is at the ends of its +-0.5 rad sweep
+    const plainX = extentOf(plain.document, plain.affected[0] as string).max[0];
+    const movedX = extentOf(moved.document, moved.affected[0] as string).max[0];
+    expect(plainX).toBeCloseTo(100 - 95 * Math.cos(1), 1);
+    expect(movedX).toBeCloseTo(100 - 95 * Math.cos(0.5), 1);
+  });
+});

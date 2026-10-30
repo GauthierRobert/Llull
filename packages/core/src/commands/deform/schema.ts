@@ -18,13 +18,17 @@ export const frameParam = z
     'Deformation frame: local z = axis, x = reference projected perpendicular to the axis, y = z cross x; regions and radii are measured from the origin along it. Every field is optional and defaults from the body bounds; the defaults used are reported in data.frame.defaulted.',
   );
 
-/** `region.infinite`, shared by the four axis deformations (01 DEF §17.1). */
-export const infiniteParam = z
-  .boolean()
-  .describe(
-    'true: infinite region. region.start and region.end then only fix the RATE of the effect (its full value per end - start of length) and the effect holds along the WHOLE axis: it keeps going beyond both region ends at that rate, nothing is rigid, nothing is unchanged and there is no crease. The ramp is linear (falloff "smooth" is refused with DEF_REGION_INVALID). Default false.',
-  )
-  .optional();
+/** `region.infinite` (01 DEF §17.1): the shared lead, then the wording of the command's own region fields. */
+export const infiniteParam = (detail: string): z.ZodOptional<z.ZodBoolean> =>
+  z
+    .boolean()
+    .describe(
+      `true: infinite region. The effect holds along the WHOLE axis and keeps going beyond both region ends at the same rate: nothing is rigid, nothing is unchanged, and there is no crease. ${detail} Default false.`,
+    )
+    .optional();
+
+const RAMP_INFINITE =
+  'region.start and region.end only fix the RATE (the full effect per end - start of length). The ramp is linear: falloff "smooth" is refused with DEF_REGION_INVALID.';
 
 export const regionParam = z
   .object({
@@ -44,7 +48,7 @@ export const regionParam = z
         'How the effect ramps from none at start to full at end: "smooth" (default, 3t^2 - 2t^3, no crease at the region ends) or "linear" (straight ramp; leaves a visible crease at both ends).',
       )
       .optional(),
-    infinite: infiniteParam,
+    infinite: infiniteParam(RAMP_INFINITE),
   })
   .describe(
     'Part of the body along the frame axis where the effect ramps in. Past the end the body follows rigidly (carries the end transform); before the start it is unchanged (with infinite true the effect instead continues along the whole axis at the rate that start and end define). Default: the whole body.',

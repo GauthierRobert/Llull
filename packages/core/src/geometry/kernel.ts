@@ -7,7 +7,7 @@
  */
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
-import type { DeformLaw } from '../model/deform';
+import type { DeformLaw, DeformRegion } from '../model/deform';
 
 import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
 import type { MeshToBrepRequest, MeshToBrepResult } from './kernelMeshBrep';
@@ -132,8 +132,11 @@ export interface GeometryKernel {
   /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */
   supports(op: ShapeRecipe['op']): boolean;
 
-  /** Whether this kernel builds `deform` nodes of that law exactly (01 DEF); absent = it follows `supports('deform')`. */
-  supportsDeform?(law: DeformLaw): boolean;
+  /**
+   * Whether this kernel builds `deform` nodes of that law (and region: an `infinite` one needs a kernel that knows the flag) exactly (01 DEF);
+   * absent = it follows `supports('deform')`.
+   */
+  supportsDeform?(law: DeformLaw, region?: DeformRegion): boolean;
 
   /** Build (or reuse, by `recipeKey`) the kernel shape of a recipe. */
   evaluate(recipe: ShapeRecipe): ShapeHandle | null;

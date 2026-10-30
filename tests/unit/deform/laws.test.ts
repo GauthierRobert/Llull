@@ -22,16 +22,23 @@ function lawOf(name: string): { law: DeformLaw; region: DeformRegion } {
     (params['z1'] as number | undefined) ?? 1,
     (params['falloff'] as DeformRegion['falloff'] | undefined) ?? 'linear',
   );
+  if (params['infinite'] === true) (span as { infinite?: true }).infinite = true;
   switch (name) {
     case 'twist':
     case 'twist_smooth':
+    case 'twist_infinite':
       return { law: { kind: 'twist', angleRad: params['angleRad'] as number }, region: span };
     case 'taper':
     case 'taper_flat':
+    case 'taper_infinite':
+    case 'taper_flat_infinite':
       return { law: { kind: 'taper', scaleEnd: params['scaleEnd'] as number, flat: params['flat'] === true }, region: span };
     case 'bend':
-      return { law: { kind: 'bend', radius: params['radius'] as number, symmetric: false }, region: span };
+    case 'bend_infinite':
+    case 'bend_infinite_symmetric':
+      return { law: { kind: 'bend', radius: params['radius'] as number, symmetric: params['symmetric'] === true }, region: span };
     case 'stretch':
+    case 'stretch_infinite':
       return { law: { kind: 'stretch', factor: params['factor'] as number }, region: span };
     default: {
       const [sx = 1, sy = 1, sz = 1] = params['factors'] as number[];
@@ -52,7 +59,21 @@ function lawOf(name: string): { law: DeformLaw; region: DeformRegion } {
 }
 
 describe('deformation laws against the validation pack (VC-DEF-30)', () => {
-  const names = ['twist', 'twist_smooth', 'taper', 'taper_flat', 'bend', 'stretch', 'scale_nonuniform'];
+  const names = [
+    'twist',
+    'twist_smooth',
+    'taper',
+    'taper_flat',
+    'bend',
+    'stretch',
+    'scale_nonuniform',
+    'twist_infinite',
+    'taper_infinite',
+    'taper_flat_infinite',
+    'bend_infinite',
+    'bend_infinite_symmetric',
+    'stretch_infinite',
+  ];
   it.each(names)('%s maps every golden point within 1e-9 and matches det J', (name) => {
     const { law, region: span } = lawOf(name);
     const warp = warpOf(deformNode(law, { region: span }));
@@ -60,13 +81,22 @@ describe('deformation laws against the validation pack (VC-DEF-30)', () => {
     for (const point of vectors.laws[name]?.points ?? []) {
       const image = warp?.point(point.in) ?? [NaN, NaN, NaN];
       image.forEach((value, axis) => expect(Math.abs(value - (point.out[axis] as number))).toBeLessThan(1e-9));
-      const onKink = [span.start, span.end].some((z) => Math.abs(point.in[2] - z) < 1e-9);
+      const onKink = span.infinite !== true && [span.start, span.end].some((z) => Math.abs(point.in[2] - z) < 1e-9);
       if (!onKink) expect(Math.abs((warp?.determinant(point.in) ?? NaN) - point.det)).toBeLessThan(1e-6);
     }
   });
 
   it('Jacobian determinants agree with central differences away from kinks', () => {
-    for (const name of ['twist_smooth', 'taper', 'taper_flat', 'bend']) {
+    for (const name of [
+      'twist_smooth',
+      'taper',
+      'taper_flat',
+      'bend',
+      'twist_infinite',
+      'taper_infinite',
+      'bend_infinite',
+      'bend_infinite_symmetric',
+    ]) {
       const { law, region: span } = lawOf(name);
       for (const q of [
         [2, 1, 30],

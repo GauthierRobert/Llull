@@ -60,7 +60,9 @@ export const bendBody = defineCommand({
           .number()
           .describe('Where the bend ends along the axis, document units from the frame origin; with start this fixes the length.')
           .optional(),
-        infinite: infiniteParam,
+        infinite: infiniteParam(
+          'The region (start with end, or length, or angleDeg with radius) only fixes the rate and where the arc begins (start); the body is refused when it would turn 360 degrees or more.',
+        ),
       })
       .describe(
         'Bent region along the axis; giving both start and end counts as giving length. With infinite true it only fixes the rate (and the start where the arc begins).',

@@ -150,10 +150,11 @@ export function jacobianRange(node: Pick<DeformNode, 'law' | 'region'>, extent: 
     };
     const [low, high] = [det(extent.min[2]), det(extent.max[2])];
     const scaleAt = (z: number): number => 1 + (law.scaleEnd - 1) * rampAt(region, z).w;
-    if (region.infinite === true && !law.flat && scaleAt(extent.min[2]) * scaleAt(extent.max[2]) <= 0) {
-      // the section scale s is linear in z and changes sign inside the body: s² reaches 0 where s does
+    if (region.infinite === true && !law.flat && Math.min(scaleAt(extent.min[2]), scaleAt(extent.max[2])) <= 0) {
+      // the section scale s is linear in z: s <= 0 anywhere on the body (a zero inside it, or the whole body past the zero, where s² > 0 but the
+      // section is mirrored and scaled) is a fold; the minimum is reported at the zero of s, clamped to the body
       const zero = region.start + (region.end - region.start) / (1 - law.scaleEnd);
-      return { min: 0, max: Math.max(low, high), minAt: corner(zero) };
+      return { min: 0, max: Math.max(low, high), minAt: corner(Math.min(Math.max(zero, extent.min[2]), extent.max[2])) };
     }
     return low <= high ? { min: low, max: high, minAt: corner(extent.min[2]) } : { min: high, max: low, minAt: corner(extent.max[2]) };
   }

@@ -5,7 +5,7 @@ use crate::recipe::{EvalError, Evaluator};
 use serde_json::{json, Value};
 use std::f64::consts::{FRAC_PI_2, PI};
 
-fn entity(kind: &str, fields: Value) -> Value {
+pub(super) fn entity(kind: &str, fields: Value) -> Value {
     let mut base = json!({ "id": "e", "kind": kind, "position": [0, 0, 0], "rotation": [0, 0, 0], "layerId": "l", "color": "#888" });
     if let (Some(target), Some(extra)) = (base.as_object_mut(), fields.as_object()) {
         target.extend(extra.clone());
@@ -14,7 +14,7 @@ fn entity(kind: &str, fields: Value) -> Value {
 }
 
 /// A `deform` node; the frame is `origin`, axis +z, reference +x unless the test needs another.
-fn node(source: &Value, law: Value, region: Option<Value>, tolerance: f64, origin: [f64; 3]) -> Value {
+pub(super) fn node(source: &Value, law: Value, region: Option<Value>, tolerance: f64, origin: [f64; 3]) -> Value {
     let mut node = json!({
         "op": "deform", "source": source, "law": law,
         "frame": { "origin": origin, "axis": [0, 0, 1], "reference": [1, 0, 0] },
@@ -26,119 +26,40 @@ fn node(source: &Value, law: Value, region: Option<Value>, tolerance: f64, origi
     node
 }
 
-fn span(start: f64, end: f64, falloff: &str) -> Value {
+pub(super) fn span(start: f64, end: f64, falloff: &str) -> Value {
     json!({ "start": start, "end": end, "falloff": falloff, "beyond": "rigid" })
 }
 
-struct Built {
-    volume: f64,
-    area: f64,
-    report: Value,
+pub(super) struct Built {
+    pub(super) volume: f64,
+    pub(super) area: f64,
+    pub(super) bounds: Vec<f64>,
+    pub(super) report: Value,
 }
 
-fn build(tree: &Value) -> Built {
+pub(super) fn build(tree: &Value) -> Built {
     let mut evaluator = Evaluator::new(16);
     let shape = evaluator.evaluate(tree).expect("evaluates").expect("the warp builds");
     let report = evaluator.deform_report(tree).expect("report");
     assert_eq!(report["ok"], json!(true), "{report}");
     assert!(crate::analyze(&shape).unwrap().valid, "the warped shape is a valid B-rep: {report}");
     let mass = mass_properties(&shape).unwrap();
-    Built { volume: mass.volume, area: mass.area, report }
+    Built { volume: mass.volume, area: mass.area, bounds: mass.bounds, report }
 }
 
-fn refusal(tree: &Value) -> Value {
+pub(super) fn refusal(tree: &Value) -> Value {
     let mut evaluator = Evaluator::new(16);
     assert!(evaluator.evaluate(tree).expect("evaluates").is_none(), "the warp is refused");
     evaluator.deform_report(tree).expect("report")
 }
 
-fn relative(measured: f64, expected: f64) -> f64 {
+pub(super) fn relative(measured: f64, expected: f64) -> f64 {
     ((measured - expected) / expected).abs()
 }
 
 /// 10 x 10 x 100 box on z in [0, 100]; frame origin on its middle.
-fn bar() -> Value {
+pub(super) fn bar() -> Value {
     entity("box", json!({ "size": [10, 10, 100], "position": [0, 0, 50] }))
-}
-
-#[test]
-fn the_law_library_matches_the_golden_vectors_of_the_pack() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/design/01-body-deformation/validation/data/point_vectors.json");
-    let vectors: Value = serde_json::from_str(&std::fs::read_to_string(path).expect("pack data")).unwrap();
-    let header = |kind: f64, params: &Value, region: (f64, f64, f64)| {
-        // kind, tolerance, origin, axis, reference, region start / end / falloff, preserveAnalytic, reserved
-        let mut spec = vec![kind, 1e-3, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, region.0, region.1, region.2, 0.0, 0.0];
-        let _ = params;
-        spec.shrink_to_fit();
-        spec
-    };
-    let number = |params: &Value, key: &str| params[key].as_f64().unwrap_or(0.0);
-    let falloff = |params: &Value| match params["falloff"].as_str() {
-        Some("smooth") => 2.0,
-        Some("none") => 0.0,
-        _ => 1.0,
-    };
-    let mut checked = 0;
-    for (name, law) in vectors["laws"].as_object().unwrap() {
-        let params = &law["params"];
-        let region = (number(params, "z0"), number(params, "z1").max(number(params, "z0") + 1.0), falloff(params));
-        let spec = match name.as_str() {
-            "twist" | "twist_smooth" => [header(1.0, params, region), vec![number(params, "angleRad")]].concat(),
-            "taper" | "taper_flat" => {
-                [header(2.0, params, region), vec![number(params, "scaleEnd"), if name == "taper_flat" { 1.0 } else { 0.0 }]].concat()
-            }
-            "bend" => [header(4.0, params, region), vec![number(params, "radius"), 0.0]].concat(),
-            "stretch" => [header(3.0, params, (region.0, region.1, 0.0)), vec![number(params, "factor")]].concat(),
-            "scale_nonuniform" => {
-                let f = params["factors"].as_array().unwrap();
-                let (x, y, z) = (f[0].as_f64().unwrap(), f[1].as_f64().unwrap(), f[2].as_f64().unwrap());
-                [header(0.0, params, region), vec![x, 0.0, 0.0, 0.0, y, 0.0, 0.0, 0.0, z, 0.0, 0.0, 0.0]].concat()
-            }
-            "point_push" => {
-                let c = params["center"].as_array().unwrap();
-                let d = params["direction"].as_array().unwrap();
-                let mut numbers = vec![c[0].as_f64().unwrap(), c[1].as_f64().unwrap(), c[2].as_f64().unwrap()];
-                numbers.extend([d[0].as_f64().unwrap(), d[1].as_f64().unwrap(), d[2].as_f64().unwrap()]);
-                numbers.extend([number(params, "distance"), number(params, "radius"), 0.0]);
-                [header(6.0, params, region), numbers].concat()
-            }
-            "ffd" => {
-                let take = |key: &str| params[key].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
-                let (min, max, degrees) = (take("min"), take("max"), take("degrees"));
-                let counts: Vec<usize> = degrees.iter().map(|d| *d as usize + 1).collect();
-                let mut offsets = vec![0.0; 3 * counts[0] * counts[1] * counts[2]];
-                for moved in params["moved"].as_array().unwrap() {
-                    let index: Vec<usize> = moved["index"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
-                    let slot = (index[0] * counts[1] + index[1]) * counts[2] + index[2];
-                    for axis in 0..3 {
-                        offsets[3 * slot + axis] += moved["delta"][axis].as_f64().unwrap();
-                    }
-                }
-                [header(5.0, params, region), min, max, degrees, offsets].concat()
-            }
-            _ => continue,
-        };
-        let points: Vec<f64> = law["points"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .flat_map(|p| p["in"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()))
-            .collect();
-        let images = crate::deform::warp_points(&spec, &points).unwrap();
-        for (k, point) in law["points"].as_array().unwrap().iter().enumerate() {
-            // the pack's ffd vectors hold the identity outside the lattice box (TECHNICAL_SPEC §5.3), so every point is checked
-            for axis in 0..3 {
-                let expected = point["out"][axis].as_f64().unwrap();
-                assert!(
-                    (images[3 * k + axis] - expected).abs() < 1e-9,
-                    "{name} point {k} axis {axis}: {} vs {expected}",
-                    images[3 * k + axis]
-                );
-            }
-        }
-        checked += 1;
-    }
-    assert_eq!(checked, 9, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
 }
 
 #[test]
@@ -326,7 +247,7 @@ fn a_flow_table_of_a_circle_is_the_bend_in_the_native_laws_too() {
         stations.extend(normal);
         stations.extend(binormal);
     }
-    // header: kind, tolerance, origin, axis, reference, region start / end / falloff, preserveAnalytic, reserved
+    // header: kind, tolerance, origin, axis, reference, region start / end / falloff, preserveAnalytic, region.infinite
     let header = |kind: f64| vec![kind, 1e-3, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, length, 1.0, 0.0, 0.0];
     let flow = [header(7.0), vec![0.0, 1.0, step, count as f64], stations].concat();
     let bend = [header(4.0), vec![radius, 0.0]].concat();
@@ -437,64 +358,4 @@ fn a_feature_on_a_deformed_body_keeps_the_adaptive_mass_rule() {
         return;
     }
     panic!("no edge of the twisted box fillets");
-}
-
-/// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).
-fn endless(start: f64, end: f64, falloff: &str) -> Value {
-    let mut region = span(start, end, falloff);
-    region["infinite"] = json!(true);
-    region
-}
-
-#[test]
-fn an_infinite_twist_keeps_its_rate_beyond_both_region_ends() {
-    // rate 36 deg per 20 units over a bar of 100: the same twist as 180 degrees linear over the whole bar, with no face split at the region ends
-    let law = |angle: f64| json!({ "kind": "twist", "angleRad": angle.to_radians() });
-    let endless_twist = build(&node(&bar(), law(36.0), Some(endless(-10.0, 10.0, "linear")), 1e-4, [0.0, 0.0, 50.0]));
-    let whole = build(&node(&bar(), law(180.0), Some(span(-50.0, 50.0, "linear")), 1e-4, [0.0, 0.0, 50.0]));
-    assert!(relative(endless_twist.volume, 10000.0) < 1e-6, "volume {}", endless_twist.volume);
-    assert!(relative(endless_twist.area, whole.area) < 1e-6, "area {} against {}", endless_twist.area, whole.area);
-    assert_eq!(endless_twist.report["faces"], json!(6));
-    assert_eq!(endless_twist.report["splitFaces"], json!(0));
-}
-
-#[test]
-fn an_infinite_stretch_scales_the_whole_body_about_the_region_start() {
-    let stretched = node(&bar(), json!({ "kind": "stretch", "factor": 1.5 }), Some(endless(-10.0, 10.0, "none")), 1e-3, [0.0, 0.0, 50.0]);
-    let built = build(&stretched);
-    assert!(relative(built.volume, 15000.0) < 1e-9, "volume {}", built.volume);
-    assert!(relative(built.area, 4.0 * 10.0 * 150.0 + 200.0) < 1e-9, "area {}", built.area);
-    assert_eq!(built.report["splitFaces"], json!(0));
-}
-
-#[test]
-fn an_infinite_taper_extends_its_slope_and_is_refused_where_it_folds() {
-    // r 5, h 40 from z = 0: s = 1 - 0.2 z / 80 reaches 0.9 at the top, a frustum of 5 and 4.5
-    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
-    let law = |scale_end: f64| json!({ "kind": "taper", "scaleEnd": scale_end, "flat": false });
-    let frustum = build(&node(&pin, law(0.8), Some(endless(0.0, 80.0, "linear")), 1e-4, [0.0, 0.0, -20.0]));
-    let expected = PI * 40.0 / 3.0 * (25.0 + 5.0 * 4.5 + 4.5 * 4.5);
-    assert!(relative(frustum.volume, expected) < 1e-5, "volume {} against {expected}", frustum.volume);
-    // s = 1 - 0.6 z / 20 is -0.2 at the top: a finite region would have stopped at 0.4
-    let report = refusal(&node(&pin, law(0.4), Some(endless(0.0, 20.0, "linear")), 1e-4, [0.0, 0.0, -20.0]));
-    assert_eq!(report["code"], json!("DEF_FOLDOVER"), "{report}");
-}
-
-#[test]
-fn an_infinite_bend_curves_a_rod_longer_than_its_region_into_one_arc() {
-    // R 50, rate pi / 2 per 78.54: the rod of twice that length is the 180 degree torus segment of VC-DEF-08, not a quarter arc and a straight tail
-    let quarter = 50.0 * FRAC_PI_2;
-    let rod = entity("cylinder", json!({ "radius": 5, "height": 2.0 * quarter }));
-    let bent = node(
-        &rod,
-        json!({ "kind": "bend", "radius": 50, "symmetric": false }),
-        Some(endless(0.0, quarter, "linear")),
-        1e-4,
-        [0.0, 0.0, -quarter],
-    );
-    let built = build(&bent);
-    assert!(relative(built.volume, 12337.0055) < 1e-6, "volume {}", built.volume);
-    assert!(relative(built.area, 4934.8022 + 2.0 * PI * 25.0) < 1e-6, "area {}", built.area);
-    assert_eq!(built.report["faces"], json!(3));
-    assert_eq!(built.report["ring"], json!(false));
 }

@@ -85,6 +85,8 @@ fn info() -> Value {
         "pipeShell",
         "gtransform",
         "deform",
+        // region.infinite (header slot 15 of the warp spec): a sidecar without it would build the clamped warp
+        "deform-infinite",
         "emboss",
     ]
     .into_iter()
@@ -336,9 +338,18 @@ mod tests {
         assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
         let capabilities = described["result"]["capabilities"].as_array().unwrap();
-        for name in
-            ["bsplineSections", "nurbsSurface", "faceSlab", "sheetSolid", "helixEdge", "pipeShell", "gtransform", "deform", "emboss"]
-        {
+        for name in [
+            "bsplineSections",
+            "nurbsSurface",
+            "faceSlab",
+            "sheetSolid",
+            "helixEdge",
+            "pipeShell",
+            "gtransform",
+            "deform",
+            "deform-infinite",
+            "emboss",
+        ] {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }
     }
