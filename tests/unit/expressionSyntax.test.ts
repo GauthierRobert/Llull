@@ -67,3 +67,18 @@ describe('set_parameter with an invalid expression', () => {
     expect(result.document.parameters['x']!.error).toContain('unknown parameter');
   });
 });
+
+describe('compileExpression', () => {
+  it('answers exactly as evaluateExpression does for every environment, tokenizing once', async () => {
+    const { compileExpression } = await import('@lib/expression');
+    for (const source of ['2 * x + sin(y) / 3', 'pow(x, 2) - max(x, y, 1)', 'x / y', '1 +', 'x $ 2', '', 'unknown + 1', '((x))']) {
+      const compiled = compileExpression(source);
+      for (const env of [
+        { x: 1, y: 2 },
+        { x: 0, y: 0 },
+        { x: -3.5, y: 4 },
+      ])
+        expect(compiled(env), `${source} @ ${JSON.stringify(env)}`).toEqual(evaluateExpression(source, env));
+    }
+  });
+});

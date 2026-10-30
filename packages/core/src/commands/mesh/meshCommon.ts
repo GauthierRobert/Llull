@@ -66,7 +66,7 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_DISPLACE_FIELD:
     'Fix the expression (names: x, y, z, nx, ny, nz; no division by something that is 0 at a vertex), or give a heightMap whose pixels are width x height bytes.',
   MESH_DISPLACE_RESULT_TOO_LARGE:
-    'The refineEdge is so short that the surface passes 4 000 000 triangles: raise refineEdge, or displace a coarser mesh.',
+    'The refineEdge is so short that the surface passes 1 000 000 triangles: raise refineEdge, or displace a coarser mesh.',
   MESH_SEGMENT_NO_GROUPS: 'The mesh has no face to segment: check it with analyze_mesh.',
   MESH_KERNEL_UNSUPPORTED: 'Run on the native OCC kernel (the llull CLI / desktop app default); Manifold has no exact B-rep builder.',
   MESH_QUAD_REMESH_FAILED:

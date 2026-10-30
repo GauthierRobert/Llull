@@ -4,7 +4,7 @@ import { decimateMesh } from './decimate';
 import { symmetricDeviation } from './deviation';
 import { segmentMesh } from './segment';
 import { SCULPT_MAX_TRIANGLES, sculptMesh } from './sculpt';
-import { displaceMesh, shrinkwrapMesh } from './wrapDisplace';
+import { DISPLACE_MAX_TRIANGLES, displaceMesh, shrinkwrapMesh } from './wrapDisplace';
 import {
   DECIMATE_DESCRIPTION,
   FILL_HOLES_DESCRIPTION,
@@ -209,7 +209,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
       if ('tooLarge' in result)
         return failure(
           'MESH_DISPLACE_RESULT_TOO_LARGE',
-          `the refined surface passed ${result.tooLarge} triangles (limit ${op.maxTriangles ?? SCULPT_MAX_TRIANGLES}): use a longer refineEdge`,
+          `the refined surface passed ${result.tooLarge} triangles (limit ${op.maxTriangles ?? DISPLACE_MAX_TRIANGLES}): use a longer refineEdge`,
         );
       return {
         mesh: result.mesh,

@@ -126,13 +126,13 @@ export const sculptMesh = defineCommand({
         if (!Array.isArray(curves)) return curves;
         path = samplesByArcLength(curves[0] as (typeof curves)[number], STROKE_CHORDS + 1);
       }
-      const along_ = stampsAlong(path, along.spacing);
-      if (along_ === null)
+      const pathStamps = stampsAlong(path, along.spacing);
+      if (pathStamps === null)
         return refuse(
           `the path has no length, or ${along.spacing} gives more than ${MAX_STROKE_STAMPS} stamps; raise the spacing`,
           'along.spacing',
         );
-      centres = along_;
+      centres = pathStamps;
     }
     return runMeshOp(doc, ctx, {
       command: 'sculpt_mesh',

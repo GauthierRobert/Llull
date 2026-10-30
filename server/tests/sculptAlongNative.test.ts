@@ -1,6 +1,6 @@
 /**
  * `sculpt_mesh` `along` on the native engine (DES-7c leftovers, TECHNICAL_SPEC 13.19): the stamps of a path are computed by the command, so the native twin of slice 3 gets
- * explicit stamps and gives the bytes of the TypeScript engine, for a polyline and a curve, with symmetry and refinement. Native runs need llull-compute (cargo build in solver/).
+ * explicit stamps and gives the bytes of the TypeScript engine, for polylines, with symmetry and refinement (the curve path is covered by tests/unit/mesh/sculptAlong.test.ts: it reaches the engine as the same explicit stamps). Native runs need llull-compute (cargo build in solver/).
  */
 
 import { describe, expect, it } from 'vitest';

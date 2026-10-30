@@ -112,6 +112,37 @@ describe('shrinkwrap_mesh', () => {
     expect(before.positions.length).toBeGreaterThan(0);
   });
 
+  it('hits the target in both directions: the nearer hit wins, forward or backward', () => {
+    const planes = (above: number, below: number): IndexedMesh => {
+      const [a, b] = [gridAt(40, 4, above), gridAt(40, 4, below)];
+      return { positions: [...a.positions, ...b.positions], indices: [...a.indices, ...b.indices.map((i) => i + a.positions.length / 3)] };
+    };
+    for (const [above, below, expected] of [
+      [1, -3, 1],
+      [3, -1, -1],
+    ] as const) {
+      const both = docWithMeshes(gridMesh(10, 4), planes(above, below));
+      const result = execute(both.doc, 'shrinkwrap_mesh', { id: both.ids[0] as string, targetId: both.ids[1] as string, mode: 'normal' });
+      expect(result.error, result.summary).toBeUndefined();
+      expect(
+        meshOf(result)
+          .positions.filter((_, i) => i % 3 === 2)
+          .every((z) => Math.abs(z - expected) < 1e-12),
+      ).toBe(true);
+      const along = execute(both.doc, 'shrinkwrap_mesh', {
+        id: both.ids[0] as string,
+        targetId: both.ids[1] as string,
+        mode: 'direction',
+        direction: [0, 0, 2],
+      });
+      expect(
+        meshOf(along)
+          .positions.filter((_, i) => i % 3 === 2)
+          .every((z) => Math.abs(z - expected) < 1e-12),
+      ).toBe(true);
+    }
+  });
+
   it('maxDistance leaves the vertices farther than it from the target in place', () => {
     const flat = docWithMeshes(gridMesh(10, 8), gridAt(40, 8, -3));
     const [a, b] = flat.ids as [string, string];
@@ -138,7 +169,7 @@ describe('shrinkwrap_mesh', () => {
     for (const [params, code, path] of cases) {
       const result = execute(doc, 'shrinkwrap_mesh', params);
       expect(result.error?.code, JSON.stringify(params)).toBe(code);
-      if (path !== undefined) expect(JSON.stringify(result.error)).toContain(path);
+      if (path !== undefined) expect(JSON.stringify(result.error) + result.summary).toContain(path);
       expectNoOp(result, doc);
     }
     const line = execute(doc, 'draw_polyline', {
@@ -167,8 +198,8 @@ describe('SurfaceIndex.ray', () => {
     expect(index.ray([2.5, 2.5, 5], [0, 0, 1], Infinity)).toBeNull();
     expect(index.ray([20, 2.5, 5], [0, 0, -1], Infinity)).toBeNull();
     // a ray along a shared edge hits both triangles at the same distance: the lower index
-    const edge = index.ray([2.5, 2.5, 5], [0, 0, -1], Infinity) as { face: number };
-    expect(edge.face).toBeGreaterThanOrEqual(0);
+    const one = gridAt(10, 1, 0); // two triangles sharing the diagonal (0, 0) - (10, 10)
+    expect(new SurfaceIndex(one.positions, one.indices).ray([5, 5, 5], [0, 0, -1], Infinity)).toEqual({ distance: 5, face: 0 });
     const stacked = new SurfaceIndex(
       [...grid.positions, ...grid.positions.map((v, i) => (i % 3 === 2 ? 1 : v))],
       [...grid.indices, ...grid.indices.map((i) => i + grid.positions.length / 3)],
@@ -302,19 +333,41 @@ describe('displace_mesh', () => {
       [{ id, expression: '1 +' }, 'MESH_PARAM_INVALID', 'expression'],
       [{ id, expression: '1', direction: [0, 0, 0] }, 'MESH_PARAM_INVALID', 'direction'],
       [{ id, heightMap: { ...map, width: 3000, height: 3000 } }, 'MESH_PARAM_INVALID', 'heightMap'],
-      [{ id, heightMap: map }, 'MESH_DISPLACE_FIELD'],
+      [{ id, heightMap: map }, 'MESH_PARAM_INVALID', 'heightMap.pixels'],
+      [{ id, expression: 'x ^ 2' }, 'MESH_PARAM_INVALID', 'expression'],
+      [{ id, expression: 'unknown_name' }, 'MESH_PARAM_INVALID', 'x, y, z, nx, ny, nz, pi, tau'],
+      [{ id, expression: '1 + '.repeat(2000) + '1' }, 'MESH_PARAM_INVALID', 'at most 4096'],
+      [{ id, expression: '('.repeat(1000) + '1' + ')'.repeat(1000) }, 'MESH_PARAM_INVALID', 'expression'],
+      [{ id, expression: '10', strength: 1e308 }, 'MESH_DISPLACE_FIELD', 'not a finite'],
       [{ id, expression: '1 / x' }, 'MESH_DISPLACE_FIELD'],
-      [{ id, expression: 'unknown_name' }, 'MESH_DISPLACE_FIELD'],
     ];
     for (const [params, code, path] of cases) {
       const result = execute(doc, 'displace_mesh', params);
       expect(result.error?.code, JSON.stringify(params)).toBe(code);
-      if (path !== undefined) expect(JSON.stringify(result.error)).toContain(path);
+      if (path !== undefined) expect(JSON.stringify(result.error) + result.summary).toContain(path);
       expectNoOp(result, doc);
     }
     const sphere = docWithMeshes(icosphere(1, 1));
     const cap: CadDocument = sphere.doc;
     expect(execute(cap, 'displace_mesh', { id: sphere.ids[0] as string, expression: '1' }).error).toBeUndefined();
+  });
+
+  it('a height map whose pixel count is not width x height is refused by the geometry too (MESH_DISPLACE_FIELD), and a non-finite displacement names its vertex', () => {
+    const mesh = { positions: grid.positions, indices: grid.indices };
+    const base = { strength: 1, midlevel: 0.5, direction: 'normal' as const };
+    const map = {
+      pixels: uint8ArrayToBase64(Uint8Array.from([1, 2, 3])),
+      width: 2,
+      height: 2,
+      plane: 'xy' as const,
+      origin: [0, 0] as [number, number],
+      size: [1, 1] as [number, number],
+    };
+    expect(tsMeshEngine.run({ mesh }, { op: 'displace', ...base, heightMap: map })).toMatchObject({ code: 'MESH_DISPLACE_FIELD' });
+    expect(tsMeshEngine.run({ mesh }, { op: 'displace', ...base, strength: 1e308, expression: '10' })).toMatchObject({
+      code: 'MESH_DISPLACE_FIELD',
+      message: expect.stringContaining('vertex 0'),
+    });
   });
 
   it('refineEdge past the triangle limit is MESH_DISPLACE_RESULT_TOO_LARGE (the geometry and the engine)', () => {

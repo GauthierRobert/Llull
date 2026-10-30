@@ -1,12 +1,15 @@
 /** Shrink-wrap and displacement of a triangle mesh (07 MSH FR-MSH-38 / FR-MSH-39, TECHNICAL_SPEC 13.18): vertices projected onto another mesh, or moved by a field. */
 
 import { base64ToUint8Array } from '../../lib/base64';
-import { evaluateExpression } from '../../lib/expression';
+import { compileExpression } from '../../lib/expression';
 import type { MeshData } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { EditMesh } from './editMesh';
-import { SCULPT_MAX_TRIANGLES, heightFieldVolume, isClosed, passEdges, signedVolume } from './sculpt';
+import { heightFieldVolume, isClosed, passEdges, signedVolume } from './sculpt';
 import { SurfaceIndex } from './surfaceIndex';
+
+/** Triangles the refined mesh may reach in the TypeScript engine (a native twin would lift it): past it the displacement is refused. */
+export const DISPLACE_MAX_TRIANGLES = 1_000_000;
 
 export const SHRINKWRAP_MODES = ['nearest', 'normal', 'direction'] as const;
 export const SHRINKWRAP_SIDES = ['keep', 'outside', 'inside'] as const;
@@ -232,10 +235,11 @@ export function displaceMesh(input: MeshData, params: DisplaceParams): DisplaceR
   let mesh = input;
   let splits = 0;
   if (params.refineEdge !== undefined) {
-    const refined = refineAll(input, params.refineEdge, params.maxTriangles ?? SCULPT_MAX_TRIANGLES);
+    const refined = refineAll(input, params.refineEdge, params.maxTriangles ?? DISPLACE_MAX_TRIANGLES);
     if ('tooLarge' in refined) return refined;
     ({ mesh, splits } = refined);
   }
+  const evaluate = params.expression === undefined ? null : compileExpression(params.expression);
   const normals = params.direction === 'normal' ? vertexNormalsOf(mesh) : null;
   const fixed = params.direction === 'normal' ? null : unitOf(params.direction);
   if (params.direction !== 'normal' && fixed === null) return { failure: 'the displacement direction has no length' };
@@ -247,8 +251,8 @@ export function displaceMesh(input: MeshData, params: DisplaceParams): DisplaceR
     const p = point(mesh.positions, v);
     const n = normals === null ? (fixed as Vec3) : (normals[v] as Vec3);
     let field = 0;
-    if (params.expression !== undefined) {
-      const result = evaluateExpression(params.expression, { x: p[0], y: p[1], z: p[2], nx: n[0], ny: n[1], nz: n[2] });
+    if (evaluate !== null) {
+      const result = evaluate({ x: p[0], y: p[1], z: p[2], nx: n[0], ny: n[1], nz: n[2] });
       if (!result.ok) return { failure: `vertex ${v}: ${result.error}` };
       field = result.value;
     } else if (params.heightMap !== undefined && grey !== null) {
@@ -256,6 +260,7 @@ export function displaceMesh(input: MeshData, params: DisplaceParams): DisplaceR
       field = level === null ? 0 : level - params.midlevel;
     }
     const distance = params.strength * field;
+    if (!Number.isFinite(distance)) return { failure: `vertex ${v}: strength x field is not a finite number (${distance})` };
     positions[v * 3] = p[0] + distance * n[0];
     positions[v * 3 + 1] = p[1] + distance * n[1];
     positions[v * 3 + 2] = p[2] + distance * n[2];

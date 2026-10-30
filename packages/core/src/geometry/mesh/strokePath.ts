@@ -15,11 +15,12 @@ export function stampsAlong(path: ReadonlyArray<Vec3>, spacing: number): Vec3[] 
     return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
   });
   const total = lengths.reduce((sum, length) => sum + length, 0);
-  if (!(total > 0) || !(spacing > 0) || Math.floor(total / spacing) + 1 > MAX_STROKE_STAMPS) return null;
+  const last = Math.floor(total / spacing);
+  if (!(total > 0) || !(spacing > 0) || last + 1 > MAX_STROKE_STAMPS) return null;
   const stamps: Vec3[] = [];
   let segment = 0;
   let before = 0;
-  for (let k = 0; k * spacing <= total; k++) {
+  for (let k = 0; k <= last; k++) {
     const arc = k * spacing;
     while (segment < lengths.length - 1 && before + (lengths[segment] as number) < arc) before += lengths[segment++] as number;
     const [a, b] = [path[segment] as Vec3, path[segment + 1] as Vec3];
