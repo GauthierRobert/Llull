@@ -48,6 +48,24 @@ export function hasMeshLeaf(recipe: ShapeRecipe): boolean {
   }
 }
 
+/** Triangles of the scans under `recipe`: every `mesh` leaf counts its stored asset (full resolution) or, without one, its inline triangles. */
+export function meshLeafTriangles(recipe: ShapeRecipe): number {
+  switch (recipe.op) {
+    case 'solid':
+      return recipe.entity.kind !== 'mesh' ? 0 : (recipe.entity.asset?.triangles ?? recipe.entity.mesh.indices.length / 3);
+    case 'brep':
+    case 'faceSlab':
+    case 'sheetSolid':
+      return 0;
+    case 'boolean':
+      return meshLeafTriangles(recipe.a) + meshLeafTriangles(recipe.b);
+    case 'blend':
+      return recipe.sources.reduce((sum, source) => sum + meshLeafTriangles(source), 0);
+    default:
+      return meshLeafTriangles(recipe.source);
+  }
+}
+
 /**
  * Recipe of an operand entity: its exact construction tree, or — only when this kernel lacks an op of that tree (a fillet recipe loaded
  * under Manifold) — its stored triangles. A transient refusal never downgrades the exact tree.

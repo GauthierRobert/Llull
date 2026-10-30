@@ -3,6 +3,7 @@
 import type { BooleanOp, CadDocument, Entity } from '../../model/types';
 import type { MeshAssetPort } from '../../geometry/mesh/assets';
 import { resolveMeshEngine } from '../../geometry/mesh/engine';
+import { hasMeshLeaf } from '../../geometry/operandRecipe';
 import type { MeshProcessingEngine } from '../../geometry/mesh/engineTypes';
 import {
   newMeshEntity,
@@ -20,9 +21,12 @@ import {
 } from '../mesh/meshCommon';
 import type { CommandResult } from '../types';
 
-/** True when every operand is a triangle-only mesh (no exact recipe): the case `engine: "auto"` sends to the mesh engine. */
+/**
+ * True when every operand is a triangle-only mesh (no exact recipe, or a recipe over an imported mesh such as a mesh-path deform result: its
+ * stored triangles are the shape): the case `engine: "auto"` sends to the mesh engine.
+ */
 export function isTriangleOnly(operands: readonly Entity[]): boolean {
-  return operands.every((operand) => operand.kind === 'mesh' && operand.brep === undefined);
+  return operands.every((operand) => operand.kind === 'mesh' && (operand.brep === undefined || hasMeshLeaf(operand.brep)));
 }
 
 /**

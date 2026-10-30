@@ -5,6 +5,7 @@ import type { CommandResult, ExecutionContext } from './types';
 import { currentContext, runInContext } from './context';
 import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
+import { guardedContext, withKernelMeshGuard } from './kernelMeshGuard';
 import { commandError, rejection, unknownCommandError } from './noop';
 import { derivationViolation } from './derivation';
 import { applyReconcile, pluginGuards } from '../plugins/host';
@@ -41,9 +42,14 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
  *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
  *   it (no extra step)
  * @invariant before any command runs, the kernel is given every document B-rep blob it has not seen (`GeometryKernel.loadBlob`)
+ * @invariant commands see the exact kernel through `kernelMeshGuard`: a recipe over more than KERNEL_MESH_LEAF_CAP imported-mesh triangles is refused (null) and the summary says so
  * @failure nextStepNumber not a safe integer >= 1 (a mutating command would re-mint ids), unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
+  return withKernelMeshGuard(() => executeGuarded(doc, commandName, params, guardedContext(ctx)));
+}
+
+function executeGuarded(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {
   const def = getCommand(commandName);
   if (!def) return rejection(doc, `Unknown command: ${commandName}`, unknownCommandError());
   const annotations = def.annotations;

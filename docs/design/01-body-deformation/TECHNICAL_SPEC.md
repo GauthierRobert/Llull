@@ -619,5 +619,27 @@ the mesh path and never evaluate a mesh leaf; `mode: "exact"` refuses by name; a
 **Review round 1 (2026-10-30).** The first fix looked at the top node only: a deformed scan deformed again, and `analyze_deformation` / `check_deformation` on it
 (the step every deform summary asks for), still evaluated the scan through the kernel. `hasMeshLeaf` walks the recipe (boolean, blend, every node with a source).
 Tests: the spy predicate is `hasMeshLeaf`; a scan deformed twice then analysed and checked; a scan as a flow face target; `hasMeshLeaf` on nested recipes (the two
-command cases fail with the top-level predicate). Left (DES-7e on the board): other kernel consumers of a recipe over a scan (`boolean`, mass properties,
-`measure_solid` through `operandRecipe` / `kernelShape`) still hand it to the kernel.
+command cases fail with the top-level predicate). The other kernel consumers of a recipe over a scan are DES-7e (§16).
+
+## 16. As built (DES-7e: no command sews a large scan in the exact kernel, 2026-10-30)
+
+**Problem.** §15 kept the deform commands off the kernel for recipes over a scan; about 30 other commands still build an operand recipe and evaluate it
+(`boolean`, `blend`, fillets, holes, pockets, topology and face queries, PMI, STEP planning). A `solid` leaf of a `mesh` entity becomes one OCCT face per
+triangle, sewn: measured on the native kernel (box minus a scan, `boolean` engine `kernel`): 320 triangles 0.18 s, 1,280 0.61 s, 5,120 3.1 s; a deform of
+20,480 took 41 s. `mass_properties` on a raw scan is not affected (mesh integration, 0.21 s at 327,680).
+
+**Decision.**
+- One guard for every command (`commands/kernelMeshGuard.ts`): `execute` hands commands a view of the exact kernel (name `occt` or an OCCT version in its info;
+  Manifold takes triangles natively and is left alone) whose `evaluate` refuses (null, the answer every caller already handles) a recipe with more than
+  `KERNEL_MESH_LEAF_CAP` = 20,000 imported-mesh triangles (`meshLeafTriangles`: stored assets at full size, inline meshes by their triangles). The outermost
+  execute appends a note with the size, the cap and the remedies. The view is cached per kernel (stable identity for kernel-keyed caches); nested executes reuse it.
+- `boolean` `engine: "auto"`: a mesh-path deform result counts as triangle-only (`isTriangleOnly` uses `hasMeshLeaf`), and an operand built on more than the cap
+  sends the boolean to the mesh engine, with the reason in the summary; below the cap mixed operands keep the exact kernel. Decided from the document alone
+  (`asset.triangles`), so replay is host-independent. `engine: "kernel"` above the cap is refused by the guard.
+- Rejected: a cap per command (30 call sites, each would drift); refusing every mesh leaf (small scans in exact booleans and `mesh_to_brep`-style work are fine
+  and used); a cap in the native host only (the stub and future kernels would hang alike, and core tests could not see it).
+
+**Tests.** `tests/unit/brep/kernelMeshGuard.test.ts` (stub exact kernel with every evaluated recipe's scan size recorded): `meshLeafTriangles` on nested recipes;
+`boolean` engine `kernel` over a 20,480-triangle scan unchanged with the note and never reaching the kernel; engine `auto` runs the mesh engine above the cap and
+the kernel below it; two mesh-path deform results union on the mesh engine; Manifold unguarded; `inspect_topology` on a large scan refused by name. The four
+routing cases fail with the wiring removed (`execute`, `boolean`, `isTriangleOnly`).

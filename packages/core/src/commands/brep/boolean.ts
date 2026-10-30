@@ -12,7 +12,9 @@ import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
-import { operandRecipe } from '../../geometry/operandRecipe';
+import { meshLeafTriangles, operandRecipe } from '../../geometry/operandRecipe';
+import { recipeOf } from '../../geometry/shapeRecipe';
+import { KERNEL_MESH_LEAF_CAP } from '../kernelMeshGuard';
 import { noop } from '../noop';
 import { isTriangleOnly, meshBoolean } from './meshBoolean';
 import { signedMeshVolume } from '../../geometry/meshVolume';
@@ -85,10 +87,20 @@ function runBoolean(
   if (instanced !== undefined)
     return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
   const [entA, ...toolEntities] = operands as [Entity, ...Entity[]];
-  const viaMesh = engine === 'mesh' || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
+  const scan = [entA, ...toolEntities]
+    .map((entity) => ({ id: entity.id, triangles: meshLeafTriangles(recipeOf(entity)) }))
+    .find((operand) => operand.triangles > KERNEL_MESH_LEAF_CAP);
+  const bySize = engine === 'auto' && scan !== undefined;
+  const viaMesh = engine === 'mesh' || bySize || (engine === 'auto' && isTriangleOnly([entA, ...toolEntities]));
   if (viaMesh) {
     const context = ctx ?? currentContext();
-    return meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
+    const result = meshBoolean(doc, opName, op, a, tools, context.meshProcessing ?? null, context.meshAssets);
+    return !bySize || scan === undefined || result.affected.length === 0
+      ? result
+      : {
+          ...result,
+          summary: `${result.summary} (engine "auto": '${scan.id}' is built on ${scan.triangles} imported-mesh triangles, above the exact kernel's ${KERNEL_MESH_LEAF_CAP}, so the mesh engine ran)`,
+        };
   }
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
@@ -126,7 +138,7 @@ const SOLID_OPERANDS_NOTE =
 /**
  * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
  * @invariant both a and b must be 3D solids; subtract keeps a − b
- * @invariant kernel-optional: triangle-only operands (engine "auto", decided from the operands alone so replay is host-independent) or engine "mesh" use ctx.meshProcessing and need no kernel; the kernel path refuses without one
+ * @invariant kernel-optional: triangle-only operands or one built on more than KERNEL_MESH_LEAF_CAP imported-mesh triangles (engine "auto", decided from the operands alone so replay is host-independent) or engine "mesh" use ctx.meshProcessing and need no kernel; the kernel path refuses without one
  * @failure triangle-only operands without a mesh engine -> MESH_ENGINE_UNSUPPORTED
  * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]
  */
@@ -157,7 +169,7 @@ export const booleanOperation = defineCommand({
       .enum(['auto', 'kernel', 'mesh'])
       .optional()
       .describe(
-        '"auto" (default): the mesh engine for triangle-only operands, else the kernel. "kernel": always the B-rep kernel. "mesh": always the mesh engine (B-rep operands are tessellated).',
+        '"auto" (default): the mesh engine for triangle-only operands (imported meshes and results deformed from them) or when an operand is built on more than 20,000 imported-mesh triangles, else the kernel. "kernel": always the B-rep kernel (a recipe over more than 20,000 imported-mesh triangles is refused). "mesh": always the mesh engine (B-rep operands are tessellated).',
       ),
   }),
   run: (doc, { op, a, b, engine }, ctx): CommandResult =>
