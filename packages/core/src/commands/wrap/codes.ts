@@ -36,7 +36,7 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_FONT_EMBEDDING_RESTRICTED: 'Use a font licensed for embedding (the bundled fonts are SIL OFL).',
   WRP_FONT_TOO_LARGE: 'Subset the font to under 4 MB, or use a bundled one.',
   WRP_CHAIN_FACE_UNSUPPORTED:
-    'Chain only plane and cylinder faces (they unfold without stretch); cones, spheres and tori have no isometric chart across an edge: wrap each face separately.',
+    'Chain only plane, cylinder, cone, sphere and torus faces; a freeform face has no chart continued across an edge: wrap it separately.',
   WRP_CHAIN_NOT_ADJACENT:
     'List the faces of the chain so that each shares an edge with the faces before it (inspect_faces / inspect_topology show the adjacency).',
   WRP_CHAIN_EDGE_CURVED:

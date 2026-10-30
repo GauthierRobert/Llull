@@ -61,11 +61,11 @@ describe('split_at_silhouette (fake kernel)', () => {
     const unsupported = expectRefusal(
       torus.doc,
       'split_at_silhouette',
-      { id: torus.id, direction: [0, 0, 1] },
+      { id: torus.id, direction: [1, 0, 0] },
       'WRP_SILHOUETTE_UNSUPPORTED',
       'id',
     );
-    expect(unsupported.summary).toContain('torus');
+    expect(unsupported.summary).toContain('equatorial plane');
     expectRefusal(box.doc, 'split_at_silhouette', { id: box.id, direction: [0, 0, 0] }, 'WRP_PARAM_INVALID', 'direction');
     expectRefusal(box.doc, 'split_at_silhouette', { id: 'missing', direction: [1, 0, 0] }, 'WRP_ENTITY_NOT_FOUND');
     expectRefusal(emptyDoc(), 'split_at_silhouette', { id: 'missing', direction: [1, 0, 0] }, 'WRP_ENTITY_NOT_FOUND');

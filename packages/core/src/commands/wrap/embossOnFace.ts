@@ -52,7 +52,7 @@ export const embossOnFace = defineCommand({
       .max(15)
       .optional()
       .describe(
-        'Multi-face emboss: more faces (plane or cylinder) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces: WRP_CHAIN_EDGE_SHARP otherwise; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
+        'Multi-face emboss: more faces (plane, cylinder, cone, sphere or torus) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch, for plane, cylinder, cone; sphere and torus faces use placement.method geodesic, the join mismatch and the stretch are measured and refused above maxLengthStrain with WRP_DISTORTION_EXCEEDED), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, rulings of cones, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces: WRP_CHAIN_EDGE_SHARP otherwise; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
       ),
     walls: z
       .enum(['normal', 'pull'])
