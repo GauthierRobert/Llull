@@ -61,6 +61,8 @@ export interface FakeWrapOptions {
   readonly noEvaluate?: boolean;
   /** `faceGeometry` reports non-finite parameter bounds. */
   readonly infiniteBounds?: boolean;
+  /** `faceGeometry` reports a parameter box with no extent in v (a face of no axial length). */
+  readonly flatBounds?: boolean;
   /** `faceGeometry` answers null. */
   readonly noGeometry?: boolean;
   /** `projectOnFace` answers null. */
@@ -89,6 +91,8 @@ export interface FakeWrapOptions {
    * `add_box` builds a stadium instead (a box 40 x 20 x 10 at the origin united with two r 10 cylinders, as the native kernel reports it: faces 0 top, 1 cylinder +x, 2 front plane y = -10,
    * 3 back plane y = 10, 4 cylinder -x, 5 bottom; 4 smooth generatrix edges, the others convex). `'cone-end'` reports the +x end as a cone, `'torus-end'` as a torus, `'unknown-edges'` every edge as unverified.
    */
+  /** The cylinder's side face is a bore: the outward normal of the solid points to the axis. */
+  readonly bore?: boolean;
   /** `faceContains` answers true everywhere (the kernel cannot tell which side of an edge a face lies on). */
   readonly sideBlind?: boolean;
   /** An extrusion carries 4 planar walls parallel to z (the lateral faces of a pull prism), so a draft finds faces to tilt. */
@@ -426,8 +430,12 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
     name: 'fake-wrap',
     solid: (entity) => {
       switch (entity.kind) {
-        case 'cylinder':
-          return cylinderShape(entity);
+        case 'cylinder': {
+          const shape = cylinderShape(entity);
+          return options.bore === true
+            ? { ...shape, faces: shape.faces.map((face, k) => (k === 0 ? { ...face, outward: [-1, 0, 0] as Vec3 } : face)) }
+            : shape;
+        }
         case 'cone':
           return coneShape(entity);
         case 'box':
@@ -602,12 +610,17 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
               return {
                 surface: options.freeform === true ? ({ type: 'other', kind: 'bspline' } as SurfaceParams) : target.surface,
                 uvBounds:
-                  options.infiniteBounds === true
+                  options.flatBounds === true
                     ? [
-                        [Number.NEGATIVE_INFINITY, 0],
-                        [Number.POSITIVE_INFINITY, 1],
+                        [0, 5],
+                        [2 * Math.PI, 5],
                       ]
-                    : uvBounds,
+                    : options.infiniteBounds === true
+                      ? [
+                          [Number.NEGATIVE_INFINITY, 0],
+                          [Number.POSITIVE_INFINITY, 1],
+                        ]
+                      : uvBounds,
               };
             },
             projectOnFace: (shape, face, points) => {

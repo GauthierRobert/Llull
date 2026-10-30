@@ -52,9 +52,9 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_PULL_PARALLEL:
     'Choose a pullDirection that crosses the face at every point of the sketch region (not along the face, and not folding over it); the angle to the face is in the message.',
   WRP_DRAFT_CLOSES:
-    'Reduce draftDeg or the depth, or enlarge the profile: the walls would meet before reaching the full depth (data.maxDraftDeg is the largest angle that keeps the profile open).',
+    'Reduce draftDeg or the depth, or enlarge the profile: the walls would meet before reaching the full depth (data.maxDraftDeg is the largest angle that keeps the thinnest place of the region open).',
   WRP_KNURL_TOO_MANY_GROOVES:
-    'Use a coarser pitch (at most 8 grooves: a diamond builds two per tooth), a larger helix angle (at most 200 turns), or the cosmetic model; every helical groove costs the exact kernel 5 s or more.',
+    'Use a coarser pitch (fewer teeth: a diamond builds two grooves per tooth), a smaller helix angle (fewer turns along the face), or the cosmetic model: the exact kernel takes about 2.3 s x (turns / 0.184)^1.8 per helical groove and one call is cut at 60 s (the estimate is in the message).',
   WRP_KNURL_GEOMETRY_UNSUPPORTED:
     'Cut helical grooves only on a cylinder face whose two ends are free caps; for a face with a shoulder use the straight pattern or the cosmetic model.',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
@@ -65,6 +65,8 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_CHECK_OUTSIDE_FACE: 'Move the anchor, rotate, or scale the sketch so every loop stays on the trimmed face.',
   WRP_CHECK_THIN_FEATURE: 'Thicken the strokes (a bolder font or a larger height) or lower minFeatureSize if the process allows.',
   WRP_CHECK_DEPTH: 'Reduce the deboss depth below the radius of the face.',
+  WRP_CHECK_VOLUME_SKIPPED:
+    'Pull walls, draft and helical knurls have no closed-form volume: only the direction of the volume change is checked; read data.expectedVolumeDelta of the command (knurl) or compare mass_properties with the source.',
   WRP_CHECK_VOLUME_MISMATCH:
     'The kernel volume disagrees with the closed form: rebuild the emboss with a smaller fitTolerance, or report the document.',
   WRP_CHECK_GLYPH_MISSING: 'Choose a font that covers the characters of the text.',

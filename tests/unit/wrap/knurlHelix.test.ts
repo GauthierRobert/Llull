@@ -14,7 +14,10 @@ import {
   helicalKnurlRecipe,
   helicalLand,
   helicalRemovedVolume,
+  estimatedKernelSeconds,
+  grooveSpan,
   leadOf,
+  MAX_KERNEL_SECONDS,
   type HelicalKnurl,
 } from '@core/commands/wrap/knurlHelix';
 import { fakeWrapKernel } from '../../helpers/fakeWrapKernel';
@@ -22,11 +25,11 @@ import { expectRefusal } from '../../helpers/commandAssertions';
 import { expectPure } from '../../helpers/expectNoOp';
 import { emptyDoc, make, type Made } from './support';
 
-const rod = (): Made => make(emptyDoc(), 'add_cylinder', { radius: 10, height: 40 });
-const FACE10 = { faceNear: [10, 0, 0] };
-/** d 20: the pitch that closes 8 teeth, and 4. */
-const PITCH8 = (Math.PI * 20) / 8;
-const PITCH4 = (Math.PI * 20) / 4;
+const rod = (): Made => make(emptyDoc(), 'add_cylinder', { radius: 20, height: 40 });
+const FACE20 = { faceNear: [20, 0, 0] };
+/** d 40: the pitch that closes 8 teeth, and 4. */
+const PITCH8 = (Math.PI * 40) / 8;
+const PITCH4 = (Math.PI * 40) / 4;
 const shapeOf = (patch: Partial<HelicalKnurl> = {}): HelicalKnurl => ({
   teeth: 8,
   radius: 20,
@@ -85,11 +88,16 @@ describe('helical groove closed forms', () => {
 });
 
 describe('helicalKnurlRecipe', () => {
-  const cut = { origin: [0, 0, 0] as [number, number, number], axis: [0, 0, 1] as [number, number, number], from: -20, to: 20 };
+  const cutFor = (shape: HelicalKnurl, axis: [number, number, number] = [0, 0, 1]): Parameters<typeof helicalKnurlRecipe>[2] => ({
+    origin: [0, 0, 0],
+    axis,
+    span: grooveSpan(shape, -20, 20),
+  });
   const source = (): { op: 'solid'; entity: never } => ({ op: 'solid', entity: rod().doc.entities['cyl-1.1'] as never });
 
   it('builds one screw sweep per tooth and hand, starting at equally spaced angles, in one boolean subtract', () => {
-    const diamond = helicalKnurlRecipe(source(), shapeOf({ hands: 2, teeth: 4 }), cut, 'k', '#fff');
+    const four = shapeOf({ hands: 2, teeth: 4 });
+    const diamond = helicalKnurlRecipe(source(), four, cutFor(four), 'k', '#fff');
     expect(typeof diamond).not.toBe('string');
     const text = JSON.stringify(diamond);
     expect(text.match(/"kind":"sweep"/g)).toHaveLength(8);
@@ -101,19 +109,30 @@ describe('helicalKnurlRecipe', () => {
     expect(angles.slice(0, 4).map((a) => a.toFixed(6))).toEqual([0, 1, 2, 3].map((i) => ((2 * Math.PI * i) / 4).toFixed(6)));
   });
 
-  it('refuses too many grooves, too many turns and a zero axis by reason', () => {
-    expect(helicalKnurlRecipe(source(), shapeOf({ hands: 2, teeth: 7 }), cut, 'k', '#fff')).toContain('exceed the limit of 8');
-    expect(helicalKnurlRecipe(source(), shapeOf({ helixDeg: 89.99, teeth: 4 }), cut, 'k', '#fff')).toContain('turns exceeds the limit');
-    expect(helicalKnurlRecipe(source(), shapeOf(), { ...cut, axis: [0, 0, 0] }, 'k', '#fff')).toContain('axis');
+  it('refuses a zero axis by reason', () => {
+    expect(helicalKnurlRecipe(source(), shapeOf(), cutFor(shapeOf(), [0, 0, 0]), 'k', '#fff')).toContain('axis');
+  });
+
+  it('the kernel-time model reproduces the measured runs (6 grooves at 30 degrees 12.6 s, 12 at 30 degrees 30 s, 8 at 45 degrees 45 s, 8 at 60 degrees over 120 s) and grows with the turns', () => {
+    const turnsAt = (helixDeg: number): number => 40 / leadOf(shapeOf({ helixDeg, radius: 20, teeth: 8 }));
+    expect(estimatedKernelSeconds(6, turnsAt(30)) / 12.6).toBeGreaterThan(0.7);
+    expect(estimatedKernelSeconds(6, turnsAt(30)) / 12.6).toBeLessThan(1.3);
+    expect(estimatedKernelSeconds(12, turnsAt(30)) / 30).toBeGreaterThan(0.7);
+    expect(estimatedKernelSeconds(12, turnsAt(30)) / 30).toBeLessThan(1.3);
+    expect(estimatedKernelSeconds(8, turnsAt(45)) / 45).toBeGreaterThan(0.7);
+    expect(estimatedKernelSeconds(8, turnsAt(45)) / 45).toBeLessThan(1.3);
+    expect(estimatedKernelSeconds(8, turnsAt(60))).toBeGreaterThan(MAX_KERNEL_SECONDS);
+    expect(estimatedKernelSeconds(8, turnsAt(45))).toBeLessThanOrEqual(MAX_KERNEL_SECONDS);
+    expect(estimatedKernelSeconds(1, turnsAt(80))).toBeGreaterThan(estimatedKernelSeconds(1, turnsAt(50)));
   });
 });
 
 describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
   const knurlShape = (patch: Partial<HelicalKnurl>): HelicalKnurl => {
     const teeth = 8;
-    const pitch = (Math.PI * 20) / teeth;
+    const pitch = (Math.PI * 40) / teeth;
     const depth = helicalDepthForLand(pitch, 90, 30, 0.1);
-    return { teeth, radius: 10, depth, toothAngleDeg: 90, helixDeg: 30, hands: 1, left: false, ...patch };
+    return { teeth, radius: 20, depth, toothAngleDeg: 90, helixDeg: 30, hands: 1, left: false, ...patch };
   };
   const useKernel = (options: Parameters<typeof fakeWrapKernel>[0]): void => setGeometryKernel(fakeWrapKernel(options));
   const recipeOf = (doc: ReturnType<typeof execute>['document'], id: string): string =>
@@ -123,7 +142,7 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
     const shape = knurlShape({});
     useKernel({ grooveVolume: 40 * helicalGrooveArea(shape) });
     const { doc, id } = rod();
-    const params = { id, face: FACE10, pattern: 'diagonal', pitch: PITCH8, model: 'geometry' };
+    const params = { id, face: FACE20, pattern: 'diagonal', pitch: PITCH8, model: 'geometry' };
     const done = execute(doc, 'add_knurl', params);
     expect(done.rejected, done.summary).toBeUndefined();
     const info = done.data as Record<string, unknown>;
@@ -137,6 +156,8 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
       toothAngleDeg: 90,
     });
     expect(info['expectedVolumeDelta']).toBeCloseTo(-8 * 40 * helicalGrooveArea(shape), 9);
+    // an independent number (dense quadrature of the polar integral, see the closed-form suite), so a wrong radius or lead in the command cannot hide behind its own formula
+    expect(info['expectedVolumeDelta']).toBeCloseTo(-12433.9481, 3);
     expect(info['volumeDelta']).toBeCloseTo(info['expectedVolumeDelta'] as number, 9);
     expect(info['lead']).toBeCloseTo(leadOf(shape), 9);
     expect(info['land']).toBeCloseTo(0.1 * PITCH8, 9);
@@ -158,7 +179,7 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
     const { doc, id } = rod();
     const left = execute(doc, 'add_knurl', {
       id,
-      face: FACE10,
+      face: FACE20,
       pattern: 'diagonal',
       pitch: PITCH4,
       model: 'geometry',
@@ -173,7 +194,7 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
     useKernel({ grooveVolume: helicalRemovedVolume(union, 40) / 8 });
     const diamond = execute(doc, 'add_knurl', {
       id,
-      face: FACE10,
+      face: FACE20,
       pattern: 'diamond',
       pitch: PITCH4,
       model: 'geometry',
@@ -185,25 +206,44 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
     expect(info).toMatchObject({ pattern: 'diamond', teeth: 4, grooves: 8, hands: ['right', 'left'] });
     expect(String(info['expectedMethod'])).toContain('numeric union');
     expect(info['expectedVolumeDelta']).toBeCloseTo(-helicalRemovedVolume(union, 40), 9);
+    expect(helicalRemovedVolume(union, 40)).toBeCloseTo(71.2501, 3);
   });
 
-  it('refuses by code: too many grooves, too many turns, grooves that meet, too deep, a hand on a diamond, a bad angle, a shoulder end, a kernel that cannot sweep, a volume that disagrees', () => {
+  it('check_wrap counts a helical knurl (no emboss node): the volume is skipped with a warning, the removal is checked', () => {
     const shape = knurlShape({});
     useKernel({ grooveVolume: 40 * helicalGrooveArea(shape) });
     const { doc, id } = rod();
-    const base = { id, face: FACE10, model: 'geometry' };
-    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diamond', pitch: PITCH8 }, 'WRP_KNURL_TOO_MANY_GROOVES', 'pitch');
+    const done = execute(doc, 'add_knurl', { id, face: FACE20, pattern: 'diagonal', pitch: PITCH8, model: 'geometry' });
+    expect(done.rejected, done.summary).toBeUndefined();
+    const knurled = done.affected[0] as string;
+    const checked = execute(done.document, 'check_wrap', {});
+    const report = checked.data as {
+      status: string;
+      checked: { ids: number; reliefsWithoutClosedForm: number };
+      findings: Array<{ code: string; ids: string[] }>;
+    };
+    expect(report.checked).toMatchObject({ ids: 1, reliefsWithoutClosedForm: 1 });
+    expect(report.findings).toContainEqual(expect.objectContaining({ code: 'WRP_CHECK_VOLUME_SKIPPED', ids: [knurled] }));
+    expect(report.status).toBe('warn');
+  });
+
+  it('refuses by code: a cut over the kernel-time envelope (many grooves, many turns), grooves that meet, too deep, a hand on a diamond, a bad angle, a shoulder end, a kernel that cannot sweep, a volume that disagrees', () => {
+    const shape = knurlShape({});
+    useKernel({ grooveVolume: 40 * helicalGrooveArea(shape) });
+    const { doc, id } = rod();
+    const base = { id, face: FACE20, model: 'geometry' };
+    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diamond', pitch: (Math.PI * 40) / 30 }, 'WRP_KNURL_TOO_MANY_GROOVES', 'pitch');
     expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: 1 }, 'WRP_KNURL_TOO_MANY_GROOVES', 'pitch');
     const steep = expectRefusal(
       doc,
       'add_knurl',
       { ...base, pattern: 'diagonal', pitch: PITCH8, helixAngleDeg: 89.99 },
       'WRP_KNURL_TOO_MANY_GROOVES',
-      'helixAngleDeg',
+      'pitch',
     );
-    expect(steep.summary).toContain('turns');
-    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8, depth: 4 }, 'WRP_KNURL_DEPTH_INVALID', 'depth');
-    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: 20, depth: 6 }, 'WRP_DEPTH_EXCEEDS_SOLID', 'depth');
+    expect(steep.summary).toContain('turns along the face each would take the exact kernel');
+    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8, depth: 8 }, 'WRP_KNURL_DEPTH_INVALID', 'depth');
+    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: 40, depth: 11 }, 'WRP_DEPTH_EXCEEDS_SOLID', 'depth');
     expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diamond', pitch: PITCH4, hand: 'left' }, 'WRP_PARAM_INVALID', 'hand');
     expectRefusal(
       doc,
@@ -218,12 +258,25 @@ describe('add_knurl model geometry, diagonal and diamond (fake kernel)', () => {
     useKernel({ grooveVolume: 1 });
     const off = expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8 }, 'WRP_KERNEL_BUILD_FAILED', 'face');
     expect(off.summary).toContain('helical grooves remove');
+    useKernel({ grooveVolume: 0 });
+    const none = expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8 }, 'WRP_KERNEL_BUILD_FAILED', 'face');
+    expect(none.summary).toContain('removed no material');
+    useKernel({ grooveVolume: 40 * helicalGrooveArea(shape), invalidResult: true });
+    const broken = expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8 }, 'WRP_KERNEL_BUILD_FAILED', 'face');
+    expect(broken.summary).toContain('not valid and closed');
+    useKernel({ grooveVolume: 40 * helicalGrooveArea(shape), flatBounds: true });
+    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8 }, 'WRP_FACE_NOT_FOUND', 'face');
+    useKernel({ bore: true });
+    const bore = expectRefusal(doc, 'add_knurl', { ...base, pattern: 'diagonal', pitch: PITCH8 }, 'WRP_KNURL_FACE_NOT_CYLINDER', 'face');
+    expect(bore.summary).toContain('bore');
+    expectRefusal(doc, 'add_knurl', { ...base, pattern: 'straight', pitch: PITCH8, hand: 'left' }, 'WRP_PARAM_INVALID', 'hand');
+    expectRefusal(doc, 'add_knurl', { id, face: FACE20, pattern: 'diagonal', pitch: PITCH8, hand: 'left' }, 'WRP_PARAM_INVALID', 'hand');
     useKernel({ stadium: true });
     const ends = make(emptyDoc(), 'add_box', { size: [40, 20, 10] });
     expectRefusal(
       ends.doc,
       'add_knurl',
-      { ...base, id: ends.id, face: { faceNear: [30, 0, 0] }, pattern: 'diagonal', pitch: PITCH8 },
+      { ...base, id: ends.id, face: { faceNear: [30, 0, 0] }, pattern: 'diagonal', pitch: (Math.PI * 20) / 8 },
       'WRP_KNURL_GEOMETRY_UNSUPPORTED',
       'face',
     );

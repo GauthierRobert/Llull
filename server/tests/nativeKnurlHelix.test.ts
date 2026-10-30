@@ -67,6 +67,13 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP helical knurl' })(
       expect(info['lead']).toBeCloseTo((2 * Math.PI * 20) / Math.tan(Math.PI / 6), 9);
       expect(info['land']).toBeCloseTo(0.1 * PITCH, 9);
       expect(seconds).toBeLessThan(60);
+      expect(info['estimatedKernelSeconds'] as number).toBeLessThan(50);
+      const audit = must(done.document, 'check_wrap', {}).data as {
+        checked: { reliefsWithoutClosedForm: number };
+        findings: Array<{ code: string }>;
+      };
+      expect(audit.checked.reliefsWithoutClosedForm).toBe(1);
+      expect(audit.findings.map((finding) => finding.code)).not.toContain('WRP_CHECK_VOLUME_MISMATCH');
     });
 
     it('the left hand removes the same volume as the right (helix 45 degrees)', () => {
@@ -119,7 +126,7 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP helical knurl' })(
       expect(seconds).toBeLessThan(120);
     });
 
-    it('refuses by code: more than 12 grooves, a shoulder at an end of the face, and grooves that meet', () => {
+    it('refuses by code: a cut over the kernel-time envelope, a shoulder at an end of the face, and grooves that meet', () => {
       const { doc, id } = rod();
       expect(execute(doc, 'add_knurl', { id, face, pattern: 'diamond', pitch: 2, model: 'geometry' }).error?.code).toBe(
         'WRP_KNURL_TOO_MANY_GROOVES',

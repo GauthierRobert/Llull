@@ -3,8 +3,9 @@
  * walls are then the lateral surface of the prism of each region along the pull, and the relief is that prism cut to the layer between the face and its offset by the depth:
  * emboss = source + (prism x (offset(source, +d) - source)), deboss = source - (prism x (source - offset(source, -d))), all exact kernel booleans of recipe nodes (`faceOp`
  * moveFaces offset for the layer). A draft tilts the walls of the relief about the plane through the anchor perpendicular to the feature axis (native BRepOffsetAPI_DraftAngle).
- * @invariant walls are parallel to the pull (a draft of 0) or tilted by exactly the draft; the footprint prism is the region projected along the pull (polygonal where the
- *   region's image is curved: data.exact is false then, fine as the sampling tolerance); the layer is the exact offset of the face
+ * @invariant walls are parallel to the pull (a draft of 0) or tilted by exactly the draft; the footprint prism is the region projected along the pull: lines and cubic Beziers fitted
+ *   within `tolerance` of the exact image without a draft, a polygon whose chord sag is within max(`tolerance`, 3e-5 x the diagonal) with one (a draft needs planar walls); `footprintDeviation` reports the
+ *   fit and the result is not exact when it is above 0; the layer is the exact offset of the face
  * @failure a pull parallel to the face (|cos| < 0.01 at a sample) or leaving it on both sides, a footprint that is not a polygon, a draft that closes the profile, a torus face,
  *   scribe, a kernel that cannot build the relief -> `{ code, message }`
  */
@@ -12,6 +13,7 @@
 import type { ShapeRecipe, Vec2, Vec3 } from '../../model/types';
 import type { FaceChart } from '../../geometry/chartFrame';
 import { sampleSegment, type PlaneSegment } from '../../geometry/planeSegments';
+import { fittedOutline, sampledPolygon, thinnestPlace, type Outline } from './footprintOutline';
 import { cross3, dot3, normalize3, scale3 } from '../../lib/vec3';
 import { eulerFromAxes } from '../../lib/eulerRotation';
 import type { UvRegion } from '../../model/wrap';
@@ -21,19 +23,30 @@ import type { FaceSession } from './faceSession';
 export interface PullFailure {
   readonly code: string;
   readonly message: string;
+  /** Where in the request the cause is (default: the pull direction). */
+  readonly path?: string;
+  /** Numbers the caller can act on (the largest draft that does not close the region). */
+  readonly data?: Record<string, unknown>;
 }
 
 export interface PullBuild {
   readonly recipe: ShapeRecipe;
   /** Unit direction the feature extends along (out of the material for an emboss, into it for a deboss). */
   readonly axis: Vec3;
-  readonly polygonVertices: number;
+  /** Segments (lines and Beziers) or polygon vertices of all footprint outlines. */
+  readonly footprintSize: number;
+  /** Largest deviation of the footprint outlines from the exact image of the regions, document units. */
+  readonly footprintDeviation: number;
   readonly draftFaces: number;
+  /** How far the drafted base grows past the footprint at the hinge (document units), 0 without a draft. */
+  readonly baseGrowth: number;
 }
 
 export const isPullFailure = (value: PullBuild | PullFailure): value is PullFailure => 'code' in value;
 
 const MAX_VERTICES = 4000;
+/** Chord sag a drafted (planar-walled) footprint is sampled to, at least, as a share of the solid diagonal: finer polygons make the draft and the booleans of the kernel too slow. */
+const DRAFT_SAG_RATIO = 3e-5;
 const MIN_COSINE = 0.01;
 
 interface Loop {
@@ -50,30 +63,6 @@ function sampleLoop(chart: FaceChart, pieces: readonly PlaneSegment[]): Loop {
   return { points };
 }
 
-/** The polygon (x, y) in the basis (e1, e2) with collinear points removed and a counter-clockwise turn. */
-function polygonOf(points: readonly Vec3[], e1: Vec3, e2: Vec3, scale: number): Vec2[] {
-  const flat: Vec2[] = points.map((p): Vec2 => [dot3(p, e1), dot3(p, e2)]);
-  const kept: Vec2[] = [];
-  const eps = 1e-9 * scale;
-  flat.forEach((point) => {
-    const prev = kept[kept.length - 1] ?? (flat[flat.length - 1] as Vec2);
-    if (Math.hypot(point[0] - prev[0], point[1] - prev[1]) < eps) return;
-    kept.push(point);
-  });
-  const simplified = kept.filter((point, k) => {
-    const prev = kept[(k + kept.length - 1) % kept.length] as Vec2;
-    const next = kept[(k + 1) % kept.length] as Vec2;
-    const cross = (point[0] - prev[0]) * (next[1] - point[1]) - (point[1] - prev[1]) * (next[0] - point[0]);
-    return Math.abs(cross) > eps * Math.hypot(next[0] - prev[0], next[1] - prev[1]);
-  });
-  const area = simplified.reduce(
-    (sum, p, k) =>
-      sum + p[0] * (simplified[(k + 1) % simplified.length] as Vec2)[1] - (simplified[(k + 1) % simplified.length] as Vec2)[0] * p[1],
-    0,
-  );
-  return area < 0 ? [...simplified].reverse() : simplified;
-}
-
 /** Face-offset layer / pull-prism relief of `regions` on the session's face. */
 export function buildPullRecipe(input: {
   readonly session: FaceSession;
@@ -86,6 +75,8 @@ export function buildPullRecipe(input: {
   readonly pull: Vec3;
   readonly draftDeg: number;
   readonly anchorOn: Vec3;
+  /** Fit tolerance of the footprint outlines, document units. */
+  readonly tolerance: number;
 }): PullBuild | PullFailure {
   const { session, chart, orientation, mode, depth } = input;
   if (session.surface.type === 'torus')
@@ -132,9 +123,18 @@ export function buildPullRecipe(input: {
     Math.tan((input.draftDeg * Math.PI) / 180) * Math.max(Math.abs(hingeHeight - surfaceLow), Math.abs(surfaceHigh - hingeHeight) + extent);
   const pad = (2 * growth) / cosMin + margin;
   const [low, high] = dot3(axis, e0) > 0 ? [surfaceLow - pad, surfaceHigh + extent + pad] : [surfaceLow - extent - pad, surfaceHigh + pad];
-  const prismOf = (polygon: readonly Vec2[], tag: string): ShapeRecipe => ({
+  const prismOf = (outline: Outline, tag: string): ShapeRecipe => ({
     op: 'place',
-    source: { op: 'solid', entity: newEntity('extrusion', `pull-${tag}`, { profile: polygon, depth: high - low }, [0, 0, 0], '#cccccc') },
+    source: {
+      op: 'solid',
+      entity: newEntity(
+        'extrusion',
+        `pull-${tag}`,
+        { profile: outline.profile, depth: high - low, ...(outline.segments === undefined ? {} : { curves: outline.segments }) },
+        [0, 0, 0],
+        '#cccccc',
+      ),
+    },
     position: scale3(e0, low),
     rotation: eulerFromAxes(e1, e2, e0),
   });
@@ -142,8 +142,8 @@ export function buildPullRecipe(input: {
   const hinge = hingeHeight;
   let draftedWalls = 0;
   /** The prism of a footprint polygon; with a draft its walls tilt about the plane through the anchor so it narrows along the feature axis (a hole prism widens). */
-  const taperedPrism = (polygon: readonly Vec2[], tag: string, widening: boolean): ShapeRecipe | PullFailure => {
-    const prism = prismOf(polygon, tag);
+  const taperedPrism = (outline: Outline, tag: string, widening: boolean): ShapeRecipe | PullFailure => {
+    const prism = prismOf(outline, tag);
     if (!(angle > 0)) return prism;
     const shape = session.kernel.evaluate(prism);
     if (shape === null)
@@ -163,9 +163,7 @@ export function buildPullRecipe(input: {
       neutral: { origin: input.anchorOn, normal: axis },
     };
   };
-  let vertices = 0;
   const tools: ShapeRecipe[] = [];
-  let loopIndex = 0;
   const away = session.surface.type === 'plane' ? 1 : orientation;
   const signedDistance = (mode === 'emboss' ? 1 : -1) * away * depth;
   const offset: ShapeRecipe = {
@@ -179,39 +177,51 @@ export function buildPullRecipe(input: {
     mode === 'emboss'
       ? { op: 'boolean', boolean: 'subtract', a: offset, b: session.source }
       : { op: 'boolean', boolean: 'subtract', a: session.source, b: offset };
-  const outers: Vec2[][] = [];
-  for (const [regionIndex, region] of input.regions.entries()) {
-    const outer = polygonOf((loops[loopIndex++] as Loop).points, e1, e2, session.diagonal);
-    const holes = region.holes.map(() => polygonOf((loops[loopIndex++] as Loop).points, e1, e2, session.diagonal));
-    outers.push(outer);
-    vertices += outer.length + holes.reduce((sum, hole) => sum + hole.length, 0);
-    if (outer.length < 3 || holes.some((hole) => hole.length < 3))
-      return { code: 'WRP_PULL_PARALLEL', message: `region ${regionIndex} projects to a degenerate polygon along the pull` };
-  }
-  if (vertices > MAX_VERTICES)
+  const image = (uv: Vec2): Vec3 => chart.pointAt(uv);
+  const outlines = input.pieces.map((pieces) =>
+    angle > 0
+      ? sampledPolygon(image, pieces, e1, e2, Math.max(input.tolerance, DRAFT_SAG_RATIO * session.diagonal), session.diagonal)
+      : fittedOutline(image, pieces, e1, e2, input.tolerance),
+  );
+  const size = outlines.reduce((sum, outline) => sum + (outline.segments?.length ?? outline.profile.length), 0);
+  const degenerate = outlines.findIndex((outline) => outline.profile.length < 3);
+  if (degenerate >= 0)
+    return { code: 'WRP_PULL_PARALLEL', message: `loop ${degenerate} projects to a degenerate outline along the pull`, path: 'profileIds' };
+  if (size > MAX_VERTICES)
     return {
       code: 'WRP_PARAM_INVALID',
-      message: `the footprint polygons have ${vertices} vertices (limit ${MAX_VERTICES}): use a simpler or smaller sketch`,
+      message: `the footprint outlines have ${size} segments or vertices (limit ${MAX_VERTICES}): use a simpler or smaller sketch`,
+      path: 'profileIds',
     };
+  // the prism narrows over its whole length, which reaches farther from the hinge than the relief does
+  const reach = Math.max(Math.abs(high - hinge), Math.abs(low - hinge));
+  let baseGrowth = 0;
   if (angle > 0) {
-    // the prism narrows over its whole length, which reaches farther from the hinge than the relief does
-    const reach = Math.max(Math.abs(high - hinge), Math.abs(low - hinge));
-    const narrow = Math.min(...outers.map(narrowestSide));
-    if (!(2 * reach * Math.tan(angle) < narrow * (1 - 1e-6)))
+    baseGrowth = reach * Math.tan(angle);
+    let start = 0;
+    let narrow = Infinity;
+    for (const region of input.regions) {
+      const count = 1 + region.holes.length;
+      narrow = Math.min(narrow, thinnestPlace(outlines.slice(start, start + count).map((outline) => outline.profile)));
+      start += count;
+    }
+    if (!(2 * baseGrowth < narrow * (1 - 1e-6))) {
+      const largest = (Math.atan(narrow / (2 * reach)) * 180) / Math.PI;
       return {
         code: 'WRP_DRAFT_CLOSES',
-        message: `a draft of ${input.draftDeg} degrees over a height of ${reach.toPrecision(6)} closes a region whose narrowest side is ${narrow.toPrecision(6)} (largest draft ${((Math.atan(narrow / (2 * reach)) * 180) / Math.PI).toPrecision(6)} degrees)`,
+        message: `a draft of ${input.draftDeg} degrees over a height of ${reach.toPrecision(6)} closes the thinnest place of the region (${narrow.toPrecision(6)} wide: the walls on its two sides move ${(2 * baseGrowth).toPrecision(6)} together); the largest draft is ${largest.toPrecision(6)} degrees`,
+        path: 'draftDeg',
+        data: { maxDraftDeg: largest, thinnestPlace: narrow, unit: 'document units' },
       };
+    }
   }
-  loopIndex = 0;
+  let loopIndex = 0;
   for (const [regionIndex, region] of input.regions.entries()) {
-    const outerPrism = taperedPrism(outers[regionIndex] as Vec2[], `${regionIndex}`, false);
+    const outerPrism = taperedPrism(outlines[loopIndex++] as Outline, `${regionIndex}`, false);
     if ('code' in outerPrism) return outerPrism;
-    loopIndex++;
     let prism: ShapeRecipe = outerPrism;
     for (const [holeIndex] of region.holes.entries()) {
-      const hole = polygonOf((loops[loopIndex++] as Loop).points, e1, e2, session.diagonal);
-      const holePrism = taperedPrism(hole, `${regionIndex}.${holeIndex}`, true);
+      const holePrism = taperedPrism(outlines[loopIndex++] as Outline, `${regionIndex}.${holeIndex}`, true);
       if ('code' in holePrism) return holePrism;
       prism = { op: 'boolean', boolean: 'subtract', a: prism, b: holePrism };
     }
@@ -224,12 +234,12 @@ export function buildPullRecipe(input: {
     mode === 'emboss'
       ? { op: 'boolean', boolean: 'union', a: session.source, b: combined }
       : { op: 'boolean', boolean: 'subtract', a: session.source, b: combined };
-  return { recipe, axis, polygonVertices: vertices, draftFaces: draftedWalls };
+  return {
+    recipe,
+    axis,
+    footprintSize: size,
+    footprintDeviation: Math.max(0, ...outlines.map((outline) => outline.deviation)),
+    draftFaces: draftedWalls,
+    baseGrowth,
+  };
 }
-
-/** The smaller side of the bounding box of a polygon. */
-const narrowestSide = (polygon: readonly Vec2[]): number => {
-  const xs = polygon.map((p) => p[0]);
-  const ys = polygon.map((p) => p[1]);
-  return Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-};

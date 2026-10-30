@@ -250,9 +250,41 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP walls' })('WRP pull w
       pullDirection: [0, 0, 1],
       placement: topPlacement,
     });
-    const info = done.data as { regionArea: number; volumeDelta: number; footprintVertices: number };
-    expect(info.footprintVertices).toBeGreaterThan(20);
+    const info = done.data as {
+      regionArea: number;
+      volumeDelta: number;
+      footprintSize: number;
+      footprintDeviation: number;
+      exact: boolean;
+    };
+    expect(info.footprintSize).toBeGreaterThan(10);
+    expect(info.footprintDeviation).toBeGreaterThan(0);
+    expect(info.footprintDeviation).toBeLessThanOrEqual(1e-4);
+    expect(info.exact).toBe(false);
     expect(relative(info.volumeDelta, info.regionArea)).toBeLessThan(1e-3);
+  });
+
+  it('check_wrap counts a pull relief on the real kernel: the volume is skipped with a warning and the direction (emboss adds) is checked', () => {
+    const body = must(base(), 'add_box', { size: [60, 40, 10] });
+    const sketch = must(body.document, 'draw_rectangle', { width: 20, height: 10, position: [-10, -5, 5] });
+    const done = must(sketch.document, 'emboss_on_face', {
+      id: body.affected[0],
+      face: onTop,
+      profileIds: [sketch.affected[0]],
+      mode: 'emboss',
+      depth: 2,
+      walls: 'pull',
+      pullDirection: [0, 0, 1],
+      placement: topPlacement,
+    });
+    const report = must(done.document, 'check_wrap', {}).data as {
+      status: string;
+      checked: { ids: number; reliefsWithoutClosedForm: number };
+      findings: Array<{ code: string }>;
+    };
+    expect(report.checked).toMatchObject({ ids: 1, reliefsWithoutClosedForm: 1 });
+    expect(report.findings.map((finding) => finding.code)).toContain('WRP_CHECK_VOLUME_SKIPPED');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('WRP_CHECK_VOLUME_MISMATCH');
   });
 
   it('refuses by code: a pull along the face, a pull folding over the region, a draft that closes the profile, and invalid combinations', () => {

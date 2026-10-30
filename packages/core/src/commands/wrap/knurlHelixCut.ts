@@ -1,7 +1,7 @@
 /**
  * add_knurl model geometry for the diagonal and diamond patterns (03 WRP M5): open the face, check the groove form, build the helical grooves of `knurlHelix.ts` as one exact recipe,
  * evaluate it on the native kernel and compare the measured volume with the closed form (diagonal) or the numeric union (diamond).
- * @failure not a cylinder outside, a depth that overlaps the grooves or reaches half the radius, more than 8 grooves or 200 turns, a missing free end cap, a kernel that cannot sweep or
+ * @failure not a cylinder outside, a depth that overlaps the grooves or reaches half the radius, a cut over the measured kernel-time envelope, a missing free end cap, a kernel that cannot sweep or
  *   cut, a volume that differs from the expected one -> coded no-op
  */
 
@@ -20,9 +20,10 @@ import {
   helicalKnurlRecipe,
   helicalLand,
   helicalRemovedVolume,
+  estimatedKernelSeconds,
+  grooveSpan,
   leadOf,
-  MAX_GROOVE_TURNS,
-  MAX_HELICAL_GROOVES,
+  MAX_KERNEL_SECONDS,
   type HelicalKnurl,
 } from './knurlHelix';
 
@@ -77,12 +78,6 @@ export function cutHelicalGrooves(
   if (depth >= 0.5 * surface.radius)
     return fail('WRP_DEPTH_EXCEEDS_SOLID', `depth ${depth} reaches half the radius ${surface.radius}`, 'depth');
   const grooves = knurl.teeth * (diamond ? 2 : 1);
-  if (grooves > MAX_HELICAL_GROOVES)
-    return fail(
-      'WRP_KNURL_TOO_MANY_GROOVES',
-      `${grooves} helical grooves (${knurl.teeth} teeth${diamond ? ' x 2 hands' : ''}) exceed the limit of ${MAX_HELICAL_GROOVES}: each is a sweep of the cut`,
-      'pitch',
-    );
   const [[, from], [, to]] = session.uvBounds;
   if (!Number.isFinite(from) || !Number.isFinite(to) || !(to > from))
     return fail('WRP_FACE_NOT_FOUND', 'the face has no axial extent', 'face');
@@ -95,12 +90,14 @@ export function cutHelicalGrooves(
     hands: diamond ? 2 : 1,
     left: params.hand === 'left',
   };
-  const turns = (to - from) / leadOf(shape);
-  if (turns > MAX_GROOVE_TURNS)
+  const span = grooveSpan(shape, from, to);
+  const faceTurns = (to - from) / leadOf(shape);
+  const seconds = estimatedKernelSeconds(grooves, faceTurns);
+  if (seconds > MAX_KERNEL_SECONDS)
     return fail(
       'WRP_KNURL_TOO_MANY_GROOVES',
-      `a groove of ${turns.toFixed(1)} turns along the face exceeds the limit of ${MAX_GROOVE_TURNS}: use a larger helix angle`,
-      'helixAngleDeg',
+      `${grooves} helical grooves (${knurl.teeth} teeth${diamond ? ' x 2 hands' : ''}) of ${faceTurns.toFixed(2)} turns along the face each would take the exact kernel about ${seconds.toFixed(0)} s (limit ${MAX_KERNEL_SECONDS} s, one kernel call is cut at 60 s): use a coarser pitch, a smaller helix angle (fewer turns), or the cosmetic model`,
+      'pitch',
     );
   const sample = session.query.faceDetails(session.shape, { samples: 1 })?.[session.face]?.samples[0];
   const hit = sample === undefined ? null : (session.query.projectOnFace(session.shape, session.face, [sample])?.[0] ?? null);
@@ -126,7 +123,7 @@ export function cutHelicalGrooves(
   const recipe = helicalKnurlRecipe(
     session.source,
     shape,
-    { origin: surface.origin, axis: surface.axis, from, to },
+    { origin: surface.origin, axis: surface.axis, span },
     nextId('mesh'),
     session.entity.color,
   );
@@ -174,6 +171,8 @@ export function cutHelicalGrooves(
       expectedVolumeDelta: expected,
       expectedMethod: diamond ? 'numeric union of the two hands over the transverse sections' : 'closed form teeth x length x A_t',
       length: to - from,
+      turns: faceTurns,
+      estimatedKernelSeconds: seconds,
     },
     {
       unverified: false,

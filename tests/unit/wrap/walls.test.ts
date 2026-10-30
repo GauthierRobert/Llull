@@ -48,7 +48,7 @@ describe('emboss_on_face with walls along a pull (fake kernel)', () => {
       walls: 'pull',
       pullDirection: [0, 0, 1],
       draftDeg: 0,
-      footprintVertices: 4,
+      footprintSize: 4,
       draftedWalls: 0,
       faceKind: 'plane',
     });
@@ -132,7 +132,7 @@ describe('emboss_on_face with walls along a pull (fake kernel)', () => {
       placement: { method: 'geodesic', anchor: { chart: [0, 0], on: [0, 0, 25] } },
     });
     expect(capped.rejected, capped.summary).toBeUndefined();
-    expect(data(capped)['footprintVertices'] as number).toBeGreaterThan(8);
+    expect(data(capped)['footprintSize'] as number).toBeGreaterThan(8);
   });
 
   it('text with a hole keeps the hole as a subtracted prism: more footprint vertices than the outline alone', () => {
@@ -149,7 +149,7 @@ describe('emboss_on_face with walls along a pull (fake kernel)', () => {
       placement: topPlacement,
     });
     expect(done.rejected, done.summary).toBeUndefined();
-    expect(data(done)['footprintVertices'] as number).toBeGreaterThan(20);
+    expect(data(done)['footprintSize'] as number).toBeGreaterThan(10);
     expect(
       JSON.stringify(recipeOf(done.document, done.affected[0] as string)).match(/"boolean":"subtract"/g)?.length,
     ).toBeGreaterThanOrEqual(2);
@@ -233,9 +233,12 @@ describe('emboss_on_face with walls along a pull (fake kernel)', () => {
         placement: topPlacement,
       },
       'WRP_DRAFT_CLOSES',
-      'pullDirection',
+      'draftDeg',
     );
     expect(closes.summary).toContain('largest draft');
+    const limit = (closes.data as { maxDraftDeg: number }).maxDraftDeg;
+    expect(limit).toBeGreaterThan(0);
+    expect(limit).toBeLessThan(20);
     const ring = make(emptyDoc(), 'add_torus', { ringRadius: 30, tubeRadius: 8 });
     const tiny = make(ring.doc, 'draw_rectangle', { width: 2, height: 2, position: [-1, -1, 0] });
     expectRefusal(
@@ -297,5 +300,174 @@ describe('walls pull when the kernel cannot build the relief', () => {
     } finally {
       setGeometryKernel(null);
     }
+  });
+});
+
+describe('pull walls: thin strokes, footprint fit, limits and check_wrap (fake kernel)', () => {
+  useFakeKernel({ pullWalls: true });
+
+  const onTop = (doc: CadDocument, id: string, profileId: string, extra: Record<string, unknown> = {}): ReturnType<typeof execute> =>
+    execute(doc, 'emboss_on_face', {
+      id,
+      face: TOP,
+      profileIds: [profileId],
+      mode: 'emboss',
+      depth: 5,
+      walls: 'pull',
+      pullDirection: [0, 0, 1],
+      placement: topPlacement,
+      ...extra,
+    });
+
+  it('WRP_DRAFT_CLOSES is the thinnest place, not the bounding box: a 20 x 1 bar turned 45 degrees (box side 14.8) closes at 10 degrees, and reports the largest draft', () => {
+    const solid = box();
+    const c = Math.SQRT1_2;
+    const corner = (x: number, y: number): [number, number] => [c * (x - y), c * (x + y)];
+    const bar = make(solid.doc, 'draw_polyline', {
+      points: [corner(-10, -0.5), corner(10, -0.5), corner(10, 0.5), corner(-10, 0.5)],
+      closed: true,
+    });
+    const closes = expectRefusal(
+      bar.doc,
+      'emboss_on_face',
+      {
+        id: solid.id,
+        face: TOP,
+        profileIds: [bar.id],
+        mode: 'emboss',
+        depth: 5,
+        walls: 'pull',
+        pullDirection: [0, 0, 1],
+        draftDeg: 10,
+        placement: topPlacement,
+      },
+      'WRP_DRAFT_CLOSES',
+      'draftDeg',
+    );
+    const info = closes.data as { maxDraftDeg: number; thinnestPlace: number };
+    expect(info.thinnestPlace).toBeCloseTo(1, 6);
+    expect(info.maxDraftDeg).toBeGreaterThan(0);
+    expect(info.maxDraftDeg).toBeLessThan(10);
+    const fits = onTop(bar.doc, solid.id, bar.id, { draftDeg: info.maxDraftDeg * 0.9 });
+    expect(fits.rejected, fits.summary).toBeUndefined();
+  });
+
+  it('a drafted "O" closes by the thickness of its stroke (the hole prism widens while the outline narrows)', () => {
+    const solid = box();
+    const text = make(solid.doc, 'add_text', { content: 'O', position: [0, 0, 5], height: 8, font: 'Fira Sans', anchor: 'center' });
+    const closes = expectRefusal(
+      text.doc,
+      'emboss_on_face',
+      {
+        id: solid.id,
+        face: TOP,
+        profileIds: [text.id],
+        mode: 'emboss',
+        depth: 3,
+        walls: 'pull',
+        pullDirection: [0, 0, 1],
+        draftDeg: 20,
+        placement: topPlacement,
+      },
+      'WRP_DRAFT_CLOSES',
+      'draftDeg',
+    );
+    expect((closes.data as { thinnestPlace: number }).thinnestPlace).toBeLessThan(1.5);
+    expect(onTop(text.doc, solid.id, text.id, { depth: 1, draftDeg: 3 }).rejected).toBeUndefined();
+  });
+
+  it('reports the fit of the footprint: a circle is fitted within fitTolerance (exact false, deviation above 0), a rectangle is exact; a draft reports the base growth, an oblique pull the shift', () => {
+    const solid = box();
+    const disk = make(solid.doc, 'draw_arc', { center: [0, 0], radius: 6 });
+    const tolerance = 1e-4;
+    const round = onTop(disk.doc, solid.id, disk.id, { depth: 2, fitTolerance: tolerance });
+    expect(round.rejected, round.summary).toBeUndefined();
+    expect(data(round)['exact']).toBe(false);
+    expect(data(round)['footprintDeviation'] as number).toBeGreaterThan(0);
+    expect(data(round)['footprintDeviation'] as number).toBeLessThanOrEqual(tolerance);
+    const rect = rectangleOn(solid.doc, 20, 10, 5);
+    const straight = onTop(rect.doc, solid.id, rect.id, { depth: 2 });
+    expect(data(straight)['exact']).toBe(true);
+    expect(data(straight)['footprintDeviation']).toBe(0);
+    expect(data(straight)['obliqueShift']).toBeCloseTo(0, 9);
+    const drafted = onTop(rect.doc, solid.id, rect.id, { depth: 2, draftDeg: 5, pullDirection: [1, 0, 3] });
+    expect(drafted.rejected, drafted.summary).toBeUndefined();
+    expect(data(drafted)['draftBaseGrowth'] as number).toBeGreaterThan(0);
+    expect(data(drafted)['obliqueShift'] as number).toBeCloseTo(2 * (1 / 3), 6);
+  });
+
+  it('refuses a footprint of more than 4000 segments by name, and a loop that projects to nothing', () => {
+    const solid = box();
+    const points = Array.from({ length: 4100 }, (_, k): [number, number] => [
+      5 * Math.cos((k * 2 * Math.PI) / 4100),
+      5 * Math.sin((k * 2 * Math.PI) / 4100),
+    ]);
+    const ring = make(solid.doc, 'draw_polyline', { points, closed: true });
+    const many = expectRefusal(
+      ring.doc,
+      'emboss_on_face',
+      {
+        id: solid.id,
+        face: TOP,
+        profileIds: [ring.id],
+        mode: 'emboss',
+        depth: 1,
+        walls: 'pull',
+        pullDirection: [0, 0, 1],
+        placement: topPlacement,
+      },
+      'WRP_PARAM_INVALID',
+      'profileIds',
+    );
+    expect(many.summary).toContain('4000');
+    const sliver = make(solid.doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [8, 0],
+        [4, 0],
+      ],
+      closed: true,
+    });
+    const flat = execute(sliver.doc, 'emboss_on_face', {
+      id: solid.id,
+      face: TOP,
+      profileIds: [sliver.id],
+      mode: 'emboss',
+      depth: 1,
+      walls: 'pull',
+      pullDirection: [0, 0, 1],
+      draftDeg: 2,
+      placement: topPlacement,
+    });
+    expect(flat.rejected).toBe(true);
+  });
+
+  it('check_wrap counts a pull relief (it has no emboss node): the volume is not claimed (WRP_CHECK_VOLUME_SKIPPED warn), the direction is checked, and a result whose volume moved the wrong way fails', () => {
+    const solid = box();
+    const rect = rectangleOn(solid.doc, 20, 10, 5);
+    const done = onTop(rect.doc, solid.id, rect.id, { depth: 2 });
+    const id = done.affected[0] as string;
+    for (const ids of [undefined, [id]]) {
+      const checked = execute(done.document, 'check_wrap', { ids, maxLengthStrain: 0.02 });
+      expect(checked.rejected, checked.summary).toBeUndefined();
+      const report = checked.data as {
+        status: string;
+        checked: { ids: number; volumesSkipped: number; reliefsWithoutClosedForm: number };
+        findings: Array<{ code: string; severity: string; ids: string[] }>;
+      };
+      expect(report.checked).toMatchObject({ ids: 1, volumesSkipped: 1, reliefsWithoutClosedForm: 1 });
+      expect(report.findings).toContainEqual(expect.objectContaining({ code: 'WRP_CHECK_VOLUME_SKIPPED', severity: 'warn', ids: [id] }));
+      expect(report.status).toBe('warn');
+    }
+    const wrongWay = {
+      ...done.document,
+      featureHistory: done.document.featureHistory.map((step) =>
+        step.name === 'emboss_on_face' ? { ...step, params: { ...(step.params as Record<string, unknown>), mode: 'deboss' } } : step,
+      ),
+    };
+    const bad = execute(wrongWay, 'check_wrap', { ids: [id], maxLengthStrain: 0.02 });
+    expect((bad.data as { status: string }).status).toBe('fail');
+    expect((bad.data as { findings: Array<{ code: string }> }).findings.map((f) => f.code)).toContain('WRP_CHECK_VOLUME_MISMATCH');
+    expect(JSON.stringify(wrongWay)).not.toBe(JSON.stringify(done.document));
   });
 });

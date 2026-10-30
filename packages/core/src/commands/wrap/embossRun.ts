@@ -8,7 +8,7 @@
 import type { EmbossParams } from '../../model/wrap';
 import type { ShapeRecipe, Vec2, Vec3 } from '../../model/types';
 import { selfIntersects } from '../../lib/polygon';
-import { len3, scale3 } from '../../lib/vec3';
+import { dot3, len3, normalize3, scale3 } from '../../lib/vec3';
 import { embossClosedForm, regionsAreas } from '../../geometry/embossVolume';
 import { mapSegment2, sampleSegment, segmentArea, segmentLength, type PlaneSegment } from '../../geometry/planeSegments';
 import { strokeRegions } from '../../geometry/strokeRegions';
@@ -291,8 +291,12 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       pull: params.pullDirection as Vec3,
       draftDeg: params.draftDeg ?? 0,
       anchorOn: resolved.anchorOn,
+      tolerance,
     });
-    if (isPullFailure(built)) return fail(built.code, built.message, ['pullDirection']);
+    if (isPullFailure(built)) {
+      const refused = fail(built.code, built.message, [built.path ?? 'pullDirection']);
+      return built.data === undefined ? refused : { ...refused, data: built.data };
+    }
     pull = built;
   }
   const recipe: ShapeRecipe = pull?.recipe ?? { op: 'emboss', source: session.source, ...recipeParams };
@@ -351,7 +355,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       mode: params.mode,
       depth,
       method: chart.method,
-      exact: !engrave,
+      exact: !engrave && !(pull !== null && pull.footprintDeviation > 0),
       faceKind: session.surface.type,
       face: session.face,
       ...(session.faceName !== undefined ? { faceName: session.faceName } : {}),
@@ -371,8 +375,12 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
         : {
             pullDirection: params.pullDirection,
             draftDeg: params.draftDeg ?? 0,
-            footprintVertices: pull.polygonVertices,
+            obliqueShift:
+              depth * Math.tan(Math.acos(Math.min(1, Math.abs(dot3(normalize3(params.pullDirection as Vec3), resolved.outward))))),
+            footprintSize: pull.footprintSize,
+            footprintDeviation: pull.footprintDeviation,
             draftedWalls: pull.draftFaces,
+            ...(pull.baseGrowth > 0 ? { draftBaseGrowth: pull.baseGrowth } : {}),
           }),
       convex: closed?.convex ?? null,
       ...(engrave

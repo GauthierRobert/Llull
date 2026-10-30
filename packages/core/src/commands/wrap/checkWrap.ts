@@ -67,9 +67,27 @@ function textsOf(doc: CadDocument, step: FeatureStep | undefined): Array<Extract
   });
 }
 
-const isWrapResult = (entity: Entity): boolean =>
+/**
+ * The step that made `id` as a relief with no closed-form volume: emboss_on_face with pull walls (straight or drafted), or add_knurl with geometry (grooves cut by plain booleans). The
+ * direction of its volume change is +1 (material added) or -1 (removed).
+ */
+function reliefOf(doc: CadDocument, id: string): { readonly direction: 1 | -1 } | undefined {
+  const step = [...doc.featureHistory]
+    .reverse()
+    .find(
+      (candidate) => (candidate.affected ?? []).includes(id) && (candidate.name === 'emboss_on_face' || candidate.name === 'add_knurl'),
+    );
+  const params = step?.params as { walls?: unknown; model?: unknown; mode?: unknown } | undefined;
+  if (step?.name === 'emboss_on_face' && params?.walls === 'pull') return { direction: params.mode === 'emboss' ? 1 : -1 };
+  if (step?.name === 'add_knurl' && params?.model === 'geometry') return { direction: -1 };
+  return undefined;
+}
+
+const isWrapResult = (doc: CadDocument, entity: Entity): boolean =>
   (entity.kind === 'nurbs_curve' && entity.onFace !== undefined) ||
-  (entity.kind === 'mesh' && entity.brep !== undefined && embossNodes(recipeOf(entity)).length > 0);
+  (entity.kind === 'mesh' &&
+    entity.brep !== undefined &&
+    (embossNodes(recipeOf(entity)).length > 0 || reliefOf(doc, entity.id) !== undefined));
 
 /**
  * @affects none (read-only)
@@ -83,7 +101,7 @@ export const checkWrap = defineCommand({
     '`maxLengthStrain`, default 0.02 and reported as a defaulted limit); for every embossed solid it compares the exact kernel volume change with the closed form (relative difference ' +
     '1e-6; a cone, sphere or torus footprint is a fitted curve, so 2 x the construction tolerance x perimeter / area is added, capped at 1e-3; limits.volumeAllowance reports the guard applied), checks the deboss depth against the face radius and, with `minFeatureSize`, the stroke width of the profiles. Fonts that are not pinned (import_font without sourceSha256) ' +
     'make the result `unverified`; characters a font lacks are warned. Returns data { status: pass | warn | fail, findings[{ code, severity, ids, value, limit, unit, remediation }], limits, ' +
-    'unverified, provenance }. `ids` default to every wrapped curve and embossed solid. Next: fix the cause named by the finding code (WRP_CHECK_DISTORTION, WRP_CHECK_VOLUME_MISMATCH, ' +
+    'unverified, provenance }. `ids` default to every wrapped curve and embossed solid. Pull-wall reliefs (emboss_on_face walls pull, drafted or not) and geometry knurls have no closed form: they are counted in checked.volumesSkipped and reliefsWithoutClosedForm with a WRP_CHECK_VOLUME_SKIPPED warning, and only the direction of the volume change (emboss adds, deboss and knurl remove) is checked. Next: fix the cause named by the finding code (WRP_CHECK_DISTORTION, WRP_CHECK_VOLUME_MISMATCH, WRP_CHECK_VOLUME_SKIPPED, ' +
     'WRP_CHECK_DEPTH, WRP_CHECK_THIN_FEATURE, WRP_CHECK_FONT_UNVERIFIED, WRP_CHECK_GLYPH_MISSING, WRP_CHECK_LIMIT_DEFAULTED). With minFeatureSize, an embossed solid on a cone, sphere or torus is not checked for stroke width: WRP_CHECK_STROKE_SKIPPED (warn) counts them.',
   params: z.object({
     ids: z
@@ -108,7 +126,7 @@ export const checkWrap = defineCommand({
   }),
   annotations: { readsMeshTriangles: true, readOnly: true },
   run: (doc, params, ctx): CommandResult => {
-    const targets = params.ids ?? doc.order.filter((id) => doc.entities[id] !== undefined && isWrapResult(doc.entities[id] as Entity));
+    const targets = params.ids ?? doc.order.filter((id) => doc.entities[id] !== undefined && isWrapResult(doc, doc.entities[id] as Entity));
     for (const [index, id] of targets.entries()) {
       const entity = doc.entities[id];
       if (entity === undefined)
@@ -120,6 +138,7 @@ export const checkWrap = defineCommand({
     let unverified = false;
     let checkedVolumes = 0;
     let skippedVolumes = 0;
+    let reliefs = 0;
     let largestAllowance = VOLUME_TOLERANCE;
     let skippedStrokeChecks = 0;
     let curves = 0;
@@ -176,6 +195,38 @@ export const checkWrap = defineCommand({
           } else if (closed !== null && node.mode !== 'scribe') skippedVolumes += 1;
         }
       }
+      const relief = entity.kind === 'mesh' && entity.brep !== undefined ? reliefOf(doc, id) : undefined;
+      if (relief !== undefined && entity.kind === 'mesh') {
+        reliefs += 1;
+        skippedVolumes += 1;
+        const top = recipeOf(entity);
+        const base = kernel === null || top.op !== 'boolean' ? null : kernel.evaluate(top.a);
+        const solid = kernel === null ? null : kernel.evaluate(top);
+        const before = kernel === null || base === null ? null : kernelVolume({ kernel }, base);
+        const after = kernel === null || solid === null ? null : kernelVolume({ kernel }, solid);
+        const change = before === null || after === null ? null : after - before;
+        if (change !== null && relief.direction * change <= 0)
+          findings.push(
+            finding(
+              'WRP_CHECK_VOLUME_MISMATCH',
+              'fail',
+              [id],
+              change,
+              relief.direction > 0 ? 'volume added' : 'volume removed',
+              doc.units + '^3',
+            ),
+          );
+        findings.push(
+          finding(
+            'WRP_CHECK_VOLUME_SKIPPED',
+            'warn',
+            [id],
+            change === null ? 'direction not measured' : `volume change ${change}`,
+            'no closed form (pull walls, draft, helical grooves): only the direction is checked',
+            'doc units^3',
+          ),
+        );
+      }
       const texts = textsOf(doc, stepOf(doc, id));
       for (const text of texts) {
         const loaded = loadFont(doc, text.font as string);
@@ -208,6 +259,7 @@ export const checkWrap = defineCommand({
           curves,
           volumes: checkedVolumes,
           volumesSkipped: skippedVolumes,
+          reliefsWithoutClosedForm: reliefs,
           ...(params.minFeatureSize === undefined ? {} : { strokeChecksSkipped: skippedStrokeChecks }),
         },
         limits: {

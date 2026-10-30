@@ -5,7 +5,7 @@
  * spaced angles (the tooth count closes round the circumference); a diamond adds the grooves of the other hand. They are united and subtracted in one boolean.
  * @invariant a screw motion keeps the transverse section: one groove removes exactly teeth x length x A_t, A_t = 2 tan(gamma) / (r cos beta) x [(r^3 - (r - h)^3) / 3 - (r - h)(r^2 - (r - h)^2) / 2],
  *   independent of the lead; a diamond removes the union of the two hand families (their overlaps counted once), integrated numerically over the transverse sections
- * @failure a free end cap missing at either end of the face (the sweep overshoots the ends), more than 12 grooves or 200 turns of one groove, a helix angle outside (0, 90) -> a named reason
+ * @failure a free end cap missing at either end of the face (the sweep overshoots the ends), a cut whose estimated kernel time exceeds the measured envelope (grooves x turns), a helix angle outside (0, 90) -> a named reason
  */
 
 import type { ShapeRecipe, Vec3 } from '../../model/types';
@@ -15,12 +15,27 @@ import { newEntity } from '../entity/newEntity';
 import { axisFrame } from '../solids/shared';
 
 /**
- * Most helical grooves one cut builds (teeth x hands). Each groove is a B-spline sweep intersected with the cylinder by the exact kernel: measured 12.6 s for 6 grooves, 30 s for 12, 45 s for 8 at 45 degrees and more than 120 s for 8
- * at 60 degrees with a 60 degree V (the cost depends on the flank slope) against the 60 s limit of one kernel call, so 8 is the bound.
+ * Estimated native kernel time of a cut of `grooves` helical grooves that each turn `turns` times along the face (face length / lead), seconds: grooves x 2.3 x (turns / 0.184)^1.8. Fitted to the
+ * measured runs on a face 40 long, radius 20 (0.184 turns at 30 degrees; each groove is a B-spline sweep intersected with the cylinder, and the cost grows with the helix angle, i.e. the turns): 6 grooves at
+ * 30 degrees 12.6 s (model 13.8), 12 at 30 degrees 30 s (27.6), 8 at 45 degrees 45 s (49.6), more than 120 s for 8 at 60 degrees with a 60 degree V (133). Accurate to about 10 % on that box.
  */
-export const MAX_HELICAL_GROOVES = 8;
-/** Most turns of one groove along the face. */
-export const MAX_GROOVE_TURNS = 200;
+export function estimatedKernelSeconds(grooves: number, turns: number): number {
+  return grooves * 2.3 * (turns / REFERENCE_TURNS) ** 1.8;
+}
+const REFERENCE_TURNS = 0.184;
+/** Longest estimated kernel time one cut may take, seconds: the measured 45 s run (model 49.6) with the model's 10 % error stays under the 60 s limit of one kernel call. */
+export const MAX_KERNEL_SECONDS = 50;
+
+/** The axial range the groove sweeps cover (the face plus the V reach at both ends) and the turns of one groove over it. */
+export function grooveSpan(
+  shape: HelicalKnurl,
+  from: number,
+  to: number,
+): { readonly z0: number; readonly z1: number; readonly turns: number } {
+  const top = slope(shape) * (shape.depth + OVERSHOOT * shape.depth);
+  const [z0, z1] = [from - top - 0.5 * shape.depth, to + top + 0.5 * shape.depth];
+  return { z0, z1, turns: (z1 - z0) / leadOf(shape) };
+}
 /** The tool rises this fraction of the depth above the surface (a sharp crest would leave the kernel a tangent edge). */
 const OVERSHOOT = 0.5;
 
@@ -100,28 +115,23 @@ export function helicalRemovedVolume(shape: HelicalKnurl, length: number): numbe
 
 /**
  * The recipe of `source` with the helical grooves cut, or the reason it cannot be built.
- * @failure degenerate axis, too many grooves or turns -> reason string
+ * @failure degenerate axis, a helix path that cannot be built -> reason string
  */
 export function helicalKnurlRecipe(
   source: ShapeRecipe,
   shape: HelicalKnurl,
-  cut: { readonly origin: Vec3; readonly axis: Vec3; readonly from: number; readonly to: number },
+  cut: { readonly origin: Vec3; readonly axis: Vec3; readonly span: ReturnType<typeof grooveSpan> },
   idPrefix: string,
   color: string,
 ): ShapeRecipe | string {
   const frame = axisFrame(cut.axis, cut.origin);
   if (typeof frame === 'string') return frame;
   const { radius: r, depth: h } = shape;
-  if (shape.teeth * shape.hands > MAX_HELICAL_GROOVES)
-    return `${shape.teeth * shape.hands} helical grooves exceed the limit of ${MAX_HELICAL_GROOVES}`;
   const over = OVERSHOOT * h;
   const k = slope(shape);
   const top = k * (h + over);
   const lead = leadOf(shape);
-  const z0 = cut.from - top - 0.5 * h;
-  const z1 = cut.to + top + 0.5 * h;
-  const turns = (z1 - z0) / lead;
-  if (turns > MAX_GROOVE_TURNS) return `a groove of ${turns.toFixed(1)} turns exceeds the limit of ${MAX_GROOVE_TURNS}`;
+  const { z0, turns } = cut.span;
   const grooves: ShapeRecipe[] = [];
   const hands = shape.hands === 2 ? [false, true] : [shape.left];
   for (const left of hands)

@@ -128,7 +128,7 @@ describe('emboss_on_face with a chain of faces (fake stadium)', () => {
 
 describe('chain refusals that need another fixture', () => {
   it('a cone face in the chain is WRP_CHAIN_FACE_UNSUPPORTED', () => {
-    useFakeKernelOnce({ stadium: 'cone-end' }, () => {
+    withFakeKernelOnce({ stadium: 'cone-end' }, () => {
       const base = stadium();
       const sketch = rectangle(base.doc, 6, 30);
       expectRefusal(
@@ -142,7 +142,7 @@ describe('chain refusals that need another fixture', () => {
   });
 
   it('edges the kernel cannot classify (unknown convexity) are refused like sharp ones when the sketch crosses them, and pass when it does not', () => {
-    useFakeKernelOnce({ stadium: 'unknown-edges' }, () => {
+    withFakeKernelOnce({ stadium: 'unknown-edges' }, () => {
       const base = stadium();
       const crossing = rectangle(base.doc, 6, 30);
       const params = { id: base.id, face: FRONT, chain: [END], profileIds: [crossing.id], mode: 'emboss', depth: 1, placement };
@@ -155,7 +155,7 @@ describe('chain refusals that need another fixture', () => {
   });
 
   it('a kernel that cannot say which side of an edge a face lies on is WRP_CHAIN_CLIP_FAILED', () => {
-    useFakeKernelOnce({ stadium: true, sideBlind: true }, () => {
+    withFakeKernelOnce({ stadium: true, sideBlind: true }, () => {
       const base = stadium();
       const sketch = rectangle(base.doc, 6, 30);
       expectRefusal(
@@ -171,7 +171,7 @@ describe('chain refusals that need another fixture', () => {
 describe('chain emboss when the kernel misbehaves', () => {
   const run = (options: FakeWrapOptions): ReturnType<typeof execute> => {
     let result!: ReturnType<typeof execute>;
-    useFakeKernelOnce({ stadium: true, ...options }, () => {
+    withFakeKernelOnce({ stadium: true, ...options }, () => {
       const base = stadium();
       const sketch = rectangle(base.doc, 6, 30);
       result = execute(sketch.doc, 'emboss_on_face', {
@@ -291,7 +291,7 @@ describe('wrap_to_face with a chain of faces (fake stadium)', () => {
 });
 
 /** Runs `body` with a fake kernel of `options` installed (and removed after). */
-function useFakeKernelOnce(options: FakeWrapOptions, body: () => void): void {
+function withFakeKernelOnce(options: FakeWrapOptions, body: () => void): void {
   setGeometryKernel(fakeWrapKernel(options));
   try {
     body();

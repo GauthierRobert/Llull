@@ -10,17 +10,17 @@ const MAX_PROFILES = 500;
 /**
  * @affects replaces the solid by a kernel result (a new mesh entity carrying the exact recipe); the profiles stay
  * @invariant develop is an isometry: the footprint on the face has the area of the profile (data.regionArea) and the volume change follows the closed form of data.expectedVolumeDelta
- *   (plane A d, cylinder A d (1 +- d / 2r), cone A d +- (d^2 / 2) cos(alpha) A_uv, sphere A (d +- d^2 / R + d^3 / 3R^2), torus by the tube-offset integral); walls are normal to the face; the result is a valid
+ *   (plane A d, cylinder A d (1 +- d / 2r), cone A d +- (d^2 / 2) cos(alpha) A_uv, sphere A (d +- d^2 / R + d^3 / 3R^2), torus by the tube-offset integral); walls are normal to the face, or with walls pull parallel to pullDirection and tilted by draftDeg (no closed form on a curved face or with a draft: data.expectedVolumeDelta is null; the footprint is fitted within fitTolerance, data.footprintDeviation, and data.exact is false above 0); the result is a valid
  *   closed exact solid or nothing changes; engrave is a deboss of the area swept by a tool of toolWidth along the outline paths (polygonal boundary, data.exact false)
  * @failure open profile (emboss / deboss / scribe), self-intersection, depth <= 0, engrave without toolWidth, depth reaching the axis (a cut on a convex face), wrap beyond one turn, region leaving the face,
- *   sphere or torus with develop, freeform face, stretch of a geodesic / parametric chart above the limit, kernel failure -> coded no-op
+ *   sphere or torus with develop, freeform face, a pull along the face (WRP_PULL_PARALLEL) or a draft that closes the thinnest place of the region (WRP_DRAFT_CLOSES, data.maxDraftDeg), stretch of a geodesic / parametric chart above the limit, kernel failure -> coded no-op
  */
 export const embossOnFace = defineCommand({
   name: 'emboss_on_face',
   description:
     'Emboss (raise), deboss (sink), scribe (split the face along) or engrave (cut a groove along) 2D profiles on a plane, cylinder, cone, sphere or torus face of a solid: the profiles are wrapped onto the face keeping every ' +
     'length (method develop on plane, cylinder, cone) or by the geodesic / parametric chart of a sphere or torus (stretch measured and held to maxLengthStrain), lifted along the face normal by `depth` (document units; emboss adds material outside the face, deboss removes it inside), and fused or cut ' +
-    'exactly; the walls are normal to the face. `profileIds` are closed sketch shapes (rectangle, circle, ellipse, closed polyline / spline) or text created with a font ' +
+    'exactly; the walls are normal to the face unless `walls` is "pull" (parallel to `pullDirection`, tilted by `draftDeg`; a pull along the face refuses with WRP_PULL_PARALLEL, a draft that closes the thinnest place with WRP_DRAFT_CLOSES and data.maxDraftDeg; expectedVolumeDelta is then null off a plane and data.footprintDeviation reports the fit of the walls). `profileIds` are closed sketch shapes (rectangle, circle, ellipse, closed polyline / spline) or text created with a font ' +
     '(holes of O, B ... are kept). `placement` anchors a sketch point on a face point, turns and may mirror the sketch (see wrap_to_face). scribe needs no depth and keeps ' +
     'the volume: the face is only split along the profile outlines (faces + 1 per closed profile). engrave takes ANY profile (open curves, closed shapes, single-line text such as font "LLULL Single Line"): a flat tool of ' +
     '`toolWidth` with round ends is swept along the outline paths and the swept area is cut `depth` deep (a closed shape gets a groove along its contour, not a pocket). The result replaces the solid and reports data: volumeDelta ' +
@@ -70,7 +70,7 @@ export const embossOnFace = defineCommand({
       .number()
       .optional()
       .describe(
-        'walls pull only: draft angle of the walls in degrees, [0, 45). The relief narrows away from the face (an emboss toward its top, a deboss toward its floor) by tan(draft) per unit of height, hinged on the plane through the placement anchor perpendicular to the feature axis. A draft that closes the profile refuses with WRP_DRAFT_CLOSES.',
+        'walls pull only: draft angle of the walls in degrees, [0, 45). The relief narrows away from the face (an emboss toward its top, a deboss toward its floor) by tan(draft) per unit of height, hinged on the plane through the placement anchor perpendicular to the pull (the tangent plane only when the pull is the face normal); the drafted base grows past the sketch footprint (data.draftBaseGrowth) and an oblique pull shifts the relief sideways (data.obliqueShift). A draft that closes the thinnest place of the region refuses with WRP_DRAFT_CLOSES (data.maxDraftDeg).',
       ),
     maxLengthStrain: z
       .number()
