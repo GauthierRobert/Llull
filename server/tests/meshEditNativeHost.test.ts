@@ -154,11 +154,12 @@ describe('remesh_mesh of a 327 680-triangle stored mesh', () => {
     const pending = post('remesh_mesh', { id: 'scan', targetEdgeLength: 0.13, iterations: 12 }, { signal: controller.signal }).catch(
       (error: unknown) => error,
     );
-    await sleep(1500);
+    for (let waited = 0; waited < 10_000 && liveChildCount() === 0; waited += 50) await sleep(50);
     expect(liveChildCount()).toBe(1);
     controller.abort();
     await pending;
-    await sleep(500);
+    // the process tree dies asynchronously (slower under load): wait on the observable, bounded
+    for (let waited = 0; waited < 10_000 && liveChildCount() > 0; waited += 50) await sleep(50);
     expect(liveChildCount()).toBe(0);
     expect(_runningJobCount()).toBe(0);
     expect(getLiveDoc()).toBe(before);
