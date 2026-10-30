@@ -35,7 +35,29 @@ const OPERATORS: Readonly<Record<string, readonly number[]>> = {
   flex: [12, 35],
   hflex1: [12, 36],
   flex1: [12, 37],
+  dotsection: [12, 0],
   and: [12, 3],
+  or: [12, 4],
+  not: [12, 5],
+  abs: [12, 9],
+  add: [12, 10],
+  sub: [12, 11],
+  div: [12, 12],
+  neg: [12, 14],
+  eq: [12, 15],
+  drop: [12, 18],
+  put: [12, 20],
+  get: [12, 21],
+  ifelse: [12, 22],
+  random: [12, 23],
+  mul: [12, 24],
+  sqrt: [12, 26],
+  dup: [12, 27],
+  exch: [12, 28],
+  index: [12, 29],
+  roll: [12, 30],
+  vsindex: [15],
+  blend: [16],
 };
 
 /** A charstring operand: 32..246 in one byte, larger integers as shortint (28), fractions as a 16.16 fixed number (255). */
@@ -49,7 +71,7 @@ function operand(value: number): number[] {
 }
 
 /** The bytes of a charstring given as tokens. */
-function charstring(tokens: readonly Token[]): number[] {
+export function charstring(tokens: readonly Token[]): number[] {
   return tokens.flatMap((token) => {
     if (typeof token === 'number') return operand(token);
     if (typeof token === 'string') {
@@ -61,8 +83,8 @@ function charstring(tokens: readonly Token[]): number[] {
   });
 }
 
-const u16 = (v: number): number[] => [(v >> 8) & 0xff, v & 0xff];
-const u32 = (v: number): number[] => [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+export const u16 = (v: number): number[] => [(v >> 8) & 0xff, v & 0xff];
+export const u32 = (v: number): number[] => [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
 
 /** An INDEX with 4-byte offsets. */
 function index(entries: readonly (readonly number[])[]): number[] {
@@ -79,7 +101,7 @@ function index(entries: readonly (readonly number[])[]): number[] {
 }
 
 /** A DICT integer operand in the fixed 5-byte form (so DICT sizes do not depend on the offsets they hold). */
-const dictInt = (v: number): number[] => [29, ...u32(v >>> 0)];
+export const dictInt = (v: number): number[] => [29, ...u32(v >>> 0)];
 
 interface CffGlyphSpec {
   readonly tokens: readonly Token[];
@@ -102,6 +124,10 @@ export interface CffSpec {
   readonly extraTopDict?: readonly number[];
   /** Name-keyed: no Private DICT operator in the Top DICT. */
   readonly noPrivate?: boolean;
+  /** Name-keyed: string ids of glyphs 1.. in a format 0 charset (what `seac` resolves its Standard Encoding codes through); without it the predefined ISOAdobe charset. */
+  readonly charset?: readonly number[];
+  /** Name-keyed: the charset as raw bytes (formats 1 and 2, damaged ones). */
+  readonly charsetBytes?: readonly number[];
   readonly version?: number;
   /** Replace the table by raw bytes after the header (corruption tests). */
   readonly rawTail?: readonly number[];
@@ -116,7 +142,12 @@ function buildCff(spec: CffSpec): number[] {
   const charStrings = index(spec.glyphs.map((glyph) => charstring(glyph.tokens)));
   const localIndex = (subrs: readonly (readonly Token[])[] | undefined): number[] =>
     subrs === undefined ? [] : index(subrs.map(charstring));
-  const topSize = (cid: boolean): number => (cid ? 37 : (spec.noPrivate === true ? 6 : 17) + (spec.extraTopDict?.length ?? 0));
+  const topSize = (cid: boolean): number =>
+    cid
+      ? 37
+      : (spec.noPrivate === true ? 6 : 17) +
+        (spec.extraTopDict?.length ?? 0) +
+        (spec.charset === undefined && spec.charsetBytes === undefined ? 0 : 6);
   const tops = (cid: boolean): number => 2 + 1 + 4 * 2 + topSize(cid);
   const fixedHead = header.length + names.length + tops(spec.cid !== undefined) + strings.length + globals.length;
   if (spec.cid === undefined) {
@@ -124,7 +155,9 @@ function buildCff(spec: CffSpec): number[] {
     const charAt = fixedHead;
     const privateAt = charAt + charStrings.length;
     const privateBytes = spec.localSubrs === undefined ? [] : [...dictInt(6), 19];
+    const charsetAt = privateAt + privateBytes.length + localIndex(spec.localSubrs).length;
     const top = [
+      ...(spec.charset === undefined && spec.charsetBytes === undefined ? [] : [...dictInt(charsetAt), 15]),
       ...(spec.extraTopDict ?? []),
       ...dictInt(charAt),
       17,
@@ -139,6 +172,7 @@ function buildCff(spec: CffSpec): number[] {
       ...charStrings,
       ...privateBytes,
       ...localIndex(spec.localSubrs),
+      ...(spec.charsetBytes ?? (spec.charset === undefined ? [] : [0, ...spec.charset.flatMap(u16)])),
     ];
     return spec.rawTail === undefined ? out : [...header, ...spec.rawTail];
   }

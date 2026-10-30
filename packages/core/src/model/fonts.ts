@@ -20,6 +20,8 @@ export interface FontRecord {
   readonly capHeightSource: 'os2' | 'glyph_H' | 'declared';
   readonly embedding: FontEmbedding;
   readonly licence?: string;
+  /** Variable font instance of this record: design value of each axis that differs from its default (absolute, tag order). Absent = the default instance. */
+  readonly variation?: Readonly<Record<string, number>>;
   /** `verified`: the bytes match a pinned sha256 (a bundled font), or the caller pinned `sourceSha256` and it matched. */
   readonly provenance: { readonly verified: boolean; readonly source?: string };
 }

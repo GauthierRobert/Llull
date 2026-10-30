@@ -51,6 +51,21 @@ function collectBrepLeaves(value: unknown, owner: string, out: Array<readonly [s
     if (key !== 'positions' && key !== 'indices') collectBrepLeaves(child, owner, out, tooDeep, depth + 1);
 }
 
+const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** `FontRecord.variation`: a plain record of 4-character axis tags to finite numbers (no reserved keys); one message per bad entry. */
+function variationProblems(id: string, variation: unknown): string[] {
+  if (variation === undefined) return [];
+  if (!isRecord(variation) || Array.isArray(variation)) return [`fonts.${id}.variation must be an object of axis tag -> number`];
+  const errors: string[] = [];
+  const entries = Object.entries(variation);
+  if (entries.length > 64) errors.push(`fonts.${id}.variation has ${entries.length} axes (at most 64)`);
+  for (const [tag, value] of entries.slice(0, 64))
+    if (RESERVED_KEYS.has(tag) || tag.length !== 4 || typeof value !== 'number' || !Number.isFinite(value))
+      errors.push(`fonts.${id}.variation.${tag} must be a finite number under a 4-character axis tag`);
+  return errors;
+}
+
 /** `fonts` (03 WRP): an object of records, each naming a stored `font/ttf` or `font/otf` blob (a font without its bytes cannot outline text). */
 function fontProblems(fonts: unknown, blobs: unknown): string[] {
   if (fonts === undefined) return [];
@@ -68,6 +83,7 @@ function fontProblems(fonts: unknown, blobs: unknown): string[] {
       errors.push(
         `WRP_FONT_UNAVAILABLE: font '${id}' needs a font blob (font/ttf, font/otf or font/x-llull-stroke) in the document blobs — re-run import_font`,
       );
+    else errors.push(...variationProblems(id, record['variation']));
   }
   return errors;
 }

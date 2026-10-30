@@ -384,7 +384,8 @@ regions, `face_ops.cxx` split by curves; Rust bindings in `src/features.rs` / `s
 | `WRP_GEODESIC_FAILED`                                                                                                          | `create_curve_on_face`                                       | shooting did not converge                                                                                  | `params.from`, `params.to`         | pick closer points or `mode: "uv"`                                        |
 | `WRP_FONT_UNAVAILABLE`                                                                                                         | `add_text`, `add_decal`                                      | font id / family not in the document nor the provider                                                      | `params.font`                      | `list_fonts`, then `import_font`                                          |
 | `WRP_FONT_PARSE`                                                                                                               | `import_font`                                                | not an sfnt font, truncated or out-of-range table                                                          | `params.path`                      | give a .ttf / .otf file                                                   |
-| `WRP_FONT_FORMAT_UNSUPPORTED`                                                                                                  | `import_font`                                                | CFF / CFF2 before V1, WOFF / WOFF2                                                                         | `params.path`                      | use a TrueType-outline (.ttf) font                                        |
+| `WRP_FONT_FORMAT_UNSUPPORTED`                                                                                                  | `import_font`                                                | WOFF / WOFF2, collections                                                                                     | `params.path`                      | use a TrueType-outline (.ttf) font                                        |
+| `WRP_FONT_VARIATION`                                                                                                          | `import_font`, `add_text`, `add_decal`                       | unknown axis, value outside its range, font without axes or not CFF2 variable                              | `params.variation`                 | name only axes of `data.axes`, inside their range                    |
 | `WRP_FONT_EMBEDDING_RESTRICTED`                                                                                                | `import_font`                                                | OS/2 fsType = 2 or bitmap-only                                                                             | `params.path`                      | use a font licensed for embedding (bundled fonts are OFL)                 |
 | `WRP_FONT_TOO_LARGE`                                                                                                           | `import_font`                                                | > 4 MB                                                                                                     | `params.path`                      | subset the font or use a bundled one                                      |
 | `WRP_GLYPH_MISSING` (warning)                                                                                                  | `add_text`, `text_outline`, `add_decal`                      | characters with no glyph                                                                                   | characters                         | choose a font that covers them                                            |
@@ -544,7 +545,7 @@ Delivered on top of §13; the sections below say what exists, what was decided, 
 - Charts (`geometry/chartFrame.ts`, `wrapChart.ts`, `curvedChart.ts`, `faceChart.ts`, `chartInverse.ts`, `chartDistortion.ts`): `develop` (plane, cylinder, cone), `geodesic` (exponential map: analytic on the sphere, RK4 on the geodesic equations of the torus, the development on developable faces) and `parametric` (arc-length scaled (u, v), affine). Every chart carries `method`, `nullMeaning`, `areaG`, and the distortion report (`data.distortion`: signed `maxLengthStrain`, `maxAbsLengthStrain`, area ratio; default limit 0.02, named).
 - Native (`llull-kernel-occt`): `surface_loops.cxx` (split from `surfaces.cxx`), sphere (kind 4) and torus (kind 5) surfaces, emboss mode `split` (tools from pcurve chains, `BRepAlgoAPI_Splitter`), surface type `face` (the face's own (u, v), split only), one lift sign for all regions of a node (an instance beyond a quarter turn was lifted inward before).
 - Commands: `create_curve_on_face` (geodesic, isoparametric, uv), `split_face_by_curves`, `pattern_on_face` (grid), `add_knurl` (cosmetic `KnurlPmi`, or `model: 'geometry'` for straight V-grooves), `emboss_on_face` modes `emboss | deboss | scribe | engrave` (`toolWidth`), `add_text.onCurve` (text on a curve), `add_decal` (`font`, `mapping: 'wrap'`).
-- Fonts (TypeScript, `lib/font`): CFF/Type 2 (`cff.ts`: INDEX/DICT, charstrings, subrs, flex, CID FDSelect; `seac`, arithmetic operators and CFF2 are refused with `WRP_FONT_PARSE`), GPOS PairPos kerning formats 1 and 2 (`gpos.ts`, before the legacy `kern`), a JSON open-stroke single-line format (`stroke.ts`, blob `font/x-llull-stroke`), multi-line layout. Bundled single-line font `llull-single-line` (`server/fonts/LlullSingleLine.json`, 49 glyphs, generated by `validation/generate_single_line_font.mjs`, CC0-1.0, sha256 `c891a617…d921e`).
+- Fonts (TypeScript, `lib/font`): CFF/Type 2 and CFF2 (`cff.ts`, `type2.ts`, `variation.ts`: see §14.5), GPOS PairPos kerning formats 1 and 2 (`gpos.ts`, before the legacy `kern`), a JSON open-stroke single-line format (`stroke.ts`, blob `font/x-llull-stroke`), multi-line layout. Bundled single-line font `llull-single-line` (`server/fonts/LlullSingleLine.json`, 49 glyphs, generated by `validation/generate_single_line_font.mjs`, CC0-1.0, sha256 `c891a617…d921e`).
 - `check_wrap` knows sphere and torus (closed-form volumes, signed strain). Codegen emits a `WRP_CODEGEN_UNSUPPORTED` note for emboss meshes (no faithful CadQuery form).
 
 ### 14.2 Decisions and deviations (never silent)
@@ -584,10 +585,53 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; `seac`, CFF arithmetic and CFF2, variable fonts; multi-face wraps (VC-WRP-36); pull walls and draft (VC-WRP-25, 26); silhouette split; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps (VC-WRP-36); pull walls and draft (VC-WRP-25, 26); silhouette split; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
 - **VC-WRP-32 passes** (native kernel, `server/tests/wrapStepRoundTrip.test.ts`): the embossed and debossed cylinders of `target_cylinder_rect_emboss_deboss`
   written with `export_step_ap242` and read back with `import_step_exact` keep their exact face count and their exact volume within 1e-6 relative.
 - **`llull guide` section 15** (wrap, project, emboss, decal, knurl, the loop and the refusal codes; AF-03), tested in `tests/unit/conventions.test.ts`.
+
+### 14.5 CFF `seac`, arithmetic operators and CFF2 variable fonts (DES-3c fonts, 2026-10-30)
+
+Files (`packages/core/src/lib/font/`): `cffIndex.ts` (INDEX / DICT, CFF 1 and CFF2 widths), `type2.ts` (the charstring machine), `cffEncoding.ts` (Standard Encoding, charset), `cff.ts` (CFF 1 / CFF2 glue, FDSelect 0 / 3 / 4,
+`seac` composition), `variation.ts` (`fvar`, `avar`, ItemVariationStore, `HVAR`); `font.ts` threads an instance through `parseFont(bytes, variation)`.
+
+**Type 2 operators added.** Arithmetic and storage (12 3 `and`, 4 `or`, 5 `not`, 9 `abs`, 10 `add`, 11 `sub`, 12 `div`, 14 `neg`, 15 `eq`, 18 `drop`, 20 `put`, 21 `get`, 22 `ifelse`, 23 `random`, 24 `mul`, 26 `sqrt`, 27 `dup`, 28 `exch`, 29 `index`, 30 `roll`; 12 0
+`dotsection` is ignored). They leave the rest of the stack in place, as the specification says. `seac` is the deprecated four-operand `endchar` (`adx ady bchar achar`, optional leading width):
+the character codes go through the CFF Standard Encoding to a string id, the charset (formats 0, 1, 2 and the predefined ISOAdobe) to a glyph; the accent is drawn at (adx, ady) from the base origin
+(Type 2 has no sidebearing correction, unlike Type 1). Hint operators were already skipped; the mask byte count is now checked against the end of the charstring and the stem count is bounded.
+
+**Decisions (never silent).**
+1. `random` returns a fixed sequence per glyph: a 32-bit LCG (seed 0x9e3779b9, x' = 1664525 x + 1013904223) mapped to (0, 1]. A glyph therefore always draws the same outline, whatever the evaluation order or cache state
+   (replay, L3). The specification only asks for a pseudo-random number in (0, 1].
+2. `seac` components are one glyph each and must not be accented themselves (no recursion); `seac` in a CID-keyed font and with a predefined Expert charset is refused (the encoding is the Standard Encoding of name-keyed fonts).
+3. CFF2 refuses what CFF2 removed (`endchar`, arithmetic, `dotsection`); a CFF2 charstring has no width and closes its last contour implicitly.
+4. Only CFF2 outlines can be instanced. A TrueType `fvar` font keeps its default instance (`gvar` is not read); `avar` version 2 only with the default instance. Both refuse a non-default `variation` with `WRP_FONT_VARIATION`.
+5. Normalised coordinates are rounded to 2.14 fixed point (as fontTools does), `avar` segment maps apply to the rounded value, region scalars follow the OpenType interpolation algorithm. Advances come from `HVAR`
+   (rounded to a font unit); a CFF2 font without `HVAR` keeps its `hmtx` advances. Cap height stays the default instance's (`OS/2`; `MVAR` is not read).
+6. Real fonts: none is pinned in the repository (only Fira Sans, TrueType) and the machine is offline, so the references are generated fonts whose outlines follow from the charstring programs (`tests/unit/wrap/variableFonts.ts`).
+   Pin a real CFF2 font (for example Source Serif Variable, OFL) in `validation/sources.md` before relying on this reader for production fonts.
+
+**Bounds (named refusals, all `WRP_FONT_PARSE`).** Operand stack 96 (CFF) / 513 (CFF2), subroutine depth 10, 200 000 operators and 20 000 points per glyph, 96 / 256 stem hints, 32 storage cells, every operand finite and under 2^31
+(`div` by zero, `sqrt` of a negative number, a non-integer cell / index / roll count refuse), an INDEX of at most 262 144 entries, at most 64 axes, 4096 regions and 4096 variation data subtables, region indexes inside the list,
+`blend` with fewer operands than n x (regions + 1), `vsindex` outside the store, a store whose axis count differs from `fvar`.
+
+**Font-wide bounds (review round).** Per-glyph caps alone do not bound a font, so: at most 256 font dicts, each read lazily, INDEXes parsed once per offset (dicts may share one Subrs INDEX); a variation data subtable lists at most as many regions as the
+store has and all subtables together at most 65 536 region indexes; one operator budget of 20 000 000 for the whole scan of a font (import and every instance re-scan; `WRP_FONT_PARSE`); the FDSelect is read once into a per-glyph table (ranges strictly increasing,
+starting at glyph 0, ending at or past the glyph count); a number prefix whose bytes run past its charstring and `return` in CFF2 are refused. `FontRecord.variation` is validated on load (plain record, 4-character tags, finite numbers, at most 64,
+no reserved keys; path `fonts.<id>.variation.<tag>`). Instances are parsed and scanned once per (blob, variation) and cached. The adversarial fonts that prove this are built in `tests/unit/wrap/hostileFonts.ts` and run by the hostile-input harness and
+`fontLimits.test.ts`. No OFL variable CFF2 font exists in the repository or `node_modules` (only WOFF2 web fonts), so a pinned real font stays a follow-up.
+
+**Interface.** `import_font`, `add_text` and `add_decal` take `variation` = { axisTag: designValue } (absolute from the font defaults; omitted axes keep their default). `import_font` returns `data.axes` (tag, min, default, max) and
+`data.variation`. One font blob backs one `FontRecord` per instance (`FontRecord.variation`, non-default axes in tag order); asking for an instance that exists returns the record, so emboss, wrap, extrude and decals read it through
+`loadFont` unchanged. An unknown axis, a value outside its range, a font without axes or a font that is not CFF2 variable refuse with `WRP_FONT_VARIATION` (path `variation` / `font`).
+
+**Tests.** `tests/unit/wrap/type2.test.ts` (one oracle per operator, seac, hint masks, bounds), `cff2.test.ts` (region scalars, `avar`, `vsindex`, subroutines, FDSelect 0 / 3 / 4, `HVAR`, every refusal),
+`variableCommands.test.ts` (import, add_text, add_decal, text_outline, emboss_on_face, wrap_to_face, extrude_profile, save / load, replay), `fontFuzz.test.ts` (every byte of the generated fonts replaced by seven hostile values at the
+default and at an instance: always a font or a stable code, no internal error text) and two entries of the hostile-input harness (`tests/helpers/hostile/coreReaders.ts`).
+
+**Measured.** One instance of the 6-glyph generated font parses and scans in 0.03 ms (2000 instances, node, this machine).
+
+**Left.** `gvar` (variable TrueType) and `avar` version 2, `MVAR` / `VVAR`, named-instance lookup by name, a pinned real CFF / CFF2 font in the validation pack.

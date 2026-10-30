@@ -6,7 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
-import { parseFont } from '@lib/font/font';
+import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
 import { parseUnit } from '@lib/quantity';
@@ -18,6 +18,8 @@ import { parseQuery } from '@protocol/discoveryRank';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { libraryFile } from '../../unit/materials/support';
 import { firaBytes } from '../../unit/wrap/fixtures';
+import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
+import { aliasedStoreFont, manyRangesFont, operatorFanFont, sharedSubrsFont } from '../../unit/wrap/hostileFonts';
 import { run as plmRun } from '../../unit/plm/scenarioRunner';
 import { inWork } from '../../unit/plm/fixtures';
 import { asBytes, asText, orRefusal, repeated, type HostileReader } from './types';
@@ -92,6 +94,45 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: () => firaBytes(),
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => parseFont(asBytes(input)),
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: parseFont (CFF2 variable font at an instance: fvar, avar, variation store, blend, HVAR)',
+    covers: [
+      'core/src/lib/font/cffIndex.ts:readIndex',
+      'core/src/lib/font/cffIndex.ts:readDict',
+      'core/src/lib/font/variation.ts:readVariationSpace',
+      'core/src/lib/font/variation.ts:readItemVariationStore',
+      'core/src/lib/font/variation.ts:readAdvanceDeltas',
+    ],
+    input: 'bytes',
+    build: () => variableFont({ avar: true, hvar: [3, 2, 1] }),
+    extra: [
+      { name: '4000 font dicts share one 262 144-entry Subrs INDEX', input: () => sharedSubrsFont(4000, 262_144, 1) },
+      { name: '256 font dicts, each used, share one 262 144-entry Subrs INDEX', input: () => sharedSubrsFont(256, 262_144, 256) },
+      { name: '4096 data subtables alias one subtable of 4096 region indexes', input: () => aliasedStoreFont(4096, 4096) },
+      { name: 'a subtable lists more regions than the store has', input: () => aliasedStoreFont(8, 1, 9) },
+      { name: 'an FDSelect of 20 000 one-glyph ranges', input: () => manyRangesFont(20_000) },
+      { name: 'an FDSelect whose ranges do not increase', input: () => manyRangesFont(100, true) },
+      { name: '2000 glyphs of 70 000 operators each (font-wide operator budget)', input: () => operatorFanFont(2000) },
+    ],
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const parsed = parseFont(asBytes(input), { wght: 650, wdth: 112.5 });
+      return parsed.ok ? validateGlyphs(parsed.font) : parsed;
+    },
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'core: parseFont (CFF with seac, an arithmetic operator and a charset)',
+    covers: ['core/src/lib/font/cffEncoding.ts:readCharset'],
+    input: 'bytes',
+    build: () => seacFont(),
+    skipLinear: 'a binary font container: its size is not a record count',
+    read: (input) => {
+      const parsed = parseFont(asBytes(input));
+      return parsed.ok ? validateGlyphs(parsed.font) : parsed;
+    },
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {

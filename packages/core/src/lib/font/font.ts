@@ -1,16 +1,18 @@
 /**
  * A parsed TrueType font (03 WRP M1): metrics, embedding permission, names and lazy glyph access over the original bytes.
  * @invariant parsing validates every table once; `parseFont` never throws (errors come back as `{ ok: false, code }`) and reads only inside `bytes`
- * @failure not a font / truncated / out-of-range table -> WRP_FONT_PARSE; CFF2, WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED; fsType restricted ->
+ * @failure not a font / truncated / out-of-range table -> WRP_FONT_PARSE; WOFF, collections -> WRP_FONT_FORMAT_UNSUPPORTED; a variation the font cannot take -> WRP_FONT_VARIATION; fsType restricted ->
  *   WRP_FONT_EMBEDDING_RESTRICTED; over 4 MB -> WRP_FONT_TOO_LARGE
  */
 
 import { readCff } from './cff';
+import { FONT_OPERATOR_BUDGET } from './type2';
 import { buildCmap } from './cmap';
 import { glyphContours, type GlyphSource } from './glyf';
 import { buildGposKerning } from './gpos';
 import { buildKerning } from './kern';
 import { isStrokeFont, readStrokeFont } from './stroke';
+import { readAdvanceDeltas, readVariationSpace, type AxisValues, type VariationAxis } from './variation';
 import type { Vec2 } from '../../model/vectors';
 import { contourLoop, loopBox, type OutlineLoop } from './outline';
 import { FontError, type FontErrorCode } from './reader';
@@ -48,6 +50,10 @@ export interface ParsedFont {
   readonly capHeightSource: 'os2' | 'glyph_H' | 'declared';
   readonly embedding: Embedding;
   readonly names: FontNames;
+  /** Variation axes of the font (`fvar`), empty for a static font. */
+  readonly axes: readonly VariationAxis[];
+  /** The instance this font was read at: the axes that differ from their default, in tag order (empty = the default instance). */
+  readonly instance: Readonly<Record<string, number>>;
   /** Glyph index of a code point; 0 (`.notdef`) when the font has none. */
   readonly glyphIndex: (codePoint: number) => number;
   readonly advance: (glyph: number) => number;
@@ -78,6 +84,8 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
     capHeightSource: 'declared',
     embedding: 'installable',
     names: font.names,
+    axes: [],
+    instance: {},
     glyphIndex: font.glyphIndex,
     advance: font.advance,
     kerning: () => 0,
@@ -86,14 +94,28 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
   };
 }
 
-function build(bytes: Uint8Array): ParsedFont {
+function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   if (bytes.length > MAX_FONT_BYTES)
     throw new FontError('WRP_FONT_TOO_LARGE', `font: ${bytes.length} bytes exceed the ${MAX_FONT_BYTES}-byte limit`);
   if (isStrokeFont(bytes)) return buildStroke(bytes);
   const tables = readDirectory(bytes);
   const header = readHeader(tables);
   const permissions = readPermissions(tables);
-  const cff = tables.flavor === 'cff' ? readCff(requireTable(tables, 'CFF ')) : null;
+  const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
+  const cffTable = tables.flavor === 'cff' ? (tables.table('CFF ') ?? requireTable(tables, 'CFF2')) : null;
+  const variable = cffTable !== null && cffTable.u8(0) === 2;
+  if (Object.keys(variation).length > 0 && space === null)
+    throw new FontError('WRP_FONT_VARIATION', 'variation: the font has no variation axes (no fvar table)');
+  const instance = space === null ? {} : space.instance(variation);
+  if (Object.keys(instance).length > 0 && !variable)
+    throw new FontError(
+      'WRP_FONT_VARIATION',
+      'variation: only CFF2 variable fonts can be instanced (TrueType gvar and CFF 1.x have no variation support)',
+    );
+  const coords = space === null || !variable ? [] : space.coordinates(variation);
+  const cff = cffTable === null ? null : readCff(cffTable, coords);
+  const hvar = variable ? tables.table('HVAR') : null;
+  const advanceDelta = hvar === null || coords.every((coord) => coord === 0) ? null : readAdvanceDeltas(hvar, coords);
   const source: GlyphSource | null =
     cff === null
       ? { glyf: requireTable(tables, 'glyf'), loca: requireTable(tables, 'loca'), longLoca: header.longLoca, numGlyphs: header.numGlyphs }
@@ -136,15 +158,19 @@ function build(bytes: Uint8Array): ParsedFont {
     embedding: permissions.embedding,
     names: readNames(tables),
     glyphIndex,
-    advance: (glyph) => advanceOf(tables, header, glyph),
+    advance: (glyph) =>
+      advanceDelta === null ? advanceOf(tables, header, glyph) : Math.round(advanceOf(tables, header, glyph) + advanceDelta(glyph)),
+    axes: space?.axes ?? [],
+    instance,
     kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
     outline,
     scanGlyphs: () => {
       let points = 0;
+      const budget = { remaining: FONT_OPERATOR_BUDGET };
       for (let glyph = 0; glyph < header.numGlyphs; glyph++) {
         points +=
           cff !== null
-            ? cff.outline(glyph).reduce((sum, loop) => sum + loop.length, 0)
+            ? cff.outline(glyph, budget).reduce((sum, loop) => sum + loop.length, 0)
             : glyphContours(source as GlyphSource, glyph).reduce((sum, contour) => sum + contour.length, 0);
         if (points > MAX_FONT_POINTS) throw new FontError('WRP_FONT_PARSE', `glyf: more than ${MAX_FONT_POINTS} points in the whole font`);
       }
@@ -153,9 +179,9 @@ function build(bytes: Uint8Array): ParsedFont {
 }
 
 /** Parse `bytes`; see the module comment for the failure codes. Glyph outlines are read on first use and may then throw `FontError` for a hostile glyph. */
-export function parseFont(bytes: Uint8Array): FontParse {
+export function parseFont(bytes: Uint8Array, variation: AxisValues = {}): FontParse {
   try {
-    return { ok: true, font: build(bytes) };
+    return { ok: true, font: build(bytes, variation) };
   } catch (error) {
     if (error instanceof FontError) return { ok: false, code: error.code, message: error.message };
     return { ok: false, code: 'WRP_FONT_PARSE', message: `font: ${error instanceof Error ? error.message : 'unreadable'}` };

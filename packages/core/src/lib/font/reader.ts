@@ -3,7 +3,12 @@
  * offset, length or count can only raise `FontError`, never read outside the font or loop without bound.
  */
 
-export type FontErrorCode = 'WRP_FONT_PARSE' | 'WRP_FONT_FORMAT_UNSUPPORTED' | 'WRP_FONT_EMBEDDING_RESTRICTED' | 'WRP_FONT_TOO_LARGE';
+export type FontErrorCode =
+  | 'WRP_FONT_PARSE'
+  | 'WRP_FONT_FORMAT_UNSUPPORTED'
+  | 'WRP_FONT_EMBEDDING_RESTRICTED'
+  | 'WRP_FONT_TOO_LARGE'
+  | 'WRP_FONT_VARIATION';
 
 /** A refusal with one of the stable `WRP_FONT_*` codes. */
 export class FontError extends Error {
