@@ -25,7 +25,9 @@ namespace llull {
 namespace blend {
 
 // The solid of the shells of `sewn`: one shell is the solid; with several, the one of the largest volume is the outer shell and every other must lie INSIDE it (a void: its shell is
-// reversed so that its normals point into the void). A shell outside the outer one is a second body, which a single solid cannot hold: null with the reason in `why`.
+// reversed so that its normals point into the void). A shell outside the outer one is a second body, which a single solid cannot hold; a shell inside another void is a body in a void
+// (an island), which one outer shell and its voids cannot hold either: null with the reason in `why`, both ways.
+// The largest volume is the outer shell only because the callers have already refused a shell that is not closed (no free edge after sewing): every piece here is a closed shell.
 // The solid is oriented (positive volume) but not checked: the caller runs BRepCheck_Analyzer.
 inline TopoDS_Solid solid_of_shells(const TopoDS_Shape &sewn, std::string &why) {
   struct Piece {
@@ -78,10 +80,22 @@ inline TopoDS_Solid solid_of_shells(const TopoDS_Shape &sewn, std::string &why) 
       why = "a shell of the sewn faces has no vertex";
       return TopoDS_Solid();
     }
-    BRepClass3d_SolidClassifier classifier(outer->solid, BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current())), 1e-7);
+    const gp_Pnt probe = BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current()));
+    const BRepClass3d_SolidClassifier classifier(outer->solid, probe, 1e-7);
+    if (classifier.State() == TopAbs_ON) {
+      why = "a void touches the outer shell (they share a face or an edge): a solid holds voids that lie inside it";
+      return TopoDS_Solid();
+    }
     if (classifier.State() != TopAbs_IN) {
       why = "the solid has a second body outside the first (a solid holds one outer shell and its voids)";
       return TopoDS_Solid();
+    }
+    for (auto other = pieces.begin(); other != pieces.end(); ++other) {
+      if (other == outer || other == piece) continue;
+      if (BRepClass3d_SolidClassifier(other->solid, probe, 1e-7).State() == TopAbs_IN) {
+        why = "a body inside a void: a solid holds one outer shell and its voids";
+        return TopoDS_Solid();
+      }
     }
     builder.Add(result, inner.Reversed());
   }

@@ -1045,3 +1045,11 @@ A solid with a void used to be refused by name ("several shells"): the profile a
   and it has one face more than the same blend without the pocket (the pocket's sphere). Test `a_solid_with_a_void_keeps_its_void_through_a_profile_blend` (was: refused). Red-proof: with a helper that ignored the closed face the pocket was dropped and the volume window
   refused the result (volume +113 against the circular fillet's -51).
 - **Left:** a void inside a void (nested shells: only depth one is classified), a blend on the edges of the void itself is built by the same path but is not tested here.
+
+### 13.17.1 Review round: what one solid cannot hold
+
+- A shell inside ANOTHER void (an island in a void) is refused by name ("a body inside a void: a solid holds one outer shell and its voids"): classified only against the outer solid it would have become a second void
+  (outer - void - island instead of + island), silently on the corner path. A void that touches the outer shell (`TopAbs_ON`) has its own message. The largest-volume rule for the outer shell relies on the callers'
+  free-edge check (every piece is a closed shell).
+- Tests: `a_second_body_and_a_body_inside_a_void_are_refused_by_name` (a disjoint sphere in a compound; an island sphere in the pocket; red-proof: without the island check the profile path fails BRepCheck, the corner path would
+  not), `a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket` (the corner builder: volume = the same corner on the solid cube less 4/3 pi 27).
