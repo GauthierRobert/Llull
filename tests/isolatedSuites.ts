@@ -62,6 +62,7 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/ViewPresets.test.tsx',
   'tests/component/uiPreferences.test.ts',
   'tests/component/useLiveDocument.test.tsx',
+  'tests/component/JobProgressChip.test.tsx',
   'tests/integration/dispatchOnResult.test.ts',
   'tests/integration/dispatchSelectAffected.test.ts',
   'tests/integration/store.test.ts',

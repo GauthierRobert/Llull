@@ -15,6 +15,7 @@
 //!   `report` = `{ weldTolerance, mergedVertices }` and `analysis` = the `MeshAnalysis` of the TypeScript engine (no result mesh). Coordinates above 1e100 are refused.
 //! - `repair` and `fill_holes` (DES-7c step 7, slice 2): see `repair_job.rs`; the result is the repaired / filled mesh and the report is the TypeScript engine's.
 //! - `shrinkwrap` (DES-7c native twins, 13.20): see `shrinkwrap_job.rs`; the target is `positions_b.f64` / `indices_b.u32`, the result is the wrapped mesh.
+//! - `harmonic_map` (DES-7c, 13.26): see `harmonic_job.rs`; the region is the whole mesh, the result is its parameters (u, v, 0) and the vertex numbers, not a mesh.
 //! - `sculpt` (DES-7c step 7, slice 3): see `sculpt_job.rs`; the result is the sculpted mesh and the report is the TypeScript engine's.
 //! - `quad_remesh` (feature `quad`): `{ targetFaces, hardEdgeRad?, adaptive }` (edges sharper than `hardEdgeRad` align the quads); the result is a quad mesh: `result_positions.f64`
 //!   and `result_indices.u32` with FOUR indices per quad; the manifold / winding / degeneracy checks are the host's. Failures: code `QUAD_REMESH_FAILED`.
@@ -30,6 +31,8 @@ pub mod deviation;
 mod edge_heap;
 mod edit;
 mod geom;
+mod harmonic;
+mod harmonic_job;
 mod hole_fair;
 mod hole_fill;
 mod hole_refine;
@@ -341,6 +344,13 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
             mesh_out = Some((pos, idx));
             report
         }
+        "harmonic_map" => {
+            progress.stage("harmonic_map", 0.05);
+            let (uv, vertices, report) =
+                harmonic_job::run_harmonic(&positions, &triangles, job.params, &mut |done| progress.tick(0.05 + 0.9 * done))?;
+            mesh_out = Some((uv, vertices));
+            report
+        }
         "shrinkwrap" => {
             progress.stage("shrinkwrap", 0.05);
             let target_positions = f64s(&read(folder, "positions_b.f64")?, "positions_b.f64")?;
@@ -428,7 +438,7 @@ pub fn run(folder: &Path, out: &mut dyn Write) -> Result<Vec<Output>, JobError> 
         }
         other => {
             return Err(input_error(format!(
-                "unknown meshops op '{other}' (decimate, smooth, remesh, analyze, repair, fill_holes, sculpt, shrinkwrap, deviation, quad_remesh)"
+                "unknown meshops op '{other}' (decimate, smooth, remesh, analyze, repair, fill_holes, sculpt, shrinkwrap, harmonic_map, deviation, quad_remesh)"
             )))
         }
     };

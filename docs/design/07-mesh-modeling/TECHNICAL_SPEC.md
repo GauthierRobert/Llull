@@ -1807,3 +1807,52 @@ A circular parameter domain (a tensor B-spline patch has a square one); the boun
 ### 13.24.4 Left, by name
 
 Stored groups of an asset-backed mesh are checked against the stored triangle count (the group ranges are over the full-resolution asset); `fit_subdivision_to_mesh` fits the cage to the group's triangles only (a cage whose far side has no target is not constrained there); group names are exact (no patterns); a segmentation re-computed with other parameters than the listing call names other regions: pass the same ones.
+
+## 13.25 As built (DES-7c: native job progress on `/live`, UI chip with Cancel, 2026-10-30)
+
+### 13.25.1 What it is
+
+A command that waits for a native mesh job (13.8) now also tells the live subscribers: SSE event `progress` (`@protocol/liveSync` `LiveProgressEvent`): `{ epoch, command, commandId?, state: 'running', op, stage, message, fraction, elapsedMs, etaMs, heartbeat }` for every report of the job (the same reports the NDJSON stream and the CLI `--progress` get, heartbeats included), and `{ epoch, command, commandId?, state: 'ended' }` once the command settles (applied, refused, failed or cancelled). It is NOT a document change: no `seq`, no `stateHash`, nothing in the command log, so `documentHash`, replay and live sync are untouched, and a client that does not listen for the type simply never sees it (an `EventSource` only delivers the types it registered). A command that needs no native job emits nothing (no `ended` either). Order for one command: the `running` events, then its `command` event (when it changed the document), then `ended`.
+
+### 13.25.2 UI
+
+`useLiveDocument` listens for `progress` into `jobProgressStore` (UI-only); the status bar shows one chip per job: `<op>: <message> <percent>% · <n> s left`, a `<progress>` bar once the job reported a share, and a Cancel button for a command THIS client sent. Cancel is the existing path: `postDispatch` now keeps an `AbortController` per command (`commandCancel.ts`); aborting the request makes the server kill the native job nobody else waits for and apply nothing (13.8); the status line says "Command 'x' cancelled." and the run does not fall back to the local engine. A cancel that loses the race (the server applied the command, its `command` event had arrived before the abort) says "Command 'x' finished before the cancel." with changed true. Every event carries a `jobId` (the command id, else `req-<n>` of the server) that keys the chip, so concurrent requests of one command without an id keep their own chips; the chips also clear when the page is closed. A command of the CLI or another client shows the chip without Cancel (no request of this client to abort). The chip also leaves on the command's own `command` event and when the stream drops.
+
+### 13.25.3 Tests
+
+`server/tests/liveProgress.test.ts` (fake native engine: running events with the command id and op, monotone fractions, order running < command < ended, no `seq` / `stateHash` on a progress frame and the command still takes `seq + 1`; a TS command sends exactly `snapshot, command`; a cancelled job sends one `ended` and no `command`), `tests/component/JobProgressChip.test.tsx` (chip text, percent, ETA, bar, ended; no Cancel for a foreign command; Cancel aborts the registered request; the hook fills / clears the store, ignores malformed data and registers no listener for an unknown type; a dropped stream clears; a cancelled dispatch aborts its POST, sets the summary and runs nothing locally). Red-proofs (each disabled in turn): the `ended` publication (2 server tests fail), the clear on the command event, the cancelled-dispatch branch.
+
+### 13.25.4 Left, by name
+
+The CLI does not subscribe to `/live`; a second desktop window of the same backend sees the chip of the first (no Cancel there). `progress` frames of a job that finishes while a client is disconnected are not replayed (the stream reconnects with a snapshot and no chip).
+
+## 13.26 As built (DES-7c: native harmonic map, the 25,000-triangle cap lifted, 2026-10-30)
+
+### 13.26.1 What it is
+
+`harmonic_map` is a mesh-processing op (`MeshOp`, answer `MeshOpResult.harmonic`) with two engines. The TypeScript engine runs `harmonicMap` (13.23) on the whole input mesh, capped at 25,000 triangles (`MESH_TS_HARMONIC_CAP`: the solve holds the caller's thread). The native engine runs `llull-meshops harmonic_map` (`solver/crates/llull-meshops/src/harmonic.rs`, `harmonic_job.rs`), a Rust twin of the same function: the same topology and Euler checks and messages, the same corner choice, the same face-order accumulation of the cotangent / mean-value weights, the same row order of the matrix, the same Jacobi-preconditioned CG and BiCGSTAB with the same stall rule and iteration budget, `Math.hypot` / `Math.atan2` by the V8 twins of `llull-jsmath`. **The parameters are bit-identical to the TypeScript result**, so no tolerance-equivalence is needed; the refusals have the same codes and the same texts (`MESH_FIT_NOT_DISK`, `MESH_FIT_PARAM_FOLDED`, the latter with the JavaScript `toExponential(2)` form of the residual). The Rust loop over the boundary has a defensive refusal (`MESH_FIT_NOT_DISK`, "does not close at vertex v") where the TypeScript one has none; it cannot be reached on either engine, because the pinch and duplicate-edge checks run first and leave the boundary edges a permutation. The job also reports progress from its solvers (every 400 iterations: iterations over the budget, bits unchanged).
+
+`fit_surface_to_mesh` cuts the region out as a mesh of its own (its vertices ascending, renumbered: every ordering rule of the map is unchanged, tested bit for bit against the map of the same region inside the whole mesh; `commands/mesh/harmonicRegion.ts`), asks the installed engines, and maps the vertex numbers back. The cap it applies is the cap of the engines installed (`capabilities().get('harmonic_map')`: 25,000 with the TypeScript engine alone, the native engine's 200,000 with it; the region cap of the command is 200,000 as before). The native job runs through the host's async path (13.8): the event loop stays free, progress streams (stage `harmonic_map`, and over `/live` since 13.25), the request cancels it. The job takes the region mesh and `{ maxIterations? }`; it writes (u, v, 0) per vertex and the ascending vertex numbers (`result_positions.f64`, `result_indices.u32`: not a mesh) and the report; the host checks sizes, ascending order, range, the parameter range, the weight kind, whole counts, a finite residual and four corners that are region vertices before it believes the answer.
+
+### 13.26.2 Measured (win32-x64, release `llull-compute`; a jittered square grid, the hemisphere of an icosphere; the result is identical in every row where both ran)
+
+| region triangles | TypeScript (blocks the thread) | native job (spawn, files, solve) | iterations |
+| --- | --- | --- | --- |
+| 3,200 | 38 ms | 75 ms | 278 |
+| 9,800 | 92 ms | 68 ms | 468 |
+| 16,200 | 100 ms | 85 ms | 586 |
+| 25,088 | 194 ms | 139 ms | 711 |
+| 40,832 (hemisphere) | 279 ms | 169 ms | 598 |
+| 100,352 | 1,198 ms | 547 ms | 1,265 |
+| 199,712 | 4,066 ms | 1,759 ms | 1,794 |
+| 163,584 (hemisphere) | not run | 1,182 ms | 1,189 |
+
+The solve is memory-bound sparse algebra: the native job is only 1.4 to 2.3 times faster than V8 here, so the gain is that nothing blocks (the TypeScript solve held the thread 4 s at 200,000) and that the cap is gone. The break-even is about 7,000 triangles: the native engine is preferred above 8,000 (`HARMONIC_PREFERRED_ABOVE`), caps at 200,000 (`HARMONIC_TRIANGLE_CAP`, the region cap of the command; the 200,000-triangle row ran in 1.8 s with 1,794 iterations, well inside the 4,000 iteration cap).
+
+### 13.26.3 Tests
+
+`server/tests/meshopsNativeHarmonic.test.ts` (native against TypeScript: equal bytes of the whole answer for a jittered grid, a hemisphere and a plain grid; the mean-value fallback on six C-shaped seeds with at least one fallback; the same refusal code and text for a closed sphere, an annulus, two pieces, a duplicated triangle, a starved budget, one triangle), `server/tests/meshFitHarmonicNativeHost.test.ts` (a 40,832-triangle hemisphere through `fit_surface_to_mesh` with the stage reported; a region of 10,240 triangles gives the same surface JSON with and without the native engine; without it the 25000 cap is named in the refusal), `tests/unit/mesh/engineHarmonic.test.ts` (TypeScript op, cap, the region cut-out bit for bit, refusals and failures passed on), Rust unit tests in `harmonic.rs`. Red-proofs (shown by disabling): the BiCGSTAB update order (mean-value fallback test fails), `f64::hypot` instead of the V8 twin (the cotangent and the fallback tests fail).
+
+### 13.26.4 Left, by name
+
+The job reads the region as its own mesh, so a very large mesh with a small region pays only for the region; the command still loads the whole mesh first. A native region over 200,000 triangles is refused by the command's region cap (`MESH_FIT_TOO_LARGE`); the matrix assembly uses hash maps (about a third of the 200,000-triangle time), a sorted-edge assembly would be faster but changes nothing observable.

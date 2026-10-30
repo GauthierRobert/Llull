@@ -37,6 +37,7 @@ import {
   type MeshOpResult,
   type MeshProcessingEngine,
 } from '@core/geometry/mesh/engineTypes';
+import { harmonicFrom } from './harmonicResult';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { positiveInteger } from '../env';
@@ -57,6 +58,8 @@ const REPAIR_TRIANGLE_CAP = 4_000_000;
 const SCULPT_TRIANGLE_CAP = 4_000_000;
 /** Named guard: triangles above which shrinkwrap refuses, in the wrapped mesh and in the target (a closest-point tree of 100 bytes per triangle each, the normals and the per-vertex answers). */
 const SHRINKWRAP_TRIANGLE_CAP = 4_000_000;
+/** Named guard: region triangles above which the native harmonic map refuses (measured in TECHNICAL_SPEC 13.26.2; the command takes regions up to 200,000). */
+const HARMONIC_TRIANGLE_CAP = 200_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
@@ -69,6 +72,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['fill_holes', REPAIR_TRIANGLE_CAP],
   ['sculpt', SCULPT_TRIANGLE_CAP],
   ['shrinkwrap', SHRINKWRAP_TRIANGLE_CAP],
+  ['harmonic_map', HARMONIC_TRIANGLE_CAP],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
 ]);
@@ -82,6 +86,9 @@ function isNativeOp(op: MeshOp): op is NativeOp {
 
 /** The command name the editable-mesh refusals mention. */
 const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
+
+/** Measured in TECHNICAL_SPEC 13.26.2. */
+const HARMONIC_PREFERRED_ABOVE = 8_000;
 
 /** Measured in TECHNICAL_SPEC 13.20.3. */
 const SHRINKWRAP_PREFERRED_ABOVE = 10_000;
@@ -103,6 +110,7 @@ const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, num
   ['fill_holes', 30_000],
   ['sculpt', SCULPT_PREFERRED_ABOVE],
   ['shrinkwrap', SHRINKWRAP_PREFERRED_ABOVE],
+  ['harmonic_map', HARMONIC_PREFERRED_ABOVE],
 ]);
 
 /** The refusals of `fill_holes` a job may hand to the command as they are (`fill_mesh_holes` documents them); any other code is `MESH_ENGINE_UNSUPPORTED`. */
@@ -120,12 +128,30 @@ const regionOf = (region: { readonly center: readonly number[]; readonly radius:
 
 type NativeOp = Extract<
   MeshOp,
-  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'sculpt' | 'shrinkwrap' | 'deviation' | 'quad_remesh' }
+  {
+    op:
+      | 'decimate'
+      | 'smooth'
+      | 'remesh'
+      | 'analyze'
+      | 'repair'
+      | 'fill_holes'
+      | 'sculpt'
+      | 'shrinkwrap'
+      | 'harmonic_map'
+      | 'deviation'
+      | 'quad_remesh';
+  }
 >;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
-  return op.op !== 'deviation' && op.op !== 'analyze' && op.op !== 'sculpt' && op.op !== 'shrinkwrap' && op.withDeviation !== undefined
+  return op.op !== 'deviation' &&
+    op.op !== 'analyze' &&
+    op.op !== 'sculpt' &&
+    op.op !== 'shrinkwrap' &&
+    op.op !== 'harmonic_map' &&
+    op.withDeviation !== undefined
     ? { deviationSamples: op.withDeviation }
     : {};
 }
@@ -150,6 +176,7 @@ function jobParams(op: NativeOp): Record<string, unknown> {
       refine: op.refine,
       ...(op.alpha !== undefined ? { alpha: op.alpha } : {}),
     };
+  if (op.op === 'harmonic_map') return op.maxIterations === undefined ? {} : { maxIterations: op.maxIterations };
   if (op.op === 'shrinkwrap')
     return {
       mode: op.mode,
@@ -304,6 +331,8 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number, triangles: numb
   }
   if (op.op === 'sculpt' && run.code === 'SCULPT_TOO_LARGE')
     return failure('MESH_SCULPT_RESULT_TOO_LARGE', run.message ?? 'the refined surface is too large');
+  if (op.op === 'harmonic_map' && (run.code === 'MESH_FIT_NOT_DISK' || run.code === 'MESH_FIT_PARAM_FOLDED'))
+    return failure(run.code, run.message ?? run.code);
   if (run.code === 'REMESH_TOO_LARGE') return failure('MESH_REMESH_RESULT_TOO_LARGE', run.message ?? 'the remeshed surface is too large');
   if (op.op === 'quad_remesh')
     return failure('MESH_QUAD_REMESH_FAILED', `QuadriFlow: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
@@ -321,7 +350,7 @@ async function resultOf(
   runner: ComputeRunner,
   folder: string,
   run: JobRun,
-  [triangles, vertices]: readonly [number, number],
+  [triangles, vertices, used]: readonly [number, number, number],
 ): Promise<MeshOpResult | MeshEngineFailure> {
   const summary: unknown = JSON.parse((await readOutput(folder, run, 'report.json')).toString('utf8'));
   const report = isRecord(summary) && isRecord(summary['report']) ? summary['report'] : {};
@@ -347,6 +376,25 @@ async function resultOf(
     if (!isMeshAnalysis(analysis) || !isPairSearchOf(analysis, op))
       return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops analyze: the job returned no well-formed analysis');
     return { analysis, report, provenance: provenance(ANALYZE_DESCRIPTION.algorithm, ANALYZE_DESCRIPTION.reference) };
+  }
+  if (op.op === 'harmonic_map') {
+    const harmonic = harmonicFrom(
+      report,
+      await readOutput(folder, run, 'result_positions.f64'),
+      await readOutput(folder, run, 'result_indices.u32'),
+      vertices,
+      used,
+    );
+    if (harmonic === null)
+      return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops harmonic_map: the job returned a malformed result');
+    return {
+      harmonic,
+      report: { weights: harmonic.weights, cgIterations: harmonic.cgIterations },
+      provenance: provenance(
+        'harmonic map onto the unit square: cotangent Laplacian (Jacobi-preconditioned CG), Floater mean-value weights (BiCGSTAB) when a triangle flips',
+        'Eck et al. 1995 (harmonic maps); Floater 2003 (mean value coordinates)',
+      ),
+    };
   }
   const mesh = unpackMesh(await readOutput(folder, run, 'result_positions.f64'), await readOutput(folder, run, 'result_indices.u32'));
   const malformed = op.op === 'quad_remesh' ? null : meshProblem(mesh);
@@ -408,7 +456,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
   /** Runs one job on the event loop; resolves with its result or a named failure, never rejects. */
   const runJob = async (
     op: NativeOp,
-    [triangles, vertices]: readonly [number, number],
+    [triangles, vertices, used]: readonly [number, number, number],
     files: readonly JobFile[],
     signal: AbortSignal,
     report: (event: Readonly<Record<string, unknown>>) => void,
@@ -418,7 +466,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         Object.fromEntries(files.map((file) => [file.name, file.data])),
         async (folder) => {
           const run = await runner.run(['meshops'], folder, timeoutMs, report, signal);
-          return run.ok ? await resultOf(op, runner, folder, run, [triangles, vertices]) : failedJob(op, run, timeoutMs, triangles);
+          return run.ok ? await resultOf(op, runner, folder, run, [triangles, vertices, used]) : failedJob(op, run, timeoutMs, triangles);
         },
         env,
       );
@@ -482,7 +530,14 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         key,
         op: op.op,
         heartbeatMs,
-        start: (signal, report) => runJob(op, [triangles, input.mesh.positions.length / 3], files, signal, report),
+        start: (signal, report) =>
+          runJob(
+            op,
+            [triangles, input.mesh.positions.length / 3, op.op === 'harmonic_map' ? new Set(input.mesh.indices).size : 0],
+            files,
+            signal,
+            report,
+          ),
       });
       return deferMeshOp(op.op);
     },

@@ -23,14 +23,19 @@ export class ServerCommandError extends Error {
 }
 
 /** GET `path`, or POST `postBody` as JSON. */
-async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
+async function request<Body>(path: string, postBody?: unknown, signal?: AbortSignal): Promise<Body> {
   let response: Response;
   try {
     response = await fetch(
       `${SERVER_BASE}${path}`,
       postBody === undefined
         ? { headers: serverAuthHeaders() }
-        : { method: 'POST', headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() }, body: JSON.stringify(postBody) },
+        : {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
+            body: JSON.stringify(postBody),
+            ...(signal === undefined ? {} : { signal }),
+          },
     );
   } catch (cause) {
     throw new ServerCommandError(`Network error: ${errorMessage(cause)}`);
@@ -42,8 +47,8 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
 }
 
 /** `commandId` makes it idempotent server-side. @throws ServerCommandError (as do undo / redo / snapshot) */
-export function postCommand(name: string, params: unknown, commandId?: string): Promise<ServerCommandResponse> {
-  return request('/command', commandId === undefined ? { name, params } : { name, params, commandId });
+export function postCommand(name: string, params: unknown, commandId?: string, signal?: AbortSignal): Promise<ServerCommandResponse> {
+  return request('/command', commandId === undefined ? { name, params } : { name, params, commandId }, signal);
 }
 
 /** Host tool over POST /exchange (`topology_solve`, exchange tools): not a document command, so not in the command log. */
