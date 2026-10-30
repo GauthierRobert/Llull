@@ -108,10 +108,11 @@ struct Meshed {
     stats: PlaneStats,
     mesher: &'static str,
     fallback: bool,
+    split_cells: usize,
 }
 
 fn finish_mesh(folder: &Path, evaluator: &Evaluator, grid: &Grid, meshed: Meshed, outputs: &mut Vec<Output>) -> Result<Value, JobError> {
-    let Meshed { mesh, stats, mesher, fallback } = meshed;
+    let Meshed { mesh, stats, mesher, fallback, split_cells } = meshed;
     let total = grid.node_count();
     let residual = mesh
         .positions
@@ -143,6 +144,7 @@ fn finish_mesh(folder: &Path, evaluator: &Evaluator, grid: &Grid, meshed: Meshed
         "nonFiniteSamples": stats.non_finite,
         "mesher": mesher,
         "mesherFallback": fallback,
+        "splitCells": split_cells,
     }))
 }
 
@@ -201,17 +203,17 @@ fn mesh_job(
         let (signs, stats) = sign_grid(evaluator, &tiles, grid);
         match dual_contour(evaluator, grid, &signs, job.max_triangles) {
             Err(OverBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
-            Ok(mesh) if is_closed_manifold(mesh.positions.len() / 3, &mesh.indices) => {
-                Meshed { mesh, stats, mesher: "dual_contouring", fallback: false }
+            Ok(contoured) if is_closed_manifold(contoured.mesh.positions.len() / 3, &contoured.mesh.indices) => {
+                Meshed { mesh: contoured.mesh, stats, mesher: "dual_contouring", fallback: false, split_cells: contoured.split_cells }
             }
             Ok(_) => match tetra_mesh(job, evaluator, grid, &tiles, out) {
-                Ok((mesh, _)) => Meshed { mesh, stats, mesher: "tetra", fallback: true },
+                Ok((mesh, _)) => Meshed { mesh, stats, mesher: "tetra", fallback: true, split_cells: 0 },
                 Err(TriangleBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
             },
         }
     } else {
         match tetra_mesh(job, evaluator, grid, &tiles, out) {
-            Ok((mesh, stats)) => Meshed { mesh, stats, mesher: "tetra", fallback: false },
+            Ok((mesh, stats)) => Meshed { mesh, stats, mesher: "tetra", fallback: false, split_cells: 0 },
             Err(TriangleBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
         }
     };

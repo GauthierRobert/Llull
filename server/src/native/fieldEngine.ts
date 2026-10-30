@@ -244,6 +244,7 @@ export function createNativeFieldEngine(options: NativeFieldEngineOptions = {}):
               nonFiniteSamples: num(report['nonFiniteSamples']),
               mesher: report['mesher'] === 'dual_contouring' ? ('dual_contouring' as const) : ('tetra' as const),
               mesherFallback: report['mesherFallback'] === true,
+              splitCells: num(report['splitCells']),
               provenance: provenance(grid.voxel),
             };
           });

@@ -11,7 +11,8 @@ use crate::jsnum::{hypot3, jmax, jmin};
 use crate::sampling::Grid;
 use crate::tetra::{IsoMesh, KeyBuild};
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 const SINGULAR_RATIO: f64 = 0.1;
 const BISECTION_STEPS: usize = 8;
@@ -57,6 +58,100 @@ fn eigen3(m: &[f64; 9]) -> ([f64; 3], [f64; 9]) {
         }
     }
     ([a[0], a[4], a[8]], v)
+}
+
+/// Index (0..11, the order of the Hermite data of a cell) of the cube edge that starts at corner (cx, cy, cz) and runs along `axis`.
+fn edge_index(cx: usize, cy: usize, cz: usize, axis: usize) -> usize {
+    match axis {
+        0 => (cy * 2 + cz) * 3,
+        1 => (cx * 2 + cz) * 3 + 1,
+        _ => (cx * 2 + cy) * 3 + 2,
+    }
+}
+
+/// A cube face: its corner bits (x + 2 y + 4 z) in cyclic order and the cube edge between each corner and the next.
+type Face = ([usize; 4], [usize; 4]);
+
+fn faces() -> &'static [Face; 6] {
+    static FACES: OnceLock<[Face; 6]> = OnceLock::new();
+    FACES.get_or_init(|| {
+        let mut faces = [([0; 4], [0; 4]); 6];
+        for axis in 0..3 {
+            for side in 0..2 {
+                let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
+                let coords: [[usize; 3]; 4] = [[0, 0], [1, 0], [1, 1], [0, 1]].map(|[a, b]| {
+                    let mut c = [0; 3];
+                    c[axis] = side;
+                    c[u] = a;
+                    c[v] = b;
+                    c
+                });
+                let bit = |c: &[usize; 3]| c[0] + 2 * c[1] + 4 * c[2];
+                let mut edges = [0; 4];
+                for k in 0..4 {
+                    let next = &coords[(k + 1) % 4];
+                    let along = if k % 2 == 0 { u } else { v };
+                    let near = if coords[k][along] == 0 { &coords[k] } else { next };
+                    edges[k] = edge_index(near[0], near[1], near[2], along);
+                }
+                faces[axis * 2 + side] = (coords.map(|c| bit(&c)), edges);
+            }
+        }
+        faces
+    })
+}
+
+/// Sheet (smallest edge index of its surface piece, -1 for an uncrossed edge) of each of the 12 edges of a cell whose corner signs are `inside`, or
+/// `None` when no face is ambiguous (four crossed edges). Edges on a common face are joined as a marching-cubes table would: a face with two crossings
+/// joins them, an ambiguous face cuts off its outside corners (a rule of the signs of the face only, so the two cells sharing it agree).
+fn cell_sheets(inside: &[bool; 8]) -> Option<[i8; 12]> {
+    let mut parent: [usize; 12] = std::array::from_fn(|i| i);
+    fn find(parent: &[usize; 12], mut i: usize) -> usize {
+        while parent[i] != i {
+            i = parent[i];
+        }
+        i
+    }
+    let join = |parent: &mut [usize; 12], a: usize, b: usize| {
+        let (ra, rb) = (find(parent, a), find(parent, b));
+        parent[ra.max(rb)] = ra.min(rb);
+    };
+    let mut ambiguous = false;
+    for (corners, edges) in faces() {
+        let crossed: [bool; 4] = std::array::from_fn(|k| inside[corners[k]] != inside[corners[(k + 1) % 4]]);
+        let count = crossed.iter().filter(|&&c| c).count();
+        if count == 2 {
+            let pair: Vec<usize> = (0..4).filter(|&k| crossed[k]).map(|k| edges[k]).collect();
+            join(&mut parent, pair[0], pair[1]);
+        } else if count == 4 {
+            ambiguous = true;
+            for k in 0..4 {
+                if !inside[corners[k]] {
+                    join(&mut parent, edges[(k + 3) % 4], edges[k]);
+                }
+            }
+        }
+    }
+    if !ambiguous {
+        return None;
+    }
+    Some(std::array::from_fn(|idx| {
+        let (d, axis) = (idx / 3, idx % 3);
+        let (d1, d2) = (d >> 1, d & 1);
+        let near = match axis {
+            0 => [0, d1, d2],
+            1 => [d1, 0, d2],
+            _ => [d1, d2, 0],
+        };
+        let mut far = near;
+        far[axis] = 1;
+        let bit = |c: [usize; 3]| c[0] + 2 * c[1] + 4 * c[2];
+        if inside[bit(near)] == inside[bit(far)] {
+            -1
+        } else {
+            find(&parent, idx) as i8
+        }
+    }))
 }
 
 /// Minimiser of sum (n . (x - p))^2 near the mass point of the Hermite data, clamped to the box [lo, hi].
@@ -155,8 +250,15 @@ impl Mesher<'_> {
         Crossing { p, n }
     }
 
-    /// Crossed edges (key = node * 3 + axis, in the 12-edge order of the TypeScript mesher) of cell `cell`.
-    fn cell_edges(&self, cell: u64) -> Vec<u64> {
+    /// Sheets of cell `cell` (`None` when no face of the cell is ambiguous).
+    fn sheets(&self, cell: u64) -> Option<[i8; 12]> {
+        let (i, j, k) = self.decode(cell);
+        let corner = |bit: usize| self.inside(self.node(i + (bit & 1), j + ((bit >> 1) & 1), k + (bit >> 2)));
+        cell_sheets(&std::array::from_fn(corner))
+    }
+
+    /// Crossed edges (index in the 12-edge order of the TypeScript mesher, key = node * 3 + axis) of cell `cell`.
+    fn cell_edges(&self, cell: u64) -> Vec<(usize, u64)> {
         let (i, j, k) = self.decode(cell);
         let mut keys = Vec::with_capacity(12);
         for d1 in 0..2 {
@@ -166,12 +268,20 @@ impl Mesher<'_> {
                     let near = self.node(ei, ej, ek);
                     let far = self.node(ei + usize::from(axis == 0), ej + usize::from(axis == 1), ek + usize::from(axis == 2));
                     if self.inside(near) != self.inside(far) {
-                        keys.push(near * 3 + axis as u64);
+                        keys.push(((d1 * 2 + d2) * 3 + axis, near * 3 + axis as u64));
                     }
                 }
             }
         }
         keys
+    }
+
+    /// Sheet of cell `cell` that holds the crossed edge `edge`, and whether the cell has an ambiguous face (otherwise its single sheet is 0).
+    fn sheet_of(&self, cell: u64, edge: u64) -> (u8, bool) {
+        let Some(sheets) = self.sheets(cell) else { return (0, false) };
+        let (i, j, k) = self.decode(cell);
+        let (ei, ej, ek) = self.decode(edge / 3);
+        (sheets[edge_index(ei - i, ej - j, ek - k, (edge % 3) as usize)].max(0) as u8, true)
     }
 
     /// The quads of the three edge scans, in the order of the TypeScript mesher.
@@ -211,16 +321,22 @@ impl Mesher<'_> {
     }
 }
 
+/// The mesh and the number of cells split into one vertex per sheet.
+pub struct DualContoured {
+    pub mesh: IsoMesh,
+    pub split_cells: usize,
+}
+
 /// More triangles than the budget (the count the quads give).
 #[derive(Debug, PartialEq, Eq)]
 pub struct OverBudget(pub u64);
 
 /// Mesh of {inside} by dual contouring. `signs` holds one flag per node (x fastest, 1 = value < 0). The caller checks the result is a closed
 /// manifold (`null` in the TypeScript mesher means "use the tetrahedra").
-pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triangles: u64) -> Result<IsoMesh, OverBudget> {
+pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triangles: u64) -> Result<DualContoured, OverBudget> {
     let nodes = grid.nodes();
     if nodes.iter().any(|&n| n < 3) {
-        return Ok(IsoMesh { positions: Vec::new(), indices: Vec::new() });
+        return Ok(DualContoured { mesh: IsoMesh { positions: Vec::new(), indices: Vec::new() }, split_cells: 0 });
     }
     let mesher = Mesher { evaluator, grid, signs, nodes };
     let quads = mesher.quads();
@@ -228,29 +344,40 @@ pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triang
     if triangles > max_triangles {
         return Err(OverBudget(triangles));
     }
-    // Cells in the order of first use (a, b, c, d of each quad), numbered like the TypeScript `vertexOf`.
+    // Vertices (a cell and its sheet) in the order of first use (a, b, c, d of each quad), numbered like the TypeScript `vertexOf`.
     let mut index_of: HashMap<u64, u32, KeyBuild> = HashMap::with_hasher(KeyBuild::default());
-    let mut cells: Vec<u64> = Vec::new();
+    let mut verts: Vec<(u64, u8)> = Vec::new();
+    let mut split: HashSet<u64, KeyBuild> = HashSet::with_hasher(KeyBuild::default());
     let mut corners: Vec<[u32; 4]> = Vec::with_capacity(quads.len());
     for quad in &quads {
         corners.push(quad.cells.map(|cell| {
-            *index_of.entry(cell).or_insert_with(|| {
-                cells.push(cell);
-                (cells.len() - 1) as u32
+            let (sheet, ambiguous) = mesher.sheet_of(cell, quad.edge);
+            if ambiguous {
+                split.insert(cell);
+            }
+            *index_of.entry(cell * 16 + u64::from(sheet)).or_insert_with(|| {
+                verts.push((cell, sheet));
+                (verts.len() - 1) as u32
             })
         }));
     }
     drop(index_of);
     let scratch = || (vec![0.0; evaluator.instrs.len()], GradientScratch::new(evaluator.instrs.len()));
-    let mut keys: Vec<u64> = cells.par_iter().flat_map_iter(|&cell| mesher.cell_edges(cell)).collect();
+    let mut keys: Vec<u64> = verts.par_iter().flat_map_iter(|&(cell, _)| mesher.cell_edges(cell).into_iter().map(|(_, key)| key)).collect();
     keys.par_sort_unstable();
     keys.dedup();
     let data: Vec<Crossing> = keys.par_iter().map_init(scratch, |(regs, grad), &key| mesher.crossing(regs, grad, key)).collect();
     let datum = |key: u64| data[keys.binary_search(&key).expect("a crossed edge has a datum")];
-    let vertices: Vec<[f64; 3]> = cells
+    let vertices: Vec<[f64; 3]> = verts
         .par_iter()
-        .map(|&cell| {
-            let hermite: Vec<Crossing> = mesher.cell_edges(cell).into_iter().map(datum).collect();
+        .map(|&(cell, sheet)| {
+            let sheets = mesher.sheets(cell);
+            let hermite: Vec<Crossing> = mesher
+                .cell_edges(cell)
+                .into_iter()
+                .filter(|&(idx, _)| sheets.is_none_or(|s| s[idx] == sheet as i8))
+                .map(|(_, key)| datum(key))
+                .collect();
             let (i, j, k) = mesher.decode(cell);
             solve_qef(&hermite, mesher.point(i, j, k), mesher.point(i + 1, j + 1, k + 1))
         })
@@ -279,7 +406,7 @@ pub fn dual_contour(evaluator: &Evaluator, grid: &Grid, signs: &[u8], max_triang
             }
         }
     }
-    Ok(IsoMesh { positions, indices })
+    Ok(DualContoured { mesh: IsoMesh { positions, indices }, split_cells: split.len() })
 }
 
 #[cfg(test)]
@@ -309,18 +436,25 @@ mod tests {
 
     fn cube(half: f64) -> Evaluator {
         let mut t = Tape::new();
+        let out = box_at(&mut t, [0.0; 3], half);
+        t.finish(out)
+    }
+
+    fn box_at(t: &mut Tape, centre: [f64; 3], half: f64) -> i64 {
         let (x, y, z) = (t.x(), t.y(), t.z());
         let h = t.c(half);
         let mut worst = None;
-        for p in [x, y, z] {
-            let a = t.un(Op::Abs, p);
+        for (axis, p) in [x, y, z].into_iter().enumerate() {
+            let c = t.c(centre[axis]);
+            let shifted = t.bin(Op::Sub, p, c);
+            let a = t.un(Op::Abs, shifted);
             let d = t.bin(Op::Sub, a, h);
             worst = Some(match worst {
                 None => d,
                 Some(w) => t.bin(Op::Max, w, d),
             });
         }
-        t.finish(worst.unwrap_or(0))
+        worst.unwrap_or(0)
     }
 
     #[test]
@@ -329,7 +463,7 @@ mod tests {
         let out = t.ball([0.0; 3], 4.0);
         let ev = t.finish(out);
         let grid = Grid::new([-6.0; 3], [6.0; 3], 0.5).unwrap();
-        let mesh = dual_contour(&ev, &grid, &signs_of(&ev, &grid), u64::MAX).unwrap();
+        let mesh = dual_contour(&ev, &grid, &signs_of(&ev, &grid), u64::MAX).unwrap().mesh;
         assert!(!mesh.indices.is_empty() && is_closed_manifold(mesh.positions.len() / 3, &mesh.indices));
         let mut regs = vec![0.0; ev.instrs.len()];
         for p in mesh.positions.chunks_exact(3) {
@@ -341,10 +475,24 @@ mod tests {
     fn a_cube_keeps_its_corner_exactly() {
         let ev = cube(2.5);
         let grid = Grid::new([-4.0; 3], [4.0; 3], 1.0).unwrap();
-        let mesh = dual_contour(&ev, &grid, &signs_of(&ev, &grid), u64::MAX).unwrap();
+        let mesh = dual_contour(&ev, &grid, &signs_of(&ev, &grid), u64::MAX).unwrap().mesh;
         assert!(is_closed_manifold(mesh.positions.len() / 3, &mesh.indices));
         let corners = mesh.positions.chunks_exact(3).filter(|p| p.iter().all(|c| (c.abs() - 2.5).abs() < 0.01)).count();
         assert_eq!(corners, 8, "the eight sharp corners are vertices (to the bisection resolution)");
+    }
+
+    #[test]
+    fn two_boxes_sharing_only_an_edge_are_one_closed_manifold_thanks_to_the_split_cells() {
+        let mut t = Tape::new();
+        let a = box_at(&mut t, [1.5, 1.5, 1.5], 2.0);
+        let b = box_at(&mut t, [5.5, 5.5, 1.5], 2.0);
+        let both = t.bin(Op::Min, a, b);
+        let ev = t.finish(both);
+        let grid = Grid::new([-2.0, -2.0, -2.0], [10.0, 10.0, 5.0], 1.0).unwrap();
+        let signs = signs_of(&ev, &grid);
+        let contoured = dual_contour(&ev, &grid, &signs, u64::MAX).unwrap();
+        assert!(contoured.split_cells > 0, "the faces along the shared edge are ambiguous");
+        assert!(is_closed_manifold(contoured.mesh.positions.len() / 3, &contoured.mesh.indices));
     }
 
     #[test]
@@ -352,10 +500,10 @@ mod tests {
         let ev = cube(2.5);
         let grid = Grid::new([-4.0; 3], [4.0; 3], 1.0).unwrap();
         let signs = signs_of(&ev, &grid);
-        let full = dual_contour(&ev, &grid, &signs, u64::MAX).unwrap();
+        let full = dual_contour(&ev, &grid, &signs, u64::MAX).unwrap().mesh;
         let triangles = full.indices.len() as u64 / 3;
         assert_eq!(dual_contour(&ev, &grid, &signs, triangles - 1).err(), Some(OverBudget(triangles)));
         let flat = Grid::new([0.0; 3], [1.0, 1.0, 0.0], 1.0).unwrap();
-        assert!(dual_contour(&ev, &flat, &signs_of(&ev, &flat), 10).unwrap().indices.is_empty());
+        assert!(dual_contour(&ev, &flat, &signs_of(&ev, &flat), 10).unwrap().mesh.indices.is_empty());
     }
 }

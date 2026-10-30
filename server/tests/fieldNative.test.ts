@@ -244,28 +244,41 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
         [voronoi.doc, voronoi.id, 0.3],
       ];
       const seen = new Set<string>();
+      let repaired = 0;
       for (const [doc, field, voxel] of cases) {
         const params = { field, voxel, mesher: 'dual_contouring' };
         const ts = step(doc, 'create_implicit_body', params);
         const nat = step(doc, 'create_implicit_body', params, engine);
         const a = ts.doc.entities[ts.id] as MeshSolidEntity;
         const b = nat.doc.entities[nat.id] as MeshSolidEntity;
-        expect(b.mesh.indices, field).toEqual(a.mesh.indices);
-        expect(
-          b.mesh.positions.filter((v, i) => !Object.is(v, a.mesh.positions[i])),
-          field,
-        ).toEqual([]);
-        expect(b.mesh.positions.length).toBe(a.mesh.positions.length);
-        for (const key of ['triangles', 'vertices', 'volumeMesh', 'area', 'closedManifold', 'mesher', 'mesherFallback', 'contentHash'])
+        const sameMesh =
+          a.mesh.indices.length === b.mesh.indices.length &&
+          a.mesh.positions.length === b.mesh.positions.length &&
+          a.mesh.indices.every((v, i) => v === b.mesh.indices[i]) &&
+          a.mesh.positions.every((v, i) => Object.is(v, b.mesh.positions[i]));
+        expect(sameMesh, `${field}: ${a.mesh.indices.length / 3} vs ${b.mesh.indices.length / 3} triangles`).toBe(true);
+        for (const key of [
+          'triangles',
+          'vertices',
+          'volumeMesh',
+          'area',
+          'closedManifold',
+          'mesher',
+          'mesherFallback',
+          'dualContouringSplitCells',
+          'contentHash',
+        ])
           expect(nat.data[key], field + ' ' + key).toEqual(ts.data[key]);
         const pa = ts.data['provenance'] as Record<string, unknown>;
         const pb = nat.data['provenance'] as Record<string, unknown>;
         expect([pa['engine'], pb['engine']]).toEqual(['ts', 'llull-field']);
         for (const key of ['samples', 'evaluatedSamples', 'nonFiniteSamples', 'maxVertexResidual', 'prunedFraction'])
           expect(pb[key], key).toEqual(pa[key]);
+        if ((ts.data['dualContouringSplitCells'] as number) > 0) repaired += 1;
         seen.add(String(ts.data['mesher']) + (ts.data['mesherFallback'] === true ? ':fallback' : ''));
       }
       expect([...seen].sort()).toEqual(['dual_contouring', 'tetra:fallback']);
+      expect(repaired, 'the octet lattice is repaired cell by cell on both engines').toBeGreaterThan(0);
     },
   );
 

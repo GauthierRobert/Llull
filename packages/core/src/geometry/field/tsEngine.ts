@@ -173,6 +173,7 @@ function mesh(program: FieldProgram, grid: FieldGrid, options: MeshOptions): Ret
     nonFiniteSamples: sampled.nonFinite,
     mesher: contoured === null ? 'tetra' : 'dual_contouring',
     mesherFallback: options.mesher === 'dual_contouring' && contoured === null,
+    splitCells: contoured?.splitCells ?? 0,
     provenance: provenance(grid.voxel),
   };
 }

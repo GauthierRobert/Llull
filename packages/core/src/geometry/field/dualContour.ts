@@ -3,13 +3,19 @@
  * minimiser of the quadratic error of the Hermite data (edge crossings refined on the exact field, normals from the exact gradient), one quad per crossed
  * grid edge. Sharp features (box clips, strut ends, crease lines of min / max) keep their corners instead of being cut as the tetrahedra do.
  * @invariant the QEF is solved by the pseudo-inverse of the 3x3 normal matrix with eigenvalues below 0.1 of the largest dropped, minimising the distance to the mass point (S19); the vertex is clamped to its cell
- * @invariant the result is checked to be a closed edge-manifold mesh; `null` means "not manifold, use the tetrahedra" (dual contouring is not manifold in general)
+ * @invariant a cell with an ambiguous face (four crossed edges) gets one vertex per sheet instead of one (manifold dual contouring, 05 IMP 14.10): the cells around ambiguous faces are the only ones that change, so a mesh that was a closed manifold is byte-identical
+ * @invariant the result is checked to be a closed edge-manifold mesh; `null` means "still not manifold after the repair, use the tetrahedra"
  */
 
 import type { IsoMesh } from '../../lib/isosurface/tetra';
 import { isClosedManifold } from '../../lib/isosurface/measures';
 import { evaluateWithGradient } from './gradient';
 import { type PreparedProgram, evaluateAt } from './interpret';
+
+/** The mesh and the number of cells that were split into one vertex per sheet. */
+export interface DualContoured extends IsoMesh {
+  readonly splitCells: number;
+}
 
 export interface ContouredGrid {
   readonly nodes: readonly [number, number, number];
@@ -69,6 +75,74 @@ function eigen3(m: Float64Array): { values: number[]; vectors: Float64Array } {
   return { values: [at(a, 0), at(a, 4), at(a, 8)], vectors: v };
 }
 
+/** Index (0..11, the order of the Hermite data of a cell) of the cube edge that starts at corner (cx, cy, cz) and runs along `axis`. */
+const edgeIndex = (cx: number, cy: number, cz: number, axis: number): number =>
+  axis === 0 ? (cy * 2 + cz) * 3 : axis === 1 ? (cx * 2 + cz) * 3 + 1 : (cx * 2 + cy) * 3 + 2;
+
+/** The six cube faces: corner bits (x + 2 y + 4 z) in cyclic order and the cube edge between each corner and the next. */
+const FACES: ReadonlyArray<{ readonly corners: readonly number[]; readonly edges: readonly number[] }> = [0, 1, 2].flatMap((axis) =>
+  [0, 1].map((side) => {
+    const [u, v] = [(axis + 1) % 3, (axis + 2) % 3];
+    const coords = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ].map(([a, b]) => {
+      const c = [0, 0, 0];
+      c[axis] = side;
+      c[u] = a as number;
+      c[v] = b as number;
+      return c;
+    });
+    const bit = (c: readonly number[]): number => (c[0] as number) + 2 * (c[1] as number) + 4 * (c[2] as number);
+    const edges = coords.map((c, k) => {
+      const next = coords[(k + 1) % 4] as number[];
+      const along = k % 2 === 0 ? u : v;
+      const near = (c[along] as number) === 0 ? c : next;
+      return edgeIndex(near[0] as number, near[1] as number, near[2] as number, along);
+    });
+    return { corners: coords.map(bit), edges };
+  }),
+);
+
+/**
+ * Sheet (smallest edge index of its surface piece, -1 for an uncrossed edge) of each of the 12 edges of a cell whose corner signs are `inside`, or null when no
+ * face is ambiguous (four crossed edges). Edges on a common face are joined as a marching-cubes table would: a face with two crossings joins them, an ambiguous
+ * face cuts off its outside corners (a rule of the face's signs only, so the two cells sharing the face agree).
+ */
+function cellSheets(inside: readonly boolean[]): Int8Array | null {
+  const parent = Int8Array.from({ length: 12 }, (_, i) => i);
+  const find = (i: number): number => ((parent[i] as number) === i ? i : find(parent[i] as number));
+  const join = (a: number, b: number): void => {
+    const [ra, rb] = [find(a), find(b)];
+    parent[Math.max(ra, rb)] = Math.min(ra, rb);
+  };
+  let ambiguous = false;
+  for (const { corners, edges } of FACES) {
+    const crossed = corners.map((c, k) => inside[c] !== inside[corners[(k + 1) % 4] as number]);
+    const count = crossed.filter(Boolean).length;
+    if (count === 2) {
+      const [a, b] = edges.filter((_, k) => crossed[k]);
+      join(a as number, b as number);
+    } else if (count === 4) {
+      ambiguous = true;
+      corners.forEach((c, k) => {
+        if (!inside[c]) join(edges[(k + 3) % 4] as number, edges[k] as number);
+      });
+    }
+  }
+  if (!ambiguous) return null;
+  return Int8Array.from({ length: 12 }, (_, idx) => {
+    const [d, axis] = [Math.floor(idx / 3), idx % 3];
+    const [d1, d2] = [d >> 1, d & 1];
+    const near = axis === 0 ? [0, d1, d2] : axis === 1 ? [d1, 0, d2] : [d1, d2, 0];
+    const far = near.map((c, a) => (a === axis ? 1 : c));
+    const bit = (c: readonly number[]): number => (c[0] as number) + 2 * (c[1] as number) + 4 * (c[2] as number);
+    return inside[bit(near)] === inside[bit(far)] ? -1 : find(idx);
+  });
+}
+
 /** Minimiser of sum (n . (x - p))^2 near the mass point of the Hermite data, clamped to the box [lo, hi]. */
 function solveQef(data: readonly Crossing[], lo: readonly number[], hi: readonly number[]): [number, number, number] {
   const mass = [0, 1, 2].map((axis) => data.reduce((sum, d) => sum + at(d.p, axis), 0) / data.length);
@@ -94,10 +168,10 @@ function solveQef(data: readonly Crossing[], lo: readonly number[], hi: readonly
   return [at(clamped, 0), at(clamped, 1), at(clamped, 2)];
 }
 
-/** Mesh of {values < 0} by dual contouring, or null when the result is not a closed edge-manifold surface. */
-export function dualContour(prepared: PreparedProgram, grid: ContouredGrid, maxTriangles: number): IsoMesh | null {
+/** Mesh of {values < 0} by dual contouring, or null when the result is not a closed edge-manifold surface even after the cells at ambiguous faces were split. */
+export function dualContour(prepared: PreparedProgram, grid: ContouredGrid, maxTriangles: number): DualContoured | null {
   const [sx, sy, sz] = grid.nodes;
-  if (sx < 3 || sy < 3 || sz < 3) return { positions: [], indices: [] };
+  if (sx < 3 || sy < 3 || sz < 3) return { positions: [], indices: [], splitCells: 0 };
   const { origin, voxel, values } = grid;
   const registers = new Float64Array(prepared.opcodes.length);
   const node = (i: number, j: number, k: number): number => i + sx * (j + sy * k);
@@ -143,10 +217,19 @@ export function dualContour(prepared: PreparedProgram, grid: ContouredGrid, maxT
   };
 
   const cellVertex = new Map<number, number>();
+  const cellSheetsOf = new Map<number, Int8Array | null>();
   const positions: number[] = [];
-  /** Vertex of cell (i, j, k), created on first use. */
-  const vertexOf = (i: number, j: number, k: number): number => {
-    const key = node(i, j, k);
+  /** Vertex of the sheet of cell (i, j, k) that holds the crossed edge (ei, ej, ek, axis), created on first use. */
+  const vertexOf = (i: number, j: number, k: number, ei: number, ej: number, ek: number, axis: 0 | 1 | 2): number => {
+    const cell = node(i, j, k);
+    let sheets = cellSheetsOf.get(cell);
+    if (sheets === undefined) {
+      const corner = (bit: number): boolean => inside(node(i + (bit & 1), j + ((bit >> 1) & 1), k + (bit >> 2)));
+      sheets = cellSheets([0, 1, 2, 3, 4, 5, 6, 7].map(corner));
+      cellSheetsOf.set(cell, sheets);
+    }
+    const sheet = sheets === null ? 0 : (sheets[edgeIndex(ei - i, ej - j, ek - k, axis)] as number);
+    const key = cell * 16 + sheet;
     const known = cellVertex.get(key);
     if (known !== undefined) return known;
     const data: Crossing[] = [];
@@ -157,10 +240,11 @@ export function dualContour(prepared: PreparedProgram, grid: ContouredGrid, maxT
           [i + d1, j, k + d2, 1],
           [i + d1, j + d2, k, 2],
         ];
-        for (const [ei, ej, ek, axis] of edges) {
-          const far = node(ei + (axis === 0 ? 1 : 0), ej + (axis === 1 ? 1 : 0), ek + (axis === 2 ? 1 : 0));
-          if (inside(node(ei, ej, ek)) !== inside(far)) data.push(crossing(ei, ej, ek, axis));
-        }
+        edges.forEach(([ex, ey, ez, a]) => {
+          const far = node(ex + (a === 0 ? 1 : 0), ey + (a === 1 ? 1 : 0), ez + (a === 2 ? 1 : 0));
+          const onSheet = sheets === null || sheets[(d1 * 2 + d2) * 3 + a] === sheet;
+          if (onSheet && inside(node(ex, ey, ez)) !== inside(far)) data.push(crossing(ex, ey, ez, a));
+        });
       }
     const lo = point(i, j, k);
     const hi = point(i + 1, j + 1, k + 1);
@@ -205,23 +289,42 @@ export function dualContour(prepared: PreparedProgram, grid: ContouredGrid, maxT
       for (let i = 0; i < sx - 1; i += 1) {
         if (inside(node(i, j, k)) === inside(node(i + 1, j, k))) continue;
         const n = crossing(i, j, k, 0).n;
-        quad(vertexOf(i, j - 1, k - 1), vertexOf(i, j, k - 1), vertexOf(i, j, k), vertexOf(i, j - 1, k), n);
+        quad(
+          vertexOf(i, j - 1, k - 1, i, j, k, 0),
+          vertexOf(i, j, k - 1, i, j, k, 0),
+          vertexOf(i, j, k, i, j, k, 0),
+          vertexOf(i, j - 1, k, i, j, k, 0),
+          n,
+        );
       }
   for (let k = 1; k < sz - 1; k += 1)
     for (let j = 0; j < sy - 1; j += 1)
       for (let i = 1; i < sx - 1; i += 1) {
         if (inside(node(i, j, k)) === inside(node(i, j + 1, k))) continue;
         const n = crossing(i, j, k, 1).n;
-        quad(vertexOf(i - 1, j, k - 1), vertexOf(i, j, k - 1), vertexOf(i, j, k), vertexOf(i - 1, j, k), n);
+        quad(
+          vertexOf(i - 1, j, k - 1, i, j, k, 1),
+          vertexOf(i, j, k - 1, i, j, k, 1),
+          vertexOf(i, j, k, i, j, k, 1),
+          vertexOf(i - 1, j, k, i, j, k, 1),
+          n,
+        );
       }
   for (let k = 0; k < sz - 1; k += 1)
     for (let j = 1; j < sy - 1; j += 1)
       for (let i = 1; i < sx - 1; i += 1) {
         if (inside(node(i, j, k)) === inside(node(i, j, k + 1))) continue;
         const n = crossing(i, j, k, 2).n;
-        quad(vertexOf(i - 1, j - 1, k), vertexOf(i, j - 1, k), vertexOf(i, j, k), vertexOf(i - 1, j, k), n);
+        quad(
+          vertexOf(i - 1, j - 1, k, i, j, k, 2),
+          vertexOf(i, j - 1, k, i, j, k, 2),
+          vertexOf(i, j, k, i, j, k, 2),
+          vertexOf(i - 1, j, k, i, j, k, 2),
+          n,
+        );
       }
-  if (indices.length / 3 > maxTriangles) return { positions, indices };
-  const mesh = { positions, indices };
+  const splitCells = [...cellSheetsOf.values()].filter((sheets) => sheets !== null).length;
+  const mesh = { positions, indices, splitCells };
+  if (indices.length / 3 > maxTriangles) return mesh;
   return isClosedManifold(mesh) ? mesh : null;
 }

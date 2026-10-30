@@ -52,6 +52,8 @@ export interface FieldMeshResult {
   /** The mesher that produced `mesh` (dual contouring reports `tetra` when it fell back). */
   readonly mesher: Mesher;
   readonly mesherFallback: boolean;
+  /** Dual contouring: cells at ambiguous faces that were given one vertex per sheet (05 IMP 14.10); 0 otherwise. */
+  readonly splitCells?: number;
   readonly provenance: FieldProvenance;
 }
 
