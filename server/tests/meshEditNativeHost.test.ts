@@ -179,17 +179,18 @@ describe('analyze_mesh and check_mesh above the TypeScript cap', () => {
       shellCount: 1,
       genus: 0,
     });
-    expect(data['selfIntersectionPairs']).toBeNull();
+    // the pair search is the command default at any size now (13.15.2): a clean sphere has none
+    expect(data['selfIntersectionPairs']).toBe(0);
     expect(Math.abs((data['volume'] as number) / ((4 / 3) * Math.PI * 1000) - 1)).toBeLessThan(0.002);
     expect(result.data).toMatchObject({ provenance: { engine: 'native' } });
   });
 
-  native('check_mesh passes the same sphere, and an explicit self-intersection search is refused by name', async () => {
+  native('check_mesh passes the same sphere, and an explicit self-intersection search is answered', async () => {
     const checked = await applyCommandAsync('check_mesh', { ids: ['scan'], purpose: 'print' });
     expect(checked.error, checked.summary).toBeUndefined();
     expect((checked.data as { meshes: Array<{ triangles: number }> }).meshes[0]?.triangles).toBe(SOURCE_TRIANGLES);
-    const refused = await applyCommandAsync('analyze_mesh', { id: 'scan', selfIntersections: true });
-    expect(refused.error?.code).toBe('MESH_ENGINE_CAP_EXCEEDED');
-    expect(refused.summary).toContain('selfIntersections false');
+    const searched = await applyCommandAsync('analyze_mesh', { id: 'scan', selfIntersections: true });
+    expect(searched.error, searched.summary).toBeUndefined();
+    expect(searched.data).toMatchObject({ selfIntersectionPairs: 0 });
   });
 });

@@ -140,6 +140,12 @@ export const isEngineFailure = (value: MeshOpResult | MeshEngineFailure): value 
 /** Largest input (triangles) the TypeScript engine accepts per op before asking for a faster engine. */
 export const MESH_TS_TRIANGLE_CAP = 200_000;
 
+/**
+ * Largest input (triangles) the TypeScript engine accepts for `cut`: one pass over the triangles and a cap per section loop, 1.3 s and about 140 MB beyond the input at
+ * 1,310,720 triangles (TECHNICAL_SPEC 13.15.1), so it is lifted instead of ported. The loop is synchronous: a cut of 4,000,000 triangles holds the event loop for 3 to 10 s.
+ */
+export const MESH_TS_CUT_CAP = 4_000_000;
+
 /** Most points one hull call takes (the cap of the `hull` op, which has no input mesh). */
 export const MESH_HULL_POINT_LIMIT = 1_000_000;
 

@@ -26,7 +26,7 @@ import {
   sculptDescription,
   smoothDescription,
 } from '@core/geometry/mesh/editable';
-import { isFillReport, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isPairSearchOf, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
@@ -258,7 +258,7 @@ function keyOf(files: readonly JobFile[]): string {
 const indexIn = (message: string | undefined): number => (/^\d+$/.test(message ?? '') ? Number(message) : -1);
 
 /** The failure of a job that did not finish ok. */
-function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFailure {
+function failedJob(op: NativeOp, run: JobRun, timeoutMs: number, triangles: number): MeshEngineFailure {
   if (run.code === 'NATIVE_TIMEOUT') return failure('MESH_TIMEOUT', `llull-compute meshops ${op.op} exceeded ${timeoutMs / 1000} s`);
   if (run.code === 'NATIVE_CANCELLED') return failure('MESH_CANCELLED', `llull-compute meshops ${op.op} was cancelled`);
   if (op.op === 'fill_holes' && run.code !== undefined && FILL_REFUSALS.has(run.code)) return failure(run.code, run.message ?? run.code);
@@ -266,6 +266,14 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFail
     // the job names the point by its position in the list; the text of a point is the JavaScript one
     const point = typeof op.select === 'object' && 'near' in op.select ? op.select.near[indexIn(run.message)] : undefined;
     if (point !== undefined) return failure('MESH_HOLE_NOT_FOUND', `no boundary loop near [${point.join(', ')}]: the mesh has none`);
+  }
+  if (op.op === 'analyze' && run.code === 'SELF_INTERSECTION_TOO_COSTLY') {
+    // up to its cap the TypeScript engine answers (the composite hands it over); above it nothing can: refuse by name with the remedy
+    if (triangles > MESH_TS_TRIANGLE_CAP)
+      return failure(
+        'MESH_ENGINE_CAP_EXCEEDED',
+        `${run.message ?? 'the self-intersection search is too costly'}: pass selfIntersections false for ${triangles} triangles`,
+      );
   }
   if (op.op === 'sculpt' && run.code === 'SCULPT_OFF_SURFACE') {
     // the job names the stamp by its position in the list; the radius is worded here, as JavaScript prints it
@@ -309,7 +317,7 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
     };
   if (op.op === 'analyze') {
     const analysis = isRecord(summary) ? summary['analysis'] : undefined;
-    if (!isMeshAnalysis(analysis))
+    if (!isMeshAnalysis(analysis) || !isPairSearchOf(analysis, op))
       return failure('MESH_ENGINE_UNSUPPORTED', 'llull-compute meshops analyze: the job returned no well-formed analysis');
     return { analysis, report, provenance: provenance(ANALYZE_DESCRIPTION.algorithm, ANALYZE_DESCRIPTION.reference) };
   }
@@ -367,6 +375,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
   /** Runs one job on the event loop; resolves with its result or a named failure, never rejects. */
   const runJob = async (
     op: NativeOp,
+    triangles: number,
     files: readonly JobFile[],
     signal: AbortSignal,
     report: (event: Readonly<Record<string, unknown>>) => void,
@@ -376,7 +385,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
         Object.fromEntries(files.map((file) => [file.name, file.data])),
         async (folder) => {
           const run = await runner.run(['meshops'], folder, timeoutMs, report, signal);
-          return run.ok ? await resultOf(op, runner, folder, run) : failedJob(op, run, timeoutMs);
+          return run.ok ? await resultOf(op, runner, folder, run) : failedJob(op, run, timeoutMs, triangles);
         },
         env,
       );
@@ -394,14 +403,6 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
       if (op.op === 'analyze' && op.weldTolerance !== 0)
         return failure('MESH_ENGINE_UNSUPPORTED', 'the native analysis welds exact duplicates only');
       const triangles = input.mesh.indices.length / 3;
-      // the pair search is not ported (slice 4): the TypeScript engine answers up to its cap, above it the command is refused by name
-      if (op.op === 'analyze' && op.selfIntersections)
-        return triangles <= MESH_TS_TRIANGLE_CAP
-          ? failure('MESH_ENGINE_UNSUPPORTED', 'the native analysis does not search self-intersections; the TypeScript engine does')
-          : failure(
-              'MESH_ENGINE_CAP_EXCEEDED',
-              `the self-intersection search is limited to ${MESH_TS_TRIANGLE_CAP} triangles: pass selfIntersections false for ${triangles}`,
-            );
       const scope = currentScope();
       const memo = scope?.memo;
       if (op.op === 'decimate' || op.op === 'remesh' || op.op === 'quad_remesh') {
@@ -433,7 +434,7 @@ export function createNativeMeshEngine(options: NativeMeshEngineOptions = {}): M
           `the job budget of this command is spent: "${op.op}" on ${triangles} triangles is left to the TypeScript engine`,
         );
       if (scope.cancelled) return failure('MESH_CANCELLED', `the "${op.op}" job was cancelled`);
-      scope.request({ key, op: op.op, heartbeatMs, start: (signal, report) => runJob(op, files, signal, report) });
+      scope.request({ key, op: op.op, heartbeatMs, start: (signal, report) => runJob(op, triangles, files, signal, report) });
       return deferMeshOp(op.op);
     },
   };

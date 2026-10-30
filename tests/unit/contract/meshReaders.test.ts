@@ -20,7 +20,7 @@ const READERS =
   /\b(entityToTriangles|entityTrianglePositions|solidTriangles|meshTriangles|localTriangles|collectExportParts|collectExportTriangles)\b/;
 /** Wider: the construction tree of a solid, mass integration, and direct reads of mesh arrays. A file that defines commands and matches is checked command by command. */
 const WIDE =
-  /\b(recipeOf|operandRecipe|exactRecipe|exactOrMesh|meshRecipeOf|bodyMassProperties|resolveMassProperties|technicalView|assemblyParts)\b|\.mesh\.(positions|indices)\b/;
+  /\b(recipeOf|operandRecipe|exactRecipe|exactOrMesh|meshRecipeOf|bodyMassProperties|resolveMassProperties|technicalView|assemblyParts|loadSolidMesh)\b|\.mesh\.(positions|indices)\b/;
 const COMMAND_NAME = /defineCommand\(\{\s*name: '([a-z0-9_]+)'/g;
 const DEFINING = new Set([
   'core/src/geometry/entityTriangles.ts',
@@ -159,6 +159,7 @@ const NOT_READERS: Readonly<Record<string, string>> = {
   cut_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   fill_mesh_holes: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   fit_subdivision_to_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
+  fit_surface_to_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   offset_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   hollow_mesh: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',
   mesh_to_brep: 'reads the stored mesh through ctx.meshAssets itself (loadSolidMesh)',

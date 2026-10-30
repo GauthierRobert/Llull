@@ -154,6 +154,35 @@ fn corner_stamp() -> Value {
     json!(point(&mesh.0, 0))
 }
 
+/// One big triangle in z = 0 (a large triangle for the grid) pierced by 60 small stakes, and a few stakes that only touch it.
+fn stakes() -> Mesh {
+    let mut positions = vec![-500.0, -500.0, 0.0, 500.0, -500.0, 0.0, 0.0, 500.0, 0.0];
+    let mut indices = vec![0u32, 1, 2];
+    for k in 0..66 {
+        let (x, y) = ((k % 11) as f64 * 2.5 - 12.0, (k / 11) as f64 * 2.5 - 8.0);
+        let top = if k % 11 == 10 { 0.0 } else { 1.0 };
+        let base = (positions.len() / 3) as u32;
+        positions.extend([x, y, -1.0, x + 0.2, y, -1.0, x, y, top]);
+        indices.extend([base, base + 1, base + 2]);
+    }
+    (positions, indices)
+}
+
+/// 200 tiny disjoint triangles at the origin, then a tiny pair at 1e11 and a crossing pair at 1e17: grid cell indices past 2^53 (the oracle looped forever on them).
+fn far_cells() -> Mesh {
+    let mut positions = Vec::new();
+    for k in 0..200 {
+        let x = k as f64 * 1e-3;
+        positions.extend([x, 0.0, 0.0, x + 1e-6, 0.0, 0.0, x, 1e-6, 0.0]);
+    }
+    let (x, s) = (1e17, 100.0);
+    positions.extend([x, 0.0, 0.0, x + 2.0 * s, 0.0, 0.0, x + s, 0.0, 2.0 * s]);
+    positions.extend([x + s, -s, s / 2.0, x + s, s, s / 2.0, x + s, 0.0, 3.0 * s]);
+    positions.extend([1e11, 0.0, 0.0, 1e11 + 1e-3, 0.0, 0.0, 1e11, 1e-3, 0.0]);
+    let faces = positions.len() as u32 / 9;
+    (positions, (0..faces * 3).collect())
+}
+
 fn pins() -> Vec<Pin> {
     vec![
         Pin { name: "remesh_sphere_split", mesh: sphere(3, 0.05, 7), job: remesh(json!({ "targetEdge": 0.9 })) },
@@ -308,6 +337,23 @@ fn pins() -> Vec<Pin> {
                 "draw",
                 json!({ "stamps": [[5.0, 5.0, 0.0], [1.0, 9.0, 0.0]], "radius": 6.0, "refineEdge": 0.5, "symmetry": "xz" }),
             ),
+        },
+        Pin {
+            name: "analyze_pairs_overlapping_spheres",
+            mesh: side_by_side(&[sphere(3, 0.02, 4), sphere(3, 0.0, 1), sphere(2, 0.1, 8)], 6.0),
+            job: analyze(json!({ "selfIntersections": true, "maxListed": 7 })),
+        },
+        Pin {
+            name: "analyze_pairs_damaged_soups",
+            mesh: side_by_side(&[damaged_sphere(), damaged_sphere()], 5.0),
+            job: analyze(json!({ "selfIntersections": true, "maxListed": 4 })),
+        },
+        Pin { name: "analyze_pairs_far_cells", mesh: far_cells(), job: analyze(json!({ "selfIntersections": true })) },
+        Pin { name: "analyze_pairs_clean_sphere", mesh: sphere(4, 0.0, 1), job: analyze(json!({ "selfIntersections": true })) },
+        Pin {
+            name: "analyze_pairs_stakes_through_a_large_triangle",
+            mesh: stakes(),
+            job: analyze(json!({ "selfIntersections": true, "maxListed": 12 })),
         },
         Pin {
             name: "remesh_free_boundary",

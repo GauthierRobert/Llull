@@ -1,7 +1,6 @@
 /** analyze_mesh — numeric inspector of a mesh or any 3D solid's triangles (07 MSH M0, FR-MSH-03). Read-only. */
 
 import { resolveMeshEngine } from '../../geometry/mesh/engine';
-import { MESH_TS_TRIANGLE_CAP } from '../../geometry/mesh/engineTypes';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
@@ -19,7 +18,7 @@ import {
 /**
  * @affects none (read-only); data = counts, topology, shells, loops, orientation, area, volume, quality, self-intersections
  * @invariant welding is the only preprocessing: the entity is not changed; every length is in document units
- * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over 200000 triangles without the native engine -> MESH_ENGINE_CAP_EXCEEDED; selfIntersections true above 200000 triangles -> MESH_ENGINE_CAP_EXCEEDED
+ * @failure unknown id -> MESH_ENTITY_NOT_FOUND; 2D / curve / sheet -> MESH_NOT_A_MESH; over 200000 triangles without the native engine -> MESH_ENGINE_CAP_EXCEEDED; a crossing-pair search that would examine more than 4e10 candidate pairs above 200000 triangles (a mesh whose triangles pile up on each other) -> MESH_ENGINE_CAP_EXCEEDED
  */
 export const analyzeMesh = defineCommand({
   name: 'analyze_mesh',
@@ -31,7 +30,7 @@ export const analyzeMesh = defineCommand({
     '(aspect ratio, min angle) statistics. Vertices within weldTolerance are welded first (default 1e-6 x bounding-box diagonal, reported as a ' +
     'named default). Lengths in document units, areas in units^2, volumes in units^3. Next: check_mesh for a pass / fail verdict. ' +
     'Meshes above 200000 triangles are analysed by the native engine (the desktop app and the llull CLI have it); without it they are refused with MESH_ENGINE_CAP_EXCEEDED. ' +
-    'The native engine does not search crossing pairs: selfIntersections true above 200000 triangles is refused. ' +
+    'The crossing-pair search runs at any size (natively above 200000 triangles); a mesh whose triangles pile up on each other so that more than 4e10 candidate pairs overlap is refused above 200000 triangles (pass selfIntersections false). ' +
     'Refusals carry error.code MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_ENGINE_CAP_EXCEEDED.',
   params: z.object({
     id: z.string().describe('Id of the mesh (or other 3D solid) to analyse.'),
@@ -43,9 +42,7 @@ export const analyzeMesh = defineCommand({
     selfIntersections: z
       .boolean()
       .optional()
-      .describe(
-        `Search for crossing triangle pairs (counts transversal crossings; touching contacts are not counted). Default true up to ${MESH_TS_TRIANGLE_CAP} triangles.`,
-      ),
+      .describe(`Search for crossing triangle pairs (counts transversal crossings; touching contacts are not counted). Default true.`),
     maxListed: z
       .number()
       .int()
@@ -58,18 +55,12 @@ export const analyzeMesh = defineCommand({
     const loaded = loadSolidMesh(doc, id, weldTolerance, contextOf(ctx).meshAssets);
     if (isLoadFailure(loaded)) return meshRejection(doc, 'analyze_mesh', loaded.code, loaded.message, loaded.ids);
     const engine = resolveMeshEngine(contextOf(ctx).meshProcessing);
-    const triangles = loaded.mesh.indices.length / 3;
     const outcome = engineOutcome(
       doc,
       'analyze_mesh',
       engine.run(
         { mesh: loaded.mesh },
-        {
-          op: 'analyze',
-          weldTolerance: 0,
-          selfIntersections: selfIntersections ?? triangles <= MESH_TS_TRIANGLE_CAP,
-          maxListed: maxListed ?? 20,
-        },
+        { op: 'analyze', weldTolerance: 0, selfIntersections: selfIntersections ?? true, maxListed: maxListed ?? 20 },
       ),
       [id],
     );

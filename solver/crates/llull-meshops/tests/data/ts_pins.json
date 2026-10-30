@@ -174,6 +174,1099 @@
       "diagonal": 14.164534880913532
     }
   },
+  "analyze_pairs_clean_sphere": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 2562,
+      "edges": 7680,
+      "faces": 5120,
+      "eulerCharacteristic": 2,
+      "genus": 0,
+      "closed": true,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 0,
+      "boundaryLoopCount": 0,
+      "boundaryLoops": [],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 1,
+      "shells": [
+        {
+          "faces": 5120,
+          "vertices": 2562,
+          "edges": 7680,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1255.1266070156187,
+          "volume": 4179.721469305296
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 1255.1266070156187,
+      "volume": 4179.721469305296,
+      "centroid": [
+        -2.4741029794713397e-15,
+        2.645163092713153e-15,
+        -1.1117579254248575e-15
+      ],
+      "selfIntersectionPairs": 0,
+      "selfIntersections": [],
+      "edgeLength": {
+        "min": 0.5782953005854614,
+        "max": 0.8260396653395068,
+        "mean": 0.7515675264180507
+      },
+      "aspectRatio": {
+        "max": 1.1326883994488388,
+        "mean": 1.032197885110054
+      },
+      "minAngleDeg": 54.017403472176895,
+      "bounds": {
+        "min": [
+          -10,
+          -10,
+          -10
+        ],
+        "max": [
+          10,
+          10,
+          10
+        ]
+      },
+      "diagonal": 34.64101615137754
+    }
+  },
+  "analyze_pairs_damaged_soups": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 6402
+    },
+    "analysis": {
+      "vertices": 1284,
+      "edges": 3840,
+      "faces": 2562,
+      "eulerCharacteristic": 4,
+      "genus": null,
+      "closed": false,
+      "manifold": false,
+      "orientationConsistent": false,
+      "boundaryEdges": 6,
+      "boundaryLoopCount": 2,
+      "boundaryLoops": [
+        {
+          "edges": 3,
+          "length": 4.5497767718457105,
+          "centroid": [
+            -4.466209383359763,
+            3.8058552849869574,
+            8.050930100949016
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.5497767718457105,
+          "centroid": [
+            0.5337906166402374,
+            3.8058552849869574,
+            8.050930100949016
+          ]
+        }
+      ],
+      "nonManifoldEdgeCount": 6,
+      "nonManifoldEdges": [
+        {
+          "a": 71,
+          "b": 73,
+          "uses": 3
+        },
+        {
+          "a": 71,
+          "b": 74,
+          "uses": 3
+        },
+        {
+          "a": 73,
+          "b": 74,
+          "uses": 3
+        },
+        {
+          "a": 713,
+          "b": 715,
+          "uses": 3
+        }
+      ],
+      "shellCount": 2,
+      "shells": [
+        {
+          "faces": 1280,
+          "vertices": 642,
+          "edges": 1920,
+          "closed": false,
+          "eulerCharacteristic": 2,
+          "genus": null,
+          "area": 1251.8120556240483,
+          "volume": null
+        },
+        {
+          "faces": 1280,
+          "vertices": 642,
+          "edges": 1920,
+          "closed": false,
+          "eulerCharacteristic": 2,
+          "genus": null,
+          "area": 1251.8120556240485,
+          "volume": null
+        }
+      ],
+      "degenerateFaces": 2,
+      "duplicateFaces": 2,
+      "area": 2503.6241112480934,
+      "volume": null,
+      "centroid": null,
+      "selfIntersectionPairs": 178,
+      "selfIntersections": [
+        [
+          83,
+          1317
+        ],
+        [
+          83,
+          1368
+        ],
+        [
+          101,
+          1353
+        ],
+        [
+          101,
+          1358
+        ]
+      ],
+      "edgeLength": {
+        "min": 0,
+        "max": 1.6528193677469043,
+        "mean": 1.5011929616134545
+      },
+      "aspectRatio": {
+        "max": 1.1337430591685456,
+        "mean": 1.0347366178096296
+      },
+      "minAngleDeg": 0,
+      "bounds": {
+        "min": [
+          -10.001600932954828,
+          -10.027596606097703,
+          -10.031356473069243
+        ],
+        "max": [
+          14.999358402999944,
+          10.049341579626235,
+          9.97351988975368
+        ]
+      },
+      "diagonal": 37.793206967962846
+    }
+  },
+  "analyze_pairs_far_cells": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 609,
+      "edges": 609,
+      "faces": 203,
+      "eulerCharacteristic": 203,
+      "genus": null,
+      "closed": false,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 609,
+      "boundaryLoopCount": 203,
+      "boundaryLoops": [
+        {
+          "edges": 3,
+          "length": 0.0000034142135623730953,
+          "centroid": [
+            3.333333333333333e-7,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623729513,
+          "centroid": [
+            0.0010003333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.0020003333333333336,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.0030003333333333336,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.004000333333333334,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.005000333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.006000333333333334,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.0000034142135623733214,
+          "centroid": [
+            0.007000333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.008000333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.009000333333333334,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.010000333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.011000333333333334,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.012000333333333335,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.013000333333333336,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.014000333333333332,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562371841,
+          "centroid": [
+            0.015000333333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562374802,
+          "centroid": [
+            0.016000333333333335,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562374802,
+          "centroid": [
+            0.017000333333333336,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562374802,
+          "centroid": [
+            0.018000333333333337,
+            3.333333333333333e-7,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 0.000003414213562374802,
+          "centroid": [
+            0.01900033333333333,
+            3.333333333333333e-7,
+            0
+          ]
+        }
+      ],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 203,
+      "shells": [
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999999579e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000000663e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 4.999999999996326e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000005e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000005e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000005e-13,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 5.000000000005e-13,
+          "volume": null
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 44200.00000050364,
+      "volume": null,
+      "centroid": null,
+      "selfIntersectionPairs": 1,
+      "selfIntersections": [
+        [
+          200,
+          201
+        ]
+      ],
+      "edgeLength": {
+        "min": 9.999999999992654e-7,
+        "max": 269.25824035672525,
+        "mean": 2.256509323199656
+      },
+      "aspectRatio": {
+        "max": 1.3938764593816975,
+        "mean": 1.3909925904869531
+      },
+      "minAngleDeg": 43.602818972703616,
+      "bounds": {
+        "min": [
+          0,
+          -100,
+          0
+        ],
+        "max": [
+          100000000000000200,
+          100,
+          300
+        ]
+      },
+      "diagonal": 100000000000000200
+    }
+  },
+  "analyze_pairs_overlapping_spheres": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 1446,
+      "edges": 4320,
+      "faces": 2880,
+      "eulerCharacteristic": 6,
+      "genus": 0,
+      "closed": true,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 0,
+      "boundaryLoopCount": 0,
+      "boundaryLoops": [],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 3,
+      "shells": [
+        {
+          "faces": 1280,
+          "vertices": 642,
+          "edges": 1920,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1250.659130996822,
+          "volume": 4152.191099169698
+        },
+        {
+          "faces": 1280,
+          "vertices": 642,
+          "edges": 1920,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1250.6175235727637,
+          "volume": 4152.684587548424
+        },
+        {
+          "faces": 320,
+          "vertices": 162,
+          "edges": 480,
+          "closed": true,
+          "eulerCharacteristic": 2,
+          "genus": 0,
+          "area": 1235.4890548307108,
+          "volume": 4055.028238614728
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 3736.7657094003107,
+      "volume": 12359.90392533285,
+      "centroid": [
+        5.950736226504784,
+        -0.0036764898812912178,
+        -0.0016083562819525165
+      ],
+      "selfIntersectionPairs": 401,
+      "selfIntersections": [
+        [
+          84,
+          1368
+        ],
+        [
+          84,
+          1392
+        ],
+        [
+          97,
+          1346
+        ],
+        [
+          104,
+          1348
+        ],
+        [
+          104,
+          1392
+        ],
+        [
+          106,
+          1349
+        ],
+        [
+          107,
+          1348
+        ]
+      ],
+      "edgeLength": {
+        "min": 1.1922222422457311,
+        "max": 3.2755199526844176,
+        "mean": 1.6659408956259687
+      },
+      "aspectRatio": {
+        "max": 1.1324952030670863,
+        "mean": 1.0356268012114311
+      },
+      "minAngleDeg": 53.74161635086613,
+      "bounds": {
+        "min": [
+          -9.989155194546733,
+          -10.04156638877725,
+          -10.013181484432033
+        ],
+        "max": [
+          21.929321166062444,
+          10.013024331221775,
+          10.09039692731414
+        ]
+      },
+      "diagonal": 42.72153563586713
+    }
+  },
+  "analyze_pairs_stakes_through_a_large_triangle": {
+    "digest": null,
+    "report": {
+      "weldTolerance": 0,
+      "mergedVertices": 0
+    },
+    "analysis": {
+      "vertices": 201,
+      "edges": 201,
+      "faces": 67,
+      "eulerCharacteristic": 67,
+      "genus": null,
+      "closed": false,
+      "manifold": true,
+      "orientationConsistent": true,
+      "boundaryEdges": 201,
+      "boundaryLoopCount": 67,
+      "boundaryLoops": [
+        {
+          "edges": 3,
+          "length": 3236.06797749979,
+          "centroid": [
+            0,
+            -166.66666666666666,
+            0
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            -11.933333333333332,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            -9.433333333333334,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            -6.933333333333334,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            -4.433333333333334,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            -1.9333333333333333,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            0.5666666666666667,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            3.0666666666666664,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            5.566666666666666,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            8.066666666666666,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 4.209975124224178,
+          "centroid": [
+            10.566666666666666,
+            -8,
+            -0.3333333333333333
+          ]
+        },
+        {
+          "edges": 3,
+          "length": 2.219803902718556,
+          "centroid": [
+            13.066666666666668,
+            -8,
+            -0.6666666666666666
+          ]
+        }
+      ],
+      "nonManifoldEdgeCount": 0,
+      "nonManifoldEdges": [],
+      "shellCount": 67,
+      "shells": [
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 500000,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.1999999999999993,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.1999999999999993,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.20000000000000018,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.20000000000000018,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.19999999999999996,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.19999999999999996,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.20000000000000018,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.20000000000000018,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.1999999999999993,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.1999999999999993,
+          "volume": null
+        },
+        {
+          "faces": 1,
+          "vertices": 3,
+          "edges": 3,
+          "closed": false,
+          "eulerCharacteristic": 1,
+          "genus": null,
+          "area": 0.09999999999999964,
+          "volume": null
+        }
+      ],
+      "degenerateFaces": 0,
+      "duplicateFaces": 0,
+      "area": 500012.60000000056,
+      "volume": null,
+      "centroid": null,
+      "selfIntersectionPairs": 60,
+      "selfIntersections": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          0,
+          8
+        ],
+        [
+          0,
+          9
+        ],
+        [
+          0,
+          10
+        ],
+        [
+          0,
+          12
+        ],
+        [
+          0,
+          13
+        ]
+      ],
+      "edgeLength": {
+        "min": 0.1999999999999993,
+        "max": 1118.033988749895,
+        "mean": 17.42281247945045
+      },
+      "aspectRatio": {
+        "max": 6.106882976754653,
+        "mean": 5.777047646162698
+      },
+      "minAngleDeg": 5.710593137499633,
+      "bounds": {
+        "min": [
+          -500,
+          -500,
+          -1
+        ],
+        "max": [
+          500,
+          500,
+          1
+        ]
+      },
+      "diagonal": 1414.2149765859504
+    }
+  },
   "analyze_sphere": {
     "digest": null,
     "report": {

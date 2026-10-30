@@ -1,6 +1,6 @@
 /**
  * A stand-in for `llull-compute meshops <folder>` that answers with a chosen result, for tests of what the host does with an answer it cannot trust.
- * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved:
+ * Run as `node --require fakeMeshopsJob.cjs meshops <folder>` (NODE_OPTIONS) with FAKE_MESHOPS_RESULT = ok | past_vertices | odd_indices | partial_positions | nan | bad_report | other_report | hole_code | sculpt_index | sculpt_blank_index | sculpt_moved | bad_pairs | pairs_costly:
  * the preload writes the result files and the final `done` event, then exits before node looks for a script called `meshops`.
  * The report of `repair`, `fill_holes` and `sculpt` is a well-formed one for the op asked (`bad_report`: an empty one; `other_report`: well-formed for another mode or
  * fairing, with a loop number past `totalLoops`, or for a sculpt without symmetry that reports a symmetry error and more stamps applied than there are); `hole_code` ends the job
@@ -30,6 +30,14 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
   const op = job.op;
   if (mode === 'hole_code') {
     fs.writeSync(1, `${JSON.stringify({ type: 'error', code: 'MESH_HOLE_UNDOCUMENTED', message: 'a code no command knows' })}\n`);
+    process.exit(1);
+  }
+  if (mode === 'pairs_costly') {
+    fs.writeSync(
+      1,
+      `${JSON.stringify({ type: 'error', code: 'SELF_INTERSECTION_TOO_COSTLY', message: 'the pair search would examine 5 candidate pairs' })}
+`,
+    );
     process.exit(1);
   }
   if (mode === 'sculpt_index' || mode === 'sculpt_blank_index') {
@@ -72,11 +80,42 @@ if (path.basename(process.argv[1] ?? '') === 'meshops') {
       stampsApplied: (other ? 3 : 1) * (job.params.stamps ?? []).length,
     },
   };
+  // the analysis of `analyze`: well-formed, with the pair-search fields the op asked for (`other_report`: the opposite, `bad_pairs`: a list past the faces)
+  const asked = job.params.selfIntersections === true;
+  const analysis = {
+    vertices: 3,
+    edges: 3,
+    faces: 2,
+    eulerCharacteristic: 1,
+    genus: null,
+    closed: false,
+    manifold: true,
+    orientationConsistent: true,
+    boundaryEdges: 3,
+    boundaryLoopCount: 1,
+    boundaryLoops: [],
+    nonManifoldEdgeCount: 0,
+    nonManifoldEdges: [],
+    shellCount: 1,
+    shells: [],
+    degenerateFaces: 0,
+    duplicateFaces: 0,
+    area: 1,
+    volume: null,
+    centroid: null,
+    selfIntersectionPairs: asked !== other ? (mode === 'bad_pairs' ? 3 : 1) : null,
+    selfIntersections: asked !== other ? (mode === 'bad_pairs' ? [[0, 9]] : [[0, 1]]) : [],
+    edgeLength: { min: 1, max: 1, mean: 1 },
+    aspectRatio: { max: 1, mean: 1 },
+    minAngleDeg: 60,
+    bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+    diagonal: 1,
+  };
   const report = mode === 'bad_report' ? {} : (reports[op] ?? {});
   const files = {
     'result_positions.f64': resultPositions,
     'result_indices.u32': resultIndices,
-    'report.json': Buffer.from(JSON.stringify({ op, items: 0, ms: 0, report })),
+    'report.json': Buffer.from(JSON.stringify({ op, items: 0, ms: 0, report, ...(op === 'analyze' ? { analysis } : {}) })),
   };
   const outputs = Object.entries(files).map(([name, bytes]) => {
     fs.writeFileSync(path.join(folder, name), bytes);

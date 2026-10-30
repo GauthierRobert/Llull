@@ -10,7 +10,7 @@ use llull_meshops::run;
 use serde_json::{json, Value};
 
 fn analysed(mesh: &Mesh, max_listed: usize) -> Value {
-    serde_json::to_value(analyze(&mesh.0, &mesh.1, max_listed)).unwrap()
+    serde_json::to_value(analyze(&mesh.0, &mesh.1, max_listed, None)).unwrap()
 }
 
 fn octahedron() -> Mesh {
@@ -122,11 +122,7 @@ fn the_job_welds_exact_duplicates_refuses_what_it_does_not_do_and_reports_its_st
         .collect();
     assert_eq!(stages, ["read", "analyze", "write"]);
 
-    for (what, params) in [
-        ("a weld tolerance", json!({ "maxListed": 5, "weldTolerance": 0.1 })),
-        ("self-intersections", json!({ "maxListed": 5, "selfIntersections": true })),
-        ("a missing list length", json!({})),
-    ] {
+    for (what, params) in [("a weld tolerance", json!({ "maxListed": 5, "weldTolerance": 0.1 })), ("a missing list length", json!({}))] {
         write_job(&dir, &json!({ "op": "analyze", "params": params }), &soup);
         assert_eq!(run(&dir, &mut std::io::sink()).unwrap_err().code, "NATIVE_JOB_INPUT", "{what}");
     }

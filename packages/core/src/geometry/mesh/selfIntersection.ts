@@ -74,7 +74,9 @@ export function findSelfIntersections(
       ((rx[1] as number) - (rx[0] as number) + 1) *
       ((ry[1] as number) - (ry[0] as number) + 1) *
       ((rz[1] as number) - (rz[0] as number) + 1);
-    if (span > MAX_CELLS_PER_FACE) {
+    // a cell index past 2^53 cannot be counted up (i++ no longer changes it): such a face is large too
+    const beyondSafe = [rx, ry, rz].some((r) => !Number.isSafeInteger(r[1]));
+    if (span > MAX_CELLS_PER_FACE || beyondSafe) {
       large.push(f);
       isLarge[f] = 1;
       continue;
