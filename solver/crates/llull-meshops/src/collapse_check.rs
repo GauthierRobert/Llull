@@ -50,12 +50,12 @@ thread_local! {
 
 /// True when the caches are bypassed (only ever in a test).
 #[cfg(test)]
-fn caches_off() -> bool {
+pub(crate) fn caches_off() -> bool {
     CACHES_OFF.with(std::cell::Cell::get)
 }
 
 #[cfg(not(test))]
-const fn caches_off() -> bool {
+pub(crate) const fn caches_off() -> bool {
     false
 }
 
@@ -105,6 +105,21 @@ impl DeviationGuard {
         Self { max_deviation, owned, original, face_stamp: vec![0; faces], hint, blame: BlameTable::default() }
     }
 
+    /// Stores what a check of the edge `(u, v)` collapsed into `keep` found out: the witnesses (`updates`), the blamed probe and the hint of the survivor.
+    pub fn apply(&mut self, (u, v): (u32, u32), keep: u32, updates: &[ProbeUpdate], outcome: &Outcome) {
+        let removed = if keep == u { v } else { u };
+        for up in updates {
+            let list = if up.inherited { removed } else { up.owner };
+            self.owned[list as usize][up.index as usize] = up.probe;
+        }
+        if let Some(blamed) = outcome.blame {
+            self.blame.insert(edge_key(u, v), blamed);
+        }
+        if let Some(hint) = outcome.hint {
+            self.hint[keep as usize] = hint;
+        }
+    }
+
     /// Call when `removed` was merged into another vertex: its edges (to `ring`, its neighbours) are gone, and so is what the blame table remembers about them.
     pub fn prune_blame(&mut self, removed: u32, ring: &[u32]) {
         for &x in ring {
@@ -132,6 +147,33 @@ pub struct Scratch {
     affected: Vec<u32>,
     faces: Vec<[Vec3; 3]>,
     face_ids: Vec<u32>,
+    /// The witnesses the last check of the deviation guard wants stored (`DeviationGuard::apply`).
+    pub updates: Vec<ProbeUpdate>,
+}
+
+/// A witness to store: the probe at `index` of the list of `owner` (or of the list the removed vertex hands over when `inherited`) with its new witness.
+#[derive(Clone, Copy)]
+pub struct ProbeUpdate {
+    pub owner: u32,
+    pub inherited: bool,
+    pub index: u32,
+    pub probe: Probe,
+}
+
+/// What a check found out besides its verdict: caches the caller stores when it uses the verdict (a check on a frozen state can be made in parallel and used later).
+#[derive(Clone, Copy, Debug)]
+pub struct Outcome {
+    pub verdict: Verdict,
+    /// The probe that failed (owner, id): the next attempt on the edge tests it first.
+    pub blame: Option<(u32, u32)>,
+    /// The original triangle that answered the last query of the survivor.
+    pub hint: Option<u32>,
+}
+
+impl Outcome {
+    fn of(verdict: Verdict) -> Self {
+        Self { verdict, blame: None, hint: None }
+    }
 }
 
 /// Squared distance from `p` to triangle `abc` (Ericson 5.1.5).
@@ -211,13 +253,34 @@ pub fn valid_collapse(
     keep: u32,
     at: Vec3,
 ) -> Verdict {
+    let outcome = check_collapse(mesh, area_floor, guard.as_deref(), scratch, (u, v), keep, at, caches_off());
+    if let Some(guard) = guard {
+        guard.apply((u, v), keep, &scratch.updates, &outcome);
+    }
+    outcome.verdict
+}
+
+/// [`valid_collapse`] on a state it only reads: the caches it would store come back in `scratch.updates` and the [`Outcome`] (`DeviationGuard::apply`), so any number of checks of one
+/// frozen state can run in parallel. `off` bypasses the witnesses, blames and hints (a test switch).
+#[allow(clippy::too_many_arguments)]
+pub fn check_collapse(
+    mesh: &EditMesh,
+    area_floor: f64,
+    guard: Option<&DeviationGuard>,
+    scratch: &mut Scratch,
+    (u, v): (u32, u32),
+    keep: u32,
+    at: Vec3,
+    off: bool,
+) -> Outcome {
+    scratch.updates.clear();
     let Scratch { ring_u, ring_v, edge_faces, fan, .. } = scratch;
     mesh.faces_on_edge_into(u, v, edge_faces);
     if edge_faces.is_empty() {
-        return Verdict::Gone;
+        return Outcome::of(Verdict::Gone);
     }
     if edge_faces.len() > 2 {
-        return Verdict::Link;
+        return Outcome::of(Verdict::Link);
     }
     let boundary_u = mesh.ring_into(u, ring_u);
     let boundary_v = mesh.ring_into(v, ring_v);
@@ -228,14 +291,14 @@ pub fn valid_collapse(
     let apexes = &mut apexes[..edge_faces.len()];
     apexes.sort_unstable();
     if !same_common_elements(ring_u, ring_v, apexes) {
-        return Verdict::Link;
+        return Outcome::of(Verdict::Link);
     }
     if edge_faces.len() == 2 && boundary_u && boundary_v {
-        return Verdict::Link;
+        return Outcome::of(Verdict::Link);
     }
     // |ring(u) union ring(v)| counts u and v themselves
     if edge_faces.len() == 2 && (ring_u.len() + ring_v.len() - common_count(ring_u, ring_v)) as i64 - 2 <= 3 {
-        return Verdict::Link;
+        return Outcome::of(Verdict::Link);
     }
     let removed = if keep == u { v } else { u };
     fan.clear();
@@ -252,14 +315,14 @@ pub fn valid_collapse(
             // a normal or an area that is not a number (overflow) is no proof that the triangle survives: refused as a fold-over
             let (dot_normals, area) = (dot(before, after), length(after) / 2.0);
             if dot_normals <= 0.0 || dot_normals.is_nan() || area <= area_floor || area.is_nan() {
-                return Verdict::FoldOver;
+                return Outcome::of(Verdict::FoldOver);
             }
             fan.push([swap(x), swap(y), swap(z)]);
         }
     }
     match guard {
-        Some(guard) => deviation_verdict(mesh, guard, (u, v), (keep, at), scratch),
-        None => Verdict::Ok,
+        Some(guard) => deviation_verdict(mesh, guard, (u, v), (keep, at), scratch, off),
+        None => Outcome::of(Verdict::Ok),
     }
 }
 
@@ -279,9 +342,18 @@ struct Check<'a, F: Fn(u32) -> Vec3> {
     witnesses: bool,
 }
 
+/// How a probe stands after the collapse.
+enum Held {
+    Fails,
+    /// Within the bound of a face, and nothing to store (its witness is still good, or it has none to give).
+    Proven,
+    /// Within the bound of a face at its owner: the probe as it should be stored, with that face as its witness.
+    Witness(Probe),
+}
+
 impl<F: Fn(u32) -> Vec3> Check<'_, F> {
-    /// True when `probe`, owned by `o`, is within the bound of a face at `o` after the collapse.
-    fn holds(&mut self, o: u32, probe: &mut Probe) -> bool {
+    /// Whether `probe`, owned by `o`, is within the bound of a face at `o` after the collapse.
+    fn holds(&mut self, o: u32, probe: &Probe) -> Held {
         let (u, v) = self.edge;
         if self.witnesses
             && probe.face != NO_FACE
@@ -290,7 +362,7 @@ impl<F: Fn(u32) -> Vec3> Check<'_, F> {
             && !probe.corners.contains(&u)
             && !probe.corners.contains(&v)
         {
-            return true;
+            return Held::Proven;
         }
         if self.loaded != o {
             self.loaded = o;
@@ -321,23 +393,26 @@ impl<F: Fn(u32) -> Vec3> Check<'_, F> {
             Some(i) => {
                 let id = self.face_ids[i];
                 if id != NO_FACE && self.witnesses {
-                    *probe = Probe { face: id, stamp: self.face_stamp[id as usize], corners: self.mesh.corners(id), ..*probe };
+                    Held::Witness(Probe { face: id, stamp: self.face_stamp[id as usize], corners: self.mesh.corners(id), ..*probe })
+                } else {
+                    Held::Proven
                 }
-                true
             }
-            None => self.faces.is_empty() && limit.is_infinite() && limit > 0.0,
+            None if self.faces.is_empty() && limit.is_infinite() && limit > 0.0 => Held::Proven,
+            None => Held::Fails,
         }
     }
 }
 
 fn deviation_verdict(
     mesh: &EditMesh,
-    guard: &mut DeviationGuard,
+    guard: &DeviationGuard,
     (u, v): (u32, u32),
     (keep, at): (u32, Vec3),
     scratch: &mut Scratch,
-) -> Verdict {
-    let Scratch { ring_u, ring_v, fan, affected, faces, face_ids, .. } = scratch;
+    off: bool,
+) -> Outcome {
+    let Scratch { ring_u, ring_v, fan, affected, faces, face_ids, updates, .. } = scratch;
     let removed = if keep == u { v } else { u };
     affected.clear();
     affected.push(keep);
@@ -353,39 +428,51 @@ fn deviation_verdict(
     // is satisfied by the first triangle within the bound), the queries on the original surface after.
     let DeviationGuard { owned, original, face_stamp, hint, blame, .. } = guard;
     let edge = edge_key(u, v);
-    let off = caches_off();
     let mut check = Check { mesh, edge: (u, v), fan, limit, place: &place, face_stamp, faces, face_ids, loaded: NO_FACE, witnesses: !off };
     // the probes the removed vertex owned are the survivor's now; they are tested with its own
-    let mut inherited = std::mem::take(&mut owned[removed as usize]);
-    let mut nothing: Vec<Probe> = Vec::new();
+    let inherited: &[Probe] = &owned[removed as usize];
+    let nothing: &[Probe] = &[];
+    let mut tested = |check: &mut Check<'_, _>, o: u32, handed_over: bool, index: usize, probe: &Probe| -> bool {
+        match check.holds(o, probe) {
+            Held::Fails => false,
+            Held::Proven => true,
+            Held::Witness(witness) => {
+                updates.push(ProbeUpdate { owner: o, inherited: handed_over, index: index as u32, probe: witness });
+                true
+            }
+        }
+    };
     let failed: Option<(u32, u32)> = 'scan: {
         // the probe that failed the last attempt on this edge goes first (only one still owned by an affected vertex counts)
         if let Some(&(o, id)) = blame.get(&edge).filter(|_| !off) {
             if affected.contains(&o) {
-                let extra: &mut [Probe] = if o == keep { &mut inherited } else { &mut nothing };
-                if let Some(probe) = owned[o as usize].iter_mut().chain(extra.iter_mut()).find(|probe| probe.id == id) {
-                    if !check.holds(o, probe) {
+                let extra: &[Probe] = if o == keep { inherited } else { nothing };
+                let own = owned[o as usize].iter().enumerate().map(|(i, p)| (false, i, p));
+                let handed = extra.iter().enumerate().map(|(i, p)| (true, i, p));
+                if let Some((from_handed, i, probe)) = own.chain(handed).find(|(_, _, probe)| probe.id == id) {
+                    if !tested(&mut check, o, from_handed, i, probe) {
                         break 'scan Some((o, id));
                     }
                 }
             }
         }
         for &o in affected.iter() {
-            let extra: &mut [Probe] = if o == keep { &mut inherited } else { &mut nothing };
-            for probe in owned[o as usize].iter_mut().chain(extra.iter_mut()) {
-                if !check.holds(o, probe) {
+            let extra: &[Probe] = if o == keep { inherited } else { nothing };
+            for (i, probe) in owned[o as usize].iter().enumerate() {
+                if !tested(&mut check, o, false, i, probe) {
+                    break 'scan Some((o, probe.id));
+                }
+            }
+            for (i, probe) in extra.iter().enumerate() {
+                if !tested(&mut check, o, true, i, probe) {
                     break 'scan Some((o, probe.id));
                 }
             }
         }
         None
     };
-    owned[removed as usize] = inherited;
     if let Some(blamed) = failed {
-        if !off {
-            blame.insert(edge, blamed);
-        }
-        return Verdict::Deviation;
+        return Outcome { verdict: Verdict::Deviation, blame: (!off).then_some(blamed), hint: None };
     }
     // the queries on the original surface start from the triangle that answered the last one of this vertex
     let mut last = if off { NO_FACE } else { hint[keep as usize] };
@@ -411,10 +498,7 @@ fn deviation_verdict(
             }
         }
     }
-    if !off {
-        hint[keep as usize] = last;
-    }
-    verdict
+    Outcome { verdict, blame: None, hint: (!off).then_some(last) }
 }
 
 #[cfg(test)]

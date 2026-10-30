@@ -64,4 +64,6 @@ fn decimating_1_3_million_triangles_by_a_deviation_bound_alone_is_timed() {
         out_indices.len(),
         report.rejected
     );
+    // the bytes of every build since 13.10: the checks made ahead (13.27) and every cache change the time only
+    assert_eq!((report.collapses, report.triangles_after, digest), (521_051, 268_618, 0xe59d_ecae_c941_9492));
 }
