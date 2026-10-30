@@ -651,3 +651,10 @@ routing cases fail with the wiring removed (`execute`, `boolean`, `isTriangleOnl
 receive its display level of detail: deliberate, so the answer does not depend on which reads a command declares. Tests added: `blend_union` over a scan
 (fails without the `blendReport` guard), five scans under the cap one by one and above it together, the note once on a nested `build_project` and a clean
 next execute.
+
+## 17. As built (DES-1c, 2026-10-30)
+
+**`output.allowMeshFallback`** (every deform command). Decision D6 asked for a refusal by default; the as-built rule of §14 (mode `auto` answers an exact
+refusal with the faceted path and names the code in the summary and `data.exactRefused`) already reads "no silent fallback" as "never unannounced", and
+agents rely on it. The default stays `true` (that rule); `false` refuses with the exact code and its param path, so an exact body never becomes a mesh.
+Folds and rings refuse either way. Test: `tests/unit/deform/exactWarp.test.ts` (the `DEF_APPROX_TOLERANCE` refusal with the option false).

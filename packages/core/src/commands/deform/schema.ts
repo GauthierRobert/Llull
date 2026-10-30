@@ -55,6 +55,12 @@ export const outputParam = z
         'Largest deviation of the result from the true deformed surface, document units, > 0: the chordal deviation of the mesh path, or the fit error of the B-spline faces and edges on the exact path (a smaller value costs control points, not accuracy). Default: 1e-5 times the body bounding-box diagonal, clamped to [1e-6, 0.01].',
       )
       .optional(),
+    allowMeshFallback: z
+      .boolean()
+      .describe(
+        'Mode "auto" only: when the exact kernel refuses this deformation (approximation above output.tolerance, kernel failure), true (default) answers with the faceted mesh path and names the refusal in the summary and data.exactRefused; false refuses with that code instead, so an exact body never becomes a mesh. Folds (DEF_FOLDOVER) always refuse.',
+      )
+      .optional(),
     preserveAnalytic: z
       .boolean()
       .describe(

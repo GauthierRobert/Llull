@@ -85,6 +85,10 @@ describe('the exact warp of the native kernel (01 DEF M2), through a stub that b
     expect(fallen.error, fallen.summary).toBeUndefined();
     expect(fallen.summary).toContain('The exact warp refused (DEF_APPROX_TOLERANCE)');
     expect(dataOf<RunData & { exactRefused: string }>(fallen)).toMatchObject({ path: 'mesh', exactRefused: 'DEF_APPROX_TOLERANCE' });
+    // allowMeshFallback false: the exact body never becomes a mesh, the exact refusal is the answer (D6)
+    const strict = execute(doc, 'twist_body', { id, ...twist, output: { ...twist.output, allowMeshFallback: false } });
+    expectNoOp(strict, doc, 'DEF_APPROX_TOLERANCE');
+    expect(strict.error).toMatchObject({ code: 'DEF_APPROX_TOLERANCE', paths: ['params.output.tolerance'] });
     stubReport.current = null;
     const generic = execute(doc, 'twist_body', { id, ...twist });
     expect(dataOf<RunData & { exactRefused: string }>(generic)).toMatchObject({ path: 'mesh', exactRefused: 'DEF_KERNEL_REFUSED' });

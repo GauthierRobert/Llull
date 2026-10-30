@@ -214,8 +214,16 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
   if (plan.ring === true && !useKernel) return ringRefusal();
   let built = build(target, node, useKernel);
   let fallback: string | null = null;
-  if (isRefusal(built) && useKernel && mode === 'auto' && built.code !== 'DEF_FOLDOVER' && plan.ring !== true) {
-    // mode "auto": a refusal of the exact warp (approximation above the tolerance, modifier failure) is answered by the faceted path; folds are real and stay refused
+  if (
+    isRefusal(built) &&
+    useKernel &&
+    mode === 'auto' &&
+    output?.allowMeshFallback !== false &&
+    built.code !== 'DEF_FOLDOVER' &&
+    plan.ring !== true
+  ) {
+    // mode "auto": a refusal of the exact warp (approximation above the tolerance, modifier failure) is answered by the faceted path unless
+    // output.allowMeshFallback is false; folds are real and stay refused
     const faceted = build(target, node, false);
     if (!isRefusal(faceted)) {
       fallback = built.code;

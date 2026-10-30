@@ -25,6 +25,7 @@ export interface OutputInput {
   readonly mode?: 'auto' | 'exact' | 'mesh' | undefined;
   readonly tolerance?: number | undefined;
   readonly preserveAnalytic?: boolean | undefined;
+  readonly allowMeshFallback?: boolean | undefined;
 }
 
 export interface DeformRequest {
