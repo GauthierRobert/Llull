@@ -1330,7 +1330,7 @@ Each fails without its fix (shown by disabling the fix): the platform `acos` fai
 
 ### 13.12.6 Left, by name
 
-- Slice 2: `repair_mesh` (weld, clean, orient, stitch, close_holes) and `fill_mesh_holes` (Liepa); slice 3: `sculpt_mesh`; slice 4: `cut_mesh` (or lift its TypeScript cap) and the self-intersection search of `analyze_mesh`.
+- Slice 2 built (13.13); slice 3: `sculpt_mesh`; slice 4: `cut_mesh` (or lift its TypeScript cap) and the self-intersection search of `analyze_mesh`.
 - `maxDeviation`-only decimation and the memory-bound collapse loop (13.10.6) are unchanged.
 - The command-level TypeScript work around the job (`prepareSolidMesh`, `measureMesh` of the result) is synchronous: a 1.3M-triangle `remesh_mesh` spends it on the event loop.
 
@@ -1355,3 +1355,43 @@ Each fails without its fix (shown by disabling the fix): the platform `acos` fai
   - *Cell indices are doubles.* `lowCell` was an `Int32Array` and wrapped past 2^31 cells (coordinates 1e10 away from the lowest corner with unit triangles) while the grid key did not, so the pair was never tested; it is a `Float64Array`. `selfIntersectionDedupe.test.ts` has the far pair with a small triangle at the origin (1e6, 1e10, 3e11; it fails with the Int32Array) and shifted clusters against the brute-force definition. No other narrowing of an unbounded index is in the diff (Rust vertex and face indices are `u32` by the job format).
   - *The job budget.* With small meshes preferred for native, a plan of more than 256 small mesh steps ended in `MESH_JOB_LIMIT` where the TypeScript engine had run them in process. Once a resolve has used its `maxJobs`, a native op whose input is within the TypeScript cap answers `MESH_ENGINE_NEEDS_HOST` (after the held-results lookup, so finished jobs still answer) and the composite hands it to the TypeScript engine; only ops it cannot take (`quad_remesh`, meshes above its cap) still count against the hard limit. The remediation text of `MESH_JOB_LIMIT` says so. Test: `server/tests/deferredBudget.test.ts` (maxJobs + 3 small steps all succeed, three native and three in process; `quad_remesh` past the budget still refuses).
   - *Provenance differs by path.* A result is identical whichever engine produced it, but `data.provenance` (`engine`: `ts` or `native`, the version) records which one did: the same command can report `ts` on a synchronous host path and `native` on the resolving one.
+
+## 13.13 As built (DES-7c step 7, slice 2: native `repair` and `fill_holes`, 2026-10-30)
+
+### 13.13.1 Code
+
+`solver/crates/llull-meshops/src/{repair,repair_job,hole_fill,hole_triangulate,hole_refine,hole_fair}.rs` (new), `weld.rs` (tolerance weld), `analyze.rs` (shell volumes shared with `orient`), `lib.rs` (job names `repair`, `fill_holes`); `server/src/native/meshProcessingEngine.ts` (capabilities, job parameters, refusal mapping, report checks); core `geometry/mesh/{editable,reportChecks,engineTypes,tsEngineEdit}.ts`, `commands/mesh/runMeshOp.ts`. The commands (`repair_mesh`, `fill_mesh_holes`) are unchanged: only the engine that answers them changes.
+
+### 13.13.2 Decisions
+
+- **Parity, as slice 1.** Result bytes, report and refusals equal the TypeScript engine's (the oracle). The twin keeps the TypeScript order where a sum or a tie depends on it: faces ascending, the breadth-first shell order for the volume `orient` compares, the lowest index on every tie, edge keys `low * vertexCount + high` (held in `u64`). The tolerance weld buckets by the same 32-bit cell hash as `weld.ts` (`ToInt32` and `Math.imul` twins), so it sees the same candidates; cell indices are doubles, so cells past 2^31 still compare (test `stitch_compares_corners_in_grid_cells_whose_index_does_not_fit_32_bits`).
+- **`fill_holes` works on the mesh as given** (nothing welded, the loops are those of its own topology, numbered as `build_topology` does), like the TypeScript engine. A patch area that overflows (coordinates near 1e154) ends the job with `NATIVE_JOB_INPUT` and the composite falls through to the TypeScript engine; in practice the triangulation weights overflow first and both engines skip the loop by code. A point that is near no loop comes back as `HOLE_NEAR_NOT_FOUND` with the point's position in the list, and the host words `MESH_HOLE_NOT_FOUND` with the JavaScript text of the point, so the message is the TypeScript one.
+- **Caps and routing.** Native cap 4,000,000 triangles for both ops (`REPAIR_TRIANGLE_CAP`: the hole filler keeps per-vertex face lists, `orient` sorts three entries per triangle). Preferred above 50,000 triangles for `repair` and 30,000 for `fill_holes` (13.13.3). Both ask for `withDeviation`, so the job measures the deviation of its result (one round). A native report is checked (`isRepairReport`, `isFillReport`) before a command reads it; a malformed one is `MESH_ENGINE_UNSUPPORTED`. Past the job budget of a resolve, inputs within the TypeScript cap go to the TypeScript engine (13.12.7 budget rule).
+
+### 13.13.3 Measured (win32-x64, 22 cores; noisy icosphere of 13.12.1, the holed variant with 50 six-triangle holes; engine call through `resolveDeferred`, process start included; TypeScript straight to the engine, cap not applied; every native result had the TypeScript bytes)
+
+| Op | 81,920 | 327,680 | 1,310,720 |
+| -- | ------ | ------- | --------- |
+| `repair` `weld` (tolerance 0) | 69 / 67 ms | 403 / 163 ms (TS refused by the cap) | 2.32 / 0.56 s (refused) |
+| `repair` `stitch` | 256 / 135 ms | 2.18 / 0.39 s (refused) | 9.9 / 1.35 s (refused) |
+| `repair` `close_holes` | 394 / 124 ms | 3.28 / 0.43 s (refused) | 13.5 / 1.75 s (refused) |
+| `fill_holes` (all 50, curvature, refine) | 120 / 70 ms | 834 / 167 ms (refused) | 3.91 / 0.60 s (refused) |
+
+TypeScript / native. Small sizes (same method): at 5,120 triangles TypeScript answers in 3 to 43 ms, native in 41 to 134 ms (a cold job costs about 40 ms); at 20,480 they are even for `stitch` (56 / 54 ms) and `close_holes` (85 / 101 ms), TypeScript faster for `weld` (27 / 42) and `fill_holes` (33 / 45); at 81,920 native is no slower for every mode. Hence one `repair` threshold of 50,000 (between the `stitch` / `close_holes` break-even and the `weld` one near 80,000) and 30,000 for `fill_holes`.
+
+### 13.13.4 Tests
+
+Cargo `tests/repair.rs` (each mode on its own damage: soups, degenerate and duplicate faces in both windings, inside-out shells and flipped patches, a crack, a stitch that would pinch the surface reverted with its note, cells past 32 bits, small shells by count and volume with the largest kept; fill selection, greedy clipping above the dynamic-program limit, fairing of a big hole, skipped and refused loops by code; same bytes on every run and thread count; stable refusal codes; stages with rising fractions and the in-job deviation; hostile meshes without a panic or an index past the vertices) and `tests/ts_pins.rs` (repair and fill pins of the TypeScript engine in `ts_pins.json`). Server: `meshopsNativeRepair.test.ts` (native == TypeScript, bit for bit, for every mode and fairing, the selections and refusals, unrefined input; the routing thresholds, the hand-over outside the resolving path, the fall-back on a job it cannot take, the caps, the provenance), `meshRepairNativeHost.test.ts` (`repair_mesh` and `fill_mesh_holes` on a stored 327,680-triangle mesh at full resolution, stages, `MESH_TIMEOUT`, closing the connection kills the process, the band between the preference sizes and the TypeScript cap), `deferredBudget.test.ts` (repair and fill past the budget), `meshopsMalformedResult.test.ts` (malformed reports). Core: `nativeEditOps.test.ts` (`isRepairReport`, `isFillReport`), `withDeviation.test.ts` (both commands ask with the job above the TypeScript cap).
+
+### 13.13.5 Left, by name
+
+Slice 3: `sculpt_mesh`; slice 4: `cut_mesh` (or lift its TypeScript cap) and the self-intersection search of `analyze_mesh`.
+
+### 13.13.6 Review round 1 (2026-10-30)
+
+- The cell-wrap test now sits in cells 2^31 - 1 and 2^31 (it was at 2^30, inside 32 bits); a wrapping narrowing of the cell index fails it (checked by mutation).
+- The in-job deviation of `repair` (from a raw soup) and `fill_holes` equals the separate native job and the TypeScript engine (`meshopsNative.test.ts`).
+- `HOLE_NEAR_NOT_FOUND` is tested with the failing point second, so the host words the right point.
+- Only the four documented `MESH_HOLE_*` codes pass to the command; any other job code is `MESH_ENGINE_UNSUPPORTED` (stand-in job `hole_code`).
+- The report checks take the op: `isRepairReport(report, mode)` and `isFillReport(report, fairing)` refuse a report for another mode or fairing and loop numbers at or past `totalLoops` (stand-in job `other_report`, and the unit cases).
+- The 1e100 coordinate guard of `fill_holes` is gone (it refused answerable meshes above the TypeScript cap); the job checks the patch areas it reports instead.

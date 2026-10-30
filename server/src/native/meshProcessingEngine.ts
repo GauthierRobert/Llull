@@ -18,11 +18,14 @@ import { isMeshAnalysis } from '@core/geometry/mesh/analysis';
 import {
   ANALYZE_DESCRIPTION,
   DECIMATE_DESCRIPTION,
+  FILL_HOLES_DESCRIPTION,
   QUAD_DESCRIPTION,
   REMESH_DESCRIPTION,
   editableProblem,
+  repairDescription,
   smoothDescription,
 } from '@core/geometry/mesh/editable';
+import { isFillReport, isRepairReport } from '@core/geometry/mesh/reportChecks';
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
@@ -46,6 +49,8 @@ const DEFAULT_HEARTBEAT_MS = 5000;
 const QUAD_REMESH_TRIANGLE_CAP = 500_000;
 /** Named guard: input triangles above which remesh refuses (the working mesh keeps per-vertex face lists: about 1 GB at this size; decimate_mesh first). */
 const REMESH_TRIANGLE_CAP = 2_000_000;
+/** Named guard: input triangles above which repair and fill_holes refuse (the working mesh of the hole filler keeps per-vertex face lists; the edge sort of orient holds 3 entries per triangle). */
+const REPAIR_TRIANGLE_CAP = 4_000_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
@@ -54,6 +59,8 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['smooth', Infinity],
   ['remesh', REMESH_TRIANGLE_CAP],
   ['analyze', Infinity],
+  ['repair', REPAIR_TRIANGLE_CAP],
+  ['fill_holes', REPAIR_TRIANGLE_CAP],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
 ]);
@@ -78,6 +85,16 @@ const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, num
   ['deviation', 3_000],
   ['smooth', 10_000],
   ['analyze', 15_000],
+  ['repair', 50_000],
+  ['fill_holes', 30_000],
+]);
+
+/** The refusals of `fill_holes` a job may hand to the command as they are (`fill_mesh_holes` documents them); any other code is `MESH_ENGINE_UNSUPPORTED`. */
+const FILL_REFUSALS: ReadonlySet<string> = new Set([
+  'MESH_HOLE_NOT_FOUND',
+  'MESH_HOLE_TOO_LARGE',
+  'MESH_HOLE_NON_SIMPLE',
+  'MESH_HOLE_NO_TRIANGULATION',
 ]);
 
 const failure = (code: string, message: string): MeshEngineFailure => ({ code, message });
@@ -85,7 +102,10 @@ const failure = (code: string, message: string): MeshEngineFailure => ({ code, m
 const regionOf = (region: { readonly center: readonly number[]; readonly radius: number } | undefined): Record<string, unknown> =>
   region === undefined ? {} : { center: [...region.center], radius: region.radius };
 
-type NativeOp = Extract<MeshOp, { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'deviation' | 'quad_remesh' }>;
+type NativeOp = Extract<
+  MeshOp,
+  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'deviation' | 'quad_remesh' }
+>;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
@@ -96,6 +116,22 @@ function deviationRequest(op: NativeOp): { deviationSamples?: number } {
 function jobParams(op: NativeOp): Record<string, unknown> {
   if (op.op === 'deviation') return { maxSamples: op.maxSamples };
   if (op.op === 'analyze') return { maxListed: op.maxListed, weldTolerance: op.weldTolerance, selfIntersections: op.selfIntersections };
+  if (op.op === 'repair')
+    return {
+      mode: op.mode,
+      weldTolerance: op.weldTolerance,
+      maxGap: op.maxGap,
+      maxBoundaryEdges: op.maxBoundaryEdges,
+      ...(op.smallComponents !== undefined ? { smallComponents: op.smallComponents } : {}),
+    };
+  if (op.op === 'fill_holes')
+    return {
+      select: op.select,
+      maxBoundaryEdges: op.maxBoundaryEdges,
+      fairing: op.fairing,
+      refine: op.refine,
+      ...(op.alpha !== undefined ? { alpha: op.alpha } : {}),
+    };
   if (op.op === 'quad_remesh')
     return { targetFaces: op.targetQuads, adaptive: op.adaptive, ...(op.hardEdgeRad !== undefined ? { hardEdgeRad: op.hardEdgeRad } : {}) };
   if (op.op === 'remesh')
@@ -196,6 +232,12 @@ function keyOf(files: readonly JobFile[]): string {
 function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFailure {
   if (run.code === 'NATIVE_TIMEOUT') return failure('MESH_TIMEOUT', `llull-compute meshops ${op.op} exceeded ${timeoutMs / 1000} s`);
   if (run.code === 'NATIVE_CANCELLED') return failure('MESH_CANCELLED', `llull-compute meshops ${op.op} was cancelled`);
+  if (op.op === 'fill_holes' && run.code !== undefined && FILL_REFUSALS.has(run.code)) return failure(run.code, run.message ?? run.code);
+  if (op.op === 'fill_holes' && run.code === 'HOLE_NEAR_NOT_FOUND') {
+    // the job names the point by its position in the list; the text of a point is the JavaScript one
+    const point = typeof op.select === 'object' && 'near' in op.select ? op.select.near[Number(run.message)] : undefined;
+    if (point !== undefined) return failure('MESH_HOLE_NOT_FOUND', `no boundary loop near [${point.join(', ')}]: the mesh has none`);
+  }
   if (run.code === 'REMESH_TOO_LARGE') return failure('MESH_REMESH_RESULT_TOO_LARGE', run.message ?? 'the remeshed surface is too large');
   if (op.op === 'quad_remesh')
     return failure('MESH_QUAD_REMESH_FAILED', `QuadriFlow: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
@@ -247,8 +289,18 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
       ...measured,
       provenance: provenance(QUAD_DESCRIPTION.algorithm, QUAD_DESCRIPTION.reference, QUADRIFLOW_LIBRARY),
     };
+  if ((op.op === 'repair' && !isRepairReport(report, op.mode)) || (op.op === 'fill_holes' && !isFillReport(report, op.fairing)))
+    return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: the job returned a malformed report`);
   const description =
-    op.op === 'decimate' ? DECIMATE_DESCRIPTION : op.op === 'remesh' ? REMESH_DESCRIPTION : smoothDescription(op.method === 'taubin');
+    op.op === 'repair'
+      ? repairDescription(op.mode)
+      : op.op === 'fill_holes'
+        ? FILL_HOLES_DESCRIPTION
+        : op.op === 'decimate'
+          ? DECIMATE_DESCRIPTION
+          : op.op === 'remesh'
+            ? REMESH_DESCRIPTION
+            : smoothDescription(op.method === 'taubin');
   return { mesh, report, ...measured, provenance: provenance(description.algorithm, description.reference) };
 }
 

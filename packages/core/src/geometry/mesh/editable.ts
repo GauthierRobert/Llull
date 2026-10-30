@@ -2,6 +2,7 @@
 
 import type { MeshData } from '../../model/types';
 import { fastMeasure } from './fastMeasure';
+import type { RepairMode } from './repair';
 import type { MeshEngineFailure, MeshProvenance } from './engineTypes';
 
 const failure = (code: string, message: string): MeshEngineFailure => ({ code, message });
@@ -44,3 +45,14 @@ export const smoothDescription = (taubin: boolean): Description => ({
   algorithm: taubin ? 'Taubin lambda|mu umbrella smoothing' : 'Laplacian umbrella smoothing',
   reference: 'Taubin, A Signal Processing Approach to Fair Surface Design, SIGGRAPH 1995',
 });
+
+export const repairDescription = (mode: RepairMode): Description => ({
+  algorithm: `repair ${mode}: weld, clean (duplicate / degenerate faces), BFS orientation, boundary-vertex stitch, shell removal, Liepa fill`,
+  reference: 'Fusion Repair / Rhino MeshRepair / Magics Fix semantics; Liepa 2003',
+});
+
+export const FILL_HOLES_DESCRIPTION: Description = {
+  algorithm:
+    'Liepa hole filling: O(n^3) dihedral/area triangulation, centroid refinement with Delaunay relaxation, membrane / thin-plate fairing (CG)',
+  reference: 'Liepa, Filling Holes in Meshes, SGP 2003, pp. 200-206',
+};

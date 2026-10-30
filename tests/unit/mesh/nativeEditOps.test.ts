@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeIndexedMesh, isMeshAnalysis } from '@core/geometry/mesh/analysis';
 import { isEngineFailure, type MeshOp } from '@core/geometry/mesh/engineTypes';
+import { isFillReport, isRepairReport } from '@core/geometry/mesh/reportChecks';
 import { REMESH_MAX_TRIANGLES, remeshMesh } from '@core/geometry/mesh/remesh';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import { icosphere } from '../../helpers/meshFixtures';
@@ -83,5 +84,76 @@ describe('isMeshAnalysis', () => {
     ],
   ])('refuses %s', (_name, value) => {
     expect(isMeshAnalysis(value)).toBe(false);
+  });
+});
+
+describe('isRepairReport and isFillReport', () => {
+  const sphere = icosphere(10, 2);
+  const open = { positions: sphere.positions, indices: sphere.indices.slice(18) };
+  const repaired = tsMeshEngine.run(
+    { mesh: open },
+    { op: 'repair', mode: 'close_holes', weldTolerance: 1e-6, maxGap: 1e-4, maxBoundaryEdges: 100 },
+  );
+  const fillOp = { op: 'fill_holes', select: 'all', maxBoundaryEdges: 100, fairing: 'curvature', refine: true } as const;
+  const filled = tsMeshEngine.run({ mesh: open }, fillOp);
+  const skipped = tsMeshEngine.run({ mesh: open }, { ...fillOp, maxBoundaryEdges: 3 });
+  if (isEngineFailure(repaired) || isEngineFailure(filled) || isEngineFailure(skipped)) throw new Error('the oracle failed');
+  type Json = Record<string, unknown>;
+  /** A copy of `report` after a round trip through JSON, damaged by `change`. */
+  const broken = (report: unknown, change: (copy: Json) => void = () => undefined): Json => {
+    const copy = JSON.parse(JSON.stringify(report)) as Json;
+    change(copy);
+    return copy;
+  };
+  const changes = (r: Json): Json => r['changes'] as Json;
+  const hole = (r: Json, key: string): Json => (r[key] as Json[])[0] as Json;
+
+  it('accept what the TypeScript engine reports, also after a round trip through JSON', () => {
+    expect((repaired.report as { changes: { holesFilled: number } }).changes.holesFilled).toBeGreaterThan(0);
+    expect(isRepairReport(broken(repaired.report), 'close_holes')).toBe(true);
+    expect((filled.report as { filled: unknown[] }).filled.length).toBeGreaterThan(0);
+    expect(isFillReport(broken(filled.report), 'curvature')).toBe(true);
+    expect((skipped.report as { skipped: unknown[] }).skipped.length).toBeGreaterThan(0);
+    expect(isFillReport(broken(skipped.report), 'curvature')).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['an array', []],
+    ['a mode that is not one', broken(repaired.report, (r) => (r['mode'] = 'wrap'))],
+    ['a mode that is not a string', broken(repaired.report, (r) => (r['mode'] = 3))],
+    ['the report of another mode than the one asked', broken(repaired.report, (r) => (r['mode'] = 'weld'))],
+    ['no changes', broken(repaired.report, (r) => delete r['changes'])],
+    ['a change count missing', broken(repaired.report, (r) => delete changes(r)['stitched'])],
+    ['a fractional change count', broken(repaired.report, (r) => (changes(r)['welded'] = 1.5))],
+    ['a negative change count', broken(repaired.report, (r) => (changes(r)['flipped'] = -1))],
+    ['notes that are not text', broken(repaired.report, (r) => (r['notes'] = [1]))],
+    ['no notes', broken(repaired.report, (r) => delete r['notes'])],
+    ['a skipped count that is null', broken(repaired.report, (r) => (r['skippedHoles'] = null))],
+  ])('isRepairReport refuses %s', (_name, value) => {
+    expect(isRepairReport(value, 'close_holes')).toBe(false);
+  });
+
+  it.each([
+    ['null', null],
+    ['no loop count', broken(filled.report, (r) => delete r['totalLoops'])],
+    ['a negative loop count', broken(filled.report, (r) => (r['totalLoops'] = -1))],
+    ['filled that is not a list', broken(filled.report, (r) => (r['filled'] = {}))],
+    ['a filled hole that is not an object', broken(filled.report, (r) => (r['filled'] = [1]))],
+    ['a filled hole without its triangles', broken(filled.report, (r) => delete hole(r, 'filled')['triangles'])],
+    ['an area that is null (a NaN through JSON)', broken(filled.report, (r) => (hole(r, 'filled')['area'] = null))],
+    ['a triangulation that is not one', broken(filled.report, (r) => (hole(r, 'filled')['triangulation'] = 'ear'))],
+    ['a fairing that is not one', broken(filled.report, (r) => (hole(r, 'filled')['fairing'] = 'smooth'))],
+    ['a fairing other than the one asked', broken(filled.report, (r) => (hole(r, 'filled')['fairing'] = 'tangent'))],
+    ['a filled loop number past totalLoops', broken(filled.report, (r) => (hole(r, 'filled')['loop'] = r['totalLoops']))],
+    ['a skipped loop number past totalLoops', broken(skipped.report, (r) => (hole(r, 'skipped')['loop'] = 1e9))],
+    ['skipped that is not a list', broken(filled.report, (r) => (r['skipped'] = 0))],
+    [
+      'a skipped loop with a code that is not a hole refusal',
+      broken(skipped.report, (r) => (hole(r, 'skipped')['code'] = 'MESH_NOT_A_MESH')),
+    ],
+    ['a skipped loop without its edges', broken(skipped.report, (r) => delete hole(r, 'skipped')['edges'])],
+  ])('isFillReport refuses %s', (_name, value) => {
+    expect(isFillReport(value, 'curvature')).toBe(false);
   });
 });

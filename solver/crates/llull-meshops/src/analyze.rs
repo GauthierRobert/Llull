@@ -3,7 +3,7 @@
 //! bit-identical; the per-face metrics are computed in parallel and reduced sequentially. The self-intersection search stays in TypeScript.
 
 use crate::geom::{diagonal, dot, js_max, js_min, length, Vec3};
-use crate::topology::{build_topology, NO_SHELL};
+use crate::topology::{build_topology, Topology, NO_SHELL};
 use llull_jsmath::{acos, hypot};
 use rayon::prelude::*;
 use serde::Serialize;
@@ -276,6 +276,31 @@ pub fn analyze(positions: &[f64], triangles: &[u32], max_listed: usize) -> Analy
         bounds: bounds(positions),
         diagonal: diagonal(positions),
     }
+}
+
+/// The faces and the signed volume of each shell of `topology` (the volume is `None` when the shell is open, non-manifold or inconsistently wound), summed in
+/// face order as `analyze` does: what `repair` needs to remove small shells.
+pub(crate) fn shell_volumes(positions: &[f64], triangles: &[u32], topology: &Topology) -> Vec<(usize, Option<f64>)> {
+    let corner = |v: u32| -> Vec3 { [positions[v as usize * 3], positions[v as usize * 3 + 1], positions[v as usize * 3 + 2]] };
+    let mut shells: Vec<(usize, f64)> = vec![(0, 0.0); topology.shell_count];
+    for (face, &shell) in topology.face_shell.iter().enumerate() {
+        if shell == NO_SHELL {
+            continue;
+        }
+        let t = &triangles[face * 3..face * 3 + 3];
+        let (pa, pb, pc) = (corner(t[0]), corner(t[1]), corner(t[2]));
+        shells[shell as usize].0 += 1;
+        shells[shell as usize].1 += dot(pa, cross(pb, pc)) / 6.0;
+    }
+    let mut inconsistent = vec![false; topology.shell_count];
+    for &face in &topology.inconsistent_faces {
+        inconsistent[topology.face_shell[face as usize] as usize] = true;
+    }
+    shells
+        .iter()
+        .enumerate()
+        .map(|(shell, &(faces, volume))| (faces, (!topology.unclosed_shells[shell] && !inconsistent[shell]).then_some(volume)))
+        .collect()
 }
 
 fn loop_summary(vertices: &[u32], corner: &impl Fn(u32) -> Vec3) -> LoopSummary {

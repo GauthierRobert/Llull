@@ -139,3 +139,29 @@ export function box(size: number, n: number): MeshData {
   }
   return { positions: unique, indices: indices.map((v) => remap[v] as number) };
 }
+
+/**
+ * `mesh` with `count` holes: the faces around evenly spaced vertices are removed (6 triangles for a vertex of valence 6), skipping vertices whose
+ * neighbourhood touches an earlier hole, so every hole is its own boundary loop. Faces keep their order.
+ */
+export function withHoles(mesh: MeshData, count: number): MeshData {
+  const vertices = mesh.positions.length / 3;
+  const faceCount = mesh.indices.length / 3;
+  const around: number[][] = Array.from({ length: vertices }, () => []);
+  for (let f = 0; f < faceCount; f++) for (let k = 0; k < 3; k++) (around[mesh.indices[f * 3 + k] as number] as number[]).push(f);
+  const removed = new Set<number>();
+  const taken = new Set<number>();
+  let holes = 0;
+  const stride = Math.max(1, Math.floor(vertices / count));
+  for (let v = Math.floor(stride / 2); v < vertices && holes < count; v += stride) {
+    const faces = around[v] as number[];
+    const ring = faces.flatMap((f) => [0, 1, 2].map((k) => mesh.indices[f * 3 + k] as number));
+    if (ring.some((w) => taken.has(w))) continue;
+    for (const f of faces) removed.add(f);
+    for (const w of ring) taken.add(w);
+    holes++;
+  }
+  const indices: number[] = [];
+  for (let f = 0; f < faceCount; f++) if (!removed.has(f)) indices.push(...mesh.indices.slice(f * 3, f * 3 + 3));
+  return { positions: mesh.positions, indices };
+}

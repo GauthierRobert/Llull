@@ -1,4 +1,4 @@
-//! Results of the TypeScript mesh engine (the oracle of VC-MSH-32), pinned for the ops ported in DES-7c step 7 (remesh, analyze): the SHA-256 of the result positions
+//! Results of the TypeScript mesh engine (the oracle of VC-MSH-32), pinned for the ops ported in DES-7c step 7 (remesh, analyze, repair, fill_holes): the SHA-256 of the result positions
 //! (`result_positions.f64`) followed by the indices (`result_indices.u32`), the whole `report` of `report.json` and, for `analyze`, its `analysis`, from `data/ts_pins.json`.
 //! `native:check` runs cargo only, so these pins keep the bit-identity of the Rust code testable where the server suite does not run;
 //! `server/tests/meshopsNative.test.ts` is the live comparison.
@@ -47,6 +47,61 @@ fn analyze(extra: Value) -> Value {
     json!({ "op": "analyze", "params": params })
 }
 
+fn repair(mode: &str, extra: Value) -> Value {
+    let mut params = json!({ "mode": mode, "weldTolerance": 1e-9, "maxGap": 1e-6, "maxBoundaryEdges": 1000 });
+    params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    json!({ "op": "repair", "params": params })
+}
+
+fn fill(extra: Value) -> Value {
+    let mut params =
+        json!({ "select": "all", "maxBoundaryEdges": 1000, "fairing": "curvature", "refine": true, "alpha": std::f64::consts::SQRT_2 });
+    params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    json!({ "op": "fill_holes", "params": params })
+}
+
+/// `mesh` without the faces listed.
+fn without(mesh: &Mesh, faces: &[usize]) -> Mesh {
+    let indices = mesh.1.chunks_exact(3).enumerate().filter(|(f, _)| !faces.contains(f)).flat_map(|(_, t)| t.to_vec()).collect();
+    (mesh.0.clone(), indices)
+}
+
+/// A mesh as a soup of three private vertices per face, each moved by up to `jitter`.
+fn soup(mesh: &Mesh, jitter: f64, seed: u64) -> Mesh {
+    let mut next = stream(seed);
+    let positions = mesh.1.iter().flat_map(|&v| point(&mesh.0, v).map(|x| x + (next() * 2.0 - 1.0) * jitter)).collect();
+    (positions, (0..mesh.1.len() as u32).collect())
+}
+
+/// `mesh` with the winding of the faces listed reversed.
+fn flipped(mesh: &Mesh, faces: &[usize]) -> Mesh {
+    let mut out = mesh.clone();
+    faces.iter().for_each(|&f| out.1.swap(f * 3 + 1, f * 3 + 2));
+    out
+}
+
+/// Holes of 6 to 10 edges in a noisy sphere.
+fn holey_sphere() -> Mesh {
+    without(&sphere(4, 0.03, 9), &[10, 11, 12, 13, 14, 15, 400, 401, 402, 403, 900, 901, 902, 903, 904, 905, 906])
+}
+
+/// The corner 2 is 0.001 from the corner 1: merging them would put a third face on the edge 0-1, so the stitch is reverted.
+fn pinch() -> Mesh {
+    (vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.001, 0.0, 0.5, 1.0, 0.0, 0.5, -1.0, 0.0, 0.5, 0.5, 1.0], vec![0, 1, 3, 1, 0, 4, 0, 2, 5])
+}
+
+/// Two wavy patches 0.001 apart: the vertices along the crack exist twice.
+fn cracked() -> Mesh {
+    let patch = grid(8, |_, y| 0.3 * y.cos(), &[]);
+    side_by_side(&[patch.clone(), patch], 10.001)
+}
+
+/// A square grid of 100 cells a side with a 40 x 40 block of cells left out: a hole of 160 edges, above the limit of the dynamic program.
+fn greedy_hole() -> Mesh {
+    let holes: Vec<(usize, usize)> = (30..70).flat_map(|i| (30..70).map(move |j| (i, j))).collect();
+    grid(100, |x, y| 0.1 * x.sin() * y.cos(), &holes)
+}
+
 /// `parts` meshes side by side (one shell each, shifted along x by `gap`).
 fn side_by_side(parts: &[Mesh], gap: f64) -> Mesh {
     let (mut positions, mut indices) = (Vec::new(), Vec::new());
@@ -74,6 +129,12 @@ fn damaged_sphere() -> Mesh {
     (soup_positions, (0..faces.len() as u32 * 3).collect())
 }
 
+/// `mesh` with a face that repeats a corner.
+fn with_degenerate(mut mesh: Mesh) -> Mesh {
+    mesh.1.extend([0, 0, 4]);
+    mesh
+}
+
 fn pins() -> Vec<Pin> {
     vec![
         Pin { name: "remesh_sphere_split", mesh: sphere(3, 0.05, 7), job: remesh(json!({ "targetEdge": 0.9 })) },
@@ -97,6 +158,36 @@ fn pins() -> Vec<Pin> {
             job: analyze(json!({ "maxListed": 1 })),
         },
         Pin { name: "analyze_damaged_soup", mesh: damaged_sphere(), job: analyze(json!({})) },
+        Pin {
+            name: "repair_weld_soup",
+            mesh: with_degenerate(soup(&sphere(2, 0.0, 1), 2e-5, 3)),
+            job: repair("weld", json!({ "weldTolerance": 1e-4 })),
+        },
+        Pin { name: "repair_clean_damaged", mesh: damaged_sphere(), job: repair("clean", json!({})) },
+        Pin {
+            name: "repair_orient_flipped",
+            mesh: side_by_side(
+                &[flipped(&sphere(3, 0.05, 4), &[3, 4, 5, 90, 200]), flipped(&sphere(2, 0.0, 6), &(0..320).collect::<Vec<_>>())],
+                30.0,
+            ),
+            job: repair("orient", json!({})),
+        },
+        Pin { name: "repair_stitch_cracked", mesh: cracked(), job: repair("stitch", json!({ "maxGap": 0.002 })) },
+        Pin { name: "repair_stitch_reverted", mesh: pinch(), job: repair("stitch", json!({ "maxGap": 0.01, "weldTolerance": 0.0 })) },
+        Pin { name: "repair_close_holes", mesh: holey_sphere(), job: repair("close_holes", json!({})) },
+        Pin { name: "repair_close_holes_greedy", mesh: greedy_hole(), job: repair("close_holes", json!({})) },
+        Pin {
+            name: "repair_small_shells",
+            mesh: side_by_side(&[sphere(3, 0.0, 1), sphere(1, 0.0, 1), grid(3, |_, _| 0.0, &[])], 40.0),
+            job: repair("clean", json!({ "smallComponents": { "maxFaces": 100, "maxVolume": 5000.0 } })),
+        },
+        Pin { name: "fill_curvature_alpha_2", mesh: holey_sphere(), job: fill(json!({ "alpha": 2.0 })) },
+        Pin {
+            name: "fill_tangent_near",
+            mesh: grid(30, |x, y| 0.2 * (x * y).sin(), &(8..22).flat_map(|i| (8..22).map(move |j| (i, j))).collect::<Vec<_>>()),
+            job: fill(json!({ "fairing": "tangent", "alpha": 2.0, "select": { "near": [[5.0, 5.0, 0.0]] } })),
+        },
+        Pin { name: "fill_plain_loops", mesh: holey_sphere(), job: fill(json!({ "fairing": "none", "refine": false, "select": [1, 0] })) },
         Pin {
             name: "remesh_free_boundary",
             mesh: grid(16, wavy, &[(3, 3), (10, 12)]),

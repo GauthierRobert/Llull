@@ -14,7 +14,8 @@ import type { MeshData } from '@core/model/types';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeMeshEngine, deviationFrom } from '../src/native/meshProcessingEngine';
 import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
-import { box, grid, hashOf, icosphere, noisy } from './meshopsNativeSupport';
+import { box, grid, hashOf, icosphere, noisy, withHoles } from './meshopsNativeSupport';
+import { soupOf } from './meshopsRepairSupport';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNative: llull-compute not built (cargo build in solver/): native runs skipped');
@@ -405,6 +406,17 @@ describe('a native job that measures the deviation of its own result (TECHNICAL_
   native.each([
     ['decimate', icosphere(10, 4), decimate({ targetTriangles: 400 })],
     ['smooth', icosphere(10, 3), smooth({ iterations: 5 })],
+    // repair measures from the raw input (a soup with unused, duplicate and degenerate corners); fill_holes from the open mesh
+    [
+      'repair',
+      soupOf(withHoles(icosphere(10, 3), 5), 1e-4, 3),
+      { op: 'repair', mode: 'close_holes', weldTolerance: 1e-3, maxGap: 0.01, maxBoundaryEdges: 1000 } as MeshOp,
+    ],
+    [
+      'fill_holes',
+      withHoles(noisy(icosphere(10, 4), 0.02), 10),
+      { op: 'fill_holes', select: 'all', maxBoundaryEdges: 1000, fairing: 'curvature', refine: true } as MeshOp,
+    ],
   ] as const)('%s: the deviation in the answer is the one the separate job, and the TypeScript engine, give', async (_name, mesh, op) => {
     const asked = { ...op, withDeviation: MAX_SAMPLES } as MeshOp;
     const answer = await nativeRun({ mesh }, asked);
