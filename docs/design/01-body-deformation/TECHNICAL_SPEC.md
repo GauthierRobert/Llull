@@ -946,3 +946,26 @@ Until now `true` was refused (`DEF_EXACT_UNAVAILABLE`). The exact warp (`cpp/def
 
 Tests: `deform_tests.rs` (`preserve_analytic_turns_the_tapered_cylinder_back_into_a_cone`, `preserve_analytic_keeps_a_twisted_cylinder_a_cylinder_...`; red-proof: with the rebuild switched off the faces stay
 "other" and both fail), `server/tests/nativeKernelAnalytic.test.ts` (the command, the topology kinds, the half angle, the refusals), the tool-schema snapshot (the `preserveAnalytic` description).
+
+### 17.12 Native `faceQuery.bspline`
+
+**What the TS side does.** `FaceQueryPort.bspline(shape, face)` is declared (`kernelPorts.ts`) and listed in the native method table, but the sidecar answered `null` (`bins/llull-kernel/src/queries.rs`: "no caller reads it yet"). The one consumer
+that wants a face as a surface, the face target of `flow_on_surface` (`faceTarget`), therefore samples the face 65 x 65 through `evaluateFace` and interpolates a cubic B-spline through the samples (an approximation
+of the face, not the face).
+
+**What the sidecar answers now** (`face_bspline_json`, `face_queries.cxx`): the surface of the face over the face's parameter box (the box of `faceGeometry.uvBounds`) as ONE clamped, non-periodic B-spline:
+`degreeU/V`, `poles[i][j]` (i along u), `weights` when rational, distinct `knotsU/V` with `multsU/V`, `periodicU/V` (always false: `SetUNotPeriodic`, so a cylinder's seam is a doubled pole line and a consumer needs no
+wrap-around knots), and `reversed` (the face's normal is the opposite of S_u x S_v).
+
+- A fitted B-spline face (the result of an exact warp) is cut to the box (`Geom_RectangularTrimmedSurface` + `GeomConvert::SurfaceToBSplineSurface`): the same (u, v) give the same point as `evaluateFace`.
+- An elementary face (plane, cylinder, cone, sphere, torus, revolution, extrusion) becomes its exact rational B-spline: the SURFACE is the face's, the parameters are not (a rational quadratic circle is not
+  angle-parameterised), so a consumer that needs the native parameters keeps `faceGeometry` / `evaluateFace`.
+- An index out of range, a face without a surface or a failed conversion answer `null`.
+
+**Parity tests.** `queries_tests.rs` `faceq_bspline_is_the_face_surface_for_planes_cylinders_and_spheres` (Cox-de Boor evaluation of the answer: every point that falls on the face is within 1e-9 of it, `projectOnFace`;
+no periodic flag; the unit box, a cylinder, a sphere), `server/tests/nativeKernelFaceBspline.test.ts` (through the sidecar and the library evaluator `evaluateSurface`: box, cylinder, sphere, cone, torus faces within 1e-9
+of the face; the fitted faces of a point push parameter for parameter within 1e-9; an out-of-range index answers null), the session test in `bins/llull-kernel/src/queries.rs` (was: answers null). Red-proof: before, every one of these
+fails (the answer was `null`).
+
+**Consumer.** `faceTarget` is NOT switched in this change: the rational conversion of an elementary face has other parameters than the sampled cubic fit, and I did not re-measure VC-DEF-17 (the wrap onto a drum face) with it, so
+the face target keeps its 65 x 65 sampling. The exact surface is there for the switch, which is a separate, measured change.

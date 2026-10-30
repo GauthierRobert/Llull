@@ -23,6 +23,7 @@ mod ffi {
         fn face_contains_json(shape: &Shape, face: i32, point: &[f64], tolerance: f64) -> Result<String>;
         fn face_graph_json(shape: &Shape) -> Result<String>;
         fn face_geometry_json(shape: &Shape, face: i32) -> Result<String>;
+        fn face_bspline_json(shape: &Shape, face: i32) -> Result<String>;
         fn project_on_face_json(shape: &Shape, face: i32, points: &[f64]) -> Result<String>;
         fn evaluate_face_json(shape: &Shape, face: i32, uv: &[f64]) -> Result<String>;
         fn face_samples_json(shape: &Shape, face: i32, uv: &[f64], nu: i32, nv: i32) -> Result<String>;
@@ -97,6 +98,12 @@ pub fn face_graph(shape: &Shape) -> OcctResult<Value> {
 pub fn face_geometry(shape: &Shape, face: f64) -> OcctResult<Value> {
     let Some(face) = index(face) else { return Ok(Value::Null) };
     parsed(ffi::face_geometry_json(inner(shape)?, face))
+}
+
+/// `faceQuery.bspline`: the face's surface as a B-spline over its parameter box (poles[i][j], weights when rational, distinct knots with multiplicities, periodic flags, `reversed`).
+pub fn face_bspline(shape: &Shape, face: f64) -> OcctResult<Value> {
+    let Some(face) = index(face) else { return Ok(Value::Null) };
+    parsed(ffi::face_bspline_json(inner(shape)?, face))
 }
 
 /// `projectOnFace` of `points` (x, y, z triples).

@@ -24,6 +24,7 @@ rust::String face_details_json(const Shape &shape, int32_t samples);
 rust::String face_contains_json(const Shape &shape, int32_t face, rust::Slice<const double> point, double tolerance);
 rust::String face_graph_json(const Shape &shape);
 rust::String face_geometry_json(const Shape &shape, int32_t face);
+rust::String face_bspline_json(const Shape &shape, int32_t face);
 rust::String project_on_face_json(const Shape &shape, int32_t face, rust::Slice<const double> points);
 rust::String evaluate_face_json(const Shape &shape, int32_t face, rust::Slice<const double> uv);
 rust::String face_samples_json(const Shape &shape, int32_t face, rust::Slice<const double> uv, int32_t nu, int32_t nv);

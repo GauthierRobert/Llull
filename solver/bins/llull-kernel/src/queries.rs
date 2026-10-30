@@ -2,7 +2,7 @@
 //! `exportStepAssembly`, `importShapes` and `loadBlob`. Arguments arrive as the worker protocol sends them (handles rewritten by
 //! `server/src/native/kernelProtocol.ts`); results have the `GeometryKernel` shapes (`@core/geometry/kernel`).
 //!
-//! `faceQuery.tessellateFace` and `bspline` answer null (the retired opencascade.js build lacked the bindings, and no caller reads them yet).
+//! `faceQuery.tessellateFace` answers null (the retired opencascade.js build lacked the bindings, and no caller reads it yet); `bspline` is native (01 DEF §17.12).
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::{self, AssemblyPart, ImportOptions, PartUse, UvRequest};
@@ -114,6 +114,7 @@ fn face_query(session: &mut Session, method: &str, args: &[Value]) -> Reply {
         }
         "faceGraph" => session.with_shape(handle, queries::face_graph),
         "faceGeometry" => session.with_shape(handle, |shape| queries::face_geometry(shape, face)),
+        "bspline" => session.with_shape(handle, |shape| queries::face_bspline(shape, face)),
         "projectOnFace" => {
             let Some(points) = flat(arg(args, 2), 3) else { return bad("projectOnFace expects [[x, y, z], …]") };
             session.with_shape(handle, |shape| queries::project_on_face(shape, face, &points))
@@ -318,7 +319,9 @@ mod tests {
         assert_eq!(grid["result"].as_array().map(Vec::len), Some(4));
         let fractional = call(&mut session, "faceQuery.faceSamples", json!([{ "key": "c" }, 0, { "nu": 1.5, "nv": 2 }]));
         assert_eq!(fractional["result"], Value::Null);
-        assert_eq!(call(&mut session, "faceQuery.bspline", json!([{ "key": "c" }, 0])), json!({ "id": 1, "result": null }));
+        let plane = call(&mut session, "faceQuery.bspline", json!([{ "key": "c" }, 0]));
+        assert_eq!(plane["result"]["degreeU"], json!(1));
+        assert_eq!(call(&mut session, "faceQuery.bspline", json!([{ "key": "c" }, 99])), json!({ "id": 1, "result": null }));
         let distances = call(&mut session, "faceQuery.distance", json!([{ "key": "c" }, [[0, 0, 0]]]));
         assert_eq!(distances["result"][0]["signed"], json!(-1));
         let bad = call(&mut session, "faceQuery.projectOnFace", json!([{ "key": "c" }, 1, [[5, 0]]]));
