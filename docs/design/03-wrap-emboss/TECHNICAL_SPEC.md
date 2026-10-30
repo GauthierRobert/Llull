@@ -618,6 +618,12 @@ the character codes go through the CFF Standard Encoding to a string id, the cha
 (`div` by zero, `sqrt` of a negative number, a non-integer cell / index / roll count refuse), an INDEX of at most 262 144 entries, at most 64 axes, 4096 regions and 4096 variation data subtables, region indexes inside the list,
 `blend` with fewer operands than n x (regions + 1), `vsindex` outside the store, a store whose axis count differs from `fvar`.
 
+**Font-wide bounds (review round).** Per-glyph caps alone do not bound a font, so: at most 256 font dicts, each read lazily, INDEXes parsed once per offset (dicts may share one Subrs INDEX); a variation data subtable lists at most as many regions as the
+store has and all subtables together at most 65 536 region indexes; one operator budget of 20 000 000 for the whole scan of a font (import and every instance re-scan; `WRP_FONT_PARSE`); the FDSelect is read once into a per-glyph table (ranges strictly increasing,
+starting at glyph 0, ending at or past the glyph count); a number prefix whose bytes run past its charstring and `return` in CFF2 are refused. `FontRecord.variation` is validated on load (plain record, 4-character tags, finite numbers, at most 64,
+no reserved keys; path `fonts.<id>.variation.<tag>`). Instances are parsed and scanned once per (blob, variation) and cached. The adversarial fonts that prove this are built in `tests/unit/wrap/hostileFonts.ts` and run by the hostile-input harness and
+`fontLimits.test.ts`. No OFL variable CFF2 font exists in the repository or `node_modules` (only WOFF2 web fonts), so a pinned real font stays a follow-up.
+
 **Interface.** `import_font`, `add_text` and `add_decal` take `variation` = { axisTag: designValue } (absolute from the font defaults; omitted axes keep their default). `import_font` returns `data.axes` (tag, min, default, max) and
 `data.variation`. One font blob backs one `FontRecord` per instance (`FontRecord.variation`, non-default axes in tag order); asking for an instance that exists returns the record, so emboss, wrap, extrude and decals read it through
 `loadFont` unchanged. An unknown axis, a value outside its range, a font without axes or a font that is not CFF2 variable refuse with `WRP_FONT_VARIATION` (path `variation` / `font`).
