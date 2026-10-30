@@ -25,7 +25,7 @@ const GAUSS: ReadonlyArray<readonly [number, number]> = [
 const LINE_PIECES = 8;
 
 /** Integral of f(v) du around the loop (counter-clockwise loops of a region of area A give minus the integral of the antiderivative of the area element). */
-export function integrateDu(loop: UvLoop, f: (v: number) => number): number {
+export function integrateDu(loop: UvLoop, f: (v: number, u: number) => number): number {
   let total = 0;
   let at = loop.start;
   for (const segment of loop.segments) {
@@ -36,14 +36,14 @@ export function integrateDu(loop: UvLoop, f: (v: number) => number): number {
         const [a, b] = [piece / LINE_PIECES, (piece + 1) / LINE_PIECES];
         for (const [x, w] of GAUSS) {
           const t = a + ((x + 1) / 2) * (b - a);
-          total += (w * (b - a) * (u2 - u1) * f(v1 + t * (v2 - v1))) / 2;
+          total += (w * (b - a) * (u2 - u1) * f(v1 + t * (v2 - v1), u1 + t * (u2 - u1))) / 2;
         }
       }
       at = segment.to;
     } else {
       const curve = { ...segment.curve, poles: segment.curve.poles.map(([x, y]): Vec3 => [x, y, 0]) };
       const [first, last] = curveDomain(curve);
-      total += integrateCurve(curve, first, last, (point, derivative) => f(point[1]) * derivative[0]);
+      total += integrateCurve(curve, first, last, (point, derivative) => f(point[1], point[0]) * derivative[0]);
       at = segment.curve.poles[segment.curve.poles.length - 1] as Vec2;
     }
   }

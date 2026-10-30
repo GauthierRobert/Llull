@@ -789,24 +789,67 @@
   },
   {
    "vc": "VC-WRP-27",
-   "what": "wrap / emboss on a B-spline face (method parametric and geodesic): distortion reported; values recorded as golden on first run",
-   "metric": "data.distortion",
-   "value": "TBD - golden on first run (no closed form for a freeform patch)",
-   "tolerance": null,
-   "unit": "1",
-   "source": "(c)",
-   "grade": "C",
+   "what": "wrap / emboss on a B-spline face that is secretly a cylinder (a plate bent 90 deg on R 50, faces R 50 convex and R 44 concave): geodesic chart circle a keeps 2 pi a; pull-walled relief of a circle equals the closed form (layer between two radii seen along a parallel pull)",
+   "metric": "data.curves[0].length3d; data.volumeDelta",
+   "value": {
+    "wrapCircles": [
+     {
+      "radius": 50,
+      "a": 6,
+      "length3d": 37.69911184307752
+     },
+     {
+      "radius": 44,
+      "a": 5,
+      "length3d": 31.41592653589793
+     }
+    ],
+    "reliefs": [
+     {
+      "mode": "emboss",
+      "radius": 50,
+      "a": 6,
+      "depth": 1.5,
+      "volume": 169.63706819455564
+     },
+     {
+      "mode": "deboss",
+      "radius": 50,
+      "a": 6,
+      "depth": 1.5,
+      "volume": -169.6554952146931
+     },
+     {
+      "mode": "emboss",
+      "radius": 44,
+      "a": 5,
+      "depth": 1.5,
+      "volume": 117.81646672425154
+     },
+     {
+      "mode": "deboss",
+      "radius": 44,
+      "a": 5,
+      "depth": 1.5,
+      "volume": -117.80342963131446
+     }
+    ],
+    "saddle": "lattice-warped 60 x 60 x 10 plate (moves +-10 at the four middle lattice points): measured, not closed form - circle a 14 geodesic chart max strain 2.24e-4, relief volume / (chart area x depth) = 0.9999994 (golden, server/tests/nativeWrapFreeform.test.ts)"
+   },
+   "tolerance": 0.0001,
+   "toleranceKind": "relative",
+   "unit": "mm / mm3",
+   "source": "(b) closed form of a cylinder (tests/unit/geometry/freeformChart.test.ts proves the chart against the analytic cylinder and sphere charts); saddle golden on first run",
+   "grade": "A",
    "proves": [
     "FR-WRP-03",
     "FR-WRP-14"
    ],
    "cli": {
-    "run": "llull wrap_to_face '{\"placement\":{\"method\":\"parametric\"},...}' --doc t.llull.json --json",
-    "assert": "data.distortion"
+    "run": "llull emboss_on_face '{\"placement\":{\"method\":\"geodesic\"},...}' --doc t.llull.json --json",
+    "assert": "data.volumeDelta, data.distortion"
    },
-   "unbuiltCommands": [
-    "wrap_to_face"
-   ]
+   "unbuiltCommands": []
   },
   {
    "vc": "VC-WRP-28",
