@@ -180,6 +180,8 @@ function run(input: MeshInput, op: MeshOp): MeshOpResult | MeshEngineFailure {
     case 'deviation':
     case 'segment':
     case 'sculpt':
+    case 'shrinkwrap':
+    case 'displace':
       return runEditOp(input, op);
     default:
       return failure('MESH_ENGINE_UNSUPPORTED', `the TypeScript engine does not answer "${op.op}"`);

@@ -247,7 +247,7 @@ function closestOnSurface(index: SurfaceIndex, point: Vec3): { point: Vec3; dist
 }
 
 /** Area-weighted displacement of an open height field along the before-normal of each face; the closed-mesh case uses the volume difference. */
-function heightFieldVolume(before: MeshData, after: ReadonlyArray<Vec3>): number {
+export function heightFieldVolume(before: MeshData, after: ReadonlyArray<Vec3>): number {
   let total = 0;
   for (let f = 0; f < before.indices.length / 3; f++) {
     const ids = [before.indices[f * 3] as number, before.indices[f * 3 + 1] as number, before.indices[f * 3 + 2] as number];
@@ -265,7 +265,7 @@ function heightFieldVolume(before: MeshData, after: ReadonlyArray<Vec3>): number
   return total;
 }
 
-function signedVolume(positions: ReadonlyArray<Vec3>, indices: ReadonlyArray<number>): number {
+export function signedVolume(positions: ReadonlyArray<Vec3>, indices: ReadonlyArray<number>): number {
   let volume = 0;
   for (let f = 0; f < indices.length / 3; f++) {
     const a = positions[indices[f * 3] as number] as Vec3;
@@ -276,7 +276,7 @@ function signedVolume(positions: ReadonlyArray<Vec3>, indices: ReadonlyArray<num
   return volume;
 }
 
-function isClosed(indices: ReadonlyArray<number>): boolean {
+export function isClosed(indices: ReadonlyArray<number>): boolean {
   const count = new Map<string, number>();
   for (let f = 0; f < indices.length / 3; f++) {
     for (let k = 0; k < 3; k++) {
@@ -312,7 +312,7 @@ function symmetryErrorOf(input: MeshData, positions: ReadonlyArray<Vec3>, plane:
  * The edges of one refinement pass as (low, high): an edge once per live face that runs it from the lower to the higher index, in face order; an edge no face runs
  * that way (a boundary edge traversed from the higher index) once, at its first face, so it is split too.
  */
-function passEdges(edit: EditMesh): Array<[number, number]> {
+export function passEdges(edit: EditMesh): Array<[number, number]> {
   const pairs = (f: number): Array<[number, number]> => {
     const [a, b, c] = edit.corners(f);
     return [

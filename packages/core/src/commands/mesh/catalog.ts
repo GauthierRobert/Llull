@@ -15,6 +15,8 @@ import { hollowMesh, offsetMesh } from './levelSetCommands';
 import { meshToBrep } from './meshToBrep';
 import { addGridMesh, addIcosphereMesh } from './addGeneratedMesh';
 import { sculptMesh } from './sculptMesh';
+import { displaceMesh } from './displaceMesh';
+import { shrinkwrapMesh } from './shrinkwrapMesh';
 import { minkowskiSum } from './minkowskiSum';
 import { quadRemesh } from './quadRemesh';
 import { remeshMesh } from './remeshMesh';
@@ -41,6 +43,8 @@ export const meshCommands = commandCatalog(
   segmentMesh,
   meshToBrep,
   sculptMesh,
+  shrinkwrapMesh,
+  displaceMesh,
   addGridMesh,
   addIcosphereMesh,
   subdivideMesh,
