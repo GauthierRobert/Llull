@@ -142,7 +142,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **DES-1c** 01 DEF left after M0–M3 + M5 + `flow_on_surface` (done 2026-10-24, TECHNICAL*SPEC §14): `preserveAnalytic` (VC-23), M4 UI
   overlays (`infinite` regions, `allowMeshFallback`, `baseCurve`, `compareTo` shapes, B-spline lattices / oriented boxes, curved-sheet base for `flow_on_surface` DONE 2026-10-30, §17-§17.6),
   native `faceQuery.bspline`, VC-22 STEP re-import (non-uniform fit grid, mesh-warp time bound, `refined_mass` through `blend_union` DONE 2026-10-30, §17.7-17.10; mass rule by face type measured and not kept, §17.9)
-  (`refined_mass` is provenance today, not through `blend_union`). \_Lane 1 + 2 + native* _deps: —_
+  _Lane 1 + 2 + native_ _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
   (diagonal / diamond) modeled knurl, knurl as AP242 PMI (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), multi-face wraps (VC-36), pull walls
   - draft (VC-25/26), silhouette split, UI render overlays
