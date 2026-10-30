@@ -584,4 +584,10 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; `seac`, CFF arithmetic and CFF2, variable fonts; multi-face wraps (VC-WRP-36); pull walls and draft (VC-WRP-25, 26); silhouette split; STEP round trip of an embossed solid (VC-WRP-32); the llull guide WRP section (AF-03); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; `seac`, CFF arithmetic and CFF2, variable fonts; multi-face wraps (VC-WRP-36); pull walls and draft (VC-WRP-25, 26); silhouette split; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+
+### DES-3c (2026-10-30)
+
+- **VC-WRP-32 passes** (native kernel, `server/tests/wrapStepRoundTrip.test.ts`): the embossed and debossed cylinders of `target_cylinder_rect_emboss_deboss`
+  written with `export_step_ap242` and read back with `import_step_exact` keep their exact face count and their exact volume within 1e-6 relative.
+- **`llull guide` section 15** (wrap, project, emboss, decal, knurl, the loop and the refusal codes; AF-03), tested in `tests/unit/conventions.test.ts`.
