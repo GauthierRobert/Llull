@@ -54,6 +54,40 @@ function planDocument(actions: readonly GoldenAction[] | undefined, name: string
   return outcome.document;
 }
 
+/** The implicit plan plus a sheet with a surface_uv gyroid and a strut lattice on it, so the mutations reach the cell maps. */
+function implicitDocument(): CadDocument {
+  const run = (doc: CadDocument, name: string, params: Record<string, unknown>): { document: CadDocument; id: string } => {
+    const result = execute(doc, name, params);
+    if (result.error !== undefined) throw new Error(`pluginSliceSeeds: ${name} refused: ${result.summary}`);
+    return { document: result.document, id: result.affected[0] ?? '' };
+  };
+  const base = planDocument(implicitPlans['implicit_shell_gyroid_block'], 'implicit_shell_gyroid_block');
+  const sheet = run(base, 'create_nurbs_surface', {
+    degreeU: 1,
+    degreeV: 1,
+    poles: [
+      [
+        [0, 0, 0],
+        [0, 20, 0],
+      ],
+      [
+        [20, 0, 0],
+        [20, 20, 0],
+      ],
+    ],
+  });
+  const map = { kind: 'surface_uv', sheetId: sheet.id, cellsU: 4, cellsV: 4, depth: 5, layers: 1 };
+  const tpms = run(sheet.document, 'add_tpms_lattice', {
+    kind: 'gyroid',
+    form: 'sheet',
+    thickness: 0.3,
+    normalize: 'none',
+    cellSize: 5,
+    map,
+  });
+  return run(tpms.document, 'add_strut_lattice', { cell: 'cubic', cellSize: 5, radius: 0.4, map }).document;
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -232,7 +266,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   implicit: {
     roots: ['implicit'],
-    build: planOf(implicitPlans, 'implicit_shell_gyroid_block'),
+    build: implicitDocument,
     mutate: { name: 'create_scalar_field', params: constant({ kind: 'coordinate', axis: 'x' }) },
   },
   plm: {

@@ -7,7 +7,13 @@ import type { FieldNode } from './model';
 import type { ScalarHost } from './scalar';
 
 export interface CompileWarning {
-  readonly code: 'IMP_OFFSET_NOT_EXACT' | 'IMP_BLEND_EXCEEDS_FEATURE' | 'IMP_BLEND_LAW_STEEP' | 'IMP_MAP_POLE' | 'IMP_LAW_OUT_OF_RANGE';
+  readonly code:
+    | 'IMP_OFFSET_NOT_EXACT'
+    | 'IMP_BLEND_EXCEEDS_FEATURE'
+    | 'IMP_BLEND_LAW_STEEP'
+    | 'IMP_MAP_POLE'
+    | 'IMP_MAP_STRETCH'
+    | 'IMP_LAW_OUT_OF_RANGE';
   readonly ids: readonly string[];
   readonly message: string;
 }
@@ -22,7 +28,10 @@ export interface CompileFailure {
     | 'IMP_GRAPH_EMPTY'
     | 'IMP_GRAPH_TOO_LARGE'
     | 'IMP_INPUT_NOT_FOUND'
-    | 'IMP_INPUT_TOO_LARGE';
+    | 'IMP_INPUT_TOO_LARGE'
+    | 'IMP_MAP_SINGULAR'
+    | 'IMP_MAP_SEAM'
+    | 'IMP_MAP_TOO_LARGE';
   readonly message: string;
   readonly ids: readonly string[];
 }

@@ -26,6 +26,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'create the input first: run and record the topology study, or mesh and solve the analysis, on a host whose artifact store holds the result',
   IMP_INPUT_TOO_LARGE: 'use a coarser analysis mesh (the limit is in the message)',
   IMP_MAP_SEAM: 'use a whole number of cells around / polar',
+  IMP_MAP_SINGULAR: 'pick a regular sheet (no collapsed edge or zero-area patch) or trim the sheet',
+  IMP_MAP_TOO_LARGE: 'raise depth (the map grid spacing is depth / 4) or use a smaller sheet',
   IMP_DERIVED_READ_ONLY: 'edit the field nodes and run create_implicit_body again',
 };
 

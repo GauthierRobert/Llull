@@ -29,6 +29,37 @@ const isLaw = (value: unknown): boolean => typeof value === 'number' || typeof v
 const isVec3 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 3 && value.every((c) => typeof c === 'number' && Number.isFinite(c));
 
+const isPositive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
+const isWhole = (value: unknown): boolean => typeof value === 'number' && Number.isInteger(value) && value >= 1;
+
+/** Whether a stored cell map is well formed (kind, finite positive sizes, whole cell counts where the seam needs them, a non-zero axis). */
+function validMap(map: unknown): boolean {
+  if (map === undefined) return true;
+  if (!isRecord(map)) return false;
+  switch (map['kind']) {
+    case 'cylindrical':
+      return (
+        isVec3(map['origin']) &&
+        isVec3(map['axis']) &&
+        Math.hypot(...(map['axis'] as number[])) > 0 &&
+        isWhole(map['cellsAround']) &&
+        isPositive(map['radialCellSize'])
+      );
+    case 'spherical':
+      return isVec3(map['origin']) && isWhole(map['cellsAround']) && isWhole(map['cellsPolar']) && isPositive(map['radialCellSize']);
+    case 'surface_uv':
+      return (
+        typeof map['sheetId'] === 'string' &&
+        isPositive(map['cellsU']) &&
+        isPositive(map['cellsV']) &&
+        isPositive(map['depth']) &&
+        isWhole(map['layers'])
+      );
+    default:
+      return false;
+  }
+}
+
 /** Entity ids of the solid nodes a body's field depends on. */
 function sourcesOf(model: ReturnType<typeof implicitOf>, root: string): string[] {
   const seen = new Set<string>();
@@ -118,14 +149,16 @@ function nodeError(key: string, node: unknown): string | null {
       isVec3(node['rotation']) &&
       (node['form'] === 'sheet' || node['form'] === 'network') &&
       (node['normalize'] === 'gradient' || node['normalize'] === 'none') &&
-      isRecord(node['control']),
+      isRecord(node['control']) &&
+      validMap(node['map']),
     struts:
       typeof node['cell'] === 'string' &&
       STRUT_CELLS.has(node['cell']) &&
       isVec3(node['cellSize']) &&
       isVec3(node['origin']) &&
       isVec3(node['rotation']) &&
-      isLaw(node['radius']),
+      isLaw(node['radius']) &&
+      validMap(node['map']),
     graph:
       Array.isArray(node['sourceIds']) &&
       node['sourceIds'].every((o) => typeof o === 'string') &&
