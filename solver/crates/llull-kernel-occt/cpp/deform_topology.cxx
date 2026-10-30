@@ -1,6 +1,7 @@
 // Topology work of the exact warp (01 DEF M2, TECHNICAL_SPEC §5.6): splitting faces where a law is not analytic, the full-turn ring (drop the
 // two coincident end caps) and sewing it closed again.
 #include "llull-kernel-occt/cpp/deform_topology.hxx"
+#include "llull-kernel-occt/cpp/mass_spans.hxx"
 
 #include <algorithm>
 #include <cmath>
@@ -297,7 +298,11 @@ TopoDS_Shape sewn_solid(const TopoDS_Shape &open, double tolerance) {
 
 double signed_volume(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  BRepGProp::VolumeProperties(shape, props, Standard_True, Standard_False, Standard_False);
+  // a graded full-patch B-spline face (a local push on a large face) is cut into its knot spans first: the whole-face rule reads a narrow bump as flat (mass_spans.hxx, 01 DEF 17.16)
+  int cut = 0;
+  const TopoDS_Compound spans = query::span_faces(shape, cut);
+  if (cut > 0) BRepGProp::VolumeProperties(spans, props, Standard_False, Standard_False, Standard_False);
+  else BRepGProp::VolumeProperties(shape, props, Standard_True, Standard_False, Standard_False);
   return props.Mass();
 }
 

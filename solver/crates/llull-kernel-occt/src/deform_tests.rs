@@ -517,8 +517,7 @@ fn a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost() {
 }
 
 /// A radius-2 push on a 1000 mm face is a LOCAL refinement: about log2(1000 / 2) halvings near the support, a few dozen nodes per direction, not the 1500 intervals a uniform grid would need.
-/// The bump is read off the face (height d phi(s) at three distances from the centre, flat beyond the support), not from a volume: the adaptive mass rule integrates a 2 mm bump on a
-/// 1000 mm B-spline face as flat (area and volume unchanged to 1e-9 although the face carries it), a finding recorded in 17.16.
+/// And the mass properties see the bump (01 DEF 17.16): the adaptive rule used to integrate it as flat (area and volume unchanged to 1e-9), now one face per knot span.
 #[test]
 fn a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump() {
     let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
@@ -538,6 +537,40 @@ fn a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump() {
     {
         assert!((top(dx, 0.0) - 3.0 - expected).abs() < 2e-3, "height at {dx} from the centre: {} against {expected}", top(dx, 0.0) - 3.0);
     }
+    // smooth_c2: z = d (1 - s^2)^3, s = r / R. Volume d pi R^2 / 4; area 2 pi int (sqrt(1 + z'^2) - 1) r dr (Simpson, 4000 steps)
+    let (d, big_r) = (0.5_f64, 2.0_f64);
+    let steps = 4000;
+    let integrand = |r: f64| {
+        let slope = 6.0 * d * r / (big_r * big_r) * (1.0 - r * r / (big_r * big_r)).powi(2);
+        ((1.0 + slope * slope).sqrt() - 1.0) * r
+    };
+    let h = big_r / steps as f64;
+    let simpson: f64 = (0..=steps)
+        .map(|k| {
+            integrand(k as f64 * h)
+                * if k == 0 || k == steps {
+                    1.0
+                } else if k % 2 == 1 {
+                    4.0
+                } else {
+                    2.0
+                }
+        })
+        .sum::<f64>()
+        * h
+        / 3.0;
+    let (closed_volume, closed_area) = (d * PI * big_r * big_r / 4.0, 2.0 * PI * simpson);
+    let mass = mass_properties(&shape).unwrap();
+    assert!(
+        (mass.volume - 3.0e6 - closed_volume).abs() < 1e-3,
+        "the volume gains {} against the closed form {closed_volume}",
+        mass.volume - 3.0e6
+    );
+    assert!(
+        (mass.area - (2.0e6 + 4.0 * 3000.0) - closed_area).abs() < 1e-2,
+        "the area gains {} against the closed form {closed_area}",
+        mass.area - 2.012e6
+    );
 }
 
 #[test]

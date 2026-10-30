@@ -165,7 +165,7 @@ describe.skipIf(nativeKernelBinary === null)('native face-query port (invariants
       ['tessellateFace', [0, 0.1]],
       ['edgeSamples', [99, 8]],
       ['edgeContinuity', [99, 8]],
-      ['bspline', [0]],
+      ['bspline', [99]],
     ] as const)
       expect(await query(method, recipe, ...args), method).toBeNull();
   });
