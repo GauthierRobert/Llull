@@ -11,7 +11,7 @@ import { addNode } from './nodeResult';
 /**
  * @affects creates 1 graph node that references the source curves (they are not copied, hidden or changed)
  * @invariant straight pieces are single beams, curved pieces are sampled to chords of at most `chord`; nodes closer than mergeTolerance are one node; beams are 3MF-style frusta (radius varies linearly along each source curve) with the chosen end caps
- * @failure unknown source -> IMP_ENTITY_NOT_FOUND; no beam -> IMP_GRAPH_EMPTY; more than 5000 beams -> IMP_GRAPH_TOO_LARGE; radius <= 0, chord <= 0 -> IMP_PARAM_RANGE or IMP_STRUT_RADIUS_RANGE; unknown region -> IMP_FIELD_NOT_FOUND
+ * @failure unknown source -> IMP_ENTITY_NOT_FOUND; no beam -> IMP_GRAPH_EMPTY; more than 100000 beams -> IMP_GRAPH_TOO_LARGE; radius <= 0, chord <= 0 -> IMP_PARAM_RANGE or IMP_STRUT_RADIUS_RANGE; unknown region -> IMP_FIELD_NOT_FOUND
  */
 export const addGraphLattice = defineCommand({
   name: 'add_graph_lattice',

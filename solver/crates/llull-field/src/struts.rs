@@ -2,18 +2,19 @@
 //! folding, 4x4x4 bucket prefilter). Same formulas and evaluation order, so every distance is bit-identical.
 
 use crate::jsnum::{hypot2, hypot3, jmax, jmin};
+use crate::strut_bvh::{Bvh, BVH_MIN_SEGMENTS};
 use crate::tape::StrutSet;
 
 const BUCKETS: usize = 4;
 
 #[derive(Clone, Copy)]
 pub struct Segment {
-    a: [f64; 3],
-    d: [f64; 3],
-    length: f64,
-    ra: f64,
-    rb: f64,
-    sphere: bool,
+    pub(crate) a: [f64; 3],
+    pub(crate) d: [f64; 3],
+    pub(crate) length: f64,
+    pub(crate) ra: f64,
+    pub(crate) rb: f64,
+    pub(crate) sphere: bool,
 }
 
 /// A beam as listed in the set: end points, end radii, cap.
@@ -25,7 +26,7 @@ struct Ends {
     sphere: bool,
 }
 
-fn segment_of(a: [f64; 3], b: [f64; 3], ra: f64, rb: f64, sphere: bool) -> Segment {
+pub(crate) fn segment_of(a: [f64; 3], b: [f64; 3], ra: f64, rb: f64, sphere: bool) -> Segment {
     let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     Segment { a, d, length: hypot3(d[0], d[1], d[2]), ra, rb, sphere }
 }
@@ -62,13 +63,18 @@ fn frustum_distance(seg: &Segment, s: f64, rho: f64, radius: f64) -> f64 {
     }
 }
 
-fn distance_to_segments(segments: &[Segment], x: f64, y: f64, z: f64, radius: f64) -> f64 {
+fn distance_to_segment(seg: &Segment, x: f64, y: f64, z: f64, radius: f64) -> f64 {
+    let (px, py, pz) = (x - seg.a[0], y - seg.a[1], z - seg.a[2]);
+    let s = if seg.length == 0.0 { 0.0 } else { (px * seg.d[0] + py * seg.d[1] + pz * seg.d[2]) / seg.length };
+    let rho = jmax(px * px + py * py + pz * pz - s * s, 0.0).sqrt();
+    frustum_distance(seg, s, rho, radius)
+}
+
+/// The brute minimum over every beam (the reference the BVH reproduces bit for bit).
+pub(crate) fn distance_to_segments(segments: &[Segment], x: f64, y: f64, z: f64, radius: f64) -> f64 {
     let mut best = f64::INFINITY;
     for seg in segments {
-        let (px, py, pz) = (x - seg.a[0], y - seg.a[1], z - seg.a[2]);
-        let s = if seg.length == 0.0 { 0.0 } else { (px * seg.d[0] + py * seg.d[1] + pz * seg.d[2]) / seg.length };
-        let rho = jmax(px * px + py * py + pz * pz - s * s, 0.0).sqrt();
-        let d = frustum_distance(seg, s, rho, radius);
+        let d = distance_to_segment(seg, x, y, z, radius);
         if d < best {
             best = d;
         }
@@ -133,7 +139,7 @@ fn segment_touches_cell(a: [f64; 3], b: [f64; 3], cell: [f64; 3], reach: f64) ->
 }
 
 pub enum StrutEval {
-    Explicit(Vec<Segment>),
+    Explicit { segments: Vec<Segment>, bvh: Option<Bvh> },
     Periodic { cell: [f64; 3], origin: [f64; 3], all: Vec<Segment>, buckets: Vec<Vec<Segment>> },
 }
 
@@ -143,7 +149,9 @@ impl StrutEval {
         let own: Vec<Ends> =
             set.beams.iter().map(|beam| Ends { a: node(beam.a), b: node(beam.b), ra: beam.ra, rb: beam.rb, sphere: beam.sphere }).collect();
         let Some((cell, origin)) = set.periodic else {
-            return StrutEval::Explicit(own.iter().map(|e| segment_of(e.a, e.b, e.ra, e.rb, e.sphere)).collect());
+            let segments: Vec<Segment> = own.iter().map(|e| segment_of(e.a, e.b, e.ra, e.rb, e.sphere)).collect();
+            let bvh = (segments.len() >= BVH_MIN_SEGMENTS).then(|| Bvh::new(&segments));
+            return StrutEval::Explicit { segments, bvh };
         };
         let reach = own.iter().flat_map(|e| [e.ra, e.rb]).fold(0.0, jmax);
         let mut all = Vec::new();
@@ -168,7 +176,10 @@ impl StrutEval {
     /// Signed distance at (x, y, z); `radius` >= 0 replaces every beam radius (spherical caps), -1 keeps the beam radii.
     pub fn distance(&self, x: f64, y: f64, z: f64, radius: f64) -> f64 {
         match self {
-            StrutEval::Explicit(segments) => distance_to_segments(segments, x, y, z, radius),
+            StrutEval::Explicit { segments, bvh: None } => distance_to_segments(segments, x, y, z, radius),
+            StrutEval::Explicit { segments, bvh: Some(bvh) } => {
+                bvh.nearest(x, y, z, radius, |i| distance_to_segment(&segments[i], x, y, z, radius))
+            }
             StrutEval::Periodic { cell, origin, all, buckets } => {
                 let (u, v, w) = (x - origin[0], y - origin[1], z - origin[2]);
                 let (qx, qy, qz) =

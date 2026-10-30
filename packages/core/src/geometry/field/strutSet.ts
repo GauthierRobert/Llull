@@ -6,6 +6,7 @@
 
 import type { Vec3 } from '../../model/types';
 import type { StrutSet } from './program';
+import { BVH_MIN_SEGMENTS, buildStrutBvh } from './strutBvh';
 
 export interface StrutEvaluator {
   /** Signed distance at (x, y, z); `radius` >= 0 replaces every beam radius (spherical caps), -1 keeps the beam radii. */
@@ -59,13 +60,18 @@ function frustumDistance(seg: Segment, s: number, rho: number, radius: number): 
   return sphereCaps ? Math.min(butt, ball(0, ra), ball(along, rb)) : butt;
 }
 
+function distanceToSegment(seg: Segment, x: number, y: number, z: number, radius: number): number {
+  const [px, py, pz] = [x - seg.ax, y - seg.ay, z - seg.az];
+  const s = seg.length === 0 ? 0 : (px * seg.dx + py * seg.dy + pz * seg.dz) / seg.length;
+  const rho = Math.sqrt(Math.max(px * px + py * py + pz * pz - s * s, 0));
+  return frustumDistance(seg, s, rho, radius);
+}
+
+/** The brute minimum over every beam (the reference the BVH reproduces bit for bit). */
 function distanceToSegments(segments: readonly Segment[], x: number, y: number, z: number, radius: number): number {
   let best = Infinity;
   for (const seg of segments) {
-    const [px, py, pz] = [x - seg.ax, y - seg.ay, z - seg.az];
-    const s = seg.length === 0 ? 0 : (px * seg.dx + py * seg.dy + pz * seg.dz) / seg.length;
-    const rho = Math.sqrt(Math.max(px * px + py * py + pz * pz - s * s, 0));
-    const d = frustumDistance(seg, s, rho, radius);
+    const d = distanceToSegment(seg, x, y, z, radius);
     if (d < best) best = d;
   }
   return best;
@@ -83,7 +89,12 @@ export function prepareStrutSet(set: StrutSet): StrutEvaluator {
   const periodic = set.periodic;
   if (periodic === null) {
     const segments = own.map((beam) => segmentOf(beam.a, beam.b, beam.ra, beam.rb, beam.sphere));
-    return { distance: (x, y, z, radius) => distanceToSegments(segments, x, y, z, radius) };
+    if (segments.length < BVH_MIN_SEGMENTS) return { distance: (x, y, z, radius) => distanceToSegments(segments, x, y, z, radius) };
+    const bvh = buildStrutBvh(segments);
+    return {
+      distance: (x, y, z, radius) =>
+        bvh.nearest(x, y, z, radius, (index) => distanceToSegment(segments[index] as Segment, x, y, z, radius)),
+    };
   }
   const { cell, origin } = periodic;
   const reach = Math.max(0, ...own.flatMap((beam) => [beam.ra, beam.rb]));

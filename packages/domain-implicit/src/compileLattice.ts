@@ -106,7 +106,9 @@ export function graphPart(host: CompileHost, node: GraphNode | VoronoiNode, fram
       hi[axis] = Math.max(hi[axis], p[axis]);
     }
   const box = growBox({ min: lo as Vec3, max: hi as Vec3 }, radiusMax);
-  host.features.push(Math.min(...set.beams.flatMap((beam) => [beam.ra, beam.rb]).filter((r) => r > 0)));
+  host.features.push(
+    set.beams.reduce((smallest, beam) => [beam.ra, beam.rb].reduce((m, r) => (r > 0 ? Math.min(m, r) : m), smallest), Infinity),
+  );
   const reg = host.b.strutSet(set, frame.x, frame.y, frame.z, null);
   const part: Part = { reg, quality: 'bound', lipschitz: 1, box };
   return clipToRegion(host, part, node.region, frame);
