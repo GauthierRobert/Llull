@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute field <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute homogenize <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute field <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -38,6 +38,9 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
             Ok(outputs)
         }
         ("topopt", [folder, ..]) => llull_topopt::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
+        ("homogenize", [folder, ..]) => {
+            llull_voxfe::homogenize_job::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message))
+        }
         ("route", [folder, ..]) => llull_route::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("stats", [folder, ..]) => llull_stats::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("panel", [folder, ..]) => llull_panel::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
@@ -51,9 +54,11 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         ("meshops", [folder, ..]) => llull_meshops::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("field", [folder, ..]) => llull_field::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("flow", [folder, ..]) => llull_flow_lbm::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
-        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud" | "geomq" | "meshops" | "flow" | "field", _) => {
-            Err(("NATIVE_USAGE".to_string(), USAGE.to_string()))
-        }
+        (
+            "post" | "raster" | "topopt" | "homogenize" | "route" | "stats" | "panel" | "explicit" | "cloud" | "geomq" | "meshops" | "flow"
+            | "field",
+            _,
+        ) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }
