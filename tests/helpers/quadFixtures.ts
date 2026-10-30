@@ -3,6 +3,7 @@
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
 import { triangulateQuads } from '@core/geometry/mesh/quadCage';
+import type { MeshData } from '@core/model/types';
 import type { IndexedMesh } from './meshFixtures';
 import type { MeshEngineFailure, MeshOp, MeshOpResult, MeshProcessingEngine, QuadMeshData } from '@core/geometry/mesh/engineTypes';
 
@@ -90,14 +91,19 @@ const PROVENANCE: MeshOpResult['provenance'] = {
 };
 
 /** A mesh engine answering only `quad_remesh`, with the result of `answer`; every op it receives is appended to `seen`. */
-export function stubQuadEngine(answer: (op: QuadOp) => QuadMeshData | MeshEngineFailure, seen: QuadOp[] = []): MeshProcessingEngine {
+export function stubQuadEngine(
+  answer: (op: QuadOp, mesh: MeshData) => QuadMeshData | MeshEngineFailure,
+  seen: QuadOp[] = [],
+  meshes: MeshData[] = [],
+): MeshProcessingEngine {
   return {
     name: 'stub-quad',
     capabilities: () => new Map([['quad_remesh', Infinity]]),
-    run(_, op) {
+    run(input, op) {
       if (op.op !== 'quad_remesh') return { code: 'MESH_ENGINE_UNSUPPORTED', message: 'stub' };
       seen.push(op);
-      const result = answer(op);
+      meshes.push(input.mesh);
+      const result = answer(op, input.mesh);
       return 'code' in result ? result : { quads: result, report: {}, provenance: PROVENANCE };
     },
   };

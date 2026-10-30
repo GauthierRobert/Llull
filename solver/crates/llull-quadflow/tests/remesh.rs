@@ -98,7 +98,7 @@ fn box_mesh(n: i64, outward: bool) -> (Vec<f64>, Vec<u32>) {
 }
 
 fn params(target_faces: i32) -> QuadParams {
-    QuadParams { target_faces, preserve_sharp: false, sharp_cos: 0.5, adaptive: false }
+    QuadParams { target_faces, preserve_sharp: false, sharp_cos: 0.5, adaptive: false, preserve_boundary: false }
 }
 
 struct Measured {
@@ -338,4 +338,69 @@ fn reference_build_valence_histogram_win32_x64() {
     let mut histogram: Vec<(u32, usize)> = m.valence.into_iter().collect();
     histogram.sort();
     assert_eq!((m.quads, histogram), (592, vec![(3, 9), (4, 584), (5, 1)]), "icosphere l4, 600 quads, win32-x64");
+}
+
+/// The upper hemisphere (the triangles whose corners all have z >= 0) of the level 4 icosphere: an open surface with one boundary loop.
+fn hemisphere() -> (Vec<f64>, Vec<u32>) {
+    let (positions, triangles) = icosphere(4);
+    let kept = triangles.chunks_exact(3).filter(|t| t.iter().all(|&v| positions[v as usize * 3 + 2] > -1e-9)).flatten().copied().collect();
+    (positions, kept)
+}
+
+/// (boundary edges, non-manifold edges, the largest distance of a boundary vertex of `mesh` to the boundary of `source`) of a quad mesh.
+fn boundary_report(mesh: &QuadMesh, source: &(Vec<f64>, Vec<u32>)) -> (usize, usize, f64) {
+    let uses = |indices: &[u32], size: usize| {
+        let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
+        for face in indices.chunks_exact(size) {
+            for k in 0..size {
+                let (a, b) = (face[k], face[(k + 1) % size]);
+                *uses.entry((a.min(b), a.max(b))).or_insert(0) += 1;
+            }
+        }
+        uses
+    };
+    let rim: Vec<([f64; 3], [f64; 3])> = uses(&source.1, 3)
+        .iter()
+        .filter(|(_, &n)| n == 1)
+        .map(|(&(a, b), _)| {
+            let p = |v: u32| [source.0[v as usize * 3], source.0[v as usize * 3 + 1], source.0[v as usize * 3 + 2]];
+            (p(a), p(b))
+        })
+        .collect();
+    let result = uses(&mesh.quads, 4);
+    let mut worst: f64 = 0.0;
+    for (&(a, b), _) in result.iter().filter(|(_, &n)| n == 1) {
+        for v in [a, b] {
+            let p = [mesh.positions[v as usize * 3], mesh.positions[v as usize * 3 + 1], mesh.positions[v as usize * 3 + 2]];
+            let nearest = rim
+                .iter()
+                .map(|(s, e)| {
+                    let d = [e[0] - s[0], e[1] - s[1], e[2] - s[2]];
+                    let t = (((p[0] - s[0]) * d[0] + (p[1] - s[1]) * d[1] + (p[2] - s[2]) * d[2])
+                        / (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]))
+                        .clamp(0.0, 1.0);
+                    ((p[0] - s[0] - t * d[0]).powi(2) + (p[1] - s[1] - t * d[1]).powi(2) + (p[2] - s[2] - t * d[2]).powi(2)).sqrt()
+                })
+                .fold(f64::INFINITY, f64::min);
+            worst = worst.max(nearest);
+        }
+    }
+    (result.values().filter(|&&n| n == 1).count(), result.values().filter(|&&n| n > 2).count(), worst)
+}
+
+#[test]
+fn an_open_mesh_with_preserve_boundary_follows_its_rim_closer_than_without() {
+    let source = hemisphere();
+    let ask = |preserve_boundary: bool| {
+        let params = QuadParams { target_faces: 300, preserve_sharp: false, sharp_cos: 0.5, adaptive: false, preserve_boundary };
+        quad_remesh(&source.0, &source.1, &params).expect("an open hemisphere is remeshed")
+    };
+    let (free, kept) = (ask(false), ask(true));
+    let (free_report, kept_report) = (boundary_report(&free, &source), boundary_report(&kept, &source));
+    // an open surface of quads, never a non-manifold one; the preserved boundary is the closer to the rim (the host snaps the rest onto it)
+    assert_eq!((free_report.1, kept_report.1), (0, 0));
+    assert!(kept_report.0 > 20 && free_report.0 > 20, "{free_report:?} {kept_report:?}");
+    assert!(kept_report.2 < free_report.2, "preserved {} against free {}", kept_report.2, free_report.2);
+    let count = kept.quads.len() / 4;
+    assert!((210..390).contains(&count), "{count} quads for a target of 300");
 }

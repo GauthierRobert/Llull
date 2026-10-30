@@ -159,7 +159,12 @@ function jobParams(op: NativeOp): Record<string, unknown> {
       ...(op.maxTriangles !== undefined ? { maxTriangles: op.maxTriangles } : {}),
     };
   if (op.op === 'quad_remesh')
-    return { targetFaces: op.targetQuads, adaptive: op.adaptive, ...(op.hardEdgeRad !== undefined ? { hardEdgeRad: op.hardEdgeRad } : {}) };
+    return {
+      targetFaces: op.targetQuads,
+      adaptive: op.adaptive,
+      ...(op.hardEdgeRad !== undefined ? { hardEdgeRad: op.hardEdgeRad } : {}),
+      ...(op.preserveBoundary === true ? { preserveBoundary: true } : {}),
+    };
   if (op.op === 'remesh')
     return {
       ...(op.targetEdge !== undefined ? { targetEdge: op.targetEdge } : {}),

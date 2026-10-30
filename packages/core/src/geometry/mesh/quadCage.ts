@@ -21,7 +21,7 @@ const quadAt = (quads: ReadonlyArray<number>, face: number): [number, number, nu
 ];
 
 /** Connected components of the quads (quads sharing a vertex): the component index of every quad. */
-function shellOfQuads(quads: ReadonlyArray<number>, vertexCount: number): { shell: number[]; count: number } {
+export function shellOfQuads(quads: ReadonlyArray<number>, vertexCount: number): { shell: number[]; count: number } {
   const parent = Array.from({ length: vertexCount }, (_, i) => i);
   const find = (v: number): number => {
     let root = v;
@@ -78,7 +78,7 @@ export function quadValence(quads: ReadonlyArray<number>, vertexCount: number): 
   return Object.fromEntries([...histogram.entries()].sort((a, b) => a[0] - b[0]).map(([valence, count]) => [String(valence), count]));
 }
 
-function faceNormal(positions: ReadonlyArray<number>, quads: ReadonlyArray<number>, face: number): Vec3 {
+export function faceNormal(positions: ReadonlyArray<number>, quads: ReadonlyArray<number>, face: number): Vec3 {
   const corners = quadAt(quads, face).map((i) => at(positions, i));
   let [x, y, z] = [0, 0, 0];
   for (const [i, p] of corners.entries()) {

@@ -65,6 +65,8 @@ export type MeshOp =
       readonly adaptive: boolean;
       /** Align the quads to edges whose faces meet at more than this angle; absent = no alignment. */
       readonly hardEdgeRad?: number;
+      /** The input is an open surface (or the half of a symmetric one): keep its boundary, the quads follow it. */
+      readonly preserveBoundary?: boolean;
     } & WithDeviation)
   | ({ readonly op: 'segment' } & SegmentParams)
   | ({ readonly op: 'sculpt' } & SculptParams)
