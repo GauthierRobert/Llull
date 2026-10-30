@@ -2,6 +2,7 @@
  * Voronoi (stochastic) beam lattice (05 IMP FR-IMP-19, M6): the edges of the Voronoi diagram of a seeded point set, clipped to a box. The points come from a
  * seeded mulberry32 generator in the box grown by 1.2 mean spacings (so cells at the box wall are complete), the diagram from a Bowyer-Watson Delaunay
  * tetrahedralisation (a Voronoi edge joins the circumcentres of two tetrahedra that share a face).
+ * @invariant the diagram is the exact Delaunay dual (exact predicates, 14.14); a seed at exactly the place of an earlier one adds no cell and is counted in dropped
  * @invariant deterministic: the same (box, density, seed) gives the same beams on every machine (no Math.random, no clock, integer-seeded generator, fixed insertion order)
  * @invariant hull tetrahedra (those touching the enclosing tetrahedron) are dropped, so every kept edge has two interior ends; edges are cut to the box (Liang-Barsky)
  */
@@ -12,7 +13,7 @@ import { type GraphResult, MAX_GRAPH_BEAMS } from './graph';
 import type { VoronoiNode } from './model';
 import { type Tet, delaunay, faceKey, facesOf } from './voronoiDelaunay';
 
-/** Seeds beyond this are refused: a seed adds about 9.2 beams (measured), so 10000 seeds give about 92000 beams, under the 100000 of a graph lattice (the Bowyer-Watson pass of voronoiDelaunay.ts takes 2.6 s there; 30000 seeds would take 10 s but 270000 beams). */
+/** Seeds beyond this are refused: a seed adds about 9.2 beams (measured), so 10000 seeds give close to the 100000 beams of a graph lattice (98420 at the measured 10000; IMP_GRAPH_TOO_LARGE either way); the Delaunay pass takes 2.1 s there (14.14). */
 const MAX_SEEDS = 10_000;
 
 function mulberry32(seed: number): () => number {
@@ -71,7 +72,7 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
     [-1, -1, 1],
   ] as const)
     points.push([centre[0] + s[0] * reach, centre[1] + s[1] * reach, centre[2] + s[2] * reach]);
-  const tets = delaunay(points, count);
+  const { tets, skipped } = delaunay(points, count);
   const owner = new Map<number, number[]>();
   tets.forEach(({ v }, index) => {
     for (const f of facesOf(v)) {
@@ -90,7 +91,7 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
     return nodes.length - 1;
   };
   const beams: StrutBeam[] = [];
-  let dropped = 0;
+  let dropped = skipped.length;
   let totalLength = 0;
   for (const pair of owner.values()) {
     if (pair.length !== 2) continue;

@@ -60,7 +60,7 @@ describe('add_voronoi_lattice', () => {
     expect(built.ok).toBe(false);
   });
 
-  it('keeps the beams and the content hash that the quadratic Delaunay pass produced (05 IMP 14.13)', () => {
+  it('pins the beams, nodes and content hash of seeded diagrams (no sliver: unchanged by the exact predicates, 05 IMP 14.14)', () => {
     const geometry = (count: number, seed: number): { beams: number; nodes: number; signature: number } => {
       const side = Math.cbrt(count / 0.1);
       const built = voronoiGeometry({ min: [0, 0, 0], max: [side, side, side], density: 0.1, seed, radius: 0.3, cap: 'sphere' });

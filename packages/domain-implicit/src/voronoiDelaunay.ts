@@ -1,13 +1,14 @@
 /**
- * Delaunay tetrahedralisation of the Voronoi seeds (05 IMP 14.13): Bowyer-Watson with a visibility walk and a face-adjacency flood instead of a scan of every tetrahedron.
- * @invariant the result is the same ARRAY as the quadratic scan it replaces, tetrahedron for tetrahedron in the same order: the insertion order is the seed order, a point
- *   removes the tetrahedra whose circumsphere holds it (the connected cavity around the tetrahedron that contains it) and the new tetrahedra are appended in the order of the
- *   first face of the cavity boundary, so the surviving tetrahedra keep their relative order (each tetrahedron has a creation number that never changes)
- * @invariant general position: the cavity is the whole set of tetrahedra whose sphere holds the point (a Delaunay triangulation has a connected one); on degenerate inputs
- *   (a point on a sphere to 1e-12) the flood and the scan may differ, which `voronoiDelaunay.test.ts` bounds on seeded sets
+ * Delaunay tetrahedralisation of the Voronoi seeds (05 IMP 14.14): Bowyer-Watson with exact predicates, a visibility walk and a face-adjacency flood.
+ * @invariant predicates are exact (`voronoiPredicates.ts`): a tetrahedron is removed by a seed only when the seed is STRICTLY inside its circumsphere, so a cospherical seed is
+ *   outside, the cavity of a seed is connected and star-shaped, and the result is a Delaunay triangulation (every circumsphere is empty, every face is shared by at most two
+ *   tetrahedra) for any input, whatever the order the cavity is searched in: the flood and a scan of every tetrahedron give the same tetrahedra
+ * @invariant an exact duplicate of an earlier seed is skipped (reported in `skipped`): it would make flat tetrahedra and add no Voronoi cell
+ * @invariant tetrahedra are listed in creation order; the circumcentre (`c`, `r2`) is rounded to doubles and is only the position of the Voronoi vertex, never used to decide
  */
 
 import type { Vec3 } from '@core/model/types';
+import { inSphere, orient3d } from './voronoiPredicates';
 
 export interface Tet {
   readonly v: readonly [number, number, number, number];
@@ -19,7 +20,7 @@ const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-/** Circumsphere of four points, or null when they are coplanar. */
+/** Circumsphere of four points rounded to doubles (position of a Voronoi vertex), or null when the double determinant vanishes. */
 function circumsphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3): { c: Vec3; r2: number } | null {
   const [u, v, w] = [sub(b, a), sub(c, a), sub(d, a)];
   const denominator = 2 * dot(u, cross(v, w));
@@ -47,25 +48,32 @@ export const facesOf = ([a, b, c, d]: readonly [number, number, number, number])
   [b, c, d],
 ];
 
-const SPHERE_TOLERANCE = 1 - 1e-12;
 const WALK_LIMIT = 4096;
 
-/** Delaunay tetrahedra of `points` (the last four points are the enclosing tetrahedron) that do not touch it. */
-export function delaunay(points: readonly Vec3[], real: number): Tet[] {
+export interface Triangulation {
+  /** Every tetrahedron of the triangulation (the enclosing ones included), in creation order. */
+  readonly tets: readonly Tet[];
+  /** Seeds skipped because an earlier seed sits at exactly the same place. */
+  readonly skipped: readonly number[];
+}
+
+/** The triangulation of `points` (the last four are the enclosing tetrahedron). */
+export function triangulate(points: readonly Vec3[], real: number): Triangulation {
   const count = points.length;
   const tets: Array<Tet | null> = [];
   const orientation: number[] = [];
   const faceTets = new Map<number, number[]>();
   const keysOf = (v: Tet['v']): number[] => facesOf(v).map((f) => faceKey(f[0], f[1], f[2], count));
+  const at = (n: number): Vec3 => points[n] as Vec3;
 
   const add = (a: number, b: number, c: number, d: number): void => {
-    const [pa, pb, pc, pd] = [points[a] as Vec3, points[b] as Vec3, points[c] as Vec3, points[d] as Vec3];
-    const sphere = circumsphere(pa, pb, pc, pd);
-    if (sphere === null) return;
+    const side = orient3d(at(a), at(b), at(c), at(d));
+    if (side === 0) return;
+    const sphere = circumsphere(at(a), at(b), at(c), at(d)) ?? { c: at(a), r2: 0 };
     const id = tets.length;
     const v: Tet['v'] = [a, b, c, d];
     tets.push({ v, ...sphere });
-    orientation.push(Math.sign(dot(sub(pb, pa), cross(sub(pc, pa), sub(pd, pa)))));
+    orientation.push(side);
     for (const key of keysOf(v)) {
       const list = faceTets.get(key);
       if (list === undefined) faceTets.set(key, [id]);
@@ -86,11 +94,10 @@ export function delaunay(points: readonly Vec3[], real: number): Tet[] {
   const holds = (id: number, point: Vec3): boolean => {
     const tet = tets[id];
     if (tet === null || tet === undefined) return false;
-    const d = sub(point, tet.c);
-    return dot(d, d) < tet.r2 * SPHERE_TOLERANCE;
+    return inSphere(at(tet.v[0]), at(tet.v[1]), at(tet.v[2]), at(tet.v[3]), point, orientation[id] as number) > 0;
   };
 
-  /** Visibility walk from `from` to the tetrahedron that contains `point`, or null when it does not settle. */
+  /** Visibility walk from `from` to a tetrahedron that contains `point` (closed), or null when it does not settle. */
   const locate = (from: number, point: Vec3): number | null => {
     let current = from;
     for (let step = 0; step < WALK_LIMIT; step += 1) {
@@ -99,10 +106,9 @@ export function delaunay(points: readonly Vec3[], real: number): Tet[] {
       let next: number | null = null;
       for (let k = 0; k < 4 && next === null; k += 1) {
         const i = (k + step) % 4;
-        const corners = tet.v.map((n) => points[n] as Vec3);
+        const corners = tet.v.map(at);
         corners[i] = point;
-        const [pa, pb, pc, pd] = corners as [Vec3, Vec3, Vec3, Vec3];
-        const side = Math.sign(dot(sub(pb, pa), cross(sub(pc, pa), sub(pd, pa))));
+        const side = orient3d(corners[0] as Vec3, corners[1] as Vec3, corners[2] as Vec3, corners[3] as Vec3);
         if (side !== 0 && side !== orientation[current]) {
           const [a, b, c] = tet.v.filter((_, index) => index !== i) as [number, number, number];
           next = neighbour(current, a, b, c);
@@ -114,10 +120,18 @@ export function delaunay(points: readonly Vec3[], real: number): Tet[] {
     return null;
   };
 
+  const skipped: number[] = [];
+  const seen = new Set<string>();
   add(real, real + 1, real + 2, real + 3);
   let hint = 0;
   for (let p = 0; p < real; p += 1) {
-    const point = points[p] as Vec3;
+    const point = at(p);
+    const spot = `${point[0]},${point[1]},${point[2]}`;
+    if (seen.has(spot)) {
+      skipped.push(p);
+      continue;
+    }
+    seen.add(spot);
     let start = locate(hint, point);
     if (start === null || !holds(start, point)) start = tets.findIndex((_, id) => holds(id, point));
     if (start < 0) continue;
@@ -145,5 +159,11 @@ export function delaunay(points: readonly Vec3[], real: number): Tet[] {
     hint = tets.length > before ? tets.length - 1 : hint;
     while (tets[hint] === null && hint > 0) hint -= 1;
   }
-  return tets.filter((tet): tet is Tet => tet !== null && tet.v.every((index) => index < real));
+  return { tets: tets.filter((tet): tet is Tet => tet !== null), skipped };
+}
+
+/** Delaunay tetrahedra of `points` that do not touch the enclosing tetrahedron (the last four points), and the seeds skipped as duplicates. */
+export function delaunay(points: readonly Vec3[], real: number): { readonly tets: Tet[]; readonly skipped: readonly number[] } {
+  const { tets, skipped } = triangulate(points, real);
+  return { tets: tets.filter((tet) => tet.v.every((index) => index < real)), skipped };
 }
