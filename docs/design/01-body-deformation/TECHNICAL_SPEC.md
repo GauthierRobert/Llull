@@ -643,3 +643,11 @@ triangle, sewn: measured on the native kernel (box minus a scan, `boolean` engin
 `boolean` engine `kernel` over a 20,480-triangle scan unchanged with the note and never reaching the kernel; engine `auto` runs the mesh engine above the cap and
 the kernel below it; two mesh-path deform results union on the mesh engine; Manifold unguarded; `inspect_topology` on a large scan refused by name. The four
 routing cases fail with the wiring removed (`execute`, `boolean`, `isTriangleOnly`).
+
+**Review round 1 (2026-10-30).** Every kernel member that takes a recipe goes through the cap (`blendReport` and `deformReport` beside `evaluate`: a refused
+`blend_union` otherwise asked `blendReport` to explain itself and sewed the scan anyway); the FEA part geometry, built outside `execute`
+(`server/src/fea/transports.ts`), uses the same `guardedKernel`, so a scan part falls to its stored triangles (`server/tests/feaScanGuard.test.ts`); `boolean`
+`auto` compares the operands' total with the cap, as the guard does. The cap counts a scan's real size (`asset.triangles`), also when the kernel would only
+receive its display level of detail: deliberate, so the answer does not depend on which reads a command declares. Tests added: `blend_union` over a scan
+(fails without the `blendReport` guard), five scans under the cap one by one and above it together, the note once on a nested `build_project` and a clean
+next execute.

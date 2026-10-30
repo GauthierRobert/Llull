@@ -21,7 +21,7 @@ afterAll(() => {
   setGeometryKernel(null);
 });
 
-/** The stub exact kernel ('occt'), every recipe that reaches it recorded with its scan size. */
+/** The stub exact kernel (`occt`), every recipe that reaches it (evaluate, blendReport, deformReport) recorded with its scan size. */
 async function spiedExactKernel(): Promise<{ reached: number[] }> {
   const kernel = (await installKernel('exact')) as GeometryKernel;
   const reached: number[] = [];
@@ -30,6 +30,14 @@ async function spiedExactKernel(): Promise<{ reached: number[] }> {
     evaluate: (recipe: ShapeRecipe) => {
       reached.push(meshLeafTriangles(recipe));
       return kernel.evaluate(recipe);
+    },
+    blendReport: (recipe: ShapeRecipe) => {
+      reached.push(meshLeafTriangles(recipe));
+      return kernel.blendReport?.(recipe) ?? null;
+    },
+    deformReport: (recipe: ShapeRecipe) => {
+      reached.push(meshLeafTriangles(recipe));
+      return kernel.deformReport?.(recipe) ?? null;
     },
   });
   return { reached };
@@ -70,7 +78,7 @@ describe('the exact kernel is never asked to rebuild a large imported mesh (DES-
     const large = scanAndBox(LARGE);
     const merged = execute(large.doc, 'boolean', { op: 'subtract', a: large.box, b: large.scan });
     expect(merged.affected).toHaveLength(1);
-    expect(merged.summary).toContain(`'${large.scan}' is built on 20480 imported-mesh triangles`);
+    expect(merged.summary).toContain(`built on 20480 imported-mesh triangles ('${large.scan}' 20480)`);
     expect(reached).toEqual([]);
     const small = scanAndBox(SMALL);
     const exact = execute(small.doc, 'boolean', { op: 'subtract', a: small.box, b: small.scan });
@@ -103,5 +111,35 @@ describe('the exact kernel is never asked to rebuild a large imported mesh (DES-
     expect(result.summary).toContain('was not asked to rebuild 20480 triangles');
     expect(reached).toEqual([]);
     expectNoOp(execute(doc, 'boolean', { op: 'subtract', a: scan, b: scan, engine: 'kernel' }), doc);
+  });
+
+  it('blend_union over a large scan: neither the build nor the explanation (blendReport) reaches the kernel', async () => {
+    const { reached } = await spiedExactKernel();
+    const { doc, scan, box } = scanAndBox(LARGE);
+    const blended = execute(doc, 'blend_union', { ids: [box, scan], radius: 1 });
+    expect(blended.document).toBe(doc);
+    expect(blended.summary).toContain('was not asked to rebuild 20480 triangles');
+    expect(reached.filter((triangles) => triangles > KERNEL_MESH_LEAF_CAP)).toEqual([]);
+  });
+
+  it('boolean "auto" counts the operands together: five scans each under the cap, above it in total, run the mesh engine', async () => {
+    const { reached } = await spiedExactKernel();
+    const { doc, ids } = docWithMeshes(...Array.from({ length: 5 }, (_, k) => icosphere(4, 4, [k * 3, 0, 0])));
+    const added = execute(doc, 'add_box', { size: [4, 4, 4], position: [6, 0, 0] });
+    const box = added.affected[0] as string;
+    const merged = execute(added.document, 'boolean', { op: 'union', a: box, b: ids });
+    expect(merged.affected).toHaveLength(1);
+    expect(merged.summary).toContain('built on 25600 imported-mesh triangles');
+    expect(reached).toEqual([]);
+  });
+
+  it('the note is written once, on the outermost summary, and the next execute starts clean', async () => {
+    await spiedExactKernel();
+    const { doc, scan, box } = scanAndBox(LARGE);
+    const plan = [{ command: 'boolean', params: { op: 'subtract', a: box, b: scan, engine: 'kernel' } }];
+    const nested = execute(doc, 'build_project', { actions: plan });
+    expect(nested.summary.split('was not asked to rebuild')).toHaveLength(2);
+    const clean = execute(doc, 'add_box', { size: [1, 1, 1] });
+    expect(clean.summary).not.toContain('was not asked to rebuild');
   });
 });

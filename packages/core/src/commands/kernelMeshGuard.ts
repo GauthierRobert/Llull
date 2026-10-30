@@ -20,28 +20,39 @@ let refusedTriangles: number | null = null;
 
 const isExactKernel = (kernel: GeometryKernel): boolean => kernel.name === 'occt' || kernel.info?.().occtVersion !== undefined;
 
-function viewOf(kernel: GeometryKernel): GeometryKernel {
+/** `call(recipe)` when its scan is within the cap, else null (recorded for the note). */
+function capped<T>(recipe: ShapeRecipe, call: (recipe: ShapeRecipe) => T | null): T | null {
+  const triangles = meshLeafTriangles(recipe);
+  if (triangles <= KERNEL_MESH_LEAF_CAP) return call(recipe);
+  if (refusedTriangles !== null) refusedTriangles = Math.max(refusedTriangles, triangles);
+  return null;
+}
+
+/**
+ * The guarded view of `kernel`: every member that takes a recipe (`evaluate`, `blendReport`, `deformReport`; the rest take handles, which only
+ * `evaluate` makes) goes through the cap. The same object for the same kernel, so caches keyed by kernel keep working. Hosts that build kernel
+ * work outside `execute` (FEA geometry) use it too.
+ */
+export function guardedKernel(kernel: GeometryKernel): GeometryKernel {
   if (isView.has(kernel) || !isExactKernel(kernel)) return kernel;
   const known = views.get(kernel);
   if (known !== undefined) return known;
+  const { blendReport, deformReport } = kernel;
   const view: GeometryKernel = {
     ...kernel,
-    evaluate: (recipe: ShapeRecipe) => {
-      const triangles = meshLeafTriangles(recipe);
-      if (triangles <= KERNEL_MESH_LEAF_CAP) return kernel.evaluate(recipe);
-      if (refusedTriangles !== null) refusedTriangles = Math.max(refusedTriangles, triangles);
-      return null;
-    },
+    evaluate: (recipe) => capped(recipe, (inner) => kernel.evaluate(inner)),
+    ...(blendReport === undefined ? {} : { blendReport: (recipe: ShapeRecipe) => capped(recipe, (inner) => blendReport(inner)) }),
+    ...(deformReport === undefined ? {} : { deformReport: (recipe: ShapeRecipe) => capped(recipe, (inner) => deformReport(inner)) }),
   };
   views.set(kernel, view);
   isView.add(view);
   return view;
 }
 
-/** `ctx` with the guarded view of its kernel (the same object for the same kernel, so caches keyed by kernel keep working). */
+/** `ctx` with the guarded view of its kernel. */
 export function guardedContext(ctx: ExecutionContext): ExecutionContext {
   if (ctx.kernel === null) return ctx;
-  const kernel = viewOf(ctx.kernel);
+  const kernel = guardedKernel(ctx.kernel);
   return kernel === ctx.kernel ? ctx : { ...ctx, kernel };
 }
 

@@ -2,6 +2,7 @@
 
 import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';
+import { guardedKernel } from '@core/commands/kernelMeshGuard';
 import { positiveInteger } from '../env';
 import { defaultFeArtifactStore } from './artifactStore';
 import { caeHooks } from './caeHooks';
@@ -16,6 +17,11 @@ import { nativeBinaryPath, nativeInstallHint } from '../native/nativeBinary';
 import { createComputeRunner } from '../native/computeJob';
 import { nativeMappingStep } from '../native/mapField';
 import { randomPostStep } from '../native/randomField';
+/** The kernel FEA geometry is built with, outside `execute`: the same scan cap as commands (DES-7e), so a scan part falls to its stored-mesh branch. */ const guardedFeaKernel =
+  (): ReturnType<typeof getGeometryKernel> => {
+    const kernel = getGeometryKernel();
+    return kernel === null ? null : guardedKernel(kernel);
+  };
 
 const DEFAULT_MESH_TIMEOUT_MS = 600_000;
 
@@ -34,7 +40,7 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
     return callNativeMesher(binary, request, timeoutMs, env);
   };
   return {
-    mesh: (analysisId, host) => runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: getGeometryKernel }),
+    mesh: (analysisId, host) => runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: guardedFeaKernel }),
     solve: (analysisId, options, host) =>
       runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost }),
     exportDeck: (analysisId, host, options) => Promise.resolve(runFeaExport(analysisId, host, { store, hooks: caeHooks }, options)),
