@@ -358,7 +358,7 @@ rust::String face_blend_reason(const Shape &shape, rust::Slice<const double> spe
   try {
     built = build_face_blend(shape, spec, why);
   } catch (const Standard_Failure &error) {
-    why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    why = blend::occt_failure(error);
   }
   return rust::String(built ? std::string() : (why.empty() ? std::string("the face blend failed") : why));
 }

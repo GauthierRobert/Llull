@@ -368,17 +368,35 @@ constexpr double kRefinedDrift = 1e-5;
 GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped) {
   // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
   // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
-  GProp_GProps fixed_rule;
-  BRepGProp::VolumeProperties(piece, fixed_rule, only_closed, Standard_False, Standard_False);
+  const auto fixed = [&]() {
+    GProp_GProps fixed_rule;
+    BRepGProp::VolumeProperties(piece, fixed_rule, only_closed, Standard_False, Standard_False);
+    return fixed_rule;
+  };
   // A fixed Gauss rule is wrong on a rational B-spline face with few spans (4.4e-4 relative volume, 0.4 % area on a sphere mapped to an ellipsoid
   // by BRepBuilderAPI_GTransform, 01 DEF VC-DEF-11), while the adaptive rule is wrong on others (1.8e-5 on conic blend faces): so only a shape
   // built by a deformation uses the adaptive rule, when its own error estimate is within 1e-5 (the fixed rule's error was 1.4e-6 on a pushed 100 mm slab).
-  if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
+  if (!shape.refined_mass || !has_freeform_face(piece)) {
+    // the fixed rule too reads a narrow feature of a large graded B-spline face as flat (an imported plate with a bump): by span when the piece has such faces
+    if (has_freeform_face(piece)) {
+      int cut = 0;
+      const TopoDS_Compound pieces = query::span_faces(piece, cut, true);
+      if (cut > 0) {
+        GProp_GProps by_span;
+        BRepGProp::VolumeProperties(pieces, by_span, Standard_False, Standard_False, Standard_False);
+        return by_span;
+      }
+    }
+    return fixed();
+  }
   GProp_GProps adaptive;
-  const double error = BRepGProp::VolumeProperties(piece, adaptive, kRefinedEps, only_closed, Standard_False);
+  int cut = 0;
+  const TopoDS_Compound pieces = query::span_faces(piece, cut, true);
+  const double error = cut > 0 ? BRepGProp::VolumeProperties(pieces, adaptive, kRefinedEps, Standard_False, Standard_False)
+                                     : BRepGProp::VolumeProperties(piece, adaptive, kRefinedEps, only_closed, Standard_False);
   if (!(error <= kRefinedDrift)) {
     if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
-    return fixed_rule;
+    return fixed();
   }
   if (rel_error != nullptr) *rel_error = error;
   return adaptive;
@@ -388,15 +406,38 @@ bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freefo
 
 bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
 
+int32_t span_cut_count(const Shape &shape) {
+  int cut = 0;
+  query::span_faces(shape.shape, cut, false);
+  return cut;
+}
+
 GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double *tripped) {
-  GProp_GProps fixed_rule;
-  BRepGProp::SurfaceProperties(piece, fixed_rule, Standard_False, Standard_False);
-  if (!shape.refined_mass || !has_freeform_face(piece)) return fixed_rule;
+  const auto fixed = [&]() {
+    GProp_GProps fixed_rule;
+    BRepGProp::SurfaceProperties(piece, fixed_rule, Standard_False, Standard_False);
+    return fixed_rule;
+  };
+  if (!shape.refined_mass || !has_freeform_face(piece)) {
+    if (has_freeform_face(piece)) {
+      int cut = 0;
+      const TopoDS_Compound pieces = query::span_faces(piece, cut, false);
+      if (cut > 0) {
+        GProp_GProps by_span;
+        BRepGProp::SurfaceProperties(pieces, by_span, Standard_False, Standard_False);
+        return by_span;
+      }
+    }
+    return fixed();
+  }
   GProp_GProps adaptive;
-  const double error = BRepGProp::SurfaceProperties(piece, adaptive, kRefinedEps, Standard_False);
+  int cut = 0;
+  const TopoDS_Compound pieces = query::span_faces(piece, cut, false);
+  const double error = cut > 0 ? BRepGProp::SurfaceProperties(pieces, adaptive, kRefinedEps, Standard_False)
+                                     : BRepGProp::SurfaceProperties(piece, adaptive, kRefinedEps, Standard_False);
   if (error <= kRefinedDrift) return adaptive;
   if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
-  return fixed_rule;
+  return fixed();
 }
 
 MassOut mass_properties(const Shape &shape) {

@@ -10,8 +10,9 @@ import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/
 import type { FaceQueryPort, SurfaceParams } from '../../geometry/kernelPorts';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import { operandRecipe } from '../../geometry/operandRecipe';
-import type { ChartMethod, FaceChart } from '../../geometry/chartFrame';
+import type { ChartMethod, ChartResult, FaceChart } from '../../geometry/chartFrame';
 import { buildChart } from '../../geometry/faceChart';
+import { freeformChartOf } from './freeformSession';
 import { dot3 } from '../../lib/vec3';
 import { is3D } from '../../model/types';
 import { currentContext } from '../context';
@@ -171,7 +172,7 @@ export const isDevelopableSurface = (surface: SurfaceParams): boolean =>
 
 /**
  * The chart for `placement` on the session's face.
- * @failure sphere or torus face with develop -> WRP_FACE_NOT_DEVELOPABLE; freeform face, or method project -> WRP_METHOD_UNAVAILABLE; anchor farther than 1e-3 x the solid
+ * @failure sphere or torus face with develop -> WRP_FACE_NOT_DEVELOPABLE; freeform face with develop -> WRP_FACE_NOT_DEVELOPABLE, a freeform face the kernel gives no own-parameter B-spline for, or method project -> WRP_METHOD_UNAVAILABLE; anchor farther than 1e-3 x the solid
  *   diagonal from the face -> WRP_ANCHOR_OFF_FACE
  */
 export function resolveChart(
@@ -190,13 +191,8 @@ export function resolveChart(
       'placement.method',
     );
   const method: ChartMethod = requested;
-  if (session.surface.type === 'other')
-    return fail(
-      'WRP_METHOD_UNAVAILABLE',
-      `face ${session.face} is a freeform surface; charts are built for plane, cylinder, cone, sphere and torus faces`,
-      'face',
-    );
-  if (method === 'develop' && !isDevelopableSurface(session.surface))
+  const freeform = session.surface.type === 'other';
+  if (method === 'develop' && !freeform && !isDevelopableSurface(session.surface))
     return fail(
       'WRP_FACE_NOT_DEVELOPABLE',
       `face ${session.face} is ${session.surface.type} (Gaussian curvature != 0): it cannot be developed without stretch; use method geodesic or parametric and read data.distortion`,
@@ -220,11 +216,13 @@ export function resolveChart(
       'placement.anchor.on',
     );
   const anchorChart: Vec2 = placement?.anchor?.chart ?? [0, 0];
-  const built = buildChart(
-    session.surface,
-    { anchorChart, anchorOn: hit.point, angleDeg: placement?.angleDeg ?? 0, mirror: placement?.mirror ?? false },
-    method,
-  );
+  const chartPlacement = { anchorChart, anchorOn: hit.point, angleDeg: placement?.angleDeg ?? 0, mirror: placement?.mirror ?? false };
+  let built: ChartResult;
+  if (freeform) {
+    const own = freeformChartOf(session, method, hit, chartPlacement);
+    if ('code' in own) return fail(own.code, own.message, own.path);
+    built = own.chart;
+  } else built = buildChart(session.surface, chartPlacement, method);
   if ('error' in built) return fail('WRP_ANCHOR_OFF_FACE', built.error, 'placement.anchor.on');
   const orientation = dot3(hit.normal, built.normalAt(built.anchorUv)) >= 0 ? 1 : -1;
   return { chart: built, anchorOn: hit.point, anchorChart, outward: hit.normal, orientation, method: requested };

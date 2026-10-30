@@ -179,6 +179,8 @@ export interface BlendBuildNotes {
   readonly junctionG1?: number;
   /** Largest angle (radians) between the normals of two blends of a chain at the ends of their junction, where each is tangent to its own support: the crease of the part the chain was mitred across (0 for a smooth chain). */
   readonly creaseRad?: number;
+  /** A conic whose chain junctions kinked faded to the circular arc at the ends that meet the next blend: how many ends and the longest fade (arc length of the ball centre, document units). */
+  readonly circularFade?: { readonly ends: number; readonly reach: number; readonly reachChords: number };
   /** The step mixes convex and concave blends, so the volume check against the circular fillet was not applied. */
   readonly mixed?: boolean;
   /** The curvature profile fell back to the zero-curvature quartic: the unique edges it applies to and why. */

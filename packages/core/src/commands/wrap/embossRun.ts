@@ -18,6 +18,7 @@ import type { CadDocument } from '../../model/types';
 import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import { runEmbossChain } from './embossChain';
+import { buildFreeformRecipe, freeformDepthLimit, isFreeformFailure } from './embossFreeform';
 import { buildPullRecipe, isPullFailure, type PullBuild } from './embossPull';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
@@ -157,6 +158,20 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
   }
   const resolved = resolveChart(doc, session, params.placement, params.face.faceNear);
   if ('summary' in resolved) return resolved;
+  if (resolved.chart.kind === 'freeform') {
+    if (scribe)
+      return fail(
+        'WRP_METHOD_UNAVAILABLE',
+        'mode scribe is built for plane, cylinder, cone, sphere and torus faces, not for a freeform face',
+        ['mode'],
+      );
+    if (pulled)
+      return fail(
+        'WRP_PARAM_INVALID',
+        'walls "pull" and draftDeg are built for plane, cylinder, cone and sphere faces: the walls of a freeform relief always run along the outward normal at the anchor',
+        ['walls'],
+      );
+  }
   let outlines: SketchOutline[] = [];
   for (const [index, profileId] of params.profileIds.entries()) {
     const outline = sketchOutline(doc, profileId);
@@ -268,6 +283,23 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       data: { distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined) },
     };
   }
+  const freeform =
+    chart.kind === 'freeform'
+      ? buildFreeformRecipe({
+          source: session.source,
+          face: session.face,
+          diagonal: session.diagonal,
+          chart,
+          orientation: resolved.orientation,
+          outward: resolved.outward,
+          holesPerRegion: regions.map((region) => region.holes.length),
+          pieces: mapped.pieces,
+          mode: cutting ? 'deboss' : 'emboss',
+          depth,
+          tolerance,
+        })
+      : null;
+  if (freeform !== null && isFreeformFailure(freeform)) return fail(freeform.code, freeform.message, ['profileIds'], params.profileIds);
   const recipeParams: EmbossParams = {
     face: session.face,
     surface: chart.wire,
@@ -299,11 +331,34 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     }
     pull = built;
   }
-  const recipe: ShapeRecipe = pull?.recipe ?? { op: 'emboss', source: session.source, ...recipeParams };
+  const recipe: ShapeRecipe =
+    freeform !== null ? freeform.recipe : (pull?.recipe ?? { op: 'emboss', source: session.source, ...recipeParams });
   // walls along a pull: the closed form of the layer is known on a plane (A d); on curved faces the volume is the measured one
   const closed =
-    pull === null || (session.surface.type === 'plane' && !((params.draftDeg ?? 0) > 0)) ? embossClosedForm(recipeParams) : null;
-  const reach = debossLimit(session, mapped.pieces, closed?.convex ?? null);
+    freeform !== null
+      ? null
+      : pull === null || (session.surface.type === 'plane' && !((params.draftDeg ?? 0) > 0))
+        ? embossClosedForm(recipeParams)
+        : null;
+  const reach = freeform !== null ? null : debossLimit(session, mapped.pieces, closed?.convex ?? null);
+  if (cutting && freeform !== null) {
+    const through = freeformDepthLimit({
+      query: session.query,
+      shape: session.shape,
+      chart,
+      orientation: resolved.orientation,
+      points: [resolved.anchorOn, ...probePoints(chart, mapped.pieces, MAX_PROBES)],
+      depth,
+    });
+    if (through !== null) {
+      const result = fail(
+        'WRP_DEPTH_EXCEEDS_SOLID',
+        `depth ${depth} passes through the material: it ends ${through.toPrecision(6)} ${doc.units} below the freeform face at the thinnest probed place`,
+        ['depth'],
+      );
+      return { ...result, data: { maxDepth: through, unit: doc.units } };
+    }
+  }
   if (cutting && reach !== null && depth >= reach * (1 - 1e-9)) {
     const result = fail(
       'WRP_DEPTH_EXCEEDS_SOLID',
@@ -342,7 +397,8 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
   const spanU =
     Math.max(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0]))) -
     Math.min(...mapped.pieces.flat().flatMap((piece) => sampleSegment(piece, 9).map((p) => p[0])));
-  const shownArea = closed?.area ?? (pull === null ? areas.uv : outlines.reduce((sum, outline) => sum + outline.area, 0));
+  const sketchArea = outlines.reduce((sum, outline) => sum + outline.area, 0);
+  const shownArea = closed?.area ?? (freeform !== null ? distortion.areaRatio * sketchArea : pull === null ? areas.uv : sketchArea);
   const instances = params.grid === undefined ? 1 : params.grid.countX * params.grid.countY;
   const data = wrapData(
     doc,
@@ -355,7 +411,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       mode: params.mode,
       depth,
       method: chart.method,
-      exact: !engrave && !(pull !== null && pull.footprintDeviation > 0),
+      exact: !engrave && freeform === null && !(pull !== null && pull.footprintDeviation > 0),
       faceKind: session.surface.type,
       face: session.face,
       ...(session.faceName !== undefined ? { faceName: session.faceName } : {}),
@@ -369,7 +425,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
           }),
       distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined),
       fullWrapChartWidth: chart.fullWrapWidth,
-      walls: pull === null ? 'normal' : 'pull',
+      walls: freeform !== null || pull !== null ? 'pull' : 'normal',
       ...(pull === null
         ? {}
         : {
@@ -383,6 +439,17 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
             ...(pull.baseGrowth > 0 ? { draftBaseGrowth: pull.baseGrowth } : {}),
           }),
       convex: closed?.convex ?? null,
+      ...(freeform === null
+        ? {}
+        : {
+            freeform: {
+              walls: 'pull',
+              pullDirection: freeform.pull,
+              footprintDeviation: freeform.footprintDeviation,
+              footprintSegments: freeform.footprintSegments,
+              note: 'walls run along the outward normal at the anchor; the top is the exact offset of the face by the depth; the footprint is the exact image fitted by Bezier segments to footprintDeviation',
+            },
+          }),
       ...(engrave
         ? { toolWidth: params.toolWidth, strokeLength, note: 'the groove is the union of round-ended strokes: its boundary is polygonal' }
         : {}),
@@ -391,7 +458,10 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     {
       unverified,
       provenance: {
-        method: `${params.mode} of regions wrapped by the ${chart.method} chart: one face-slab per region, fused / cut / split in a single exact operation`,
+        method:
+          freeform !== null
+            ? `${params.mode} of regions charted by the ${chart.method} chart of a freeform face: intersections of the footprint prisms along the outward normal with the exact offset layer of the face, fused / cut as exact booleans`
+            : `${params.mode} of regions wrapped by the ${chart.method} chart: one face-slab per region, fused / cut / split in a single exact operation`,
         ...(font !== null ? { font } : {}),
         inputs: {
           id: params.id,
@@ -417,7 +487,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       volumeDelta === null
         ? 'volume change not measured'
         : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${shownArea.toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) (${instances > 1 ? `${instances} instances, ` : ''}${mapped.regions.length} region(s), area ${shownArea.toPrecision(8)} ${doc.units}^2${scribe ? '' : `, depth ${depth}`}${engrave ? `, tool ${params.toolWidth}` : ''}) on ${freeform !== null ? 'freeform' : session.surface.type} face ${session.face} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}${unverified ? '; unverified font' : ''}. Source solid consumed, profiles kept.${session.note}`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }

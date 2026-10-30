@@ -165,9 +165,12 @@ describe.skipIf(nativeKernelBinary === null)('native face-query port (invariants
       ['tessellateFace', [0, 0.1]],
       ['edgeSamples', [99, 8]],
       ['edgeContinuity', [99, 8]],
-      ['bspline', [0]],
+      ['bspline', [99]],
     ] as const)
       expect(await query(method, recipe, ...args), method).toBeNull();
+    // bspline is native since 06 DEF 17.12: a box face is a bilinear patch (degree 1 x 1, 2 x 2 poles); an index out of range is the null above
+    const patch = await query<{ degreeU: number; degreeV: number; poles: unknown[][] }>('bspline', recipe, 0);
+    expect([patch.degreeU, patch.degreeV, patch.poles.length, patch.poles[0]?.length]).toEqual([1, 1, 2, 2]);
   });
 });
 

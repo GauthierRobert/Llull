@@ -561,7 +561,7 @@ std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<cons
     g_last_reason = built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why);
     return built;
   } catch (const Standard_Failure &error) {
-    g_last_reason = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    g_last_reason = blend::occt_failure(error);
     return nullptr;
   }
 }
@@ -577,7 +577,7 @@ rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> 
   try {
     built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
   } catch (const Standard_Failure &error) {
-    why = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    why = blend::occt_failure(error);
   }
   return rust::String(built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why));
 }

@@ -23,7 +23,7 @@ export const placementField = z
       .enum(['develop', 'geodesic', 'parametric', 'project'])
       .optional()
       .describe(
-        'How the sketch is carried onto the face. develop (default) keeps every length and angle and works on plane, cylinder and cone faces (Gaussian curvature 0). geodesic, parametric and project are not built yet (WRP_METHOD_UNAVAILABLE); a sphere or freeform face is WRP_FACE_NOT_DEVELOPABLE with develop.',
+        'How the sketch is carried onto the face. develop (default) keeps every length and angle and works on plane, cylinder and cone faces (Gaussian curvature 0). geodesic (exponential map about the anchor) and parametric (arc-length scaled u, v) work on sphere, torus and freeform (B-spline) faces and report the measured stretch (WRP_DISTORTION_EXCEEDED above maxLengthStrain); a sphere, torus or freeform face with develop is WRP_FACE_NOT_DEVELOPABLE; project is the job of project_to_face (WRP_METHOD_UNAVAILABLE here).',
       ),
     anchor: z
       .object({

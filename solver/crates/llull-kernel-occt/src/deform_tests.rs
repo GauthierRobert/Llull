@@ -517,8 +517,7 @@ fn a_push_narrower_than_the_fit_can_resolve_is_refused_by_name_not_lost() {
 }
 
 /// A radius-2 push on a 1000 mm face is a LOCAL refinement: about log2(1000 / 2) halvings near the support, a few dozen nodes per direction, not the 1500 intervals a uniform grid would need.
-/// The bump is read off the face (height d phi(s) at three distances from the centre, flat beyond the support), not from a volume: the adaptive mass rule integrates a 2 mm bump on a
-/// 1000 mm B-spline face as flat (area and volume unchanged to 1e-9 although the face carries it), a finding recorded in 17.16.
+/// And the mass properties see the bump (01 DEF 17.16): the adaptive rule used to integrate it as flat (area and volume unchanged to 1e-9), now one face per knot span.
 #[test]
 fn a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump() {
     let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
@@ -538,6 +537,40 @@ fn a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump() {
     {
         assert!((top(dx, 0.0) - 3.0 - expected).abs() < 2e-3, "height at {dx} from the centre: {} against {expected}", top(dx, 0.0) - 3.0);
     }
+    // smooth_c2: z = d (1 - s^2)^3, s = r / R. Volume d pi R^2 / 4; area 2 pi int (sqrt(1 + z'^2) - 1) r dr (Simpson, 4000 steps)
+    let (d, big_r) = (0.5_f64, 2.0_f64);
+    let steps = 4000;
+    let integrand = |r: f64| {
+        let slope = 6.0 * d * r / (big_r * big_r) * (1.0 - r * r / (big_r * big_r)).powi(2);
+        ((1.0 + slope * slope).sqrt() - 1.0) * r
+    };
+    let h = big_r / steps as f64;
+    let simpson: f64 = (0..=steps)
+        .map(|k| {
+            integrand(k as f64 * h)
+                * if k == 0 || k == steps {
+                    1.0
+                } else if k % 2 == 1 {
+                    4.0
+                } else {
+                    2.0
+                }
+        })
+        .sum::<f64>()
+        * h
+        / 3.0;
+    let (closed_volume, closed_area) = (d * PI * big_r * big_r / 4.0, 2.0 * PI * simpson);
+    let mass = mass_properties(&shape).unwrap();
+    assert!(
+        (mass.volume - 3.0e6 - closed_volume).abs() < 1e-3,
+        "the volume gains {} against the closed form {closed_volume}",
+        mass.volume - 3.0e6
+    );
+    assert!(
+        (mass.area - (2.0e6 + 4.0 * 3000.0) - closed_area).abs() < 1e-2,
+        "the area gains {} against the closed form {closed_area}",
+        mass.area - 2.012e6
+    );
 }
 
 #[test]
@@ -549,4 +582,53 @@ fn a_push_centred_on_an_edge_keeps_the_edge_and_the_faces_together() {
     let built = build(&node(&slab, push, None, 1e-3, [0.0; 3]));
     assert!(built.report["shapeTolerance"].as_f64().unwrap() <= 1e-3, "{}", built.report);
     assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+}
+
+/// The same narrow push as above: every volume and area the kernel reports reads the bump, not only `mass_properties` (the topology totals, the sum of the face areas, the warp's own volume).
+#[test]
+fn every_volume_and_area_the_kernel_reports_agrees_on_a_narrow_bump() {
+    let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 3], "direction": [0, 0, 1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let tree = node(&slab, push, None, 1e-3, [0.0; 3]);
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(&tree).unwrap().unwrap();
+    let report = evaluator.deform_report(&tree).unwrap();
+    let mass = mass_properties(&shape).unwrap();
+    let topology = crate::queries::topology(&shape).unwrap();
+    let summed: f64 = topology["faces"].as_array().unwrap().iter().map(|face| face["area"].as_f64().unwrap()).sum();
+    assert!(relative(summed, mass.area) < 1e-9, "face areas {summed} against {}", mass.area);
+    assert!(relative(topology["volume"].as_f64().unwrap(), mass.volume) < 1e-9, "{} against {}", topology["volume"], mass.volume);
+    assert!(
+        relative(report["volume"].as_f64().unwrap(), mass.volume) < 1e-8,
+        "the warp's own volume {} against {}",
+        report["volume"],
+        mass.volume
+    );
+    assert!(mass.volume - 3.0e6 > 1.5, "and it is the slab plus the bump: {}", mass.volume - 3.0e6);
+    assert!(crate::test_bridge::span_cut_count(&shape) >= 1, "the top face is cut");
+}
+
+/// The bump pushed OUT of the bottom face (the pieces of a reversed face keep their orientation): the same gain, d pi R^2 / 4.
+#[test]
+fn a_narrow_push_out_of_the_bottom_face_adds_the_same_volume() {
+    let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 0], "direction": [0, 0, -1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(&node(&slab, push, None, 1e-3, [0.0; 3])).unwrap().unwrap();
+    let mass = mass_properties(&shape).unwrap();
+    assert!((mass.volume - 3.0e6 - 0.5 * PI * 4.0 / 4.0).abs() < 1e-3, "the volume gains {}", mass.volume - 3.0e6);
+}
+
+/// A TRIMMED B-spline face (a hole through the slab) is not cut: its pcurves are not the sides of the parameter box, so it is integrated by the whole-face rule as before (13.16.1 limits).
+#[test]
+fn a_trimmed_bspline_face_is_not_cut() {
+    let plate = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let pocketed = json!({ "op": "boolean", "boolean": "subtract", "a": plate, "b": entity("cylinder", json!({ "radius": 100, "height": 10, "position": [-300, -300, -2] })) });
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 3], "direction": [0, 0, 1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let mut evaluator = Evaluator::new(16);
+    let tree = node(&pocketed, push, None, 1e-3, [0.0; 3]);
+    let shape = evaluator.evaluate(&tree).unwrap();
+    let report = evaluator.deform_report(&tree).unwrap();
+    let shape = shape.unwrap_or_else(|| panic!("the pocketed slab warps: {report}"));
+    assert_eq!(crate::test_bridge::span_cut_count(&shape), 0, "the faces with a hole (top, bottom) are trimmed: none is cut");
 }

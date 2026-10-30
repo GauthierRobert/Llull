@@ -1120,3 +1120,40 @@ blend ends (limit 5e-6 x diagonal, `g0Corner`), the angle to the supports (0.01 
   The cost: the first setting no longer passes, so a mixed corner takes two to three fills (about 4 s per corner on the boss against 1.4 s for a convex one). Corner speed is the next item.
 - **Left, refused by name as before:** a profile (conic / curvature) corner at a mixed vertex (the automatic profile corners round convex edges), a vertex with an unrounded third edge, curved edges or faces, `size2`, a varying size at
   a mixed vertex has not been built or tested here (the algebra and Q handle a linear taper, no test), faces that are reflex at a vertex of four or more edges (the pairing is per face, so it should hold; untested).
+
+## 13.19 As built: a conic that fades to the circular arc at a kinked chain junction (DES-6c, 2026-10-30)
+
+### 13.19.1 Why the junction kinked, and what cannot fix it
+
+A blend of a chain meets the next one along a section: both end sections are the circular fillet's, so G0 holds. The normal across the junction does not: the profile section is the conic a, t, b with the apex t (the intersection of the two tangent lines), and the surface normal in the interior of the section depends on the derivative of t along the rail. t moves with the fold angle of the walls, whose derivative jumps where the curvature of a wall jumps (a plane against a cylinder on a rounded outline), so the two blends have different along-rail derivatives at the junction (13.11.3: 0.0182 rad measured on an R 30 sphere cap cut by a 2 mm rounded outline; limit 0.0095 rad).
+
+Why no change of the conic repairs it: G1 against the walls requires t to lie in both wall tangent planes at the contacts, a line along the rail, so only the out-of-plane part of t' is free; the in-plane jump of t' is not. A weight w(s) alone cannot cancel a vector jump that changes with the section parameter. The circular section has no such dependence (its normal is radial, whatever the frame does): the rolling ball is G1 across any wall-curvature jump.
+
+### 13.19.2 The construction
+
+When the first pass is refused for a junction kink (conic only), `rails_blend` runs a second pass in which every blend end that meets the next blend of its chain (and is not mitred: a mitre keeps its crease allowance) fades to the circular arc. The weight of the rational quadratic goes from the profile's (rho / (1 - rho)) to the circle's (cos of half the arc, the weight that makes a, t, b exactly the ball's arc) by a quintic smooth step of the arc length of the ball centre: share 0 at the junction (the section IS the circular arc there, so the surface is the rolling ball's and G1 across the junction), 1 at the fade length, with zero first and second derivatives at both. Length = 3 chords |a b| of the end section (`kFadeReach`), at most 0.45 of the blend. The weight varies per station, so the middle pole row is interpolated as w x P beside the weight curve (same parameters, same knots) and the surface is the ordinary NURBS with those weights; the along-rail refinement criterion of 13.11.2 compares w x P and the weight. Closed blends (rims) have no ends and no fade. A first pass that builds is untouched (byte-identical results). A curvature profile has no fade (its section is a polynomial of degree 5, no circle in it): its refusal is unchanged and names both passes.
+
+`data.profile.circularFade` = `{ ends, reach, reachChords }` and the summary sentence say that it happened; the profile there differs from the asked one by the weight change (here 0.81 to 1.0 of the circle's against the conic's weight 1, within 3.86 mm of each junction).
+
+**Why the fade is G1 across the junction (the carrying argument).** The junction section of a faded end is OCCT's circular iso-arc: a, b are its contacts and t the apex of its tangent lines, and the weight there is the weight of its own section circle (cos of half the arc, read from the section, so a varying size is covered: the circle changes along the chain, the weight follows it). The weight curve is built so that its derivative along the rail equals that of the circle's weight wc(s) at the junction (the quintic share has zero first and second derivative there, so w'(s) = wc'(s)). The rational surface a B0 + w t B1 + b B2 over B0 + w B1 + B2 with w = wc(s), a(s), b(s), t(s) the circle's own data is the circular blend itself, and OCCT's circular chain is G1 across the junction (the rolling ball): the faded blend is tangent to it to first order at the junction from both sides, hence G1 with its neighbour. Two approximations carry the claim to a measured 2.3e-6 rad, not to zero: the contact points are snapped onto the support faces when closer than 1e-3 of the apex distance (OCCT's own contact error, section 13.11.3) and the end slope of the interpolated weight curve is the spline's, not wc'(s) exactly.
+
+### 13.19.3 Measured (native llull-kernel, OCCT 7.9.2)
+
+R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, conic rho 0.5, blend 1:
+
+- before: refused, junction 0.0182 rad (limit 0.0095);
+- after: built (the rim is 9 edges, a closed chain of 9 blends, so 18 ends fade: both sides of every junction, which is the evidence that the junction is G1 and not only one side tangent to it), `junctionG1` 2.3e-6 rad (the largest angle between the normals of two blends along their junction), contacts with the walls G1 5.3e-6 rad, gap 4.1e-6 (limit 3.1e-4), 18 faded ends, reach 3.86 mm;
+- volume: the circular fillet removes 7.079 mm3 of 13838.71; the faded conic 6.216 mm3 (ratio 0.878). The conic alone (weight 1 at a right angle: a parabola) removes (r^2 / 6) / (r^2 (1 - pi / 4)) = 0.78 of the circle's per section, the circle all of it, so the faded blend is in between: the test asserts (0.80, 0.95).
+  A chain that builds without the fade (R 20 cap, blend 1, 0.0077 rad) is unchanged and has no `circularFade`.
+
+### 13.19.4 Left, by name
+
+- The fade is applied to all non-mitred junction ends of the chain when any junction kinks, not only the kinked ones (the failing junction is not identified per pair): chains that kink in one place lose profile weight everywhere along 3 chords of every junction.
+- Curvature (G2) profiles are not faded; a chain they cannot build (quartic also kinks) stays refused; ask for the conic.
+- The second pass is skipped when no blend end meets the next blend across a smooth (not mitred) junction: the first pass reason is returned unchanged. When it runs and still kinks the refusal says "still kinks with its ends faded"; when it fails for another reason, "the build with its ends faded fails: <reason>". No test provokes either branch (a kink at a mitred junction only, or a second-pass failure).
+- A pole of the interpolated weight curve at or below 1e-9 is refused by name (a NURBS weight is positive); the weights run from the circle's (0.81 here) to the profile's and nothing in the tests approaches the bound.
+- Mixed vertices and the deform mass rule are lane 2 (`blend_corner.cxx`), untouched here.
+
+### 13.19.5 Tests
+
+`a_chain_whose_curvature_blend_would_meet_at_more_than_the_g1_default_is_refused_and_a_conic_fades_to_the_circle` (`blend_rail_tests.rs`): the curvature refusal names both passes; the R 30 conic builds with the fade, junction below 1e-4 rad, contacts G1, volume ratio in (0.75, 1); the R 20 chain has no fade. Red-proof: with the fade disabled the same test fails with the 0.0182 rad refusal. `tests/unit/blendProfile.test.ts` (summary and data), tool-schema snapshot (description).

@@ -10,7 +10,11 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_FACE_NOT_DEVELOPABLE:
     'Only plane, cylinder and cone faces develop without stretch; a sphere or torus needs method geodesic or parametric (read data.distortion).',
   WRP_METHOD_UNAVAILABLE:
-    'Use method develop, geodesic or parametric on a plane, cylinder, cone, sphere or torus face; freeform (B-spline) faces have no chart yet, and method project is project_to_face.',
+    'Use method develop, geodesic or parametric on a plane, cylinder, cone, sphere or torus face, or geodesic / parametric on a freeform (B-spline) face of the native kernel; method project is project_to_face.',
+  WRP_FACE_TOO_STEEP:
+    'Use a smaller sketch or an anchor where the freeform face is flatter: the walls of a freeform relief run along the outward normal at the anchor and the face must cross that direction the same way over the whole region.',
+  WRP_CHART_FOLD:
+    'Use a smaller sketch, move the anchor to a flatter place, or use method parametric: the geodesic chart of a freeform face folds at a conjugate point of the exponential map.',
   WRP_GEODESIC_FAILED:
     'Pick points closer together (a quarter great circle at most on a sphere), not through the cone apex, or use mode "uv" with intermediate points.',
   WRP_SPLIT_CURVE_NOT_ON_FACE:

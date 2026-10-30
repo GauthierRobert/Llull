@@ -17,6 +17,20 @@ const pg = load('pull_and_geodesic.json');
 const glyphs = load('font_firasans_glyphs.json');
 const text = load('text_cases.json');
 
+/** Volume of the pull-walled relief of a circle of developed radius a on a cylinder of radius R: the layer between radii inner and outer seen along a parallel pull (midpoint rule on the substitution s = a sin(theta)). */
+function freeformCylinderRelief(radius, a, inner, outer) {
+  const steps = 20000;
+  let total = 0;
+  for (let k = 0; k < steps; k++) {
+    const theta = ((k + 0.5) * Math.PI) / steps - Math.PI / 2;
+    const s = a * Math.sin(theta);
+    const x = radius * Math.sin(s / radius);
+    const thickness = Math.sqrt(outer * outer - x * x) - Math.sqrt(inner * inner - x * x);
+    total += 2 * a * Math.cos(theta) * thickness * Math.cos(s / radius) * a * Math.cos(theta) * (Math.PI / steps);
+  }
+  return total;
+}
+
 const D = '--doc t.llull.json --json';
 const r12 = (x) => Number(x.toPrecision(12));
 const cylinderVolume = 16000 * Math.PI; // add_cylinder r 20 h 40
@@ -440,16 +454,31 @@ const cases = [
   },
   {
     vc: 'VC-WRP-27',
-    what: 'wrap / emboss on a B-spline face (method parametric and geodesic): distortion reported; values recorded as golden on first run',
-    metric: 'data.distortion',
-    value: 'TBD - golden on first run (no closed form for a freeform patch)',
-    tolerance: null,
-    unit: '1',
-    source: '(c)',
-    grade: 'C',
+    what: 'wrap / emboss on a B-spline face that is secretly a cylinder (a plate bent 90 deg on R 50, faces R 50 convex and R 44 concave): geodesic chart circle a keeps 2 pi a; pull-walled relief of a circle equals the closed form (layer between two radii seen along a parallel pull)',
+    metric: 'data.curves[0].length3d; data.volumeDelta',
+    value: {
+      wrapCircles: [
+        { radius: 50, a: 6, length3d: 2 * Math.PI * 6 },
+        { radius: 44, a: 5, length3d: 2 * Math.PI * 5 },
+      ],
+      reliefs: [
+        { mode: 'emboss', radius: 50, a: 6, depth: 1.5, volume: freeformCylinderRelief(50, 6, 50, 51.5) },
+        { mode: 'deboss', radius: 50, a: 6, depth: 1.5, volume: -freeformCylinderRelief(50, 6, 48.5, 50) },
+        { mode: 'emboss', radius: 44, a: 5, depth: 1.5, volume: freeformCylinderRelief(44, 5, 42.5, 44) },
+        { mode: 'deboss', radius: 44, a: 5, depth: 1.5, volume: -freeformCylinderRelief(44, 5, 44, 45.5) },
+      ],
+      saddle:
+        'lattice-warped 60 x 60 x 10 plate (moves +-10 at the four middle lattice points): measured, not closed form - circle a 14 geodesic chart max strain 2.24e-4, relief volume / (chart area x depth) = 0.9999994 (golden, server/tests/nativeWrapFreeform.test.ts)',
+    },
+    tolerance: 1e-4,
+    toleranceKind: 'relative',
+    unit: 'mm / mm3',
+    source:
+      '(b) closed form of a cylinder (tests/unit/geometry/freeformChart.test.ts proves the chart against the analytic cylinder and sphere charts); saddle golden on first run',
+    grade: 'A',
     proves: ['FR-WRP-03', 'FR-WRP-14'],
-    cli: { run: `llull wrap_to_face '{"placement":{"method":"parametric"},...}' ${D}`, assert: 'data.distortion' },
-    unbuiltCommands: ['wrap_to_face'],
+    cli: { run: `llull emboss_on_face '{"placement":{"method":"geodesic"},...}' ${D}`, assert: 'data.volumeDelta, data.distortion' },
+    unbuiltCommands: [],
   },
   {
     vc: 'VC-WRP-28',
@@ -573,11 +602,15 @@ const cases = [
     what: 'multi-face wrap across tangent faces: stadium (box 40 x 20 x 10 + two r 10 cylinder ends), a 6 wide band 30 long from the front plane over the +x cylinder end, emboss depth 1: plane part A 60, cylinder part A 120 (arc length 20), volume A d + A d (1 + d / 2r); three faces (60 long band): 60 + 6 (10 pi) 1.05 + 6 (50 - 10 pi)',
     metric: 'data.faces[].area, data.chainArea, data.volumeDelta',
     value: {
-      twoFaces: { areas: [60, 120], chainArea: 180, volumeDelta: 60 + 120 * 1.05, debossVolumeDelta: -(60 + 120 * 0.95), edgeLength: 10, convexity: 'smooth' },
-      threeFaces: {
-        areas: [60, 60 * Math.PI, 6 * (50 - 10 * Math.PI)],
-        volumeDelta: 60 + 60 * Math.PI * 1.05 + 6 * (50 - 10 * Math.PI),
+      twoFaces: {
+        areas: [60, 120],
+        chainArea: 180,
+        volumeDelta: 60 + 120 * 1.05,
+        debossVolumeDelta: -(60 + 120 * 0.95),
+        edgeLength: 10,
+        convexity: 'smooth',
       },
+      threeFaces: { areas: [60, 60 * Math.PI, 6 * (50 - 10 * Math.PI)], volumeDelta: 60 + 60 * Math.PI * 1.05 + 6 * (50 - 10 * Math.PI) },
       wrap: { lineLength: 40, lengths3d: [10, 30], sharpEdgeCrossing: { lineLength: 8, lengths3d: [5, 3] } },
     },
     tolerance: 1e-6,
@@ -586,7 +619,10 @@ const cases = [
     source: '(b) develop is an isometry; plane A d, cylinder A d (1 + d / 2r); server/tests/nativeWrapChain.test.ts',
     grade: 'A',
     proves: ['FR-WRP-15'],
-    cli: { run: `llull emboss_on_face '{"id":"$stadium","face":{"faceNear":[0,-10,0]},"chain":[{"faceNear":[30,0,0]}],"profileIds":["$band"],"mode":"emboss","depth":1,"placement":{"anchor":{"chart":[0,0],"on":[10,-10,0]}}}' ${D}`, assert: 'data.volumeDelta' },
+    cli: {
+      run: `llull emboss_on_face '{"id":"$stadium","face":{"faceNear":[0,-10,0]},"chain":[{"faceNear":[30,0,0]}],"profileIds":["$band"],"mode":"emboss","depth":1,"placement":{"anchor":{"chart":[0,0],"on":[10,-10,0]}}}' ${D}`,
+      assert: 'data.volumeDelta',
+    },
   },
   {
     vc: 'VC-WRP-37',
