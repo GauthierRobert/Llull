@@ -107,6 +107,12 @@ describe('silhouettes', () => {
     expect((found.curves[0]?.curve.poles[0] as Vec3)[1]).toBeCloseTo(20, 9);
   });
 
+  it('a line on the boundary of the face (inside by the kernel test, the probes beside it outside) is an edge even when the u bounds do not say so', () => {
+    const found = silhouettes(session([cylinder], { onlyAzimuth: [0, Math.PI / 2] }), [1, 0, 0]);
+    expect(found.curves).toEqual([]);
+    expect(found.onEdge).toEqual([0]);
+  });
+
   it('a cone seen along x: two generatrices through the apex (slant length minus the face start), seen along its axis none', () => {
     const slant = Math.hypot(20, 40);
     const cone: Geometry = {
