@@ -832,7 +832,7 @@ The crate evaluates the §13.3 tape on a voxel grid (plane by plane, interval-pr
 (`llull-jsmath`, checked against 4000 random values and 36 node-generated bit patterns). `server/tests/fieldNative.test.ts` (the parity suite): on seven fields (smooth blends, clipped gyroid, diamond, octet, solid-sourced, shell)
 the native mesh equals the TS mesh vertex for vertex and triangle for triangle, `contentHash` inputs, volumes, quadratures and quantiles are equal, `lattice_properties` / `check_implicit` agree, and refusals carry the same codes. Budgets:
 2^30 samples, 5 000 000 triangles inline, 20 000 000 when the host holds a mesh asset store (`maxStoredTriangles`); a failed native job falls back to the TS engine when the grid is below its cap, else is refused with
-`IMP_ENGINE_FAILED` and the named cause. Gradients and malformed programs are delegated to the TS engine. Rust: `cargo fmt --check`, `clippy -D warnings`, 24 unit + 6 job tests + the trig reference.
+`IMP_ENGINE_FAILED` and the named cause. Malformed programs are delegated to the TS engine (gradients and dual contouring run natively since 14.10). Rust: `cargo fmt --check`, `clippy -D warnings`, 24 unit + 6 job tests + the trig reference.
 
 Measured (CLI, this machine): smooth union corner 33.6e6 samples -> 3.45e6 triangles 2.3 s; octet block 66.4e6 samples -> 13.6e6 triangles 15.8 s; shell + gyroid 8.6e6 samples -> 6.87e6 triangles 6.3 s; sleeve 19.1e6 samples -> 9.14e6
 triangles 7.2 s; graded column 4.5e6 samples -> 2.47e6 triangles 1.7 s. The TS engine refuses all of them before sampling (`IMP_GRID_BUDGET`).
@@ -882,8 +882,8 @@ measured wall plus that band and says so in the finding.
 - **`<i:sqrt>` is written as `<i:pow A 0.5>`**: the pinned XSD declares two inputs on `sqrt` against its own documentation, so a conforming `sqrt` would not validate.
 - **Level-set export covers field programs without strut sets.** Strut and graph lattices stay beam lattices or meshes (`data.implicit.skipped` names the reason); a body built on solids needs a millimetre document (the operand meshes are written in millimetres).
 - **Dual contouring** (`mesher: 'dual_contouring'`): one QEF vertex per crossed cell (pseudo-inverse, singular values below 0.1 of the largest dropped, mass-point regularisation, vertex clamped to its cell), edge crossings refined by 8 bisections on the exact
-  field, normals from the exact gradient, one quad per crossed edge split on the shorter diagonal. The result is checked closed and edge-manifold; otherwise the tetrahedra are used and `data.mesherFallback` says so. The native engine delegates
-  it to the TS engine (grid cap 2^21). The mesher is part of the content hash.
+  field, normals from the exact gradient, one quad per crossed edge split on the shorter diagonal. The result is checked closed and edge-manifold; otherwise the tetrahedra are used and `data.mesherFallback` says so. The native engine meshes it too (14.10),
+  bit-identical to the TS mesher, up to 2^29 grid nodes (the TS engine: 2^21). The mesher is part of the content hash.
 - **Mesh asset store (D3 host cache)** adopted for bodies above 100 000 triangles: the entity keeps a 50 000-triangle level of detail, the body record keeps the asset key; load reads the store, else re-derives. `fullBodyMesh` serves the properties and checks.
 - **Beam-lattice clipping meshes** are cut from the region by dual contouring on at most 32 cells along the longest side, independent of the body voxel (a 0.05 voxel over 20 mm wrote 8.3 MB of coplanar triangles and ran out of memory).
 - **`export_3mf` of large meshes** (review fix): an indexed mesh above 250 000 triangles is written straight from its arrays in batches into a streaming DEFLATE encoder (`lib/deflateStream.ts`, fixed Huffman + one-candidate LZ77, verified against zlib) and a chunked ZIP (`zipChunked`); smaller meshes are stored byte for byte as before. The package still travels as one base64 string, which caps the deflated model part at 375 000 000 bytes (V8 strings stop near 536 million characters): about 8 million triangles of a gyroid-like mesh. Above that, and for a non-indexed body over 2 000 000 triangles, the command answers `EXPORT_MESH_TOO_LARGE`. The 6.87M-triangle body of the shell + gyroid plan therefore exports. The triangle lists of asset-backed parts are built lazily, so beam-lattice and level-set exports never materialise them.
@@ -901,7 +901,7 @@ measured wall plus that band and says so in the finding.
 ### 14.7 Not built
 
 Surface-UV cell maps and maps for strut lattices; scalar kinds `topology_density` and `fea_result` (VC-IMP-29 stays open); numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a faster than quadratic Delaunay pass for Voronoi (14.9);
-native `gradient` evaluation and native dual contouring (both delegate to the TS engine); per-cell dual-contouring fallback (the whole body falls back); a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.
+a 3MF package above 375 MB (needs a file sink instead of one base64 string); GPU preview.
 
 ### 14.8 A plain field over a coarsely shown body (DES-5c, 2026-10-30)
 
@@ -944,3 +944,26 @@ The old 5000 beam case is 16x (graph) and 33x (Voronoi) faster natively and two 
 **Tests.** `tests/unit/field/strutBvh.test.ts`: bit-identical to the brute loop on a random 300 beam set (about 1700 points inside beams, on caps, far away, with the radius override), NaN points, NaN / infinite / 1e-120 beams, 0 against -0 in both beam orders, the bound never above the true value (single beam sets, with and without override). `strut_bvh.rs` repeats the first three on the Rust twin and the empty set. Red without the fix: removing the tie rule fails the 0 / -0 tests (TS and Rust); shifting the bound by +0.5 fails the bit-identity and bound tests (TS and Rust). `tests/unit/implicit/gaps6.test.ts` (the 20 mm cube builds; a box above 6000 seeds is refused by name) and `lattices5.test.ts` (a 12566 beam ring builds and evaluates; 251000 beams are refused). TS to Rust parity: the existing `server/tests/fieldNative.test.ts`; the content hashes of existing bodies are unchanged (implicit lifecycle and golden suites).
 
 **Left.** A Delaunay pass faster than quadratic (it must keep the same tetrahedra for the hashes); a BVH inside the buckets of periodic sets with many beams per cell; a native Voronoi builder.
+
+### 14.10 Native gradient, native dual contouring, per-cell fallback (DES-5c, 2026-10-30)
+
+**Native gradient.** `solver/crates/llull-field/src/gradient.rs` is the twin of `gradient.ts` (forward-mode value + d/dx, d/dy, d/dz per register, same formulas, same operation order, V8-exact `sin` / `cos` / `atan2` / `exp`, central differences of 1e-6 for `mesh_sdf` / `strut_set`). The job `evaluate` takes `gradient: true` and writes `gradients.f64` beside `values.f64`; the host (`fieldEngine.ts`) no longer sends `withGradient` requests to the TS engine. `evaluate_field gradient: true` and the dual-contouring normals therefore run natively. Tests: `server/tests/fieldNative.test.ts` compares value and gradient with `Object.is` for every field of the pack scene and a Voronoi set (strut BVH), and for each of the 20 arithmetic ops over a 729 point grid with degenerate points (`sqrt` at 0, `abs` and `clamp` on both sides, `smin` with k <= 0 and wide blends); `gradient.rs` has two unit tests. Red: swapping two components of the `fract` gradient in Rust fails the op sweep.
+
+**Native dual contouring.** `dual_contour.rs` is the twin of `dualContour.ts`: sign grid (one byte per node, from the interval-pruned planes after the zero snap), the three edge scans in the TS order, 8 bisections on the exact field, the exact gradient normal, the 3x3 Jacobi eigen-decomposition and pseudo-inverse (eigenvalues below 0.1 of the largest dropped), mass-point regularisation, clamp to the cell, quads split on the shorter diagonal. The order of every floating-point operation is the TS one, so the mesh is identical vertex for vertex and triangle for triangle, and the content hash (which covers the mesher but not the engine) is unchanged. Rayon parallelises only pure per-edge and per-cell work (Hermite datum, QEF vertex); vertex numbering follows the sequential scan of the quads. A mesh that is not a closed edge-manifold falls back to the whole-body tetrahedra (replaced by the per-cell repair below); the job answers `mesher` and `mesherFallback`.
+- Cap: `NATIVE_DUAL_CONTOURING_MAX_SAMPLES` = 2^29 grid nodes (`fieldEngine.ts`; the sign grid is 512 MB at the cap; above it the job refuses with `IMP_GRID_BUDGET` before sampling and names the limit). The TS engine keeps 2^21. The triangle budget is checked right after the edge scan (two triangles per crossed edge, exactly), so a body over budget is refused before the Hermite data are computed.
+- Tests: `fieldNative.test.ts` runs `create_implicit_body mesher: dual_contouring` on both engines for the 7 scene fields, a sharp box minus sphere and a Voronoi set and compares positions (`Object.is`), indices, content hash, `mesher`, `mesherFallback`, figures; the set contains a body that stays dual contouring and one that falls back, and the cap refusal. Red: 7 instead of 8 bisections, or a singular ratio of 0.3, fails the parity test. `dual_contour.rs`: sphere closed and on the surface, cube corners kept, budget count, tiny grid.
+
+**Measured** (sphere r = 10 and a gyroid sheet in a 20 mm cube, `create_implicit_body`, maxTriangles 20e6, release build, shared machine):
+
+| grid nodes | body | TS dual contouring | native dual contouring | native tetra |
+| --- | --- | --- | --- | --- |
+| 1.0e6 | sphere | 965 ms | 236 ms | 233 ms |
+| 2.0e6 (TS cap) | sphere | 1494 ms | 172 ms | 296 ms |
+| 1.0e6 | gyroid, 1.8M triangles | 11.9 s | 1.17 s | not run |
+| 2.0e6 | gyroid, 3.0M triangles | 20.3 s | 1.81 s | not run |
+| 9.9e6 | sphere | over the TS cap | 375 ms | 681 ms |
+| 9.9e6 | gyroid, 9.1M triangles | over the TS cap | 6.5 s | not run |
+| 1.0e8 | sphere, 2.0M triangles | over the TS cap | 1.6 s | 3.7 s |
+| 5.1e8 | sphere, 6.0M triangles | over the TS cap | 5.7 s | 16.4 s |
+
+Native dual contouring is 4x to 17x faster than the TS mesher and 2.5x to 3x faster than the native tetrahedra (it makes a third of the triangles).

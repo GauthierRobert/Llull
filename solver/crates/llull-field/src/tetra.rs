@@ -12,7 +12,10 @@ use std::hash::{BuildHasherDefault, Hasher};
 const KUHN: [[usize; 4]; 6] = [[0, 1, 3, 7], [0, 1, 5, 7], [0, 2, 3, 7], [0, 2, 6, 7], [0, 4, 5, 7], [0, 4, 6, 7]];
 
 #[derive(Default)]
-struct KeyHasher(u64);
+pub struct KeyHasher(u64);
+
+/// Hasher builder of the exact edge / cell keys.
+pub type KeyBuild = BuildHasherDefault<KeyHasher>;
 
 impl Hasher for KeyHasher {
     fn write(&mut self, bytes: &[u8]) {

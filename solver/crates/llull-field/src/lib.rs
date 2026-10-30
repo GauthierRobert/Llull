@@ -16,6 +16,7 @@
 //! `evaluate` with `gradient: true` also writes `gradients.f64` (3 per point, `gradient.rs`, twin of `gradient.ts`).
 
 mod components;
+mod dual_contour;
 mod eval;
 mod files;
 mod gradient;

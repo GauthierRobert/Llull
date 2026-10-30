@@ -2,13 +2,14 @@
 //! (`report.json` with a `refusal`), a malformed folder is a `JobError`.
 
 use crate::components::{components, solid_nodes, Component};
+use crate::dual_contour::{dual_contour, OverBudget};
 use crate::eval::Evaluator;
 use crate::files::{f64_bytes, input_error, read_f64, u32_bytes, write_file, JobError};
 use crate::gradient::GradientScratch;
 use crate::measure::{quantiles, volume};
 use crate::sampling::{fill_plane, Grid, PlaneStats, Tiles};
 use crate::tape::{Program, ProgramSpec};
-use crate::tetra::{extract, is_closed_manifold, TriangleBudget};
+use crate::tetra::{extract, is_closed_manifold, IsoMesh, TriangleBudget};
 use llull_protocol::{emit, Event, Output};
 use rayon::prelude::*;
 use serde::Deserialize;
@@ -56,6 +57,12 @@ struct Job {
     points: usize,
     #[serde(default)]
     gradient: bool,
+    /// `tetra` (default) or `dual_contouring` (a mesh that is not a closed manifold falls back to the tetrahedra).
+    #[serde(default)]
+    mesher: String,
+    /// Grid nodes the dual-contouring sign grid (one byte per node) may hold.
+    #[serde(default)]
+    max_dual_contouring_samples: u64,
 }
 
 fn refusal(code: &str, message: String, samples: Option<u64>, limit: Option<u64>) -> Value {
@@ -85,6 +92,7 @@ fn component_json(c: &Component) -> Value {
 /// The refusal when the op needs more samples than the engine holds.
 fn over_budget(job: &Job, grid: &Grid) -> Option<Value> {
     let (count, limit) = match (job.op.as_str(), &job.request) {
+        ("mesh", _) if job.mesher == "dual_contouring" => (grid.node_count(), job.max_samples.min(job.max_dual_contouring_samples)),
         ("mesh", _) => (grid.node_count(), job.max_samples),
         (_, Some(Request::Components | Request::Nodes)) => (grid.node_count(), job.max_samples.min(COMPONENT_NODES)),
         (_, Some(Request::Quantile { .. })) => (grid.cell_count(), job.max_samples.min(QUANTILE_CELLS)),
@@ -94,36 +102,17 @@ fn over_budget(job: &Job, grid: &Grid) -> Option<Value> {
         .then(|| refusal("IMP_GRID_BUDGET", format!("{count} samples exceed the llull-field limit of {limit}"), Some(count), Some(limit)))
 }
 
-fn mesh_job(
-    folder: &Path,
-    job: &Job,
-    evaluator: &Evaluator,
-    grid: &Grid,
-    out: &mut impl Write,
-    outputs: &mut Vec<Output>,
-) -> Result<Value, JobError> {
+/// The mesh and its figures, written to the folder.
+struct Meshed {
+    mesh: IsoMesh,
+    stats: PlaneStats,
+    mesher: &'static str,
+    fallback: bool,
+}
+
+fn finish_mesh(folder: &Path, evaluator: &Evaluator, grid: &Grid, meshed: Meshed, outputs: &mut Vec<Output>) -> Result<Value, JobError> {
+    let Meshed { mesh, stats, mesher, fallback } = meshed;
     let total = grid.node_count();
-    let tiles = Tiles::classify(evaluator, grid);
-    let mut planes = |k: usize, plane: &mut [f64]| fill_plane(evaluator, &tiles, grid, k, plane);
-    let mut last = 0;
-    let mut progress = |layer: usize, layers: usize| {
-        let percent = layer * 20 / layers.max(1);
-        if percent != last {
-            last = percent;
-            let _ = emit(out, &Event::Progress { step: layer as u64, total: layers as u64, message: "meshing", detail: None });
-        }
-    };
-    let (mesh, stats): (_, PlaneStats) = match extract(grid, job.max_triangles, &mut planes, &mut progress) {
-        Ok(done) => done,
-        Err(TriangleBudget(reached)) => {
-            return Ok(refusal(
-                "IMP_TRIANGLE_BUDGET",
-                format!("more than {} triangles (at least {reached}) exceed the budget of {}", job.max_triangles, job.max_triangles),
-                Some(reached),
-                Some(job.max_triangles),
-            ))
-        }
-    };
     let residual = mesh
         .positions
         .par_chunks_exact(3)
@@ -152,7 +141,81 @@ fn mesh_job(
         "prunedFraction": if total == 0 { 0.0 } else { 1.0 - stats.evaluated as f64 / total as f64 },
         "maxVertexResidual": residual,
         "nonFiniteSamples": stats.non_finite,
+        "mesher": mesher,
+        "mesherFallback": fallback,
     }))
+}
+
+fn triangle_refusal(max: u64, reached: u64) -> Value {
+    refusal(
+        "IMP_TRIANGLE_BUDGET",
+        format!("more than {max} triangles (at least {reached}) exceed the budget of {max}"),
+        Some(reached),
+        Some(max),
+    )
+}
+
+/// Marching tetrahedra of the whole grid (the `tetra` mesher, and the fallback of a dual-contouring mesh that is not a closed manifold).
+fn tetra_mesh(
+    job: &Job,
+    evaluator: &Evaluator,
+    grid: &Grid,
+    tiles: &Tiles,
+    out: &mut impl Write,
+) -> Result<(IsoMesh, PlaneStats), TriangleBudget> {
+    let mut planes = |k: usize, plane: &mut [f64]| fill_plane(evaluator, tiles, grid, k, plane);
+    let mut last = 0;
+    let mut progress = |layer: usize, layers: usize| {
+        let percent = layer * 20 / layers.max(1);
+        if percent != last {
+            last = percent;
+            let _ = emit(out, &Event::Progress { step: layer as u64, total: layers as u64, message: "meshing", detail: None });
+        }
+    };
+    extract(grid, job.max_triangles, &mut planes, &mut progress)
+}
+
+/// Sign of every node (1 = value < 0, after the zero snap), x fastest, from the interval-pruned planes.
+fn sign_grid(evaluator: &Evaluator, tiles: &Tiles, grid: &Grid) -> (Vec<u8>, PlaneStats) {
+    let [sx, sy, sz] = grid.nodes();
+    let mut signs = vec![0u8; sx * sy * sz];
+    let mut plane = vec![0.0; sx * sy];
+    let mut stats = PlaneStats::default();
+    for (k, slab) in signs.chunks_exact_mut(sx * sy).enumerate().take(sz) {
+        stats = stats.add(fill_plane(evaluator, tiles, grid, k, &mut plane));
+        slab.par_iter_mut().zip(plane.par_iter()).for_each(|(sign, &value)| *sign = u8::from(value < 0.0));
+    }
+    (signs, stats)
+}
+
+fn mesh_job(
+    folder: &Path,
+    job: &Job,
+    evaluator: &Evaluator,
+    grid: &Grid,
+    out: &mut impl Write,
+    outputs: &mut Vec<Output>,
+) -> Result<Value, JobError> {
+    let tiles = Tiles::classify(evaluator, grid);
+    let meshed = if job.mesher == "dual_contouring" {
+        let (signs, stats) = sign_grid(evaluator, &tiles, grid);
+        match dual_contour(evaluator, grid, &signs, job.max_triangles) {
+            Err(OverBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
+            Ok(mesh) if is_closed_manifold(mesh.positions.len() / 3, &mesh.indices) => {
+                Meshed { mesh, stats, mesher: "dual_contouring", fallback: false }
+            }
+            Ok(_) => match tetra_mesh(job, evaluator, grid, &tiles, out) {
+                Ok((mesh, _)) => Meshed { mesh, stats, mesher: "tetra", fallback: true },
+                Err(TriangleBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
+            },
+        }
+    } else {
+        match tetra_mesh(job, evaluator, grid, &tiles, out) {
+            Ok((mesh, stats)) => Meshed { mesh, stats, mesher: "tetra", fallback: false },
+            Err(TriangleBudget(reached)) => return Ok(triangle_refusal(job.max_triangles, reached)),
+        }
+    };
+    finish_mesh(folder, evaluator, grid, meshed, outputs)
 }
 
 fn measure_job(

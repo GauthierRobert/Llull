@@ -13,9 +13,15 @@ import { FieldBuilder } from '@core/geometry/field/build';
 import type { FieldOp } from '@core/geometry/field/program';
 import { getFieldEngine, setFieldEngine } from '@core/geometry/field/engine';
 import type { FieldEngine } from '@core/geometry/field/engineTypes';
+import { compileField } from '@implicit/compile';
 import { tsFieldEngine } from '@core/geometry/field/tsEngine';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
-import { NATIVE_FIELD_LIMITS, createNativeFieldEngine, installFieldEngine } from '../src/native/fieldEngine';
+import {
+  NATIVE_DUAL_CONTOURING_MAX_SAMPLES,
+  NATIVE_FIELD_LIMITS,
+  createNativeFieldEngine,
+  installFieldEngine,
+} from '../src/native/fieldEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -218,6 +224,59 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
       ).toBe(true);
       expect(nat.gradients?.length).toBe(points.length);
     }
+  });
+
+  native(
+    'native dual contouring: mesh, mesher choice, hash and figures identical to the TS mesher for every field, sharp and falling back alike (05 IMP 14.10)',
+    () => {
+      if (engine === null) return;
+      const box = step(createEmptyDocument(), 'add_field_primitive', { shape: 'box', size: [8, 8, 8], position: [4, 4, 4], rounding: 0 });
+      const cut = step(box.doc, 'add_field_primitive', { shape: 'sphere', radius: 5, position: [7, 7, 7] });
+      const sharp = step(cut.doc, 'combine_fields', { op: 'subtract', a: box.id, b: cut.id });
+      const voronoi = step(sharp.doc, 'add_voronoi_lattice', { region: box.id, density: 0.15, seed: 4, radius: 0.35 });
+      const cases: Array<[CadDocument, string, number]> = [
+        ...Object.keys(SCENE.fields).map((name): [CadDocument, string, number] => [
+          SCENE.doc,
+          SCENE.fields[name] as string,
+          VOXEL[name] as number,
+        ]),
+        [sharp.doc, sharp.id, 0.4],
+        [voronoi.doc, voronoi.id, 0.3],
+      ];
+      const seen = new Set<string>();
+      for (const [doc, field, voxel] of cases) {
+        const params = { field, voxel, mesher: 'dual_contouring' };
+        const ts = step(doc, 'create_implicit_body', params);
+        const nat = step(doc, 'create_implicit_body', params, engine);
+        const a = ts.doc.entities[ts.id] as MeshSolidEntity;
+        const b = nat.doc.entities[nat.id] as MeshSolidEntity;
+        expect(b.mesh.indices, field).toEqual(a.mesh.indices);
+        expect(
+          b.mesh.positions.filter((v, i) => !Object.is(v, a.mesh.positions[i])),
+          field,
+        ).toEqual([]);
+        expect(b.mesh.positions.length).toBe(a.mesh.positions.length);
+        for (const key of ['triangles', 'vertices', 'volumeMesh', 'area', 'closedManifold', 'mesher', 'mesherFallback', 'contentHash'])
+          expect(nat.data[key], field + ' ' + key).toEqual(ts.data[key]);
+        const pa = ts.data['provenance'] as Record<string, unknown>;
+        const pb = nat.data['provenance'] as Record<string, unknown>;
+        expect([pa['engine'], pb['engine']]).toEqual(['ts', 'llull-field']);
+        for (const key of ['samples', 'evaluatedSamples', 'nonFiniteSamples', 'maxVertexResidual', 'prunedFraction'])
+          expect(pb[key], key).toEqual(pa[key]);
+        seen.add(String(ts.data['mesher']) + (ts.data['mesherFallback'] === true ? ':fallback' : ''));
+      }
+      expect([...seen].sort()).toEqual(['dual_contouring', 'tetra:fallback']);
+    },
+  );
+
+  native('native dual contouring refuses a grid above its named cap (2^29 nodes) before sampling, with the cap in the refusal', () => {
+    if (engine === null) return;
+    const sphere = step(createEmptyDocument(), 'add_field_primitive', { shape: 'sphere', radius: 3 });
+    const compiled = compileField(sphere.doc, sphere.id);
+    if (!compiled.ok) throw new Error(compiled.message);
+    const grid = { min: [0, 0, 0] as const, max: [900, 900, 900] as const, voxel: 1 };
+    const refused = engine.mesh(compiled.program, grid, { mesher: 'dual_contouring', maxTriangles: 1000 });
+    expect(refused).toMatchObject({ ok: false, code: 'IMP_GRID_BUDGET', limit: NATIVE_DUAL_CONTOURING_MAX_SAMPLES });
   });
 
   native('randomized trigonometry parity: thousands of points at TPMS scale and in the V8 reduction range, bit for bit', () => {
