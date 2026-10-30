@@ -11,6 +11,7 @@ import { isClosedManifold } from '../../lib/isosurface/measures';
 import { zipChunked, zipStore } from '../../lib/zip';
 import type { Triangle } from '../../geometry/triangles';
 import { IMPLICIT_NAMESPACE, type ThreeMfLevelSet, VOLUMETRIC_NAMESPACE, levelSetXml } from './threeMfImplicit';
+import { type ThreeMfFileSink, writeThreeMfPackage } from './threeMfFile';
 import { MAX_3MF_BYTES, type ThreeMfIndexedMesh, keptIndices, meshObjectChunks, modelSink } from './threeMfStream';
 import { BEAM_BALLS_NAMESPACE, BEAM_LATTICE_NAMESPACE, type ThreeMfLattice, latticeObjectXml, otherObjectXml } from './threeMfBeamLattice';
 
@@ -151,10 +152,7 @@ const ROOT_RELS =
  * one `base` per body (displaycolor = the body colour), referenced by `pindex`. A body with a `lattice` becomes a beam-lattice object (Beam Lattice Extension
  * 1.2); its clipping and representation meshes are extra `type="other"` objects (ids after n+1, defined before the objects that use them), never build items.
  */
-export function buildThreeMf(
-  bodies: readonly ThreeMfBody[],
-  maxBytes: number = MAX_3MF_BYTES,
-): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
+function assembleThreeMf(bodies: readonly ThreeMfBody[]): { model: ModelPart[]; objects: ThreeMfObjectReport[] } {
   const entries = bodies
     .map((body) => ({
       body,
@@ -224,16 +222,8 @@ export function buildThreeMf(
     '</model>',
     '',
   ];
-  const encoder = new TextEncoder();
-  const bytes = model.every((part) => typeof part === 'string')
-    ? zipStore([
-        { name: '[Content_Types].xml', data: encoder.encode(CONTENT_TYPES) },
-        { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
-        { name: '3D/3dmodel.model', data: encoder.encode(model.join('\n')) },
-      ])
-    : zipStreamed(model, maxBytes);
   return {
-    bytes,
+    model,
     objects: entries.map(({ body, mesh, kept }) =>
       body.levelset !== undefined
         ? { name: body.name, vertices: 0, triangles: 0, manifold: false, levelsetNodes: body.levelset.program.instructions.length }
@@ -249,4 +239,49 @@ export function buildThreeMf(
             : { name: body.name, vertices: body.lattice.nodes.length, triangles: 0, manifold: false, beams: body.lattice.beams.length },
     ),
   };
+}
+
+/** The 3MF archive of `bodies` in memory (see `assembleThreeMf`): small packages are stored, a model with a streamed mesh is deflated (`maxBytes` caps the deflated model). */
+export function buildThreeMf(
+  bodies: readonly ThreeMfBody[],
+  maxBytes: number = MAX_3MF_BYTES,
+): { bytes: Uint8Array; objects: ThreeMfObjectReport[] } {
+  const { model, objects } = assembleThreeMf(bodies);
+  const encoder = new TextEncoder();
+  const bytes = model.every((part) => typeof part === 'string')
+    ? zipStore([
+        { name: '[Content_Types].xml', data: encoder.encode(CONTENT_TYPES) },
+        { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
+        { name: '3D/3dmodel.model', data: encoder.encode(model.join('\n')) },
+      ])
+    : zipStreamed(model, maxBytes);
+  return { bytes, objects };
+}
+
+/**
+ * The same archive written to `sink` in chunks (the bytes of `zipStreamed` for a model with a streamed mesh; a small model is deflated too): no whole-package string or buffer.
+ * @failure the archive passes `limit` bytes or the model XML 2 GB -> ThreeMfTooLargeError
+ */
+export function writeThreeMf(
+  bodies: readonly ThreeMfBody[],
+  sink: ThreeMfFileSink,
+  limit?: number,
+): { bytes: number; objects: ThreeMfObjectReport[] } {
+  const { model, objects } = assembleThreeMf(bodies);
+  const bytes = writeThreeMfPackage(
+    sink,
+    [
+      { name: '[Content_Types].xml', text: CONTENT_TYPES },
+      { name: '_rels/.rels', text: ROOT_RELS },
+    ],
+    '3D/3dmodel.model',
+    (push) =>
+      model.forEach((part, index) => {
+        if (index > 0) push('\n');
+        if (typeof part === 'string') push(part);
+        else for (const text of part()) push(text);
+      }),
+    limit,
+  );
+  return { bytes, objects };
 }

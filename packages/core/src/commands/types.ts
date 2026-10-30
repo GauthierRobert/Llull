@@ -213,6 +213,22 @@ export interface ObjectStorePort {
   get(sha256: string): string | null;
 }
 
+/** A file the host opens for an export too large to come back as one string (3MF above ~8 million triangles; 05 IMP 14.12). */
+export interface ExportFileWriter {
+  write(chunk: Uint8Array): void;
+  /** Rewrites bytes already written (the ZIP local header whose sizes were not known yet). */
+  patch(offset: number, bytes: Uint8Array): void;
+  /** Completes the file; `path` is where it is on the host. */
+  close(): { readonly path: string };
+  /** Discards a partial file. */
+  abort(): void;
+}
+
+export interface ExportFilePort {
+  /** Opens a new file named after `fileName` (the host picks the folder and keeps the name unique); null when none can be opened. */
+  open(fileName: string): ExportFileWriter | null;
+}
+
 export interface ExecutionContext {
   /** Set by `runCommand` while a command runs: a command it executes in turn is nested (a query then refuses an unreadable mesh asset instead of degrading). */
   readonly nested?: boolean;
@@ -248,6 +264,8 @@ export interface ExecutionContext {
   readonly pointClouds?: PointCloudPort | null;
   /** Content-addressed mesh asset store of this machine (07 MSH FR-MSH-02); null/absent = big meshes refuse with MESH_ASSET_UNAVAILABLE. */
   readonly meshAssets?: MeshAssetPort | null;
+  /** Files of this host for exports too large to return as a string (`export_3mf` toFile); null/absent = such exports stay in memory and refuse above their ceiling. */
+  readonly exportFiles?: ExportFilePort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */
