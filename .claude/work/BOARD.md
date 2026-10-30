@@ -149,8 +149,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
-  selection + falloff drag, chip layout, bench (VC-18) + 200-face preview timing, true G1 patches, bevel across vertex chains, OCC reason in
-  `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net`, M7. _Lane 2 + 1 + native_ _deps: —_
+  selection + falloff drag, chip layout, bench (VC-18) + 200-face preview timing, true G1 patches, bevel across vertex chains,
+  `render_view overlay=cage|net`, M7 (OCC reason in `DIR_FACE_MOVE_FAILED` DONE 2026-10-30). _Lane 2 + 1 + native_ _deps: —_
 - `[TODO]` **DES-5c** 05 IMP left after M0–M6 (M4–M6 done 2026-10-25, §14.7): surface-UV cell maps + maps for strut lattices;
   scalar kinds `topology_density` / `fea_result` (VC-IMP-29); numerical homogenisation on `llull-voxfe`; BVH for explicit strut sets (lift the
   5000-beam cap, faster Voronoi realise); native `gradient` + native dual contouring + per-cell DC fallback; 3MF file sink (export above the

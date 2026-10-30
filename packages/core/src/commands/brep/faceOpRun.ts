@@ -66,8 +66,9 @@ export function runFaceOp(doc: CadDocument, ctx: ExecutionContext | undefined, r
   if ('code' in params) return request.coded?.(params.code, params.message) ?? fail(`${params.message} on '${id}'`);
   const result = evaluateRecipe(kernel, { op: 'faceOp', source, ...params });
   if (typeof result === 'string') {
+    const reason = result === 'refused' ? (kernel.lastRefusal?.() ?? null) : null;
     const refused = fail(
-      `the kernel could not ${request.describe(params)} into a valid solid (${result}); try a smaller value or other faces`,
+      `the kernel could not ${request.describe(params)} into a valid solid (${result}${reason === null ? '' : `: ${reason}`}); try a smaller value or other faces`,
     );
     const failure = request.kernelFailure;
     return failure === undefined

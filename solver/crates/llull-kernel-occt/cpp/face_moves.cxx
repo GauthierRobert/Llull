@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
@@ -149,15 +150,20 @@ std::unique_ptr<Shape> offset_faces(const Shape &shape, const std::vector<TopoDS
                    Standard_False);
   for (const TopoDS_Face &face : picked) maker.SetOffsetOnFace(face, offset_sign(face) * distance);
   maker.MakeOffsetShape();
-  if (!maker.IsDone() || maker.Shape().IsNull()) return nullptr;
+  if (!maker.IsDone() || maker.Shape().IsNull())
+    throw std::runtime_error("BRepOffset_MakeOffset failed" +
+                             (maker.Error() == BRepOffset_NoError ? std::string() : " (BRepOffset_Error " + std::to_string(static_cast<int>(maker.Error())) + ")") +
+                             ": the moved faces do not meet their neighbours");
   TopoDS_Shape result = single_solid(maker.Shape());
   if (result.IsNull()) {
     TopTools_IndexedMapOfShape shells;
     TopExp::MapShapes(maker.Shape(), TopAbs_SHELL, shells);
-    if (shells.Extent() != 1) return nullptr;
+    if (shells.Extent() != 1)
+      throw std::runtime_error("the offset gave " + std::to_string(shells.Extent()) + " shells, not one closed solid");
     result = ShapeFix_Solid().SolidFromShell(TopoDS::Shell(shells(1)));
   }
-  if (!sound(result) || volume_of(result) <= 0) return nullptr;
+  if (!sound(result)) throw std::runtime_error("the offset solid is not valid (BRepCheck_Analyzer)");
+  if (volume_of(result) <= 0) throw std::runtime_error("the offset solid has no volume left (the faces moved through each other)");
   const std::vector<naming::Named> inputs{naming::named(shape)};
   return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "offset"));
 }
@@ -165,11 +171,11 @@ std::unique_ptr<Shape> offset_faces(const Shape &shape, const std::vector<TopoDS
 // Moves the FEATURE made of `picked`: defeature it away, then cut back / fuse the removed / added volume moved by `motion`.
 std::unique_ptr<Shape> move_feature(const Shape &shape, const std::vector<TopoDS_Face> &picked, const gp_Trsf &motion) {
   std::unique_ptr<Shape> current = defeature(shape, picked);
-  if (!current) return nullptr;
+  if (!current) throw std::runtime_error("the picked feature could not be removed (BRepAlgoAPI_Defeaturing) before moving it");
   const double significant = kNegligibleVolume * std::max(volume_of(shape.shape), 1.0);
   std::unique_ptr<Shape> removed = boolean_op(*current, shape, 1, false);
   std::unique_ptr<Shape> added = boolean_op(shape, *current, 1, false);
-  if (!removed || !added) return nullptr;
+  if (!removed || !added) throw std::runtime_error("the boolean that splits the feature from the solid failed");
   // the moved copy keeps the face names of the tool through the transform's own history, so the moved wall is still the picked face
   const auto moved = [&motion](const Shape &tool) {
     BRepBuilderAPI_Transform transform(tool.shape, motion, Standard_True);
@@ -189,7 +195,8 @@ std::unique_ptr<Shape> move_feature(const Shape &shape, const std::vector<TopoDS
     current = boolean_op(*current, moved(*added), 0, true);
     if (!current) return nullptr;
   }
-  return sound(current->shape) ? std::move(current) : nullptr;
+  if (!sound(current->shape)) throw std::runtime_error("the moved feature leaves an invalid solid (BRepCheck_Analyzer)");
+  return current;
 }
 
 // A planar face's outward normal and a point on it, or false for any other face.

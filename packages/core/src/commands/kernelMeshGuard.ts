@@ -38,9 +38,19 @@ export function guardedKernel(kernel: GeometryKernel): GeometryKernel {
   const known = views.get(kernel);
   if (known !== undefined) return known;
   const { blendReport, deformReport } = kernel;
+  /** The guard's own reason when it answered the latest evaluate, else the kernel's (`lastRefusal`). */
+  let guardReason: string | null = null;
   const view: GeometryKernel = {
     ...kernel,
-    evaluate: (recipe) => capped(recipe, (inner) => kernel.evaluate(inner)),
+    evaluate: (recipe) => {
+      guardReason = `the recipe holds ${meshLeafTriangles(recipe)} imported-mesh triangles, above ${KERNEL_MESH_LEAF_CAP}`;
+      const built = capped(recipe, (inner) => {
+        guardReason = null;
+        return kernel.evaluate(inner);
+      });
+      return built;
+    },
+    lastRefusal: () => guardReason ?? kernel.lastRefusal?.() ?? null,
     ...(blendReport === undefined ? {} : { blendReport: (recipe: ShapeRecipe) => capped(recipe, (inner) => blendReport(inner)) }),
     ...(deformReport === undefined ? {} : { deformReport: (recipe: ShapeRecipe) => capped(recipe, (inner) => deformReport(inner)) }),
   };

@@ -612,7 +612,7 @@ net overlays, loop-cut drag, pointer capture: the next agent), the bench of sect
   hole wall by name and the history replays (test `occtFaceMoves`).
 - **`delete_faces`**: `BRepAlgoAPI_Defeaturing`; a picked face that OCC reports as not deleted is a refusal (it used to succeed silently with the box unchanged). Both commands report the exact
   `volumeBefore` / `volumeAfter` and record the picked face names. `DIR_FACE_MOVE_TOPOLOGY` is checked before the kernel call for a cylinder / sphere whose radius + distance <= 0; the OCC reason of
-  `DIR_FACE_MOVE_FAILED` / `DIR_DEFEATURE_FAILED` is not carried over the kernel port (the answer is "refused").
+  `DIR_FACE_MOVE_FAILED` / `DIR_DEFEATURE_FAILED` was not carried over the kernel port (the answer was "refused"); carried since DES-4c (below).
 - **`squash_steps { fromStepId, toStepId, label? }`** (metaHistory): the range becomes ONE `build_project` step (id of the first step) holding the same commands. It is accepted only when replaying the new
   history reproduces the current document exactly (entities, order, every definition: canonical JSON of the document without history), so replay equality and step-scoped ids are guaranteed by
   construction; a range that creates entities or cage elements (their ids come from the step number) is refused with the history unchanged, as is a suppressed step in the range, a failing replay or a
@@ -661,3 +661,13 @@ test of 7 cases runs in 0.6 s). Not benchmarked: the 200-face kernel preview, `t
 UI (next agent): drag handles for `push_pull_face` / `replace_face` / `draft_faces`, net overlays for poles (VC-37), loop-cut drag, pointer capture, the remote preview client (`/preview`, debounce, abort),
 the `edge_only` boundary in the viewport mesh, palette entries for the new commands. Overall: the bench (VC-18), `fit_cage_vertices`, preserve-shape loop cut, Stam evaluation, `face_to_subdivision`,
 a true G1 patch construction, a multi-edge bevel across a vertex chain, the OCC reason in `DIR_FACE_MOVE_FAILED`, a faster exact seam check, `move_faces` of closed spherical faces, `render_view overlay=cage|net`.
+
+### DES-4c (2026-10-30): the OCC reason of a refused face move
+
+`GeometryKernel.lastRefusal()` (optional) answers why the latest `evaluate` returned null, in the kernel's words; the native host records the sidecar's
+error text of that call (`server/src/isolatedKernel.ts`), the scan guard of `execute` answers its own reason when it refused (01 DEF §16). The C++ face
+moves (`cpp/face_moves.cxx`: offset, feature move) now throw with the OCC reason instead of returning a silent null (`BRepOffset_MakeOffset failed`, the
+shell count, an invalid or empty result, the defeature or boolean step of a feature move); the refusal itself is unchanged (cached null, same codes).
+`runFaceOp` puts the reason in the summary: `... (refused: NATIVE_OCC_FAILURE: BRepOffset_MakeOffset failed: the moved faces do not meet their
+neighbours)`. Tests: `tests/unit/faceMoves.test.ts` (a stub reason reaches the summary), `tests/unit/brep/kernelMeshGuard.test.ts` (the guard's own
+reason, then the kernel's), `server/tests/faceMoveReason.test.ts` (native: an offset through a 10 mm box).

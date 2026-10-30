@@ -226,7 +226,13 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     return transact(target, op, args);
   };
 
-  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => exchange(op, args)?.result ?? null;
+  /** The error text of the latest evaluate that answered null (`lastRefusal`). */
+  let lastEvaluateError: string | null = null;
+  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => {
+    const reply = exchange(op, args);
+    if (op === 'evaluate') lastEvaluateError = reply?.result === null || reply === null ? (reply?.error ?? null) : null;
+    return reply?.result ?? null;
+  };
 
   /** Output call with key-only handles first; on SHAPE_NOT_CACHED (evicted/recycled) retry with full recipes. */
   const shapeCall = (op: KernelOperation, handles: readonly ShapeHandle[], wrap: boolean, extra: readonly unknown[] = []): unknown => {
@@ -289,10 +295,13 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     supports: () => true,
     supportsDeform,
     // a law the sidecar cannot build is answered here, without the round trip and its warning
-    evaluate: (recipe) =>
-      unsupportedOp({ supports: () => true, supportsDeform }, recipe) === 'deform' || call('evaluate', [recipe]) === null
-        ? null
-        : handleOf(recipe),
+    evaluate: (recipe) => {
+      if (unsupportedOp({ supports: () => true, supportsDeform }, recipe) === 'deform') {
+        lastEvaluateError = 'this kernel build cannot evaluate the deformation law or region';
+        return null;
+      }
+      return call('evaluate', [recipe]) === null ? null : handleOf(recipe);
+    },
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
@@ -305,6 +314,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
     blendReport: (recipe) => call('blendReport', [recipe]) as BlendReport | null,
     deformReport: (recipe) => (recipe.op === 'deform' ? (call('deformReport', [recipe]) as DeformReport | null) : null),
+    lastRefusal: () => lastEvaluateError,
     importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
     meshToBrep: (request) => call('meshToBrep', [request]) as MeshToBrepResult | null,
     info,

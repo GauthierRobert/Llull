@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { KERNEL_MESH_LEAF_CAP } from '@core/commands/kernelMeshGuard';
+import { guardedKernel, KERNEL_MESH_LEAF_CAP } from '@core/commands/kernelMeshGuard';
 import { type GeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import { meshLeafTriangles } from '@core/geometry/operandRecipe';
@@ -141,5 +141,17 @@ describe('the exact kernel is never asked to rebuild a large imported mesh (DES-
     expect(nested.summary.split('was not asked to rebuild')).toHaveLength(2);
     const clean = execute(doc, 'add_box', { size: [1, 1, 1] });
     expect(clean.summary).not.toContain('was not asked to rebuild');
+  });
+
+  it('the view names its own refusal (lastRefusal), and hands back the kernel reason after a recipe it let through', async () => {
+    const kernel = (await installKernel('exact')) as GeometryKernel;
+    const view = guardedKernel({ ...kernel, lastRefusal: () => 'OCC_FAILURE: from the kernel' });
+    const { doc, scan } = scanAndBox(LARGE);
+    const recipe = { op: 'solid', entity: doc.entities[scan] } as ShapeRecipe;
+    expect(view.evaluate(recipe)).toBeNull();
+    expect(view.lastRefusal?.()).toContain(`above ${KERNEL_MESH_LEAF_CAP}`);
+    const small = scanAndBox(SMALL);
+    view.evaluate({ op: 'solid', entity: small.doc.entities[small.scan] } as ShapeRecipe);
+    expect(view.lastRefusal?.()).toBe('OCC_FAILURE: from the kernel');
   });
 });

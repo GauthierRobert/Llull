@@ -4,7 +4,7 @@ import { createEmptyDocument, type MeshSolidEntity } from '@core/model/types';
 import type { FaceOpParams } from '@core/model/faceOps';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
-import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
+import { getGeometryKernel, setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { kernelFromOps, type FaceQueryOps } from '@core/geometry/shapeKernel';
 import { validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { TETRA } from '../helpers/fakeKernel';
@@ -168,6 +168,18 @@ describe('move_faces', () => {
     const failed = execute(box.document, 'move_faces', { id: box.affected[0], faceIndices: [0], mode: 'translate', vector: [0, 0, 1] });
     expect(code(failed)).toBe('DIR_FACE_MOVE_FAILED');
     expect(failed.error?.ids).toEqual([box.affected[0]]);
+    expect(failed.summary).toContain('(refused)');
+    expectNoOp(failed, box.document);
+  });
+
+  it('names the reason the kernel gives for the refusal (DES-4c: the OCC words over the kernel port)', () => {
+    exactKernel({ refuse: true });
+    const kernel = getGeometryKernel() as GeometryKernel;
+    setGeometryKernel({ ...kernel, lastRefusal: () => 'OCC_FAILURE: BRepOffset_MakeOffset: offset not done' });
+    const box = boxDoc();
+    const failed = execute(box.document, 'move_faces', { id: box.affected[0], faceIndices: [0], mode: 'offset', distance: 1 });
+    expect(code(failed)).toBe('DIR_FACE_MOVE_FAILED');
+    expect(failed.summary).toContain('(refused: OCC_FAILURE: BRepOffset_MakeOffset: offset not done)');
     expectNoOp(failed, box.document);
   });
 

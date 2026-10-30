@@ -167,6 +167,8 @@ export interface GeometryKernel {
 
   /** How the exact `deform` recipe built (approximation error, faces split) or why it was refused (DEF_* code); null for other recipes or kernels without the exact warp. */
   deformReport?(recipe: ShapeRecipe): DeformReport | null;
+  /** Why the latest `evaluate` answered null, in the kernel's own words (e.g. OCC's), or null when it built or has no reason; read right after the call. */
+  lastRefusal?(): string | null;
 
   /** What this kernel is and which optional ports it has (`kernel_info`, TR-KRN-04). */
   info?(): KernelInfo;
