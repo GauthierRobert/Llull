@@ -13,7 +13,8 @@ import {
   regionCreases,
 } from '../../geometry/deform/bounds';
 import { type DeformNode, type Warp, warpOf } from '../../geometry/deform/laws';
-import { toWorld } from '../../geometry/deform/frame';
+import { toLocal, toWorld } from '../../geometry/deform/frame';
+import { baseFlowGrid } from '../../geometry/deform/baseFlowGrid';
 import { storedChordError } from '../../geometry/deform/storedError';
 import { predictedVolumeOf } from '../../geometry/deform/predicted';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
@@ -67,8 +68,18 @@ export interface AnalysisFailure {
 const GRID = 21;
 
 /** World points of a regular grid over the part of the body extent the law acts in (point push: its support sphere box; lattice: its box; flow: all). */
-function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp): number[] {
+function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp, positions: ReadonlyArray<number>): number[] {
   const { law } = node;
+  if (law.kind === 'flowCurve' && law.base !== undefined) {
+    const local: number[] = [];
+    for (let i = 0; i + 2 < positions.length; i += 3)
+      local.push(...toLocal(warp.frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]));
+    const grid = baseFlowGrid(law, local);
+    const world: number[] = [];
+    for (let i = 0; i + 2 < grid.length; i += 3)
+      world.push(...toWorld(warp.frame, [grid[i] as number, grid[i + 1] as number, grid[i + 2] as number]));
+    return world;
+  }
   if (law.kind !== 'point' && law.kind !== 'lattice' && law.kind !== 'flowCurve' && law.kind !== 'flowSurface' && law.kind !== 'rbf')
     return [];
   const low: Vec3 = [0, 1, 2].map((a) =>
@@ -163,7 +174,7 @@ export function analyzeDeformed(
       message: 'the deformation source cannot be rebuilt without a geometry kernel (only solid leaves and deform chains can)',
     };
   const extent = localExtentOf(warp.frame, source.positions);
-  const sampling = sampleJacobian([...zonePoints(node, extent, warp), ...source.positions], warp);
+  const sampling = sampleJacobian([...zonePoints(node, extent, warp, source.positions), ...source.positions], warp);
   const shape = exactShape(kernel, entity);
   const sourceShape = kernel === null || hasMeshLeaf(node.source) ? null : kernel.evaluate(node.source);
   const exactSource = sourceShape === null ? undefined : kernel?.massProperties?.(sourceShape)?.volume;
@@ -186,7 +197,10 @@ export function analyzeDeformed(
     node,
     path,
     extent,
-    range: jacobianRange(node, extent),
+    range:
+      node.law.kind === 'flowCurve' && node.law.base !== undefined
+        ? { min: sampling.sampled.min, max: sampling.sampled.max, minAt: sampling.sampled.minAt }
+        : jacobianRange(node, extent),
     sampled: sampling.sampled,
     maxDisplacement: sampling.maxDisplacement,
     volume: {

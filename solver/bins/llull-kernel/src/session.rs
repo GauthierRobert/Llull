@@ -87,6 +87,8 @@ fn info() -> Value {
         "deform",
         // region.infinite (header slot 15 of the warp spec): a sidecar without it would build the clamped warp
         "deform-infinite",
+        // flowCurve laws with a base curve (the extra station table after the target's)
+        "deform-base-curve",
         "emboss",
     ]
     .into_iter()
@@ -348,6 +350,7 @@ mod tests {
             "gtransform",
             "deform",
             "deform-infinite",
+            "deform-base-curve",
             "emboss",
         ] {
             assert!(capabilities.contains(&json!(name)), "{name}");

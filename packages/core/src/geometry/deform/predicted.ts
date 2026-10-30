@@ -4,6 +4,7 @@ import type { MeshData } from '../../model/types';
 import type { DeformNode } from './laws';
 import { type PredictedVolume, predictedVolume } from './predictedVolume';
 import { predictedLocalVolume } from './predictedLocal';
+import { predictedBaseFlowVolume } from './predictedBaseFlow';
 import { predictedVolumeByQuadrature } from './predictedQuadrature';
 
 /**
@@ -14,5 +15,6 @@ import { predictedVolumeByQuadrature } from './predictedQuadrature';
 export function predictedVolumeOf(source: MeshData, node: Pick<DeformNode, 'law' | 'frame' | 'region'>): PredictedVolume | null {
   const { kind } = node.law;
   if (kind === 'lattice' || kind === 'point') return predictedLocalVolume(source, node);
+  if (node.law.kind === 'flowCurve' && node.law.base !== undefined) return predictedBaseFlowVolume(source, node);
   return kind === 'flowSurface' || kind === 'rbf' ? predictedVolumeByQuadrature(source, node) : predictedVolume(source, node);
 }

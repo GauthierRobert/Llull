@@ -41,9 +41,14 @@ function flowProblem(law: Record<string, unknown>): string | null {
   const { stations, step } = law;
   if (!isFiniteNumber(law['z0']) || !isPositiveNumber(law['ratio']) || !isPositiveNumber(step))
     return 'flowCurve: z0 finite, ratio and step > 0';
-  return Array.isArray(stations) && stations.length >= 24 && stations.length % 12 === 0 && stations.every(isFiniteNumber)
+  const table = (value: unknown): boolean =>
+    Array.isArray(value) && value.length >= 24 && value.length % 12 === 0 && value.every(isFiniteNumber);
+  if (!table(stations)) return 'flowCurve: stations must be finite numbers, 12 per station, at least 2 stations';
+  const base = law['base'];
+  if (base === undefined) return null;
+  return isRecord(base) && isPositiveNumber(base['step']) && table(base['stations'])
     ? null
-    : 'flowCurve: stations must be finite numbers, 12 per station, at least 2 stations';
+    : 'flowCurve: base needs step > 0 and stations (finite numbers, 12 per station, at least 2 stations)';
 }
 
 function surfaceFlowProblem(law: Record<string, unknown>): string | null {

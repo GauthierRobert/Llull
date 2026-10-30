@@ -1,7 +1,9 @@
 /** flow_on_surface — wrap a flat-designed body onto a curved target surface, keeping its arc lengths (01 DEF M4, FR-DEF-15, Rhino FlowAlongSrf / CATIA Wrap Surface). */
 
 import type { CadDocument, Vec3 } from '../../model/types';
+import { mapSurfacePoles } from '../../geometry/deform/curveWarp';
 import { buildFlowSurface } from '../../geometry/deform/flowSurface';
+import { resolveFrame, toLocal } from '../../geometry/deform/frame';
 import { worldSurface } from '../../geometry/deform/worldNurbs';
 import { hasMeshLeaf } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
@@ -175,14 +177,20 @@ export const flowOnSurface = defineCommand({
           'centre',
         );
         if ('code' in resolved) return resolved;
-        const { surface, side } = found;
-        const origin = closestOnSurface(surface, targetOrigin ?? base.plane.origin);
+        const local = resolveFrame(resolved.frame);
+        if (local === null) return { code: 'DEF_FRAME_DEGENERATE', message: 'the base plane is degenerate', paths: ['params.base'] };
+        // the law maps local frame coordinates (z = base normal, x = uDirection, origin = base origin): the sheet, the origin and the direction are read in them
+        // (read in the world they landed shifted by the base origin and turned by the base plane)
+        const side = found.side;
+        const surface = mapSurfacePoles(found.surface, (pole) => toLocal(local, pole));
+        const direction = (v: Vec3): Vec3 => [dot3(v, local.x), dot3(v, local.y), dot3(v, local.z)];
+        const origin = closestOnSurface(surface, toLocal(local, targetOrigin ?? base.plane.origin));
         const derivatives = surfaceDerivatives(surface, origin.u, origin.v, 1);
         const su = (derivatives[1] as Vec3[])[0] as Vec3;
         const sv = (derivatives[0] as Vec3[])[1] as Vec3;
         const normal = normalize3(cross3(su, sv));
         if (len3(cross3(su, sv)) === 0) return invalid('the target has a degenerate tangent plane at the target origin', '');
-        const wanted = targetUDirection ?? base.plane.uDirection;
+        const wanted = direction(targetUDirection ?? base.plane.uDirection);
         const along = (tangent: Vec3): number => dot3(tangent, normalize3(wanted)) / len3(tangent);
         const xAlong = Math.abs(along(su)) >= Math.abs(along(sv)) ? 'u' : 'v';
         const tangentX = xAlong === 'u' ? su : sv;

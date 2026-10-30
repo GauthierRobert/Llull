@@ -28,8 +28,14 @@ const at = (stations: ReadonlyArray<number>, k: number, offset: number): Vec3 =>
   stations[k * STRIDE + offset + 2] as number,
 ];
 
-/** Station count of a law's table. */
-const stationCount = (law: FlowLaw): number => law.stations.length / STRIDE;
+/** A table of frames along a curve at uniform arc length (the target of a flow, or its base curve). */
+export interface FrameTable {
+  readonly step: number;
+  readonly stations: ReadonlyArray<number>;
+}
+
+/** Station count of a table. */
+const stationCount = (law: FrameTable): number => law.stations.length / STRIDE;
 
 interface Sample {
   readonly point: Vec3;
@@ -37,7 +43,7 @@ interface Sample {
 }
 
 /** P, T, N, B at arc length `s` of the table (extended straight beyond both ends). */
-function sampleAt(law: FlowLaw, s: number): Sample {
+function sampleAt(law: FrameTable, s: number): Sample {
   const count = stationCount(law);
   const length = (count - 1) * law.step;
   const clamped = Math.min(Math.max(s, 0), length);
@@ -59,10 +65,64 @@ function sampleAt(law: FlowLaw, s: number): Sample {
   return { point: add3(point, scale3(tangent, extra)), frame: { t: tangent, n: normal, b: binormal } };
 }
 
+/**
+ * Arc length s on a base table where `q` lies in the normal plane of the base: (q - P(s))·T(s) = 0. Newton from the nearest station (the base is extended
+ * straight beyond its ends, where the equation is linear); the same iteration is mirrored in cpp/deform_laws.hxx.
+ */
+export function projectOnBase(base: FrameTable, q: Vec3): number {
+  const count = stationCount(base);
+  const length = (count - 1) * base.step;
+  // seed: the nearest station, found on a coarse grid of every `stride`-th station, then among the stations within one stride of the coarse winner
+  // (2 sqrt(count) distances instead of count; mirrored in cpp/deform_laws.hxx project_on_base)
+  const stride = Math.max(1, Math.ceil(Math.sqrt(count)));
+  let best = 0;
+  let nearest = Infinity;
+  const consider = (k: number): void => {
+    const gap = sub3(q, at(base.stations, k, 0));
+    const distance = dot3(gap, gap);
+    if (distance < nearest) {
+      nearest = distance;
+      best = k;
+    }
+  };
+  for (let k = 0; k < count; k += stride) consider(k);
+  const coarse = best;
+  for (let k = Math.max(0, coarse - stride); k <= Math.min(count - 1, coarse + stride); k++) consider(k);
+  let s = best * base.step;
+  const h = 1e-4 * base.step;
+  for (let iteration = 0; iteration < BASE_NEWTON_STEPS; iteration++) {
+    const here = sampleAt(base, s);
+    const gap = sub3(q, here.point);
+    const slope = scale3(sub3(sampleAt(base, s + h).frame.t, sampleAt(base, s - h).frame.t), 1 / (2 * h));
+    const derivative = -1 + dot3(gap, slope);
+    if (Math.abs(derivative) < 1e-12) break;
+    const step = dot3(gap, here.frame.t) / derivative;
+    s -= step;
+    if (Math.abs(step) < 1e-13 * (1 + length)) break;
+  }
+  return s;
+}
+
+/** Newton steps of the projection on a base curve (a fold leaves it unconverged; the command refuses a body wider than the base curvature radius). */
+const BASE_NEWTON_STEPS = 40;
+
+/** The base frame of the table at arc length `s`. */
+export function baseFrameAt(base: FrameTable, s: number): { readonly point: Vec3; readonly t: Vec3; readonly n: Vec3; readonly b: Vec3 } {
+  const { point, frame } = sampleAt(base, s);
+  return { point, ...frame };
+}
+
 /** The image of local point `q`. */
 export function flowMap(law: FlowLaw, q: Vec3): Vec3 {
-  const { point, frame } = sampleAt(law, law.ratio * (q[2] - law.z0));
-  return add3(point, add3(scale3(frame.n, q[0]), scale3(frame.b, q[1])));
+  if (law.base === undefined) {
+    const { point, frame } = sampleAt(law, law.ratio * (q[2] - law.z0));
+    return add3(point, add3(scale3(frame.n, q[0]), scale3(frame.b, q[1])));
+  }
+  const s = projectOnBase(law.base, q);
+  const own = sampleAt(law.base, s);
+  const gap = sub3(q, own.point);
+  const { point, frame } = sampleAt(law, law.ratio * (s - law.z0));
+  return add3(point, add3(scale3(frame.n, dot3(gap, own.frame.n)), scale3(frame.b, dot3(gap, own.frame.b))));
 }
 
 /** det J of the flow at `q`, by central differences of the map (the table is only piecewise smooth). */
@@ -79,7 +139,7 @@ export function flowDeterminant(law: FlowLaw, q: Vec3): number {
 }
 
 /** Largest curvature of the target over the table (1 / document units), from the change of the tangent between stations. */
-function maxCurvature(law: FlowLaw): number {
+function maxCurvature(law: FrameTable): number {
   let worst = 0;
   for (let k = 0; k + 1 < stationCount(law); k++)
     worst = Math.max(worst, len3(sub3(at(law.stations, k + 1, 3), at(law.stations, k, 3))) / law.step);
@@ -99,6 +159,8 @@ export interface FlowOptions {
   readonly lateral: number;
   /** Direction of the first normal (unit, perpendicular to the first tangent), for the rotation-minimising frame. */
   readonly initialNormal: Vec3;
+  /** The base curve's table (buildBaseTable): the law then carries it and `z0` is an arc length along it. */
+  readonly base?: FrameTable | undefined;
 }
 
 export type FlowFailure = 'CURVE_DEGENERATE' | 'UP_PARALLEL';
@@ -156,6 +218,42 @@ export function buildFlowLaw(target: NurbsCurveData, options: FlowOptions): Flow
   if (!(total > 0) || !(options.baseLength > 0)) return 'CURVE_DEGENERATE';
   const length = options.stretch ? total : Math.min(total, options.baseLength);
   const ratio = options.stretch ? total / options.baseLength : 1;
+  const law = refinedTable(target, coarse, length, ratio, options);
+  return typeof law === 'string' || options.base === undefined
+    ? law
+    : { ...law, base: { step: options.base.step, stations: options.base.stations } };
+}
+
+/**
+ * The frame table of a base curve (rotation-minimising frames from `initialNormal`, in the same local coordinates as the body) and its arc length.
+ * @failure curve of zero length or tangent -> 'CURVE_DEGENERATE'
+ */
+export function buildBaseTable(
+  curve: NurbsCurveData,
+  options: { readonly tolerance: number; readonly lateral: number; readonly initialNormal: Vec3 },
+): { readonly table: FrameTable; readonly length: number } | FlowFailure {
+  const coarse = arcTable(curve, 512);
+  const length = coarse.s[coarse.s.length - 1] as number;
+  if (!(length > 0)) return 'CURVE_DEGENERATE';
+  const law = refinedTable(curve, coarse, length, 1, {
+    z0: 0,
+    baseLength: length,
+    stretch: false,
+    orientation: 'minimal',
+    tolerance: options.tolerance,
+    lateral: options.lateral,
+    initialNormal: options.initialNormal,
+  });
+  return typeof law === 'string' ? law : { table: { step: law.step, stations: law.stations }, length };
+}
+
+function refinedTable(
+  target: NurbsCurveData,
+  coarse: { u: number[]; s: number[] },
+  length: number,
+  ratio: number,
+  options: FlowOptions,
+): FlowLaw | FlowFailure {
   // stations: the frame error of linear blending is about (κ h)² ρ / 8; refine from a first guess of κ
   let count = 64;
   for (let pass = 0; pass < 6; pass++) {
@@ -221,4 +319,12 @@ function tableFor(
     stations.push(...(points[k] as Vec3), ...t, ...n, ...cross3(t, n));
   }
   return { kind: 'flowCurve', z0: options.z0, ratio, step, stations };
+}
+
+/** The curvatures of a table's curve at arc length `s` in its own frame: T' = k1 N + k2 B (1 / document units). */
+export function frameCurvatures(table: FrameTable, s: number): { readonly k1: number; readonly k2: number } {
+  const h = 1e-4 * table.step;
+  const here = sampleAt(table, s).frame;
+  const slope = scale3(sub3(sampleAt(table, s + h).frame.t, sampleAt(table, s - h).frame.t), 1 / (2 * h));
+  return { k1: dot3(slope, here.n), k2: dot3(slope, here.b) };
 }

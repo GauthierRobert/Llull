@@ -11,6 +11,10 @@ export interface DeformPlan {
   readonly region?: DeformRegion;
   /** Frame of the body in the plan's frame (for the Jacobian pre-check and the report). */
   readonly extent: LocalExtent;
+  /** Local coordinates (flat xyz) of the body's own vertices, for a map whose Jacobian cannot be read off the extent box (a flow with a base curve). */
+  readonly samples?: ReadonlyArray<number>;
+  /** Extra local points always evaluated for that Jacobian: the base-frame grid of a flow with a base curve (`baseFlowGrid`). */
+  readonly gridSamples?: ReadonlyArray<number>;
   /** Look for the result crossing itself (a bend past a quarter turn with straight parts left). */
   readonly checkOverlap?: boolean;
   /** A full-turn bend of the whole body: its end faces coincide, which only the exact kernel closes (it sews the ring). */

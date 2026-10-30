@@ -23,6 +23,8 @@ export const DEF_REMEDIATION: Readonly<Record<string, string>> = {
   DEF_LATTICE_INDEX: 'Name each control point by exactly one of index [i, j, k] (0..degree on each axis) or near (a world point).',
   DEF_LATTICE_FIXED_MOVED:
     'Do not move the control points in the fixed layers next to a lattice face the body crosses (or lower fixedLayers, or enlarge the box).',
+  DEF_BASE_CURVE_SHORT:
+    'The base curve is shorter than the body along it (or the body starts before it): give a longer baseCurve, or shorten or move the body.',
   DEF_CURVE_NOT_FOUND: 'targetId must be the id of a nurbs_curve entity (describe_scene lists them).',
   DEF_CURVE_INVALID:
     'The curve has zero length or a zero tangent, or the up vector is parallel to its tangent: use another curve, up vector or orientation "minimal".',

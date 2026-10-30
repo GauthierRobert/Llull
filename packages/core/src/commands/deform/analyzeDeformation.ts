@@ -55,21 +55,46 @@ export const analyzeDeformation = defineCommand({
     id: idParam.describe('Id of the deformed mesh entity to analyse (the id a deformation command returned in affected).'),
     compareTo: z
       .object({
-        kind: z.enum(['torus', 'cylinder', 'cone', 'spheroid']).describe('Analytic reference surface the result should coincide with.'),
+        kind: z
+          .enum(['torus', 'cylinder', 'cone', 'spheroid', 'sphere', 'plane', 'ellipticCylinder', 'helicoid'])
+          .describe('Analytic reference surface the result should coincide with.'),
         majorRadius: z.number().describe('torus: distance from the torus axis to the tube centre circle, document units, > 0.').optional(),
         minorRadius: z.number().describe('torus: tube radius, document units, > 0.').optional(),
-        radius: z.number().describe('cylinder: radius, document units, > 0.').optional(),
-        center: vec3('torus / spheroid: centre point, world document units.').optional(),
-        point: vec3('cylinder: a point on the axis, world document units.').optional(),
+        radius: z.number().describe('cylinder / sphere: radius, document units, > 0.').optional(),
+        center: vec3('torus / spheroid / sphere: centre point, world document units.').optional(),
+        point: vec3(
+          'cylinder / ellipticCylinder / helicoid: a point on the axis; plane: a point of the plane; world document units.',
+        ).optional(),
         apex: vec3('cone: apex point, world document units.').optional(),
         axis: vec3(
-          'torus / cylinder / cone: axis direction, unitless (normalised); for a cone it points from the apex toward the wide end.',
+          'torus / cylinder / cone / ellipticCylinder / helicoid: axis direction, unitless (normalised); for a cone it points from the apex toward the wide end.',
         ).optional(),
         halfAngleDeg: z.number().describe('cone: half opening angle, degrees, 0 < angle < 90.').optional(),
         semiAxes: vec3('spheroid: semi-axes along world x, y, z, document units, each > 0.').optional(),
+        normal: vec3('plane: normal direction, unitless (normalised), non-zero.').optional(),
+        reference: vec3(
+          'ellipticCylinder: direction of the first semi-axis (its component across the axis is used); helicoid: direction of the plane normal at the axis point (same rule). Unitless.',
+        ).optional(),
+        radii: z
+          .array(z.number())
+          .length(2)
+          .describe('ellipticCylinder: the two semi-axes [along reference, across it], document units, each > 0.')
+          .optional(),
+        rate: z
+          .number()
+          .describe(
+            'helicoid: rotation of the surface per unit length along the axis, radians per document unit (positive = counter-clockwise looking down the axis toward the point), e.g. a twist_body angle / length.',
+          )
+          .optional(),
+        offset: z
+          .number()
+          .describe(
+            'helicoid: signed distance of the generating plane from the axis along reference, document units; default 0 (a true helicoid).',
+          )
+          .optional(),
       })
       .describe(
-        'Optional analytic reference (torus, cylinder, cone, spheroid): data.compareTo.maxDeviation is the largest distance of the result surface vertices to it, document units. Fields needed: torus majorRadius, minorRadius, center, axis; cylinder radius, point, axis; cone apex, axis, halfAngleDeg; spheroid center, semiAxes.',
+        'Optional analytic reference surface: data.compareTo.maxDeviation is the largest distance of the result vertices to it, document units (every vertex counts, so give a result whose surface is the shape; a thin plate deviates from its plane or helicoid by its half thickness). Fields needed: torus majorRadius, minorRadius, center, axis; cylinder radius, point, axis; cone apex, axis, halfAngleDeg; spheroid center, semiAxes (first-order distance); sphere center, radius; plane point, normal; ellipticCylinder point, axis, reference, radii (first-order distance); helicoid point, axis, reference, rate and optional offset (the twist_body surface: a plane offset from the axis twisted at the given rate; first-order distance).',
       )
       .optional(),
   }),
