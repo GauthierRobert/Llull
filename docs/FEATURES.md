@@ -964,7 +964,7 @@
 | `quad_remesh` | Rebuild a CLOSED mesh (or the triangles of any closed 3D solid) as a clean quad mesh whose edge flow follows the surface (QuadriFlow, Huang et al., SGP 2018: o… |  |
 | `remesh_mesh` | Remesh a mesh (or the triangles of any 3D solid) into a regular, well-shaped triangulation of the same surface. |  |
 | `repair_mesh` | Repair a mesh (or the triangles of any 3D solid). |  |
-| `sculpt_mesh` | Sculpt a triangle mesh (or the triangles of any 3D solid) with a brush stroke: each stamp centre is projected onto the surface, then every vertex closer than `… |  |
+| `sculpt_mesh` | Sculpt a triangle mesh (or the triangles of any 3D solid) with a brush stroke: give EITHER `stamps` (centres) OR `along` (a path and a spacing: a stamp every `… |  |
 | `segment_mesh` | Segment a mesh (or the triangles of any 3D solid) into regions and fit each one with the analytic surface it follows: "plane", "cylinder" (axis, radius), "cone… | read-only |
 | `smooth_mesh` | Smooth the vertices of a mesh (or the triangles of any 3D solid) with the umbrella operator, connectivity unchanged. |  |
 | `subdivide_mesh` | Refine a mesh (or the triangles of any 3D solid) so later operations have enough resolution. |  |

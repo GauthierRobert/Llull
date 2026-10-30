@@ -755,7 +755,7 @@ Plans (`node server/bin/llull.cjs run <plan> --continue`, cwd `docs/design/07-me
 ### 13.5.4 Left
 
 - **M6**: `quad_remesh` is built (13.6); `fit_subdivision_to_mesh`, `fit_surface_to_mesh` and the fit half of VC-22 are built (13.7).
-- `sculpt_mesh` `along` (curve stamps) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (COULD); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`. (Native decimate speed: built, 13.10.) (`--progress` events and the async native engine are built: 13.8.)
+- `sculpt_mesh` `along` (curve stamps: built, 13.19) and the 04 DIR gesture; `shrinkwrap_mesh`, `displace_mesh` (COULD); torus fit; native `analyze` / `remesh` / `cut` / `fill` / `repair` / `sculpt`. (Native decimate speed: built, 13.10.) (`--progress` events and the async native engine are built: 13.8.)
 - The native mesh engine no longer blocks the backend: a job is awaited on the event loop (13.8), capped by `LLULL_MESH_OP_TIMEOUT_S` (600 s, `MESH_TIMEOUT`).
 - `mesh_to_brep` follows exact curves only for line, circle and ellipse chains; regions bounded by other intersections (cone-cylinder with tilted axes, free-form) stay triangles.
 
@@ -1495,3 +1495,23 @@ Each fails without its fix (shown by disabling the fix): the shared-vertex test,
 - `maxDeviation`-only decimation and the memory-bound collapse loop (13.10.6) are unchanged.
 - The pair search keeps the TypeScript predicate (an edge of one face through the interior of the other, with `END_MARGIN`), so coplanar overlaps and contacts are not counted by either engine; a count of those is not planned.
 - The step-7 plan (13.12.2) is complete: `remesh`, `analyze` (with the pair search), `repair`, `fill_holes`, `sculpt` are native; `cut` is a lifted TypeScript cap.
+
+## 13.19 As built (DES-7c leftovers (3): `sculpt_mesh` `along`, 2026-10-30)
+
+### 13.19.1 What it is
+
+FR-MSH-18 and the table of 5.7 list "a stroke along a curve entity with spacing". `sculpt_mesh` now takes EITHER `stamps` (as before) OR `along: { curveId | points, spacing }`: a stamp every `spacing` of arc length from the start of the path. The path is a `nurbs_curve` entity in its world placement (`curveId`; sampled into 2,000 chords of equal arc length by `samplesByArcLength`, the same sampler `flow_along_curve` uses) or a polyline `points` (2 or more points). The first stamp is at the start of the path; the end is a stamp only when it falls on a multiple of `spacing`. `geometry/mesh/strokePath.ts` (`stampsAlong`, pure) does the placement.
+
+### 13.19.2 Decisions
+
+- **The path is expanded by the command, before the engine is asked.** The op the engines get is the existing `sculpt` op with explicit `stamps`: each stamp is projected onto the surface by the engine like any other (a stamp farther than `radius` from the surface is `MESH_SCULPT_STAMP_OFF_SURFACE`, naming its index), and the slice 3 native twin needs no change. The bit-identity of TypeScript and native engines is therefore the one of slice 3, and `server/tests/sculptAlongNative.test.ts` shows it for two strokes along a 30-point polyline on an 81,920-triangle sphere (the native engine is asked, the bytes equal the TypeScript engine's, also mirrored and refined). `along` and the explicit stamps it stands for give the same bytes (`sculptAlong.test.ts`).
+- **A stroke is at most 10,000 stamps** (`MAX_STROKE_STAMPS`): each stamp visits every vertex, so a path of a million stamps would not end; a path without length or too many stamps is `MESH_PARAM_INVALID` (path `along.spacing`) with the remedy "raise the spacing". Exactly one of `stamps` / `along` and, inside `along`, exactly one of `curveId` / `points`: else `MESH_PARAM_INVALID`. A `curveId` that is not a `nurbs_curve` gets the surfacing refusals (`SRF_ENTITY_NOT_FOUND`, `SRF_NOT_NURBS`), as `loft` does.
+- `data.stamps` is the number of stamps placed; the summary says `x<count>`.
+
+### 13.19.3 Tests
+
+`tests/unit/mesh/sculptAlong.test.ts` (placement round corners and at the multiples, zero-length segments, the limit at 10,000 and 10,001; `along` equals the explicit stamps to the bit; a `nurbs_curve` with a placement equals the polyline stroke to 1e-6 (the curve sampling); the refusals with exact codes; purity) and `server/tests/sculptAlongNative.test.ts` (native bytes equal TypeScript bytes). Each fails without its fix (shown by disabling the fix): the end stamp on a multiple, the limit comparison, the corner walk of the path and the "exactly one of stamps / along" check each fail named tests.
+
+### 13.19.4 Left, by name
+
+A path whose points are projected onto the surface before spacing (the spacing is along the path, not along the surface), and view-dependent directions (the FR lists "view" next to normal and vector; there is no view in the command layer).
