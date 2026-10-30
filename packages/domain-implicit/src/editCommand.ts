@@ -126,12 +126,11 @@ function editorOf(node: FieldNode): Editor {
             cellSize: node.cellSize,
             radius: node.radius,
             nodeRadius: node.nodeRadius,
-            origin: node.origin,
-            rotation: node.rotation,
+            ...(node.map === undefined ? { origin: node.origin, rotation: node.rotation } : { map: node.map }),
             region: node.region,
             name: node.name,
           }),
-        keys: ['cell', 'cellSize', 'radius', 'nodeRadius', 'origin', 'rotation', 'region'],
+        keys: ['cell', 'cellSize', 'radius', 'nodeRadius', 'origin', 'rotation', 'map', 'region'],
         refs: ['region', 'radius'],
       };
     case 'graph':

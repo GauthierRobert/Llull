@@ -111,7 +111,11 @@ export function bareCell(doc: CadDocument, node: FieldNode & { op: 'tpms' | 'str
           void wrapped,
           { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
         ))(node)
-      : (({ region: clipped, ...rest }) => (void clipped, { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }))(node);
+      : (({ region: clipped, map: wrapped, ...rest }) => (
+          void clipped,
+          void wrapped,
+          { ...rest, rotation: [0, 0, 0] as Vec3, id: '__cell' }
+        ))(node);
   return compileField(withField(doc, bare), '__cell');
 }
 

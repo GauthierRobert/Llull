@@ -41,16 +41,59 @@ const MAP_SCHEMA = z
       cellsPolar: z.number().describe('Whole cells over the half turn of colatitude pole to pole (an integer >= 1, else IMP_MAP_SEAM).'),
       radialCellSize: z.number().describe('Cell size along the radius in document units (> 0).'),
     }),
+    z.object({
+      kind: z.literal('surface_uv').describe('Follow a NURBS sheet: cells along its (u, v) and its normal.'),
+      sheetId: z.string().describe('Id of a nurbs_surface entity (a sheet; trims are honoured).'),
+      cellsU: z.number().describe('Cells over the u range of the sheet (> 0; need not be whole, the patch has no seam).'),
+      cellsV: z.number().describe('Cells over the v range of the sheet (> 0).'),
+      depth: z.number().describe('Cell size along the sheet normal in document units (> 0).'),
+      layers: z
+        .number()
+        .describe('Cells of depth on the side the normal points to (an integer >= 1): the lattice fills 0 <= distance <= layers * depth.'),
+    }),
   ])
   .describe(
-    'Conformal cell map (replaces origin / rotation). cylindrical: sleeves and tubes. spherical: shells; the cells collapse at the poles (warning IMP_MAP_POLE). Normalised walls stay uniform away from the singularities.',
+    'Conformal cell map (replaces origin / rotation). cylindrical: sleeves and tubes. spherical: shells; the cells collapse at the poles (warning IMP_MAP_POLE). surface_uv: a lattice skin on a nurbs_surface sheet, cells along its (u, v) and normal (IMP_MAP_SINGULAR for a degenerate sheet, IMP_MAP_TOO_LARGE for a grid above 600000 nodes, warning IMP_MAP_STRETCH where the cells are stretched more than 2x). A mapped field is approximate, not a distance; normalised walls stay uniform away from the singularities and the stretch.',
   );
+
+type MapParams = z.infer<typeof MAP_SCHEMA>;
+
+/** The first problem of a map request (before the sheet is read), or null. */
+function mapProblem(
+  doc: Parameters<typeof fieldOf>[0],
+  map: MapParams,
+  placed: boolean,
+): { code: string; message: string; path: string; ids: readonly string[] } | null {
+  if (placed)
+    return { code: 'IMP_PARAM_CONFLICT', message: 'map replaces origin and rotation: give one or the other', path: 'origin', ids: [] };
+  if (map.kind === 'surface_uv') {
+    if (![map.cellsU, map.cellsV, map.depth].every((n) => Number.isFinite(n) && n > 0))
+      return { code: 'IMP_PARAM_RANGE', message: 'surface_uv needs cellsU, cellsV and depth > 0', path: 'map', ids: [] };
+    if (!(Number.isInteger(map.layers) && map.layers >= 1))
+      return { code: 'IMP_PARAM_RANGE', message: `layers must be a whole number >= 1 (got ${map.layers})`, path: 'map.layers', ids: [] };
+    const sheet = Object.hasOwn(doc.entities, map.sheetId) ? doc.entities[map.sheetId] : undefined;
+    if (sheet === undefined)
+      return { code: 'IMP_ENTITY_NOT_FOUND', message: `no sheet '${map.sheetId}'`, path: 'map.sheetId', ids: [map.sheetId] };
+    return null;
+  }
+  const wholeCells = map.kind === 'spherical' ? [map.cellsAround, map.cellsPolar] : [map.cellsAround];
+  if (!wholeCells.every((n) => Number.isInteger(n) && n >= 1))
+    return {
+      code: 'IMP_MAP_SEAM',
+      message: `cell counts of a ${map.kind} map must be whole numbers >= 1 (got ${wholeCells.join(', ')}): a fraction jumps at the seam`,
+      path: 'map.cellsAround',
+      ids: [],
+    };
+  if (!(Number.isFinite(map.radialCellSize) && map.radialCellSize > 0) || (map.kind === 'cylindrical' && Math.hypot(...map.axis) === 0))
+    return { code: 'IMP_PARAM_RANGE', message: 'map needs radialCellSize > 0 and (cylindrical) a non-zero axis', path: 'map', ids: [] };
+  return null;
+}
 
 /**
  * @affects creates 1 tpms node (the infinite lattice field, or its intersection with `region`); data.control is the resolved thickness / level
  * @invariant normalised walls (default) are the stated thickness to first order; a relativeDensity target is solved once (quantile of the sampled cell) and stored as the resolved control next to the target; a field id as thickness / level grades the lattice
  * @invariant field-engine-optional: reads ctx.fieldEngine when present, else the built-in TS engine (no kernel is needed)
- * @failure unknown region / scalar -> IMP_FIELD_NOT_FOUND; two or no controls -> IMP_PARAM_CONFLICT; control (or the range of a graded one) outside its valid interval or density unreachable -> IMP_TPMS_CONTROL_RANGE; cell size <= 0 -> IMP_PARAM_RANGE; fractional cells in a map -> IMP_MAP_SEAM
+ * @failure unknown region / scalar -> IMP_FIELD_NOT_FOUND; two or no controls -> IMP_PARAM_CONFLICT; control (or the range of a graded one) outside its valid interval or density unreachable -> IMP_TPMS_CONTROL_RANGE; cell size <= 0 -> IMP_PARAM_RANGE; fractional cells in a cylindrical / spherical map -> IMP_MAP_SEAM; surface_uv: unknown sheet -> IMP_ENTITY_NOT_FOUND, not a nurbs_surface -> IMP_PARAM_RANGE, degenerate sheet -> IMP_MAP_SINGULAR, grid above 600000 nodes -> IMP_MAP_TOO_LARGE
  */
 export const addTpmsLattice = defineCommand({
   name: 'add_tpms_lattice',
@@ -93,20 +136,8 @@ export const addTpmsLattice = defineCommand({
     if (!cellSize.every((c) => Number.isFinite(c) && c > 0))
       return fail('IMP_PARAM_RANGE', `cellSize must be > 0 on every axis (got ${JSON.stringify(p.cellSize)})`, 'cellSize');
     if (p.map !== undefined) {
-      const wholeCells = p.map.kind === 'spherical' ? [p.map.cellsAround, p.map.cellsPolar] : [p.map.cellsAround];
-      if (!wholeCells.every((n) => Number.isInteger(n) && n >= 1))
-        return fail(
-          'IMP_MAP_SEAM',
-          `cell counts of a ${p.map.kind} map must be whole numbers >= 1 (got ${wholeCells.join(', ')}): a fraction jumps at the seam`,
-          'map.cellsAround',
-        );
-      if (
-        !(Number.isFinite(p.map.radialCellSize) && p.map.radialCellSize > 0) ||
-        (p.map.kind === 'cylindrical' && Math.hypot(...p.map.axis) === 0)
-      )
-        return fail('IMP_PARAM_RANGE', 'map needs radialCellSize > 0 and (cylindrical) a non-zero axis', 'map');
-      if (p.origin !== undefined || p.rotation !== undefined)
-        return fail('IMP_PARAM_CONFLICT', 'map replaces origin and rotation: give one or the other', 'origin');
+      const problem = mapProblem(doc, p.map, p.origin !== undefined || p.rotation !== undefined);
+      if (problem !== null) return fail(problem.code, problem.message, problem.path, problem.ids);
     }
     const absent = badRegion(doc, p.region);
     if (absent !== undefined) return fail('IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, 'region', [absent]);
@@ -199,6 +230,9 @@ export const addStrutLattice = defineCommand({
       .describe('Optional ball radius at every node in document units; only larger than radius has an effect (constant radius only).'),
     origin: vec3('Lattice origin [x, y, z] (a lattice node) in document units. Default [0, 0, 0].').optional(),
     rotation: vec3('Lattice Euler XYZ rotation in radians about origin. Default [0, 0, 0].').optional(),
+    map: MAP_SCHEMA.optional().describe(
+      'Conformal cell map (replaces origin / rotation): the periodic cell is laid on the cells of a cylindrical, spherical or surface_uv map (cell sizes as cellSize, the map as described for add_tpms_lattice). A mapped strut lattice is approximate, not a distance: the strut distance is divided by the mean local stretch of the map.',
+    ),
     region: z.string().optional().describe('Id of a field that clips the lattice (kept where that field is negative).'),
     name: z.string().optional().describe('Optional label for the node.'),
   }),
@@ -208,6 +242,10 @@ export const addStrutLattice = defineCommand({
     const cellSize = asVec3(p.cellSize);
     if (!cellSize.every((c) => Number.isFinite(c) && c > 0))
       return fail('IMP_PARAM_RANGE', `cellSize must be > 0 on every axis (got ${JSON.stringify(p.cellSize)})`, 'cellSize');
+    if (p.map !== undefined) {
+      const problem = mapProblem(doc, p.map, p.origin !== undefined || p.rotation !== undefined);
+      if (problem !== null) return fail(problem.code, problem.message, problem.path, problem.ids);
+    }
     const absent = badRegion(doc, p.region);
     if (absent !== undefined) return fail('IMP_FIELD_NOT_FOUND', `no region field '${absent}'`, 'region', [absent]);
     const range = lawBounds(doc, p.radius);
@@ -232,6 +270,7 @@ export const addStrutLattice = defineCommand({
       rotation: p.rotation ?? [0, 0, 0],
       radius: p.radius,
       ...(p.nodeRadius === undefined ? {} : { nodeRadius: p.nodeRadius }),
+      ...(p.map === undefined ? {} : { map: p.map }),
       ...(p.region === undefined ? {} : { region: p.region }),
       ...(p.name === undefined ? {} : { name: p.name }),
     };

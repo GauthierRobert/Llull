@@ -371,6 +371,64 @@ describe('native field engine parity (VC-IMP-44, 45)', () => {
     },
   );
 
+  native(
+    'mapped lattices (surface_uv sheet map, cylindrical strut map): values and gradients bit-identical to the TS engine (05 IMP 14.13)',
+    () => {
+      if (engine === null) return;
+      const sheet = step(createEmptyDocument(), 'create_nurbs_surface', {
+        degreeU: 2,
+        degreeV: 2,
+        poles: [
+          [
+            [0, 0, 0],
+            [0, 10, 1],
+            [0, 20, 0],
+          ],
+          [
+            [10, 0, 2],
+            [10, 10, 4],
+            [10, 20, 2],
+          ],
+          [
+            [20, 0, 0],
+            [20, 10, 1],
+            [20, 20, 0],
+          ],
+        ],
+      });
+      const map = { kind: 'surface_uv', sheetId: sheet.id, cellsU: 3, cellsV: 3, depth: 4, layers: 1 };
+      const gyroid = step(sheet.doc, 'add_tpms_lattice', {
+        kind: 'gyroid',
+        form: 'sheet',
+        thickness: 0.3,
+        normalize: 'none',
+        cellSize: 4,
+        map,
+      });
+      const struts = step(gyroid.doc, 'add_strut_lattice', { cell: 'octet', cellSize: 4, radius: 0.3, map });
+      const cylinder = step(struts.doc, 'add_strut_lattice', {
+        cell: 'cubic',
+        cellSize: 4,
+        radius: 0.4,
+        map: { kind: 'cylindrical', origin: [0, 0, 0], axis: [0, 0, 1], cellsAround: 6, radialCellSize: 4 },
+      });
+      const points = Array.from({ length: 300 }, (_, n) => [(n * 0.37) % 22, (n * 0.73) % 22, -1 + ((n * 0.29) % 7)]);
+      for (const field of [gyroid.id, struts.id, cylinder.id]) {
+        for (const gradient of [false, true]) {
+          const ts = step(cylinder.doc, 'evaluate_field', { field, points, gradient });
+          const nat = step(cylinder.doc, 'evaluate_field', { field, points, gradient }, engine);
+          const [a, b] = [ts.data['values'] as number[], nat.data['values'] as number[]];
+          expect(a.length === b.length && a.every((v, i) => Object.is(v, b[i])), field + ' values').toBe(true);
+          if (gradient) {
+            const [ga, gb] = [ts.data['gradients'] as number[], nat.data['gradients'] as number[]];
+            expect(ga.length === gb.length && ga.every((v, i) => Object.is(v, gb[i])), field + ' gradients').toBe(true);
+          }
+          expect(ts.data['distanceQuality']).toBe('approximate');
+        }
+      }
+    },
+  );
+
   native('randomized trigonometry parity: thousands of points at TPMS scale and in the V8 reduction range, bit for bit', () => {
     if (engine === null) return;
     let seed = 20260101;

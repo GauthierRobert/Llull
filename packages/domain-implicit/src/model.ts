@@ -94,7 +94,17 @@ interface SphericalMap {
   readonly radialCellSize: number;
 }
 
-export type CellMap = CylindricalMap | SphericalMap;
+/** Cells along a `nurbs_surface` sheet: `cellsU` x `cellsV` cells over its (u, v) patch, `layers` cells of size `depth` along its normal (signed distance / depth is the third coordinate). */
+export interface SurfaceUvMap {
+  readonly kind: 'surface_uv';
+  readonly sheetId: string;
+  readonly cellsU: number;
+  readonly cellsV: number;
+  readonly depth: number;
+  readonly layers: number;
+}
+
+export type CellMap = CylindricalMap | SphericalMap | SurfaceUvMap;
 
 export interface TpmsNode extends NodeBase {
   readonly op: 'tpms';
@@ -120,6 +130,8 @@ export interface StrutsNode extends NodeBase {
   readonly rotation: Vec3;
   readonly radius: Law;
   readonly nodeRadius?: number;
+  /** When set, replaces origin / rotation: the periodic cell is mapped onto the cells of the map (a mapped field is approximate, not a distance). */
+  readonly map?: CellMap;
   readonly region?: string;
 }
 

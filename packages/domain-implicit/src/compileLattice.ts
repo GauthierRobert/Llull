@@ -7,7 +7,8 @@ import type { Vec3 } from '@core/model/types';
 import { type CompileHost, Failure, type Part, degrade, worst } from './compileTypes';
 import { type Frame, axisFrame, growBox, placeFrame } from './frame';
 import { graphGeometry } from './graph';
-import type { GraphNode, StrutsNode, TpmsNode, VoronoiNode } from './model';
+import type { CellMap, GraphNode, StrutsNode, TpmsNode, VoronoiNode } from './model';
+import { surfaceMapOf } from './surfaceMap';
 import type { ScalarPart } from './scalar';
 import { strutGeometry } from './struts';
 import { voronoiGeometry } from './voronoi';
@@ -32,12 +33,35 @@ function clipToRegion(host: CompileHost, part: Part, region: string | undefined,
   };
 }
 
-function cellCoordinates(host: CompileHost, node: TpmsNode, frame: Frame): CellCoordinates {
+/** The lattice node fields a cell map reads. */
+interface Mappable {
+  readonly id: string;
+  readonly cellSize: Vec3;
+  readonly origin: Vec3;
+  readonly rotation: Vec3;
+  readonly map?: CellMap;
+}
+
+/** Cell coordinates of `node` at the frame point: rectangular, or the phases of its map (2 pi per cell) with the phase per document length of each. */
+function cellCoordinates(host: CompileHost, node: Mappable, frame: Frame): CellCoordinates {
   const b = host.b;
   const map = node.map;
   if (map === undefined) return rectangularCoordinates(b, node.cellSize, placeFrame(b, frame, node.origin, node.rotation, 1));
   if (map.kind === 'cylindrical')
     return cylindricalCoordinates(b, axisFrame(b, frame, map.origin, map.axis), map.cellsAround, node.cellSize[2], map.radialCellSize);
+  if (map.kind === 'surface_uv') {
+    const made = surfaceMapOf(host.doc, map);
+    if (!made.ok) throw new Failure({ ok: false, code: made.code, message: made.message, ids: [...made.ids, node.id] });
+    const { u, v, w, scales, stretch } = made.data;
+    if (stretch.max > STRETCH_WARNING * stretch.min)
+      host.warnings.push({
+        code: 'IMP_MAP_STRETCH',
+        ids: [node.id, map.sheetId],
+        message: `the cells of '${node.id}' on sheet '${map.sheetId}' are stretched by up to ${stretch.max.toPrecision(3)} (shortest edge to longest): walls are not uniform where the sheet is far from developable`,
+      });
+    const phase = (grid: typeof u): number => host.b.scale(host.b.sampledField(grid, frame.x, frame.y, frame.z), TWO_PI);
+    return { coords: [phase(u), phase(v), phase(w)], scales: [b.constant(scales[0]), b.constant(scales[1]), b.constant(scales[2])] };
+  }
   host.warnings.push({
     code: 'IMP_MAP_POLE',
     ids: [node.id],
@@ -45,6 +69,10 @@ function cellCoordinates(host: CompileHost, node: TpmsNode, frame: Frame): CellC
   });
   return sphericalCoordinates(b, placeFrame(b, frame, map.origin, [0, 0, 0], 1), map.cellsAround, map.cellsPolar, map.radialCellSize);
 }
+
+const TWO_PI = 2 * Math.PI;
+/** Longest to shortest cell edge above which a surface map reports its stretch. */
+const STRETCH_WARNING = 2;
 
 const sheetFeature = (value: ScalarPart): number => (Number.isFinite(value.lo) ? value.lo / 2 : Infinity);
 
@@ -76,7 +104,32 @@ function radiusReach(node: StrutsNode, value: ScalarPart): number {
   return Number.isFinite(value.hi) ? Math.min(value.hi, shortest / 2) : shortest / 2;
 }
 
+/**
+ * A strut lattice on a cell map: the periodic cell of `cellSize` is laid on the cells of the map (cell coordinate i times cellSize[i]), the strut set is evaluated at those
+ * lengths and its distance is divided by the mean local stretch of the map (phase scale / 2 pi times cell size, averaged over the three axes). The result is approximate, not
+ * a distance; a radius (number or law) is multiplied by the same stretch, capped below half the shortest strut.
+ */
+function mappedStruts(host: CompileHost, node: StrutsNode, frame: Frame): Part {
+  const b = host.b;
+  const cell = cellCoordinates(host, node, frame);
+  const mapped = cell.coords.map((phase, axis) => b.scale(phase, (node.cellSize[axis] as number) / TWO_PI)) as [number, number, number];
+  const stretch = b.scale(
+    [0, 1, 2]
+      .map((axis) => b.scale(cell.scales[axis] as number, (node.cellSize[axis] as number) / TWO_PI))
+      .reduce((sum, term) => b.add(sum, term)),
+    1 / 3,
+  );
+  const value = host.law(node.radius, frame);
+  const reach = radiusReach(node, { reg: value.reg, lo: -Infinity, hi: Infinity });
+  const { set } = strutGeometry(node.cell, node.cellSize, reach, undefined);
+  if (Number.isFinite(value.lo) && value.lo > 0) host.features.push(value.lo);
+  const radius = b.min(b.max(b.mul(value.reg, stretch), b.constant(0)), b.constant(reach));
+  const reg = b.div(b.strutSet(set, mapped[0], mapped[1], mapped[2], radius), stretch);
+  return clipToRegion(host, { reg, quality: 'approximate', lipschitz: 2, box: null }, node.region, frame);
+}
+
 export function strutsPart(host: CompileHost, node: StrutsNode, frame: Frame): Part {
+  if (node.map !== undefined) return mappedStruts(host, node, frame);
   const b = host.b;
   const local = placeFrame(b, frame, node.origin, node.rotation, 1);
   const value = host.law(node.radius, frame);

@@ -15,13 +15,19 @@ import { lawRange } from './lawRange';
 import { latticeMechanics } from './mechanics';
 import { quadratureVolume } from './measure';
 import { type CellMap, type FieldNode, type StrutsNode, type TpmsNode, fieldOf } from './model';
+import { surfaceMapOf } from './surfaceMap';
 import { KNOWN_CLASS, strutGeometry } from './struts';
 import { TPMS_FACTS } from './tpms';
 
 type Box = { readonly min: Vec3; readonly max: Vec3 };
 
 /** Radii (from the map's axis or centre) of region samples: a 24^3 grid over the region box, the points where the region field is <= 0. */
-function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine: FieldEngine): number[] | null {
+function regionRadii(
+  map: Exclude<CellMap, { kind: 'surface_uv' }>,
+  box: Box,
+  region: FieldProgram | null,
+  engine: FieldEngine,
+): number[] | null {
   const n = 24;
   const points: number[] = [];
   const spots: Vec3[] = [];
@@ -50,13 +56,18 @@ function regionRadii(map: CellMap, box: Box, region: FieldProgram | null, engine
 
 /** Ratio of the longest to the shortest edge of a mapped cell over the radii the region spans (1 = undistorted cells), or null without a map / region. */
 function mapStretch(
-  node: TpmsNode,
+  doc: CadDocument,
+  node: TpmsNode | StrutsNode,
   box: Box | null,
   region: FieldProgram | null,
   engine: FieldEngine,
 ): { min: number; max: number } | null {
   const map = node.map;
   if (map === undefined || box === null) return null;
+  if (map.kind === 'surface_uv') {
+    const made = surfaceMapOf(doc, map);
+    return made.ok ? made.data.stretch : null;
+  }
   const radii = (regionRadii(map, box, region, engine) ?? []).filter((r) => r > 1e-9);
   if (radii.length === 0) return null;
   const sizes = (rho: number): number[] =>
@@ -183,7 +194,10 @@ export const latticeProperties = defineCommand({
     if (typeof described === 'string')
       return refuseImplicit(doc, 'lattice_properties', 'IMP_FIELD_UNBOUNDED', described, [id], ['params.id']);
     const regionCompiled = node.region === undefined ? null : compileField(doc, node.region);
-    const stretch = node.op === 'tpms' ? mapStretch(node, box, regionCompiled?.ok === true ? regionCompiled.program : null, engine) : null;
+    const stretch =
+      node.op === 'tpms' || node.op === 'struts'
+        ? mapStretch(doc, node, box, regionCompiled?.ok === true ? regionCompiled.program : null, engine)
+        : null;
     const rho = rhoMeasured ?? described.mechanicsInput.rho1;
     const mechanics =
       estimateMechanics === true && rho !== null
