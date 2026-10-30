@@ -90,6 +90,10 @@ export const MESH_REMEDIATION: Readonly<Record<string, string>> = {
   MESH_FIT_CAGE_FAR:
     'Move and scale the cage onto the target first (edit_subdivision_cage), or make the cage from the target with quad_remesh.',
   MESH_FIT_NOT_CONVERGED: 'Raise iterations or maxDeviation, add cage detail (quad_remesh with more quads), or lower smoothing.',
+  MESH_FIT_NOT_DISK:
+    'The harmonic map needs one connected disk (one boundary loop, no holes, no handles): pick a region of that kind (a sphere `region`, segment_mesh groups), fill_mesh_holes, or use parameterization "projection" for a gently curved region.',
+  MESH_FIT_PARAM_FOLDED:
+    'The harmonic map could not be made without flipped triangles: repair_mesh the region (degenerate or overlapping triangles), or pick a cleaner region.',
   MESH_FIT_REGION_EMPTY: 'Move or enlarge the region sphere so that it holds triangle centres, or omit region.',
   MESH_FIT_NOT_PROJECTABLE:
     'Pick a smaller region that looks like a height field over one plane (a gently curved patch), or split the mesh with segment_mesh first.',

@@ -175,14 +175,18 @@ const capOf = (degrees: number): { doc: CadDocument; id: string; region: { cente
 };
 
 describe('fit_surface_to_mesh fold rule and caps', () => {
-  it('brackets the 2 % fold rule: a 60 degree cap is fitted, a hemisphere is refused with its folded percentage', () => {
+  it('brackets the 2 % fold rule: a 60 degree cap is fitted, a hemisphere is refused by projection with its folded percentage (auto uses the harmonic map: fitSurfaceHarmonic.test.ts)', () => {
     const sixty = capOf(60);
     const accepted = execute(sixty.doc, 'fit_surface_to_mesh', { id: sixty.id, region: sixty.region, controlPoints: [10, 10] });
     expect(accepted.error, accepted.summary).toBeUndefined();
     expect(dataOf(accepted)['foldedFraction'] as number).toBeLessThan(0.02);
     expect(dataOf(accepted)['maxDeviation'] as number).toBeLessThan(0.1);
     const hemisphere = capOf(90);
-    const refused = execute(hemisphere.doc, 'fit_surface_to_mesh', { id: hemisphere.id, region: hemisphere.region });
+    const refused = execute(hemisphere.doc, 'fit_surface_to_mesh', {
+      id: hemisphere.id,
+      region: hemisphere.region,
+      parameterization: 'projection',
+    });
     expectNoOp(refused, hemisphere.doc);
     expect(codeOf(refused)).toBe('MESH_FIT_NOT_PROJECTABLE');
     expect(refused.summary).toMatch(/[0-9]+[.][0-9] %/);

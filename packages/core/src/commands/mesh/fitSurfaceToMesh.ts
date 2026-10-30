@@ -3,6 +3,7 @@
 import { cross3, dot3, sub3 } from '../../lib/vec3';
 import { MAX_SURFACE_POLES } from '../../lib/nurbs/surfaceTypes';
 import { type PatchFit, footPoints, fitPatch, regionFrame } from '../../geometry/mesh/surfaceLsq';
+import { type HarmonicMap, harmonicMap, parameterStretch } from '../../geometry/mesh/harmonicMap';
 import type { Vec3 } from '../../model/types';
 import { colorField, defineCommand, layerIdField, nameField, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
@@ -25,19 +26,31 @@ const AUTO_LONG_SIDES = [6, 8, 12, 16, 24, 32, 40];
 /** Samples needed per pole for the fit to be determined by the data. */
 const SAMPLES_PER_POLE = 2;
 
+const PARAMETERIZATIONS = ['auto', 'projection', 'harmonic'] as const;
+
+/** Mean of parameter pairs. */
+const meanUv = (uvs: ReadonlyArray<[number, number]>): [number, number] => [
+  uvs.reduce((sum, uv) => sum + uv[0], 0) / uvs.length,
+  uvs.reduce((sum, uv) => sum + uv[1], 0) / uvs.length,
+];
+
 const round6 = (v: number): number => Math.round(v * 1e6) / 1e6;
 
 /**
  * @affects creates 1 nurbs_surface entity (poles in world coordinates, position zero); the mesh is not touched
- * @invariant a clamped uniform tensor-product B-spline of one degree; the parameter plane is the best-fit plane of the region; the surface normal (du x dv) faces the side the mesh triangles face; data.maxDeviation is the largest distance from region vertices, edge midpoints and triangle centres to the patch (a lower bound of the Hausdorff distance) (the patch may extend past a non-rectangular region)
- * @failure unknown id / not a solid -> MESH_*; region without triangles, over the region cap, folded against its best-fit plane, or too few samples for the pole grid -> MESH_FIT_*; degree/pole grid out of range -> MESH_PARAM_INVALID; maxDeviation not reached -> surface created, warning MESH_FIT_NOT_CONVERGED in data.warnings
+ * @invariant a clamped uniform tensor-product B-spline of one degree; the parameters are the orthogonal projection onto the best-fit plane of the region, or the harmonic map of a disk region onto the unit square (data.parameterization); the surface normal (du x dv) faces the side the mesh triangles face; data.maxDeviation is the largest distance from region vertices, edge midpoints and triangle centres to the patch (a lower bound of the Hausdorff distance) (the patch may extend past a non-rectangular region)
+ * @failure unknown id / not a solid -> MESH_*; region without triangles, over the region cap, folded against its best-fit plane (projection) or not a disk (harmonic) or its map folded, or too few samples for the pole grid -> MESH_FIT_*; degree/pole grid out of range -> MESH_PARAM_INVALID; maxDeviation not reached -> surface created, warning MESH_FIT_NOT_CONVERGED in data.warnings
  */
 export const fitSurfaceToMesh = defineCommand({
   name: 'fit_surface_to_mesh',
   description:
-    'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region`. The region is ' +
-    'parameterised by orthogonal projection onto its best-fit plane (so it must look like a height field over that plane: gently curved, ' +
-    'not folded back; a whole closed body or a vertical wall is refused, pick a `region` or segment_mesh first), then rounds of ' +
+    'Fit ONE tensor-product B-spline surface (a nurbs_surface sheet) to a mesh, or to the part of it inside a sphere `region`. `parameterization` ' +
+    '"projection" projects the region orthogonally onto its best-fit plane (it must look like a height field over that plane: gently curved, ' +
+    'not folded back); "harmonic" maps a DISK-topology region (one connected manifold piece with exactly one boundary loop) onto the unit square ' +
+    'by the harmonic map (cotangent Laplacian solved by conjugate gradient to 1e-10, boundary by arc length, corners at the quarter points of its length; weights ' +
+    'clamped positive when the exact ones flip a triangle), which follows a strongly curved region (a hemisphere, a bowl) that projection ' +
+    'refuses; "auto" (default) uses projection when the region is projectable and the harmonic map otherwise. A closed body, a region with holes or in ' +
+    'several pieces, or a vertical wall is refused (MESH_FIT_NOT_PROJECTABLE / MESH_FIT_NOT_DISK: pick a `region` or segment_mesh first). Rounds of ' +
     'least-squares pole fitting alternate with foot-point parameter correction, with a small second-difference fairing of the pole ' +
     'grid (`smoothing`). Give `controlPoints` [nu, nv] for a fixed grid (u runs along the long axis of the region), or give only ' +
     '`maxDeviation` and the grid grows (6 up to 40 poles on the long side) until the patch is within it; with neither, a grid is chosen ' +
@@ -47,7 +60,7 @@ export const fitSurfaceToMesh = defineCommand({
     'Hausdorff distance, tight for a fine mesh); the patch covers the bounding rectangle of ' +
     'the region in its plane, so parts of it past a non-rectangular region are not measured. If `maxDeviation` is given and not reached ' +
     'the surface is still created and data.warnings holds MESH_FIT_NOT_CONVERGED. Pure TypeScript, no kernel. Refusals: ' +
-    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_TOO_LARGE (a region of over ' +
+    'MESH_ENTITY_NOT_FOUND, MESH_NOT_A_MESH, MESH_PARAM_INVALID, MESH_FIT_REGION_EMPTY, MESH_FIT_NOT_DISK (harmonic: not a disk; the reason is named), MESH_FIT_PARAM_FOLDED (harmonic: the map did not converge or a triangle stays flipped), MESH_FIT_TOO_LARGE (a region of over ' +
     `${MAX_REGION_TRIANGLES} triangles: pick a smaller region or decimate_mesh first), MESH_FIT_NOT_PROJECTABLE, MESH_FIT_TOO_FEW_SAMPLES, ` +
     'MESH_FIT_FAILED.',
   params: z.object({
@@ -59,6 +72,12 @@ export const fitSurfaceToMesh = defineCommand({
       })
       .optional()
       .describe('Fit only the triangles whose centre lies inside this sphere. Default: the whole mesh.'),
+    parameterization: z
+      .enum(PARAMETERIZATIONS)
+      .optional()
+      .describe(
+        '"auto" (default): projection for a projectable region, the harmonic map for a disk that is not; "projection"; "harmonic" (a disk region only).',
+      ),
     degree: z.number().int().min(1).max(5).optional().describe(`Degree of the surface in u and v, 1..5 (default ${DEFAULT_DEGREE}).`),
     controlPoints: z
       .tuple([z.number().int().min(2).max(MAX_CONTROL_POINTS), z.number().int().min(2).max(MAX_CONTROL_POINTS)])
@@ -124,19 +143,27 @@ export const fitSurfaceToMesh = defineCommand({
       );
     const framed = regionFrame(mesh, faces);
     if (framed === null) return fail('MESH_FIT_REGION_EMPTY', 'the region has no area or no best-fit plane', 'region');
-    if (framed.foldedFraction > MAX_FOLDED_FRACTION)
-      return fail(
-        'MESH_FIT_NOT_PROJECTABLE',
-        `${(100 * framed.foldedFraction).toFixed(1)} % of the region's area folds back or stands vertical against its best-fit plane (limit ${100 * MAX_FOLDED_FRACTION} %)`,
-        'region',
-      );
+    const wanted = params.parameterization ?? 'auto';
+    const foldedText = `${(100 * framed.foldedFraction).toFixed(1)} % of the region's area folds back or stands vertical against its best-fit plane (limit ${100 * MAX_FOLDED_FRACTION} %)`;
+    const projectable = framed.foldedFraction <= MAX_FOLDED_FRACTION;
+    let harmonic: HarmonicMap | null = null;
+    if (wanted === 'harmonic' || (wanted === 'auto' && !projectable)) {
+      const mapped = harmonicMap(mesh, faces);
+      if ('code' in mapped)
+        return wanted === 'auto' && mapped.code === 'MESH_FIT_NOT_DISK'
+          ? fail('MESH_FIT_NOT_PROJECTABLE', `${foldedText}, and the harmonic map needs a disk: ${mapped.message}`, 'region')
+          : fail(mapped.code, mapped.message, 'region');
+      harmonic = mapped;
+    } else if (!projectable) return fail('MESH_FIT_NOT_PROJECTABLE', foldedText, 'region');
     const { frame } = framed;
+    const hv = (v: number): [number, number] => (harmonic as HarmonicMap).uv.get(v) as [number, number];
     const planar = (p: Vec3): [number, number] => {
       const d = sub3(p, frame.origin);
       return [dot3(d, frame.uAxis), dot3(d, frame.vAxis)];
     };
     const vertexWeight = new Map<number, number>();
     const measured: Vec3[] = [];
+    const measuredUv: Array<[number, number]> = [];
     const seenEdges = new Set<number>();
     const vertexCount = mesh.positions.length / 3;
     for (const f of faces) {
@@ -145,6 +172,7 @@ export const fitSurfaceToMesh = defineCommand({
       const area = Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2;
       for (const v of corners) vertexWeight.set(v, (vertexWeight.get(v) ?? 0) + area / 3);
       measured.push([(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3]);
+      if (harmonic !== null) measuredUv.push(meanUv(corners.map(hv)));
       corners.forEach((v, k) => {
         const w = corners[(k + 1) % 3] as number;
         const key = Math.min(v, w) * vertexCount + Math.max(v, w);
@@ -152,6 +180,7 @@ export const fitSurfaceToMesh = defineCommand({
         seenEdges.add(key);
         const [p, q] = [vertex(v), vertex(w)];
         measured.push([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2]);
+        if (harmonic !== null) measuredUv.push(meanUv([hv(v), hv(w)]));
       });
     }
     const used = [...vertexWeight.keys()].sort((x, y) => x - y);
@@ -160,25 +189,29 @@ export const fitSurfaceToMesh = defineCommand({
     const points = picked.map(vertex);
     const total = picked.reduce((sum, v) => sum + (vertexWeight.get(v) as number), 0);
     const weights = picked.map((v) => (vertexWeight.get(v) as number) / total);
-    const bounds = used.map(vertex).reduce(
-      (box, p) => {
-        const [s, t] = planar(p);
-        return { s0: Math.min(box.s0, s), s1: Math.max(box.s1, s), t0: Math.min(box.t0, t), t1: Math.max(box.t1, t) };
-      },
-      { s0: Infinity, s1: -Infinity, t0: Infinity, t1: -Infinity },
-    );
+    const bounds =
+      harmonic !== null
+        ? { s0: 0, s1: 1, t0: 0, t1: 1 }
+        : used.map(vertex).reduce(
+            (box, p) => {
+              const [s, t] = planar(p);
+              return { s0: Math.min(box.s0, s), s1: Math.max(box.s1, s), t0: Math.min(box.t0, t), t1: Math.max(box.t1, t) };
+            },
+            { s0: Infinity, s1: -Infinity, t0: Infinity, t1: -Infinity },
+          );
     const [spanS, spanT] = [bounds.s1 - bounds.s0, bounds.t1 - bounds.t0];
     if (!(spanS > 0 && spanT > 0)) return fail('MESH_FIT_REGION_EMPTY', 'the region is degenerate in its best-fit plane', 'region');
     const uvOf = (p: Vec3): [number, number] => {
       const [s, t] = planar(p);
       return [(s - bounds.s0) / spanS, (t - bounds.t0) / spanT];
     };
-    const swapped = spanT > spanS;
-    const orient = (p: Vec3): [number, number] => {
-      const [u, v] = uvOf(p);
-      return swapped ? [v, 1 - u] : [u, v];
-    };
-    const [longSpan, shortSpan] = swapped ? [spanT, spanS] : [spanS, spanT];
+    const stretch = harmonic === null ? null : parameterStretch(mesh, faces, harmonic.uv);
+    const swapped = stretch === null ? spanT > spanS : stretch.v > stretch.u;
+    const orientUv = ([u, v]: [number, number]): [number, number] => (swapped ? [v, 1 - u] : [u, v]);
+    const orient = (p: Vec3): [number, number] => orientUv(uvOf(p));
+    const [longSpan, shortSpan] =
+      stretch !== null ? [Math.max(stretch.u, stretch.v), Math.min(stretch.u, stretch.v)] : swapped ? [spanT, spanS] : [spanS, spanT];
+    const fitUv = harmonic !== null ? picked.map((v) => orientUv(hv(v))) : points.map(orient);
     const sizes: Array<[number, number]> =
       params.controlPoints !== undefined
         ? [params.controlPoints]
@@ -201,7 +234,7 @@ export const fitSurfaceToMesh = defineCommand({
           );
         break;
       }
-      const fit = fitPatch(points, weights, points.map(orient), {
+      const fit = fitPatch(points, weights, fitUv, {
         degree,
         countU: size[0],
         countV: size[1],
@@ -216,7 +249,11 @@ export const fitSurfaceToMesh = defineCommand({
     const last = fitted[fitted.length - 1] as { fit: PatchFit; size: [number, number] };
     const stride2 = Math.max(1, Math.ceil((used.length + measured.length) / MAX_MEASURED));
     const everything = [...used.map(vertex), ...measured].filter((_, i) => i % stride2 === 0);
-    const check = footPoints(last.fit.surface, everything, everything.map(orient));
+    const everythingUv =
+      harmonic !== null
+        ? [...used.map((v) => orientUv(hv(v))), ...measuredUv.map(orientUv)].filter((_, i) => i % stride2 === 0)
+        : everything.map(orient);
+    const check = footPoints(last.fit.surface, everything, everythingUv);
     const converged = params.maxDeviation === undefined || check.stats.max <= params.maxDeviation;
     const unit = doc.units;
     const rounded = {
@@ -260,7 +297,23 @@ export const fitSurfaceToMesh = defineCommand({
           converged,
           foldedFraction: framed.foldedFraction,
           smoothing,
-          frame: { origin: frame.origin, uAxis: frame.uAxis, vAxis: frame.vAxis, normal: frame.normal, longAxis: swapped ? 'v' : 'u' },
+          parameterization:
+            harmonic === null
+              ? { method: 'projection' }
+              : {
+                  method: 'harmonic',
+                  weights: harmonic.weights,
+                  flippedWithExactWeights: harmonic.flippedFirst,
+                  collapsedTriangles: harmonic.collapsedInParameters,
+                  interiorVertices: harmonic.interiorVertices,
+                  boundaryVertices: harmonic.boundaryVertices,
+                  cgIterations: harmonic.cgIterations,
+                  cgResidual: harmonic.cgResidual,
+                },
+          frame:
+            harmonic === null
+              ? { origin: frame.origin, uAxis: frame.uAxis, vAxis: frame.vAxis, normal: frame.normal, longAxis: swapped ? 'v' : 'u' }
+              : null,
           warnings: converged
             ? []
             : [
