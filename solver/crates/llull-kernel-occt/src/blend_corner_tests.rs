@@ -511,3 +511,28 @@ fn per_edge_setbacks_whose_blends_outgrow_each_other_do_not_settle_and_are_named
     let reason = setback_reason(&shape, &flat_edges, &flat).unwrap();
     assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("they do not settle"), "{reason}");
 }
+
+/// BLD §13.17: the corner builder keeps a void too. A 10 cube with a spherical pocket (r 3 at its centre), one corner rounded with a setback corner: the volume is the
+/// same corner on the solid cube less the pocket.
+#[test]
+fn a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket() {
+    let _serial = crate::serial_blends();
+    let pocket = crate::placed(&crate::make_sphere(3.0).unwrap().unwrap(), [0.0; 3], [5.0; 3], [0.0; 3]).unwrap().unwrap();
+    let hollow = boolean(BooleanOp::Subtract, &cube(10.0), &pocket, true).unwrap().unwrap();
+    let corner = [0.0; 3];
+    let rounded = |shape: &Shape| {
+        let meeting = edges_at(shape, corner);
+        let (edges, corners) = spec(shape, &meeting, 0.5, &[corner], 1.2);
+        fillet_setback(shape, &edges, &corners).unwrap().expect("a solid")
+    };
+    let with_pocket = rounded(&hollow);
+    let solid = rounded(&cube(10.0));
+    let void = 4.0 / 3.0 * std::f64::consts::PI * 27.0;
+    let (a, b) = (mass_properties(&with_pocket).unwrap().volume, mass_properties(&solid).unwrap().volume);
+    assert!((a - (b - void)).abs() < 1e-6 * b, "{a} vs {}", b - void);
+    assert!(analyze(&with_pocket).unwrap().valid);
+    assert_eq!(
+        topology(&with_pocket).unwrap()["faces"].as_array().unwrap().len(),
+        topology(&solid).unwrap()["faces"].as_array().unwrap().len() + 1
+    );
+}

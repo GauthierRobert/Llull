@@ -671,7 +671,7 @@ Not built, each refused by name with `BLD_PROFILE_FAILED` and the reason:
 - **Corners of curved edges or non-planar faces** (profiled edges meeting at a vertex where an edge is curved or a face is curved), **vertices with an unrounded edge** (two rounded edges and a third left sharp: the blends would have to be intersected and trimmed), **a profile with a `setback` corner** (`corners` still refuses a profile: M3 remainder). The corner patch is G1 only (13.10.2), also with a curvature profile.
 - **Ends**: a blend that ends obliquely on a face, on a curved face, or on a corner patch of OCCT's own (the end edge is then not a section; refused as "ends obliquely"). A blend that ends square on a flat face, on the next blend of a chain, or closes on itself is built.
 - **Asymmetric legs (`size2`) on a curved edge, on curved faces, or with a varying size.** The contact points of a leg pair are not the circular fillet's, so OCCT cannot supply the rails (a different rolling-ball construction would be needed).
-- **Solids with a void or several bodies** (the rebuilt shell would drop them): refused ("several shells").
+- **Solids with a void**: built since §13.17 (a second body outside the first is still refused by name).
 - **Parts of about 0.3 mm**: OCCT's own circular fillet is already 5 to 17 x off 1e-6 x diagonal below 3 mm (an absolute approximation error of about 1.6e-6 to 3e-6); the profile blend builds from 0.4 mm (sphere band; rims from 0.3 mm) and the 0.3 mm band is refused with the measured gap (13.11.3).
 - A straight-piece (kinked) law gets about 30 extra stations around each kink; a very sharp one can exceed the cap and is refused with the measured deviation.
 - **Profiled edges that meet at a vertex with a varying size** (see 13.11.3): refused.
@@ -968,12 +968,12 @@ Done: a conic or curvature `profile` on `fillet_edge` / `fillet_faces` builds on
 
 ### 13.16.1 Code
 
-| Piece  | Where |
-| ------ | ----- |
+| Piece  | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Native | `cpp/blend_rails.hxx` (new: `Section`, `Blend`, `Mitre` with its `turn`, `FaceEdit`), `cpp/blend_mitre.cxx` (new: `plan_mitres`, `rebuild_face`), `cpp/blend_rail_section.cxx` (new: `section_at` moved out of `blend_rails.cxx`, `apply_mitre`, `circular_section_volume`, `result_diagonal`, `number`), `cpp/blend_rails.cxx` (`rails_once`: the plan, the support re-trim, the junction rule; 783 lines against 807 before the step), Rust `lib.rs` (test module) |
-| Core   | `checkBlends.ts` (junction judged beyond the crease of its supports, `creaseRad` on the junction row), `checkBlendFindings.ts` (new: findings, remediations and tolerances moved out of `checkBlends.ts`, which was at the 500-line limit), `blendJunctions.ts` (`supportCrease`, `judgeJunction`, `CHAIN_CREASE_LIMIT`), `profileNotes.ts` + `kernelPorts.ts` (`creaseRad`), descriptions of `fillet_edge` and `check_blends` |
-| Tests  | Rust `src/blend_mitre_tests.rs` (10), `server/tests/nativeBlendMitre.test.ts` (new, 16), `nativeBlendProfiles.test.ts` (the N-gon refusal replaced), `tests/unit/blendChains.test.ts` (`supportCrease`, `judgeJunction`: smooth chain, crease, cap), `blendProfile.test.ts` (the sentence) |
-| Pack   | `generate_plans.mjs`: VC-BLD-48 and 4 steps added to `target_profiles_curved_variable` (33/33 became 37/37); tool-schema snapshot: the `fillet_edge` and `check_blends` descriptions only |
+| Core   | `checkBlends.ts` (junction judged beyond the crease of its supports, `creaseRad` on the junction row), `checkBlendFindings.ts` (new: findings, remediations and tolerances moved out of `checkBlends.ts`, which was at the 500-line limit), `blendJunctions.ts` (`supportCrease`, `judgeJunction`, `CHAIN_CREASE_LIMIT`), `profileNotes.ts` + `kernelPorts.ts` (`creaseRad`), descriptions of `fillet_edge` and `check_blends`                                       |
+| Tests  | Rust `src/blend_mitre_tests.rs` (10), `server/tests/nativeBlendMitre.test.ts` (new, 16), `nativeBlendProfiles.test.ts` (the N-gon refusal replaced), `tests/unit/blendChains.test.ts` (`supportCrease`, `judgeJunction`: smooth chain, crease, cap), `blendProfile.test.ts` (the sentence)                                                                                                                                                                           |
+| Pack   | `generate_plans.mjs`: VC-BLD-48 and 4 steps added to `target_profiles_curved_variable` (33/33 became 37/37); tool-schema snapshot: the `fillet_edge` and `check_blends` descriptions only                                                                                                                                                                                                                                                                            |
 
 ### 13.16.2 What OCCT gives (measured, native llull-kernel, OCCT 7.9.2)
 
@@ -1003,22 +1003,22 @@ Decision, with that reason. The allowance for the crease is **never measured on 
 
 Oracle: with A the area of the removed section, M its first moment about the wall (both numerical integrals of the profile curve, closed forms for rho 0.5: A = d^2/6, M = d^3/30), P the rim length and the sum of tan(turn/2) taken with sign over the corners, a mitred sweep along a closed polygon changes the volume by A P - 2 M sum(s tan(turn/2)) (removed when convex, added with the opposite sign of the second term when concave); an open chain between square end walls uses its own length. Every row below is the whole `fillet_edge` step through the server, including tessellation; each case passes `check_blends` at its defaults (64 chain members read as the profile, 64 junction rows with `creaseRad` 0.0982, 128 contact rows, no failing or warning finding, 0 unverified); for 10 and 100 mm only the build, the gap and the volume are asserted (check_blends takes 7 to 9 s on 64 conic blends).
 
-| 64-gon rim (R 50 x size, r = size) | gap | junction angle (crease) | volume error | time conic / curvature |
-| --- | --- | --- | --- | --- |
-| 1 mm | 3.7e-14 (limit 6.8e-4) | 0.09817 (0.09817) | 1.4e-7 / 3.0e-7 | 1.5 s / 2.5 s |
-| 10 mm | 3.5e-13 (limit 6.8e-3) | 0.09817 (0.09817) | 1.4e-7 / 3.0e-7 | 2.0 s / 2.2 s |
-| 100 mm | 3.9e-12 (limit 6.8e-2) | 0.09817 (0.09817) | 1.4e-7 / 3.0e-7 | 2.4 s / 2.2 s |
-| 1000 mm | 3.0e-11 (limit 0.68) | 0.09817 (0.09817) | 1.4e-7 / 3.0e-7 | 2.5 s / 4.2 s |
+| 64-gon rim (R 50 x size, r = size) | gap                    | junction angle (crease) | volume error    | time conic / curvature |
+| ---------------------------------- | ---------------------- | ----------------------- | --------------- | ---------------------- |
+| 1 mm                               | 3.7e-14 (limit 6.8e-4) | 0.09817 (0.09817)       | 1.4e-7 / 3.0e-7 | 1.5 s / 2.5 s          |
+| 10 mm                              | 3.5e-13 (limit 6.8e-3) | 0.09817 (0.09817)       | 1.4e-7 / 3.0e-7 | 2.0 s / 2.2 s          |
+| 100 mm                             | 3.9e-12 (limit 6.8e-2) | 0.09817 (0.09817)       | 1.4e-7 / 3.0e-7 | 2.4 s / 2.2 s          |
+| 1000 mm                            | 3.0e-11 (limit 0.68)   | 0.09817 (0.09817)       | 1.4e-7 / 3.0e-7 | 2.5 s / 4.2 s          |
 
 (gap in mm: 5e-11 of its limit at every size; the kink is the crease, excess 0; times vary 2x with the load of the machine, 23 to 39 ms per blend face for the conic, tessellation included.)
 
-| Case | Result |
-| --- | --- |
-| 120-gon rim (turn 0.0524), 1 and 1000 mm (Rust) | builds; 3.1 s through the server (26 ms per blend); volume within 1e-6 of the oracle |
-| 240-corner wavy outline (turns -0.05 to +0.09 rad, reflex and convex), 0.5 mm blend | builds (13 s: 56 ms per blend; the whole test with mass and check_blends takes 51 s), volume within 2e-5 of the signed-turn oracle, pass |
-| bent bar, creases 0.099 and -0.099 rad, 1 and 1000 mm, conic and curvature | builds between its square end walls; volume error 5e-8 to 9e-8; gap 3e-14 to 6e-11; pass; 66 to 153 ms |
-| concave foot ring of a 64-gon boss on a plate (10 mm), conic rho 0.4 and curvature | material added, volume error 2.2e-8 / 1.4e-8; gap 6.8e-13; pass |
-| replay | `replay_history` gives the identical recipe and a volume equal to 1e-9; an upstream `edit_step_params` (depth 20 -> 30) re-mitres the chain, pass |
+| Case                                                                                | Result                                                                                                                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 120-gon rim (turn 0.0524), 1 and 1000 mm (Rust)                                     | builds; 3.1 s through the server (26 ms per blend); volume within 1e-6 of the oracle                                                              |
+| 240-corner wavy outline (turns -0.05 to +0.09 rad, reflex and convex), 0.5 mm blend | builds (13 s: 56 ms per blend; the whole test with mass and check_blends takes 51 s), volume within 2e-5 of the signed-turn oracle, pass          |
+| bent bar, creases 0.099 and -0.099 rad, 1 and 1000 mm, conic and curvature          | builds between its square end walls; volume error 5e-8 to 9e-8; gap 3e-14 to 6e-11; pass; 66 to 153 ms                                            |
+| concave foot ring of a 64-gon boss on a plate (10 mm), conic rho 0.4 and curvature  | material added, volume error 2.2e-8 / 1.4e-8; gap 6.8e-13; pass                                                                                   |
+| replay                                                                              | `replay_history` gives the identical recipe and a volume equal to 1e-9; an upstream `edit_step_params` (depth 20 -> 30) re-mitres the chain, pass |
 
 Rust (`cargo test --release -p llull-kernel-occt`): 195 tests, all pass (the 24 rail tests and the 10 new ones among them, one mixing a mitred chain with four tangent arcs: 4 creased and 16 smooth junctions, every smooth one within the plain 0.0095); `cargo clippy -D warnings`, `cargo fmt`. Server: `nativeBlend*` (11 files) and `nativeFilletLaws`, all pass. Plans (`llull run ... --continue`, native kernel): `baseline_variable_radius_laws` 24/24, `baseline_limits_today` 6/8, `target_laws_and_profiles` 32/32, `target_corners_faces_chamfers` 28/28, `target_error_codes` 4/9, `target_profiles_curved_variable` **37/37 (was 33/33: the only change is the 4 steps added for VC-BLD-48, a bent bar with creases of 0.09 rad: extrude, mitred conic, mass, check_blends)**, `target_corners_concave_tapered` 14/15, `target_face_sets` 28/31, `target_m5` 18/20 (the others unchanged: the failures are the designed refusals).
 
@@ -1032,3 +1032,24 @@ Rust (`cargo test --release -p llull-kernel-occt`): 195 tests, all pass (the 24 
 - **Guards no native shape reaches** (the code refuses, no test provokes them): a rail over several support faces at a crease (OCCT splits a blend at every change of support, so each piece has one; a seam under the contact line, tried with two stacked prisms, does not cross the rail), a crease above 0.5 rad between two blends that share an edge (OCCT chains below 0.1 only), a curved support and an asymmetric crease (above).
 - **Mass properties and `check_blends` of a long chain are slow** (all costs are per knot span and per face: on the 64-gon conic `mass_properties` takes 3 to 4 s (1.8 to 2.8 s without the adaptive rule) and `check_blends` 9 s (6.7 s without it); the curvature case, build + mass + check, takes 21 s against 14 s for the conic); the build itself is 23 to 56 ms per blend face, within the 150 ms budget. A smaller first station set for straight blends (24 stations per face today, 41 after refinement) is the lever, not taken here: it changes how a narrow feature between stations is found for every profile.
 - The rest of DES-6c as in 13.9, 13.10.4, 13.11.5, 13.12.5, 13.13.5, 13.14.6 (without the mitre ends) and 13.15.4.
+
+## 13.17 As built: solids with voids (DES-6c step 8, 2026-10-30)
+
+A solid with a void used to be refused by name ("several shells"): the profile and corner builders sew the faces of the circular fillet's result into ONE shell and make a solid of it, which dropped any other shell.
+
+- **Now** (`blend_solid.hxx`, `solid_of_shells`, used by `blend_rails.cxx` and `blend_corner.cxx`): the shells of the sewn shape are collected, a closed face that sewed into a face of its own (a sphere pocket is one face) becomes a shell
+  of one face, the shell of the largest volume is the outer shell, and every other one must lie inside it (`BRepClass3d_SolidClassifier` on one of its vertices): it is added reversed, as an inner shell of the same solid.
+  A shell outside the outer one is a second body, which one solid cannot hold: refused by name ("a second body outside the first"), as before. The volume window of the profile blend, `BRepCheck_Analyzer` and the gap checks run on
+  the whole solid.
+- **Check.** A cylinder (r 10, h 20) with a spherical pocket (r 3 at z 10), its rim blended by a conic profile of size 2: the result is valid, its volume is the blended solid cylinder's less the pocket (4/3 pi 27) within 1e-6 of the volume,
+  and it has one face more than the same blend without the pocket (the pocket's sphere). Test `a_solid_with_a_void_keeps_its_void_through_a_profile_blend` (was: refused). Red-proof: with a helper that ignored the closed face the pocket was dropped and the volume window
+  refused the result (volume +113 against the circular fillet's -51).
+- **Left:** a void inside a void (nested shells: only depth one is classified), a blend on the edges of the void itself is built by the same path but is not tested here.
+
+### 13.17.1 Review round: what one solid cannot hold
+
+- A shell inside ANOTHER void (an island in a void) is refused by name ("a body inside a void: a solid holds one outer shell and its voids"): classified only against the outer solid it would have become a second void
+  (outer - void - island instead of + island), silently on the corner path. A void that touches the outer shell (`TopAbs_ON`) has its own message. The largest-volume rule for the outer shell relies on the callers'
+  free-edge check (every piece is a closed shell).
+- Tests: `a_second_body_and_a_body_inside_a_void_are_refused_by_name` (a disjoint sphere in a compound; an island sphere in the pocket; red-proof: without the island check the profile path fails BRepCheck, the corner path would
+  not), `a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket` (the corner builder: volume = the same corner on the solid cube less 4/3 pi 27).

@@ -55,6 +55,7 @@
 #include <gp_Vec.hxx>
 
 #include "llull-kernel-occt/cpp/blend_rails.hxx"
+#include "llull-kernel-occt/cpp/blend_solid.hxx"
 #include "llull-kernel-occt/cpp/blend_tool.hxx"
 #include "llull-kernel-occt/cpp/blends.hxx"
 #include "llull-kernel-occt/cpp/features.hxx"
@@ -581,14 +582,13 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     if (curved && junction) stage = Stage::Junction;
     return nullptr;
   }
-  // A void (or a second body) sews into a shell or a closed face of its own, which the solid built from one shell would drop.
-  if (query::distinct(shell, TopAbs_FACE).Extent() != query::distinct(sewn, TopAbs_FACE).Extent()) {
-    why = "the solid has several shells (a void or a second body): a profile blend rebuilds one closed shell";
+  // A void sews into a shell of its own: it becomes an inner shell of the solid (a second body outside the first is refused by name).
+  std::string shells_why;
+  TopoDS_Solid solid = blend::solid_of_shells(sewn, shells_why);
+  if (solid.IsNull() && !shells_why.empty()) {
+    why = "the profile blend cannot hold the sewn shells in one solid: " + shells_why;
     return nullptr;
   }
-  BRepBuilderAPI_MakeSolid solid_maker(shell);
-  TopoDS_Solid solid = solid_maker.Solid();
-  BRepLib::OrientClosedSolid(solid);
   if (solid.IsNull() || !BRepCheck_Analyzer(solid, Standard_True).IsValid()) {
     why = "the profile blend fails the BRepCheck validity analysis";
     return nullptr;
