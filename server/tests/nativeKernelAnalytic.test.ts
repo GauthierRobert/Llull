@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { ShapeRecipe } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { IsolatedKernel } from '../src/isolatedKernel';

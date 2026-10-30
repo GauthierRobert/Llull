@@ -16,7 +16,7 @@ const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('latticeHomogenizeNative: llull-compute not built (cargo build in solver/): native runs skipped');
 const native = BINARY === null ? it.skip : it;
 const engine = BINARY === null ? null : createNativeFieldEngine({ binary: BINARY });
-const ctx = () => ({ ...defaultContext(), ...(engine === null ? {} : { fieldEngine: engine }) });
+const ctx = (): ReturnType<typeof defaultContext> => ({ ...defaultContext(), ...(engine === null ? {} : { fieldEngine: engine }) });
 
 interface Homogenization {
   youngRatio: number[];

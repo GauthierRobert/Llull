@@ -61,7 +61,10 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP silhouette' })('WRP s
     expect([data.facesBefore, data.facesAfter]).toEqual([3, 4]);
     expect(relative(data.volumeAfter, data.volumeBefore)).toBeLessThan(1e-5);
     expect(relative(volume(done.document, solidOf(done)), Math.PI * 400 * 40)).toBeLessThan(1e-5);
-    const curve = done.document.entities[found.curves[0]?.id as string] as { curve: { poles: number[][] }; onFace?: { faceIndex: number } };
+    const curve = done.document.entities[found.curves[0]?.id as string] as unknown as {
+      curve: { poles: number[][] };
+      onFace?: { faceIndex: number };
+    };
     expect(Math.abs(Math.abs(curve.curve.poles[0]?.[1] as number) - 20)).toBeLessThan(1e-9);
     expect(curve.onFace?.faceIndex).toBe(found.curves[0]?.face);
     const halves = areas(done).filter((area) => Math.abs(area - Math.PI * 20 * 40) < 1e-3);
