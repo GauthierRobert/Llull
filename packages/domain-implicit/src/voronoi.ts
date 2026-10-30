@@ -10,9 +10,10 @@ import type { StrutBeam } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
 import { type GraphResult, MAX_GRAPH_BEAMS } from './graph';
 import type { VoronoiNode } from './model';
+import { type Tet, delaunay, faceKey, facesOf } from './voronoiDelaunay';
 
-/** Seeds beyond this are refused: the Bowyer-Watson pass is quadratic (6000 seeds, 55000 beams: 9-12 s; 10000 seeds: 32-43 s), and a seed adds about 9 beams (measured), so 6000 seeds stay under the 100000 beams of a graph lattice. */
-const MAX_SEEDS = 6000;
+/** Seeds beyond this are refused: a seed adds about 9.2 beams (measured), so 10000 seeds give about 92000 beams, under the 100000 of a graph lattice (the Bowyer-Watson pass of voronoiDelaunay.ts takes 2.6 s there; 30000 seeds would take 10 s but 270000 beams). */
+const MAX_SEEDS = 10_000;
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -23,68 +24,6 @@ function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-interface Tet {
-  readonly v: readonly [number, number, number, number];
-  readonly c: Vec3;
-  readonly r2: number;
-}
-
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
-/** Circumsphere of four points, or null when they are coplanar. */
-function circumsphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3): { c: Vec3; r2: number } | null {
-  const [u, v, w] = [sub(b, a), sub(c, a), sub(d, a)];
-  const denominator = 2 * dot(u, cross(v, w));
-  if (Math.abs(denominator) < 1e-300) return null;
-  const [vw, wu, uv] = [cross(v, w), cross(w, u), cross(u, v)];
-  const [lu, lv, lw] = [dot(u, u), dot(v, v), dot(w, w)];
-  const offset: Vec3 = [
-    (lu * vw[0] + lv * wu[0] + lw * uv[0]) / denominator,
-    (lu * vw[1] + lv * wu[1] + lw * uv[1]) / denominator,
-    (lu * vw[2] + lv * wu[2] + lw * uv[2]) / denominator,
-  ];
-  return { c: [a[0] + offset[0], a[1] + offset[1], a[2] + offset[2]], r2: dot(offset, offset) };
-}
-
-const faceKey = (a: number, b: number, c: number): string => [a, b, c].sort((x, y) => x - y).join(',');
-
-const facesOf = ([a, b, c, d]: readonly [number, number, number, number]): ReadonlyArray<readonly [number, number, number]> => [
-  [a, b, c],
-  [a, b, d],
-  [a, c, d],
-  [b, c, d],
-];
-
-/** Delaunay tetrahedra of `points` (the last four points are the enclosing tetrahedron) that do not touch it. */
-function delaunay(points: readonly Vec3[], real: number): Tet[] {
-  let tets: Tet[] = [];
-  const add = (a: number, b: number, c: number, d: number): void => {
-    const sphere = circumsphere(points[a] as Vec3, points[b] as Vec3, points[c] as Vec3, points[d] as Vec3);
-    if (sphere !== null) tets.push({ v: [a, b, c, d], ...sphere });
-  };
-  add(real, real + 1, real + 2, real + 3);
-  for (let p = 0; p < real; p += 1) {
-    const point = points[p] as Vec3;
-    const bad: Tet[] = [];
-    const rest: Tet[] = [];
-    for (const tet of tets) {
-      const d = sub(point, tet.c);
-      (dot(d, d) < tet.r2 * (1 - 1e-12) ? bad : rest).push(tet);
-    }
-    const faces = new Map<string, readonly [number, number, number] | null>();
-    for (const { v } of bad)
-      for (const f of facesOf(v)) {
-        const key = faceKey(f[0], f[1], f[2]);
-        faces.set(key, faces.has(key) ? null : f);
-      }
-    tets = rest;
-    for (const f of faces.values()) if (f !== null) add(f[0], f[1], f[2], p);
-  }
-  return tets.filter((tet) => tet.v.every((index) => index < real));
 }
 
 /**
@@ -133,10 +72,10 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
   ] as const)
     points.push([centre[0] + s[0] * reach, centre[1] + s[1] * reach, centre[2] + s[2] * reach]);
   const tets = delaunay(points, count);
-  const owner = new Map<string, number[]>();
+  const owner = new Map<number, number[]>();
   tets.forEach(({ v }, index) => {
     for (const f of facesOf(v)) {
-      const key = faceKey(f[0], f[1], f[2]);
+      const key = faceKey(f[0], f[1], f[2], points.length);
       owner.set(key, [...(owner.get(key) ?? []), index]);
     }
   });

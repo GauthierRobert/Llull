@@ -156,14 +156,14 @@ describe('infill_solid failure inside a composed step', () => {
 });
 
 describe('Voronoi limits', () => {
-  it('builds the 20 mm cube at 0.04 seeds/mm3 that the 5000 beam cap used to refuse, and refuses a box above 6000 seeds by name', () => {
+  it('builds the 20 mm cube at 0.04 seeds/mm3 that the 5000 beam cap used to refuse, and refuses a box above 10000 seeds by name', () => {
     const box = ok(empty(), 'add_field_primitive', { shape: 'box', size: [20, 20, 20], position: [10, 10, 10] });
     const dense = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.04, seed: 1, radius: 0.1 });
     expect(dense.data['beams'] as number).toBeGreaterThan(4000);
     const huge = ok(empty(), 'add_field_primitive', { shape: 'box', size: [60, 60, 60], position: [30, 30, 30] });
     const refused = run(huge.doc, 'add_voronoi_lattice', { region: huge.id, density: 0.04, seed: 1, radius: 0.1 });
     expectRefused(huge.doc, refused, 'IMP_GRAPH_TOO_LARGE');
-    expect(refused.result.summary).toContain('limit 6000');
+    expect(refused.result.summary).toContain('limit 10000');
   });
 
   it('keeps the command object and a deterministic geometry for equal inputs', () => {

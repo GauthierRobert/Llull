@@ -900,7 +900,7 @@ measured wall plus that band and says so in the finding.
 
 ### 14.7 Not built
 
-Surface-UV cell maps and maps for strut lattices; numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients; a faster than quadratic Delaunay pass for Voronoi (14.9);
+Surface-UV cell maps and maps for strut lattices; numerical homogenisation on `llull-voxfe`; shipped Gibson-Ashby coefficients;
 GPU preview.
 
 ### 14.8 A plain field over a coarsely shown body (DES-5c, 2026-10-30)
@@ -922,7 +922,7 @@ Median split by centroid on the widest axis (sort key a total order: NaN after e
 - Proof that the bound is below the signed distance of every beam: in the beam frame the point is (s, rho) and the axis is [0, L] x {0}. Inside the frustum the value is `-edge >= rho - r(s) >= rho - r` (the slant edge is at most r(s) - rho away); outside, every point of the three tested edges lies within |rho| <= r of the axis, so by the triangle inequality `edge >= dist(p, axis) - r`; the sphere caps and the zero-length ball are `hypot - r` to a point of the axis; the override branch is `dist(p, axis) - radius`. The AABB contains the axis, so its distance is at most `dist(p, axis)`. (The signed distance is negative inside a beam, so the AABB distance alone would NOT be a bound: the radius term is what makes it one.)
 - Rounding: the brute loop computes `rho = sqrt(|p|^2 - s^2)`, which cancels to an error of about 3e-8 |p| near an axis. The slack is `1e-6 (max|p_i| + max|coordinate of the set| + r)`, thirty times that; the radius term covers the butt edge error (about eps r) when r is much larger than the coordinates. A node holding a non finite coordinate or a beam shorter than 1e-100 (where `s = dot / length` loses precision) is never skipped; a NaN or overflowing bound never skips (`NaN > best` is false), so a NaN point still returns what the brute loop returns.
 - Order independence: the result is a minimum of exact per-beam values; every skipped beam is strictly greater than the final best, so it can neither be the minimum nor tie with it. Ties among evaluated beams go to the lowest beam index (`d < best || (d === best && index < bestIndex)`), which reproduces the brute loop, whose first beam wins under `<`; this matters only for 0 against -0 (a point on the boundary of a butt beam gives -0, on a sphere cap +0). NaN values are never taken, as in the brute loop.
-- Caps (named): `MAX_GRAPH_BEAMS` 5000 -> 100000 (`graph.ts`); Voronoi `MAX_SEEDS` 700 -> 6000 (`voronoi.ts`; its beam check only guards `MAX_GRAPH_BEAMS`, which 6000 seeds (55000 beams) do not reach). Both refuse with `IMP_GRAPH_TOO_LARGE`. The Voronoi limit is the Bowyer-Watson pass (TS only, quadratic: 6000 seeds 9-12 s, 10000 seeds 32-43 s), not the field.
+- Caps (named): `MAX_GRAPH_BEAMS` 5000 -> 100000 (`graph.ts`); Voronoi `MAX_SEEDS` 700 -> 6000 (10000 since 14.14; `voronoi.ts`; its beam check only guards `MAX_GRAPH_BEAMS`, which 6000 seeds (55000 beams) do not reach). Both refuse with `IMP_GRAPH_TOO_LARGE`. The Voronoi limit is the Bowyer-Watson pass (TS only, quadratic: 6000 seeds 9-12 s, 10000 seeds 32-43 s), not the field.
 - Side fix: `compileLattice` spread all beam radii into `Math.min(...)` and overflowed the stack above about 60000 beams; it reduces now.
 
 **Measured** (voxel 0.3 unless noted; body = `create_implicit_body`, add = building the beams, always on the TS side; Windows, release native, two other lanes running so times are indicative). Graph: serpentine polylines in a plane, radius 0.25, chord 0.3, pitch 0.9. Voronoi: cubes at 0.04 seeds/mm3, radius 0.3.
@@ -943,7 +943,7 @@ The old 5000 beam case is 16x (graph) and 33x (Voronoi) faster natively and two 
 
 **Tests.** `tests/unit/field/strutBvh.test.ts`: bit-identical to the brute loop on a random 300 beam set (about 1700 points inside beams, on caps, far away, with the radius override), NaN points, NaN / infinite / 1e-120 beams, 0 against -0 in both beam orders, the bound never above the true value (single beam sets, with and without override). `strut_bvh.rs` repeats the first three on the Rust twin and the empty set. Red without the fix: removing the tie rule fails the 0 / -0 tests (TS and Rust); shifting the bound by +0.5 fails the bit-identity and bound tests (TS and Rust). `tests/unit/implicit/gaps6.test.ts` (the 20 mm cube builds; a box above 6000 seeds is refused by name) and `lattices5.test.ts` (a 12566 beam ring builds and evaluates; 251000 beams are refused). TS to Rust parity: the existing `server/tests/fieldNative.test.ts`; the content hashes of existing bodies are unchanged (implicit lifecycle and golden suites).
 
-**Left.** A Delaunay pass faster than quadratic (it must keep the same tetrahedra for the hashes); a BVH inside the buckets of periodic sets with many beams per cell; a native Voronoi builder.
+**Left.** (The Delaunay pass is near-linear since 14.14.) A BVH inside the buckets of periodic sets with many beams per cell; a native Voronoi builder.
 
 ### 14.10 Native gradient, native dual contouring, per-cell fallback (DES-5c, 2026-10-30)
 
@@ -1019,3 +1019,30 @@ The sink halves the memory of a package that still fits in memory and exports th
 **Tests.** `tests/unit/exchange/threeMfFile.test.ts`: the sink archive equals the in-memory archive byte for byte (312 000 triangles), written in chunks of at most 64 KiB, limit refusal, no chunk held by `DeflateStream(onChunk)`, `toFile` at command level (path instead of base64, `close` once; `EXPORT_SINK_UNAVAILABLE`; `abort` on a refusal; below the automatic threshold the export stays in memory). `server/tests/export3mfFile.test.ts`: the real port writes the same bytes as memory, `--save` moves the file, a limit leaves nothing behind, and the slow test above. Red: `writeThreeMf` without the header patch fails the byte equality; an unlimited archive fails the limit test.
 
 **Left.** The document load and the desktop UI export dialog do not use `toFile` yet (the UI still takes the in-memory package); ZIP64 for archives above 4 GB; `export_3mf` of a level-set or beam-lattice body has no size problem and is unchanged.
+
+### 14.14 A near-linear Delaunay for Voronoi lattices, same tetrahedra, same hashes (DES-5c, 2026-10-30)
+
+**Problem.** The Bowyer-Watson pass of `add_voronoi_lattice` scanned every tetrahedron for every seed: 6000 seeds took 9-12 s and 10000 seeds 32-43 s (14.9), which set the seed cap.
+
+**Decision.** The insertion order stays the seed order (a BRIO or any other order would change the sequence of the tetrahedron array, hence the order of the beams and the nodes, hence the program and the content hash of every Voronoi body). Only the search changes (`voronoiDelaunay.ts`): a visibility walk from the newest tetrahedron finds the tetrahedron that contains the seed (random seed order: the walk is about n^(1/3) steps), a flood over the face adjacency (face key = an exact integer, `faceTets` map) collects the connected cavity of the tetrahedra whose circumsphere holds the seed (same predicate, `d2 < r2 (1 - 1e-12)`), and the new tetrahedra are appended in the order the quadratic scan appended them. Identity of the array:
+- every tetrahedron keeps its creation number; the cavity is sorted by creation number before its faces are collected, which is the order of the surviving scan (`tets = rest` keeps the relative order, the faces map is filled in that order), and the new tetrahedra are created in that map's order, so ids, the filtered result and the `owner` map built from it come out in the order of the scan;
+- in general position the tetrahedra whose sphere holds a point are exactly the connected cavity around the tetrahedron that contains it (a Delaunay triangulation has no other), so the flood finds the scan's bad set; a walk that does not settle, or a start tetrahedron whose sphere does not hold the point (rounding), falls back to the scan for the first bad tetrahedron;
+- points on a sphere to 1e-12, duplicates and coplanar quadruples are the degenerate cases: they follow the same predicate and the same skip rule as the scan (a point that no sphere holds adds nothing).
+
+**Proof by test.** `tests/unit/implicit/voronoiDelaunay.test.ts` keeps the quadratic scan as `referenceDelaunay` and compares the arrays (vertex indices and the circumsphere radius to the bit) on 40 / 200 / 500 / 1200 / 1200 seeded points, a 5 x 5 x 5 cospherical lattice (every cube shares a sphere) and a set with a duplicate point and a coplanar quadruple: identical. `voronoi.test.ts` pins the beams and nodes of two seeded sets (3046 beams / 1949 nodes, 13266 / 7812) and the content hash of a Voronoi body (`9c0effbb...`) taken from the quadratic code before the change. Red: sorting the cavity the other way fails the five seeded cases.
+
+**Measured** (TS, the Delaunay pass alone; seeds uniform at 0.04 per mm3; the whole command at 0.1 seeds per mm3):
+
+| seeds | quadratic (14.9) | walk + flood | tetrahedra |
+| --- | --- | --- | --- |
+| 1000 | - | 0.17 s | 6319 |
+| 6000 | 9-12 s | 1.4 s | 39674 |
+| 10000 | 32-43 s | 2.6 s | 66420 |
+| 30000 | - | 9.9 s | 200927 |
+| 100000 | - | 45 s | 672620 |
+
+The cost grows as about n^1.25 (the walk), five times to fifteen times faster than the scan at the old caps. `add_voronoi_lattice` over a 41.2 mm cube at 0.1 seeds/mm3 (about 10000 seeds, 98423 beams, 54091 nodes) takes 4.6 s in all, a 20 mm cube (11780 beams) 0.5 s.
+
+**Cap.** `MAX_SEEDS` 6000 -> 10000 (`voronoi.ts`): a seed adds about 9.2 beams, so 10000 seeds stay just under the 100000 beams of a graph lattice (`MAX_GRAPH_BEAMS`); more seeds are refused by the beam cap anyway, so the seed cap is no longer the one that bites. The description and `@failure` of `add_voronoi_lattice` and the refusal test (a 60 mm cube at 0.04: 12000 seeds) follow.
+
+**Left.** A native Delaunay (the TS builder is the only one); the beam cap, not the Delaunay time, bounds the lattice now.
