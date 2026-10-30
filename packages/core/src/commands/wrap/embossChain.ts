@@ -112,7 +112,10 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       return fail(mapped.code, `face ${face.session.face}: ${mapped.message}`, ['profileIds'], params.profileIds);
     const overlap = checkWrapAround(face.chart, mapped.pieces, params.profileIds);
     if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, ['profileIds'], params.profileIds);
-    const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds, face.slack);
+    const outside = checkOnFace(face.session, probePoints(face.chart, mapped.pieces, MAX_PROBES), params.profileIds, {
+      slack: face.slack,
+      joins: face.joins,
+    });
     if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, ['profileIds'], params.profileIds);
     const recipeParams = {
       surface: face.chart.wire,

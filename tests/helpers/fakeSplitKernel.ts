@@ -110,7 +110,7 @@ function sphereShape(id: string, radius: number): SplitShape {
 
 const CUTS = [0.5, Math.PI + 0.5] as const;
 
-function torusShape(id: string, major: number, minor: number): SplitShape {
+function torusShape(id: string, major: number, minor: number, options: FakeSplitOptions): SplitShape {
   const surface: SurfaceParams = { type: 'torus', center: [0, 0, 0], axis: [0, 0, 1], major, minor };
   const inFirst = (p: Vec3, tolerance = 0): boolean => {
     const a = azimuth(p);
@@ -122,13 +122,20 @@ function torusShape(id: string, major: number, minor: number): SplitShape {
     (count: number): Vec3[] =>
       Array.from({ length: count }, (_, k): Vec3 => {
         const v = (2 * Math.PI * k) / (count - 1);
-        return [(major + minor * Math.cos(v)) * Math.cos(u), (major + minor * Math.cos(v)) * Math.sin(u), minor * Math.sin(v)];
+        const noise = options.closedNoise === true && k === count - 1 ? 5e-9 : 0;
+        return [(major + minor * Math.cos(v)) * Math.cos(u), (major + minor * Math.cos(v)) * Math.sin(u), minor * Math.sin(v) + noise];
       });
   return {
     id,
     volume: 2 * Math.PI ** 2 * major * minor * minor,
     faces: [
-      { surface, contains: inFirst, sample: [(major + minor) * Math.cos(1.5), (major + minor) * Math.sin(1.5), 0] },
+      {
+        surface,
+        contains: (p, tolerance = 0) =>
+          inFirst(p, tolerance) &&
+          (options.trim === undefined || Math.abs(Math.atan2(p[2], Math.hypot(p[0], p[1]) - major)) <= options.trim + tolerance / minor),
+        sample: [(major + minor) * Math.cos(1.5), (major + minor) * Math.sin(1.5), 0],
+      },
       {
         surface,
         contains: (p, tolerance = 0) => {
@@ -158,6 +165,10 @@ export interface FakeSplitOptions {
   readonly blindFace?: number;
   /** The second ruling of the cone runs through the apex (its points have no chart coordinates). */
   readonly apexEdge?: boolean;
+  /** The torus half 0 is trimmed to |v| <= trim (the tube angle from the outer equator): a boundary that is not a join. */
+  readonly trim?: number;
+  /** The last sample of a closed edge differs from its first by 5e-9 (a kernel's rounding), which decides which of the two is the nearer to a point. */
+  readonly closedNoise?: boolean;
 }
 
 export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel {
@@ -182,7 +193,7 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
           : shape;
       }
       if (entity.kind === 'sphere') return sphereShape(entity.id, entity.radius);
-      if (entity.kind === 'torus') return torusShape(entity.id, entity.ringRadius, entity.tubeRadius);
+      if (entity.kind === 'torus') return torusShape(entity.id, entity.ringRadius, entity.tubeRadius, options);
       return null;
     },
     boolean: () => null,

@@ -36,6 +36,8 @@ export interface ChainFace {
   readonly probe: Vec3;
   /** How far (document units) the chain's chart of this face can put a point of a shared edge off the face: the mismatch of its geodesic joins, 0 for developable faces. */
   readonly slack: number;
+  /** The joined stretches (3D points) of the shared edges of the geodesic joins: only probes near them get `slack` as extra tolerance. */
+  readonly joins: Vec3[][];
 }
 
 export interface ChainEdge {
@@ -141,6 +143,9 @@ function chartCoordinates(chart: FaceChart, points: readonly Vec3[], bounds: Fac
 }
 
 const dist2 = (a: Vec2, b: Vec2): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** Largest extent of a set of points (the scale a closed edge's coincident ends are judged against). */
+const edgeScale = (points: readonly Vec3[]): number => Math.max(...points.map((p) => distance3(p, points[0] as Vec3)));
 
 /** Largest distance of the points from the line through the first and the last. */
 function straightness(points: readonly Vec2[]): number {
@@ -271,6 +276,7 @@ export function buildChain(
     clips: [],
     probe: probeOf(session),
     slack: 0,
+    joins: [],
   });
   const edges: ChainEdge[] = [];
   const pending = sessions.slice(1);
@@ -298,7 +304,12 @@ export function buildChain(
           const [first, last] = [flat[0] as Vec2, flat[flat.length - 1] as Vec2];
           const side = (p: Vec2): number => (last[0] - first[0]) * (p[1] - first[1]) - (last[1] - first[1]) * (p[0] - first[0]);
           const probes = sketch.length > 0 ? sketch.flat() : [candidate.parent.chart.anchorChart];
-          const crossing = probes.some((p) => side(p) > 0) && probes.some((p) => side(p) < 0);
+          const mine = probes.filter((p) =>
+            candidate.parent.clips.every(
+              (clip) => (p[0] - clip.point[0]) * clip.normal[0] + (p[1] - clip.point[1]) * clip.normal[1] >= -1e-9,
+            ),
+          );
+          const crossing = mine.some((p) => side(p) > 0) && mine.some((p) => side(p) < 0);
           const near = Math.min(...probes.flatMap((p) => flat.map((c) => dist2(c, p))));
           const score = (crossing ? 0 : 1e9) + near;
           if (score < best) {
@@ -326,10 +337,15 @@ export function buildChain(
       let seed = -1;
       for (const [k, c] of coords.entries())
         if (reached(k) && (seed < 0 || nearTarget(c as Vec2) < nearTarget(coords[seed] as Vec2))) seed = k;
+      // a closed edge (a meridian) has its first sample on its last: the window runs round the ring, so a seed next to the wrap gets both sides
+      const closed = all.length > 2 && distance3(all[0] as Vec3, all[all.length - 1] as Vec3) < 1e-9 * (1 + edgeScale(all));
+      const ring = closed ? all.length - 1 : all.length;
+      const at = (k: number): number => (closed ? ((k % ring) + ring) % ring : k);
+      const available = (k: number): boolean => (closed ? Math.abs(k - seed) < ring : k >= 0 && k < all.length) && reached(at(k));
       let low = seed;
       let high = seed;
-      while (seed >= 0 && low > 0 && reached(low - 1)) low--;
-      while (seed >= 0 && high < all.length - 1 && reached(high + 1)) high++;
+      while (seed >= 0 && available(low - 1) && high - low < ring - 1) low--;
+      while (seed >= 0 && available(high + 1) && high - low < ring - 1) high++;
       if (seed < 0 || high - low < 2)
         return fail(
           'WRP_CHAIN_EDGE_CURVED',
@@ -338,14 +354,15 @@ export function buildChain(
       const developableJoin = isDevelopable(join.parent.session.surface.type) && isDevelopable(child.surface.type);
       // a geodesic that is not through the chart anchor is a curve in its geodesic chart: keep the stretch of the edge that is straight to half the limit (the sketch is local to the seed)
       const keep = { low, high };
+      const window = (): number[] => Array.from({ length: keep.high - keep.low + 1 }, (_, k) => at(keep.low + k));
       while (!developableJoin && keep.high - keep.low > 2) {
-        const stretch = coords.slice(keep.low, keep.high + 1) as Vec2[];
+        const stretch = window().map((k) => coords[k] as Vec2);
         if (straightness(stretch) <= 0.5 * limit * dist2(stretch[0] as Vec2, stretch[stretch.length - 1] as Vec2)) break;
         if (seed - keep.low > keep.high - seed) keep.low++;
         else keep.high--;
       }
-      const points = all.slice(keep.low, keep.high + 1);
-      const parentPoints = coords.slice(keep.low, keep.high + 1) as Vec2[];
+      const points = window().map((k) => all[k] as Vec3);
+      const parentPoints = window().map((k) => coords[k] as Vec2);
       const length = dist2(parentPoints[0] as Vec2, parentPoints[parentPoints.length - 1] as Vec2);
       const seedAt = seed - keep.low;
       const edgeLength = all.reduce((sum, p, k) => (k === 0 ? 0 : sum + distance3(p, all[k - 1] as Vec3)), 0);
@@ -431,9 +448,16 @@ export function buildChain(
           for (let k = 0; k + 1 < polyline.length; k++) {
             const [a, b] = [polyline[k] as Vec2, polyline[k + 1] as Vec2];
             const [sa, sb] = [side(a), side(b)];
-            if (!(sa * sb < 0)) continue;
+            if ((sa === 0 && sb === 0) || (sa > 0 && sb > 0) || (sa < 0 && sb < 0)) continue;
             const t = sa / (sa - sb);
             const cut: Vec2 = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+            // a crossing counts where the parent face is: not on the part of the endless line beyond the cut lines to its earlier joins
+            if (
+              !join.parent.clips.every(
+                (clip) => (cut[0] - clip.point[0]) * clip.normal[0] + (cut[1] - clip.point[1]) * clip.normal[1] >= -1e-9,
+              )
+            )
+              continue;
             const along = ((cut[0] - first[0]) * direction[0] + (cut[1] - first[1]) * direction[1]) / length;
             if (along < -1e-6 || along > 1 + 1e-6)
               return fail(
@@ -458,9 +482,23 @@ export function buildChain(
       const parentClip: HalfPlane = { point: first, normal: [parentSide * normal[0], parentSide * normal[1]] };
       const childClip: HalfPlane = { point: first, normal: [-parentSide * normal[0], -parentSide * normal[1]] };
       const parent = join.parent;
-      const slack = developableJoin ? 0 : Math.max(candidate.residual, gap);
-      placed.set(parent.session.face, { ...parent, clips: [...parent.clips, parentClip], slack: Math.max(parent.slack, slack) });
-      placed.set(child.face, { session: child, chart: unfolded.chart, orientation, clips: [childClip], probe: probeOf(child), slack });
+      const slack = developableJoin ? 0 : Math.max(candidate.residual, gap, bend);
+      const joined = slack > 0 ? [points] : [];
+      placed.set(parent.session.face, {
+        ...parent,
+        clips: [...parent.clips, parentClip],
+        slack: Math.max(parent.slack, slack),
+        joins: [...parent.joins, ...joined],
+      });
+      placed.set(child.face, {
+        session: child,
+        chart: unfolded.chart,
+        orientation,
+        clips: [childClip],
+        probe: probeOf(child),
+        slack,
+        joins: joined,
+      });
       edges.push({
         edge: join.edge,
         faces: [parent.session.face, child.face],

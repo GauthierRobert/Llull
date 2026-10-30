@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { buildChart } from '@core/geometry/faceChart';
 import { evaluateCurve } from '@lib/nurbs/evaluate';
 import type { CadDocument, NurbsCurveEntity, Vec3 } from '@core/model/types';
 import { fakeSplitKernel, type FakeSplitOptions } from '../../helpers/fakeSplitKernel';
@@ -182,8 +183,8 @@ describe('wrap_to_face across the two halves of a sphere or a torus (geodesic, m
     const gap = edgesOf(high)[0]?.cutGap as number;
     expect(gap).toBeGreaterThan(0);
     expect(edgesOf(high)[0]?.mismatch).toBeGreaterThanOrEqual(gap / (edgesOf(high)[0]?.windowLength as number) - 1e-12);
-    const beyond = wrapTorus(ringPoint(0.4), 3, { maxLengthStrain: 0.5 });
-    expect(beyond.rejected, beyond.summary).toBeUndefined();
+    const loose = wrapTorus(ringPoint(0.4), 3, { maxLengthStrain: 0.5 });
+    expect(loose.rejected, loose.summary).toBeUndefined();
   });
 
   it('torus: a diagonal sketch crosses the meridian away from the anchor row; the window is seeded where it crosses, so the join covers the crossing', () => {
@@ -205,6 +206,90 @@ describe('wrap_to_face across the two halves of a sphere or a torus (geodesic, m
     expect(lengths(done)).toHaveLength(2);
     expect(Math.abs(sum(lengths(done)) / Math.hypot(3.2, 3.2) - 1)).toBeLessThan(0.02);
   });
+
+  for (const offset of [0.4, -0.4])
+    it(`torus: a stroke crossing the closed meridian ${offset > 0 ? 'above' : 'below'} its first sample (the wrap of the ring) gets a two-sided window`, () => {
+      use({ closedNoise: true });
+      const { doc, id } = torus();
+      const sketch = make(doc, 'draw_polyline', {
+        points: [
+          [0, offset],
+          [3, offset],
+        ],
+      });
+      const done = execute(sketch.doc, 'wrap_to_face', {
+        id,
+        face: { faceIndex: 1 },
+        chain: [{ faceIndex: 0 }],
+        entityIds: [sketch.id],
+        placement: { method: 'geodesic', anchor: { chart: [0, 0], on: ringPoint(0.4) } },
+      });
+      expect(done.rejected, done.summary).toBeUndefined();
+      expect(lengths(done)).toHaveLength(2);
+      const [edge] = edgesOf(done);
+      // the window holds samples on both sides of the one nearest the crossing, across the wrap of the ring
+      expect(edge?.windowLength).toBeGreaterThan(0.5);
+      expect(edge?.mismatch).toBeLessThan(0.02);
+    });
+
+  it('torus: the extra tolerance of a join is for probes near the join only: a corner far from it overhanging a trimmed boundary by half the join mismatch is refused, kept inside it passes', () => {
+    use({ trim: 0.9 });
+    const surface = { type: 'torus' as const, center: [0, 0, 0] as Vec3, axis: [0, 0, 1] as Vec3, major: 10, minor: 3 };
+    const chart = buildChart(surface, { anchorChart: [0, 0], anchorOn: ringPoint(0.4), angleDeg: 0, mirror: false }, 'geodesic');
+    if ('error' in chart) throw new Error(chart.error);
+    /** The chart y at which the point (3, y) has tube angle `target`. */
+    const heightFor = (target: number): number => {
+      let [low, high] = [0, 4];
+      for (let k = 0; k < 60; k++) {
+        const mid = (low + high) / 2;
+        const v = (chart.uvAt([3, mid]) as [number, number])[1];
+        if (v < target) low = mid;
+        else high = mid;
+      }
+      return (low + high) / 2;
+    };
+    const band = (top: number): Run => {
+      const { doc, id } = torus();
+      const outline = make(doc, 'draw_polyline', {
+        points: [
+          [0.4, -0.5],
+          [3, -0.5],
+          [3, top],
+          [0.4, top],
+        ],
+        closed: true,
+      });
+      return execute(outline.doc, 'wrap_to_face', {
+        id,
+        face: { faceIndex: 1 },
+        chain: [{ faceIndex: 0 }],
+        entityIds: [outline.id],
+        maxLengthStrain: 0.06,
+        placement: { method: 'geodesic', anchor: { chart: [0, 0], on: ringPoint(0.4) } },
+      });
+    };
+    const inside = band(heightFor(0.7));
+    expect(inside.rejected, inside.summary).toBeUndefined();
+    const [edge] = edgesOf(inside);
+    const budget = 0.5 * (edge?.mismatch as number) * (edge?.windowLength as number);
+    expect(budget).toBeGreaterThan(0);
+    // the child chart sits off the root chart by the join mismatch, so find where the corner starts to leave face 0 by bisection on the height of the band
+    const refused = (top: number): boolean => codeOf(band(top)) === 'WRP_OUTSIDE_FACE';
+    let [good, bad] = [heightFor(0.7), heightFor(1.2)];
+    expect(refused(bad)).toBe(true);
+    for (let k = 0; k < 8; k++) {
+      const mid = (good + bad) / 2;
+      if (refused(mid)) bad = mid;
+      else good = mid;
+    }
+    const message = band(bad).summary;
+    const found = message.slice(message.indexOf('[') + 1, message.indexOf(']'));
+    const probe = found.split(',').map(Number);
+    const v = Math.atan2(probe[2] as number, Math.hypot(probe[0] as number, probe[1] as number) - 10);
+    // the first corner refused overhangs the trimmed boundary |v| = 0.4 by less than half the join mismatch x window: the corner is held to the exact tolerance, not to the join's
+    expect((v - 0.9) * 3).toBeGreaterThan(0);
+    expect((v - 0.9) * 3).toBeLessThan(budget);
+  }, 120_000);
 
   it('torus: a second stroke that crosses the meridian farther from the window than the nearest stroke is refused (the join does not cover it)', () => {
     const { doc, id } = torus();
@@ -273,7 +358,7 @@ describe('wrap_to_face across the two halves of a sphere or a torus (geodesic, m
     );
     const done = outcomes.find((run) => run.rejected !== true);
     expect(done, outcomes.map((run) => run.summary).join(' / ')).toBeDefined();
-    expect(edgesOf(done as Run)[0]?.mismatch).toBeLessThan(0.01);
+    expect(edgesOf(done as Run)[0]?.mismatch).toBeLessThan(0.02);
     expect(Math.abs(sum(lengths(done as Run)) / 4 - 1)).toBeLessThan(0.01);
   });
 

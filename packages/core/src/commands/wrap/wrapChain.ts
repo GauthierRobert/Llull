@@ -95,7 +95,10 @@ export function runWrapChain(input: ChainWrap): CommandResult {
     const pieces = mapped.map((curve) => curve.pieces);
     const overlap = checkWrapAround(face.chart, pieces, params.entityIds);
     if (overlap !== null) return fail(overlap.code, `face ${face.session.face}: ${overlap.message}`, overlap.ids);
-    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds, face.slack);
+    const outside = checkOnFace(face.session, probePoints(face.chart, pieces, MAX_PROBES), params.entityIds, {
+      slack: face.slack,
+      joins: face.joins,
+    });
     if (outside !== null) return fail(outside.code, `face ${face.session.face}: ${outside.message}`, outside.ids);
     let length = 0;
     for (const curve of mapped) {
