@@ -213,6 +213,22 @@ export interface DeformReport {
   /** Smallest det J found on the surface of the body. */
   readonly minDeterminant: number;
   readonly volume: number;
+  /** `output.preserveAnalytic`: what the rebuild of analytic faces found (01 DEF §17.11). Absent when it was not asked. */
+  readonly analyticFaces?: AnalyticFaces;
+}
+
+/** Faces of an exact deformation rebuilt on an analytic surface: counts per surface type, the B-spline faces looked at, and the largest deviation of a rebuilt face. */
+interface AnalyticFaces {
+  readonly tried: number;
+  readonly plane: number;
+  readonly cylinder: number;
+  readonly cone: number;
+  readonly sphere: number;
+  /** Recognised through the analytic surface of their source face (a twisted cylinder: its parameterisation moved, so OCCT alone does not see it). */
+  readonly fromSource: number;
+  /** Recognised but the rebuilt face was not a valid face: kept as fitted. */
+  readonly rejected: number;
+  readonly gap: number;
 }
 
 /** One cross-section of a blend face (BLD M1): the contact points on both sides, the section mid point, and the circle through the three. */

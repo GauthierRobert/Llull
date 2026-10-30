@@ -409,3 +409,69 @@ fn two_separated_local_features_are_both_resolved_with_graded_nodes() {
     assert!(gain_one > 1.0, "the first bump adds volume {gain_one}");
     assert!(relative(gain_two, 2.0 * gain_one) < 1e-4, "two bumps {gain_two} vs twice one {}", 2.0 * gain_one);
 }
+
+/// The faces of the exact warp of `tree`, as (surface kind, face geometry): `preserveAnalytic` asked.
+fn faces_of(tree: &Value) -> (Value, Vec<(String, Value)>) {
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(tree).expect("evaluates").expect("the warp builds");
+    let report = evaluator.deform_report(tree).expect("report");
+    let count = crate::queries::topology(&shape).unwrap()["faces"].as_array().unwrap().len();
+    let faces = (0..count).map(|i| {
+        let geometry = crate::queries::face_geometry(&shape, i as f64).unwrap();
+        (geometry["surface"]["type"].as_str().unwrap_or("").to_string(), geometry)
+    });
+    (report, faces.collect())
+}
+
+#[test]
+fn preserve_analytic_turns_the_tapered_cylinder_back_into_a_cone() {
+    // VC-DEF-23: the VC-06 frustum (r 5 -> 2 over h 40) is one cone face of half angle atan(3 / 40) with two planar caps
+    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
+    let mut tapered =
+        node(&pin, json!({ "kind": "taper", "scaleEnd": 0.4, "flat": false }), Some(span(0.0, 40.0, "linear")), 1e-4, [0.0, 0.0, -20.0]);
+    tapered["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&tapered);
+    assert_eq!(report["ok"], json!(true), "{report}");
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "cone").count(), 1, "{kinds:?} {report}");
+    assert_eq!(kinds.iter().filter(|k| **k == "plane").count(), 2, "{kinds:?}");
+    assert_eq!(report["analyticFaces"]["cone"], json!(1));
+    let cone = faces.iter().find(|(kind, _)| kind == "cone").unwrap();
+    let angle = cone.1["surface"]["semiAngle"].as_f64().unwrap().to_degrees();
+    assert!((angle - 4.28915332882).abs() < 1e-6, "half angle {angle}");
+}
+
+#[test]
+fn preserve_analytic_keeps_a_twisted_cylinder_a_cylinder_and_leaves_the_twisted_box_sides_free_form() {
+    // VC-DEF-23: a twist about the axis of a cylinder is a rotation of every circle: one cylinder face, two planar caps
+    let pin = entity("cylinder", json!({ "radius": 5, "height": 40 }));
+    let mut twisted = node(&pin, json!({ "kind": "twist", "angleRad": 1.2 }), Some(span(0.0, 40.0, "linear")), 1e-4, [0.0, 0.0, -20.0]);
+    twisted["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&twisted);
+    let kinds: Vec<&str> = faces.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "cylinder").count(), 1, "{kinds:?} {report}");
+    assert_eq!(report["analyticFaces"]["cylinder"], json!(1));
+    // the sides of a twisted box are not planes: only the caps are recognised, the report says what it looked at
+    let mut bar = node(
+        &entity("box", json!({ "size": [10, 10, 40], "position": [0, 0, 20] })),
+        json!({ "kind": "twist", "angleRad": 1.2 }),
+        Some(span(0.0, 40.0, "linear")),
+        1e-4,
+        [0.0; 3],
+    );
+    bar["output"]["preserveAnalytic"] = json!(true);
+    let (report, faces) = faces_of(&bar);
+    let planes = faces.iter().filter(|(kind, _)| kind == "plane").count();
+    assert_eq!(planes, 2, "{report}");
+    assert_eq!(report["analyticFaces"]["plane"], json!(2));
+    assert_eq!(report["analyticFaces"]["tried"], json!(6));
+    // the same body without the flag keeps B-spline faces only, and the volumes agree
+    let plain = build(&node(
+        &entity("box", json!({ "size": [10, 10, 40], "position": [0, 0, 20] })),
+        json!({ "kind": "twist", "angleRad": 1.2 }),
+        Some(span(0.0, 40.0, "linear")),
+        1e-4,
+        [0.0; 3],
+    ));
+    assert!(relative(report["volume"].as_f64().unwrap(), plain.volume) < 1e-6);
+}

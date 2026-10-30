@@ -550,7 +550,7 @@ A kernel refusal keeps the core warp's own code (`DEF_BUDGET_EXCEEDED`, `DEF_FRA
 ## 14. As built (DES-1b: M2 to M5, 2026-10-24)
 
 **Done.** M2 exact OCCT warp, M3 lattice / point / flow along a curve, M4 flow on a surface, M5 curve to curve and morph. Not done: `preserveAnalytic`
-(VC-DEF-23, still `DEF_EXACT_UNAVAILABLE`), the UI overlays of M4 (`src/ui` untouched), B-spline lattices and oriented boxes (M5).
+(VC-DEF-23: done in §17.11), the UI overlays of M4 (`src/ui` untouched), B-spline lattices and oriented boxes (M5).
 
 **Commands added.** `deform_lattice`, `deform_by_point`, `flow_along_curve`, `flow_on_surface`, `deform_curve_to_curve`, `morph_bodies` (meshes are morphed through their placed, world-coordinate vertices; toolset `3d`). All
 deformation commands take `ids` (several bodies, one feature step) and `keepSource`. `bend_body` accepts up to 360 degrees; a bend that closes the whole body is a ring
@@ -923,3 +923,26 @@ Tests: `blend_tests.rs` `the_blend_union_keeps_the_adaptive_mass_rule_of_its_ope
 **Bisect of the slow VC-DEF-17 (exact path).** Release sidecar, test alone: `feat/des-7d` base about 5 s (28 s file duration with transforms), 68eeabc2 (per-interval fit) about 5 s, 7d0616e8 as first committed about 63 s.
 Cause: the cell-middle rule ran whenever a cell deviated, also when an axis error already explained it, so a global law (the plate wrapped on a drum) refined the other direction too and the tensor grid grew.
 The rule now applies only when neither axis error exceeds the tolerance (the cell-only case), as before; the time is back to about 5 s (file 16 s), the 30 native server tests pass at the default timeouts (49 s against 113 s).
+
+### 17.11 `output.preserveAnalytic` (FR-DEF-12, VC-DEF-23)
+
+Until now `true` was refused (`DEF_EXACT_UNAVAILABLE`). The exact warp (`cpp/deform_recognise.cxx`) now rebuilds the faces that are still a plane, cylinder, cone or sphere after the warp:
+
+- **Recognition.** Every face the warp fitted (a B-spline) is tried with `ShapeAnalysis_CanonicalRecognition` (plane, cylinder, cone, sphere, in that order) at a quarter of the tolerance. OCCT looks at the surface by itself, so it
+  misses a face whose parameterisation moved (a cylinder twisted about its axis: the helical iso-lines defeat it, at any tolerance tried). A face it does not recognise is therefore also tried against the analytic surface
+  of its SOURCE face (`origin`: result face -> source face, from the modifier history): sample points of the fitted face (13 x 13) are projected on it and the face takes it when none is farther than the same quarter
+  tolerance (a twist about the axis keeps the cylinder, a stretch along it too, a plane normal to the axis stays that plane). `fromSource` counts those.
+- **Rebuild.** The face is made again on the analytic surface with the same wires (the 3D edges stay shared with the neighbours). The surface is turned to the side of the fitted one, so the face keeps its orientation and the
+  wires theirs; the wires are read without the face's orientation (read with it, a reversed face is reversed twice: the `BadOrientationOfSubshape` of the first attempt). The curves on the new surface are projected
+  (exactly on a plane, `BRepLib::BuildPCurveForEdgeOnPlane`; `ShapeFix_Face` otherwise), `SameParameter` runs, and the face must pass `BRepCheck_Analyzer` alone (else it is kept as fitted and counted in `rejected`).
+  The faces are replaced with `ShapeBuild_ReShape`; the naming history follows the replacement, so the face names are unchanged.
+- **Guard.** The result must stay valid and its volume may move by at most tolerance / 2 x area (a rebuilt face deviates by at most a quarter tolerance); otherwise `DEF_KERNEL_REFUSED` says so.
+- **Report.** `DeformReport.analyticFaces` and the command data `analyticFaces`: faces tried, rebuilt per type, `fromSource`, `rejected` (+ `rejectedStatus`, the first BRepCheck status), `gap` (largest deviation of a rebuilt
+  face). Torus faces are not recognised (`ShapeAnalysis_CanonicalRecognition` has no torus), nor are edge curves (they stay B-splines).
+- **Refused by name** (`DEF_EXACT_UNAVAILABLE`, `params.output.preserveAnalytic`): mode `mesh`, a mesh kernel or a faceted source, a sidecar without the capability `deform-analytic`, a linear scale (the affine law goes
+  through `gtransform`, which has no rebuild), an exact warp that was refused and fell back to the faceted path.
+- **VC-DEF-23.** The VC-06 taper (r 5 -> 2, h 40): one cone face of half angle 4.289154 degrees (closed form 4.289153, difference < 1e-6) and two planar caps, volume 1633.6292 (VC-06: 1633.62818, 6e-7); a twisted
+  cylinder: one cylinder (`fromSource` 1) and two planes; a twisted box: the two caps become planes, the four twisted sides stay free-form (6 faces tried, 2 rebuilt).
+
+Tests: `deform_tests.rs` (`preserve_analytic_turns_the_tapered_cylinder_back_into_a_cone`, `preserve_analytic_keeps_a_twisted_cylinder_a_cylinder_...`; red-proof: with the rebuild switched off the faces stay
+"other" and both fail), `server/tests/nativeKernelAnalytic.test.ts` (the command, the topology kinds, the half angle, the refusals), the tool-schema snapshot (the `preserveAnalytic` description).

@@ -53,6 +53,7 @@
 #include <gp_Pln.hxx>
 
 #include "llull-kernel-occt/cpp/deform_fit.hxx"
+#include "llull-kernel-occt/cpp/deform_recognise.hxx"
 #include "llull-kernel-occt/cpp/deform_spec.hxx"
 #include "llull-kernel-occt/cpp/deform_topology.hxx"
 #include "llull-kernel-occt/cpp/json_writer.hxx"
@@ -91,6 +92,8 @@ struct Stats {
   double fixed_tolerance = 0;
   double volume = 0;
   bool failed = false;  // an approximation failed inside the modification
+  bool preserve = false;  // preserveAnalytic was asked: the report says what was recognised
+  deform::Recognised recognised;
 };
 
 void publish(const Stats &stats) {
@@ -111,6 +114,19 @@ void publish(const Stats &stats) {
   json.key("fixedTolerance").number(stats.fixed_tolerance);
   json.key("minDeterminant").number(stats.min_determinant);
   json.key("volume").number(stats.volume);
+  if (stats.preserve) {
+    json.key("analyticFaces").begin_object();
+    json.key("tried").integer(stats.recognised.tried);
+    json.key("fromSource").integer(stats.recognised.from_source);
+    json.key("rejected").integer(stats.recognised.rejected);
+    json.key("rejectedStatus").integer(stats.recognised.status);
+    json.key("plane").integer(stats.recognised.plane);
+    json.key("cylinder").integer(stats.recognised.cylinder);
+    json.key("cone").integer(stats.recognised.cone);
+    json.key("sphere").integer(stats.recognised.sphere);
+    json.key("gap").number(stats.recognised.worst_gap);
+    json.end_object();
+  }
   json.end_object();
   g_report = json.text();
 }
@@ -121,6 +137,13 @@ std::unique_ptr<Shape> refuse(Stats &stats, const char *code, const std::string 
   stats.message = message;
   publish(stats);
   return nullptr;
+}
+
+// Area of the faces of `shape` (default Gauss rule): bounds the volume a deviation of at most the tolerance can move.
+double surface_area(const TopoDS_Shape &shape) {
+  GProp_GProps properties;
+  BRepGProp::SurfaceProperties(shape, properties);
+  return properties.Mass();
 }
 
 class WarpModification : public BRepTools_Modification {
@@ -320,6 +343,27 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
     volume = -volume;
   }
   stats.volume = volume;
+  stats.preserve = preserve;
+  TopTools_DataMapOfShapeShape replaced;
+  if (preserve) {
+    TopTools_DataMapOfShapeShape origin;
+    if (!stats.ring) {
+      TopTools_IndexedMapOfShape source_faces;
+      TopExp::MapShapes(source, TopAbs_FACE, source_faces);
+      for (int f = 1; f <= source_faces.Extent(); ++f)
+        for (TopTools_ListIteratorOfListOfShape image(modifier.Modified(source_faces(f))); image.More(); image.Next()) origin.Bind(image.Value(), source_faces(f));
+    }
+    const TopoDS_Shape analytic = deform::recognise_analytic(result, 0.25 * tolerance, origin, stats.recognised, replaced);
+    if (stats.recognised.total() > 0) {
+      BRepLib::SameParameter(analytic, tolerance, Standard_True);
+      const double rebuilt_volume = signed_volume(analytic);
+      if (!BRepCheck_Analyzer(analytic, Standard_True).IsValid() || !(std::abs(rebuilt_volume - volume) <= 0.5 * tolerance * surface_area(result) + 1e-9 * volume))
+        return refuse(stats, "DEF_KERNEL_REFUSED",
+                      "preserveAnalytic: valid=" + std::to_string(BRepCheck_Analyzer(analytic, Standard_True).IsValid()) + " v=" + std::to_string(rebuilt_volume) + " rebuilding " + std::to_string(stats.recognised.total()) + " recognised face(s) on their analytic surface gave an invalid B-rep or a volume change above the tolerance times the area");
+      result = analytic;
+      stats.volume = volume = rebuilt_volume;
+    }
+  }
   if (!(stats.min_determinant > kJacobianFloor))
     return refuse(stats, "DEF_FOLDOVER", "the map folds the body: det J reaches " + std::to_string(stats.min_determinant) + " on its surface");
   if (!(volume > 0)) return refuse(stats, "DEF_FOLDOVER", "the deformed shape has no positive volume (the map folds the body)");
@@ -331,7 +375,7 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
     TopExp::MapShapes(source, TopAbs_FACE, old_faces);
     for (int f = 1; f <= old_faces.Extent(); ++f) {
       for (TopTools_ListIteratorOfListOfShape image(modifier.Modified(old_faces(f))); image.More(); image.Next())
-        if (!image.Value().IsSame(old_faces(f))) history->AddModified(old_faces(f), image.Value());
+        if (!image.Value().IsSame(old_faces(f))) history->AddModified(old_faces(f), replaced.IsBound(image.Value()) ? replaced.Find(image.Value()) : image.Value());
     }
   }
   std::vector<std::string> names;

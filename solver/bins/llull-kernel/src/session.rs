@@ -93,6 +93,8 @@ fn info() -> Value {
         "deform-lattice-spline",
         // flowSurface laws with a base sheet table after the target's
         "deform-base-sheet",
+        // output.preserveAnalytic: faces that stayed a plane / cylinder / cone / sphere are rebuilt analytic (the report has `analyticFaces`)
+        "deform-analytic",
         "emboss",
     ]
     .into_iter()
@@ -357,6 +359,7 @@ mod tests {
             "deform-base-curve",
             "deform-lattice-spline",
             "deform-base-sheet",
+            "deform-analytic",
             "emboss",
         ] {
             assert!(capabilities.contains(&json!(name)), "{name}");
