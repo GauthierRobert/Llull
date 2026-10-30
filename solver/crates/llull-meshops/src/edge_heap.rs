@@ -216,7 +216,7 @@ impl EdgeHeap {
     pub fn smallest(&self, count: usize, out: &mut Vec<Candidate>) {
         use std::cmp::Reverse;
         out.clear();
-        let order = |at: usize| Reverse((rank(self.nodes[at].cost).to_bits(), self.meta[self.nodes[at].id as usize].edge, at));
+        let order = |at: usize| Reverse(((rank(self.nodes[at].cost) + 0.0).to_bits(), self.meta[self.nodes[at].id as usize].edge, at));
         let mut frontier = std::collections::BinaryHeap::new();
         if !self.nodes.is_empty() {
             frontier.push(order(0));
