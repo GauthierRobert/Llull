@@ -35,7 +35,13 @@ interface Slice {
 }
 
 /** Area and ∫ y dA of the section of an outward-wound closed mesh by the plane z = ζ (local coordinates), by Green's theorem over oriented segments. */
-function sectionAt(local: Float64Array, indices: ReadonlyArray<number>, heights: Float64Array, spans: Float64Array, zeta: number): Slice {
+export function sectionAt(
+  local: Float64Array,
+  indices: ReadonlyArray<number>,
+  heights: Float64Array,
+  spans: Float64Array,
+  zeta: number,
+): Slice {
   let area = 0;
   let moment = 0;
   let momentX = 0;

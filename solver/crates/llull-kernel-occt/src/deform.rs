@@ -111,6 +111,23 @@ fn law_numbers(law: &Value) -> Option<(f64, Vec<f64>)> {
             }
             let mut numbers = vec![number(law, "z0")?, number(law, "ratio")?, number(law, "step")?, (stations.len() / 12) as f64];
             numbers.extend(stations);
+            // the base curve (flow_along_curve baseCurve): station count (0: the frame axis), step, stations
+            match law.get("base") {
+                None => numbers.push(0.0),
+                Some(base) => {
+                    let table: Vec<f64> = base
+                        .get("stations")?
+                        .as_array()?
+                        .iter()
+                        .map(|value| value.as_f64().filter(|number| number.is_finite()))
+                        .collect::<Option<_>>()?;
+                    if table.len() < 24 || !table.len().is_multiple_of(12) {
+                        return None;
+                    }
+                    numbers.extend([(table.len() / 12) as f64, number(base, "step")?]);
+                    numbers.extend(table);
+                }
+            }
             Some((FLOW, numbers))
         }
         "flowSurface" => {

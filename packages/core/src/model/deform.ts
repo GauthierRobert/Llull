@@ -63,6 +63,12 @@ export type DeformLaw =
       readonly ratio: number;
       readonly step: number;
       readonly stations: ReadonlyArray<number>;
+      /**
+       * Base curve (flow_along_curve baseCurve), same table layout as the target in local frame coordinates, `step` apart in arc length: when present, a point
+       * is taken in the base frame at the arc length s where (q - P(s)) is perpendicular to T(s), offsets x = (q - P)·N, y = (q - P)·B, and goes to
+       * Pt(ratio (s - z0)) + x Nt + y Bt. Absent: the base is the frame axis (s = z).
+       */
+      readonly base?: { readonly step: number; readonly stations: ReadonlyArray<number> };
     }
   /**
    * Flow of a base plane onto a surface (flow_on_surface): the point (x, y, w) goes to P(x, y) + w N(x, y), x and y arc lengths on the target. P and N are tabulated on

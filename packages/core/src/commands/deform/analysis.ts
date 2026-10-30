@@ -69,6 +69,7 @@ const GRID = 21;
 /** World points of a regular grid over the part of the body extent the law acts in (point push: its support sphere box; lattice: its box; flow: all). */
 function zonePoints(node: DeformNode, extent: LocalExtent, warp: Warp): number[] {
   const { law } = node;
+  if (law.kind === 'flowCurve' && law.base !== undefined) return [];
   if (law.kind !== 'point' && law.kind !== 'lattice' && law.kind !== 'flowCurve' && law.kind !== 'flowSurface' && law.kind !== 'rbf')
     return [];
   const low: Vec3 = [0, 1, 2].map((a) =>
@@ -186,7 +187,10 @@ export function analyzeDeformed(
     node,
     path,
     extent,
-    range: jacobianRange(node, extent),
+    range:
+      node.law.kind === 'flowCurve' && node.law.base !== undefined
+        ? { min: sampling.sampled.min, max: sampling.sampled.max, minAt: sampling.sampled.minAt }
+        : jacobianRange(node, extent),
     sampled: sampling.sampled,
     maxDisplacement: sampling.maxDisplacement,
     volume: {

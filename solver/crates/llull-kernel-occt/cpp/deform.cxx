@@ -222,6 +222,16 @@ bool parse_spec(rust::Slice<const double> spec, Warp &warp, double &tolerance, b
         return false;
       }
       law.flow.stations.assign(p + 4, p + 4 + 12 * count);
+      // then the optional base curve: a station count (0 or absent: the frame axis), its step and its stations
+      const size_t base_count = n >= 5 + 12 * count ? static_cast<size_t>(p[4 + 12 * count]) : 0;
+      if (base_count > 0) {
+        if (base_count < 2 || !need(6 + 12 * count + 12 * base_count) || !(p[5 + 12 * count] > 0)) {
+          if (why.empty()) why = "flow base curve needs step > 0 and at least 2 stations";
+          return false;
+        }
+        law.flow.base_step = p[5 + 12 * count];
+        law.flow.base.assign(p + 6 + 12 * count, p + 6 + 12 * count + 12 * base_count);
+      }
       return true;
     }
     case LawKind::Rbf: {

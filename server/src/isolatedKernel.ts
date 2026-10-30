@@ -92,6 +92,7 @@ const FACE_QUERY_METHODS = [
 export function nativeSupportsDeform(capabilities: readonly string[], law: DeformLaw, region?: DeformRegion): boolean {
   if (!capabilities.includes(law.kind === 'affine' ? 'gtransform' : 'deform')) return false;
   if (law.kind !== 'affine' && !NATIVE_WARP_LAWS.has(law.kind)) return false;
+  if (law.kind === 'flowCurve' && law.base !== undefined && !capabilities.includes('deform-base-curve')) return false;
   return region?.infinite !== true || capabilities.includes('deform-infinite');
 }
 

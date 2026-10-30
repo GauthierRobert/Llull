@@ -10,6 +10,7 @@ import {
   bend,
   stretch,
   scaleNonUniform,
+  flowBaseArc,
   ffd,
   latticeOf,
   pointPush,
@@ -521,6 +522,34 @@ vectors.ffd = {
       : round(p),
   })),
 };
+// flow along a curve with a base curve: base arc of radius 50 in the xz plane; the points are given by (theta, offset toward the centre, y) so they stay inside the base
+for (const [name, params] of Object.entries({
+  flow_base_line: { baseRadius: 50, targetRadius: 0, ratio: 1, baseLength: 60, step: 0.2 },
+  flow_base_arc: { baseRadius: 50, targetRadius: 30, ratio: 1, baseLength: 60, step: 0.2 },
+  flow_base_line_stretch: { baseRadius: 50, targetRadius: 0, ratio: 2, baseLength: 60, step: 0.2 },
+})) {
+  const points = [];
+  for (const theta of [0.05, 0.4, 0.9, 1.1])
+    for (const [offset, y] of [
+      [-5, -3],
+      [0, 0],
+      [4, 6],
+    ]) {
+      const r = params.baseRadius - offset;
+      points.push([params.baseRadius - r * Math.cos(theta), y, r * Math.sin(theta)]);
+    }
+  vectors[name] = {
+    params,
+    points: points.map((p) => ({
+      in: round(p),
+      out: round(flowBaseArc(p, params)),
+      det: round(
+        jacobianDet((q) => flowBaseArc(q, params), p),
+        9,
+      ),
+    })),
+  };
+}
 save('point_vectors.json', { note: 'frame = world (origin 0, axis +z, reference +x); tolerance 1e-9 absolute', laws: vectors });
 
 // ---------------------------------------------------------------- mesh path refinement budget

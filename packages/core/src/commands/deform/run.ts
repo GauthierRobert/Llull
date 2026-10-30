@@ -6,7 +6,7 @@
  */
 
 import type { CadDocument, Entity, MeshData, Vec3 } from '../../model/types';
-import { JACOBIAN_FLOOR, type LocalExtent, jacobianRange } from '../../geometry/deform/bounds';
+import { JACOBIAN_FLOOR, jacobianRange, sampledRangeAt } from '../../geometry/deform/bounds';
 import type { DeformNode } from '../../geometry/deform/laws';
 import { MAX_WARP_TRIANGLES, estimateWarp, warpMesh } from '../../geometry/deform/meshWarp';
 import { findSelfIntersections } from '../../geometry/mesh/selfIntersection';
@@ -20,7 +20,7 @@ import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { changed } from '../noop';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defRejection } from './codes';
-import type { DeformRequest } from './request';
+import type { DeformPlan, DeformRequest } from './request';
 import { deformSheet } from './runSheet';
 import { NEXT_STEP } from './schema';
 import { type DeformTarget, type Refusal, defaultTolerance, isRefusal, isTarget, loadTarget } from './target';
@@ -97,9 +97,13 @@ function build(target: DeformTarget, node: DeformNode, useKernel: boolean): Buil
   };
 }
 
-function foldRefusal(node: DeformNode, extent: LocalExtent): Refusal | null {
+const rangeOfPlan = (node: DeformNode, plan: DeformPlan): ReturnType<typeof jacobianRange> =>
+  plan.samples === undefined ? jacobianRange(node, plan.extent) : sampledRangeAt(node, plan.samples);
+
+function foldRefusal(node: DeformNode, plan: DeformPlan): Refusal | null {
   if (node.law.kind === 'affine') return null;
-  const range = jacobianRange(node, extent);
+  const range = rangeOfPlan(node, plan);
+  const { extent } = plan;
   if (range.min > JACOBIAN_FLOOR) return null;
   const { law } = node;
   if (law.kind === 'bend') {
@@ -181,7 +185,7 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
     ...(plan.region === undefined ? {} : { region: plan.region }),
     output: { mode, tolerance, preserveAnalytic: false },
   };
-  const fold = foldRefusal(node, plan.extent);
+  const fold = foldRefusal(node, plan);
   if (fold !== null) return reject(fold);
   const { kernel } = target;
   const useKernel =
@@ -279,7 +283,7 @@ function deformOne(doc: CadDocument, ctx: ExecutionContext | undefined, request:
     },
     ...(plan.region === undefined ? {} : { region: plan.region }),
     tolerance: { value: tolerance, unit: doc.units, defaulted: output?.tolerance === undefined },
-    jacobian: { min: jacobianRange(node, plan.extent).min, max: jacobianRange(node, plan.extent).max },
+    jacobian: { min: rangeOfPlan(node, plan).min, max: rangeOfPlan(node, plan).max },
     triangles: built.mesh.indices.length / 3,
     volume: { ...volume, unit: `${doc.units}^3` },
     edgeLength: built.edgeLength,

@@ -34,6 +34,16 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
                 [header(4.0, params, region), vec![number(params, "radius"), symmetric]].concat()
             }
             "stretch" | "stretch_infinite" => [header(3.0, params, (region.0, region.1, 0.0)), vec![number(params, "factor")]].concat(),
+            "flow_base_line" | "flow_base_arc" | "flow_base_line_stretch" => {
+                let (ratio, length, step) = (number(params, "ratio"), number(params, "baseLength"), number(params, "step"));
+                let target = arc_stations(number(params, "targetRadius"), ratio * length, step);
+                let base = arc_stations(number(params, "baseRadius"), length, step);
+                let mut numbers = vec![0.0, ratio, step, (target.len() / 12) as f64];
+                numbers.extend(target);
+                numbers.extend([(base.len() / 12) as f64, step]);
+                numbers.extend(base);
+                [header(7.0, params, region), numbers].concat()
+            }
             "scale_nonuniform" => {
                 let f = params["factors"].as_array().unwrap();
                 let (x, y, z) = (f[0].as_f64().unwrap(), f[1].as_f64().unwrap(), f[2].as_f64().unwrap());
@@ -75,7 +85,7 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
             for axis in 0..3 {
                 let expected = point["out"][axis].as_f64().unwrap();
                 assert!(
-                    (images[3 * k + axis] - expected).abs() < 1e-9,
+                    (images[3 * k + axis] - expected).abs() < if name.starts_with("flow_base") { 1e-8 } else { 1e-9 },
                     "{name} point {k} axis {axis}: {} vs {expected}",
                     images[3 * k + axis]
                 );
@@ -83,7 +93,7 @@ fn the_law_library_matches_the_golden_vectors_of_the_pack() {
         }
         checked += 1;
     }
-    assert_eq!(checked, 15, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
+    assert_eq!(checked, 18, "every law of the pack except the flow onto a cylinder (the flow along a curve is tested against the bend)");
 }
 
 /// A region whose `start` and `end` only fix the rate: the law holds on the whole axis (`region.infinite`, 01 DEF §17.1).
@@ -188,4 +198,45 @@ fn an_infinite_taper_with_the_whole_body_past_its_zero_is_refused() {
     let tree =
         node(&pin, json!({ "kind": "taper", "scaleEnd": 3, "flat": false }), Some(endless(50.0, 60.0, "linear")), 1e-3, [0.0, 0.0, -20.0]);
     assert_eq!(refusal(&tree)["code"], json!("DEF_FOLDOVER"));
+}
+
+/// Stations (P, T, N, B) every `step` of arc length along an arc of `radius` in the xz plane (centre (R, 0, 0), normal toward it), or a line along +z for radius 0.
+fn arc_stations(radius: f64, length: f64, step: f64) -> Vec<f64> {
+    (0..=(length / step).round() as usize)
+        .flat_map(|k| {
+            let s = k as f64 * step;
+            if radius == 0.0 {
+                return vec![0.0, 0.0, s, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+            }
+            let t = s / radius;
+            vec![radius * (1.0 - t.cos()), 0.0, radius * t.sin(), t.sin(), 0.0, t.cos(), t.cos(), 0.0, -t.sin(), 0.0, 1.0, 0.0]
+        })
+        .collect()
+}
+
+#[test]
+fn a_bent_rod_flowed_from_its_own_arc_onto_a_line_is_straight_again() {
+    // quarter torus segment (R 50, r 5) built by the exact bend, then flowed with the bend's centreline as the base and a line as the target:
+    // det J = 1 / (1 - x / 50), so the volume is that of the straight rod, V = pi r^2 L, and it spans z in [-L/2, L/2] on the axis
+    let quarter = 50.0 * FRAC_PI_2;
+    let rod = entity("cylinder", json!({ "radius": 5, "height": quarter }));
+    let mut bent = node(
+        &rod,
+        json!({ "kind": "bend", "radius": 50, "symmetric": false }),
+        Some(span(0.0, quarter, "linear")),
+        1e-4,
+        [0.0, 0.0, -quarter / 2.0],
+    );
+    bent["frame"]["reference"] = json!([0, -1, 0]);
+    let step = 0.2;
+    let (target, base) = (arc_stations(0.0, quarter + 2.0, step), arc_stations(50.0, quarter + 2.0, step));
+    let flow = json!({
+        "kind": "flowCurve", "z0": 0.0, "ratio": 1.0, "step": step, "stations": target,
+        "base": { "step": step, "stations": base },
+    });
+    let straight = build(&node(&bent, flow, None, 1e-3, [0.0, 0.0, -quarter / 2.0]));
+    assert!(relative(straight.volume, PI * 25.0 * quarter) < 1e-4, "volume {}", straight.volume);
+    // bounds [min x y z, max x y z]: a straight rod of radius 5 along the axis, z from the frame origin up
+    assert!(straight.bounds[0] > -5.01 && straight.bounds[3] < 5.01, "{:?}", straight.bounds);
+    assert!((straight.bounds[5] - straight.bounds[2] - quarter).abs() < 0.02, "{:?}", straight.bounds);
 }

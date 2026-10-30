@@ -197,6 +197,25 @@ function sampledFlowRange(node: Pick<DeformNode, 'law' | 'region'>, extent: Loca
   return { min, max, minAt };
 }
 
+/** det J of a flow with a base curve over the body's own local points (flat xyz): the box of its extent is not the body, so the box grid cannot be used. */
+export function sampledRangeAt(node: Pick<DeformNode, 'law' | 'region'>, points: ReadonlyArray<number>, limit = 4000): JacobianRange {
+  let min = Infinity;
+  let max = -Infinity;
+  let minAt: Vec3 = [0, 0, 0];
+  const count = points.length / 3;
+  const stride = Math.max(1, Math.ceil(count / limit));
+  for (let v = 0; v < count; v += stride) {
+    const q: Vec3 = [points[v * 3] as number, points[v * 3 + 1] as number, points[v * 3 + 2] as number];
+    const value = localDeterminant(node.law, node.region ?? FLOW_REGION, q);
+    if (value < min) {
+      min = value;
+      minAt = q;
+    }
+    max = Math.max(max, value);
+  }
+  return { min, max, minAt };
+}
+
 export interface RegionCrease {
   readonly at: 'start' | 'end';
   readonly angleRad: number;

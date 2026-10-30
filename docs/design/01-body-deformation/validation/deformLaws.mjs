@@ -60,6 +60,22 @@ export function stretch([x, y, z], { factor: f, z0, z1, infinite = false }) {
   return [x, y, z + (f - 1) * (z1 - z0)];
 }
 
+/**
+ * Flow along a curve with a base curve (flow_along_curve baseCurve, TECHNICAL_SPEC §17.2), closed form for a base arc of radius `baseRadius` in the xz plane
+ * (centre (R, 0, 0), start at the origin, tangent +z, normal toward the centre) onto a target line along +z (`targetRadius` 0) or a target arc of
+ * `targetRadius` bending the same way. A point q lies at polar angle theta about the base centre and offset x = R - |q - centre| toward it; it goes to the
+ * target at arc length ratio R theta with the same offsets (x along the target normal, y along the binormal).
+ */
+export function flowBaseArc([x, y, z], { baseRadius: R, targetRadius: Rt = 0, ratio = 1 }) {
+  const dx = R - x;
+  const theta = Math.atan2(z, dx);
+  const offset = R - Math.hypot(dx, z);
+  const s = ratio * R * theta;
+  if (Rt === 0) return [offset, y, s];
+  const phi = s / Rt;
+  return [Rt * (1 - Math.cos(phi)) + offset * Math.cos(phi), y, Rt * Math.sin(phi) - offset * Math.sin(phi)];
+}
+
 /** Non-uniform scale about the frame origin. det = sx sy sz. */
 export const scaleNonUniform = ([x, y, z], { factors: [sx, sy, sz] }) => [sx * x, sy * y, sz * z];
 

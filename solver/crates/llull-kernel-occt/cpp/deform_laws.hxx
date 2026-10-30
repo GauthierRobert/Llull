@@ -108,9 +108,13 @@ struct Lattice {
 
 // Flow along a curve (flow.ts): stations of 12 numbers (P, T, N, B) at uniform arc length `step`; the point (x, y, z) goes to P(s) + x N(s) + y B(s),
 // s = ratio (z - z0), cubic Hermite on P and a normalised linear blend of the frames, straight beyond both ends.
+// With a base curve (flow_along_curve baseCurve) the same 12-number stations describe the base at uniform arc length `base_step`: a point is taken in the base
+// frame at the arc length s where (q - P(s)).T(s) = 0, with offsets (q - P).N and (q - P).B, and goes to the target at ratio (s - z0) with the same offsets.
 struct Flow {
   double z0 = 0, ratio = 1, step = 1;
   std::vector<double> stations;
+  double base_step = 0;
+  std::vector<double> base;  // empty: the base is the frame axis
 };
 
 // Flow of a base plane onto a surface (flowSurface.ts): P and N tabulated on a regular (x, y) grid, six numbers per node (i-major); bicubic Catmull-Rom,
@@ -255,20 +259,24 @@ inline Vec3J cross(const Vec3J &a, const Vec3J &b) { return {a[1] * b[2] - a[2] 
 inline Vec3J normalized(const Vec3J &a) { return a * reciprocal(sqrt(dot(a, a))); }
 inline Vec3J constant(const double *p) { return {Jet(p[0]), Jet(p[1]), Jet(p[2])}; }
 
-inline Vec3J flow_map(const Flow &flow, const Vec3J &q) {
-  const size_t count = flow.stations.size() / 12;
-  const double length = static_cast<double>(count - 1) * flow.step;
-  const Jet s = Jet(flow.ratio) * (q[2] - Jet(flow.z0));
+// P, T, N, B of a station table at arc length s (cubic Hermite on P, normalised linear blend of the frames, straight beyond both ends; flow.ts sampleAt).
+struct FlowSample {
+  Vec3J point, tangent, normal, binormal;
+};
+
+inline FlowSample flow_sample(const std::vector<double> &stations, double step, const Jet &s) {
+  const size_t count = stations.size() / 12;
+  const double length = static_cast<double>(count - 1) * step;
   const double clamped = std::min(std::max(s.v, 0.0), length);
-  const size_t k = std::min(static_cast<size_t>(std::floor(clamped / flow.step)), count - 2);
+  const size_t k = std::min(static_cast<size_t>(std::floor(clamped / step)), count - 2);
   const Jet inside = s.v < 0 ? Jet(0) : (s.v > length ? Jet(length) : s);
-  const Jet u = (inside - Jet(static_cast<double>(k) * flow.step)) * Jet(1 / flow.step);
-  const double *row0 = &flow.stations[k * 12];
-  const double *row1 = &flow.stations[(k + 1) * 12];
+  const Jet u = (inside - Jet(static_cast<double>(k) * step)) * Jet(1 / step);
+  const double *row0 = &stations[k * 12];
+  const double *row1 = &stations[(k + 1) * 12];
   const Jet u2 = u * u, u3 = u2 * u;
   const Jet h00 = Jet(2) * u3 - Jet(3) * u2 + Jet(1), h10 = u3 - Jet(2) * u2 + u, h01 = Jet(-2) * u3 + Jet(3) * u2, h11 = u3 - u2;
   const Jet d00 = Jet(6) * u2 - Jet(6) * u, d10 = Jet(3) * u2 - Jet(4) * u + Jet(1), d01 = Jet(-6) * u2 + Jet(6) * u, d11 = Jet(3) * u2 - Jet(2) * u;
-  const double h = flow.step;
+  const double h = step;
   Vec3J point = constant(row0) * h00 + constant(row0 + 3) * (h10 * Jet(h)) + constant(row1) * h01 + constant(row1 + 3) * (h11 * Jet(h));
   const Vec3J slope = constant(row0) * (d00 * Jet(1 / h)) + constant(row0 + 3) * d10 + constant(row1) * (d01 * Jet(1 / h)) + constant(row1 + 3) * d11;
   const Vec3J tangent = normalized(slope);
@@ -277,7 +285,62 @@ inline Vec3J flow_map(const Flow &flow, const Vec3J &q) {
   const Vec3J binormal = cross(tangent, normal);
   if (s.v < 0) point = point + tangent * s;
   else if (s.v > length) point = point + tangent * (s - Jet(length));
-  return point + normal * q[0] + binormal * q[1];
+  return {point, tangent, normal, binormal};
+}
+
+// The arc length s of the base table where q lies in the normal plane of the base (flow.ts projectOnBase: Newton from the nearest station).
+inline double project_on_base(const std::vector<double> &stations, double step, const double q[3], double *derivative_out = nullptr) {
+  const size_t count = stations.size() / 12;
+  const double length = static_cast<double>(count - 1) * step;
+  double s = 0, nearest = 1e300;
+  for (size_t k = 0; k < count; ++k) {
+    double distance = 0;
+    for (int a = 0; a < 3; ++a) {
+      const double gap = q[a] - stations[k * 12 + static_cast<size_t>(a)];
+      distance += gap * gap;
+    }
+    if (distance < nearest) {
+      nearest = distance;
+      s = static_cast<double>(k) * step;
+    }
+  }
+  const double h = 1e-4 * step;
+  double derivative = -1;
+  for (int iteration = 0; iteration < 40; ++iteration) {
+    const FlowSample here = flow_sample(stations, step, Jet(s));
+    const FlowSample ahead = flow_sample(stations, step, Jet(s + h));
+    const FlowSample behind = flow_sample(stations, step, Jet(s - h));
+    double along = 0, bend = 0;
+    for (size_t a = 0; a < 3; ++a) {
+      const double gap = q[a] - here.point[a].v;
+      along += gap * here.tangent[a].v;
+      bend += gap * ((ahead.tangent[a].v - behind.tangent[a].v) * (1 / (2 * h)));
+    }
+    derivative = -1 + bend;
+    if (std::fabs(derivative) < 1e-12) break;
+    const double move = along / derivative;
+    s -= move;
+    if (std::fabs(move) < 1e-13 * (1 + length)) break;
+  }
+  if (derivative_out != nullptr) *derivative_out = derivative;
+  return s;
+}
+
+inline Vec3J flow_map(const Flow &flow, const Vec3J &q) {
+  if (flow.base.empty()) {
+    const FlowSample at = flow_sample(flow.stations, flow.step, Jet(flow.ratio) * (q[2] - Jet(flow.z0)));
+    return at.point + at.normal * q[0] + at.binormal * q[1];
+  }
+  const double point[3] = {q[0].v, q[1].v, q[2].v};
+  double derivative = -1;
+  Jet arc(project_on_base(flow.base, flow.base_step, point, &derivative));
+  // implicit derivative of the projection: ds = T.dq / (1 - gap.T'), the same Jet direction as q
+  const FlowSample own = flow_sample(flow.base, flow.base_step, arc);
+  for (size_t a = 0; a < 3; ++a) arc.a += own.tangent[a].v * q[a].a / -derivative;
+  const FlowSample base = flow_sample(flow.base, flow.base_step, arc);
+  const Vec3J gap = q - base.point;
+  const FlowSample at = flow_sample(flow.stations, flow.step, Jet(flow.ratio) * (arc - Jet(flow.z0)));
+  return at.point + at.normal * dot(gap, base.normal) + at.binormal * dot(gap, base.binormal);
 }
 
 inline void catmull_rom(const Jet &t, Jet out[4]) {
