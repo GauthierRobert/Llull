@@ -3,13 +3,14 @@
 import { decimateMesh } from './decimate';
 import { symmetricDeviation } from './deviation';
 import { segmentMesh } from './segment';
-import { sculptMesh } from './sculpt';
+import { SCULPT_MAX_TRIANGLES, sculptMesh } from './sculpt';
 import {
   DECIMATE_DESCRIPTION,
   FILL_HOLES_DESCRIPTION,
   REMESH_DESCRIPTION,
   editableProblem,
   repairDescription,
+  sculptDescription,
   smoothDescription,
 } from './editable';
 import {
@@ -150,6 +151,11 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
     }
     case 'sculpt': {
       const result = sculptMesh(mesh, op);
+      if ('tooLarge' in result)
+        return failure(
+          'MESH_SCULPT_RESULT_TOO_LARGE',
+          `the refined surface passed ${result.tooLarge} triangles (limit ${op.maxTriangles ?? SCULPT_MAX_TRIANGLES}): use a longer refineEdge, or sculpt a smaller region`,
+        );
       if (result.offSurface !== null)
         return failure(
           'MESH_SCULPT_STAMP_OFF_SURFACE',
@@ -166,10 +172,7 @@ export function runEditOp(input: MeshInput, op: EditOp): MeshOpResult | MeshEngi
           refinedEdges: result.refinedEdges,
           stampsApplied: result.stampsApplied,
         },
-        provenance: provenance(
-          `sculpt brush ${op.brush}: falloff-weighted displacement of the vertices within the radius of each stamp, stamps in order, mirrored in the same pass`,
-          'Blender sculpt brush definitions (draw, inflate, grab, smooth, flatten, pinch, crease, layer); TECHNICAL_SPEC 5.7',
-        ),
+        provenance: provenance(sculptDescription(op.brush).algorithm, sculptDescription(op.brush).reference),
       };
     }
     case 'cut': {

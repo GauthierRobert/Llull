@@ -1,12 +1,13 @@
 /**
- * The engine-side rules that the native `remesh` and `analyze` (DES-7c step 7, TECHNICAL_SPEC 13.12) share with the TypeScript engine: the triangle limit of a
- * remesh refuses alike in both, and a native analysis is checked field by field before a command uses it.
+ * The engine-side rules that the native `remesh`, `analyze`, `repair`, `fill_holes` and `sculpt` (DES-7c step 7, TECHNICAL_SPEC 13.12 to 13.14) share with the TypeScript
+ * engine: the triangle limit of a remesh and of a sculpt refinement refuses alike in both, and a native report is checked field by field before a command uses it.
  */
 
 import { describe, expect, it } from 'vitest';
 import { analyzeIndexedMesh, isMeshAnalysis } from '@core/geometry/mesh/analysis';
 import { isEngineFailure, type MeshOp } from '@core/geometry/mesh/engineTypes';
-import { isFillReport, isRepairReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
+import { SCULPT_MAX_TRIANGLES, sculptMesh } from '@core/geometry/mesh/sculpt';
 import { REMESH_MAX_TRIANGLES, remeshMesh } from '@core/geometry/mesh/remesh';
 import { tsMeshEngine } from '@core/geometry/mesh/tsEngine';
 import { icosphere } from '../../helpers/meshFixtures';
@@ -155,5 +156,127 @@ describe('isRepairReport and isFillReport', () => {
     ['a skipped loop without its edges', broken(skipped.report, (r) => delete hole(r, 'skipped')['edges'])],
   ])('isFillReport refuses %s', (_name, value) => {
     expect(isFillReport(value, 'curvature')).toBe(false);
+  });
+});
+
+describe('the sculpt refinement triangle limit', () => {
+  const sphere = icosphere(10, 2);
+  const op: Extract<MeshOp, { op: 'sculpt' }> = {
+    op: 'sculpt',
+    brush: 'draw',
+    stamps: [[0, 0, 10]],
+    radius: 5,
+    strength: 0.2,
+    falloff: 'smooth',
+    direction: 'area_normal',
+    taubin: false,
+    refineEdge: 0.05,
+  };
+
+  it('stops the splitting and refuses with MESH_SCULPT_RESULT_TOO_LARGE, naming the size reached and the limit', () => {
+    const result = tsMeshEngine.run({ mesh: sphere }, { ...op, maxTriangles: 3000 });
+    expect(result).toMatchObject({ code: 'MESH_SCULPT_RESULT_TOO_LARGE', message: expect.stringContaining('(limit 3000)') });
+    const reached = Number(/passed (\d+) triangles/.exec((result as { message: string }).message)?.[1]);
+    expect(reached).toBeGreaterThan(3000);
+    expect(reached).toBeLessThan(40_000);
+  });
+
+  it('is part of the result of the library function; a refinement within the limit reports none, and the default is 4,000,000', () => {
+    expect(sculptMesh(sphere, { ...op, maxTriangles: 3000 })).toEqual({ tooLarge: expect.any(Number) });
+    expect(sculptMesh(sphere, { ...op, refineEdge: 1, maxTriangles: 3000 })).not.toHaveProperty('tooLarge');
+    expect(SCULPT_MAX_TRIANGLES).toBe(4_000_000);
+    expect(tsMeshEngine.run({ mesh: sphere }, { ...op, refineEdge: 1 })).not.toHaveProperty('code');
+  });
+});
+
+describe('isSculptReport', () => {
+  const sphere = icosphere(10, 3);
+  const op: Extract<MeshOp, { op: 'sculpt' }> = {
+    op: 'sculpt',
+    brush: 'inflate',
+    stamps: [
+      [0, 0, 10],
+      [2, 1, 9.7],
+    ],
+    radius: 3,
+    strength: 0.3,
+    falloff: 'smooth',
+    direction: 'area_normal',
+    taubin: false,
+    symmetry: 'yz',
+    refineEdge: 0.5,
+  };
+  const omit = (source: typeof op, ...keys: Array<'symmetry' | 'refineEdge'>): typeof op => {
+    const copy = { ...source };
+    for (const key of keys) delete copy[key];
+    return copy;
+  };
+  const answer = tsMeshEngine.run({ mesh: sphere }, op);
+  if (isEngineFailure(answer)) throw new Error('the oracle failed');
+  type Json = Record<string, unknown>;
+  const broken = (change: (copy: Json) => void = () => undefined): Json => {
+    const copy = JSON.parse(JSON.stringify(answer.report)) as Json;
+    change(copy);
+    return copy;
+  };
+
+  it('accepts what the TypeScript engine reports, also after a round trip through JSON', () => {
+    expect(answer.report).toMatchObject({ stampsApplied: 3 });
+    expect((answer.report as { refinedEdges: number }).refinedEdges).toBeGreaterThan(0);
+    expect(isSculptReport(broken(), op)).toBe(true);
+    // no symmetry plane: the symmetry error is null and one stamp is one application
+    const bare = omit(op, 'symmetry', 'refineEdge');
+    const plain = tsMeshEngine.run({ mesh: sphere }, bare);
+    expect(isSculptReport(JSON.parse(JSON.stringify((plain as { report: unknown }).report)), bare)).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['an array', []],
+    ['no moved count', broken((r) => delete r['movedVertices'])],
+    ['a fractional moved count', broken((r) => (r['movedVertices'] = 1.5))],
+    ['a negative moved count', broken((r) => (r['movedVertices'] = -1))],
+    ['a maximum displacement that is null (a NaN through JSON)', broken((r) => (r['maxDisplacement'] = null))],
+    ['a negative maximum displacement', broken((r) => (r['maxDisplacement'] = -0.1))],
+    ['a volume that is a string', broken((r) => (r['displacedVolume'] = '1'))],
+    ['a volume basis that is not one', broken((r) => (r['volumeBasis'] = 'mesh-difference'))],
+    ['a symmetry error that is a string', broken((r) => (r['symmetryError'] = '0'))],
+    ['a negative symmetry error', broken((r) => (r['symmetryError'] = -1))],
+    ['a refined count that is fractional', broken((r) => (r['refinedEdges'] = 0.5))],
+    ['no stamps applied', broken((r) => delete r['stampsApplied'])],
+    ['fewer stamps applied than stamps', broken((r) => (r['stampsApplied'] = 1))],
+    ['more than two applications per stamp', broken((r) => (r['stampsApplied'] = 5))],
+  ])('refuses %s', (_name, value) => {
+    expect(isSculptReport(value, op)).toBe(false);
+  });
+
+  it('takes the op: a symmetry error without a plane, applications beyond the stamps without one, and refined edges without refineEdge are refused', () => {
+    const withoutPlane = omit(op, 'symmetry');
+    expect(typeof (answer.report as { symmetryError: unknown }).symmetryError).toBe('number');
+    expect(
+      isSculptReport(
+        broken((r) => (r['stampsApplied'] = 2)),
+        withoutPlane,
+      ),
+    ).toBe(false);
+    expect(
+      isSculptReport(
+        broken((r) => ((r['symmetryError'] = null), (r['stampsApplied'] = 2))),
+        withoutPlane,
+      ),
+    ).toBe(true);
+    expect(
+      isSculptReport(
+        broken((r) => ((r['symmetryError'] = null), (r['stampsApplied'] = 3))),
+        withoutPlane,
+      ),
+    ).toBe(false);
+    expect(isSculptReport(broken(), omit(op, 'refineEdge'))).toBe(false);
+    expect(
+      isSculptReport(
+        broken((r) => (r['refinedEdges'] = 0)),
+        omit(op, 'refineEdge'),
+      ),
+    ).toBe(true);
   });
 });

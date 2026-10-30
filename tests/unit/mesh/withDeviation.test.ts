@@ -149,6 +149,30 @@ describe('decimate_mesh, smooth_mesh, remesh_mesh, repair_mesh and fill_mesh_hol
     60_000,
   );
 
+  it('sculpt_mesh measures no deviation, so its job is not asked for one', () => {
+    const seen: MeshOp[] = [];
+    const sculptReport = {
+      movedVertices: 1,
+      maxDisplacement: 0.5,
+      displacedVolume: 1,
+      volumeBasis: 'height-field-sum',
+      symmetryError: null,
+      refinedEdges: 0,
+      stampsApplied: 1,
+    };
+    const engine = recordingEngine({ sculpt: result(sculptReport) }, true, seen);
+    const done = execute(
+      big.doc,
+      'sculpt_mesh',
+      { id, brush: 'draw', stamps: [{ center: [0, 0, 0] }], radius: 5, strength: 1 },
+      contextWith(engine),
+    );
+    expect(done.error).toBeUndefined();
+    expect(seen.map((asked) => asked.op)).toEqual(['sculpt']);
+    expect(seen[0]).not.toHaveProperty('withDeviation');
+    expect(done.data).not.toHaveProperty('deviation');
+  }, 60_000);
+
   it('an engine without a deviation in its answer leaves the separate measure to the engines', () => {
     const seen: MeshOp[] = [];
     const engine = recordingEngine(

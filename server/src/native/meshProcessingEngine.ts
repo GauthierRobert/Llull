@@ -23,9 +23,10 @@ import {
   REMESH_DESCRIPTION,
   editableProblem,
   repairDescription,
+  sculptDescription,
   smoothDescription,
 } from '@core/geometry/mesh/editable';
-import { isFillReport, isRepairReport } from '@core/geometry/mesh/reportChecks';
+import { isFillReport, isRepairReport, isSculptReport } from '@core/geometry/mesh/reportChecks';
 import { isDeviationSummary, type DeviationSummary } from '@core/geometry/mesh/deviation';
 import {
   MESH_TS_TRIANGLE_CAP,
@@ -51,6 +52,8 @@ const QUAD_REMESH_TRIANGLE_CAP = 500_000;
 const REMESH_TRIANGLE_CAP = 2_000_000;
 /** Named guard: input triangles above which repair and fill_holes refuse (the working mesh of the hole filler keeps per-vertex face lists; the edge sort of orient holds 3 entries per triangle). */
 const REPAIR_TRIANGLE_CAP = 4_000_000;
+/** Named guard: input triangles above which sculpt refuses (the brushes keep per-vertex face lists and the closest-point tree 100 bytes per triangle, and the refinement works on a per-vertex face-list mesh capped at the same size). */
+const SCULPT_TRIANGLE_CAP = 4_000_000;
 /** The vendored QuadriFlow commit (solver/crates/llull-quadflow/vendor/README.md), recorded in the provenance of every result with the platform: the float code differs between compilers, so a result is reproducible per platform build. */
 const QUADRIFLOW_LIBRARY = ` + QuadriFlow@810b7a0 (${process.platform}-${process.arch})`;
 
@@ -61,6 +64,7 @@ const CAPABILITIES: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, number
   ['analyze', Infinity],
   ['repair', REPAIR_TRIANGLE_CAP],
   ['fill_holes', REPAIR_TRIANGLE_CAP],
+  ['sculpt', SCULPT_TRIANGLE_CAP],
   ['deviation', Infinity],
   ['quad_remesh', QUAD_REMESH_TRIANGLE_CAP],
 ]);
@@ -75,6 +79,9 @@ function isNativeOp(op: MeshOp): op is NativeOp {
 /** The command name the editable-mesh refusals mention. */
 const OP_COMMAND = { decimate: 'decimate_mesh', remesh: 'remesh_mesh', quad_remesh: 'quad_remesh' } as const;
 
+/** Measured in TECHNICAL_SPEC 13.14.3. */
+const SCULPT_PREFERRED_ABOVE = 15_000;
+
 /**
  * Input triangles above which the native engine is asked before the TypeScript one (TECHNICAL_SPEC 13.12.4): the smallest sizes at which a cold job
  * (spawn, files, JSON; 25 to 45 ms on the reference machine) is no slower than the in-process answer, with a margin. `quad_remesh` has no TypeScript twin.
@@ -87,6 +94,7 @@ const PREFERRED_ABOVE: ReadonlyMap<MeshOpName, number> = new Map<MeshOpName, num
   ['analyze', 15_000],
   ['repair', 50_000],
   ['fill_holes', 30_000],
+  ['sculpt', SCULPT_PREFERRED_ABOVE],
 ]);
 
 /** The refusals of `fill_holes` a job may hand to the command as they are (`fill_mesh_holes` documents them); any other code is `MESH_ENGINE_UNSUPPORTED`. */
@@ -104,12 +112,14 @@ const regionOf = (region: { readonly center: readonly number[]; readonly radius:
 
 type NativeOp = Extract<
   MeshOp,
-  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'deviation' | 'quad_remesh' }
+  { op: 'decimate' | 'smooth' | 'remesh' | 'analyze' | 'repair' | 'fill_holes' | 'sculpt' | 'deviation' | 'quad_remesh' }
 >;
 
 /** `deviationSamples` of job.json: the job also measures the deviation of its result from its input (the Rust side skips it when absent). */
 function deviationRequest(op: NativeOp): { deviationSamples?: number } {
-  return op.op !== 'deviation' && op.op !== 'analyze' && op.withDeviation !== undefined ? { deviationSamples: op.withDeviation } : {};
+  return op.op !== 'deviation' && op.op !== 'analyze' && op.op !== 'sculpt' && op.withDeviation !== undefined
+    ? { deviationSamples: op.withDeviation }
+    : {};
 }
 
 /** The job parameters (JSON) of a supported op; `Math.cos` of the feature angle is computed here, as the TypeScript engine does. */
@@ -131,6 +141,22 @@ function jobParams(op: NativeOp): Record<string, unknown> {
       fairing: op.fairing,
       refine: op.refine,
       ...(op.alpha !== undefined ? { alpha: op.alpha } : {}),
+    };
+  if (op.op === 'sculpt')
+    return {
+      brush: op.brush,
+      stamps: op.stamps.map((stamp) => [...stamp]),
+      radius: op.radius,
+      strength: op.strength,
+      falloff: op.falloff,
+      direction: typeof op.direction === 'string' ? op.direction : [...op.direction],
+      taubin: op.taubin,
+      ...(op.symmetry !== undefined ? { symmetry: op.symmetry } : {}),
+      ...(op.maxHeight !== undefined ? { maxHeight: op.maxHeight } : {}),
+      ...(op.refineEdge !== undefined ? { refineEdge: op.refineEdge } : {}),
+      ...(op.mask !== undefined ? { mask: regionOf(op.mask) } : {}),
+      ...(op.planePoint !== undefined ? { planePoint: [...op.planePoint] } : {}),
+      ...(op.maxTriangles !== undefined ? { maxTriangles: op.maxTriangles } : {}),
     };
   if (op.op === 'quad_remesh')
     return { targetFaces: op.targetQuads, adaptive: op.adaptive, ...(op.hardEdgeRad !== undefined ? { hardEdgeRad: op.hardEdgeRad } : {}) };
@@ -238,6 +264,14 @@ function failedJob(op: NativeOp, run: JobRun, timeoutMs: number): MeshEngineFail
     const point = typeof op.select === 'object' && 'near' in op.select ? op.select.near[Number(run.message)] : undefined;
     if (point !== undefined) return failure('MESH_HOLE_NOT_FOUND', `no boundary loop near [${point.join(', ')}]: the mesh has none`);
   }
+  if (op.op === 'sculpt' && run.code === 'SCULPT_OFF_SURFACE') {
+    // the job names the stamp by its position in the list; the radius is worded here, as JavaScript prints it
+    const stamp = Number(run.message);
+    if (Number.isInteger(stamp) && stamp >= 0 && stamp < op.stamps.length)
+      return failure('MESH_SCULPT_STAMP_OFF_SURFACE', `stamp ${stamp} is farther than the radius ${op.radius} from the mesh surface`);
+  }
+  if (op.op === 'sculpt' && run.code === 'SCULPT_TOO_LARGE')
+    return failure('MESH_SCULPT_RESULT_TOO_LARGE', run.message ?? 'the refined surface is too large');
   if (run.code === 'REMESH_TOO_LARGE') return failure('MESH_REMESH_RESULT_TOO_LARGE', run.message ?? 'the remeshed surface is too large');
   if (op.op === 'quad_remesh')
     return failure('MESH_QUAD_REMESH_FAILED', `QuadriFlow: ${run.code ?? 'failed'} — ${run.message ?? ''}`.trim());
@@ -289,18 +323,24 @@ async function resultOf(op: NativeOp, runner: ComputeRunner, folder: string, run
       ...measured,
       provenance: provenance(QUAD_DESCRIPTION.algorithm, QUAD_DESCRIPTION.reference, QUADRIFLOW_LIBRARY),
     };
-  if ((op.op === 'repair' && !isRepairReport(report, op.mode)) || (op.op === 'fill_holes' && !isFillReport(report, op.fairing)))
+  if (
+    (op.op === 'repair' && !isRepairReport(report, op.mode)) ||
+    (op.op === 'fill_holes' && !isFillReport(report, op.fairing)) ||
+    (op.op === 'sculpt' && !isSculptReport(report, op))
+  )
     return failure('MESH_ENGINE_UNSUPPORTED', `llull-compute meshops ${op.op}: the job returned a malformed report`);
   const description =
     op.op === 'repair'
       ? repairDescription(op.mode)
       : op.op === 'fill_holes'
         ? FILL_HOLES_DESCRIPTION
-        : op.op === 'decimate'
-          ? DECIMATE_DESCRIPTION
-          : op.op === 'remesh'
-            ? REMESH_DESCRIPTION
-            : smoothDescription(op.method === 'taubin');
+        : op.op === 'sculpt'
+          ? sculptDescription(op.brush)
+          : op.op === 'decimate'
+            ? DECIMATE_DESCRIPTION
+            : op.op === 'remesh'
+              ? REMESH_DESCRIPTION
+              : smoothDescription(op.method === 'taubin');
   return { mesh, report, ...measured, provenance: provenance(description.algorithm, description.reference) };
 }
 

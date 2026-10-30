@@ -670,5 +670,197 @@
       "notes": [],
       "skippedHoles": 0
     }
+  },
+  "sculpt_damaged_inflate": {
+    "digest": "c8fc01af7010b92b76010be796f35d32e62c8b0d91056a5b4f8cb6be198a0c67",
+    "report": {
+      "movedVertices": 679,
+      "maxDisplacement": 0.5000000000000008,
+      "displacedVolume": 37.526856339570614,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 2
+    }
+  },
+  "sculpt_damaged_soup": {
+    "digest": "8f90ad2c37d3da4fcc735f2f9cb77bffed1efda05ec23e1381cd4189c2c4b61b",
+    "report": {
+      "movedVertices": 679,
+      "maxDisplacement": 0.669842489610329,
+      "displacedVolume": -1.327266380308318e-15,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 2
+    }
+  },
+  "sculpt_draw_normal_mirror": {
+    "digest": "447a5260c02817ab30397b18c5d4ed801dea81f78a0c995375c2ce64ae722032",
+    "report": {
+      "movedVertices": 159,
+      "maxDisplacement": 0.9538386022575969,
+      "displacedVolume": 39.7498972692747,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": 0.030270364899657422,
+      "refinedEdges": 0,
+      "stampsApplied": 5
+    }
+  },
+  "sculpt_draw_stroke": {
+    "digest": "484516afdf20223e6d59ee312a97cd7ee46e0fdb59b1acd6f0088b6835ec367a",
+    "report": {
+      "movedVertices": 108,
+      "maxDisplacement": 0.5547877721779949,
+      "displacedVolume": 11.174514723183165,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 3
+    }
+  },
+  "sculpt_flatten_open": {
+    "digest": "c867d3e6dd6317b7c24f3ec6a5b409a0aa1093f0a1cd1b4d4327150c20a9e694",
+    "report": {
+      "movedVertices": 160,
+      "maxDisplacement": 0.04720850912712097,
+      "displacedVolume": -0.08331768104677219,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 2
+    }
+  },
+  "sculpt_flatten_plane_point": {
+    "digest": "1fe214670619ee065aa8b8e2ef7f21b32e03ac78720f438c8a75c7eee0ac7d7a",
+    "report": {
+      "movedVertices": 177,
+      "maxDisplacement": 0.05431701698570847,
+      "displacedVolume": 0.17560047020443081,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 1
+    }
+  },
+  "sculpt_grab_vector_mirror": {
+    "digest": "e79c83931d3d4e01028ed971441f08f927fdca57f4d517b84ee1413944c0e0ac",
+    "report": {
+      "movedVertices": 147,
+      "maxDisplacement": 4.17612260356422,
+      "displacedVolume": 163.70757408365716,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": 0,
+      "refinedEdges": 0,
+      "stampsApplied": 6
+    }
+  },
+  "sculpt_inflate_masked": {
+    "digest": "dd2f9edcbe13badb5cc53a3147a0d0fd2d962ece6bbafdc668044dd35d335396",
+    "report": {
+      "movedVertices": 40,
+      "maxDisplacement": 0.5450916151550568,
+      "displacedVolume": 6.569552729280076,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 3
+    }
+  },
+  "sculpt_layer_height": {
+    "digest": "e653e26c38ef5811c2754e5b948259a5cdb2021a1d732d5dabbeaed2dd6029e2",
+    "report": {
+      "movedVertices": 117,
+      "maxDisplacement": 0.30000000000000004,
+      "displacedVolume": 2.1922754427590716,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 3
+    }
+  },
+  "sculpt_pinch": {
+    "digest": "579112ac8a4ec3e077d78600998437d64b2482eb1ed8e2b36e01025ff1511444",
+    "report": {
+      "movedVertices": 109,
+      "maxDisplacement": 0.2851985438199384,
+      "displacedVolume": -0.03656887771986868,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 1
+    }
+  },
+  "sculpt_pinch_crease": {
+    "digest": "7f239c3044b299c6048ae61982705699c2ae6b969b115f7d9d00a8bd12f7b99b",
+    "report": {
+      "movedVertices": 72,
+      "maxDisplacement": 0.4417996784397153,
+      "displacedVolume": -0.9730877939987482,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": 0.8834926134066896,
+      "refinedEdges": 0,
+      "stampsApplied": 2
+    }
+  },
+  "sculpt_refine_mask": {
+    "digest": "c7d526ee617c05b06797f23e9ee7c3e1414a8ce73ffcd6141df7f19c922392a2",
+    "report": {
+      "movedVertices": 202,
+      "maxDisplacement": 0.39999999999999936,
+      "displacedVolume": 2.432473753548038,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": null,
+      "refinedEdges": 339,
+      "stampsApplied": 1
+    }
+  },
+  "sculpt_repeated_corner_inflate": {
+    "digest": "a0e595cb43213ae49b87f5df6432cae1c065bbcf3e3bfe81e1a2e3de764812fc",
+    "report": {
+      "movedVertices": 16,
+      "maxDisplacement": 0.5000000000000003,
+      "displacedVolume": 4.783035191177867,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 1
+    }
+  },
+  "sculpt_repeated_corner_smooth": {
+    "digest": "8630270fdc0dbfb024783d806c4db6444deba0d30d4d6f954a90747ac12df97f",
+    "report": {
+      "movedVertices": 16,
+      "maxDisplacement": 0.5807291989595532,
+      "displacedVolume": -0.6645060395729581,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 1
+    }
+  },
+  "sculpt_smooth_taubin": {
+    "digest": "44940a0b702ee27701793d288a37a44b682761b6fd3d864c309d39b1ccbb2385",
+    "report": {
+      "movedVertices": 138,
+      "maxDisplacement": 0.03432644854547996,
+      "displacedVolume": -0.24318040481648495,
+      "volumeBasis": "closed-volume-difference",
+      "symmetryError": null,
+      "refinedEdges": 0,
+      "stampsApplied": 3
+    }
+  },
+  "sculpt_soup_mirror": {
+    "digest": "e0caad053aeba63e524501524aca9de43096c147fc58a3372ff11ced98dd33d3",
+    "report": {
+      "movedVertices": 78,
+      "maxDisplacement": 0.44892716912984204,
+      "displacedVolume": 18.945945393813826,
+      "volumeBasis": "height-field-sum",
+      "symmetryError": 0.16768907320045043,
+      "refinedEdges": 0,
+      "stampsApplied": 3
+    }
   }
 }

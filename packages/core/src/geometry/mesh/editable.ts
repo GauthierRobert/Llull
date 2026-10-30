@@ -51,6 +51,11 @@ export const repairDescription = (mode: RepairMode): Description => ({
   reference: 'Fusion Repair / Rhino MeshRepair / Magics Fix semantics; Liepa 2003',
 });
 
+export const sculptDescription = (brush: string): Description => ({
+  algorithm: `sculpt brush ${brush}: falloff-weighted displacement of the vertices within the radius of each stamp, stamps in order, mirrored in the same pass`,
+  reference: 'Blender sculpt brush definitions (draw, inflate, grab, smooth, flatten, pinch, crease, layer); TECHNICAL_SPEC 5.7',
+});
+
 export const FILL_HOLES_DESCRIPTION: Description = {
   algorithm:
     'Liepa hole filling: O(n^3) dihedral/area triangulation, centroid refinement with Delaunay relaxation, membrane / thin-plate fairing (CG)',

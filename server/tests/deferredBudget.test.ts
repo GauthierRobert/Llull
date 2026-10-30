@@ -50,6 +50,27 @@ describe('a plan of small steps longer than the job budget', () => {
     expect(engines).toEqual(['native', 'native', 'ts', 'ts', 'ts']);
   }, 60_000);
 
+  it('the same for sculpt: 81,920 triangles are above its native preference, and past the budget the TypeScript engine takes them', async () => {
+    const maxJobs = 2;
+    const big = icosphere(10, 6);
+    const strokes = (): MeshOp[] =>
+      [1, 2, 3, 4].map(
+        (k): MeshOp => ({
+          op: 'sculpt',
+          brush: 'draw',
+          stamps: [[0, 0, 10]],
+          radius: 1 + k,
+          strength: 0.5,
+          falloff: 'smooth',
+          direction: 'area_normal',
+          taubin: false,
+        }),
+      );
+    const results = await resolveDeferred(() => strokes().map((op) => composite.run({ mesh: big }, op)), { maxJobs });
+    expect(results.every((result) => !isEngineFailure(result))).toBe(true);
+    expect(results.map((result) => (result as MeshOpResult).provenance.engine)).toEqual(['native', 'native', 'ts', 'ts']);
+  }, 60_000);
+
   it('still refuses with MESH_JOB_LIMIT when what is left cannot be taken by the TypeScript engine', async () => {
     const quad: MeshOp = { op: 'quad_remesh', targetQuads: 100, adaptive: false };
     const refusals: string[] = [];

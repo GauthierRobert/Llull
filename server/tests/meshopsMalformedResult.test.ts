@@ -1,7 +1,7 @@
 /**
  * The native engine does not trust a result file (DES-7c step 7): a job that answers with a mesh whose indices point past its vertices, whose indices are not
  * whole triangles, whose positions are not whole triples or whose coordinate is not a number is refused by name, never handed to a command. The same for the
- * report of `repair` and `fill_holes`, which the commands read field by field. The job is a
+ * report of `repair`, `fill_holes` and `sculpt`, which the commands read field by field. The job is a
  * stand-in (`fixtures/fakeMeshopsJob.cjs`, node preloaded in place of `llull-compute`), so this runs without the Rust binary.
  */
 
@@ -21,6 +21,19 @@ const ops: ReadonlyArray<[string, MeshOp]> = [
   ['remesh', { op: 'remesh', targetEdge: 1, iterations: 1, featureAngleRad: 0.7, preserveBoundary: true, project: true }],
   ['repair', { op: 'repair', mode: 'weld', weldTolerance: 1e-6, maxGap: 1e-4, maxBoundaryEdges: 100 }],
   ['fill_holes', { op: 'fill_holes', select: 'all', maxBoundaryEdges: 100, fairing: 'curvature', refine: true }],
+  [
+    'sculpt',
+    {
+      op: 'sculpt',
+      brush: 'draw',
+      stamps: [[0, 0, 10]],
+      radius: 3,
+      strength: 0.5,
+      falloff: 'smooth',
+      direction: 'area_normal',
+      taubin: false,
+    },
+  ],
 ];
 
 const fakeEngine = (mode: string): NonNullable<ReturnType<typeof createNativeMeshEngine>> =>
@@ -48,9 +61,9 @@ describe('a result the host cannot trust', () => {
   });
 });
 
-describe('a report the host cannot trust (repair and fill_holes)', () => {
+describe('a report the host cannot trust (repair, fill_holes and sculpt)', () => {
   beforeEach(() => _clearResultCache());
-  const reported = ops.filter(([name]) => name === 'repair' || name === 'fill_holes');
+  const reported = ops.filter(([name]) => name === 'repair' || name === 'fill_holes' || name === 'sculpt');
 
   it.each(reported)('%s: an empty report is refused by name', async (_name, op) => {
     const engine = fakeEngine('bad_report');
@@ -71,6 +84,22 @@ describe('a report the host cannot trust (repair and fill_holes)', () => {
     const engine = fakeEngine('hole_code');
     const result = await resolveDeferred(() => engine.run({ mesh: sphere }, ops[3]?.[1] as MeshOp));
     expect(result).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('MESH_HOLE_UNDOCUMENTED') });
+  });
+
+  it('sculpt: a report that claims a symmetry error without a symmetry plane, or too many stamps applied, is refused (the checks take the op)', async () => {
+    const op = ops[4]?.[1] as MeshOp;
+    const mirrored = { ...op, symmetry: 'yz' } as MeshOp;
+    const engine = fakeEngine('other_report');
+    // 3 x the stamps applied is past the 2 x of a mirrored stroke too, and a symmetry error with a plane is fine
+    for (const asked of [op, mirrored])
+      expect(await resolveDeferred(() => engine.run({ mesh: sphere }, asked))).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED' });
+    _clearResultCache();
+    expect(isEngineFailure(await resolveDeferred(() => fakeEngine('ok').run({ mesh: sphere }, mirrored)))).toBe(false);
+  });
+
+  it('sculpt: a stamp index the op does not have is not handed to the command', async () => {
+    const result = await resolveDeferred(() => fakeEngine('sculpt_index').run({ mesh: sphere }, ops[4]?.[1] as MeshOp));
+    expect(result).toMatchObject({ code: 'MESH_ENGINE_UNSUPPORTED', message: expect.stringContaining('SCULPT_OFF_SURFACE') });
   });
 
   it.each(ops.filter(([name]) => name === 'decimate' || name === 'remesh'))('%s: the report is not checked here', async (_name, op) => {

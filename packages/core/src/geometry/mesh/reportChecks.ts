@@ -1,10 +1,11 @@
 /**
- * Shape checks of the `report` a native job returns for `repair` and `fill_holes`: the commands read these reports field by field (`changes`, `filled`,
- * `skipped`), so a report that is not what the TypeScript engine would give is refused by the host before a command sees it (as `isMeshAnalysis` does).
+ * Shape checks of the `report` a native job returns for `repair`, `fill_holes` and `sculpt`: the commands read these reports field by field (`changes`, `filled`,
+ * `skipped`, `movedVertices`), so a report that is not what the TypeScript engine would give is refused by the host before a command sees it (as `isMeshAnalysis` does).
  */
 
 import type { Fairing } from './holeRefine';
 import type { RepairChanges, RepairMode } from './repair';
+import type { SculptParams } from './sculpt';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
@@ -56,5 +57,30 @@ export function isFillReport(value: unknown, fairing: Fairing): boolean {
     ) &&
     Array.isArray(skipped) &&
     skipped.every((hole) => isRecord(hole) && isLoop(hole['loop']) && isCount(hole['edges']) && isOneOf(HOLE_CODES, hole['code']))
+  );
+}
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * True when `value` is the sculpt report of the op asked: whole counts, finite measures, a volume basis from the two the TypeScript engine names, a symmetry error only
+ * when the op has a symmetry plane, no refined edge without `refineEdge`, and between one and two stamps applied per stamp (two only with a symmetry plane).
+ */
+export function isSculptReport(value: unknown, op: Pick<SculptParams, 'stamps' | 'symmetry' | 'refineEdge'>): boolean {
+  if (!isRecord(value)) return false;
+  const { movedVertices, maxDisplacement, displacedVolume, volumeBasis, symmetryError, refinedEdges, stampsApplied } = value;
+  const stamps = op.stamps.length;
+  return (
+    isCount(movedVertices) &&
+    isFiniteNumber(maxDisplacement) &&
+    maxDisplacement >= 0 &&
+    isFiniteNumber(displacedVolume) &&
+    isOneOf(['closed-volume-difference', 'height-field-sum'], volumeBasis) &&
+    (symmetryError === null || (op.symmetry !== undefined && isFiniteNumber(symmetryError) && symmetryError >= 0)) &&
+    isCount(refinedEdges) &&
+    (op.refineEdge !== undefined || refinedEdges === 0) &&
+    isCount(stampsApplied) &&
+    stampsApplied >= stamps &&
+    stampsApplied <= (op.symmetry === undefined ? stamps : 2 * stamps)
   );
 }
