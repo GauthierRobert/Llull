@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <Geom_Curve.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -65,7 +66,6 @@ struct Fade {
   bool at[2] = {false, false};
   double reach[2] = {0, 0};
   std::vector<double> along, arc;  // the ball centre's arc length at sampled stations of the blend
-  double largest = 0;              // the largest change of the weight (the profile's against the circle's) at a station
 };
 
 // The fade of `blend` at the ends that meet the next blend of the chain and are not mitred; `reach_factor` x the chord of the end section is the
@@ -74,6 +74,10 @@ bool plan_fade(const BRepAdaptor_Surface &surface, const Blend &blend, double re
 
 // The weight of the conic at `along`: the profile's `profile_weight` away from the faded ends, `circle_weight` at them.
 double faded_weight(const Fade &fade, double along, double circle_weight, double profile_weight);
+
+// Every pole of the interpolated weight curve of a faded blend must exceed this (a NURBS weight is positive); false with the reason in `why`.
+constexpr double kLeastWeight = 1e-9;
+bool positive_weights(const Handle(Geom_BSplineCurve) &weights, std::string &why);
 
 // A contact point whose mitre displacement is below this fraction of the diagonal does not move (no re-trimming, no pin test).
 constexpr double kStillFraction = 1e-6;

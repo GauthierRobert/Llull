@@ -310,6 +310,7 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
       return nullptr;
     }
     weight_curve = interpolation.Curve();
+    if (!positive_weights(weight_curve, why)) return nullptr;
     curves.push_back(weight_curve);
   }
   rows_out = curves;
@@ -420,7 +421,7 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
 }
 
 // Where a pass failed: only a chain junction that does not sew in a curved pass is worth the zero-curvature pass.
-enum class Stage { Other, Junction };
+enum class Stage { Other, Junction, NothingToFade };
 
 // What a successful pass measured.
 struct Measured {
@@ -526,6 +527,15 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   std::vector<Meeting> meetings;  // the vertex two rails of one support share at a mitre
   int faded_ends = 0;             // the ends of blends that fade to the circular arc (13.19)
   double fade_reach = 0;          // the longest of those fades (arc length of the ball centre)
+  // a second pass has nothing to change when no blend end meets the next blend across a smooth (not mitred) junction: the first pass's reason stands
+  if (faded && kind == 0 &&
+      !std::any_of(faces.begin(), faces.end(), [](const Blend &blend) {
+        return (!blend.end_blend[0].IsNull() && !blend.mitre[0].active) || (!blend.end_blend[1].IsNull() && !blend.mitre[1].active);
+      })) {
+    stage = Stage::NothingToFade;
+    why = "no blend end meets the next blend of its chain across a smooth junction";
+    return nullptr;
+  }
   for (const Blend &blend : faces) {
     Fade fade;
     if (faded && kind == 0) {
@@ -791,7 +801,9 @@ std::unique_ptr<Shape> blend::rails_blend(const Shape &source, rust::Slice<const
     const std::string kinked = why;
     built = rails_once(source, edges, laws, kind, param, false, true, stage, measured, why);
     if (!built) {
-      why = "the conic kinks at a chain junction (" + kinked + ") and so does it with its ends faded to the circular arc (" + why + ")";
+      if (stage == Stage::NothingToFade) why = kinked;
+      else if (stage == Stage::Junction) why = "the conic kinks at a chain junction (" + kinked + ") and still kinks with its ends faded to the circular arc (" + why + ")";
+      else why = "the conic kinks at a chain junction (" + kinked + ") and the build with its ends faded to the circular arc fails: " + why;
       return nullptr;
     }
     faded = true;
@@ -843,7 +855,7 @@ rust::String rails_reason(const Shape &shape, rust::Slice<const uint32_t> edges,
   try {
     built = blend::rails_blend(shape, edges, laws, static_cast<int>(kind), param, notes, why);
   } catch (const Standard_Failure &error) {
-    why = std::string("OCCT failed: ") + error.DynamicType()->Name() + " " + (error.GetMessageString() != nullptr ? error.GetMessageString() : "");
+    why = blend::occt_failure(error);
   }
   return rust::String(built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why));
 }

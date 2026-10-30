@@ -1068,19 +1068,22 @@ When the first pass is refused for a junction kink (conic only), `rails_blend` r
 
 `data.profile.circularFade` = `{ ends, reach, reachChords }` and the summary sentence say that it happened; the profile there differs from the asked one by the weight change (here 0.81 to 1.0 of the circle's against the conic's weight 1, within 3.86 mm of each junction).
 
+**Why the fade is G1 across the junction (the carrying argument).** The junction section of a faded end is OCCT's circular iso-arc: a, b are its contacts and t the apex of its tangent lines, and the weight there is the weight of its own section circle (cos of half the arc, read from the section, so a varying size is covered: the circle changes along the chain, the weight follows it). The weight curve is built so that its derivative along the rail equals that of the circle's weight wc(s) at the junction (the quintic share has zero first and second derivative there, so w'(s) = wc'(s)). The rational surface a B0 + w t B1 + b B2 over B0 + w B1 + B2 with w = wc(s), a(s), b(s), t(s) the circle's own data is the circular blend itself, and OCCT's circular chain is G1 across the junction (the rolling ball): the faded blend is tangent to it to first order at the junction from both sides, hence G1 with its neighbour. Two approximations carry the claim to a measured 2.3e-6 rad, not to zero: the contact points are snapped onto the support faces when closer than 1e-3 of the apex distance (OCCT's own contact error, section 13.11.3) and the end slope of the interpolated weight curve is the spline's, not wc'(s) exactly.
+
 ### 13.19.3 Measured (native llull-kernel, OCCT 7.9.2)
 
 R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, conic rho 0.5, blend 1:
 - before: refused, junction 0.0182 rad (limit 0.0095);
-- after: built, `junctionG1` 2.3e-6 rad (the largest angle between the normals of two blends along their junction), contacts with the walls G1 5.3e-6 rad, gap 4.1e-6 (limit 3.1e-4), 18 faded ends, reach 3.86 mm;
-- volume: the circular fillet removes 7.079 mm3 of 13838.71; the faded conic 6.216 mm3 (ratio 0.878; the window of 13.11 is [0.01, 4] and a conic of weight 1 alone would remove less).
+- after: built (the rim is 9 edges, a closed chain of 9 blends, so 18 ends fade: both sides of every junction, which is the evidence that the junction is G1 and not only one side tangent to it), `junctionG1` 2.3e-6 rad (the largest angle between the normals of two blends along their junction), contacts with the walls G1 5.3e-6 rad, gap 4.1e-6 (limit 3.1e-4), 18 faded ends, reach 3.86 mm;
+- volume: the circular fillet removes 7.079 mm3 of 13838.71; the faded conic 6.216 mm3 (ratio 0.878). The conic alone (weight 1 at a right angle: a parabola) removes (r^2 / 6) / (r^2 (1 - pi / 4)) = 0.78 of the circle's per section, the circle all of it, so the faded blend is in between: the test asserts (0.80, 0.95).
 A chain that builds without the fade (R 20 cap, blend 1, 0.0077 rad) is unchanged and has no `circularFade`.
 
 ### 13.19.4 Left, by name
 
 - The fade is applied to all non-mitred junction ends of the chain when any junction kinks, not only the kinked ones (the failing junction is not identified per pair): chains that kink in one place lose profile weight everywhere along 3 chords of every junction.
 - Curvature (G2) profiles are not faded; a chain they cannot build (quartic also kinks) stays refused; ask for the conic.
-- If the second pass still kinks the refusal names both passes ("the conic kinks ... and so does it with its ends faded"); no case reaches it in the tests.
+- The second pass is skipped when no blend end meets the next blend across a smooth (not mitred) junction: the first pass reason is returned unchanged. When it runs and still kinks the refusal says "still kinks with its ends faded"; when it fails for another reason, "the build with its ends faded fails: <reason>". No test provokes either branch (a kink at a mitred junction only, or a second-pass failure).
+- A pole of the interpolated weight curve at or below 1e-9 is refused by name (a NURBS weight is positive); the weights run from the circle's (0.81 here) to the profile's and nothing in the tests approaches the bound.
 - Mixed vertices and the deform mass rule are lane 2 (`blend_corner.cxx`), untouched here.
 
 ### 13.19.5 Tests

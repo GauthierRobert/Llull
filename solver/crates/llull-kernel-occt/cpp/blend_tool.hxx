@@ -10,6 +10,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <Geom_Curve.hxx>
+#include <Standard_Failure.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
@@ -20,6 +21,13 @@
 
 namespace llull {
 namespace blend {
+
+// "OCCT failed: <exception type>[: <message>]": the message of a Standard_Failure is often empty, the type is what says what went wrong.
+inline std::string occt_failure(const Standard_Failure &error) {
+  std::string text = std::string("OCCT failed: ") + error.DynamicType()->Name();
+  if (error.GetMessageString() != nullptr && error.GetMessageString()[0] != '\0') text += std::string(": ") + error.GetMessageString();
+  return text;
+}
 
 constexpr double kPi = 3.14159265358979323846;
 // A face counts as "inside" for the legs when the point is IN or ON it (document units).

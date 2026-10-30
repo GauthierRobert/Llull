@@ -550,14 +550,16 @@ fn a_chain_whose_curvature_blend_would_meet_at_more_than_the_g1_default_is_refus
     let faded = built(&cap_small, &rim_small, &laws_small, 0.0, 0.5);
     let notes = notes_of(&faded);
     assert_eq!(notes["circularFade"]["reachChords"], 3.0);
-    assert!(notes["circularFade"]["ends"].as_u64().unwrap() >= rim_small.len() as u64, "{notes}");
+    // both ends of every blend of the closed chain fade: 2 x the blends, which is what makes the junctions G1 (a junction with one faded side would still kink)
+    assert_eq!(notes["circularFade"]["ends"].as_u64().unwrap(), 2 * rim_small.len() as u64, "{notes}");
     // G1 across every junction to rounding (0.0182 rad without the fade), the contacts with the walls as for any profile
     assert!(notes["junctionG1"].as_f64().unwrap() < 1e-4, "{notes}");
     assert!(contacts(&faded).g1 < 1e-4 && contacts(&faded).g0 < 1e-3, "g1 {} g0 {}", contacts(&faded).g1, contacts(&faded).g0);
-    // volume: the circular fillet removes 7.079 mm3 here; a conic of weight 1 (the profile) removes less, the circle (the fade's end) as much: between the two
+    // volume: the circular fillet removes 7.079 mm3 here; the conic alone (weight 1 at a right angle: a parabola) removes (r^2 / 6) / (r^2 (1 - pi / 4)) = 0.78 of it, the circle (the fade's end)
+    // all of it: the faded conic is in between (0.878 measured)
     let circular = crate::features::fillet(&cap_small, &rim_small, 1.0, None).unwrap().unwrap();
     let removed = (volume_of(&cap_small) - volume_of(&faded)) / (volume_of(&cap_small) - volume_of(&circular));
-    assert!(removed > 0.75 && removed < 1.0, "the faded conic removes {removed} of the circular fillet's volume");
+    assert!(removed > 0.80 && removed < 0.95, "the faded conic removes {removed} of the circular fillet's volume");
     // a chain that does not kink has no fade, and a curvature profile has none to give
     assert!(notes_of(&built(&cap, &rim, &[1.0, NAN, 0.0, 0.0].repeat(rim.len()), 0.0, 0.5)).get("circularFade").is_none());
 }
