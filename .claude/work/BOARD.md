@@ -144,8 +144,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   native `faceQuery.bspline`, VC-22 STEP re-import (non-uniform fit grid, mesh-warp time bound, `refined_mass` through `blend_union` DONE 2026-10-30, §17.7-17.10; mass rule by face type measured and not kept, §17.9)
   _Lane 1 + 2 + native_ _deps: —_
 - `[TODO]` **DES-3c** 03 WRP left after M0–M5 (done 2026-10-24, TECHNICAL_SPEC §14): freeform (B-spline) face charts + emboss, helical
-  (diagonal / diamond) modeled knurl, knurl as AP242 PMI (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), multi-face wraps (VC-36), pull walls
-  - draft (VC-25/26), silhouette split, UI render overlays
+  (diagonal / diamond) modeled knurl, knurl as AP242 PMI (CFF `seac` / arithmetic / CFF2 variable fonts DONE 2026-10-30, §14.5; left: `gvar`, avar 2, MVAR, a pinned real CFF2), (multi-face wraps VC-36 and `split_at_silhouette` DONE 2026-10-30, §14.6-14.7; left: chains over cones / spheres / tori, mitred walls, torus / freeform silhouettes), pull walls
+  - draft (VC-25/26), UI render overlays
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
   drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
