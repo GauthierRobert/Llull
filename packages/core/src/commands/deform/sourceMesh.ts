@@ -5,14 +5,15 @@ import { warpMesh } from '../../geometry/deform/meshWarp';
 import { entityToTriangles } from '../../geometry/entityTriangles';
 import type { GeometryKernel } from '../../geometry/kernel';
 import { isUnverified } from '../mesh/meshCommon';
+import { hasMeshLeaf } from '../../geometry/operandRecipe';
 
 /**
  * Triangles of `recipe` (indexed; welded by the consumers). With a kernel it tessellates the kernel shape; without one only `solid` leaves and
- * chains of `deform` nodes over them can be evaluated.
+ * chains of `deform` nodes over them can be evaluated. A recipe over a scan's triangles (`hasMeshLeaf`) is never handed to the kernel.
  * @failure a recipe the kernel refuses, or a node the core cannot evaluate without a kernel -> null
  */
 export function sourceMeshOf(kernel: GeometryKernel | null, recipe: ShapeRecipe, doc: CadDocument): MeshData | null {
-  if (kernel !== null) {
+  if (kernel !== null && !hasMeshLeaf(recipe)) {
     const shape = kernel.evaluate(recipe);
     const mesh = shape === null ? null : kernel.tessellate(shape);
     if (mesh !== null && mesh.indices.length > 0) return mesh;

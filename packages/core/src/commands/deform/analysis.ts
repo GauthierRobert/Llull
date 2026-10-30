@@ -19,6 +19,7 @@ import { predictedVolumeOf } from '../../geometry/deform/predicted';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
 import type { DeformReport } from '../../geometry/kernelPorts';
 import { orientOutward, signedMeshVolume } from '../../geometry/meshVolume';
+import { hasMeshLeaf } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { MESH_TS_TRIANGLE_CAP } from '../../geometry/mesh/engineTypes';
 import { hasUnverifiedLeaf, sourceMeshOf } from './sourceMesh';
@@ -124,7 +125,7 @@ function sampleJacobian(positions: ReadonlyArray<number>, warp: Warp): { sampled
 function exactShape(kernel: GeometryKernel | null, entity: Entity): ReturnType<GeometryKernel['evaluate']> {
   if (kernel === null || !kernel.supports('deform')) return null;
   const recipe = recipeOf(entity);
-  if (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law) === false) return null;
+  if (hasMeshLeaf(recipe) || (recipe.op === 'deform' && kernel.supportsDeform?.(recipe.law) === false)) return null;
   const shape = kernel.evaluate(recipe);
   return shape !== null && kernel.topology(shape) !== null ? shape : null;
 }
@@ -164,7 +165,7 @@ export function analyzeDeformed(
   const extent = localExtentOf(warp.frame, source.positions);
   const sampling = sampleJacobian([...zonePoints(node, extent, warp), ...source.positions], warp);
   const shape = exactShape(kernel, entity);
-  const sourceShape = kernel === null ? null : kernel.evaluate(node.source);
+  const sourceShape = kernel === null || hasMeshLeaf(node.source) ? null : kernel.evaluate(node.source);
   const exactSource = sourceShape === null ? undefined : kernel?.massProperties?.(sourceShape)?.volume;
   const volumes = predictedVolumeOf(source, node);
   const exactMeasured = shape === null ? undefined : kernel?.massProperties?.(shape)?.volume;

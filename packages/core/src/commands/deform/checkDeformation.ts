@@ -289,12 +289,11 @@ export const checkDeformation = defineCommand({
         remediation: 'import with sourceSha256 set to the file hash',
       });
     const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.some((f) => f.severity === 'warn') ? 'warn' : 'pass';
-    const reviewReason =
-      purpose === 'release' && meshResult
-        ? 'release of a faceted mesh result: a person must confirm the mesh is acceptable'
-        : purpose === 'release' && unverifiedIds.length > 0
-          ? 'release of a body built from an unverified input mesh'
-          : undefined;
+    const reasons = [
+      ...(meshResult ? ['release of a faceted mesh result: a person must confirm the mesh is acceptable'] : []),
+      ...(unverifiedIds.length > 0 ? ['release of a body built from an unverified input mesh'] : []),
+    ];
+    const reviewReason = purpose === 'release' && reasons.length > 0 ? reasons.join('; ') : undefined;
     const data = {
       purpose,
       status,

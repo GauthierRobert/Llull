@@ -28,6 +28,27 @@ export function unsupportedOp(kernel: Pick<GeometryKernel, 'supports' | 'support
 }
 
 /**
+ * True when a leaf of `recipe` is the stored triangles of a `mesh` entity (an import or scan: no exact construction). A kernel would sew one face per
+ * triangle to rebuild it (superlinear: a 327k-triangle scan never finishes), so the deformation paths keep such recipes on the core mesh path.
+ */
+export function hasMeshLeaf(recipe: ShapeRecipe): boolean {
+  switch (recipe.op) {
+    case 'solid':
+      return recipe.entity.kind === 'mesh';
+    case 'brep':
+    case 'faceSlab':
+    case 'sheetSolid':
+      return false;
+    case 'boolean':
+      return hasMeshLeaf(recipe.a) || hasMeshLeaf(recipe.b);
+    case 'blend':
+      return recipe.sources.some(hasMeshLeaf);
+    default:
+      return hasMeshLeaf(recipe.source);
+  }
+}
+
+/**
  * Recipe of an operand entity: its exact construction tree, or — only when this kernel lacks an op of that tree (a fillet recipe loaded
  * under Manifold) — its stored triangles. A transient refusal never downgrades the exact tree.
  */

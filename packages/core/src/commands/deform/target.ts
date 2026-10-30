@@ -6,7 +6,7 @@ import { type LocalExtent, localExtentOf } from '../../geometry/deform/bounds';
 import { resolveFrame, toLocal } from '../../geometry/deform/frame';
 import { entityToTriangles } from '../../geometry/entityTriangles';
 import type { GeometryKernel } from '../../geometry/kernel';
-import { operandRecipe } from '../../geometry/operandRecipe';
+import { hasMeshLeaf, operandRecipe } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { clamp } from '../../lib/clamp';
 import { cross3, dot3, normalize3 } from '../../lib/vec3';
@@ -21,7 +21,7 @@ export interface DeformTarget {
   readonly source: ShapeRecipe;
   /** World-space triangles of the source (indexed; the kernel tessellation when a kernel builds it, else the entity's own triangles). */
   readonly mesh: MeshData;
-  /** The source is the stored triangles of a `mesh` entity (no exact construction): FR-DEF-08 mesh path, the kernel is never asked to build it. */
+  /** A leaf of the source is the stored triangles of a `mesh` entity (no exact construction): FR-DEF-08 mesh path, the kernel is never asked to build it. */
   readonly faceted: boolean;
   readonly min: Vec3;
   readonly max: Vec3;
@@ -67,8 +67,8 @@ export function loadTarget(doc: CadDocument, command: string, id: string, ctx: E
     return unsupported(`entity '${id}' (kind '${entity.kind}') is not a 3D solid or mesh`);
   const kernel = (ctx ?? currentContext()).kernel;
   const source = kernel === null ? recipeOf(entity) : operandRecipe(kernel, entity);
-  // a kernel would sew one face per stored triangle (superlinear: a 327k-triangle scan never finished) to give back the same triangles
-  const faceted = source.op === 'solid' && source.entity.kind === 'mesh';
+  // a kernel would sew one face per stored triangle of a scan, anywhere in the recipe (superlinear: 327k triangles never finished)
+  const faceted = hasMeshLeaf(source);
   const shape = kernel === null || faceted ? null : kernel.evaluate(source);
   const built = shape === null || kernel === null ? null : kernel.tessellate(shape);
   const mesh = built !== null && built.indices.length > 0 ? built : trianglesOf(entity, doc);

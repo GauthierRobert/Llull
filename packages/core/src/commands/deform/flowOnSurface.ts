@@ -3,6 +3,7 @@
 import type { CadDocument, Vec3 } from '../../model/types';
 import { buildFlowSurface } from '../../geometry/deform/flowSurface';
 import { worldSurface } from '../../geometry/deform/worldNurbs';
+import { hasMeshLeaf } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import type { GeometryKernel } from '../../geometry/kernel';
 import { closestOnSurface } from '../../lib/nurbs/closest';
@@ -42,9 +43,14 @@ function faceTarget(doc: CadDocument, kernel: GeometryKernel | null, entityId: s
         'a face of a solid is read through the exact kernel (native kernel); no exact kernel is installed. Use a sheet target (nurbs_surface) instead',
       paths: ['params.target'],
     };
-  const shape = kernel.evaluate(recipeOf(entity));
-  const topology = shape === null ? null : kernel.topology(shape);
   const invalid = (message: string): Refusal => ({ code: 'DEF_FLOW_TARGET_INVALID', message, paths: ['params.target.faceNear'] });
+  const recipe = recipeOf(entity);
+  if (hasMeshLeaf(recipe))
+    return invalid(
+      `entity '${entityId}' is built on a mesh without an exact construction: a face target needs a solid with exact B-rep faces`,
+    );
+  const shape = kernel.evaluate(recipe);
+  const topology = shape === null ? null : kernel.topology(shape);
   if (shape === null || topology === null) return invalid(`entity '${entityId}' has no exact B-rep faces`);
   const query = kernel.faceQuery;
   let best: { face: number; distance: number; normal: Vec3 } | null = null;
@@ -78,7 +84,7 @@ function faceTarget(doc: CadDocument, kernel: GeometryKernel | null, entityId: s
  * @invariant arc lengths along the iso-curves through the target origin are kept, w is the offset along the target normal, det J = (1 - w k1)(1 - w k2) x (area ratio):
  *   on a cylinder of radius R a plate of thickness t outside has volume W H (t + t^2 / (2 R)); kernel-optional: exact warp on the native kernel, mesh path otherwise;
  *   a face target needs the exact kernel
- * @failure target missing / not a sheet or a face -> DEF_FLOW_TARGET_INVALID; a face without the exact kernel -> DEF_TARGET_FACE_NEEDS_KERNEL; the body leaves a
+ * @failure target missing / not a sheet or a face / a face of a body built on an imported mesh -> DEF_FLOW_TARGET_INVALID; a face without the exact kernel -> DEF_TARGET_FACE_NEEDS_KERNEL; the body leaves a
  *   non-closed target -> DEF_FLOW_OUTSIDE_BASE; wraps past a closed target's period -> DEF_FLOW_OVERLAP; w inside the radius of curvature -> DEF_FOLDOVER
  */
 export const flowOnSurface = defineCommand({

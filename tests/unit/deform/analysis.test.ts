@@ -139,7 +139,7 @@ describe('check_deformation', () => {
     expect(release.unverified).toBe(false);
   });
 
-  it('release of an exact result from an unverified input needs review for that reason', async () => {
+  it('release of a result from an unverified input needs review for that reason, beside the faceted-mesh reason', async () => {
     await installKernel('exact');
     const tetra = { positions: [0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10], indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] };
     const imported = execute(createEmptyDocument(), 'import_mesh', { bodies: [tetra] });
@@ -147,6 +147,7 @@ describe('check_deformation', () => {
     const data = run(scaled.document, { purpose: 'release', approx: 1, volumeDriftRel: 1e-3, creaseRad: 1 });
     expect(data.unverified).toBe(true);
     expect(data.reviewReason).toContain('unverified');
+    expect(data.reviewReason).toContain('faceted mesh result');
     expect(codes(data)).toContain('DEF_CHECK_INPUT_UNVERIFIED');
   });
 

@@ -37,7 +37,7 @@ export const DEF_REMEDIATION: Readonly<Record<string, string>> = {
   DEF_FOLDOVER: 'The map folds the body (det J <= 0): reduce the parameter named in the message.',
   DEF_SELF_INTERSECTION: 'The result would overlap itself: reduce the angle or the extent.',
   DEF_EXACT_UNAVAILABLE:
-    'Use mode "auto" (or "mesh"), or run with the native kernel (it builds twist, taper, stretch, bend and the affine maps exactly).',
+    'Use mode "auto" (or "mesh"), or run with the native kernel (it builds twist, taper, stretch, bend and the affine maps exactly). A body built on an imported mesh or scan (no exact construction) only deforms on the mesh path.',
   DEF_APPROX_TOLERANCE:
     'The exact fit would need more control points than the budget or cannot reach the tolerance: raise output.tolerance, narrow the region, or use mode "mesh".',
   DEF_KERNEL_REFUSED: 'The kernel could not build the result: run check_model on the source, or try mode "mesh".',
