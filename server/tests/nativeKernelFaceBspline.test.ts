@@ -26,7 +26,8 @@ describeNativeWhen({ capabilities: ['deform', 'faceQuery'], label: 'nativeKernel
       setGeometryKernel(null);
     });
 
-    const shapeOf = (doc: CadDocument, id: string) => kernel.evaluate(recipeOf(doc.entities[id] as never));
+    const shapeOf = (doc: CadDocument, id: string): ReturnType<IsolatedKernel['evaluate']> =>
+      kernel.evaluate(recipeOf(doc.entities[id] as never));
     const made = (name: string, params: Record<string, unknown>): { doc: CadDocument; id: string } => {
       const result = execute(createEmptyDocument(), name, params);
       return { doc: result.document, id: result.affected[0] as string };

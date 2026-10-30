@@ -969,3 +969,15 @@ fails (the answer was `null`).
 
 **Consumer.** `faceTarget` is NOT switched in this change: the rational conversion of an elementary face has other parameters than the sampled cubic fit, and I did not re-measure VC-DEF-17 (the wrap onto a drum face) with it, so
 the face target keeps its 65 x 65 sampling. The exact surface is there for the switch, which is a separate, measured change.
+
+### 17.13 VC-DEF-22: an exact deformation through STEP and back
+
+`server/tests/deformStepRoundTrip.test.ts` (the model of VC-WRP-32): a tapered cylinder, a twisted box and a point push on a slab are exported with `export_step_ap242` and read back with `import_step_exact` on the real
+sidecar. The read solid has the same number of exact faces, B-spline surfaces where the warp fitted them, and a volume within 2e-6 of the original; a second round trip changes the volume by less than 1e-9 (the exchange
+itself is lossless). With `output.preserveAnalytic` (§17.11) the faces come back as one cone and two planes, volume within 1e-6.
+
+**Finding: the 1e-6 of VC-DEF-22 is not met on the raw numbers, and why.** The taper of the VC-06 cylinder is 1633.62792 before the exchange and 1633.63005 after (1.3e-6); the closed form is 1633.62818. The geometry is the
+same: the difference is the MASS RULE. A shape built by a deformation carries `refined_mass` (the adaptive `BRepGProp` rule, 1.6e-7 from the closed form here); the flag is a property of how a shape was built, not of its
+geometry, and the STEP file does not carry it (the read solid is a fresh shape), so it is integrated by the fixed Gauss rule of its B-spline faces (+1.1e-6 from the closed form, the known
+error of that rule on a fitted face, §14). Carrying the flag through the exchange (a marker in the STEP product, read into the blob) is the missing piece; deriving it from the faces (adaptive on every imported B-spline
+face) would move the NIST corpus numbers (§17.9), so it is not done here. The test asserts the 2e-6 that the rule gap allows and the lossless second round trip.
