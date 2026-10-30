@@ -1,4 +1,4 @@
-/** import_font / list_fonts — embed a TrueType font in the document and list the fonts text can use (03 WRP M1). */
+/** import_font / list_fonts — embed a TrueType, CFF or CFF2 font in the document and list the fonts text can use (03 WRP M1). */
 
 import { base64ToUint8Array } from '../../lib/base64';
 import { sha256Hex } from '../../lib/sha256';
@@ -9,22 +9,25 @@ import { MAX_FONT_BYTES } from '../../lib/font/font';
 import type { CommandResult } from '../types';
 import { isFontFailure, registerFont } from './fontStore';
 import { wrapRejection } from './codes';
+import { variationField } from './variationField';
 
 /**
- * @affects creates 1 font record `doc.fonts[font-<step>.<k>]` and its `font/ttf` blob (the raw bytes, keyed by their sha256), unless the same bytes are already stored
+ * @affects creates 1 font record `doc.fonts[font-<step>.<k>]` and its `font/ttf` or `font/otf` blob (the raw bytes, keyed by their sha256), unless the same bytes at the same instance are already stored; one blob serves every instance record of a variable font
  * @invariant the font is parsed completely (every glyph, all offsets bounded) before anything is stored; embedding permission is enforced (OS/2 fsType 2 and bitmap-only refuse)
  * @invariant fonts are `unverified` unless `sourceSha256` was given and matches the bytes; replay needs no font file: the recorded step keeps only `blob` (the sha256), the bytes live once in the document blobs
- * @failure not base64 / not a font / truncated -> WRP_FONT_PARSE; CFF, WOFF, collection -> WRP_FONT_FORMAT_UNSUPPORTED (CFF2, WOFF, collections); fsType 2 -> WRP_FONT_EMBEDDING_RESTRICTED; > 4 MB -> WRP_FONT_TOO_LARGE
+ * @invariant `variation` picks a CFF2 instance by design value per axis tag (absolute from the font defaults); omitted or all-default = the default instance, which is also the only instance of a TrueType or CFF 1.x font
+ * @failure not base64 / not a font / truncated -> WRP_FONT_PARSE; WOFF, collection -> WRP_FONT_FORMAT_UNSUPPORTED; fsType 2 -> WRP_FONT_EMBEDDING_RESTRICTED; > 4 MB -> WRP_FONT_TOO_LARGE;
+ *   an unknown axis, a value outside its range, a variation on a font that is not CFF2 variable -> WRP_FONT_VARIATION
  */
 export const importFont = defineCommand({
   name: 'import_font',
   description:
-    'Embed a TrueType (.ttf) or CFF-outline OpenType (.otf) font in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). ' +
+    'Embed a TrueType (.ttf), CFF-outline OpenType (.otf) or CFF2 variable (.otf) font in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). ' +
     'Give the file as `base64` (CLI: `file=PATH` or `path=PATH` reads the file and fills it). The font is parsed completely and stored with the ' +
     'document, so a reopened document needs no font file. Refused when the font forbids embedding (OS/2 fsType restricted), is larger than 4 MB, ' +
-    'is CFF2 / WOFF / a collection (not supported) or is damaged. The result is `unverified` unless you pass the sha256 of ' +
+    'is WOFF / a collection (not supported) or is damaged. A CFF2 variable font is read at one instance: `variation` = {axisTag: value} in the design units of the font (e.g. {wght: 700, wdth: 87.5}), axes left out keep their default; the result lists `axes` ({tag, min, default, max}) so a first import without `variation` tells you the choices, and importing the same bytes with another `variation` adds a second record that shares the bytes. The result is `unverified` unless you pass the sha256 of ' +
     'the file as `sourceSha256` and it matches. Importing the same bytes twice returns the first record. Next: add_text with font=<id>, then ' +
-    'text_outline. Refusals carry error.code WRP_FONT_PARSE, WRP_FONT_FORMAT_UNSUPPORTED, WRP_FONT_EMBEDDING_RESTRICTED, WRP_FONT_TOO_LARGE.',
+    'text_outline. Refusals carry error.code WRP_FONT_PARSE, WRP_FONT_FORMAT_UNSUPPORTED, WRP_FONT_EMBEDDING_RESTRICTED, WRP_FONT_TOO_LARGE, WRP_FONT_VARIATION.',
   params: z.object({
     base64: z.string().optional().describe('The font file bytes, base64 encoded. The CLI fills it from file=PATH or path=PATH.'),
     path: z
@@ -45,6 +48,7 @@ export const importFont = defineCommand({
       .string()
       .optional()
       .describe('sha256 (hex) you expect the font bytes to have. A match marks the font verified; a mismatch refuses the import.'),
+    variation: variationField(),
   }),
   run: (doc, params): CommandResult => {
     const reject = (code: string, message: string, paths: string[] = []): CommandResult =>
@@ -62,9 +66,11 @@ export const importFont = defineCommand({
     const registered = registerFont(doc, bytes, {
       licence: params.licence,
       verified: params.sourceSha256 !== undefined,
+      variation: params.variation,
       source: params.path === undefined ? 'import_font' : `file ${params.path}`,
     });
-    if (isFontFailure(registered)) return reject(registered.code, registered.message, ['base64']);
+    if (isFontFailure(registered))
+      return reject(registered.code, registered.message, [registered.code === 'WRP_FONT_VARIATION' ? 'variation' : 'base64']);
     const { record, existing } = registered;
     const data = {
       id: record.id,
@@ -78,6 +84,8 @@ export const importFont = defineCommand({
       capHeight: record.capHeight,
       capHeightSource: record.capHeightSource,
       embedding: record.embedding,
+      axes: registered.axes,
+      variation: record.variation ?? {},
       ...(record.licence !== undefined ? { licence: record.licence } : {}),
       verified: record.provenance.verified,
       unverified: !record.provenance.verified,
@@ -85,7 +93,7 @@ export const importFont = defineCommand({
     };
     const summary = existing
       ? `import_font: the document already holds these bytes as ${record.id} (${record.family} ${record.style}); nothing added.`
-      : `import_font: embedded ${record.family} ${record.style} as ${record.id} (${registered.glyphs} glyphs, ${bytes.length} bytes, cap height ${record.capHeight} of ${record.unitsPerEm} units, embedding ${record.embedding}, ${record.provenance.verified ? 'verified against the pinned sha256' : 'unverified: no pinned sha256'}).`;
+      : `import_font: embedded ${record.family} ${record.style} as ${record.id} (${registered.glyphs} glyphs${registered.axes.length === 0 ? '' : `, axes ${registered.axes.map((a) => `${a.tag} ${a.min}..${a.default}..${a.max}`).join(' ')}, instance ${JSON.stringify(record.variation ?? {})}`}, ${bytes.length} bytes, cap height ${record.capHeight} of ${record.unitsPerEm} units, embedding ${record.embedding}, ${record.provenance.verified ? 'verified against the pinned sha256' : 'unverified: no pinned sha256'}).`;
     const recorded = existing ? {} : { recordExtras: { base64: undefined, blob: record.blob } };
     return { ...changed(registered.document, summary, [record.id]), data, ...recorded };
   },
@@ -121,6 +129,7 @@ export const listFonts = defineCommand({
       format: font.format,
       ...(font.licence !== undefined ? { licence: font.licence } : {}),
       sha256: font.blob,
+      ...(font.variation !== undefined ? { variation: font.variation } : {}),
       source: 'document',
       verified: font.provenance.verified,
     }));

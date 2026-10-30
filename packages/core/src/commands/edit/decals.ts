@@ -16,6 +16,7 @@ import { hasGlyph, rasterizeText } from '../../lib/blockFont';
 import { decalPatch } from '../../geometry/decal';
 import { wrapExtent } from '../../geometry/decalWrap';
 import { wrapRejection } from '../wrap/codes';
+import { variationField } from '../wrap/variationField';
 import { fontDecal } from './decalFont';
 import { wrapFaceAt } from './decalWrapFace';
 import { localTriangles } from '../../geometry/solidTriangles';
@@ -70,6 +71,7 @@ export const addDecal = defineCommand({
         'Outline font of the letters: a font id (import_font, list_fonts) or a bundled family name such as "Fira Sans". Default: the built-in block font.',
       )
       .optional(),
+    variation: variationField(),
     mapping: z
       .enum(['project', 'wrap'])
       .describe(
@@ -79,7 +81,7 @@ export const addDecal = defineCommand({
   }),
   run: (
     doc,
-    { id, text, at, normal, height, width, angle = 0, depth, color = '#ffffff', background, font, mapping },
+    { id, text, at, normal, height, width, angle = 0, depth, color = '#ffffff', background, font, variation, mapping },
     ctx,
   ): CommandResult => {
     const fail = failer(doc, 'add_decal');
@@ -98,7 +100,7 @@ export const addDecal = defineCommand({
     let missing: readonly string[] = [];
     let family: string | undefined;
     if (font !== undefined) {
-      const made = fontDecal(doc, ctx, font, text, height);
+      const made = fontDecal(doc, ctx, font, text, height, variation);
       if ('code' in made) return wrapRejection(doc, 'add_decal', made.code, made.message, [id], ['font']);
       working = made.document;
       ink = { width: made.inkWidth, height: made.inkHeight };

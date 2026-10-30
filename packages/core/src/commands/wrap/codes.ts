@@ -29,9 +29,10 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_PROJECTION_MISSES_FACE: 'Change `direction` or move the sketch plane so the curves face the solid.',
   WRP_KERNEL_BUILD_FAILED: 'Simplify the profile, reduce depth, or report the document (the exact kernel refused the construction).',
   WRP_FONT_UNAVAILABLE: 'Run `list_fonts`, then `import_font` for a font that is not listed.',
-  WRP_FONT_PARSE: 'Give a TrueType (.ttf) or CFF OpenType (.otf) font file.',
-  WRP_FONT_FORMAT_UNSUPPORTED:
-    'Use a TrueType (.ttf) or CFF-outline OpenType (.otf) font; CFF2 (variable), WOFF and collections are not supported.',
+  WRP_FONT_PARSE: 'Give a TrueType (.ttf), CFF OpenType (.otf) or CFF2 variable font file.',
+  WRP_FONT_FORMAT_UNSUPPORTED: 'Use a TrueType (.ttf), CFF-outline OpenType (.otf) or CFF2 font; WOFF and collections are not supported.',
+  WRP_FONT_VARIATION:
+    'Name only axes the font has (import_font returns data.axes with tag, min, default, max), keep each value inside its range, and use a CFF2 variable font: TrueType (gvar) fonts only have their default instance.',
   WRP_FONT_EMBEDDING_RESTRICTED: 'Use a font licensed for embedding (the bundled fonts are SIL OFL).',
   WRP_FONT_TOO_LARGE: 'Subset the font to under 4 MB, or use a bundled one.',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',

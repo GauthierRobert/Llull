@@ -280,9 +280,9 @@ describe('Type 2 charstrings', () => {
     expect('regions' in filled && filled.regions[0]?.holes.length).toBe(1);
   });
 
-  it('refuses seac, arithmetic operators, stack underflow, bad subroutines, recursion, too many operators and unknown escapes', () => {
+  it('refuses an unresolvable seac, stack underflow, bad subroutines, recursion, too many operators and unknown escapes', () => {
     expect(failure({ glyphs: glyphs([10, 20, 65, 66, 'endchar']) }).code).toBe('WRP_FONT_PARSE');
-    expect(failure({ glyphs: glyphs([1, 2, 'and', 'endchar']) }).message).toContain('not supported');
+    expect(failure({ glyphs: glyphs([1, 'and', 'endchar']) }).message).toContain('underflow');
     expect(failure({ glyphs: glyphs(['callsubr', 'endchar']) }).message).toContain('underflow');
     expect(failure({ glyphs: glyphs([5, 'callsubr', 'endchar']), localSubrs: [['return']] }).message).toContain('out of range');
     expect(failure({ glyphs: glyphs([-107, 'callsubr', 'endchar']) }).message).toContain('without subroutines');

@@ -15,6 +15,7 @@ import { MAX_DISPLAY_PRECISION } from '../limits';
 import { MAX_TEXT_CHARACTERS } from '../../lib/font/layout';
 import { isFontFailure, loadFont, resolveFont } from '../wrap/fontStore';
 import { wrapRejection } from '../wrap/codes';
+import { variationField } from '../wrap/variationField';
 import { DEFAULT_DIMENSION_OFFSET, dimensionDrawing, formatDimensionValue } from '../../geometry/dimensionAnnotation';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
@@ -67,6 +68,7 @@ export const addText = defineCommand({
         'Font of the outline text: a font id (import_font, list_fonts) or a bundled family name such as "Fira Sans" (embedded in the document on first use).',
       )
       .optional(),
+    variation: variationField(),
     verticalAnchor: z
       .enum(['baseline', 'cap_middle', 'cap_top'])
       .describe(
@@ -108,6 +110,7 @@ export const addText = defineCommand({
       color = '#333333',
       layer,
       font,
+      variation,
       verticalAnchor,
       letterSpacing,
       kerning,
@@ -157,7 +160,7 @@ export const addText = defineCommand({
           [],
           ['content'],
         );
-      const resolved = resolveFont(doc, ctx, font);
+      const resolved = resolveFont(doc, ctx, font, variation);
       if (isFontFailure(resolved)) return reject(resolved.code, resolved.message);
       const loaded = loadFont(resolved.document, resolved.record.id);
       if (isFontFailure(loaded)) return reject(loaded.code, loaded.message);

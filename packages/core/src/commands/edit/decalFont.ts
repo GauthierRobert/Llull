@@ -11,6 +11,7 @@ import { flattenLoop } from '../../lib/font/outline';
 import { packMask, rasterizePolygons } from '../../lib/outlineRaster';
 import { outlineErrorCode, textOutline } from '../../geometry/textOutline';
 import type { ExecutionContext } from '../types';
+import type { AxisValues } from '../../lib/font/variation';
 import { isFontFailure, loadFont, resolveFont } from '../wrap/fontStore';
 
 /** Pixel rows of a text mask: coarse enough to keep the stored bits small (a line of ten letters is under 3 KB), fine enough for paint. */
@@ -36,8 +37,9 @@ export function fontDecal(
   reference: string,
   text: string,
   capHeight: number,
+  variation?: AxisValues,
 ): FontDecal | { readonly code: string; readonly message: string } {
-  const resolved = resolveFont(doc, ctx, reference);
+  const resolved = resolveFont(doc, ctx, reference, variation);
   if (isFontFailure(resolved)) return resolved;
   const loaded = loadFont(resolved.document, resolved.record.id);
   if (isFontFailure(loaded)) return loaded;
