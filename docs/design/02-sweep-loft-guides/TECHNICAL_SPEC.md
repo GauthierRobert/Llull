@@ -620,7 +620,7 @@ VC-SWG-32 (mesh path, limit 5e-3): worst case VC-36 3.9e-3, VC-19 at 90 / 120 de
 
 ### 16.4 Not done
 
-The frames overlay is done (section 17). A native test that provokes `SWG_CHECK_VOLUME_MISMATCH` on a real overlapping solid (see 16.3).
+The frames overlay is done (section 17). The native test of an overlapping solid is done (2026-10-30, DES-2c), and it changed the check: a sweep whose path passes back through its own tube (path [0,0,0] [60,0,0] [60,40,0] [30,40,0] [30,-30,0], r 4, bend radius 8) is built by the native kernel and its exact volume EQUALS the section-times-path integral (9 535.317379 both: the kernel integrates the overlap twice, as the integral does), so `SWG_CHECK_VOLUME_MISMATCH` cannot see an overlap; it reveals folds the sewing accepted and construction errors (its remedy text says so now). `check_sweep_loft` gained a global overlap search for every sweep that is not a helix (the helix keeps its closed-form test): the welded display triangles are searched for crossing pairs (`checkOverlap.ts`, above 60 000 triangles an info finding says it was skipped), fail finding `SWG_CHECK_SELF_INTERSECTION_GLOBAL` with the pair count. Tests: `tests/unit/sweep/globalOverlap.test.ts` (crossing path fails, L, U-turn and closed ring clean, the triangle limit; the crossing case fails with the search disabled), `server/tests/nativeKernelSweepOverlap.test.ts` (native: built, volumes equal within 1e-6, the only failing finding is the global overlap).
 
 ## 17. As built (DES-2c step 3: frames overlay, 2026-10-25)
 

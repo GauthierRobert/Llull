@@ -122,7 +122,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 - `[DONE]` **DES-2c** 02 SWG left after M0–M8 (done 2026-10-23, §13–§14), the code export of sweeps / lofts (done 2026-10-25, §15) and step 2 (done 2026-10-25, §16: `ShapeRecipe` node `sheetSolid`,
   `volumeConsistencyRel`, hollow round sections with laws, exact-curve `inspect_sweep` curvature, closed-loft drift distribution, VC-SWG-32 table):
-  frames overlay (UI, step 3, done 2026-10-25, TECHNICAL_SPEC §17). Left: a native test that provokes `SWG_CHECK_VOLUME_MISMATCH` (§16.4). _Lane 1 + 2_ _deps: —_
+  frames overlay (UI, step 3, done 2026-10-25, TECHNICAL_SPEC §17). The overlapping-solid native test is done (§16.4: the volume check cannot see an overlap; a global overlap search was added). _Lane 1 + 2_ _deps: —_
 - `[TODO]` **DES-6c** 06 BLD left after M0–M1 + M2 + restricted M4 + M3 (done 2026-10-23 / 25 / 26, TECHNICAL_SPEC §13.5–13.11): M3 remainder
   (done in step 3, 2026-10-26, §13.12: concave setback corners, linear `sizeEnd` at setback corners, corner acceptance 68 ms/corner cheaper; left: the exact-boundary corner patch that meets the default 1e-6 x diagonal G0 instead of the 5x `g0Corner` (investigated, needs n Coons/Hermite faces per corner; deferred by coordinator decision: 5e-6 x diagonal is below OCCT / STEP edge tolerances, revisit when a consumer needs 1e-6 or G2 corners are scheduled, §13.12.3), setback corners with a rolling-ball neighbour or on curved / non-straight edges, mixed convex/concave vertices, smooth / multi-station radius laws, G2 patches); M2 leftovers (§13.11.5: corners of
   curved edges / faces and of vertices with an unrounded third edge, `size2` on curved edges or with a varying size, oblique / curved ends,

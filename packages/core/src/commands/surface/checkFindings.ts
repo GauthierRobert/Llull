@@ -30,12 +30,13 @@ export const REMEDIATION: Readonly<Record<string, string>> = {
     'use a smaller section or scale, or a larger bend radius, so that the fold margin stays above the limit',
   SWG_CHECK_FRAME_DEGENERATE: 'rebuild the sweep with orientation minimal, or another direction',
   SWG_CHECK_LAW_INVALID: 'fix the twist / scale / area laws so that they are finite, and scale / area positive',
-  SWG_CHECK_SELF_INTERSECTION_GLOBAL: 'use a larger pitch or a smaller section so neighbouring turns do not touch',
+  SWG_CHECK_SELF_INTERSECTION_GLOBAL:
+    'use a larger pitch or a smaller section so neighbouring turns do not touch, or route the path so it stays a section diameter away from itself',
   SWG_CHECK_FIT_APPROXIMATION:
     'none for an info finding; a warning means the exact solid is not built (mesh only): loosen fitTolerance or simplify the sweep',
   SWG_CHECK_RAIL_DEVIATION: 'loosen railTolerance / fitTolerance, simplify the rails, or split the path',
   SWG_CHECK_VOLUME_MISMATCH:
-    'the sweep overlaps itself or folds: use a larger pitch, bend radius or a smaller section / scale so the solid keeps its full volume',
+    'the exact solid is not the swept section (a fold the kernel sewing accepted, or a construction error): use a larger pitch, bend radius or a smaller section / scale; an overlap of the path through itself does not change the volume (SWG_CHECK_SELF_INTERSECTION_GLOBAL finds it)',
   SWG_CHECK_LOFT_TWIST: 'rebuild the loft with alignment auto (or seams) so the section starts line up',
   SWG_CHECK_LOFT_CLOSURE_G1: 'add a section or move the last one so the closed loft returns to the first section tangentially',
   SWG_CHECK_SURFACE_DEGENERATE: 'move the sections or guides so the skin has no pinched or folded interior point',

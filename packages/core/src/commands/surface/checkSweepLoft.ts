@@ -14,6 +14,7 @@ import { helixOverlap } from '../solids/sweepOrientation';
 import { REMEDIATION, sig, type Finding, type NamedTolerance } from './checkFindings';
 import { checkLoft, checkSheet } from './checkLoft';
 import { checkVolume, type VolumeCheck } from './checkVolume';
+import { checkOverlap } from './checkOverlap';
 
 const CHECK_SAMPLES = 256;
 
@@ -92,6 +93,10 @@ function checkSweep(
       remediation: REMEDIATION.SWG_CHECK_SELF_INTERSECTION_GLOBAL as string,
       message: overlap,
     });
+  else {
+    const crossing = checkOverlap(entity, unit);
+    if (crossing !== null) findings.push(crossing);
+  }
   if (volume.kernel !== undefined && volume.kernel !== null && volume.budget.left > 0) {
     volume.budget.left -= 1;
     const measured = checkVolume(entity, volume.kernel, volume.tolerance, unit);
