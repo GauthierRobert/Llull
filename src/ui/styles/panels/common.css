@@ -437,6 +437,38 @@
   color: var(--fg-subtle);
 }
 
+/* A labelled row of checkboxes: no native fieldset frame; the legend sits in the label column like a .field label. */
+.checkbox-group {
+  display: flow-root;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.checkbox-group__legend {
+  float: left;
+  width: 68px;
+  margin-right: var(--space-2);
+  padding: 0;
+  line-height: 22px;
+}
+
+.checkbox-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.checkbox-group__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
 .field input[type='text'],
 .field input[type='number'] {
   flex: 1 1 0;
