@@ -47,6 +47,7 @@ QuadMesh quad_remesh(rust::Slice<const double> positions, rust::Slice<const std:
   field->flag_preserve_sharp = params.preserve_sharp ? 1 : 0;
   field->sharp_cos_threshold = params.sharp_cos;
   field->flag_adaptive_scale = params.adaptive ? 1 : 0;
+  field->flag_preserve_boundary = params.preserve_boundary ? 1 : 0;
 
   field->Initialize(params.target_faces);
   announce(sink, "orientation_field");

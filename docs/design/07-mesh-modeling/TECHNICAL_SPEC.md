@@ -787,8 +787,8 @@ Plans (`node server/bin/llull.cjs run <plan> --continue`, cwd `docs/design/07-me
 ### 13.6.3 Decisions where the spec was open or wrong
 
 1. **The source is kept** and a new entity is created (`subd-<step>.<k>` or `mesh-<step>.<k>`). The spec's convention "rewrite in place" would delete the target that `fit_subdivision_to_mesh {cageId, targetId}` and the plan need. There is no `keepSource`.
-2. **Closed meshes only** (`MESH_NOT_CLOSED` otherwise). The spec says only "manifold". QuadriFlow does run on open meshes, but the result has valence-1 and -2 vertices all along the boundary and would need the open-cage `boundary` mode. Open input is a later extension.
-3. **`symmetry` is not offered** (FR-MSH-22 lists it): QuadriFlow has no symmetry, and an accepted-but-ignored parameter is worse than none.
+2. **Closed meshes only** (`MESH_NOT_CLOSED` otherwise; open input with output `mesh` since 13.17). The spec says only "manifold". QuadriFlow does run on open meshes, but the result has valence-1 and -2 vertices all along the boundary and would need the open-cage `boundary` mode. Open input is a later extension.
+3. **`symmetry` is not offered** (FR-MSH-22 lists it): QuadriFlow has no symmetry, and an accepted-but-ignored parameter is worse than none. (Built in 13.17 by remeshing the half and mirroring it.)
 4. **`adaptiveSize` 0..100 is an on / off switch** (QuadriFlow's `-adaptive` is a flag); the description says any value above 0 is the same.
 5. **`detectHardEdgesDeg`** does two things: it aligns the field to sharp edges of the source (`-sharp`, with the angle as a parameter), and for the subdivision output it makes cage edges creases when they follow a source edge sharper than the angle. The first version judged creases from the cage's own dihedral angles; a coarse cage of a torus got 184 creases on a smooth surface. Now a cage edge needs a sharp edge of the SOURCE under it: five samples along the edge (ends, midpoint, two more) must each lie within a quarter of the edge length (at most half a grid cell) of a sharp source segment that runs within 20 degrees of the edge. Every sample is matched on its own, so the source tessellation may be finer or coarser than the cage (the first rule needed one source segment to cover the whole edge and found 0 creases on a box tessellated 8 x 8 per face). The segments sit in a uniform grid with the median turned-edge length as the cell: linear time.
 6. **Output `mesh`** splits the quads along the shorter diagonal into a triangle mesh (`MeshData` has no quads). `subdivision` (default) has `levels` 2 (D5: B-spline faces = quads x 4^(levels-1)); the refined surface is capped at 10^6 quads.
@@ -828,7 +828,7 @@ Plans (`node server/bin/llull.cjs run <plan> --continue`, cwd `docs/design/07-me
 ### 13.6.5 Left
 
 - `fit_subdivision_to_mesh`, `fit_surface_to_mesh` and the fit half of VC-22: built, see 13.7.
-- Open (boundary) input with an open-cage output; symmetry.
+- Open (boundary) input and symmetry: built in 13.17 (open input with output `mesh` only; an open cage and meshes with holes are still not offered).
 - No known crash remains. (The one-cell box that crashed at 6 quads in a probe was its inconsistently wound variant, which the host refuses before the engine; the outward box gives 6 quads.)
 - Time at 40 000 quads (about 2 minutes) no longer blocks the backend event loop (13.8).
 
@@ -1101,7 +1101,7 @@ Cargo (`llull-meshops`): `edge_heap` (order by cost then ids, move both ways, bu
 
 ### 13.10.6 Left
 
-- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe.
+- `maxDeviation`-only decimation of a million triangles (17.9 s): a witness triangle per probe (done in 13.16: 13.4 s, not under 10 s).
 - Fewer cache misses in the collapse loop (it is memory bound): a storage permutation behind the logical ids.
 
 ## 13.11 As built (DES-7c step 6: full-resolution reads through every indirection, 2026-10-27)
@@ -1495,3 +1495,114 @@ Each fails without its fix (shown by disabling the fix): the shared-vertex test,
 - `maxDeviation`-only decimation and the memory-bound collapse loop (13.10.6) are unchanged.
 - The pair search keeps the TypeScript predicate (an edge of one face through the interior of the other, with `END_MARGIN`), so coplanar overlaps and contacts are not counted by either engine; a count of those is not planned.
 - The step-7 plan (13.12.2) is complete: `remesh`, `analyze` (with the pair search), `repair`, `fill_holes`, `sculpt` are native; `cut` is a lifted TypeScript cap.
+
+## 13.16 As built (DES-7c leftovers (1): the `maxDeviation`-only decimation, 2026-10-30)
+
+### 13.16.1 Profile (13.10.4 input: icosphere l8, radius 10, radial noise +-0.1, seed 42, 1,310,720 triangles, `maxDeviation 0.05`, no target, `preserveBoundary`)
+
+`tests/perf.rs` (ignored test `decimating_1_3_million_triangles_by_a_deviation_bound_alone_is_timed`) reproduces 13.10.4: 17.4 s, 521,051 collapses, 268,618 triangles, 1,686,216 queue pops, of which 130,994 refused by the link condition, 81,376 by the fold-over test and 952,795 by the deviation guard (positions digest `e59decaec9419492`, which is the digest every later build had to reproduce). The cost was NOT the deviation re-evaluated per queue entry or a rebuilt queue (the queue is the indexed heap of 13.10; set-up is 0.4 s). Timed inside the loop (an instrumented build, one machine, other lanes running so each figure is good to about 10 %):
+
+| Part of the loop | Seconds |
+| ---------------- | ------- |
+| the deviation guard, probe tests (`DeviationGuard`: 45.2 M probe checks, 85.6 M point-triangle tests over 1.47 M calls) | 6.0 |
+| the guard's queries on the original surface (`farther_than` at the survivor position and at the centre of each fan triangle; reached only by the 521 k attempts that passed every probe) | 3.8 |
+| the rest of `valid_collapse` (rings, link, fold-over), pops, `choose`, applying a collapse, re-queueing | about 7.5 |
+
+Every one of the 952,795 deviation refusals was a probe refusal (the surface queries never refused): an attempt walks the probes of the survivor and of its ring (the probes inherited from merged vertices make that list long: 26 probes per call on average, 40 to 70 for an accepted collapse), and a collapse that is accepted must check them all.
+
+### 13.16.2 What was changed (results unchanged, bit for bit)
+
+All three are caches of facts that the guard would recompute; none changes a verdict, and the order of the independent tests was already free (13.10.2 point 5).
+
+1. **A witness per probe** (`collapse_check.rs`, `Probe`): the face that last proved the probe within the bound, with its stamp and its corners. A face stamp (`DeviationGuard::touch`) counts the changes of the face (its corners and the positions of its corners: bumped for every face at the two vertices of an accepted collapse), so an unchanged stamp means the geometry the probe was measured against; the witness proves the probe again when its face is still one of the faces the test would use (a face at the owner that has neither end of the edge). The witness is stored in the probe, and the probes of a vertex are one contiguous list, so reading them is sequential.
+2. **A blamed probe per refused edge**: the probe whose test failed is remembered by edge; the next attempt on the edge tests it first (it only counts if an affected vertex still owns it). 508,600 of 534,243 retries were refused by it alone.
+3. **A hint per survivor for the original-surface queries**: the triangle that answered the last query of a collapse that keeps the vertex is tried before the tree (`SurfaceIndex::within(p, bound, hint)`; a triangle within the bound proves the answer, so the answer is the negation of the old `farther_than` for any hint, which is tested for hints that name any face or none).
+
+**Tried and dropped.** A memo of the refusals (an edge refused again when nothing within three edges of it changed since): 0 hits in 1.7 M pops, by construction (an edge is requeued exactly when a collapse changed its neighbourhood), and the marking cost made it slower (20 s). A second witness was not built: a probe owned by the survivor, a large share of the checks, can never use one (every face at the survivor has an end of the edge), and the other probes already hit 28 % of the time.
+
+### 13.16.3 Measured (win32-x64, 22 cores, other lanes running; the same job, one process; three runs)
+
+| | Before | After |
+| - | ------ | ----- |
+| `maxDeviation 0.05`, 1,310,720 triangles, no target | 17.3 to 17.9 s | 13.4 to 14.1 s (16.2 s once under load) |
+| collapses, triangles, rejections, positions digest | 521,051, 268,618, 130,994 / 81,376 / 952,795, `e59decaec9419492` | the same |
+| `targetTriangles 100000` (no guard), same input | 4.33 to 4.6 s | 4.33 s (4.47 s with the 0.14 s deviation measure) |
+
+The reduction is about 20 to 25 %: the witness and the locality take the probe tests from 6.0 s to about 4.4 s, the hint and the blame the surface queries from 3.8 s to about 1.4 s; the 7 to 8 s of the shared loop are unchanged. The path is still three times the target path and over the 10 s budget of 13.10: a guard that validates every probe of a neighbourhood for every accepted collapse (26 probes per attempt on average, more for an accepted collapse, growing as vertices merge) is O(probes) per collapse, and 521 k collapses with 953 k refused retries are what the quadric order asks for with this bound. The spec text of 13.10.4 ("a witness triangle per probe would skip most of the tests") was too optimistic: the witness skips 28 % of them.
+
+### 13.16.4 Tests
+
+Cargo: `collapse_check` unit tests (guard on a wheel, now through `Probe`), `surface` (`within` equals the old `farther_than` around the bound to the ulp, a hint names any face or none and never changes the answer, the face it returns is within the bound), `tests/decimate_pins.rs` (the old-implementation pins, including the `bounded` and `bound_and_target` ones), and 4 new TypeScript pins in `tests/ts_pins.rs` / `ts_pins.json` (regenerated with the two documented steps: 64 lines added, none changed): `decimate_deviation_sphere` (20,480 triangles, 16,265 deviation refusals), `decimate_deviation_free_boundary_features` (open grid with holes, free boundary, feature angle), `decimate_deviation_locked_region`, `decimate_deviation_and_target`. The server parity (`meshopsNative.test.ts`) and the 1.3 M job stay green.
+
+Each fails without its fix (shown by disabling the fix): stamps never bumped, a witness that ignores the two ends of the edge, a blamed probe that is not re-tested (refuses without testing), and a hint accepted without its distance test each fail `ts_pins` (the first also fails `decimate_pins`).
+
+### 13.16.5 Left, by name
+
+- The deviation path of a million triangles is 13.4 s, not under 10 s. What would be left to try, each a larger change: probes held in a spatial structure per surviving vertex so that a collapse re-tests only the probes near the changed faces (the survivor's own probes would still be re-tested), or the quadric order replaced by a cheaper bound check, which changes the result.
+- The memory-bound collapse loop of 13.10.6 (a storage permutation behind the logical ids) is unchanged.
+
+## 13.17 As built (DES-7c leftovers (2): `quad_remesh` of open meshes and with mirror symmetry, 2026-10-30)
+
+### 13.17.1 What the requirement is, and what the engine does
+
+FR-MSH-22 lists "symmetry axis" and 13.6.3 decisions 2 and 3 left two things out: open input (the result of QuadriFlow on an open mesh has valence-1 and -2 vertices along its boundary and does not lie on the input boundary) and `symmetry` (QuadriFlow has none). What they must do, as built:
+
+- **Open mesh.** The quads cover the mesh and keep its boundary: every boundary loop of the quads lies on exactly one boundary loop of the source, one for one, the quads wound like the source triangles they lie on. Output is `mesh` only: a subdivision cage needs a closed surface (`MESH_NOT_CLOSED`, now with the remedy in its text). The vendored QuadriFlow already has the flag the upstream calls `flag_preserve_boundary` (boundary edges are treated as sharp edges, so the field and the integer grid are aligned to them); the facade now sets it (`QuadParams.preserve_boundary`, job parameter `preserveBoundary`, op field `preserveBoundary`). Measured on the l4 hemisphere (300 quads): the largest distance of a boundary vertex to the rim is 2.88 with the flag off and 1.38 with it on, in both cases not zero: the engine's boundary is a staircase near the rim, so the host snaps it (below).
+- **Symmetry.** `symmetry: { plane: yz | xz | xy }`, a plane through the origin as in `sculpt_mesh`. The quads are exactly mirror-symmetric: the result vertices set equals its mirror image bit for bit. QuadriFlow cannot give that, so the half is remeshed and mirrored: (1) the source must be symmetric (`symmetryProblem`: every vertex mirrored lies within 0.1 % of the source diagonal of the source surface, else `MESH_QUAD_REMESH_NOT_SYMMETRIC` with the worst distance); (2) `halfOf` cuts the positive half exactly at the plane (`cutMeshByPlane`, no cap; vertices within 1e-9 of the diagonal of the plane are put exactly on it); (3) the engine remeshes the half as an open mesh (`preserveBoundary`, half the target quads); (4) its boundary is snapped onto the half's boundary, the part on the plane exactly onto it; (5) `mirrorWeld` adds the mirror image with reversed winding and shares the vertices on the plane. A symmetric open mesh works the same (its own rim is kept).
+
+### 13.17.2 The boundary snap (`geometry/mesh/quadOpen.ts`, pure)
+
+`snapQuadBoundary(source, positions, quads, axis)`: the boundary loops of the source (edges of one triangle chained by direction) and of the quads must be simple loops and equal in number; each quad loop must be nearest, at every vertex, to one source loop and no two to the same one; the vertices of a quad loop are projected onto their source loop by arc length, the arc lengths unwrapped and made strictly monotone in the direction the loop goes round (a gap of at least 1e-3 of the rim over the vertex count), and the loop must go once round. The corners of the rim are kept exactly: the quad vertex nearest to each corner is put on it (a corner is where the rim turns by more than 60 degrees seen from one quad edge away, so a rim of tiny jagged triangles has none, a square plate has its four, and where the rim joins or leaves the symmetry plane). A quad that the snap folds or collapses (the normal of any quad touched must keep its direction) refuses the result. `orientQuadsToSource` winds each connected piece like the source triangles it lies on (a vote per quad against its closest source triangle), because an open surface has no inside for `outwardQuads`. A problem has a cause: `source` (the source's own boundary branches: `MESH_NON_MANIFOLD`), `loops` (the loop counts or the loop-to-loop pairing differ: `MESH_QUAD_REMESH_BOUNDARY_LOST`, remedy `fill_mesh_holes`) or `shape` (loops present but not placeable without folding or reordering: `MESH_QUAD_REMESH_SNAP_FAILED`, remedy another `targetQuadCount`).
+
+**What stays refused, by name.** Open input with output "subdivision" (`MESH_NOT_CLOSED`); a source that is not symmetric (`MESH_QUAD_REMESH_NOT_SYMMETRIC`); a mesh with holes or an annulus: the engine does not keep an inner boundary loop (measured on a 10 x 10 plate with a 3.3 x 3.3 hole: the quads cover the hole, one loop against two), refused as `MESH_QUAD_REMESH_BOUNDARY_LOST` (remedy: `fill_mesh_holes`, or cut along the hole); and any result whose boundary the snap cannot place without folding a quad. Things that are not refused but are worth knowing (measured below): the boundary of the quads has many valence-1 and valence-2 vertices (a staircase boundary, not an edge loop aligned to the rim), and a symmetric remesh has valence-2 and valence-6 vertices along the seam where the half's own boundary met the plane, and lands 0.7 to 0.8 of the target.
+
+### 13.17.3 Measured (win32-x64, release build, 22 cores; the whole command through the native engine, including the validation and the deviation job)
+
+| Case | Quads (ratio to target) | Valence (vertices per number of quads around them) | Largest boundary move | Hausdorff / mean to the source | Time |
+| ---- | ----------------------- | -------------------------------------------------- | --------------------- | ------------------------------ | ---- |
+| closed l4 sphere, 600, no symmetry (control: unchanged path) | 614 (1.02) | {3: 8, 4: 608} | n/a | 0.066 / 0.029 | 0.48 s |
+| the same, symmetry yz | 432 (0.72) | {2: 8, 3: 6, 4: 413, 6: 7} | 1.00 | 0.112 / 0.045 | 0.39 s |
+| the same, symmetry xz / xy | 482 (0.80) / 408 (0.68) | {2: 16, 3: 4, 4: 450, 6: 14} / {2: 17, 3: 2, 4: 377, 6: 14} | 0.80 / 0.88 | 0.109 / 0.041, 0.107 / 0.049 | 0.36 s |
+| hemisphere l4 (rim = the jagged boundary of 2,528 triangles, area 628), 300 | 232 (0.77) | {1: 16, 2: 22, 3: 16, 4: 205} | 1.36 | 0.332 / 0.042 | 0.20 s |
+| the same, symmetry yz | 236 (0.79) | {1: 20, 2: 19, 3: 18, 4: 205, 6: 2} | 0.94 | 0.284 / 0.044 | 0.14 s |
+| hemisphere l5, 1000, symmetry yz | 828 (0.83) | {1: 20, 2: 58, 3: 20, 4: 767, 6: 8} | 0.48 | 0.175 / 0.012 | 0.57 s |
+| hemisphere l5, 1000, no symmetry | refused `MESH_QUAD_REMESH_BOUNDARY_LOST` | | | | 0.49 s |
+| square plate 10 x 10, 100 / 400 | 100 (1.00) / 360 (0.90), the four corners exact | {1: 6, 2: 34, 3: 2, 4: 80} / {1: 25, 2: 50, 3: 21, 4: 313} | 0.73 / 0.29 | 0 / 0 (flat) | 0.09 s / 0.34 s |
+| closed l6 sphere, 4000, symmetry yz | refused `MESH_QUAD_REMESH_BOUNDARY_LOST` | | | | 1.9 s |
+| closed l6 sphere, 4000, no symmetry | 3,877 (0.97) | {3: 9, 4: 3869, 5: 1} | n/a | 0.010 / 0.0046 | 2.6 s |
+
+Two of the twelve runs were refused by the boundary rule (the engine's boundary could not be snapped without folding, or lost a loop): the rule makes a failure visible instead of returning quads that leave the rim. The result's `data` has `open`, `symmetry`, `boundaryLoops` and `boundaryMove` (the largest move of a vertex, in document units) and the summary says how many loops were kept.
+
+### 13.17.3b Retries (review fix, 2026-10-30)
+
+An open or symmetric result lands below its target, and a snap can fail at one count and pass at a neighbour, so the command retries deterministically and reports it (`data.attempts`, `data.engineTargets`). A snap failure is asked again at ceil(1.15 x) then ceil(0.87 x) the first count before it is refused (a `source` cause is not retried); a result under 0.85 of the target is asked once more for ceil(count / ratio) and the closer to 1 of the two is kept. Re-measured through the native engine:
+
+| Case | Quads (ratio) | Attempts: counts sent | Time |
+| ---- | ------------- | --------------------- | ---- |
+| closed l4 600 | 614 (1.02) | 1: 600 | 0.49 s |
+| same, symmetry yz / xz / xy | 432 (0.72) / 602 (1.00) / 408 (0.68) | 2: 300, 417 / 2: 300, 374 / 2: 300, 442 | 0.66 s |
+| hemisphere l4, 300 | 232 (0.77) | 2: 300, 388 | 0.44 s |
+| same, symmetry yz | 236 (0.79) | 2: 150, 191 | 0.29 s |
+| hemisphere l5, 1000, symmetry yz | 828 (0.83) | 2: 500, 604 | 0.95 s |
+| hemisphere l5, 1000 | refused `MESH_QUAD_REMESH_SNAP_FAILED` | 3: 1000, 1150, 870 | 1.35 s |
+| plate 100 / 400 | 109 (1.09) / 360 (0.90) | 2: 100, 139 / 1: 400 | 0.12 / 0.17 s |
+| closed l6, 4000, symmetry yz | refused `MESH_QUAD_REMESH_SNAP_FAILED` | 3: 2000, 2300, 1740 | 5.0 s |
+| closed l6, 4000 | 3,877 (0.97) | 1: 4000 | 2.7 s |
+
+The 10 x 10 plate with a 3.3 x 3.3 hole at 200 quads: the engine now returns the hole's loop at this count and the snap folds quad 172 at each of the three counts, so it is `MESH_QUAD_REMESH_SNAP_FAILED` (a count mismatch stays `BOUNDARY_LOST`, pinned by the stub-engine test); the refusal reports the first attempt's cause.
+
+The second request helped in two of the eight retried results (xz 0.80 to 1.00; plate 0.9x to 1.09) and was not closer in the others (the first result was kept); the two refusals (earlier read as `BOUNDARY_LOST`) are shape failures that three counts did not cure, now named `MESH_QUAD_REMESH_SNAP_FAILED`. Symmetry with triangles lying in the plane is refused (`MESH_PARAM_INVALID`, path `symmetry`, with the count).
+
+### 13.17.4 Tests
+
+Rust: `llull-quadflow/tests/remesh.rs` (`an_open_mesh_with_preserve_boundary_follows_its_rim_closer_than_without`: no non-manifold edge, boundary closer to the rim with the flag, quad count within 210 to 390 of 300; red with the facade not setting the flag: preserved 2.554 against free 2.554). Core, stub engine: `tests/unit/mesh/quadRemeshOpen.test.ts` (12 cases: the snap moves only boundary vertices onto the rim and keeps the four corners exactly, reports loops and the largest move; the refusals (loop counts, a source boundary that branches, a quad folded); the winding vote; `mirrorWeld` (welds the plane vertices, reverses the mirrored quads); `symmetryProblem` accepts a symmetric sphere (yz, xy) and refuses a shifted one with the distance; `halfOf` in the three planes and nothing on the positive side; cut vertices put exactly on the plane when the clipping arithmetic leaves 5.55e-17; the command: the engine gets the open mesh with `preserveBoundary` and no `withDeviation` request, the half with half the target, the result mirror-symmetric to the bit, `MESH_NOT_CLOSED` for an open mesh with output "subdivision", `MESH_QUAD_REMESH_NOT_SYMMETRIC`, a lost loop, and the document returned unchanged). Server, native engine: `server/tests/quadRemeshOpenNative.test.ts` (7 cases: a hemisphere keeps its rim (every boundary vertex of the quads on the source boundary to 1e-9, one loop, move under one quad edge, deviation under 1); a square plate keeps its four corners exactly and stays flat; a plate with a hole is refused by name; the subdivision and asymmetry refusals; a sphere in the three planes is exactly mirror-symmetric, closed, and its valence sum is 8; the symmetric cage is a closed subdivision solid with symmetric vertices; a symmetric hemisphere keeps its rim). `tests/unit/contract/__snapshots__/toolSchemas.json` changed for the `quad_remesh` description and the new parameter only; `quadRemesh.test.ts` and `quadRemeshNative.test.ts` (the closed path) are unchanged and green.
+
+Each fails without its fix (shown by disabling the fix): the corner pins (the corners are no longer exact), the winding vote (a reversed piece stays reversed), the symmetry check (a shifted sphere is accepted), the exact zero of the cut vertices (`halfOf` leaves 5.55e-17 and the mirror cannot weld them), the loop count comparison, and the winding reversal of the mirror each fail one `quadRemeshOpen.test.ts` test; the flag of the facade fails the Rust test. Not separately red-proven: the monotone arc order and the fold check of the snap (defence in depth: on the real engine's output the unordered nearest-point snap folded quad 172 of the plate with a hole before the order was added, and no committed input reproduces a fold that the order does not already prevent).
+
+### 13.17.5 Left, by name
+
+- Meshes with holes (several boundary loops where the engine keeps fewer): refused as `MESH_QUAD_REMESH_BOUNDARY_LOST`; a remesher that treats inner boundaries as constraints (or the half-and-mirror trick for them) is not built.
+- The quads at a boundary are a staircase (valence-1 and -2 vertices, 16 to 25 corners on a circular rim of a few hundred quads) and a symmetric result has valence-2 and -6 vertices along the seam; a post-pass that relaxes and realigns the boundary rows would make them regular and is not built.
+- A symmetric remesh lands at 0.7 to 0.8 of the target (the half's boundary rows count twice at the seam); the command says "usually within 15 %" only for the closed, non-symmetric case and states the retry.
+- Two of twelve measured inputs are refused by the boundary rule (a hemisphere of 20,480 triangles at 1,000 quads, a closed l6 sphere at 4,000 quads with symmetry); lowering or raising the target usually passes.
+- The symmetry plane passes through the origin (as in `sculpt_mesh`); a plane elsewhere is not offered.

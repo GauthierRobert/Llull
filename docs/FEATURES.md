@@ -961,7 +961,7 @@
 | `mesh_to_brep` | Convert a closed triangle mesh (or any 3D solid's triangles) into an exact B-rep solid on the native OCC kernel, so mass_properties is exact (method exact) and… | kernel |
 | `minkowski_sum` | Minkowski sum (dilation: grow `a` by the shape of `b`) or difference (erosion: the positions where `b` still fits inside `a`) of two closed meshes / solids. |  |
 | `offset_mesh` | Offset the surface of a mesh (or any 3D solid) by a signed distance: positive grows it, negative shrinks it. |  |
-| `quad_remesh` | Rebuild a CLOSED mesh (or the triangles of any closed 3D solid) as a clean quad mesh whose edge flow follows the surface (QuadriFlow, Huang et al., SGP 2018: o… |  |
+| `quad_remesh` | Rebuild a mesh (or the triangles of any 3D solid) as a clean quad mesh whose edge flow follows the surface (QuadriFlow, Huang et al., SGP 2018: orientation fie… |  |
 | `remesh_mesh` | Remesh a mesh (or the triangles of any 3D solid) into a regular, well-shaped triangulation of the same surface. |  |
 | `repair_mesh` | Repair a mesh (or the triangles of any 3D solid). |  |
 | `sculpt_mesh` | Sculpt a triangle mesh (or the triangles of any 3D solid) with a brush stroke: each stamp centre is projected onto the surface, then every vertex closer than `… |  |

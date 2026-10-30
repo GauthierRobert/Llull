@@ -24,6 +24,8 @@ mod ffi {
         sharp_cos: f64,
         /// Smaller quads where the surface curves more.
         adaptive: bool,
+        /// Keep the boundary of an open mesh: boundary edges are treated as sharp edges (the quad edges follow them).
+        preserve_boundary: bool,
     }
 
     /// An indexed quad mesh: `positions` x, y, z per vertex, `quads` four vertex indices each.

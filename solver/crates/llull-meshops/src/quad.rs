@@ -13,6 +13,9 @@ pub struct QuadJob {
     /// Align the quads to edges whose faces turn by more than this angle (radians); absent = no alignment.
     pub hard_edge_rad: Option<f64>,
     pub adaptive: bool,
+    /// The input is open: boundary edges are treated as sharp edges (the quads follow them).
+    #[serde(default)]
+    pub preserve_boundary: bool,
 }
 
 /// `(positions, quads)` of the remeshed surface; the host checks that the input is manifold, consistently wound and free of degenerate faces.
@@ -32,6 +35,7 @@ pub fn quad_remesh(
         preserve_sharp: sharp_cos.is_some(),
         sharp_cos: sharp_cos.unwrap_or(0.0),
         adaptive: job.adaptive,
+        preserve_boundary: job.preserve_boundary,
     };
     let mesh = llull_quadflow::quad_remesh_with_stages(positions, triangles, &params, on_stage)
         .map_err(|error| JobError { code: "QUAD_REMESH_FAILED", message: error.0 })?;
