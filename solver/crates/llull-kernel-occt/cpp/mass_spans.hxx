@@ -1,7 +1,7 @@
 // Mass properties by knot span (01 DEF §17.16). BRepGProp integrates a B-spline face from a coarse sampling of its WHOLE parameter box and refines until two orders agree: a feature much
 // narrower than the face (a push of radius 2 on a 1000 mm face: 1.57 mm^3 of 3e6) lies between the first samples, the two orders agree on a flat surface, and the face reads as flat (area
-// and volume unchanged to 1e-9 although the surface carries the bump). The cure is to hand the integrator one face per knot span: a patch whose parameter box is the span, whose surface
-// is the polynomial (or rational) piece the rule is exact for.
+// and volume unchanged to 1e-9 although the surface carries the bump). The cure is to hand the integrator pieces of the face: one per run of FINE spans (the slivers of a local refinement,
+// as wide as the feature that caused them) and one per run of COARSE spans, each a patch whose parameter box is the run.
 #pragma once
 
 #include <BRepAdaptor_Curve2d.hxx>
@@ -13,6 +13,7 @@
 #include <Precision.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopAbs.hxx>
 #include <TopLoc_Location.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
@@ -102,21 +103,35 @@ inline std::vector<double> span_borders(const TColStd_Array1OfReal &knots, doubl
   return borders;
 }
 
-// A compound of the faces of `shape` in which every full-patch B-spline face is replaced by one face per knot span (same surface, same orientation). The faces that are not B-spline
-// patches, are trimmed, carry a location, or would need more than kMaxSpanFaces pieces stay as they are. `cut` counts the faces that were replaced.
-inline TopoDS_Compound span_faces(const TopoDS_Shape &shape, int &cut) {
+// Whether every face of `shape` belongs to a closed shell: only then do the open-cone volumes of its faces add up to a volume (an open shell integrated from an arbitrary apex
+// depends on where the apex is).
+inline bool all_shells_closed(const TopoDS_Shape &shape) {
+  if (TopExp_Explorer(shape, TopAbs_FACE, TopAbs_SHELL).More()) return false;
+  bool any = false;
+  for (TopExp_Explorer shells(shape, TopAbs_SHELL); shells.More(); shells.Next()) {
+    any = true;
+    if (!BRep_Tool::IsClosed(shells.Current())) return false;
+  }
+  return any;
+}
+
+// A compound of the faces of `shape` in which every full-patch B-spline face is cut into one face per run of fine spans and per run of coarse spans (same surface, same orientation,
+// the location of the face applied to the surface). The faces that are not B-spline patches, are trimmed, or would need more than kMaxSpanFaces pieces stay as they are; so does a face
+// one of whose pieces cannot be made (it is not counted). `cut` counts the faces that were replaced. With `need_closed` (a volume) a shape that has a face outside a closed shell is
+// returned as it is, with cut 0.
+inline TopoDS_Compound span_faces(const TopoDS_Shape &shape, int &cut, bool need_closed) {
   BRep_Builder builder;
   TopoDS_Compound compound;
   builder.MakeCompound(compound);
   cut = 0;
+  const bool whole = need_closed && !all_shells_closed(shape);
   for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
     const TopoDS_Face face = TopoDS::Face(faces.Current());
-    TopLoc_Location location;
-    const Handle(Geom_Surface) surface = BRep_Tool::Surface(face, location);
+    const Handle(Geom_Surface) surface = BRep_Tool::Surface(face);  // the location applied: the pieces lie where the face lies
     const Handle(Geom_BSplineSurface) spline = surface.IsNull() ? Handle(Geom_BSplineSurface)() : Handle(Geom_BSplineSurface)::DownCast(surface);
     double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
-    if (!spline.IsNull() && location.IsIdentity()) BRepTools::UVBounds(face, u0, u1, v0, v1);
-    if (spline.IsNull() || !location.IsIdentity() || !is_full_patch(face, u0, u1, v0, v1)) {
+    if (!whole && !spline.IsNull()) BRepTools::UVBounds(face, u0, u1, v0, v1);
+    if (whole || spline.IsNull() || !is_full_patch(face, u0, u1, v0, v1)) {
       builder.Add(compound, face);
       continue;
     }
@@ -129,31 +144,27 @@ inline TopoDS_Compound span_faces(const TopoDS_Shape &shape, int &cut) {
       builder.Add(compound, face);
       continue;
     }
-    ++cut;
-    for (size_t i = 0; i + 1 < us.size(); ++i)
-      for (size_t j = 0; j + 1 < vs.size(); ++j) {
+    std::vector<TopoDS_Face> pieces;
+    bool complete = true;
+    for (size_t i = 0; i + 1 < us.size() && complete; ++i)
+      for (size_t j = 0; j + 1 < vs.size() && complete; ++j) {
         BRepBuilderAPI_MakeFace maker(spline, us[i], us[i + 1], vs[j], vs[j + 1], Precision::Confusion());
-        if (!maker.IsDone()) continue;
+        if (!maker.IsDone()) {
+          complete = false;
+          break;
+        }
         TopoDS_Face piece = maker.Face();
         piece.Orientation(face.Orientation());
-        builder.Add(compound, piece);
+        pieces.push_back(piece);
       }
+    if (!complete) {
+      builder.Add(compound, face);
+      continue;
+    }
+    ++cut;
+    for (const TopoDS_Face &piece : pieces) builder.Add(compound, piece);
   }
   return compound;
-}
-
-// The result of span_faces with the shape it was cut from.
-struct SpanPieces {
-  TopoDS_Shape source;
-  TopoDS_Compound faces;
-  int cut = 0;
-};
-
-inline SpanPieces span_pieces(const TopoDS_Shape &piece) {
-  SpanPieces out;
-  out.source = piece;
-  out.faces = span_faces(piece, out.cut);
-  return out;
 }
 
 }  // namespace query

@@ -583,3 +583,52 @@ fn a_push_centred_on_an_edge_keeps_the_edge_and_the_faces_together() {
     assert!(built.report["shapeTolerance"].as_f64().unwrap() <= 1e-3, "{}", built.report);
     assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
 }
+
+/// The same narrow push as above: every volume and area the kernel reports reads the bump, not only `mass_properties` (the topology totals, the sum of the face areas, the warp's own volume).
+#[test]
+fn every_volume_and_area_the_kernel_reports_agrees_on_a_narrow_bump() {
+    let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 3], "direction": [0, 0, 1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let tree = node(&slab, push, None, 1e-3, [0.0; 3]);
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(&tree).unwrap().unwrap();
+    let report = evaluator.deform_report(&tree).unwrap();
+    let mass = mass_properties(&shape).unwrap();
+    let topology = crate::queries::topology(&shape).unwrap();
+    let summed: f64 = topology["faces"].as_array().unwrap().iter().map(|face| face["area"].as_f64().unwrap()).sum();
+    assert!(relative(summed, mass.area) < 1e-9, "face areas {summed} against {}", mass.area);
+    assert!(relative(topology["volume"].as_f64().unwrap(), mass.volume) < 1e-9, "{} against {}", topology["volume"], mass.volume);
+    assert!(
+        relative(report["volume"].as_f64().unwrap(), mass.volume) < 1e-8,
+        "the warp's own volume {} against {}",
+        report["volume"],
+        mass.volume
+    );
+    assert!(mass.volume - 3.0e6 > 1.5, "and it is the slab plus the bump: {}", mass.volume - 3.0e6);
+    assert!(crate::test_bridge::span_cut_count(&shape) >= 1, "the top face is cut");
+}
+
+/// The bump pushed OUT of the bottom face (the pieces of a reversed face keep their orientation): the same gain, d pi R^2 / 4.
+#[test]
+fn a_narrow_push_out_of_the_bottom_face_adds_the_same_volume() {
+    let slab = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 0], "direction": [0, 0, -1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let mut evaluator = Evaluator::new(16);
+    let shape = evaluator.evaluate(&node(&slab, push, None, 1e-3, [0.0; 3])).unwrap().unwrap();
+    let mass = mass_properties(&shape).unwrap();
+    assert!((mass.volume - 3.0e6 - 0.5 * PI * 4.0 / 4.0).abs() < 1e-3, "the volume gains {}", mass.volume - 3.0e6);
+}
+
+/// A TRIMMED B-spline face (a hole through the slab) is not cut: its pcurves are not the sides of the parameter box, so it is integrated by the whole-face rule as before (13.16.1 limits).
+#[test]
+fn a_trimmed_bspline_face_is_not_cut() {
+    let plate = entity("box", json!({ "size": [1000, 1000, 3], "position": [0, 0, 1.5] }));
+    let pocketed = json!({ "op": "boolean", "boolean": "subtract", "a": plate, "b": entity("cylinder", json!({ "radius": 100, "height": 10, "position": [-300, -300, -2] })) });
+    let push = json!({ "kind": "point", "center": [123.4, 56.7, 3], "direction": [0, 0, 1], "distance": 0.5, "radius": 2, "falloff": "smooth_c2" });
+    let mut evaluator = Evaluator::new(16);
+    let tree = node(&pocketed, push, None, 1e-3, [0.0; 3]);
+    let shape = evaluator.evaluate(&tree).unwrap();
+    let report = evaluator.deform_report(&tree).unwrap();
+    let shape = shape.unwrap_or_else(|| panic!("the pocketed slab warps: {report}"));
+    assert_eq!(crate::test_bridge::span_cut_count(&shape), 0, "the faces with a hole (top, bottom) are trimmed: none is cut");
+}

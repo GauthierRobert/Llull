@@ -1061,3 +1061,22 @@ attempt, -1071 against -52 on a mitre test).
 - **Limits, stated.** A trimmed face (a hole, a circular boundary) is not cut: its pcurves are not the sides of the box, and a narrow bump on a large TRIMMED B-spline face is still integrated from a coarse
   sampling. A graded face with more than 1024 pieces is not cut (not reachable with classes, kept as a bound). A feature wider than the fine run's share of a piece but narrower than the whole-face rule's
   first samples would need a finer split.
+
+### 17.16.2 Review round on §17.16.1
+
+- **Volumes only on closed shells.** `span_faces(shape, cut, need_closed)`: a volume (`volume_props`, the warp's `signed_volume`) takes the pieces only when every face of the shape belongs to a closed shell
+  (`all_shells_closed`); an open shell, a sheet or a compound with a free face is integrated as before. The pieces are integrated with `OnlyClosed` off, and open cones from the apex of a call add up to a volume
+  only on a closed shell; the first version cut whenever a face qualified and made the sign of an open shell depend on the barycentre of its vertices. Areas (`surface_props`, `face_metric`) need no closure.
+- **A piece that cannot be made keeps the whole face** (all pieces of a face are built first; if one `MakeFace` fails the face is added as it was and not counted as cut): the first version skipped the piece and lost its area.
+- **Located faces are cut too** (an instance of an assembly part): the surface is read with the location applied (`BRep_Tool::Surface(face)`), so an instance measures like the part.
+- **No cache.** The pieces are built per call: 9 per face at most, and a cache keyed on the shape kept the last shape alive and ignored orientation.
+- **Whole-face consumers, on purpose.** These measure deltas, windows or sanity values of a blend or a move, not the volume a user reads, and none of them holds a bump narrower than its face: the chamfer and blend volume
+  windows (`blend_chamfer.cxx`, `blend_corner.cxx`, `blend_rails.cxx`: volume before / after a blend, a ratio of 0.01 to 4 against the circular fillet), the face moves (`face_moves.cxx`), the feature cuts
+  (`features.cxx`), the replaced area of the analytic recognition (`deform_recognise.cxx`: a bound for a tolerance), the mesh-B-rep report (`mesh_brep.cxx`) and the Netgen meshing shape (`llull-netgen`). A blend
+  rebuild on a pushed body would be judged by the whole-face rule: a window of a factor of 400 does not see the difference.
+- **Tests added.** `every_volume_and_area_the_kernel_reports_agrees_on_a_narrow_bump` (the topology volume and the sum of the face areas agree with `mass_properties` to 1e-9, the warp's own volume to 1e-8: its fixed rule on
+  the pieces is 0.6 % off the bump, 3e-9 of the volume), `a_narrow_push_out_of_the_bottom_face_adds_the_same_volume` (the pieces of a reversed face), `a_trimmed_bspline_face_is_not_cut` (a slab with a hole: the
+  trimmed faces are not cut, `span_cut_count` 0: they are integrated as before), and in `deformStepRoundTrip.test.ts` the narrow bump after the STEP round trip: the imported plate reads 1.5800 mm^3 of bump
+  against 1.5708 before the exchange and the closed form 1.5708 (the fixed rule on the pieces), not flat. `nativeKernelQueries.test.ts` keeps a positive assertion for `bspline`: a box face is a bilinear patch (degree 1 x 1,
+  2 x 2 poles; the test used to expect null and was stale since the native `bspline`).
+- **Not tested:** an open shell warped (no catalogue geometry gives a graded open B-spline shell), a `MakeFace` failure of a piece.

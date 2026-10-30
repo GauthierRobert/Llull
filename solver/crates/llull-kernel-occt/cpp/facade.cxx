@@ -365,14 +365,6 @@ MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_
 constexpr double kRefinedEps = 1e-9;
 constexpr double kRefinedDrift = 1e-5;
 
-// The faces of `piece` with every graded full-patch B-spline face cut into its knot spans (mass_spans.hxx): the whole-face adaptive rule reads a feature much narrower than a large
-// B-spline face as flat. Built once per piece (mass_properties asks for the volume and the area of the same piece).
-const query::SpanPieces &spans_of(const TopoDS_Shape &piece) {
-  thread_local query::SpanPieces last;
-  if (last.source.IsNull() || !last.source.IsSame(piece)) last = query::span_pieces(piece);
-  return last;
-}
-
 GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool only_closed, double *rel_error, double *tripped) {
   // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
   // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
@@ -386,19 +378,21 @@ GProp_GProps volume_props(const Shape &shape, const TopoDS_Shape &piece, bool on
   // built by a deformation uses the adaptive rule, when its own error estimate is within 1e-5 (the fixed rule's error was 1.4e-6 on a pushed 100 mm slab).
   if (!shape.refined_mass || !has_freeform_face(piece)) {
     // the fixed rule too reads a narrow feature of a large graded B-spline face as flat (an imported plate with a bump): by span when the piece has such faces
-    if (has_freeform_face(piece) && is_closed_solid(piece)) {
-      const query::SpanPieces &all = spans_of(piece);
-      if (all.cut > 0) {
+    if (has_freeform_face(piece)) {
+      int cut = 0;
+      const TopoDS_Compound pieces = query::span_faces(piece, cut, true);
+      if (cut > 0) {
         GProp_GProps by_span;
-        BRepGProp::VolumeProperties(all.faces, by_span, Standard_False, Standard_False, Standard_False);
+        BRepGProp::VolumeProperties(pieces, by_span, Standard_False, Standard_False, Standard_False);
         return by_span;
       }
     }
     return fixed();
   }
   GProp_GProps adaptive;
-  const query::SpanPieces &spans = is_closed_solid(piece) ? spans_of(piece) : query::SpanPieces();
-  const double error = spans.cut > 0 ? BRepGProp::VolumeProperties(spans.faces, adaptive, kRefinedEps, Standard_False, Standard_False)
+  int cut = 0;
+  const TopoDS_Compound pieces = query::span_faces(piece, cut, true);
+  const double error = cut > 0 ? BRepGProp::VolumeProperties(pieces, adaptive, kRefinedEps, Standard_False, Standard_False)
                                      : BRepGProp::VolumeProperties(piece, adaptive, kRefinedEps, only_closed, Standard_False);
   if (!(error <= kRefinedDrift)) {
     if (tripped != nullptr && !(*tripped >= error)) *tripped = error;
@@ -412,6 +406,12 @@ bool adaptive_rule(const Shape &shape) { return shape.refined_mass && has_freefo
 
 bool refined_mass_flag(const Shape &shape) { return shape.refined_mass; }
 
+int32_t span_cut_count(const Shape &shape) {
+  int cut = 0;
+  query::span_faces(shape.shape, cut, false);
+  return cut;
+}
+
 GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double *tripped) {
   const auto fixed = [&]() {
     GProp_GProps fixed_rule;
@@ -420,18 +420,20 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
   };
   if (!shape.refined_mass || !has_freeform_face(piece)) {
     if (has_freeform_face(piece)) {
-      const query::SpanPieces &all = spans_of(piece);
-      if (all.cut > 0) {
+      int cut = 0;
+      const TopoDS_Compound pieces = query::span_faces(piece, cut, false);
+      if (cut > 0) {
         GProp_GProps by_span;
-        BRepGProp::SurfaceProperties(all.faces, by_span, Standard_False, Standard_False);
+        BRepGProp::SurfaceProperties(pieces, by_span, Standard_False, Standard_False);
         return by_span;
       }
     }
     return fixed();
   }
   GProp_GProps adaptive;
-  const query::SpanPieces &spans = spans_of(piece);
-  const double error = spans.cut > 0 ? BRepGProp::SurfaceProperties(spans.faces, adaptive, kRefinedEps, Standard_False)
+  int cut = 0;
+  const TopoDS_Compound pieces = query::span_faces(piece, cut, false);
+  const double error = cut > 0 ? BRepGProp::SurfaceProperties(pieces, adaptive, kRefinedEps, Standard_False)
                                      : BRepGProp::SurfaceProperties(piece, adaptive, kRefinedEps, Standard_False);
   if (error <= kRefinedDrift) return adaptive;
   if (tripped != nullptr && !(*tripped >= error)) *tripped = error;

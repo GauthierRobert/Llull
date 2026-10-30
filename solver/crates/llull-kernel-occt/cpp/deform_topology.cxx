@@ -298,9 +298,9 @@ TopoDS_Shape sewn_solid(const TopoDS_Shape &open, double tolerance) {
 
 double signed_volume(const TopoDS_Shape &shape) {
   GProp_GProps props;
-  // a graded full-patch B-spline face (a local push on a large face) is cut into its knot spans first: the whole-face rule reads a narrow bump as flat (mass_spans.hxx, 01 DEF 17.16)
+  // a graded full-patch B-spline face (a local push on a large face) of a closed solid is cut into runs of fine and of coarse spans first: the whole-face rule reads a narrow bump as flat (mass_spans.hxx, 01 DEF 17.16)
   int cut = 0;
-  const TopoDS_Compound spans = query::span_faces(shape, cut);
+  const TopoDS_Compound spans = query::span_faces(shape, cut, true);
   if (cut > 0) BRepGProp::VolumeProperties(spans, props, Standard_False, Standard_False, Standard_False);
   else BRepGProp::VolumeProperties(shape, props, Standard_True, Standard_False, Standard_False);
   return props.Mass();

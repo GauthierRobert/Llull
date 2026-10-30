@@ -15,11 +15,17 @@ mod ffi {
         fn refined_mass_flag(shape: &Shape) -> bool;
         /// Whether the per-face areas use the adaptive rule: refined and with a freeform face.
         fn adaptive_rule(shape: &Shape) -> bool;
+        /// How many faces the mass rule by knot span cuts into pieces.
+        fn span_cut_count(shape: &Shape) -> i32;
     }
 }
 
 pub fn refined_mass(shape: &Shape) -> bool {
     ffi::refined_mass_flag(crate::inner(shape).expect("a shape"))
+}
+
+pub fn span_cut_count(shape: &Shape) -> i32 {
+    ffi::span_cut_count(crate::inner(shape).expect("a shape"))
 }
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
