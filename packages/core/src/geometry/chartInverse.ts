@@ -107,5 +107,7 @@ export function chartPointOf(chart: FaceChart, target: Vec3): Inverse {
       return sphereInverse(chart, target);
     case 'torus':
       return torusInverse(chart, target);
+    case 'freeform':
+      return { error: 'geodesics through points are built for plane, cylinder, cone, sphere and torus faces' };
   }
 }

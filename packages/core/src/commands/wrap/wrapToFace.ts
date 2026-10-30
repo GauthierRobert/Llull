@@ -24,7 +24,7 @@ const MAX_PROBES = 48;
  * @invariant develop is an isometry: chart length = 3D length (data.curves[i].maxLengthStrain 0, data.distortion.areaRatio 1); geodesic and parametric charts on a sphere or
  *   torus stretch, and the stretch is measured (data.distortion) and held to maxLengthStrain; plane curves are exact, the others are fitted within fitTolerance (reported
  *   per curve); ids are step-scoped
- * @failure unknown ids / not a solid / no face / sphere or torus face with develop / freeform face / region leaving the face / wrap beyond one turn / stretch above the limit /
+ * @failure unknown ids / not a solid / no face / sphere, torus or freeform face with develop / freeform face without a kernel B-spline / fold of a freeform geodesic chart / region leaving the face / wrap beyond one turn / stretch above the limit /
  *   anchor off the face -> coded no-op
  */
 export const wrapToFace = defineCommand({
@@ -33,8 +33,9 @@ export const wrapToFace = defineCommand({
     'Wrap 2D sketch entities onto a face of a solid as curves lying on that face. Method develop (default) keeps every length (the face is unrolled like paper) and works on ' +
     'plane, cylinder and cone faces; on a sphere or torus it refuses with WRP_FACE_NOT_DEVELOPABLE. Method geodesic wraps by the exponential map about the anchor (radial lengths ' +
     'exact, circumferential ones stretch by sin(rho / R) / (rho / R) on a sphere); method parametric scales (u, v) by the arc-length rates at the anchor; both work on sphere and ' +
-    'torus faces and report data.distortion { maxLengthStrain, meanLengthStrain, areaRatio, worst } and refuse above maxLengthStrain (WRP_DISTORTION_EXCEEDED). Freeform faces ' +
-    'are not built (WRP_METHOD_UNAVAILABLE). `entityIds` are sketch curves (line, arc, circle, ' +
+    'torus faces and report data.distortion { maxLengthStrain, meanLengthStrain, areaRatio, worst } and refuse above maxLengthStrain (WRP_DISTORTION_EXCEEDED). On a freeform (B-spline) face ' +
+    'only geodesic and parametric work (develop refuses with WRP_FACE_NOT_DEVELOPABLE): the geodesic chart integrates the geodesics of the exact surface (RK4) and refuses a sketch that reaches a fold of the ' +
+    'exponential map with WRP_CHART_FOLD, the curves record their pcurve in the own (u, v) of the face; a kernel with no B-spline for the face refuses with WRP_METHOD_UNAVAILABLE. `entityIds` are sketch curves (line, arc, circle, ' +
     'rectangle, polyline, spline ...) or text created with a font (each glyph contour becomes a curve). `placement` puts a sketch point on a face point ' +
     '(anchor), turns the sketch (angleDeg) and may mirror it; the chart x axis follows the circumference (cylinder: +azimuth about the axis) and y the axis. ' +
     'Each closed loop and open chain becomes one nurbs_curve entity with its pcurve (`onFace`). The result lists per curve length3d (document units), chartLength, ' +
@@ -133,6 +134,7 @@ export const wrapToFace = defineCommand({
             faceIndex: session.face,
             ...(session.faceName !== undefined ? { faceName: session.faceName } : {}),
             pcurve: curve.pcurve,
+            ...(resolved.chart.kind === 'freeform' ? { frame: 'native' as const } : {}),
             fitTolerance: curve.fitTolerance,
             chartLength: curve.chartLength,
           },

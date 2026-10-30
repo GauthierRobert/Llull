@@ -6,7 +6,7 @@
 import type { NurbsCurve2Data } from '../../lib/nurbs/curve2d';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { Vec2, Vec3 } from '../../model/vectors';
-import { segmentEnd, segmentLength, segmentStart, type PlaneSegment } from '../../geometry/planeSegments';
+import { sampleSegment, segmentEnd, segmentLength, segmentStart, type PlaneSegment } from '../../geometry/planeSegments';
 import { curve3d, extentOf, isMappingError, lengthOnFace, mapPieces, pcurveOf } from '../../geometry/wrapCurves';
 import type { FaceChart } from '../../geometry/chartFrame';
 import type { UvLoop, UvRegion } from '../../model/wrap';
@@ -70,7 +70,9 @@ function mapChain(
   tolerance: number,
 ): PlaneSegment[] | MappingFailure {
   const mapped = mapPieces(chart, chain, tolerance);
-  return isMappingError(mapped) ? { code: 'WRP_OUTSIDE_FACE', message: mapped.error, ids: [session.entity.id] } : mapped;
+  if (!isMappingError(mapped)) return mapped;
+  const folds = chain.some((piece) => sampleSegment(piece, 33).some((point) => chart.diagnose?.(point) === 'fold'));
+  return { code: folds ? 'WRP_CHART_FOLD' : 'WRP_OUTSIDE_FACE', message: mapped.error, ids: [session.entity.id] };
 }
 
 /** Every loop and open chain of `outline` as a curve on the face. @failure a chart or fit failure -> MappingFailure */
@@ -142,7 +144,7 @@ export function checkWrapAround(
   pieces: readonly (readonly PlaneSegment[])[],
   ids: readonly string[],
 ): MappingFailure | null {
-  if (chart.kind === 'plane' || pieces.length === 0) return null;
+  if (chart.kind === 'plane' || chart.kind === 'freeform' || pieces.length === 0) return null;
   const boxes = pieces.map((chain) => extentOf(chain));
   const extent = Math.max(...boxes.map((box) => box.max[0])) - Math.min(...boxes.map((box) => box.min[0]));
   if (extent <= 2 * Math.PI * (1 + 1e-9)) return null;

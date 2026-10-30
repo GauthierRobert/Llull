@@ -18,6 +18,7 @@ import type { CadDocument } from '../../model/types';
 import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
 import { runEmbossChain } from './embossChain';
+import { buildFreeformRecipe, isFreeformFailure } from './embossFreeform';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
 import {
@@ -247,6 +248,29 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       data: { distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined) },
     };
   }
+  const freeform =
+    chart.kind === 'freeform'
+      ? buildFreeformRecipe({
+          source: session.source,
+          face: session.face,
+          diagonal: session.diagonal,
+          chart,
+          orientation: resolved.orientation,
+          outward: resolved.outward,
+          holesPerRegion: regions.map((region) => region.holes.length),
+          pieces: mapped.pieces,
+          mode: cutting ? 'deboss' : 'emboss',
+          depth,
+          tolerance,
+        })
+      : null;
+  if (scribe && chart.kind === 'freeform')
+    return fail(
+      'WRP_METHOD_UNAVAILABLE',
+      'mode scribe is built for plane, cylinder, cone, sphere and torus faces, not for a freeform face',
+      ['mode'],
+    );
+  if (freeform !== null && isFreeformFailure(freeform)) return fail(freeform.code, freeform.message, ['profileIds'], params.profileIds);
   const recipeParams: EmbossParams = {
     face: session.face,
     surface: chart.wire,
@@ -257,8 +281,8 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     // the construction tolerance of the recipe: sewing, and the fit of the pcurves (the kernel builds the 3D edges of a fitted pcurve to about that)
     tolerance: Math.max(SEWING_RATIO * session.diagonal, MIN_FIT_TOLERANCE, tolerance),
   };
-  const recipe: ShapeRecipe = { op: 'emboss', source: session.source, ...recipeParams };
-  const closed = embossClosedForm(recipeParams);
+  const recipe: ShapeRecipe = freeform !== null ? freeform.recipe : { op: 'emboss', source: session.source, ...recipeParams };
+  const closed = freeform !== null ? null : embossClosedForm(recipeParams);
   const reach = debossLimit(session, mapped.pieces, closed?.convex ?? null);
   if (cutting && reach !== null && depth >= reach * (1 - 1e-9)) {
     const result = fail(
@@ -304,13 +328,13 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     {
       volumeDelta,
       expectedVolumeDelta: closed?.delta ?? null,
-      regionArea: closed?.area ?? areas.uv,
+      regionArea: closed?.area ?? (freeform === null ? areas.uv : distortion.areaRatio * outlines.reduce((sum, o) => sum + o.area, 0)),
       regions: mapped.regions.length,
       loops: mapped.pieces.length,
       mode: params.mode,
       depth,
       method: chart.method,
-      exact: !engrave,
+      exact: !engrave && freeform === null,
       faceKind: session.surface.type,
       face: session.face,
       ...(session.faceName !== undefined ? { faceName: session.faceName } : {}),
@@ -325,6 +349,17 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       distortion: distortionData(distortion, chart, resolved.method, limit, params.maxLengthStrain === undefined),
       fullWrapChartWidth: chart.fullWrapWidth,
       convex: closed?.convex ?? null,
+      ...(freeform === null
+        ? {}
+        : {
+            freeform: {
+              walls: 'pull',
+              pullDirection: freeform.pull,
+              footprintDeviation: freeform.footprintDeviation,
+              footprintSegments: freeform.footprintSegments,
+              note: 'walls run along the outward normal at the anchor; the top is the exact offset of the face by the depth; the footprint is the exact image fitted by Bezier segments to footprintDeviation',
+            },
+          }),
       ...(engrave
         ? { toolWidth: params.toolWidth, strokeLength, note: 'the groove is the union of round-ended strokes: its boundary is polygonal' }
         : {}),
