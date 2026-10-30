@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical (diagonal / diamond) modeled knurl; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) face charts and emboss (`WRP_METHOD_UNAVAILABLE`; `create_curve_on_face` supports only iso/uv there); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across cones, spheres, tori or edges that do not develop straight, and mitred walls across sharp edges; the silhouette of torus and freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -692,3 +692,23 @@ away from the face (an emboss toward its top, a deboss toward its floor); hole p
 
 **Measured (native kernel, `server/tests/nativeWrapWalls.test.ts`).** VC-25 pull +x on r 20, rectangle 30 x 10: 149.562188 / 298.308583 / 593.663229 at depth 0.5 / 1 / 2 (1e-6), against 151.875 / 307.5 / 630 for normal walls. VC-26 plane 20 x 10, d 2, 10 degrees, emboss and deboss: 379.1724 (1e-6); cylinder, 5 degrees, d 1:
 318.0674 emboss (kernel 1e-4), 277.2150 deboss (1e-6); an oblique pull on a plane keeps A d; a sphere with the pull along its axis and a geodesic disc follows the cap integral (1e-3); text with a hole adds A d (1e-3); every refusal by code; replay equal. Fake-kernel unit tests: `tests/unit/wrap/walls.test.ts`.
+
+### 14.9 Modeled diagonal and diamond knurl (DES-3c, FR-WRP-32)
+
+`add_knurl model: "geometry"` now cuts the helical patterns (files `knurlHelix.ts`, `knurlHelixCut.ts`; new param `hand`). No native code changed.
+
+**Construction.** One groove is one exact screw sweep: the helix is the native spine (`helixCurve`, radius r, lead 2 pi r / tan(beta), beta the helix angle from the axis), the section is a V in the plane through the axis (`orientation axis_plane`, as the rectangular wire of `add_coil`).
+The V is defined NORMAL to the groove (`toothAngleDeg` is the included angle of a knurling wheel, default 90): in the plane through the axis its half-width slope is k = tan(gamma) / sin(beta) per unit of depth (gamma half the tooth angle). The grooves of a hand start at N equally spaced angles
+(`HelixDefinition.startAngle`, N = round(pi d / pitch) so the teeth close), a diamond adds the grooves of the other hand; all are united (balanced) and subtracted in one boolean. The sweeps run from the face start minus the flank reach to the face end plus it, past free end caps.
+Default depth leaves a land of 10 % of the pitch: h = 0.9 p cos(beta) / (2 tan gamma) (circumferential land = p - 2 h tan(gamma) / cos(beta), at least 2 % of p: `WRP_KNURL_DEPTH_INVALID`).
+
+**Volume.** A screw motion keeps the transverse section, so one groove removes exactly A_t x (axial length), A_t = 2 tan(gamma) / (r cos beta) x [(r^3 - (r - h)^3) / 3 - (r - h)(r^2 - (r - h)^2) / 2] (-> h^2 tan(gamma) / cos(beta) for a shallow groove), independent of the lead:
+a diagonal removes N x length x A_t (closed form, data.expectedVolumeDelta). A diamond removes the union of the two hand families, integrated numerically over 1200 transverse sections of 360 polar samples (`expectedMethod`); the command checks the measured volume against it
+(1e-4 diagonal, 1e-3 diamond; measured 1e-5) and refuses otherwise.
+
+**Bounds and refusals (performance is the binding one).** An exact groove is a B-spline sweep intersected with the cylinder: measured on the native kernel (this machine, loaded) 12.6 s for 6 grooves, 30 s for 12, 45 s for 8 at 45 degrees, and more than 120 s for 8 grooves at 60 degrees with a 60 degree V
+(the flank slope sets the cost), against the 60 s limit of one kernel call. So at most 8 grooves (teeth x hands) and 200 turns of one groove: `WRP_KNURL_TOO_MANY_GROOVES`; a kernel that times out refuses with `WRP_KERNEL_BUILD_FAILED` ("could not cut N helical grooves"). Helical grooves run past both ends of the face, so each
+end must be a free cap: a shoulder or ring-shaped neighbour is `WRP_KNURL_GEOMETRY_UNSUPPORTED` (use the straight pattern or the cosmetic model). Real knurls (60 and more teeth) therefore stay cosmetic or straight until the kernel intersects such sweeps faster; a native tool that builds the knurled surface directly is the way forward.
+
+**Measured (native kernel, `server/tests/nativeKnurlHelix.test.ts`).** d 40, h 40, 8 teeth, helix 30 degrees, 90 degree V: removed volume = 8 x 40 x A_t (1e-5), lead 2 pi r / tan(beta), land 10 % of the pitch; the left hand removes the same as the right; a diamond of 4 teeth x 2 hands at 45 degrees lies between
+one and two single families and within 1e-3 of the numeric union (1.4e-5 measured: 4 teeth x 2 hands, depth 2, 15 s); refusals by code; replay equal. Fake-kernel unit tests: `tests/unit/wrap/knurlHelix.test.ts`.

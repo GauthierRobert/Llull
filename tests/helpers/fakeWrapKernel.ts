@@ -93,6 +93,8 @@ export interface FakeWrapOptions {
   readonly sideBlind?: boolean;
   /** An extrusion carries 4 planar walls parallel to z (the lateral faces of a pull prism), so a draft finds faces to tilt. */
   readonly pullWalls?: boolean;
+  /** Volume of one helical groove sweep (a `sweep` entity): the fake cannot sweep, the test passes the closed form. */
+  readonly grooveVolume?: number;
   readonly stadium?: boolean | 'cone-end' | 'torus-end' | 'unknown-edges';
 }
 
@@ -434,6 +436,8 @@ export function fakeWrapKernel(options: FakeWrapOptions = {}): GeometryKernel {
           return sphereShape(entity);
         case 'torus':
           return torusShape(entity);
+        case 'sweep':
+          return options.grooveVolume === undefined ? null : { id: entity.id, volume: options.grooveVolume, faces: [] };
         case 'extrusion': {
           const groove = grooveVolume(entity);
           if (groove !== null) return { id: entity.id, volume: groove, faces: [] };

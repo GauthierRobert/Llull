@@ -53,6 +53,10 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
     'Choose a pullDirection that crosses the face at every point of the sketch region (not along the face, and not folding over it); the angle to the face is in the message.',
   WRP_DRAFT_CLOSES:
     'Reduce draftDeg or the depth, or enlarge the profile: the walls would meet before reaching the full depth (data.maxDraftDeg is the largest angle that keeps the profile open).',
+  WRP_KNURL_TOO_MANY_GROOVES:
+    'Use a coarser pitch (at most 8 grooves: a diamond builds two per tooth), a larger helix angle (at most 200 turns), or the cosmetic model; every helical groove costs the exact kernel 5 s or more.',
+  WRP_KNURL_GEOMETRY_UNSUPPORTED:
+    'Cut helical grooves only on a cylinder face whose two ends are free caps; for a face with a shoulder use the straight pattern or the cosmetic model.',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
   WRP_TEXT_TOO_LONG: 'Split the text; outline text is limited to 2000 characters per entity.',
   WRP_PARAM_INVALID: 'Fix the named parameter; see `llull describe <command>`.',

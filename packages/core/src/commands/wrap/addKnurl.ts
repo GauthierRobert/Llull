@@ -15,6 +15,7 @@ import { namedDefault, wrapData } from './conventions';
 import { isRejection, openFace } from './faceSession';
 import { faceRefField } from './schemas';
 import { kernelVolume } from './embossRun';
+import { cutHelicalGrooves } from './knurlHelixCut';
 import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG, depthForLand, freeEnds, grooveArea, knurlRecipe, landFor } from './knurlGeometry';
 
 /** Helix angle of a diagonal or diamond knurl when none is given: a named default of the pack (D-WRP-8), not a standard. */
@@ -42,8 +43,10 @@ export const addKnurl = defineCommand({
     'teeth, pitch, requestedPitch, diameter, pattern, helixAngleDeg?, pitchAdjusted, warnings, reviewRequired: true }. The note is review-required PMI (drawings and STEP AP242 carry it). ' +
     "With model 'geometry' (straight pattern only) the grooves are CUT: the solid is replaced by one with N V-grooves along the axis (tooth angle `toothAngleDeg`, default 90 included; " +
     'depth `depth`, default the one that leaves a flat land of 10 % of the pitch between grooves; both named defaults, not standards); data.expectedVolumeDelta is the closed-form volume removed ' +
-    '(N x length x groove area) and no PMI note is added (add_pmi_note if the drawing needs one). Diagonal and diamond geometry refuses with WRP_KNURL_GEOMETRY_UNSUPPORTED (helical grooves are not built: use the ' +
-    'cosmetic model). A face that is not a cylinder refuses with WRP_KNURL_FACE_NOT_CYLINDER. Needs the exact (native) kernel. Next: check_pmi, accept_pmi_review, mass_properties, render_view.',
+    '(N x length x groove area) and no PMI note is added (add_pmi_note if the drawing needs one). Diagonal and diamond geometry cuts HELICAL V-grooves (one exact screw sweep per tooth, a diamond adds the other hand; the V is defined normal to the groove, ' +
+    'so toothAngleDeg is the included angle of a knurling wheel; depth defaults to the one leaving a 10 % land): data.expectedVolumeDelta is N x length x A_t for a diagonal and the numeric union of both hands for a diamond, ' +
+    'data also gives lead, grooves, hands and land. Helical grooves run past both ends of the face, so each end must be a free cap (WRP_KNURL_GEOMETRY_UNSUPPORTED at a shoulder), the groove count is limited to 8 (seconds of kernel time each, tens of seconds in all) ' +
+    '(WRP_KNURL_TOO_MANY_GROOVES, as for 200 turns of one groove) and a depth that makes the grooves meet is WRP_KNURL_DEPTH_INVALID. A face that is not a cylinder refuses with WRP_KNURL_FACE_NOT_CYLINDER. Needs the exact (native) kernel. Next: check_pmi, accept_pmi_review, mass_properties, render_view.',
   params: z.object({
     id: z.string().describe('Id of the solid.'),
     face: faceRefField,
@@ -72,7 +75,13 @@ export const addKnurl = defineCommand({
     toothAngleDeg: z
       .number()
       .optional()
-      .describe('geometry only: included angle of the V groove, degrees in (0, 180). Default 90 (named default).'),
+      .describe(
+        'geometry only: included angle of the V groove, degrees in (0, 180) (normal to the groove for helical patterns). Default 90 (named default).',
+      ),
+    hand: z
+      .enum(['right', 'left'])
+      .optional()
+      .describe('geometry, diagonal pattern only: the hand of the helix (default right). A diamond has both hands.'),
   }),
   annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
@@ -190,6 +199,8 @@ function cutGrooves(
     id: string;
     face: { faceNear?: readonly number[] | undefined };
     pattern: string;
+    helixAngleDeg?: number | undefined;
+    hand?: 'right' | 'left' | undefined;
     pitch: number;
     depth?: number | undefined;
     toothAngleDeg?: number | undefined;
@@ -202,10 +213,20 @@ function cutGrooves(
   const { surface } = session;
   if (surface.type !== 'cylinder') return fail('WRP_KNURL_FACE_NOT_CYLINDER', 'not a cylinder', 'face');
   if (params.pattern !== 'straight')
-    return fail(
-      'WRP_KNURL_GEOMETRY_UNSUPPORTED',
-      `only the straight pattern is modeled as geometry (${params.pattern} needs helical grooves): use the cosmetic model`,
-      'pattern',
+    return cutHelicalGrooves(
+      doc,
+      {
+        id: params.id,
+        pattern: params.pattern as 'diagonal' | 'diamond',
+        pitch: params.pitch,
+        helixAngleDeg: params.helixAngleDeg ?? DEFAULT_HELIX_DEG,
+        requestedHelix: params.helixAngleDeg !== undefined,
+        depth: params.depth,
+        toothAngleDeg: params.toothAngleDeg,
+        hand: params.hand,
+      },
+      session,
+      { teeth: knurl.teeth, pitch: knurl.pitch, diameter: knurl.diameter, adjusted: knurl.adjusted, requestedPitch: params.pitch },
     );
   const angle = params.toothAngleDeg ?? DEFAULT_TOOTH_ANGLE_DEG;
   if (!(angle > 0 && angle < 180)) return fail('WRP_PARAM_INVALID', `toothAngleDeg must be in (0, 180) (got ${angle})`, 'toothAngleDeg');
