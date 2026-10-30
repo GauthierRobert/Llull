@@ -4,6 +4,9 @@
 //! bit-identical to the TypeScript result and the refusals carry the same codes and texts.
 //! The region is the whole input mesh (the host cuts the region out first and maps the vertex numbers back).
 
+// `!(x > 0.0)` is the TypeScript oracle's test, which is also true for NaN; `partial_cmp` rewrites would change that and break the twin.
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
+
 use llull_jsmath::{atan2, hypot};
 use std::collections::{HashMap, HashSet};
 
@@ -470,7 +473,7 @@ fn conjugate_gradient(system: &System, b: &[f64], x0: &[f64], max_iterations: us
         residual = dot_v(&r, &r).sqrt() / norm_b;
         iterations += 1;
         best = best.min(residual);
-        if iterations % STALL_WINDOW == 0 {
+        if iterations.is_multiple_of(STALL_WINDOW) {
             tick(iterations as f64 / max_iterations as f64);
             if best >= 0.99 * checkpoint {
                 break;
@@ -546,7 +549,7 @@ fn bi_cg_stab(system: &System, b: &[f64], x0: &[f64], max_iterations: usize, tic
         rho = rho_next;
         residual = dot_v(&r, &r).sqrt() / norm_b;
         best = best.min(residual);
-        if iterations % STALL_WINDOW == 0 {
+        if iterations.is_multiple_of(STALL_WINDOW) {
             tick(iterations as f64 / max_iterations as f64);
             if best >= 0.99 * checkpoint {
                 break;
