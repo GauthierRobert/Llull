@@ -1017,3 +1017,20 @@ face) would move the NIST corpus numbers (§17.9), so it is not done here. The t
 - `deform_recognise.cxx` skips a face with a location (the fitted faces of the warp have none), so both kinds of candidate are in one frame.
 - The bump volume of the review test is asserted against the closed form of `smooth_c2`: phi(s) = (1 - s^2)^3, a push centred on the face adds d x 2 pi R^2 x int phi(t) t dt = d pi R^2 / 4 (0.0883573 mm^3 for d 0.05, R 1.5),
   within 1e-5.
+
+### 17.16 The cap counts nodes, not the finest level
+
+§17.15 refused a radius-2 push on a 1000 mm face ("needs 1500 intervals"): `refine_across` compared `Axis::den` (the denominator of the finest level, a power of two, 2048 here) with the 512 meant for a
+UNIFORM grid. The refinement is local, so the finest level says nothing about the work: a push of radius 2 on 1000 mm has about 11 halvings near the support and a few dozen nodes per direction.
+
+- **Now:** the 512 counts the nodes of a direction (`axis.intervals()`), the finest level has its own bound, `kMaxDenominator = 2^28` (a `long` is 32 bits on Windows, so `den * 2` must stay below 2^31; an
+  overflow there gave a `BSplCLib::Interpolate` failure for radii below 1e-6 on 1000 mm, found while measuring), and the loop of the fit stops on the nodes and the denominator, not on `den > 512`. A uniform grid has
+  `intervals == den`, so every global law refines exactly as before. The curves already counted nodes.
+- **Measured** (release): a radius-2 push of height 0.5 on a 1000 x 1000 x 3 slab builds, 6605 fit nodes (81 x 81), the face height at the centre is 0.49997 (closed form 0.5); the
+  closed form d (1 - s^2)^3 holds within 2e-3 at s = 0, 0.5, 0.95 and gives 0 beyond the support; radius 1e-3 builds; radius 1e-6 and below is refused by name (`DEF_APPROX_TOLERANCE`, "the push radius 1e-06 is below what the fit can
+  resolve on a face or edge of length 1000 (it needs intervals of 1/2.7e9 ..., the finest grid is 1/2.7e8 ...)"). Test `a_radius_2_push_on_a_1000_mm_face_refines_locally_and_carries_the_bump`;
+  red-proof: with the old comparison (`den * 2 > 512`) the warp is refused and the test fails.
+- **Found: the adaptive mass rule does not see a narrow bump on a large B-spline face.** The same body reports an area of 2 011 999.9999999974 and a volume of 2 999 999.999999998 (the flat slab's, to 1e-9) although the
+  face carries the 0.5 mm bump (`evaluateFace` says so; the bump adds about 1.57 mm^3 and 0.4 mm^2): `BRepGProp` with `Eps` 1e-9 starts from a coarse sampling of the whole face, finds the two orders equal and stops
+  (`rel_error` 7e-16). `VolumePropertiesGK` with `IsUseSpan` gives the same. So the volume of a body with a bump much narrower than its faces cannot be asserted from `mass_properties` today; the test reads the
+  geometry. A mass rule that integrates per knot span is the follow-up (board).
