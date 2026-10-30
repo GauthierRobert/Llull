@@ -1,7 +1,8 @@
 /**
- * VC-DIR-18 (04 DIR §8): the kernel preview of `move_faces` on a 200-face solid, on the real native kernel. The spec budget (first ghost 500 ms, then 5 Hz)
- * is NOT met by an offset (measured 530 / 480 ms: BRepOffset_MakeOffset of the whole solid is 370 ms of it); the bounds below are the re-baselined
- * regression guards (2x headroom). Skipped without the native binary. LLULL_BENCH_LOG=<file> appends the numbers.
+ * VC-DIR-18 (04 DIR §8): the kernel preview (`preview: true`) of `move_faces` on a 200-face solid, on the real native kernel: first ghost within 500 ms, then 5 Hz.
+ * Measured after the prism routing of square-neighbour planar offsets: first about 255 ms, repeats p50 about 190-205 ms (before: 517 / 481 ms). The first-ghost bound is
+ * the spec's; the repeat bound has 1.5x headroom over the 200 ms target because a loaded machine moves it by 10 %. Skipped without the native binary.
+ * LLULL_BENCH_LOG=<file> appends the numbers.
  */
 
 import { appendFileSync } from 'node:fs';
@@ -17,7 +18,7 @@ const ctx = (): ExecutionContext => ({ ...defaultContext(), kernel: kernels.occt
 const SIDES = 198;
 
 describeNative('face-move preview timing on a 200-face solid (VC-DIR-18, native kernel)', () => {
-  it('first ghost within 1 s, repeats within 0.8 s (budget 500 ms / 5 Hz: see the header)', () => {
+  it('first ghost within 500 ms, repeats within 300 ms (budget 500 ms / 5 Hz: see the header)', () => {
     const profile = Array.from({ length: SIDES }, (_, i) => {
       const radius = 20 + (i % 2) * 2;
       return [radius * Math.cos((2 * Math.PI * i) / SIDES), radius * Math.sin((2 * Math.PI * i) / SIDES)];
@@ -31,7 +32,7 @@ describeNative('face-move preview timing on a 200-face solid (VC-DIR-18, native 
       const moved = execute(
         solid.document,
         'move_faces',
-        { id, facesNear: [[0, 0, 10]], mode: 'offset', distance: 0.2 + run * 0.01 },
+        { id, facesNear: [[0, 0, 10]], mode: 'offset', distance: 0.2 + run * 0.01, preview: true },
         ctx(),
       );
       timings.push(performance.now() - started);
@@ -43,7 +44,7 @@ describeNative('face-move preview timing on a 200-face solid (VC-DIR-18, native 
         process.env['LLULL_BENCH_LOG'],
         `move_faces preview, ${faces} faces: first ${timings[0]?.toFixed(0)} ms, repeats p50 ${repeats[2]?.toFixed(0)} ms max ${repeats[4]?.toFixed(0)} ms\n`,
       );
-    expect(timings[0]).toBeLessThan(1000);
-    expect(repeats[2]).toBeLessThan(800);
+    expect(timings[0]).toBeLessThan(500);
+    expect(repeats[2]).toBeLessThan(300);
   }, 120_000);
 });

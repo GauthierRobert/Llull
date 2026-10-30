@@ -85,7 +85,7 @@ function topologySuffix(kernel: GeometryKernel, shape: ShapeHandle): string {
 /**
  * Replace `operands` (the first one styles the result) by the kernel result's `mesh` entity. The
  * summary is `describe(newId, triangles)` plus the fallback / topology / lost-reference notes. `keep` leaves the operands in the document
- * (the result is added after them).
+ * (the result is added after them). `exactNotes` false skips the exact-topology note (one topology query of the result: a dry run does not need it).
  */
 export function commitKernelResult(
   doc: CadDocument,
@@ -94,12 +94,13 @@ export function commitKernelResult(
   operands: readonly [Entity, ...Entity[]],
   describe: (newId: string, triangles: number) => string,
   keep = false,
+  exactNotes = true,
 ): CommandResult {
   const newId = nextId('mesh');
   const ids = operands.map((operand) => operand.id);
   const created = kernelResultEntity(newId, result, operands[0]);
   const document = keep ? withEntities(doc, [created]) : replaceEntities(doc, ids, created);
-  const notes = `${fallbackSuffix(kernel, operands)}${topologySuffix(kernel, result.shape)}`;
+  const notes = `${fallbackSuffix(kernel, operands)}${exactNotes ? topologySuffix(kernel, result.shape) : ''}`;
   const summary = `${describe(newId, result.mesh.indices.length / 3)}${notes}`;
   return changed(document, `${summary}${referenceLossSuffix(doc, document)}`, [newId]);
 }
