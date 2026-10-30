@@ -374,3 +374,38 @@ fn a_local_push_on_a_wide_slab_refines_the_fit_only_where_it_acts() {
     let cap = 3.0 * PI * 100.0 / 4.0;
     assert!((built.volume - (200000.0 + cap)).abs() < 2e-3, "volume {}", built.volume);
 }
+
+#[test]
+fn a_push_hidden_between_the_first_nodes_is_found_by_the_cell_centres() {
+    // the 4 x 4 start grid of the top face has nodes 25 mm apart: a push of radius 4 centred in the middle of a cell touches no node line, only the cell middle
+    let slab = entity("box", json!({ "size": [100, 100, 20], "position": [0, 0, 10] }));
+    let push = json!({ "kind": "point", "center": [-37.5, -37.5, 20], "direction": [0, 0, 1], "distance": 2, "radius": 4, "falloff": "smooth_c2" });
+    let built = build(&node(&slab, push, None, 1e-3, [0.0; 3]));
+    assert!(built.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", built.report);
+    let cap = 2.0 * PI * 16.0 / 4.0;
+    assert!((built.volume - (200000.0 + cap)).abs() < 1e-2 * cap, "volume {} vs {}", built.volume, 200000.0 + cap);
+}
+
+#[test]
+fn two_separated_local_features_are_both_resolved_with_graded_nodes() {
+    // a cubic lattice with a control point raised at two far corners of a 100 mm slab: two bumps, one volume of each; the second one lies between samples of the coarse intervals
+    let slab = entity("box", json!({ "size": [100, 100, 20], "position": [0, 0, 10] }));
+    let lattice = |offsets: Value| {
+        json!({
+            "kind": "lattice", "degrees": [8, 8, 1], "splineDegrees": [3, 3, 1],
+            "box": { "min": [-50, -50, -1], "max": [50, 50, 21] }, "offsets": offsets,
+        })
+    };
+    let one = build(&node(&slab, lattice(json!([{ "index": [1, 1, 1], "delta": [0, 0, 2] }])), None, 1e-3, [0.0; 3]));
+    let two = build(&node(
+        &slab,
+        lattice(json!([{ "index": [1, 1, 1], "delta": [0, 0, 2] }, { "index": [7, 7, 1], "delta": [0, 0, 2] }])),
+        None,
+        1e-3,
+        [0.0; 3],
+    ));
+    assert!(two.report["maxError"].as_f64().unwrap() <= 1e-3, "{}", two.report);
+    let (gain_one, gain_two) = (one.volume - 200000.0, two.volume - 200000.0);
+    assert!(gain_one > 1.0, "the first bump adds volume {gain_one}");
+    assert!(relative(gain_two, 2.0 * gain_one) < 1e-4, "two bumps {gain_two} vs twice one {}", 2.0 * gain_one);
+}

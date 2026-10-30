@@ -166,3 +166,38 @@ describe('predictedVolume (independent of the deformed surface)', () => {
     );
   });
 });
+
+describe('warpMesh work bound (01 DEF 17.7)', () => {
+  const refused = (node: ReturnType<typeof deformNode>, tolerance: number): { code: string; message: string; ms: number } => {
+    const started = Date.now();
+    const result = warpMesh(boxMesh(10, 10, 100), node, { tolerance });
+    const ms = Date.now() - started;
+    if (result.ok) throw new Error(`warped: ${result.mesh.indices.length / 3} triangles`);
+    return { code: result.code, message: result.message, ms };
+  };
+
+  it('an honest map that needs more work than the bound is refused BEFORE the pass that would cross it, with the remedy, in seconds', () => {
+    const node = deformNode({ kind: 'twist', angleRad: 3 * Math.PI }, { region: region(0, 100, 'linear') });
+    const result = refused(node, 1e-4);
+    expect(result.code).toBe('DEF_BUDGET_EXCEEDED');
+    expect(result.message).toContain("output mode 'exact'");
+    expect(result.ms).toBeLessThan(60_000);
+  }, 120_000);
+
+  it('a fold (a bend radius inside the body) is refused, not refined to the floor', () => {
+    const node = deformNode({ kind: 'bend', radius: 3, symmetric: false }, { region: region(0, 100) });
+    const result = refused(node, 1e-4);
+    expect(['DEF_APPROX_TOLERANCE', 'DEF_BUDGET_EXCEEDED']).toContain(result.code);
+    expect(result.ms).toBeLessThan(60_000);
+  }, 120_000);
+
+  it('a refusal is remembered for the same node and mesh (the host asks again to name it) and not for another mesh', () => {
+    const node = deformNode({ kind: 'twist', angleRad: 3 * Math.PI }, { region: region(0, 100, 'linear') });
+    const first = warpMesh(boxMesh(10, 10, 100), node, { tolerance: 1e-4 });
+    const started = Date.now();
+    const again = warpMesh(boxMesh(10, 10, 100), node, { tolerance: 1e-4 });
+    expect(again).toBe(first);
+    expect(Date.now() - started).toBeLessThan(50);
+    expect(warpMesh(boxMesh(10, 10, 100), node, { tolerance: 1e-4, maxTriangles: 7 })).not.toBe(first);
+  }, 120_000);
+});

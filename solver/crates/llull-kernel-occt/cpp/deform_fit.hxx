@@ -93,6 +93,27 @@ struct Axis {
       if (i < split.size() && split[i] != 0) next.push_back(index[i] + index[i + 1]);
     }
     index = next;
+    grade();
+  }
+  // 2:1 grading: an interval more than twice as long as a neighbour is halved (until none is), so that a second local feature between the samples of a coarse interval
+  // is met by a gradual change of the node spacing and found by the next check instead of falling between two far nodes.
+  void grade() {
+    for (bool changed = true; changed;) {
+      changed = false;
+      std::vector<long> next;
+      for (size_t i = 0; i + 1 < index.size(); ++i) {
+        next.push_back(index[i]);
+        const long size = index[i + 1] - index[i];
+        const long before = i == 0 ? size : index[i] - index[i - 1];
+        const long after = i + 2 < index.size() ? index[i + 2] - index[i + 1] : size;
+        if (size % 2 == 0 && (size > 2 * before || size > 2 * after)) {
+          next.push_back(index[i] + size / 2);
+          changed = true;
+        }
+      }
+      next.push_back(index.back());
+      index = next;
+    }
   }
 };
 
@@ -218,11 +239,10 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
     const bool more_u = worst_u > tolerance, more_v = worst_v > tolerance;
     for (int i = 0; i < nu; ++i) split_u[static_cast<size_t>(i)] = more_u && error_u[static_cast<size_t>(i)] > tolerance;
     for (int j = 0; j < nv; ++j) split_v[static_cast<size_t>(j)] = more_v && error_v[static_cast<size_t>(j)] > tolerance;
-    // only the cell middles deviate: both directions everywhere, as the uniform doubling did
-    if (!more_u && !more_v) {
-      std::fill(split_u.begin(), split_u.end(), static_cast<char>(1));
-      std::fill(split_v.begin(), split_v.end(), static_cast<char>(1));
-    }
+    // a cell whose middle deviates (the law bulges inside it between nodes that all agree): both of its intervals
+    for (int i = 0; i < nu; ++i)
+      for (int j = 0; j < nv; ++j)
+        if (error_c[static_cast<size_t>(i) * static_cast<size_t>(nv) + static_cast<size_t>(j)] > tolerance) split_u[static_cast<size_t>(i)] = split_v[static_cast<size_t>(j)] = 1;
     // a law that deviates over much of the face (a quarter of the intervals or more) is refined everywhere, as the uniform doubling did: the integrals of the result
     // (volume, area) then stay as close to the closed form as before; a localised one (a push, a lattice cell) only where it acts
     const auto widen = [](std::vector<char> &split) {
@@ -230,8 +250,14 @@ inline SurfaceFit fit_surface(const Warp &warp, const Handle(Geom_Surface) & bas
       if (4 * flagged >= static_cast<long>(split.size())) std::fill(split.begin(), split.end(), static_cast<char>(1));
       return flagged > 0;
     };
-    const bool any_u = widen(split_u);
-    const bool any_v = widen(split_v);
+    bool any_u = widen(split_u);
+    bool any_v = widen(split_v);
+    // structural progress: an error above the tolerance that no flag explained refines both directions everywhere (the loop can never stand still)
+    if (!any_u && !any_v) {
+      std::fill(split_u.begin(), split_u.end(), static_cast<char>(1));
+      std::fill(split_v.begin(), split_v.end(), static_cast<char>(1));
+      any_u = any_v = true;
+    }
     if (any_u) uaxis.refine(split_u);
     if (any_v) vaxis.refine(split_v);
     if (uaxis.den > kMaxSegmentsPerDirection || vaxis.den > kMaxSegmentsPerDirection ||

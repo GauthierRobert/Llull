@@ -335,10 +335,10 @@ fn a_body_past_the_base_table_is_refused_not_warped_with_an_unconverged_solve() 
     }
 }
 
-/// 01 DEF §17.8: the mass rule is chosen by face type. A twisted bar cut by a plain box has planar caps (fixed rule) and twisted B-spline sides (adaptive rule): the volume is
+/// 01 DEF §17.9: a cut warped bar keeps the whole-shape adaptive rule (planar caps are exact in either rule, the twisted B-spline sides need the adaptive one): the volume is
 /// the closed form 10 x 10 x 50 and the centroid the middle, and the shape asks for the adaptive rule only because it came from a warp.
 #[test]
-fn a_cut_warped_bar_mixes_the_fixed_rule_on_its_caps_with_the_adaptive_one_on_its_sides() {
+fn a_cut_warped_bar_keeps_the_whole_shape_adaptive_rule() {
     let twisted = node(&bar(), json!({ "kind": "twist", "angleRad": 1.2 }), Some(span(-50.0, 50.0, "linear")), 1e-4, [0.0, 0.0, 50.0]);
     let mut evaluator = crate::recipe::Evaluator::new(16);
     let warped = evaluator.evaluate(&twisted).expect("evaluates").expect("the warp builds");

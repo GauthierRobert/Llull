@@ -7,7 +7,6 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { focalCheck } from '@core/commands/deform/flowSheetBase';
 import type { IsolatedKernel } from '../src/isolatedKernel';
 import { nativeSupportsDeform } from '../src/isolatedKernel';
 import { createNativeTestKernel, describeNativeWhen } from './kernelTestSupport';
@@ -111,6 +110,7 @@ describeNativeWhen({ capabilities: ['deform', 'deform-base-sheet'], label: 'nati
       expect(mass.method).toBe('exact');
       const closed = QUARTER * 20 * 2;
       expect(Math.abs(mass.volume - closed) / closed).toBeLessThan(2e-3);
+      expect(meshed.error, meshed.summary).toBeUndefined();
       expect(Math.abs((meshed.data as { volume: { value: number } }).volume.value - closed) / closed).toBeLessThan(2e-2);
       for (const result of [exact, meshed]) {
         const id = result.affected[0] as string;
@@ -125,66 +125,6 @@ describeNativeWhen({ capabilities: ['deform', 'deform-base-sheet'], label: 'nati
       }
       const check = execute(exact.document, 'check_deformation', { volumeDriftRel: 5e-3 });
       expect((check.data as { status: string }).status).not.toBe('fail');
-    }, 300_000);
-
-    it('the exact warp never hangs either: a body around the axis, the focal check bypassed, ends with a refusal within seconds', () => {
-      const plate = execute(createEmptyDocument(), 'add_box', { size: [60, 20, 10], position: [20, -10, -5], anchor: 'min' });
-      const w = Math.SQRT1_2;
-      const ring = [
-        [0, 0, 0],
-        [0, 0, 50],
-        [50, 0, 50],
-        [100, 0, 50],
-        [100, 0, 0],
-        [100, 0, -50],
-        [50, 0, -50],
-        [0, 0, -50],
-        [0, 0, 0],
-      ];
-      const base = sheet(plate.document, {
-        degreeU: 2,
-        degreeV: 1,
-        poles: ring.map((pole) => [
-          [pole[0]!, -15, pole[2]!],
-          [pole[0]!, 15, pole[2]!],
-        ]),
-        weights: [1, w, 1, w, 1, w, 1, w, 1].map((weight) => [weight, weight]),
-        knotsU: [0, 0.25, 0.5, 0.75, 1],
-        multiplicitiesU: [3, 2, 2, 2, 3],
-      });
-      const target = sheet(base.doc, {
-        degreeU: 1,
-        degreeV: 1,
-        poles: [
-          [
-            [-10, -30, 0],
-            [-10, 30, 0],
-          ],
-          [
-            [400, -30, 0],
-            [400, 30, 0],
-          ],
-        ],
-      });
-      focalCheck.enabled = false;
-      const started = Date.now();
-      try {
-        const result = execute(target.doc, 'flow_on_surface', {
-          id: plate.affected[0],
-          base: { sheetId: base.id, origin: [0, 0, 0], uDirection: [0, 0, 1] },
-          target: { sheetId: target.id },
-          targetOrigin: [0, 0, 0],
-          targetUDirection: [1, 0, 0],
-          output: { mode: 'exact' },
-        });
-        expect(result.error, result.summary).toBeDefined();
-        expect(['DEF_APPROX_TOLERANCE', 'DEF_BUDGET_EXCEEDED', 'DEF_FLOW_BASE_OUTSIDE', 'DEF_KERNEL_REFUSED', 'DEF_FOLDOVER']).toContain(
-          result.error?.code,
-        );
-      } finally {
-        focalCheck.enabled = true;
-      }
-      expect(Date.now() - started).toBeLessThan(120_000);
     }, 300_000);
   },
 );

@@ -538,7 +538,7 @@ fn a_sided_chamfer_is_refused_for_a_face_that_does_not_bound_the_edge_and_for_a_
     );
 }
 
-/// 01 DEF §17.8: the adaptive mass rule is asked by a shape built by a deformation (or a kinked blend) and kept by the operations that rebuild it: also by the
+/// 01 DEF §17.9: the adaptive mass rule is asked by a shape built by a deformation (or a kinked blend) and kept by the operations that rebuild it: also by the
 /// fused blend of several solids, one operand of which asks for it. Plain operands do not ask for it.
 #[test]
 fn the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands() {

@@ -859,7 +859,7 @@ the chord rule never stops splitting until the 4 M triangle cap. The cap was the
   discontinuous or folded in the body"). A first criterion on the worst deviation alone refused `deform_by_point` (a localised bump is discovered late: its deviation does not fall while new regions
   are found); the ratio, with its absolute level, does not. The same input now ends after about 8 passes, in seconds.
 - **Work.** Independently of the triangle count, the chord evaluations are counted (a map that solves for its argument, the base-frame laws, counts 20 each) and the mesh path refuses with
-  `DEF_BUDGET_EXCEEDED` beyond 4e8 weighted evaluations (an honest infinite bend of a 157 mm cylinder at 1e-4 needs 2.9M triangles and 35 s: the first value, 4e7, refused it, caught by `nativeKernelDeform`). With the progress check disabled the same input stops by this bound after a few minutes instead of never.
+  `DEF_BUDGET_EXCEEDED` beyond a work bound (4e8 at first, predicted per pass and 4e7 since §17.10; an honest infinite bend of a 157 mm cylinder at 1e-4 needs 2.9M triangles and 35 s: the first value, 4e7, refused it, caught by `nativeKernelDeform`). With the progress check disabled the same input stops by this bound after a few minutes instead of never.
 - **Native.** The exact warp's loops were already bounded by construction (a Newton solve of at most 40 steps, the fit by 512 segments per direction and 400 000 points, then
   `DEF_APPROX_TOLERANCE`); the exact path of the same input ends with a refusal within the test bound.
 
@@ -900,3 +900,22 @@ Loosening the integration accuracy to buy time was measured too: Eps 1e-7 instea
 
 Tests: `blend_tests.rs` `the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands` (red-proof: without the propagation the fused blend is unflagged), `deform_infinite_tests.rs`
 `a_cut_warped_bar_mixes_the_fixed_rule_on_its_caps_with_the_adaptive_one_on_its_sides` (closed-form volume and centroid of a warped bar cut by a box).
+
+### 17.10 Review round on §17.7-§17.9: the time bound of the mesh refinement, the fit grid
+
+- **The mesh path ends in seconds, not only ends.** The bound is now PREDICTED before every pass (`warpMesh`): the triangles of the pass times (the bookkeeping of the pass, 4 units per triangle, plus the weighted map
+  evaluations of the pass, 5 per triangle, plus those of the final chord measure and move, 2 x 2.5 per triangle) is added to the units already spent, and the pass is refused when the sum exceeds 4e7 units
+  (`DEF_BUDGET_EXCEEDED`, with the remedy: output mode 'exact' or a coarser tolerance). Every map evaluation is counted (chord samples, vertex images, the final measure and the move); the cost weight of a base-frame
+  law is 10 + 0.2 x sqrt(table size) (the coarse search of the table). 4e7 units are about 10 s on the dev machine (3e6 units/s measured); the first value, 4e8, was minutes.
+- **The honest 157 mm infinite bend** (cylinder r 5, bend r 50, region infinite, tolerance 1e-4, mesh mode) needed 2.9M triangles and 35 s: it is now refused up front with the remedy; mode 'exact' builds it
+  (natively) and the mesh path at tolerance 1e-3 builds it (`nativeKernelDeform` asserts the three). The other server tests that compared the mesh path at 1e-4 with the exact path use 1e-3 for the mesh.
+- **Hostile seeds** (`meshWarp.test.ts`): a twist of 3 pi over 100 mm at tolerance 1e-4 is refused with the remedy by the work bound before a pass crosses it (red-proof: with the bound at 1e12 it warps 1.25M
+  triangles instead); a bend with a radius inside the body (a fold) is refused (`DEF_APPROX_TOLERANCE` or `DEF_BUDGET_EXCEEDED`) in seconds. A jump map evading the progress check cannot be built from the
+  catalogue laws (the region ends are cut by the plane rule, so a step never lies inside an edge); the work bound is what covers that class.
+- **One warp, not two.** A refusal is remembered per node and mesh (`WeakMap`, fingerprint of the coordinates): the host that warps through the Manifold kernel, gets null and re-warps to read the reason, no longer
+  warps twice.
+- **`focalCheck` is gone** (a mutable module global in core that disabled a refusal). The two tests that flipped it went with it; the exact path's bound is by construction (§17.7), the mesh path's by the above.
+- **Fit grid.** Intervals are graded 2:1 (an interval more than twice as long as a neighbour is halved), a cell whose middle deviates halves its own two intervals instead of everything, and an error that no flag
+  explains refines everything (the loop cannot stand still). Tests: a push of radius 4 hidden in the middle of a start cell (found by the cell middles), two separated lattice bumps (twice the volume of one).
+  The grading is not red-proven by these (the features of the catalogue laws are wide enough to be found at the first grid); it is kept as a guard against a narrow second feature.
+- `iges.cxx` file counter is `std::atomic`; the cut-bar test is named for what it checks (§17.9).
