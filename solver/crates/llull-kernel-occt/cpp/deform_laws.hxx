@@ -439,6 +439,13 @@ inline void base_residual(const FlowSurface &table, double x, double y, double w
   for (size_t a = 0; a < 3; ++a) out[a] = sum[a].v + w * normal[a].v - q[a];
 }
 
+// Set when a base solve ended with a large residual (a point past the table or at a centre of curvature): the warp then refuses instead of returning the
+// last iterate. The sidecar is single threaded.
+inline bool &base_unconverged() {
+  static bool flag = false;
+  return flag;
+}
+
 // The base coordinates (x, y, w) of q: Newton on P_b + w N_b = q from the nearest of a coarse grid of base nodes (flowSurface.ts solveBase, the same
 // iteration), with the implicit derivative along the Jet direction: d(x, y, w) = J^-1 dq.
 inline Vec3J flow_surface_base(const FlowSurface &table, const Vec3J &q) {
@@ -499,6 +506,7 @@ inline Vec3J flow_surface_base(const FlowSurface &table, const Vec3J &q) {
   // the Jacobian at the solution gives the Jet direction of (x, y, w)
   double f[3];
   base_residual(table, u[0], u[1], u[2], point, f);
+  if (!(std::sqrt(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]) <= 1e-9 * scale)) base_unconverged() = true;
   for (int c = 0; c < 3; ++c) {
     double plus[3], minus[3], up[3] = {u[0], u[1], u[2]}, um[3] = {u[0], u[1], u[2]};
     up[c] += steps[c];

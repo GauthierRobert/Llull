@@ -16,6 +16,9 @@ type Rows = [Vec3, Vec3, Vec3];
 
 const AXES = [0, 1, 2] as const;
 
+/** Relative slack of the oriented box faces (normalised coordinates). */
+const FACE_SLACK = 1e-12;
+
 const binomial = (n: number, k: number): number => {
   let value = 1;
   for (let i = 1; i <= k; i++) value = (value * (n - k + i)) / i;
@@ -146,8 +149,10 @@ function normalised(law: LatticeLaw, q: Vec3): Vec3 | null {
   for (const a of AXES) {
     const size = law.box.max[a] - law.box.min[a];
     const t = (c[a] - law.box.min[a]) / size;
-    if (!(t >= 0 && t <= 1)) return null;
-    s[a] = t;
+    // an oriented box is reached through a rotation: a point on a face may land 1e-16 outside it
+    const slack = law.axes === undefined ? 0 : FACE_SLACK;
+    if (!(t >= -slack && t <= 1 + slack)) return null;
+    s[a] = Math.min(Math.max(t, 0), 1);
   }
   return s;
 }
@@ -172,13 +177,18 @@ export function latticeMap(law: LatticeLaw, q: Vec3): Vec3 {
 
 /** Jacobian rows ∂X_a/∂q_b of the map at `q` (identity outside the box). */
 export function latticeJacobian(law: LatticeLaw, q: Vec3): Rows {
-  const identity: Rows = [
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-  ];
   const s = normalised(law, q);
-  if (s === null) return identity;
+  if (s === null)
+    return [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ];
+  return jacobianAtNormalised(law, s);
+}
+
+/** The Jacobian at the normalised box coordinates `s` (inside the box), with no round trip through frame coordinates. */
+function jacobianAtNormalised(law: LatticeLaw, s: Vec3): Rows {
   const [m, n] = [law.degrees[1], law.degrees[2]];
   const offsets = denseOffsets(law);
   const basis = [axisBasis(law, 0, s[0], true), axisBasis(law, 1, s[1], true), axisBasis(law, 2, s[2], true)] as const;
@@ -221,6 +231,9 @@ const det3 = ([a, b, c]: Rows): number =>
 /** det J of the lattice map at `q`. */
 export const latticeDeterminant = (law: LatticeLaw, q: Vec3): number => det3(latticeJacobian(law, q));
 
+/** det J at the normalised box coordinates `s`: what the bounds use, so a node on a face of an oriented box is not lost to the frame round trip. */
+const determinantAtNormalised = (law: LatticeLaw, s: Vec3): number => det3(jacobianAtNormalised(law, s));
+
 /** Inverse of the Bernstein-Vandermonde matrix of degree `d` at the nodes i / d: converts values at the nodes to Bernstein coefficients. */
 function bernsteinInverse(d: number): number[][] {
   const size = d + 1;
@@ -255,6 +268,9 @@ export interface DeterminantBounds {
   /** Local point of the smallest sampled value. */
   readonly sampledMinAt: Vec3;
 }
+
+/** Samples per axis of the grid inside each knot span of a B-spline lattice. */
+const SPAN_GRID = 7;
 
 /** Samples per axis of the polishing grid (capped: a degree 8 lattice has 24 coefficients per axis). */
 const GRID_CAP = 25;
@@ -305,8 +321,11 @@ interface PatchBound {
  */
 function patchBound(law: LatticeLaw, low: Vec3, high: Vec3, degrees: Vec3): PatchBound {
   const [dx, dy, dz] = degrees;
-  const at = (s: number, t: number, u: number): Vec3 =>
-    pointAt(law, low[0] + s * (high[0] - low[0]), low[1] + t * (high[1] - low[1]), low[2] + u * (high[2] - low[2]));
+  const at = (s: number, t: number, u: number): Vec3 => [
+    low[0] + s * (high[0] - low[0]),
+    low[1] + t * (high[1] - low[1]),
+    low[2] + u * (high[2] - low[2]),
+  ];
   const values = new Float64Array((dx + 1) * (dy + 1) * (dz + 1));
   let sampledMin = Infinity;
   let sampledMax = -Infinity;
@@ -315,7 +334,7 @@ function patchBound(law: LatticeLaw, low: Vec3, high: Vec3, degrees: Vec3): Patc
   for (let i = 0; i <= dx; i++)
     for (let j = 0; j <= dy; j++)
       for (let k = 0; k <= dz; k++) {
-        const value = latticeDeterminant(law, at(i / dx, j / dy, k / dz));
+        const value = determinantAtNormalised(law, at(i / dx, j / dy, k / dz));
         values[(i * (dy + 1) + j) * (dz + 1) + k] = value;
         const node: Vec3 = [
           low[0] + (i / dx) * (high[0] - low[0]),
@@ -381,7 +400,8 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
     let boundMax = -Infinity;
     let sampledMin = Infinity;
     let sampledMax = -Infinity;
-    let sampledMinAt: Vec3 = [0, 0, 0];
+    let minNode: Vec3 = [0, 0, 0];
+    let maxNode: Vec3 = [0, 0, 0];
     const [mx, my, mz] = marks as [number[], number[], number[]];
     for (let i = 0; i + 1 < mx.length; i++)
       for (let j = 0; j + 1 < my.length; j++)
@@ -396,11 +416,40 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
           boundMax = Math.max(boundMax, patch.max);
           if (patch.sampledMin < sampledMin) {
             sampledMin = patch.sampledMin;
-            sampledMinAt = pointAt(law, patch.minNode[0], patch.minNode[1], patch.minNode[2]);
+            minNode = patch.minNode;
           }
-          sampledMax = Math.max(sampledMax, patch.sampledMax);
+          if (patch.sampledMax > sampledMax) {
+            sampledMax = patch.sampledMax;
+            maxNode = patch.maxNode;
+          }
+          // the nodes of the interpolation are not where a polynomial peaks: a denser grid inside the span too
+          const [lo, hi] = [[mx[i], my[j], mz[k]] as Vec3, [mx[i + 1], my[j + 1], mz[k + 1]] as Vec3];
+          for (let a = 0; a < SPAN_GRID; a++)
+            for (let b = 0; b < SPAN_GRID; b++)
+              for (let c = 0; c < SPAN_GRID; c++) {
+                const s: Vec3 = [
+                  (lo[0] as number) + (((hi[0] as number) - (lo[0] as number)) * a) / (SPAN_GRID - 1),
+                  (lo[1] as number) + (((hi[1] as number) - (lo[1] as number)) * b) / (SPAN_GRID - 1),
+                  (lo[2] as number) + (((hi[2] as number) - (lo[2] as number)) * c) / (SPAN_GRID - 1),
+                ];
+                const value = determinantAtNormalised(law, s);
+                if (value < sampledMin) {
+                  sampledMin = value;
+                  minNode = s;
+                }
+                if (value > sampledMax) {
+                  sampledMax = value;
+                  maxNode = s;
+                }
+              }
         }
-    return { boundMin, boundMax, sampledMin, sampledMax, sampledMinAt };
+    const stepSize = 0.5 / (SPAN_GRID * Math.max(...marks.map((m) => m.length - 1)));
+    const atNode = (s: Vec3): number => determinantAtNormalised(law, s);
+    const lowest = polish(atNode, minNode, stepSize, 1);
+    const highest = polish(atNode, maxNode, stepSize, -1);
+    sampledMin = Math.min(sampledMin, lowest.value);
+    sampledMax = Math.max(sampledMax, highest.value);
+    return { boundMin, boundMax, sampledMin, sampledMax, sampledMinAt: pointAt(law, lowest.at[0], lowest.at[1], lowest.at[2]) };
   }
   const degrees = law.degrees.map((degree) => 3 * degree - 1) as unknown as Vec3;
   const whole = patchBound(law, [0, 0, 0], [1, 1, 1], degrees);
@@ -410,7 +459,7 @@ export function determinantBounds(law: LatticeLaw): DeterminantBounds {
   // a denser grid (the nodes of the interpolation are not where a polynomial peaks), then a local search from the best points of both
   const dense = (axisDegree: number): number => Math.min(GRID_CAP, 6 * axisDegree + 1);
   const [gx, gy, gz] = [dense(degrees[0]), dense(degrees[1]), dense(degrees[2])];
-  const determinantAt = (s: Vec3): number => latticeDeterminant(law, pointAt(law, s[0], s[1], s[2]));
+  const determinantAt = (s: Vec3): number => determinantAtNormalised(law, s);
   for (let i = 0; i < gx; i++)
     for (let j = 0; j < gy; j++)
       for (let k = 0; k < gz; k++) {

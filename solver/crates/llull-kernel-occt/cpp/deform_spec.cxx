@@ -100,8 +100,8 @@ bool parse_spec(rust::Slice<const double> spec, Warp &warp, double &tolerance, b
         const double *trailer = p + 9 + count;
         for (int a = 0; a < 3; ++a) {
           lattice.spline[a] = static_cast<int>(trailer[a]);
-          if (lattice.spline[a] != 0 && (lattice.spline[a] < 2 || lattice.spline[a] > lattice.degree[a])) {
-            why = "lattice spline degree must be 0 or from 2 to the lattice degree";
+          if (lattice.spline[a] != 0 && (lattice.spline[a] < std::min(2, lattice.degree[a]) || lattice.spline[a] > lattice.degree[a])) {
+            why = "lattice spline degree must be 0 or from min(2, the lattice degree) to the lattice degree";
             return false;
           }
         }

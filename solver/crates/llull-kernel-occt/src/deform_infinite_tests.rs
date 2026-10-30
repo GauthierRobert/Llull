@@ -312,3 +312,25 @@ fn sheet_nodes(radius: f64, (x0, hx, nx): (f64, f64, usize), (y0, hy, ny): (f64,
     }
     out
 }
+
+#[test]
+fn a_body_past_the_base_table_is_refused_not_warped_with_an_unconverged_solve() {
+    // identity flow on a 6 x 6 plane table of step 1 (x, y in [0, 5]): a body at x in [3, 8] runs past the base table, so the solve cannot converge there
+    let nodes = sheet_nodes(0.0, (0.0, 1.0, 6), (0.0, 1.0, 6));
+    let law = |with_base: bool| {
+        let mut law = json!({ "kind": "flowSurface", "x0": 0.0, "y0": 0.0, "hx": 1.0, "hy": 1.0, "nx": 6, "ny": 6, "nodes": nodes });
+        if with_base {
+            law["baseNodes"] = json!(nodes);
+        }
+        law
+    };
+    let body = entity("box", json!({ "size": [5, 2, 2], "position": [5.5, 2.5, 0] }));
+    // the plane base (no base table) builds it: only the unconverged base solve makes the difference
+    let tree = node(&body, law(true), None, 1e-3, [0.0; 3]);
+    let mut evaluator = crate::recipe::Evaluator::new(16);
+    let built = evaluator.evaluate(&tree);
+    assert!(!matches!(built, Ok(Some(_))), "an unconverged base solve must not build a shape");
+    if let Ok(None) = built {
+        assert_eq!(evaluator.deform_report(&tree).expect("report")["code"], json!("DEF_FLOW_BASE_OUTSIDE"));
+    }
+}

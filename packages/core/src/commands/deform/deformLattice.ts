@@ -32,7 +32,7 @@ interface Move {
  *   not move and the layers next to a face the body crosses are fixed, so the result stays continuous; kernel-optional: exact warp on the native kernel,
  *   mesh path on Manifold and without a kernel
  * @invariant splineDegrees: control points rest on the Greville abscissae (zero moves = identity, affine moves = that affine map); orientation: offsets stay displacements in frame coordinates
- * @failure degrees outside 1..8 or splineDegrees outside 2..degree -> DEF_LATTICE_DEGREE; orientation degenerate -> DEF_FRAME_DEGENERATE; an index outside the control net, or a move with both / neither of index and near -> DEF_LATTICE_INDEX; a fixed layer
+ * @failure degrees outside 1..8 or splineDegrees outside min(2, degree)..degree -> DEF_LATTICE_DEGREE; orientation degenerate -> DEF_FRAME_DEGENERATE; an index outside the control net, or a move with both / neither of index and near -> DEF_LATTICE_INDEX; a fixed layer
  *   moved -> DEF_LATTICE_FIXED_MOVED; box not meeting the body -> DEF_REGION_MISSES_BODY; no move -> DEF_NO_EFFECT; det J <= 0 -> DEF_FOLDOVER
  */
 export const deformLattice = defineCommand({
@@ -90,7 +90,7 @@ export const deformLattice = defineCommand({
       .array(z.number())
       .length(3)
       .describe(
-        'B-spline lattice: degrees [p, q, r] of the basis along the box axes, integers from 2 to the lattice degree of the axis (a uniform clamped knot vector; the control net keeps degrees + 1 points per axis). ' +
+        'B-spline lattice: degrees [p, q, r] of the basis along the box axes, integers from 2 to the lattice degree of the axis (1 where that degree is 1; a uniform clamped knot vector; the control net keeps degrees + 1 points per axis). ' +
           'A control point then acts only on the p + 1 knot spans around it (local control: moving one point leaves the rest of the body alone), where the default Bernstein lattice (omit this) acts everywhere. ' +
           'p equal to the lattice degree is the Bernstein lattice. Control points rest on the Greville abscissae of the knots (index [i, j, k] and near use those positions).',
       )
@@ -144,11 +144,13 @@ export const deformLattice = defineCommand({
             message: `degree ${String(degrees[bad])} must be an integer in 1..8`,
             paths: [`params.degrees.${bad}`],
           };
-        const splineBad = splineDegrees?.findIndex((p, a) => !Number.isInteger(p) || p < 2 || p > (degrees[a] as number)) ?? -1;
+        const splineBad =
+          splineDegrees?.findIndex((p, a) => !Number.isInteger(p) || p < Math.min(2, degrees[a] as number) || p > (degrees[a] as number)) ??
+          -1;
         if (splineBad >= 0)
           return {
             code: 'DEF_LATTICE_DEGREE',
-            message: `spline degree ${String(splineDegrees?.[splineBad])} must be an integer from 2 to the lattice degree ${String(degrees[splineBad])} of its axis`,
+            message: `spline degree ${String(splineDegrees?.[splineBad])} must be an integer from min(2, the lattice degree) to the lattice degree ${String(degrees[splineBad])} of its axis`,
             paths: [`params.splineDegrees.${splineBad}`],
           };
         const axes = orientation === undefined ? undefined : boxAxes(orientation.uAxis as Vec3, orientation.vAxis as Vec3);

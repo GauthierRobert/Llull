@@ -779,10 +779,10 @@ vs 10 × 5 (and 10.3: 0.3), plate twisted at 36 degrees per 20 vs the helicoid (
 
 Two optional extensions of the lattice law (`lattice.ts`; both absent: the Bernstein, frame-aligned lattice of §5.3, bit-identical results).
 
-- **`splineDegrees` [p, q, r]** (each 2..the axis degree): the basis along each axis is a uniform clamped B-spline of that degree on the same (l+1)(m+1)(n+1) control net
+- **`splineDegrees` [p, q, r]** (each min(2, degree)..the axis degree): the basis along each axis is a uniform clamped B-spline of that degree on the same (l+1)(m+1)(n+1) control net
   (knots: p+1 zeros, l−p interior knots at i/(l+1−p), p+1 ones). A control point acts only on the p+1 knot spans around it (local control); points rest on the
   Greville abscissae g*i = (t*{i+1}+…+t\_{i+p})/p, so zero offsets are the identity and an affine displacement of every point is that affine map (linear precision).
-  p equal to the lattice degree is the Bernstein lattice. `index` and `near` use the Greville positions. Degree 1 is refused (`DEF_LATTICE_DEGREE`): the interior knots
+  p equal to the lattice degree is the Bernstein lattice. `index` and `near` use the Greville positions. Degree 1 on an axis whose lattice degree is larger is refused (`DEF_LATTICE_DEGREE`): the interior knots
   would be kinks the exact warp would have to split at; p ≥ 2 is C¹.
 - **`orientation` {uAxis, vAxis}** → `axes` (orthonormal rows, frame coordinates): the box is measured in c = A q about the frame origin (`box.min/max` in those
   coordinates, default `"bounds"` = the body bounds along them); points outside it do not move; the offsets stay displacements in frame coordinates. The Jacobian is
@@ -827,3 +827,22 @@ like the target's) and w the offset along its normal, and goes to P(x, y) + w N(
 Tests: `tests/unit/deform/flowSheetBase.test.ts` (pack, grid, recipe validation, a plate bent on R 50 unrolled onto a flat sheet: extents, volume, det J range 50/51..50/49, predicted
 volume; a 300 degree wrap; a flat base sheet equals `base.plane`; refusals by name; a target fold), `server/tests/nativeKernelFlowSheet.test.ts` (exact vs mesh vs closed form on the
 native kernel, the capability), cargo pack vectors.
+
+### 17.6 Review round on §17.4 and §17.5
+
+- **Oriented box nodes.** The det J bounds, the dense grid and the polish now evaluate the Jacobian at the normalised box coordinates directly (`determinantAtNormalised`):
+  a face node mapped to frame coordinates and back landed about 1e-16 outside an oriented box and read as outside (identity, det J = 1; 195 of 7938 face nodes wrong, the Bernstein
+  enclosure off by up to 11). An oriented box also gives a 1e-12 relative slack to a face in `normalised`. Test: an oriented lattice and its aligned twin (offsets turned by the axes)
+  have equal `determinantBounds` and equal det J at every node of a 9 x 9 x 9 grid of the box, faces included.
+- **B-spline sampled extremes.** A dense grid inside every knot span (7 per axis) and a pattern-search polish from the best points replace the interpolation nodes alone (test: the
+  sampled extremes are within 1e-9 of a 31³ grid of the lattice).
+- **Spline degree 1.** `splineDegrees` accepts min(2, degree)..degree per axis: 1 where the axis degree is 1 (that is the Bernstein degree), 2 or more elsewhere (TS command, recipe,
+  `parse_spec`).
+- **Centre of curvature of a base sheet.** det J of the base map tends to infinity there, never to the floor, so a closed base around its axis tore a body silently. `planSheetBase`
+  now finds the base sheet's focal points (P + N / kappa for both principal curvatures on a 41 x 41 grid, from the second fundamental form) and refuses `DEF_FOLDOVER` when one lies
+  inside the body (ray parity against the source mesh, `containsPoints.ts`). Test: a box straddling the axis of a closed base cylinder (without the check the table build does not
+  terminate in practical time).
+- **Unconverged base solve.** `solveBaseChecked` reports the residual of the last Newton iterate. After the table is built the plan checks that the solve at the sampled vertices has
+  a tiny residual and agrees with the closest-point coordinates (x modulo the period), else `DEF_FLOW_BASE_OUTSIDE`. The warp sets a flag when a base solve ends with a large residual
+  and refuses with the same code instead of returning the last iterate (cargo test: a body running past the table is never built; the test also passes without the flag because the
+  B-spline fit of the clamped table already throws, so the flag itself is not proven by it).

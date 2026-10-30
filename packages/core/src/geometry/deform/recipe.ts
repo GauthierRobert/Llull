@@ -32,9 +32,9 @@ function latticeProblem(law: Record<string, unknown>): string | null {
     if (
       !Array.isArray(splineDegrees) ||
       splineDegrees.length !== 3 ||
-      !splineDegrees.every((p, a) => isIntegerIn(p, 2, (degrees as number[])[a] as number))
+      !splineDegrees.every((p, a) => isIntegerIn(p, Math.min(2, (degrees as number[])[a] as number), (degrees as number[])[a] as number))
     )
-      return 'lattice: splineDegrees must be 3 integers, each from 2 to the degree of its axis';
+      return 'lattice: splineDegrees must be 3 integers, each from min(2, degree) to the degree of its axis';
   }
   if (axes !== undefined) {
     const rows = Array.isArray(axes) && axes.length === 3 && axes.every(isVec3) ? (axes as unknown as number[][]) : null;

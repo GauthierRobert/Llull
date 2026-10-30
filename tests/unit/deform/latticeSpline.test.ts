@@ -51,6 +51,49 @@ describe('lattice laws against the validation pack (independent Cox-de Boor refe
   });
 });
 
+describe('an oriented lattice equals its aligned twin in the box coordinates (review: face nodes lost to the frame round trip)', () => {
+  const pack = packData<Pack>('point_vectors.json');
+  const twinOf = (oriented: LatticeLaw): LatticeLaw => {
+    const axes = oriented.axes as [Vec3, Vec3, Vec3];
+    const { axes: _unused, ...rest } = oriented;
+    void _unused;
+    return {
+      ...rest,
+      offsets: oriented.offsets.map(({ index, delta }) => ({
+        index,
+        delta: axes.map((row) => row[0] * delta[0] + row[1] * delta[1] + row[2] * delta[2]) as unknown as Vec3,
+      })),
+    };
+  };
+  it.each(['ffd_oriented', 'ffd_spline_oriented'])(
+    '%s: the det J bounds and the determinant at every face node agree with the twin',
+    (name) => {
+      const oriented = lawOfPack((pack.laws[name] as Pack['laws'][string]).params);
+      const twin = twinOf(oriented);
+      const [a, b] = [determinantBounds(oriented), determinantBounds(twin)];
+      expect(a.boundMin).toBeCloseTo(b.boundMin, 9);
+      expect(a.boundMax).toBeCloseTo(b.boundMax, 9);
+      expect(a.sampledMin).toBeCloseTo(b.sampledMin, 9);
+      expect(a.sampledMax).toBeCloseTo(b.sampledMax, 9);
+      // every node of a 9 x 9 x 9 grid of the box, the faces included: the same det J through the frame as in the box coordinates
+      let nodes = 0;
+      for (let i = 0; i < 9; i++)
+        for (let j = 0; j < 9; j++)
+          for (let k = 0; k < 9; k++) {
+            const c: Vec3 = [0, 1, 2].map((axis) => {
+              const s = [i, j, k][axis] as number;
+              return (
+                (oriented.box.min[axis] as number) + (s / 8) * ((oriented.box.max[axis] as number) - (oriented.box.min[axis] as number))
+              );
+            }) as unknown as Vec3;
+            expect(latticeDeterminant(oriented, fromBoxCoordinates(oriented, c))).toBeCloseTo(latticeDeterminant(twin, c), 9);
+            nodes++;
+          }
+      expect(nodes).toBe(729);
+    },
+  );
+});
+
 describe('B-spline lattice (closed forms)', () => {
   const base = {
     kind: 'lattice' as const,
@@ -110,6 +153,28 @@ describe('B-spline lattice (closed forms)', () => {
       [9, 9, 90],
     ] as Vec3[])
       latticeMap(equal, q).forEach((v, a) => expect(v).toBeCloseTo(latticeMap(bezier, q)[a] as number, 12));
+  });
+
+  it('the sampled det J extremes of a B-spline lattice are those of a dense grid (not only of the interpolation nodes)', () => {
+    const offsets: LatticeLaw['offsets'] = [
+      { index: [1, 1, 3], delta: [3.1, 1.7, 0] },
+      { index: [1, 0, 2], delta: [-2, 0.8, 0.5] },
+    ];
+    const spline: LatticeLaw = { ...base, splineDegrees: [2, 2, 2], offsets };
+    const bounds = determinantBounds(spline);
+    let [min, max] = [Infinity, -Infinity];
+    const N = 31;
+    for (let i = 0; i < N; i++)
+      for (let j = 0; j < N; j++)
+        for (let k = 0; k < N; k++) {
+          const q: Vec3 = [(10 * i) / (N - 1), (10 * j) / (N - 1), (100 * k) / (N - 1)];
+          const value = latticeDeterminant(spline, q);
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+    expect(bounds.sampledMin).toBeLessThanOrEqual(min + 1e-9);
+    expect(bounds.sampledMax).toBeGreaterThanOrEqual(max - 1e-9);
+    expect(bounds.boundMin).toBeLessThanOrEqual(bounds.sampledMin + 1e-9);
   });
 
   it('an oriented box measures c = A q: the point of box coordinates (0.5, 0.5, 0.5) is the middle of the rotated box', () => {
@@ -252,6 +317,31 @@ describe.each(KERNELS)('deform_lattice with splineDegrees and orientation, kerne
     // near [0, 0, 50]: the box coordinates are (0, 50, 0), the middle of the box on u and w and the middle of v: Greville rest positions of 4 points are 0, 1/4... of the span
     expect(law.law.offsets[0]?.index[0]).toBeGreaterThanOrEqual(1);
     expect(law.law.offsets[0]?.index[1]).toBeGreaterThanOrEqual(1);
+  });
+
+  it('accepts spline degree 1 on an axis whose lattice degree is 1 (that is the Bernstein degree), 2 or more elsewhere', async () => {
+    await installKernel(kind);
+    const { doc, id } = bar();
+    const result = execute(doc, 'deform_lattice', {
+      id,
+      degrees: [1, 2, 2],
+      splineDegrees: [1, 2, 2],
+      box: BOX,
+      frame: WORLD_Z,
+      moves: [{ index: [1, 1, 1], delta: [0.5, 0, 0] }],
+      fixedLayers: 0,
+    });
+    expect(result.error, result.summary).toBeUndefined();
+    expect(
+      execute(doc, 'deform_lattice', {
+        id,
+        degrees: [3, 2, 2],
+        splineDegrees: [1, 2, 2],
+        box: BOX,
+        frame: WORLD_Z,
+        moves: [{ index: [1, 1, 1], delta: [1, 0, 0] }],
+      }).error?.code,
+    ).toBe('DEF_LATTICE_DEGREE');
   });
 
   it('refuses a spline degree outside 2..degree, a degenerate orientation and a fold, by name', async () => {

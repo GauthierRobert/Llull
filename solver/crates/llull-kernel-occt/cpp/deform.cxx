@@ -247,6 +247,7 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
   std::string why;
   if (!parse_spec(spec, warp, tolerance, preserve, why)) return refuse(stats, "DEF_KERNEL_REFUSED", why);
   if (input.shape.IsNull()) return refuse(stats, "DEF_KERNEL_REFUSED", "the source shape is empty");
+  deform::base_unconverged() = false;
   std::vector<naming::Named> named{naming::named(input)};
   TopoDS_Shape source = input.shape;
 
@@ -286,6 +287,8 @@ std::unique_ptr<Shape> warp_shape(const Shape &input, rust::Slice<const double> 
   WarpShape modifier(source, modification);
   if (stats.failed) return refuse(stats, stats.code.empty() ? "DEF_APPROX_TOLERANCE" : stats.code.c_str(), stats.message);
   if (!modifier.IsDone() || modifier.Shape().IsNull()) return refuse(stats, "DEF_KERNEL_REFUSED", "the geometry modifier failed");
+  if (deform::base_unconverged())
+    return refuse(stats, "DEF_FLOW_BASE_OUTSIDE", "the base coordinates of a point of the body could not be solved on the base table (it lies past the sheet or at its centre of curvature)");
   TopoDS_Shape result = modifier.Shape();
 
   if (stats.ring) {

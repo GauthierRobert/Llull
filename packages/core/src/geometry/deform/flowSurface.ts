@@ -103,8 +103,13 @@ const BASE_STEPS = 40;
  * @failure a law without a base -> q itself
  */
 export function solveBase(law: FlowSurfaceLaw, q: Vec3): Vec3 {
+  return solveBaseChecked(law, q).u;
+}
+
+/** `solveBase` with the largest residual |P_b + w N_b - q| of its last iterate: it did not converge when that is not tiny against the table. */
+export function solveBaseChecked(law: FlowSurfaceLaw, q: Vec3): { readonly u: Vec3; readonly residual: number } {
   const base = law.baseNodes;
-  if (base === undefined) return q;
+  if (base === undefined) return { u: q, residual: 0 };
   const [sx, sy] = [Math.max(1, Math.ceil(Math.sqrt(law.nx))), Math.max(1, Math.ceil(Math.sqrt(law.ny)))];
   let best: [number, number] = [0, 0];
   let nearest = Infinity;
@@ -139,7 +144,7 @@ export function solveBase(law: FlowSurfaceLaw, q: Vec3): Vec3 {
     u = [u[0] - step[0], u[1] - step[1], u[2] - step[2]];
     if (Math.hypot(step[0], step[1], step[2]) < 1e-13 * scale) break;
   }
-  return u;
+  return { u, residual: len3(baseResidual(law, base, u, q).f) };
 }
 
 /** The image of local point `q`. */

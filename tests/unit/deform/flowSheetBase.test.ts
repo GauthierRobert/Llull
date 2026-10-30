@@ -6,7 +6,7 @@ import type { DeformLaw } from '@core/model/deform';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { validateShapeRecipe } from '@core/geometry/shapeRecipe';
-import { baseSurfaceGrid, flowSurfaceDeterminant, flowSurfaceMap, solveBase } from '@core/geometry/deform/flowSurface';
+import { baseSurfaceGrid, flowSurfaceDeterminant, flowSurfaceMap, solveBase, solveBaseChecked } from '@core/geometry/deform/flowSurface';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import {
   type AnalysisData,
@@ -105,6 +105,26 @@ describe('flow onto a surface from a base sheet against the validation pack (clo
     expect(baseSurfaceGrid({ ...law, baseNodes: undefined } as unknown as SurfaceLaw, [0, 10], [-8, 8], [-1, 1])).toEqual([]);
   });
 
+  it('the base solve reports its residual: tiny on the base surface, large far off the table', () => {
+    const { params } = pack.laws['flow_surface_base_cylinder'] as Pack['laws'][string];
+    const step = params['step'] as number;
+    const [x0, nx, y0, ny] = [-0.6, Math.round(((params['length'] as number) + 1.2) / step) + 1, -12, 121];
+    const law: SurfaceLaw = {
+      kind: 'flowSurface',
+      x0,
+      y0,
+      hx: step,
+      hy: step,
+      nx,
+      ny,
+      nodes: sheetNodes(0, x0, step, nx, y0, step, ny),
+      baseNodes: sheetNodes(50, x0, step, nx, y0, step, ny),
+    };
+    expect(solveBaseChecked(law, [50 - 51 * Math.cos(0.5), 2, 51 * Math.sin(0.5)]).residual).toBeLessThan(1e-9);
+    expect(solveBaseChecked(law, [5000, 0, 5000]).residual).toBeGreaterThan(1);
+    expect(solveBaseChecked({ ...law, baseNodes: undefined } as unknown as SurfaceLaw, [1, 2, 3]).residual).toBe(0);
+  });
+
   it('a recipe node validates baseNodes', () => {
     const node = (patch: Record<string, unknown>): unknown => ({
       op: 'deform',
@@ -146,6 +166,34 @@ function cylinderSheet(doc: CadDocument, radius: number, halfWidth: number): { d
   });
   expect(made.error, made.summary).toBeUndefined();
   return { doc: made.document, id: made.affected[0] as string };
+}
+
+/** A rational full-circle sheet of radius 50 (centre (50, 0, 0), arc from the origin up, normal out), y within +-15. */
+function fullCircleSheet(doc: CadDocument): ReturnType<typeof execute> {
+  // the full base circle: four quarter spans, centre (50, 0, 0), from the origin up
+  const w = Math.SQRT1_2;
+  const ring: Vec3[] = [
+    [0, 0, 0],
+    [0, 0, 50],
+    [50, 0, 50],
+    [100, 0, 50],
+    [100, 0, 0],
+    [100, 0, -50],
+    [50, 0, -50],
+    [0, 0, -50],
+    [0, 0, 0],
+  ];
+  return execute(doc, 'create_nurbs_surface', {
+    degreeU: 2,
+    degreeV: 1,
+    poles: ring.map((pole) => [
+      [pole[0], -15, pole[2]],
+      [pole[0], 15, pole[2]],
+    ]),
+    weights: [1, w, 1, w, 1, w, 1, w, 1].map((weight) => [weight, weight]),
+    knotsU: [0, 0.25, 0.5, 0.75, 1],
+    multiplicitiesU: [3, 2, 2, 2, 3],
+  });
 }
 
 function flatSheet(doc: CadDocument, x: [number, number], y: [number, number], z: number): { doc: CadDocument; id: string } {
@@ -231,30 +279,7 @@ describe.each(KERNELS)('flow_on_surface with a base sheet, kernel: %s', (kind) =
     const box = addBox([2, 20, length], 'base-center');
     const bent = execute(box.doc, 'bend_body', { id: box.id, radius: 50, angleDeg: 300, frame: WORLD_Z, output: { tolerance: 0.1 } });
     expect(bent.error, bent.summary).toBeUndefined();
-    // the full base circle: four quarter spans, centre (50, 0, 0), from the origin up
-    const w = Math.SQRT1_2;
-    const ring: Vec3[] = [
-      [0, 0, 0],
-      [0, 0, 50],
-      [50, 0, 50],
-      [100, 0, 50],
-      [100, 0, 0],
-      [100, 0, -50],
-      [50, 0, -50],
-      [0, 0, -50],
-      [0, 0, 0],
-    ];
-    const made = execute(bent.document, 'create_nurbs_surface', {
-      degreeU: 2,
-      degreeV: 1,
-      poles: ring.map((pole) => [
-        [pole[0], -15, pole[2]],
-        [pole[0], 15, pole[2]],
-      ]),
-      weights: [1, w, 1, w, 1, w, 1, w, 1].map((weight) => [weight, weight]),
-      knotsU: [0, 0.25, 0.5, 0.75, 1],
-      multiplicitiesU: [3, 2, 2, 2, 3],
-    });
+    const made = fullCircleSheet(bent.document);
     expect(made.error, made.summary).toBeUndefined();
     const target = flatSheet(made.document, [-10, 400], [-30, 30], 0);
     const result = execute(target.doc, 'flow_on_surface', {
@@ -312,6 +337,23 @@ describe.each(KERNELS)('flow_on_surface with a base sheet, kernel: %s', (kind) =
       targetUDirection: [0, 0, 1],
     });
     expect(result.error?.code).toBe('DEF_FOLDOVER');
+  });
+
+  it('refuses a body that contains the axis of a closed base (the centre of curvature of the sheet), by name', async () => {
+    await installKernel(kind);
+    const plate = execute(createEmptyDocument(), 'add_box', { size: [60, 20, 10], position: [20, -10, -5], anchor: 'min' });
+    const ring = fullCircleSheet(plate.document);
+    expect(ring.error, ring.summary).toBeUndefined();
+    const target = flatSheet(ring.document, [-10, 400], [-30, 30], 0);
+    const result = execute(target.doc, 'flow_on_surface', {
+      id: plate.affected[0],
+      base: { sheetId: ring.affected[0], origin: [0, 0, 0], uDirection: [0, 0, 1] },
+      target: { sheetId: target.id },
+      targetOrigin: [0, 0, 0],
+      targetUDirection: [1, 0, 0],
+    });
+    expect(result.error?.code).toBe('DEF_FOLDOVER');
+    expect(result.summary).toContain('centre of curvature');
   });
 
   it('refuses a base given twice or not at all, a non-sheet base, a body off the base sheet, and a target fold, by name', async () => {
