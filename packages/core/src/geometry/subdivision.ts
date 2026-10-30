@@ -277,15 +277,24 @@ export function subdivide(cage: Cage, levels: number): Cage {
   return current;
 }
 
-/** Closed, outward-wound triangles of a subdivision solid; `origin` is added to every vertex. */
-export function subdivisionTriangles(entity: Cage & Pick<SubdivisionEntity, 'levels'>, origin: Vec3 = [0, 0, 0]): Triangle[] {
+/**
+ * Closed, outward-wound triangles of a subdivision solid; `origin` is added to every vertex, or `place` maps it (once per surface vertex: the
+ * triangles of a vertex share its point, so a ghost of tens of thousands of triangles allocates one point per vertex, not three per triangle).
+ */
+export function subdivisionTriangles(
+  entity: Cage & Pick<SubdivisionEntity, 'levels'>,
+  origin: Vec3 = [0, 0, 0],
+  place?: (point: Vec3) => Vec3,
+): Triangle[] {
   const surface = subdivide(entity, entity.levels);
-  const at = (v: number): Vec3 => add3(surface.vertices[v] as Vec3, origin);
-  return surface.faces.flatMap((face) => {
-    const triangles: Triangle[] = [];
-    for (let k = 1; k + 1 < face.length; k++) triangles.push([at(face[0] as number), at(face[k] as number), at(face[k + 1] as number)]);
-    return triangles;
-  });
+  const points = surface.vertices.map((p) => (place === undefined ? add3(p, origin) : place(add3(p, origin))));
+  const triangles: Triangle[] = [];
+  for (const face of surface.faces) {
+    const first = points[face[0] as number] as Vec3;
+    for (let k = 1; k + 1 < face.length; k++)
+      triangles.push([first, points[face[k] as number] as Vec3, points[face[k + 1] as number] as Vec3]);
+  }
+  return triangles;
 }
 
 /**

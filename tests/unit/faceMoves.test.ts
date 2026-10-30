@@ -106,6 +106,24 @@ describe('move_faces', () => {
     expect((rotate.move as { angle: number }).angle).toBeCloseTo(Math.PI / 3, 12);
   });
 
+  it('preview true builds the same node but skips the volume report and the exact-topology note', () => {
+    const { ops } = exactKernel();
+    const box = boxDoc();
+    const id = box.affected[0];
+    const full = execute(box.document, 'move_faces', { id, faceIndices: [1], mode: 'offset', distance: 1.5 });
+    expect(ops.at(-1)).not.toHaveProperty('unchecked');
+    const dry = execute(box.document, 'move_faces', { id, faceIndices: [1], mode: 'offset', distance: 1.5, preview: true });
+    expect(ops.at(-1)).toMatchObject({ kind: 'moveFaces', unchecked: true });
+    expect(full.summary).toMatch(/Volume 1000/);
+    expect(full.summary).toContain('Exact B-rep kept');
+    expect(dry.affected).toHaveLength(1);
+    expect(dry.data).toBeUndefined();
+    expect(dry.summary).not.toMatch(/Volume/);
+    expect(dry.summary).not.toContain('Exact B-rep kept');
+    const gone = execute(box.document, 'delete_faces', { id, faceIndices: [1], preview: true });
+    expect(gone.summary).not.toMatch(/Volume/);
+  });
+
   it('leaves out the volume report when the kernel has no mass properties', () => {
     exactKernel({ volumes: false });
     const box = boxDoc();

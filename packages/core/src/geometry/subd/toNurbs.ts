@@ -13,6 +13,8 @@ import { cross3, distance3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3'
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
+import { edgeKey } from './edgeKey';
+import { MEASURE_STATIONS, fitTangentPlanes } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
@@ -24,6 +26,8 @@ export interface ToNurbsOptions {
   readonly tangentToleranceDeg?: number | undefined;
   /** Deviation samples per patch side (a samples x samples grid of cell centres). */
   readonly samples: number;
+  /** Fit the interior poles of the quads around extraordinary vertices to the tangent planes of their neighbours (`g1Fit.ts`). */
+  readonly fitTangents?: boolean | undefined;
 }
 
 interface EvEdgeReport {
@@ -82,12 +86,13 @@ function patchFrame(patch: BezierPatch, u: number, v: number): { point: Vec3; no
 const sideParameter = (k: number, t: number): readonly [number, number] =>
   k === 0 ? [t, 0] : k === 1 ? [1, t] : k === 2 ? [1 - t, 1] : [0, 1 - t];
 
-/** Gap and normal angle along every edge that touches an extraordinary vertex. */
+/** Gap (at 5 stations, ends included) and normal angle (at `MEASURE_STATIONS`) along every smooth edge that touches an extraordinary vertex; a crease edge is intentionally not G1 and is not listed (the smooth edges at a crease vertex are). */
 function evEdgeReports(refined: Cage, patches: readonly BezierPatch[], valence: ReadonlyArray<number>): EvEdgeReport[] {
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const reports: EvEdgeReport[] = [];
+  const creases = new Set(refined.creases.map(([a, b]) => edgeKey(a, b)));
   for (const edge of topology.edges) {
-    if (edge.faces.length !== 2 || (valence[edge.a] === 4 && valence[edge.b] === 4)) continue;
+    if (edge.faces.length !== 2 || (valence[edge.a] === 4 && valence[edge.b] === 4) || creases.has(edgeKey(edge.a, edge.b))) continue;
     const [f, g] = edge.faces as [number, number];
     const [from, to] = topology.directed.get(`${edge.a}>${edge.b}`) === f ? [edge.a, edge.b] : [edge.b, edge.a];
     const kf = (refined.faces[f] as ReadonlyArray<number>).indexOf(from);
@@ -98,6 +103,11 @@ function evEdgeReports(refined: Cage, patches: readonly BezierPatch[], valence: 
       const [u2, v2] = sideParameter(kg, 1 - t);
       const [first, second] = [patchFrame(patches[f] as BezierPatch, u1, v1), patchFrame(patches[g] as BezierPatch, u2, v2)];
       g0 = Math.max(g0, distance3(first.point, second.point));
+    }
+    for (const t of MEASURE_STATIONS) {
+      const [u1, v1] = sideParameter(kf, t);
+      const [u2, v2] = sideParameter(kg, 1 - t);
+      const [first, second] = [patchFrame(patches[f] as BezierPatch, u1, v1), patchFrame(patches[g] as BezierPatch, u2, v2)];
       const cosine = Math.min(1, Math.max(-1, dot3(first.normal, second.normal)));
       g1 = Math.max(g1, (Math.acos(cosine) * 180) / Math.PI);
     }
@@ -136,13 +146,14 @@ interface Build {
   readonly evEdges: EvEdgeReport[];
 }
 
-function buildLevel(cage: Cage, levels: number): Build {
+function buildLevel(cage: Cage, levels: number, fit: boolean): Build {
   const refined = subdivide(cage, levels);
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const valence = topology.vertexEdges.map((edges, v) =>
     edges.length === (topology.vertexFaces[v] as number[]).length ? edges.length : 4,
   );
-  const patches = quadCagePatches(refined);
+  const geometry = quadCagePatches(refined);
+  const patches = fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
   return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence) };
 }
 
@@ -151,11 +162,12 @@ const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((e
 /** The cage's patches as NURBS sheets with the conversion report. The cage may be open (boundary edges are creases) and may contain n-gons. */
 export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult {
   let refineLevels = Math.max(1, settleLevels(cage));
-  let build = buildLevel(cage, refineLevels);
+  const fit = options.fitTangents === true;
+  let build = buildLevel(cage, refineLevels, fit);
   const tolerance = options.tangentToleranceDeg;
   while (tolerance !== undefined && worstBreak(build) > tolerance && build.patches.length * 4 <= MAX_REFINED_PATCHES) {
     refineLevels++;
-    build = buildLevel(cage, refineLevels);
+    build = buildLevel(cage, refineLevels, fit);
   }
   const { refined, patches, evEdges } = build;
   const blocks = options.packed ? packedBlocks(prepare(refined)).filter((block) => block.quads.length > 1) : [];

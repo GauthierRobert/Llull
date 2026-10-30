@@ -6,13 +6,16 @@ import { useStore } from '@ui/store';
 import { useFaceEditStore } from '@ui/store/faceEditStore';
 import { faceCommand } from './faceEditModel';
 
+/** Face commands that the viewport previews with `preview: true` (a dry run that skips the exact volume report, the topology note and the prism route's validity check). */
+const PREVIEW_FLAGGED = new Set(['move_faces']);
+
 /** Set the drag value and refresh the ghost (an idle value clears it). */
 export function updateFaceDrag(value: number): void {
   const { entityId, pick, op } = useFaceEditStore.getState();
   useFaceEditStore.getState().setValue(value);
   const command = entityId === null || pick === null ? null : faceCommand(op, entityId, pick, value);
   if (command === null) endRemotePreview();
-  else requestRemotePreview(command.name, command.params);
+  else requestRemotePreview(command.name, PREVIEW_FLAGGED.has(command.name) ? { ...command.params, preview: true } : command.params);
 }
 
 /** Dispatch the dragged value as one command. @returns whether a command went out */

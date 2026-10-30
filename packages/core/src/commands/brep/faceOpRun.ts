@@ -41,6 +41,8 @@ export interface FaceOpRequest {
   /** Coded refusal when the kernel cannot build the result, and `true` to report the exact volume before and after (needs the kernel's mass properties). */
   readonly kernelFailure?: { readonly code: string; readonly remediation: string };
   readonly reportVolume?: boolean;
+  /** A dry run for a ghost (`preview: true`): the volume report and the exact-topology note (two more kernel queries) are skipped; the geometry is the same. */
+  readonly preview?: boolean;
   readonly coded?: (code: string, message: string) => CommandResult;
 }
 
@@ -82,8 +84,10 @@ export function runFaceOp(doc: CadDocument, ctx: ExecutionContext | undefined, r
     [entity],
     (newId, triangles) =>
       `${command}: ${request.describe(params)} on '${id}' → mesh '${newId}' (${triangles} triangles). Source entity consumed.${pick.note}`,
+    false,
+    request.preview !== true,
   );
-  const volumes = request.reportVolume === true ? exactVolumes(kernel, shape, result.shape) : null;
+  const volumes = request.reportVolume === true && request.preview !== true ? exactVolumes(kernel, shape, result.shape) : null;
   const reported =
     volumes === null
       ? committed

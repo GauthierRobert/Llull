@@ -21,6 +21,12 @@ const FACE_MOVE_REMEDIATION: Readonly<Record<string, string>> = {
 };
 const refuseMove = tableRejection(FACE_MOVE_REMEDIATION);
 
+const PREVIEW_FLAG = z
+  .boolean()
+  .describe(
+    'true: a dry run for a viewport ghost (POST /preview): skips the exact volume report and the exact-topology note, and lets a planar offset that takes the prism route skip its validity check; the geometry is the same. Never set it on a command you commit.',
+  )
+  .optional();
 const faceIndices = z
   .array(z.number().int().nonnegative())
   .describe('0-based unique face indices (inspect_topology / inspect_faces).')
@@ -66,7 +72,7 @@ function offsetTopologyProblem(context: FaceOpContext, distance: number): string
 
 /**
  * @affects removes source entity; creates 1 mesh entity with the picked faces moved
- * @invariant kernel-bound (requiresKernel): the result is ONE valid closed solid (BRepCheck) or the step is refused; picked faces are recorded by persistent name; a moved face keeps its name; data { volumeBefore, volumeAfter } are the exact kernel volumes
+ * @invariant kernel-bound (requiresKernel): offset of one planar face with only plane neighbours square to it, and nothing else in the way of its prism (bounding boxes), is the prism path (same solid, volume and face names as the whole-solid offset, much cheaper; anything else is the whole-solid offset); the result is ONE valid closed solid (BRepCheck, positive volume; only a dry run with preview: true skips the check on the prism route) or the step is refused; picked faces are recorded by persistent name; a moved face keeps its name; data { volumeBefore, volumeAfter } are the exact kernel volumes (absent with preview: true)
  * @failure no exact kernel, bad face pick, missing mode parameters (DIR_FACE_MOVE_PARAMS), a round face that would vanish (DIR_FACE_MOVE_TOPOLOGY), OCC cannot rebuild a valid solid (DIR_FACE_MOVE_FAILED) -> no-op
  */
 export const moveFaces = defineCommand({
@@ -100,6 +106,7 @@ export const moveFaces = defineCommand({
       .describe('rotate: angle in degrees, positive counter-clockwise about the axis direction (non-zero, below 180).')
       .optional(),
     distance: z.number().describe('offset: signed distance in document units along the surface normal (non-zero).').optional(),
+    preview: PREVIEW_FLAG,
   }),
   run: (doc, params, ctx): CommandResult => {
     const { id, mode, vector, axis, angleDeg, distance } = params;
@@ -134,12 +141,13 @@ export const moveFaces = defineCommand({
             message: 'a planar face rotates by less than 85 degrees (the draft behind it stops there)',
           };
         return problem === null
-          ? { kind: 'moveFaces', faces: [...context.faces], move }
+          ? { kind: 'moveFaces', faces: [...context.faces], move, ...(params.preview === true ? { unchecked: true as const } : {}) }
           : { code: 'DIR_FACE_MOVE_TOPOLOGY', message: problem };
       },
       describe: (node) => `${mode} ${node.faces.length} face(s)`,
       kernelFailure: { code: 'DIR_FACE_MOVE_FAILED', remediation: FACE_MOVE_REMEDIATION['DIR_FACE_MOVE_FAILED'] as string },
       reportVolume: true,
+      preview: params.preview === true,
       coded: (code, message) => refuseMove(doc, 'move_faces', code, message, [id], []),
     });
   },
@@ -147,7 +155,7 @@ export const moveFaces = defineCommand({
 
 /**
  * @affects removes source entity; creates 1 mesh entity without the picked faces (the neighbours extend to close the gap)
- * @invariant kernel-bound (requiresKernel): the result is ONE valid closed solid or the step is refused; surviving faces keep their persistent names; data { volumeBefore, volumeAfter } are the exact kernel volumes
+ * @invariant kernel-bound (requiresKernel): the result is ONE valid closed solid or the step is refused; surviving faces keep their persistent names; data { volumeBefore, volumeAfter } are the exact kernel volumes (absent with preview: true)
  * @failure no exact kernel, bad face pick, OCC defeaturing not done or not one valid solid (DIR_DEFEATURE_FAILED) -> no-op
  */
 export const deleteFaces = defineCommand({
@@ -159,8 +167,8 @@ export const deleteFaces = defineCommand({
     'facesNear or faceNames. Exact B-rep only (native OCC kernel; inputs must be solids); the source is consumed and the result must be one valid solid. ' +
     'Returns data { volumeBefore, volumeAfter, volumeUnit, faces }. Refuses what OCC cannot heal (DIR_DEFEATURE_FAILED, e.g. an unclosed gap or a face that has ' +
     'no neighbours to extend). Next: mass_properties, inspect_topology, move_faces.',
-  params: z.object({ id: z.string().describe('Id of the 3D solid.'), faceIndices, facesNear, faceNames }),
-  run: (doc, { id, faceIndices: indices = [], facesNear: near = [], faceNames: names }, ctx): CommandResult =>
+  params: z.object({ id: z.string().describe('Id of the 3D solid.'), faceIndices, facesNear, faceNames, preview: PREVIEW_FLAG }),
+  run: (doc, { id, faceIndices: indices = [], facesNear: near = [], faceNames: names, preview }, ctx): CommandResult =>
     runFaceOp(doc, ctx, {
       command: 'delete_faces',
       id,
@@ -169,5 +177,6 @@ export const deleteFaces = defineCommand({
       describe: (node) => `delete ${node.faces.length} face(s)`,
       kernelFailure: { code: 'DIR_DEFEATURE_FAILED', remediation: FACE_MOVE_REMEDIATION['DIR_DEFEATURE_FAILED'] as string },
       reportVolume: true,
+      preview: preview === true,
     }),
 });

@@ -60,8 +60,6 @@ export function previewCageCommand(doc: CadDocument, name: string, params: objec
     summary: result.summary,
     entity: edited,
     displayLevels,
-    triangles: subdivisionTriangles({ ...edited, levels: displayLevels }).map(
-      (triangle) => triangle.map((p) => entityLocalToWorld(edited, p)) as unknown as Triangle,
-    ),
+    triangles: subdivisionTriangles({ ...edited, levels: displayLevels }, [0, 0, 0], (p) => entityLocalToWorld(edited, p)),
   };
 }

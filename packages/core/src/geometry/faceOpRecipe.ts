@@ -74,7 +74,7 @@ export function faceOpParamsOf(node: FaceOpParams): FaceOpParams {
     case 'splitFace':
       return { kind: 'splitFace', faces: node.faces, plane: node.plane };
     case 'moveFaces':
-      return { kind: 'moveFaces', faces: node.faces, move: node.move };
+      return { kind: 'moveFaces', faces: node.faces, move: node.move, ...(node.unchecked === true ? { unchecked: true as const } : {}) };
     case 'deleteFaces':
       return { kind: 'deleteFaces', faces: node.faces };
   }
