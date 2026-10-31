@@ -7,8 +7,8 @@ import { localDispatch, liveSnapshot, spyDispatch } from '../helpers/storeTestHe
 
 // Helpers
 
-/** The store's real dispatch, captured before any test swaps in a spy via `spyDispatch`. */
-const realDispatch = useStore.getState().dispatch;
+/** The store's real dispatch. Read from the initial state, not the live one: a previous file in the shared graph may have left a spy. */
+const realDispatch = useStore.getInitialState().dispatch;
 
 function resetStore(): void {
   useStore.setState({ dispatch: realDispatch });
