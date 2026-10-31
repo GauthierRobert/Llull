@@ -94,6 +94,7 @@ function checkEntity(
   g0Param: number | undefined,
   requireG2: boolean,
   unit: string,
+  only?: ReadonlySet<string>,
 ): EntityCheck {
   const entityId = entity.id;
   const findings: Finding[] = [];
@@ -157,6 +158,7 @@ function checkEntity(
   for (const face of topology.faces) {
     const source = face.name === undefined ? null : blendSource(face.name);
     if (source === null || face.name === undefined) continue;
+    if (only !== undefined && !only.has(face.name)) continue;
     const contacts: Contact[] = [];
     const before = unverified;
     // width of the blend: its area over its longest edge (the contact lines)
@@ -364,6 +366,12 @@ const roundContact = (contact: ReturnType<typeof measureContact> & object): Omit
  * @invariant kernel-optional: without a kernel, without exact face queries or with no filleted solid the result is status "not_run" (no error); status "fail" when any finding fails, "warn" when any warns, else "pass"; "not_run" without exact face queries; each blend row lists the contacts where it meets its two support faces; a corner patch (kind "corner") lists every edge it shares, measured on the open interior (g1AngleRad) and at its two end points (g1EndAngleRad)
  * @failure unknown id / no fillet in the solid -> SRF_ENTITY_NOT_FOUND; non-positive tolerance or samples outside 2..101 -> no-op
  */
+/** The findings of the blend faces named in `only` alone, at the default tolerances (the guard of a fillet step reads just the faces the step made: its cost follows the step, not the history). */
+export function checkBlendFaces(kernel: GeometryKernel, entity: Entity, only: ReadonlySet<string>, unit: string): Finding[] {
+  const base = { g1AngleRad: DEFAULT_G1_ANGLE_RAD, g2Rel: DEFAULT_G2_REL };
+  return checkEntity(kernel, entity, DEFAULT_SAMPLES, base, undefined, false, unit, only).findings;
+}
+
 export const checkBlends = defineCommand({
   name: 'check_blends',
   annotations: { readOnly: true, idempotent: true },

@@ -389,9 +389,10 @@ describeNative('BLD M2 remainder: profiles on curved edges and faces, varying si
   });
 
   it('two separate steps never make a junction: a rim blend and a later blend that meet at a crease give no junction row and no unmeasured warning', () => {
+    // the later blend is not larger than the first (a larger one is refused: BLD_FILLET_NOT_TANGENT, nativeFilletKink.test.ts)
     const cube = made(createEmptyDocument(), 'add_box', { size: [20, 20, 20], anchor: 'min' });
-    const first = made(cube.doc, 'fillet_edge', { id: cube.id, edgesNear: [[10, 0, 20]], radius: 2 });
-    const second = made(first.doc, 'fillet_edge', { id: first.id, edgesNear: [[0, 0, 10]], radius: 3 });
+    const first = made(cube.doc, 'fillet_edge', { id: cube.id, edgesNear: [[10, 0, 20]], radius: 3 });
+    const second = made(first.doc, 'fillet_edge', { id: first.id, edgesNear: [[0, 0, 10]], radius: 2 });
     expect(second.result.error).toBeUndefined();
     const checked = check(second.doc, second.id);
     expect(checked.blends.flatMap((row) => [...(row.junctions ?? [])])).toEqual([]);
