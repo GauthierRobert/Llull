@@ -205,6 +205,8 @@ export const filletEdge = defineCommand({
     { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners, partial },
     ctx,
   ): CommandResult => {
+    const target = validateSolidTarget(doc, 'fillet_edge', id);
+    if ('summary' in target) return target;
     const refused = refusePartial(doc, id, partial);
     if (refused !== null) return refused;
     if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)

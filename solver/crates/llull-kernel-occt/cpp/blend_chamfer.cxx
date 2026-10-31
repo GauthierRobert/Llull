@@ -36,7 +36,9 @@
 #include <Geom_Surface.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_MapOfShape.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
@@ -447,6 +449,23 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
       }
   naming::Named current = input;
   if (!apply_tools(current, tools, why)) return nullptr;
+  if (std::any_of(tools.begin(), tools.end(), [](const Tool &tool) { return !tool.convex; })) {
+    // The end faces of a fused (concave) tool that end flush on a face of the solid stay faces of their own next to it ("tool.<k>"): merge the coplanar ones.
+    // Only the edges of those faces may disappear; every other edge is kept, so a face split by split_face or an imported coplanar face keeps its name.
+    const TopTools_IndexedMapOfShape fused_faces = query::distinct(current.shape, TopAbs_FACE);
+    TopTools_MapOfShape tool_edges, keep;
+    for (int f = 1; f <= fused_faces.Extent(); ++f)
+      if (current.names[static_cast<size_t>(f - 1)].rfind("tool.", 0) == 0)
+        for (TopExp_Explorer it(fused_faces(f), TopAbs_EDGE); it.More(); it.Next()) tool_edges.Add(it.Current());
+    for (TopExp_Explorer it(current.shape, TopAbs_EDGE); it.More(); it.Next())
+      if (!tool_edges.Contains(it.Current())) keep.Add(it.Current());
+    ShapeUpgrade_UnifySameDomain unifier(current.shape, Standard_False, Standard_True, Standard_False);
+    unifier.KeepShapes(keep);
+    unifier.AllowInternalEdges(Standard_False);
+    unifier.Build();
+    const std::vector<naming::Named> fused{current};
+    current = naming::Named{unifier.Shape(), naming::inherit(unifier.Shape(), fused, unifier.History(), "unify")};
+  }
   const bool all_convex = std::all_of(tools.begin(), tools.end(), [](const Tool &tool) { return tool.convex; });
   const bool all_concave = std::none_of(tools.begin(), tools.end(), [](const Tool &tool) { return tool.convex; });
   const double before = volume_of(source.shape), after = volume_of(current.shape);

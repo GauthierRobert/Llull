@@ -40,6 +40,17 @@ describe('fillet_edge partial', () => {
     },
   );
 
+  it('an entity that is not a solid is refused as before, before the partial option is looked at', () => {
+    const result = execute(doc.document, 'fillet_edge', {
+      id: 'missing',
+      edgesNear: [[0, 10, 10]],
+      radius: 2,
+      partial: { start: 0.25, end: 0.75 },
+    });
+    expect(result.error?.code).not.toBe('BLD_PARTIAL_UNSUPPORTED');
+    expect(result.summary).toContain('not found');
+  });
+
   it('without partial the command is as before (the usual answer, never a partial refusal)', () => {
     const result = execute(doc.document, 'fillet_edge', { id, edgesNear: [[0, 10, 10]], radius: 2 });
     expect(result.error?.code).not.toBe('BLD_PARTIAL_UNSUPPORTED');

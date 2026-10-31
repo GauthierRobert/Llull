@@ -16,9 +16,10 @@ export const partialSchema = z
     end: z.number().describe('Relative position along the edge where the blend ends (1 = the edge end), start < end <= 1.'),
   })
   .describe(
-    'Partial fillet: round only t in [start, end] of the edge, the rest stays sharp (the radius running out at both ends). NOT built: the call is refused with BLD_PARTIAL_UNSUPPORTED and the reason (a radius law falling to a small value builds but leaves a hairline round along the whole edge, so the edge is never sharp). ' +
-      'Use the radius laws (edges[].sizes / sizeEnd) for a blend that varies, a setback corner (corners) to stop a blend short of a vertex, or chamfer_edge with distanceEnd.',
+    'Always refused (BLD_PARTIAL_UNSUPPORTED, a bad range BLD_LAW_INVALID): a blend over t in [start, end] of the edge is not built; use edges[].sizes / sizeEnd for a varying radius, corners (setback) to stop a blend short of a vertex, or chamfer_edge with distanceEnd.',
   );
+
+/** The `partial` param is declared so that it is refused by name and never silently ignored (an undeclared key would be): a stub to implement or remove under FR-BLD-11. */
 
 /** The refusal of a `partial` option, or null when there is none. */
 export function refusePartial(doc: CadDocument, id: string, partial: { start: number; end: number } | undefined): CommandResult | null {

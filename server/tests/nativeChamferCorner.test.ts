@@ -139,6 +139,8 @@ describeNative('BLD M5: variable chamfers meeting at a corner (native OCCT kerne
       distance: 1,
       distanceEnd: 2,
     });
+    expect(mixed.error?.code).toBe('BLD_CHAMFER_FAILED');
+    expect(mixed.error?.paths).toEqual(['distanceEnd']);
     expect(mixed.summary).toContain('all convex or all concave');
     expect(mixed.document).toBe(step.document);
     expect(execute(step.document, 'chamfer_edge', { id, edgesNear: [[10, 5, 5]], distance: 1, distanceEnd: 2 }).rejected).toBeUndefined();
@@ -153,5 +155,125 @@ describeNative('BLD M5: variable chamfers meeting at a corner (native OCCT kerne
         distanceEnd: 2,
       }).rejected,
     ).toBeUndefined();
+  });
+
+  /** Faces of the result and whether the exact kernel finds it valid and closed. */
+  const faceCount = (doc: Doc, id: string): number => (execute(doc, 'inspect_topology', { id }).data as { faces: unknown[] }).faces.length;
+  const healthy = (doc: Doc, id: string): boolean => {
+    const recipe = (doc.entities[id] as { brep?: Parameters<typeof kernel.evaluate>[0] }).brep;
+    const handle = recipe === undefined ? null : kernel.evaluate(recipe);
+    const health = handle === null ? null : (kernel.analyze?.(handle) ?? null);
+    return health !== null && health.valid && health.closed;
+  };
+
+  it('asymmetric legs at the corner (side 1 leg 1 -> 3, the other leg 2 -> 1) build 6 + 3 faces, valid, and remove the grid union of the wedges u / d1(t) + v / d2(t) < 1 within 2e-3', () => {
+    const { doc, id } = cube();
+    const done = chamfer(doc, id, { distance: 1, distanceEnd: 3, distance2: 2, distance2End: 1, side1Near: [0.1, 0.3, 0.2] });
+    expect(done.rejected, done.summary).toBeUndefined();
+    const out = done.affected[0] as string;
+    expect(faceCount(done.document, out)).toBe(9);
+    expect(healthy(done.document, out)).toBe(true);
+    const removed = volume(doc, id) - volume(done.document, out);
+    const grows = startsAtOrigin(doc, id);
+    // per edge (x, y, z): the axis, the coordinate on side 1 (the face nearest to side1Near) and the other one; side 1 of edge x is z = 0 (leg along y), of edge y is x = 0 (leg along z), of edge z is x = 0 (leg along y)
+    const sides: Array<[number, number, number]> = [
+      [0, 1, 2],
+      [1, 2, 0],
+      [2, 1, 0],
+    ];
+    const d1 = (i: number, t: number): number => (grows[i] ? 1 + (2 * t) / L : 3 - (2 * t) / L);
+    const d2 = (i: number, t: number): number => (grows[i] ? 2 - t / L : 1 + t / L);
+    const dmax = 3;
+    const n = 240;
+    const h = dmax / n;
+    let corner = 0;
+    for (let a = 0; a < n; a++)
+      for (let b = 0; b < n; b++)
+        for (let c = 0; c < n; c++) {
+          const p = [(a + 0.5) * h, (b + 0.5) * h, (c + 0.5) * h];
+          if (
+            sides.some(
+              ([axis, u, v]) => (p[u] as number) / d1(axis, p[axis] as number) + (p[v] as number) / d2(axis, p[axis] as number) < 1,
+            )
+          )
+            corner += 1;
+        }
+    let tails = 0;
+    for (let axis = 0; axis < 3; axis++) {
+      const m = 4000;
+      for (let k = 0; k < m; k++) {
+        const t = dmax + ((k + 0.5) * (L - dmax)) / m;
+        tails += 0.5 * d1(axis, t) * d2(axis, t) * ((L - dmax) / m);
+      }
+    }
+    const expected = corner * h ** 3 + tails;
+    expect(Math.abs(removed - expected) / expected).toBeLessThan(2e-3);
+  });
+
+  /** A block 20 x 20 x 20 with a pocket 10 x 10 x 10 cut from its top corner (x, y in [0, 10], z in [10, 20]): the inner corner at (10, 10, 10) has three concave edges, each 10 long. */
+  const pocket = (): { doc: Doc; id: string } => {
+    const block = execute(createEmptyDocument(), 'add_box', { size: [20, 20, 20], position: [10, 10, 10] });
+    const hole = execute(block.document, 'add_box', { size: [10, 10, 10], position: [5, 5, 15] });
+    const cut = execute(hole.document, 'boolean', { op: 'subtract', a: block.affected[0] as string, b: hole.affected[0] as string });
+    expect(cut.rejected, cut.summary).toBeUndefined();
+    return { doc: cut.document, id: cut.affected[0] as string };
+  };
+  const INNER: number[][] = [
+    [10, 5, 10],
+    [5, 10, 10],
+    [10, 10, 15],
+  ];
+
+  it('three concave edges at the inner corner of a pocket (d = 2, L = 10) add 3/2 d^2 L - 3/4 d^3 = 54, 9 + 3 faces, valid; the edges listed in reverse order give the same volume and face count', () => {
+    const { doc, id } = pocket();
+    const before = volume(doc, id);
+    // one concave edge alone: the end faces of the fused tool are merged with the faces they end on (10 faces, not 11)
+    const single = execute(doc, 'chamfer_edge', { id, edgesNear: [INNER[0] as number[]], distance: 2, distanceEnd: 2 });
+    expect(faceCount(single.document, single.affected[0] as string)).toBe(10);
+    const forward = execute(doc, 'chamfer_edge', { id, edgesNear: INNER, distance: 2, distanceEnd: 2 });
+    expect(forward.rejected, forward.summary).toBeUndefined();
+    const reversed = execute(doc, 'chamfer_edge', { id, edgesNear: [...INNER].reverse(), distance: 2, distanceEnd: 2 });
+    expect(reversed.rejected, reversed.summary).toBeUndefined();
+    for (const done of [forward, reversed]) {
+      const out = done.affected[0] as string;
+      expect(Math.abs(volume(done.document, out) - before - 54) / 54).toBeLessThan(1e-9);
+      expect(faceCount(done.document, out)).toBe(12);
+      expect(healthy(done.document, out)).toBe(true);
+    }
+  });
+
+  it('the constant path (no distanceEnd, OCCT MakeChamfer) and the variable path with distance = distanceEnd = 2 on the same three edges: volume and face count', () => {
+    const { doc, id } = cube();
+    const constant = chamfer(doc, id, { distance: 2 });
+    expect(constant.rejected, constant.summary).toBeUndefined();
+    const variable = chamfer(doc, id, { distance: 2, distanceEnd: 2 });
+    const [a, b] = [constant, variable].map((done) => ({
+      removed: volume(doc, id) - volume(done.document, done.affected[0] as string),
+      faces: faceCount(done.document, done.affected[0] as string),
+    }));
+    // OCCT's constant chamfer fills the corner with a patch of its own (10 faces, d^3 / 12 less material left); the variable path leaves the mitre of the three planes (9 faces)
+    expect(a?.faces).toBe(10);
+    expect(a?.removed).toBeCloseTo(114 + 8 / 12, 9);
+    expect(b?.faces).toBe(9);
+    expect(b?.removed).toBeCloseTo(114, 9);
+  });
+
+  it('legs large against the edge (L = 6, d = 2): the stations the mitre trims are over a quarter of them, so check_blends says the legs were not verified (status not_run with a BLD_CHECK_CHAMFER_UNVERIFIED warning, never a pass)', () => {
+    const small = execute(createEmptyDocument(), 'add_box', { size: [6, 6, 6], position: [3, 3, 3] });
+    const done = execute(small.document, 'chamfer_edge', {
+      id: small.affected[0] as string,
+      edgesNear: [
+        [3, 0, 0],
+        [0, 3, 0],
+        [0, 0, 3],
+      ],
+      distance: 2,
+      distanceEnd: 2,
+    });
+    expect(done.rejected, done.summary).toBeUndefined();
+    const read = execute(done.document, 'check_blends', {});
+    const data = read.data as { status: string; findings: Array<{ code: string; severity: string }> };
+    expect(data.status).toBe('not_run');
+    expect(data.findings.some((finding) => finding.code === 'BLD_CHECK_CHAMFER_UNVERIFIED' && finding.severity === 'warn')).toBe(true);
   });
 });
