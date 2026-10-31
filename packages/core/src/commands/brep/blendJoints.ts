@@ -5,6 +5,9 @@
  */
 
 import type { JointRadius } from '../../model/blendTypes';
+import type { Entity, ShapeRecipe } from '../../model/types';
+import type { GeometryKernel } from '../../geometry/kernel';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { DEFAULT_LAW_SAMPLES, MAX_LAW_SAMPLES, MIN_LAW_SAMPLES, isLawProblem, resolveLaw } from '../../geometry/blend/law';
 import { vec3, z } from '../schema';
 
@@ -127,4 +130,43 @@ export function planJoints(joints: readonly JointInput[]): { readonly joints: Jo
     });
   }
   return { joints: planned };
+}
+
+/** The blend recipe of blend_union over `operands` (shared by the command and check_model, so both resolve joints identically). */
+export function unionRecipe(
+  kernel: GeometryKernel,
+  operands: readonly Entity[],
+  radius: number,
+  joints: readonly JointRadius[],
+): ShapeRecipe {
+  return {
+    op: 'blend',
+    sources: operands.map((entity) => operandRecipe(kernel, entity)),
+    radius,
+    ...(joints.length === 0 ? {} : { joints: [...joints] }),
+  };
+}
+
+const KERNEL_PICK_REFUSAL =
+  /^\[(BLD_JOINT_PARAMS|BLD_LAW_NOT_PERIODIC|REF_LOST|REF_SPLIT)\]\s*(joints(?:\[(\d+)\])?(?:\.\w+)?):\s*([\s\S]*)$/;
+
+export interface PickRefusal {
+  readonly code: string;
+  /** `joints[i].name` as the kernel words it. */
+  readonly path: string;
+  /** Joint index, when the path has one. */
+  readonly index: number | null;
+  readonly text: string;
+}
+
+/** `[CODE] joints[i].path: message` as the kernel words a refusal about a pick, or null for any other message. */
+export function parsePickRefusal(message: string | undefined): PickRefusal | null {
+  const coded = KERNEL_PICK_REFUSAL.exec(message ?? '');
+  if (coded === null) return null;
+  return {
+    code: coded[1] ?? '',
+    path: coded[2] ?? 'joints',
+    index: coded[3] === undefined ? null : Number(coded[3]),
+    text: coded[4] ?? '',
+  };
 }
