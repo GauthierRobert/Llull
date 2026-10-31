@@ -143,7 +143,8 @@ describe('preview_add_knurl', () => {
     const right = execute(doc, 'preview_add_knurl', modeled);
     expect(right.rejected, right.summary).toBeUndefined();
     const rightFirst = (data(right)['lines'] as Array<{ points: Vec3[] }>)[0]?.points as Vec3[];
-    const rightTurn = ((angle(rightFirst[rightFirst.length - 1] as Vec3) - angle(rightFirst[0] as Vec3) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    const rightTurn =
+      ((angle(rightFirst[rightFirst.length - 1] as Vec3) - angle(rightFirst[0] as Vec3) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
     const left = execute(doc, 'preview_add_knurl', { ...modeled, hand: 'left' });
     const leftFirst = (data(left)['lines'] as Array<{ points: Vec3[] }>)[0]?.points as Vec3[];
     const leftTurn =
