@@ -61,6 +61,9 @@ export function App(): React.ReactElement {
       data-sidebar={sidebarOpen ? 'open' : 'closed'}
       data-inspector={showInspector ? 'open' : 'closed'}
     >
+      {/* DOM order is the Tab / landmark order (header, browser, viewport, properties, command bar); stacking comes from z-index. */}
+      <TopBar />
+      <Sidebar />
       <main className="app-viewport" aria-label="Viewport">
         <MeasurementHUD />
         <ExchangeReportHUD />
@@ -74,8 +77,6 @@ export function App(): React.ReactElement {
         <ViewportContextMenu />
       </main>
 
-      <TopBar />
-      <Sidebar />
       {showInspector && <PropertiesPanel className="inspector" />}
       <Toolbar />
       <StatusBar />

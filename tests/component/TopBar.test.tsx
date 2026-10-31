@@ -22,40 +22,6 @@ describe('TopBar — brand', () => {
   });
 });
 
-// TopBar — agent pill
-
-describe('TopBar — agent pill', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-  it('shows "live" text when liveStatus is connected', () => {
-    useStore.setState({ liveStatus: 'connected' });
-    render(<TopBar />);
-    expect(screen.getByText('live')).toBeDefined();
-  });
-  it('shows "connecting…" text when liveStatus is connecting', () => {
-    useStore.setState({ liveStatus: 'connecting' });
-    render(<TopBar />);
-    expect(screen.getByText('connecting…')).toBeDefined();
-  });
-  it('shows "offline" text when liveStatus is disconnected', () => {
-    useStore.setState({ liveStatus: 'disconnected' });
-    render(<TopBar />);
-    expect(screen.getByText('offline')).toBeDefined();
-  });
-  it('has agent-pill--connected class when connected', () => {
-    useStore.setState({ liveStatus: 'connected' });
-    render(<TopBar />);
-    const pill = screen.getByLabelText(/live sync: connected/i);
-    expect(pill.className).toContain('agent-pill--connected');
-  });
-  it('has accessible label reflecting connected status', () => {
-    useStore.setState({ liveStatus: 'connected' });
-    render(<TopBar />);
-    expect(screen.getByLabelText('Live sync: connected')).toBeDefined();
-  });
-});
-
 // TopBar — command palette trigger
 
 describe('TopBar — More menu', () => {

@@ -136,6 +136,47 @@ describe('PropertiesPanel — editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(useStore.getState().document.entities[id]).toBeUndefined();
   });
+  it('typing a size edits the creating step and keeps the entity selected', () => {
+    const id = createBox([1, 2, 3]);
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    commit('Size Y', '7');
+    const state = useStore.getState();
+    expect(state.document.entities[id]).toMatchObject({ kind: 'box', size: [1, 7, 3] });
+    expect(state.document.featureHistory[0]?.params).toMatchObject({ size: [1, 7, 3] });
+    expect(state.document.selection).toEqual([id]);
+  });
+  it('typing a cylinder radius edits its creating step', () => {
+    const id = localDispatch('add_cylinder', { radius: 1, height: 2 }).affected[0]!;
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    commit('Radius', '2.5');
+    expect(useStore.getState().document.entities[id]).toMatchObject({ radius: 2.5, height: 2 });
+  });
+  it('shows a refused dimension edit and leaves the document unchanged', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    const before = useStore.getState().document;
+    commit('Size X', '-4');
+    expect(useStore.getState().document).toBe(before);
+    expect(screen.getByRole('alert').textContent).toMatch(/edit_step_params/);
+  });
+  it('shows a parameter-driven dimension as its read-only expression', () => {
+    localDispatch('set_parameter', { name: 'w', expression: '4' });
+    const id = Object.keys(localDispatch('insert_step', { name: 'add_box', params: { size: ['=w', 2, 2] } }).document.entities).at(-1)!;
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    expect(screen.getByText('=w')).toBeDefined();
+    expect(screen.queryByLabelText('Size X')).toBeNull();
+  });
+  it('picking a colour commits set_entity_color once the picker closes', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#c8553d' } });
+    expect(useStore.getState().document.entities[id]?.color).toBe('#c8553d');
+  });
   it('offers rotation for solids only', () => {
     const line = localDispatch('draw_polyline', { points: xy(0, 0, 1, 0) }).affected[0]!;
     useStore.getState().select([line]);

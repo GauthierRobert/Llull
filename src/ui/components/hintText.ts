@@ -34,7 +34,7 @@ export function hintText(context: HintContext): string {
 
   if (viewMode === '2d' && modifyTool !== 'none') {
     const label = modifyTool.charAt(0).toUpperCase() + modifyTool.slice(1);
-    return `${label}: follow the prompt above · Esc cancels · Esc again returns to Select.`;
+    return `${label} tool · Esc cancels the step · Esc again returns to Select.`; // the step prompt pill above says what to click
   }
 
   if (viewMode === '2d' && drawTool === 'move') {
@@ -44,7 +44,8 @@ export function hintText(context: HintContext): string {
   }
   if (viewMode === '2d' && drawTool !== 'none' && drawTool !== 'move')
     return `${DRAW_TOOL_HINTS[drawTool]} Esc cancels · Esc again returns to Select.`;
-  if (entityCount === 0) return 'Empty model: pick a solid (Box, Cylinder…) or a 2D tool (Line, Rectangle…) in the toolbar above.';
+  if (entityCount === 0)
+    return 'Empty model: pick a solid (Box, Cylinder…) or a 2D tool (Line, Rectangle…) from Tools (+) in the command bar.';
   if (selectionCount === 0) {
     return viewMode === '3d'
       ? 'Click an object to select it · drag to orbit, right-drag to pan, scroll to zoom · ? shortcuts.'

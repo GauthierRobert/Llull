@@ -1,4 +1,4 @@
-// Command bar (bottom-center). Idle it is one line: a Tools button and "Ask or run a command" (opens the palette).
+// Command bar (bottom-center). Idle it is one line: a Tools button and "Search or run a command" (opens the palette).
 // Everything else is on demand: the Tools panel (sketch tools, solids, view mode, select, shortcuts), the armed
 // tool chip, an Undo/Redo pair (disabled when idle), and the selection's actions while something is selected.
 
@@ -253,7 +253,7 @@ function AskButton(): React.ReactElement {
       title={`Search every action and command (${PALETTE_SHORTCUT_LABEL})`}
     >
       <Icon name="search" size={15} />
-      <span className="dock-ask__text">Ask or run a command…</span>
+      <span className="dock-ask__text">Search or run a command…</span>
       <kbd className="dock-ask__kbd">{PALETTE_SHORTCUT_LABEL}</kbd>
     </button>
   );

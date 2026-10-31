@@ -22,6 +22,11 @@
   flex: 1 1 0;
 }
 
+/* The second field of a pair ("Unit") is labelled by a short word, not the column-wide label. */
+.aero__pair > .field + .field .field__label {
+  flex-basis: auto;
+}
+
 .aero__axis .field__label {
   flex-basis: 12px;
 }

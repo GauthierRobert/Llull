@@ -58,6 +58,16 @@ describe('lensTarget', () => {
     expect(target?.dimensions[0]).toMatchObject({ key: 'radius', value: null, expression: '=r' });
     expect(lensTarget(history, 'nothing')).toBeNull();
   });
+
+  it('finds a hand-inserted step (no recorded affected ids) by its step-scoped entity id', () => {
+    const history: FeatureStep[] = [
+      { id: 'step-1', name: 'add_box', params: { size: [1, 1, 1] } },
+      { id: 'step-2', name: 'add_cylinder', params: { radius: 1, height: 2 } },
+    ];
+    expect(lensTarget(history, 'cyl-2.1')?.stepId).toBe('step-2');
+    expect(lensTarget(history, 'box-1.1')?.stepId).toBe('step-1');
+    expect(lensTarget(history, 'box-12.1')).toBeNull();
+  });
 });
 
 describe('LensPills', () => {

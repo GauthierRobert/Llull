@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { getCommand } from '@core/commands/registry';
 import { execute } from '@core/commands/registry';
+import { derivedEntityIds } from '@core/plugins/host';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useFeatureSessionStore } from '@ui/store/featureSessionStore';
@@ -206,6 +207,15 @@ describe('feature drag session', () => {
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Fillet', 'Shell']);
     unmount();
     useStore.setState({ document: { ...doc, selection: [boxId, rectId] }, dispatch });
+    render(<FeatureStartBar />);
+    expect(screen.queryByRole('toolbar')).toBeNull();
+  });
+
+  it('offers nothing for plugin-derived geometry (a building element is read-only)', () => {
+    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', {}).document;
+    const derivedSolid = [...derivedEntityIds(doc)].find((id) => doc.entities[id]?.kind === 'mesh');
+    if (derivedSolid === undefined) throw new Error('the portal frame derived no solid');
+    useStore.setState({ document: { ...doc, selection: [derivedSolid] }, dispatch });
     render(<FeatureStartBar />);
     expect(screen.queryByRole('toolbar')).toBeNull();
   });

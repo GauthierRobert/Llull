@@ -11,8 +11,8 @@ const base: HintContext = {
 };
 
 describe('hintText', () => {
-  it('points an empty model at the toolbar', () => {
-    expect(hintText({ ...base, entityCount: 0 })).toMatch(/toolbar/i);
+  it('points an empty model at the Tools menu of the command bar', () => {
+    expect(hintText({ ...base, entityCount: 0 })).toMatch(/Tools \(\+\) in the command bar/);
   });
   it('explains selection when nothing is selected', () => {
     expect(hintText(base)).toMatch(/click an object/i);
@@ -35,6 +35,6 @@ describe('hintText', () => {
     expect(hintText({ ...base, viewMode: '2d', drawTool: 'move', selectionCount: 2 })).toMatch(/base point/);
   });
   it('defers to the modify palette prompt while a modify tool is armed', () => {
-    expect(hintText({ ...base, viewMode: '2d', modifyTool: 'fillet' })).toMatch(/^Fillet: follow/);
+    expect(hintText({ ...base, viewMode: '2d', modifyTool: 'fillet' })).toMatch(/^Fillet tool · Esc cancels/);
   });
 });

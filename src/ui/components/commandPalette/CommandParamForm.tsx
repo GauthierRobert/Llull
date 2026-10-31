@@ -12,7 +12,7 @@ import { usePreviewController } from '@ui/preview/usePreviewController';
 import { useFootprintPreview } from '@ui/preview/useFootprintPreview';
 import { useFootprintPreviewStore } from '@ui/store/footprintPreviewStore';
 import { Icon } from '@ui/components/Icon';
-import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
+import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, optionLabel, parseFormValues, valuesFromParams } from './paramForm';
 import { visibleFields } from './fieldVisibility';
 import type { FormField, FormValues } from './paramForm';
 
@@ -75,16 +75,18 @@ function TypeaheadSelect({ common, value, options, optional, onChange }: Typeahe
         const now = Date.now();
         const text = now - typed.current.at > TYPEAHEAD_RESET_MS ? e.key : typed.current.text + e.key;
         typed.current = { text, at: now };
-        const match = matchTypeahead(options, text);
+        // Typed text matches what the select shows: "y" picks true (Yes), "he" picks heat_steady (Heat steady).
+        const labels = options.map(optionLabel);
+        const match = matchTypeahead(labels, text);
         if (match === undefined) return;
         e.preventDefault();
-        onChange(match);
+        onChange(options[labels.indexOf(match)] ?? match);
       }}
     >
       {optional && <option value="">Default</option>}
       {options.map((option) => (
         <option key={option} value={option}>
-          {option}
+          {optionLabel(option)}
         </option>
       ))}
     </select>
