@@ -43,6 +43,8 @@ constexpr double kNormalCosine = 1 - 1e-9;
 // Two edges of the hole that turn by less than this at a vertex continue each other (a joint of a chain, no spoke); a hole with fewer than 3 corners gets spokes from the middles of its edges.
 constexpr double kCornerAngle = 0.02;
 constexpr size_t kSmoothSpokes = 6;
+// A crease vertex (13.33.2): its two supports must meet at an angle of at least this many radians (less is a vertex the ordinary star takes) and at most pi minus it (a spike).
+constexpr double kMinCrease = 0.2;
 
 struct Hermite3 {
   double p0, d0, p1, d1;
@@ -232,6 +234,11 @@ struct Vertex {
   Vec rate_leaving, rate_arriving;  // d(normal)/ds of the supports along them
   Vec rate;  // d(normal)/dv of the spoke at the vertex
   Vec spoke_tangent;
+  // A crease vertex (13.33.2): the supports of the two edges that meet here are NOT tangent (an unrounded edge of the part enters the hole). The spoke leaves along the line of
+  // the two tangent planes and each side of it has its own normal field: normal_left (the support of the edge that starts here, the sub-patch on the left of the spoke) and
+  // normal_right (the support of the edge that ends here) with their own derivatives. At an ordinary vertex both are the shared normal and the shared rate.
+  bool crease = false;
+  Vec normal_left, normal_right, rate_left, rate_right;
 };
 
 struct Star {
@@ -246,9 +253,10 @@ struct Star {
   std::vector<Vec> arrival;  // spoke tangent at the centre
   Vec rate_at_centre(size_t k) const { return arrival[k] * curvature_at_centre; }
 
-  // The normal of the shared tangent plane along spoke k at v.
-  bool spoke_normal(size_t k, double v, Vec &n) const {
-    Vec g = cubic_vec(v, vertices[k].normal, vertices[k].rate, centre_normal, rate_at_centre(k));
+  // The normal of the shared tangent plane along spoke k at v; `right` selects the field of the sub-patch on the right of a crease spoke (the same field at any other vertex).
+  bool spoke_normal(size_t k, double v, Vec &n, bool right = false) const {
+    Vec g = right ? cubic_vec(v, vertices[k].normal_right, vertices[k].rate_right, centre_normal, rate_at_centre(k))
+                  : cubic_vec(v, vertices[k].normal_left, vertices[k].rate_left, centre_normal, rate_at_centre(k));
     Vec t = spokes[k].at(v, 1);
     if (!unit(t)) return false;
     n = project(g, t);
@@ -257,6 +265,15 @@ struct Star {
 };
 
 bool solve_vertex(Vertex &vertex, std::string &why) {
+  if (vertex.crease) {
+    // along the line of the two tangent planes; the side that points into the hole is chosen once the centre of the hole is known
+    vertex.toward = vertex.normal_left ^ vertex.normal_right;
+    if (!unit(vertex.toward)) {
+      why = "the supports at a crease vertex are parallel";
+      return false;
+    }
+    return true;
+  }
   Vec a = project(vertex.leaving, vertex.normal), b = project(vertex.arriving * -1.0, vertex.normal);
   if (!unit(a) || !unit(b)) {
     why = "an edge of the hole has no tangent at a vertex";
@@ -307,7 +324,7 @@ struct Patch {
   }
   Vec cross_right(double v) const {
     Vec n;
-    if (!star.spoke_normal(j, v, n)) broken = true;
+    if (!star.spoke_normal(j, v, n, true)) broken = true;
     return project(cubic_vec(v, star.sides[k].tangent(1), suv10, Vec(0, 0, 0), theta), n);
   }
   Vec cross_top(double u) const { return star.arrival[k] * (1 - u) + star.arrival[j] * u; }
@@ -476,8 +493,18 @@ bool place(Star &star, const gp_XYZ &centroid, double height, double scale, std:
       why = "a vertex of the hole is at its centre";
       return false;
     }
+    if (vertex.crease && Vec(vertex.toward) * Vec(vertex.at, star.centre) < 0) vertex.toward.Reverse();
     vertex.spoke_tangent = vertex.toward * length;
-    vertex.rate = spoke_rate(vertex, vertex.spoke_tangent);
+    if (vertex.crease) {
+      // one-sided: the least-norm derivative of each side's normal that holds the twist of its own support along the edge on that side (leaving . Dn = rate . d0)
+      const auto one_sided = [&](const Vec &edge, const Vec &support_rate) { return edge * ((support_rate * vertex.spoke_tangent) / edge.SquareMagnitude()); };
+      vertex.rate_left = one_sided(vertex.leaving, vertex.rate_leaving);
+      vertex.rate_right = one_sided(vertex.arriving, vertex.rate_arriving);
+      vertex.rate = (vertex.rate_left + vertex.rate_right) * 0.5;
+    } else {
+      vertex.rate = spoke_rate(vertex, vertex.spoke_tangent);
+      vertex.rate_left = vertex.rate_right = vertex.rate;
+    }
     curvature += (vertex.rate * vertex.spoke_tangent) / vertex.spoke_tangent.SquareMagnitude();
     Vec outward = project(Vec(star.centre, vertex.at), centre_normal);
     if (!unit(outward)) outward = vertex.toward * -1.0;
@@ -504,7 +531,14 @@ bool place(Star &star, const gp_XYZ &centroid, double height, double scale, std:
     Quintic &spoke = star.spokes[k];
     spoke.p0 = Vec(vertex.at.XYZ());
     spoke.d0 = vertex.spoke_tangent;
-    spoke.q0 = vertex.normal * -(vertex.rate * vertex.spoke_tangent);
+    if (vertex.crease) {
+      // the spoke lies in both tangent planes: n_left . q0 = -Dn_left . d0 and n_right . q0 = -Dn_right . d0, q0 in the span of the two normals
+      const double a11 = vertex.normal_left * vertex.normal_left, a12 = vertex.normal_left * vertex.normal_right, a22 = vertex.normal_right * vertex.normal_right;
+      const double r1 = -(vertex.rate_left * vertex.spoke_tangent), r2 = -(vertex.rate_right * vertex.spoke_tangent);
+      const double det = a11 * a22 - a12 * a12;
+      spoke.q0 = vertex.normal_left * ((r1 * a22 - r2 * a12) / det) + vertex.normal_right * ((a11 * r2 - a12 * r1) / det);
+    } else
+      spoke.q0 = vertex.normal * -(vertex.rate * vertex.spoke_tangent);
     spoke.p1 = Vec(star.centre.XYZ());
     spoke.d1 = star.arrival[k];
     spoke.q1 = centre_normal * -(star.curvature_at_centre * star.arrival[k].SquareMagnitude());
@@ -549,7 +583,7 @@ double joint_crease(const Handle(Geom_BSplineSurface) &surface, const std::vecto
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -614,6 +648,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   // The supports must be tangent at every vertex of the loop. The spokes leave from the CORNERS (where the two edges turn); a vertex where the edges continue each other (the contact
   // of a blend with its support) is only a joint of a chain: at such a vertex the twist condition of the spoke would have two parallel equations with different right-hand sides.
   std::vector<double> cuts;  // positions e + s along the loop where a spoke leaves
+  int creases = 0;
   for (size_t k = 0; k < raw_count; ++k) {
     const size_t before = (k + raw_count - 1) % raw_count;
     Vec n_leaving, n_arriving;
@@ -621,16 +656,23 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       why = "a support has no normal at a vertex";
       return false;
     }
-    if (n_leaving * n_arriving < kNormalCosine) {
-      why = "the supports of the hole are not tangent at a vertex (normals differ by " + std::to_string(std::acos(std::min(1.0, n_leaving * n_arriving))) + " rad)";
-      return false;
+    const bool creased = n_leaving * n_arriving < kNormalCosine;
+    if (creased) {
+      // one crease vertex is allowed, where an unrounded edge of the part enters the hole (13.33.2): its two supports meet at an angle
+      const double angle = std::acos(std::max(-1.0, std::min(1.0, n_leaving * n_arriving)));
+      if (!allow_crease || creases > 0 || angle < kMinCrease || angle > kPi - kMinCrease) {
+        why = "the supports of the hole are not tangent at a vertex (normals differ by " + std::to_string(angle) + " rad)" +
+              (allow_crease ? (creases > 0 ? ": a second crease vertex" : " (not a crease the star can hold: " + std::to_string(kMinCrease) + " to pi - that)") : "");
+        return false;
+      }
+      ++creases;
     }
     Vec leaving = star.raw[k].tangent(0), arriving = star.raw[before].tangent(1);
     if (!unit(leaving) || !unit(arriving)) {
       why = "an edge of the hole has no tangent at a vertex";
       return false;
     }
-    if (spokes_at_every_vertex || leaving * arriving < std::cos(kCornerAngle)) cuts.push_back(static_cast<double>(k));
+    if (creased || spokes_at_every_vertex || leaving * arriving < std::cos(kCornerAngle)) cuts.push_back(static_cast<double>(k));
   }
   // Fewer than 3 corners (a hole bounded by smooth curves): spokes also leave from the middles of the longest edges, where one support is smooth.
   const size_t wanted = std::max<size_t>(3, std::min<size_t>(raw_count, kSmoothSpokes));
@@ -723,6 +765,9 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     }
     vertex.normal = n_leaving + n_arriving;
     unit(vertex.normal);
+    vertex.crease = n_leaving * n_arriving < kNormalCosine;
+    vertex.normal_left = vertex.crease ? n_leaving : vertex.normal;
+    vertex.normal_right = vertex.crease ? n_arriving : vertex.normal;
     vertex.at = star.sides[k].point(0);
     vertex.leaving = star.sides[k].tangent(0);
     vertex.arriving = star.sides[before].tangent(1);
@@ -766,8 +811,8 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   for (size_t k = 0; k < m; ++k) {
     const size_t j = (k + 1) % m;
     Patch patch{star, k, j, Vec(), Vec(), Vec()};
-    patch.suv00 = star.vertices[k].normal * -(star.vertices[k].rate_leaving * star.vertices[k].spoke_tangent);
-    patch.suv10 = star.vertices[j].normal * -(star.vertices[j].rate_arriving * star.vertices[j].spoke_tangent);
+    patch.suv00 = star.vertices[k].normal_left * -(star.vertices[k].rate_leaving * star.vertices[k].spoke_tangent);
+    patch.suv10 = star.vertices[j].normal_right * -(star.vertices[j].rate_arriving * star.vertices[j].spoke_tangent);
     patch.theta = star.arrival[j] - star.arrival[k];
     patches.push_back(patch);
   }
@@ -828,7 +873,15 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
         if (t < 0.97) {
           const size_t previous = (k + m - 1) % m;
           Vec left, right;
-          if (normal_of(surfaces[k], 0, t, left) && normal_of(surfaces[previous], 1, t, right)) {
+          if (star.vertices[k].crease) {
+            // a crease spoke: the two sides differ by design; each must follow ITS OWN normal field along the spoke (the field of the support at the vertex, closing to the common normal at the centre)
+            Vec field_left, field_right;
+            if (normal_of(surfaces[k], 0, t, left) && normal_of(surfaces[previous], 1, t, right) && star.spoke_normal(k, t, field_left) && star.spoke_normal(k, t, field_right, true)) {
+              out.angle = std::max({out.angle, line_angle(left, field_left), line_angle(right, field_right)});
+              if (left * field_left < 0 || right * field_right < 0) out.angle = kPi;
+            } else
+              out.angle = std::max(out.angle, kPi / 2);
+          } else if (normal_of(surfaces[k], 0, t, left) && normal_of(surfaces[previous], 1, t, right)) {
             out.angle = std::max(out.angle, line_angle(left, right));
             if (left * right < 0) {
               out.angle = kPi;

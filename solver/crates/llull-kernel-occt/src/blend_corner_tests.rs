@@ -5,20 +5,20 @@ use crate::queries::{edge_continuity, topology};
 use crate::{analyze, boolean, make_box, make_sewn_solid, mass_properties, BooleanOp, Shape};
 use serde_json::Value;
 
-fn cube(size: f64) -> Shape {
+pub(crate) fn cube(size: f64) -> Shape {
     make_box([0.0; 3], [size; 3]).unwrap().unwrap()
 }
 
-fn num(value: &Value) -> f64 {
+pub(crate) fn num(value: &Value) -> f64 {
     value.as_f64().unwrap()
 }
 
-fn point(value: &Value) -> [f64; 3] {
+pub(crate) fn point(value: &Value) -> [f64; 3] {
     [num(&value[0]), num(&value[1]), num(&value[2])]
 }
 
 /// The unique indices of the edges that start or end at `vertex`.
-fn edges_at(shape: &Shape, vertex: [f64; 3]) -> Vec<usize> {
+pub(crate) fn edges_at(shape: &Shape, vertex: [f64; 3]) -> Vec<usize> {
     let topo = topology(shape).unwrap();
     let near = |a: [f64; 3], b: [f64; 3]| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6);
     topo["edges"]
@@ -32,7 +32,7 @@ fn edges_at(shape: &Shape, vertex: [f64; 3]) -> Vec<usize> {
 }
 
 /// Edge indices (all of them) with radius `radius`, and one corner per `vertex` with `setback` on every edge that meets it.
-fn spec(shape: &Shape, edges: &[usize], radius: f64, vertices: &[[f64; 3]], setback: f64) -> (Vec<f64>, Vec<f64>) {
+pub(crate) fn spec(shape: &Shape, edges: &[usize], radius: f64, vertices: &[[f64; 3]], setback: f64) -> (Vec<f64>, Vec<f64>) {
     let tapers: Vec<(usize, f64, f64)> = edges.iter().map(|&edge| (edge, radius, radius)).collect();
     spec_tapered(shape, &tapers, vertices, setback)
 }
@@ -54,7 +54,7 @@ fn spec_tapered(shape: &Shape, edges: &[(usize, f64, f64)], vertices: &[[f64; 3]
     (flat_edges, flat_corners)
 }
 
-fn cube_vertices(size: f64) -> Vec<[f64; 3]> {
+pub(crate) fn cube_vertices(size: f64) -> Vec<[f64; 3]> {
     let mut all = Vec::new();
     for x in [0.0, size] {
         for y in [0.0, size] {
@@ -78,14 +78,14 @@ fn volume_change(built: &Shape, shape: &Shape) -> f64 {
 }
 
 /// The faces that are not corner patches, and the corner patches (faces named `blend(v:...`: the sub-patches of the exact stars, 13.21).
-fn split_faces(faces: &[Value]) -> (usize, usize) {
+pub(crate) fn split_faces(faces: &[Value]) -> (usize, usize) {
     let patches = faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count();
     (faces.len() - patches, patches)
 }
 
 /// The largest angle (radians) between the outward normals across every edge of every corner patch (a face named `blend(v:...`), at 21 samples, WITHOUT the sharp-edge skip of
 /// `worst_tangent_angle` (a patch folded back against its neighbour reads pi there and was skipped as a sharp edge).
-fn worst_patch_angle(shape: &Shape) -> f64 {
+pub(crate) fn worst_patch_angle(shape: &Shape) -> f64 {
     let topo = topology(shape).unwrap();
     let patches: Vec<usize> = topo["faces"]
         .as_array()
@@ -114,7 +114,7 @@ fn worst_patch_angle(shape: &Shape) -> f64 {
 }
 
 /// The largest angle (radians) between the two face normals over the 9 samples of every edge whose faces are not at a sharp angle (> 0.5 rad).
-fn worst_tangent_angle(shape: &Shape) -> f64 {
+pub(crate) fn worst_tangent_angle(shape: &Shape) -> f64 {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
     let mut worst: f64 = 0.0;
     for edge in 0..count {
@@ -134,7 +134,7 @@ fn pyramid() -> Shape {
 }
 
 /// A pyramid on a 10 x 10 base whose apex is `height` above the centre.
-fn tall_pyramid(height: f64) -> Shape {
+pub(crate) fn tall_pyramid(height: f64) -> Shape {
     let apex = [5.0, 5.0, height];
     let corners = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [10.0, 10.0, 0.0], [0.0, 10.0, 0.0]];
     let mut positions = Vec::new();
@@ -233,9 +233,10 @@ fn what_this_build_does_not_make_is_named_not_faked() {
     let _serial = crate::serial_blends();
     let shape = cube(10.0);
     let all: Vec<usize> = (0..12).collect();
-    // a vertex where one of the edges is not rounded
+    // a vertex where two of its three edges are not rounded (one sharp edge is built, 13.33)
     let first = point(&topology(&shape).unwrap()["edges"][0]["start"]);
-    let (edges, corners) = spec(&shape, &(1..12).collect::<Vec<_>>(), 1.0, &[first], 2.0);
+    let meeting = edges_at(&shape, first);
+    let (edges, corners) = spec(&shape, &(0..12).filter(|e| *e != meeting[0] && *e != meeting[1]).collect::<Vec<_>>(), 1.0, &[first], 2.0);
     let reason = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("is not rounded"), "{reason}");
     // rounded edges that meet at a vertex without a corner
@@ -270,7 +271,7 @@ fn the_patch_is_valid_and_tangent_at_every_size() {
 }
 
 /// A 10 cube with the octant [5, 11]^3 cut away: the notch has an inner corner at (5, 5, 5) where three concave edges meet.
-fn notched_cube() -> Shape {
+pub(crate) fn notched_cube() -> Shape {
     let notch = make_box([5.0; 3], [6.0; 3]).unwrap().unwrap();
     boolean(BooleanOp::Subtract, &cube(10.0), &notch, true).unwrap().unwrap()
 }
@@ -821,7 +822,7 @@ fn the_corner_fills_give_the_same_solid_on_any_number_of_threads() {
 }
 
 /// Puts the test hooks of the corner fills back, even when the test fails.
-struct CornerHooks;
+pub(crate) struct CornerHooks;
 
 impl Drop for CornerHooks {
     fn drop(&mut self) {
@@ -908,7 +909,7 @@ fn the_guards_of_the_mixed_corner_fail_on_a_patch_turned_round_and_on_an_unmeasu
 }
 
 /// The largest distance between the two faces along every edge of every corner patch (the `g0` of the continuity samples, 21 per edge).
-fn worst_patch_gap(shape: &Shape) -> f64 {
+pub(crate) fn worst_patch_gap(shape: &Shape) -> f64 {
     let topo = topology(shape).unwrap();
     let patches: Vec<usize> = topo["faces"]
         .as_array()
@@ -1590,7 +1591,7 @@ fn cut_block_vertex(radius: f64) -> (Shape, [f64; 3], Vec<usize>) {
 }
 
 /// Fillets the cut block at its vertex, radius 0.5, setbacks 1.2 / 1.2 / `third`, no plate fallback (hook 5); the reason when it is refused.
-fn cut_block_setback(radius: f64, third: f64) -> Result<Shape, String> {
+pub(crate) fn cut_block_setback(radius: f64, third: f64) -> Result<Shape, String> {
     let (shape, vertex, meeting) = cut_block_vertex(radius);
     let (edges, mut corners) = spec(&shape, &meeting, 0.5, &[vertex], 1.2);
     corners[7] = third;

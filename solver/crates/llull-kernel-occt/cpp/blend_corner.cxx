@@ -252,6 +252,7 @@ struct Plan {
   std::vector<std::map<int, gp_Vec>> stubs;         // per corner: unit direction away from the vertex of each incident edge
   std::vector<bool> concave;                        // per corner: ALL its edges are concave (the blends add material), else convex (they remove it)
   std::vector<bool> mixed;                          // per corner: convex and concave edges meet (material on both sides of the patch, 13.18)
+  std::vector<int> sharp;                           // per corner: the unrounded edge that enters the hole (13.33), -1 when every edge is rounded
   // per corner: the faces at the vertex that are reflex there (the sector of the face between its two rounded edges exceeds pi): the plane of the face
   // (outward normal) and the point Q where the contact lines of its two blends meet; the hole is bounded there by P_a -> Q -> P_b instead of a chord (13.18.2)
   struct Reflex {
@@ -285,12 +286,36 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
   }
   std::map<int, gp_Vec> stub;
   std::map<int, double> distance;
-  for (const int edge : incident) {
-    if (radius.find(edge) == radius.end()) {
-      why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the " + (mode.automatic ? "vertex " : "setback vertex ") +
-            where(corner.at) + " but is not rounded: a " + noun + " rounds every edge that meets there, in the same step";
+  // An unrounded edge (13.33): exactly one edge of a three-edge vertex may stay sharp in a setback corner; the star holds the crease where it enters the hole. Anything else refuses.
+  std::vector<int> rounded, unrounded;
+  for (const int edge : incident) (radius.find(edge) == radius.end() ? unrounded : rounded).push_back(edge);
+  int sharp = -1;
+  if (!unrounded.empty()) {
+    const std::string cause = std::string("edge ") + std::to_string(unrounded.front()) + " meets the " + (mode.automatic ? "vertex " : "setback vertex ") + where(corner.at) + " but is not rounded: ";
+    if (mode.automatic) {
+      why = std::string(kUnsupported) + cause + "a " + noun + " rounds every edge that meets there, in the same step";
       return false;
     }
+    if (unrounded.size() > 1 || incident.size() != 3) {
+      why = std::string(kUnsupported) + cause + "a setback corner leaves at most one edge of a three-edge vertex sharp (this vertex has " + std::to_string(incident.size()) + " edges, " +
+            std::to_string(unrounded.size()) + " not rounded); round the others in the same step";
+      return false;
+    }
+    sharp = unrounded.front();
+    EdgeFrame frame;
+    std::string frame_why;
+    if (!edge_frame(shape, sharp, "the unrounded edge of a setback corner", frame, frame_why)) {
+      why = std::string(kUnsupported) + cause + "an edge left sharp at a setback corner must be straight between two planar faces (" + frame_why + ")";
+      return false;
+    }
+    plan.frames[sharp] = frame;
+    for (const int edge : rounded)
+      if (!radius.at(edge).constant()) {
+        why = std::string(kUnsupported) + cause + "the two rounded edges of a vertex with a sharp edge need a constant radius in this build (edge " + std::to_string(edge) + " varies)";
+        return false;
+      }
+  }
+  for (const int edge : incident) {
     const auto found = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
     if (!mode.automatic && found == corner.setbacks.end()) {
       why = std::string(kFailed) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + " (give 0 for an edge left to the rolling ball)";
@@ -298,7 +323,8 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     }
     if (!mode.automatic && !(found->second > 0)) {
       why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " at " + where(corner.at) +
-            " is left to the rolling ball (setback 0): an edge rounded by the rolling ball at a setback vertex is made on a curved edge or face only (the trim builder)";
+            (edge == sharp ? " is left sharp and has setback 0: the distance of an unrounded edge is where it enters the corner patch (> 0)"
+                           : " is left to the rolling ball (setback 0): an edge rounded by the rolling ball at a setback vertex is made on a curved edge or face only (the trim builder)");
       return false;
     }
     distance[edge] = mode.automatic ? 1.0 : found->second;
@@ -309,10 +335,19 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       why = std::string(kFailed) + "edge " + std::to_string(edge) + " does not end at " + where(corner.at);
       return false;
     }
+    if (edge == sharp && !(distance[edge] < frame.length)) {
+      why = std::string(kUnsupported) + "the setback " + number(distance[edge]) + " of the unrounded edge " + std::to_string(edge) + " at " + where(corner.at) + " is not shorter than the edge (" + number(frame.length) + ")";
+      return false;
+    }
   }
   const int concave_edges = static_cast<int>(std::count_if(incident.begin(), incident.end(), [&](int edge) { return !plan.frames.at(edge).convex; }));
   plan.concave.push_back(concave_edges == static_cast<int>(incident.size()));
   plan.mixed.push_back(concave_edges != 0 && concave_edges != static_cast<int>(incident.size()));
+  if (sharp >= 0 && plan.mixed.back()) {
+    why = std::string(kUnsupported) + "edge " + std::to_string(sharp) + " is left sharp at " + where(corner.at) + " and the edges there are convex and concave: a vertex with a sharp edge needs all its edges convex or all concave";
+    return false;
+  }
+  plan.sharp.push_back(sharp);
   plan.reflex.emplace_back();
   // Each face at the vertex is bounded there by exactly two rounded edges i, j whose contact lines (distance leg_i, leg_j from the edges, inside the
   // face) meet in one point; the setback of an edge must end beyond it, else the chord of the patch across the face has no length.
@@ -320,7 +355,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
   // The setback must exceed every distance the blends reach, and those distances are linear in d_e, so the least setback is a closed form per term:
   // d > c0 + c1 d  <=>  d > c0 / (1 - c1); a slope c1 >= 1 means no setback outruns the growing blend.
   std::map<int, double> offset, slope;
-  for (const int edge : incident) {
+  for (const int edge : rounded) {
     const EdgeFrame &frame = plan.frames.at(edge);
     const bool from_start = same_point(frame.start, corner.at, plan.tolerance);
     const double rate = (plan.radii.at(edge).end - plan.radii.at(edge).start) / frame.length * plan.half_tangent.at(edge);
@@ -338,7 +373,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     double cosine, sine;
   };
   std::vector<Pair> pairs;  // the two rounded edges that bound each face at the vertex, and the angle between them
-  for (const int edge : incident) terms[edge].push_back({offset.at(edge), slope.at(edge), false});
+  for (const int edge : rounded) terms[edge].push_back({offset.at(edge), slope.at(edge), false});
   for (TopTools_ListIteratorOfListOfShape it(vertex_faces.FindFromKey(vertex)); it.More(); it.Next()) {
     std::vector<int> on_face;
     for (const int edge : incident) {
@@ -364,6 +399,14 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     if (std::fabs(sine) < 1e-6) {
       why = std::string(kUnsupported) + "two edges leave " + where(corner.at) + " along one line";
       return false;
+    }
+    if (sharp >= 0 && (i == sharp || j == sharp)) {
+      // a face between one rounded edge and the sharp one: the hole is bounded by the chord from the contact point of the blend to the point where the sharp edge enters (13.33.1); it asks for no setback
+      if (sine < 0) {
+        why = std::string(kUnsupported) + "a face that is reflex at " + where(corner.at) + " meets the edge left sharp there: the chord to the entry point of the sharp edge would leave the face";
+        return false;
+      }
+      continue;
     }
     if (sine < 0) {
       // a reflex face asks for no setback (Q lies behind the vertex): its pair adds no term and no least-setback constraint, the hole is bounded through Q (13.18.2)
@@ -391,7 +434,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     terms[j].push_back({(leg_of(i) + offset.at(j) * cosine) / sine, slope.at(j) * cosine / sine, true});
   }
   std::map<int, double> required;
-  for (const int edge : incident) {
+  for (const int edge : rounded) {
     required[edge] = 0.0;
     for (const Term &term : terms.at(edge)) {
       if (term.c1 >= 1.0) {
@@ -404,40 +447,40 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
   }
   if (mode.automatic) {
     corner.setbacks.clear();
-    for (const int edge : incident) {
+    for (const int edge : rounded) {
       distance[edge] = required[edge] * mode.factor;
       corner.setbacks.emplace_back(edge, distance[edge]);
     }
   }
-  for (const int edge : incident)
+  for (const int edge : rounded)
     if (distance[edge] <= required[edge] * (1 + kMarginRelative)) {
       // The number to report is the least setback that works when the neighbours' setbacks move with it, not the one that holds them at the given values
       // (the blend of a neighbour reaches further when its own setback grows with a tapered radius, or at an angle other than a right one): the joint
       // minimum, uniform when every edge was given the same setback, else the least fixed point of the setbacks of all the edges.
-      const bool uniform = std::all_of(incident.begin(), incident.end(), [&](int e) { return std::fabs(distance[e] - distance[edge]) <= 1e-12 * distance[edge]; });
+      const bool uniform = std::all_of(rounded.begin(), rounded.end(), [&](int e) { return std::fabs(distance[e] - distance[edge]) <= 1e-12 * distance[edge]; });
       std::map<int, double> least;
       std::string problem;
       if (uniform) {
         double best = 0.0;
-        for (const int e : incident) best = std::max(best, offset.at(e) / (1.0 - slope.at(e)));
+        for (const int e : rounded) best = std::max(best, offset.at(e) / (1.0 - slope.at(e)));
         for (const Pair &pair : pairs)
           for (const auto &[a, b] : {std::make_pair(pair.i, pair.j), std::make_pair(pair.j, pair.i)}) {
             const double denominator = pair.sine - slope.at(b) - slope.at(a) * pair.cosine;
             if (denominator <= 1e-12) problem = "edges " + std::to_string(a) + " and " + std::to_string(b) + " (their blends outgrow the setback)";
             else best = std::max(best, (offset.at(b) + offset.at(a) * pair.cosine) / denominator);
           }
-        for (const int e : incident) least[e] = best;
+        for (const int e : rounded) least[e] = best;
       } else {
-        for (const int e : incident) least[e] = 0.0;
+        for (const int e : rounded) least[e] = 0.0;
         bool settled = false;
         for (int round = 0; round < 1000 && !settled; ++round) {
           std::map<int, double> next;
-          for (const int e : incident) next[e] = offset.at(e) + slope.at(e) * least.at(e);
+          for (const int e : rounded) next[e] = offset.at(e) + slope.at(e) * least.at(e);
           for (const Pair &pair : pairs)
             for (const auto &[a, b] : {std::make_pair(pair.i, pair.j), std::make_pair(pair.j, pair.i)})
               next[a] = std::max(next[a], (offset.at(b) + slope.at(b) * least.at(b) + (offset.at(a) + slope.at(a) * least.at(a)) * pair.cosine) / pair.sine);
           settled = true;
-          for (const int e : incident) {
+          for (const int e : rounded) {
             settled = settled && std::fabs(next[e] - least[e]) <= 1e-10 * std::max(std::fabs(next[e]), 1e-300);
             least[e] = next[e];
           }
@@ -449,7 +492,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
         return false;
       }
       std::string list;
-      for (const int e : incident) list += (list.empty() ? "" : ", ") + std::string("edge ") + std::to_string(e) + " " + number(least.at(e));
+      for (const int e : rounded) list += (list.empty() ? "" : ", ") + std::string("edge ") + std::to_string(e) + " " + number(least.at(e));
       why = std::string(kTooShort) + "setback " + number(distance[edge]) + " on edge " + std::to_string(edge) + " at " + where(corner.at) +
             " must exceed " + number(least.at(edge)) + " (the least " + (uniform ? "setback of every edge there" : "setbacks together") + ": " + list +
             "; the distance along the edge its neighbours' blends reach)";
@@ -744,6 +787,7 @@ struct FillJob {
   std::vector<TopoDS_Face> supports;        // copies, aligned with `boundary`
   double tolerance_3d = 0, tolerance_2d = 0;
   bool mixed = false;
+  bool creased = false;  // an unrounded edge enters the hole (13.33): the star holds its crease, a plate cannot
   // results
   TopoDS_Face patch;                  // the MakeFilling patch
   std::vector<TopoDS_Face> patches;   // what replaces the hole: the exact star (13.21) or the MakeFilling patch
@@ -854,7 +898,7 @@ bool fill_exact(FillJob &job, double diagonal) {
         }
       return best < 1e299;
     };
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load())) return false;
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased)) return false;
   for (double seen = g_last_crease.load(); exact.crease > seen && !g_last_crease.compare_exchange_weak(seen, exact.crease);) {
   }
   job.hinted = exact.centre_from_hint;
@@ -872,6 +916,11 @@ void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
     if (g_fault_corner.load() == static_cast<int>(job.corner)) throw std::bad_alloc();
     if (job.allow_star && g_exact_mode.load() != 0 && fill_exact(job, diagonal)) {
       job.filled = true;
+      return;
+    }
+    if (job.creased) {
+      job.problem = "was not filled: the exact-boundary star is the only patch that holds the crease of the unrounded edge, and it was " +
+                    (job.exact_problem.empty() ? std::string("not tried") : "refused: " + job.exact_problem);
       return;
     }
     if (g_exact_mode.load() >= 5 && !job.exact_problem.empty()) {
@@ -1784,8 +1833,10 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   // Corners: chords across the support faces between the contact points at the wall arcs, then the patch over the hole they bound.
   std::vector<std::vector<Wall>> walls(corners.size());
   for (size_t c = 0; c < corners.size(); ++c)
-    for (const auto &[edge, stub] : plan.stubs[c])
+    for (const auto &[edge, stub] : plan.stubs[c]) {
+      if (edge == plan.sharp[c]) continue;
       walls[c].push_back({corners[c].at.Translated(stub * std::max(0.0, setback_of(static_cast<int>(c), edge))), stub});
+    }
   TopTools_IndexedDataMapOfShapeListOfShape cut_vertex_faces;
   TopExp::MapShapesAndAncestors(current.shape, TopAbs_VERTEX, TopAbs_FACE, cut_vertex_faces);
   TopTools_ListOfShape chords;
@@ -1807,10 +1858,22 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       why = std::string(kFailed) + "the vertex " + where(corners[c].at) + " is gone after the cut";
       return nullptr;
     }
+    TopoDS_Vertex entry;
     for (TopTools_ListIteratorOfListOfShape it(cut_vertex_faces.FindFromKey(apex)); it.More(); it.Next()) {
       std::vector<TopoDS_Vertex> on_face;
       for (const TopoDS_Vertex &end : ends)
         if (listed(cut_vertex_faces.FindFromKey(end), it.Value())) on_face.push_back(end);
+      if (plan.sharp[c] >= 0 && on_face.size() == 1) {
+        // a face between a rounded edge and the sharp one (13.33.1): the chord runs from the blend's contact point to the point where the sharp edge enters the hole, one vertex shared by both chords
+        if (entry.IsNull()) entry = BRepBuilderAPI_MakeVertex(corners[c].at.Translated(plan.stubs[c].at(plan.sharp[c]) * setback_of(static_cast<int>(c), plan.sharp[c]))).Vertex();
+        BRepBuilderAPI_MakeEdge toward_entry(on_face[0], entry);
+        if (!toward_entry.IsDone()) {
+          why = std::string(kFailed) + "the chord to the entry point of the sharp edge at " + where(corners[c].at) + " could not be made";
+          return nullptr;
+        }
+        chords.Append(toward_entry.Edge());
+        continue;
+      }
       if (on_face.size() != 2) {
         why = std::string(kFailed) + "a face at " + where(corners[c].at) + " touches " + std::to_string(on_face.size()) + " blend ends (2 expected)";
         return nullptr;
@@ -1878,6 +1941,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     FillJob &job = jobs[c];
     job.corner = c;
     job.mixed = plan.mixed[c];
+    job.creased = plan.sharp[c] >= 0;
     TopTools_IndexedMapOfShape removed;
     const TopoDS_Vertex apex = vertex_at(split, corners[c].at, vertex_tolerance);
     if (apex.IsNull()) {
@@ -1902,7 +1966,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
             supports.push_back(TopoDS::Face(owner.Value()));
           }
       }
-    const size_t expected = 2 * plan.stubs[c].size() + plan.reflex[c].size();
+    const size_t expected = 2 * plan.stubs[c].size() - (plan.sharp[c] >= 0 ? 1 : 0) + plan.reflex[c].size();  // one arc per blend end, one chord per face (the sharp edge has no wall)
     const std::vector<TopoDS_Edge> loop = boundary.size() == expected ? loop_of(boundary) : std::vector<TopoDS_Edge>();
     if (loop.size() != expected) {
       job.hole_error = std::string(kFailed) + "the hole at " + where(corners[c].at) + " is bounded by " + std::to_string(boundary.size()) +
@@ -2054,14 +2118,18 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   // exactly) moves by less than the sum over the corners. This catches a patch far outside its corner; a patch folded onto its neighbours is caught by the oriented check below.
   double bound = 0;
   for (size_t c = 0; c < corners.size(); ++c) {
-    double largest = 0;
+    double largest = 0, sharp_setback = 0;
     for (const auto &entry : corners[c].setbacks) {
+      if (entry.first == plan.sharp[c]) {
+        sharp_setback = entry.second;  // the sharp stub the patch replaces is a slab as wide as the largest leg
+        continue;
+      }
       const EdgeFrame &frame = plan.frames.at(entry.first);
       const double leg = plan.leg_at(entry.first, same_point(frame.start, corners[c].at, plan.tolerance) ? 0.0 : frame.length);
       bound += entry.second * leg * leg;
       largest = std::max(largest, leg);
     }
-    bound += largest * largest * largest;
+    bound += (largest * largest) * (largest + sharp_setback);
   }
   if (std::fabs(volume_after - volume_tools) > bound) {
     why = std::string(kFailed) + "the corner patches changed the volume by " + number(volume_after - volume_tools) + " where the stubs they replace bound it at " + number(bound) +

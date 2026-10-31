@@ -19,6 +19,7 @@ import { blendFaceContacts } from '../../geometry/blend/blendInfo';
 import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
+import { creaseRowOf } from './checkCornerCrease';
 import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes } from '../../geometry/blend/blendInfo';
 
@@ -289,6 +290,7 @@ function checkEntity(
   }
   // A corner patch named `blend(v:...)#k` is one sub-patch of an exact star (cpp/blend_corner_exact.cxx, 06 BLD 13.21): judged at the default g0. A plain `blend(v:...)` is the B-spline fit of a plate
   // surface (the fallback of the star): its gap to the edges it is sewn to is judged against 5x the default.
+  const world = { kernel, shape, topology, graph, entityId, unit };
   const plateTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
   for (const face of topology.faces) {
     const sources = face.name === undefined ? null : cornerSources(face.name);
@@ -299,6 +301,13 @@ function checkEntity(
     graph.edgeFaces.forEach((around, edge) => {
       if (around.length !== 2 || !around.includes(face.index)) return;
       const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
+      // the spoke of a star that continues an edge of the part left sharp at the corner: judged by its shape, not as a tangent contact (13.33)
+      const crease = measured === null ? null : creaseRowOf(world, measured, face.index, edge, cornerTolerances);
+      if (crease !== null) {
+        contacts.push(crease.contact);
+        findings.push(...crease.findings);
+        return;
+      }
       // G0 over the whole contact (end points included); G1 on the open interior, the end points judged apart (three faces meet there).
       const last = (measured?.length ?? 0) - 1;
       const interior =
@@ -386,7 +395,7 @@ export const checkBlends = defineCommand({
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +
     '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), ' +
     'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), BLD_CHECK_RADIUS_LAW (fail: the realised radius is off the radius asked for by more than 1e-4 relative; compared for fillet_edge radius laws and for every joint of a blend_union, whose radii are the default radius or the joints pick), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
-    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares (an exact star, named blend(v:...)#k, is one row per sub-patch with profile "star" and is judged at g0; the plate patch of the fallback, named blend(v:...), has profile "patch"): G0 over the whole contact against g0 (star) or g0Corner (plate), G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
+    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares (an edge between two sub-patches that continues an edge of the part left sharp at the corner is a crease spoke, order "crease": G0 against g0, its angle at the sharp edge must equal the dihedral of that edge (creaseRad), must fade monotonically to the pole, and g1AngleRad is the pole reading, a warn above the limit) (an exact star, named blend(v:...)#k, is one row per sub-patch with profile "star" and is judged at g0; the plate patch of the fallback, named blend(v:...), has profile "patch"): G0 over the whole contact against g0 (star) or g0Corner (plate), G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
   params: z.object({
     ids: z
       .array(z.string())
