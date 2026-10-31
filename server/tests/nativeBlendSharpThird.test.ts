@@ -63,6 +63,13 @@ describeNative('DES-6c 13.33: a sharp third edge at a setback corner (native OCC
     const done = rounded(2);
     expect(done.error, done.summary).toBeUndefined();
     const id = done.affected[0] as string;
+    // the result names the crease the star keeps: the sharp edge of the source and its (signed, convex) dihedral at the vertex
+    const reported = (done.data as { corners: { vertex: number[]; crease: { sharpEdge: number; entryRad: number } }[] }).corners;
+    expect(reported).toHaveLength(1);
+    expect(reported[0]?.crease.entryRad).toBeCloseTo(Math.PI / 2, 6);
+    expect(Number.isInteger(reported[0]?.crease.sharpEdge)).toBe(true);
+    expect(done.summary).toContain('Sharp edge kept at 1 corner(s)');
+    expect(done.summary).toContain('fades to nothing at the pole');
     const list = faces(done.document, id);
     expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(5);
     expect(list.filter((face) => face.surface === 'cylinder')).toHaveLength(2);

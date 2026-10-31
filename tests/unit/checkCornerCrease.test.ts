@@ -9,7 +9,13 @@ import type { FaceGraph } from '@core/geometry/kernelPorts';
 import type { ContactSample } from '@core/geometry/blend/continuity';
 import { creaseSpoke, judgeCrease } from '@core/commands/brep/checkCornerCrease';
 
-const sample = (g1: number, g0 = 0): ContactSample => ({ t: 0, g0, g1, normalCurvature: [0, 0] });
+const sample = (g1: number, g0 = 0, g1Signed?: number): ContactSample => ({
+  t: 0,
+  g0,
+  g1,
+  ...(g1Signed === undefined ? {} : { g1Signed }),
+  normalCurvature: [0, 0],
+});
 const edge = (index: number, start: [number, number, number], end: [number, number, number]): ShapeEdge => ({
   index,
   curve: 'line',
@@ -35,7 +41,7 @@ function fixture(options: { sharpFaces?: number[]; patchNames?: [string, string]
     vertices: 0,
     volume: 1,
   } as ShapeTopology;
-  const graph = { faces: [], edgeFaces: [options.sharpFaces ?? [0, 1], [1, 2], [2, 3]], edgeConvexity: [] } as unknown as FaceGraph;
+  const graph = { faces: [], edgeFaces: [options.sharpFaces ?? [0, 1], [1, 2], [2, 3], [0, 3]], edgeConvexity: [] } as unknown as FaceGraph;
   return { topology, graph };
 }
 
@@ -81,9 +87,31 @@ describe('creaseSpoke', () => {
     // the edge at the entry point has a blend face: not a sharp edge of the part
     const blended = fixture({ sharpFaces: [0, 2] });
     expect(creaseSpoke(blended.topology, blended.graph, 2, fading, () => sharp)).toBeNull();
+    // the sharp edge at the entry point borders faces that are not the supports of this star: not the declared sharp edge
+    const elsewhere = fixture({ sharpFaces: [0, 4] });
+    expect(creaseSpoke(elsewhere.topology, elsewhere.graph, 2, fading, () => sharp)).toBeNull();
     expect(creaseSpoke(topology, graph, 2, fading, () => null)).toBeNull();
     expect(creaseSpoke(topology, graph, 2, fading, () => [])).toBeNull();
     expect(creaseSpoke(topology, graph, 9, fading, () => sharp)).toBeNull();
+  });
+
+  it('is not a crease spoke when the right entry angle is held all along it (an interior spoke does not fade): it stays an ordinary contact, a G1 failure', () => {
+    const { topology, graph } = fixture();
+    const constant = fading.map(() => sample(Math.PI / 2));
+    expect(creaseSpoke(topology, graph, 2, constant, () => sharp)).toBeNull();
+    // a far end that is only half way down is no crease either
+    expect(creaseSpoke(topology, graph, 2, [sample(Math.PI / 2), sample(0.4)], () => sharp)).toBeNull();
+  });
+
+  it('reads the signed fold: a spoke leaving at the opposite fold of the sharp edge has the opposite sign', () => {
+    const { topology, graph } = fixture();
+    const reversedFold = fading.map((one) => sample(one.g1, 0, -one.g1));
+    const found = creaseSpoke(topology, graph, 2, reversedFold, () => [sample(Math.PI / 2, 0, Math.PI / 2)]);
+    expect(found?.entryRad).toBeCloseTo(-Math.PI / 2, 12);
+    expect(found?.dihedralRad).toBeCloseTo(Math.PI / 2, 12);
+    if (found === null) throw new Error('not recognised');
+    const row = judgeCrease(found, reversedFold, at, tolerances);
+    expect(row.findings.map((finding) => `${finding.code}:${finding.severity}`)).toEqual(['BLD_CHECK_G1_ANGLE:fail']);
   });
 
   it('reports a spoke whose angle rises along it as not fading', () => {
@@ -116,6 +144,8 @@ describe('judgeCrease', () => {
     expect(codes(judgeCrease(spoke({ entryRad: 1.2 }), fading, at, tolerances))).toEqual(['BLD_CHECK_G1_ANGLE:fail']);
     expect(codes(judgeCrease(spoke({ fades: false }), fading, at, tolerances))).toEqual(['BLD_CHECK_G1_ANGLE:fail']);
     expect(codes(judgeCrease(spoke({ poleRad: 0.02 }), fading, at, tolerances))).toEqual(['BLD_CHECK_G1_ANGLE:warn']);
+    // a crease still open at the pole beyond the loose bound fails
+    expect(codes(judgeCrease(spoke({ poleRad: 0.2 }), fading, at, tolerances))).toEqual(['BLD_CHECK_G1_ANGLE:fail']);
     expect(codes(judgeCrease(spoke(), [sample(1, 1e-3), ...fading], at, tolerances))).toEqual(['BLD_CHECK_G0_GAP:fail']);
     const unnamed = judgeCrease(spoke(), fading, { ...at, name: undefined }, tolerances);
     expect('name' in unnamed.contact).toBe(false);
