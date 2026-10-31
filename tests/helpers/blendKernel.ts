@@ -81,6 +81,8 @@ export function scriptedKernel(script: BlendScript = {}): ScriptedKernel {
       ? { ...base, faces: base.faces.map(({ name: _name, ...face }) => face), edges: base.edges.map(({ name: _name, ...edge }) => edge) }
       : base;
   const faceQuery = {
+    // a point the nearest-face query leaves unresolved (face -1) lies on no face of the script
+    faceContains: () => false,
     faceGraph: () => (script.noGraph === true ? null : (script.graph ?? GRAPH)),
     edgeContinuity: (_shape: unknown, edge: number, count: number) =>
       script.noContinuity === true
