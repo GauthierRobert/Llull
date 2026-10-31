@@ -880,3 +880,24 @@ Red-proofs: a crease edge treated as an ordinary edge (poles free, rows imposed)
 **Review fixes (boundary rule, 2026-10-31).** The frozen row is the whole r[0..3] (above); an inner edge pole frozen on either side of its edge is a constant. A crease that ends at smooth vertices (the top-front row of a 2 x 2 x 2 box: 2 creases, 96 quads) is now a refusal: group of 96 quads, valence 3, `contradiction`, residual 2.59e-2 (the frozen row leaves the smooth edges at the crease ends no solution);
 `subdivision_to_nurbs { g1Solve: "exact" }` keeps the fit and names the group (`exactG1Refused[0].reason`, "G1 fit (1 group(s) refused by the exact solve)"). A closed crease loop (the box rim), a flat crease, the pentagonal cap and the bowl are unchanged by the fix (deltas 0).
 **Tests added:** the open crease box (crease angle at t = 0, 0.5, 0.75, 1 equal to 1e-12 or the group refused with the crease poles unchanged; red-proof: freezing only r[1..2] fails it), the command-level refusal (`g1Choice.test.ts`), and a permanent bit-identity pin of the crease-free cages: FNV-1a digests of the patch bytes + method + free quads computed with the parent commit (cube 603bab35, box 2x2x2 2c91501c, box 3x2x1 314dba98, cylinders 5 / 8 80911ea3 / 07572f8d, pyramid e2f8dad1, bipyramid 3e01e569).
+
+#### DES-4c (2026-10-31): the limit-surface objective above 900 unknowns (supersedes `objective "start"` of the conjugate-gradient path)
+
+`solveSparse` (`geometry/subd/g1Linear.ts`) now spends the freedom the rows leave on the distance to the limit surface, like the dense path, instead of the distance to the start poles. After the feasibility CGLS (unchanged) the poles move inside the null space of the rows by a projected conjugate gradient
+on the samples (4 x 4 per free patch, the same samples as the dense path; the group builds them whatever its size): the projector P = I - A^T (A A^T)^+ A is applied through the SPARSE rows, never as a matrix: P v = v - A^+ A v, where A^+ A v is CGLS on the rows from zero (at most 400 inner iterations, stop at 1e-26 of the start gradient).
+30 outer iterations x 3 axes. A last repair (x + A^+ (b - A x), three rounds) removes the drift of the inexact projections, and the answer is kept only when its residual is within a factor 1e3 of the feasibility one.
+**Work budget (same bound, `maxWork` / 1.5e9 multiply-adds):** what the feasibility iterations left (12 nonzeros each) is divided over 3 axes x 30 outer iterations x (a projection + the sample products); fewer than 20 inner iterations per projection = no objective, the nearest-to-start solution stays and
+`data.g1Exact.objective` says `"start"`. So `"limit"` now holds wherever the budget allows it, which is every cage tried.
+
+**Measured** (node, one run; `cageToNurbs` with `g1Solve: "exact"`, 4 x 4 samples; deviation = `data.maxDeviation`):
+
+| cage | objective start (before) | objective limit (now) | break |
+| --- | --- | --- | --- |
+| cylinder 24 sides (240 quads, 1 group, above 900 unknowns) | deviation 1.566e-1, solve 0.50 s | 6.222e-2 (2.5x nearer the surface), solve 2.76 s | 1.71e-6 deg, unchanged |
+| cylinder 16 sides | 1.284e-1, 0.19 s | 6.222e-2, 1.43 s | 1.91e-6 deg (1.71e-6 before) |
+| box 2 x 2 x 2 (96 quads, dense path) | 4.206e-2 (already `limit`) | identical (dense path untouched) | 1.48e-6 deg |
+
+The price is time (about 5x on the cylinders) for a surface 2.5x nearer to the Catmull-Clark one; the group residuals stay at 5e-16 of the cage (consistent threshold 1e-9).
+
+**Tests.** `tests/unit/subd/g1Sparse.test.ts` (a 60-unknown system solved by `solveDense` and by `solveSparse` with the same samples: conditions met to 1e-9 and the poles within 2e-3 of the dense ones; the misfit to the samples falls below half the start-objective one; no samples or no work left keeps `"start"`), `g1Exact.test.ts` (the 24-sided cylinder: group `objective: "limit"`, analytic break < 1e-7 rad), `g1Choice.test.ts` (through the command: objective `limit`, deviation < 0.1, break < 1e-5 deg).
+Red-proof: the projection replaced by the identity fails the dense-agreement test. Not built: a warm start of the inner CGLS from the previous projection (the time above would shrink).

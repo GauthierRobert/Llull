@@ -252,32 +252,31 @@ function solveAssembly(
     const initial = touched.map((u) => start[u] as Vec3);
     const small = touched.length <= DENSE_MAX_UNKNOWNS;
     const samples: Sample[] = [];
-    if (small)
-      for (const f of faces)
-        for (let i = 0; i < SAMPLES; i++)
-          for (let j = 0; j < SAMPLES; j++) {
-            const [u, v] = [(i + 0.5) / SAMPLES, (j + 0.5) / SAMPLES];
-            const hit = evaluate(f, u, v);
-            if (hit === null) continue;
-            const [bu, bv] = [bernstein(u), bernstein(v)];
-            const terms: Array<readonly [number, number]> = [];
-            const offset = [0, 0, 0];
-            for (let p = 0; p < 16; p++) {
-              const w = (bu[Math.floor(p / 4)] as number) * (bv[p % 4] as number);
-              const id = variableOf.get(f * 16 + p);
-              if (id !== undefined && column.has(id)) terms.push([column.get(id) as number, w]);
-              else
-                for (let k = 0; k < 3; k++) offset[k] = (offset[k] as number) + w * (((patches[f] as BezierPatch)[p] as Vec3)[k] as number);
-            }
-            samples.push({ terms, constant: [offset[0] as number, offset[1] as number, offset[2] as number], target: hit.point });
+    for (const f of faces)
+      for (let i = 0; i < SAMPLES; i++)
+        for (let j = 0; j < SAMPLES; j++) {
+          const [u, v] = [(i + 0.5) / SAMPLES, (j + 0.5) / SAMPLES];
+          const hit = evaluate(f, u, v);
+          if (hit === null) continue;
+          const [bu, bv] = [bernstein(u), bernstein(v)];
+          const terms: Array<readonly [number, number]> = [];
+          const offset = [0, 0, 0];
+          for (let p = 0; p < 16; p++) {
+            const w = (bu[Math.floor(p / 4)] as number) * (bv[p % 4] as number);
+            const id = variableOf.get(f * 16 + p);
+            if (id !== undefined && column.has(id)) terms.push([column.get(id) as number, w]);
+            else
+              for (let k = 0; k < 3; k++) offset[k] = (offset[k] as number) + w * (((patches[f] as BezierPatch)[p] as Vec3)[k] as number);
           }
+          samples.push({ terms, constant: [offset[0] as number, offset[1] as number, offset[2] as number], target: hit.point });
+        }
     const targets = withTerms.map((row) => row.rhs);
     const broken = faces.some((f) => assembly.degenerate.has(f));
     const solution = broken
-      ? { x: initial, residual: Infinity, status: 'ok' as const }
+      ? { x: initial, residual: Infinity, status: 'ok' as const, objective: 'start' as const }
       : small
         ? solveDense(sparse, targets, initial, samples, maxWork)
-        : solveSparse(sparse, targets, initial, maxWork);
+        : solveSparse(sparse, targets, initial, samples, maxWork);
     const residual = Math.max(solution.residual, stuck) / scale;
     const endMisfit = Math.max(0, ...faces.map((f) => assembly.endMisfit.get(f) ?? 0));
     const consistent = !broken && solution.status === 'ok' && residual < CONSISTENT;
@@ -294,7 +293,7 @@ function solveAssembly(
       endMisfit,
       consistent,
       reason,
-      objective: small ? 'limit' : 'start',
+      objective: solution.objective,
     });
   }
   return { groups, out };

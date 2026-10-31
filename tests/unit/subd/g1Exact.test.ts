@@ -200,12 +200,12 @@ describe('solveExactG1', () => {
     });
   }
 
-  it('a cylinder of 24 sides (valence-24 cap stars, one group of 240 quads and over 900 unknown poles: the conjugate-gradient path, no limit-surface objective) is exact too', () => {
+  it('a cylinder of 24 sides (valence-24 cap stars, one group of 240 quads and over 900 unknown poles: the conjugate-gradient path with its projected limit-surface objective) is exact too', () => {
     const refined = subdivide(cylinderCage(1, 2, 24, 2), 1);
     const patches = quadCagePatches(refined);
     const result = solveExactG1(refined, patches, valenceOf(refined));
     expect(result.method).toBe('edges-freed');
-    expect(result.groups).toEqual([expect.objectContaining({ quads: 240, consistent: true })]);
+    expect(result.groups).toEqual([expect.objectContaining({ quads: 240, consistent: true, objective: 'limit' })]);
     expect(worstBreak(refined, patches)).toBeGreaterThan(0.5);
     expect(worstBreak(refined, result.patches)).toBeLessThan(1e-7);
   }, 60_000);

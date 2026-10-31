@@ -148,9 +148,11 @@ describe('the exact solve is bounded and refuses by name', () => {
     }
   });
 
-  it('the objective is "start" for a group too big for the dense path (a 24-sided cylinder) and the exact solution still holds', () => {
+  it('a group too big for the dense path (a 24-sided cylinder) keeps the limit-surface objective: the exact solution holds and stays 2.5x nearer to the surface than with the start objective (0.062 against 0.157)', () => {
     const { data } = convert(cylinderCage(1, 2, 24, 2), { g1Solve: 'exact', tangentToleranceDeg: 0.5 });
-    expect(data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'start' } });
+    expect(data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'limit' } });
+    expect(data.maxDeviation).toBeLessThan(0.1);
+    expect(data.maxEvG1Deg).toBeLessThan(1e-5);
   }, 120_000);
 
   it('whole-cage fallback: with no ring allowed around the star the box is solved by freeing every quad, and without that fallback it is refused', () => {
