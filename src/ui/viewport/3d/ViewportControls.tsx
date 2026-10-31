@@ -6,6 +6,7 @@ import { type IconName, Icon } from '@ui/components/Icon';
 import { DeformOverlayControl, DeformOverlayPopover } from './overlays/DeformOverlayControl';
 import { ImplicitPreviewControl, ImplicitPreviewNote } from './implicitPreview/ImplicitPreviewControl';
 import { WrapOverlayControl, WrapOverlayPopover } from './overlays/WrapOverlayControl';
+import { BlendOverlayControl, BlendOverlayPopover } from './overlays/BlendOverlayControl';
 import { NumberField } from '@ui/components/NumberField';
 import { type SurfaceMapChoice, useSurfaceOverlayStore } from '@ui/store/surfaceOverlayStore';
 
@@ -314,12 +315,14 @@ export function ViewportControls(): React.ReactElement {
         <DeformOverlayControl />
         <ImplicitPreviewControl />
         <WrapOverlayControl />
+        <BlendOverlayControl />
         <AnimationTransportControls />
       </div>
       <SectionPopover />
       <DeformOverlayPopover />
       <ImplicitPreviewNote />
       <WrapOverlayPopover />
+      <BlendOverlayPopover />
     </div>
   );
 }
