@@ -30,6 +30,8 @@ export interface EmbossPreviewInput {
   /** The direction the relief is lifted along at the anchor (outward for an emboss, into the material for a deboss is the sign of the normal: this is the face normal). */
   readonly normal: Vec3;
   readonly instances: number;
+  /** Walls "pull" with a draft: the drafted walls are built by the command only (the preview hands nothing to the kernel). */
+  readonly draftNotBuilt: boolean;
 }
 
 /** The polyline of a loop of (u, v) pieces on the face, in world coordinates, closed (first point repeated) and thinned to MAX_LOOP_POINTS. */
@@ -51,6 +53,7 @@ export function embossPreviewResult(doc: CadDocument, command: string, input: Em
     points: worldLoop(input.chart, pieces),
   }));
   const data = {
+    kind: 'footprint' as const,
     footprint,
     mode: input.mode,
     depth: input.depth,
@@ -60,6 +63,12 @@ export function embossPreviewResult(doc: CadDocument, command: string, input: Em
     anchor: input.anchor,
     normal: input.normal,
     instances: input.instances,
+    ...(input.draftNotBuilt
+      ? {
+          draftChecked:
+            'the drafted walls are built and checked by emboss_on_face (draft closing is checked here); the footprint is the undrafted outline at the face',
+        }
+      : {}),
     expectedVolumeDelta: input.expectedVolumeDelta,
     regionArea: input.regionArea,
     distortion: distortionData(input.distortion, input.chart, input.requestedMethod, input.limit, input.limitDefaulted),
@@ -68,7 +77,7 @@ export function embossPreviewResult(doc: CadDocument, command: string, input: Em
   const strain = input.distortion.maxLengthStrain;
   return report(
     doc,
-    `${command}: the ${input.mode} would land on face ${input.face} (${input.faceKind}, ${input.chart.method} chart) as ${footprint.length} loop(s)${input.instances > 1 ? ` x ${input.instances} instances` : ''}, max length strain ${(100 * strain).toPrecision(3)} %${input.expectedVolumeDelta === null ? '' : `, volume ${input.expectedVolumeDelta >= 0 ? '+' : ''}${input.expectedVolumeDelta.toPrecision(6)} ${doc.units}^3 (closed form)`}; nothing is changed.`,
+    `${command}: the ${input.mode} would land on face ${input.face} (${input.faceKind}, ${input.chart.method} chart) as ${footprint.length} loop(s)${input.instances > 1 ? ` x ${input.instances} instances` : ''}, max length strain ${(100 * strain).toPrecision(3)} %${input.expectedVolumeDelta === null ? '' : `, volume ${input.expectedVolumeDelta >= 0 ? '+' : ''}${input.expectedVolumeDelta.toPrecision(6)} ${doc.units}^3 (closed form)`}${input.draftNotBuilt ? '; the drafted walls are built and checked only by the command' : ''}; nothing is changed.`,
     data,
   );
 }

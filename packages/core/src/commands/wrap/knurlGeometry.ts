@@ -11,6 +11,9 @@ import { dot3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
 import { axisFrame } from '../solids/shared';
 
+/** Azimuth, radians in the frame of `axisFrame(axis, origin)`, of the centre line of groove `tooth` of `teeth` where it starts (the straight grooves everywhere, the helical ones at the start of their sweep): the one place the phase of a knurl is defined, read by the recipes and by the preview. */
+export const toothAzimuth = (tooth: number, teeth: number): number => (2 * Math.PI * tooth) / teeth;
+
 /** Fraction of the pitch left as a flat land between grooves when `depth` is not given (a named default, not a standard). */
 export const DEFAULT_LAND_RATIO = 0.1;
 /** Included angle of the V, degrees, when none is given (90 is the usual knurl form; a named default, not a standard). */
@@ -99,7 +102,7 @@ export function knurlRecipe(source: ShapeRecipe, shape: KnurlShape, cut: KnurlCu
   const wide = (depth + over) * half;
   const [before, after] = [cut.pastFrom ? over : 0, cut.pastTo ? over : 0];
   const grooves = Array.from({ length: teeth }, (_, i): ShapeRecipe => {
-    const angle = (2 * Math.PI * i) / teeth;
+    const angle = toothAzimuth(i, teeth);
     const [c, s] = [Math.cos(angle), Math.sin(angle)];
     const at = (radial: number, across: number): Vec2 => [radial * c - across * s, radial * s + across * c];
     const profile: Vec2[] = [at(radius - depth, 0), at(radius + over, -wide), at(radius + over, wide)];

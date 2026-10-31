@@ -101,6 +101,7 @@ describe('preview_emboss_on_face', () => {
 });
 
 describe('preview_add_knurl', () => {
+  // the groove lines are the ones the recipes sweep, the refusals those of add_knurl before its build, nothing reaches the kernel (below)
   useFakeKernel();
   const rod = (): { doc: ReturnType<typeof emptyDoc>; id: string } => {
     const made = make(emptyDoc(), 'add_cylinder', { radius: 10, height: 40 });
@@ -129,7 +130,7 @@ describe('preview_add_knurl', () => {
 
   it('a diagonal knurl is helices of the hand asked (default right, 30 degrees from the axis: the azimuth turns 40 tan 30 / 10 over the length), a diamond has both hands', () => {
     const { doc, id } = rod();
-    const diagonal = execute(doc, 'preview_add_knurl', { id, face, pattern: 'diagonal', pitch: (Math.PI * 20) / 60, model: 'geometry' });
+    const diagonal = execute(doc, 'preview_add_knurl', { id, face, pattern: 'diagonal', pitch: (Math.PI * 20) / 60 });
     expect(diagonal.rejected, diagonal.summary).toBeUndefined();
     const lines = data(diagonal)['lines'] as Array<{ hand: string; points: Vec3[] }>;
     expect(lines).toHaveLength(60);
@@ -138,18 +139,16 @@ describe('preview_add_knurl', () => {
     const angle = (p: Vec3): number => Math.atan2(p[1], p[0]);
     const turn = ((angle(first[first.length - 1] as Vec3) - angle(first[0] as Vec3) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
     expect(Math.abs(turn)).toBeCloseTo(((40 * Math.tan(Math.PI / 6)) / 10) % (2 * Math.PI), 6);
-    const left = execute(doc, 'preview_add_knurl', {
-      id,
-      face,
-      pattern: 'diagonal',
-      pitch: (Math.PI * 20) / 60,
-      model: 'geometry',
-      hand: 'left',
-    });
+    const modeled = { id, face, pattern: 'diagonal', pitch: (Math.PI * 20) / 8, model: 'geometry', helixAngleDeg: 15 };
+    const right = execute(doc, 'preview_add_knurl', modeled);
+    expect(right.rejected, right.summary).toBeUndefined();
+    const rightFirst = (data(right)['lines'] as Array<{ points: Vec3[] }>)[0]?.points as Vec3[];
+    const rightTurn = ((angle(rightFirst[rightFirst.length - 1] as Vec3) - angle(rightFirst[0] as Vec3) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    const left = execute(doc, 'preview_add_knurl', { ...modeled, hand: 'left' });
     const leftFirst = (data(left)['lines'] as Array<{ points: Vec3[] }>)[0]?.points as Vec3[];
     const leftTurn =
       ((angle(leftFirst[leftFirst.length - 1] as Vec3) - angle(leftFirst[0] as Vec3) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
-    expect(Math.sign(leftTurn)).toBe(-Math.sign(turn));
+    expect(Math.sign(leftTurn)).toBe(-Math.sign(rightTurn));
     const diamond = execute(doc, 'preview_add_knurl', { id, face, pattern: 'diamond', pitch: (Math.PI * 20) / 60, helixAngleDeg: 20 });
     const hands = new Set((data(diamond)['lines'] as Array<{ hand: string }>).map((line) => line.hand));
     expect([...hands].sort()).toEqual(['left', 'right']);
@@ -164,6 +163,7 @@ describe('preview_add_knurl', () => {
     expect(data(result)).toMatchObject({ teeth: 628, thinned: true });
     expect((data(result)['lines'] as unknown[]).length).toBeLessThanOrEqual(400);
     expect(result.summary).toContain('every 2th');
+    expect(data(result)['kind']).toBe('lines');
   });
 
   it('refuses like add_knurl: a face that is not a cylinder, a pitch too coarse or not positive, a helix with a straight pattern, a hand without a diagonal geometry knurl', () => {

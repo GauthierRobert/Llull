@@ -9,15 +9,15 @@ import { useFootprintPreviewStore } from '@ui/store/footprintPreviewStore';
 import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm';
 import { FootprintPreviewLayer } from '@ui/viewport/3d/preview/FootprintPreviewLayer';
 import { FOOTPRINT_DEBOUNCE_MS } from '@ui/preview/useFootprintPreview';
-import { footprintPreviewCommand, parseFootprint, polylineSegments } from '@ui/preview/footprintPreview';
+import { parseFootprint, polylineSegments } from '@ui/preview/footprintPreview';
 import { resetOfflineStore } from '../helpers/storeTestHelpers';
 import { cylinder, FACE, rectangleOn, useFakeKernel } from '../unit/wrap/support';
 
 describe('footprint preview mapping', () => {
-  it('only emboss_on_face and add_knurl have a preview command', () => {
-    expect(footprintPreviewCommand('emboss_on_face')).toBe('preview_emboss_on_face');
-    expect(footprintPreviewCommand('add_knurl')).toBe('preview_add_knurl');
-    expect(footprintPreviewCommand('add_box')).toBeNull();
+  it('only emboss_on_face and add_knurl name a preview query (annotations.previewQuery)', () => {
+    expect(getCommand('emboss_on_face')?.annotations?.previewQuery).toBe('preview_emboss_on_face');
+    expect(getCommand('add_knurl')?.annotations?.previewQuery).toBe('preview_add_knurl');
+    expect(getCommand('add_box')?.annotations?.previewQuery).toBeUndefined();
   });
 
   it('a footprint answer gives outlines and holes; a knurl answer its lines; damaged entries and other data are left out', () => {
@@ -27,18 +27,19 @@ describe('footprint preview mapping', () => {
       [1, 1, 0],
       [0, 0, 0],
     ];
-    const view = parseFootprint('preview_emboss_on_face', {
+    const view = parseFootprint({
+      kind: 'footprint',
       footprint: [{ hole: false, points: square }, { hole: true, points: square }, { hole: false, points: [[0, 'x', 0]] }, null],
       method: 'develop',
     });
     expect(view?.outlines).toHaveLength(1);
     expect(view?.holes).toHaveLength(1);
-    const knurl = parseFootprint('preview_add_knurl', { lines: [{ points: square }, {}], teeth: 12, pitch: 2.5, thinned: true });
+    const knurl = parseFootprint({ kind: 'lines', lines: [{ points: square }, {}], teeth: 12, pitch: 2.5, thinned: true });
     expect(knurl).toMatchObject({ kind: 'knurl', holes: [] });
     expect(knurl?.outlines).toHaveLength(1);
-    expect(parseFootprint('preview_emboss_on_face', null)).toBeNull();
-    expect(parseFootprint('preview_emboss_on_face', {})).toBeNull();
-    expect(parseFootprint('other', { lines: [] })).toBeNull();
+    expect(parseFootprint(null)).toBeNull();
+    expect(parseFootprint({})).toBeNull();
+    expect(parseFootprint({ kind: 'other', lines: [] })).toBeNull();
   });
 
   it('closed loops join the last point to the first, open lines do not', () => {
@@ -113,6 +114,39 @@ describe('the param form drives the preview', () => {
     expect(screen.getByRole('status').textContent).toContain('volume +630');
     unmount();
     expect(useFootprintPreviewStore.getState().status).toBe('idle');
+  });
+
+  it('editing the sketch in the document asks the preview query again; a selection change does not', async () => {
+    const params = scene();
+    render(form('emboss_on_face', params));
+    await act(async () => {
+      vi.advanceTimersByTime(FOOTPRINT_DEBOUNCE_MS + 50);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const before = useFootprintPreviewStore.getState();
+    expect(before.status).toBe('ready');
+    const first = before.view;
+    act(() => useStore.getState().select([params['id'] as string]));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(useFootprintPreviewStore.getState().view).toBe(first);
+    const { document: doc } = useStore.getState();
+    const sketch = (params['profileIds'] as string[])[0] as string;
+    act(() =>
+      useStore.setState({ document: { ...doc, entities: { ...doc.entities, [sketch]: { ...doc.entities[sketch], width: 20 } as never } } }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const after = useFootprintPreviewStore.getState();
+    expect(after.status, after.summary).toBe('ready');
+    expect(after.summary).not.toBe(before.summary);
   });
 
   it('a refusal of the preview query is shown as unavailable with its reason and draws nothing', async () => {

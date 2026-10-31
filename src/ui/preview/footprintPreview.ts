@@ -1,12 +1,7 @@
-// The footprint preview of the wrap commands (03 WRP, spec §14.17), presentation only: which commands have one, and the mapping of the answer of their read-only
+// The footprint preview of the wrap commands (03 WRP, spec §14.19), presentation only: the mapping of the answer of their read-only
 // preview query (world polylines) to the lines a ghost draws. Every point comes from the query; nothing is derived from the document here.
 
 import type { Vec3 } from '@core/model/types';
-
-/** The read-only preview command of a command, or null when it has none. */
-export function footprintPreviewCommand(name: string): 'preview_emboss_on_face' | 'preview_add_knurl' | null {
-  return name === 'emboss_on_face' ? 'preview_emboss_on_face' : name === 'add_knurl' ? 'preview_add_knurl' : null;
-}
 
 export interface FootprintView {
   readonly kind: 'footprint' | 'knurl';
@@ -20,11 +15,11 @@ const isVec3 = (value: unknown): value is Vec3 =>
   Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'number' && Number.isFinite(v));
 const pointsOf = (value: unknown): Vec3[] | null => (Array.isArray(value) && value.every(isVec3) ? (value as Vec3[]) : null);
 
-/** The view of the answer of preview_emboss_on_face / preview_add_knurl; null when the data is not one. */
-export function parseFootprint(command: string, data: unknown): FootprintView | null {
+/** The view of the answer of a footprint / knurl preview query (its `data.kind`: 'footprint' loops or 'lines' grooves); null when the data is not one. */
+export function parseFootprint(data: unknown): FootprintView | null {
   if (typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
-  if (command === 'preview_emboss_on_face' && Array.isArray(d['footprint'])) {
+  if (d['kind'] === 'footprint' && Array.isArray(d['footprint'])) {
     const loops = (d['footprint'] as unknown[]).flatMap((entry) => {
       const loop = (entry ?? {}) as Record<string, unknown>;
       const points = pointsOf(loop['points']);
@@ -36,7 +31,7 @@ export function parseFootprint(command: string, data: unknown): FootprintView | 
       holes: loops.filter((loop) => loop.hole).map((loop) => loop.points),
     };
   }
-  if (command === 'preview_add_knurl' && Array.isArray(d['lines'])) {
+  if (d['kind'] === 'lines' && Array.isArray(d['lines'])) {
     const lines = (d['lines'] as unknown[]).flatMap((entry) => {
       const points = pointsOf(((entry ?? {}) as Record<string, unknown>)['points']);
       return points === null ? [] : [points];

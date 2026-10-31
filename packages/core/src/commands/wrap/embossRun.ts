@@ -337,6 +337,7 @@ export function runEmboss(
       draftDeg: params.draftDeg ?? 0,
       anchorOn: resolved.anchorOn,
       tolerance,
+      preview: options.preview === true,
     });
     if (isPullFailure(built)) {
       const refused = fail(built.code, built.message, [built.path ?? 'pullDirection']);
@@ -396,7 +397,8 @@ export function runEmboss(
       faceKind: session.surface.type,
       face: session.face,
       anchor: resolved.anchorOn,
-      normal: scale3(chart.normalAt(mapped.regions[0]?.outer.start as Vec2), resolved.orientation),
+      normal: recipeParams.direction,
+      draftNotBuilt: pulled && (params.draftDeg ?? 0) > 0,
       instances: params.grid === undefined ? 1 : params.grid.countX * params.grid.countY,
     });
   const built = evaluateRecipe(session.kernel, recipe);

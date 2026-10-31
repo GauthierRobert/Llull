@@ -3,7 +3,6 @@
 import type { KnurlPmi } from '../../model/pmi';
 import { pmiText } from '../../geometry/pmiText';
 import { nextId } from '../../lib/id';
-import { dot3, sub3 } from '../../lib/vec3';
 import { changed } from '../noop';
 import { featureOf, isRefusal, placementFor, resolveOn, solidTarget } from '../pmi/featureOps';
 import { REVIEW_REQUIRED, withItem } from '../pmi/pmiOps';
@@ -17,7 +16,8 @@ import { faceRefField } from './schemas';
 import { kernelVolume } from './embossRun';
 import { DEFAULT_HELIX_DEG, planKnurl } from './knurlPlan';
 import { cutHelicalGrooves } from './knurlHelixCut';
-import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG, depthForLand, freeEnds, grooveArea, knurlRecipe, landFor } from './knurlGeometry';
+import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG, grooveArea, knurlRecipe } from './knurlGeometry';
+import { planKnurlGeometry } from './knurlGeometryPlan';
 
 /** Relative difference between the measured volume change of the grooves and their closed form that is refused: the exact kernel integrates the quadrics to about 1e-6 (VC-WRP-39). */
 const KNURL_VOLUME_RESOLUTION = 1e-4;
@@ -84,7 +84,7 @@ export const addKnurl = defineCommand({
     'data also gives lead, grooves, hands, land, turns and estimatedKernelSeconds. The V depth is measured from the outer radius of the face (the apex lies `depth` below the surface). Helical grooves run past both ends of the face, so each end must be a free cap (WRP_KNURL_GEOMETRY_UNSUPPORTED at a shoulder), and the cut is limited to the measured envelope of the exact kernel: ' +
     'grooves x 2.3 s x (turns of a groove along the face / 0.184)^1.8 at most 50 s, one kernel call being cut at 60 s (WRP_KNURL_TOO_MANY_GROOVES says the estimate: 8 grooves at 30 degrees take about 18 s, at 45 degrees about 50 s, at 60 degrees about 130 s) and a depth that makes the grooves meet is WRP_KNURL_DEPTH_INVALID. A face that is not a cylinder refuses with WRP_KNURL_FACE_NOT_CYLINDER. Needs the exact (native) kernel. Next: check_pmi, accept_pmi_review, mass_properties, render_view.',
   params: knurlParams,
-  annotations: { readsMeshTriangles: true, requiresKernel: true },
+  annotations: { readsMeshTriangles: true, requiresKernel: true, previewQuery: 'preview_add_knurl' },
   run: (doc, params, ctx): CommandResult => {
     const plan = planKnurl(doc, ctx, 'add_knurl', params);
     if ('summary' in plan) return plan;
@@ -183,9 +183,22 @@ function cutGrooves(
 ): CommandResult {
   const fail = (code: string, message: string, path: string): CommandResult =>
     wrapRejection(doc, 'add_knurl', code, message, [params.id], [path]);
-  const { surface } = session;
-  if (surface.type !== 'cylinder') return fail('WRP_KNURL_FACE_NOT_CYLINDER', 'not a cylinder', 'face');
-  if (params.pattern !== 'straight')
+  const plan = planKnurlGeometry(
+    doc,
+    'add_knurl',
+    {
+      id: params.id,
+      pattern: params.pattern as 'straight' | 'diagonal' | 'diamond',
+      depth: params.depth,
+      toothAngleDeg: params.toothAngleDeg,
+      hand: params.hand,
+      helixAngleDeg: params.helixAngleDeg ?? DEFAULT_HELIX_DEG,
+    },
+    session,
+    knurl,
+  );
+  if ('summary' in plan) return plan;
+  if (plan.kind === 'helical')
     return cutHelicalGrooves(
       doc,
       {
@@ -200,47 +213,10 @@ function cutGrooves(
       },
       session,
       { teeth: knurl.teeth, pitch: knurl.pitch, diameter: knurl.diameter, adjusted: knurl.adjusted, requestedPitch: params.pitch },
+      plan,
     );
-  const angle = params.toothAngleDeg ?? DEFAULT_TOOTH_ANGLE_DEG;
-  if (!(angle > 0 && angle < 180)) return fail('WRP_PARAM_INVALID', `toothAngleDeg must be in (0, 180) (got ${angle})`, 'toothAngleDeg');
-  if (params.depth !== undefined && !(params.depth > 0))
-    return fail('WRP_PARAM_INVALID', `depth must be > 0 (got ${params.depth})`, 'depth');
-  const depth = params.depth ?? depthForLand(knurl.pitch, angle, DEFAULT_LAND_RATIO);
-  const land = landFor(knurl.pitch, angle, depth);
-  if (land < 0.02 * knurl.pitch)
-    return fail(
-      'WRP_KNURL_DEPTH_INVALID',
-      `depth ${depth} leaves a land of ${land} between grooves (needs at least 2 % of the pitch ${knurl.pitch}): the grooves would meet`,
-      'depth',
-    );
-  if (depth >= 0.5 * surface.radius)
-    return fail('WRP_DEPTH_EXCEEDS_SOLID', `depth ${depth} reaches half the radius ${surface.radius}`, 'depth');
-  const [[, from], [, to]] = session.uvBounds;
-  if (!Number.isFinite(from) || !Number.isFinite(to) || !(to > from))
-    return fail('WRP_FACE_NOT_FOUND', 'the face has no axial extent', 'face');
-  const sample = session.query.faceDetails(session.shape, { samples: 1 })?.[session.face]?.samples[0];
-  const hit = sample === undefined ? null : (session.query.projectOnFace(session.shape, session.face, [sample])?.[0] ?? null);
-  if (hit === null || dot3(hit.normal, sub3(hit.point, surface.origin)) <= 0)
-    return fail(
-      'WRP_KNURL_FACE_NOT_CYLINDER',
-      `face ${session.face} is a bore (material outside it): only an outside cylinder is knurled`,
-      'face',
-    );
-  const shape = { teeth: knurl.teeth, radius: surface.radius, depth, toothAngleDeg: angle };
-  const [pastFrom, pastTo] = freeEnds(
-    session.query.faceGraph(session.shape),
-    session.face,
-    { origin: surface.origin, dir: surface.axis },
-    [from, to],
-    1e-6 * session.diagonal,
-  );
-  const recipe = knurlRecipe(
-    session.source,
-    shape,
-    { origin: surface.origin, axis: surface.axis, from, to, pastFrom, pastTo },
-    nextId('mesh'),
-    session.entity.color,
-  );
+  const { depth, land, from, to, shape, pastFrom, pastTo, origin, axis, toothAngleDeg: angle } = plan;
+  const recipe = knurlRecipe(session.source, shape, { origin, axis, from, to, pastFrom, pastTo }, nextId('mesh'), session.entity.color);
   if (recipe === null) return fail('WRP_KERNEL_BUILD_FAILED', 'the cylinder axis is degenerate', 'face');
   const built = evaluateRecipe(session.kernel, recipe);
   if (typeof built === 'string')
