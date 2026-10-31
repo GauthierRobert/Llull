@@ -112,7 +112,11 @@ export function runFaceBlend(doc: CadDocument, ctx: ExecutionContext | undefined
     const pick = pickFaces(kernel, shape, topology, { indices: [], near: set.near ?? [], names: set.names });
     if ('problem' in pick)
       return pick.error === undefined
-        ? refuse('BLD_FACESET_EMPTY', `${key}: ${pick.problem}`, `${key}.near`)
+        ? refuse(
+            'BLD_FACESET_EMPTY',
+            `${key}: ${pick.problem}`,
+            pick.nearIndex === undefined ? `${key}.near` : `${key}.near[${pick.nearIndex}]`,
+          )
         : {
             ...noop(doc, `${command}: ${pick.problem} on '${id}'; document unchanged.`),
             rejected: true,
