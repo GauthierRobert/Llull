@@ -216,7 +216,7 @@ bool parse(rust::Slice<const double> edges, rust::Slice<const double> corners, b
     corner.at = gp_Pnt(corners[at], corners[at + 1], corners[at + 2]);
     const size_t count = static_cast<size_t>(corners[at + 3]);
     at += 4;
-    if (count < 3 || at + 2 * count > corners.size()) {
+    if (count < 1 || at + 2 * count > corners.size()) {
       why = std::string(kFailed) + "the setback blend parameters are malformed (corner edges)";
       return false;
     }
@@ -287,7 +287,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     }
     const auto found = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
     if (!mode.automatic && (found == corner.setbacks.end() || !(found->second > 0))) {
-      why = std::string(kFailed) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at);
+      why = std::string(kUnsupported) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + ": an edge rounded by the rolling ball at a setback vertex is made on a curved edge or face only (the trim builder)";
       return false;
     }
     distance[edge] = mode.automatic ? 1.0 : found->second;
@@ -991,11 +991,6 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const double diagonal = blend::diagonal_of(shape);
   const double sewing_tolerance = std::max(1e-6 * diagonal, 1e-12);
   const double patch_gap_limit = blend::kGapAccepted * kPatchGapFraction * diagonal;
-  for (const auto &[index, taper] : radius)
-    if (!taper.constant()) {
-      why = std::string(kUnsupported) + "a radius that varies along edge " + std::to_string(index) + " is not made at a corner on a curved edge or face (constant radius only)";
-      return nullptr;
-    }
   std::vector<double> reach;
   for (const Corner &corner : corners) {
     double least = 1e300, most = 0;
@@ -1069,7 +1064,9 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       why = std::string(kFailed) + "edge " + std::to_string(index) + " is not an edge of the solid";
       return nullptr;
     }
-    maker.Add(taper.start, TopoDS::Edge(edge_map(index + 1)));
+    // a radius that is linear between the two ends of the edge is OCCT's evolving fillet; the minimum and the clearance below are measured on what it made
+    if (taper.constant()) maker.Add(taper.start, TopoDS::Edge(edge_map(index + 1)));
+    else maker.Add(taper.start, taper.end, TopoDS::Edge(edge_map(index + 1)));
   }
   maker.Build();
   if (!maker.IsDone() || maker.Shape().IsNull()) {

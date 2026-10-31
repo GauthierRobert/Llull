@@ -1137,10 +1137,6 @@ fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
     corners[5] = 3.0; // one edge of the vertex at another setback
     let text = reason(&shape, &edges, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("different setbacks"), "{text}");
-    let tapers: Vec<(usize, f64, f64)> = all.iter().map(|&edge| (edge, 0.8, 1.2)).collect();
-    let (edges, corners) = spec_tapered(&shape, &tapers, &[[0.0; 3]], 2.0);
-    let text = reason(&shape, &edges, &corners);
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("varies along edge"), "{text}");
     let (edges, corners) = spec(&shape, &all, 1.0, &[[0.0; 3], [10.0, 0.0, 0.0]], 5.5);
     let text = reason(&shape, &edges, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("overlap"), "{text}");
@@ -1279,4 +1275,71 @@ fn a_trimmed_step_whose_star_fails_after_the_fills_is_built_again_with_the_plate
     assert!(fillet_setback(&shape, &edges, &corners).unwrap().is_none());
     let reason = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(reason.contains("(the exact-boundary patch was refused: [BLD_CORNER_FAILED] forced by the test hook"), "{reason}");
+}
+
+/// BLD §13.22: a radius that varies along the edges on the trim path (OCCT's evolving fillet, linear from 0.8 to 1.2 along every edge of the cube, ball 2 at the 8 vertices): the loop of the
+/// ball cut is still well formed and gets the star; the volume is within 0.2 % of OCCT's evolving fillet of the same edges.
+#[test]
+fn a_radius_that_varies_along_the_edges_is_cut_by_the_ball_and_gets_the_star() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let tapers: Vec<(usize, f64, f64)> = all.iter().map(|&edge| (edge, 0.8, 1.2)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &cube_vertices(10.0), 2.0);
+    let unique: Vec<u32> = (0..12).collect();
+    let reference =
+        mass_properties(&crate::features::fillet(&shape, &unique, 0.8, Some(1.2)).unwrap().expect("an evolving fillet")).unwrap().volume;
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("the star is accepted on the loops of the evolving fillet");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    let volume = mass_properties(&built).unwrap().volume;
+    assert!((volume - reference).abs() < 2e-3 * reference, "{volume} against the evolving fillet {reference}");
+}
+
+/// BLD §13.22: a rolling-ball neighbour. One of the three edges at the vertex (0, 0, 0) of the cube has no setback entry: OCCT rounds it like the others (r 1), the ball of the other two (2) cuts all
+/// three blends and the hole gets the star. The analytic builder refuses it by name.
+#[test]
+fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_the_same_ball() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let (edges, mut corners) = spec(&shape, &all, 1.0, &cube_vertices(10.0), 2.0);
+    // drop the entry of one edge at the first vertex: the entry list shrinks by one pair
+    let mut flat = Vec::new();
+    let mut cursor = 0;
+    while cursor < corners.len() {
+        let count = corners[cursor + 3] as usize;
+        let entries: Vec<(f64, f64)> = (0..count).map(|k| (corners[cursor + 4 + 2 * k], corners[cursor + 5 + 2 * k])).collect();
+        let origin = corners[cursor..cursor + 3] == [0.0, 0.0, 0.0];
+        let kept: Vec<(f64, f64)> = entries.into_iter().filter(|(edge, _)| !(origin && *edge == meeting[0] as f64)).collect();
+        flat.extend_from_slice(&corners[cursor..cursor + 3]);
+        flat.push(kept.len() as f64);
+        for (edge, distance) in kept {
+            flat.extend([edge, distance]);
+        }
+        cursor += 4 + 2 * count;
+    }
+    corners = flat;
+    let reason = |hook_trim: bool| {
+        crate::test_bridge::set_corner_trim(hook_trim);
+        setback_reason(&shape, &edges, &corners).unwrap()
+    };
+    let text = reason(false);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("rolling ball at a setback vertex"), "{text}");
+    crate::test_bridge::set_corner_exact_patch(5);
+    assert_eq!(reason(true), "", "the trim builder takes it");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    let unique: Vec<u32> = (0..12).collect();
+    let reference =
+        mass_properties(&crate::features::fillet(&shape, &unique, 1.0, None).unwrap().expect("a rolling-ball cube")).unwrap().volume;
+    assert!((mass_properties(&built).unwrap().volume - reference).abs() < 2e-3 * reference);
 }

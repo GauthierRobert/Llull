@@ -84,6 +84,41 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
   });
 
+  it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
+    const done = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [
+        { near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], rollingBall: true }] },
+      ],
+    });
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    expect(faces(done.document, result).filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(6);
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
+    const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
+    expect(checked.status).not.toBe('fail');
+    const both = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [
+        {
+          near: vertex,
+          type: 'setback',
+          setback: 1.2,
+          setbacks: [{ near: edges[1] as [number, number, number], rollingBall: true, distance: 1 }],
+        },
+      ],
+    });
+    expect(both.affected).toHaveLength(0);
+    expect(both.summary).toContain('both distance and rollingBall');
+  });
+
   it('refuses by name an edge at the setback vertex that is not rounded, a ball that does not hold the rolling-ball corner, and a step that mixes the two builders', () => {
     const { doc, id, vertex, edges } = dshape();
     const left = execute(doc, 'fillet_edge', {

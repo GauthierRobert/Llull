@@ -63,8 +63,15 @@ export const cornerSchema = z
             .number()
             .positive()
             .describe(
-              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; a vertex on a curved edge or face takes one distance for all its edges (different distances are refused).',
-            ),
+              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; a vertex on a curved edge or face takes one distance for all its edges (different distances are refused). Give it, or rollingBall: true.',
+            )
+            .optional(),
+          rollingBall: z
+            .boolean()
+            .describe(
+              'true: this edge gets no setback of its own; the kernel rounds it with the rolling ball like the others and the same ball around the vertex cuts its blend (only at a vertex on a curved edge or face; the analytic builder refuses it by name). Instead of distance.',
+            )
+            .optional(),
         }),
       )
       .describe('Per-edge setbacks overriding `setback` (each entry names one edge meeting the vertex).')
@@ -103,13 +110,14 @@ const isVarying = (law: EdgeRadius): boolean =>
   law.size2 !== undefined ||
   (law.sizeEnd !== undefined && law.sizeEnd !== law.size && law.interpolation !== 'linear');
 
-/** The distance of every edge override, by unique-edge index; or why one cannot be resolved. */
+/** The distance of every edge override, by unique-edge index (and the edges left to the rolling ball); or why one cannot be resolved. */
 function overrides(
   topology: ShapeTopology,
   entry: CornerInput,
   path: string,
-): { readonly distances: Map<number, number> } | CornerResolution {
+): { readonly distances: Map<number, number>; readonly rolling: Set<number> } | CornerResolution {
   const distances = new Map<number, number>();
+  const rolling = new Set<number>();
   for (const [at, override] of (entry.setbacks ?? []).entries()) {
     const where = `${path}.setbacks[${at}]`;
     if ((override.near === undefined) === (override.name === undefined)) return { problem: `${where} needs exactly one of near or name` };
@@ -131,10 +139,14 @@ function overrides(
       edge = 'problem' in picked ? undefined : picked.edges[0];
     }
     if (edge === undefined) return { problem: `${where} found no edge` };
-    if (distances.has(edge)) return { problem: `${where}: edge ${edge} is given twice` };
-    distances.set(edge, override.distance);
+    if (distances.has(edge) || rolling.has(edge)) return { problem: `${where}: edge ${edge} is given twice` };
+    if (override.rollingBall === true) {
+      if (override.distance !== undefined) return { problem: `${where} gives both distance and rollingBall` };
+      rolling.add(edge);
+    } else if (override.distance === undefined) return { problem: `${where} needs a distance or rollingBall: true` };
+    else distances.set(edge, override.distance);
   }
-  return { distances };
+  return { distances, rolling };
 }
 
 /** An override as recorded: its edge by persistent name when the name finds exactly this edge, else by a point on it. */
@@ -147,6 +159,14 @@ function recordedEdge(topology: ShapeTopology, edge: number, distance: number): 
 const isOverride = (
   value: ReturnType<typeof overrides>,
 ): value is Extract<ReturnType<typeof overrides>, { distances: Map<number, number> }> => 'distances' in value;
+
+const recordedRolling = (topology: ShapeTopology, edge: number): NonNullable<CornerInput['setbacks']>[number] => {
+  const name = topology.edges[edge]?.name;
+  const unique = name !== undefined && hasNames(topology, 'edge') && resolveNames(topology, 'edge', [name]).ok;
+  return unique
+    ? { name, rollingBall: true }
+    : { near: [...(topology.edges[edge]?.mid ?? [0, 0, 0])] as [number, number, number], rollingBall: true };
+};
 
 /**
  * The corners `inputs` ask for on `topology`, for a fillet of `planned` edges.
@@ -208,9 +228,12 @@ export function resolveCorners(
       if (claimed.has(target)) return { problem: `${path}: the vertex at [${vertex.point.join(', ')}] already has a corner entry` };
       claimed.add(target);
       // Recorded by name when the name finds exactly this vertex (else by point), with only the overrides of edges that meet it.
-      const recordedOverrides = [...resolved.distances]
-        .filter(([edge]) => vertex.edges.includes(edge))
-        .map(([edge, distance]) => recordedEdge(topology, edge, distance));
+      const recordedOverrides = [
+        ...[...resolved.distances]
+          .filter(([edge]) => vertex.edges.includes(edge))
+          .map(([edge, distance]) => recordedEdge(topology, edge, distance)),
+        ...[...resolved.rolling].filter((edge) => vertex.edges.includes(edge)).map((edge) => recordedRolling(topology, edge)),
+      ];
       record.push({
         ...(vertex.name !== undefined && resolveVertexName(vertices, vertex.name).ok
           ? { name: vertex.name }
@@ -222,6 +245,7 @@ export function resolveCorners(
       if (type === 'rolling_ball') continue;
       const distances: SetbackCorner['distances'][number][] = [];
       for (const edge of vertex.edges) {
+        if (resolved.rolling.has(edge)) continue;
         const distance = resolved.distances.get(edge) ?? input.setback;
         if (distance === undefined)
           return {
