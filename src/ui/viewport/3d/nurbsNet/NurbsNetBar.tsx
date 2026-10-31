@@ -2,7 +2,7 @@
 // selected, the soft-selection falloff (radius in pole indices, weight curve) and the box-selection rectangle. Gathers input only; a pole drag
 // commits one move_poles command (netActions).
 
-import { FALLOFF_SHAPES, type FalloffShape } from '@core/lib/falloff';
+import { FALLOFF_SHAPES, type FalloffShape } from '@lib/falloff';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { useNurbsNetStore } from '@ui/store/nurbsNetStore';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';

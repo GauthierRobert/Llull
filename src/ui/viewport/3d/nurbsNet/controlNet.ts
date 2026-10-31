@@ -4,7 +4,7 @@
 import type { NurbsCurveEntity, NurbsSurfaceEntity, Vec3 } from '@core/model/types';
 import { applyEulerXYZ, inverseEulerXYZ } from '@lib/eulerRotation';
 import { add3, dot3, scale3, sub3 } from '@lib/vec3';
-import type { FalloffShape } from '@core/lib/falloff';
+import type { FalloffShape } from '@lib/falloff';
 
 export type NurbsNetEntity = NurbsCurveEntity | NurbsSurfaceEntity;
 
