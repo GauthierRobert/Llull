@@ -279,8 +279,8 @@ fn one_face(recipe: &Value, field: &str) -> Option<f64> {
     }
 }
 
-/// BLD M4 `faceBlend` node as the flat spec of `features::face_blend`: face A, face B, radius, section kind, rho / shape.
-fn face_blend_spec(recipe: &Value) -> Option<[f64; 5]> {
+/// BLD M4 `faceBlend` node as the flat spec of `features::face_blend`: face A, face B, radius, section kind, rho / shape, cliff (0 none, 1 on A, 2 on B).
+fn face_blend_spec(recipe: &Value) -> Option<[f64; 6]> {
     let radius = number(recipe, "radius").filter(|radius| positive(*radius))?;
     let profile = recipe.get("profile").filter(|profile| !profile.is_null());
     let factor = |field: &str| profile.and_then(|profile| number(profile, field)).filter(|value| (0.05..=0.95).contains(value));
@@ -290,7 +290,13 @@ fn face_blend_spec(recipe: &Value) -> Option<[f64; 5]> {
         "curvature" => (1.0, factor("shape")?),
         _ => return None,
     };
-    Some([one_face(recipe, "facesA")?, one_face(recipe, "facesB")?, radius, kind, param])
+    let cliff = match recipe.get("cliff").and_then(Value::as_str) {
+        None => 0.0,
+        Some("A") => 1.0,
+        Some("B") => 2.0,
+        Some(_) => return None,
+    };
+    Some([one_face(recipe, "facesA")?, one_face(recipe, "facesB")?, radius, kind, param, cliff])
 }
 
 /// BLD M4 `fullRound` node as the flat spec of `features::full_round`: side 1, center, side 2.
