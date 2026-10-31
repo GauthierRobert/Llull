@@ -723,6 +723,49 @@ fn a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket() {
     );
 }
 
+/// BLD §13.20: the corner fills run in parallel and the build does not depend on the number of threads. The 8-corner cube and the four feet of the boss are built on 1, 2 and 8 threads,
+/// twice each: the volume and the area to the bit, the face count and the BRepCheck result are the same.
+#[test]
+fn the_corner_fills_give_the_same_solid_on_any_number_of_threads() {
+    let _serial = crate::serial_blends();
+    let cube_shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let (cube_edges, cube_corners) = spec(&cube_shape, &all, 1.0, &cube_vertices(10.0), 2.0);
+    let plate = make_box([0.0; 3], [20.0, 20.0, 4.0]).unwrap().unwrap();
+    let boss = make_box([6.0, 6.0, 4.0], [8.0, 8.0, 6.0]).unwrap().unwrap();
+    let boss_shape = boolean(BooleanOp::Union, &plate, &boss, true).unwrap().unwrap();
+    let feet = [[6.0, 6.0, 4.0], [14.0, 6.0, 4.0], [14.0, 14.0, 4.0], [6.0, 14.0, 4.0]];
+    let mut rounded: Vec<usize> = feet.iter().flat_map(|corner| edges_at(&boss_shape, *corner)).collect();
+    rounded.sort_unstable();
+    rounded.dedup();
+    let (boss_edges, mut boss_corners) = spec(&boss_shape, &rounded, 0.5, &feet[..1], 1.2);
+    for corner in &feet[1..] {
+        boss_corners.extend(spec(&boss_shape, &rounded, 0.5, &[*corner], 1.2).1);
+    }
+    let fingerprint = |shape: &Shape, edges: &[f64], corners: &[f64]| {
+        let built = fillet_setback(shape, edges, corners).unwrap().expect("a solid");
+        let mass = mass_properties(&built).unwrap();
+        (
+            mass.volume.to_bits(),
+            mass.area.to_bits(),
+            topology(&built).unwrap()["faces"].as_array().unwrap().len(),
+            analyze(&built).unwrap().valid,
+        )
+    };
+    let mut reference = None;
+    for threads in [1, 2, 8, 1, 8] {
+        crate::test_bridge::set_corner_threads(threads);
+        let both = (fingerprint(&cube_shape, &cube_edges, &cube_corners), fingerprint(&boss_shape, &boss_edges, &boss_corners));
+        assert_eq!((both.0 .2, both.1 .2), (26, 23), "faces on {threads} threads");
+        assert!(both.0 .3 && both.1 .3, "valid on {threads} threads");
+        if let Some(first) = reference {
+            assert_eq!(both, first, "the solid is the same on {threads} threads as on the first run");
+        }
+        reference = reference.or(Some(both));
+    }
+    crate::test_bridge::set_corner_threads(0);
+}
+
 /// BLD §13.18 review: the guards of the mixed corner are exercised on shapes the test chooses (cfg(test) seams in blend_corner.cxx). The oriented patch check on the blend face of a filleted block
 /// reads about 0 across its tangent edges, and about pi once the face is turned round in a rebuilt shell; the boundary angle is measured for an intact boundary and refuses (-1, not
 /// measured) when a loop edge is missing from it.
