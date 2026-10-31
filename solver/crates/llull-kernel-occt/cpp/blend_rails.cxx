@@ -74,10 +74,10 @@ namespace {
 // How far (x the diagonal) the interpolated section poles may leave the circular fillet's contact lines between two stations.
 constexpr double kDeviationFraction = 1e-8;
 // Stations along a blend: the first uniform set (and the grid of the convexity scan), and the most the refinement inserts (where the surface between two stations misses the section).
-// A blend whose sections hardly change (a constant size on a straight edge: 5 stations are enough, 24 were built) is first skinned from kSeedIntervals (kSeedClosedIntervals when closed)
+// A blend whose sections are constant (the same section translated along: a constant size on a straight edge; 5 stations are enough, 24 were built) is first skinned from kSeedIntervals (kSeedClosedIntervals when closed)
 // and refined by the worst probe of each interval that misses the section; the probes are the 2 x kFirstStations grid points and the midpoint of every interval, which are the points the
-// uniform set of kFirstStations and its midpoints see, so the sparse skin holds the same 1e-8 x diagonal at the same points. It is given up for the uniform set the moment it needs more than
-// kFirstStations stations (a mitred chain, a varying size, a curved rail: the stations then follow the tolerance, not the seed, and the result stays exactly the one of the uniform set).
+// uniform set of kFirstStations and its midpoints see, so the sparse skin holds the same 1e-8 x diagonal at the same points. Only constant sections take it (checked at the grid points); a varying
+// size, a curved rail or a faded end is skinned from the uniform set, bit-identical to before, and a constant one that needs more than kFirstStations stations is given up for the uniform set.
 constexpr int kFirstStations = 24, kMostStations = 6000, kProbeGrid = 2 * kFirstStations, kSeedIntervals = 4, kSeedClosedIntervals = 8;
 // The profile faces must meet the faces around them within this fraction of the diagonal (the corner patches' rule of 13.10.2); the sewing
 // tolerance below is an input of the sewing, not an acceptance rule.
@@ -465,8 +465,27 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
     }
   };
   // a sparse skin that is given up or refused is skinned again from the uniform set: the failures and the results of the uniform set are the ones of before
-  const Handle(Geom_BSplineSurface) quick = run(true);
-  if (!quick.IsNull()) return quick;
+  // Constant sections only: every probe-grid section is the first one translated (the vectors from a to t, b, the centre and the bends agree to 1e-10 of the chord, same weight, no fade).
+  const auto constant_sections = [&]() {
+    if (fade.active) return false;
+    const Section *first = nullptr;
+    if (!truth_at(blend.lo, first)) return false;
+    const double tolerance = 1e-10 * std::max(first->a.Distance(first->b), 1e-12);
+    const auto same = [&](const gp_Vec &x, const gp_Vec &y) { return (x - y).Magnitude() <= tolerance; };
+    for (int g = 1; g <= kProbeGrid; ++g) {
+      const Section *other = nullptr;
+      if (!truth_at(blend.lo + span * g / kProbeGrid, other)) return false;
+      if (std::fabs(other->circle_weight - first->circle_weight) > 1e-10 || !same(gp_Vec(other->a, other->t), gp_Vec(first->a, first->t)) ||
+          !same(gp_Vec(other->a, other->b), gp_Vec(first->a, first->b)) || !same(gp_Vec(other->a, other->centre), gp_Vec(first->a, first->centre)) ||
+          !same(other->bend_a, first->bend_a) || !same(other->bend_b, first->bend_b))
+        return false;
+    }
+    return true;
+  };
+  if (constant_sections()) {
+    const Handle(Geom_BSplineSurface) quick = run(true);
+    if (!quick.IsNull()) return quick;
+  }
   return run(false);
 }
 

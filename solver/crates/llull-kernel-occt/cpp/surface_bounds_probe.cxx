@@ -29,8 +29,8 @@ void push(rust::Vec<double> &out, const Bnd_Box &box) {
 
 }  // namespace
 
-// kind 0: a wavy bicubic surface (bumps inside the patches); 1: the same, rational with weights 0.4 to 2.5; 2: flat with one narrow spike (a pole raised on fine knots);
-// 3: a face that is not a full patch (a corner trimmed off): no fast path. Returns [fast box (0 x 6 when refused), AddOptimal box, dense 300 x 300 sample box].
+// kind 0: a wavy bicubic surface (bumps inside the patches); 1: the same, rational with weights 0.4 to 2.5; 2: flat with one narrow spike (a pole raised on fine knots); 4: rational with weights 0.02 to 30 (non-uniform);
+// 3: a face that is not a full patch (a corner trimmed off): no fast path; 5: kind 0 with the depth limit lowered to 2 (a patch reaches it outside the found box: refused). Returns [fast box (0 x 6 when refused), AddOptimal box, dense 300 x 300 sample box].
 rust::Vec<double> spline_bounds_probe(int32_t kind) {
   constexpr int kCount = 14, kDegree = 3;
   TColgp_Array2OfPnt poles(1, kCount, 1, kCount);
@@ -41,6 +41,7 @@ rust::Vec<double> spline_bounds_probe(int32_t kind) {
       if (kind == 2) z = (i == 7 && j == 7) ? 3.0 : 0.0;
       poles(i, j) = gp_Pnt(i * 1.0 + 0.2 * std::sin(0.5 * j), j * 1.0 + 0.2 * std::cos(0.4 * i), z);
       weights(i, j) = kind == 1 ? 0.4 + 2.1 * (0.5 + 0.5 * std::sin(1.3 * i + 0.8 * j)) : 1.0;
+      if (kind == 4) weights(i, j) = 0.02 + 30.0 * std::pow(0.5 + 0.5 * std::sin(2.1 * i + 1.7 * j), 3);
     }
   const int spans = kCount - kDegree;
   TColStd_Array1OfReal knots(1, spans + 1);
@@ -49,7 +50,7 @@ rust::Vec<double> spline_bounds_probe(int32_t kind) {
     knots(k) = static_cast<double>(k - 1) / spans;
     mults(k) = (k == 1 || k == spans + 1) ? kDegree + 1 : 1;
   }
-  const Handle(Geom_BSplineSurface) surface = kind == 1 ? new Geom_BSplineSurface(poles, weights, knots, knots, mults, mults, kDegree, kDegree)
+  const Handle(Geom_BSplineSurface) surface = kind == 1 || kind == 4 ? new Geom_BSplineSurface(poles, weights, knots, knots, mults, mults, kDegree, kDegree)
                                                         : new Geom_BSplineSurface(poles, knots, knots, mults, mults, kDegree, kDegree);
   BRepBuilderAPI_MakeFace maker(surface, 1e-7);
   TopoDS_Face face = maker.Face();
@@ -59,7 +60,7 @@ rust::Vec<double> spline_bounds_probe(int32_t kind) {
   }
   rust::Vec<double> out;
   Bnd_Box fast;
-  if (query::add_spline_bounds(face, fast)) push(out, fast);
+  if (query::add_spline_bounds(face, fast, kind == 5 ? 2 : query::kBoundsMaxDepth)) push(out, fast);
   else
     for (int k = 0; k < 6; ++k) out.push_back(0.0);
   Bnd_Box optimal;

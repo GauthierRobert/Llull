@@ -1,8 +1,10 @@
 // Tight bounding boxes of many-span B-spline faces by Bezier patch (CHK1, 06 BLD TECHNICAL_SPEC 13.22.6). BRepBndLib::AddOptimal costs about 30 ms per blend face (a B-spline surface of 12 to 41 stations
 // and 3 spans across), 1.6 s of the 2.3 s of `mass_properties` on a 64-gon rim; the box that function returns is the exact one, which a branch and bound reaches in a fraction of the time:
 // the surface lies in the convex hull of the poles of each Bezier patch (weights are positive), so a patch whose pole box is inside the box of the points found so far (within the tolerance) cannot
-// widen it, and only the patches that can are split (de Casteljau, by `Segment`) and their new corner points added. The result is the exact box to `kBoundsRelativeTolerance` x the
-// diagonal of the face's box (it can only be smaller than the exact one, by at most that), or `false` when the face is not a plain full-patch B-spline or the search does not finish (the caller uses AddOptimal).
+// widen it, and only the patches that can are split (de Casteljau, by `Segment`) and their new corner points added. The found box may fall short of the exact extreme by at most the tolerance
+// `kBoundsRelativeTolerance` x the diagonal of the face's box (a patch is skipped when its pole box leaves the found box by no more), so the returned box is padded by that tolerance on every side and
+// ENCLOSES the exact one; it overshoots it by at most twice the tolerance. The guarantee is relative (1e-9 of the diagonal), outward. `false` when the face is not a plain full-patch B-spline, the search does
+// not finish, or a patch reaches kBoundsMaxDepth without being inside the found box (the caller uses AddOptimal).
 #pragma once
 
 #include <Bnd_Box.hxx>
@@ -37,7 +39,7 @@ inline void add_samples(Bnd_Box &box, const Handle(Geom_BezierSurface) &patch) {
 }
 
 // Adds the box of `face` (a plain full-patch B-spline face with many patches) to `box`; false (box untouched) when the face does not qualify or the search is too long.
-inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box) {
+inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box, int max_depth = kBoundsMaxDepth) {
   const Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
   const Handle(Geom_BSplineSurface) spline = surface.IsNull() ? Handle(Geom_BSplineSurface)() : Handle(Geom_BSplineSurface)::DownCast(surface);
   if (spline.IsNull() || spline->IsUPeriodic() || spline->IsVPeriodic()) return false;
@@ -86,7 +88,8 @@ inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box) {
     const double inner_lo[3] = {x0, y0, z0}, inner_hi[3] = {x1, y1, z1};
     bool inside = true;
     for (int axis = 0; axis < 3; ++axis) inside = inside && lo[axis] >= inner_lo[axis] - tolerance && hi[axis] <= inner_hi[axis] + tolerance;
-    if (inside || node.depth >= kBoundsMaxDepth) continue;
+    if (inside) continue;
+    if (node.depth >= max_depth) return false;
     if (++visits > kBoundsMaxVisits) return false;
     for (int quarter = 0; quarter < 4; ++quarter) {
       const double ua = quarter % 2 == 0 ? 0.0 : 0.5, va = quarter < 2 ? 0.0 : 0.5;
@@ -97,8 +100,8 @@ inline bool add_spline_bounds(const TopoDS_Face &face, Bnd_Box &box) {
     }
   }
   found.Get(x0, y0, z0, x1, y1, z1);
-  box.Add(gp_Pnt(x0, y0, z0));
-  box.Add(gp_Pnt(x1, y1, z1));
+  box.Add(gp_Pnt(x0 - tolerance, y0 - tolerance, z0 - tolerance));
+  box.Add(gp_Pnt(x1 + tolerance, y1 + tolerance, z1 + tolerance));
   return true;
 }
 

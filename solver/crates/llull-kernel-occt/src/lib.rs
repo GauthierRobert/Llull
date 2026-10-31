@@ -22,6 +22,17 @@ pub(crate) fn serial_blends() -> std::sync::MutexGuard<'static, ()> {
     LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+// Test hook of the per-shape memo: the whole-shape queries that reached the facade (a memo hit does not count), per thread.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FACADE_QUERIES: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn facade_query(name: &'static str) {
+    FACADE_QUERIES.with(|log| log.borrow_mut().push(name));
+}
+
 #[cfg(test)]
 mod blend_chamfer_tests;
 #[cfg(test)]
@@ -147,6 +158,8 @@ impl Shape {
         if let Some(found) = self.1.json.borrow().get(name) {
             return Ok(found.clone());
         }
+        #[cfg(test)]
+        facade_query(name);
         let value = compute()?;
         self.1.json.borrow_mut().insert(name, value.clone());
         Ok(value)
@@ -266,6 +279,8 @@ pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {
     if let Some(found) = shape.1.mass.borrow().as_ref() {
         return Ok(found.clone());
     }
+    #[cfg(test)]
+    facade_query("massProperties");
     let mass = occt(ffi::mass_properties(inner(shape)?))?;
     *shape.1.mass.borrow_mut() = Some(mass.clone());
     Ok(mass)
@@ -275,6 +290,8 @@ pub fn analyze(shape: &Shape) -> OcctResult<AnalysisOut> {
     if let Some(found) = shape.1.analysis.borrow().as_ref() {
         return Ok(found.clone());
     }
+    #[cfg(test)]
+    facade_query("analyze");
     let analysis = occt(ffi::analyze(inner(shape)?))?;
     *shape.1.analysis.borrow_mut() = Some(analysis.clone());
     Ok(analysis)
