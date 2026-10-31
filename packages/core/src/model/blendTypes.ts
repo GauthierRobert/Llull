@@ -34,6 +34,8 @@ export interface FaceBlendParams {
   readonly facesB: readonly number[];
   readonly radius: number;
   readonly profile?: BlendProfile;
+  /** The set whose far straight edge is a cliff edge (13.28): the ball touches it instead of being tangent to the face; absent = tangent on both. */
+  readonly cliff?: 'A' | 'B';
 }
 
 /** Fields of a `fullRound` recipe node besides `source` (BLD M4): the two parallel side faces and the center face the half-round consumes. */
