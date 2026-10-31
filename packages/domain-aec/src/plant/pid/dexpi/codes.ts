@@ -11,6 +11,9 @@ export const DEXPI_REMEDIATION: Readonly<Record<string, string>> = {
   DEXPI_UNMAPPED_CLASS: 'Nothing to fix if the class is intended: the item was imported as Custom with its class kept in passthrough.',
   DEXPI_GRAPHICS_DROPPED: 'Nothing to fix: the data is intact; the drawing is simplified (symbols come from the llull library).',
   DEXPI_ATTRIBUTE_UNIT: 'Check the unit in the source file; the value was kept as text flagged unverified.',
+  DEXPI_EXPORT_ITEM_SKIPPED:
+    'Check the items named: each needs a piping segment on its sheet (components, off-page connectors, flow arrows) or an instrument (signal generating functions); the rest of the file is complete.',
+  PID_EXPORT_TOO_LARGE: 'Export fewer sheets at a time (DEXPI: sheets=[...], limit 50 million characters; SVG: limit 30 million).',
   PID_CLASS_UNKNOWN: 'List the classes the library knows (the close names are in the message) and pass one of them.',
   PID_ITEM_NOT_FOUND: 'Pass an item id, a tag or a ; pid_report kind=connectivity lists what exists.',
   PID_ITEM_KIND: 'Pass an item of the kind the message names (a valve for an actuating system, a line or a segment for a flow).',

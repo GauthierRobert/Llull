@@ -34,8 +34,10 @@ function endpointLabel(pid: PidModel, end: PidEndpoint): string {
   switch (end.type) {
     case 'free':
       return 'free';
-    case 'branch':
-      return `branch:${end.segmentId}`;
+    case 'branch': {
+      const host = pid.items[end.segmentId];
+      return `branch:${host?.passthrough?.['dexpi:segment'] ?? host?.sourceId ?? end.segmentId}`;
+    }
     case 'nozzle': {
       const nozzle = pid.items[end.itemId];
       if (nozzle?.kind !== 'nozzle') return end.itemId;
