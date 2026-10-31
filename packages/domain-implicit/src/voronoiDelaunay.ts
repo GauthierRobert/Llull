@@ -1,5 +1,5 @@
 /**
- * Delaunay tetrahedralisation of the Voronoi seeds (05 IMP 14.14): Bowyer-Watson with exact predicates, a visibility walk and a face-adjacency flood.
+ * Delaunay tetrahedralisation of the Voronoi seeds (05 IMP 14.14, 14.16): Bowyer-Watson with exact predicates, a visibility walk from the nearest earlier seed and a face-adjacency flood, on typed arrays.
  * @invariant predicates are exact (`voronoiPredicates.ts`): a tetrahedron is removed by a seed only when the seed is STRICTLY inside its circumsphere, so a cospherical seed is
  *   outside, the cavity of a seed is connected and star-shaped, and the result is a Delaunay triangulation (every circumsphere is empty, every face is shared by at most two
  *   tetrahedra) for any input, whatever the order the cavity is searched in: the flood and a scan of every tetrahedron give the same tetrahedra
@@ -8,7 +8,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { inSphere, orient3d } from './voronoiPredicates';
+import { inSphereIndexed, orient3dIndexed } from './voronoiPredicates';
 
 export interface Tet {
   readonly v: readonly [number, number, number, number];
@@ -37,8 +37,9 @@ function circumsphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3): { c: Vec3; r2: number
 
 /** Exact key of the face (a, b, c) among `count` points (count^3 stays below 2^53 up to about 200000 points). */
 export const faceKey = (a: number, b: number, c: number, count: number): number => {
-  const [lo, mid, hi] = [a, b, c].sort((x, y) => x - y) as [number, number, number];
-  return (lo * count + mid) * count + hi;
+  const lo = Math.min(a, b, c);
+  const hi = Math.max(a, b, c);
+  return (lo * count + (a + b + c - lo - hi)) * count + hi;
 };
 
 export const facesOf = ([a, b, c, d]: readonly [number, number, number, number]): ReadonlyArray<readonly [number, number, number]> => [
@@ -49,117 +50,248 @@ export const facesOf = ([a, b, c, d]: readonly [number, number, number, number])
 ];
 
 const WALK_LIMIT = 4096;
+/** Seeds looked at per grid cell when the walk picks its start: clustered seeds put thousands in a cell, and any one of the nearest few is as good a start. */
+const CANDIDATES_PER_CELL = 8;
 
 export interface Triangulation {
   /** Every tetrahedron of the triangulation (the enclosing ones included), in creation order. */
   readonly tets: readonly Tet[];
   /** Seeds skipped because an earlier seed sits at exactly the same place. */
   readonly skipped: readonly number[];
+  /** Work counters: steps of the visibility walk over all seeds, and seeds for which the walk failed and every tetrahedron was scanned. */
+  readonly stats: { readonly walkSteps: number; readonly scans: number };
 }
 
-/** The triangulation of `points` (the last four are the enclosing tetrahedron). */
+/** Opposite-vertex slots of the faces of a tetrahedron in the order `facesOf` lists them: abc (opposite d), abd, acd, bcd. */
+const FACE_ORDER = [3, 2, 1, 0] as const;
+/** The three vertex slots of the face opposite slot i, in the order `facesOf` lists them. */
+const FACE_SLOTS = [
+  [1, 2, 3],
+  [0, 2, 3],
+  [0, 1, 3],
+  [0, 1, 2],
+] as const;
+
+/** Index of `value` among the four neighbour slots of tetrahedron `id`. */
+const slotOf = (neighbours: Int32Array, id: number, value: number): number => {
+  for (let i = 0; i < 4; i += 1) if (neighbours[4 * id + i] === value) return i;
+  return -1;
+};
+
+/**
+ * The triangulation of `points` (the last four are the enclosing tetrahedron). Typed arrays and face adjacency (the neighbour across the face opposite each vertex); the walk
+ * starts from a tetrahedron around the nearest earlier seed (a grid of the inserted seeds), so a location costs a few steps instead of n^(1/3); the cavity is the flood over the
+ * adjacency. Seeds are inserted in order and tetrahedra are listed in creation order with the vertex order of the first version: the output is the same list, value for value.
+ */
 export function triangulate(points: readonly Vec3[], real: number): Triangulation {
   const count = points.length;
-  const tets: Array<Tet | null> = [];
-  const orientation: number[] = [];
-  const faceTets = new Map<number, number[]>();
-  const keysOf = (v: Tet['v']): number[] => facesOf(v).map((f) => faceKey(f[0], f[1], f[2], count));
-  const at = (n: number): Vec3 => points[n] as Vec3;
+  const coords = new Float64Array(3 * count);
+  points.forEach((p, i) => {
+    coords[3 * i] = p[0];
+    coords[3 * i + 1] = p[1];
+    coords[3 * i + 2] = p[2];
+  });
+  let capacity = Math.max(64, 28 * count);
+  let verts: Int32Array = new Int32Array(4 * capacity);
+  let neighbours: Int32Array = new Int32Array(4 * capacity).fill(-1);
+  let orientation: Int8Array = new Int8Array(capacity);
+  let alive: Uint8Array = new Uint8Array(capacity);
+  let mark: Int32Array = new Int32Array(capacity);
+  let total = 0;
+  const grow = (): void => {
+    capacity *= 2;
+    const wider = (array: Int32Array | Int8Array | Uint8Array, per: number, fill?: number): Int32Array | Int8Array | Uint8Array => {
+      const bigger = new (array.constructor as new (n: number) => Int32Array | Int8Array | Uint8Array)(per * capacity);
+      if (fill !== undefined) bigger.fill(fill);
+      bigger.set(array);
+      return bigger;
+    };
+    verts = wider(verts, 4) as Int32Array;
+    neighbours = wider(neighbours, 4, -1) as Int32Array;
+    orientation = wider(orientation, 1) as Int8Array;
+    alive = wider(alive, 1) as Uint8Array;
+    mark = wider(mark, 1) as Int32Array;
+  };
+  const vertexTet = new Int32Array(count).fill(-1);
 
-  const add = (a: number, b: number, c: number, d: number): void => {
-    const side = orient3d(at(a), at(b), at(c), at(d));
-    if (side === 0) return;
-    const sphere = circumsphere(at(a), at(b), at(c), at(d)) ?? { c: at(a), r2: 0 };
-    const id = tets.length;
-    const v: Tet['v'] = [a, b, c, d];
-    tets.push({ v, ...sphere });
-    orientation.push(side);
-    for (const key of keysOf(v)) {
-      const list = faceTets.get(key);
-      if (list === undefined) faceTets.set(key, [id]);
-      else list.push(id);
-    }
+  /** A new tetrahedron (a, b, c, d). The cavity of a seed is star-shaped with respect to it (exact predicates, 14.14), so none of the tetrahedra made on its boundary is flat. */
+  const create = (a: number, b: number, c: number, d: number): number => {
+    const side = orient3dIndexed(coords, a, b, c, d);
+    if (total === capacity) grow();
+    const id = total++;
+    verts[4 * id] = a;
+    verts[4 * id + 1] = b;
+    verts[4 * id + 2] = c;
+    verts[4 * id + 3] = d;
+    orientation[id] = side;
+    alive[id] = 1;
+    vertexTet[a] = id;
+    vertexTet[b] = id;
+    vertexTet[c] = id;
+    vertexTet[d] = id;
+    return id;
   };
-  const remove = (id: number): void => {
-    const tet = tets[id] as Tet;
-    for (const key of keysOf(tet.v)) {
-      const list = faceTets.get(key) as number[];
-      list.splice(list.indexOf(id), 1);
-      if (list.length === 0) faceTets.delete(key);
-    }
-    tets[id] = null;
-  };
-  const neighbour = (id: number, a: number, b: number, c: number): number | null =>
-    (faceTets.get(faceKey(a, b, c, count)) ?? []).find((other) => other !== id) ?? null;
-  const holds = (id: number, point: Vec3): boolean => {
-    const tet = tets[id];
-    if (tet === null || tet === undefined) return false;
-    return inSphere(at(tet.v[0]), at(tet.v[1]), at(tet.v[2]), at(tet.v[3]), point, orientation[id] as number) > 0;
-  };
+  const holds = (id: number, p: number): boolean =>
+    alive[id] === 1 &&
+    inSphereIndexed(
+      coords,
+      verts[4 * id] as number,
+      verts[4 * id + 1] as number,
+      verts[4 * id + 2] as number,
+      verts[4 * id + 3] as number,
+      p,
+      orientation[id] as number,
+    ) > 0;
 
-  /** Visibility walk from `from` to a tetrahedron that contains `point` (closed), or null when it does not settle. */
-  const locate = (from: number, point: Vec3): number | null => {
+  /** Visibility walk from `from` to a tetrahedron that contains point `p` (closed), or -1 when it does not settle. */
+  let walkSteps = 0;
+  let scans = 0;
+  const locate = (from: number, p: number): number => {
     let current = from;
     for (let step = 0; step < WALK_LIMIT; step += 1) {
-      const tet = tets[current];
-      if (tet === null || tet === undefined) return null;
-      let next: number | null = null;
-      for (let k = 0; k < 4 && next === null; k += 1) {
+      walkSteps += 1;
+      if (alive[current] !== 1) return -1;
+      let moved = false;
+      for (let k = 0; k < 4 && !moved; k += 1) {
         const i = (k + step) % 4;
-        const corners = tet.v.map(at);
-        corners[i] = point;
-        const side = orient3d(corners[0] as Vec3, corners[1] as Vec3, corners[2] as Vec3, corners[3] as Vec3);
+        const corner = (slot: number): number => (slot === i ? p : (verts[4 * current + slot] as number));
+        const side = orient3dIndexed(coords, corner(0), corner(1), corner(2), corner(3));
         if (side !== 0 && side !== orientation[current]) {
-          const [a, b, c] = tet.v.filter((_, index) => index !== i) as [number, number, number];
-          next = neighbour(current, a, b, c);
+          const next = neighbours[4 * current + i] as number;
+          if (next >= 0) {
+            current = next;
+            moved = true;
+          }
         }
       }
-      if (next === null) return current;
-      current = next;
+      if (!moved) return current;
     }
-    return null;
+    return -1;
+  };
+
+  // grid of the inserted seeds: the walk starts around the nearest one
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < real; i += 1)
+    for (let axis = 0; axis < 3; axis += 1) {
+      low[axis] = Math.min(low[axis] as number, coords[3 * i + axis] as number);
+      high[axis] = Math.max(high[axis] as number, coords[3 * i + axis] as number);
+    }
+  const side = Math.max(1, Math.round(Math.cbrt(real / 2)));
+  const cellOf = (p: number, axis: number): number => {
+    const extent = (high[axis] as number) - (low[axis] as number);
+    return extent > 0 ? Math.min(side - 1, Math.floor((((coords[3 * p + axis] as number) - (low[axis] as number)) / extent) * side)) : 0;
+  };
+  const head = new Int32Array(side * side * side).fill(-1);
+  const chain = new Int32Array(Math.max(real, 1)).fill(-1);
+  const startFor = (p: number, hint: number): number => {
+    const [cx, cy, cz] = [cellOf(p, 0), cellOf(p, 1), cellOf(p, 2)];
+    let best = -1;
+    let bestDistance = Infinity;
+    for (let dz = -1; dz <= 1; dz += 1)
+      for (let dy = -1; dy <= 1; dy += 1)
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const [x, y, z] = [cx + dx, cy + dy, cz + dz];
+          if (x < 0 || y < 0 || z < 0 || x >= side || y >= side || z >= side) continue;
+          let looked = 0;
+          for (
+            let q = head[(z * side + y) * side + x] as number;
+            q >= 0 && looked < CANDIDATES_PER_CELL;
+            q = chain[q] as number, looked += 1
+          ) {
+            const d =
+              ((coords[3 * q] as number) - (coords[3 * p] as number)) ** 2 +
+              ((coords[3 * q + 1] as number) - (coords[3 * p + 1] as number)) ** 2 +
+              ((coords[3 * q + 2] as number) - (coords[3 * p + 2] as number)) ** 2;
+            if (d < bestDistance) [best, bestDistance] = [q, d];
+          }
+        }
+    const around = best >= 0 ? (vertexTet[best] as number) : -1;
+    return around >= 0 && alive[around] === 1 ? around : hint;
   };
 
   const skipped: number[] = [];
   const seen = new Set<string>();
-  add(real, real + 1, real + 2, real + 3);
+  create(real, real + 1, real + 2, real + 3);
   let hint = 0;
+  let stamp = 0;
   for (let p = 0; p < real; p += 1) {
-    const point = at(p);
-    const spot = `${point[0]},${point[1]},${point[2]}`;
+    const spot = `${coords[3 * p]},${coords[3 * p + 1]},${coords[3 * p + 2]}`;
     if (seen.has(spot)) {
       skipped.push(p);
       continue;
     }
     seen.add(spot);
-    let start = locate(hint, point);
-    if (start === null || !holds(start, point)) start = tets.findIndex((_, id) => holds(id, point));
+    let start = locate(startFor(p, hint), p);
+    if (start < 0 || !holds(start, p)) {
+      start = -1;
+      scans += 1;
+      for (let id = 0; id < total && start < 0; id += 1) if (holds(id, p)) start = id;
+    }
     if (start < 0) continue;
-    const cavity = new Set<number>([start]);
-    const stack = [start];
-    while (stack.length > 0) {
-      const id = stack.pop() as number;
-      for (const [a, b, c] of facesOf((tets[id] as Tet).v)) {
-        const other = neighbour(id, a, b, c);
-        if (other !== null && !cavity.has(other) && holds(other, point)) {
-          cavity.add(other);
-          stack.push(other);
+    // the cavity: the flood over the face adjacency from the tetrahedron that holds the seed
+    stamp += 1;
+    const cavity = [start];
+    mark[start] = stamp;
+    for (let at = 0; at < cavity.length; at += 1) {
+      const id = cavity[at] as number;
+      for (let i = 0; i < 4; i += 1) {
+        const other = neighbours[4 * id + i] as number;
+        if (other >= 0 && mark[other] !== stamp && holds(other, p)) {
+          mark[other] = stamp;
+          cavity.push(other);
         }
       }
     }
-    const faces = new Map<number, readonly [number, number, number] | null>();
-    for (const id of [...cavity].sort((x, y) => x - y))
-      for (const f of facesOf((tets[id] as Tet).v)) {
-        const key = faceKey(f[0], f[1], f[2], count);
-        faces.set(key, faces.has(key) ? null : f);
+    cavity.sort((x, y) => x - y);
+    // the boundary faces, in the order of the first version (cavity tetrahedra by id, faces abc, abd, acd, bcd)
+    const boundary: Array<{ face: readonly [number, number, number]; outer: number; inner: number }> = [];
+    for (const id of cavity)
+      for (const i of FACE_ORDER) {
+        const outer = neighbours[4 * id + i] as number;
+        if (outer >= 0 && mark[outer] === stamp) continue;
+        const slots = FACE_SLOTS[i];
+        boundary.push({
+          face: [verts[4 * id + slots[0]] as number, verts[4 * id + slots[1]] as number, verts[4 * id + slots[2]] as number],
+          outer,
+          inner: id,
+        });
       }
-    for (const id of cavity) remove(id);
-    const before = tets.length;
-    for (const f of faces.values()) if (f !== null) add(f[0], f[1], f[2], p);
-    hint = tets.length > before ? tets.length - 1 : hint;
-    while (tets[hint] === null && hint > 0) hint -= 1;
+    for (const id of cavity) alive[id] = 0;
+    const open = new Map<number, number>();
+    for (const { face, outer, inner } of boundary) {
+      const id = create(face[0], face[1], face[2], p);
+      neighbours[4 * id + 3] = outer;
+      if (outer >= 0) neighbours[4 * outer + slotOf(neighbours, outer, inner)] = id;
+      // the three faces through the new seed are shared with the tetrahedra on the neighbouring boundary faces: matched by their common edge
+      for (let i = 0; i < 3; i += 1) {
+        const others = [0, 1, 2].filter((slot) => slot !== i).map((slot) => face[slot] as number);
+        const key = Math.min(others[0] as number, others[1] as number) * count + Math.max(others[0] as number, others[1] as number);
+        const waiting = open.get(key);
+        if (waiting === undefined) open.set(key, id * 4 + i);
+        else {
+          open.delete(key);
+          neighbours[4 * id + i] = Math.floor(waiting / 4);
+          neighbours[4 * Math.floor(waiting / 4) + (waiting % 4)] = id;
+        }
+      }
+      hint = id;
+    }
+    const cell = (cellOf(p, 2) * side + cellOf(p, 1)) * side + cellOf(p, 0);
+    chain[p] = head[cell] as number;
+    head[cell] = p;
   }
-  return { tets: tets.filter((tet): tet is Tet => tet !== null), skipped };
+  const tets: Tet[] = [];
+  for (let id = 0; id < total; id += 1) {
+    if (alive[id] !== 1) continue;
+    const v: Tet['v'] = [verts[4 * id] as number, verts[4 * id + 1] as number, verts[4 * id + 2] as number, verts[4 * id + 3] as number];
+    const sphere = circumsphere(points[v[0]] as Vec3, points[v[1]] as Vec3, points[v[2]] as Vec3, points[v[3]] as Vec3) ?? {
+      c: points[v[0]] as Vec3,
+      r2: 0,
+    };
+    tets.push({ v, ...sphere });
+  }
+  return { tets, skipped, stats: { walkSteps, scans } };
 }
 
 /** Delaunay tetrahedra of `points` that do not touch the enclosing tetrahedron (the last four points), and the seeds skipped as duplicates. */
