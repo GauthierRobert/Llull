@@ -10,6 +10,8 @@ export interface ContactSample {
   readonly t: number;
   readonly g0: number;
   readonly g1: number;
+  /** `g1` signed by the fold of the two faces (convex positive); absent when the kernel does not tell. */
+  readonly g1Signed?: number;
   readonly normalCurvature: readonly [number, number];
 }
 

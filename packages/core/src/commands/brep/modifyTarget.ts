@@ -1,15 +1,12 @@
 /** Shared checks and refusal texts of the edge-modifying commands (fillet_edge, chamfer_edge, shell_solid). */
 
 import { type CadDocument, type Entity, type ShapeRecipe, is3D } from '../../model/types';
-import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
+import type { GeometryKernel } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
 import { noop } from '../noop';
 
 /** Surface-neutral pointer to the B-rep kernel (server env var). */
 export const OCC_KERNEL_HINT = 'the OCC kernel (the desktop default; LLULL_KERNEL=occt-native or occt for the CLI and server)';
-
-/** The name of one sub-patch of an exact corner star: `blend(v:<edge name>,...)#k`. */
-const STAR_FACE = /^blend\(v:.*\)#\d+$/;
 
 export function validateSolidTarget(doc: CadDocument, opName: string, id: string): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
@@ -25,13 +22,7 @@ export function validateSolidTarget(doc: CadDocument, opName: string, id: string
 }
 
 /** Why the kernel gave no usable result: an unsupported op, a failed / invalid solid, or an open mesh. */
-export function modifyFailure(
-  command: string,
-  kernel: GeometryKernel,
-  modified: ShapeRecipe,
-  result: 'refused' | 'empty',
-  source: ShapeTopology | null = null,
-): string {
+export function modifyFailure(command: string, kernel: GeometryKernel, modified: ShapeRecipe, result: 'refused' | 'empty'): string {
   if (!kernel.supports(modified.op))
     return `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`;
   if (result === 'empty')
@@ -45,18 +36,10 @@ export function modifyFailure(
     const named = kernel.lastRefusal?.() ?? null;
     const at = named === null ? -1 : named.indexOf('[SHL_');
     if (named !== null && at >= 0) return `shell_solid: ${named.slice(at)}; document unchanged.`;
-    // the kernel keeps no reason for a recipe it already refused (it caches the refusal as null): a sealed shell of a solid with corner-star faces says so from the topology
-    const stars =
-      modified.op === 'shell' && modified.openNear === undefined
-        ? (source?.faces ?? []).filter((face) => STAR_FACE.test(face.name ?? '')).length
-        : 0;
     return (
       'shell_solid: the kernel could not hollow this solid into a valid one (returned null: thickness too ' +
       'large for a feature, a rounded edge whose radius is not larger than the thickness, an openFacesNear point that picks no face, or a ' +
-      'self-intersecting offset); document unchanged. Try a smaller thickness (below the smallest fillet radius), or shell BEFORE filleting.' +
-      (stars === 0
-        ? ''
-        : ` The solid carries ${stars} corner-star faces (setback corners): the sealed shell of fine ones (36 poles per direction or more) is refused by the kernel as [SHL_STAR_FACES] before the offset; open the shell at a face (openFacesNear) instead.`)
+      'self-intersecting offset); document unchanged. Try a smaller thickness (below the smallest fillet radius), or shell BEFORE filleting.'
     );
   }
   return (

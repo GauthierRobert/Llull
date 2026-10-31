@@ -83,11 +83,7 @@ export function blendRefusal(
   result: 'refused' | 'empty',
   topology: ShapeTopology | null,
 ): CommandResult {
-  const generic = (): CommandResult => ({
-    document: doc,
-    summary: modifyFailure(command, kernel, modified, result, topology),
-    affected: [],
-  });
+  const generic = (): CommandResult => ({ document: doc, summary: modifyFailure(command, kernel, modified, result), affected: [] });
   const reported =
     modified.op === 'fillet' ||
     modified.op === 'faceBlend' ||
