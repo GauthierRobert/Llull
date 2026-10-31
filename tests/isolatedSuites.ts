@@ -53,6 +53,8 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/LiveFx.test.tsx',
   'tests/component/ModelExport.test.tsx',
   'tests/component/NamedViews.test.tsx',
+  'tests/component/CagePointerAxisLock.test.tsx',
+  'tests/component/FacePointerAxisLock.test.tsx',
   'tests/component/NetPointer.test.tsx',
   'tests/component/PmiPanel.test.tsx',
   'tests/component/ReportIssueDialog.test.tsx',
