@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec3 } from '@core/model/types';
 import { delaunay, faceKey, facesOf, triangulate } from '@implicit/voronoiDelaunay';
-import { inSphere, orient3d } from '@implicit/voronoiPredicates';
+import { inSphere, inSphereIndexed, orient3d, orient3dIndexed } from '@implicit/voronoiPredicates';
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -172,4 +172,62 @@ describe('delaunay (exact walk + flood Bowyer-Watson)', () => {
     for (let layer = 0; layer < 4; layer += 1) for (let n = 0; n < 12; n += 1) points.push([random() * 8, random() * 8, layer * 2]);
     expectDelaunay(withEnclosure(points, 8), points.length, 'layers');
   });
+});
+
+describe('typed-array Delaunay (14.16): the same list as the exact scan, at a scale the scan cannot reach', () => {
+  const pack = (points: readonly Vec3[]): Float64Array => Float64Array.from(points.flat());
+
+  it('the indexed predicates give the sign of the exact ones on random, near-cospherical, cospherical and 1e-300-off configurations', () => {
+    const random = mulberry32(31);
+    const cases: Vec3[][] = [];
+    for (let n = 0; n < 400; n += 1) cases.push(Array.from({ length: 5 }, (): Vec3 => [random() * 10, random() * 10, random() * 10]));
+    for (let n = 0; n < 80; n += 1) {
+      // five points on one sphere (exactly cospherical when the offset is 0), four on one plane
+      const spot = (): Vec3 => {
+        const [u, v] = [random() * 2 - 1, random() * 2 * Math.PI];
+        const s = Math.sqrt(1 - u * u);
+        const offset = n % 2 === 0 ? 0 : 1e-300;
+        return [5 + 5 * s * Math.cos(v) + offset, 5 + 5 * s * Math.sin(v), 5 + 5 * u];
+      };
+      cases.push(Array.from({ length: 5 }, spot));
+      cases.push([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [1, 1, n % 2 === 0 ? 0 : 1e-300],
+        [0.5, 0.5, 1e-9 * n],
+      ]);
+    }
+    for (const [a, b, c, d, e] of cases as [Vec3, Vec3, Vec3, Vec3, Vec3][]) {
+      const packed = pack([a, b, c, d, e]);
+      expect(orient3dIndexed(packed, 0, 1, 2, 3)).toBe(orient3d(a, b, c, d));
+      const side = orient3d(a, b, c, d) || 1;
+      expect(inSphereIndexed(packed, 0, 1, 2, 3, 4, side)).toBe(inSphere(a, b, c, d, e, side));
+    }
+  });
+
+  it('2500 uniform seeds give exactly the tetrahedra, vertex order and circumcentres of the scan over every tetrahedron', () => {
+    const random = mulberry32(17);
+    const points = Array.from({ length: 2500 }, (): Vec3 => [random() * 30, random() * 30, random() * 30]);
+    const all = withEnclosure(points, 30);
+    expect(triangulate(all, 2500).tets.map((tet) => [...tet.v])).toEqual(referenceTriangulation(all, 2500));
+  }, 600_000);
+
+  it('100000 seeds triangulate in a few seconds, deterministically, and the tetrahedra tile the enclosing tetrahedron', () => {
+    const random = mulberry32(7);
+    const extent = Math.cbrt(100_000 / 0.04);
+    const points = Array.from({ length: 100_000 }, (): Vec3 => [random() * extent, random() * extent, random() * extent]);
+    const all = withEnclosure(points, extent);
+    const started = performance.now();
+    const first = triangulate(all, 100_000);
+    const seconds = (performance.now() - started) / 1000;
+    expect(seconds).toBeLessThan(30);
+    expect(first.skipped).toEqual([]);
+    const enclosing = volumeOf([all[100_000], all[100_001], all[100_002], all[100_003]] as Corners);
+    const total = first.tets.reduce((sum, tet) => sum + volumeOf(tet.v.map((n) => all[n]) as Corners), 0);
+    expect(Math.abs(total - enclosing) / enclosing).toBeLessThan(1e-6);
+    const second = triangulate(all, 100_000);
+    expect(second.tets.length).toBe(first.tets.length);
+    expect(second.tets.every((tet, i) => tet.v.every((n, k) => n === first.tets[i]?.v[k]))).toBe(true);
+  }, 120_000);
 });

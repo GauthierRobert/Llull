@@ -50,7 +50,7 @@ describe('add_voronoi_lattice', () => {
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 0 }), 'IMP_PARAM_RANGE');
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, seed: 1.5 }), 'IMP_PARAM_RANGE');
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, radius: 0 }), 'IMP_STRUT_RADIUS_RANGE');
-    expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 5 }), 'IMP_GRAPH_TOO_LARGE');
+    expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 500 }), 'IMP_GRAPH_TOO_LARGE');
     const plane = ok(empty(), 'add_field_primitive', { shape: 'plane', normal: [0, 0, 1], offset: 0 });
     expectRefused(plane.doc, run(plane.doc, 'add_voronoi_lattice', { ...base, region: plane.id }), 'IMP_FIELD_UNBOUNDED');
   });

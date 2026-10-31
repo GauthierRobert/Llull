@@ -12,7 +12,7 @@ import { voronoiGeometry } from './voronoi';
 /**
  * @affects creates 1 voronoi node (a graph of beams along the edges of the Voronoi diagram of the seeds, cut to the bounding box of the region and clipped by the region)
  * @invariant deterministic for (region bounds, density, seed): the same integer seed gives the same lattice; the seed set is not stored, it is re-derived
- * @failure unknown region -> IMP_FIELD_NOT_FOUND; region without finite bounds -> IMP_FIELD_UNBOUNDED; density <= 0, non-integer or negative seed -> IMP_PARAM_RANGE; radius <= 0 -> IMP_STRUT_RADIUS_RANGE; no beam -> IMP_GRAPH_EMPTY; more than 10000 seeds (density x grown box volume), or more than 100000 beams (about 9.2 per seed) -> IMP_GRAPH_TOO_LARGE
+ * @failure unknown region -> IMP_FIELD_NOT_FOUND; region without finite bounds -> IMP_FIELD_UNBOUNDED; density <= 0, non-integer or negative seed -> IMP_PARAM_RANGE; radius <= 0 -> IMP_STRUT_RADIUS_RANGE; no beam -> IMP_GRAPH_EMPTY; more than 100000 seeds (density x grown box volume), or more than 1000000 beams (about 9.2 per seed) -> IMP_GRAPH_TOO_LARGE
  */
 export const addVoronoiLattice = defineCommand({
   name: 'add_voronoi_lattice',
@@ -20,7 +20,7 @@ export const addVoronoiLattice = defineCommand({
   description:
     'Create a stochastic (Voronoi) strut lattice as an implicit FIELD: a seeded random point set with `density` seeds per document unit^3 fills the bounding box of `region`, and the beams run along the edges of its Voronoi diagram ' +
     '(about 9 beams per seed), cut to that box and clipped by the region field. The same seed gives the same lattice on every machine. Beams have a constant radius; cap "sphere" rounds the joints. ' +
-    'At most 10000 seeds (close to the 100000-beam cap: IMP_GRAPH_TOO_LARGE either way; about 5 s in all there): lower the density or shrink the region otherwise. Next: create_implicit_body (voxel well below radius), export_3mf beamLattice for printers that read beams.',
+    'At most 100000 seeds and 1000000 beams (about 9 to 11 beams per seed: IMP_GRAPH_TOO_LARGE either way; the command takes 0.5 s for 10000 seeds and 1.5 s for 30000 on the TS side): lower the density or shrink the region otherwise. A body of a lattice that large needs a coarse voxel (a 90 mm cube of 1000000 beams realises natively in 15 s at voxel 2). Next: create_implicit_body (voxel well below radius), export_3mf beamLattice for printers that read beams.',
   params: z.object({
     region: z
       .string()

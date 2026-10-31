@@ -125,3 +125,74 @@ function insphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3, e: Vec3): number {
 export function inSphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3, e: Vec3, orientation: number): number {
   return insphere(a, b, c, d, e) * orientation;
 }
+
+const vec = (p: Float64Array, i: number): Vec3 => [p[3 * i] as number, p[3 * i + 1] as number, p[3 * i + 2] as number];
+
+/**
+ * `orient3d` of the points a, b, c, d given by index into the packed coordinates `p` (x, y, z per point): the same double filter on scalars, no allocation; the exact
+ * fallback is `orient3d` itself, so the sign is the one of the real determinant.
+ */
+export function orient3dIndexed(p: Float64Array, a: number, b: number, c: number, d: number): number {
+  const [dx, dy, dz] = [p[3 * d] as number, p[3 * d + 1] as number, p[3 * d + 2] as number];
+  const adx = (p[3 * a] as number) - dx;
+  const ady = (p[3 * a + 1] as number) - dy;
+  const adz = (p[3 * a + 2] as number) - dz;
+  const bdx = (p[3 * b] as number) - dx;
+  const bdy = (p[3 * b + 1] as number) - dy;
+  const bdz = (p[3 * b + 2] as number) - dz;
+  const cdx = (p[3 * c] as number) - dx;
+  const cdy = (p[3 * c + 1] as number) - dy;
+  const cdz = (p[3 * c + 2] as number) - dz;
+  const det = adx * (bdy * cdz - bdz * cdy) + ady * (bdz * cdx - bdx * cdz) + adz * (bdx * cdy - bdy * cdx);
+  const permanent =
+    Math.abs(adx) * (Math.abs(bdy * cdz) + Math.abs(bdz * cdy)) +
+    Math.abs(ady) * (Math.abs(bdz * cdx) + Math.abs(bdx * cdz)) +
+    Math.abs(adz) * (Math.abs(bdx * cdy) + Math.abs(bdy * cdx));
+  if (Math.abs(det) > FILTER * permanent) return sign(det);
+  return orient3d(vec(p, a), vec(p, b), vec(p, c), vec(p, d));
+}
+
+/** `inSphere` of the points given by index into the packed coordinates `p`: the scalar double filter, the exact `inSphere` when the value is inside the bound. */
+export function inSphereIndexed(p: Float64Array, a: number, b: number, c: number, d: number, e: number, orientation: number): number {
+  const [ex, ey, ez] = [p[3 * e] as number, p[3 * e + 1] as number, p[3 * e + 2] as number];
+  const aex = (p[3 * a] as number) - ex;
+  const aey = (p[3 * a + 1] as number) - ey;
+  const aez = (p[3 * a + 2] as number) - ez;
+  const bex = (p[3 * b] as number) - ex;
+  const bey = (p[3 * b + 1] as number) - ey;
+  const bez = (p[3 * b + 2] as number) - ez;
+  const cex = (p[3 * c] as number) - ex;
+  const cey = (p[3 * c + 1] as number) - ey;
+  const cez = (p[3 * c + 2] as number) - ez;
+  const dex = (p[3 * d] as number) - ex;
+  const dey = (p[3 * d + 1] as number) - ey;
+  const dez = (p[3 * d + 2] as number) - ez;
+  const ab = aex * bey - bex * aey;
+  const bc = bex * cey - cex * bey;
+  const cd = cex * dey - dex * cey;
+  const da = dex * aey - aex * dey;
+  const ac = aex * cey - cex * aey;
+  const bd = bex * dey - dex * bey;
+  const abc = aez * bc - bez * ac + cez * ab;
+  const bcd = bez * cd - cez * bd + dez * bc;
+  const cda = cez * da + dez * ac + aez * cd;
+  const dab = dez * ab + aez * bd + bez * da;
+  const alift = aex * aex + aey * aey + aez * aez;
+  const blift = bex * bex + bey * bey + bez * bez;
+  const clift = cex * cex + cey * cey + cez * cez;
+  const dlift = dex * dex + dey * dey + dez * dez;
+  const det = dlift * abc - clift * dab + (blift * cda - alift * bcd);
+  const pab = Math.abs(aex * bey) + Math.abs(bex * aey);
+  const pbc = Math.abs(bex * cey) + Math.abs(cex * bey);
+  const pcd = Math.abs(cex * dey) + Math.abs(dex * cey);
+  const pda = Math.abs(dex * aey) + Math.abs(aex * dey);
+  const pac = Math.abs(aex * cey) + Math.abs(cex * aey);
+  const pbd = Math.abs(bex * dey) + Math.abs(dex * bey);
+  const permanent =
+    (Math.abs(aez) * pbc + Math.abs(bez) * pac + Math.abs(cez) * pab) * dlift +
+    (Math.abs(bez) * pcd + Math.abs(cez) * pbd + Math.abs(dez) * pbc) * alift +
+    (Math.abs(cez) * pda + Math.abs(dez) * pac + Math.abs(aez) * pcd) * blift +
+    (Math.abs(dez) * pab + Math.abs(aez) * pbd + Math.abs(bez) * pda) * clift;
+  if (Math.abs(det) > FILTER * permanent) return sign(det) * orientation;
+  return inSphere(vec(p, a), vec(p, b), vec(p, c), vec(p, d), vec(p, e), orientation);
+}
