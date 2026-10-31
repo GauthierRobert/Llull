@@ -22,6 +22,7 @@ import { filletEach } from './filletEach';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
 import { blendRejection } from './blendCodes';
+import { partialSchema, refusePartial } from './filletPartial';
 import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
@@ -112,7 +113,7 @@ function modifyEdges(
 /**
  * @affects removes source entity; creates 1 mesh entity with rounded edges
  * @invariant target must be a 3D solid; radius > 0; geometry kernel must be injected
- * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]
+ * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]; partial -> BLD_PARTIAL_UNSUPPORTED (a valid range) or BLD_LAW_INVALID (a bad range), see filletPartial.ts
  */
 export const filletEdge = defineCommand({
   name: 'fillet_edge',
@@ -189,6 +190,7 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     profile: profileSchema.optional(),
+    partial: partialSchema.optional(),
     mode: z
       .enum(FILLET_MODES)
       .describe(
@@ -200,9 +202,11 @@ export const filletEdge = defineCommand({
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners },
+    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners, partial },
     ctx,
   ): CommandResult => {
+    const refused = refusePartial(doc, id, partial);
+    if (refused !== null) return refused;
     if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
       return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile, corners });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
