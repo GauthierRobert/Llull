@@ -485,7 +485,7 @@ const STRAIGHT_LAW_NOTE =
 
 /** The note of a program that exports a monotone radius law: OCP interpolates the dense nodes of the exact curve with its own cubic. */
 const MONOTONE_LAW_NOTE =
-  'monotone radius law exported as 12 nodes per piece on the exact curve, interpolated by the own cubic spline of OCP: within 2e-6 relative of the exact volume and 2e-3 of the radius (measured, 06 BLD 13.19); the native kernel and its STEP carry the exact law.';
+  'monotone radius law exported as 12 nodes per piece on the exact curve, interpolated by the own cubic spline of OCP: within 2e-6 relative of the exact volume and 2e-3 of the radius (measured, 06 BLD 13.22); the native kernel and its STEP carry the exact law.';
 
 function withStraightLawNote(program: FeatureProgram): FeatureProgram {
   const laws = program.features.flatMap((feature) => (feature.op === 'fillet' ? (feature.laws ?? []) : []));

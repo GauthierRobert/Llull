@@ -1,5 +1,5 @@
 /**
- * DES-6c: the monotone radius law on the native OCCT kernel (docs/design/06-variable-blends 13.19): `interpolation: "monotone"` is a C1 cubic Hermite law
+ * DES-6c: the monotone radius law on the native OCCT kernel (docs/design/06-variable-blends 13.22): `interpolation: "monotone"` is a C1 cubic Hermite law
  * through the stations installed in the fillet spine (Law_BSpFunc pieces), exact and never below the smallest station. Radius read back from the contact line
  * on the top face against the closed form, the volume against `abc - (1 - pi/4) L integral r(t)^2 dt` by Simpson quadrature, the two-station law against
  * OCCT's own smooth transition, check_blends reading the law back, and the steepness the kernel carries. Skipped when the llull-kernel binary is not built.

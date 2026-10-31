@@ -1242,13 +1242,13 @@ the sidecar sets neither. Tests: `an_exception_in_a_parallel_fill_is_an_error_of
   serial (sewing, `BRepCheck`, the volume: about 350 ms on the cube) and the machine's other work; OCCT's allocator shares one heap.
 - **Not done:** the serial 350 ms (sew + `BRepCheck_Analyzer` 197 ms, volume 100 ms) have no cheap path: the validity analysis is the guarantee, and the volume is the sign / bound check of 13.18.6.
 
-## 13.21 As built: monotone (never-overshooting) multi-station radius laws, exact in the kernel (DES-6c, 2026-10-31)
+## 13.22 As built: monotone (never-overshooting) multi-station radius laws, exact in the kernel (DES-6c, 2026-10-31)
 
 Done: `interpolation: "monotone"` on a fillet radius law. The stations (start `size`, the `sizes` control points, end `sizeEnd`) are joined by a **C1 piecewise cubic Hermite curve** (Fritsch-Carlson / PCHIP slopes, zero slope at both ends like the kernel smooth law) that stays between the radii of the two stations around it, so it never goes below the smallest station. It is built **exactly** in the native kernel (not as graded nodes), read back exactly by `check_blends` (`LawRecord`), exported to OCP as dense nodes of the exact curve, and refused by name when the edge cannot carry it.
 
 **Why.** `interpolation: "smooth"` through control points is OCCT's own cubic spline (13.7): C2, but it overshoots between stations. Measured on the 20 x 10 x 5 block, top edge, stations r = 1, 1, 3, 3 at t = 0, 0.4, 0.6, 1 (a plateau and a jump): the smooth law's contact line dips to **r = 0.4687**, 53 % below the smallest station; the monotone law's minimum is 1.000000000. A radius that overshoots to a small value narrows the blend where the design asked for none, and below zero it fails.
 
-### 13.21.1 Code
+### 13.22.1 Code
 
 | Piece  | Where                                                                                                                                                                                                                                                                                                                                                                            |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1257,11 +1257,11 @@ Done: `interpolation: "monotone"` on a fillet radius law. The stations (start `s
 | Native | `cpp/law_fillet.hxx` / `.cxx` (`LawKind`, `monotone_slopes`, `hermite_piece`: every stretch of the spine spline on a monotone edge becomes `Law_BSpFunc` Bezier-form cubic pieces through the knots OCCT kept, exactly as the straight law of 13.15 becomes `Law_Linear` pieces), `cpp/blends.cxx` / `.hxx` (mode 2 of the flat law layout; `has_straight_kink` also covers an interior station of a monotone law so the adaptive mass rule is used), `src/recipe/nodes.rs` (`"monotone"` -> mode 2) |
 | Tests  | `tests/unit/blendMonotone.test.ts` (closed forms, no overshoot, C1, steepness, scripted kernel, 9), `tests/unit/blendCodegen.test.ts`, `server/tests/nativeBlendMonotone.test.ts` (native, 6)                                                                                                                                                                                      |
 
-### 13.21.2 The curve and its closed forms
+### 13.22.2 The curve and its closed forms
 
 For stations (t_k, r_k), secants d_k = (r_{k+1} - r_k) / (t_{k+1} - t_k), widths h_k: the slope at an interior station is 0 when d_{k-1} d_k <= 0 (a local extremum), else the weighted harmonic mean (w1 + w2) / (w1 / d_{k-1} + w2 / d_k) with w1 = 2 h_k + h_{k-1}, w2 = h_k + 2 h_{k-1}; the end slopes are 0. Each piece is the cubic Hermite polynomial of its two stations and slopes. A start and an end alone make the smoothstep r(t) = a + (b - a)(3t^2 - 2t^3), whose mean radius is exactly (a + b) / 2. The same formula is in TypeScript (`monotone.ts`) and C++ (`monotone_slopes`); the native test reads the contact line against the TypeScript curve, so the two cannot drift.
 
-### 13.21.3 Measured (native kernel, block 20 x 10 x 5, top edge; `server/tests/nativeBlendMonotone.test.ts`)
+### 13.22.3 Measured (native kernel, block 20 x 10 x 5, top edge; `server/tests/nativeBlendMonotone.test.ts`)
 
 Radius read from the contact line on the top face (1001 samples); volume against `abc - (1 - pi/4) L integral r(t)^2 dt` by Simpson quadrature of the exact curve.
 
@@ -1277,14 +1277,14 @@ Red-proof: with the native law kind ignored (mode 2 read as smooth) the closed-f
 
 A start and an end alone with `"monotone"` is **not** OCCT's smooth transition: the two differ by 7.6e-5 of the volume (OCCT's own cubic is not the smoothstep), so a monotone law keeps `interpolation` even without stations; a constant law drops it.
 
-### 13.21.4 Refusals by name
+### 13.22.4 Refusals by name
 
 - `BLD_LAW_INVALID`: a radius <= 0, stations not strictly increasing inside (0, 1), as before, with the path of the value (`edges[i].sizes[k].t` / `.size`).
 - **`BLD_LAW_TOO_STEEP`** (new, for every law, not only monotone): the steepest slope dr/ds of the law on the edge (the straight piece, or the monotone curve; the kernel smooth law is estimated by the monotone curve through the same stations) must stay below 1, the rate at which the rolling ball advances. The message gives the slope, the edge length and the length that would carry the law. Measured: slope 0.96 builds in OCCT (above), so the rule is not tighter than the kernel.
 - `BLD_CORNER_UNSUPPORTED`: a monotone law at a setback vertex (`corners`), like every smooth or multi-station law (13.12, 13.18); not changed.
 - A profile blend (conic, curvature) takes its laws through the same `add_fillet_laws`, so a monotone law should be exact there too (**not tested**); a chain whose edges mix kinds keeps the OCCT spline on the other edges (the radius is continuous at the junction, the slope jumps there, as for the straight law).
 
-### 13.21.5 Export (VC-BLD-26 style)
+### 13.22.5 Export (VC-BLD-26 style)
 
 `export_code` lowers a monotone law to `fillet_laws(..., 'monotone', nodes)` with 12 nodes per piece on the exact curve (stations included); OCP interpolates them with its own cubic spline (no exact monotone law exists there either, 13.15.2). The measured gap, reproduced on the native kernel with the same nodes as ordinary smooth control points, is **1.4e-6 relative in volume and 1.7e-3 in radius**; the export summary says so, and the recorded trace (`_record("fillet_edge", ...)`) carries `interpolation: "monotone"` so a replay is exact. **The run-time oracle under CPython + OCP was not run**: this machine has no Python with cadquery (the 13.15.2 scratch interpreter is gone); the nodes were checked on the native kernel instead, and the generated text is asserted in `blendCodegen.test.ts`.
 
