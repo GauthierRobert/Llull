@@ -41,13 +41,25 @@ function facesByPoint(kernel: GeometryKernel, shape: ShapeHandle, near: readonly
       problem: `point ${far} (${(near[far] ?? []).join(', ')}) is not on the solid (nearest face ${hits[far]?.distance} away)`,
       nearIndex: far,
     };
-  const unresolved = hits.findIndex((hit) => !Number.isInteger(hit.face) || hit.face < 0);
-  if (unresolved >= 0)
-    return {
-      problem: `point ${unresolved} (${(near[unresolved] ?? []).join(', ')}) resolves to no single face of the solid (a pole, a seam or a split face): move it onto the interior of one face`,
-      nearIndex: unresolved,
-    };
-  return hits.map((hit) => hit.face);
+  const faceCount = kernel.topology(shape)?.faces.length ?? 0;
+  const resolved: number[] = [];
+  for (const [k, hit] of hits.entries()) {
+    // a point on an edge or a seam answers -1: take the lowest-numbered face that contains it
+    const face = Number.isInteger(hit.face) && hit.face >= 0 ? hit.face : lowestContaining(kernel, shape, faceCount, near[k] as Vec3);
+    if (face === null)
+      return {
+        problem: `point ${k} (${(near[k] ?? []).join(', ')}) resolves to no single face of the solid (a pole, a seam or a split face): move it onto the interior of one face`,
+        nearIndex: k,
+      };
+    resolved.push(face);
+  }
+  return resolved;
+}
+
+function lowestContaining(kernel: GeometryKernel, shape: ShapeHandle, faceCount: number, point: Vec3): number | null {
+  const tolerance = 1e-6 * Math.max(1, ...point.map(Math.abs));
+  for (let face = 0; face < faceCount; face++) if (kernel.faceQuery?.faceContains(shape, face, point, tolerance) === true) return face;
+  return null;
 }
 
 /** The faces `request` names on `shape` (see the module doc); [] is refused (a face operation needs at least one face). */
