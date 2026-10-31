@@ -82,7 +82,7 @@ describe('face operations on an exact kernel', () => {
     const { ops } = exactKernel();
     const box = boxDoc();
     const kernel = getGeometryKernel() as GeometryKernel;
-    const query = kernel.faceQuery as unknown as { distance: (...args: unknown[]) => unknown };
+    const query = kernel.faceQuery as unknown as { distance: unknown };
     query.distance = (_shape: unknown, points: readonly (readonly number[])[]) => points.map(() => ({ distance: 0, signed: 0, face: -1 }));
     const pulled = execute(box.document, 'push_pull_face', { id: box.affected[0], faceNear: [0, 0, 5], distance: 1 });
     expect(pulled.document).toBe(box.document);
