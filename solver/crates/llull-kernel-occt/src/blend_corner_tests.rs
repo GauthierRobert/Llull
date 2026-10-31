@@ -1123,7 +1123,7 @@ fn a_cube_trimmed_around_its_vertices_is_the_rolling_ball_blend_with_a_star_at_e
     assert!((mass_properties(&plate).unwrap().volume - reference).abs() < 2e-3 * reference);
 }
 
-/// BLD §13.22: what the trim builder does not take is refused by name: setbacks that differ along the edges of a vertex, a radius that varies, balls that overlap, a ball that does not hold
+/// BLD §13.22: what the trim builder does not take is refused by name: balls that overlap, a ball that does not hold
 /// OCCT's own corner (s = 0.7 r, s = r sqrt(2)), a face that does not meet the vertex inside the ball, an edge at the vertex that is not rounded.
 #[test]
 fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
@@ -1133,10 +1133,6 @@ fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
     let shape = cube(10.0);
     let all: Vec<usize> = (0..12).collect();
     let reason = |shape: &Shape, edges: &[f64], corners: &[f64]| setback_reason(shape, edges, corners).unwrap();
-    let (edges, mut corners) = spec(&shape, &all, 1.0, &[[0.0; 3]], 2.0);
-    corners[5] = 3.0; // one edge of the vertex at another setback
-    let text = reason(&shape, &edges, &corners);
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("different setbacks"), "{text}");
     let (edges, corners) = spec(&shape, &all, 1.0, &[[0.0; 3], [10.0, 0.0, 0.0]], 5.5);
     let text = reason(&shape, &edges, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("overlap"), "{text}");
@@ -1431,4 +1427,106 @@ fn the_evolving_radius_is_the_size_at_the_start_of_the_edge_and_sizeend_at_its_e
     };
     assert!((width_at(0.0) - 0.5).abs() < 1e-3, "at the start: {}", width_at(0.0));
     assert!((width_at(10.0) - 1.5).abs() < 1e-3, "at the end: {}", width_at(10.0));
+}
+
+fn cube_with_setbacks_at_origin(distances: [f64; 3]) -> (Shape, Vec<f64>, Vec<f64>) {
+    let (shape, edges, corners) = cube_corner_step();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let mut flat = Vec::new();
+    let mut cursor = 0;
+    while cursor < corners.len() {
+        let count = corners[cursor + 3] as usize;
+        let origin = corners[cursor..cursor + 3] == [0.0, 0.0, 0.0];
+        flat.extend_from_slice(&corners[cursor..cursor + 4]);
+        for k in 0..count {
+            let edge = corners[cursor + 4 + 2 * k];
+            let distance =
+                if origin { distances[meeting.iter().position(|&m| m as f64 == edge).unwrap()] } else { corners[cursor + 5 + 2 * k] };
+            flat.extend([edge, distance]);
+        }
+        cursor += 4 + 2 * count;
+    }
+    (shape, edges, flat)
+}
+
+fn cylinder_spans(shape: &Shape) -> Vec<f64> {
+    let mut spans: Vec<f64> = topology(shape).unwrap()["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|face| face["surface"] == "cylinder")
+        .map(|face| num(&face["axis"]["span"][1]) - num(&face["axis"]["span"][0]))
+        .collect();
+    spans.sort_by(f64::total_cmp);
+    spans
+}
+
+/// BLD §13.22.6: different setbacks at one vertex on the trim path. The cube (r 1, 8 corners at 2) with the setbacks 1.5 / 2 / 2.5 along the three edges of the origin: planes normal to each edge at
+/// its own setback point cut the rolling-ball blend (so the setback is a distance ALONG the edge, as on the analytic path: the blend cylinders span 10 - 2 - s = 6.5 / 6 / 5.5), the star closes the
+/// hole. Valid, tangent, the default g0; the volume differs from the equal-setback cube by 0.023 % (976.513 against 976.292).
+#[test]
+fn a_vertex_with_different_setbacks_is_cut_by_planes_normal_to_its_edges_and_gets_the_star() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let (shape, edges, equal_corners) = cube_with_setbacks_at_origin([2.0, 2.0, 2.0]);
+    let equal = fillet_setback(&shape, &edges, &equal_corners).unwrap().expect("the equal case");
+    let (_, _, corners) = cube_with_setbacks_at_origin([1.5, 2.0, 2.5]);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("the planes isolate the vertex");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    let spans = cylinder_spans(&built);
+    assert_eq!(spans.len(), 12);
+    // a ball of 2 cuts a blend of r 1 at sqrt(3) along the axis; a plane at s cuts it at s: 10 - sqrt(3) - s at the origin vertex, 10 - 2 sqrt(3) elsewhere
+    let (ball_end, count) = (3.0_f64.sqrt(), |value: f64| spans.iter().filter(|span| (**span - value).abs() < 1e-6).count());
+    assert_eq!(
+        (count(10.0 - ball_end - 1.5), count(10.0 - ball_end - 2.0), count(10.0 - ball_end - 2.5), count(10.0 - 2.0 * ball_end)),
+        (1, 1, 1, 9),
+        "{spans:?}"
+    );
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    assert!(worst_patch_gap(&built) < 1e-6 * 10.0 * 3.0_f64.sqrt(), "{}", worst_patch_gap(&built));
+    let (volume, reference) = (mass_properties(&built).unwrap().volume, mass_properties(&equal).unwrap().volume);
+    assert!(
+        (volume - reference).abs() < 1e-3 * reference && (volume - reference).abs() > 1e-5 * reference,
+        "{volume} against the equal setbacks {reference}"
+    );
+    assert!((volume - 976.513).abs() < 0.02, "{volume}");
+}
+
+/// BLD §13.22.6: what the planes do not take is refused by name: a setback not shorter than its edge, a plane inside OCCT's own corner (setback 0.9 against the extent 1), and a region that is not
+/// isolated (a pocket wall that does not meet the vertex falls inside the planes; with shorter setbacks the same vertex builds).
+#[test]
+fn the_planes_of_different_setbacks_are_refused_by_name_when_they_do_not_isolate_the_vertex() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let block = cube(10.0);
+    let meeting_cube = edges_at(&block, [0.0; 3]);
+    let reason = |distances: [f64; 3]| {
+        let (edges, mut corners) = spec(&block, &meeting_cube, 1.0, &[[0.0; 3]], 2.0);
+        for (k, distance) in distances.iter().enumerate() {
+            corners[5 + 2 * k] = *distance;
+        }
+        setback_reason(&block, &edges, &corners).unwrap()
+    };
+    let text = reason([2.0, 2.0, 12.0]);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("is not shorter than the edge"), "{text}");
+    let text = reason([0.9, 2.0, 2.5]);
+    assert!(text.starts_with("[BLD_SETBACK_TOO_SHORT]") && text.contains("extent of the rolling-ball corner along the edge"), "{text}");
+    // the pocket wall x = 1.5 (y from 0.8, z up to 2) does not meet the vertex
+    let pocket = make_box([1.5, 0.8, 0.0], [2.5, 3.0, 2.0]).unwrap().unwrap();
+    let pocketed = boolean(BooleanOp::Subtract, &cube(10.0), &pocket, true).unwrap().unwrap();
+    let meeting = edges_at(&pocketed, [0.0; 3]);
+    let build = |distances: [f64; 3]| {
+        let (edges, mut corners) = spec(&pocketed, &meeting, 0.5, &[[0.0; 3]], 2.0);
+        for (k, distance) in distances.iter().enumerate() {
+            corners[5 + 2 * k] = *distance;
+        }
+        setback_reason(&pocketed, &edges, &corners).unwrap()
+    };
+    let text = build([2.0, 2.2, 2.4]);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("the cut planes do not isolate the vertex"), "{text}");
+    assert_eq!(build([1.1, 1.2, 1.3]), "", "clear of the pocket");
 }

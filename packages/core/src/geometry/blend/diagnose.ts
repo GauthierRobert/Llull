@@ -127,7 +127,7 @@ const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
   BLD_WALKING_FAILURE: 'use a smaller radius or a smoother law, or split the chain (fillet in two steps)',
   BLD_TWISTED_SURFACE: 'reduce the radius law slope or the radius on concave faces',
   BLD_CORNER_UNSUPPORTED:
-    'give the vertex a setback corner: corners: [{ near: <the vertex>, type: "setback", setback: <distance> }] (every edge there rounded, constant radius; along the edge on straight edges between planar faces, all convex or all concave, or the radius of a ball around the vertex on a curved edge or face, one kind per step), or round fewer of the edges meeting there per step',
+    'give the vertex a setback corner: corners: [{ near: <the vertex>, type: "setback", setback: <distance> }] (every edge there rounded, constant radius; along the edge on straight edges between planar faces, all convex or all concave, or, on a curved edge or face, the radius of a ball around the vertex (equal distances) or a plane normal to each edge at its distance (different ones), one kind per step), or round fewer of the edges meeting there per step',
   BLD_CORNER_FAILED: 'try a setback corner at that vertex (corners), a different radius or setback there, or round fewer edges per step',
   BLD_SETBACK_TOO_SHORT:
     'use at least the minimum the message names (it is the distance along the edge that the neighbouring blends reach)',

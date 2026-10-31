@@ -110,6 +110,30 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
   });
 
+  it('different setbacks at the vertex (setbacks overrides) cut each edge by a plane at its own distance along it (13.22.6): built within the limits, refused by name when the corner leaves them', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
+    const withSetback = (distance: number): ReturnType<typeof execute> =>
+      execute(doc, 'fillet_edge', {
+        id,
+        edgesNear: edges,
+        radius: 0.5,
+        corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance }] }],
+      });
+    const done = withSetback(1.3);
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    expect(faces(done.document, result).some((face) => face.name?.startsWith('blend(v:'))).toBe(true);
+    const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
+    expect(checked.status).not.toBe('fail');
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
+    // on this cylinder the star of 1.2 / 1.6 leaves its supports by 0.00965 rad in the sewn solid (the limit is 0.0095) and the plate misses the blend ends: refused, with both reasons
+    const refused = withSetback(1.6);
+    expect(refused.error?.code).toBe('BLD_CORNER_FAILED');
+    expect(refused.summary).toContain('the exact-boundary patch was refused');
+  });
+
   it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {
     const { doc, id, vertex, edges } = dshape();
     const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });

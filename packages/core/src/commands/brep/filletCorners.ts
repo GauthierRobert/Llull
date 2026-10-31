@@ -50,7 +50,7 @@ export const cornerSchema = z
       .positive()
       .describe(
         'Setback distance in document units, used for every edge meeting there. It must exceed the distance the neighbouring blends reach (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.' +
-          ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and it is the RADIUS OF A BALL around the vertex (one distance for all the edges there; the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex). The two agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
+          ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and with the same distance on every edge of the vertex it is the RADIUS OF A BALL around the vertex (the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex); with different distances each edge is cut by a plane normal to it at its own distance ALONG the edge (as on straight edges), and the planes must isolate the vertex ("the cut planes do not isolate the vertex" otherwise). The ball and the plane agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
       )
       .optional(),
     setbacks: z
@@ -64,7 +64,7 @@ export const cornerSchema = z
             .number()
             .positive()
             .describe(
-              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; a vertex on a curved edge or face takes one distance for all its edges (different distances are refused). Give it, or rollingBall: true.',
+              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; on a curved edge or face equal distances at a vertex are the radius of a ball, different ones a plane normal to each edge at its distance along it. Give it, or rollingBall: true.',
             )
             .optional(),
           rollingBall: z
