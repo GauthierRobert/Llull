@@ -48,6 +48,8 @@ export interface BlendScript {
   g1?: (edge: number, t: number) => number;
   /** g0 (gap between the two faces) at `t` of an edge; default 0. */
   g0?: (edge: number, t: number) => number;
+  /** Normal curvatures of the two faces at `t` of an edge (default flat: both 0). */
+  curvature?: (edge: number, t: number) => [number, number];
   noContinuity?: boolean;
   noGraph?: boolean;
   noNames?: boolean;
@@ -86,7 +88,7 @@ export function scriptedKernel(script: BlendScript = {}): ScriptedKernel {
             point: [k, 0, 0] as [number, number, number],
             g0: (script.g0 ?? (() => 0))(edge, k / (count - 1)),
             g1: (script.g1 ?? (() => Math.PI / 2))(edge, k / (count - 1)),
-            normalCurvature: [0, 0] as [number, number],
+            normalCurvature: (script.curvature ?? (() => [0, 0] as [number, number]))(edge, k / (count - 1)),
           })),
     edgeSamples: (_shape: unknown, edge: number, count: number) =>
       Array.from({ length: count }, (_, k) => ({

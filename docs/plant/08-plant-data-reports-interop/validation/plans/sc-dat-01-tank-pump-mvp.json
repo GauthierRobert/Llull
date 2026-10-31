@@ -1,6 +1,6 @@
 {
   "id": "SC-DAT-01",
-  "status": "PARTLY BUILT \u2014 DAT-M1 built define_plant_hierarchy, define_plant_class, assign_plant_object and check_plant_data (the steps run in tests/unit/plant/data/scenarioPlans.test.ts); still flagged \"unbuilt\": true: plant_report (M2) and the `schema` param of export_ifc (M3).",
+  "status": "PARTLY BUILT — DAT-M1 built define_plant_hierarchy, define_plant_class, assign_plant_object and check_plant_data, DAT-M2 built plant_report (the steps run in tests/unit/plant/data/scenarioPlans.test.ts); still flagged \"unbuilt\": true: the `schema` param of export_ifc (M3).",
   "validates": [
     "VC-DAT-01",
     "VC-DAT-02",
@@ -296,28 +296,24 @@
     },
     {
       "command": "plant_report",
-      "unbuilt": true,
       "params": {
         "kind": "line_list"
       }
     },
     {
       "command": "plant_report",
-      "unbuilt": true,
       "params": {
         "kind": "equipment_list"
       }
     },
     {
       "command": "plant_report",
-      "unbuilt": true,
       "params": {
         "kind": "nozzle_schedule"
       }
     },
     {
       "command": "plant_report",
-      "unbuilt": true,
       "params": {
         "kind": "mto",
         "groupBy": [
@@ -329,7 +325,6 @@
     },
     {
       "command": "plant_report",
-      "unbuilt": true,
       "params": {
         "kind": "tag_register"
       }

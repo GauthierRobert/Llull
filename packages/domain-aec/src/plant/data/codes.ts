@@ -59,6 +59,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_VALUE_UNVERIFIED: 'Verify the value against its source and send it again with set_plant_properties without the unverified flag.',
   DAT_RESERVED_TAG_UNMODELLED: 'Nothing to fix: the tag is held for a future object; assign it to a model object when it exists.',
   DAT_COLUMN_UNKNOWN: 'plant_data_table (without columns) returns the column names of the class.',
+  DAT_REPORT_KIND_UNAVAILABLE:
+    'Use line_list, equipment_list, nozzle_schedule, mto or tag_register; valve_list and instrument_index arrive with the component and P&ID providers, custom with report definitions.',
 };
 
 export const refuseDat = tableRejection(REMEDIATION);

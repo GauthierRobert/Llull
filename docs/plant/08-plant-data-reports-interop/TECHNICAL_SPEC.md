@@ -621,7 +621,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/**` (non-negotiabl
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | M1 data core | model, validate, hierarchy, classes + default library, tag formats, registry, `assign_plant_object`, `set_plant_properties`, `plant_data_table`, `check_plant_data` (MVP rules) | — | 2.5 weeks — **built 2026-10-25 (DAT-M1), §13**: also `define_plant_hierarchy`, `define_plant_class`, `load_plant_class_library`, `set_tag_format`, `unassign_plant_object`, the object providers; not in M1 and still open: the port rules of the check (`DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE`: M2 / M3), `renumber_tags` (M4) |
-| M2 reports | line list, equipment list, nozzle schedule (inferred), tag register, MTO (centreline), CSV; `@lib` crc32 / zipWrite / xlsxWrite; `export_plant_data` | M1 | 1.5 weeks |
+| M2 reports | line list, equipment list, nozzle schedule (inferred), tag register, MTO (centreline), CSV; `@lib` crc32 / zipWrite / xlsxWrite; `export_plant_data` | M1 | 1.5 weeks — **built 2026-10-31 (DAT-M2), §13.9**: `plant_report`, `export_plant_data`, `@lib/xlsxWrite` (crc32 and the ZIP writer already existed); `import_plant_data` is M4, not M2 |
 | M3 IFC 4.3 | `schema` param, hierarchy, class mapping, decomposition + ports + connections + systems, units + Psets, `Tag` in IFC4 too; `stepRead` promoted; production-oracle Python hook | M1 | 2.5 weeks |
 | M4 round trip + checks | inflate, xlsxRead, `import_plant_data`, `import_tag_list`, `renumber_tags`, report definitions, `ifc_summary`, `check_ifc_requirements` | M2, M3 | 3 weeks |
 | M5 sibling hooks | providers for 03 EQP nozzles, 01/02 components (valve list, MTO with take-outs), 04 PID instruments (instrument index, reserved tags from P&ID) | siblings | 1.5 weeks (DAT side) |
@@ -753,7 +753,7 @@ The registry is the union of the plant objects (per tag scope) and these model t
 
 ### 13.7 Left for later milestones
 
-Reports and XLSX (M2), `export_ifc` `schema` / ports / systems (M3), import, `renumber_tags`, report definitions (M4), nozzle / component / instrument providers (M5), deliverables and handover (M6). The built-in `inlineComponent` provider has no write path yet (the valve tag is owned by 02 RTE `insert_inline_component`).
+Reports and XLSX export (M2, built: §13.9), `export_ifc` `schema` / ports / systems (M3), import, `renumber_tags`, report definitions (M4), nozzle / component / instrument providers (M5), deliverables and handover (M6). The built-in `inlineComponent` provider has no write path yet (the valve tag is owned by 02 RTE `insert_inline_component`).
 
 ### 13.8 Review fixes (2026-10-25)
 
@@ -772,3 +772,29 @@ Reports and XLSX (M2), `export_ifc` `schema` / ports / systems (M3), import, `re
 
 **Known deviations and follow-ups.** (1) The §8 row "`assign_plant_object` / `set_plant_properties` batch, 10 000 edits < 1 s" is met for `set_plant_properties` (70 ms) and **NOT met for 10 000 sequential `assign_plant_object`** (15.4 s, §13.8): a bulk assign is needed before M2's `import_plant_data`. (2) Display colour rules `when: { property: 'mark', equals }` (09 VIS) keep the old text silently when an equipment is renamed; `update_equipment`'s mark change should route through `rename_equipment_tag` (board follow-up).
 
+
+### 13.9 DAT-M2 (2026-10-31): reports and XLSX export
+
+**Scope.** The §10 row for M2 lists reports and `export_plant_data`; `import_plant_data`, `import_tag_list`, `xlsxRead` and `inflate` are M4 and were NOT built (the task text expected `import_plant_data`, the delivery plan puts it in M4). Two commands, `plant_report` and `export_plant_data`, both read-only queries of toolset `plant_data` (the plugin now has 12 commands); `@lib/xlsxWrite` (`xlsxWrite`, `xlsxSheetName`, `xlsxColumnLetters`). `crc32` (`@lib/crc32`), the ZIP writer (`@lib/zip` `zipChunked`) and `deflateRaw` already existed, so no `zipWrite.ts` was added: `xlsxWrite` deflates each part and calls `zipChunked`.
+
+| Command | What it does |
+| ------- | ------------ |
+| `plant_report` | `kind` `line_list`, `equipment_list`, `nozzle_schedule`, `mto`, `tag_register`; `hierarchy`, `groupBy` (mto: `spec`, `itemType`, `nominalSize`, `line`, `hierarchy`), `format` `json` / `csv` / `xlsx`, `offset` / `limit` (≤ 20 000, default 2 000). `data` = `{ kind, columns[{ name, displayName, type, unit, readOnly, source }], rows, total, offset, limit, rowsByTag?, totals, method, defaults, files?, fileName? }` |
+| `export_plant_data` | `classes[]`, `hierarchy?`, `format` `xlsx` (one workbook `plant-data.xlsx`, a sheet per class) / `csv` (`<class>.csv` each), `includeReadOnly`. `data` = `{ files[{ fileName, base64 \| content }], sheets{ <class>: { rows, columns } } }` |
+
+**Files** (`packages/domain-aec/src/plant/data/`): `plantReports/{types,scope,propertyColumns,lineGeometry,lineList,equipmentList,nozzleSchedule,mto,tagRegister,build,files}.ts`, `commands/{plantReport,exportPlantData}.ts`; core `packages/core/src/lib/xlsxWrite.ts`. Tests: `tests/unit/plant/data/{reports,exportData}.test.ts`, `tests/unit/lib/xlsxWrite.test.ts`, helper `tests/helpers/xlsxCells.ts` (an XLSX reader independent of the writer, also reads the openpyxl fixture), `scenarioPlans.test.ts` now runs steps 15-19 of SC-DAT-01.
+
+**Decisions and deviations.**
+
+| # | Decision | Why |
+| - | -------- | --- |
+| E1 | `valve_list`, `instrument_index` and `custom` are accepted by `kind` and refused with `DAT_REPORT_KIND_UNAVAILABLE` (message names DAT-M5 / DAT-M4); SC-DAT-02 keeps its `valve_list` step flagged `unbuilt`. | §5.9; the `inlineComponent` provider has no class/valve list yet |
+| E2 | File results are `data.files[{ fileName, content \| base64 }]` only, not also `csv` / `xlsxBase64` (§4 sketch). `--save` already writes `files[]`, so no host change and no duplicated payload. csv / xlsx files hold ALL rows; `data.rows` is paged. | §6 "preferred: no host change"; 20 000-row output cap |
+| E3 | Both commands run the export gate (`exportRefusal`, target `data`, param `confirmExportControlled`); `plant_report` only for `csv` / `xlsx` (a file leaves the machine). | `exportGateAll.test.ts` requires every `export_*`; the same reasoning covers a report file |
+| E4 | Export columns are `ObjectId` (key, locked), `Tag`, `Class`, `Hierarchy`, then one column per property headed `DisplayName (unit)`; rows in natural tag order (the openpyxl fixture is in creation order and puts `Hierarchy` after `Description`). Column order differs from the fixture, so M4 must map by header. `ObjectId` is the plant object id (`plantobj-<step>.<k>`), the fixture holds `equipment-1`: M4 import falls back to the `Tag` key (`keyColumn: 'Tag'`, §5.11). The hidden `_meta` sheet with the document hash (`DAT_IMPORT_STALE`) is M4. | the fixture is a hand-made file; the key is what `set_plant_properties` takes |
+| E5 | Line geometry: a line object owns the polylines of its own target and of every object whose `lineId` names it (legacy pipes `points`, routed runs `[start, ...pis, end]`); length in m rounded to 1e-6, straights = points - 1, bends = points - 2 (routed: `pis`). MTO lists `pipe` in m and `bend` in ea per line (spec, nominalSize from the line object, else the pipe DN), `method: 'centreline'`, `source` names the lines; no take-out is deducted. Order: spec, item type (pipe before bend), DN. | §5.4, §5.9, expected file |
+| E6 | `nozzle_schedule` infers a nozzle where the first (`from`, SOURCE) or last (`to`, SINK) point of a line lies in the oriented box of the equipment its end names (mark match, `elementBoxes` as `check_clashes`, 1 mm margin), numbered N1, N2 per equipment in line creation order over the whole document (a hierarchy filter keeps the numbers). Equipment with its own 03 EQP nozzles infers none and lists none: its nozzle rows, rating and facing are M5 (`rating` / `facing` are null). | §5.6 step 5 |
+| E7 | Pressures, temperatures and the weight of the line / equipment lists take the type and unit of the first class that defines the property and convert the others (`convertUnit`; a gauge value never converts to absolute and becomes null); columns exist only when some listed class defines the property; `OperatingWeightKg` falls back to the element weight; every row has an `unverified` boolean (AF-32). `rowsByTag` is returned only when the keys of the returned rows are unique. | AF-04, AF-32 |
+| E8 | Not built: the `DAT_OPEN_PORT` / `DAT_INFERRED_NOZZLE` rules of `check_plant_data` (the §13.5 note said M2 / M3): they need the M3 ports; the report row `inferred: true` carries the fact meanwhile. XLSX was checked with an in-repo reader and the openpyxl fixture, NOT opened in Excel / LibreOffice / openpyxl (no Python in the authoring environment). | scope |
+
+**Measured here** (`vitest`, this machine): `plant_report` tag_register + equipment_list CSV on 10 000 objects 271 ms (budget 1 s per 20 000); `xlsxWrite` 20 000 rows × 20 columns < 15 MB, write + read-back 2.1 s (budget 3 s write). 10 000 `assign_plant_objects` (the DAT-M1b bulk path) build the 10 000-object document of the budget test. Coverage of `plant/data/**` in the scoped run: 96.3 / 88.4 / 99.2 / 98.8.

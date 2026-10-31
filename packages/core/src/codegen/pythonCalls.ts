@@ -87,8 +87,16 @@ export function modifierLine(feature: Extract<Feature, { op: 'fillet' | 'chamfer
     feature.near === undefined ? '' : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
   if (feature.laws !== undefined)
     return `${v} = fillet_laws(${v}, [${feature.edges.map(formatNumber).join(', ')}], [${feature.laws.map(lawTuple).join(', ')}]${near})`;
+  const edgeList = `[${feature.edges.map(formatNumber).join(', ')}]`;
+  if (feature.legs !== undefined) {
+    const { end, second, secondEnd, lead, starts } = feature.legs;
+    const leadArgument = lead === undefined ? '' : `, lead=[(${lead.map(formatNumber).join(', ')})]`;
+    const varying = end !== feature.size.value || secondEnd !== second;
+    const startArgument = varying ? `, start=[${starts.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]` : '';
+    return `${v} = chamfer_legs(${v}, ${edgeList}, ${formatTerm(feature.size)}, ${formatNumber(end)}, ${formatNumber(second)}, ${formatNumber(secondEnd)}${leadArgument}${near}${startArgument})`;
+  }
   const size = formatTerm(feature.size);
-  return `${v} = ${feature.op}(${v}, [${feature.edges.map(formatNumber).join(', ')}], ${size}${near})`;
+  return `${v} = ${feature.op}(${v}, ${edgeList}, ${size}${near})`;
 }
 
 /** `, position=(…), rotation=(…)` kwargs; omitted when zero. Meshes are already world-space. */

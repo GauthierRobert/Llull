@@ -184,6 +184,10 @@ two gates above.
 Gates 1–4 can reuse this corpus and the Playwright harness as they are. A nightly CI job running
 `npm run quality` (the repo has no CI workflow yet) is what turns these from tools into gates.
 
+## Code-export oracle — `tests/unit/chamferCodegenOracle.test.ts`
+
+The exported CadQuery / build123d program of a variable or two-leg chamfer is RUN with real OCP and compared with the analytic removed volume (the value the native kernel is held to) and with absolute vertex positions. It needs a python that imports OCP, cadquery and build123d: `uv venv` + `uv pip install cadquery build123d`, then `LLULL_PYTHON=<venv>/Scripts/python.exe npx vitest run tests/unit/chamferCodegenOracle.test.ts` (about 3 minutes). Without such a python the suite is skipped with a warning; with `CI` set it fails instead.
+
 ## Drawing gate — `quality/drawings/`
 
 21 parts modelled in llull from published 2D technical drawings (Too Tall Toby, build123d) and
