@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -803,3 +803,26 @@ does not know the overlap). Scribe crosses sharp edges as before.
 
 **Measured (native kernel, `server/tests/nativeWrapMitre.test.ts`).** Box 60 x 40 x 10, rectangle 8 x 6 centred on the top-side edge, d 1: emboss on the convex edge +54 (the filler 6), deboss -42 (overlap 6); on the concave edge of an L-shaped solid emboss +42, deboss -54; each within 1e-5 of the
 closed form on the exact solid.
+
+### 14.16 Silhouette of freeform (B-spline) faces (DES-3c)
+
+`split_at_silhouette` traces the contour n . d = 0 of a B-spline face on the exact surface of `faceQuery.bspline` (the face's own (u, v)). G = n . d / |n| is sampled on a 48 x 48 grid of the face's parameter box; the sign changes
+are linked by marching squares into polylines (open ones end on the box, closed ones are loops); every crossing is refined to the contour by bisection on its grid edge. A trimmed face is handled with `faceContains`: the
+polyline is cut at the trimming boundary by bisection (each probe re-projected onto F = (S_u x S_v) . d = 0 by Newton on the exact first and second derivatives). Each piece is an interpolating cubic through the refined vertices (decimated to
+a third of a cell), projected back onto the contour at every evaluation, and then fitted as a cubic B-spline within the tolerance (the pcurve in the face's own (u, v) likewise); `deviation` is the larger of the two fits, and the
+fitted curve is checked against `projectOnFace` / `faceContains` at 48 points. A contour along a boundary of the face already is an edge (`onEdge`), a face with |n . d| < 1e-9 at every node is edge-on (`edgeOn`).
+
+**Refused by name** (`WRP_SILHOUETTE_UNSUPPORTED` with the reason, the face left unsplit): no B-spline from the kernel; a periodic B-spline; a pole or collapsed edge (|S_u x S_v| = 0 at a node); a face seen almost tangentially
+(|n . d| < 1e-3 everywhere without a sign change: a double root cannot be traced); a cusp or branch point (the gradient of n . d along the contour falls under 5 % of its largest value, Newton does not converge, or a grid cell
+has four crossings); a fit that misses the tolerance.
+
+**Measured.** Closed forms on the fake freeform kernel (`tests/unit/wrap/freeformSilhouette.test.ts`): a cylinder patch R 20 h 40 seen along (0.2, 1, 0) gives the ruling at azimuth -atan 0.2, length 40 to 1e-6, deviation under the
+tolerance 1e-6; a saddle z = 0.05 (x^2 - y^2) seen along x gives the parabola x = 0, length 2 [(5/2) sqrt(1 + a^2 25) + asinh(5a) / 2a] (a = 0.1) to 1e-6, and the skew view (1, 0.3, 0) the line x = 0.3 y; cut at y = 3 the arc is the
+closed-form partial integral; a bump seen along (1, 0, 0.5) has one closed loop with |n . d| < 1e-7 on the exact surface. Native OCCT (`server/tests/nativeSilhouetteFreeform.test.ts`): a plate bent 90 degrees on R 50 (two B-spline faces,
+R 50 and R 44) seen along (cos 30, 0, sin 30) gives two rulings of length 30 (error under 1e-5) at 30 degrees from the vertical (points within 1e-3 of the cylinder, the bent B-spline's own fit), fit deviation 4e-11; each curve alone
+divides its face into arcs of 30 and 60 degrees times the width (1e-3).
+
+**Deviations (never silent).** Features smaller than a cell of the grid (an island or a fold inside one cell) are not seen; a branch point inside a cell is refused when the contour's gradient falls under 5 % of its maximum or the
+cell has four crossings, a crossing that passes both tests is traced as two smooth branches. **Kernel defect found (not fixed here, native C++):** `split_face_by_curves` with curves on two different faces keeps only the last
+face's split: every `split_shape` ends with `ShapeUpgrade_UnifySameDomain` whose keep set holds only that step's tool edges, so the dividing edge of the previous step (two halves of one B-spline face) is merged back. The
+command reports the face counts as the kernel gives them (6 -> 7 for the bent plate, not 8), and a second `split_face_by_curves` on the result for the other face is refused with WRP_SPLIT_NO_EFFECT (7 faces before and after: it divides its face and merges the first split back). The fix belongs in `split_shape` (keep the edges shared by two faces of the source); each curve alone divides its face correctly.

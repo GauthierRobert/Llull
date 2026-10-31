@@ -5,7 +5,7 @@
  * perpendicular to the direction) and only the part inside its face is kept.
  * @invariant every curve returned lies on its face to the kernel's evaluation (points come from `evaluateFace` / are verified by `projectOnFace`), has |n . d| <= 1e-6 along it, and is
  *   strictly inside the face (the faces on both sides of it are the face itself); a silhouette that already is an edge of the solid is reported, not returned
- * @failure freeform faces, a torus seen along its equatorial plane (four crossing circles), a torus whose frame the kernel parametrises differently, a torus or sphere patch the contour leaves, a face whose silhouette is only partly inside it (a hole), a convention mismatch of the face
+ * @failure a freeform face with a cusp, a branch point, a pole, a periodic B-spline or a tangential view (freeformSilhouette.ts), a torus seen along its equatorial plane (four crossing circles), a torus whose frame the kernel parametrises differently, a torus or sphere patch the contour leaves, a face whose silhouette is only partly inside it (a hole), a convention mismatch of the face
  *   parameters -> listed in `unsupported` with the reason
  */
 
@@ -18,18 +18,9 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import type { SurfaceParams } from '../../geometry/kernelPorts';
 import type { SolidSession } from './faceSession';
+import { freeformContours } from './freeformSilhouette';
+import type { SilhouetteCurve } from './silhouetteCurve';
 import { continuousUv } from './splitChains';
-
-export interface SilhouetteCurve {
-  readonly face: number;
-  readonly kind: 'line' | 'circle' | 'fitted';
-  readonly curve: NurbsCurveData;
-  /** Pcurve in the kernel's own (u, v) of the face: a polyline through the projected samples. */
-  readonly pcurve: NurbsCurve2Data;
-  readonly length: number;
-  /** Largest distance of the 3D curve (and of the pcurve edge) from the exact contour, document units (0 for a line or a circle). */
-  readonly deviation: number;
-}
 
 export interface SilhouetteReport {
   readonly curves: SilhouetteCurve[];
@@ -303,11 +294,19 @@ export function silhouettes(session: SolidSession, direction: Vec3, tolerance = 
         report.curves.push(...found.curves);
         if (found.onEdge && !report.onEdge.includes(face)) report.onEdge.push(face);
       }
+    } else if (surface.type === 'other' && surface.kind === 'bspline') {
+      const found = freeformContours(session, face, uvBounds, d, tolerance);
+      if (typeof found === 'string') report.unsupported.push({ face, surface: 'bspline', reason: found });
+      else {
+        report.curves.push(...found.curves);
+        if (found.edgeOn) report.edgeOn.push(face);
+        if (found.onEdge && !report.onEdge.includes(face)) report.onEdge.push(face);
+      }
     } else
       report.unsupported.push({
         face,
         surface: surface.type,
-        reason: 'only plane, cylinder, cone, sphere and torus faces have a closed-form silhouette',
+        reason: 'only plane, cylinder, cone, sphere, torus and B-spline faces have a silhouette',
       });
   }
   return report;
