@@ -14,7 +14,14 @@ import { readMetricDeltas } from './mvar';
 import { buildGposKerning } from './gpos';
 import { buildKerning } from './kern';
 import { isStrokeFont, readStrokeFont } from './stroke';
-import { readAdvanceDeltas, readVariationSpace, readVerticalAdvanceDeltas, type AxisValues, type VariationAxis } from './variation';
+import {
+  readAdvanceDeltas,
+  readTopSideBearingDeltas,
+  readVariationSpace,
+  readVerticalAdvanceDeltas,
+  type AxisValues,
+  type VariationAxis,
+} from './variation';
 import type { Vec2 } from '../../model/vectors';
 import { contourLoop, loopBox, type OutlineLoop } from './outline';
 import { FontError, type FontErrorCode } from './reader';
@@ -28,6 +35,8 @@ import {
   readPermissions,
   requireTable,
   verticalAdvanceOf,
+  topSideBearingOf,
+  verticalLineOf,
   verticalOriginOf,
   type Embedding,
   type FontNames,
@@ -65,8 +74,13 @@ export interface ParsedFont {
   readonly instance: Readonly<Record<string, number>>;
   /** Advance height in font units (`vmtx` + `VVAR`, or the phantom points of a gvar font; ascender - descender without vertical metrics). */
   readonly verticalAdvance: (glyph: number) => number;
-  /** Where the glyph hangs in vertical text: y of its vertical origin above the baseline (font units). `VORG` for a CFF font that has one, else the ascender (the OpenType default; the horizontal origin is the middle of the advance width). */
-  readonly verticalOrigin: (glyph: number) => { readonly y: number; readonly source: 'VORG' | 'ascender' };
+  /**
+   * Where the glyph hangs in vertical text: y of its vertical origin above the baseline (font units). `VORG` for a CFF font that has one; else, for a font with `vmtx`, the top of the glyph (control-point yMax)
+   * plus its top side bearing (moved by the `VVAR` bearing map, or by the top phantom point of a gvar font without `VVAR`); else (and for a blank glyph) the ascender. The horizontal origin is the middle of the advance width.
+   */
+  readonly verticalOrigin: (glyph: number) => { readonly y: number; readonly source: 'VORG' | 'vmtx' | 'ascender' };
+  /** Line pitch of vertical text in font units: `vhea` typographic ascender - descender + line gap (moved by MVAR vasc / vdsc / vlgp), else the horizontal line height. */
+  readonly verticalLine: { readonly height: number; readonly source: 'vhea' | 'hhea' };
   /** Glyph index of a code point; 0 (`.notdef`) when the font has none. */
   readonly glyphIndex: (codePoint: number) => number;
   readonly advance: (glyph: number) => number;
@@ -114,6 +128,7 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
     advance: font.advance,
     verticalAdvance: () => font.ascender - font.descender,
     verticalOrigin: () => ({ y: font.ascender, source: 'ascender' }),
+    verticalLine: { height: font.ascender - font.descender + font.lineGap, source: 'hhea' },
     kerning: () => 0,
     outline: () => [],
     scanGlyphs: () => undefined,
@@ -175,6 +190,7 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
   const metric = (tag: string): number => Math.round(metricDeltas.get(tag) ?? 0);
   const vvar = varying ? tables.table('VVAR') : null;
   const verticalDelta = vvar === null || !moved ? null : readVerticalAdvanceDeltas(vvar, coords);
+  const bearingDelta = vvar === null || !moved ? null : readTopSideBearingDeltas(vvar, coords);
   const advances = new Map<number, number>();
   const heights = new Map<number, number>();
   const advanceWork = { remaining: FONT_OPERATOR_BUDGET };
@@ -214,6 +230,37 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     }
     return loops;
   };
+  /** Highest control point of a glyph (the yMax of its header for TrueType, of its charstring for CFF) at the instance, or at the default instance with `atDefault`; null for a blank glyph. */
+  const pointsTop = (glyph: number, atDefault: boolean): number | null => {
+    const ys =
+      cff !== null
+        ? cff
+            .outline(glyph)
+            .flatMap((loop) =>
+              loop.flatMap((segment) =>
+                segment.kind === 'line'
+                  ? [segment.from[1], segment.to[1]]
+                  : segment.kind === 'quad'
+                    ? [segment.from[1], segment.control[1], segment.to[1]]
+                    : [segment.from[1], segment.control1[1], segment.control2[1], segment.to[1]],
+              ),
+            )
+        : glyphContours(
+            atDefault && source?.variation !== undefined
+              ? { glyf: source.glyf, loca: source.loca, longLoca: source.longLoca, numGlyphs: source.numGlyphs }
+              : (source as GlyphSource),
+            glyph,
+          ).flatMap((contour) => contour.map((p) => p.y));
+    return ys.length === 0 ? null : Math.max(...ys);
+  };
+  const lineOfVhea = verticalLineOf(tables);
+  const verticalLine: ParsedFont['verticalLine'] =
+    lineOfVhea === null
+      ? { height: header.ascender + metric('hasc') - (header.descender + metric('hdsc')) + header.lineGap + metric('hlgp'), source: 'hhea' }
+      : {
+          height: lineOfVhea.ascender + metric('vasc') - (lineOfVhea.descender + metric('vdsc')) + lineOfVhea.lineGap + metric('vlgp'),
+          source: 'vhea',
+        };
   let capHeight = permissions.capHeight === null ? null : permissions.capHeight + metric('cpht');
   let capHeightSource: ParsedFont['capHeightSource'] = 'os2';
   if (capHeight === null) {
@@ -267,8 +314,18 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     },
     verticalOrigin: (glyph) => {
       const declared = tables.flavor === 'cff' ? verticalOriginOf(tables, glyph) : null;
-      return declared === null ? { y: header.ascender + metric('hasc'), source: 'ascender' } : { y: declared, source: 'VORG' };
+      if (declared !== null) return { y: declared, source: 'VORG' };
+      const bearing = topSideBearingOf(tables, header, glyph);
+      if (bearing !== null) {
+        // a gvar font without VVAR moves the origin with the top phantom point (from the default outline); otherwise the origin is the top of the glyph at the instance plus its (VVAR moved) bearing
+        const byPhantom = source?.variation !== undefined && vvar === null;
+        const top = pointsTop(glyph, byPhantom);
+        if (top !== null)
+          return { y: top + bearing + Math.round(byPhantom ? phantomsOf(glyph).top : (bearingDelta?.(glyph) ?? 0)), source: 'vmtx' };
+      }
+      return { y: header.ascender + metric('hasc'), source: 'ascender' };
     },
+    verticalLine: verticalLine,
     axes: space?.axes ?? [],
     namedInstances,
     namedInstanceProblems: space?.instanceProblems ?? [],

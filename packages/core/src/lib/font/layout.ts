@@ -52,7 +52,7 @@ export function layoutText(font: ParsedFont, content: string, options: LayoutOpt
   }
   const pitch = options.lineSpacing * (font.ascender - font.descender + font.lineGap) * scale;
   if (options.direction === 'vertical') {
-    const placed = layoutVertical(font, lines, options, scale, pitch);
+    const placed = layoutVertical(font, lines, options, scale, options.lineSpacing * font.verticalLine.height * scale);
     return {
       glyphs: placed.glyphs,
       loops: placed.glyphs.flatMap((glyph) => glyph.loops),

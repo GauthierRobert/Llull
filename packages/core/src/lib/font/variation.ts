@@ -347,6 +347,22 @@ export function readAdvanceDeltas(hvar: ByteView, coords: readonly number[]): (g
 }
 
 /**
+ * The top-side-bearing delta of a glyph at `coords` from a `VVAR` table (font units, unrounded), null when the table has no top-side-bearing mapping (offset 0: the bearings do not vary).
+ * @failure damage of the table -> WRP_FONT_PARSE (the same checks as `readVerticalAdvanceDeltas`)
+ */
+export function readTopSideBearingDeltas(vvar: ByteView, coords: readonly number[]): ((glyph: number) => number) | null {
+  readVerticalAdvanceDeltas(vvar, coords);
+  const mappingAt = vvar.u32(12);
+  if (mappingAt === 0) return null;
+  const store = readItemVariationStore(vvar.sub(vvar.u32(4), vvar.length - vvar.u32(4), 'VVAR store'));
+  const mapped = readIndexMap(vvar, mappingAt);
+  return (glyph) => {
+    const [outer, inner] = mapped(glyph);
+    return store.delta(outer, inner, coords);
+  };
+}
+
+/**
  * The advance-height delta of a glyph at `coords` from a `VVAR` table, in font units (unrounded). The advance-height mapping is optional (without it the glyph index is the row of subtable 0);
  * the mappings of the side bearings and of the vertical origin are not used, but must lie inside the table.
  * @failure a version other than 1, an offset outside the table, a damaged store or map -> WRP_FONT_PARSE

@@ -20,7 +20,7 @@ export const fontMetrics = defineCommand({
   annotations: { readOnly: true },
   description:
     'Metrics of a font at one instance, in font units (divide by data.unitsPerEm for em): data.ascender / descender / lineGap / capHeight (moved by MVAR for a variable font) and, for each character of `text`, ' +
-    'its glyph index, advanceWidth (hmtx + HVAR) and advanceHeight (vmtx + VVAR, or the phantom points of a TrueType gvar font; ascender - descender when the font has no vertical metrics), verticalOrigin (where the glyph hangs in vertical text: VORG of a CFF font, else the ascender), plus their sums. ' +
+    'its glyph index, advanceWidth (hmtx + HVAR) and advanceHeight (vmtx + VVAR, or the phantom points of a TrueType gvar font; ascender - descender when the font has no vertical metrics), verticalOrigin { y, source } (where the glyph hangs in vertical text: VORG of a CFF font, else the glyph top + its vmtx top side bearing (source vmtx), else the ascender), plus their sums. ' +
     '`font` = a font id of the document, a family name, or a bundled font; `variation` = {axisTag: value} or `instance` = a named instance (Bold), not both; omitted = the default instance. ' +
     'Read-only. Next: add_text with the same font and instance, import_font to embed it.',
   params: z.object({

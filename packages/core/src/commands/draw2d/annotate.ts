@@ -82,7 +82,8 @@ export const addText = defineCommand({
     direction: z
       .enum(['horizontal', 'vertical'])
       .describe(
-        'Font text only: horizontal (default) sets the glyphs along the baseline; vertical stacks them top to bottom by the vertical advance of the font (vmtx, ascender - descender without it), each hung from its vertical origin (VORG, else the middle of its advance at the ascender), upright; newline starts a new column to the LEFT; position is the top of the first glyph, `verticalAnchor` cap_middle centres the column on it, `anchor` aligns the column. Not with onCurve.',
+        'Font text only: horizontal (default) sets the glyphs along the baseline; vertical stacks them top to bottom by the vertical advance of the font (vmtx, ascender - descender without it), each hung from its vertical origin (VORG of a CFF font, else the glyph top + its vmtx top side bearing, else the ascender; x = the middle of its advance width), upright. ' +
+          'position is the vertical origin of the FIRST glyph of the first column (the top of its advance box). `verticalAnchor`: baseline and cap_top hang the text down from position, cap_middle centres each column on position.y. `anchor`, per column: center puts the middle of its glyphs on its x, left its left edge, right its right edge, where the first column sits at position.x and a newline starts the next column one vertical line pitch (vhea ascender - descender + gap, else the horizontal line height; times lineSpacing) further LEFT. Not with onCurve.',
       )
       .optional(),
     lineSpacing: z
