@@ -4,7 +4,7 @@ import { refuseIso } from '../codes';
 import { getFabrication, withFabrication } from '../state';
 
 /**
- * @affects plant.fabrication.pcfLines[lineId] (removed)
+ * @affects plant.fabrication.pcfLines[lineId] (removed) with the line's field welds, weld numbers and spool breaks
  * @invariant only lines stored by import_pcf are removed; routed and legacy lines are untouched
  * @failure no imported line with that id -> ISO_LINE_NOT_FOUND; the document is unchanged
  */
@@ -30,8 +30,26 @@ export const deletePcfLine = defineCommand({
       );
     const { [params.lineId]: _removed, ...pcfLines } = fabrication.pcfLines;
     void _removed;
+    const ofOtherLines = <T extends { lineId: string }>(records: Readonly<Record<string, T>> | undefined): Record<string, T> | undefined =>
+      records === undefined
+        ? undefined
+        : Object.fromEntries(Object.entries(records).filter(([, record]) => record.lineId !== params.lineId));
+    const without = <T>(record: Readonly<Record<string, T>> | undefined): Record<string, T> | undefined =>
+      record === undefined ? undefined : Object.fromEntries(Object.entries(record).filter(([key]) => key !== params.lineId));
+    const fieldWelds = ofOtherLines(fabrication.fieldWelds);
+    const welds = ofOtherLines(fabrication.welds);
+    const highestWeldNumber = without(fabrication.highestWeldNumber);
+    const spoolBreaks = without(fabrication.spoolBreaks);
     return {
-      document: withFabrication(doc, { ...fabrication, pcfLines }),
+      document: withFabrication(doc, {
+        version: 1,
+        pcfLines,
+        ...(fabrication.rules === undefined ? {} : { rules: fabrication.rules }),
+        ...(fieldWelds === undefined ? {} : { fieldWelds }),
+        ...(welds === undefined ? {} : { welds }),
+        ...(highestWeldNumber === undefined ? {} : { highestWeldNumber }),
+        ...(spoolBreaks === undefined ? {} : { spoolBreaks }),
+      }),
       summary: `delete_pcf_line: removed line ${params.lineId} (${line.components.length} component(s))`,
       affected: [params.lineId],
     };

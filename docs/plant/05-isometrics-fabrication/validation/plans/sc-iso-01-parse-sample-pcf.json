@@ -23,7 +23,7 @@
     { "step": 1, "path": "data.countsByType", "value": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1 }, "source": "file" },
     { "step": 1, "path": "data.totalPipeLengthMm", "value": 13045.0, "abs": 1e-6, "source": "sum of PIPE end-point distances" },
     { "step": 3, "path": "data.welds.length", "value": 13, "source": "reference script" },
-    { "step": 3, "path": "data.welds[number=W2].kind", "value": "field", "source": "SKEY WS = site weld (S6, S13)" },
+    { "step": 3, "path": "data.welds[number=W2].kind", "value": "site", "source": "SKEY WS = site weld (S6, S13)" },
     { "step": 5, "path": "data.spools.length", "value": 2, "source": "split at the field weld" },
     { "step": 6, "path": "data.pieces[*].cutLengthMm", "value": [2424, 2348, 3696, 1696, 1848, 714, 319], "abs": 1e-6, "source": "reference script" },
     { "step": 7, "path": "data.pieces[*].cutLengthMm", "value": [2421, 2345, 3693, 1693, 1845, 711, 316], "abs": 1e-6, "source": "gap 3 mm: -1.5 mm per welded end" },

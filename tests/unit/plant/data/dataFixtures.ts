@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { getPlantData, type PlantDataModel, withPlantData } from '@aec/plant/data/model';
 import { apply } from '../../../helpers/commandAssertions';
@@ -74,4 +75,27 @@ export function assignPump(doc: CadDocument, target: string, extra: Record<strin
 /** Rebuilds the plant data of `doc` with `change` applied (to plant a state the commands refuse, e.g. a duplicate tag). */
 export function withData(doc: CadDocument, change: (current: PlantDataModel) => PlantDataModel): CadDocument {
   return withPlantData(doc, change(getPlantData(doc)));
+}
+
+/** SC-DAT-01 steps 0-14 of the validation pack (tank T-101, pump P-101, lines 150-P-1001-A1A and 100-P-1002-A1A, classified and tagged). */
+export function scDat01Document(): CadDocument {
+  const plan = packJson<{ actions: Array<{ command: string; params: Record<string, unknown>; as?: string; unbuilt?: boolean }> }>(
+    'plans/sc-dat-01-tank-pump-mvp.json',
+  );
+  const aliases = new Map<string, string>();
+  const bind = (value: unknown): unknown => {
+    if (typeof value === 'string') return value.startsWith('$') ? (aliases.get(value.slice(1)) ?? value) : value;
+    if (Array.isArray(value)) return value.map(bind);
+    if (value !== null && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, bind(item)]));
+    return value;
+  };
+  let doc = createEmptyDocument();
+  for (const action of plan.actions.slice(0, 15)) {
+    const result = execute(doc, action.command, bind(action.params));
+    if (result.rejected === true) throw new Error(`${action.command}: ${result.summary}`);
+    doc = result.document;
+    if (action.as !== undefined && result.affected[0] !== undefined) aliases.set(action.as, result.affected[0]);
+  }
+  return doc;
 }

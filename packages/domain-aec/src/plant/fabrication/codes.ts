@@ -28,6 +28,24 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   ISO_LEVEL_MISSING: 'Recreate the level (add_level) or move the pipe onto an existing level: its z is relative to the level elevation.',
   ISO_OPEN_END: 'Add an end flange or cap, or set from / to on the pipe.',
   ISO_PARAM_INVALID: 'Fix the parameter named in paths.',
+  ISO_WELD_NOT_ON_PIPE: 'Pick a point on the centreline of a pipe of the line (within 1 mm); weld_list and cut_list show the pipe pieces.',
+  ISO_WELD_TOO_CLOSE:
+    'Move the weld away from the joint: both pieces must be at least minCutPieceMm (set_fabrication_rules) and 1 mm long.',
+  ISO_WELD_NOT_FOUND:
+    'List the numbered welds with weld_list (number them first with number_welds) and pass a weldId or a point on a numbered weld.',
+  ISO_WELDS_UNNUMBERED: 'Run number_welds on the line to store the numbers (the listed ones are provisional).',
+  ISO_GAP_UNDEFINED:
+    'Pass weldGapMm (and fieldFitAllowanceMm for field-fit welds) or store them with set_fabrication_rules weldGapMm=... source=...: no value is assumed.',
+  ISO_CUT_LENGTH_SHORT: 'Move the weld, reduce the gap, or merge the pieces: a cut piece must be longer than 0 and than minCutPieceMm.',
+  ISO_SPOOL_TOO_LARGE: 'Add a field weld (add_field_weld) or run split_spools with autoBreak=true.',
+  ISO_SPOOL_TOO_HEAVY: 'Add a field weld (add_field_weld) or run split_spools with autoBreak=true.',
+  ISO_SPOOL_NOT_FOUND: 'List the spools of the line with spool_list and pass one of the names.',
+  ISO_ITEM_CODE_MISSING: 'Assign the spec item (01 PSC) or the ITEM-CODE of the PCF record: the component is left out of the BOM rows.',
+  ISO_BOLTING_UNRESOLVED:
+    'Nothing to fix if the flange is not ASME B16.5: otherwise name the pressure class in the flange item code (e.g. FLWN-100-150) so the bolt table row can be found.',
+  ISO_FIELD_WELD_STALE:
+    'The weld no longer lies on a pipe of the line (it was edited): it is ignored; delete the line data or re-add the weld.',
+  ISO_SPOOL_WEIGHT_INCOMPLETE: 'Components without a WEIGHT are not counted: the spool weight is a lower bound.',
 };
 
 export const refuseIso = tableRejection(REMEDIATION);

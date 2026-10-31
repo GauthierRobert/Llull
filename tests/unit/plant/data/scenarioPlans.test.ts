@@ -1,7 +1,7 @@
 /**
- * Plant 08 DAT M1: runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
+ * Plant 08 DAT M1 + M2: runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
  * `as` binds the first affected id, `$alias` is replaced in params and expected values) and compares each `expected` row with the step's `data` / `error`.
- * Steps whose command is not registered yet (plant_report: M2, the `schema` param of export_ifc: M3) are skipped, and so are their rows.
+ * Steps flagged `unbuilt` (the `schema` param of export_ifc: M3; valve_list: M5) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01.
  * SC-DAT-03 uses onError "continue": a refused step is an outcome, not a failure (VC-DAT-12).
  */
 
@@ -79,7 +79,7 @@ describe.each([
   it('meets the expected rows of every built step', () => {
     expect(plan.id).toBe(id);
     const built = plan.expected.filter((row) => outcomes[row.step] != null);
-    expect(built.length).toBeGreaterThanOrEqual(id === 'SC-DAT-01' ? 4 : 7);
+    expect(built.length).toBeGreaterThanOrEqual(id === 'SC-DAT-01' ? 11 : 7);
     for (const row of built) compare(pick(outcomes[row.step], row.path), row, aliases);
   });
 

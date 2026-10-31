@@ -47,6 +47,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   curvedWall: ['thickness', 'height', 'baseOffset'], connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
   pipeSupport: ['rodLength', 'pedestalHeight'], grating: ['topOffset', 'bearingBarAngle'],
   railing: ['height', 'kneeRails', 'toePlate', 'postSpacingMax'],
+  ladder: ['facing', 'climbHeight', 'clearWidth', 'rungPitch', 'rungCount', 'railExtension', 'backClearance'],
 };
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
@@ -58,6 +59,7 @@ const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
   stair: ['angle', 'riserCount'], member: ['roll'], footing: ['topOffset'], equipment: ['angle', 'clearance', 'weight'],
   curvedWall: ['baseOffset'], connection: ['haunchLength'], pipeSupport: ['rodLength', 'pedestalHeight'], grating: ['topOffset', 'bearingBarAngle'],
   railing: ['kneeRails', 'toePlate'],
+  ladder: ['facing', 'rungCount', 'railExtension', 'backClearance'],
 };
 
 /** Fields that must be strictly positive. */

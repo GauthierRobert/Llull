@@ -132,9 +132,74 @@ export interface PcfLineData {
   readonly unknownRecords: readonly PcfUnknownRecord[];
 }
 
-/** `doc.plant.fabrication`: absent until the first fabrication command (`import_pcf`). Later milestones add welds, spools and isometrics. */
+/** A user-given number with the place it comes from (AF-31: no silent defaults). */
+export interface Quantity {
+  readonly value: number;
+  readonly source: string;
+}
+
+/** Shipping limits of a spool; `lengthMm` / `widthMm` / `heightMm` form the envelope compared after sorting both triples. */
+export interface SpoolLimits {
+  readonly lengthMm?: number;
+  readonly widthMm?: number;
+  readonly heightMm?: number;
+  readonly weightKg?: number;
+  readonly pieces?: number;
+  readonly source: string;
+}
+
+/** Document-wide fabrication rules (`set_fabrication_rules`). */
+export interface FabricationRules {
+  readonly weldGapMm?: Quantity;
+  readonly fieldFitAllowanceMm?: Quantity;
+  readonly minCutPieceMm?: Quantity;
+  readonly maxSpool?: SpoolLimits;
+  readonly weldPrefix?: { readonly fabrication?: string; readonly erection?: string };
+  readonly spoolPrefix?: string;
+}
+
+export type FieldWeldType = 'site' | 'field_fit';
+
+/** A weld the user added on a pipe (`add_field_weld`): the network of its line is split there (position in world mm). */
+export interface FieldWeldRecord {
+  readonly id: string;
+  readonly lineId: string;
+  readonly xyz: readonly [number, number, number];
+  readonly type: FieldWeldType;
+}
+
+/** A numbered weld joint. `status: orphaned` = its joint vanished after an edit; the number is kept and never reused. */
+export interface WeldRecord {
+  readonly id: string;
+  readonly lineId: string;
+  readonly n: number;
+  readonly number: string;
+  readonly kind: WeldKind;
+  /** The kind was set by `set_weld_type` and wins over the detected one. */
+  readonly kindSet: boolean;
+  readonly joint: {
+    readonly xyz: readonly [number, number, number];
+    readonly componentIds: readonly string[];
+    readonly boreMm: number;
+    readonly endType: string;
+  };
+  readonly status: 'active' | 'orphaned';
+}
+
+export type SpoolBreak = 'field_welds' | 'flanged_joints' | 'line_ends';
+
+/** `doc.plant.fabrication`: absent until the first fabrication command (`import_pcf`). Spools and cut lists are derived, never stored. */
 export interface FabricationModel {
   readonly version: 1;
   /** Imported lines kept as read-only data (as: pcf_line), by line id. */
   readonly pcfLines: Readonly<Record<string, PcfLineData>>;
+  readonly rules?: FabricationRules;
+  /** Field welds by id (ISO-M2). */
+  readonly fieldWelds?: Readonly<Record<string, FieldWeldRecord>>;
+  /** Numbered welds by id (`<lineId>#<n>`), orphaned ones included. */
+  readonly welds?: Readonly<Record<string, WeldRecord>>;
+  /** Highest weld number ever given per line (PCF HIGHEST-WELD-NUMBER). */
+  readonly highestWeldNumber?: Readonly<Record<string, number>>;
+  /** Spool break choice of `split_spools` per line. */
+  readonly spoolBreaks?: Readonly<Record<string, readonly SpoolBreak[]>>;
 }

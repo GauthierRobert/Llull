@@ -68,40 +68,22 @@
       "tank_shell_thickness"
     ],
     "docs/plant/04-pid-schematics/validation/plans/sc-pid-03-pid-vs-3d.json": ["check_pid_3d"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": [
-      "check_isometric",
-      "cut_list",
-      "piping_bom",
-      "split_spools",
-      "spool_list",
-      "weld_list"
-    ],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": [
-      "add_end_flange",
-      "add_field_weld",
-      "piping_bom"
-    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": ["check_isometric"],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": ["add_end_flange"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-03-isometric-sheet.json": ["export_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-04-sloped-line.json": ["export_isometric"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": [
-      "add_field_weld",
-      "define_isometric",
-      "export_isometric"
-    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": ["define_isometric", "export_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": ["check_isometric", "set_fabrication_rules"],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": ["check_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": ["export_isometric"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": ["add_ladder"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": ["add_steel_stair"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [
       "add_circular_platform",
       "platform_takeoff"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": ["add_pipe_rack"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-05-access-negative.json": ["add_ladder"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": [
       "add_circular_platform",
-      "add_ladder",
       "check_reachability"
     ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [
@@ -144,13 +126,7 @@
       "pipe_stress_allowables",
       "spring_variability"
     ],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-01-tank-pump-mvp.json": ["plant_report"],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-02-inline-valves-v1.json": ["plant_report"],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": [
-      "export_plant_data",
-      "import_plant_data",
-      "plant_report"
-    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": ["import_plant_data"],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-05-ifc-summary-bsi.json": ["ifc_summary"],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
       "export_bcf_viewpoint",

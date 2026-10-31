@@ -196,7 +196,7 @@ leave the document unchanged.
 | `add_grating` | mutating | `{ boundary? \| bounds?, supportedBy: 'beams' \| memberIds[], gratingType, bearingBarDirection: [x,y], topOffset?, thickness?, levelId? }` (built, M2; `thickness` must equal the bar depth) | @affects 1 grating per support bay; @invariant top = level + topOffset, panels split at supports; @failure unknown type `STA_GRATING_TYPE_UNKNOWN`, no support under an edge `STA_NO_SUPPORT_FOUND`, polygon invalid `STA_INVALID_GEOMETRY` |
 | `check_grating` | query | `{ ids?, uniformLoadKPa, concentratedLoadKNPerM?, deflectionLimitMm \| deflectionRatio, spanBasis? }` (no defaults: AF-31; built, M2) | data.panels[]: spanMm, allowableUniformKPa, allowableConcentratedKNPerM, deflectionMm, utilisation, findings |
 | `add_railing` | mutating | `{ path? \| hostId + edges (+ opening?), height?, kneeRails?, toePlate?, postProfile?, railProfile?, postSpacingMax?, openings?, role?, rulesets?, levelId? }` (built, M3) | @affects 1 railing + posts / rails / toe plate entities; @invariant posts at ends and corners, equal spacing ≤ max; @failure path < 2 points, opening outside the path |
-| `add_ladder` | mutating | `{ base, climbHeight? \| attachTo, facing, clearWidth?, rungPitch? \| rungPitchMax?, exit?, fallProtection?, installedOn?, rulesets? }` | @affects 1 ladder (+ gate in the host railing); @invariant uniform pitch; cage / landings placed per the active rulesets; @failure no arrival surface `STA_NO_ARRIVAL_SURFACE`, pitch infeasible for every ruleset `STA_LADDER_PITCH_INFEASIBLE` |
+| `add_ladder` | mutating | `{ base, climbHeight? \| attachTo, facing, clearWidth?, rungPitch? \| rungPitchMax?, exit?, fallProtection?, installedOn?, rulesets? }` | @affects 1 ladder (+ gate in the host railing); @invariant uniform pitch; cage / landings placed per the active rulesets; @failure no arrival surface `STA_NO_ARRIVAL_SURFACE`, pitch infeasible for every ruleset `STA_LADDER_PITCH_INFEASIBLE` (built, M4; `facing` is a plan vector, §13.6) |
 | `add_steel_stair` | mutating | `{ start, angle, rise \| toSurfaceId, width?, riserMax, going, stringerProfile?, tread?, landingEvery? \| landings?, railings?: 'none' \| 'left' \| 'right' \| 'both', railingHeight?, rulesets? }` | @affects 1 steelStair + 2 stringer members + treads + railings; @invariant equal risers, n = ceil(rise / riserMax); @failure riserMax / going ≤ 0, rise > 30 m |
 | `add_platform` | mutating | `{ boundary, elevation, framing?: { profile, maxSpacing } \| 'existing', gratingType, bearingBarDirection, railing?: { edges: 'all' \| number[], height, … }, imposedLoadKPa? }` | @affects 1 assembly + beams + gratings + railings; @failure overlap with another platform at the same elevation `STA_PLATFORM_OVERLAP` |
 | `add_circular_platform` | mutating | `{ equipmentId, elevation, startAngleDeg, sweepDeg, gap, width, gratingType?, bracketProfile?, bracketSpacingMax?, railing?: { edges: ('outer' \| 'inner' \| 'ends')[], height, postSpacingMax, kneeRails, toePlate } }` | @affects 1 assembly + brackets (members role bracket) + grating segments + railings; @invariant ri = OD/2 + gap; follows the vessel; @failure equipment not a vertical vessel `STA_EQUIPMENT_NOT_VESSEL`, elevation outside the shell height `STA_OUTSIDE_SHELL` |
@@ -404,6 +404,7 @@ a tolerance of 1e-6 mm.
 | `STA_LADDER_CAGE_NOT_PRIMARY` | finding | OSHA: cage alone on a ladder > 24 ft installed from 2018-11-19 | `ladder_safety_system` or `pfas` |
 | `STA_LADDER_CAGE_RETROFIT` | finding (warn) | existing caged ladder > 24 ft; retrofit date 2036-11-18 (proposed repeal) | plan the retrofit; reviewer decides |
 | `STA_LADDER_CAGE_START` | finding | first hoop outside the allowed band | `cage.startHeight` |
+| `STA_LADDER_CAGE_GEOMETRY` | finding (warn) | hoop spacing above, or cage diameter below, the grade B limit (added in M4) | `cage.hoopSpacing` / `cage.diameter` |
 | `STA_LADDER_LANDING_INTERVAL` | finding | caged section or LSS climb longer than the allowed interval | add landings |
 | `STA_STAIR_BLONDEL` | finding | 2h + g outside 600–660 mm | change `riserMax` / `going` |
 | `STA_STAIR_RISER`, `STA_STAIR_TREAD`, `STA_STAIR_ANGLE`, `STA_STAIR_WIDTH` | finding | OSHA 1910.25(c) limits | change the param named in the finding |
@@ -462,7 +463,7 @@ Coverage gate 90 / 85 / 90 / 90 applies (`packages/domain-aec/src/**`).
 | M1 | Plugin skeleton, codes, rule tables from `access_rules.json`, `list_access_rules`, `check_access` on the existing `stair` (concrete) and slabs (edges) | — | 1.0 |
 | M2 | Catalogue families FL / RD, grating types, `add_grating`, `check_grating`, takeoff lines. **Built 2026-10-25** (§13.4) | M1 | 1.5 |
 | M3 | `add_railing` (paths, host edges, openings, gates), evaluation, IFC railing, edge coverage in `check_access`. **Built 2026-10-25** (§13.5) | M1 | 1.5 |
-| M4 | `add_ladder` (cage, LSS, landings, exits, back clearance), IFC ladder | M3 | 1.5 |
+| M4 | `add_ladder` (cage, LSS, landings, exits, back clearance), IFC ladder. **Built 2026-10-31** (§13.6) | M3 | 1.5 |
 | M5 | `add_steel_stair` (stringers, treads, landings, railings) | M2, M3 | 1.5 |
 | M6 | `add_platform`, `add_circular_platform`, assemblies + derivation guard, `update_platform`, `platform_takeoff` | M2, M3 | 2.0 |
 | M7 | `add_pipe_rack`, `update_pipe_rack`, `check_steel_members` integration | M6 | 1.5 |
@@ -517,10 +518,10 @@ Full list with grades in [validation/sources.md](validation/sources.md). All acc
 - [R13] AISC Engineering Journal, pipe-rack design article — https://ej.aisc.org/index.php/engj/article/download/991/990
 - [R14] Roark's Formulas for Stress and Strain (simply supported beam cases) — closed forms used in §5.4
 
-## 13. As built (M1 2026-10-23, M2 and M3 2026-10-25)
+## 13. As built (M1 2026-10-23, M2 and M3 2026-10-25, M4 2026-10-31)
 
-Built: M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges), M2 (§13.4: FL / RD bars, grating catalogue, `add_grating`, `update_grating`, `check_grating`, takeoff) and M3 (§13.5: `add_railing`, `update_railing`, evaluation, IFC for railings and gratings, railing rules and edge coverage in `check_access`). Not built:
-ladder, steel stair, platforms, pipe rack, reachability, fireproofing, plan symbols; M4..M8 stay open.
+Built: M4 (§13.6: `add_ladder`, ladder rules in `check_access`, evaluation, IFC ladder, takeoff and schedule), M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges), M2 (§13.4: FL / RD bars, grating catalogue, `add_grating`, `update_grating`, `check_grating`, takeoff) and M3 (§13.5: `add_railing`, `update_railing`, evaluation, IFC for railings and gratings, railing rules and edge coverage in `check_access`). Not built:
+steel stair, platforms, pipe rack, reachability, fireproofing, plan symbols; M5..M8 stay open.
 
 ### 13.1 What exists
 
@@ -544,12 +545,13 @@ ladder, steel stair, platforms, pipe rack, reachability, fireproofing, plan symb
 | VC | State |
 | -- | ----- |
 | VC-STA-04 rule part (3 stair cases) | passing, `tests/unit/plant/structures/checkAccess.test.ts` |
-| VC-STA-13 (fields, B warn + unverified, `reviewRequired`, invalid ruleset) | passing for stairs, edges, railings and gratings; ladder codes follow M4 |
-| VC-STA-02, 03 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks need M4 |
+| VC-STA-13 (fields, B warn + unverified, `reviewRequired`, invalid ruleset) | passing for stairs, edges, railings, gratings and ladders |
+| VC-STA-02, 03 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks are tested on the ladder since M4 (`ladder.test.ts`: every VC-STA-02 / 03 row) |
 | VC-STA-05 | passing (M3): post counts 4 / 5 for 4000 / 6000 mm, the five height / knee-rail / toe-plate rows under both rulesets, `railing.test.ts`, `scenarioPlans.test.ts` (SC-STA-05 railing and edge rows) |
 | VC-STA-06 | passing (M2): closed form against the published 19-W-4 table at every span of the pack, pedestrian span, 0.5176 mm; SC-STA-06 meets all five rows, `grating.test.ts`, `scenarioPlans.test.ts` |
-| VC-STA-12 | railing, grating and the FL / RD profile definitions passing (`ifcAccess.test.ts`, every enum string read from `data/ifc4x3_enums`); ladder, stair, landing and rack strut follow M4..M7 |
-| VC-STA-01, 07..11, 14 | not started |
+| VC-STA-12 | railing, grating and the FL / RD profile definitions passing (`ifcAccess.test.ts`, every enum string read from `data/ifc4x3_enums`); ladder (`.LADDER.`, `.STRINGER.`, `.MEMBER.`, landing `.LANDING.`) passing in `ladder.test.ts`; stair and rack strut follow M5..M7 |
+| VC-STA-01 | passing (M4): the six heights of the pack, `ladder.test.ts`; SC-STA-01 and its 8000 mm variant in `scenarioPlans.test.ts` |
+| VC-STA-07..11, 14 | not started |
 
 ### 13.4 M2 as built (2026-10-25): catalogue families FL / RD, gratings, takeoff
 
@@ -595,3 +597,29 @@ Decisions (owner delegated, 2026-10-25):
 
 Tests: 71 new (`tests/unit/plant/structures/{grating,railing,ifcAccess,scenarioPlans}.test.ts`, `tests/unit/building/barProfiles.test.ts`) plus the `check_access` expectations of M1 updated for `surfaceId` and the new `checked` fields.
 - **Review fixes (M2 / M3)**: load validation of a railing runs the unit-free part of the add_railing validation (path points, integer 0..10 knee rails, non-negative toe plate, ascending gaps inside the path, known profiles); the fit of the rails needs the document unit and stays a command-time check. A guard-rail whose profile left the catalogue is a `STA_INVALID_GEOMETRY` fail finding in `check_access`. OSHA-GRD-MID is evaluated as the 19 in opening only and listed under `notEvaluated` for its position. The IFC grating property `BearingBarAngle` is in radians (the project plane-angle unit); a grating whose type left the catalogue is not exported. The refusal to move a hosted railing names its slab or grating host.
+
+
+### 13.6 M4 as built (2026-10-31): fixed ladders
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| Element | `building/types.ts` `LadderElement` (category `ladder`, mark `LD<n>`, layer `S-LADR`), `ladder/ladderLayout.ts`, `evaluate/evaluateLadder.ts` | Merged meshes, one entity per part: `stiles`, `rungs`, `cage-hoops`, `cage-bars`, `landings` (at most 5 entities). Sections are named constants: stiles FL70x10, rungs RD20, hoops FL50x5, cage bars RD12, landing plate 6 mm thick, 600 mm deep. |
+| `add_ladder` | `ladder/addLadder.ts` (+ `ladderDefaults`, `ladderSurface`, `ladderClearance`, `ladderGate`, `ladderMeasure`) | Registered in `catalog.ts`; toolset `plant_structures`. |
+| Rules | `access/ladderChecks.ts`, wired into `checkAccess.ts` (`include` gains `"ladders"`, `data.checked.ladders`) | Pitch (ISO-LAD-PITCH, OSHA-LAD-RUNG-PITCH), width, back clearance, stile extension, fall protection (ISO from 3000 mm, OSHA above 7315.2 mm with the 2018-11-19 rule), cage start / hoop / diameter, landing interval (cage 15 240 mm grade A, LSS / PFAS rest 45 720 mm grade B). |
+| IFC | `exchange/ifcLadderExport.ts`, dispatched from `ifcBuild.ts` | `IfcStair` `.LADDER.` (cage hoops and bars as its own body) aggregating 2 `IfcMember` `.STRINGER.`, one `IfcMember` `.MEMBER.` with ObjectType `RUNG` per rung and one `IfcSlab` `.LANDING.` per landing; `Pset_llullLadder`. |
+| Takeoff / schedule | `quantities/accessTakeoff.ts` | `ladder.rung.ea`, `ladder.cage.m` (first hoop to stile top), `ladder.landing.ea`, `ladder.steel.kg`; `building_schedule` kind `ladder`. |
+| Codes | `codes.ts` | `STA_NO_ARRIVAL_SURFACE`, `STA_LADDER_PITCH_INFEASIBLE` (refusals); `STA_LADDER_{PITCH_OUT_OF_RANGE,WIDTH,BACK_CLEARANCE,RAIL_EXTENSION,FALL_PROTECTION_MISSING,CAGE_NOT_PRIMARY,CAGE_RETROFIT,CAGE_START,LANDING_INTERVAL}` and the new `STA_LADDER_CAGE_GEOMETRY` (hoop spacing and cage diameter, both grade B) |
+
+Decisions (owner delegated, quality first):
+
+- **Arrival surface (§5.7)**: a slab or grating panel whose top is within 50 mm of base z + climbHeight and whose plan is within 600 mm of the base (nearest first). `attachTo` computes the height from that surface top and applies the same plan reach. A platform assembly arrives with M6. The departure surface is not verified (the ladder may stand on grade).
+- **Pitch**: `spaces = ceil(H / pMax - 1e-9)`, `pitch = H / spaces`, `rungCount = spaces - 1`; `pMax` defaults to the smallest ruleset maximum (300 mm with both) and the pitch must reach the largest minimum (254 mm), else `STA_LADDER_PITCH_INFEASIBLE` (for example H = 500 mm). An explicit `rungPitch` is kept (exclusive with `rungPitchMax`): rungs at k x pitch, `rungCount = ceil(H / pitch) - 1`, so the last step to the arrival can be shorter; `check_access` judges it. More than 500 rungs is refused as a unit mistake.
+- **Defaults are named in `data.defaults`**: clearWidth = largest minimum (406.4 mm with both), railExtension = largest minimum (1100 mm; ISO-LAD-STILE-EXT is grade B), fallProtection = `ladder_safety_system` above 24 ft for an OSHA ladder installed from 2018-11-19, else `cage` where ISO (from 3000 mm) or OSHA (existing cage) allows one, else `none`; cage start 2200 mm, hoops at most 1500 mm, 650 mm inside diameter (ISO 14122-4 rows), 5 bars (no rule: a named default); landings only with `osha_1910`, in equal sections within 15 240 mm (cage) or 45 720 mm (LSS / PFAS).
+- **`installedOn` is optional** (deviation: §3 has it required and §8 defaults it to the project date, but `ProjectInfo.date` is free text and usually empty). Absent means unknown and is checked as installed after 2018-11-19, the strict reading of 1910.28(b)(9); the result says so. An invalid date is refused.
+- **ISO fall protection** accepts a cage or a ladder safety system (as in §5.1); `pfas` satisfies OSHA only. `STA_LADDER_CAGE_RETROFIT` is a warning on the grade A row, with the 2036-11-18 date and the repeal flag in the finding source.
+- **Back clearance** (§5.1): rays along the facing direction from the rung centreline at the middle and at both stiles, against the plan footprints (walls, columns, steel members as strips of their larger section dimension, equipment, other slabs and gratings) whose height range contains a rung; the arrival surface is not an obstacle. Stored once at creation and capped at 2000 mm (a ladder with nothing nearer stores 2000); `check_access` reads the stored value and lists that under `notEvaluated` (a moved obstacle is not re-measured). Circular columns and vessels use inscribed polygons.
+- **Exit**: `through` cuts a gap with a self-closing gate (width = clearWidth + 2 stile thicknesses + post diameter, centred on the ladder) in the guard-rail of the arrival level that the facing ray meets within 600 mm; a railing already gated there is reported `existing`, a gap that does not fit or crosses another gap is reported `skipped` with the reason (the ladder is still added). `side_step` cuts nothing. `data.gate` says which. The two exits differ only in this; the geometry is the same (deviation: §5.1 described an offset ladder).
+- **Cage geometry**: a 240 degree arc behind the climber (hoops as flat-bar segments every 5 degrees, bars across the arc), from the first hoop to the stile top; cage sections are not offset at landings. Landings are plates 600 mm deep on the climber side, without a railing (add one with `add_railing`).
+- **Not in M4**: `update_ladder` (the remediation texts say to delete the ladder and add it again), plan symbols and DXF (M8), `check_clashes` for ladders, the ISO flight rule (grade C), a ladder following its platform (FR-STA-14, M6). Landings are stored as heights only.
+- **Outside the lane**: `src/ui/panels/building/describeElement.ts` (exhaustive element labels, as in M3: 4 lines). Existing tool text changed: `check_access` (description, `include` enum gains `ladders`, `ids` description) and `building_schedule` (description, `kind` enum gains `ladder`).
+- **Plans**: SC-STA-01 and SC-STA-05 start the ladder on the Grade level (`levelId: $grade`) because the base z is level-relative; the SC-STA-01 variant also raises the platform level to 8000 so that an arrival surface exists. Both plans run in full in `scenarioPlans.test.ts`; `blockedPlanCommands.json` lost their `add_ladder` entries (SC-STA-07 still waits for `add_circular_platform` and `check_reachability`).

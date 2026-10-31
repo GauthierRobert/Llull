@@ -213,7 +213,7 @@ export function edgeBlend(request: EdgeBlendRequest, context: BlendContext): Ble
       : unsupported(
           graph === null
             ? 'the kernel reports no face adjacency'
-            : 'facesA and facesB share no sharp edge: faces that do not meet are blended only as one planar face per set with a constant radius (the faces between them are consumed)',
+            : 'facesA and facesB share no sharp edge: faces that do not meet are blended with a constant radius or a straight taper (radius, radiusEnd; the faces between them are consumed); a law or a chord width needs a shared edge',
           'facesA',
         );
   const varying = size.end !== undefined || size.law !== undefined;

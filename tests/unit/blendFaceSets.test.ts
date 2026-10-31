@@ -9,6 +9,7 @@ import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import type { FaceGraph } from '@core/geometry/kernelPorts';
 import { edgeOf, scriptedKernel, TOPOLOGY } from '../helpers/blendKernel';
+import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 
 afterEach(() => setGeometryKernel(null));
@@ -72,6 +73,29 @@ describe('fillet_faces over the edges two face sets share', () => {
     expect(brepOf(adjacent.document, adjacent.affected[0] as string)).toMatchObject({ op: 'fillet', edges: [0], size: 2 });
     const apart = execute(doc, 'fillet_faces', { id, facesA: setOf(3), facesB: setOf(1), radius: 2 }, context(scriptedKernel()));
     expect(brepOf(apart.document, apart.affected[0] as string)).toMatchObject({ op: 'faceBlend', facesA: [3], facesB: [1] });
+    // sets of several faces that share no edge go to the kernel too (it measures the supports), with a straight taper when radiusEnd is given
+    const several = execute(
+      doc,
+      'fillet_faces',
+      { id, facesA: setOf(3), facesB: setOf(1, 2), radius: 2, radiusEnd: 4, startNear: [20, 0, 0] },
+      context(scriptedKernel()),
+    );
+    expect(brepOf(several.document, several.affected[0] as string)).toMatchObject({
+      op: 'faceBlend',
+      facesA: [3],
+      facesB: [1, 2],
+      radius: 2,
+      radiusEnd: 4,
+      startNear: [20, 0, 0],
+    });
+    const constant = execute(
+      doc,
+      'fillet_faces',
+      { id, facesA: setOf(3), facesB: setOf(1), radius: 2, startNear: [20, 0, 0] },
+      context(scriptedKernel()),
+    );
+    expect(brepOf(constant.document, constant.affected[0] as string)).not.toHaveProperty('radiusEnd');
+    expect(brepOf(constant.document, constant.affected[0] as string)).not.toHaveProperty('startNear');
   });
 
   it('radiusEnd, a law and a width on one shared edge become fillet_edge sizes (smooth end radius, expression law, chord mode)', () => {
@@ -272,8 +296,14 @@ describe('fillet_faces over the edges two face sets share', () => {
     const apart = execute(doc, 'fillet_faces', { id, facesA: setOf(3), facesB: setOf(1), width: 1 }, context(scriptedKernel()));
     expectNoOp(apart, doc, 'share no sharp edge');
     expect(apart.error).toMatchObject({ code: 'BLD_FACE_BLEND_UNSUPPORTED', ids: [id], paths: ['facesA'] });
-    const curvedApart = execute(doc, 'fillet_faces', { id, facesA: setOf(3), facesB: setOf(1, 2), radius: 1 }, context(scriptedKernel()));
-    expect(curvedApart.error?.code).toBe('BLD_FACE_BLEND_UNSUPPORTED');
+    const lawApart = execute(
+      doc,
+      'fillet_faces',
+      { id, facesA: setOf(3), facesB: setOf(1), law: { expression: '1 + t' } },
+      context(scriptedKernel()),
+    );
+    expect(lawApart.error).toMatchObject({ code: 'BLD_FACE_BLEND_UNSUPPORTED', paths: ['facesA'] });
+    expect(lawApart.summary).toContain('a law or a chord width needs a shared edge');
     const tangent = { faces: [], edgeFaces: [[0, 1]], edgeConvexity: ['smooth'] } as unknown as FaceGraph;
     const smooth = execute(
       doc,
@@ -334,5 +364,22 @@ describe('fillet_faces over the edges two face sets share', () => {
       code: 'BLD_LAW_INVALID',
       paths: ['radiusEnd'],
     });
+  });
+
+  it('the faceBlend taper fields are part of the recipe key and are validated (radiusEnd > 0, startNear a finite point that needs radiusEnd)', () => {
+    const source: ShapeRecipe = { op: 'solid', entity: { id: 'b', kind: 'box' } as never };
+    const base = { op: 'faceBlend', source, facesA: [0], facesB: [1], radius: 2 } as const;
+    const keys = [
+      base,
+      { ...base, radiusEnd: 4 },
+      { ...base, radiusEnd: 5 },
+      { ...base, radiusEnd: 4, startNear: [1, 2, 3] as [number, number, number] },
+    ];
+    expect(new Set(keys.map(recipeKey)).size).toBe(4);
+    const leaf = (): string | null => null;
+    expect(validateShapeRecipe({ ...base, radiusEnd: 4, startNear: [1, 2, 3] }, leaf)).toBeNull();
+    expect(validateShapeRecipe({ ...base, radiusEnd: 0 }, leaf)).toContain('radiusEnd must be > 0');
+    expect(validateShapeRecipe({ ...base, startNear: [1, 2, 3] }, leaf)).toContain('needs radiusEnd');
+    expect(validateShapeRecipe({ ...base, radiusEnd: 4, startNear: [1, 2] as never }, leaf)).toContain('finite [x, y, z]');
   });
 });

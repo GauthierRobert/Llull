@@ -91,3 +91,37 @@ describe('inspect_face_triangles', () => {
     expectNoOp(refused, heavy);
   });
 });
+
+describe('inspect_face_triangles placement (world coordinates)', () => {
+  it('labels the WORLD centroids of a moved and rotated kernel result against the PLACED recipe, so both sides of the query are in the same frame', () => {
+    const { doc, id } = box();
+    const leaf = doc.entities[id] as Entity;
+    const placement = { position: [4, 5, 6] as [number, number, number], rotation: [0.1, 0.2, 0.3] as [number, number, number] };
+    const corners = entityToTriangles(leaf, doc).flat(2);
+    const mesh = { positions: corners, indices: Array.from({ length: corners.length / 3 }, (_, k) => k) };
+    const solid = { ...leaf, id: 'm', kind: 'mesh', mesh, brep: { op: 'solid', entity: leaf }, ...placement };
+    const moved: CadDocument = { ...doc, entities: { ...doc.entities, m: solid as never }, order: [...doc.order, 'm'] };
+    const recipes: string[] = [];
+    const probed: Array<readonly [number, number, number]> = [];
+    const base = labelling((_shape, points) => {
+      probed.push(...points);
+      return points.map(() => ({ distance: 0, signed: 0, face: 0 }));
+    });
+    const kernel: GeometryKernel = { ...base, evaluate: (recipe) => (recipes.push(recipe.op), base.evaluate(recipe)) };
+    const result = run(moved, { entityId: 'm' }, kernel);
+    expect(result.error, result.summary).toBeUndefined();
+    expect(recipes.at(-1)).toBe('place');
+    const world = entityToTriangles(moved.entities['m'] as Entity, moved).map(
+      (t) => [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3, (t[0][2] + t[1][2] + t[2][2]) / 3] as const,
+    );
+    expect(world.length).toBeGreaterThan(0);
+    expect(probed).toEqual(world);
+    expect(world).not.toEqual(
+      entityToTriangles(leaf, doc).map((t) => [
+        (t[0][0] + t[1][0] + t[2][0]) / 3,
+        (t[0][1] + t[1][1] + t[2][1]) / 3,
+        (t[0][2] + t[1][2] + t[2][2]) / 3,
+      ]),
+    );
+  });
+});

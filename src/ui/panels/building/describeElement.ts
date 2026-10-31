@@ -25,6 +25,7 @@ export const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string
   pipeSupport: 'Pipe support',
   grating: 'Grating',
   railing: 'Railing',
+  ladder: 'Ladder',
 };
 
 export function describe(element: BuildingElement, units: DocumentUnit): string {
@@ -70,5 +71,7 @@ export function describe(element: BuildingElement, units: DocumentUnit): string 
       return `${element.gratingType} · ${element.supportIds.length} supports`;
     case 'railing':
       return `${element.role} · ${element.height}`;
+    case 'ladder':
+      return `${element.climbHeight} · ${element.rungCount} rungs · ${element.fallProtection}`;
   }
 }

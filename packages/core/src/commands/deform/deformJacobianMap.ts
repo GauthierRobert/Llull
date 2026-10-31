@@ -1,11 +1,12 @@
 /** deform_jacobian_map — read-only per-vertex det J of a deformation on the deformed body, for a colour map in the viewport (01 DEF M4, FR-DEF-21). */
 
-import type { CadDocument } from '../../model/types';
+import type { CadDocument, Entity } from '../../model/types';
 import type { Vec3 } from '../../model/vectors';
 import { JACOBIAN_FLOOR } from '../../geometry/deform/bounds';
 import { type DeformNode, type Warp, warpOf } from '../../geometry/deform/laws';
 import { type WarpResult, evaluationCost, reversesOrientation, warpMesh } from '../../geometry/deform/meshWarp';
 import type { GeometryKernel } from '../../geometry/kernel';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
@@ -22,6 +23,16 @@ const MAX_COARSENINGS = 10;
 /** Work units of the determinant pass (6 evaluations per triangle for the finite-difference laws, weighted by the cost of the law). */
 const MAX_DETERMINANT_WORK = 2e7;
 const DETERMINANT_EVALUATIONS = 6;
+
+/** Flat xyz of the deformed body (kernel-local: the recipe is before position / rotation) moved by the entity placement, single precision. */
+function placedPositions(entity: Pick<Entity, 'position' | 'rotation'>, positions: ArrayLike<number>): number[] {
+  const placed: number[] = [];
+  for (let i = 0; i + 2 < positions.length; i += 3)
+    placed.push(
+      ...entityLocalToWorld(entity, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]).map(Math.fround),
+    );
+  return placed;
+}
 
 /** How far inside the body (along the inward normal, as a fraction of the body size) a triangle is sampled: a cap lying IN a region-end plane then reads the inside of the region. */
 const INWARD = 1e-6;
@@ -199,7 +210,7 @@ export const deformJacobianMap = defineCommand({
         laws: [...stages.map((stage) => stage.node.law.kind), node.law.kind],
         deforms: stages.length + 1,
         scope,
-        positions: Array.from(warped.mesh.positions, Math.fround),
+        positions: placedPositions(entity, warped.mesh.positions),
         indices: Array.from(indices),
         determinant,
         min: count === 0 ? null : min,

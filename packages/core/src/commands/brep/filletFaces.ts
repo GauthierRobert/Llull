@@ -110,7 +110,7 @@ export const filletFaces = defineCommand({
     'Alternatively holdLine { id of a drawn line or polyline lying on one of the two faces, onFaces "A" | "B" } rounds the edge the two faces share with the radius that makes the blend leave that face on the drawn curve (radius = distance to the edge / tan(fold / 2), fold = angle between the outward normals); a conic / curvature profile with a hold line follows the profile rules of fillet_edge (a sloped line is a varying size, which a profile blend takes). ' +
     'profile { type: "conic", rho } or { type: "curvature", shape } changes the section. Each set may hold several faces, planar or curved (cylinders, cones, spheres, B-spline faces, tangent-continuous or not): the blend runs along every sharp edge shared by a face of facesA and a face of facesB, built as fillet_edge builds it (same radius laws, chord mode, profiles and limits; data.blendEdges lists them with their two ends). The blend rounds the whole tangent chain of every shared edge, as fillet_edge does: if that chain bounds a face outside facesA and facesB the blend is refused (BLD_FACE_BLEND_UNSUPPORTED names the edges and faces) rather than round a face you did not pick. ' +
     'radiusEnd (smooth start-to-end radius), law { expression, samples } (radius as an expression of t in [0, 1] along the shared edge) and width (the CHORD between the two contact lines at the start, widthEnd at the end) vary or size the blend like fillet_edge; a varying size runs over the whole blend: one edge, or a tangent chain of several shared edges (one open path or one closed loop whose joints are tangent: a line, an arc and a line of a rounded outline), where radiusEnd / widthEnd change in a straight line in arc length from the start of the chain to its end and law is an expression of t over the total arc length of the chain (the kernel gets one sub-law per edge, equal at every joint); several separate chains, a branch or a bend at a joint are refused by name. startNear picks which end of the edge or chain is t = 0. ' +
-    'Faces that share no sharp edge (a chamfer between them is consumed) are blended only as one planar face per set with a constant radius that end on flat faces square to the blend. ' +
+    'Faces that share no sharp edge (a chamfer, a groove or a gap between them is consumed) are blended by the closed form of the rolling ball (data.blends names the blend face): (1) PLANAR sets: each set is one plane (one or several coplanar faces; the contact line may cross from one face of a set to the next) and the blend runs over the length the two sets overlap, ending on flat faces square to it; radius constant, or radius with radiusEnd for a straight taper (a cone; radiusEnd is linear, not the smooth S-curve of the edge route; startNear picks the end where radius applies); (2) ROUND sets: a plane square to an axis, a cylinder or a cone about that axis, in any pair (a boss on a plate across a chamfer, a bore against a floor, two cones), the blend is swept once around the axis with a constant radius. The contact lines and the arc are checked exactly against the faces (a groove, a hole or a missing sector in a set is refused, not spanned). check_blends does NOT verify the radius of such a blend (a face-set blend has no radius-law record to read back, so a wrong taper from radius to radiusEnd passes it; it checks validity and G1 continuity only): measure the section (measure, section_solid) when the taper matters. Refused by name with the measured reason: spheres, tori, B-spline faces, a plane that is not square to the axis, axes that differ, a set whose faces are not on one support surface, parallel faces, a law or width, a profile other than circular with radiusEnd, a taper about an axis. ' +
     'cliff "A" | "B" (one planar face per set, constant radius, circular section): when the ball would run off the far edge of that face (the face is narrower than the tangent contact distance radius * tan(fold / 2)), the blend stops at that edge, the cliff edge: the ball stays tangent to the other face and touches the cliff edge instead of being tangent to its face, so the blend is G1 to the other face and meets the cliff edge at an angle; the cliff face is consumed. Without a run-off the ordinary tangent blend is built. data.cliffEngaged says which, data.cliffEdgeAngle (degrees, 0 = tangent) is the angle at the cliff edge and data.cliffFace the consumed face. Other trim modes (extending or trimming the blend past its ends) are not offered. Without cliff, a blend that runs off a face is refused (BLD_FACE_FILLET_NO_SOLUTION / BLD_FACE_BLEND_UNSUPPORTED). BLD_FACE_FILLET_NO_SOLUTION says when no ball of that radius stays in the material (and the smallest radius that does), ' +
     'BLD_FACE_BLEND_UNSUPPORTED what else is not built. Needs the exact native kernel (check kernel_info); with the mesh kernel it no-ops. Run check_blends afterwards.',
   params: z.object({
@@ -210,7 +210,6 @@ export const filletFaces = defineCommand({
           ['cliff'],
         );
     }
-    const edgeRoute = law !== undefined || radiusEnd !== undefined || width !== undefined;
     const profile = resolveProfile(params.profile);
     if (isProfileRefusal(profile)) return blendRejection(doc, 'fillet_faces', profile.code, profile.message, [id], [profile.path]);
     const sets = { facesA, facesB };
@@ -238,6 +237,7 @@ export const filletFaces = defineCommand({
             radius: radius ?? 0,
             ...(profile.profile === undefined ? {} : { profile: profile.profile }),
             ...(params.cliff === undefined ? {} : { cliff: params.cliff }),
+            ...(radiusEnd === undefined ? {} : { radiusEnd, ...(params.startNear === undefined ? {} : { startNear: params.startNear }) }),
           },
         });
         if (params.cliff !== undefined)
@@ -250,7 +250,7 @@ export const filletFaces = defineCommand({
             profile: params.profile,
             size: { start: radius ?? width ?? 0, end: radiusEnd ?? widthEnd, law, chord: width !== undefined },
             startNear: params.startNear,
-            spandrel: edgeRoute || !onePlanarFaceEach(context) ? undefined : spandrel,
+            spandrel: law !== undefined || width !== undefined ? undefined : spandrel,
           },
           context,
         );

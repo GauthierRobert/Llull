@@ -1,6 +1,6 @@
 {
   "id": "SC-STA-01",
-  "status": "PROPOSED — add_ladder, check_access are not built (TECHNICAL_SPEC §4); add_level, add_slab exist today",
+  "status": "BUILT (M4) — add_ladder and the ladder rows of check_access run in tests/unit/plant/structures/scenarioPlans.test.ts; the ladder starts on the Grade level (levelId $grade) because the base z is level-relative",
   "validates": [
     "VC-STA-01",
     "VC-STA-02",
@@ -20,7 +20,8 @@
         "name": "Grade",
         "elevation": 0,
         "height": 7300
-      }
+      },
+      "as": "grade"
     },
     {
       "command": "add_level",
@@ -60,6 +61,7 @@
     {
       "command": "add_ladder",
       "params": {
+        "levelId": "$grade",
         "base": [
           1500,
           -250,
@@ -143,10 +145,10 @@
     }
   ],
   "variant": {
-    "description": "Same ladder with climbHeight 8000: OSHA now requires a ladder safety system or PFAS for a ladder installed after 2018-11-19",
+    "description": "Same ladder with climbHeight 8000 and the platform level at +8000 (the arrival surface must be 8000 above the base): OSHA now requires a ladder safety system or PFAS for a ladder installed after 2018-11-19",
     "change": {
-      "step": 4,
-      "params.climbHeight": 8000
+      "step 2": { "params.elevation": 8000 },
+      "step 4": { "params.climbHeight": 8000 }
     },
     "expected": [
       {

@@ -14,6 +14,7 @@ import { probeFillet } from './probeFillet';
 import { filletFaces } from './filletFaces';
 import { filletFullRound } from './filletFullRound';
 import { checkBlends } from './checkBlends';
+import { blendOverlay } from './blendOverlay';
 
 export const brepCommands = commandCatalog(
   booleanOperation,
@@ -24,6 +25,7 @@ export const brepCommands = commandCatalog(
   filletFaces,
   filletFullRound,
   checkBlends,
+  blendOverlay,
   shellSolid,
   draftFaces,
   pushPullFace,
