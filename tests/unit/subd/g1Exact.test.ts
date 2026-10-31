@@ -8,6 +8,7 @@ import { cageToNurbs } from '@core/geometry/subd/toNurbs';
 import { buildTopology } from '@core/geometry/subd/topology';
 import { type BezierPatch, quadCagePatches } from '@core/geometry/subdivisionPatches';
 import type { Vec3 } from '@core/model/types';
+import { pentagonCap, pentagonalBipyramid, pentagonalPyramid } from './pentagonFixture';
 
 const INTERIOR = new Set([5, 6, 9, 10]);
 const CORNERS = new Set([0, 3, 12, 15]);
@@ -56,22 +57,6 @@ const hexahedra: Array<[string, Cage]> = (() => {
     ['cube with one corner pulled out', warp((v, i): Vec3 => (i === 0 ? [v[0] - 0.2, v[1] - 0.2, v[2] - 0.2] : v))],
   ];
 })();
-
-/** A pentagonal cap: a valence-5 vertex and valence-3 vertices around it. */
-function pentagonCap(): Cage {
-  const ring = (z: number): Vec3[] =>
-    Array.from({ length: 5 }, (_, i): Vec3 => [Math.cos((2 * Math.PI * i) / 5), Math.sin((2 * Math.PI * i) / 5), z]);
-  const mid = Array.from(
-    { length: 5 },
-    (_, i): Vec3 => [0.5 * Math.cos((2 * Math.PI * (i + 0.5)) / 5), 0.5 * Math.sin((2 * Math.PI * (i + 0.5)) / 5), 1.2],
-  );
-  const vertices: Vec3[] = [...ring(1), ...mid, [0, 0, 1.4], ...ring(-1)];
-  const faces: number[][] = [];
-  for (let i = 0; i < 5; i++) faces.push([10, 5 + ((i + 4) % 5), i, 5 + i].reverse());
-  for (let i = 0; i < 5; i++) faces.push([i, (i + 1) % 5, 11 + ((i + 1) % 5), 11 + i].reverse());
-  faces.push([11, 12, 13, 14, 15].reverse());
-  return { vertices, faces, creases: [] };
-}
 
 /** Two quads sharing the edge x = 1 (vertices 0 and 4 stand for extraordinary ones so that both are free): P on [0, 1] x [0, 1], Q on [1, 3] x [0, 1], planar. */
 const pairCage: Cage = {
@@ -179,6 +164,36 @@ describe('solveExactG1', () => {
     const result = solveExactG1(cap, patches, valenceOf(cap));
     expect(result.groups.some((group) => !group.consistent && group.residual > 1e-3)).toBe(true);
     expect(JSON.stringify(result.patches)).toBe(JSON.stringify(patches));
+  });
+
+  it('valence 5 is not the obstruction: closed pentagonal pyramid and bipyramid (apexes of valence 5, pentagon centre of valence 5, corners of valence 3) are made exactly G1 by the linear solve', () => {
+    for (const cage of [pentagonalPyramid(), pentagonalBipyramid()]) {
+      const refined = subdivide(cage, 1);
+      const patches = quadCagePatches(refined);
+      const result = solveExactG1(refined, patches, valenceOf(refined));
+      expect(result.groups.length).toBeGreaterThan(0);
+      for (const group of result.groups) expect(group).toMatchObject({ consistent: true, reason: 'solved' });
+      expect(result.groups.some((group) => group.valences.includes(5))).toBe(true);
+      expect(worstBreak(refined, patches)).toBeGreaterThan(0.02);
+      expect(worstBreak(refined, result.patches)).toBeLessThan(1e-7);
+      // the corner poles (the refined cage vertices) never move
+      result.patches.forEach((patch, f) => {
+        for (const k of CORNERS) expect(patch[k]).toEqual((patches[f] as BezierPatch)[k]);
+      });
+    }
+  });
+
+  it('the pentagonal cap is refused because the quads at its boundary creases are frozen, not because of valence 5: with the freeze lifted every group is solved', () => {
+    const cap = subdivide(pentagonCap(), 1);
+    expect(cap.creases.length).toBeGreaterThan(0);
+    const frozen = solveExactG1(cap, quadCagePatches(cap), valenceOf(cap));
+    expect(frozen.groups.some((group) => !group.consistent)).toBe(true);
+    const lifted = { ...cap, creases: [] };
+    const patches = quadCagePatches(lifted);
+    const result = solveExactG1(lifted, patches, valenceOf(lifted));
+    expect(result.groups.length).toBeGreaterThan(0);
+    for (const group of result.groups) expect(group.consistent).toBe(true);
+    expect(worstBreak(lifted, result.patches)).toBeLessThan(1e-7);
   });
 
   it('closed form: two flat patches whose cross derivatives differ by a factor 2 across their edge (a = 2, beta = 0) already satisfy the conditions and are not moved; a tilted pair is moved until it is G1 to 1e-7 rad', () => {
