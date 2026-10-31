@@ -8,11 +8,14 @@ import { outcomeIsFailure } from '@protocol/commandOutcome';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { requestJson, type FetchLike } from '@server/restClient';
 import { saveDataFiles } from '@server/cli/saveFiles';
+import { isHostedExport } from '@server/exportFiles';
 
 export interface ExportFileOptions {
   readonly url: string;
   readonly token: string;
   readonly target: string;
+  /** The folder the backend writes hosted exports to (`desktopExportDir`): a reported file anywhere else is refused and left alone. */
+  readonly exportDir: string;
   readonly fetchImpl?: FetchLike;
 }
 
@@ -27,8 +30,11 @@ export async function export3mfToFile(options: ExportFileOptions): Promise<strin
   if (outcomeIsFailure('export_3mf', outcome, true))
     throw new Error(outcome.summary !== '' ? outcome.summary : `export_3mf failed (HTTP ${status})`);
   const file = isRecord(outcome.data) ? outcome.data['file'] : undefined;
-  if (!isRecord(file) || typeof file['path'] !== 'string') throw new Error(`export_3mf wrote no file: ${outcome.summary}`);
-  const saved = saveDataFiles(outcome.data, path.resolve(options.target))[0];
+  if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number')
+    throw new Error(`export_3mf reported no usable file (data.file.path and data.file.bytes are needed): ${outcome.summary}`);
+  if (!isHostedExport(file['path'], options.exportDir))
+    throw new Error(`export_3mf reported a file outside the export folder (${file['path']}); nothing was moved`);
+  const saved = saveDataFiles(outcome.data, path.resolve(options.target), options.exportDir)[0];
   if (saved === undefined) throw new Error('the exported file could not be saved');
   return `${saved.path} (${saved.bytes} bytes)`;
 }

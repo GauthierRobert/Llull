@@ -1,5 +1,5 @@
 /** Electron main: wiring only (unchanged server in a utility process + per-launch token); logic is in Electron-free modules. */
-import { app, BrowserWindow, dialog, Menu, shell, utilityProcess } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } from 'electron';
 import { randomBytes } from 'crypto';
 import { existsSync, mkdirSync } from 'fs';
 import { crashReportsDir } from '@server/crashReports';
@@ -8,7 +8,7 @@ import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
-import { backendEnv, backendOrigin, nativeBundleDir } from './backendEnv';
+import { backendEnv, backendOrigin, desktopExportDir, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { trustPendingKeys } from './keyTrust';
 import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vault';
@@ -39,6 +39,8 @@ const token = randomBytes(24).toString('hex');
 let backend: RunningBackend | null = null;
 let session: DocumentSession | null = null;
 let backendUrl = '';
+let exportDir = '';
+let exporting = false;
 let window: BrowserWindow | null = null;
 let quitting = false;
 let cliInstalled = false;
@@ -135,16 +137,37 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
   return ok;
 }
 
-/** File > Export 3MF…: the backend writes the package straight to the chosen file (export_3mf toFile). */
-async function exportThreeMf(): Promise<void> {
-  if (session === null) return;
-  const result = await dialog.showSaveDialog({ defaultPath: 'model.3mf', filters: [{ name: '3MF', extensions: ['3mf'] }] });
-  if (result.canceled || result.filePath === undefined) return;
-  const chosen = result.filePath;
-  await guarded('Export 3MF', async () => {
-    const message = await export3mfToFile({ url: backendUrl, token, target: chosen });
-    await dialog.showMessageBox({ type: 'info', message: 'Exported 3MF', detail: message });
-  });
+/** The outcome the renderer's Export menu shows (IPC `llull:export-3mf`). */
+interface ExportOutcome {
+  readonly ok: boolean;
+  readonly message: string;
+}
+
+/**
+ * Export 3MF…: the native save dialog, then the backend writes the package straight to the chosen file (export_3mf toFile). One export at a time.
+ * @failure no session, an export already running, a cancelled dialog or a refused export -> { ok: false, message }
+ */
+async function exportThreeMf(): Promise<ExportOutcome> {
+  if (session === null) return { ok: false, message: 'The backend is not running yet' };
+  if (exporting) return { ok: false, message: 'Another export is still running' };
+  exporting = true;
+  try {
+    const result = await dialog.showSaveDialog({ defaultPath: 'model.3mf', filters: [{ name: '3MF', extensions: ['3mf'] }] });
+    if (result.canceled || result.filePath === undefined) return { ok: false, message: 'Export cancelled' };
+    const chosen = path.extname(result.filePath) === '' ? `${result.filePath}.3mf` : result.filePath;
+    return { ok: true, message: await export3mfToFile({ url: backendUrl, token, target: chosen, exportDir }) };
+  } catch (error) {
+    return { ok: false, message: errorMessage(error) };
+  } finally {
+    exporting = false;
+  }
+}
+
+/** File > Export 3MF…: the same export, with a message box for the outcome. */
+async function exportThreeMfFromMenu(): Promise<void> {
+  const outcome = await exportThreeMf();
+  if (outcome.ok) await dialog.showMessageBox({ type: 'info', message: 'Exported 3MF', detail: outcome.message });
+  else if (outcome.message !== 'Export cancelled') dialog.showErrorBox('llull — Export 3MF failed', outcome.message);
 }
 
 async function openDocument(filePath?: string): Promise<void> {
@@ -304,7 +327,7 @@ function createWindow(url: string): BrowserWindow {
     width: 1440,
     height: 900,
     title: 'llull',
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.js') },
   });
   const origin = new URL(url).origin;
   created.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -342,11 +365,22 @@ async function boot(): Promise<void> {
   backend = await startBackend(
     (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
-    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env, nativeDir, vaultDir }),
+    backendEnv({
+      port,
+      token,
+      layout,
+      userDataDir: userData,
+      baseEnv: process.env,
+      nativeDir,
+      vaultDir,
+      exportDir: desktopExportDir(process.env, userData),
+    }),
     url,
     token,
   );
   backendUrl = url;
+  exportDir = desktopExportDir(process.env, userData);
+  ipcMain.handle('llull:export-3mf', () => exportThreeMf());
   session = createDocumentSession({ url, token });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
@@ -364,7 +398,7 @@ async function boot(): Promise<void> {
           vaultCheckOut: () => void vaultCheckOutItem(),
           vaultCheckIn: () => void vaultCheckInDocument(),
           showCrashReports: () => void showCrashReports(),
-          export3mf: () => void exportThreeMf(),
+          export3mf: () => void exportThreeMfFromMenu(),
         },
         process.platform,
         app.getName(),

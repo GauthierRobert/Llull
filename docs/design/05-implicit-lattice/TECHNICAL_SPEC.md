@@ -1020,7 +1020,7 @@ The sink halves the memory of a package that still fits in memory and exports th
 
 **Tests.** `tests/unit/exchange/threeMfFile.test.ts`: the sink archive equals the in-memory archive byte for byte (312 000 triangles), written in chunks of at most 64 KiB, limit refusal, no chunk held by `DeflateStream(onChunk)`, `toFile` at command level (path instead of base64, `close` once; `EXPORT_SINK_UNAVAILABLE`; `abort` on a refusal; below the automatic threshold the export stays in memory). `server/tests/export3mfFile.test.ts`: the real port writes the same bytes as memory, `--save` moves the file, a limit leaves nothing behind, and the slow test above. Red: `writeThreeMf` without the header patch fails the byte equality; an unlimited archive fails the limit test.
 
-**Left.** The document load and the desktop UI export dialog do not use `toFile` yet (the UI still takes the in-memory package); ZIP64 for archives above 4 GB; `export_3mf` of a level-set or beam-lattice body has no size problem and is unchanged.
+**Left.** The document load does not use `toFile` (it never exports a package); the desktop File > Export 3MF… and the renderer's Export menu ("3MF package", desktop only, through `window.llull.exportThreeMf()`, no argument) do; ZIP64 for archives above 4 GB; `export_3mf` of a level-set or beam-lattice body has no size problem and is unchanged.
 
 ### 14.13 Surface-UV cell maps and maps for strut lattices (DES-5c, 2026-10-30; FR-IMP-17, TR-IMP-07)
 

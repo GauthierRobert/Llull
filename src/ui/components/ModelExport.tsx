@@ -6,10 +6,12 @@ import { runQuery } from '@ui/services/localQuery';
 import { downloadBlob as download, downloadText } from '@ui/download';
 import { isCodeExportData, isStlExportData } from '@ui/resultData';
 import { type ExactExportCommand, fetchExactExport, fetchStepExport } from '@ui/services/serverFiles';
+import { desktopBridge } from '@ui/desktopBridge';
 
-type ExportFormat = 'stl' | 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step' | 'ap242' | 'iges';
+type ExportFormat = '3mf' | 'stl' | 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step' | 'ap242' | 'iges';
 
 const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
+  { value: '3mf', label: '3MF package (.3mf)' },
   { value: 'stl', label: 'STL mesh (.stl)' },
   { value: 'cadquery', label: 'CadQuery (.py)' },
   { value: 'build123d', label: 'build123d (.py)' },
@@ -29,7 +31,7 @@ export function ModelExport(): React.ReactElement {
   const [format, setFormat] = useState<ExportFormat>('stl');
   const [status, setStatus] = useState('');
 
-  const exportCode = (language: Exclude<ExportFormat, 'step' | 'stl' | 'ap242' | 'iges'>): void => {
+  const exportCode = (language: Exclude<ExportFormat, 'step' | 'stl' | 'ap242' | 'iges' | '3mf'>): void => {
     const result = runQuery('export_code', { language, name: 'model' });
     if (!isCodeExportData(result.data)) {
       setStatus(result.summary);
@@ -38,6 +40,17 @@ export function ModelExport(): React.ReactElement {
     const { text, fileName } = result.data;
     downloadText(text, fileName, 'text/plain');
     setStatus(result.summary);
+  };
+
+  const exportThreeMf = async (): Promise<void> => {
+    const bridge = desktopBridge();
+    if (bridge === null) {
+      setStatus('3MF export needs the desktop app');
+      return;
+    }
+    setStatus('Exporting 3MF…');
+    const outcome = await bridge.exportThreeMf();
+    setStatus(outcome.message);
   };
 
   const exportStl = (): void => {
@@ -65,7 +78,8 @@ export function ModelExport(): React.ReactElement {
   };
 
   const handleExport = (): void => {
-    if (format === 'ap242' || format === 'iges') void exportExact(format);
+    if (format === '3mf') void exportThreeMf();
+    else if (format === 'ap242' || format === 'iges') void exportExact(format);
     else if (format === 'step') void exportStep();
     else if (format === 'stl') exportStl();
     else exportCode(format);
@@ -80,7 +94,7 @@ export function ModelExport(): React.ReactElement {
         aria-label="Export format"
         title="Export the 3D model as script code, STEP (AP242 with validation properties) or IGES. Building drawings, DXF and IFC are in the Building panel › Deliverables."
       >
-        {FORMATS.map((f) => (
+        {FORMATS.filter((f) => f.value !== '3mf' || desktopBridge() !== null).map((f) => (
           <option key={f.value} value={f.value}>
             {f.label}
           </option>

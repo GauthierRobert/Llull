@@ -5,6 +5,9 @@
 
 import {
   closeSync,
+  copyFileSync,
+  mkdirSync,
+  renameSync,
   createReadStream,
   fstatSync,
   mkdtempSync,
@@ -19,7 +22,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createInflateRaw } from 'node:zlib';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
@@ -27,7 +30,7 @@ import type { MeshAssetPort } from '@core/geometry/mesh/assets';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { CRC32_INIT, crc32Final, crc32Update } from '@lib/crc32';
 import { unzip } from '@lib/zipRead';
-import { saveDataFiles } from '../src/cli/saveFiles';
+import { type MoveOps, moveHostedFile, saveDataFiles } from '../src/cli/saveFiles';
 import { EXPORT_FILE_MAX_AGE_MS, exportFilePort, isHostedExport, reapExportFiles } from '../src/exportFiles';
 
 interface GridMesh {
@@ -243,4 +246,48 @@ describe('export_3mf above the in-memory ceiling (LLULL_SLOW_TESTS=1)', () => {
     },
     1_800_000,
   );
+});
+
+describe('moving a hosted export (--save, desktop export)', () => {
+  let dir = '';
+  beforeEach(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'llull-move-'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  const sameVolumeFails = (to: string, copy?: MoveOps['copyFileSync']): MoveOps => ({
+    // a rename onto the final path fails (another volume, a locked target); the rename of the .part file works
+    renameSync: (from, destination) => {
+      if (destination === to && !from.endsWith('.part')) throw Object.assign(new Error('EXDEV'), { code: 'EXDEV' });
+      renameSync(from, destination);
+    },
+    copyFileSync: copy ?? copyFileSync,
+    rmSync,
+  });
+
+  it('copies through a .part file when the rename fails, and leaves only the final file', () => {
+    const [from, to] = [path.join(dir, 'hosted.3mf'), path.join(dir, 'out.3mf')];
+    writeFileSync(from, 'package');
+    moveHostedFile(from, to, sameVolumeFails(to));
+    expect(readFileSync(to, 'utf8')).toBe('package');
+    expect(readdirSync(dir).sort()).toEqual(['out.3mf']);
+  });
+
+  it('a failing copy leaves no partial file at the user path: the .part file and the hosted package are removed and the error is rethrown', () => {
+    const [from, to] = [path.join(dir, 'hosted.3mf'), path.join(dir, 'out.3mf')];
+    writeFileSync(from, 'package');
+    const failing = sameVolumeFails(to, (source, part) => {
+      writeFileSync(part, 'pa');
+      throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
+    });
+    expect(() => moveHostedFile(from, to, failing)).toThrow(/ENOSPC/);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('a hosted file outside the given export folder is not a hosted file (saveDataFiles refuses it)', () => {
+    const [exports, outside] = [path.join(dir, 'exports'), path.join(dir, 'other.3mf')];
+    mkdirSync(exports);
+    writeFileSync(outside, 'x');
+    expect(() => saveDataFiles({ file: { path: outside, bytes: 1 } }, path.join(dir, 'saved.3mf'), exports)).toThrow(/no file payload/);
+    expect(readFileSync(outside, 'utf8')).toBe('x');
+  });
 });

@@ -80,34 +80,60 @@ export interface SavedFile {
 }
 
 /** The host file a command wrote itself (`data.file = { path, bytes }`, e.g. `export_3mf` toFile), or null. */
-function hostedFileOf(data: unknown): { path: string; bytes: number; name: string | null } | null {
+function hostedFileOf(data: unknown, exportDir?: string): { path: string; bytes: number; name: string | null } | null {
   if (!isRecord(data)) return null;
   const file = data['file'];
-  if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number' || !isHostedExport(file['path']))
+  if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number' || !isHostedExport(file['path'], exportDir))
     return null;
   return { path: file['path'], bytes: file['bytes'], name: nonEmptyString(data['fileName']) ?? null };
 }
 
-/** Moves the host file to `target` (a directory keeps the suggested name); copies across volumes. */
+/** The file operations of a move, injectable so a failing volume or a locked target can be tested. */
+export interface MoveOps {
+  readonly renameSync: (from: string, to: string) => void;
+  readonly copyFileSync: (from: string, to: string) => void;
+  readonly rmSync: (file: string, options: { force: boolean }) => void;
+}
+
+/**
+ * Moves `from` to `to`: a rename, else (another volume, a locked file) a copy to `<to>.part` that is renamed into place, so `to` never holds a partial file.
+ * @failure the copy or the final rename fails -> the .part file and `from` are removed and the error is rethrown
+ */
+export function moveHostedFile(from: string, to: string, ops: MoveOps = fs): void {
+  try {
+    ops.renameSync(from, to);
+    return;
+  } catch {
+    // another volume or a locked target: fall through to the copy
+  }
+  const part = `${to}.part`;
+  try {
+    ops.copyFileSync(from, part);
+    ops.renameSync(part, to);
+    ops.rmSync(from, { force: true });
+  } catch (error) {
+    ops.rmSync(part, { force: true });
+    ops.rmSync(from, { force: true });
+    throw error;
+  }
+}
+
+/** Moves the host file to `target` (a directory keeps the suggested name). */
 function saveHostedFile(hosted: { path: string; bytes: number; name: string | null }, target: string): SavedFile[] {
   const directory = target.endsWith('/') || (fs.existsSync(target) && fs.statSync(target).isDirectory());
   const destination = directory ? path.join(target, hosted.name ?? path.basename(hosted.path)) : target;
   fs.mkdirSync(path.dirname(path.resolve(destination)), { recursive: true });
-  try {
-    fs.renameSync(hosted.path, destination);
-  } catch {
-    fs.copyFileSync(hosted.path, destination);
-    fs.rmSync(hosted.path, { force: true });
-  }
+  moveHostedFile(hosted.path, destination);
   return [{ path: destination, bytes: hosted.bytes }];
 }
 
 /**
  * Write `data`'s payload: one file -> `target` path (or a directory: suggested name); several -> `target` dir (created).
+ * `exportDir`: the folder a hosted file must be in (default: the host's own export folder).
  * @failure no payload in data / several files but target is an existing file -> Error
  */
-export function saveDataFiles(data: unknown, target: string): SavedFile[] {
-  const hosted = hostedFileOf(data);
+export function saveDataFiles(data: unknown, target: string, exportDir?: string): SavedFile[] {
+  const hosted = hostedFileOf(data, exportDir);
   if (hosted !== null) return saveHostedFile(hosted, target);
   const wantsPng = path.extname(target).toLowerCase() === '.png';
   const svg = wantsPng ? svgOfData(data) : undefined;
