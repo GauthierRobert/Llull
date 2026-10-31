@@ -4,7 +4,9 @@ import { tableRejection } from '../noop';
 
 const REMEDIATION = {
   BLD_LAW_INVALID: 'fix the named value; sizes are > 0 and expressions use t in [0, 1]',
-  BLD_LAW_NOT_PERIODIC: 'make the end radius equal the start, or use a periodic expression',
+  BLD_LAW_NOT_PERIODIC: 'make the end radius equal the start (leave radiusEnd out on a closed loop), or use a periodic expression',
+  BLD_CHAIN_UNSUPPORTED:
+    'select exactly the edges of ONE tangent chain (an open path or a closed loop whose joints are tangent within 0.01 rad), or give each edge its own law with edges[]',
   BLD_CHORD_UNDEFINED: 'use radius there, or split the edge',
   BLD_ASYMMETRIC_SIDE_MISSING: 'give side1Near (a point on the face that carries the first distance) or side1Name',
   BLD_BLEND_PARAMS: 'give exactly one of radius, width, law or holdLine (radiusEnd only with radius, widthEnd only with width)',
