@@ -292,6 +292,8 @@ interface EdgeContinuitySample {
   readonly point: Vec3;
   readonly g0: number;
   readonly g1: number;
+  /** `g1` signed by the fold of the two faces (convex positive, concave negative). */
+  readonly g1Signed?: number;
   readonly normalCurvature: readonly [number, number];
   /** The end sample sits on the collapsed side of a corner star: its normals are read just inside the end and its curvatures are 0 (not measured). */
   readonly nudged?: boolean;

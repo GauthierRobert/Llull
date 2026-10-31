@@ -61,6 +61,18 @@ describe('shell_solid', () => {
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('could not hollow this solid');
   });
+  it('says what the kernel named before it tried: a refusal that starts with [SHL_ is the summary, with the remedy', () => {
+    const named =
+      '[SHL_STAR_FACES] the solid carries corner-star faces of 64 x 64 poles. Open the shell at a face (openFacesNear), shell before filleting';
+    setGeometryKernel({ ...fakeKernel({ shell: null }), lastRefusal: () => 'OCC failure: ' + named });
+    const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toBe(`shell_solid: ${named}; document unchanged.`);
+    // any other kernel words, or none, keep the generic text
+    setGeometryKernel({ ...fakeKernel({ shell: null }), lastRefusal: () => 'Standard_Failure' });
+    expect(execute(doc, 'shell_solid', { id, thickness: 0.5 }).summary).toContain('could not hollow this solid');
+  });
   it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
     setGeometryKernel(fakeKernel({ unsupported: ['shell'] }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });

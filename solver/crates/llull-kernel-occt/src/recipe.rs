@@ -61,6 +61,8 @@ pub type Evaluated = Result<Option<Rc<Shape>>, EvalError>;
 
 pub struct Evaluator {
     cache: Lru<Option<Rc<Shape>>>,
+    /// The refusal text of a recipe cached as null (a thrown OCCT / named refusal), by recipe key: a repeated refused recipe answers the same reason.
+    reasons: Lru<String>,
     builds: u64,
     /// Document blobs (`BRepTools::Write` text by sha256 hex) that `brep` leaves read.
     blobs: HashMap<String, String>,
@@ -322,7 +324,7 @@ fn boolean_op(name: &str) -> Option<BooleanOp> {
 
 impl Evaluator {
     pub fn new(capacity: usize) -> Self {
-        Self { cache: Lru::new(capacity), builds: 0, blobs: HashMap::new(), reports: Lru::new(capacity) }
+        Self { cache: Lru::new(capacity), reasons: Lru::new(capacity), builds: 0, blobs: HashMap::new(), reports: Lru::new(capacity) }
     }
 
     /// Keeps blob `sha256` for `brep` leaves (idempotent) and forgets refusals, which may have been "blob missing"; false when the
@@ -333,6 +335,7 @@ impl Evaluator {
         }
         if self.blobs.insert(sha256.to_string(), text.to_string()).is_none() {
             self.cache.retain(Option::is_some);
+            self.reasons.retain(|_| false);
         }
         true
     }
@@ -350,13 +353,22 @@ impl Evaluator {
     pub fn evaluate(&mut self, recipe: &Value) -> Evaluated {
         let key = canonical_key(recipe);
         if let Some(hit) = self.cache.get(&key) {
-            return Ok(hit.clone());
+            let hit = hit.clone();
+            if hit.is_none() {
+                if let Some(reason) = self.reasons.get(&key) {
+                    return Err(EvalError::Failure(reason.clone()));
+                }
+            }
+            return Ok(hit);
         }
         self.builds += 1;
         let built = self.build(recipe);
         match &built {
             Ok(shape) => self.cache.insert(key, shape.clone()),
-            Err(EvalError::Failure(_)) => self.cache.insert(key, None),
+            Err(EvalError::Failure(reason)) => {
+                self.reasons.insert(key.clone(), reason.clone());
+                self.cache.insert(key, None);
+            }
             Err(EvalError::Unsupported(_)) => {}
         }
         built
@@ -564,6 +576,25 @@ mod tests {
         assert_eq!(evaluator.evaluate(&scaled).map(|shape| shape.is_none()), Ok(true), "blob not loaded yet: refused");
         assert!(evaluator.load_blob(&digest, &text));
         assert!((volume(evaluator.evaluate(&scaled)) - 48.0).abs() < 1e-9);
+    }
+
+    /// A recipe that throws (here the sealed shell with the fault hook: a named refusal) answers the same reason the second time, from the cache; a blob load forgets it with the other refusals.
+    #[test]
+    fn a_throwing_recipe_keeps_its_reason_until_a_blob_is_loaded() {
+        let _serial = crate::serial_blends();
+        let mut evaluator = Evaluator::new(8);
+        let shell = json!({ "op": "shell", "thickness": 1, "source": leaf(entity("box", json!({ "size": [10, 10, 10] }))) });
+        crate::test_bridge::set_shell_fault(1);
+        let first = evaluator.evaluate(&shell).err();
+        let second = evaluator.evaluate(&shell).err();
+        crate::test_bridge::set_shell_fault(0);
+        assert!(matches!(&first, Some(EvalError::Failure(text)) if text.contains("[SHL_NO_CAVITY]")), "{first:?}");
+        assert_eq!(first, second, "the second evaluation answers the same text");
+        // still the cached refusal with the hook off; a new blob forgets the refusals and the shell builds
+        assert!(evaluator.evaluate(&shell).is_err());
+        let text = crate::queries::write_brep(&crate::make_box([0.0; 3], [1.0, 1.0, 1.0]).unwrap().unwrap()).unwrap();
+        assert!(evaluator.load_blob(&sha256_hex(text.as_bytes()), &text));
+        assert!(evaluator.evaluate(&shell).unwrap().is_some(), "the reason is gone after the blob load");
     }
 
     #[test]

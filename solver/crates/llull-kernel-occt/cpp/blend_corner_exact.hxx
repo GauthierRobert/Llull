@@ -29,7 +29,8 @@ struct Patches {
 
 // The loop (ordered, closed) with the support face of each edge (`supports[k]` carries `loop[k]`; the faces are the outward ones of the split solid). False with `why` when the
 // construction is refused or its own measures exceed `max_gap` / `max_angle`; the caller falls back to another fill.
+// `allow_crease`: one vertex of the loop may join two supports that are NOT tangent (an unrounded edge of the part enters the hole there, 13.33.2); its spoke is a crease.
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false);
+           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false, bool allow_crease = false);
 
 }  // namespace llull::corner_exact

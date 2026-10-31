@@ -49,7 +49,7 @@ export const cornerSchema = z
       .number()
       .positive()
       .describe(
-        'Setback distance in document units, used for every edge meeting there. It must exceed the distance the neighbouring blends reach (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.' +
+        'Setback distance in document units, used for every edge meeting there (for an edge left sharp, the distance from the vertex at which it enters the corner patch; it must be shorter than that edge). It must exceed the distance the neighbouring blends reach (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.' +
           ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and with the same distance on every edge of the vertex it is the RADIUS OF A BALL around the vertex (the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex); with different distances each edge is cut by a plane normal to it at its own distance ALONG the edge (as on straight edges), and the planes must isolate the vertex ("the cut planes do not isolate the vertex" otherwise). The ball and the plane agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
       )
       .optional(),
@@ -79,7 +79,7 @@ export const cornerSchema = z
       .optional(),
   })
   .describe(
-    'Corner treatment at one vertex or all: a setback corner (every edge meeting there is rounded in this step with a constant radius: straight edges between planar faces, all convex or all concave, take the analytic builder and a star of exact sub-patches; a circle, a B-spline or a cylinder / cone / free-form face at the vertex takes the rolling-ball blend cut inside a ball of the setback around the vertex, one setback distance per vertex, the hole filled by a star of exact sub-patches, the plate fit as the fallback).',
+    'Corner treatment at one vertex or all: a setback corner (every edge meeting there is rounded in this step with a constant radius, except that at a vertex of exactly three edges ONE edge may be left sharp (pick that vertex with name or near, `all` skips it): the star keeps the sharp edge up to the point `setback` (or its own `setbacks` distance) from the vertex, continues it as a crease that fades to nothing at the pole of the star (a design choice: the alternative, a mitre like the rolling ball, would carry a true crease from the entry point to the pole; the star removes slightly more material than the rolling-ball mitre, growing with the setback, 0.24 to 2.33 mm3 measured for setbacks 1.5 to 3 at radius 1; the result reports data.corners[].crease = { sharpEdge, entryRad }), and is tangent everywhere else; straight edges between planar faces, all convex or all concave, take the analytic builder and a star of exact sub-patches; a circle, a B-spline or a cylinder / cone / free-form face at the vertex takes the rolling-ball blend cut inside a ball of the setback around the vertex, one setback distance per vertex, the hole filled by a star of exact sub-patches, the plate fit as the fallback).',
   );
 
 export type CornerInput = z.infer<typeof cornerSchema>;

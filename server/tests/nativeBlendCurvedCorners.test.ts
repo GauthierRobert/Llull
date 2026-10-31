@@ -144,8 +144,8 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     }
   });
 
-  // Downstream of the star: shell_solid (an inward offset) of the 1.2 / 1.2 / 1.6 block, open at the bottom, is a valid hollow solid in about 0.8 s. The SEALED cavity is not tested: the offset of the
-  // 64-pole faces of a star takes 17 s with equal setbacks and 120 s (the kernel call limit, then refused by name: "could not hollow this solid") with 1.6; the plain rounded block takes 0.1 s (13.22.6).
+  // Downstream of the star: shell_solid (an inward offset) of the 1.2 / 1.2 / 1.6 block, open at the bottom, is a valid hollow solid in about 0.8 s. The SEALED cavity is refused by name before the offset
+  // (the next test): the offset of its star faces (54 poles) takes 160 s and returns the solid without a cavity (13.33.6); the plain rounded block takes 0.1 s (13.22.6).
   it('the cylinder block with setbacks 1.2 / 1.2 / 1.6 can be shelled open at the bottom: a valid hollow solid with the faces of the star', () => {
     const { doc, id, vertex, edges } = dshape();
     const rounded = execute(doc, 'fillet_edge', {
@@ -164,6 +164,35 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(volume(hollow.document, result)).toBeGreaterThan(0);
     expect(volume(hollow.document, result)).toBeLessThan(full);
     expect(faces(hollow.document, result).length).toBeGreaterThan(25);
+  });
+
+  it('the same block shelled SEALED is refused by name before the offset: its star faces have 54 poles (13.33.6), the document is unchanged', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const rounded = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance: 1.6 }] }],
+    });
+    const solid = rounded.affected[0] as string;
+    const started = Date.now();
+    const sealed = execute(rounded.document, 'shell_solid', { id: solid, thickness: 0.2 });
+    expect(Date.now() - started).toBeLessThan(60_000); // the offset takes 160 s
+    expect(sealed.document).toBe(rounded.document);
+    expect(sealed.affected).toEqual([]);
+    expect(sealed.summary).toContain('shell_solid: [SHL_STAR_FACES]');
+    expect(sealed.summary).toContain('openFacesNear');
+    // the kernel caches the refusal TEXT with the refused recipe: the same command again gets the same named reason, word for word
+    const reason = kernel.lastRefusal?.();
+    expect(reason).toContain('[SHL_STAR_FACES]');
+    const again = execute(rounded.document, 'shell_solid', { id: solid, thickness: 0.2 });
+    expect(again.document).toBe(rounded.document);
+    expect(again.summary).toBe(sealed.summary);
+    expect(kernel.lastRefusal?.()).toBe(reason);
+    // a plain rounded block of the same shape (no setback corner, no star) is not refused for its faces
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
+    const hollow = execute(plain.document, 'shell_solid', { id: plain.affected[0] as string, thickness: 0.2 });
+    expect(hollow.summary).not.toContain('SHL_STAR_FACES');
   });
 
   it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {

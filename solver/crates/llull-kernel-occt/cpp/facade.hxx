@@ -78,6 +78,10 @@ void set_corner_c0_knots(bool on);
 void set_law_inversion_fault(int32_t after);
 void set_law_node_cap(int32_t nodes);
 void set_corner_trim(bool on);
+// Test-only hooks (features.cxx): the pole count from which a sealed shell of a solid with corner-star faces refuses, and the most poles of a star face seen by the last sealed shell.
+void set_shell_star_pole_limit(int32_t limit);
+void set_shell_fault(int32_t fault);
+int32_t last_shell_star_poles();
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).

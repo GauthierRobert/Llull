@@ -31,12 +31,17 @@ export function modifyFailure(command: string, kernel: GeometryKernel, modified:
       'several rounded edges meet); document unchanged. Round fewer edges per call, or clip the corners ' +
       'with boolean op intersect (e.g. a rounded-rectangle prism) instead.'
     );
-  if (command === 'shell_solid')
+  if (command === 'shell_solid') {
+    // a refusal the kernel named before it tried (SHL_*: corner-star faces too fine for the inward offset, 06 BLD 13.33.5): its own words, with the remedy
+    const named = kernel.lastRefusal?.() ?? null;
+    const at = named === null ? -1 : named.indexOf('[SHL_');
+    if (named !== null && at >= 0) return `shell_solid: ${named.slice(at)}; document unchanged.`;
     return (
       'shell_solid: the kernel could not hollow this solid into a valid one (returned null: thickness too ' +
       'large for a feature, a rounded edge whose radius is not larger than the thickness, an openFacesNear point that picks no face, or a ' +
       'self-intersecting offset); document unchanged. Try a smaller thickness (below the smallest fillet radius), or shell BEFORE filleting.'
     );
+  }
   return (
     `${command}: the kernel could not round these edges into a valid solid (returned null: size too large ` +
     'for a neighbouring face, or a blend meeting a tangent face; a recipe with per-edge radii also needs a kernel that reads them); ' +

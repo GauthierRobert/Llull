@@ -46,7 +46,11 @@ mod blend_mitre_tests;
 #[cfg(test)]
 mod blend_rail_tests;
 #[cfg(test)]
+mod blend_shell_tests;
+#[cfg(test)]
 mod blend_tests;
+#[cfg(test)]
+mod blend_third_tests;
 #[cfg(test)]
 mod blend_uneven_tests;
 #[cfg(test)]
@@ -55,6 +59,8 @@ mod bounds_tests;
 mod deform_infinite_tests;
 #[cfg(test)]
 mod deform_tests;
+#[cfg(test)]
+mod edge_fold_tests;
 #[cfg(test)]
 mod features_tests;
 #[cfg(test)]

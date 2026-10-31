@@ -143,6 +143,39 @@ describe('fillet_edge corners', () => {
     expect(recorded?.every((entry) => entry.name?.startsWith('v(e(') === true && entry.setback === 2)).toBe(true);
   });
 
+  it('a vertex where two of the three edges are rounded takes the corner by near or name: the edge left sharp gets its distance too (DES-6c 13.33); all skips it', () => {
+    const kernel = scriptedKernel({ topology: TOPOLOGY });
+    const { doc, id } = cube();
+    const vertex = solidVertices(TOPOLOGY)[0];
+    const meeting = vertex?.edges ?? [];
+    expect(meeting).toHaveLength(3);
+    const rounded = meeting.slice(0, 2);
+    const done = execute(
+      doc,
+      'fillet_edge',
+      {
+        id,
+        edgeIndices: rounded,
+        radius: 1,
+        corners: [{ near: corner, setback: 2, setbacks: [{ near: TOPOLOGY.edges[meeting[2] as number]?.mid, distance: 3 }] }],
+      },
+      ctxOf(kernel),
+    );
+    expect(done.rejected, done.summary).not.toBe(true);
+    const recipe = filletOf(done.document, done.affected[0] as string);
+    expect(recipe.edges).toHaveLength(2);
+    expect(recipe.corners).toHaveLength(1);
+    const distances = recipe.corners?.[0]?.distances ?? [];
+    expect(distances.map((entry) => entry.edge).sort()).toEqual([...meeting].sort());
+    expect(distances.find((entry) => entry.edge === meeting[2])?.distance).toBe(3);
+    expect(distances.filter((entry) => entry.edge !== meeting[2]).every((entry) => entry.distance === 2)).toBe(true);
+    expectNoOp(
+      execute(doc, 'fillet_edge', { id, edgeIndices: rounded, radius: 1, corners: [{ all: true, setback: 2 }] }, ctxOf(kernel)),
+      doc,
+      'no vertex has 3 or more rounded edges',
+    );
+  });
+
   it('a recorded vertex name wins on regeneration: the same vertex gets the corner; nothing more is recorded', () => {
     const kernel = scriptedKernel({ topology: TOPOLOGY });
     const { doc, id } = cube();
