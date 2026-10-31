@@ -130,6 +130,11 @@ export function planChain(
   }
   if (walked.length !== seeds.length) return { problem: `the shared edges ${seeds.join(', ')} are not one chain`, path: startPath };
   const total = walked.reduce((sum, entry) => sum + lengthOf(entry.edge), 0);
+  if (!(total > 0) || walked.some((entry) => !(lengthOf(entry.edge) > 0)))
+    return {
+      problem: `the length of the shared edges ${seeds.join(', ')} is unknown or zero, so a size over their arc length cannot be laid out`,
+      path: startPath,
+    };
   let run = 0;
   const edges = walked.map((entry): ChainEdge => {
     const length = lengthOf(entry.edge);
@@ -163,7 +168,7 @@ export function chainLaws(plan: ChainPlan, size: ChainSize, endPath: string): Ed
     if (plan.closed && Math.abs(a - b) > PERIODIC * Math.max(a, b))
       return {
         code: 'BLD_LAW_NOT_PERIODIC',
-        message: `the shared edges form a closed loop, so the size must return to its start: ${a} at the start but ${b} at the end`,
+        message: `the shared edges form a closed loop, so the size must return to its start: ${a} at the start but ${b} at the end (leave radiusEnd out on a closed loop)`,
         path: endPath,
       };
     at = (tau) => a + (b - a) * tau;
@@ -178,7 +183,7 @@ export function chainLaws(plan: ChainPlan, size: ChainSize, endPath: string): Ed
     )
       return {
         code: 'BLD_LAW_NOT_PERIODIC',
-        message: `the shared edges form a closed loop, so the law must return to its start: r(0) = ${values[0]} but r(1) = ${values[values.length - 1]}`,
+        message: `the shared edges form a closed loop, so the law must return to its start: r(0) = ${values[0]} but r(1) = ${values[values.length - 1]} (use a periodic expression on a closed loop)`,
         path: 'law.expression',
       };
     stations = Math.max(MIN_LAW_SAMPLES, Math.min(MAX_LAW_SAMPLES, samples));
