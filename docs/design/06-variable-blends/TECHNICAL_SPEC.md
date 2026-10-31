@@ -749,7 +749,7 @@ The taper takes about 3x the step time after review round 1 (8 to 16 s after rou
 ### 13.12.5 Left (exactly)
 
 - **The exact-boundary corner patch** (13.12.3): one Coons / Hermite quadrilateral per corner of the outline (n faces per corner), or a decision to keep the plate fit and `g0Corner`.
-- **Mixed-kind vertices**, smooth and multi-station radius laws, `size2` and profiles at a setback vertex, a rolling-ball neighbour on the same edge set, curved edges and faces: each is `BLD_CORNER_UNSUPPORTED` with the reason.
+- **Mixed-kind vertices** (built since §13.18), smooth and multi-station radius laws, `size2` and profiles at a setback vertex, a rolling-ball neighbour on the same edge set, curved edges and faces: each is `BLD_CORNER_UNSUPPORTED` with the reason.
 - **Profile corners on concave edges** (the automatic profile corner mode refuses them; the setback mode builds them).
 - **G2 corner patches**: `BRepFill_Filling` has no G2 order for these faces; needs the exact-boundary patch above.
 - **Corner time in the whole step** (tessellation of 8100-pole patches): a compact patch surface.
@@ -1054,6 +1054,92 @@ A solid with a void used to be refused by name ("several shells"): the profile a
 - Tests: `a_second_body_and_a_body_inside_a_void_are_refused_by_name` (a disjoint sphere in a compound; an island sphere in the pocket; red-proof: without the island check the profile path fails BRepCheck, the corner path would
   not), `a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket` (the corner builder: volume = the same corner on the solid cube less 4/3 pi 27).
 
+## 13.18 Mixed convex / concave vertices (DES-6c step 9, 2026-10-30): design
+
+Before this step a setback corner refused a vertex where convex and concave edges meet (`BLD_CORNER_UNSUPPORTED`, "a vertex of mixed kinds has no patch in this build"): the rim vertex of a notch (two convex
+top edges and the concave edge that goes down the notch), the foot of a rib on a plate edge, every re-entrant corner of a pocket or a step. The edge blends themselves are not the problem (the convex ones are
+cut, the concave ones fused, in one boolean, and the planner's algebra does not care which): the CORNER is, because of the faces at the vertex.
+
+### 13.18.1 What changes at a mixed vertex: a face can be reflex
+
+At a vertex of rounded planar edges every face F at V is bounded there by exactly two rounded edges a, b. Let s_a, s_b be their unit stubs (away from V), n the outward normal of F and w_a the unit
+inward direction of F perpendicular to edge a. Orient the pair so that F lies counterclockwise from a seen from outside (that is, (s_a x w_a) . n > 0) and let theta in (0, 2 pi) be the angle swept from s_a to s_b THROUGH F:
+cos theta = s_a . s_b and sin theta = (s_a x s_b) . n (signed). At an all-convex or all-concave vertex theta < pi for every face; at a mixed vertex a face can have theta > pi: the top face of a notch at its rim
+vertex has theta = 270 degrees (the two convex edges are 90 degrees apart, the face is the complement of the notch). theta = pi is two stubs along one line (refused already).
+
+Each blend leaves a contact line on F at the distance l_e(x) = off_e + slope_e x from its edge (x the distance from V along the edge; off_e, slope_e as in `plan_corner`, constant when the radius is). Put s_a on the
+x axis and F counterclockwise from it. The contact line of a is y = l_a(x); the contact line of b is {p : n_b . p = l_b}, with the inward normal n_b = (sin theta, -cos theta) of b, whatever theta is. Their intersection Q:
+
+    x_a = (l_b + l_a cos theta) / sin theta,   y = l_a            (and symmetrically x_b = (l_a + l_b cos theta) / sin theta along s_b)
+
+For theta < pi this is the existing `(leg_j + offset_i cos) / sine`: Q is in front of V and the setback d_a of a must exceed x_a for the contact point P_a = (d_a, l_a) to lie beyond Q (13.10.2). For theta > pi the same
+formula with the SIGNED sine gives x_a < 0: Q lies BEHIND V (270 degrees, l_a = l_b = l: Q = (-l, l)) and the face imposes no lower bound on a setback (the required value is clamped at 0). That is the sign change of the setback
+algebra: `plan_corner` used |sin theta|, which for a reflex face would have asked for a setback of |x_a| it does not need and, in the report of a too-short setback, for a minimum that does not exist; it now uses the signed
+value, ignores reflex pairs in the least-fixed-point report, and a slope c_1 = slope cos / sin that is negative cannot reach 1.
+
+### 13.18.2 The boundary of the hole on a reflex face: P_a -> Q -> P_b
+
+On a face with theta < pi the hole is bounded by the straight chord between the two contact points P_a, P_b (13.10): the chord cuts the corner off the face. On a reflex face that chord runs OUTSIDE the face
+(through the notch). The boundary is the path along the two contact lines to their intersection, P_a -> Q -> P_b: both segments are inside F (F contains the half plane beyond each contact line), Q is in the plane of F,
+and the part of F that is removed is the polygon V, W_a, P_a, Q, P_b, W_b (W the foot of the setback wall on the stub), a hexagon for 270 degrees. Q is computed in `plan_corner` for every reflex pair as the solution of the 2 x 2
+linear system "line a = line b" (constant or linearly varying radii alike) and is independent of the setbacks. The splitter then gets TWO tool edges for that face, (P_a, Q) and (Q, P_b), instead of one chord; a
+reflex face is recognised among the faces at the vertex of the cut solid by its plane (the cut faces are new shapes): Q lies in it and its normal is the recorded one.
+
+### 13.18.3 The patch: n-sided fill with more than 6 boundary curves
+
+The hole is bounded by one blend arc per edge (n of them) and one chord per wedge face or two segments per reflex face: 2n + r edges for r reflex faces (7 for the notch rim). `BRepOffsetAPI_MakeFilling` takes any number
+of constrained edges; each is added with its support face and G1, so the two segments of a reflex face are two constraints on the same support meeting at Q at an angle (a corner of the boundary, not a tangent
+continuation). The checks of the loop (`expected = 2 * edges`) count r more edges. The two checks that assume one kind of corner are replaced for a mixed vertex: the patch centre is not required to lie inside the
+source (convex) or outside (concave): a mixed corner has material on both sides, so the test is the volume sanity only for a step whose corners are all of one kind. What stays: validity, the gap of the patch to the
+blend ends (limit 5e-6 x diagonal, `g0Corner`), the angle to the supports (0.01 rad), tangency of the neighbouring blends.
+
+### 13.18.4 What is checked, with what, and what stays refused
+
+- Closed form / measured: the notched cube of 13.10 (10 mm cube minus the octant [5, 11]^3), the rim vertex (5, 5, 10): three edges, one concave and two convex, r = 1 (the top face, 270 degrees); the volume against the
+  sum of the spandrel prisms and a bounded patch region, the patch G1 to the faces and the blends (`worst_tangent_angle`), validity, face count (9 planes + 3 blends + 1 patch + ...), the polyline recorded in the notes.
+- Red-proof (13.18.5): with the straight chord on the reflex face the loop is not one loop (17 boundary edges). The signed sine of the algebra has no test of its own: a reflex pair asks for a setback
+  of |x_a| = l at most, below every setback these tests give, so |sin| builds the same corners; the sign matters for a setback shorter than the offset.
+  convex edges; the setback mode takes the mixed vertex).
+
+### 13.18.5 As built, measured
+
+- **Code** (`blend_corner.cxx`): `plan_corner` computes the signed sector per face (the edge from which the face lies counterclockwise, `sin theta = (s_a x s_b) . n`), skips a reflex pair in the setback algebra and in the least-fixed-point
+  report, and records for it the outward normal and Q (`Plan::Reflex`; the faces at a vertex are listed once per edge that meets it, so records are deduplicated by Q); `build_setback` gives the splitter the two edges
+  (P_a, Q), (Q, P_b) for a face whose plane contains a recorded Q, `expected` counts one more edge per reflex face, and the patch-side and volume sanity checks are skipped for a mixed corner (material on both sides).
+- **The notch rim** (`notched_cube` of 13.10, the rim vertex (5, 5, 10) and the inner vertex (5, 5, 5) together: two convex top edges, three concave edges): 16 faces (9 planes, 5 blends, 2 patches), valid,
+  worst tangent angle 0.0094, the volume change +0.5263 against the prisms (+0.1395 for the three added and two removed prism pieces) and the inner patch (+0.339, 13.10.3): the rim patch takes the rest, +0.048.
+  The notch is symmetric about x = y and the built solid is: centroid x = y and Ixx = Iyy to 1e-6 (the construction is not symmetric by itself: the polyline, the fill and the sewing are).
+  Test `a_vertex_of_convex_and_concave_edges_takes_a_setback_corner_through_the_contact_line_intersection`. Red-proof: with the straight chord on the reflex face the build stops with the 17 boundary edges of the first
+  experiment ("the hole at [5, 5, 10] is bounded by 17 edge(s) that do not close one loop (7 expected)").
+- **The foot of a boss** (`the_four_foot_corners_of_a_boss_on_a_plate_are_mixed_vertices_and_build`): a 8 x 8 x 6 boss on a 20 x 20 x 4 plate, the four foot edges (concave) and the four vertical edges of the boss (convex)
+  rounded, a setback corner at each foot vertex (two concave edges and a convex one: the opposite mix of the notch rim): 23 faces (11 planes, 8 blends, 4 patches), valid, centroid (10, 10), Ixx = Iyy, the patches take -0.180
+  together (-0.045 each; the rim patch of the notch, with the opposite mix, +0.048).
+- **Found while building it: `MakeFilling`'s G1Error is not what `check_blends` reads.** The first fit of the four feet reported a G1Error under the 0.01 limit and the built solid read 0.0107 rad across the chords of the walls.
+  A mixed corner is therefore judged by the angle MEASURED at 101 samples of every boundary edge (21 in the first version) (`boundary_angle`: the support normal from the edge's curve on the support, the patch normal from the patch edge that passes through the
+  middle of the loop edge, located by a 1D projection; a projection on the patch itself costs seconds on 8100 poles), limit 0.0095, and the next fit setting is tried above it: the same four feet read 0.0090 at most.
+  The cost: the first setting no longer passes, so a mixed corner takes two to three fills (about 4 s per corner on the boss against 1.4 s for a convex one). Corner speed is the next item.
+- **Left, refused by name as before:** a profile (conic / curvature) corner at a mixed vertex (the automatic profile corners round convex edges), a vertex with an unrounded third edge, curved edges or faces, `size2`, a varying size at
+  a mixed vertex has not been built or tested here (the algebra and Q handle a linear taper, no test), faces that are reflex at a vertex of four or more edges (the pairing is per face, so it should hold; untested).
+
+### 13.18.7 Second review round
+
+- **The volume bound is tighter and says what it catches.** Per corner it is the sum over its edges of setback x leg^2 (the slab of stub that edge leaves between the vertex and its blend end, the leg taken AT the
+  corner end of the edge, not mid-edge) plus the cube of the largest leg where the slabs meet; summed over the corners (about 2.05 on the notch rim step; the first version's cube of setback + leg was 25 x the measured
+  change on the rim and 109 x on the boss feet). It catches a patch far outside its corner. It does not catch a fold: a patch folded onto its neighbours changes the volume by less than any bound, and the oriented
+  check on the sewn solid is what catches it (the earlier claim of a sensitivity check with the bound at 0 is withdrawn: it only showed that the bound is evaluated).
+- **A tangency shortfall is retried, a wrong-way patch is not.** An oriented angle above kMixedFillAngle but below pi / 2 sets `fill_failed`, so the next fit setting or setback factor is tried; a patch that faces the other way
+  (above pi / 2) stays a hard failure.
+- **The guards are exercised** (`#[cfg(test)]` seams `oriented_angle_probe`, `boundary_angle_probe` in `blend_corner.cxx`, bridged in `test_bridge.rs`; the build never calls them): on the blend face of a filleted
+  block the oriented check reads < 1e-6 across its tangent edges as built and pi (to 1e-6) once the face is Reversed() in a rebuilt shell; the boundary measure is >= 0 for an intact boundary and -1 (not measured) with a loop edge
+  missing from `boundary`. `boundary_angle`'s 95 % rule is not exercised on its own.
+- **Q path.** The check classifies five points along each of the two segments (it was the midpoints).
+- **The taper test is pinned.** The notch rim with its top edges tapering 0.5 -> 0.3 BUILDS: 16 faces (9 planes, 5 blends, 2 patches), valid, worst patch angle 0.0075, volume change +0.724 in the band
+  prisms (closed form, 0.250 to 0.313) + the inner patch 0.339 + the rim patch (0.05 to 0.1). The 300 degree prism has 16 faces, two edges meet at Q = (3.2, 5, 6) and at (3.2, 5, 0) (the polyline corners), the prisms are
+  -0.677 and the two patches take +0.477 (+0.24 each: the sharp stub of a 300 degree corner is bigger than the notch rim's), the centroid is at y = 5 and Ixy = Iyz = 0.
+- **Patch edges are never skipped in the tests:** `worst_patch_angle` (every edge of a patch, 21 samples, no skip) sits next to `worst_tangent_angle` in the mixed tests.
+- **Not tested, stated:** a face that is reflex at a vertex whose edges are all of one kind (the behaviour change of 13.18.6): a convex solid has none, and the non-convex solids tried (a pyramid over a concave base, an L
+  prism) give a reflex face only at a vertex that also has a concave edge, i.e. a mixed one; a fixture needs a vertex of four or more edges and has not been built.
+
 ## 13.19 As built: a conic that fades to the circular arc at a kinked chain junction (DES-6c, 2026-10-30)
 
 ### 13.19.1 Why the junction kinked, and what cannot fix it
@@ -1073,10 +1159,11 @@ When the first pass is refused for a junction kink (conic only), `rails_blend` r
 ### 13.19.3 Measured (native llull-kernel, OCCT 7.9.2)
 
 R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, conic rho 0.5, blend 1:
+
 - before: refused, junction 0.0182 rad (limit 0.0095);
 - after: built (the rim is 9 edges, a closed chain of 9 blends, so 18 ends fade: both sides of every junction, which is the evidence that the junction is G1 and not only one side tangent to it), `junctionG1` 2.3e-6 rad (the largest angle between the normals of two blends along their junction), contacts with the walls G1 5.3e-6 rad, gap 4.1e-6 (limit 3.1e-4), 18 faded ends, reach 3.86 mm;
 - volume: the circular fillet removes 7.079 mm3 of 13838.71; the faded conic 6.216 mm3 (ratio 0.878). The conic alone (weight 1 at a right angle: a parabola) removes (r^2 / 6) / (r^2 (1 - pi / 4)) = 0.78 of the circle's per section, the circle all of it, so the faded blend is in between: the test asserts (0.80, 0.95).
-A chain that builds without the fade (R 20 cap, blend 1, 0.0077 rad) is unchanged and has no `circularFade`.
+  A chain that builds without the fade (R 20 cap, blend 1, 0.0077 rad) is unchanged and has no `circularFade`.
 
 ### 13.19.4 Left, by name
 
@@ -1089,3 +1176,68 @@ A chain that builds without the fade (R 20 cap, blend 1, 0.0077 rad) is unchange
 ### 13.19.5 Tests
 
 `a_chain_whose_curvature_blend_would_meet_at_more_than_the_g1_default_is_refused_and_a_conic_fades_to_the_circle` (`blend_rail_tests.rs`): the curvature refusal names both passes; the R 30 conic builds with the fade, junction below 1e-4 rad, contacts G1, volume ratio in (0.75, 1); the R 20 chain has no fade. Red-proof: with the fade disabled the same test fails with the 0.0182 rad refusal. `tests/unit/blendProfile.test.ts` (summary and data), tool-schema snapshot (description).
+
+### 13.18.6 Review round on §13.18
+
+- **The boundary measure fails closed.** `boundary_angle` (the fill-time angle, now at kGapSamples + 1 = 101 samples as `check_blends` reads) returns false, and the fill attempt fails ("a boundary that could not be measured
+  against its supports"), unless EVERY loop edge was matched to a patch edge and at least 95 % of its samples were measured; before, an unmatched edge or a failed projection read 0 and passed.
+- **The orientation is checked after the sewing.** The fill-time angle is of the normal LINES (`n.Angle(m)` folded into [0, pi/2]): a patch tangent to its support but facing the other way reads 0. The check that catches
+  that is `oriented_patch_angle`, on the sewn solid, for every patch of a mixed corner: along every edge of the patch image the outward normals of both faces (the face orientation applied) differ by less than
+  kMixedFillAngle (0.0095), sampled at 101 points; an anti-parallel pair reads pi and fails by name ("it faces the other way"); an edge with other than two faces, or without a curve on a face, fails as unmeasured.
+- **The volume check covers every step.** A step with a mixed corner used to skip the volume checks altogether. The sign test (convex steps lose volume, concave ones gain) is still only defined for a step of one kind,
+  but a bound applies to all: the patches only replace the sharp stubs between the blend ends, which fit in a cube of the longest setback plus the longest tangent distance of the edges of each corner, so the volume after
+  the tools (measured: the prisms exactly) moves by less than the sum of those cubes. (Withdrawn in 13.18.7: the bound only shows that the check is evaluated.)
+- **Q is checked** (`plan_corner`, once the setbacks are final). It must be computable (|u x v . n| > 1e-9 |u||v| and finite: parallel contact lines refuse the corner naming the vertex), in front of nothing it should not
+  be (the position of Q along each stub must be below that edge's setback: a taper can bring it forward of the contact point), inside the source face, and the two tool segments (P_a, Q) and (Q, P_b) must have their midpoints
+  inside it. As the sector tends to 2 pi, Q goes to r cot(phi / 2): in plain geometry the notch edge's own tangent distance, r cot(phi / 2) too, outgrows the setback first (`a_reflex_face_too_narrow_for_its_path_is_refused_by_name`:
+  BLD_SETBACK_TOO_SHORT with 22.9 at the vertex), so the Q guard itself is not reached by a prism and is not tested alone. A reflex record is one per source face (`IsSame`); the cut face that carries it is
+  found by plane and Q, and two records in one plane at one vertex fail by name.
+- **Behaviour change, stated:** a face that is reflex at a vertex whose edges are all of one kind (a convex vertex of four edges whose face sweeps more than pi, say) now takes the Q path instead of the chord, which crossed the face
+  outside.
+- **Why the measured boundary angle is not applied to every corner.** For corners of one kind, `MakeFilling`'s G1Error was the criterion and the built solids read 0.0045 (the 10 mm cube, eight corners) to 0.0094 (the notch)
+  at the tangency check, under the 0.01 limit with a margin; only the mixed corners were seen above it (0.0107). Applying the measure to every corner costs a fill per rejected attempt (the first setting passes for
+  the cube corners today) and would change patches that are valid; it is the follow-up if a one-kind corner is found above the limit.
+- **Tests:** `a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmetry` (a prism of an outline with a 60 degree notch, the reflex top and bottom faces; the solid is mirror symmetric about y = 5, so the
+  centroid y is 5 and Ixy = Iyz = 0 to 1e-6), `a_taper_on_a_mixed_corner_builds_or_is_refused_by_name` (the rim with its two top edges tapering 0.5 -> 0.3), `worst_patch_angle` (never skips an edge of a patch: the old
+  helper skipped any edge with a sample above 0.5 rad, a fold-back included; 21 samples), the rim patch band is +0.03 to +0.07 (measured +0.048), Ixx = Iyy and Ixz = Iyz to 1e-6.
+  `nativeBlendCorners.test.ts` pins the reason of the remaining refusal ("the face closing the rounded edge at [0, 0, 0] is too oblique to the edge"). No test provokes an unmeasured boundary or a folded patch: neither is
+  reachable by a prism, the checks are closed by construction.
+
+## 13.20 As built: the corner fills run in parallel (DES-6c step 10, 2026-10-31)
+
+### 13.20.1 Where the time of a setback step goes
+
+Profile of the 8-corner cube (10 mm, radius 1, setback 2, release, 1.96 s): plan + tools 4 ms, tools boolean + unify 23 ms, chords + split 11 ms, `BRepOffsetAPI_MakeFilling::Build` 8 x 175 to 225 ms (1.6 s: 82 %), the rest
+of the corner loop 13 ms, sew + solid + `BRepCheck_Analyzer` 197 ms, volume 100 ms. The gap check after a fill is 1 ms and each corner takes one fill attempt. The first fit setting (15 points, degree 12, 60 segments) is the
+cheapest that passes: 45 segments leave one corner at 8.9e-5 against the limit 8.2e-5, 40 at 1.14e-4 (the exact-boundary patch of 13.12.3 is what would change that).
+
+### 13.20.2 Construction
+
+The loop over the corners is three loops (`blend_corner.cxx`):
+
+1. **serial, in corner order:** isolate the hole of every corner (`FillJob`: the faces it replaces, the loop, the boundary edges and their supports, both fill tolerances). A hole that cannot be isolated is recorded in the job
+   (`hole_error`), not returned, so that errors are still reported in the order of the serial run (an earlier corner's fill failure comes before a later corner's hole error);
+2. **parallel:** `fill_all` runs `fill_corner` (the fit settings in turn until a patch passes) on up to `corner_threads` threads, one job per task from an atomic counter;
+3. **serial, in corner order:** the same checks as before (the side of the solid, the patches, the names, the removed faces).
+
+**No TopoDS is shared between threads.** In loop 1 the support faces of a job (which carry its boundary edges) are put in a compound and copied with their geometry (`BRepBuilderAPI_Copy`, `copyGeom` on); the boundary,
+the supports and the loop of the job are the copies (`ModifiedShape`), so the handles and caches OCCT touches in a task belong to that task. The patch is built from the copies, and it is sewn to the split solid by its geometry,
+as before (the patch edges were never the edges of the loop).
+
+**Threads.** `corner_threads`: the test hook `set_corner_threads`, else `LLULL_CORNER_THREADS`, else `std::thread::hardware_concurrency`, at most 8 and at most one per job; 1 runs inline. The build does not depend on the
+number: the jobs are independent, the finish is serial.
+
+**Failures (review).** The cap is per call (each build plans its own threads; none are shared between builds). A worker catches everything (`catch (...)`) and keeps the exception in its job (`FillJob::error`); the serial
+finish rethrows it at that corner, so an OCCT exception or a `std::bad_alloc` in a fill reaches the facade's try/catch as it did serially (a fill that throws is an error of the build, not a retry with the next fit
+setting). If a thread cannot be created (`std::system_error`) the calling thread and the started ones take its jobs from the counter, and a joiner (`Workers`) joins every started thread whatever leaves the scope. The first
+failed position is kept (atomic minimum): the jobs above it are skipped, and the jobs after the first hole that could not be isolated are not started, so a failing step costs no more than the serial one. Lookups in the copy
+(`ModifiedShape`) get the orientation of the shape looked up. Safety of the shared allocator rests on OCCT's default (`MMGT_OPT=0`, the system malloc, thread safe): `MMGT_OPT=1` without `MMGT_REENTRANT=1` would not be, and
+the sidecar sets neither. Tests: `an_exception_in_a_parallel_fill_is_an_error_of_the_build_not_the_end_of_the_process`, `a_thread_that_cannot_be_created_leaves_its_jobs_to_the_others`.
+
+### 13.20.3 Measured, and what is the same
+
+- **Byte-identical.** The 8-corner cube and the four feet of the boss, before the change (serial, shared shapes): volume 0x408e4dd9f784d7b7 / 0x409efff50ae3049e, area 0x4080de16eeef0abe / 0x409451df6f694288. After, on 1, 2 and 8
+  threads, twice each: the same bits (test `the_corner_fills_give_the_same_solid_on_any_number_of_threads`: the volume and area to the bit, 26 and 23 faces, valid, the same on every run).
+- **Time** (release, a busy 22-thread machine): cube 2100 ms before; 1990 / 1374 / 1033 / 952 ms on 1 / 2 / 4 / 8 threads; boss feet 7092 ms before; 5851 / 3642 / 2711 / 2854 ms. About 2.1x, not 8x: what is left is
+  serial (sewing, `BRepCheck`, the volume: about 350 ms on the cube) and the machine's other work; OCCT's allocator shares one heap.
+- **Not done:** the serial 350 ms (sew + `BRepCheck_Analyzer` 197 ms, volume 100 ms) have no cheap path: the validity analysis is the guarantee, and the volume is the sign / bound check of 13.18.6.

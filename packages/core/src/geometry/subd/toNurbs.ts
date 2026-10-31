@@ -9,12 +9,13 @@
  */
 
 import type { Vec3 } from '../../model/types';
-import { cross3, distance3, dot3, normalize3OrZero, sub3 } from '../../lib/vec3';
+import { distance3, dot3 } from '../../lib/vec3';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
 import { edgeKey } from './edgeKey';
-import { MEASURE_STATIONS, fitTangentPlanes } from './g1Fit';
+import { type ExactG1, type ExactG1Group, solveExactG1 } from './g1Exact';
+import { MEASURE_STATIONS, fitTangentPlanes, patchNormal } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
 import { settleLevels } from './settle';
@@ -28,6 +29,22 @@ export interface ToNurbsOptions {
   readonly samples: number;
   /** Fit the interior poles of the quads around extraordinary vertices to the tangent planes of their neighbours (`g1Fit.ts`). */
   readonly fitTangents?: boolean | undefined;
+  /**
+   * With `fitTangents`: "exact" = the linear G1 solve (`g1Exact.ts`), the fit where it has no solution; "fit" = the approximate tangent-plane fit only; "auto" (default) = both are
+   * built and the exact one is kept when its break is within the tolerance and its deviation from the limit surface is at most max(1.25 x the fit one, `deviationTolerance`),
+   * the fit otherwise, the exact one when only it meets the tolerance.
+   */
+  readonly g1Solve?: 'exact' | 'fit' | 'auto' | undefined;
+  /** "auto": the deviation (document units) up to which the exact solve is accepted whatever the fit does; default 1e-3 x the diagonal of the cage. */
+  readonly deviationTolerance?: number | undefined;
+}
+
+/** How the G1 method was chosen: the one kept, why, and both deviations (null where a method was not built or not valid). */
+interface G1Choice {
+  readonly chosen: 'exact' | 'fit';
+  readonly reason: string;
+  readonly exactDeviation: number | null;
+  readonly fitDeviation: number | null;
 }
 
 interface EvEdgeReport {
@@ -57,6 +74,19 @@ export interface ToNurbsResult {
   readonly refineLevels: number;
   /** With a tangent tolerance: whether the refinement reached it before the patch budget ran out; null without one. */
   readonly g1ToleranceMet: boolean | null;
+  /** With a G1 request and extraordinary vertices: how the interior poles were found, "exact" (every group satisfies the linear G1 conditions) or "fit" (the tangent-plane fit); null otherwise. */
+  readonly g1Method: 'exact' | 'fit' | null;
+  /** The groups of quads the exact solve could not make G1 (empty when the method is "exact"). */
+  readonly exactRefused: ExactG1Group[];
+  /** With the exact method: "boundary-kept" (only interior poles moved) or "edges-freed" (the inner edge poles between free quads moved too); null otherwise. */
+  readonly exactMethod: ExactG1['method'];
+  /** Quads whose poles the exact solve was allowed to move (the patch count never changes); 0 without it. */
+  readonly exactFreeQuads: number;
+  /** What the exact solve's free poles approached: "limit" (the limit surface at samples), "start" (the geometry poles, groups too big for the dense path); null without the exact method. */
+  readonly exactObjective: 'limit' | 'start' | null;
+  readonly g1Choice: G1Choice | null;
+  /** Largest deviation of the plain (G0) patches from the limit surface: what a G1 method is measured against; null without a G1 request or extraordinary vertices. */
+  readonly plainMaxDeviation: number | null;
 }
 
 /** A bicubic Bézier patch as a clamped bicubic NURBS surface with domain [0, 1]². */
@@ -72,14 +102,9 @@ export function patchSurface(patch: BezierPatch): NurbsSurfaceData {
   };
 }
 
-/** Surface point and unit normal of `patch` at (u, v). */
+/** Surface point and unit normal of `patch` at (u, v): the normal by analytic derivatives, so a break of 1e-8 rad is not drowned by differencing noise. */
 function patchFrame(patch: BezierPatch, u: number, v: number): { point: Vec3; normal: Vec3 } {
-  const h = 1e-6;
-  const [u0, u1] = [Math.max(0, u - h), Math.min(1, u + h)];
-  const [v0, v1] = [Math.max(0, v - h), Math.min(1, v + h)];
-  const du = sub3(patchPoint(patch, u1, v), patchPoint(patch, u0, v));
-  const dv = sub3(patchPoint(patch, u, v1), patchPoint(patch, u, v0));
-  return { point: patchPoint(patch, u, v), normal: normalize3OrZero(cross3(du, dv)) };
+  return { point: patchPoint(patch, u, v), normal: patchNormal(patch, u, v) };
 }
 
 /** Parameter of side `k` (directed v_k -> v_k+1) of a patch at fraction t along it. */
@@ -144,17 +169,121 @@ interface Build {
   readonly valence: number[];
   readonly patches: BezierPatch[];
   readonly evEdges: EvEdgeReport[];
+  readonly g1Method: 'exact' | 'fit' | null;
+  readonly exactRefused: ExactG1Group[];
+  readonly exactMethod: ExactG1['method'];
+  readonly exactFreeQuads: number;
+  readonly exactObjective: 'limit' | 'start' | null;
+  readonly g1Choice: G1Choice | null;
+  readonly plainMaxDeviation: number | null;
+  /** The exact solve was built and refused (a later refinement level does not try again). */
+  readonly exactRefusedHere: boolean;
 }
 
-function buildLevel(cage: Cage, levels: number, fit: boolean): Build {
+/** The kept method of "auto": the exact one when it meets the tolerance and stays near the limit surface, the fit when it does not, the exact one when only it meets the tolerance. */
+function chooseSolve(
+  exact: { breakDeg: number; deviation: number },
+  fit: { breakDeg: number; deviation: number },
+  tolerance: number,
+  deviationTolerance: number,
+): G1Choice {
+  const exactDeviation = exact.deviation;
+  const fitDeviation = fit.deviation;
+  if (exact.breakDeg > tolerance)
+    return { chosen: 'fit', reason: 'the exact solve misses the tangent tolerance', exactDeviation, fitDeviation };
+  if (fit.breakDeg > tolerance)
+    return { chosen: 'exact', reason: 'only the exact solve meets the tangent tolerance', exactDeviation, fitDeviation };
+  if (exactDeviation <= Math.max(1.25 * fitDeviation, deviationTolerance))
+    return {
+      chosen: 'exact',
+      reason: 'both meet the tolerance and the exact deviation is within max(1.25 x the fit, the deviation tolerance)',
+      exactDeviation,
+      fitDeviation,
+    };
+  return {
+    chosen: 'fit',
+    reason: 'both meet the tolerance and the exact deviation exceeds max(1.25 x the fit, the deviation tolerance)',
+    exactDeviation,
+    fitDeviation,
+  };
+}
+
+function buildLevel(cage: Cage, levels: number, options: ToNurbsOptions, allowExact: boolean): Build {
   const refined = subdivide(cage, levels);
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const valence = topology.vertexEdges.map((edges, v) =>
     edges.length === (topology.vertexFaces[v] as number[]).length ? edges.length : 4,
   );
   const geometry = quadCagePatches(refined);
-  const patches = fit ? fitTangentPlanes(refined, geometry, valence) : geometry;
-  return { refined, valence, patches, evEdges: evEdgeReports(refined, patches, valence) };
+  const fit = options.fitTangents === true;
+  const hasStar = valence.some((n) => n !== 4);
+  const mode = options.g1Solve ?? 'auto';
+  const build = (patches: BezierPatch[]): Build => ({
+    refined,
+    valence,
+    patches,
+    evEdges: evEdgeReports(refined, patches, valence),
+    g1Method: null,
+    exactRefused: [],
+    exactMethod: null,
+    exactFreeQuads: 0,
+    exactObjective: null,
+    g1Choice: null,
+    plainMaxDeviation: null,
+    exactRefusedHere: false,
+  });
+  if (!fit || !hasStar) return build(geometry);
+  // the exact linear solve (a cage whose groups it cannot make G1 keeps the approximate fit), the approximate fit, the plain patches to measure both against
+  const exact = mode !== 'fit' && allowExact ? solveExactG1(refined, geometry, valence) : null;
+  const exactHolds = exact !== null && exact.groups.length > 0 && exact.groups.every((group) => group.consistent);
+  const fitted = mode === 'exact' && exactHolds ? null : fitTangentPlanes(refined, geometry, valence);
+  const plainMaxDeviation = deviation(refined, geometry, options.samples).max;
+  let chosen: 'exact' | 'fit' = exactHolds ? 'exact' : 'fit';
+  let g1Choice: G1Choice | null = null;
+  if (mode === 'auto' && exactHolds && fitted !== null && exact !== null) {
+    const diagonal = Math.hypot(
+      ...[0, 1, 2].map(
+        (axis) => Math.max(...refined.vertices.map((p) => p[axis] as number)) - Math.min(...refined.vertices.map((p) => p[axis] as number)),
+      ),
+    );
+    const measure = (patches: BezierPatch[]): { breakDeg: number; deviation: number } => ({
+      breakDeg: Math.max(0, ...evEdgeReports(refined, patches, valence).map((edge) => edge.g1Deg)),
+      deviation: deviation(refined, patches, options.samples).max,
+    });
+    g1Choice = chooseSolve(
+      measure(exact.patches),
+      measure(fitted),
+      options.tangentToleranceDeg ?? Infinity,
+      options.deviationTolerance ?? 1e-3 * diagonal,
+    );
+    chosen = g1Choice.chosen;
+  } else if (mode === 'auto' && !exactHolds)
+    g1Choice = {
+      chosen: 'fit',
+      reason: exact === null ? 'the exact solve was refused at a coarser level' : 'the exact solve has no solution for this cage',
+      exactDeviation: null,
+      fitDeviation: null,
+    };
+  else if (mode !== 'auto')
+    g1Choice = {
+      chosen,
+      reason: `g1Solve "${mode}" was asked for${mode === 'exact' && !exactHolds ? ' (the exact solve has no solution: the fit)' : ''}`,
+      exactDeviation: null,
+      fitDeviation: null,
+    };
+  const patches = chosen === 'exact' && exact !== null ? exact.patches : (fitted ?? fitTangentPlanes(refined, geometry, valence));
+  return {
+    ...build(patches),
+    g1Method: chosen,
+    exactRefused: exact === null ? [] : exact.groups.filter((group) => !group.consistent),
+    exactMethod: chosen === 'exact' && exact !== null ? exact.method : null,
+    exactFreeQuads: chosen === 'exact' && exact !== null ? exact.freeQuads : 0,
+    exactObjective:
+      chosen === 'exact' && exact !== null ? (exact.groups.every((group) => group.objective === 'limit') ? 'limit' : 'start') : null,
+    g1Choice,
+    plainMaxDeviation,
+    exactRefusedHere: exact !== null && !exactHolds,
+  };
 }
 
 const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((edge) => edge.g1Deg));
@@ -162,12 +291,16 @@ const worstBreak = (build: Build): number => Math.max(0, ...build.evEdges.map((e
 /** The cage's patches as NURBS sheets with the conversion report. The cage may be open (boundary edges are creases) and may contain n-gons. */
 export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult {
   let refineLevels = Math.max(1, settleLevels(cage));
-  const fit = options.fitTangents === true;
-  let build = buildLevel(cage, refineLevels, fit);
+  let build = buildLevel(cage, refineLevels, options, true);
+  let allowExact = !build.exactRefusedHere;
+  let refusal = build.exactRefused;
   const tolerance = options.tangentToleranceDeg;
   while (tolerance !== undefined && worstBreak(build) > tolerance && build.patches.length * 4 <= MAX_REFINED_PATCHES) {
     refineLevels++;
-    build = buildLevel(cage, refineLevels, fit);
+    // an exact solve that was refused is not tried again on the finer cages (its cost grows with them and the refusal does not go away)
+    build = buildLevel(cage, refineLevels, options, allowExact);
+    if (build.exactRefusedHere) refusal = build.exactRefused;
+    allowExact = allowExact && !build.exactRefusedHere;
   }
   const { refined, patches, evEdges } = build;
   const blocks = options.packed ? packedBlocks(prepare(refined)).filter((block) => block.quads.length > 1) : [];
@@ -190,5 +323,13 @@ export function cageToNurbs(cage: Cage, options: ToNurbsOptions): ToNurbsResult 
     maxEvG1Deg: worstBreak(build),
     refineLevels,
     g1ToleranceMet: tolerance === undefined ? null : worstBreak(build) <= tolerance,
+    g1Method: build.g1Method,
+    // the groups refused at the level where the exact solve was tried (the finer levels do not try again)
+    exactRefused: build.exactMethod === null ? refusal : [],
+    exactMethod: build.exactMethod,
+    exactFreeQuads: build.exactFreeQuads,
+    exactObjective: build.exactObjective,
+    g1Choice: build.g1Choice,
+    plainMaxDeviation: build.plainMaxDeviation,
   };
 }
