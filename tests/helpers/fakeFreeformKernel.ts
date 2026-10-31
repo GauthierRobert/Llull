@@ -33,6 +33,8 @@ export interface FakeFreeformOptions {
   readonly reversed?: boolean;
   /** Material thickness below the face, along the inward normal (default 10): the point deeper than this is outside the solid. */
   readonly thickness?: number;
+  /** The face is trimmed: `faceContains` answers true only where this holds (and the point is on the surface). */
+  readonly trim?: (point: Vec3) => boolean;
   /** Area of the freeform face (the fake does not integrate it). */
   readonly area?: number;
 }
@@ -117,6 +119,7 @@ export function fakeFreeformKernel(patch: PortSurface, options: FakeFreeformOpti
       ],
       faceContains: (_shape, _face, point) => {
         if (options.containsNothing === true) return false;
+        if (options.trim !== undefined && !options.trim(point)) return false;
         const uv = chart.uvOfPoint(point);
         const at = chart.pointAt(uv);
         return Math.hypot(at[0] - point[0], at[1] - point[1], at[2] - point[2]) < 1e-4;

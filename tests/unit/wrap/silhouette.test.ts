@@ -203,15 +203,21 @@ describe('silhouettes', () => {
     const patch = silhouettes(session([sphere], { patch: true }), [1, 2, 2]);
     expect(patch.curves).toEqual([]);
     expect(patch.unsupported[0]?.reason).toContain('leaves this sphere patch');
-    const torus: Geometry = {
+    // a B-spline face the kernel gives no B-spline for, and a face of another freeform kind (here a revolution), are refused by reason
+    const freeform: Geometry = {
       surface: { type: 'other', kind: 'bspline' },
       uvBounds: [
         [0, 0],
         [1, 1],
       ],
     };
-    expect(silhouettes(session([torus]), [0, 0, 1]).unsupported).toEqual([
-      { face: 0, surface: 'other', reason: 'only plane, cylinder, cone, sphere and torus faces have a closed-form silhouette' },
+    const withoutPort = session([freeform]);
+    const noBspline = { ...withoutPort, query: { ...withoutPort.query, bspline: () => null } } as SolidSession;
+    expect(silhouettes(noBspline, [0, 0, 1]).unsupported).toEqual([
+      { face: 0, surface: 'bspline', reason: 'the kernel gave no exact B-spline for this freeform face' },
+    ]);
+    expect(silhouettes(session([{ ...freeform, surface: { type: 'other', kind: 'revolution' } }]), [0, 0, 1]).unsupported).toEqual([
+      { face: 0, surface: 'other', reason: 'only plane, cylinder, cone, sphere, torus and B-spline faces have a silhouette' },
     ]);
   });
 

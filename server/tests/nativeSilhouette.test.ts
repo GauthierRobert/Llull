@@ -147,8 +147,9 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP silhouette' })('WRP s
     expect(execute(box.document, 'split_at_silhouette', { id: box.affected[0], direction: [0, 0, 0] }).error?.code).toBe(
       'WRP_PARAM_INVALID',
     );
+    // seen in its equatorial plane a torus has four crossing contour circles (along its axis it has the two parallels, covered by nativeSilhouetteTorus)
     const torus = must(base(), 'add_torus', { ringRadius: 30, tubeRadius: 8 });
-    expect(execute(torus.document, 'split_at_silhouette', { id: torus.affected[0], direction: [0, 0, 1] }).error?.code).toBe(
+    expect(execute(torus.document, 'split_at_silhouette', { id: torus.affected[0], direction: [1, 0, 0] }).error?.code).toBe(
       'WRP_SILHOUETTE_UNSUPPORTED',
     );
     expect(execute(base(), 'split_at_silhouette', { id: 'missing', direction: [1, 0, 0] }).error?.code).toBe('WRP_ENTITY_NOT_FOUND');
