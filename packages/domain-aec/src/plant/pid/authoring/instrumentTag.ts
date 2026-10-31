@@ -1,4 +1,6 @@
-/** Minimal instrument tag split of the authoring commands (M3): letters, separator, loop number, suffix. The ISA 5.1 grammar and letter tables are M4 (`parse_instrument_tag`). */
+/** Instrument tag split of the authoring commands: the ISA 5.1 parser (`tags/parseTag.ts`) reduced to the stored parts. */
+
+import { parseTag } from '../tags/parseTag';
 
 export interface TagParts {
   readonly category: string;
@@ -7,15 +9,18 @@ export interface TagParts {
   readonly suffix: string;
 }
 
-/** `FIC-101`, `PDIT 12.01`, `FV101A`: 1 to 6 capital letters, optional `-` or space, a loop number (digits, optional `.digits`), an optional suffix letter. */
-const INSTRUMENT_TAG = /^([A-Z])([A-Z]{0,5})[- ]?(\d{1,9}(?:\.\d{1,9})?)([A-Z]?)$/;
-
+/** `FIC-101`, `PDIT 12.01`, `FV101A`: category = first letter, functions = the other letters, loop number, suffix; undefined unless the tag parses with ISA 5.1 letters. */
 export function splitInstrumentTag(tag: string): TagParts | undefined {
-  const match = INSTRUMENT_TAG.exec(tag.trim().replace(/\s+/g, ' '));
-  if (match === null) return undefined;
-  const [, category, functions, loopNumber, suffix] = match;
-  return { category: category ?? '', functions: functions ?? '', loopNumber: loopNumber ?? '', suffix: suffix ?? '' };
+  const parsed = parseTag(tag);
+  if (!parsed.ok) return undefined;
+  return { category: parsed.letters.slice(0, 1), functions: parsed.letters.slice(1), loopNumber: parsed.loop, suffix: parsed.suffix ?? '' };
 }
 
 /** Tag of an instrument built from its parts: letters, `-`, loop number. */
 export const composeInstrumentTag = (category: string, functions: string, loop: string): string => `${category}${functions}-${loop}`;
+
+/** Why a tag is not an ISA 5.1 instrument tag (the parser's reason), for the refusal of the authoring commands. */
+export function tagRefusal(tag: string): string {
+  const parsed = parseTag(tag);
+  return parsed.ok ? `"${tag}" parses` : `${parsed.message} (ISA 5.1, see parse_instrument_tag)`;
+}

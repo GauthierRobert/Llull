@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-02",
-  "status": "PARTLY BUILT (PID-M3): the authoring commands run (tests/unit/plant/pid/authoringScenario.test.ts); unbuilt: check_pid and pid_report kind=line_list (M4).",
+  "status": "BUILT (PID-M3 authoring, PID-M4 check_pid and pid_report kind=line_list): tests/unit/plant/pid/authoringScenario.test.ts and checkScenario.test.ts.",
   "validates": [
     "VC-PID-10",
     "VC-PID-13",
@@ -302,13 +302,13 @@
     },
     {
       "step": 11,
-      "path": "data.findings[0].code",
+      "path": "data.items[0].code",
       "value": "PID_OPC_UNRESOLVED",
       "source": "by construction"
     },
     {
       "step": 11,
-      "path": "data.findings[?code=='PID_NOZZLE_UNCONNECTED'][*].item",
+      "path": "data.items[?code=='PID_NOZZLE_UNCONNECTED'][*].item",
       "value": [
         "T-101/N2"
       ],

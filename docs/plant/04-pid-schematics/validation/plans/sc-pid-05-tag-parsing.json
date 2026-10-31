@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-05",
-  "status": "DRAFT — unbuilt command: parse_instrument_tag (read-only).",
+  "status": "BUILT (PID-M4): parse_instrument_tag (read-only); tests/unit/plant/pid/tagParse.test.ts and checkScenario.test.ts.",
   "validates": ["VC-PID-08"],
   "description": "Parse the 16 tags of data/tag_parse_cases.json. Shown here: the brief's example and two tags taken from DEXPI example files.",
   "actions": [
