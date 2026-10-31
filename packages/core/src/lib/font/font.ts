@@ -56,6 +56,8 @@ export interface ParsedFont {
   readonly names: FontNames;
   /** The named instances of `fvar` with a name in the `name` table, in `fvar` order: what `instance` (import_font) picks by name. */
   readonly namedInstances: readonly NamedInstance[];
+  /** Why instance records of `fvar` were left out (a value outside its axis, an unreadable record table); the font is still usable. */
+  readonly namedInstanceProblems: readonly string[];
   /** Variation axes of the font (`fvar`), empty for a static font. */
   readonly axes: readonly VariationAxis[];
   /** The instance this font was read at: the axes that differ from their default, in tag order (empty = the default instance). */
@@ -103,6 +105,7 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
     names: font.names,
     axes: [],
     namedInstances: [],
+    namedInstanceProblems: [],
     instance: {},
     glyphIndex: font.glyphIndex,
     advance: font.advance,
@@ -122,26 +125,22 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
   const permissions = readPermissions(tables);
   const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
   const strings = readNameStrings(tables);
-  const namedInstances: NamedInstance[] = (space?.instances ?? []).flatMap((record) => {
-    const name = strings.get(record.subfamilyNameId);
-    return name === undefined
-      ? []
-      : [
-          {
-            name,
-            postScriptName: record.postScriptNameId === null ? null : (strings.get(record.postScriptNameId) ?? null),
-            variation: record.coordinates,
-          },
-        ];
-  });
+  // a name is matched in every language of the name table (a localised record never hides the English one), listed in the preferred language
+  const namedInstances: NamedInstance[] = [];
+  const languages = new Map<NamedInstance, readonly string[]>();
+  for (const record of space?.instances ?? []) {
+    const names = strings.get(record.subfamilyNameId);
+    if (names === undefined) continue;
+    const postScript = record.postScriptNameId === null ? undefined : strings.get(record.postScriptNameId);
+    const instance: NamedInstance = { name: names[0] as string, postScriptName: postScript?.[0] ?? null, variation: record.coordinates };
+    namedInstances.push(instance);
+    languages.set(instance, [...names, ...(postScript ?? [])]);
+  }
   let variation = asked;
   if (instanceName !== undefined) {
     if (Object.keys(asked).length > 0)
       throw new FontError('WRP_FONT_VARIATION', 'variation: give the axis values or a named instance, not both');
-    const found = namedInstances.find(
-      (candidate) =>
-        sameName(candidate.name, instanceName) || (candidate.postScriptName !== null && sameName(candidate.postScriptName, instanceName)),
-    );
+    const found = namedInstances.find((candidate) => (languages.get(candidate) ?? []).some((text) => sameName(text, instanceName)));
     if (found === undefined)
       throw new FontError(
         'WRP_FONT_VARIATION',
@@ -264,6 +263,7 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     },
     axes: space?.axes ?? [],
     namedInstances,
+    namedInstanceProblems: space?.instanceProblems ?? [],
     instance,
     kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
     outline,

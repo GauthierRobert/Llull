@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { parseFont, type ParsedFont } from '@lib/font/font';
-import type { StoreSpec } from './cff2Builder';
+import { buildHvar, type StoreSpec } from './cff2Builder';
 import { AXES_OF_THE_FONT, TUPLES, t, variable } from './variableTrueType';
 import { buildFvarWithInstances, buildVhea, buildVmtx, buildVvar } from './vvarBuilder';
 
@@ -163,16 +163,90 @@ describe('named instances', () => {
     ]);
   });
 
-  it('damaged instance records: a record size that fits neither form, a value outside its axis, more instances than the cap', () => {
+  it('a damaged instance record leaves that instance out (and says why); a record table that cannot be read leaves them all out; the font stays usable', () => {
     const wrongSize = [...buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true)];
     wrongSize[15] = 13;
-    expect(refusal(variable({ names: NAMES, tables: { fvar: wrongSize } })).code).toBe('WRP_FONT_PARSE');
-    const outside = buildFvarWithInstances(AXES_OF_THE_FONT, [{ subfamily: 258, postScript: 262, coordinates: [2000, 100] }], true);
-    expect(refusal(variable({ names: NAMES, tables: { fvar: outside } })).message).toContain('outside');
+    const noSize = font(variable({ names: NAMES, tables: { fvar: wrongSize } }));
+    expect(noSize.namedInstances).toEqual([]);
+    expect(noSize.namedInstanceProblems.join(' ')).toContain('instance records of 13 bytes');
+    const outside = buildFvarWithInstances(
+      AXES_OF_THE_FONT,
+      [
+        { subfamily: 258, postScript: 262, coordinates: [2000, 100] },
+        { subfamily: 260, postScript: 264, coordinates: [700, 100] },
+      ],
+      true,
+    );
+    const partly = font(variable({ names: NAMES, tables: { fvar: outside } }));
+    expect(partly.namedInstances.map((i) => i.name)).toEqual(['Bold']);
+    expect(partly.namedInstanceProblems.join(' ')).toContain('named instance 0 has wght = 2000 outside 100..900; left out');
     const many = [...buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true)];
     many[12] = 0x13;
     many[13] = 0x88;
-    expect(refusal(variable({ names: NAMES, tables: { fvar: many } })).message).toContain('exceed');
+    expect(font(variable({ names: NAMES, tables: { fvar: many } })).namedInstanceProblems.join(' ')).toContain('exceed');
+    const cut = buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true);
+    expect(font(variable({ names: NAMES, tables: { fvar: cut.slice(0, cut.length - 30) } })).namedInstanceProblems.join(' ')).toContain(
+      'run past the table',
+    );
+    // the other uses of the font are not affected, and the problems reach import_font
+    expect(font(variable({ names: NAMES, tables: { fvar: wrongSize } }), { wght: 700 }).instance).toEqual({ wght: 700 });
+    const imported = execute(createEmptyDocument(), 'import_font', {
+      base64: Buffer.from(variable({ names: NAMES, tables: { fvar: outside } })).toString('base64'),
+    });
+    expect((imported.data as { namedInstanceProblems: string[] }).namedInstanceProblems).toHaveLength(1);
+  });
+
+  it('a name is read in every language: the English record is the primary one even when a localised record comes later, and either name picks the instance', () => {
+    const localised = [
+      ...NAMES.filter((n) => n.id !== 260),
+      { platform: 3 as const, id: 260, text: 'Bold', language: 0x0409 },
+      { platform: 3 as const, id: 260, text: 'Gras', language: 0x040c },
+    ];
+    const bytes = variable({ names: localised, tables: { fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true) } });
+    expect(font(bytes).namedInstances.map((i) => i.name)).toEqual(['Light', 'Regular', 'Bold', 'Condensed Bold']);
+    expect(font(bytes, {}, 'Gras').instance).toEqual({ wght: 700 });
+    expect(font(bytes, {}, 'Bold').instance).toEqual({ wght: 700 });
+    // the localised record first in the table: the English one is still primary
+    const reversed = [
+      ...NAMES.filter((n) => n.id !== 260),
+      { platform: 3 as const, id: 260, text: 'Gras', language: 0x040c },
+      { platform: 3 as const, id: 260, text: 'Bold', language: 0x0409 },
+    ];
+    const other = variable({ names: reversed, tables: { fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true) } });
+    expect(font(other).namedInstances[2]?.name).toBe('Bold');
+    // a Macintosh English record ranks under Windows English and over a Windows record of another language
+    const mac = [
+      ...NAMES.filter((n) => n.id !== 260),
+      { platform: 3 as const, id: 260, text: 'Gras', language: 0x040c },
+      { platform: 1 as const, id: 260, text: 'Bold' },
+    ];
+    expect(
+      font(variable({ names: mac, tables: { fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true) } })).namedInstances[2]?.name,
+    ).toBe('Bold');
+  });
+
+  it('the 600th name record is read (no cap of 512 on the records that are kept), and 20 languages of one name keep 16', () => {
+    const filler = Array.from({ length: 600 }, (_, k) => ({ platform: 3 as const, id: 1000 + k, text: `n${k}`, language: 0x0409 }));
+    const bytes = variable({ names: [...filler, ...NAMES], tables: { fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true) } });
+    expect(font(bytes).namedInstances).toHaveLength(4);
+    const many = Array.from({ length: 20 }, (_, k) => ({ platform: 3 as const, id: 260, text: `Bold${k}`, language: 0x0500 + k }));
+    const crowded = variable({
+      names: [...NAMES.filter((n) => n.id !== 260), ...many],
+      tables: { fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true) },
+    });
+    expect(font(crowded, {}, 'Bold15').instance).toEqual({ wght: 700 });
+    expect(refusal(crowded, {}, 'Bold17').code).toBe('WRP_FONT_VARIATION');
+  });
+
+  it('an ItemVariationStore that starts inside the header of an HVAR or a VVAR is WRP_FONT_PARSE', () => {
+    const inside = withVertical({ VVAR: buildVvar(STORE, undefined, { offsets: [8, 0, 0, 0, 0] }) });
+    expect(refusal(inside, { wght: 900 }).message).toContain('VVAR');
+    const hvar = buildHvar(STORE);
+    hvar[4] = 0;
+    hvar[5] = 0;
+    hvar[6] = 0;
+    hvar[7] = 8;
+    expect(refusal(variable({ tables: { HVAR: hvar } }), { wght: 900 }).message).toContain('HVAR');
   });
 
   it('import_font instance="Bold" embeds the font at that instance, lists the named instances, and refuses a name that is not there or given with variation', () => {
@@ -185,5 +259,54 @@ describe('named instances', () => {
     expect(data.namedInstances.map((i) => i.name)).toEqual(['Light', 'Regular', 'Bold', 'Condensed Bold']);
     expect(execute(doc, 'import_font', { base64, instance: 'Black' }).error?.code).toBe('WRP_FONT_VARIATION');
     expect(execute(doc, 'import_font', { base64, instance: 'Bold', variation: { wght: 700 } }).error?.code).toBe('WRP_FONT_VARIATION');
+  });
+});
+
+describe('font_metrics', () => {
+  const bytes = variable({
+    names: NAMES,
+    tables: {
+      fvar: buildFvarWithInstances(AXES_OF_THE_FONT, INSTANCES, true),
+      vhea: buildVhea(5),
+      vmtx: buildVmtx(HEIGHTS, 5),
+      VVAR: buildVvar(STORE),
+    },
+  });
+  const imported = execute(createEmptyDocument(), 'import_font', { base64: Buffer.from(bytes).toString('base64') });
+  const doc = imported.document;
+  const id = imported.affected[0] as string;
+
+  it('gives the vertical metrics and the advance width and height of each character at the default instance and at a named one', () => {
+    const base = execute(doc, 'font_metrics', { font: id, text: 'AB' });
+    expect(base.rejected, base.summary).toBeUndefined();
+    const data = base.data as {
+      unitsPerEm: number;
+      ascender: number;
+      glyphs: Array<{ character: string; glyph: number; advanceWidth: number; advanceHeight: number }>;
+      height: number;
+      width: number;
+    };
+    expect(data.unitsPerEm).toBe(1000);
+    expect(data.glyphs.map((g) => [g.character, g.glyph, g.advanceWidth, g.advanceHeight])).toEqual([
+      ['A', 1, 600, 1100],
+      ['B', 2, 700, 1200],
+    ]);
+    expect([data.width, data.height]).toEqual([1300, 2300]);
+    // the instance moves the heights: wght 700 is coordinate 0.6 (VVAR 10 k)
+    const bold = execute(doc, 'font_metrics', { font: id, text: 'AB', instance: 'Bold' }).data as {
+      glyphs: Array<{ advanceHeight: number }>;
+      instance: unknown;
+    };
+    expect(bold.instance).toEqual({ wght: 700 });
+    expect(bold.glyphs.map((g) => g.advanceHeight)).toEqual([1106, 1212]);
+    expect(base.document).toBe(doc);
+  });
+
+  it('refuses an unknown font and an instance or variation the font does not have, by code', () => {
+    expect(execute(doc, 'font_metrics', { font: 'nope' }).error?.code).toBe('WRP_FONT_UNAVAILABLE');
+    expect(execute(doc, 'font_metrics', { font: id, instance: 'Black' }).error?.code).toBe('WRP_FONT_VARIATION');
+    expect(execute(doc, 'font_metrics', { font: id, instance: 'Bold', variation: { wght: 700 } }).error?.code).toBe('WRP_FONT_VARIATION');
+    const metricsOnly = execute(doc, 'font_metrics', { font: id });
+    expect((metricsOnly.data as { glyphs: unknown[] }).glyphs).toEqual([]);
   });
 });

@@ -863,6 +863,12 @@ mappings must lie inside the table (the side-bearing and origin mappings are val
 name, any case, and mean the axis values of that record (the record stored in the document carries them as `variation`, so `add_text font=<id>` follows). A name the font does not have lists the names it has; a name together with
 `variation`, or on a font without axes, is `WRP_FONT_VARIATION`. `data.namedInstances` of `import_font` lists name, PostScript name and axis values.
 
+**Names in every language.** The `name` table keeps every language of a name id (at most 16 per id, every record read): the preferred string is Windows English (0x0409), then Unicode, then Macintosh English, then the others in table order,
+and a requested name is matched against every language of the instance's subfamily and PostScript name ids, so a localised record that comes later never hides the English one and `instance="Gras"` works as well as `Bold`.
+**A bad instance record is not a bad font.** A record whose values lie outside their axes is left out, a record table that cannot be read (a size that fits neither form, more than 4096, cut short) lists no instance; both are lines of
+`ParsedFont.namedInstanceProblems` and of `data.namedInstanceProblems` of `import_font`. An ItemVariationStore that starts inside the 20-byte header of an HVAR or the 24-byte header of a VVAR is `WRP_FONT_PARSE`.
+**`font_metrics`** (read-only, `font`, optional `text`, `variation` or `instance`) is where the heights are read: the vertical metrics at the instance and the glyph, advance width and advance height of each character, with the sums.
+
 **Measured (closed forms by construction, `tests/unit/wrap/vvar.test.ts`).** Heights 1000..1400 with a VVAR of 0, 10, 20, 30, 40 on wght+: at wght 900 the glyphs read 1000, 1110, 1220, 1330, 1440, at wght 650 (coordinate 0.5)
 1000, 1105, 1210, 1315, 1420; through a map to rows 3 - k: 1030, 1120, 1210, 1300, 1400; without vmtx 1150 + 10 k; the phantom fallback 30 - 10 = 20 on glyph 2. Four instances give four names, and `Bold`, `bold`, `Test-Bold` equal
-the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layout of text (the heights are read, nothing lays text out vertically), `VORG`.
+the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layout of text (the heights are read by font_metrics, nothing lays text out vertically), `VORG`.

@@ -25,7 +25,9 @@ export const importFont = defineCommand({
     'Embed a TrueType (.ttf), CFF-outline OpenType (.otf) or CFF2 variable (.otf) font in the document so text can be turned into outlines (text_outline, extrude_profile, emboss_on_face). ' +
     'Give the file as `base64` (CLI: `file=PATH` or `path=PATH` reads the file and fills it). The font is parsed completely and stored with the ' +
     'document, so a reopened document needs no font file. Refused when the font forbids embedding (OS/2 fsType restricted), is larger than 4 MB, ' +
-    'is WOFF / a collection (not supported) or is damaged. A CFF2 variable font is read at one instance: `variation` = {axisTag: value} or `instance` = a named instance of the font (Bold; data.namedInstances lists them) in the design units of the font (e.g. {wght: 700, wdth: 87.5}), axes left out keep their default; the result lists `axes` ({tag, min, default, max}) so a first import without `variation` tells you the choices, and importing the same bytes with another `variation` adds a second record that shares the bytes. The result is `unverified` unless you pass the sha256 of ' +
+    'is WOFF / a collection (not supported) or is damaged. A variable font (CFF2, or TrueType with gvar) is read at one instance: give `variation` = {axisTag: value} in the design units of the font (e.g. {wght: 700, wdth: 87.5}; axes left out keep their default) ' +
+    'or `instance` = the name of one of its named instances (a subfamily or PostScript name such as Bold, any case), not both. The result lists `axes` ({tag, min, default, max}) and `namedInstances` ({name, postScriptName, variation}), so a first import without either tells you the choices; ' +
+    '`namedInstanceProblems` says which instance records of the font were left out. Importing the same bytes with another instance adds a second record that shares the bytes. The result is `unverified` unless you pass the sha256 of ' +
     'the file as `sourceSha256` and it matches. Importing the same bytes twice returns the first record. Next: add_text with font=<id>, then ' +
     'text_outline. Refusals carry error.code WRP_FONT_PARSE, WRP_FONT_FORMAT_UNSUPPORTED, WRP_FONT_EMBEDDING_RESTRICTED, WRP_FONT_TOO_LARGE, WRP_FONT_VARIATION.',
   params: z.object({
@@ -97,6 +99,7 @@ export const importFont = defineCommand({
       embedding: record.embedding,
       axes: registered.axes,
       namedInstances: registered.namedInstances,
+      namedInstanceProblems: registered.namedInstanceProblems,
       variation: record.variation ?? {},
       ...(record.licence !== undefined ? { licence: record.licence } : {}),
       verified: record.provenance.verified,

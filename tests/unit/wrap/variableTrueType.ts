@@ -69,7 +69,7 @@ export interface Options {
   readonly gvar?: Partial<GvarSpec>;
   readonly tables?: Record<string, readonly number[]>;
   readonly omit?: readonly string[];
-  readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string }>;
+  readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string; readonly language?: number }>;
 }
 
 export function variable(options: Options = {}): Uint8Array {

@@ -78,6 +78,8 @@ export interface Registered {
   readonly axes: readonly VariationAxis[];
   /** The named instances of the font (the names `instance` accepts). */
   readonly namedInstances: readonly NamedInstance[];
+  /** Instance records of the font that were left out, and why. */
+  readonly namedInstanceProblems: readonly string[];
 }
 
 /**
@@ -101,7 +103,15 @@ function addRecord(doc: CadDocument, blob: DocumentBlob, font: ParsedFont, optio
     (record) => record.blob === blob.sha256 && JSON.stringify(record.variation ?? {}) === JSON.stringify(instance),
   );
   if (known !== undefined)
-    return { document: doc, record: known, existing: true, glyphs: font.numGlyphs, axes: font.axes, namedInstances: font.namedInstances };
+    return {
+      document: doc,
+      record: known,
+      existing: true,
+      glyphs: font.numGlyphs,
+      axes: font.axes,
+      namedInstances: font.namedInstances,
+      namedInstanceProblems: font.namedInstanceProblems,
+    };
   const licence = options.licence ?? font.names.licence;
   const record: FontRecord = {
     id: nextId('font'),
@@ -118,7 +128,15 @@ function addRecord(doc: CadDocument, blob: DocumentBlob, font: ParsedFont, optio
     provenance: { verified: options.verified, ...(options.source !== undefined ? { source: options.source } : {}) },
   };
   const document = withBlob({ ...doc, fonts: { ...doc.fonts, [record.id]: record } }, blob);
-  return { document, record, existing: false, glyphs: font.numGlyphs, axes: font.axes, namedInstances: font.namedInstances };
+  return {
+    document,
+    record,
+    existing: false,
+    glyphs: font.numGlyphs,
+    axes: font.axes,
+    namedInstances: font.namedInstances,
+    namedInstanceProblems: font.namedInstanceProblems,
+  };
 }
 
 /**
@@ -145,10 +163,11 @@ export function resolveFont(
   ctx: ExecutionContext | undefined,
   reference: string,
   variation?: AxisValues,
+  instance?: string,
 ): { document: CadDocument; record: FontRecord } | FontFailure {
   const base = resolveBase(doc, ctx, reference);
-  if (isFontFailure(base) || variation === undefined || Object.keys(variation).length === 0) return base;
-  return instanceOf(base.document, base.record, variation);
+  if (isFontFailure(base) || (instance === undefined && (variation === undefined || Object.keys(variation).length === 0))) return base;
+  return instanceOf(base.document, base.record, variation ?? {}, instance);
 }
 
 /** The record of the same font bytes at `variation` (absolute design values, not relative to the record's own instance): found, or added. @failure -> FontFailure WRP_FONT_VARIATION */
@@ -156,15 +175,16 @@ function instanceOf(
   doc: CadDocument,
   record: FontRecord,
   variation: AxisValues,
+  instance?: string,
 ): { document: CadDocument; record: FontRecord } | FontFailure {
   const stored = doc.blobs?.[record.blob];
-  const key = `${record.blob}|${JSON.stringify(Object.entries(variation).sort(([a], [b]) => (a < b ? -1 : 1)))}`;
+  const key = `${record.blob}|${JSON.stringify(Object.entries(variation).sort(([a], [b]) => (a < b ? -1 : 1)))}|${instance ?? ''}`;
   let font = scannedInstances.get(key);
   if (font === undefined) {
     const bytes = stored === undefined ? null : blobBytes(stored);
     if (stored === undefined || bytes === null)
       return { code: 'WRP_FONT_UNAVAILABLE', message: `font '${record.id}' lost its bytes (blob ${record.blob})` };
-    const parsed = parseFont(bytes, variation);
+    const parsed = parseFont(bytes, variation, instance);
     if (!parsed.ok) return { code: parsed.code, message: parsed.message };
     const scan = validateGlyphs(parsed.font);
     if (!scan.ok) return { code: scan.code, message: scan.message };
