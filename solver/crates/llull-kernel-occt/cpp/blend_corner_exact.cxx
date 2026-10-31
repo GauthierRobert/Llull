@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <cassert>
+#include <thread>
 #include <atomic>
 #include <functional>
 #include <iterator>
@@ -63,8 +65,10 @@ constexpr size_t kSmoothSpokes = 6;
 constexpr double kMinCrease = 0.2;
 // The G2 gate: a jump of the normal curvature across a loop edge passes when it is under this share of the larger curvature plus this over the mean length of the chains of the hole.
 constexpr double kG2Relative = 0.02, kG2Floor = 2e-4;
-// G2 across the spokes (13.38): the stretch of each spoke, from its vertex, over which the curvature correction fades in (a transition of order 3 at the vertex keeps the G2 data of the contact).
+// G2 across the spokes (13.38): the stretch of each spoke, from its vertex, over which the curvature correction fades in (a transition whose first three derivatives vanish at the vertex, O(v^4), keeps the G2 data of the contact).
 constexpr double kSpokeReach = 0.2;
+// The last sample along a spoke that is measured for G2 spokes (the pole itself is degenerate: S_u = 0 there; the correction is nil at it, so the samples up to here show it leaves no gap or fold).
+constexpr double kSpokeLastSample = 0.99;
 
 struct Hermite3 {
   double p0, d0, p1, d1;
@@ -318,7 +322,9 @@ struct Star {
   bool g2 = false;  // the normal field along the spokes is quintic (13.36)
   double spoke_reach = 0;  // G2 across the spokes (13.38): the share of a spoke over which the curvature correction fades in from its vertex (0: off)
   // (spoke, v) -> the corrections of the sub-patch before and after the spoke, the curvature across it they agree on, and the two natural curvatures; the sub-patches are built one at a time, so no lock
+  // Not synchronised: a star is built by the one thread that created it (asserted in spoke_fix).
   mutable std::map<std::pair<size_t, double>, std::array<double, 5>> spoke_fixes;
+  std::thread::id owner = std::this_thread::get_id();
   const std::vector<Patch> *ring = nullptr;
   std::vector<Vec> arrival;  // spoke tangent at the centre
   Vec rate_at_centre(size_t k) const { return arrival[k] * curvature_at_centre; }
@@ -503,9 +509,10 @@ struct Patch {
 
   // G2 across spoke s (13.38). Along the spoke both sub-patches have the tangent plane of the shared normal field n(v) and the second fundamental form II with II(S_v, S_v) = n . spoke'' and
   // II(S_v, w) = -n' . w, so they differ only in the normal curvature kappa = II(c, c) across it (c: the unit direction in the plane across the spoke). Each side reads its own kappa from n . S_uu;
-  // both are given the mean, faded in over the first `spoke_reach` of the spoke (a transition of order 3 at the vertex, so the contact with the supports keeps its G2 data there) by
+  // both are given the mean, faded in over the first `spoke_reach` of the spoke (a transition whose first three derivatives vanish at the vertex, so the contact with the supports keeps its G2 data there) by
   // n . S_uu += alpha^2 (kappa - kappa_side), alpha = S_u . c. Returns {correction of the sub-patch before the spoke, of the one after it, kappa, kappa before, kappa after}.
   std::array<double, 5> spoke_fix(size_t s, double v) const {
+    assert(star.owner == std::this_thread::get_id());
     const auto cached = star.spoke_fixes.find({s, v});
     if (cached != star.spoke_fixes.end()) return cached->second;
     const size_t m = star.vertices.size();
@@ -840,7 +847,7 @@ SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSpline
     const size_t previous = (k + m - 1) % m;
     for (int s = 0; s <= kCheckSamples; ++s) {
       const double t = static_cast<double>(s) / kCheckSamples;
-      if (t > 0.97) break;
+      if (t > kSpokeLastSample) break;
       Vec n;
       Vec across = Vec(0, 0, 0);
       if (star.spoke_normal(k, t, n)) across = n ^ star.spokes[k].at(t, 1);
@@ -1184,6 +1191,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     }
   }
   bool spokes_blocked = false;  // an attempt met every gate but the spokes'
+  std::string spokes_refused;   // why: the measure of the last such attempt
   std::string tried;  // the pole counts measured so far, named in the refusal of a G2 star
   for (const Attempt &attempt : attempts) {
     const int poles = attempt.poles;
@@ -1223,7 +1231,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
         }
         else
           out.angle = std::max(out.angle, kPi / 2);
-        if (t < 0.97) {
+        if (t < (attempt.reach > 0 ? kSpokeLastSample + 1e-9 : 0.97)) {
           const size_t previous = (k + m - 1) % m;
           Vec left, right;
           if (star.vertices[k].crease) {
@@ -1282,9 +1290,15 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       out.spokes = read_spokes(star, surfaces, attempt.reach, mean_length, spoke_excess);
     }
     const bool others_met = out.gap <= max_gap && out.angle <= angle_limit && g2_excess <= 0;
-    if (others_met && spoke_excess > 0) spokes_blocked = true;
+    if (others_met && spoke_excess > 0) {
+      spokes_blocked = true;
+      spokes_refused = "the curvature jump across the spokes beyond the first " + std::to_string(attempt.reach) + " of each spoke stays over the gate (" + std::to_string(kG2Relative) + " relative + " +
+                       std::to_string(kG2Floor) + " /length) by " + std::to_string(spoke_excess) + " /length at " + std::to_string(poles) + " x " + std::to_string(poles) + " poles (jump " +
+                       std::to_string(out.spokes.jump) + " /length, relative " + std::to_string(out.spokes.relative) + ")";
+    }
     if (others_met && spoke_excess <= 0) {
       out.g2_built = g2;
+      if (attempt.reach == 0.0) out.spokes.refused = spokes_refused;
       for (const Handle(Geom_BSplineSurface) &surface : surfaces) {
         BRepBuilderAPI_MakeFace maker(surface, 0.0, 1.0, 0.0, 1.0, 1e-7);
         if (!maker.IsDone()) {

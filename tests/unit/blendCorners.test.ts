@@ -751,17 +751,27 @@ describe('setback overrides survive replay and upstream edits', () => {
 });
 
 describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
-  type Finding = { code: string; severity: string; edge?: number };
+  type Finding = { code: string; severity: string; edge?: number; value?: number; limit?: number; message: string };
   type Contact = { edge: number; order: string };
   /** Two star sub-patches (faces 2, 3): edge 0 and edge 2 are contacts with the flat faces 0 and 1, edge 1 is the seam between the sub-patches. */
   function star(
-    curvature: (edge: number) => [number, number],
+    curvature: (edge: number, t: number) => [number, number],
     params: Record<string, unknown>,
+    declared?: { reach: number; fromPole?: boolean },
   ): { findings: Finding[]; contacts: Contact[]; status: string } {
     const name = (rank: number): string =>
       `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))#${rank}`;
+    // the seam (edge 1) leaves the vertex it shares with the contact edge 0, or arrives at it when its samples run from the pole
+    const seam = declared?.fromPole === true ? { start: [10, 5, 5], end: [0, 0, 0] } : { start: [0, 0, 0], end: [10, 5, 5] };
     const topology: ShapeTopology = {
       ...TOPOLOGY,
+      edges: TOPOLOGY.edges.map((edge) =>
+        edge.index === 1
+          ? ({ ...edge, ...seam } as unknown as ShapeEdge)
+          : edge.index === 0 || edge.index === 2
+            ? ({ ...edge, start: [0, 0, 0] } as unknown as ShapeEdge)
+            : edge,
+      ),
       faces: [
         ...TOPOLOGY.faces.slice(0, 2),
         { index: 2, name: name(1), surface: 'bspline', area: 3 },
@@ -777,7 +787,36 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
       ],
       edgeConvexity: [],
     } as unknown as FaceGraph;
-    const kernel = scriptedKernel({ topology, graph, g1: () => 0.001, curvature: (edge) => curvature(edge) });
+    const scripted = scriptedKernel({ topology, graph, g1: () => 0.001, curvature });
+    const notes = {
+      builder: 'corners' as const,
+      corners: [
+        {
+          vertex: [0, 0, 0] as [number, number, number],
+          continuity: 'G2' as const,
+          spokes: 'G2-beyond-reach' as const,
+          spokeReach: declared?.reach ?? 0,
+          setbacks: [],
+        },
+      ],
+    };
+    const kernel: GeometryKernel =
+      declared === undefined
+        ? scripted
+        : {
+            ...scripted,
+            blendReport: () =>
+              ({
+                stage: 'none',
+                contours: [],
+                vertices: [],
+                partial: false,
+                unsupportedVertices: [],
+                done: true,
+                valid: true,
+                notes,
+              }) as BlendReport,
+          };
     const { doc, id } = cube();
     const filleted = execute(doc, 'fillet_edge', { id, radius: 1, corners: [{ near: corner, setback: 2 }] }, {
       kernel: scriptedKernel({ topology: TOPOLOGY }),
@@ -800,11 +839,71 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
     const result = star(g2Star, { require: 'G2' });
     expect(result.contacts.filter((contact) => contact.edge !== 1).every((contact) => contact.order === 'G2')).toBe(true);
     expect(result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toEqual([
-      expect.objectContaining({ severity: 'warn', edge: 1, message: expect.stringContaining('seams of the corner are curvature-continuous beyond the stretch next to the vertices') }),
+      expect.objectContaining({
+        severity: 'warn',
+        edge: 1,
+        message: expect.stringContaining('all along the seam'),
+        value: expect.any(Number),
+        limit: 0.1,
+      }),
       expect.objectContaining({ severity: 'warn', edge: 1 }),
     ]);
     expect(result.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);
     expect(result.status).toBe('warn');
+  });
+
+  // the star declares curvature-continuous seams beyond 0.2 of the spoke from its vertex; the seam jumps by a relative 0.58 where it is tangent only
+  const declaredJump =
+    (jumpsAt: (t: number) => boolean) =>
+    (edge: number, t: number): [number, number] =>
+      edge === 1 && jumpsAt(t) ? [0.5, 1.2] : edge === 0 ? [0, 1e-3] : [0, 0];
+
+  it('a jump inside the declared stretch next to the vertex is a warn BLD_CHECK_SPOKE_G2 that names the reach; the status is warn', () => {
+    const result = star(
+      declaredJump((t) => t < 0.2),
+      { require: 'G2' },
+      { reach: 0.2 },
+    );
+    const warns = result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2');
+    // one finding per sub-patch that shares the seam
+    const one = expect.objectContaining({
+      severity: 'warn',
+      edge: 1,
+      limit: 0.1,
+      value: expect.any(Number),
+      message: expect.stringContaining('spokeReach 0.2'),
+    });
+    expect(warns).toEqual([one, one]);
+    expect(warns[0]?.value).toBeGreaterThan(warns[0]?.limit ?? Infinity);
+    expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(false);
+    expect(result.status).toBe('warn');
+  });
+
+  it('the same jump beyond the declared stretch is a FAIL BLD_CHECK_SPOKE_G2_LOST: the correction was lost', () => {
+    const result = star(
+      declaredJump((t) => t >= 0.25 && t <= 0.3),
+      { require: 'G2' },
+      { reach: 0.2 },
+    );
+    const lost = expect.objectContaining({ severity: 'fail', edge: 1, limit: 0.1, value: expect.any(Number) });
+    expect(result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toEqual([lost, lost]);
+    expect(result.status).toBe('fail');
+  });
+
+  it('the stretch is counted from the vertex whichever way the seam runs: samples from the pole, a jump at t > 0.8 is inside it', () => {
+    const inside = star(
+      declaredJump((t) => t > 0.8),
+      { require: 'G2' },
+      { reach: 0.2, fromPole: true },
+    );
+    expect(inside.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(false);
+    expect(inside.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toBe(true);
+    const outside = star(
+      declaredJump((t) => t > 0.8),
+      { require: 'G2' },
+      { reach: 0.2 },
+    );
+    expect(outside.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2_LOST')).toBe(true);
   });
 
   it('without require G2 the seam raises nothing and the star passes', () => {

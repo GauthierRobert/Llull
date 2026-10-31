@@ -4,7 +4,7 @@
  */
 
 import type { CliffEdge } from '../../geometry/blend/cliffEdge';
-import type { measureContact } from '../../geometry/blend/continuity';
+import { measureContact, type ContactSample } from '../../geometry/blend/continuity';
 import { roundSignificant } from '../../lib/significant';
 
 const sig = (value: number): number => roundSignificant(value, 10);
@@ -46,8 +46,10 @@ export const REMEDIATION = {
   BLD_CHECK_G0_GAP: 'the faces do not meet at the contact: use a smaller radius or fewer edges per step',
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
+  BLD_CHECK_SPOKE_G2_LOST:
+    'the corner star declared curvature-continuous seams beyond the stretch next to its vertices (data.profile.corners[].spokeReach) but the kernel reads a jump there: rebuild the fillet and report the part',
   BLD_CHECK_SPOKE_G2:
-    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2", spokeReach) and with G1 next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1"); its contacts with the blend and flat faces are G2',
+    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2-beyond-reach", spokeReach) and with G1 within that stretch next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1", spokeRefused); its contacts with the blend and flat faces are G2',
   BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
   BLD_CHECK_RADIUS_LAW:
     'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',
@@ -126,28 +128,59 @@ export function cliffFinding(entityId: string, face: number, name: string, cliff
   };
 }
 
-/** The warn for the curvature jump across a spoke (an edge between two sub-patches) of a corner star whose contacts with the blend and flat faces are G2: its internal seams are G1 (06 BLD 13.36). */
+/** The last share of a spoke the seam is read to (the pole itself is degenerate). */
+const SPOKE_LAST_SAMPLE = 0.97;
+
+/**
+ * The findings for the curvature jump across a spoke (an edge between two sub-patches) of a corner star whose contacts with the blend and flat faces are G2 (06 BLD 13.36, 13.38).
+ * `reach` > 0: the star declares curvature-continuous spokes beyond that share of each spoke from its vertex (`fromVertex`: the samples' t counts from the vertex): a jump above g2Rel
+ * within the stretch is a warn BLD_CHECK_SPOKE_G2 (declared), beyond it a FAIL BLD_CHECK_SPOKE_G2_LOST (the correction was lost). `reach` 0: the spokes are G1 seams, one warn on the whole seam.
+ * @failure no samples beyond the stretch -> nothing for it
+ */
 export function spokeFinding(
   entityId: string,
   face: number,
   edge: number,
-  contact: NonNullable<ReturnType<typeof measureContact>>,
+  samples: readonly ContactSample[],
+  reach: number,
+  fromVertex: boolean,
   tolerances: Tolerances,
   unit: string,
 ): Finding[] {
-  if (contact.g2Rel <= tolerances.g2Rel) return [];
-  return [
-    {
-      code: 'BLD_CHECK_SPOKE_G2',
-      severity: 'warn',
+  const where = (sample: ContactSample): number => (fromVertex ? sample.t : 1 - sample.t);
+  const seam = (kept: readonly ContactSample[]): NonNullable<ReturnType<typeof measureContact>> | null => measureContact(kept, tolerances);
+  const readings =
+    reach > 0
+      ? [
+          {
+            code: 'BLD_CHECK_SPOKE_G2',
+            severity: 'warn' as const,
+            measure: seam(samples.filter((sample) => where(sample) < reach)),
+            place: `within the declared stretch next to the vertex (spokeReach ${sig(reach)} of the spoke, where the seam is tangent only)`,
+          },
+          {
+            code: 'BLD_CHECK_SPOKE_G2_LOST',
+            severity: 'fail' as const,
+            measure: seam(samples.filter((sample) => where(sample) >= reach && where(sample) <= SPOKE_LAST_SAMPLE)),
+            place: `beyond the declared stretch of ${sig(reach)} next to the vertex, where the corner was built curvature-continuous`,
+          },
+        ]
+      : [{ code: 'BLD_CHECK_SPOKE_G2', severity: 'warn' as const, measure: seam(samples), place: 'all along the seam' }];
+  const found: Finding[] = [];
+  for (const { code, severity, measure, place } of readings) {
+    if (measure === null || measure.g2Rel <= tolerances.g2Rel) continue;
+    found.push({
+      code,
+      severity,
       entityId,
       face,
       edge,
-      value: sig(contact.g2Rel),
+      value: sig(measure.g2Rel),
       limit: sig(tolerances.g2Rel),
       unit: 'ratio',
-      remediation: REMEDIATION.BLD_CHECK_SPOKE_G2,
-      message: `curvature jumps by ${sig(contact.g2Gap)} 1/${unit} (relative ${sig(contact.g2Rel)}) across edge ${edge}, a seam between two sub-patches of corner patch ${face}: the internal seams of the corner are curvature-continuous beyond the stretch next to the vertices (or G1 all along when the build could not meet its gate), its contacts with the blend and flat faces are G2`,
-    },
-  ];
+      remediation: REMEDIATION[code as 'BLD_CHECK_SPOKE_G2' | 'BLD_CHECK_SPOKE_G2_LOST'],
+      message: `curvature jumps by ${sig(measure.g2Gap)} 1/${unit} (relative ${sig(measure.g2Rel)}) ${place} across edge ${edge}, a seam between two sub-patches of corner patch ${face}`,
+    });
+  }
+  return found;
 }

@@ -465,20 +465,27 @@ describe('describeProfileNotes', () => {
     };
     const g2Spokes = {
       ...star,
-      spokes: 'G2' as const,
+      spokes: 'G2-beyond-reach' as const,
       spokeJump: 0.0148,
       spokeReach: 0.2,
       spokeRelative: 0.0045,
       spokeVertexRelative: 1.74,
     };
-    const g1Spokes = { ...star, spokes: 'G1' as const, spokeJump: 0.83 };
+    const g1Spokes = {
+      ...star,
+      spokes: 'G1' as const,
+      spokeJump: 0.83,
+      spokeRefused: 'the curvature jump across the spokes stays over the gate',
+    };
     const both = describeProfileNotes({ builder: 'corners', factor: 2, corners: [g2Spokes, g1Spokes] }, TOPOLOGY, 'mm');
     expect(both.text).toContain(
       '2 corner star(s) G2 to their blends and flat faces (continuity "G2"), 1 of them with curvature-continuous seams',
     );
-    expect(both.text).toContain('beyond the first 0.2 of each spoke from its vertex (spokes "G2"), 1 with G1 seams (spokes "G1")');
+    expect(both.text).toContain(
+      'beyond the first 0.2 of each spoke from its vertex (spokes "G2-beyond-reach", tangent only within that stretch), 1 with G1 seams (spokes "G1")',
+    );
     expect(both.data.corners?.[0]).toMatchObject({
-      spokes: 'G2',
+      spokes: 'G2-beyond-reach',
       spokeJump: 0.0148,
       spokeReach: 0.2,
       spokeRelative: 0.0045,
@@ -486,6 +493,8 @@ describe('describeProfileNotes', () => {
     });
     expect(both.data.corners?.[1]).toMatchObject({ spokes: 'G1', spokeJump: 0.83 });
     expect(both.data.corners?.[1]).not.toHaveProperty('spokeReach');
+    expect(both.data.corners?.[1]).toMatchObject({ spokeRefused: 'the curvature jump across the spokes stays over the gate' });
+    expect(both.text).toContain('G2 spokes refused, G1 spokes built: the curvature jump across the spokes stays over the gate');
   });
 
   it('a mitred chain reports its crease and says the blends meet at that angle where each touches its own support', () => {

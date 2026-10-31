@@ -22,6 +22,7 @@ struct SpokeReading {
   double jump = 0;             // largest jump (1/length) of the normal curvature across a spoke, over the whole spoke
   double relative = 0;         // largest share of the larger of the two curvatures beyond the stretch (the whole spoke when reach is 0)
   double vertex_relative = 0;  // the same within the stretch next to the vertices
+  std::string refused;         // G1 spokes of a G2 star: why the G2 spokes were refused (the measure against the gate)
 };
 
 struct Patches {

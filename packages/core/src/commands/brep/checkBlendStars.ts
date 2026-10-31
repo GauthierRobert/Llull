@@ -8,6 +8,10 @@
 import { cornerSources, measureContact, STAR_SUFFIX } from '../../geometry/blend/continuity';
 import { roundSignificant } from '../../lib/significant';
 import { REMEDIATION, contactFindings, spokeFinding, type Finding, type Tolerances } from './checkBlendFindings';
+import type { ContactSample } from '../../geometry/blend/continuity';
+import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
+import { blendNodes, filletNodes } from '../../geometry/blend/blendInfo';
+import type { ShapeRecipe } from '../../model/types';
 import { withBlendScaleFloor } from './checkBlendTolerances';
 import type { BlendRow, Contact } from './checkBlendRows';
 import { creaseRowOf, type CreaseWorld } from './checkCornerCrease';
@@ -28,6 +32,31 @@ export interface CornerInput {
   readonly tolerances: Tolerances;
   readonly plateTolerances: Tolerances;
   readonly requireG2: boolean;
+  /** The stretch of each spoke, from its vertex, that the corner stars of this solid declare tangent-only (data.profile.corners[].spokeReach); 0: unknown, or some star has G1 spokes. */
+  readonly spokeReach?: number;
+}
+
+/** The spoke stretch every G2 corner star of `recipe` declares (the notes of its blend nodes), or 0 when there is none or one of them has G1 spokes. */
+export function spokeReachOf(kernel: GeometryKernel, recipe: ShapeRecipe): number {
+  const stars = [...filletNodes(recipe), ...blendNodes(recipe)].flatMap((node) =>
+    (kernel.blendReport?.(node)?.notes?.corners ?? []).filter((corner) => corner.continuity === 'G2'),
+  );
+  if (stars.length === 0 || !stars.every((corner) => corner.spokes === 'G2-beyond-reach')) return 0;
+  return Math.max(...stars.map((corner) => corner.spokeReach ?? 0));
+}
+
+/** Whether the samples of the seam `edge` of a star run from its vertex (the end that touches a contact edge with a blend or flat face) to the pole, else from the pole. */
+function runsFromVertex(topology: ShapeTopology, edge: number, contactEdges: readonly number[]): boolean {
+  const own = topology.edges[edge];
+  if (own === undefined) return true;
+  const tolerance = 1e-6 * Math.max(1, own.length);
+  const touches = (point: readonly number[]): boolean =>
+    contactEdges.some((other) => {
+      const o = topology.edges[other];
+      const near = (q: readonly number[]): boolean => Math.hypot(point[0]! - q[0]!, point[1]! - q[1]!, point[2]! - q[2]!) <= tolerance;
+      return o !== undefined && (near(o.start) || near(o.end));
+    });
+  return !(touches(own.end) && !touches(own.start));
 }
 
 type Measured = NonNullable<ReturnType<typeof measureContact>>;
@@ -35,6 +64,7 @@ type Measured = NonNullable<ReturnType<typeof measureContact>>;
 /** Appends the corner rows and findings of one solid; returns how many contacts the kernel could not measure. */
 export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findings: Finding[]): number {
   const { world, samples, tolerances, plateTolerances, requireG2 } = input;
+  const spokeReach = input.spokeReach ?? 0;
   const { kernel, shape, topology, graph, entityId, unit } = world;
   let unverified = 0;
   const longestEdgeOf = (face: number): number =>
@@ -47,7 +77,7 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
     // a star sub-patch is read at the blend scale like a blend face: a curvature-continuous star meets a plane to the noise of its interpolation, not exactly
     const cornerTolerances = star ? withBlendScaleFloor(tolerances, face.area, longestEdgeOf(face.index)) : plateTolerances;
     const contacts: Contact[] = [];
-    const seams: Array<{ edge: number; measure: Measured }> = [];
+    const seams: Array<{ edge: number; measure: Measured; samples: readonly ContactSample[] }> = [];
     graph.edgeFaces.forEach((around, edge) => {
       if (around.length !== 2 || !around.includes(face.index)) return;
       const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
@@ -79,7 +109,7 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
       contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(interior), g1EndAngleRad: sig(ends.g1AngleRad) });
       // a spoke of a star is held back: whether its curvature jump is a failure depends on the contacts of the whole sub-patch (below)
       const seam = star && around.every(isStar);
-      if (seam) seams.push({ edge, measure: interior });
+      if (seam) seams.push({ edge, measure: interior, samples: measured ?? [] });
       findings.push(
         ...contactFindings(entityId, face.index, edge, interior, cornerTolerances, requireG2, unit).filter(
           (found) => found.code !== 'BLD_CHECK_G2_JUMP' || (requireG2 && !seam),
@@ -103,7 +133,11 @@ export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findi
     // read G2 (a G1 star) keeps the plain BLD_CHECK_G2_JUMP on its seams, a fail under require G2.
     const outer = contacts.filter((contact) => !seams.some((seam) => seam.edge === contact.edge));
     if (requireG2 && outer.length > 0 && outer.every((contact) => contact.order === 'G2'))
-      for (const seam of seams) findings.push(...spokeFinding(entityId, face.index, seam.edge, seam.measure, cornerTolerances, unit));
+      for (const seam of seams) {
+        const contactEdges = outer.map((contact) => contact.edge);
+        const fromVertex = runsFromVertex(topology, seam.edge, contactEdges);
+        findings.push(...spokeFinding(entityId, face.index, seam.edge, seam.samples, spokeReach, fromVertex, cornerTolerances, unit));
+      }
     else if (requireG2)
       for (const seam of seams)
         findings.push(

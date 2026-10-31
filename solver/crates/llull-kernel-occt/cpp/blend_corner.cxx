@@ -2197,8 +2197,9 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
       if (patch_continuity[c] == "G2") {
         const corner_exact::SpokeReading &spokes = patch_spokes[c];
-        log.key("spokes").string(spokes.reach > 0 ? "G2" : "G1").key("spokeJump").number(spokes.jump);
+        log.key("spokes").string(spokes.reach > 0 ? "G2-beyond-reach" : "G1").key("spokeJump").number(spokes.jump);
         if (spokes.reach > 0) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
+        if (!spokes.refused.empty()) log.key("spokeRefused").string(spokes.refused);
       }
       if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
       log.key("setbacks").begin_array();

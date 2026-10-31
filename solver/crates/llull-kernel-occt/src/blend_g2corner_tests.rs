@@ -33,7 +33,7 @@ fn corners_of(shape: &Shape) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The `spokes` note of each corner ("G2" or "G1" for a G2 star, absent otherwise).
+/// The `spokes` note of each corner ("G2-beyond-reach" or "G1" for a G2 star, absent otherwise).
 fn spokes_of(shape: &Shape) -> Vec<String> {
     let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
     notes["corners"].as_array().unwrap().iter().map(|corner| corner["spokes"].as_str().unwrap_or("").to_string()).collect()
@@ -113,7 +113,9 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
     assert!(g2.spokes.0 < 1e-4, "the spokes are G1: {:e}", g2.spokes.0);
     // the spokes are curvature-continuous beyond the first fifth from each vertex (13.38): the jump over the 21 samples (the first is inside that stretch) is 50 times under the 0.83 of 13.36
     assert!(g2.spokes.1 < 0.03, "spoke curvature jump {:e}", g2.spokes.1);
-    assert_eq!(spokes_of(&shape), vec!["G2".to_string(); 8]);
+    let notes: Value = serde_json::from_str(&shape_notes(&shape).unwrap()).unwrap();
+    assert!(notes["corners"].as_array().unwrap().iter().all(|corner| corner["spokeRefused"].is_null()));
+    assert_eq!(spokes_of(&shape), vec!["G2-beyond-reach".to_string(); 8]);
     for (key, low, high) in
         [("spokeReach", 0.2, 0.2), ("spokeRelative", 0.0, 0.02), ("spokeVertexRelative", 0.1, 2.0), ("spokeJump", 1e-3, 0.03)]
     {
@@ -156,7 +158,7 @@ fn unequal_sizes_other_shape_factors_and_a_larger_blend_stay_g2() {
         // the spokes: curvature-continuous beyond the stretch next to the vertices, the first sample of which is the worst
         assert!(measured.spokes.1 < 0.2, "{label}: spoke jump {:e}", measured.spokes.1);
         assert!(spoke_note(&shape, "spokeRelative").iter().all(|relative| *relative < 0.02), "{label}");
-        assert_eq!(spokes_of(&shape), vec!["G2".to_string(); 8], "{label}");
+        assert_eq!(spokes_of(&shape), vec!["G2-beyond-reach".to_string(); 8], "{label}");
     }
 }
 
@@ -175,6 +177,12 @@ fn spokes_whose_gate_is_not_met_stay_g1_in_a_star_that_is_still_g2_to_its_blends
     assert!(measured.contacts.1 < 1e-3 && measured.spokes.0 < 1e-4, "{:e} {:e}", measured.contacts.1, measured.spokes.0);
     assert!(measured.spokes.1 > 0.5, "the G1 spokes jump by {:e}", measured.spokes.1);
     assert!(spoke_note(&shape, "spokeJump").iter().all(|jump| *jump > 0.5));
+    // the refusal is recorded with the measure against the gate
+    let notes: Value = serde_json::from_str(&shape_notes(&shape).unwrap()).unwrap();
+    for corner in notes["corners"].as_array().unwrap() {
+        let why = corner["spokeRefused"].as_str().unwrap_or("");
+        assert!(why.contains("stays over the gate") && why.contains("beyond the first 0.2") && why.contains("relative"), "{why}");
+    }
 }
 
 #[test]
