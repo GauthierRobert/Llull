@@ -17,11 +17,12 @@ import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
 import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
 import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
-import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
+import { RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
 import { creaseRowOf } from './checkCornerCrease';
 import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes, legFilletNodes } from '../../geometry/blend/blendInfo';
+import type { BlendRow, Contact, EntityCheck } from './checkBlendRows';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -40,55 +41,6 @@ const G0_FRACTION = 1e-6;
 const FLAT_CURVATURE_FRACTION = 1e-8;
 /** A normal curvature below this fraction of the blend's own scale (1 / its width) is flat for the G2 reading: a curvature-continuous blend meets a plane to the noise of its rails, not exactly. */
 const BLEND_FLAT_FRACTION = 1e-3;
-
-interface Contact {
-  readonly edge: number;
-  readonly name?: string;
-  readonly g0Gap: number;
-  readonly g1AngleRad: number;
-  /** Corner patches only: the largest angle at the two end points of the contact, where three faces meet (g1AngleRad covers the open interior). */
-  readonly g1EndAngleRad?: number;
-  /** Junctions only: the blend face on the other side. */
-  readonly neighbour?: string;
-  /** Junctions across a crease of the part only: the angle between the two blends' normals at the ends of the junction (each is tangent to its own support there); the junction is judged by what g1AngleRad allows beyond it. */
-  readonly creaseRad?: number;
-  readonly g2Gap: number;
-  readonly g2Rel: number;
-  readonly order: string;
-}
-
-interface BlendRow {
-  readonly entityId: string;
-  readonly face: number;
-  readonly name: string;
-  readonly kind: 'edge' | 'corner';
-  readonly sourceEdges: readonly string[];
-  readonly contacts: readonly Contact[];
-  /** Where this blend face meets the next blend face of its tangent chain (not a support): G0 / G1 across the junction edge, measured once from the lower face. */
-  readonly junctions?: readonly Contact[];
-  /** Realised radius along the blend (absent when the kernel cannot section the face). */
-  readonly radius?: RadiusReadback;
-  /** Whether the recipe's radius law was compared with the realised radius. */
-  readonly lawChecked?: boolean;
-  /** Why a law that could be compared was not (an edge of uneven speed whose spine position could not be read): named, never a guess. */
-  readonly lawNote?: string;
-  /** blend_union joints: where the radius asked for came from, the pick ("joints[i]") or "default". */
-  readonly source?: string;
-  /** Section the recipe asked for: "circular", "conic" or "curvature" (a non-circular section has no radius readback). */
-  readonly profile: string;
-}
-
-interface EntityCheck {
-  readonly blends: BlendRow[];
-  readonly findings: Finding[];
-  readonly unverified: number;
-  /** Junctions between blends of a chain that the kernel could not measure (counted apart from the contacts). */
-  readonly unverifiedJunctions: number;
-  /** The gap tolerance applied to this solid (document units). */
-  readonly g0: number;
-  /** Why nothing could be measured, when that is so. */
-  readonly notRun?: string;
-}
 
 function checkEntity(
   kernel: GeometryKernel,
