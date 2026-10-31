@@ -286,8 +286,13 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       return false;
     }
     const auto found = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
-    if (!mode.automatic && (found == corner.setbacks.end() || !(found->second > 0))) {
-      why = std::string(kUnsupported) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + ": an edge rounded by the rolling ball at a setback vertex is made on a curved edge or face only (the trim builder)";
+    if (!mode.automatic && found == corner.setbacks.end()) {
+      why = std::string(kFailed) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + " (give 0 for an edge left to the rolling ball)";
+      return false;
+    }
+    if (!mode.automatic && !(found->second > 0)) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " at " + where(corner.at) +
+            " is left to the rolling ball (setback 0): an edge rounded by the rolling ball at a setback vertex is made on a curved edge or face only (the trim builder)";
       return false;
     }
     distance[edge] = mode.automatic ? 1.0 : found->second;
@@ -991,14 +996,35 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const double diagonal = blend::diagonal_of(shape);
   const double sewing_tolerance = std::max(1e-6 * diagonal, 1e-12);
   const double patch_gap_limit = blend::kGapAccepted * kPatchGapFraction * diagonal;
+  // OCCT spreads one linear law over the whole tangent contour an edge belongs to: a contour of several edges would not get the per-edge law that was asked for.
+  {
+    BRepFilletAPI_MakeFillet probe(shape, ChFi3d_Rational);
+    const TopTools_IndexedMapOfShape probe_edges = query::distinct(shape, TopAbs_EDGE);
+    for (const auto &[index, taper] : radius)
+      if (index >= 0 && index < probe_edges.Extent()) probe.Add(taper.start, TopoDS::Edge(probe_edges(index + 1)));
+    for (const auto &[index, taper] : radius) {
+      if (taper.constant() || index < 0 || index >= probe_edges.Extent()) continue;
+      const int contour = probe.Contour(TopoDS::Edge(probe_edges(index + 1)));
+      if (contour > 0 && probe.NbEdges(contour) > 1) {
+        why = std::string(kUnsupported) + "the radius of edge " + std::to_string(index) + " varies along it, and it belongs to a chain of " + std::to_string(probe.NbEdges(contour)) +
+              " tangent edges that the kernel rounds as one contour (one linear law over the whole chain): give the chain a constant radius";
+        return nullptr;
+      }
+    }
+  }
   std::vector<double> reach;
   for (const Corner &corner : corners) {
     double least = 1e300, most = 0;
     for (const auto &entry : corner.setbacks) {
+      if (!(entry.second > 0)) continue;  // 0: left to the rolling ball
       least = std::min(least, entry.second);
       most = std::max(most, entry.second);
     }
-    if (!(least > 0) || most - least > 1e-9 * most) {
+    if (!(most > 0)) {
+      why = std::string(kFailed) + "no setback distance at " + where(corner.at) + ": every edge is left to the rolling ball";
+      return nullptr;
+    }
+    if (most - least > 1e-9 * most) {
       why = std::string(kUnsupported) + "the edges at " + where(corner.at) + " have different setbacks: a corner on a curved edge or face trims at one distance from the vertex";
       return nullptr;
     }
@@ -1029,12 +1055,26 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       why = std::string(kUnsupported) + "only " + std::to_string(incident.size()) + " edge(s) meet at " + where(corner.at) + ": a setback corner needs 3 or more";
       return nullptr;
     }
-    for (const int edge : incident)
+    for (const int edge : incident) {
       if (radius.find(edge) == radius.end()) {
         why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
               " but is not rounded: a setback corner rounds every edge that meets there, in the same step";
         return nullptr;
       }
+      if (std::none_of(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; })) {
+        why = std::string(kFailed) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + " (give 0 for an edge left to the rolling ball)";
+        return nullptr;
+      }
+    }
+    // every entry names an edge of the vertex, once
+    for (size_t k = 0; k < corner.setbacks.size(); ++k) {
+      const int edge = corner.setbacks[k].first;
+      const bool repeated = std::any_of(corner.setbacks.begin(), corner.setbacks.begin() + static_cast<std::ptrdiff_t>(k), [&](const auto &entry) { return entry.first == edge; });
+      if (repeated || std::find(incident.begin(), incident.end(), edge) == incident.end()) {
+        why = std::string(kFailed) + "the setback of edge " + std::to_string(edge) + " at " + where(corner.at) + (repeated ? " is given twice" : " names an edge that does not meet the vertex");
+        return nullptr;
+      }
+    }
   }
   for (const auto &entry : radius) {
     if (entry.first < 0 || entry.first >= unique_edges.Extent()) continue;

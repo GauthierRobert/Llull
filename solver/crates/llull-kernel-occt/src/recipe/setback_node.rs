@@ -54,7 +54,8 @@ pub(super) fn setback_specs(recipe: &Value) -> Result<Option<SetbackSpecs>, ()> 
         flat_corners.extend([vertex[0], vertex[1], vertex[2], distances.len() as f64]);
         for entry in distances {
             let edge = entry.get("edge").and_then(Value::as_u64).ok_or(())?;
-            let distance = number(entry, "distance").filter(|distance| positive(*distance)).ok_or(())?;
+            // 0 marks an edge left to the rolling ball (the trim builder rounds it and cuts it with the same ball)
+            let distance = number(entry, "distance").filter(|distance| *distance >= 0.0).ok_or(())?;
             flat_corners.extend([edge as f64, distance]);
         }
     }

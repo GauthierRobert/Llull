@@ -1300,8 +1300,8 @@ fn a_radius_that_varies_along_the_edges_is_cut_by_the_ball_and_gets_the_star() {
     assert!((volume - reference).abs() < 2e-3 * reference, "{volume} against the evolving fillet {reference}");
 }
 
-/// BLD §13.22: a rolling-ball neighbour. One of the three edges at the vertex (0, 0, 0) of the cube has no setback entry: OCCT rounds it like the others (r 1), the ball of the other two (2) cuts all
-/// three blends and the hole gets the star. The analytic builder refuses it by name.
+/// BLD §13.22: a rolling-ball neighbour. One of the three edges at the vertex (0, 0, 0) of the cube has the setback 0: OCCT rounds it like the others (r 1), the ball of the other two (2) cuts all
+/// three blends and the hole gets the star. The analytic builder refuses it by name; an edge with NO entry, an entry twice or for an edge that does not meet the vertex is an error of the build.
 #[test]
 fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_the_same_ball() {
     let _serial = crate::serial_blends();
@@ -1310,14 +1310,17 @@ fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_th
     let all: Vec<usize> = (0..12).collect();
     let meeting = edges_at(&shape, [0.0; 3]);
     let (edges, mut corners) = spec(&shape, &all, 1.0, &cube_vertices(10.0), 2.0);
-    // drop the entry of one edge at the first vertex: the entry list shrinks by one pair
+    // the entry of one edge at the first vertex becomes 0: left to the rolling ball
     let mut flat = Vec::new();
     let mut cursor = 0;
     while cursor < corners.len() {
         let count = corners[cursor + 3] as usize;
         let entries: Vec<(f64, f64)> = (0..count).map(|k| (corners[cursor + 4 + 2 * k], corners[cursor + 5 + 2 * k])).collect();
         let origin = corners[cursor..cursor + 3] == [0.0, 0.0, 0.0];
-        let kept: Vec<(f64, f64)> = entries.into_iter().filter(|(edge, _)| !(origin && *edge == meeting[0] as f64)).collect();
+        let kept: Vec<(f64, f64)> = entries
+            .into_iter()
+            .map(|(edge, distance)| if origin && edge == meeting[0] as f64 { (edge, 0.0) } else { (edge, distance) })
+            .collect();
         flat.extend_from_slice(&corners[cursor..cursor + 3]);
         flat.push(kept.len() as f64);
         for (edge, distance) in kept {
@@ -1331,7 +1334,7 @@ fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_th
         setback_reason(&shape, &edges, &corners).unwrap()
     };
     let text = reason(false);
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("rolling ball at a setback vertex"), "{text}");
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("left to the rolling ball"), "{text}");
     crate::test_bridge::set_corner_exact_patch(5);
     assert_eq!(reason(true), "", "the trim builder takes it");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
@@ -1342,4 +1345,90 @@ fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_th
     let reference =
         mass_properties(&crate::features::fillet(&shape, &unique, 1.0, None).unwrap().expect("a rolling-ball cube")).unwrap().volume;
     assert!((mass_properties(&built).unwrap().volume - reference).abs() < 2e-3 * reference);
+}
+
+/// BLD §13.22 review: the entries of a corner on the trim path are checked: an edge of the vertex without an entry, an entry twice, an entry for an edge that does not meet the vertex.
+#[test]
+fn the_setback_entries_of_a_trimmed_corner_must_name_each_edge_of_the_vertex_once() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let elsewhere = (0..12).find(|edge| !meeting.contains(edge)).unwrap();
+    let (edges, _) = spec(&shape, &all, 1.0, &[[0.0; 3]], 2.0);
+    let corner = |entries: &[(usize, f64)]| {
+        let mut flat = vec![0.0, 0.0, 0.0, entries.len() as f64];
+        for &(edge, distance) in entries {
+            flat.extend([edge as f64, distance]);
+        }
+        flat
+    };
+    let cases: [(&str, Vec<(usize, f64)>); 4] = [
+        ("no setback distance for edge", vec![(meeting[0], 2.0), (meeting[1], 2.0)]),
+        ("is given twice", vec![(meeting[0], 2.0), (meeting[1], 2.0), (meeting[2], 2.0), (meeting[2], 2.0)]),
+        ("does not meet the vertex", vec![(meeting[0], 2.0), (meeting[1], 2.0), (meeting[2], 2.0), (elsewhere, 2.0)]),
+        ("no setback distance at", vec![(meeting[0], 0.0), (meeting[1], 0.0), (meeting[2], 0.0)]),
+    ];
+    for (expected, entries) in cases {
+        let text = setback_reason(&shape, &edges, &corner(&entries)).unwrap();
+        assert!(text.starts_with("[BLD_CORNER_FAILED]") && text.contains(expected), "{expected}: {text}");
+    }
+}
+
+/// BLD §13.22 review: the kernel's evolving radius is one linear law over the whole tangent contour of an edge. An edge of a chain of tangent edges (the tangent-continuous top outline of a box united
+/// with a cylinder: a line and an arc) with a varying radius is refused by name; with a constant radius the chain is taken.
+#[test]
+fn a_varying_radius_on_a_chain_of_tangent_edges_is_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let block = make_box([0.0, -3.0, 0.0], [10.0, 6.0, 5.0]).unwrap().unwrap();
+    let cylinder = crate::make_cylinder(3.0, 5.0).unwrap().unwrap();
+    let union = boolean(BooleanOp::Union, &block, &cylinder, true).unwrap().unwrap();
+    let topo = topology(&union).unwrap();
+    let on_top = |edge: &Value| num(&edge["start"][2]) > 4.9 && num(&edge["end"][2]) > 4.9;
+    let top: Vec<usize> =
+        topo["edges"].as_array().unwrap().iter().enumerate().filter(|(_, edge)| on_top(edge)).map(|(index, _)| index).collect();
+    assert!(top.len() >= 3, "the outline of the top: {top:?}");
+    crate::test_bridge::set_corner_trim(true);
+    let tapers: Vec<(usize, f64, f64)> = top.iter().map(|&edge| (edge, 0.3, 0.5)).collect();
+    let (edges, corners) = spec_tapered(&union, &tapers, &[[10.0, 3.0, 5.0]], 1.5);
+    let text = setback_reason(&union, &edges, &corners).unwrap();
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("belongs to a chain of 3 tangent edges"), "{text}");
+}
+
+/// BLD §13.22 review: the convention of the evolving radius. On one open edge of the cube (from (0,0,0) to (10,0,0)) the kernel's blend is 0.5 wide at the START of the edge and 1.5 at its end,
+/// which is how the recipe's size / sizeEnd and the trim builder (Add(start, end, edge)) read the edge.
+#[test]
+fn the_evolving_radius_is_the_size_at_the_start_of_the_edge_and_sizeend_at_its_end() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let topo = topology(&shape).unwrap();
+    let edge = topo["edges"].as_array().unwrap().iter().position(|edge| {
+        let (start, end) = (&edge["start"], &edge["end"]);
+        num(&start[0]) == 0.0
+            && num(&start[1]) == 0.0
+            && num(&start[2]) == 0.0
+            && num(&end[0]) == 10.0
+            && num(&end[1]) == 0.0
+            && num(&end[2]) == 0.0
+    });
+    let edge = edge.expect("the edge from the origin along x") as u32;
+    let built = crate::features::fillet(&shape, &[edge], 0.5, Some(1.5)).unwrap().expect("an evolving fillet");
+    // the contact lines of the blend on the face z = 0 end at (x, w, 0): w is the radius at x
+    let width_at = |x: f64| {
+        let topo = topology(&built).unwrap();
+        let mut found: f64 = 0.0;
+        for edge in topo["edges"].as_array().unwrap() {
+            for end in [&edge["start"], &edge["end"]] {
+                if (num(&end[0]) - x).abs() < 1e-6 && num(&end[2]).abs() < 1e-6 && num(&end[1]) > 1e-6 && num(&end[1]) < 2.0 {
+                    found = found.max(num(&end[1]));
+                }
+            }
+        }
+        found
+    };
+    assert!((width_at(0.0) - 0.5).abs() < 1e-3, "at the start: {}", width_at(0.0));
+    assert!((width_at(10.0) - 1.5).abs() < 1e-3, "at the end: {}", width_at(10.0));
 }

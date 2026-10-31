@@ -84,6 +84,32 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
   });
 
+  it('a radius that is linear along the edges (size to sizeEnd) works on the curved edges and faces too: a star, valid, close to the plain evolving fillet', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const laws = edges.map((near) => ({ near, size: 0.5, sizeEnd: 0.7, interpolation: 'linear' as const }));
+    const plain = execute(doc, 'fillet_edge', { id, edges: laws });
+    expect(plain.error, plain.summary).toBeUndefined();
+    const done = execute(doc, 'fillet_edge', { id, edges: laws, corners: [{ near: vertex, type: 'setback', setback: 1.5 }] });
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    const names = faces(done.document, result)
+      .map((face) => face.name ?? '')
+      .filter((name) => name.startsWith('blend(v:'));
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    expect(names.every((name) => /#\d+$/.test(name))).toBe(true);
+    // check_blends reads the realised radius of OCCT's evolving fillet against the law along the curved edge (the law is linear in the parameter): the plain fillet fails that check by itself, the corner must
+    // add no failure of its own
+    type Found = { findings: Array<{ code: string; severity: string }> };
+    const failures = (document: CadDocument, entity: string): string[] =>
+      (execute(document, 'check_blends', { ids: [entity] }).data as Found).findings
+        .filter((finding) => finding.severity === 'fail')
+        .map((finding) => finding.code);
+    const own = failures(plain.document, plain.affected[0] as string);
+    expect(failures(done.document, result).filter((code) => !own.includes(code))).toEqual([]);
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
+  });
+
   it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {
     const { doc, id, vertex, edges } = dshape();
     const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });

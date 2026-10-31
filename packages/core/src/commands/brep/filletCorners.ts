@@ -2,7 +2,8 @@
  * Corner treatment of fillet_edge (BLD M3, TECHNICAL_SPEC §3, §5.5): picks the vertices (persistent name, point, or every vertex where 3 or more
  * rounded edges meet), gives each setback corner the distance from the vertex at which every edge blend stops, and derives the persistent
  * vertex names to record so a regeneration follows the same corners (REF_LOST / REF_SPLIT when one is gone).
- * @invariant a vertex gets one treatment; a setback corner has a distance for every edge meeting at the vertex (non-degenerate edges)
+ * @invariant a vertex gets one treatment; a setback corner has a distance for every edge meeting at the vertex (non-degenerate edges) ; the edges marked rollingBall (rounded by the kernel and cut by the
+ *   same ball) are listed with distance 0 (not absent: a missing edge is an error of the native builder); at least one edge has a distance > 0
  * @failure a selector that is not exactly one of name / near / all, an unknown or repeated vertex, a distance missing for an edge, an override
  *   edge that does not meet the vertex -> a problem; a lost / split vertex or edge name -> REF_LOST / REF_SPLIT; a smooth, multi-station or profiled blend with a
  *   setback corner -> BLD_CORNER_UNSUPPORTED
@@ -219,7 +220,7 @@ export function resolveCorners(
           path,
         },
       };
-    for (const edge of resolved.distances.keys())
+    for (const edge of [...resolved.distances.keys(), ...resolved.rolling])
       if (!targets.some((target) => vertices[target]?.edges.includes(edge)))
         return { problem: `${path}.setbacks: edge ${edge} does not meet ${targets.length === 1 ? 'the vertex' : 'any of the vertices'}` };
     for (const target of targets) {
@@ -245,7 +246,10 @@ export function resolveCorners(
       if (type === 'rolling_ball') continue;
       const distances: SetbackCorner['distances'][number][] = [];
       for (const edge of vertex.edges) {
-        if (resolved.rolling.has(edge)) continue;
+        if (resolved.rolling.has(edge)) {
+          distances.push({ edge, distance: 0 });
+          continue;
+        }
         const distance = resolved.distances.get(edge) ?? input.setback;
         if (distance === undefined)
           return {
@@ -253,6 +257,10 @@ export function resolveCorners(
           };
         distances.push({ edge, distance });
       }
+      if (!distances.some((entry) => entry.distance > 0))
+        return {
+          problem: `${path}: at least one edge at the vertex at [${vertex.point.join(', ')}] needs a setback distance (it is the radius of the ball that cuts the blends); not every edge can be rollingBall`,
+        };
       corners.push({ vertex: vertex.point, type: 'setback', distances });
     }
   }

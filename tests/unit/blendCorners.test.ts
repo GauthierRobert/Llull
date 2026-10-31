@@ -9,6 +9,7 @@ import type { ShapeEdge, ShapeTopology } from '@core/geometry/kernel';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { BlendReport, FaceGraph } from '@core/geometry/kernelPorts';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { defaultContext } from '@core/commands/context';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { diagnoseBlend, remediationOf } from '@core/geometry/blend/diagnose';
@@ -187,6 +188,70 @@ describe('fillet_edge corners', () => {
     expect(corners[1]?.distances.find((entry) => entry.edge === edge?.index)?.distance).toBe(4);
   });
 
+  it('a setbacks entry with rollingBall: true leaves that edge out of the distances of the vertex and is recorded; distance and rollingBall together, or neither, are a no-op', () => {
+    const kernel = scriptedKernel({ topology: TOPOLOGY });
+    const { doc, id } = cube();
+    const edge = TOPOLOGY.edges.find(
+      (candidate) => candidate.start[0] === -5 && candidate.end[0] === 5 && candidate.start[1] === -5 && candidate.start[2] === -5,
+    );
+    const done = execute(
+      doc,
+      'fillet_edge',
+      { id, radius: 1, corners: [{ near: [-5, -5, -5], setback: 2, setbacks: [{ near: edge?.mid, rollingBall: true }] }] },
+      ctxOf(kernel),
+    );
+    expect(done.rejected).not.toBe(true);
+    const corners = filletOf(done.document, done.affected[0] as string).corners ?? [];
+    expect(corners).toHaveLength(1);
+    expect(corners[0]?.distances).toHaveLength(3);
+    expect(corners[0]?.distances.find((entry) => entry.edge === edge?.index)?.distance).toBe(0);
+    expect(corners[0]?.distances.filter((entry) => entry.distance === 2)).toHaveLength(2);
+    const step = done.document.featureHistory[done.document.featureHistory.length - 1];
+    const recorded = JSON.stringify((step?.params as { corners?: unknown }).corners);
+    expect(recorded).toContain('"rollingBall":true');
+    expectNoOp(
+      execute(
+        doc,
+        'fillet_edge',
+        { id, radius: 1, corners: [{ near: [-5, -5, -5], setback: 2, setbacks: [{ near: edge?.mid, rollingBall: true, distance: 1 }] }] },
+        ctxOf(kernel),
+      ),
+      doc,
+      'both distance and rollingBall',
+    );
+    expectNoOp(
+      execute(
+        doc,
+        'fillet_edge',
+        { id, radius: 1, corners: [{ near: [-5, -5, -5], setback: 2, setbacks: [{ near: edge?.mid }] }] },
+        ctxOf(kernel),
+      ),
+      doc,
+      'needs a distance or rollingBall',
+    );
+  });
+
+  it('a rollingBall corner is recorded by the persistent name of the edge and survives save and load (distance 0 for that edge, the recipe validates on read)', () => {
+    const kernel = scriptedKernel({ topology: TOPOLOGY });
+    const { doc, id } = cube();
+    const edge = TOPOLOGY.edges.find(
+      (candidate) => candidate.start[0] === -5 && candidate.end[0] === 5 && candidate.start[1] === -5 && candidate.start[2] === -5,
+    );
+    const done = execute(
+      doc,
+      'fillet_edge',
+      { id, radius: 1, corners: [{ near: corner, setback: 2, setbacks: [{ name: edge?.name, rollingBall: true }] }] },
+      ctxOf(kernel),
+    );
+    expect(done.rejected).not.toBe(true);
+    const step = done.document.featureHistory[done.document.featureHistory.length - 1];
+    const recorded = (step?.params as { corners: Array<{ setbacks?: Array<Record<string, unknown>> }> }).corners[0]?.setbacks;
+    expect(recorded).toEqual([{ name: edge?.name, rollingBall: true }]);
+    const back = deserializeDocument(serializeDocument(done.document));
+    const loaded = filletOf(back, back.order[0] as string).corners ?? [];
+    expect(loaded[0]?.distances.map((entry) => entry.distance).sort()).toEqual([0, 2, 2]);
+  });
+
   it('only rolling_ball entries leave the recipe without corners', () => {
     const kernel = scriptedKernel({ topology: TOPOLOGY });
     const { doc, id } = cube();
@@ -219,6 +284,29 @@ describe('fillet_edge corners', () => {
     );
     const far = TOPOLOGY.edges.find((candidate) => candidate.start[0] === 5 && candidate.start[1] === 5 && candidate.end[0] === 5);
     expectNoOp(run([{ near: corner, setback: 2, setbacks: [{ near: far?.mid, distance: 1 }] }]), doc, 'does not meet the vertex');
+    expectNoOp(run([{ near: corner, setback: 2, setbacks: [{ near: far?.mid, rollingBall: true }] }]), doc, 'does not meet the vertex');
+    const meeting = TOPOLOGY.edges.filter((candidate) =>
+      [candidate.start, candidate.end].some((end) => end.every((value, axis) => value === corner[axis])),
+    );
+    expectNoOp(
+      run([{ near: corner, setback: 2, setbacks: meeting.map((edge) => ({ near: edge.mid, rollingBall: true })) }]),
+      doc,
+      'at least one edge at the vertex',
+    );
+    expectNoOp(
+      run([
+        {
+          near: corner,
+          setback: 2,
+          setbacks: [
+            { near: meeting[0]?.mid, rollingBall: true },
+            { name: meeting[0]?.name, distance: 1 },
+          ],
+        },
+      ]),
+      doc,
+      'is given twice',
+    );
     expectNoOp(
       run([
         {
@@ -416,9 +504,16 @@ describe('the fillet recipe field', () => {
     expect(validateShapeRecipe(node('x'))).toContain('corners must be a list');
     expect(validateShapeRecipe(node([{ ...good, type: 'rolling_ball' }]))).toContain('type "setback"');
     expect(validateShapeRecipe(node([{ ...good, vertex: [0, 0] }]))).toContain('vertex');
-    expect(validateShapeRecipe(node([{ ...good, distances: good.distances.slice(0, 2) }]))).toContain('3 or more edges');
-    expect(validateShapeRecipe(node([{ ...good, distances: [{ edge: 0, distance: 0 }, ...good.distances.slice(1)] }]))).toContain(
-      'distance > 0',
+    // an edge left to the rolling ball is listed with distance 0: one distance is enough, [] is not, at least one must be positive
+    expect(validateShapeRecipe(node([{ ...good, distances: good.distances.slice(0, 2) }]))).toBeNull();
+    expect(validateShapeRecipe(node([{ ...good, distances: good.distances.slice(0, 1) }]))).toBeNull();
+    expect(validateShapeRecipe(node([{ ...good, distances: [] }]))).toContain('1 or more edges');
+    expect(validateShapeRecipe(node([{ ...good, distances: [{ edge: 0, distance: 0 }, ...good.distances.slice(1)] }]))).toBeNull();
+    expect(validateShapeRecipe(node([{ ...good, distances: good.distances.map((entry) => ({ ...entry, distance: 0 })) }]))).toContain(
+      'at least one distance > 0',
+    );
+    expect(validateShapeRecipe(node([{ ...good, distances: [{ edge: 0, distance: -1 }, ...good.distances.slice(1)] }]))).toContain(
+      'distance >= 0',
     );
     expect(validateShapeRecipe(node([{ ...good, distances: [{ edge: -1, distance: 1 }, ...good.distances.slice(1)] }]))).toContain(
       'edge index',

@@ -263,11 +263,19 @@ function cornersError(node: Record<string, unknown>): string | null {
   if (!Array.isArray(corners)) return 'fillet: corners must be a list';
   for (const corner of corners) {
     const distances = isRecord(corner) ? corner['distances'] : undefined;
-    if (!isRecord(corner) || corner['type'] !== 'setback' || !isVec3(corner['vertex']) || !Array.isArray(distances) || distances.length < 3)
-      return 'fillet: a corner needs type "setback", a vertex [x, y, z] and distances for 3 or more edges';
+    if (!isRecord(corner) || corner['type'] !== 'setback' || !isVec3(corner['vertex']) || !Array.isArray(distances) || distances.length < 1)
+      return 'fillet: a corner needs type "setback", a vertex [x, y, z] and distances for 1 or more edges (distance 0: the edge is left to the rolling ball)';
     for (const entry of distances)
-      if (!isRecord(entry) || !Number.isInteger(entry['edge']) || (entry['edge'] as number) < 0 || !positiveNumber(entry['distance']))
-        return 'fillet: corner distances need a non-negative edge index and a distance > 0';
+      if (
+        !isRecord(entry) ||
+        !Number.isInteger(entry['edge']) ||
+        (entry['edge'] as number) < 0 ||
+        !isFiniteNumber(entry['distance']) ||
+        (entry['distance'] as number) < 0
+      )
+        return 'fillet: corner distances need a non-negative edge index and a distance >= 0 (0: left to the rolling ball)';
+    if (!distances.some((entry) => isRecord(entry) && positiveNumber(entry['distance'])))
+      return 'fillet: a corner needs at least one distance > 0 (the setback of an edge that is not left to the rolling ball)';
   }
   return null;
 }
