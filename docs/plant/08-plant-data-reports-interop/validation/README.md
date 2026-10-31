@@ -20,8 +20,8 @@ still `unbuilt`. In a finding of `check_plant_data`, `ids` lists the plant objec
 - `tests/unit/plant/scenarioPlans.test.ts` runs every plan in `plans/` through `build_project`, which is the path of
   `llull run plan.json`, and compares the `expected` rows (AF-23).
 - The schema-validity case (VC-DAT-06) needs IfcOpenShell. It runs in the production gate when Python is available
-  (`npm run production`, oracle `tests/production/oracle/ifc.ts` gains a `python3 -m ifcopenshell.validate --rules`
-  call). Without Python it is skipped with a reason and the TypeScript structural checks of VC-DAT-07/08 still run.
+  (the hook `tests/production/oracle/ifcRules.ts`, `python -I -m ifcopenshell.validate --rules --json`, run by
+  `tests/unit/plant/exchange/ifcRules.test.ts`; built in DAT-M3, not yet run against IfcOpenShell). Without Python it is skipped with a reason and the TypeScript structural checks of VC-DAT-07/08 still run.
 
 ## Gate policy
 

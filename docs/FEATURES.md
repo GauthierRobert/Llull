@@ -696,7 +696,7 @@
 | `export_anchor_plan` | Produce the anchor bolt setting-out plan (SVG in real millimetres, print to PDF at 100%): grid lines with bubbles, dashed footing outlines, base plate outlines… | read-only |
 | `export_building_dxf` | Export a BUILDING floor-plan DXF of one level (civil entities: use export_civil_dxf) (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revi… | read-only |
 | `export_elevation_sheet` | Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) drawn as an ISO 128 line drawing from the 3D model with hidden… | read-only |
-| `export_ifc` | Export the building model as IFC4 (OpenBIM, ISO 16739) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks…: project / site / building / storeys, walls … | read-only |
+| `export_ifc` | Export the building model as IFC4 (OpenBIM, ISO 16739; schema IFC4X3_ADD2 on request) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks…: project / si… | read-only |
 | `export_nc_files` | Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. | read-only |
 | `export_plan_sheet` | Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the level plan at a true scale (1:50, 1:100…; auto-fitted when om… | read-only |
 | `list_steel_profiles` | Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS, equal angles L, flat bars FL<width>x<thickness> and solid round ba… | read-only |

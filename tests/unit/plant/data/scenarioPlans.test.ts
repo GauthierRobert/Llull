@@ -1,7 +1,7 @@
 /**
- * Plant 08 DAT M1 + M2: runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
+ * Plant 08 DAT M1 + M2 + M3: runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
  * `as` binds the first affected id, `$alias` is replaced in params and expected values) and compares each `expected` row with the step's `data` / `error`.
- * Steps flagged `unbuilt` (the `schema` param of export_ifc: M3; valve_list: M5) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01.
+ * Steps flagged `unbuilt` (valve_list: M5; the sibling commands of SC-DAT-02) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01, DAT-M3 the export_ifc `schema` step 21.
  * SC-DAT-03 uses onError "continue": a refused step is an outcome, not a failure (VC-DAT-12).
  */
 
@@ -79,15 +79,17 @@ describe.each([
   it('meets the expected rows of every built step', () => {
     expect(plan.id).toBe(id);
     const built = plan.expected.filter((row) => outcomes[row.step] != null);
-    expect(built.length).toBeGreaterThanOrEqual(id === 'SC-DAT-01' ? 11 : 7);
+    if (id === 'SC-DAT-01') expect(built, 'every expected row of SC-DAT-01 runs since DAT-M3').toHaveLength(plan.expected.length);
+    else expect(built.length).toBeGreaterThanOrEqual(7);
     for (const row of built) compare(pick(outcomes[row.step], row.path), row, aliases);
   });
 
   it('is deterministic: a second run gives byte-identical step data and the same plant data', () => {
     const again = runPlan(file);
-    const plantSteps = (list: Array<Outcome | null>): string =>
-      JSON.stringify(list.filter((_outcome, index) => plan.actions[index]?.command !== 'export_ifc'));
-    expect(plantSteps(again.outcomes)).toBe(plantSteps(outcomes));
+    // GlobalIds are salted with the building uid, which differs between two fresh documents; the file text of one document is compared in ifc4x3.test.ts.
+    const stable = (list: Array<Outcome | null>): string =>
+      JSON.stringify(list, (key, value: unknown) => (key === 'ifc' && typeof value === 'string' ? value.length : value));
+    expect(stable(again.outcomes)).toBe(stable(outcomes));
     expect(again.final.plant?.data).toEqual(final.plant?.data);
   });
 });

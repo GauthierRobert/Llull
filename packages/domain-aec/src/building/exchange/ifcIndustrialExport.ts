@@ -38,6 +38,7 @@ import type { Exported } from './ifcElementExport';
 import { dot3 } from '@lib/vec3';
 import { vesselSolid } from './ifcVesselExport';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
+import type { ProductClass } from './ifcPlant';
 
 /** IFC parametric profile definition of a catalogue section (dimensions in mm). */
 export function steelProfileDef(context: Context, profile: SteelProfile): string {
@@ -96,10 +97,17 @@ export function sweptSolids(context: Context, profileRef: string, points: Readon
   return solids;
 }
 
+/** Plant data of an equipment or legacy pipe: the `Tag` attribute and, in IFC4X3_ADD2, the mapped product class of the equipment. */
+export interface ProductPlant {
+  readonly tag: string;
+  readonly product: ProductClass | null;
+}
+
 export function exportIndustrial(
   context: Context,
   element: SteelMemberElement | FootingElement | PanelElement | EquipmentElement | PipeElement | CableTrayElement,
   storeyPlacement: string,
+  plant?: ProductPlant,
 ): Exported | null {
   const { mm, writer } = context;
   const guid = context.guid(element.id);
@@ -151,8 +159,12 @@ export function exportIndustrial(
       );
       const solid =
         vesselSolid(context, element) ?? extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height));
+      const tag = ifcString(plant?.tag ?? element.id);
+      const product = plant?.product;
       const ref = writer.add(
-        `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [solid])},${ifcString(element.id)},.ELEMENT.)`,
+        product
+          ? `${product.entity}('${guid}',$,${ifcString(product.name)},${ifcString(product.description)},${product.objectType === null ? '$' : ifcString(product.objectType)},${local},${shape(context, [solid])},${tag},.${product.predefined}.)`
+          : `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [solid])},${tag},.ELEMENT.)`,
       );
       addPropertySet(context, { id: element.id, ref }, 'Pset_llullEquipment', [
         `IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(${ifcReal(element.weight)}),$)`,
@@ -168,7 +180,7 @@ export function exportIndustrial(
       if (solids.length === 0) return null;
       const description = [element.line, element.service].filter(Boolean).join(' ');
       const ref = writer.add(
-        `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(description)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
+        `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(description)},$,${local},${shape(context, solids)},${ifcString(plant?.tag ?? element.id)},.RIGIDSEGMENT.)`,
       );
       return { ref, material: element.material };
     }

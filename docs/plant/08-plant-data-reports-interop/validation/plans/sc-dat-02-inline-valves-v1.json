@@ -115,7 +115,7 @@
     },
     { "command": "plant_report", "unbuilt": true, "params": { "kind": "valve_list" } },
     { "command": "check_plant_data", "params": {} },
-    { "command": "export_ifc", "params": { "timestamp": "2026-10-18T00:00:00" } }
+    { "command": "export_ifc", "params": { "schema": "IFC4X3_ADD2", "timestamp": "2026-10-18T00:00:00" } }
   ],
   "expected": [
     { "step": 13, "path": "rows.length", "value": 2, "source": "plan (XV-1001, NRV-1002)" },
