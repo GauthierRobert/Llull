@@ -283,3 +283,33 @@ fn delete_faces_refuses_what_it_cannot_heal_and_fills_a_bore() {
     let bad = face_op(&cube, json!({ "kind": "moveFaces", "faces": [0], "move": { "type": "spin" } }));
     assert!(evaluator.evaluate(&bad).unwrap().is_none(), "an unknown move type is refused");
 }
+
+#[test]
+fn a_face_blend_spec_is_thirteen_numbers_plus_the_extra_faces_and_refuses_a_bad_taper() {
+    let recipe = |extra: Value| {
+        let mut node = json!({ "op": "faceBlend", "facesA": [3, 4, 4, 5], "facesB": [7], "radius": 2.0 });
+        for (key, value) in extra.as_object().unwrap() {
+            node[key] = value.clone();
+        }
+        node
+    };
+    let constant = face_blend_spec(&recipe(json!({}))).unwrap();
+    assert_eq!(
+        constant,
+        vec![3.0, 7.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 4.0, 5.0],
+        "duplicates dropped, two extra faces of A"
+    );
+    let taper = face_blend_spec(&recipe(json!({ "facesA": [3], "radiusEnd": 6.0, "startNear": [5.0, 5.0, 10.0] }))).unwrap();
+    assert_eq!(
+        taper,
+        vec![3.0, 7.0, 2.0, 2.0, 0.0, 0.0, 6.0, 1.0, 5.0, 5.0, 10.0, 0.0, 0.0],
+        "the 13-number spec: radius at the other end, start point, no extras"
+    );
+    assert!(face_blend_spec(&recipe(json!({ "radiusEnd": 0.0 }))).is_none(), "a zero radius at the other end is refused");
+    assert!(face_blend_spec(&recipe(json!({ "radiusEnd": -1.0 }))).is_none());
+    assert!(face_blend_spec(&recipe(json!({ "startNear": [1.0, 2.0] }))).is_none(), "a start point is three numbers");
+    assert!(face_blend_spec(&recipe(json!({ "startNear": "end" }))).is_none());
+    assert!(face_blend_spec(&recipe(json!({ "facesB": [] }))).is_none(), "an empty set is refused");
+    let absent = face_blend_spec(&recipe(json!({ "radiusEnd": null, "startNear": null }))).unwrap();
+    assert_eq!(absent[6..11], [0.0; 5], "null fields read as absent");
+}
