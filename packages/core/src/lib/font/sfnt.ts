@@ -82,6 +82,20 @@ export function readHeader(tables: SfntTables): FontHeader {
   };
 }
 
+/**
+ * Advance height (font units) of glyph `glyph` from `vhea` / `vmtx`, or null when the font has no vertical metrics.
+ * @failure a `vmtx` shorter than `vhea` says -> WRP_FONT_PARSE
+ */
+export function verticalAdvanceOf(tables: SfntTables, header: FontHeader, glyph: number): number | null {
+  const vhea = tables.table('vhea');
+  const vmtx = tables.table('vmtx');
+  if (vhea === null || vmtx === null) return null;
+  const count = vhea.u16(34);
+  if (count === 0 || count > header.numGlyphs) throw parseError(`vhea: ${count} vertical metrics for ${header.numGlyphs} glyphs`);
+  if (vmtx.length < 4 * count + 2 * (header.numGlyphs - count)) throw parseError('vmtx: shorter than its glyph count requires');
+  return vmtx.u16(4 * Math.min(glyph, count - 1));
+}
+
 /** Advance width (font units) of glyph `glyph`. */
 export function advanceOf(tables: SfntTables, header: FontHeader, glyph: number): number {
   const hmtx = requireTable(tables, 'hmtx');
@@ -119,29 +133,54 @@ export interface FontNames {
   readonly licence?: string;
 }
 
-/** Name records of a platform: Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII. */
-export function readNames(tables: SfntTables): FontNames {
+/** Language preference of a name record: Windows English (0x0409, or the unset language 0 of a careless font), then Unicode, then Macintosh English, then any other Windows language, any other Macintosh one, the rest. */
+function nameRank(platform: number, language: number): number {
+  if (platform === 3) return language === 0x0409 || language === 0 ? 0 : 3;
+  if (platform === 0) return 1;
+  if (platform === 1) return language === 0 ? 2 : 4;
+  return 5;
+}
+
+const MAX_NAME_RECORDS = 65_535;
+const MAX_STRINGS_PER_ID = 16;
+
+/**
+ * The strings of the `name` table by name id, every language, the preferred one first (Windows English, then Unicode, then Macintosh English, then the others in table order), each at most 256
+ * characters and at most 16 per id. Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII; records outside the table are skipped.
+ */
+export function readNameStrings(tables: SfntTables): ReadonlyMap<number, readonly string[]> {
   const name = tables.table('name');
-  const found = new Map<number, string>();
+  const ranked = new Map<number, Array<{ rank: number; text: string }>>();
   if (name !== null) {
-    const count = Math.min(name.u16(2), 512);
+    const count = Math.min(name.u16(2), MAX_NAME_RECORDS);
     const storage = name.u16(4);
     for (let k = 0; k < count; k++) {
       const record = 6 + 12 * k;
       if (record + 12 > name.length) break;
       const platform = name.u16(record);
+      const language = name.u16(record + 4);
       const id = name.u16(record + 6);
       const length = name.u16(record + 8);
       const offset = storage + name.u16(record + 10);
-      if (offset + length > name.length || (platform === 1 && found.has(id))) continue;
-      const text = platform === 1 ? name.ascii(offset, length) : name.utf16(offset, length);
-      if (text.length > 0) found.set(id, text.slice(0, 256));
+      if (offset + length > name.length) continue;
+      const text = (platform === 1 ? name.ascii(offset, length) : name.utf16(offset, length)).slice(0, 256);
+      const list = ranked.get(id) ?? [];
+      if (text.length === 0 || list.length >= MAX_STRINGS_PER_ID || list.some((entry) => entry.text === text)) continue;
+      list.push({ rank: nameRank(platform, language), text });
+      ranked.set(id, list);
     }
   }
-  const licence = found.get(13);
+  return new Map([...ranked].map(([id, list]) => [id, [...list].sort((x, y) => x.rank - y.rank).map((entry) => entry.text)]));
+}
+
+/** The family, style and licence of the font. */
+export function readNames(tables: SfntTables): FontNames {
+  const found = readNameStrings(tables);
+  const first = (id: number): string | undefined => found.get(id)?.[0];
+  const licence = first(13);
   return {
-    family: found.get(16) ?? found.get(1) ?? 'Unknown',
-    style: found.get(17) ?? found.get(2) ?? 'Regular',
+    family: first(16) ?? first(1) ?? 'Unknown',
+    style: first(17) ?? first(2) ?? 'Regular',
     ...(licence !== undefined ? { licence } : {}),
   };
 }

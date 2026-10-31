@@ -5,6 +5,7 @@ import { addKnurl } from './addKnurl';
 import { checkWrap } from './checkWrap';
 import { createCurveOnFace } from './createCurveOnFace';
 import { embossOnFace } from './embossOnFace';
+import { fontMetrics } from './fontMetrics';
 import { importFont, listFonts } from './importFont';
 import { patternOnFace } from './patternOnFace';
 import { projectToFace } from './projectToFace';
@@ -17,6 +18,7 @@ import { wrapToFace } from './wrapToFace';
 export const wrapCommands = commandCatalog(
   importFont,
   listFonts,
+  fontMetrics,
   textOutlineCommand,
   unwrapFace,
   wrapToFace,

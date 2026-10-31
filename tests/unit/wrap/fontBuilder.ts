@@ -32,7 +32,7 @@ export interface FontSpec {
   readonly cmap?: 'f4' | 'f4-range' | 'f12' | 'none' | 'f4-bad' | 'f12-bad';
   readonly codePoints?: ReadonlyArray<readonly [number, number]>;
   readonly os2?: { readonly version: number; readonly fsType: number; readonly capHeight?: number } | null;
-  readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string }>;
+  readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string; readonly language?: number }>;
   readonly kern?: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> | 'vertical' | 'version1';
   /** An OpenType font with CFF outlines: the OTTO sfnt tag. */
   readonly otto?: boolean;
@@ -209,7 +209,7 @@ function nameTable(names: NonNullable<FontSpec['names']>): number[] {
     records
       .u16(record.platform)
       .u16(record.platform === 3 ? 1 : 0)
-      .u16(0)
+      .u16(record.language ?? 0)
       .u16(record.id)
       .u16(strings.bytes.length - start)
       .u16(start);

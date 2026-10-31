@@ -171,6 +171,7 @@
 | `fillet_full_round` | Full round of a rib or wall top: replace the center face by a half-cylinder tangent to the two side faces (radius = half the distance between them, document un… | kernel |
 | `flow_along_curve` | Lay a straight 3D solid or mesh along a NURBS curve: the body axis (frame z, default the longest bounding-box direction, starting at the body start) is mapped … |  |
 | `flow_on_surface` | Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface, or move a body laid out on a CURVED base sheet (base.sheetId: a plat… |  |
+| `font_metrics` | Metrics of a font at one instance, in font units (divide by data.unitsPerEm for em): data.ascender / descender / lineGap / capHeight (moved by MVAR for a varia… | read-only |
 | `import_font` | Embed a TrueType (.ttf), CFF-outline OpenType (.otf) or CFF2 variable (.otf) font in the document so text can be turned into outlines (text_outline, extrude_pr… |  |
 | `inspect_face_triangles` | For an exact 3D solid, the B-rep face of every display triangle: data.faceOfTriangle[t] is the index (as in inspect_topology / inspect_faces) of the face that … | read-only, kernel |
 | `inspect_faces` | List the faces of an exact 3D solid with located geometry: per face its index (the same index inspect_topology uses), surface type (plane, cylinder, cone, sphe… | read-only, kernel |

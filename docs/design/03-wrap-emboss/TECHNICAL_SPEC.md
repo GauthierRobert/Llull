@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VVAR` / vertical metrics variations and named-instance lookup by name (see 14.14); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VORG` and the side-bearing variations of `VVAR` (read for their structure, not used), vertical text layout (§14.18); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -850,3 +850,25 @@ divides its face into arcs of 30 and 60 degrees times the width (1e-3).
 cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
 (the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised through the test hooks of `freeformContours` (a field or projection no real surface gives) and by a C0 crease. A kernel defect found on the way (two sequential
 face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.
+
+### 14.18 Vertical metrics variations and named instances (DES-3c)
+
+**Advance heights.** `ParsedFont.verticalAdvance(glyph)` is the advance height in font units: the `vmtx` entry (the last long metric repeats for the glyphs after `vhea.numOfLongVerMetrics`), else ascender - descender when the font has no
+vertical metrics, moved at an instance by `VVAR` (the delta of the row the advance-height map gives, else row = glyph index of subtable 0; rounded to a font unit) or, for a gvar font without `VVAR`, by the phantom points of the glyph (the
+third minus the fourth phantom point, the vertical counterpart of the width from the first and second). A `VVAR` is read at the instance only when the instance moved an axis; its version must be 1, its store and every offset of its four
+mappings must lie inside the table (the side-bearing and origin mappings are validated and not used). Damage is `WRP_FONT_PARSE`; a `vhea` with more long metrics than glyphs or a `vmtx` shorter than its glyphs need refuses when a height is asked.
+
+**Named instances.** The `fvar` instance records (subfamily name id, flags, one Fixed per axis, optional PostScript name id; the record size must be 4 + 4 axes or 6 + 4 axes, at most 4096 records, every value inside its axis) are listed in
+`ParsedFont.namedInstances` with the strings of the `name` table (an instance whose subfamily name id has no string is left out). `parseFont(bytes, {}, name)` and `import_font instance="Bold"` pick one by its subfamily or PostScript
+name, any case, and mean the axis values of that record (the record stored in the document carries them as `variation`, so `add_text font=<id>` follows). A name the font does not have lists the names it has; a name together with
+`variation`, or on a font without axes, is `WRP_FONT_VARIATION`. `data.namedInstances` of `import_font` lists name, PostScript name and axis values.
+
+**Names in every language.** The `name` table keeps every language of a name id (at most 16 per id, every record read): the preferred string is Windows English (0x0409), then Unicode, then Macintosh English, then the others in table order,
+and a requested name is matched against every language of the instance's subfamily and PostScript name ids, so a localised record that comes later never hides the English one and `instance="Gras"` works as well as `Bold`.
+**A bad instance record is not a bad font.** A record whose values lie outside their axes is left out, a record table that cannot be read (a size that fits neither form, more than 4096, cut short) lists no instance; both are lines of
+`ParsedFont.namedInstanceProblems` and of `data.namedInstanceProblems` of `import_font`. An ItemVariationStore that starts inside the 20-byte header of an HVAR or the 24-byte header of a VVAR is `WRP_FONT_PARSE`.
+**`font_metrics`** (read-only, `font`, optional `text`, `variation` or `instance`) is where the heights are read: the vertical metrics at the instance and the glyph, advance width and advance height of each character, with the sums.
+
+**Measured (closed forms by construction, `tests/unit/wrap/vvar.test.ts`).** Heights 1000..1400 with a VVAR of 0, 10, 20, 30, 40 on wght+: at wght 900 the glyphs read 1000, 1110, 1220, 1330, 1440, at wght 650 (coordinate 0.5)
+1000, 1105, 1210, 1315, 1420; through a map to rows 3 - k: 1030, 1120, 1210, 1300, 1400; without vmtx 1150 + 10 k; the phantom fallback 30 - 10 = 20 on glyph 2. Four instances give four names, and `Bold`, `bold`, `Test-Bold` equal
+the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layout of text (the heights are read by font_metrics, nothing lays text out vertically), `VORG`.
