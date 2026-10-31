@@ -9,6 +9,8 @@ import { listCommands } from '@core/commands/registry';
 const PID_COMMANDS = [
   'import_dexpi',
   'pid_report',
+  'check_pid',
+  'parse_instrument_tag',
   'create_pid_sheet',
   'add_pid_equipment',
   'add_pid_nozzle',
@@ -26,14 +28,14 @@ const PID_COMMANDS = [
 ];
 
 describe('pid plugin', () => {
-  it('is the pid toolset with the M2 + M3 commands and adds no derived entity', () => {
+  it('is the pid toolset with the M2 to M4 commands and adds no derived entity', () => {
     expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid' });
     expect(pidPlugin.commands.map((command) => command.name)).toEqual(PID_COMMANDS);
     expect(TOOLSET_NAMES).toContain('pid');
     expect([...TOOLSETS.pid].sort()).toEqual([...PID_COMMANDS].sort());
     expect(
       listCommands()
-        .filter((command) => /pid|dexpi/.test(command.name))
+        .filter((command) => /pid|dexpi|instrument_tag/.test(command.name))
         .map((command) => command.name)
         .sort(),
     ).toEqual([...PID_COMMANDS].sort());

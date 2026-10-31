@@ -8,6 +8,7 @@ import { parseCatalogFile } from '@aec/plant/catalog/file';
 import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { readPcf } from '@aec/plant/fabrication/pcf/pcfRead';
 import { readProteus } from '@aec/plant/pid/dexpi/proteusRead';
+import { parseTag } from '@aec/plant/pid/tags/parseTag';
 import { parseLineNumber } from '@aec/plant/piping/lineNumber';
 import { parseSpecFile } from '@aec/plant/spec/file';
 import { parseCrossingName } from '@aec/industrial/framing/gridFraming';
@@ -98,6 +99,21 @@ export const AEC_READERS: readonly HostileReader[] = [
     extra: proteusExtras,
     read: (input) => readProteus(asText(input), 'pid-1.1', 'auto'),
     accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'plant: parseTag (ISA 5.1 instrument tag)',
+    covers: ['domain-aec/src/plant/pid/tags/parseTag.ts:parseTag'],
+    input: 'text',
+    build: (records) => `F${'I'.repeat(records)}-1`,
+    extra: [
+      { name: 'one million spaces', input: () => ` ${' '.repeat(1_000_000)}FIC-1` },
+      { name: 'one million digits', input: () => `FIC-${'9'.repeat(1_000_000)}` },
+      { name: 'one million plus signs', input: () => `P${'+'.repeat(1_000_000)}-1` },
+      { name: 'one million superscript plus signs', input: () => `P${'⁺'.repeat(1_000_000)} 1` },
+    ],
+    read: (input) => parseTag(asText(input)),
+    accepts: (result) => (result as { ok: boolean }).ok,
+    skipLinear: 'tags over 64 characters are refused after one linear normalisation pass; the grammar itself is bounded by that limit',
   },
   {
     name: 'plant: import_dexpi (execute)',

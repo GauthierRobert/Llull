@@ -363,7 +363,7 @@ and fills the corner with a G1 patch. Profile blends, setback patches and \`blen
 \`\`\`
 
 Read \`check_blends\`: \`status\` pass / warn / fail, per blend face the contacts (gap, \`g1AngleRad\`, \`order\`) and the realised radius, and coded findings (BLD_CHECK_*). A circular
-fillet is G1 to a plane, never G2: ask for \`require: "G2"\` only with a curvature profile. Not offered (no param exists): partial fillets, cliff / trim modes of face blends, G3 blends.
+fillet is G1 to a plane, never G2: ask for \`require: "G2"\` only with a curvature profile. Not offered (no param exists): partial fillets, trim modes of face blends other than the end walls, G3 blends. Cliff edges: \`fillet_faces cliff\` (one planar face per set, constant radius, circular section).
 
 ---
 

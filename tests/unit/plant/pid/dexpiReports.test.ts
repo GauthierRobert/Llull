@@ -102,7 +102,7 @@ describe('pid_report kind=counts', () => {
 
   it('refuses an unknown sheet with PID_SHEET_NOT_FOUND', () => {
     expectRefusal(c01, 'pid_report', { kind: 'counts', sheet: 'PID-009' }, 'PID_SHEET_NOT_FOUND', 'sheet');
-    expect(execute(c01, 'pid_report', { kind: 'line_list' }).rejected).toBe(true);
+    expect(execute(c01, 'pid_report', { kind: 'line_list', sheet: 'PID-009' }).rejected).toBe(true);
   });
 });
 
@@ -169,9 +169,8 @@ describe('SC-PID-01 plan (import, then the counts of the reference P&ID)', () =>
       doc = result.document;
       return result.rejected === true ? null : { data: result.data };
     });
-    // Steps 2..6 (line_list, valve_list, instrument_index, equipment_list, check_pid) belong to M4; their commands do not exist yet.
-    expect(outcomes.slice(0, 2).every((outcome) => outcome !== null && outcome !== undefined)).toBe(true);
-    expect(outcomes.slice(2).every((outcome) => outcome === null)).toBe(true);
+    // Steps 2..6 (the lists and check_pid, M4) are asserted in checkScenario.test.ts.
+    expect(outcomes.every((outcome) => outcome !== null && outcome !== undefined)).toBe(true);
     const pick = (root: unknown, expression: string): unknown =>
       expression.split('.').reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], root);
     const rows = plan.expected.filter((row) => row.step < 2);

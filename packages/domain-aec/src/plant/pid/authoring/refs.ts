@@ -29,7 +29,7 @@ export const refuse = (doc: CadDocument, command: string, f: Fail): CommandResul
   refusePid(doc, command, f.code, f.message, f.ids, f.paths);
 
 /** Kinds whose `tag` is unique in the document (loops, annotations and segments carry derived or imported tags). */
-const TAGGED_KINDS: ReadonlySet<PidItem['kind']> = new Set(['equipment', 'inline', 'instrument', 'actuating']);
+export const TAGGED_KINDS: ReadonlySet<PidItem['kind']> = new Set(['equipment', 'inline', 'instrument', 'actuating']);
 
 export const MAX_TAG_LENGTH = 64;
 

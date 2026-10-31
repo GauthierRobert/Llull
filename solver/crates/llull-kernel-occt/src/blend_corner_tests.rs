@@ -830,6 +830,8 @@ impl Drop for CornerHooks {
         crate::test_bridge::set_corner_spawn_limit(-1);
         crate::test_bridge::set_corner_exact_patch(1);
         crate::test_bridge::set_corner_trim(false);
+        crate::test_bridge::set_corner_crease_gate(true);
+        crate::test_bridge::set_corner_c0_knots(false);
     }
 }
 
@@ -1575,4 +1577,109 @@ fn a_concave_vertex_with_different_setbacks_is_cut_by_planes_too() {
     assert!(analyze(&built).unwrap().valid);
     assert!(mass_properties(&built).unwrap().volume > mass_properties(&shape).unwrap().volume, "the concave blends add material");
     assert!(worst_tangent_angle(&built) < 0.0095);
+}
+
+/// A 10 x 10 x 5 block cut by a cylinder of `radius` about the z axis, and the vertex (10, sqrt(radius^2 - 100), 5) of its straight top edge, the cylinder-plane edge and the circular top edge.
+fn cut_block_vertex(radius: f64) -> (Shape, [f64; 3], Vec<usize>) {
+    let block = make_box([0.0; 3], [10.0, 10.0, 5.0]).unwrap().unwrap();
+    let cylinder = crate::make_cylinder(radius, 5.0).unwrap().unwrap();
+    let cut = boolean(BooleanOp::Intersect, &block, &cylinder, true).unwrap().unwrap();
+    let vertex = [10.0, (radius * radius - 100.0).sqrt(), 5.0];
+    let meeting = edges_at(&cut, vertex);
+    (cut, vertex, meeting)
+}
+
+/// Fillets the cut block at its vertex, radius 0.5, setbacks 1.2 / 1.2 / `third`, no plate fallback (hook 5); the reason when it is refused.
+fn cut_block_setback(radius: f64, third: f64) -> Result<Shape, String> {
+    let (shape, vertex, meeting) = cut_block_vertex(radius);
+    let (edges, mut corners) = spec(&shape, &meeting, 0.5, &[vertex], 1.2);
+    corners[7] = third;
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    fillet_setback(&shape, &edges, &corners).unwrap().ok_or_else(|| setback_reason(&shape, &edges, &corners).unwrap())
+}
+
+/// BLD §13.22.6: the cylinder block with different setbacks (1.2 / 1.2 / x along the edges of the vertex). The chains of the bottom of a sub-patch join pieces whose supports change (a plane and the
+/// cylinder): the cross tangent of the sub-patch (the support's tangent plane projected) has a kink there, so the surface has a kink in its u derivative along the whole joint, growing with v.
+/// A knot of multiplicity 4 (C1) cannot hold it: the boundary error decays like h (0.0056 / 0.0063 rad at 36 poles), which the oriented check of the sewn solid read as 0.0097; a knot of
+/// multiplicity 5 (C0) holds the boundary but creases the interior (`a_c0_knot_creases_...`). The build takes C1 knots at 48 or 64 poles, measured interior jump 0.0009 to 0.0015 rad.
+#[test]
+fn a_kink_in_the_cross_tangent_at_the_joint_of_a_chain_is_held_by_fine_c1_knots_without_an_interior_crease() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    for radius in [12.0, 11.0] {
+        for third in [1.3, 1.4, 1.6] {
+            let built = cut_block_setback(radius, third).unwrap_or_else(|reason| panic!("{radius} {third}: {reason}"));
+            assert!(analyze(&built).unwrap().valid);
+            // the cylinder meets the side plane at acos(10 / radius): 0.43 rad for radius 11, a sharp edge of the part away from the corner, so only the patches are read there
+            let tangent = if radius == 12.0 { worst_tangent_angle(&built) } else { 0.0 };
+            assert!(tangent < 0.0095 && worst_patch_angle(&built) < 0.0095, "{radius} {third}: {tangent} {}", worst_patch_angle(&built));
+            let crease = crate::test_bridge::last_corner_crease();
+            assert!(crease < 0.0095 && crease > 0.0, "{radius} {third}: the interior jump across the joint lines is {crease}");
+            assert!(
+                worst_patch_gap(&built) < 1e-6 * (10.0_f64 * 10.0 + 10.0 * 10.0 + 25.0).sqrt(),
+                "{radius} {third}: {}",
+                worst_patch_gap(&built)
+            );
+        }
+    }
+}
+
+/// BLD §13.22.6 review: the interior crease of a C0 joint knot is measured and gated. With only C0 knots (hook) the cylinder block 1.2 / 1.2 / 1.6 passes every boundary measure of the star but
+/// the normals on the two sides of each joint iso-line differ by 0.37 rad (21 degrees) inside the sub-patch: refused by name with the gate, built with it off (the hook).
+#[test]
+fn a_c0_knot_creases_the_interior_of_a_sub_patch_and_the_gate_refuses_it() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_c0_knots(true);
+    let reason = cut_block_setback(12.0, 1.6).err().expect("the crease is refused");
+    assert!(reason.contains("C0 joint knots) crease by") && reason.contains("limit 0.009500"), "{reason}");
+    crate::test_bridge::set_corner_crease_gate(false);
+    let built = cut_block_setback(12.0, 1.6).expect("without the gate the creased star is built");
+    assert!(analyze(&built).unwrap().valid);
+    let crease = crate::test_bridge::last_corner_crease();
+    assert!(crease > 0.3, "the crease the gate refuses: {crease}");
+    assert!(worst_tangent_angle(&built) < 0.0095, "the boundary reads fine: the crease is only in the interior");
+}
+
+/// BLD §13.22.6 review: a larger jump of the curvature (a smaller cylinder, radius 11 and 10.2 against 12; the top edge shortens to 4.58 and 2.0) builds with the interior jump under the
+/// limit, or is refused by name (radius 10.5: the hole folds, the star leaves its supports by pi).
+#[test]
+fn a_smaller_cylinder_builds_under_the_crease_limit_or_is_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    for radius in [11.0, 10.2] {
+        for third in [1.3, 1.6] {
+            cut_block_setback(radius, third).unwrap_or_else(|reason| panic!("{radius} {third}: {reason}"));
+            let crease = crate::test_bridge::last_corner_crease();
+            assert!(crease < 0.0095, "{radius} {third}: {crease}");
+        }
+    }
+    let reason = cut_block_setback(10.5, 1.4).err().expect("the folded hole is refused");
+    assert!(reason.contains("the exact-boundary patch was refused") && reason.contains("leave the edges by"), "{reason}");
+}
+
+/// BLD §13.22.6 review: why C1 knots come first. On the cylinder block with a radius tapering 0.5 -> 0.7 along its three edges (setback 1.5) the default (C1 first) builds with an interior jump
+/// across the joints under the limit, while C0 knots alone (hook) crease the sub-patches by 0.15 rad and are refused by the gate. (The earlier reading that all-C0 leaves the pole-end normals
+/// of the neighbours 0.0128 to 0.0146 rad apart did not reproduce here: with the gate off this block builds with C0 knots too.)
+#[test]
+fn the_tapered_cylinder_block_builds_with_c1_knots_while_c0_knots_alone_crease_it() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, vertex, meeting) = cut_block_vertex(12.0);
+    let tapers: Vec<(usize, f64, f64)> = meeting.iter().map(|&edge| (edge, 0.5, 0.7)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &[vertex], 1.5);
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "C1 first: builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(worst_patch_angle(&built) < 0.0095, "{}", worst_patch_angle(&built));
+    let crease = crate::test_bridge::last_corner_crease();
+    assert!(crease < 0.0095, "{crease}");
+    crate::test_bridge::set_corner_c0_knots(true);
+    let creased = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(creased.contains("C0 joint knots) crease by"), "{creased}");
+    crate::test_bridge::set_corner_crease_gate(false);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "the gate alone refuses it");
+    assert!(crate::test_bridge::last_corner_crease() > 0.1, "{}", crate::test_bridge::last_corner_crease());
 }

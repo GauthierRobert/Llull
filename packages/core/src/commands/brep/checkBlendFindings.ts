@@ -3,6 +3,7 @@
  * @invariant pure; lengths in document units, angles in radians
  */
 
+import type { CliffEdge } from '../../geometry/blend/cliffEdge';
 import type { measureContact } from '../../geometry/blend/continuity';
 import { roundSignificant } from '../../lib/significant';
 
@@ -36,6 +37,8 @@ export const REMEDIATION = {
     'the kernel did not give what the leg readback needs (the chamfer face by name, its contact lines, the faces of the edge): rebuild with the native kernel, or read the legs with inspect_topology and measure_distance',
   BLD_CHECK_CHAMFER_LEGS:
     'the chamfer face does not keep the legs of its law (a leg is measured on each face from the edge in the plane perpendicular to it): use smaller distances, or a constant chamfer, or report the part',
+  BLD_CHECK_CLIFF_EDGE:
+    'none needed: a cliff edge (fillet_faces cliff) is where the ball touches the far edge of a narrow face, so it is sharp there by construction',
   BLD_CHECK_G0_GAP: 'the faces do not meet at the contact: use a smaller radius or fewer edges per step',
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
@@ -101,3 +104,18 @@ export const statusOf = (findings: readonly Finding[]): 'pass' | 'warn' | 'fail'
     : findings.some((finding) => finding.severity === 'warn')
       ? 'warn'
       : 'pass';
+
+/** The info finding for the cliff edge of a cliff blend (fillet_faces cliff): a sharp edge by construction, never a failure. */
+export function cliffFinding(entityId: string, face: number, name: string, cliff: CliffEdge): Finding {
+  return {
+    code: 'BLD_CHECK_CLIFF_EDGE',
+    severity: 'info',
+    entityId,
+    face,
+    edge: cliff.edge,
+    value: sig(cliff.angleRad),
+    unit: 'rad',
+    remediation: REMEDIATION.BLD_CHECK_CLIFF_EDGE,
+    message: `cliff edge, not a tangent contact (angle ${sig((cliff.angleRad * 180) / Math.PI)}°): blend face ${face} (${name}) touches the far edge of a consumed face at edge ${cliff.edge}`,
+  };
+}
