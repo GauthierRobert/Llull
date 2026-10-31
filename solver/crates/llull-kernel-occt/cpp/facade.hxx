@@ -70,6 +70,7 @@ void set_corner_threads(int32_t count);
 int32_t last_corner_threads();
 void set_corner_fault(int32_t corner);
 void set_corner_spawn_limit(int32_t workers);
+void set_corner_exact_patch(int32_t mode);
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).

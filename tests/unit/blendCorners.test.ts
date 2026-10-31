@@ -114,6 +114,7 @@ describe('cornerSources', () => {
   it('splits a corner patch name at the top-level commas; any other name is null', () => {
     expect(cornerSources('blend(v:e(a|b),e(a|c),e(b|c))')).toEqual(['e(a|b)', 'e(a|c)', 'e(b|c)']);
     expect(cornerSources('blend(e(a|b))')).toBeNull();
+    expect(cornerSources('blend(v:e(a|b),e(a|c),e(b|c))#4')).toEqual(['e(a|b)', 'e(a|c)', 'e(b|c)']);
     expect(cornerSources('blend(v:e(a|b')).toBeNull();
   });
 });
@@ -436,8 +437,9 @@ describe('check_blends corner patches', () => {
     edgeG1: (edge: number, t: number) => number,
     params: Record<string, unknown> = {},
     gap: (edge: number, t: number) => number = () => 0,
+    rank = '',
   ): ReturnType<typeof execute> {
-    const patch = `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))`;
+    const patch = `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))${rank}`;
     const topology: ShapeTopology = {
       ...TOPOLOGY,
       faces: [...TOPOLOGY.faces.slice(0, 2), { index: 2, name: patch, surface: 'bspline', area: 3 }],
@@ -507,6 +509,34 @@ describe('check_blends corner patches', () => {
       () => 3 * g0,
     ).data as Run;
     expect(explicit.findings.some((finding) => finding.code === 'BLD_CHECK_G0_GAP' && finding.severity === 'fail')).toBe(true);
+  });
+
+  it('a sub-patch of an exact star (blend(v:...)#k) is judged at the default g0, the plate patch at 5x: the same 3 x g0 gap fails the star and passes the plate; g0Corner is listed for plate rows only', () => {
+    type Run = {
+      findings: Array<{ code: string; severity: string }>;
+      tolerances: Record<string, { value: number }>;
+      blends: Array<{ kind: string; profile: string; sourceEdges: string[] }>;
+    };
+    const g0 = (patched(() => 0.001).data as Run).tolerances['g0']?.value ?? 0;
+    const star = patched(
+      () => 0.001,
+      {},
+      () => 3 * g0,
+      '#2',
+    ).data as Run;
+    expect(star.findings.some((finding) => finding.code === 'BLD_CHECK_G0_GAP' && finding.severity === 'fail')).toBe(true);
+    expect(star.tolerances['g0Corner']).toBeUndefined();
+    const row = star.blends.find((blend) => blend.kind === 'corner');
+    expect(row?.profile).toBe('star');
+    expect(row?.sourceEdges).toHaveLength(3);
+    const plate = patched(
+      () => 0.001,
+      {},
+      () => 3 * g0,
+    ).data as Run;
+    expect(plate.findings.filter((finding) => finding.code === 'BLD_CHECK_G0_GAP')).toEqual([]);
+    expect(plate.tolerances['g0Corner']).toBeDefined();
+    expect(plate.blends.find((blend) => blend.kind === 'corner')?.profile).toBe('patch');
   });
 
   it('fails with BLD_CHECK_G1_ANGLE when the interior of a patch contact is not tangent', () => {

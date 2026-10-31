@@ -52,27 +52,30 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
   it('VC-BLD-12: a 10-cube with all edges r 1 and setback 2 at the 8 corners: every blend cylinder spans 6, the volume lies in the bounds, the patches are G1', () => {
     const { doc, id } = rounded(10, 2);
     const list = faces(doc, id);
-    expect(list).toHaveLength(26);
+    // 6 planes, 12 blend cylinders and, at each of the 8 corners, a star of 6 exact sub-patches (06 BLD 13.21)
+    expect(list).toHaveLength(66);
     const cylinderSpans = spans(list);
     expect(cylinderSpans).toHaveLength(12);
     for (const span of cylinderSpans) expect(Math.abs(span - 6)).toBeLessThan(1e-6);
-    expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(8);
+    expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(48);
     const solid = volume(doc, id);
     expect(solid).toBeGreaterThan(920.548667765);
     expect(solid).toBeLessThan(984.548667765);
-    // golden (this build: Plate fill, degree 3, 15 points per curve, B-spline approximation degree 12 / 60 segments)
+    // golden (the thin-plate fill gave 969.73; the exact stars agree to 1e-5)
     expect(Math.abs(solid - 969.73)).toBeLessThan(0.05);
     const checked = execute(doc, 'check_blends', { ids: [id] });
     const data = checked.data as { status: string; blends: CornerRow[] };
     expect(data.status).toBe('pass');
     const patches = data.blends.filter((blend) => blend.kind === 'corner');
-    expect(patches).toHaveLength(8);
+    expect(patches).toHaveLength(48);
     for (const patch of patches) {
-      expect(patch.contacts).toHaveLength(6);
+      // the edge it shares with a blend or a flat face and its two spokes
+      expect(patch.contacts).toHaveLength(3);
       for (const contact of patch.contacts) {
         expect(contact.g1AngleRad).toBeLessThan(0.01);
         expect(contact.g1EndAngleRad).toBeLessThan(0.01);
-        expect(contact.g0Gap).toBeLessThan(5e-6 * Math.sqrt(3) * 10);
+        // the default g0 (1e-6 x the diagonal), not the 5x of the thin-plate fill
+        expect(contact.g0Gap).toBeLessThan(0.2e-6 * Math.sqrt(3) * 10);
       }
     }
   });
@@ -113,13 +116,13 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     expect(done.error).toBeUndefined();
     const result = done.affected[0] as string;
     const list = faces(done.document, result);
-    expect(list).toHaveLength(11);
-    expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(1);
+    expect(list).toHaveLength(18);
+    expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(8);
     const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string; blends: CornerRow[] };
     expect(checked.status).not.toBe('fail');
-    const patch = checked.blends.find((blend) => blend.kind === 'corner');
-    expect(patch?.contacts).toHaveLength(8);
-    for (const contact of patch?.contacts ?? []) expect(contact.g1AngleRad).toBeLessThan(0.01);
+    const patchRows = checked.blends.filter((blend) => blend.kind === 'corner');
+    expect(patchRows).toHaveLength(8);
+    for (const contact of patchRows.flatMap((row) => row.contacts)) expect(contact.g1AngleRad).toBeLessThan(0.01);
     expect(volume(done.document, result)).toBeLessThan(volume(plain.document, plain.affected[0] as string) + 1);
   });
 
@@ -173,7 +176,7 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
       expect(inner.error).toBeUndefined();
       const resultId = inner.affected[0] as string;
       const list = faces(inner.document, resultId);
-      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(1);
+      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(6);
       expect(list.filter((face) => face.surface === 'cylinder')).toHaveLength(3);
       // three prisms of area r^2 (1 - pi / 4) over 5 s - 1.2 s, plus the patch region (measured 0.339 s^3, under a quarter of the cube of the setback)
       const prisms = 3 * 0.25 * scale ** 2 * (1 - Math.PI / 4) * 3.8 * scale;
@@ -206,7 +209,7 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     });
     expect(mixed.error, mixed.summary).toBeUndefined();
     const mixedFaces = faces(mixed.document, mixed.affected[0] as string);
-    expect(mixedFaces.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(2);
+    expect(mixedFaces.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(13); // a star of 7 at the rim, of 6 at the inner vertex
     expect(volume(mixed.document, mixed.affected[0] as string)).toBeGreaterThan(volume(doc, id));
     const checked = execute(mixed.document, 'check_blends', { ids: [mixed.affected[0] as string] }).data as { status: string };
     expect(checked.status).toBe('pass');
@@ -263,8 +266,8 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
       expect(done.error).toBeUndefined();
       const result = done.affected[0] as string;
       const list = faces(done.document, result);
-      expect(list).toHaveLength(26);
-      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(8);
+      expect(list).toHaveLength(66);
+      expect(list.filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(48);
       const checked = execute(done.document, 'check_blends', { ids: [result] }).data as {
         status: string;
         findings: Array<{ code: string }>;
@@ -316,6 +319,27 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     const lost = execute(fresh.doc, 'fillet_edge', { id: fresh.id, radius: 1, corners: [{ name: 'v(e(gone))', setback: 2 }] });
     expect(lost.error?.code).toBe('REF_LOST');
     expect(lost.affected).toHaveLength(0);
+  });
+
+  it('a sub-patch of a corner star is picked by its blend(v:...)#k name, resolves to that one face and still does after the cube is resized upstream (13.21)', () => {
+    const { doc, id } = rounded(10, 2);
+    const names = faces(doc, id)
+      .map((face) => face.name ?? '')
+      .filter((name) => name.startsWith('blend(v:'));
+    expect(new Set(names).size).toBe(48);
+    expect(names.every((name) => /#[1-6]$/.test(name))).toBe(true);
+    const picked = names[0] as string;
+    const done = execute(doc, 'delete_faces', { id, faceNames: [picked] });
+    expect(done.error?.code ?? '').not.toMatch(/^REF_/);
+    expect(done.summary).not.toMatch(/REF_(SPLIT|LOST)/);
+    // the pick is recorded and is replayed: the name resolves to one face again after the cube is resized upstream
+    const boxStep = doc.featureHistory[0];
+    const resized = execute(done.error === undefined ? done.document : doc, 'edit_step_params', {
+      stepId: boxStep?.id,
+      params: { size: [30, 30, 30] },
+    });
+    expect(resized.rejected).not.toBe(true);
+    expect(resized.summary).not.toMatch(/REF_(SPLIT|LOST)/);
   });
 
   it('VC-BLD-25: a setback fillet replays to the identical recipe and ids', () => {
@@ -393,7 +417,7 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     const done = execute(made.document, 'fillet_edge', { id: made.affected[0] as string, radius: 1, corners: [{ all: true, setback: 2 }] });
     expect(done.error).toBeUndefined();
     const result = done.affected[0] as string;
-    expect(faces(done.document, result)).toHaveLength(26);
+    expect(faces(done.document, result)).toHaveLength(66);
     for (const span of spans(faces(done.document, result))) expect(Math.abs(span - 6)).toBeLessThan(1e-5);
   });
 });

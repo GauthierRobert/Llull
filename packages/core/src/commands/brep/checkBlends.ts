@@ -3,7 +3,7 @@
  * from the kernel's exact face queries, plus validity. Numbers and coded findings instead of a zebra render.
  */
 
-import { hasFillet, blendSource, cornerSources, measureContact } from '../../geometry/blend/continuity';
+import { hasFillet, blendSource, cornerSources, measureContact, STAR_SUFFIX } from '../../geometry/blend/continuity';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { Entity, ShapeRecipe } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
@@ -277,11 +277,14 @@ function checkEntity(
             : `${unverified - before} contact line(s) of blend face ${face.index} could not be measured by the kernel`,
       });
   }
-  // The corner patch is a B-spline fit of a plate surface (cpp/blend_corner.cxx): its gap to the edges it is sewn to is judged against 5x the default.
-  const cornerTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
+  // A corner patch named `blend(v:...)#k` is one sub-patch of an exact star (cpp/blend_corner_exact.cxx, 06 BLD 13.21): judged at the default g0. A plain `blend(v:...)` is the B-spline fit of a plate
+  // surface (the fallback of the star): its gap to the edges it is sewn to is judged against 5x the default.
+  const plateTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
   for (const face of topology.faces) {
     const sources = face.name === undefined ? null : cornerSources(face.name);
     if (sources === null || face.name === undefined) continue;
+    const star = STAR_SUFFIX.test(face.name);
+    const cornerTolerances = star ? tolerances : plateTolerances;
     const contacts: Contact[] = [];
     graph.edgeFaces.forEach((around, edge) => {
       if (around.length !== 2 || !around.includes(face.index)) return;
@@ -324,7 +327,15 @@ function checkEntity(
           message: `the normals differ by ${sig(ends.g1AngleRad)} rad at an end point of edge ${edge} (corner patch ${face.index}, where three faces meet)`,
         });
     });
-    blends.push({ entityId, face: face.index, name: face.name, kind: 'corner', sourceEdges: [...sources], contacts, profile: 'patch' });
+    blends.push({
+      entityId,
+      face: face.index,
+      name: face.name,
+      kind: 'corner',
+      sourceEdges: [...sources],
+      contacts,
+      profile: star ? 'star' : 'patch',
+    });
   }
   return { blends, findings, unverified, unverifiedJunctions, g0: tolerances.g0 };
 }
@@ -359,7 +370,7 @@ export const checkBlends = defineCommand({
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +
     '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), ' +
     'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), BLD_CHECK_RADIUS_LAW (fail: the realised radius is off the radius asked for by more than 1e-4 relative; compared for fillet_edge radius laws and for every joint of a blend_union, whose radii are the default radius or the joints pick), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
-    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares: G0 over the whole contact against g0Corner, G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
+    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares (an exact star, named blend(v:...)#k, is one row per sub-patch with profile "star" and is judged at g0; the plate patch of the fallback, named blend(v:...), has profile "patch"): G0 over the whole contact against g0 (star) or g0Corner (plate), G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
   params: z.object({
     ids: z
       .array(z.string())
@@ -374,7 +385,7 @@ export const checkBlends = defineCommand({
     g0: z
       .number()
       .describe(
-        'Largest allowed gap between the blend and a support face, document units (> 0). Default 1e-6 x the bounding-box diagonal. Profile blend rows (conic / curvature, contacts and junctions: tolerance g0Profile, the B-spline fit of a re-skinned blend) and corner patch contacts (blend rows of kind "corner") default to 5 x this (tolerance g0Corner: the plate-surface fit of a setback patch is that accurate); an explicit g0 applies to them unchanged.',
+        'Largest allowed gap between the blend and a support face, document units (> 0). Default 1e-6 x the bounding-box diagonal. Profile blend rows (conic / curvature, contacts and junctions: tolerance g0Profile, the B-spline fit of a re-skinned blend) and plate corner patch contacts (blend rows of kind "corner" with profile "patch") default to 5 x this (tolerance g0Corner: the plate-surface fit of a setback patch is that accurate; an exact star is judged at g0 itself); an explicit g0 applies to them unchanged.',
       )
       .optional(),
     g1AngleRad: z
@@ -421,7 +432,7 @@ export const checkBlends = defineCommand({
       g2Rel: base.g2Rel,
       g2Given: params.g2Rel !== undefined,
       profiled: checks.some((check) => check.blends.some((blend) => blend.kind === 'edge' && blend.profile !== 'circular')),
-      cornered: checks.some((check) => check.blends.some((blend) => blend.kind === 'corner')),
+      cornered: checks.some((check) => check.blends.some((blend) => blend.kind === 'corner' && blend.profile === 'patch')),
     });
     const findings = checks.flatMap((check) => check.findings);
     const defaulted = Object.entries(named)

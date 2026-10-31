@@ -12,6 +12,7 @@
 #include <new>
 #include <system_error>
 #include <thread>
+#include <tuple>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -58,6 +59,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include "llull-kernel-occt/cpp/blend_corner_exact.hxx"
 #include "llull-kernel-occt/cpp/blend_solid.hxx"
 #include "llull-kernel-occt/cpp/blend_tool.hxx"
 #include "llull-kernel-occt/cpp/features.hxx"
@@ -668,6 +670,13 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
         gp_Vec du, dv;
         BRepAdaptor_Surface(sides[side], Standard_False).D1(uv.X(), uv.Y(), point, du, dv);
         gp_Vec normal = du.Crossed(dv);
+        if (normal.Magnitude() < 1e-14 && (k == 0 || k == kGapSamples)) {
+          // the pole of an exact corner star (13.21), at an END of the edge only: the normal just inside it
+          const double inside = fraction < 0.5 ? 1e-4 : 1.0 - 1e-4;
+          const gp_Pnt2d shifted = curves[side].first->Value(curves[side].second.first + (curves[side].second.second - curves[side].second.first) * inside);
+          BRepAdaptor_Surface(sides[side], Standard_False).D1(shifted.X(), shifted.Y(), point, du, dv);
+          normal = du.Crossed(dv);
+        }
         if (normal.Magnitude() < 1e-14) {
           worst = kPi;
           return false;
@@ -718,7 +727,14 @@ struct FillJob {
   double tolerance_3d = 0, tolerance_2d = 0;
   bool mixed = false;
   // results
-  TopoDS_Face patch;
+  TopoDS_Face patch;                  // the MakeFilling patch
+  std::vector<TopoDS_Face> patches;   // what replaces the hole: the exact star (13.21) or the MakeFilling patch
+  gp_Pnt centre;                      // the centre of the exact star
+  bool has_centre = false;
+  std::string exact_problem;          // why the exact star was refused
+  bool allow_star = true;             // false: the plate only (the star failed after the sewing)
+  std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
+  std::vector<std::tuple<std::string, long long, long long, long long>> loop_keys;  // aligned with `loop`: the stable order of the sub-patches (13.21.2)
   double gap = 0;
   std::string problem;
   bool filled = false;
@@ -773,15 +789,56 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
 std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
 std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
+std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills)
 std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
+
+// The key that orders the sub-patches of a star independently of where the loop starts: the name of the support the loop edge lies on, then its middle rounded to the sewing tolerance.
+std::tuple<std::string, long long, long long, long long> loop_key(const TopoDS_Edge &edge, const std::string &support_name, double quantum) {
+  const BRepAdaptor_Curve curve(edge);
+  const gp_Pnt middle = curve.Value(0.5 * (curve.FirstParameter() + curve.LastParameter()));
+  return {support_name, std::llround(middle.X() / quantum), std::llround(middle.Y() / quantum), std::llround(middle.Z() / quantum)};
+}
+
+// The exact star of 13.21 first (G0 to the default 1e-6 x the diagonal, a fifth of it here); MakeFilling when it is refused, with the reason kept for the message.
+bool fill_exact(FillJob &job, double diagonal) {
+  if (g_exact_mode.load() == 2) {
+    job.exact_problem = "refused by the test hook";
+    return false;
+  }
+  std::vector<TopoDS_Face> aligned;
+  for (const TopoDS_Edge &edge : job.loop) {
+    const auto at = std::find_if(job.boundary.begin(), job.boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); });
+    if (at == job.boundary.end()) {
+      job.exact_problem = "an edge of the hole is not in its boundary";
+      return false;
+    }
+    aligned.push_back(job.supports[static_cast<size_t>(at - job.boundary.begin())]);
+  }
+  corner_exact::Patches exact;
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem)) return false;
+  job.patches = exact.faces;
+  job.patch_loop = exact.loop_index;
+  job.centre = exact.centre;
+  job.has_centre = true;
+  job.gap = exact.gap;
+  return true;
+}
 
 void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
   try {
     if (g_fault_corner.load() == static_cast<int>(job.corner)) throw std::bad_alloc();
+    if (job.allow_star && g_exact_mode.load() != 0 && fill_exact(job, diagonal)) {
+      job.filled = true;
+      return;
+    }
     for (const FillSetting &setting : kFillSettings) {
       job.filled = fill_hole(job, setting, patch_gap_limit, diagonal);
-      if (job.filled) return;
+      if (job.filled) {
+        job.patches = {job.patch};
+        return;
+      }
     }
+    if (!job.exact_problem.empty()) job.problem += " (the exact-boundary patch was refused: " + job.exact_problem + ")";
   } catch (...) {
     job.filled = false;
     job.error = std::current_exception();
@@ -840,8 +897,8 @@ void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagona
   work();
 }
 
-std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
-                                     bool &fill_failed, std::string &corners_json, std::string &why) {
+std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
+                                          bool &fill_failed, std::string &corners_json, std::string &why, bool allow_star, bool &star_used) {
   fill_failed = false;
   std::map<int, Taper> radius;
   std::vector<Corner> corners;
@@ -1109,6 +1166,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   TopTools_IndexedMapOfShape dropped;
   std::vector<TopoDS_Face> patches;
   std::vector<size_t> patch_corner;  // the corner of each patch
+  std::vector<std::string> patch_kinds(corners.size());  // "exact" (a star) or "plate" per corner
   std::vector<std::string> patch_names;
   // Serial: isolate the hole of every corner and give its fill its own copies of the support faces (13.20); parallel: the fills; serial, in corner order: the checks and the patches.
   std::vector<FillJob> jobs(corners.size());
@@ -1169,9 +1227,23 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     };
     for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(image(edge)));
     for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(image(support)));
-    for (const TopoDS_Edge &edge : loop) job.loop.push_back(TopoDS::Edge(image(edge)));
+    for (const TopoDS_Edge &edge : loop) {
+      job.loop.push_back(TopoDS::Edge(image(edge)));
+      const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) - boundary.begin());
+      const int support_index = split_faces.FindIndex(supports[at]);
+      job.loop_keys.push_back(loop_key(edge, support_index > 0 && static_cast<size_t>(support_index) <= split_names.size() ? split_names[static_cast<size_t>(support_index - 1)] : std::string(),
+                                       std::max(1e-6 * diagonal, 1e-12)));
+    }
+    job.allow_star = allow_star;
   }
   fill_all(jobs, patch_gap_limit, diagonal);
+  for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
+  // test hooks: 3 = a step with a star fails after the fills (the plate pass must then build it), 4 = every step fails there (the message names both reasons)
+  if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
+    fill_failed = true;
+    why = std::string(kFailed) + "forced by the test hook after the fills";
+    return nullptr;
+  }
   for (size_t c = 0; c < corners.size(); ++c) {
     FillJob &job = jobs[c];
     if (!job.hole_error.empty()) {
@@ -1184,14 +1256,13 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
       why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + job.problem;
       return nullptr;
     }
-    const TopoDS_Face &patch = job.patch;
     worst_patch_gap = std::max(worst_patch_gap, job.gap);
     {
       // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
       GProp_GProps props;
-      BRepGProp::SurfaceProperties(patch, props);
+      if (!job.has_centre) BRepGProp::SurfaceProperties(job.patches.front(), props);
       BRepClass3d_SolidClassifier classifier(shape);
-      classifier.Perform(props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
+      classifier.Perform(job.has_centre ? job.centre : props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
       const TopAbs_State expected = plan.concave[c] ? TopAbs_OUT : TopAbs_IN;
       if (!plan.mixed[c] && classifier.State() != expected) {
         // deliberately not fill_failed: a patch on the wrong side is a logic failure of the construction, a finer fit would not change it
@@ -1200,11 +1271,22 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
         return nullptr;
       }
     }
-    patches.push_back(patch);
-    patch_corner.push_back(c);
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
-    patch_names.push_back("blend(v:" + joined_names(around) + ")");
+    // A star's sub-patches are told apart by #k, k = 1.. the rank of the support / position key of the loop edge each has as its bottom (stable under a different start of the loop).
+    std::vector<size_t> rank(job.loop_keys.size());
+    {
+      std::vector<size_t> order(job.loop_keys.size());
+      for (size_t k = 0; k < order.size(); ++k) order[k] = k;
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return job.loop_keys[a] < job.loop_keys[b]; });
+      for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
+    }
+    for (size_t k = 0; k < job.patches.size(); ++k) {
+      patches.push_back(job.patches[k]);
+      patch_corner.push_back(c);
+      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[job.patch_loop[k]] + 1)));
+    }
+    patch_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
 
@@ -1304,7 +1386,33 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     const int index = final_faces.FindIndex(image);
     if (index > 0) names[static_cast<size_t>(index - 1)] = member_names[m];
   }
+  {
+    // the same log with the kind of patch each corner got
+    JsonWriter log;
+    log.begin_array();
+    for (size_t c = 0; c < corners.size(); ++c) {
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(patch_kinds[c]).key("setbacks").begin_array();
+      for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
+      log.end_array().end_object();
+    }
+    corners_json = log.end_array().text();
+  }
   return naming::wrap_named(solid, names);
+}
+
+// The step is built with the exact stars first; if a star passed its own checks but the step fails after the sewing (free edges, validity, volume, the oriented check) it is built once more
+// with the plate patches only, and if that also fails the reason of the star is appended to the plate's.
+std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
+                                     bool &fill_failed, std::string &corners_json, std::string &why) {
+  bool star_used = false;
+  std::unique_ptr<Shape> built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, true, star_used);
+  if (built != nullptr || !star_used) return built;
+  const std::string star_why = why;
+  bool unused = false;
+  why.clear();
+  built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, false, unused);
+  if (built == nullptr) why += " (the exact-boundary patch was refused: " + star_why + ")";
+  return built;
 }
 
 }  // namespace
@@ -1315,6 +1423,7 @@ void set_corner_threads(int32_t count) { g_corner_threads.store(count); }
 int32_t last_corner_threads() { return g_last_threads.load(); }
 void set_corner_fault(int32_t corner) { g_fault_corner.store(corner); }
 void set_corner_spawn_limit(int32_t workers) { g_spawn_limit.store(workers); }
+void set_corner_exact_patch(int32_t mode) { g_exact_mode.store(mode); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
 // The oriented check on face `face` of the first solid of `shape`, rebuilt into a shell with that face reversed when `reverse`, over the tangent edges only: about 0 for a blend face as built,

@@ -192,6 +192,8 @@ export interface BlendBuildNotes {
   readonly contours?: ReadonlyArray<{ readonly radius: number; readonly source: string; readonly edges: readonly string[] }>;
   readonly corners?: ReadonlyArray<{
     readonly vertex: Vec3;
+    /** "exact": the corner patch is a star of exact-boundary sub-patches (13.21); "plate": the MakeFilling patch. */
+    readonly patch?: 'exact' | 'plate';
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
   }>;
 }
@@ -266,6 +268,8 @@ interface EdgeContinuitySample {
   readonly g0: number;
   readonly g1: number;
   readonly normalCurvature: readonly [number, number];
+  /** The end sample sits on the collapsed side of a corner star: its normals are read just inside the end and its curvatures are 0 (not measured). */
+  readonly nudged?: boolean;
   readonly g3?: number;
 }
 
