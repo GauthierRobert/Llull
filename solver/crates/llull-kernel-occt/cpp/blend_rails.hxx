@@ -116,6 +116,7 @@ struct Replacement {
   TopoDS_Edge old_edge;
   Handle(Geom_Curve) curve;
   TopoDS_Vertex vertex[2];
+  double grow_limit = 0;  // oblique ends: the most the new curve may miss the old vertices by (their tolerance grows to hold it); 0: the vertices are used as they are, as before
 };
 struct FaceEdit {
   TopoDS_Face face;

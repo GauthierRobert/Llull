@@ -105,8 +105,8 @@ constexpr double kIsoFraction = 1e-6;
 // degrees, so at most 61 degrees from square); below it the end is a crease OCCT did not chain. The two contact lines of a blend with an oblique end must overlap along
 // more than this fraction of the blend face's parameter length.
 constexpr double kMinObliqueCrease = 0.5, kMinCoreFraction = 1e-3;
-// The skin of a blend with an oblique end runs this fraction of the blend's parameter span past the end of the circular blend's own patch.
-constexpr double kObliqueMargin = 0.03;
+// The skin of a blend with an oblique end runs past the end of the circular blend's own patch by the overshoot of the cut (kObliqueSafety times the section chord x tan of the angle from square, in parameter), at least this fraction of the span.
+constexpr double kObliqueMargin = 0.005, kObliqueSafety = 1.5;
 
 gp_Vec face_normal(const BRepAdaptor_Surface &surface, const gp_Pnt2d &uv) {
   gp_Pnt point;
@@ -281,7 +281,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
     const double middle = 0.5 * (lo + hi);
     const int side = oblique ? (at < middle ? 0 : 1) : (std::fabs(at - lo) <= tolerance ? 0 : (std::fabs(at - hi) <= tolerance ? 1 : -1));
     if (oblique && (value(other.from, along_coordinate) < middle) != (value(other.to, along_coordinate) < middle)) {
-      why = "an oblique end of the blend runs across the middle of the blend (the end face cuts the blend in two)";
+      why = "internal error: an oblique end of the blend runs across the middle of the blend (the end face cuts the blend in two)";
       return false;
     }
     if (side < 0 || !blend.end[side].IsNull()) {
@@ -306,7 +306,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
     return false;
   }
   if ((blend.oblique[0] || blend.oblique[1]) && !(blend.core[1] - blend.core[0] > kMinCoreFraction * (hi - lo))) {
-    why = "the oblique end faces cut the two contact lines of the blend to nothing (they overlap along " + number(blend.core[1] - blend.core[0]) +
+    why = "internal error: the oblique end faces cut the two contact lines of the blend to nothing (they overlap along " + number(blend.core[1] - blend.core[0]) +
           " of the " + number(hi - lo) + " parameter length of the blend face)";
     return false;
   }
@@ -607,9 +607,28 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     const BRepAdaptor_Surface surface(blend.face, Standard_False);
     const bool periodic = blend.across_is_u ? surface.IsVPeriodic() : surface.IsUPeriodic();
     const double first = blend.across_is_u ? surface.FirstVParameter() : surface.FirstUParameter(), last = blend.across_is_u ? surface.LastVParameter() : surface.LastUParameter();
-    const double margin = kObliqueMargin * (blend.hi - blend.lo);
-    if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin : std::max(first, blend.lo - margin);
-    if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin : std::min(last, blend.hi + margin);
+    // How far past the circular blend's patch the cut can lie: the plane crosses the section planes at the angle from square, so across a section of chord c it
+    // moves by up to c tan(angle) along the blend (measured per end: the direction of the blend and the chord there), kObliqueSafety times that, at least
+    // kObliqueMargin of the span.
+    const auto margin_at = [&](int side) {
+      const double along = blend.core[side];
+      gp_Pnt at;
+      gp_Vec du, dv;
+      const double mid = 0.5 * (blend.across[0] + blend.across[1]);
+      if (blend.across_is_u) surface.D1(mid, along, at, du, dv);
+      else surface.D1(along, mid, at, du, dv);
+      const gp_Vec direction = blend.across_is_u ? dv : du;
+      const gp_Pnt a = blend.across_is_u ? surface.Value(blend.across[0], along) : surface.Value(along, blend.across[0]);
+      const gp_Pnt b = blend.across_is_u ? surface.Value(blend.across[1], along) : surface.Value(along, blend.across[1]);
+      const double speed = direction.Magnitude();
+      const double cosine = speed > 1e-14 ? std::fabs(direction.Normalized().Dot(blend.end_normal[side])) : 1.0;
+      const double tangent = std::sqrt(std::max(0.0, 1.0 - cosine * cosine)) / std::max(cosine, 0.2);
+      const double needed = speed > 1e-14 ? kObliqueSafety * a.Distance(b) * tangent / speed : 0.0;
+      return std::min(std::max(needed, kObliqueMargin * (blend.hi - blend.lo)), 0.5 * (blend.hi - blend.lo));
+    };
+    const double margin_lo = blend.oblique[0] ? margin_at(0) : 0.0, margin_hi = blend.oblique[1] ? margin_at(1) : 0.0;
+    if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin_lo : std::max(first, blend.lo - margin_lo);
+    if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin_hi : std::min(last, blend.hi + margin_hi);
   }
   for (const Blend &blend : faces)
     if ((blend.oblique[0] || blend.oblique[1]) && !check_extension(blend, kGapLimit * diagonal, why)) return nullptr;
@@ -695,7 +714,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
       skinned.push_back(made.Face());
     }
     for (int side = 0; side < 2; ++side)
-      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}});
+      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}, blend.oblique[side] ? kGapLimit * diagonal : 0.0});
     // The rails of a mitred blend end at new points: the support faces take the rail curves of the new surface between a shared vertex at each mitre.
     for (int rail = 0; rail < 2; ++rail) {
       bool moves[2];

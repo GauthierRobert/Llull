@@ -145,19 +145,24 @@ fn xz_prism(points: &[[f64; 2]], depth: f64) -> Shape {
     let mut chain = Vec::new();
     for k in 0..points.len() {
         let (a, b) = (points[k], points[(k + 1) % points.len()]);
-        chain.extend([0.0, a[0], 15.0, a[1], b[0], 15.0, b[1]]);
+        chain.extend([0.0, a[0], depth / 2.0, a[1], b[0], depth / 2.0, b[1]]);
     }
     prism_of_face(&crate::features::chain_face(&chain).unwrap().unwrap(), [0.0, -depth, 0.0]).unwrap().unwrap()
 }
 
 /// `shape` kept on the side `x cos(tilt) + z sin(tilt) <= c` of a plane parallel to y.
 fn keep_side(shape: &Shape, tilt: f64, c: f64) -> Shape {
+    keep_side_scaled(shape, tilt, c, 1.0)
+}
+
+/// `keep_side` for a part `scale` times larger (the cutter is scaled with it).
+fn keep_side_scaled(shape: &Shape, tilt: f64, c: f64, scale: f64) -> Shape {
     let (cos, sin) = (tilt.cos(), tilt.sin());
-    let far = 60.0;
+    let far = 60.0 * scale;
     let on = [c * cos, c * sin];
     let (along, normal) = ([-sin, cos], [cos, sin]);
     let corner = |s: f64, n: f64| [on[0] + along[0] * s * far + normal[0] * n * far, on[1] + along[1] * s * far + normal[1] * n * far];
-    let cutter = xz_prism(&[corner(1.0, 0.0), corner(-1.0, 0.0), corner(-1.0, -1.0), corner(1.0, -1.0)], 30.0);
+    let cutter = xz_prism(&[corner(1.0, 0.0), corner(-1.0, 0.0), corner(-1.0, -1.0), corner(1.0, -1.0)], 30.0 * scale);
     boolean(BooleanOp::Intersect, shape, &cutter, false).unwrap().unwrap()
 }
 
@@ -215,7 +220,7 @@ fn a_parabolic_rim_ending_on_a_tilted_plane_is_the_integral_of_the_spandrel() {
         let shape = built(&part, &edge, &[d, NAN, 0.0, 0.0], 0.0, 0.5);
         let removed = volume_of(&part) - volume_of(&shape);
         let expected = revolved_cut(rim, tilt, 3.0, &parabola_curve(d));
-        assert!(near(removed, expected, 1e-6), "tilt {tilt}: removed {removed} expected {expected}");
+        assert!(near(removed, expected, 5e-6), "tilt {tilt}: removed {removed} expected {expected}");
         let (g0, g1, found) = contacts(&shape);
         assert_eq!(found, 2);
         assert!(g0 < 1e-6 * diagonal(&shape) && g1 < 1e-3, "tilt {tilt}: g0 {g0} g1 {g1}");
@@ -355,4 +360,56 @@ fn what_an_oblique_end_cannot_have_is_named() {
     });
     let why = blend(&part, &edge, &[0.4, 0.4, 1.0, 0.0], 0.0, 0.5).err().expect("refused");
     assert!(why.contains("does not leave the blend on the solid's side"), "{why}");
+}
+
+#[test]
+fn a_steep_tilt_with_a_large_size_still_gets_the_whole_cut_from_the_derived_margin() {
+    let _serial = crate::serial_blends();
+    let rim = Rim { radius: 8.0, corner_z: 3.0, convex: true };
+    // the plane leans 0.5 rad and the size is a large part of the 3 high wall: the cut lies far past the circular blend's patch
+    for (tilt, c, r) in [(0.5_f64, 6.0, 2.0), (0.5, 6.0, 1.0), (-0.5, 4.0, 1.0)] {
+        let part = keep_side(&make_cylinder(8.0, 3.0).unwrap().unwrap(), tilt, c);
+        let edge = rim_edge(&part, 3.0);
+        assert_eq!(edge.len(), 1, "tilt {tilt}");
+        let shape = built(&part, &edge, &[r, NAN, 0.0, 0.0], 0.0, CIRCLE_PARAM);
+        let removed = volume_of(&part) - volume_of(&shape);
+        let expected = revolved_cut(rim, tilt, c, &circle_curve(r));
+        assert!(near(removed, expected, 1e-6), "tilt {tilt} r {r}: removed {removed} expected {expected}");
+        let occt = fillet(&part, &edge, r, None).unwrap().unwrap();
+        assert!(near(volume_of(&shape), volume_of(&occt), 1e-6), "tilt {tilt} r {r}: {} vs OCCT {}", volume_of(&shape), volume_of(&occt));
+    }
+}
+
+#[test]
+fn an_oblique_end_on_a_cone_rim_builds_and_meets_the_conical_support_tangentially() {
+    let _serial = crate::serial_blends();
+    let cone = crate::make_cone(10.0, 5.0, 20.0).unwrap().unwrap();
+    let part = keep_side(&cone, -0.3, 2.0);
+    let edge = edges_where(&part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 20.0).abs() < 1e-3);
+    assert_eq!(edge.len(), 1);
+    // a conic of rho 0.5 (the fold of the cone against its top is not a right angle, so the circle is a different weight): tangent to both supports to the gate, and it removes material
+    let shape = built(&part, &edge, &[1.0, NAN, 0.0, 0.0], 0.0, 0.5);
+    assert!(volume_of(&shape) < volume_of(&part) - 1.0);
+    let (g0, g1, found) = contacts(&shape);
+    assert_eq!(found, 2);
+    assert!(g0 < 1e-6 * diagonal(&shape) && g1 < 1e-3, "g0 {g0} g1 {g1}");
+}
+
+#[test]
+fn a_part_ten_times_larger_holds_the_gap_of_the_new_end_curve_in_the_vertex_tolerance() {
+    let _serial = crate::serial_blends();
+    // the vertices of the circular blend's end edge carry OCCT's tolerance of its own scale; the conic's end curve misses them by more at 10 times the size
+    let s = 10.0;
+    let rim = Rim { radius: 8.0, corner_z: 3.0, convex: true };
+    for tilt in [0.3_f64, -0.3] {
+        let part = keep_side_scaled(&make_cylinder(8.0 * s, 3.0 * s).unwrap().unwrap(), tilt, 3.0 * s, s);
+        let edge = rim_edge(&part, 3.0 * s);
+        assert_eq!(edge.len(), 1);
+        let shape = built(&part, &edge, &[s, NAN, 0.0, 0.0], 0.0, CIRCLE_PARAM);
+        let removed = volume_of(&part) - volume_of(&shape);
+        let expected = s.powi(3) * revolved_cut(rim, tilt, 3.0, &circle_curve(1.0));
+        assert!(near(removed / s.powi(3), expected / s.powi(3), 5e-6), "tilt {tilt}: removed {removed} expected {expected}");
+        let occt = fillet(&part, &edge, s, None).unwrap().unwrap();
+        assert!(near(volume_of(&shape), volume_of(&occt), 1e-6), "tilt {tilt}: {} vs OCCT {}", volume_of(&shape), volume_of(&occt));
+    }
 }

@@ -13,6 +13,8 @@
 #include <BRepLib.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <GC_MakeCircle.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Geom_Surface.hxx>
 #include <Geom_Circle.hxx>
 #include <gp_Circ.hxx>
 #include <BRep_Tool.hxx>
@@ -47,6 +49,8 @@ namespace {
 constexpr int kExtensionStations = 8;
 // The most the chord of the section may change (relative) between the slopes inside and outside the end of the circular blend's contact lines.
 constexpr double kLawKink = 1e-5;
+// The most the skin may leave a support face at (radians) in the extension: the blend is tangent to it.
+constexpr double kExtensionAngle = 1e-4;
 
 // The half space on the outer side of the plane through `point` with outward `normal`, as a box large enough for the part.
 TopoDS_Shape outer_box(const gp_Pnt &point, const gp_Vec &normal, double extent) {
@@ -95,13 +99,13 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
   cut.SetTools(cutters);
   cut.Build();
   if (!cut.IsDone() || cut.HasErrors()) {
-    why = "the skin could not be cut back by the plane of an oblique end face";
+    why = "internal error: the skin could not be cut back by the plane of an oblique end face";
     return false;
   }
   TopTools_IndexedMapOfShape faces;
   TopExp::MapShapes(cut.Shape(), TopAbs_FACE, faces);
   if (faces.Extent() != 1) {
-    why = "the plane of an oblique end face cuts the blend surface into " + std::to_string(faces.Extent()) + " pieces (one expected)";
+    why = "internal error: the plane of an oblique end face cuts the blend surface into " + std::to_string(faces.Extent()) + " pieces (one expected)";
     return false;
   }
   trimmed = TopoDS::Face(faces(1));
@@ -125,7 +129,7 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
       if (blend.oblique[side] && lies_in_plane(TopoDS::Edge(edges(e)), blend.end_point[side], blend.end_normal[side], gap_limit)) {
         const Handle(Geom_Curve) curve = curve_of(TopoDS::Edge(edges(e)));
         if (curve.IsNull()) {
-          why = "the cut of the blend surface by an oblique end face has no 3D curve";
+          why = "internal error: the cut of the blend surface by an oblique end face has no 3D curve";
           return false;
         }
         pieces.push_back(Handle(Geom_BSplineCurve)::DownCast(curve));
@@ -152,7 +156,7 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
         }
       }
       if (next == pieces.size()) {
-        why = "the cut of the blend surface by an oblique end face does not join the end vertices of the circular blend (it stops " +
+        why = "internal error: the cut of the blend surface by an oblique end face does not join the end vertices of the circular blend (it stops " +
               std::to_string(at.Distance(finish)) + " from the last one; limit " + std::to_string(gap_limit) + "): the circular blend surface is not accurate past its end";
         return false;
       }
@@ -160,7 +164,7 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
       Handle(Geom_BSplineCurve) piece = Handle(Geom_BSplineCurve)::DownCast(pieces[next]->Copy());
       if (reversed) piece->Reverse();
       if (!chain.Add(piece, std::max(gap_limit, 1e-9))) {
-        why = "the pieces of the cut of the blend surface by an oblique end face could not be joined";
+        why = "internal error: the pieces of the cut of the blend surface by an oblique end face could not be joined";
         return false;
       }
       at = piece->EndPoint();
@@ -175,7 +179,7 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
 bool check_extension(const Blend &blend, double limit, std::string &why) {
   const BRepAdaptor_Surface surface(blend.face, Standard_False);
   const double span = blend.hi - blend.lo;
-  double worst = 0, where = 0, arc_worst = 0, arc_where = 0;
+  double worst = 0, where = 0, arc_worst = 0, arc_where = 0, angle_worst = 0, angle_where = 0;
   for (int side = 0; side < 2; ++side) {
     if (!blend.oblique[side]) continue;
     const double from = side == 0 ? blend.lo : blend.hi, to = side == 0 ? blend.core[0] : blend.core[1];
@@ -190,7 +194,7 @@ bool check_extension(const Blend &blend, double limit, std::string &why) {
         };
         GC_MakeCircle circle(point(0.0), point(0.5), point(1.0));
         if (!circle.IsDone()) {
-          why = "a section of the circular blend past its end is not a circle arc";
+          why = "internal error: a section of the circular blend past its end is not a circle arc";
           return false;
         }
         const gp_Circ round = circle.Value()->Circ();
@@ -218,8 +222,35 @@ bool check_extension(const Blend &blend, double limit, std::string &why) {
         }
         gp_Pnt on;
         if (nearest == nullptr || !project_on_face(nearest->face, contact, on)) {
-          why = "a contact point of the extended blend could not be projected on its support face";
+          why = "internal error: a contact point of the extended blend could not be projected on its support face";
           return false;
+        }
+        {
+          // the blend meets the support tangentially there: the normals of the skin and of the support (the UNTRIMMED surface of the face, as the projection above) agree
+          gp_Pnt at;
+          gp_Vec du, dv;
+          if (blend.across_is_u) surface.D1(blend.across[rail], along, at, du, dv);
+          else surface.D1(along, blend.across[rail], at, du, dv);
+          TopLoc_Location location;
+          const Handle(Geom_Surface) support = BRep_Tool::Surface(nearest->face, location);
+          GeomAPI_ProjectPointOnSurf projection(contact.Transformed(location.Transformation().Inverted()), support);
+          if (support.IsNull() || projection.NbPoints() < 1) {
+            why = "internal error: a contact point of the extended blend could not be projected on its support surface";
+            return false;
+          }
+          double u = 0, v = 0;
+          projection.LowerDistanceParameters(u, v);
+          gp_Pnt on_support;
+          gp_Vec su, sv;
+          support->D1(u, v, on_support, su, sv);
+          const gp_Vec n1 = du.Crossed(dv), n2 = su.Crossed(sv);
+          if (n1.Magnitude() > 1e-14 && n2.Magnitude() > 1e-14) {
+            const double angle = std::acos(std::min(1.0, std::fabs(n1.Normalized().Dot(n2.Normalized()))));
+            if (angle > angle_worst) {
+              angle_worst = angle;
+              angle_where = along;
+            }
+          }
         }
         if (contact.Distance(on) > worst) {
           worst = contact.Distance(on);
@@ -249,6 +280,12 @@ bool check_extension(const Blend &blend, double limit, std::string &why) {
             "), so an oblique end that needs the extension of a varying size is not the profile of that size";
       return false;
     }
+  }
+  if (angle_worst > kExtensionAngle) {
+    why = "the circular blend surface past the end of its shorter contact line meets the support face at " + std::to_string(angle_worst) + " rad (limit " +
+          std::to_string(kExtensionAngle) + ", at parameter " + std::to_string(angle_where) +
+          "): OCCT extends the surface of a varying size by extrapolation, so an oblique end that needs the extension is not exact";
+    return false;
   }
   if (arc_worst > limit) {
     why = "the circular blend surface past the end of its shorter contact line is not made of circular arcs: its section misses the arc through its contact points by " +
