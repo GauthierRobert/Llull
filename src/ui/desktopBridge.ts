@@ -1,6 +1,6 @@
 // The renderer's door to the desktop app (desktop/src/preload.ts): present only inside Electron. It takes no argument: the desktop owns the dialog and the path.
 
-export interface DesktopExportOutcome {
+interface DesktopExportOutcome {
   readonly ok: boolean;
   readonly message: string;
 }

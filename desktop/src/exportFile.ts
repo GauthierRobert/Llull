@@ -2,12 +2,13 @@
  * File > Export 3MF…: the backend writes the package to a host file (`export_3mf` toFile, 05 IMP 14.12) and the desktop moves that file to the
  * chosen path. The bytes never pass through the renderer or this process's memory. Only `export_3mf` has a file sink today.
  */
+import fs from 'fs';
 import path from 'path';
 import { isRecord } from '@lib/isRecord';
 import { outcomeIsFailure } from '@protocol/commandOutcome';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { requestJson, type FetchLike } from '@server/restClient';
-import { saveDataFiles } from '@server/cli/saveFiles';
+import { moveHostedFile } from '@server/hostedFile';
 import { isHostedExport } from '@server/exportFiles';
 
 export interface ExportFileOptions {
@@ -34,7 +35,8 @@ export async function export3mfToFile(options: ExportFileOptions): Promise<strin
     throw new Error(`export_3mf reported no usable file (data.file.path and data.file.bytes are needed): ${outcome.summary}`);
   if (!isHostedExport(file['path'], options.exportDir))
     throw new Error(`export_3mf reported a file outside the export folder (${file['path']}); nothing was moved`);
-  const saved = saveDataFiles(outcome.data, path.resolve(options.target), options.exportDir)[0];
-  if (saved === undefined) throw new Error('the exported file could not be saved');
-  return `${saved.path} (${saved.bytes} bytes)`;
+  const destination = path.resolve(options.target);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  moveHostedFile(file['path'], destination);
+  return `${destination} (${file['bytes']} bytes)`;
 }

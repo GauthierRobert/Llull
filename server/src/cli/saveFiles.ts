@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { rasterizeSvg } from '../renderImage';
 import { isHostedExport } from '../exportFiles';
+import { moveHostedFile } from '../hostedFile';
 
 export interface OutputFile {
   readonly name: string | null; // suggested: `fileName`, or a `name` with an extension
@@ -86,36 +87,6 @@ function hostedFileOf(data: unknown, exportDir?: string): { path: string; bytes:
   if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number' || !isHostedExport(file['path'], exportDir))
     return null;
   return { path: file['path'], bytes: file['bytes'], name: nonEmptyString(data['fileName']) ?? null };
-}
-
-/** The file operations of a move, injectable so a failing volume or a locked target can be tested. */
-export interface MoveOps {
-  readonly renameSync: (from: string, to: string) => void;
-  readonly copyFileSync: (from: string, to: string) => void;
-  readonly rmSync: (file: string, options: { force: boolean }) => void;
-}
-
-/**
- * Moves `from` to `to`: a rename, else (another volume, a locked file) a copy to `<to>.part` that is renamed into place, so `to` never holds a partial file.
- * @failure the copy or the final rename fails -> the .part file and `from` are removed and the error is rethrown
- */
-export function moveHostedFile(from: string, to: string, ops: MoveOps = fs): void {
-  try {
-    ops.renameSync(from, to);
-    return;
-  } catch {
-    // another volume or a locked target: fall through to the copy
-  }
-  const part = `${to}.part`;
-  try {
-    ops.copyFileSync(from, part);
-    ops.renameSync(part, to);
-    ops.rmSync(from, { force: true });
-  } catch (error) {
-    ops.rmSync(part, { force: true });
-    ops.rmSync(from, { force: true });
-    throw error;
-  }
 }
 
 /** Moves the host file to `target` (a directory keeps the suggested name). */

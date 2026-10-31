@@ -30,7 +30,8 @@ import type { MeshAssetPort } from '@core/geometry/mesh/assets';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { CRC32_INIT, crc32Final, crc32Update } from '@lib/crc32';
 import { unzip } from '@lib/zipRead';
-import { type MoveOps, moveHostedFile, saveDataFiles } from '../src/cli/saveFiles';
+import { saveDataFiles } from '../src/cli/saveFiles';
+import { type MoveOps, moveHostedFile } from '../src/hostedFile';
 import { EXPORT_FILE_MAX_AGE_MS, exportFilePort, isHostedExport, reapExportFiles } from '../src/exportFiles';
 
 interface GridMesh {
@@ -275,7 +276,7 @@ describe('moving a hosted export (--save, desktop export)', () => {
   it('a failing copy leaves no partial file at the user path: the .part file and the hosted package are removed and the error is rethrown', () => {
     const [from, to] = [path.join(dir, 'hosted.3mf'), path.join(dir, 'out.3mf')];
     writeFileSync(from, 'package');
-    const failing = sameVolumeFails(to, (source, part) => {
+    const failing = sameVolumeFails(to, (_source, part) => {
       writeFileSync(part, 'pa');
       throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
     });
