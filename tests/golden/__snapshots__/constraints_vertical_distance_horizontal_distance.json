@@ -6,19 +6,39 @@
       "#1": {
         "id": "#1",
         "kind": "line",
-        "start": [3, 2],
-        "end": [8, 14],
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
+        "start": [3,2],
+        "end": [8,14],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#4a90d9"
       }
     },
-    "order": ["#1"],
-    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
-    "layerOrder": ["#2"],
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -28,74 +48,70 @@
       {
         "id": "#3",
         "name": "draw_polyline",
-        "params": {
-          "points": [
-            [3, 2],
-            [10, 9]
-          ]
-        },
+        "params": {"points":[[3,2],[10,9]]},
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#4",
         "name": "add_constraint",
-        "params": { "constraint": { "kind": "fix", "a": { "entityId": "#1", "kind": "start" } } },
+        "params": {"constraint":{"kind":"fix","a":{"entityId":"#1","kind":"start"}}},
         "suppressed": false,
         "affected": ["#5"]
       },
       {
         "id": "#6",
         "name": "add_constraint",
-        "params": {
-          "constraint": {
-            "kind": "horizontal_distance",
-            "a": { "entityId": "#1", "kind": "start" },
-            "b": { "entityId": "#1", "kind": "end" },
-            "value": 5
-          }
-        },
+        "params": {"constraint":{"kind":"horizontal_distance","a":{"entityId":"#1","kind":"start"},"b":{"entityId":"#1","kind":"end"},"value":5}},
         "suppressed": false,
         "affected": ["#7"]
       },
       {
         "id": "#8",
         "name": "add_constraint",
-        "params": {
-          "constraint": {
-            "kind": "vertical_distance",
-            "a": { "entityId": "#1", "kind": "start" },
-            "b": { "entityId": "#1", "kind": "end" },
-            "value": 12
-          }
-        },
+        "params": {"constraint":{"kind":"vertical_distance","a":{"entityId":"#1","kind":"start"},"b":{"entityId":"#1","kind":"end"},"value":12}},
         "suppressed": false,
         "affected": ["#9"]
       },
-      { "id": "#10", "name": "solve_constraints", "params": {}, "suppressed": false, "affected": ["#1"] }
+      {
+        "id": "#10",
+        "name": "solve_constraints",
+        "params": {},
+        "suppressed": false,
+        "affected": ["#1"]
+      }
     ],
     "configurations": {},
     "materials": {},
     "recipes": {},
     "components": {},
     "constraints": {
-      "#5": { "kind": "fix", "a": { "entityId": "#1", "kind": "start" }, "b": { "entityId": "#1", "kind": "start" }, "id": "#5" },
+      "#5": {
+        "kind": "fix",
+        "a": {"entityId":"#1","kind":"start"},
+        "b": {"entityId":"#1","kind":"start"},
+        "id": "#5"
+      },
       "#7": {
         "kind": "horizontal_distance",
-        "a": { "entityId": "#1", "kind": "start" },
-        "b": { "entityId": "#1", "kind": "end" },
+        "a": {"entityId":"#1","kind":"start"},
+        "b": {"entityId":"#1","kind":"end"},
         "value": 5,
         "id": "#7"
       },
       "#9": {
         "kind": "vertical_distance",
-        "a": { "entityId": "#1", "kind": "start" },
-        "b": { "entityId": "#1", "kind": "end" },
+        "a": {"entityId":"#1","kind":"start"},
+        "b": {"entityId":"#1","kind":"end"},
         "value": 12,
         "id": "#9"
       }
     },
-    "constraintOrder": ["#5", "#7", "#9"],
+    "constraintOrder": [
+      "#5",
+      "#7",
+      "#9"
+    ],
     "joints": {},
     "jointOrder": [],
     "driveRelations": {},

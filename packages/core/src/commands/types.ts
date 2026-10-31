@@ -102,6 +102,8 @@ export interface CommandAnnotations {
    * every asset-backed mesh the params reach, directly or through a group, layer, component, instance or record id, or all of them when none is named (07 MSH FR-MSH-02, TECHNICAL_SPEC 13.11); when an asset cannot be read, a readOnly query that is not `writesArtifact` answers from the display mesh with a named warning (`data.lodOnly`) and every other command refuses MESH_ASSET_LOD_ONLY; MESH_ASSET_TOO_LARGE above MESH_FULL_READ_TRIANGLE_CAP refuses all. 'document' = the scope is every solid of the document whatever the params name (a drawing view without entityIds). Not emitted in tool schemas.
    */
   readonly readsMeshTriangles?: boolean | 'document';
+  /** Name of the read-only query that answers what this command would do with the same params (a ghost while a form is edited); the UI reads it, nothing else does. Not emitted in tool schemas. */
+  readonly previewQuery?: string;
   /** With `readsMeshTriangles`: false when, for these params on this document, the command reads no triangle (it only places what it copies), so the stored meshes are not read and an unheld asset does not matter. */
   readonly readsMeshTrianglesWhen?: (doc: CadDocument, params: unknown) => boolean;
   /** A readOnly command whose `data` is a file or a figure that leaves the document (an export): it refuses an unreadable mesh asset instead of answering from the display mesh. */

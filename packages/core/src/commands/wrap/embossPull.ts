@@ -77,6 +77,8 @@ export function buildPullRecipe(input: {
   readonly anchorOn: Vec3;
   /** Fit tolerance of the footprint outlines, document units. */
   readonly tolerance: number;
+  /** A read-only preview: nothing is handed to the kernel, so the walls of a draft are not built (the checks that need only the outlines still run). */
+  readonly preview?: boolean;
 }): PullBuild | PullFailure {
   const { session, chart, orientation, mode, depth } = input;
   if (session.surface.type === 'torus')
@@ -144,7 +146,7 @@ export function buildPullRecipe(input: {
   /** The prism of a footprint polygon; with a draft its walls tilt about the plane through the anchor so it narrows along the feature axis (a hole prism widens). */
   const taperedPrism = (outline: Outline, tag: string, widening: boolean): ShapeRecipe | PullFailure => {
     const prism = prismOf(outline, tag);
-    if (!(angle > 0)) return prism;
+    if (!(angle > 0) || input.preview === true) return prism;
     const shape = session.kernel.evaluate(prism);
     if (shape === null)
       return { code: 'WRP_KERNEL_BUILD_FAILED', message: 'the exact kernel could not build the footprint prism before drafting its walls' };

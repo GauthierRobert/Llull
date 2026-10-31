@@ -7,6 +7,7 @@ import {
   crossedThreshold,
   dragGesture,
   insetThickness,
+  nextAxisLock,
   quaternionAxisAngle,
   rayPlanePoint,
   unitsPerPixel,
@@ -117,5 +118,20 @@ describe('overlay buffers', () => {
     expect(planes.map((p) => p.axis)).toEqual(['x', 'z']);
     expect(planes[0]?.triangles.length).toBe(18);
     expect(planes[0]?.outline.length).toBe(24);
+  });
+});
+
+describe('nextAxisLock', () => {
+  it('locks the pressed axis, switches to another, and a second press of the same axis releases the lock', () => {
+    expect(nextAxisLock(null, 'x')).toBe('x');
+    expect(nextAxisLock('x', 'y')).toBe('y');
+    expect(nextAxisLock('y', 'y')).toBeNull();
+  });
+  it('a locked drag only moves along the locked world axis', () => {
+    const start: DragStart = { kind: 'translate', ray: down(0, 0), origin: [0, 0, 0], axis: [0, 0, 1] };
+    const to = down(3, 4);
+    expect(dragGesture(start, to, nextAxisLock(null, 'x'))).toEqual({ kind: 'translate', delta: [3, 0, 0] });
+    expect(dragGesture(start, to, nextAxisLock('x', 'y'))).toEqual({ kind: 'translate', delta: [0, 4, 0] });
+    expect(dragGesture(start, to, nextAxisLock('y', 'y'))).toEqual({ kind: 'translate', delta: [3, 4, 0] });
   });
 });

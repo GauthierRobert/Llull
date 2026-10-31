@@ -53,6 +53,7 @@ import { FaceEditBar } from './faceEdit/FaceEditBar';
 import { NurbsNetLayer } from './nurbsNet/NurbsNetLayer';
 import { NurbsNetBar } from './nurbsNet/NurbsNetBar';
 import { RemotePreviewLayer } from './preview/RemotePreviewLayer';
+import { FootprintPreviewLayer } from './preview/FootprintPreviewLayer';
 import { CageEditBar } from './cage/CageEditBar';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
@@ -146,6 +147,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <FaceEditLayer />
         <NurbsNetLayer />
         <RemotePreviewLayer />
+        <FootprintPreviewLayer />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />

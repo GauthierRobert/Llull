@@ -6,70 +6,58 @@
       "#1": {
         "id": "#1",
         "kind": "nurbs_curve",
-        "curve": {
-          "degree": 3,
-          "poles": [
-            [0, 0, 0],
-            [0.5, 1, 0],
-            [1, 1.5, 0.125],
-            [1.9375, 1.875, 0.4375],
-            [3.25, 1.5, 1],
-            [4, 0, 1],
-            [6, -1, 2]
-          ],
-          "knots": [0, 0.25, 0.5, 1],
-          "multiplicities": [4, 2, 1, 4]
-        },
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
+        "curve": {"degree":3,"poles":[[0,0,0],[0.5,1,0],[1,1.5,0.125],[1.9375,1.875,0.4375],[3.25,1.5,1],[4,0,1],[6,-1,2]],"knots":[0,0.25,0.5,1],"multiplicities":[4,2,1,4]},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2a7ab0"
       },
       "#3": {
         "id": "#3",
         "kind": "nurbs_curve",
-        "curve": {
-          "degree": 3,
-          "poles": [
-            [0, 0, 0],
-            [0.675319411, 1.305746, -1.21648441],
-            [2.31251065, 1.15312044, 3.652664],
-            [3.3605261, -2.47737242, -2.15432611],
-            [4, 0, 2]
-          ],
-          "knots": [0, 0.458795442, 1],
-          "multiplicities": [4, 1, 4]
-        },
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
+        "curve": {"degree":3,"poles":[[0,0,0],[0.675319411,1.305746,-1.21648441],[2.31251065,1.15312044,3.652664],[3.3605261,-2.47737242,-2.15432611],[4,0,2]],"knots":[0,0.458795442,1],"multiplicities":[4,1,4]},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2a7ab0"
       },
       "#4": {
         "id": "#4",
         "kind": "nurbs_curve",
-        "curve": {
-          "degree": 2,
-          "poles": [
-            [5, 0, 0],
-            [5, 5, 0],
-            [0, 5, 0]
-          ],
-          "weights": [1, 0.707106781, 1],
-          "knots": [0, 1],
-          "multiplicities": [3, 3]
-        },
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
+        "curve": {"degree":2,"poles":[[5,0,0],[5,5,0],[0,5,0]],"weights":[1,0.707106781,1],"knots":[0,1],"multiplicities":[3,3]},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2a7ab0"
       }
     },
-    "order": ["#1", "#3", "#4"],
-    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
-    "layerOrder": ["#2"],
+    "order": [
+      "#1",
+      "#3",
+      "#4"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -79,46 +67,28 @@
       {
         "id": "#5",
         "name": "create_nurbs_curve",
-        "params": {
-          "degree": 3,
-          "poles": [
-            [0, 0, 0],
-            [1, 2, 0],
-            [3, 2, 1],
-            [4, 0, 1],
-            [6, -1, 2]
-          ]
-        },
+        "params": {"degree":3,"poles":[[0,0,0],[1,2,0],[3,2,1],[4,0,1],[6,-1,2]]},
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#6",
         "name": "edit_nurbs",
-        "params": { "id": "#1", "operation": "insert_knot", "u": 0.25, "times": 2 },
+        "params": {"id":"#1","operation":"insert_knot","u":0.25,"times":2},
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#7",
         "name": "interpolate_curve",
-        "params": {
-          "points": [
-            [0, 0, 0],
-            [1, 1, 0],
-            [2, 0.5, 1],
-            [3, -1, 0],
-            [4, 0, 2]
-          ],
-          "parameterization": "centripetal"
-        },
+        "params": {"points":[[0,0,0],[1,1,0],[2,0.5,1],[3,-1,0],[4,0,2]],"parameterization":"centripetal"},
         "suppressed": false,
         "affected": ["#3"]
       },
       {
         "id": "#8",
         "name": "create_conic",
-        "params": { "start": [5, 0, 0], "apex": [5, 5, 0], "end": [0, 5, 0], "rho": 0.414213562 },
+        "params": {"start":[5,0,0],"apex":[5,5,0],"end":[0,5,0],"rho":0.414213562},
         "suppressed": false,
         "affected": ["#4"]
       }

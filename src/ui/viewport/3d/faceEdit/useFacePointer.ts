@@ -8,7 +8,7 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Entity, Vec3 } from '@core/model/types';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
-import { type AxisLock, translateDelta, unitsPerPixel } from '../cage/dragMath';
+import { type AxisLock, nextAxisLock, translateDelta, unitsPerPixel } from '../cage/dragMath';
 import { createFrameScheduler } from '../cage/frameScheduler';
 import { capturePointer, releasePointer } from '../pointerCapture';
 import { createWorldRay, type WorldRay } from '../worldRay';
@@ -53,6 +53,7 @@ export function useFacePointer(entity: Entity | undefined): void {
     const rayAt = createWorldRay(gl, camera);
     let press: Press | null = null;
     let lock: AxisLock = null;
+    const lastPointer = { x: 0, y: 0 };
     const forward = new THREE.Vector3();
     const hoverFrame = createFrameScheduler(
       (cb) => window.requestAnimationFrame(cb),
@@ -106,7 +107,14 @@ export function useFacePointer(entity: Entity | undefined): void {
       consume();
     };
 
+    const moveFeatureTo = (held: Press, x: number, y: number): void => {
+      const vector = translateDelta({ ray: held.ray, origin: held.rules.pick.point, axis: held.view }, rayAt(x, y), lock);
+      if (vector !== null) updateFaceDrag(len3(vector), vector);
+    };
+
     const onPointerMove = (event: PointerEvent): void => {
+      lastPointer.x = event.clientX;
+      lastPointer.y = event.clientY;
       const target = entityRef.current;
       const edit = useFaceEditStore.getState();
       if (target === undefined || !edit.active) return;
@@ -115,12 +123,7 @@ export function useFacePointer(entity: Entity | undefined): void {
         press.active = true;
         const { pick } = press.rules;
         if (press.rules.op === 'move_feature') {
-          const vector = translateDelta(
-            { ray: press.ray, origin: pick.point, axis: press.view },
-            rayAt(event.clientX, event.clientY),
-            lock,
-          );
-          if (vector !== null) updateFaceDrag(len3(vector), vector);
+          moveFeatureTo(press, event.clientX, event.clientY);
           return;
         }
         const travel = travelAlongAxis(pick.point, pick.normal, press.ray, rayAt(event.clientX, event.clientY));
@@ -160,7 +163,8 @@ export function useFacePointer(entity: Entity | undefined): void {
       if (press?.active === true && useFaceEditStore.getState().op === 'move_feature' && (key === 'x' || key === 'y' || key === 'z')) {
         event.preventDefault();
         event.stopPropagation();
-        lock = key;
+        lock = nextAxisLock(lock, key);
+        moveFeatureTo(press, lastPointer.x, lastPointer.y);
       }
     };
 

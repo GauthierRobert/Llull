@@ -6,127 +6,140 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [300, 10, 10],
-        "position": [150, 5, 5],
-        "rotation": [0, 0, 0],
+        "size": [300,10,10],
+        "position": [150,5,5],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c",
         "materialId": "steel"
       }
     },
-    "order": ["#1"],
-    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
-    "layerOrder": ["#2"],
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
     "featureHistory": [
-      { "id": "#3", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "#3",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
       {
         "id": "#4",
         "name": "add_box",
-        "params": { "size": [300, 10, 10], "position": [0, 0, 0], "anchor": "min" },
+        "params": {"size":[300,10,10],"position":[0,0,0],"anchor":"min"},
         "suppressed": false,
         "affected": ["#1"]
       },
-      { "id": "#5", "name": "create_material", "params": { "name": "steel", "density": 0.0078 }, "suppressed": false, "affected": [] },
+      {
+        "id": "#5",
+        "name": "create_material",
+        "params": {"name":"steel","density":0.0078},
+        "suppressed": false,
+        "affected": []
+      },
       {
         "id": "#6",
         "name": "add_material_model",
-        "params": {
-          "material": "steel",
-          "id": "elastic",
-          "model": { "kind": "elastic_isotropic", "E": { "value": 210, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
-          "basis": "company",
-          "source": { "citation": "golden test input" }
-        },
+        "params": {"material":"steel","id":"elastic","model":{"kind":"elastic_isotropic","E":{"value":210,"unit":"GPa"},"nu":{"value":0.3,"unit":"1"}},"basis":"company","source":{"citation":"golden test input"}},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#7",
         "name": "define_constitutive_set",
-        "params": { "material": "steel", "#8": { "id": "#8", "elastic": "elastic" }, "makeDefault": true },
+        "params": {"material":"steel","#8":{"id":"#8","elastic":"elastic"},"makeDefault":true},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#9",
         "name": "assign_material",
-        "params": { "materialName": "steel", "entityIds": ["#1"] },
+        "params": {"materialName":"steel","entityIds":["#1"]},
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#10",
         "name": "create_analysis",
-        "params": { "name": "pull", "analysisType": "static" },
+        "params": {"name":"pull","analysisType":"static"},
         "suppressed": false,
         "affected": ["#11"]
       },
       {
         "id": "#12",
         "name": "set_part_idealization",
-        "params": { "analysisId": "#11", "entityId": "#1" },
+        "params": {"analysisId":"#11","entityId":"#1"},
         "suppressed": false,
         "affected": ["#11"]
       },
       {
         "id": "#13",
         "name": "add_fea_constraint",
-        "params": { "analysisId": "#11", "name": "root", "kind": "fixed", "target": { "entityId": "#1", "facesNear": [[0, 5, 5]] } },
+        "params": {"analysisId":"#11","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}},
         "suppressed": false,
         "affected": ["#14"]
       },
       {
         "id": "#15",
         "name": "add_fea_load",
-        "params": {
-          "analysisId": "#11",
-          "name": "tip",
-          "kind": "force",
-          "vector": [0, -500, 0],
-          "target": { "entityId": "#1", "facesNear": [[300, 5, 5]] }
-        },
+        "params": {"analysisId":"#11","name":"tip","kind":"force","vector":[0,-500,0],"target":{"entityId":"#1","facesNear":[[300,5,5]]}},
         "suppressed": false,
         "affected": ["#16"]
       },
       {
         "id": "#17",
         "name": "add_fea_load",
-        "params": {
-          "analysisId": "#11",
-          "name": "tip torque",
-          "kind": "moment",
-          "vector": [0, 0, 500],
-          "referencePoint": [300, 5, 5],
-          "target": { "entityId": "#1", "facesNear": [[300, 5, 5]] }
-        },
+        "params": {"analysisId":"#11","name":"tip torque","kind":"moment","vector":[0,0,500],"referencePoint":[300,5,5],"target":{"entityId":"#1","facesNear":[[300,5,5]]}},
         "suppressed": false,
         "affected": ["#18"]
       },
       {
         "id": "#19",
         "name": "set_margin_band",
-        "params": { "analysisId": "#11", "marginalBand": 0.1 },
+        "params": {"analysisId":"#11","marginalBand":0.1},
         "suppressed": false,
         "affected": ["#11"]
       },
       {
         "id": "#20",
         "name": "set_result_view",
-        "params": { "analysisId": "#11", "field": "von_mises", "loadCase": "LC1" },
+        "params": {"analysisId":"#11","field":"von_mises","loadCase":"LC1"},
         "suppressed": false,
         "affected": ["#11"]
       },
       {
         "id": "#21",
         "name": "set_mesh_controls",
-        "params": { "analysisId": "#11", "elementFamily": "tet", "order": 2, "globalSize": 5 },
+        "params": {"analysisId":"#11","elementFamily":"tet","order":2,"globalSize":5},
         "suppressed": false,
         "affected": ["#11"]
       }
@@ -139,16 +152,8 @@
         "color": "#b0b0b0",
         "metalness": 0,
         "roughness": 0.5,
-        "materialModels": [
-          {
-            "id": "elastic",
-            "model": { "kind": "elastic_isotropic", "E": { "value": 210, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
-            "basis": "company",
-            "provenance": { "citation": "golden test input" },
-            "parametersSha256": "30421fa3f397d54eaf45d88076fc32649f5afb824ea335b2b4eceedcacc52612"
-          }
-        ],
-        "constitutiveSets": [{ "id": "#8", "elastic": "elastic" }],
+        "materialModels": [{"id":"elastic","model":{"kind":"elastic_isotropic","E":{"value":210,"unit":"GPa"},"nu":{"value":0.3,"unit":"1"}},"basis":"company","provenance":{"citation":"golden test input"},"parametersSha256":"30421fa3f397d54eaf45d88076fc32649f5afb824ea335b2b4eceedcacc52612"}],
+        "constitutiveSets": [{"id":"#8","elastic":"elastic"}],
         "defaultConstitutiveSet": "#8"
       }
     },
@@ -163,49 +168,11 @@
     "nextStepNumber": 15,
     "analysis": {
       "cases": {
-        "#11": {
-          "id": "#11",
-          "name": "pull",
-          "type": "static",
-          "solver": "calculix",
-          "unitSystem": "N-mm-t-s",
-          "factors": { "ultimate": 1.5, "yield": 1, "extra": [] },
-          "parts": { "#1": { "kind": "solid" } },
-          "constraints": {
-            "#14": { "id": "#14", "name": "root", "kind": "fixed", "target": { "entityId": "#1", "facesNear": [[0, 5, 5]] } }
-          },
-          "constraintOrder": ["#14"],
-          "loads": {
-            "#16": {
-              "id": "#16",
-              "name": "tip",
-              "loadCase": "LC1",
-              "category": "limit",
-              "kind": "force",
-              "target": { "entityId": "#1", "facesNear": [[300, 5, 5]] },
-              "vector": [0, -500, 0],
-              "distribution": "total"
-            },
-            "#18": {
-              "id": "#18",
-              "name": "tip torque",
-              "loadCase": "LC1",
-              "category": "limit",
-              "kind": "moment",
-              "target": { "entityId": "#1", "facesNear": [[300, 5, 5]] },
-              "vector": [0, 0, 500],
-              "referencePoint": [300, 5, 5]
-            }
-          },
-          "loadOrder": ["#16", "#18"],
-          "mesh": { "mesher": "netgen", "elementFamily": "tet", "order": 2, "globalSize": 5, "refinements": [], "optimize": "default" },
-          "probes": {},
-          "dispositions": {},
-          "marginalBand": 0.1,
-          "view": { "field": "von_mises", "loadCase": "LC1", "deformationScale": 1 }
-        }
+        "#11": {"id":"#11","name":"pull","type":"static","solver":"calculix","unitSystem":"N-mm-t-s","factors":{"ultimate":1.5,"yield":1,"extra":[]},"parts":{"#1":{"kind":"solid"}},"constraints":{"#14":{"id":"#14","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}}},"constraintOrder":["#14"],"loads":{"#16":{"id":"#16","name":"tip","loadCase":"LC1","category":"limit","kind":"force","target":{"entityId":"#1","facesNear":[[300,5,5]]},"vector":[0,-500,0],"distribution":"total"},"#18":{"id":"#18","name":"tip torque","loadCase":"LC1","category":"limit","kind":"moment","target":{"entityId":"#1","facesNear":[[300,5,5]]},"vector":[0,0,500],"referencePoint":[300,5,5]}},"loadOrder":["#16","#18"],"mesh":{"mesher":"netgen","elementFamily":"tet","order":2,"globalSize":5,"refinements":[],"optimize":"default"},"probes":{},"dispositions":{},"marginalBand":0.1,"view":{"field":"von_mises","loadCase":"LC1","deformationScale":1}}
       },
-      "caseOrder": ["#11"]
+      "caseOrder": [
+        "#11"
+      ]
     }
   }
 }

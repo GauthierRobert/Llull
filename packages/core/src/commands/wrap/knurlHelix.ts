@@ -13,6 +13,7 @@ import { curveChain } from '../../geometry/nurbsChain';
 import { helixCurve } from '../../lib/helix/helix';
 import { newEntity } from '../entity/newEntity';
 import { axisFrame } from '../solids/shared';
+import { toothAzimuth } from './knurlGeometry';
 
 /**
  * Estimated native kernel time of a cut of `grooves` helical grooves that each turn `turns` times along the face (face length / lead), seconds: grooves x 2.3 x (turns / 0.184)^1.8. Fitted to the
@@ -54,6 +55,10 @@ export interface HelicalKnurl {
 
 /** Half-width (along the axis) of the V in the plane through the axis, per unit of depth. */
 const slope = (shape: HelicalKnurl): number => Math.tan((shape.toothAngleDeg * Math.PI) / 360) / Math.sin((shape.helixDeg * Math.PI) / 180);
+
+/** Azimuth (radians, frame of axisFrame) of the centre line of groove `tooth` of one hand at axial coordinate `z`, the sweep of which starts at `z0` (grooveSpan.z0): the helix the recipe sweeps. */
+export const helicalAzimuth = (shape: HelicalKnurl, tooth: number, left: boolean, z0: number, z: number): number =>
+  toothAzimuth(tooth, shape.teeth) + ((left ? -1 : 1) * 2 * Math.PI * (z - z0)) / leadOf(shape);
 
 /** Axial advance per turn of the groove helix. */
 export const leadOf = (shape: HelicalKnurl): number => (2 * Math.PI * shape.radius) / Math.tan((shape.helixDeg * Math.PI) / 180);
@@ -136,7 +141,7 @@ export function helicalKnurlRecipe(
   const hands = shape.hands === 2 ? [false, true] : [shape.left];
   for (const left of hands)
     for (let i = 0; i < shape.teeth; i++) {
-      const theta = (2 * Math.PI * i) / shape.teeth;
+      const theta = toothAzimuth(i, shape.teeth);
       const origin: Vec3 = [-r * Math.cos(theta), -r * Math.sin(theta), 0];
       const definition = {
         type: 'helix' as const,

@@ -33,7 +33,7 @@ describe('gestureCommand: every gesture is ONE registered command with valid par
   const cases: Array<[string, CageGesture, CageSelection, string]> = [
     ['translate', { kind: 'translate', delta: [0.25, 0, 0] }, vertices, 'edit_subdivision_cage'],
     ['rotate', { kind: 'rotate', axis: [0, 0, 1], angleDeg: 15, pivot: [0, 0, 0] }, vertices, 'edit_subdivision_cage'],
-    ['scale', { kind: 'scale', factor: 1.2, pivot: [0, 0, 0] }, faceSelection, 'edit_subdivision_cage'],
+    ['scale', { kind: 'scale', factors: [1.2, 1.2, 1.2], pivot: [0, 0, 0] }, faceSelection, 'edit_subdivision_cage'],
     ['extrude', { kind: 'extrude', distance: 0.4 }, faceSelection, 'extrude_cage_faces'],
     ['inset', { kind: 'inset', thickness: 0.1 }, faceSelection, 'inset_cage_faces'],
   ];
@@ -43,6 +43,21 @@ describe('gestureCommand: every gesture is ONE registered command with valid par
     const result = execute(doc, command?.name ?? '', command?.params ?? {});
     expect(result.error).toBeUndefined();
     expect(result.affected).toEqual([id]);
+  });
+
+  it('scale keeps the factor of each axis: an X handle stretches along X only', () => {
+    const command = gestureCommand(id, { kind: 'scale', factors: [1.5, 1, 1], pivot: [0, 0, 1] }, faceSelection, DEFAULT_FALLOFF);
+    expect(command?.params).toMatchObject({ scale: [1.5, 1, 1], pivot: [0, 0, 1] });
+    const after = execute(doc, command?.name ?? '', command?.params ?? {}).document.entities[id] as SubdivisionEntity;
+    const moved = cage.faces.filter((_, i) => faces.includes(cage.elementIds.faces[i] as string)).flat();
+    expect(moved.length).toBeGreaterThan(0);
+    for (const v of moved) {
+      const [ax, ay] = cage.vertices[v] as [number, number, number];
+      const [bx, by] = after.vertices[v] as [number, number, number];
+      expect(by).toBeCloseTo(ay, 9);
+      expect(bx).toBeCloseTo(ax * 1.5, 9);
+    }
+    expect(gestureCommand(id, { kind: 'scale', factors: [1, 1, 1.0000001], pivot: [0, 0, 0] }, faceSelection, DEFAULT_FALLOFF)).toBeNull();
   });
 
   it('loop cut names the edge and the number of loops', () => {
@@ -58,7 +73,7 @@ describe('gestureCommand: every gesture is ONE registered command with valid par
     expect(gestureCommand(id, { kind: 'inset', thickness: 1 }, vertices, DEFAULT_FALLOFF)).toBeNull();
     for (const idle of [
       { kind: 'rotate', axis: [0, 0, 1], angleDeg: 0, pivot: [0, 0, 0] },
-      { kind: 'scale', factor: 1, pivot: [0, 0, 0] },
+      { kind: 'scale', factors: [1, 1, 1], pivot: [0, 0, 0] },
       { kind: 'extrude', distance: 0 },
       { kind: 'inset', thickness: 0 },
     ] as const)
