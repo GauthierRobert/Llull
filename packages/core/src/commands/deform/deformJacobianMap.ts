@@ -9,6 +9,7 @@ import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
 import { defRejection } from './codes';
+import { chainOf, isChainFailure } from './deformChain';
 import { deformNodeOf, sourceMeshOf } from './sourceMesh';
 import { idParam } from './schema';
 
@@ -49,21 +50,30 @@ const boundsDiagonal = (positions: ArrayLike<number>): number => {
 const roundDet = (value: number): number => Number(value.toPrecision(4));
 
 /**
- * @affects none (read-only); data = positions (flat world xyz of the deformed body), indices, determinant PER TRIANGLE (at its rest centroid nudged inward), min / max / folded triangle count, law, floor, displayTolerance
+ * @affects none (read-only); data = positions (flat world xyz of the deformed body), indices, determinant PER TRIANGLE (at its rest centroid nudged inward; the product over the chain with scope composed), min / max / folded triangle count, law, laws, deforms, scope, floor, displayTolerance
  * @invariant computed on read: the source is re-refined as the deformation did (coarsened when the answer would be too large); planeRule cuts at the region ends so no triangle straddles a jump of det J, and each triangle carries det J of the map at its REST centroid, nudged into the body so a cap in a region-end plane reads the material side; nothing is stored
+ * @invariant scope composed (default): the determinant of every node of the chain is read at the rest point of the triangle in that node's input space (carried through every refinement, barycentric for new vertices) and multiplied: the volume ratio against the ORIGINAL body; scope outermost: the outermost node alone
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate frame -> DEF_FRAME_DEGENERATE; source not rebuildable -> DEF_SOURCE_UNAVAILABLE; refinement still over the budget after coarsening, or refused -> the warp's code (DEF_BUDGET_EXCEEDED, DEF_APPROX_TOLERANCE)
  */
 export const deformJacobianMap = defineCommand({
   name: 'deform_jacobian_map',
   annotations: { readsMeshTriangles: true, readOnly: true },
   description:
-    'Jacobian determinant of the OUTERMOST deform node of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates). ' +
-    'data: positions (flat [x, y, z, ...] of the deformed body), indices (triangles), determinant (det J of the map at the rest centroid of each triangle: 1 = volume kept, > 1 stretched, < 1 compressed, <= floor folded), ' +
-    'min, max (of the determinants), folded (triangles with det J <= floor = 1e-6), floor, law (kind of the node), displayTolerance (the refinement tolerance used: coarser than the deformation output.tolerance when the answer would exceed 200000 triangles). ' +
-    'Computed from the recipe by re-refining the source as the deformation did; read-only, nothing is stored. A chain of deformations reports the outermost map only. ' +
+    'Jacobian determinant of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates): by default COMPOSED along the chain of deformations (the volume ratio against the original body), or `scope: "outermost"` for the last node alone. ' +
+    'data: positions (flat [x, y, z, ...] of the deformed body), indices (triangles), determinant (det J at the rest centroid of each triangle: 1 = volume kept, > 1 stretched, < 1 compressed, <= floor folded), ' +
+    'min, max (of the determinants), folded (triangles with det J <= floor = 1e-6), floor, law (kind of the outermost node), laws (every node of the chain used, inner first), deforms (their count), scope, displayTolerance (the refinement tolerance used: coarser than the deformation output.tolerance when the answer would exceed 200000 triangles). ' +
+    'Computed from the recipe by re-refining the source as the deformation did; read-only, nothing is stored. A single deformation: scope makes no difference. ' +
     'Next: analyze_deformation for the closed-form range over the whole body, check_deformation for a verdict.',
-  params: z.object({ id: idParam.describe('Id of the deformed mesh entity (the id a deformation command returned in affected).') }),
-  run: (doc: CadDocument, { id }, ctx): CommandResult => {
+  params: z.object({
+    id: idParam.describe('Id of the deformed mesh entity (the id a deformation command returned in affected).'),
+    scope: z
+      .enum(['composed', 'outermost'])
+      .optional()
+      .describe(
+        'composed (default): the product of the determinants of every deform node of the chain (the volume ratio against the original body); outermost: only the last node.',
+      ),
+  }),
+  run: (doc: CadDocument, { id, scope = 'composed' }, ctx): CommandResult => {
     const fail = (code: string, message: string): CommandResult =>
       defRejection(doc, 'deform_jacobian_map', code, message, [id], ['params.id']);
     const entity = doc.entities[id];
@@ -72,17 +82,24 @@ export const deformJacobianMap = defineCommand({
     if (node === null) return fail('DEF_NOT_DEFORMED', `entity '${id}' (kind '${entity.kind}') has no deform node in its recipe`);
     const warp = warpOf(node);
     if (warp === null) return fail('DEF_FRAME_DEGENERATE', 'the recorded frame axis is zero or the reference is parallel to it');
-    const source = sourceMeshOf(ctx?.kernel ?? null, node.source, doc);
+    // composed: the inner deformations are re-run on the mesh path with their rest positions carried; otherwise (or without an inner deformation) the source is the body below the node
+    const chain = scope === 'composed' && node.source.op === 'deform' ? chainOf(ctx?.kernel ?? null, node.source, doc) : null;
+    if (chain !== null && isChainFailure(chain)) return fail(chain.code, chain.message);
+    const source = chain === null ? sourceMeshOf(ctx?.kernel ?? null, node.source, doc) : chain.mesh;
     if (source === null) return fail('DEF_SOURCE_UNAVAILABLE', 'the deformation source cannot be rebuilt without a geometry kernel');
+    const inner = chain === null ? [] : chain.nodes.map((innerNode) => ({ node: innerNode, warp: warpOf(innerNode) }));
+    if (inner.some((entry) => entry.warp === null))
+      return fail('DEF_FRAME_DEGENERATE', 'the recorded frame axis of an inner deformation is zero or the reference is parallel to it');
+    const attributes = chain === null ? [] : chain.stages;
     const unitWork = DETERMINANT_EVALUATIONS * evaluationCost(node);
     let tolerance = node.output.tolerance;
-    let warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES });
+    let warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES, attributes });
     // too many triangles (or too much determinant work): coarsen the picture, never the deformation itself
     const tooBig = (): boolean =>
       !warped.ok ? warped.code === 'DEF_BUDGET_EXCEEDED' : (warped.mesh.indices.length / 3) * unitWork > MAX_DETERMINANT_WORK;
     for (let attempt = 0; attempt < MAX_COARSENINGS && tooBig(); attempt++) {
       tolerance *= COARSEN;
-      warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES });
+      warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES, attributes });
     }
     if (!warped.ok) return fail(warped.code, warped.message);
     if (tooBig())
@@ -94,13 +111,20 @@ export const deformJacobianMap = defineCommand({
     const rest = warped.restPositions;
     const count = indices.length / 3;
     const nudge = INWARD * boundsDiagonal(rest);
+    const stages = warped.attributes.map((positions, k) => ({
+      positions,
+      nudge: INWARD * boundsDiagonal(positions),
+      warp: (inner[k] as { warp: NonNullable<ReturnType<typeof warpOf>> }).warp,
+    }));
     const determinant: number[] = new Array<number>(count);
     let min = Infinity;
     let max = -Infinity;
     let folded = 0;
     for (let t = 0; t < count; t++) {
       const [a, b, c] = [indices[3 * t] as number, indices[3 * t + 1] as number, indices[3 * t + 2] as number];
-      const det = roundDet(warp.determinant(sampleAt(rest, a, b, c, nudge)));
+      let composed = warp.determinant(sampleAt(rest, a, b, c, nudge));
+      for (const stage of stages) composed *= stage.warp.determinant(sampleAt(stage.positions, a, b, c, stage.nudge));
+      const det = roundDet(composed);
       determinant[t] = det;
       min = Math.min(min, det);
       max = Math.max(max, det);
@@ -110,11 +134,14 @@ export const deformJacobianMap = defineCommand({
     const coarse = tolerance === node.output.tolerance ? '' : `; refinement coarsened to tolerance ${tolerance.toPrecision(3)}`;
     return report(
       doc,
-      `deform_jacobian_map: '${id}' outermost deform (${node.law.kind}): ${count} triangles, ${range}, ${folded} folded (det J <= ${JACOBIAN_FLOOR})${coarse}.`,
+      `deform_jacobian_map: '${id}' ${stages.length === 0 ? `outermost deform (${node.law.kind})` : `composed (${stages.length + 1} deforms)`}: ${count} triangles, ${range}, ${folded} folded (det J <= ${JACOBIAN_FLOOR})${coarse}.`,
       {
         id,
         unit: doc.units,
         law: node.law.kind,
+        laws: [...inner.map((entry) => entry.node.law.kind), node.law.kind],
+        deforms: inner.length + 1,
+        scope,
         positions: Array.from(warped.mesh.positions, Math.fround),
         indices: Array.from(indices),
         determinant,

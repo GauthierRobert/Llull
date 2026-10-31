@@ -86,4 +86,29 @@ describe('Jacobian map layer', () => {
     expect(useDeformOverlayStore.getState().layers.jacobian).toBe(true);
     expect(screen.getByLabelText('Jacobian map').textContent).toContain('magenta = folded');
   });
+
+  it('a chain of deformations is composed by default (legend "composed (2 deforms)", range 2 x s^2), and "Outermost only" reads the last node alone', () => {
+    const box = dispatchEntity('add_box', { size: [10, 10, 100], anchor: 'base-center' }).id;
+    const stretch = localDispatch('stretch_body', { id: box, factor: 2, frame: FRAME }).affected[0] as string;
+    const taper = localDispatch('taper_body', { id: stretch, scaleEnd: 0.5, region: { start: 0, end: 200 }, frame: FRAME })
+      .affected[0] as string;
+    useStore.getState().select([taper]);
+    render(
+      <>
+        <DeformOverlay />
+        <ViewportControls />
+      </>,
+    );
+    act(() => useDeformOverlayStore.getState().setLayer('jacobian', true));
+    const legend = (): string => screen.getByLabelText('Jacobian map').textContent ?? '';
+    expect(legend()).toContain('composed (2 deforms)');
+    const composed = useDeformOverlayStore.getState().jacobian[taper];
+    expect(composed).toMatchObject({ deforms: 2 });
+    expect(composed !== undefined && 'max' in composed ? composed.max : null).toBeCloseTo(2, 6);
+    fireEvent.click(screen.getByLabelText('Outermost only'));
+    expect(useDeformOverlayStore.getState().jacobianScope).toBe('outermost');
+    expect(legend()).toContain('outermost deform (taper)');
+    const outermost = useDeformOverlayStore.getState().jacobian[taper];
+    expect(outermost !== undefined && 'max' in outermost ? outermost.max : null).toBeCloseTo(1, 6);
+  });
 });

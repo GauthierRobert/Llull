@@ -14,7 +14,8 @@ const OPACITY = 0.88;
 
 export function JacobianMap({ entity }: { entity: MeshSolidEntity }): React.ReactElement | null {
   const setStats = useDeformOverlayStore((s) => s.setJacobian);
-  const params = useMemo(() => ({ id: entity.id }), [entity.id]);
+  const scope = useDeformOverlayStore((s) => s.jacobianScope);
+  const params = useMemo(() => ({ id: entity.id, scope }), [entity.id, scope]);
   const query = useHostQuery('deform_jacobian_map', params, entity);
   const view = useMemo(() => (query.status === 'done' && !query.isError ? parseJacobianMap(query.data) : null), [query]);
   const failure = query.status === 'done' && view === null ? query.summary : null;
@@ -25,7 +26,7 @@ export function JacobianMap({ entity }: { entity: MeshSolidEntity }): React.Reac
         ? failure === null
           ? null
           : { failure }
-        : { min: view.min, max: view.max, folded: view.folded, floor: view.floor, law: view.law },
+        : { min: view.min, max: view.max, folded: view.folded, floor: view.floor, law: view.law, deforms: view.deforms },
     );
     return () => setStats(entity.id, null);
   }, [entity.id, view, failure, setStats]);

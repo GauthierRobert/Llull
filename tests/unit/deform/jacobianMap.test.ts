@@ -174,3 +174,97 @@ describe('deform_jacobian_map', () => {
     expectPure(doc, () => execute(doc, 'deform_jacobian_map', { id }));
   });
 });
+
+/** `second` applied to the result of `first` on the 10 x 10 x 100 box (a chain of two deformations). */
+async function chained(
+  first: [string, Record<string, unknown>],
+  second: [string, Record<string, unknown>],
+): Promise<{ doc: CadDocument; id: string }> {
+  const one = await deformed(first[0], first[1]);
+  const made = execute(one.doc, second[0], { id: one.id, frame: WORLD_Z, output: { tolerance: 0.01 }, ...second[1] });
+  expect(made.error, made.summary).toBeUndefined();
+  return { doc: made.document, id: made.affected[0] as string };
+}
+
+interface ChainMap extends JacobianMap {
+  readonly laws: string[];
+  readonly deforms: number;
+  readonly scope: string;
+}
+
+const chainMap = (doc: CadDocument, id: string, scope?: 'composed' | 'outermost'): ChainMap => {
+  const result = execute(doc, 'deform_jacobian_map', { id, ...(scope === undefined ? {} : { scope }) });
+  expect(result.error, result.summary).toBeUndefined();
+  return dataOf<ChainMap>(result);
+};
+
+describe('deform_jacobian_map along a chain of deformations (composed det J = the volume ratio against the original body)', () => {
+  it('a twist (det 1) then a taper to 0.5: the composed map is the taper alone, 0.25 .. 1, and the summary says composed (2 deforms)', async () => {
+    const { doc, id } = await chained(['twist_body', { angleDeg: 40 }], ['taper_body', { scaleEnd: 0.5, region: { start: 0, end: 100 } }]);
+    const composed = chainMap(doc, id);
+    const outermost = chainMap(doc, id, 'outermost');
+    expect(composed).toMatchObject({ laws: ['twist', 'taper'], deforms: 2, scope: 'composed' });
+    expect(outermost).toMatchObject({ laws: ['taper'], deforms: 1, scope: 'outermost' });
+    expect(composed.min).toBeCloseTo(0.25, 6);
+    expect(composed.max).toBeCloseTo(1, 6);
+    expect(composed.determinant).toEqual(outermost.determinant);
+    expect(execute(doc, 'deform_jacobian_map', { id }).summary).toContain('composed (2 deforms)');
+  });
+
+  it('a stretch of 2 over the whole body, then a taper to 0.5 over its 200: composed = 2 s^2 (0.5 .. 2) on every triangle, the outermost alone s^2 (0.25 .. 1)', async () => {
+    const { doc, id } = await chained(['stretch_body', { factor: 2 }], ['taper_body', { scaleEnd: 0.5, region: { start: 0, end: 200 } }]);
+    const composed = chainMap(doc, id);
+    const outermost = chainMap(doc, id, 'outermost');
+    expect(composed.min).toBeCloseTo(0.5, 6);
+    expect(composed.max).toBeCloseTo(2, 6);
+    expect(outermost.min).toBeCloseTo(0.25, 6);
+    expect(outermost.max).toBeCloseTo(1, 6);
+    expect(composed.determinant).toHaveLength(outermost.determinant.length);
+    composed.determinant.forEach((det, t) => expect(det).toBeCloseTo(2 * (outermost.determinant[t] as number), 3));
+  });
+
+  it('a stretch then a bend (the bend splits triangles: the rest positions of the new vertices are carried): composed = 2 (1 - y / R) = 2 (R - 5) / R .. 2 (R + 5) / R', async () => {
+    const { doc, id } = await chained(['stretch_body', { factor: 2 }], ['bend_body', { radius: 400, angleDeg: 20 }]);
+    const composed = chainMap(doc, id);
+    expect(composed.deforms).toBe(2);
+    expect(composed.min).toBeCloseTo((2 * 395) / 400, 3);
+    expect(composed.max).toBeCloseTo((2 * 405) / 400, 3);
+    expect(composed.determinant.length).toBeGreaterThan(24);
+  });
+
+  it('three deformations multiply: stretch 2 x stretch 1.5 x taper 0.5 over 300 -> 3 s^2', async () => {
+    await installKernel('none');
+    const one = await chained(['stretch_body', { factor: 2 }], ['stretch_body', { factor: 1.5 }]);
+    const made = execute(one.doc, 'taper_body', {
+      id: one.id,
+      frame: WORLD_Z,
+      scaleEnd: 0.5,
+      region: { start: 0, end: 300 },
+      output: { tolerance: 0.01 },
+    });
+    expect(made.error, made.summary).toBeUndefined();
+    const composed = chainMap(made.document, made.affected[0] as string);
+    expect(composed.laws).toEqual(['stretch', 'stretch', 'taper']);
+    expect(composed.min).toBeCloseTo(0.75, 6);
+    expect(composed.max).toBeCloseTo(3, 6);
+  });
+
+  it('an inner deformation the mesh warp refuses refuses the composed map by its code and leaves the document alone; the outermost scope names the missing source', async () => {
+    const { doc, id } = await chained(['bend_body', { radius: 400, angleDeg: 14 }], ['stretch_body', { factor: 2 }]);
+    const entity = meshEntity(doc, id);
+    if (entity.brep?.op !== 'deform' || entity.brep.source.op !== 'deform') throw new Error('a chain of two deform nodes expected');
+    const hopeless: CadDocument = {
+      ...doc,
+      entities: {
+        ...doc.entities,
+        [id]: {
+          ...entity,
+          brep: { ...entity.brep, source: { ...entity.brep.source, output: { ...entity.brep.source.output, tolerance: 1e-30 } } },
+        },
+      },
+    };
+    const refused = execute(hopeless, 'deform_jacobian_map', { id });
+    expectNoOp(refused, hopeless);
+    expect(refused.summary).toContain('DEF_BUDGET_EXCEEDED');
+  });
+});

@@ -62,6 +62,8 @@ export interface WarpResult {
   readonly mesh: MeshData;
   /** The rest position of every vertex of `mesh` (flat xyz, same vertex order): the point the map was evaluated at. */
   readonly restPositions: number[];
+  /** The `attributes` of the options, one array per attribute, for the vertices of `mesh` (empty without any). */
+  readonly attributes: number[][];
   /** Triangles of the welded source before refinement. */
   readonly sourceTriangles: number;
   /** Longest edge allowed by the refinement bound (Infinity: none needed). */
@@ -80,11 +82,18 @@ export interface WarpOptions {
   /** Maximum chordal deviation (document units, > 0). */
   readonly tolerance: number;
   readonly maxTriangles?: number;
+  /**
+   * Per-vertex attributes of `source` (flat xyz each, same vertex order) carried through the refinement: a vertex that splits an edge gets the linear interpolation of its two ends (barycentric).
+   * The composed Jacobian of a chain of deformations carries the rest position of every vertex in the input space of each earlier node.
+   */
+  readonly attributes?: ReadonlyArray<ReadonlyArray<number>>;
 }
 
 export interface Soup {
   positions: number[];
   indices: number[];
+  /** Per-vertex attributes (flat xyz) refined with the positions: a new vertex interpolates its edge ends like its position. */
+  attributes?: number[][];
 }
 
 /** Split decision for the edge from vertex `low` to vertex `high` (`low` < `high`): the parameter in (0, 1) of the new vertex, or null. */
@@ -117,6 +126,10 @@ export function splitPass(soup: Soup, decide: EdgeSplit): boolean {
     const index = positions.length / 3;
     const [p, q] = [at(positions, low), at(positions, high)];
     positions.push(p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t);
+    for (const attribute of soup.attributes ?? []) {
+      const [u, w] = [at(attribute, low), at(attribute, high)];
+      attribute.push(u[0] + (w[0] - u[0]) * t, u[1] + (w[1] - u[1]) * t, u[2] + (w[2] - u[2]) * t);
+    }
     created.set(key, index);
     return index;
   };
@@ -297,6 +310,23 @@ function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions):
   const cap = options.maxTriangles ?? MAX_WARP_TRIANGLES;
   const welded = weldMesh(source, 1e-7 * meshDiagonal(source.positions));
   const soup: Soup = { positions: welded.positions, indices: welded.triangles };
+  if (options.attributes !== undefined && options.attributes.length > 0) {
+    // the welded vertices are copies of source vertices (first come wins): find each one by its exact coordinates
+    const bySource = new Map<string, number>();
+    for (let v = 0; v < source.positions.length / 3; v++) {
+      const key = `${source.positions[v * 3]},${source.positions[v * 3 + 1]},${source.positions[v * 3 + 2]}`;
+      if (!bySource.has(key)) bySource.set(key, v);
+    }
+    soup.attributes = options.attributes.map((attribute) => {
+      const carried: number[] = [];
+      for (let v = 0; v < soup.positions.length / 3; v++) {
+        const found = bySource.get(`${soup.positions[v * 3]},${soup.positions[v * 3 + 1]},${soup.positions[v * 3 + 2]}`);
+        const from = found === undefined ? at(soup.positions, v) : at(attribute, found);
+        carried.push(from[0], from[1], from[2]);
+      }
+      return carried;
+    });
+  }
   const sourceTriangles = soup.indices.length / 3;
   const extent = localExtentOf(warp.frame, soup.positions);
   const edgeLength = maxEdgeLength(node, extent, options.tolerance);
@@ -364,7 +394,15 @@ function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions):
     moved[v * 3 + 2] = p[2];
   }
   const indices = reversesOrientation(node) ? flipped(soup.indices) : soup.indices;
-  return { ok: true, mesh: { positions: moved, indices }, restPositions: soup.positions, sourceTriangles, edgeLength, maxChordError };
+  return {
+    ok: true,
+    mesh: { positions: moved, indices },
+    restPositions: soup.positions,
+    attributes: soup.attributes ?? [],
+    sourceTriangles,
+    edgeLength,
+    maxChordError,
+  };
 }
 
 export interface WarpEstimate {

@@ -40,7 +40,8 @@ describe('parseJacobianMap', () => {
     expect(colors.slice(0, 3)).toEqual(colors.slice(3, 6));
     expect(colors.slice(0, 3)).toEqual(colors.slice(6, 9));
     expect(colors.slice(9, 12)).toEqual([...FOLDED]);
-    expect(view).toMatchObject({ min: -1, max: 2, folded: 1, floor: 1e-6, law: 'bend' });
+    expect(view).toMatchObject({ min: -1, max: 2, folded: 1, floor: 1e-6, law: 'bend', deforms: 1 });
+    expect(parseJacobianMap({ ...good, deforms: 3 })?.deforms).toBe(3);
   });
   it('rejects data that is not a map: wrong type, a determinant count that disagrees with the triangles, a triangle past the vertices, no floor', () => {
     expect(parseJacobianMap(null)).toBeNull();
