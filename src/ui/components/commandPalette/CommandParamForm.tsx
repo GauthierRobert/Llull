@@ -6,6 +6,7 @@ import type { CommandDefinition } from '@core/commands/types';
 import { useStore } from '@ui/store';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { isPreviewable } from '@ui/preview/previewable';
+import { previewNote } from '@ui/preview/previewNote';
 import { usePreviewController } from '@ui/preview/usePreviewController';
 import { Icon } from '@ui/components/Icon';
 import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
@@ -35,7 +36,7 @@ const PLACEHOLDERS: Readonly<Record<FormField['kind'], string>> = {
   boolean: '',
   numberList: 'e.g. 0, 0, 10',
   textList: 'id-1, id-2',
-  json: 'JSON, e.g. [[0,0],[10,0]]',
+  json: 'JSON',
 };
 
 interface FieldControlProps {
@@ -100,7 +101,7 @@ function FieldControl({ field, id, value, describedBy, invalid, autoFocus, onCha
         rows={3}
         spellCheck={false}
         value={value}
-        placeholder={PLACEHOLDERS.json}
+        placeholder={field.example === '' || field.example === 'null' ? PLACEHOLDERS.json : `JSON, e.g. ${field.example}`}
         onChange={(e) => onChange(e.target.value)}
       />
     );
@@ -246,8 +247,8 @@ export function CommandParamForm({
       )}
 
       {previewing && previewOutcome !== null && (
-        <p className={`palette-form__preview${previewOutcome.ok ? '' : ' palette-form__preview--refused'}`} role="status">
-          <strong>{previewOutcome.ok ? 'Preview' : 'Preview unavailable'}</strong> {previewOutcome.summary}
+        <p className={`palette-form__preview${previewNote(previewOutcome).refused ? ' palette-form__preview--refused' : ''}`} role="status">
+          <strong>{previewNote(previewOutcome).label}</strong> {previewNote(previewOutcome).text}
         </p>
       )}
 
