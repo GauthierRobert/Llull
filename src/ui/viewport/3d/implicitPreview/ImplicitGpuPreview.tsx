@@ -97,13 +97,14 @@ function GpuMesh({ program, onFailed }: { program: GpuProgram; onFailed: () => v
     [program.key, program.source, minKey, maxKey],
   );
   useEffect(() => watchShaderFailure(gl?.debug, program.key, onFailed), [gl, program.key, onFailed]);
+  const stepScale = stepScaleOf(program);
   useEffect(() => {
     const slots = material.uniforms['uC']?.value as THREE.Vector4[];
     slots.forEach((slot, i) => slot.fromArray(program.constants, 4 * i));
-    (material.uniforms['uStepScale'] as { value: number }).value = stepScaleOf(program);
+    (material.uniforms['uStepScale'] as { value: number }).value = stepScale;
     (material.uniforms['uMaxStep'] as { value: number }).value = Number.isFinite(program.maxStep) ? program.maxStep : 1e30;
     invalidate();
-  }, [material, program.constants, program.lipschitz, program.quality, program.maxStep, invalidate]);
+  }, [material, program.constants, stepScale, program.maxStep, invalidate]);
 
   const inverse = useMemo(() => new THREE.Matrix4(), []);
   const direction = useMemo(() => new THREE.Vector3(), []);
