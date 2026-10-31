@@ -76,6 +76,8 @@ class LawFillet : public BRepBuilderAPI_MakeShape {
   struct Slot {
     Handle(LawSpine) spine;
     int index = 0;
+    // The contour walks the edge from its end to its start: a law given along the edge is handed to the spine mirrored (the spine reads every edge's law along its own walk).
+    bool reversed = false;
   };
   Slot slot(const TopoDS_Edge &edge);
 

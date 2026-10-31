@@ -180,7 +180,7 @@ describe('fillet_faces over the edges two face sets share', () => {
     expect(widthEnd.error?.paths).toEqual(['widthEnd']);
   });
 
-  it('two seeds with radiusEnd are refused before the build, at radiusEnd, naming the shared edges', () => {
+  it('two seeds that are not one tangent chain with radiusEnd are refused before the build, at radiusEnd', () => {
     const { doc, id } = box();
     const refused = execute(
       doc,
@@ -188,7 +188,7 @@ describe('fillet_faces over the edges two face sets share', () => {
       { id, facesA: setOf(0), facesB: setOf(1, 2), radius: 1, radiusEnd: 2 },
       context(scriptedKernel()),
     );
-    expectNoOp(refused, doc, 'the sets share edges 0, 2');
+    expectNoOp(refused, doc, 'not one tangent chain');
     expect(refused.error).toMatchObject({ code: 'BLD_FACE_BLEND_UNSUPPORTED', paths: ['radiusEnd'] });
   });
 

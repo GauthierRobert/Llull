@@ -281,7 +281,7 @@ describeNative('BLD M4 remainder: fillet_faces over face sets, curved faces and 
     const varying = execute(l.doc, 'fillet_faces', { id: l.id, ...two, radius: 2, radiusEnd: 3 });
     expect(varying.document).toBe(l.doc);
     expect(varying.error).toMatchObject({ code: 'BLD_FACE_BLEND_UNSUPPORTED', paths: ['radiusEnd'] });
-    expect(varying.summary).toContain('exactly one edge');
+    expect(varying.summary).toMatch(/not one tangent chain|separate pieces/);
     const plate = made(createEmptyDocument(), 'add_box', { size: [60, 60, 5], anchor: 'min' });
     const boss = made(plate.doc, 'add_cylinder', { radius: 10, height: 15, position: [30, 30, 5], anchor: 'base-center' });
     const fused = made(boss.doc, 'boolean', { op: 'union', a: plate.id, b: boss.id });

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include <BRepAdaptor_Curve.hxx>
 #include <ChFiDS_Stripe.hxx>
 #include <Law_BSpline.hxx>
 #include <Law_BSpFunc.hxx>
@@ -153,11 +154,23 @@ void LawBuilder::add_edge(const TopoDS_Edge &edge) {
 
 LawFillet::LawFillet(const TopoDS_Shape &shape) : builder_(shape) {}
 
+// Whether the spine walks `edge` (the edge `index` of its contour) from its end to its start: the point of the walk at the start of the edge's stretch is the edge's own end.
+static bool walked_backwards(const Handle(LawSpine) & spine, int index, const TopoDS_Edge &edge) {
+  if (spine.IsNull()) return false;
+  const gp_Pnt walked_start = spine->Value(spine->FirstParameter(index)), walked_end = spine->Value(spine->LastParameter(index));
+  const BRepAdaptor_Curve curve(edge);
+  const gp_Pnt own_start = curve.Value(curve.FirstParameter()), own_end = curve.Value(curve.LastParameter());
+  return walked_start.Distance(own_end) + walked_end.Distance(own_start) + 1e-9 < walked_start.Distance(own_start) + walked_end.Distance(own_end);
+}
+
 LawFillet::Slot LawFillet::slot(const TopoDS_Edge &edge) {
   builder_.add_edge(edge);
   Slot found;
   const int contour = builder_.Contains(edge, found.index);
-  if (contour != 0) found.spine = Handle(LawSpine)::DownCast(builder_.Value(contour));
+  if (contour != 0) {
+    found.spine = Handle(LawSpine)::DownCast(builder_.Value(contour));
+    found.reversed = walked_backwards(found.spine, found.index, edge);
+  }
   return found;
 }
 
@@ -174,8 +187,8 @@ bool LawFillet::range(const TopoDS_Edge &edge, double start, double end) {
   if (std::abs(start - end) < Precision::Confusion()) return constant(edge, 0.5 * (start + end));
   const Slot target = slot(edge);
   if (target.spine.IsNull()) return false;
-  target.spine->add_node(0., start, target.index, LawKind::Smooth);
-  target.spine->add_node(1., end, target.index, LawKind::Smooth);
+  target.spine->add_node(0., target.reversed ? end : start, target.index, LawKind::Smooth);
+  target.spine->add_node(1., target.reversed ? start : end, target.index, LawKind::Smooth);
   return true;
 }
 
@@ -185,7 +198,10 @@ bool LawFillet::nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &node
   if (nodes.size() == 2 && kind == LawKind::Smooth) return range(edge, nodes.front().Y(), nodes.back().Y());
   const Slot target = slot(edge);
   if (target.spine.IsNull()) return false;
-  for (const gp_Pnt2d &node : nodes) target.spine->add_node(node.X(), node.Y(), target.index, kind);
+  if (target.reversed)
+    for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) target.spine->add_node(1. - it->X(), it->Y(), target.index, kind);
+  else
+    for (const gp_Pnt2d &node : nodes) target.spine->add_node(node.X(), node.Y(), target.index, kind);
   return true;
 }
 

@@ -237,8 +237,12 @@ describeNative('BLD straight radius laws (native OCCT kernel)', () => {
    * radius there (to the 1e-6 readback of the section circle): one of the two ends of the first row equals one of the two ends of the second.
    * 7 of the 8 blends are read, so 6 junctions are seen.
    */
-  const expectContinuousChain = ({ rows: chain, edges }: { rows: Row[]; edges: readonly ShapeEdge[] }): void => {
-    expect(chain).toHaveLength(7);
+  const expectContinuousChain = (
+    { rows: chain, edges }: { rows: Row[]; edges: readonly ShapeEdge[] },
+    rowCount = 7,
+    junctionCount = 6,
+  ): void => {
+    expect(chain).toHaveLength(rowCount);
     const top = chain.map((row) => edges[row.contacts.find((contact) => /:z\+\)(#\d+)?$/.test(contact.name))?.edge ?? -1]);
     expect(top.every((edge) => edge !== undefined)).toBe(true);
     const near = (a: readonly number[] | undefined, b: readonly number[] | undefined): boolean =>
@@ -267,7 +271,7 @@ describeNative('BLD straight radius laws (native OCCT kernel)', () => {
         const gap = Math.abs(radiusAt(chain[a] as Row, first, shared) - radiusAt(chain[b] as Row, second, shared));
         expect(gap, `junction of rows ${a} and ${b}`).toBeLessThan(1e-5);
       }
-    expect(junctions).toBe(6);
+    expect(junctions).toBe(junctionCount);
   };
   const secondDifference = (row: Row): number => {
     const at = row.radius?.at ?? [];
@@ -287,28 +291,31 @@ describeNative('BLD straight radius laws (native OCCT kernel)', () => {
     expect(chain.rows.filter((row) => row.lawChecked === false && secondDifference(row) > 1e-4).length).toBeGreaterThan(0);
   });
 
-  it("a mixed chain (a straight law and a smooth one on the same rim): the straight edge is exact, the smooth one is OCCT's own S shape (equal to the all-smooth run to 1e-9), radius continuous", () => {
+  it("a mixed chain (a straight law and a smooth one on the same rim): the straight edge is exact, the smooth one is OCCT's own S shape (zero slope at both ends), radius continuous", () => {
     const { doc, id } = roundedSlab();
     const smoothLaw = { near: [20, 0, 6], size: 1, sizeEnd: 2 };
     const mixed = made(doc, 'fillet_edge', { id, edges: [{ near: [20, 30, 6], size: 1, sizeEnd: 2, interpolation: 'linear' }, smoothLaw] });
     expect(mixed.result.error).toBeUndefined();
     const chain = chainRows(mixed.doc, mixed.id);
-    expectContinuousChain(chain);
+    // with two laws on the rim every one of the 8 rim blends has a radius readback (the laws are read along the edges, 13.27) and the loop has 8 junctions
+    expectContinuousChain(chain, 8, 8);
     const straight = chain.rows.filter((row) => (row.radius?.at[1]?.value ?? 0) > 1.0999 && (row.radius?.at[1]?.value ?? 0) < 1.1001);
     expect(straight).toHaveLength(1);
     for (const point of straight[0]?.radius?.at ?? []) expect(Math.abs(point.value - (1 + point.t))).toBeLessThan(2e-5);
     // the smooth edge: OCCT's cubic with zero slope at the ends (1.04 at t = 0.1 against 1.1 on a line)
+    // (a row's readback runs along its contact line, which may run against its edge: the smooth edge reads 2 -> 1 here, with 1.972 at t = 0.1 where a line has 1.9)
     const isSmooth = (row: Row): boolean =>
-      Math.abs((row.radius?.at[0]?.value ?? 0) - 1) < 1e-5 && Math.abs((row.radius?.at[1]?.value ?? 0) - 1.1) > 0.03;
+      row.lawChecked === true &&
+      Math.abs((row.radius?.at[0]?.value ?? 0) - (row.radius?.at[10]?.value ?? 0)) > 0.5 &&
+      !straight.includes(row);
     const smooth = chain.rows.filter(isSmooth);
     expect(smooth).toHaveLength(1);
-    // the same rim with both edges smooth: the smooth edge's radius is the same row-for-row (same blend, same readback)
-    const allSmooth = made(doc, 'fillet_edge', { id, edges: [{ near: [20, 30, 6], size: 1, sizeEnd: 2 }, smoothLaw] });
-    expect(allSmooth.result.error).toBeUndefined();
-    const reference = chainRows(allSmooth.doc, allSmooth.id).rows[chain.rows.indexOf(smooth[0] as Row)];
-    expect(reference?.radius?.at).toHaveLength(11);
-    smooth[0]?.radius?.at.forEach((point, k) =>
-      expect(Math.abs(point.value - (reference?.radius?.at[k]?.value ?? Number.NaN))).toBeLessThan(1e-9),
-    );
+    // the smooth stretch is OCCT's spline through the nodes of the whole contour, so its shape depends on the neighbouring law (it is no longer the all-smooth shape row for row, 13.27): an S with zero slope at both ends and the two radii at its ends
+    const values = (smooth[0]?.radius?.at ?? []).map((point) => point.value);
+    expect(values).toHaveLength(11);
+    expect(Math.abs((values[0] ?? 0) - (values[10] ?? 0))).toBeCloseTo(1, 6);
+    expect(Math.abs((values[0] ?? 0) - (values[1] ?? 0))).toBeLessThan(0.05);
+    expect(Math.abs((values[10] ?? 0) - (values[9] ?? 0))).toBeLessThan(0.05);
+    expect(Math.abs((values[5] ?? 0) - 1.5)).toBeLessThan(1e-3);
   });
 });
