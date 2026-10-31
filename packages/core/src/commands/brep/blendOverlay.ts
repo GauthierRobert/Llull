@@ -2,6 +2,7 @@
 
 import { chamferNodes } from '../../geometry/blend/blendInfo';
 import { hasFillet } from '../../geometry/blend/continuity';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { is3D, type CadDocument, type Vec3 } from '../../model/types';
 import { currentContext } from '../context';
 import { report, tableRejection } from '../noop';
@@ -74,6 +75,10 @@ interface Checked {
   readonly notRunReason?: string;
 }
 
+/** The worse of two statuses (fail > warn > pass). */
+const worst = (a: OverlayStatus, b: OverlayStatus): OverlayStatus =>
+  a === 'fail' || b === 'fail' ? 'fail' : a === 'warn' || b === 'warn' ? 'warn' : 'pass';
+
 /** The worst severity of the findings that name this face and edge (a null edge: the findings of the face alone): fail, warn or pass (info is a pass). */
 function statusOfFindings(findings: readonly CheckedFinding[], face: number | null, edge: number | null): OverlayStatus {
   const own = findings.filter((found) => found.face === (face ?? undefined) && found.edge === (edge ?? undefined));
@@ -85,6 +90,7 @@ const emptyAnswer = (doc: CadDocument, summary: string, reason: string): Command
     status: 'not_run',
     lines: [],
     counts: { pass: 0, warn: 0, fail: 0, not_run: 0 },
+    blendsWithoutLines: 0,
     findings: [],
     firstFailure: null,
     notRunReason: reason,
@@ -92,8 +98,9 @@ const emptyAnswer = (doc: CadDocument, summary: string, reason: string): Command
   });
 
 /**
- * @affects none (read-only); data = { status, lines [{ role: contact | junction | corner | chamfer, edge, face, blend, profile, status: pass | warn | fail | not_run, angleRad, gap, deviation, points[] }], counts, findings [{ code, severity, face, edge, message }], firstFailure, notRunReason?, unit }
- * @invariant the readings are check_blends' own (run in-process on the same solid, never re-measured here): a line's status is the worst severity of the findings that name its edge, or a failing finding of its blend face alone (radius law); a blend row without a measurable line counts as one "not_run"; points are the kernel's edge samples
+ * @affects none (read-only); data = { status, lines [{ role: contact | junction | corner | chamfer, edge, face, blend, profile, status: pass | warn | fail | not_run, angleRad, gap, deviation, points[] }], counts, blendsWithoutLines, findings [{ code, severity, face, edge, message }], firstFailure, notRunReason?, unit }
+ * @invariant the readings are check_blends' own: checkBlends.run is called in-process on purpose (read-only, same tolerances, and it answers a missing kernel itself with notRunReason), never re-measured here; a line's status is the worst severity of the findings that name its edge and of the findings of its blend face alone (radius law; a face-level warn marks every line of the face); counts sum to lines.length (a line whose edge the kernel cannot sample is a "not_run" line with empty points); blend faces with no contact row are counted apart in blendsWithoutLines
+ * @invariant placement: points are the kernel's edge samples (kernel-local, the brep is before position / rotation) moved by the entity placement (rotation about the origin, then position, the rule of the viewport): world coordinates
  * @failure unknown id or not a solid -> SRF_ENTITY_NOT_FOUND; a solid without a blend, or no exact kernel -> status "not_run" with notRunReason (no error)
  */
 export const blendOverlay = defineCommand({
@@ -101,8 +108,8 @@ export const blendOverlay = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Geometry to DRAW the check_blends readings of one solid for review, in world coordinates (document units): data.lines [{ role: "contact" | "junction" | "corner" | "chamfer", edge, face, blend, profile ("star" | "patch" for a corner patch), ' +
-    'status: "pass" | "warn" | "fail" | "not_run", angleRad (largest angle between the outward normals on the line), gap, deviation (chamfer legs), points[] }], data.counts {pass, warn, fail, not_run}, data.findings (the first 20 warnings and failures of check_blends) and ' +
-    'data.firstFailure. The readings are those of check_blends (same tolerances, same findings): a line is "fail" when a failing finding names its edge, "warn" for a warning, else "pass"; a blend with no measurable contact counts as "not_run". ' +
+    'status: "pass" | "warn" | "fail" | "not_run", angleRad (largest angle between the outward normals on the line), gap, deviation (chamfer legs), points[] }], data.counts {pass, warn, fail, not_run} (they sum to the number of lines), data.blendsWithoutLines (blend faces with no contact to draw), data.findings (the first 20 warnings and failures of check_blends) and ' +
+    'data.firstFailure. The readings are those of check_blends (same tolerances, same findings): a line is "fail" when a failing finding names its edge, "warn" for a warning on its edge or on its blend face, else "pass"; a line the kernel cannot sample is "not_run" with no points. ' +
     'A solid without a blend, or no exact native kernel, answers status "not_run" with notRunReason. Read-only; nothing is stored. Next: check_blends for the numbers behind the picture.',
   params: z.object({
     id: z.string().describe('Id of the solid whose blends are drawn.'),
@@ -126,46 +133,54 @@ export const blendOverlay = defineCommand({
       return emptyAnswer(doc, `blend_overlay: '${params.id}' not drawn — ${reason}.`, reason);
     }
     const lines: BlendOverlayLine[] = [];
-    const pointsOf = (edge: number): Vec3[] => query.edgeSamples(shape, edge, count)?.map((sample) => sample.point) ?? [];
-    let rowsWithoutLines = 0;
+    const pointsOf = (edge: number): Vec3[] | null =>
+      query.edgeSamples(shape, edge, count)?.map((sample) => entityLocalToWorld(entity, sample.point)) ?? null;
+    let blendsWithoutLines = 0;
     for (const blend of data.blends) {
-      const faceFails = statusOfFindings(data.findings, blend.face, null) === 'fail';
+      const ofFace = statusOfFindings(data.findings, blend.face, null);
       const rows: Array<[OverlayRole, CheckedContact]> = [
         ...blend.contacts.map((contact): [OverlayRole, CheckedContact] => [blend.kind === 'corner' ? 'corner' : 'contact', contact]),
         ...(blend.junctions ?? []).map((junction): [OverlayRole, CheckedContact] => ['junction', junction]),
       ];
-      if (rows.length === 0) rowsWithoutLines += 1;
+      if (rows.length === 0) blendsWithoutLines += 1;
       for (const [role, contact] of rows) {
-        const own = statusOfFindings(data.findings, blend.face, contact.edge);
+        const points = pointsOf(contact.edge);
         lines.push({
           role,
           edge: contact.edge,
           face: blend.face,
           blend: blend.name,
           profile: blend.profile,
-          status: own === 'pass' && faceFails ? 'fail' : own,
+          status: points === null ? 'not_run' : worst(statusOfFindings(data.findings, blend.face, contact.edge), ofFace),
           angleRad: Math.max(contact.g1AngleRad, contact.g1EndAngleRad ?? 0),
           gap: contact.g0Gap,
           deviation: null,
-          points: pointsOf(contact.edge),
+          points: points ?? [],
         });
       }
     }
     for (const chamfer of data.chamfers ?? []) {
+      const points = pointsOf(chamfer.edge);
       lines.push({
         role: 'chamfer',
         edge: chamfer.edge,
         face: chamfer.face,
         blend: chamfer.name,
         profile: 'chamfer',
-        status: chamfer.note !== undefined ? 'not_run' : statusOfFindings(data.findings, chamfer.face, chamfer.edge),
+        status:
+          chamfer.note !== undefined || points === null
+            ? 'not_run'
+            : worst(
+                statusOfFindings(data.findings, chamfer.face, chamfer.edge),
+                chamfer.face === null ? 'pass' : statusOfFindings(data.findings, chamfer.face, null),
+              ),
         angleRad: null,
         gap: null,
         deviation: chamfer.maxDeviation,
-        points: pointsOf(chamfer.edge),
+        points: points ?? [],
       });
     }
-    const counts = { pass: 0, warn: 0, fail: 0, not_run: rowsWithoutLines };
+    const counts = { pass: 0, warn: 0, fail: 0, not_run: 0 };
     for (const line of lines) counts[line.status] += 1;
     const findings = data.findings
       .filter((found) => found.severity !== 'info')
@@ -180,11 +195,12 @@ export const blendOverlay = defineCommand({
     const firstFailure = findings.find((found) => found.severity === 'fail') ?? null;
     return report(
       doc,
-      `blend_overlay: '${params.id}' ${data.status} — ${lines.length} line(s): ${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail, ${counts.not_run} not run.`,
+      `blend_overlay: '${params.id}' ${data.status} — ${lines.length} line(s): ${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail, ${counts.not_run} not run${blendsWithoutLines > 0 ? `; ${blendsWithoutLines} blend face(s) without a contact to draw` : ''}.`,
       {
         status: data.status,
         lines,
         counts,
+        blendsWithoutLines,
         findings,
         firstFailure,
         ...(data.notRunReason === undefined ? {} : { notRunReason: data.notRunReason }),

@@ -16,6 +16,10 @@ export interface BlendOverlayView {
   readonly counts: Readonly<Record<OverlayStatus, number>>;
   /** The message of the first failing finding. */
   readonly firstFailure: string | null;
+  /** Lines of the answer that were damaged (unknown role, a point that is not 3 finite numbers, ...) and left out: counts are of the lines kept. */
+  readonly damaged: number;
+  /** Blend faces with no contact to draw (the command's blendsWithoutLines). */
+  readonly unmeasuredBlends: number;
   /** Why nothing could be read, when that is so. */
   readonly notRunReason: string | null;
 }
@@ -42,13 +46,16 @@ export function parseBlendOverlay(data: unknown): BlendOverlayView | null {
       ? [{ role: l['role'] as OverlayRole, edge: l['edge'], profile: l['profile'], status: l['status'], points: l['points'] as Vec3[] }]
       : [];
   });
-  const raw = (d['counts'] ?? {}) as Record<string, unknown>;
-  const count = (key: OverlayStatus): number => (typeof raw[key] === 'number' ? raw[key] : 0);
+  const counts: Record<OverlayStatus, number> = { pass: 0, warn: 0, fail: 0, not_run: 0 };
+  for (const line of lines) counts[line.status] += 1;
+  const unmeasured = d['blendsWithoutLines'];
   const failure = (d['firstFailure'] ?? null) as { message?: unknown } | null;
   return {
     status: d['status'],
     lines,
-    counts: { pass: count('pass'), warn: count('warn'), fail: count('fail'), not_run: count('not_run') },
+    counts,
+    damaged: (d['lines'] as unknown[]).length - lines.length,
+    unmeasuredBlends: typeof unmeasured === 'number' && Number.isFinite(unmeasured) && unmeasured > 0 ? Math.floor(unmeasured) : 0,
     firstFailure: typeof failure?.message === 'string' ? failure.message : null,
     notRunReason: typeof d['notRunReason'] === 'string' ? d['notRunReason'] : null,
   };
@@ -57,8 +64,13 @@ export function parseBlendOverlay(data: unknown): BlendOverlayView | null {
 /** The status line of a solid: the counts, then the first failing finding, or why nothing could be read. */
 export function statusLine(id: string, view: BlendOverlayView): string {
   const { pass, warn, fail, not_run } = view.counts;
-  if (view.lines.length === 0 && not_run === 0) return `${id}: ${view.notRunReason ?? 'no blend to review'}`;
-  const counted = `${id}: ${pass} pass, ${warn} warn, ${fail} fail, ${not_run} not run`;
+  if (view.lines.length === 0 && view.damaged === 0 && view.unmeasuredBlends === 0)
+    return `${id}: ${view.notRunReason ?? 'no blend to review'}`;
+  const notes = [
+    ...(view.unmeasuredBlends > 0 ? [`${view.unmeasuredBlends} blend face(s) without a contact to draw`] : []),
+    ...(view.damaged > 0 ? [`${view.damaged} damaged line(s) left out`] : []),
+  ];
+  const counted = `${id}: ${pass} pass, ${warn} warn, ${fail} fail, ${not_run} not run${notes.length === 0 ? '' : ` (${notes.join('; ')})`}`;
   return view.firstFailure === null ? counted : `${counted}. First failure: ${view.firstFailure}`;
 }
 

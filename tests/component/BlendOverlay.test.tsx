@@ -37,6 +37,7 @@ describe('ViewportControls - blend overlay toggle', () => {
     expect(button.tagName).toBe('BUTTON');
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.hasAttribute('aria-controls')).toBe(false);
     expect(screen.queryByLabelText('Blend overlay layers')).toBeNull();
     fireEvent.click(button);
     expect(button.getAttribute('aria-pressed')).toBe('true');
@@ -117,10 +118,17 @@ describe('blend overlay geometry from blend_overlay', () => {
         { role: 'nowhere', edge: 3, profile: 'x', status: 'pass', points: [] },
         null,
       ],
-      counts: { warn: 1 },
+      counts: { warn: 4, fail: 9 },
+      blendsWithoutLines: 2,
     });
     expect(view?.lines).toHaveLength(1);
-    expect(view?.counts.warn).toBe(1);
+    // the counts are those of the lines that are kept (the command's own are not trusted), the damaged ones are reported apart
+    expect(view?.counts).toEqual({ pass: 0, warn: 1, fail: 0, not_run: 0 });
+    expect(view?.damaged).toBe(3);
+    expect(view?.unmeasuredBlends).toBe(2);
+    expect(view && statusLine('s', view)).toBe(
+      's: 0 pass, 1 warn, 0 fail, 0 not run (2 blend face(s) without a contact to draw; 3 damaged line(s) left out)',
+    );
     const box = dispatchEntity('add_box', { size: [10, 10, 10] }).id;
     const bare = parseBlendOverlay(runQuery('blend_overlay', { id: box }).data);
     expect(bare && statusLine(box, bare)).toContain('no filleted or chamfered solid');

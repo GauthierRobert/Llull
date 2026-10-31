@@ -3,6 +3,7 @@
 import type { CadDocument } from '../../model/types';
 import { resolveFrame, toLocal } from '../../geometry/deform/frame';
 import { buildDeformOverlay } from '../../geometry/deform/overlay';
+import { placeDeformOverlay, placeWire } from '../../geometry/deform/placeOverlay';
 import { referenceWire } from '../../geometry/deform/referenceWire';
 import { referenceDistance } from '../../geometry/deform/referenceShape';
 import type { Vec3 } from '../../model/vectors';
@@ -35,7 +36,7 @@ function boundsOf(positions: ReadonlyArray<number>): { centre: Vec3; radius: num
 }
 
 /**
- * @affects none (read-only); data = frame axes, region planes, lattice net (rest and displaced), flow base / target curves, flow sheets, reference wire, all in world coordinates
+ * @affects none (read-only); data = frame axes, region planes, lattice net (rest and displaced), flow base / target curves, flow sheets, reference wire, all in world coordinates (the recipe frame is kernel-local, moved by the entity position / rotation)
  * @invariant computed on read from the recipe's outermost deform node and the mesh bounds, nothing stored; a viewport draws exactly these polylines (no geometry is derived in the UI)
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate recorded frame -> DEF_FRAME_DEGENERATE; compareTo missing a field -> DEF_COMPARE_INVALID
  */
@@ -102,8 +103,8 @@ export const deformOverlayQuery = defineCommand({
     return report(doc, `deform_overlay: '${id}' ${node.law.kind}: ${parts.join(', ')} (world coordinates, ${doc.units}).`, {
       id,
       unit: doc.units,
-      ...overlay,
-      reference,
+      ...placeDeformOverlay(entity, overlay),
+      reference: reference === null ? null : placeWire(entity, reference),
     });
   },
 });

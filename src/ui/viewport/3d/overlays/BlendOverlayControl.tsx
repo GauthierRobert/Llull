@@ -26,7 +26,7 @@ export function BlendOverlayControl(): React.ReactElement {
         aria-pressed={enabled}
         aria-label="Blend overlays"
         aria-expanded={enabled}
-        aria-controls={BLEND_OPTIONS_ID}
+        aria-controls={enabled ? BLEND_OPTIONS_ID : undefined}
         title={
           enabled
             ? 'Hide the blend review of the selected solids'

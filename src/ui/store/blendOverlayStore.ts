@@ -44,7 +44,7 @@ export const useBlendOverlayStore = create<BlendOverlayState>()((set) => ({
   status: {},
   setStatus: (id, lines) =>
     set((state) => {
-      const { [id]: _previous, ...rest } = state.status;
+      const rest = Object.fromEntries(Object.entries(state.status).filter(([key]) => key !== id));
       return { status: lines.length === 0 ? rest : { ...rest, [id]: lines } };
     }),
   setEnabled: (enabled) => set({ enabled }),

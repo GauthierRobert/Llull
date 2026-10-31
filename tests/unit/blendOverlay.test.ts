@@ -3,7 +3,8 @@
  * (the native values are checked in the desktop app). The readings are check_blends' own: the overlay never re-measures.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument, type Vec3 } from '@core/model/types';
+import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
@@ -23,6 +24,7 @@ type Overlay = {
   counts: Record<string, number>;
   findings: Array<{ code: string; severity: string; face: number | null; edge: number | null }>;
   firstFailure: { code: string; edge: number | null } | null;
+  blendsWithoutLines: number;
   notRunReason?: string;
 };
 
@@ -155,7 +157,7 @@ describe('blend_overlay', () => {
     expect(dataOf(result).notRunReason).toContain('no filleted');
   });
 
-  it('a blend face with no contact line counts as one not_run', () => {
+  it('a blend face with no contact line is counted apart (blendsWithoutLines), never as a line: counts sum to the lines', () => {
     const kernel = scriptedKernel({
       topology: CHAIN_TOPOLOGY,
       graph: { faces: [], edgeFaces: [[], [], [], []], edgeConvexity: [] } as unknown as FaceGraph,
@@ -164,7 +166,8 @@ describe('blend_overlay', () => {
     const filleted = execute(box.document, 'fillet_edge', { id: box.affected[0], radius: 1 }, ctxOf(kernel));
     const data = dataOf(execute(filleted.document, 'blend_overlay', { id: filleted.affected[0] }, ctxOf(kernel)));
     expect(data.lines).toEqual([]);
-    expect(data.counts.not_run).toBeGreaterThan(0);
+    expect(data.counts).toEqual({ pass: 0, warn: 0, fail: 0, not_run: 0 });
+    expect(data.blendsWithoutLines).toBeGreaterThan(0);
   });
 });
 
@@ -205,7 +208,7 @@ describe('blend_overlay corner patches and chamfers', () => {
 
   const chamferDoc = (): CadDocument => ({
     ...createEmptyDocument(),
-    entities: { m: { ...entityOf(chamfer()), mesh: { positions: [], indices: [] } } as never },
+    entities: { m: { ...entityOf(chamfer()), position: [0, 0, 0], rotation: [0, 0, 0], mesh: { positions: [], indices: [] } } as never },
     order: ['m'],
   });
 
@@ -281,5 +284,77 @@ describe('blend_overlay radius law', () => {
     expect(data.lines.length).toBeGreaterThan(0);
     expect(data.lines.every((found) => found.status === 'fail')).toBe(true);
     expect(data.firstFailure?.code).toBe('BLD_CHECK_RADIUS_LAW');
+  });
+});
+
+describe('blend_overlay placement and consistency', () => {
+  const PLACEMENT = { position: [5, -3, 2] as Vec3, rotation: [0.3, -0.5, 0.8] as Vec3 };
+  const moved = (doc: CadDocument, id: string, placement: { position: Vec3; rotation: Vec3 }): CadDocument => ({
+    ...doc,
+    entities: { ...doc.entities, [id]: { ...doc.entities[id], ...placement } as never },
+  });
+
+  it('the points of a moved and rotated solid are the entity placement of the kernel-local points; a translation alone is a plain offset', () => {
+    const { doc, result } = overlayOf(() => 0, { samples: 4 });
+    const id = Object.keys(doc.entities)[0] as string;
+    const local = dataOf(result).lines;
+    expect(local.length).toBeGreaterThan(0);
+    const context = ctxOf(chainKernel(() => 0));
+    const placedDoc = moved(doc, id, PLACEMENT);
+    const placed = dataOf(execute(placedDoc, 'blend_overlay', { id, samples: 4 }, context)).lines;
+    expect(placed.map((line) => line.edge)).toEqual(local.map((line) => line.edge));
+    placed.forEach((line, k) => {
+      const expected = (local[k]?.points ?? []).map((point) => entityLocalToWorld(placedDoc.entities[id] as never, point));
+      expect(line.points).toHaveLength(expected.length);
+      line.points.forEach((point, at) =>
+        point.forEach((value, axis) => expect(value).toBeCloseTo((expected[at] as Vec3)[axis] as number, 9)),
+      );
+    });
+    expect(placed[0]?.points[0]).not.toEqual(local[0]?.points[0]);
+    const shifted = dataOf(
+      execute(moved(doc, id, { position: [10, 20, 30], rotation: [0, 0, 0] }), 'blend_overlay', { id, samples: 4 }, context),
+    ).lines;
+    expect(shifted[0]?.points[1]).toEqual((local[0]?.points[1] as Vec3).map((v, axis) => v + [10, 20, 30][axis]!));
+  });
+
+  it('a line whose edge the kernel cannot sample is a not_run line with no points; counts still sum to the lines', () => {
+    const base = chainKernel(() => 0);
+    const kernel: GeometryKernel = {
+      ...base,
+      faceQuery: {
+        ...base.faceQuery!,
+        edgeSamples: (shape, edge, count) => (edge === 2 ? null : base.faceQuery!.edgeSamples(shape, edge, count)),
+      },
+    };
+    const box = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
+    const done = execute(box.document, 'fillet_edge', { id: box.affected[0], ...CHAIN_FILLET }, ctxOf(base));
+    const data = dataOf(execute(done.document, 'blend_overlay', { id: done.affected[0] }, ctxOf(kernel)));
+    expect(data.lines.map((line) => [line.edge, line.status, line.points.length > 0])).toEqual([
+      [0, 'pass', true],
+      [2, 'not_run', false],
+      [1, 'pass', true],
+    ]);
+    const sum = Object.values(data.counts).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(data.lines.length);
+  });
+
+  it('a face-level warning (a junction the kernel could not read) marks the lines of that face warn, and counts sum to the lines', () => {
+    const base = chainKernel(() => 0);
+    const kernel: GeometryKernel = {
+      ...base,
+      faceQuery: {
+        ...base.faceQuery!,
+        edgeContinuity: (shape, edge, count) => (edge === 2 ? null : base.faceQuery!.edgeContinuity(shape, edge, count)),
+      },
+    };
+    const box = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
+    const done = execute(box.document, 'fillet_edge', { id: box.affected[0], ...CHAIN_FILLET }, ctxOf(base));
+    const data = dataOf(execute(done.document, 'blend_overlay', { id: done.affected[0] }, ctxOf(kernel)));
+    const faceWarns = data.findings.filter((found) => found.severity === 'warn' && found.edge === null && found.face !== null);
+    expect(faceWarns.length).toBeGreaterThan(0);
+    const warned = data.lines.filter((line) => faceWarns.some((found) => found.face === line.face));
+    expect(warned.length).toBeGreaterThan(0);
+    expect(warned.every((line) => line.status === 'warn')).toBe(true);
+    expect(Object.values(data.counts).reduce((a, b) => a + b, 0)).toBe(data.lines.length);
   });
 });
