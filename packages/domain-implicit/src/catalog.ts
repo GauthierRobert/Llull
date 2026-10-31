@@ -16,6 +16,7 @@ import { deleteField, regenerateImplicitBodies } from './lifecycleCommands';
 import { combineFields, offsetField, shellField, transformField } from './opCommands';
 import { addFieldPrimitive } from './primitiveCommand';
 import { implicitProperties } from './propertiesQuery';
+import { implicitGpuProgram } from './gpuProgramCommand';
 import { createScalarField } from './scalarCommand';
 import { sectionField } from './sectionCommand';
 import { fieldFromSolid } from './solidCommand';
@@ -39,6 +40,7 @@ const bareCommands = commandCatalog(
   regenerateImplicitBodies,
   evaluateField,
   implicitProperties,
+  implicitGpuProgram,
   latticeProperties,
   sectionField,
   checkImplicit,
