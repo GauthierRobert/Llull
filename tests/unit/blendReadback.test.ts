@@ -277,6 +277,57 @@ describe('radius law over a setback blend (checkRadius)', () => {
   });
 });
 
+describe('radius law over a curved source edge (checkRadius reads the spine position on an edge of uneven speed)', () => {
+  // a quarter circle of radius 10 from (10, 0) to (0, 10); the edge runs at an uneven speed (its parameter t is at the arc fraction t^2) and the sections are uniform in that parameter
+  const at = (u: number, scale = 1): [number, number, number] => [
+    10 * scale * Math.cos((Math.PI / 2) * u),
+    10 * scale * Math.sin((Math.PI / 2) * u),
+    2.5,
+  ];
+  const edges = [
+    edgeOf(0, { name: 'e(blend|a)', start: at(0, 0.9), end: at(1, 0.9), mid: at(0.5, 0.9) }),
+    edgeOf(1, { name: 'e(blend|b)', start: at(0, 1.1), end: at(1, 1.1), mid: at(0.5, 1.1) }),
+    edgeOf(2, { name: 'end', start: at(1, 3), end: at(1, 4), mid: at(1, 3.5) }),
+    edgeOf(3, { name: SOURCE_EDGE, curve: 'circle', start: at(0), end: at(1), mid: at(0.5) }),
+  ];
+  const sections =
+    (radius: (u: number) => number, speed: (t: number) => number) =>
+    (_face: number, count: number): BlendSection[] =>
+      Array.from({ length: count }, (_, k) => {
+        const u = speed(k / (count - 1));
+        return { t: k / (count - 1), a: at(u, 0.9), mid: at(u, 0.95), b: at(u, 1.1), radius: radius(u), centre: at(u, 0.9) };
+      });
+  const squared = (t: number): number => t * t;
+  const run = (law: EdgeRadius, radius: (u: number) => number, speed = squared): ReturnType<typeof checkRadius> => {
+    const kernel = scriptedKernel({
+      topology: { ...TOPOLOGY, edges },
+      graph: GRAPH,
+      g1: () => 0,
+      sections: sections(radius, speed),
+      edgePoint: (_edge, t) => at(speed(t)),
+    });
+    const shape = {} as ShapeHandle;
+    const record: LawRecord = { node: 0, law, shape, topology: { ...TOPOLOGY, edges }, edge: 3, chain: new Set(), setback: false };
+    return checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
+  };
+  const linear: EdgeRadius = { size: 1, sizeEnd: 2, interpolation: 'linear' };
+
+  it('a radius that follows the law in the ARC length is met although the sections are uniform in the edge parameter', () => {
+    expect(run(linear, (u) => 1 + u)).toMatchObject({ lawChecked: true, deviations: [] });
+  });
+
+  it('an edge of steady speed keeps the fraction along the first contact edge (the sections are not projected)', () => {
+    const steady = (t: number): number => t;
+    expect(run(linear, (u) => 1 + u, steady)).toMatchObject({ lawChecked: true, deviations: [] });
+    expect(run(linear, (u) => 1 + 0.5 * u, steady).deviations.length).toBeGreaterThan(5);
+  });
+
+  it('a radius that follows the law in the parameter instead, or another law, is reported', () => {
+    expect(run(linear, (u) => 1 + Math.sqrt(u)).deviations.length).toBeGreaterThan(5);
+    expect(run(linear, (u) => 1 + 0.5 * u).deviations.length).toBeGreaterThan(5);
+  });
+});
+
 describe('blendInfo helpers', () => {
   it('blendFaceContacts: the blend face with its two contact edges; faces without both contacts are skipped', () => {
     const found = blendFaceContacts(TOPOLOGY, GRAPH);

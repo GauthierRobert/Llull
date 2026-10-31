@@ -30,6 +30,10 @@ const sig = (value: number): number => roundSignificant(value, 10);
 
 /** Sections read per blend face (min, max and the law comparison come from this grid). */
 const FINE_SECTIONS = 101;
+/** Samples of the source edge the sections are placed on (the arc fraction of a section is read between two of them). */
+const SPINE_SAMPLES = 1001;
+/** Largest gap between the parameter fraction and the arc fraction of an edge still read as a steady speed (a line, a circle). */
+const STEADY_SPEED = 1e-5;
 /** Relative deviation from the law above which the blend is off the law (named default, TECHNICAL_SPEC §7.1). */
 export const RADIUS_LAW_TOLERANCE = 1e-4;
 
@@ -164,6 +168,36 @@ function directionOf(
   return sameDirection(sections, (t) => kernel.faceQuery?.edgeSamples(shape, edge, 5)?.[Math.round(t * 4)]?.point ?? null);
 }
 
+/**
+ * Arc fraction along the source edge (0 at its start) of the spine point each section belongs to, for an edge that does not run at a steady speed (an
+ * ellipse, a B-spline: its parameter fraction is not its arc fraction by more than STEADY_SPEED); null for an edge of steady speed (the fraction along the
+ * first contact edge is then the arc fraction) or one the kernel cannot sample. A section lies in the plane normal to the spine, so the edge point nearest
+ * to its mid point is its spine point. The fraction along a contact edge is not the law's abscissa there: the law is placed on the edge parameter
+ * (law_fillet.cxx), and the contact edge's own arc fraction is the spine offset by about the radius (measured on an elliptic rim: 3% ahead).
+ */
+function spineFractions(kernel: GeometryKernel, record: LawRecord, sections: readonly BlendSection[]): number[] | null {
+  const { shape, edge } = record;
+  const samples = shape === undefined || edge === undefined ? null : (kernel.faceQuery?.edgeSamples?.(shape, edge, SPINE_SAMPLES) ?? null);
+  if (samples === null || samples.length < 2) return null;
+  const point = (k: number, axis: number): number => samples[k]?.point[axis] ?? 0;
+  const arc = samples.map((sample) => sample.s);
+  const total = arc[arc.length - 1] ?? 0;
+  if (!(total > 0) || arc.every((length, k) => Math.abs(length / total - k / (arc.length - 1)) < STEADY_SPEED)) return null;
+  return sections.map((section) => {
+    let best = { gap: Number.POSITIVE_INFINITY, s: 0 };
+    for (let k = 0; k + 1 < samples.length; k++) {
+      const along = [0, 1, 2].map((axis) => point(k + 1, axis) - point(k, axis));
+      const toward = [0, 1, 2].map((axis) => (section.mid[axis] ?? 0) - point(k, axis));
+      const length2 = along.reduce((sum, value) => sum + value * value, 0);
+      const dot = along.reduce((sum, value, axis) => sum + value * (toward[axis] ?? 0), 0);
+      const share = length2 > 0 ? Math.min(1, Math.max(0, dot / length2)) : 0;
+      const gap = Math.hypot(...along.map((value, axis) => share * value - (toward[axis] ?? 0)));
+      if (gap < best.gap) best = { gap, s: (arc[k] ?? 0) + share * ((arc[k + 1] ?? 0) - (arc[k] ?? 0)) };
+    }
+    return best.s / total;
+  });
+}
+
 /** The radius along `blend` at `samples` uniform fractions plus the law's control points, and its deviation from the law. */
 export function checkRadius(
   kernel: GeometryKernel,
@@ -197,12 +231,18 @@ export function checkRadius(
   const exact = exactParameters(record.law);
   const parameters = exact === 'all' || span !== null ? Array.from({ length: 21 }, (_, k) => k / 20) : exact;
   const deviations: RadiusFinding[] = [];
+  // an edge of uneven speed: the law is read at the spine position of each section, not at the fraction along the first contact edge
+  const spine =
+    span === null && record.topology?.edges[record.edge ?? -1]?.curve !== 'line' ? spineFractions(kernel, record, sections) : null;
+  const onSpine = spine === null ? null : fine.map((sample, k) => ({ t: spine[k] ?? 0, radius: sample.radius })).sort((a, b) => a.t - b.t);
   for (const u of parameters) {
     // without a span `u` is the position on the edge; with one it is the position on the blend, mapped onto the edge fractions the blend covers
     const t = span !== null ? u : direction ? u : 1 - u;
     const onEdge = span === null ? u : span.forward ? span.lo + u * (span.hi - span.lo) : span.hi - u * (span.hi - span.lo);
-    const expected = radiusAt(record.law, onEdge);
-    const actual = radiusAtT(fine, t);
+    // the blend covers [first, last] of the edge: a station beyond it is read at the blend end (its own spine position), not clamped against the law there
+    const at = onSpine === null ? onEdge : Math.min(Math.max(onEdge, onSpine[0]?.t ?? 0), onSpine[onSpine.length - 1]?.t ?? 1);
+    const expected = radiusAt(record.law, at);
+    const actual = onSpine === null ? radiusAtT(fine, t) : radiusAtT(onSpine, at);
     if (Math.abs(actual - expected) > RADIUS_LAW_TOLERANCE * expected)
       deviations.push({
         face: blend.face,

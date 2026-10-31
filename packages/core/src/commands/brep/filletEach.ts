@@ -127,6 +127,16 @@ function resolveChain(
   request: FilletRequest,
   chain: ChainInput,
 ): Resolution {
+  const unsupported =
+    request.mode === 'chord' ? 'mode' : request.profile !== undefined ? 'profile' : request.corners !== undefined ? 'corners' : null;
+  if (unsupported !== null)
+    return {
+      refusal: {
+        code: 'BLD_CHAIN_UNSUPPORTED',
+        message: `chain runs one radius law over the chain: it does not combine with ${unsupported} (chord sizes, profile blends and setback corners are per edge); drop ${unsupported} or drop chain`,
+        path: unsupported,
+      },
+    };
   if (request.edges !== undefined) return { problem: 'chain takes the selected edges (edgeIndices / edgesNear / edgeNames), not edges[]' };
   const picked = selectEdges(topology, request.edgeIndices, request.edgesNear);
   if ('problem' in picked) return { problem: picked.problem };

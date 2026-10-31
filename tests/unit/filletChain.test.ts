@@ -198,4 +198,25 @@ describe('fillet_edge chain', () => {
     const closed = run(kernel, doc, { id, edgeIndices: [0, 1], radius: 1, chain: {} });
     expect(closed.rejected, closed.summary).toBeUndefined();
   });
+
+  it('chain does not combine with chord sizes, a profile or setback corners: BLD_CHAIN_UNSUPPORTED at the named path, the document unchanged', () => {
+    const { kernel, laws } = scripted(LINE);
+    const { doc, id } = box();
+    const base = { id, edgeIndices: [0, 1, 2], radius: 1, radiusEnd: 3, chain: {} };
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ mode: 'chord' }, 'mode'],
+      [{ profile: { type: 'conic', rho: 0.5 } }, 'profile'],
+      [{ corners: [{ all: true, type: 'setback', setback: 1 }] }, 'corners'],
+    ];
+    for (const [extra, path] of cases) {
+      const result = run(kernel, doc, { ...base, ...extra });
+      expect(result.rejected, path).toBe(true);
+      expect(result.error?.code, path).toBe('BLD_CHAIN_UNSUPPORTED');
+      expect(result.error?.paths, path).toEqual([path]);
+      expect(result.summary).toContain('does not combine with ' + path);
+      expect(result.document).toBe(doc);
+      expect(result.affected).toEqual([]);
+    }
+    expect(laws).toHaveLength(0);
+  });
 });

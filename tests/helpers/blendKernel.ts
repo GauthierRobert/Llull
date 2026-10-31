@@ -88,12 +88,15 @@ export function scriptedKernel(script: BlendScript = {}): ScriptedKernel {
             g1: (script.g1 ?? (() => Math.PI / 2))(edge, k / (count - 1)),
             normalCurvature: [0, 0] as [number, number],
           })),
-    edgeSamples: (_shape: unknown, edge: number, count: number) =>
-      Array.from({ length: count }, (_, k) => ({
-        t: k / (count - 1),
-        point: (script.edgePoint ?? ((_e, t) => [20 * t, 0, 0]))(edge, k / (count - 1)),
-        tangent: [1, 0, 0],
-      })),
+    edgeSamples: (_shape: unknown, edge: number, count: number) => {
+      const points = Array.from({ length: count }, (_, k) => (script.edgePoint ?? ((_e, t) => [20 * t, 0, 0]))(edge, k / (count - 1)));
+      let arc = 0;
+      return points.map((point, k) => {
+        const before = points[k - 1];
+        arc += before === undefined ? 0 : Math.hypot(point[0] - before[0], point[1] - before[1], point[2] - before[2]);
+        return { t: k / (count - 1), s: arc, point, tangent: [1, 0, 0] };
+      });
+    },
     distance: (_shape: unknown, points: ReadonlyArray<readonly [number, number, number]>) =>
       script.faceAt === null
         ? null

@@ -176,7 +176,7 @@ export const filletEdge = defineCommand({
     radiusEnd: z
       .number()
       .describe(
-        'Variable fillet: radius at the END of each selected edge (> 0), document units; the radius varies from radius at the edge start to radiusEnd ' +
+        'Variable fillet: radius at the END of each selected edge (> 0; with chain: at the end of the whole chain), document units; the radius varies from radius at the edge start to radiusEnd ' +
           '(the kernel smooth transition, flattened at both ends; use edges[] with interpolation "linear" for a straight one). Omit for a constant radius. Not allowed on a closed edge unless equal to radius (BLD_LAW_NOT_PERIODIC).',
       )
       .optional(),
