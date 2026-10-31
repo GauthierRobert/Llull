@@ -20,6 +20,7 @@ import {
 } from '../../geometry/blend/blendInfo';
 import { blendSource } from '../../geometry/blend/continuity';
 import { controlParameters, radiusAt } from '../../geometry/blend/law';
+import { spineStations } from './spineStations';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { BlendSection } from '../../geometry/kernelPorts';
@@ -30,6 +31,8 @@ const sig = (value: number): number => roundSignificant(value, 10);
 
 /** Sections read per blend face (min, max and the law comparison come from this grid). */
 const FINE_SECTIONS = 101;
+/** A closed edge: how far past the covered span (a fraction of the edge) a law position still belongs to it. */
+const LAP_SLACK = 0.02;
 /** Relative deviation from the law above which the blend is off the law (named default, TECHNICAL_SPEC §7.1). */
 export const RADIUS_LAW_TOLERANCE = 1e-4;
 
@@ -52,6 +55,8 @@ export interface RadiusCheck {
   /** The law was compared with the blend (false: not comparable, or the kernel cannot section). */
   readonly lawChecked: boolean;
   readonly deviations: readonly RadiusFinding[];
+  /** Why the law was not compared although the blend was read (absent when it was, or when the law is not comparable by design: a profile, a chain, a setback). */
+  readonly lawNote?: string;
 }
 
 export interface LawRecord {
@@ -209,12 +214,36 @@ export function checkRadius(
   const exact = exactParameters(record.law);
   const parameters = exact === 'all' || span !== null ? Array.from({ length: 21 }, (_, k) => k / 20) : exact;
   const deviations: RadiusFinding[] = [];
+  // a curved edge carries a position-dependent law at the spine position of each section when the KERNEL says it runs at an uneven speed (its own decision, ShapeEdge.unevenSpeed)
+  const info = record.topology?.edges[record.edge ?? -1];
+  const positioned = span === null && !constantLaw(record.law) && info !== undefined && info.curve !== 'line';
+  const unchecked = (lawNote: string): RadiusCheck => ({ radius, lawChecked: false, deviations: [], lawNote });
+  if (positioned && info.unevenSpeed === undefined)
+    return unchecked(
+      `edge ${record.edge} is curved and the kernel does not report whether it runs at a steady speed, so the law is not read along it`,
+    );
+  const read =
+    positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
+      ? spineStations(kernel, record.shape, record.edge, info, sections)
+      : null;
+  if (read !== null && 'reason' in read) return unchecked(read.reason);
+  const onSpine =
+    read === null ? null : fine.map((sample, k) => ({ t: read.stations[k] ?? 0, radius: sample.radius })).sort((x, y) => x.t - y.t);
   for (const u of parameters) {
     // without a span `u` is the position on the edge; with one it is the position on the blend, mapped onto the edge fractions the blend covers
     const t = span !== null ? u : direction ? u : 1 - u;
     const onEdge = span === null ? u : span.forward ? span.lo + u * (span.hi - span.lo) : span.hi - u * (span.hi - span.lo);
-    const expected = radiusAt(record.law, onEdge);
-    const actual = radiusAtT(fine, t);
+    // the blend covers [first, last] of the edge: a station beyond it is read at the blend end (its own spine position), not clamped against the law there
+    // (a closed edge: the lap of the unwrapped stations that holds the law position, the seam read from the side the blend is on)
+    const first = onSpine?.[0]?.t ?? 0;
+    const last = onSpine?.[onSpine.length - 1]?.t ?? 1;
+    const lap =
+      read?.closed === true
+        ? ([onEdge, onEdge - 1, onEdge + 1].find((c) => c >= first - LAP_SLACK && c <= last + LAP_SLACK) ?? onEdge)
+        : onEdge;
+    const at = onSpine === null ? onEdge : Math.min(Math.max(lap, first), last);
+    const expected = radiusAt(record.law, read?.closed === true ? (at < 0 ? at + 1 : at > 1 ? at - 1 : at) : at);
+    const actual = onSpine === null ? radiusAtT(fine, t) : radiusAtT(onSpine, at);
     if (Math.abs(actual - expected) > RADIUS_LAW_TOLERANCE * expected)
       deviations.push({
         face: blend.face,
