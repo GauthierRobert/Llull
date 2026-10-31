@@ -464,7 +464,7 @@ unverified, provenance { method, formula, reference, kernel, inputs } }`. Mass /
 | M1 (MVP mesh)  | `scale_nonuniform` (exact affine on the native kernel from day one: GTransform is a few lines), `twist_body`, `taper_body`, `stretch_body`, `bend_body` on Manifold and without a kernel; `analyze_deformation`, `check_deformation`; golden plans | M0                          | 4                  |
 | M2 (MVP exact) | `deform.cxx` WarpModification + adaptors + approximation + splitting + validity + capability `deform`; host wire; server tests; STEP of results                                                                                                    | M1, native toolchain (SV1)  | 5                  |
 | M3 (V1)        | `deform_lattice`, `deform_by_point`, `flow_along_curve`, curves / sheets path, `ids` multi-body, `keepSource`                                                                                                                                      | M2                          | 4                  |
-| M4 (V1)        | `flow_on_surface` (sheet and face targets), `preserveAnalytic`, UI overlays (frame, region, lattice, curves, sheets, reference wire; done §18; the Jacobian map is deferred)                                                                       | M3                          | 3                  |
+| M4 (V1)        | `flow_on_surface` (sheet and face targets), `preserveAnalytic`, UI overlays (frame, region, lattice, curves, sheets, reference wire; done §18; the Jacobian map: §18.1)                                                                       | M3                          | 3                  |
 | M5 (V2)        | `deform_curve_to_curve` (RBF / thin-plate displacement fitted to curve pairs, then the generic warp), `morph_bodies`, B-spline lattices and oriented boxes                                                                                         | M4; 04 DIR for drag handles | 3                  |
 
 Total ≈ 21 eng-weeks. Cross-pack: 04 DIR commits these commands from drag gestures; 03 WRP may reuse `geometry/deform/flow.ts` for
@@ -1101,3 +1101,20 @@ flow-on-surface sheets (target and base grids), a typed torus reference wire. **
 curves (in the app the target at x = 200 showed as a thin line and the base was not seen in the framing used).
 
 **Review fixes (DES-1c).** `compareTo` is validated by `referenceDistance` before it is drawn: a missing or unusable field (non-positive radius, a torus with `minorRadius >= majorRadius`, a zero axis or normal, a cone half angle outside 0 to 90) is `DEF_COMPARE_INVALID` naming the field, for `deform_overlay` and `analyze_deformation` alike. The reference text is queried 250 ms after typing stops, the last drawing stays on screen while the next answer loads, and each field shows why it is unusable (`aria-invalid`).
+
+### 18.1 Jacobian map (DES-1c, 2026-10-31)
+
+**Command.** `deform_jacobian_map` (read-only, `readsMeshTriangles`; toolset 3d): `{ id }` re-refines the SOURCE of the entity's outermost `deform` node with the mesh warp, exactly as the deformation did
+(`warpMesh`; its result now also returns `restPositions`, the rest point of every vertex), and returns `positions` (deformed body, flat world xyz), `indices`, `determinant` (det J of the node's map at each vertex's rest point),
+`min`, `max`, `folded` (vertices with det J <= `floor` = `JACOBIAN_FLOOR` 1e-6) and `floor`. On the exact (kernel) path the map is sampled on the mesh-path refinement of the same node, which approximates the exact body to the node tolerance.
+The refinement is capped at 500000 triangles (about 250000 vertices, about 30 MB of JSON). Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_SOURCE_UNAVAILABLE`, and the warp's `DEF_BUDGET_EXCEEDED` / `DEF_APPROX_TOLERANCE`.
+A chain of deformations reports the OUTERMOST map's determinant (the composed one is the product, `analyze_deformation` gives the closed-form range of the node).
+
+**UI.** A "Det J" layer of the Deform popover (off by default, queried only while on): `overlays/JacobianMap.tsx` draws the answer as a vertex-coloured mesh over the body (`jacobianColors.ts`: log scale, grey at 1, red towards 2,
+blue towards 0.5, magenta at or below the floor = folded), and the popover legend lists, per drawn body, `det J min .. max` and the folded count (or the refusal summary). UI state only, no command changes the document.
+
+**Tests.** `tests/unit/deform/jacobianMap.test.ts` (twist = 1 everywhere and the vertices equal the stored mesh; stretch; taper range 0.25 .. 1; a recipe edited to fold flags `folded` > 0; refusals; pure),
+`tests/unit/ui/jacobianColors.test.ts`, `tests/component/JacobianMap.test.tsx`.
+
+**Verified in the desktop app** (Electron 38): a 40 x 40 x 120 mm box tapered to 0.4 over z 20..100 shows grey at the base shading to blue towards the narrow end, legend `det J 0.160 .. 1.00, 0 folded`.
+Folds cannot be produced through the commands (they refuse `DEF_FOLDOVER`), so the magenta colour is verified by tests only.

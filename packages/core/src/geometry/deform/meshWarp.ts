@@ -60,6 +60,8 @@ function evaluationCost(node: DeformNode): number {
 export interface WarpResult {
   readonly ok: true;
   readonly mesh: MeshData;
+  /** The rest position of every vertex of `mesh` (flat xyz, same vertex order): the point the map was evaluated at. */
+  readonly restPositions: number[];
   /** Triangles of the welded source before refinement. */
   readonly sourceTriangles: number;
   /** Longest edge allowed by the refinement bound (Infinity: none needed). */
@@ -362,7 +364,7 @@ function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions):
     moved[v * 3 + 2] = p[2];
   }
   const indices = reversesOrientation(node) ? flipped(soup.indices) : soup.indices;
-  return { ok: true, mesh: { positions: moved, indices }, sourceTriangles, edgeLength, maxChordError };
+  return { ok: true, mesh: { positions: moved, indices }, restPositions: soup.positions, sourceTriangles, edgeLength, maxChordError };
 }
 
 export interface WarpEstimate {

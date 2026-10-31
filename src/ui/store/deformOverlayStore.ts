@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 
-export type DeformLayer = 'frame' | 'region' | 'lattice' | 'flow' | 'sheet' | 'reference';
+export type DeformLayer = 'frame' | 'region' | 'lattice' | 'flow' | 'sheet' | 'reference' | 'jacobian';
 
 export const DEFORM_LAYERS: ReadonlyArray<{ value: DeformLayer; label: string; title: string }> = [
   { value: 'frame', label: 'Frame', title: 'The deformation frame: x red, y green, z (the axis) blue' },
@@ -20,6 +20,12 @@ export const DEFORM_LAYERS: ReadonlyArray<{ value: DeformLayer; label: string; t
   { value: 'flow', label: 'Curves', title: 'flow_along_curve: the target curve (green) and the base curve (cyan)' },
   { value: 'sheet', label: 'Sheets', title: 'flow_on_surface: the target sheet nodes (green) and the base sheet (cyan)' },
   { value: 'reference', label: 'Reference', title: 'The analytic reference shape of the comparison, drawn as a wire' },
+  {
+    value: 'jacobian',
+    label: 'Det J',
+    title:
+      'Jacobian map: det J of the deformation at every vertex of the body (grey = volume kept, red = stretched, blue = compressed, magenta = folded)',
+  },
 ];
 
 /** What the user typed for the reference shape: the kind and the text of each field. */
@@ -28,21 +34,35 @@ export interface ReferenceDraft {
   readonly fields: Readonly<Record<string, string>>;
 }
 
+/** What the Jacobian map of one body reports: its range and folded vertices, or why it could not be computed. */
+export type JacobianStats =
+  | { readonly min: number | null; readonly max: number | null; readonly folded: number }
+  | { readonly failure: string };
+
 interface DeformOverlayState {
   /** The master switch: nothing is drawn (and nothing is queried) while it is off. */
   enabled: boolean;
   layers: Readonly<Record<DeformLayer, boolean>>;
   reference: ReferenceDraft | null;
+  /** Jacobian map summary per drawn entity id (set by the map itself while it is drawn). */
+  jacobian: Readonly<Record<string, JacobianStats>>;
   setEnabled(enabled: boolean): void;
   setLayer(layer: DeformLayer, on: boolean): void;
   setReference(reference: ReferenceDraft | null): void;
+  setJacobian(id: string, stats: JacobianStats | null): void;
 }
 
 export const useDeformOverlayStore = create<DeformOverlayState>()((set) => ({
   enabled: false,
-  layers: { frame: true, region: true, lattice: true, flow: true, sheet: true, reference: true },
+  layers: { frame: true, region: true, lattice: true, flow: true, sheet: true, reference: true, jacobian: false },
   reference: null,
+  jacobian: {},
   setEnabled: (enabled) => set({ enabled }),
   setLayer: (layer, on) => set((state) => ({ layers: { ...state.layers, [layer]: on } })),
   setReference: (reference) => set({ reference }),
+  setJacobian: (id, stats) =>
+    set((state) => {
+      const { [id]: _dropped, ...rest } = state.jacobian;
+      return { jacobian: stats === null ? rest : { ...rest, [id]: stats } };
+    }),
 }));

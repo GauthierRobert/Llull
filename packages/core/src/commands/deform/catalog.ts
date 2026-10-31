@@ -7,6 +7,7 @@ import { checkDeformation } from './checkDeformation';
 import { deformByPoint } from './deformByPoint';
 import { deformCurveToCurve } from './deformCurveToCurve';
 import { deformLattice } from './deformLattice';
+import { deformJacobianMap } from './deformJacobianMap';
 import { deformOverlayQuery } from './deformOverlay';
 import { flowAlongCurve } from './flowAlongCurve';
 import { flowOnSurface } from './flowOnSurface';
@@ -30,5 +31,6 @@ export const deformCommands = commandCatalog(
   morphBodies,
   analyzeDeformation,
   deformOverlayQuery,
+  deformJacobianMap,
   checkDeformation,
 );
