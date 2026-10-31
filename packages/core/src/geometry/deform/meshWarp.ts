@@ -11,7 +11,7 @@ import { type DeformNode, warpOf } from './laws';
 import { localExtentOf, maxEdgeLength, splitHeights } from './bounds';
 import { toLocal } from './frame';
 import { edgeActive, featureEdgeLength } from './influence';
-import { meshDiagonal, weldMesh } from '../mesh/weld';
+import { type WeldedMesh, meshDiagonal, weldMesh } from '../mesh/weld';
 
 /** Triangles above which the mesh path refuses (01 DEF §5.7). */
 export const MAX_WARP_TRIANGLES = 4_000_000;
@@ -271,7 +271,7 @@ function chordError(soup: Soup, point: (p: Vec3) => Vec3): number {
 }
 
 /** Whether the law reverses orientation everywhere (negative affine determinant). */
-function reversesOrientation(node: DeformNode): boolean {
+export function reversesOrientation(node: DeformNode): boolean {
   const warp = warpOf(node);
   return warp !== null && node.law.kind === 'affine' && warp.determinant([0, 0, 0]) < 0;
 }
@@ -281,8 +281,8 @@ function reversesOrientation(node: DeformNode): boolean {
  * @failure degenerate frame -> DEF_FRAME_DEGENERATE; more than `maxTriangles` after (or estimated before) refinement, or work above MAX_EVALUATIONS predicted before a pass -> DEF_BUDGET_EXCEEDED; deviation that does not fall with the edge length (jump, fold) -> DEF_APPROX_TOLERANCE
  */
 export function warpMesh(source: MeshData, node: DeformNode, options: WarpOptions): WarpResult | WarpFailure {
-  // a refused warp is asked again by the host to name the refusal (the mesh kernel warps, fails, then the command re-warps to read why): the refusal of the same node on the same mesh is remembered
-  const key = `${options.tolerance}|${options.maxTriangles ?? ''}|${fingerprint(source.positions)}`;
+  // a refused warp is asked again by the host to name the refusal (the mesh kernel warps, fails, then the command re-warps to read why): the refusal of the same node on the same mesh and attributes is remembered
+  const key = `${options.tolerance}|${options.maxTriangles ?? ''}|${fingerprint(source.positions)}|${(options.attributes ?? []).map(fingerprint).join(',')}`;
   const known = refusals.get(node);
   if (known?.key === key) return known.failure;
   const result = warpUncached(source, node, options);
@@ -303,6 +303,39 @@ function fingerprint(positions: ReadonlyArray<number>): string {
   return `${positions.length}:${sum}:${squares}`;
 }
 
+/** Two source vertices welded into one whose attributes differ by more than this fraction of the attribute's bounding diagonal are a collapse (fold, seam, taper to a point), not one point. */
+const ATTRIBUTE_MERGE_TOLERANCE = 1e-4;
+
+/**
+ * The attributes of the welded vertices, by index through the weld's remap (the welded vertex takes the attribute of the source vertex it copies).
+ * @failure a weld joined source vertices whose attributes differ by more than ATTRIBUTE_MERGE_TOLERANCE of the attribute's size (the map collapses distinct rest points onto one position) -> DEF_APPROX_TOLERANCE
+ */
+function carryAttributes(attributes: ReadonlyArray<ReadonlyArray<number>>, welded: WeldedMesh): number[][] | WarpFailure {
+  const count = welded.positions.length / 3;
+  const carried: number[][] = [];
+  for (const [index, attribute] of attributes.entries()) {
+    const limit = ATTRIBUTE_MERGE_TOLERANCE * meshDiagonal(attribute);
+    const out = new Array<number>(3 * count);
+    for (let w = 0; w < count; w++) {
+      const from = at(attribute, welded.origin[w] as number);
+      out[3 * w] = from[0];
+      out[3 * w + 1] = from[1];
+      out[3 * w + 2] = from[2];
+    }
+    for (let s = 0; s < welded.remap.length; s++) {
+      const w = welded.remap[s] as number;
+      if (w < 0 || distance(at(attribute, s), at(out, w)) <= limit) continue;
+      return {
+        ok: false,
+        code: 'DEF_APPROX_TOLERANCE',
+        message: `the inner deformation collapses distinct points onto one position (vertex ${s} of the input mesh shares a position with vertex ${welded.origin[w]} but its rest point in input space ${index} is ${distance(at(attribute, s), at(out, w)).toPrecision(3)} away): a fold, a seam or a taper to a point, so the composed determinant is not defined there`,
+      };
+    }
+    carried.push(out);
+  }
+  return carried;
+}
+
 function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions): WarpResult | WarpFailure {
   const warp = warpOf(node);
   if (warp === null)
@@ -311,21 +344,9 @@ function warpUncached(source: MeshData, node: DeformNode, options: WarpOptions):
   const welded = weldMesh(source, 1e-7 * meshDiagonal(source.positions));
   const soup: Soup = { positions: welded.positions, indices: welded.triangles };
   if (options.attributes !== undefined && options.attributes.length > 0) {
-    // the welded vertices are copies of source vertices (first come wins): find each one by its exact coordinates
-    const bySource = new Map<string, number>();
-    for (let v = 0; v < source.positions.length / 3; v++) {
-      const key = `${source.positions[v * 3]},${source.positions[v * 3 + 1]},${source.positions[v * 3 + 2]}`;
-      if (!bySource.has(key)) bySource.set(key, v);
-    }
-    soup.attributes = options.attributes.map((attribute) => {
-      const carried: number[] = [];
-      for (let v = 0; v < soup.positions.length / 3; v++) {
-        const found = bySource.get(`${soup.positions[v * 3]},${soup.positions[v * 3 + 1]},${soup.positions[v * 3 + 2]}`);
-        const from = found === undefined ? at(soup.positions, v) : at(attribute, found);
-        carried.push(from[0], from[1], from[2]);
-      }
-      return carried;
-    });
+    const carried = carryAttributes(options.attributes, welded);
+    if ('ok' in carried) return carried;
+    soup.attributes = carried;
   }
   const sourceTriangles = soup.indices.length / 3;
   const extent = localExtentOf(warp.frame, soup.positions);

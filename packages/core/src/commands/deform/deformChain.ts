@@ -24,23 +24,38 @@ export interface ChainFailure {
   readonly message: string;
 }
 
+/** What bounds the re-run of the inner nodes: the triangles each may refine to, and a factor on every node's own tolerance (the display coarsening, see deform_jacobian_map). */
+export interface ChainLimits {
+  readonly maxTriangles?: number;
+  readonly coarsen?: number;
+}
+
 export const isChainFailure = (value: DeformChain | ChainFailure): value is ChainFailure => 'code' in value;
 
 /**
- * The chain under `recipe`: for a `deform` node the inner chain warped by it (mesh path, at the node's own tolerance, rest positions carried); for any other recipe its triangles
+ * The chain under `recipe`: for a `deform` node the inner chain warped by it (mesh path, at the node's own tolerance times `limits.coarsen`, refused above `limits.maxTriangles`, rest positions carried); for any other recipe its triangles
  * (kernel or core) with no stage.
  * @failure the base body cannot be rebuilt -> DEF_SOURCE_UNAVAILABLE; an inner node the mesh warp refuses -> its code (DEF_BUDGET_EXCEEDED, DEF_APPROX_TOLERANCE, DEF_FRAME_DEGENERATE)
  */
-export function chainOf(kernel: GeometryKernel | null, recipe: ShapeRecipe, doc: CadDocument): DeformChain | ChainFailure {
+export function chainOf(
+  kernel: GeometryKernel | null,
+  recipe: ShapeRecipe,
+  doc: CadDocument,
+  limits: ChainLimits = {},
+): DeformChain | ChainFailure {
   if (recipe.op !== 'deform') {
     const mesh = sourceMeshOf(kernel, recipe, doc);
     return mesh === null
       ? { code: 'DEF_SOURCE_UNAVAILABLE', message: 'the deformation source cannot be rebuilt without a geometry kernel' }
       : { mesh, stages: [], nodes: [] };
   }
-  const inner = chainOf(kernel, recipe.source, doc);
+  const inner = chainOf(kernel, recipe.source, doc, limits);
   if (isChainFailure(inner)) return inner;
-  const warped = warpMesh(inner.mesh, recipe, { tolerance: recipe.output.tolerance, attributes: inner.stages });
+  const warped = warpMesh(inner.mesh, recipe, {
+    tolerance: recipe.output.tolerance * (limits.coarsen ?? 1),
+    ...(limits.maxTriangles === undefined ? {} : { maxTriangles: limits.maxTriangles }),
+    attributes: inner.stages,
+  });
   if (!warped.ok) return { code: warped.code, message: warped.message };
   return { mesh: warped.mesh, stages: [...warped.attributes, warped.restPositions], nodes: [...inner.nodes, recipe] };
 }
