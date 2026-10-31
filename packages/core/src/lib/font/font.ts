@@ -8,13 +8,13 @@
 import { readCff } from './cff';
 import { FONT_OPERATOR_BUDGET } from './type2';
 import { buildCmap } from './cmap';
-import { glyphContours, phantomAdvanceDelta, type GlyphSource } from './glyf';
+import { glyphContours, phantomAdvanceDeltas, type GlyphSource } from './glyf';
 import { readGvar } from './gvar';
 import { readMetricDeltas } from './mvar';
 import { buildGposKerning } from './gpos';
 import { buildKerning } from './kern';
 import { isStrokeFont, readStrokeFont } from './stroke';
-import { readAdvanceDeltas, readVariationSpace, type AxisValues, type VariationAxis } from './variation';
+import { readAdvanceDeltas, readVariationSpace, readVerticalAdvanceDeltas, type AxisValues, type VariationAxis } from './variation';
 import type { Vec2 } from '../../model/vectors';
 import { contourLoop, loopBox, type OutlineLoop } from './outline';
 import { FontError, type FontErrorCode } from './reader';
@@ -24,8 +24,10 @@ import {
   readDirectory,
   readHeader,
   readNames,
+  readNameStrings,
   readPermissions,
   requireTable,
+  verticalAdvanceOf,
   type Embedding,
   type FontNames,
 } from './sfnt';
@@ -52,10 +54,14 @@ export interface ParsedFont {
   readonly capHeightSource: 'os2' | 'glyph_H' | 'declared';
   readonly embedding: Embedding;
   readonly names: FontNames;
+  /** The named instances of `fvar` with a name in the `name` table, in `fvar` order: what `instance` (import_font) picks by name. */
+  readonly namedInstances: readonly NamedInstance[];
   /** Variation axes of the font (`fvar`), empty for a static font. */
   readonly axes: readonly VariationAxis[];
   /** The instance this font was read at: the axes that differ from their default, in tag order (empty = the default instance). */
   readonly instance: Readonly<Record<string, number>>;
+  /** Advance height in font units (`vmtx` + `VVAR`, or the phantom points of a gvar font; ascender - descender without vertical metrics). */
+  readonly verticalAdvance: (glyph: number) => number;
   /** Glyph index of a code point; 0 (`.notdef`) when the font has none. */
   readonly glyphIndex: (codePoint: number) => number;
   readonly advance: (glyph: number) => number;
@@ -66,6 +72,15 @@ export interface ParsedFont {
   /** Reads every glyph once without keeping it; throws `FontError` for a hostile glyph. */
   readonly scanGlyphs: () => void;
 }
+
+/** A named instance of a variable font: its subfamily name (e.g. `Bold`), its PostScript name when the font gives one, and the design value of every axis. */
+export interface NamedInstance {
+  readonly name: string;
+  readonly postScriptName: string | null;
+  readonly variation: Readonly<Record<string, number>>;
+}
+
+const sameName = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export type FontParse =
   | { readonly ok: true; readonly font: ParsedFont }
@@ -87,16 +102,18 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
     embedding: 'installable',
     names: font.names,
     axes: [],
+    namedInstances: [],
     instance: {},
     glyphIndex: font.glyphIndex,
     advance: font.advance,
+    verticalAdvance: () => font.ascender - font.descender,
     kerning: () => 0,
     outline: () => [],
     scanGlyphs: () => undefined,
   };
 }
 
-function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
+function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | undefined): ParsedFont {
   if (bytes.length > MAX_FONT_BYTES)
     throw new FontError('WRP_FONT_TOO_LARGE', `font: ${bytes.length} bytes exceed the ${MAX_FONT_BYTES}-byte limit`);
   if (isStrokeFont(bytes)) return buildStroke(bytes);
@@ -104,6 +121,34 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   const header = readHeader(tables);
   const permissions = readPermissions(tables);
   const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
+  const strings = readNameStrings(tables);
+  const namedInstances: NamedInstance[] = (space?.instances ?? []).flatMap((record) => {
+    const name = strings.get(record.subfamilyNameId);
+    return name === undefined
+      ? []
+      : [
+          {
+            name,
+            postScriptName: record.postScriptNameId === null ? null : (strings.get(record.postScriptNameId) ?? null),
+            variation: record.coordinates,
+          },
+        ];
+  });
+  let variation = asked;
+  if (instanceName !== undefined) {
+    if (Object.keys(asked).length > 0)
+      throw new FontError('WRP_FONT_VARIATION', 'variation: give the axis values or a named instance, not both');
+    const found = namedInstances.find(
+      (candidate) =>
+        sameName(candidate.name, instanceName) || (candidate.postScriptName !== null && sameName(candidate.postScriptName, instanceName)),
+    );
+    if (found === undefined)
+      throw new FontError(
+        'WRP_FONT_VARIATION',
+        `variation: the font has no named instance '${instanceName}' (named instances: ${namedInstances.map((candidate) => candidate.name).join(', ') || 'none'})`,
+      );
+    variation = found.variation;
+  }
   const cffTable = tables.flavor === 'cff' ? (tables.table('CFF ') ?? requireTable(tables, 'CFF2')) : null;
   const variable = cffTable !== null && cffTable.u8(0) === 2;
   const gvarTable = cffTable === null ? tables.table('gvar') : null;
@@ -125,8 +170,12 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   const mvar = varying && moved ? tables.table('MVAR') : null;
   const metricDeltas = mvar === null ? new Map<string, number>() : readMetricDeltas(mvar, coords);
   const metric = (tag: string): number => Math.round(metricDeltas.get(tag) ?? 0);
+  const vvar = varying ? tables.table('VVAR') : null;
+  const verticalDelta = vvar === null || !moved ? null : readVerticalAdvanceDeltas(vvar, coords);
   const advances = new Map<number, number>();
+  const heights = new Map<number, number>();
   const advanceWork = { remaining: FONT_OPERATOR_BUDGET };
+  const phantoms = new Map<number, ReturnType<typeof phantomAdvanceDeltas>>();
   const source: GlyphSource | null =
     cff === null
       ? {
@@ -142,6 +191,15 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   if (source !== null && source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
     throw new FontError('WRP_FONT_PARSE', 'loca: shorter than its glyph count requires');
   const glyphIndex = buildCmap(requireTable(tables, 'cmap'), header.numGlyphs);
+  /** The phantom-point advance variations of a glyph (one read per glyph, charged to one budget for the font). */
+  const phantomsOf = (glyph: number): ReturnType<typeof phantomAdvanceDeltas> => {
+    let known = phantoms.get(glyph);
+    if (known === undefined) {
+      known = phantomAdvanceDeltas(source as GlyphSource, glyph, advanceWork);
+      phantoms.set(glyph, known);
+    }
+    return known;
+  };
   const cache = new Map<number, readonly OutlineLoop[]>();
   const loopsOf = (glyph: number): readonly OutlineLoop[] =>
     cff !== null ? cff.outline(glyph) : glyphContours(source as GlyphSource, glyph).map(contourLoop);
@@ -187,11 +245,25 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
           ? Math.round(base + advanceDelta(glyph))
           : source?.variation === undefined
             ? base
-            : Math.round(base + phantomAdvanceDelta(source, glyph, advanceWork));
+            : Math.round(base + phantomsOf(glyph).width);
       advances.set(glyph, advance);
       return advance;
     },
+    verticalAdvance: (glyph) => {
+      const known = heights.get(glyph);
+      if (known !== undefined) return known;
+      const base = verticalAdvanceOf(tables, header, glyph) ?? header.ascender - header.descender;
+      const height =
+        verticalDelta !== null
+          ? Math.round(base + verticalDelta(glyph))
+          : source?.variation === undefined
+            ? base
+            : Math.round(base + phantomsOf(glyph).height);
+      heights.set(glyph, height);
+      return height;
+    },
     axes: space?.axes ?? [],
+    namedInstances,
     instance,
     kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
     outline,
@@ -210,9 +282,9 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
 }
 
 /** Parse `bytes`; see the module comment for the failure codes. Glyph outlines are read on first use and may then throw `FontError` for a hostile glyph. */
-export function parseFont(bytes: Uint8Array, variation: AxisValues = {}): FontParse {
+export function parseFont(bytes: Uint8Array, variation: AxisValues = {}, instance?: string): FontParse {
   try {
-    return { ok: true, font: build(bytes, variation) };
+    return { ok: true, font: build(bytes, variation, instance) };
   } catch (error) {
     if (error instanceof FontError) return { ok: false, code: error.code, message: error.message };
     return { ok: false, code: 'WRP_FONT_PARSE', message: `font: ${error instanceof Error ? error.message : 'unreadable'}` };

@@ -9,7 +9,7 @@ import { blobBytes, makeBinaryBlob, withBlob } from '../../model/blobs';
 import type { CadDocument } from '../../model/types';
 import type { DocumentBlob } from '../../model/types';
 import type { FontRecord } from '../../model/fonts';
-import { parseFont, validateGlyphs, type ParsedFont } from '../../lib/font/font';
+import { parseFont, validateGlyphs, type ParsedFont, type NamedInstance } from '../../lib/font/font';
 import type { AxisValues, VariationAxis } from '../../lib/font/variation';
 import type { FontErrorCode } from '../../lib/font/reader';
 import { sha256Hex } from '../../lib/sha256';
@@ -65,6 +65,8 @@ export interface RegisterOptions {
   readonly source?: string | undefined;
   /** Axis values (design units) of the instance to record; omitted or all-default = the default instance. */
   readonly variation?: AxisValues | undefined;
+  /** A named instance of the variable font (subfamily or PostScript name) instead of axis values. */
+  readonly instance?: string | undefined;
 }
 
 export interface Registered {
@@ -74,6 +76,8 @@ export interface Registered {
   readonly existing: boolean;
   readonly glyphs: number;
   readonly axes: readonly VariationAxis[];
+  /** The named instances of the font (the names `instance` accepts). */
+  readonly namedInstances: readonly NamedInstance[];
 }
 
 /**
@@ -81,7 +85,7 @@ export interface Registered {
  * @failure not a font, unsupported format, restricted embedding, too large, hostile glyph -> FontFailure
  */
 export function registerFont(doc: CadDocument, bytes: Uint8Array, options: RegisterOptions): Registered | FontFailure {
-  const parsed = parseFont(bytes, options.variation);
+  const parsed = parseFont(bytes, options.variation, options.instance);
   if (!parsed.ok) return { code: parsed.code, message: parsed.message };
   const scan = validateGlyphs(parsed.font);
   if (!scan.ok) return { code: scan.code, message: scan.message };
@@ -96,7 +100,8 @@ function addRecord(doc: CadDocument, blob: DocumentBlob, font: ParsedFont, optio
   const known = Object.values(doc.fonts ?? {}).find(
     (record) => record.blob === blob.sha256 && JSON.stringify(record.variation ?? {}) === JSON.stringify(instance),
   );
-  if (known !== undefined) return { document: doc, record: known, existing: true, glyphs: font.numGlyphs, axes: font.axes };
+  if (known !== undefined)
+    return { document: doc, record: known, existing: true, glyphs: font.numGlyphs, axes: font.axes, namedInstances: font.namedInstances };
   const licence = options.licence ?? font.names.licence;
   const record: FontRecord = {
     id: nextId('font'),
@@ -113,7 +118,7 @@ function addRecord(doc: CadDocument, blob: DocumentBlob, font: ParsedFont, optio
     provenance: { verified: options.verified, ...(options.source !== undefined ? { source: options.source } : {}) },
   };
   const document = withBlob({ ...doc, fonts: { ...doc.fonts, [record.id]: record } }, blob);
-  return { document, record, existing: false, glyphs: font.numGlyphs, axes: font.axes };
+  return { document, record, existing: false, glyphs: font.numGlyphs, axes: font.axes, namedInstances: font.namedInstances };
 }
 
 /**

@@ -82,6 +82,20 @@ export function readHeader(tables: SfntTables): FontHeader {
   };
 }
 
+/**
+ * Advance height (font units) of glyph `glyph` from `vhea` / `vmtx`, or null when the font has no vertical metrics.
+ * @failure a `vmtx` shorter than `vhea` says -> WRP_FONT_PARSE
+ */
+export function verticalAdvanceOf(tables: SfntTables, header: FontHeader, glyph: number): number | null {
+  const vhea = tables.table('vhea');
+  const vmtx = tables.table('vmtx');
+  if (vhea === null || vmtx === null) return null;
+  const count = vhea.u16(34);
+  if (count === 0 || count > header.numGlyphs) throw parseError(`vhea: ${count} vertical metrics for ${header.numGlyphs} glyphs`);
+  if (vmtx.length < 4 * count + 2 * (header.numGlyphs - count)) throw parseError('vmtx: shorter than its glyph count requires');
+  return vmtx.u16(4 * Math.min(glyph, count - 1));
+}
+
 /** Advance width (font units) of glyph `glyph`. */
 export function advanceOf(tables: SfntTables, header: FontHeader, glyph: number): number {
   const hmtx = requireTable(tables, 'hmtx');
@@ -119,8 +133,8 @@ export interface FontNames {
   readonly licence?: string;
 }
 
-/** Name records of a platform: Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII. */
-export function readNames(tables: SfntTables): FontNames {
+/** The strings of the `name` table by name id (at most 512 records, 256 characters each): Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII, a Windows string wins over a Macintosh one of the same id. */
+export function readNameStrings(tables: SfntTables): ReadonlyMap<number, string> {
   const name = tables.table('name');
   const found = new Map<number, string>();
   if (name !== null) {
@@ -138,6 +152,12 @@ export function readNames(tables: SfntTables): FontNames {
       if (text.length > 0) found.set(id, text.slice(0, 256));
     }
   }
+  return found;
+}
+
+/** The family, style and licence of the font. */
+export function readNames(tables: SfntTables): FontNames {
+  const found = readNameStrings(tables);
   const licence = found.get(13);
   return {
     family: found.get(16) ?? found.get(1) ?? 'Unknown',

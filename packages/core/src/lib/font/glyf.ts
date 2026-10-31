@@ -215,11 +215,17 @@ export function glyphContours(source: GlyphSource, glyph: number, work?: { remai
 }
 
 /**
- * The horizontal advance variation of `glyph` from its `gvar` phantom points (the second minus the first), for a font without `HVAR`: 0 for a glyph without variation data.
+ * The advance variations of `glyph` from its `gvar` phantom points: the width (the second phantom point minus the first, for a font without `HVAR`) and the height (the third minus the fourth,
+ * for a font without `VVAR`); both 0 for a glyph without variation data.
  * @failure a damaged glyph or table -> WRP_FONT_PARSE
  */
-export function phantomAdvanceDelta(source: GlyphSource, glyph: number, work?: { remaining: number }): number {
-  if (source.variation === undefined) return 0;
+export function phantomAdvanceDeltas(
+  source: GlyphSource,
+  glyph: number,
+  work?: { remaining: number },
+): { readonly width: number; readonly height: number } {
+  const none = { width: 0, height: 0 };
+  if (source.variation === undefined) return none;
   const [start, end] = range(source, glyph);
   const budget: Budget = { points: 0, components: 0, work: undefined };
   let points: GlyphPoints;
@@ -236,7 +242,10 @@ export function phantomAdvanceDelta(source: GlyphSource, glyph: number, work?: {
     }
   }
   const deltas = source.variation.gvar.deltas(glyph, source.variation.coords, points, work);
-  if (deltas === null) return 0;
+  if (deltas === null) return none;
   const phantom = points.xs.length;
-  return (deltas.dx[phantom + 1] as number) - (deltas.dx[phantom] as number);
+  return {
+    width: (deltas.dx[phantom + 1] as number) - (deltas.dx[phantom] as number),
+    height: (deltas.dy[phantom + 2] as number) - (deltas.dy[phantom + 3] as number),
+  };
 }

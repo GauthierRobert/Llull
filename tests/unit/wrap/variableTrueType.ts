@@ -2,6 +2,7 @@
 
 import { buildFvar, buildHvar, type AxisSpec, type StoreSpec } from './cff2Builder';
 import { buildFont, type GlyphPointSpec } from './fontBuilder';
+import { buildFvarWithInstances, buildVhea, buildVmtx, buildVvar } from './vvarBuilder';
 import { buildAvar2, buildGvar, buildMvar, type GvarSpec, type TupleSpec } from './gvarBuilder';
 
 const AXES: readonly AxisSpec[] = [
@@ -9,6 +10,7 @@ const AXES: readonly AxisSpec[] = [
   { tag: 'wdth', min: 75, default: 100, max: 125 },
 ];
 /** Shared tuples: wght+, wght-, wdth+. */
+export const AXES_OF_THE_FONT = AXES;
 export const SHARED = [
   [1, 0],
   [-1, 0],
@@ -67,6 +69,7 @@ export interface Options {
   readonly gvar?: Partial<GvarSpec>;
   readonly tables?: Record<string, readonly number[]>;
   readonly omit?: readonly string[];
+  readonly names?: ReadonlyArray<{ readonly platform: 1 | 3; readonly id: number; readonly text: string }>;
 }
 
 export function variable(options: Options = {}): Uint8Array {
@@ -100,6 +103,7 @@ export function variable(options: Options = {}): Uint8Array {
       ...options.tables,
     },
     ...(options.omit === undefined ? {} : { omit: options.omit }),
+    ...(options.names === undefined ? {} : { names: options.names }),
   });
 }
 
@@ -141,6 +145,23 @@ export function variableTrueTypeWithMetrics(): Uint8Array {
         store,
       ),
       HVAR: buildHvar(store),
+      VVAR: buildVvar(store, [0, 1, 2, 3, 3]),
+      vhea: buildVhea(5),
+      vmtx: buildVmtx([1000, 1100, 1200, 1300, 1400], 5),
+      fvar: buildFvarWithInstances(
+        AXES,
+        [
+          { subfamily: 258, postScript: 260, coordinates: [200, 100] },
+          { subfamily: 259, postScript: 261, coordinates: [700, 90] },
+        ],
+        true,
+      ),
     },
+    names: [
+      { platform: 3, id: 258, text: 'Light' },
+      { platform: 3, id: 259, text: 'Bold Condensed' },
+      { platform: 3, id: 260, text: 'Test-Light' },
+      { platform: 3, id: 261, text: 'Test-BoldCondensed' },
+    ],
   });
 }
