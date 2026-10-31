@@ -124,7 +124,8 @@ fn a_kink_and_a_narrow_feature_of_a_straight_radius_law_are_followed_whatever_th
     let (block, edge) = block_and_edge();
     let whole = volume(&block);
     // (name, laws: start, end, straight pieces, count, then (t, size) per control point; the same as the points of the closed form)
-    let cases: [(&str, Vec<f64>, Vec<(f64, f64)>); 3] = [
+    type Case = (&'static str, Vec<f64>, Vec<(f64, f64)>);
+    let cases: [Case; 3] = [
         // a kink at t = 0.3137: not on the grid of 48 probes
         ("kink", vec![1.0, 1.0, 1.0, 1.0, 0.3137, 2.0], vec![(0.0, 1.0), (0.3137, 2.0), (1.0, 1.0)]),
         // a spike 0.2 mm wide (0.01 of the edge) centred ON the probe 23 / 48 (t = 0.4792), which no station of the uniform set (j / 24) is on: only the probe grid sees it (between probes it is missed, see the test below)
