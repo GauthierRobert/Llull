@@ -6,7 +6,7 @@ import { add3 } from '../../lib/vec3';
 import { type LocalFrame, toWorld } from './frame';
 import { fromBoxCoordinates, restPosition } from './lattice';
 
-export interface FrameOverlay {
+interface FrameOverlay {
   readonly origin: Vec3;
   readonly x: Vec3;
   readonly y: Vec3;
@@ -15,7 +15,7 @@ export interface FrameOverlay {
   readonly length: number;
 }
 
-export interface RegionOverlay {
+interface RegionOverlay {
   readonly start: number;
   readonly end: number;
   readonly infinite: boolean;
@@ -27,7 +27,7 @@ export interface RegionOverlay {
   readonly radius: number;
 }
 
-export interface LatticeOverlay {
+interface LatticeOverlay {
   readonly degrees: readonly [number, number, number];
   /** Null: a Bernstein lattice; else the B-spline degrees. */
   readonly splineDegrees: readonly [number, number, number] | null;
@@ -42,13 +42,13 @@ export interface LatticeOverlay {
   readonly displaced: number;
 }
 
-export interface FlowOverlay {
+interface FlowOverlay {
   /** The stations of the target curve (world), and of the base curve when the flow has one. */
   readonly target: Vec3[];
   readonly base: Vec3[] | null;
 }
 
-export interface SheetOverlay {
+interface SheetOverlay {
   readonly nx: number;
   readonly ny: number;
   /** The nodes of the target sheet and of the base sheet (world, i-major) the flow tabulates; the base is null for a base plane. */

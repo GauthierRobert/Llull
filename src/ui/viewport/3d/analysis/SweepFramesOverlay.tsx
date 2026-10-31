@@ -19,7 +19,7 @@ const AXIS_COLORS = { tangent: '#e5484d', normal: '#30a46c', binormal: '#3e63dd'
 const OUTLINE_COLOR = '#f5a524';
 
 /** Lines drawn depth-tested, plus a faint second pass without depth so the parts behind the solid stay readable. */
-function Segments({ positions, color }: { positions: Float32Array; color: string }): React.ReactElement | null {
+export function Segments({ positions, color }: { positions: Float32Array; color: string }): React.ReactElement | null {
   const geometry = useDisposable(() => positionsGeometry(positions), [positions]);
   const front = useDisposable(() => new THREE.LineBasicMaterial({ color }), [color]);
   const behind = useDisposable(

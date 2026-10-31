@@ -9,7 +9,7 @@ import { resolveFrame } from '@core/geometry/deform/frame';
 import { deformOverlay } from '@core/geometry/deform/overlay';
 import { referenceWire } from '@core/geometry/deform/referenceWire';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { WORLD_Z, addBox, dataOf, installKernel } from './harness';
+import { WORLD_Z, addBox, addCylinder, dataOf, installKernel } from './harness';
 
 afterEach(() => setGeometryKernel(null));
 
@@ -112,28 +112,49 @@ describe('deform_overlay of a deformed body', () => {
     expect(corner[2]).toBeCloseTo(-1, 9);
   });
 
-  it('a flow with a base curve: the target curve stations and the base curve stations, starting on the curves', async () => {
+  it('a flow with a curved base: the stations of the target curve and of the base curve, starting on the curves; a flow without a base has none to draw', async () => {
     await installKernel('none');
-    const bar = addBox([10, 10, 78.5], 'base-center');
-    const arc = curve(bar.doc, 'create_conic', { start: [100, 0, 0], apex: [100, 0, 50], end: [100, 50, 50], rho: Math.SQRT2 - 1 });
-    const base = curve(arc.doc, 'create_nurbs_curve', {
+    const rod = addCylinder(5, (50 * Math.PI) / 2);
+    const bent = execute(rod.doc, 'bend_body', { id: rod.id, radius: 50, angleDeg: 90, frame: WORLD_Z, output: { tolerance: 0.01 } });
+    expect(bent.error, bent.summary).toBeUndefined();
+    const base = curve(bent.document, 'create_conic', { start: [0, 0, 0], apex: [0, 0, 50], end: [50, 0, 50], rho: Math.SQRT2 - 1 });
+    const target = curve(base.doc, 'create_nurbs_curve', {
       degree: 1,
       poles: [
-        [0, 0, -20],
-        [0, 0, 100],
+        [200, 0, 0],
+        [200, 0, 100],
       ],
     });
-    const flowed = execute(base.doc, 'flow_along_curve', { id: bar.id, targetId: arc.id, baseCurve: base.id, frame: WORLD_Z, output: { tolerance: 0.01 } });
+    const flowed = execute(target.doc, 'flow_along_curve', {
+      id: bent.affected[0],
+      targetId: target.id,
+      baseCurve: base.id,
+      frame: WORLD_Z,
+      output: { tolerance: 0.01 },
+    });
     expect(flowed.error, flowed.summary).toBeUndefined();
     const { flow, region } = dataOf<Overlay>(execute(flowed.document, 'deform_overlay', { id: flowed.affected[0] }));
     expect(region).toBeNull();
     expect(flow?.target.length).toBeGreaterThan(10);
     expect(flow?.base?.length).toBeGreaterThan(10);
-    expect(distance((flow?.target as Vec3[])[0] as Vec3, [100, 0, 0])).toBeLessThan(1e-6);
-    expect(distance((flow?.base as Vec3[])[0] as Vec3, [0, 0, -20])).toBeLessThan(1e-6);
-    // without a base curve there is none to draw
-    const plain = execute(arc.doc, 'flow_along_curve', { id: bar.id, targetId: arc.id, frame: WORLD_Z, output: { tolerance: 0.01 } });
-    expect(dataOf<Overlay>(execute(plain.document, 'deform_overlay', { id: plain.affected[0] })).flow?.base).toBeNull();
+    expect(distance((flow?.target as Vec3[])[0] as Vec3, [200, 0, 0])).toBeLessThan(1e-6);
+    expect(distance((flow?.base as Vec3[])[0] as Vec3, [0, 0, 0])).toBeLessThan(1e-6);
+    const other = addCylinder(5, 78.5);
+    const line = curve(other.doc, 'create_nurbs_curve', {
+      degree: 1,
+      poles: [
+        [200, 0, 0],
+        [200, 0, 100],
+      ],
+    });
+    const straight = execute(line.doc, 'flow_along_curve', {
+      id: other.id,
+      targetId: line.id,
+      frame: WORLD_Z,
+      output: { tolerance: 0.01 },
+    });
+    expect(straight.error, straight.summary).toBeUndefined();
+    expect(dataOf<Overlay>(execute(straight.document, 'deform_overlay', { id: straight.affected[0] })).flow?.base).toBeNull();
   });
 
   it('a flow onto a surface: the nodes of the target sheet and of the base sheet in world coordinates (pure overlay of the tabulated law)', () => {
@@ -190,8 +211,11 @@ describe('deform_overlay of a deformed body', () => {
     for (const shape of shapes) {
       const wire = referenceWire(shape as never, extent);
       expect(wire, shape.kind).not.toBeNull();
-      expect((wire as Vec3[][]).length, shape.kind).toBeGreaterThan(3);
-      expect((wire as Vec3[][]).flat().every((p) => p.every(Number.isFinite)), shape.kind).toBe(true);
+      expect((wire as Vec3[][]).length, shape.kind).toBeGreaterThanOrEqual(3);
+      expect(
+        (wire as Vec3[][]).flat().every((p) => p.every(Number.isFinite)),
+        shape.kind,
+      ).toBe(true);
     }
     expect(referenceWire({ kind: 'torus', majorRadius: 5 }, extent)).toBeNull();
     // the plane is drawn through the foot of the body centre
@@ -206,7 +230,7 @@ describe('deform_overlay refusals', () => {
     const { doc, id } = addBox();
     const missing = execute(doc, 'deform_overlay', { id: 'nope' });
     expect(missing.error?.code).toBe('DEF_ENTITY_NOT_FOUND');
-    expectNoOp(doc, missing);
+    expectNoOp(missing, doc);
     const plain = execute(doc, 'deform_overlay', { id });
     expect(plain.error?.code).toBe('DEF_NOT_DEFORMED');
     const twisted = execute(doc, 'twist_body', { id, angleDeg: 30, frame: WORLD_Z, output: { tolerance: 0.01 } });

@@ -37,7 +37,7 @@ function boundsOf(positions: ReadonlyArray<number>): { centre: Vec3; radius: num
  */
 export const deformOverlayQuery = defineCommand({
   name: 'deform_overlay',
-  annotations: { readOnly: true },
+  annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'Geometry to DRAW a deformation for review, in world coordinates (document units): data.frame {origin, x, y, z, length} (the deformation frame axes), data.region {start, end, infinite, falloff, startCentre, endCentre, radius} ' +
     '(the slab the law acts on; infinite = the law holds on the whole axis), data.lattice {degrees, splineDegrees, oriented, rest[], moved[], box[8], displaced} (deform_lattice: control points at rest and displaced, i-major then j then k; ' +
