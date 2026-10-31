@@ -14,6 +14,7 @@ import { trustPendingKeys } from './keyTrust';
 import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vault';
 import { currentHolder } from '@server/plm/vault/vault';
 import { createDocumentSession, type DocumentSession } from './documents';
+import { export3mfToFile } from './exportFile';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
@@ -37,6 +38,7 @@ const token = randomBytes(24).toString('hex');
 
 let backend: RunningBackend | null = null;
 let session: DocumentSession | null = null;
+let backendUrl = '';
 let window: BrowserWindow | null = null;
 let quitting = false;
 let cliInstalled = false;
@@ -131,6 +133,18 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
     ok = true;
   });
   return ok;
+}
+
+/** File > Export 3MF…: the backend writes the package straight to the chosen file (export_3mf toFile). */
+async function exportThreeMf(): Promise<void> {
+  if (session === null) return;
+  const result = await dialog.showSaveDialog({ defaultPath: 'model.3mf', filters: [{ name: '3MF', extensions: ['3mf'] }] });
+  if (result.canceled || result.filePath === undefined) return;
+  const chosen = result.filePath;
+  await guarded('Export 3MF', async () => {
+    const message = await export3mfToFile({ url: backendUrl, token, target: chosen });
+    await dialog.showMessageBox({ type: 'info', message: 'Exported 3MF', detail: message });
+  });
 }
 
 async function openDocument(filePath?: string): Promise<void> {
@@ -332,6 +346,7 @@ async function boot(): Promise<void> {
     url,
     token,
   );
+  backendUrl = url;
   session = createDocumentSession({ url, token });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
@@ -349,6 +364,7 @@ async function boot(): Promise<void> {
           vaultCheckOut: () => void vaultCheckOutItem(),
           vaultCheckIn: () => void vaultCheckInDocument(),
           showCrashReports: () => void showCrashReports(),
+          export3mf: () => void exportThreeMf(),
         },
         process.platform,
         app.getName(),

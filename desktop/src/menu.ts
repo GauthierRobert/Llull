@@ -20,6 +20,8 @@ export interface MenuHandlers {
   /** File > Vault: Check In: store the open managed item in the vault (checkpoint, snapshots, refs) and free its lock. */
   readonly vaultCheckIn: () => void;
   readonly showCrashReports: () => void;
+  /** File > Export 3MF…: ask for a file, let the backend write the package straight to it. */
+  readonly export3mf: () => void;
 }
 
 export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, appName: string): MenuItemConstructorOptions[] {
@@ -33,6 +35,7 @@ export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, 
       { label: 'Save', accelerator: 'CmdOrCtrl+S', click: handlers.save },
       { label: 'Save As…', accelerator: 'Shift+CmdOrCtrl+S', click: handlers.saveAs },
       { type: 'separator' },
+      { label: 'Export 3MF…', click: handlers.export3mf },
       { type: 'separator' },
       { label: 'Vault: Check Out…', click: handlers.vaultCheckOut },
       { label: 'Vault: Check In', click: handlers.vaultCheckIn },

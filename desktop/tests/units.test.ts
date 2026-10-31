@@ -243,6 +243,7 @@ describe('menuTemplate', () => {
     vaultCheckOut: handler('checkout'),
     vaultCheckIn: handler('checkin'),
     showCrashReports: handler('crashes'),
+    export3mf: handler('export3mf'),
   };
 
   it('has File and Help menus wired to the handlers, an app menu only on macOS', () => {
@@ -251,7 +252,7 @@ describe('menuTemplate', () => {
     expect(menuTemplate(handlers, 'darwin', 'llull')[0]?.role).toBe('appMenu');
     const items = linux.flatMap((menu) => (Array.isArray(menu.submenu) ? menu.submenu : []));
     for (const item of items) if (typeof item.click === 'function') (item.click as () => void)();
-    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'checkout', 'checkin', 'data', 'trust', 'cli', 'help', 'crashes']);
+    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'export3mf', 'checkout', 'checkin', 'data', 'trust', 'cli', 'help', 'crashes']);
   });
 
   it('explains --app and points to the installer until the CLI is installed', () => {
