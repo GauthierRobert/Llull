@@ -578,6 +578,25 @@ mod tests {
         assert!((volume(evaluator.evaluate(&scaled)) - 48.0).abs() < 1e-9);
     }
 
+    /// A recipe that throws (here the sealed shell with the fault hook: a named refusal) answers the same reason the second time, from the cache; a blob load forgets it with the other refusals.
+    #[test]
+    fn a_throwing_recipe_keeps_its_reason_until_a_blob_is_loaded() {
+        let _serial = crate::serial_blends();
+        let mut evaluator = Evaluator::new(8);
+        let shell = json!({ "op": "shell", "thickness": 1, "source": leaf(entity("box", json!({ "size": [10, 10, 10] }))) });
+        crate::test_bridge::set_shell_fault(1);
+        let first = evaluator.evaluate(&shell).err();
+        let second = evaluator.evaluate(&shell).err();
+        crate::test_bridge::set_shell_fault(0);
+        assert!(matches!(&first, Some(EvalError::Failure(text)) if text.contains("[SHL_NO_CAVITY]")), "{first:?}");
+        assert_eq!(first, second, "the second evaluation answers the same text");
+        // still the cached refusal with the hook off; a new blob forgets the refusals and the shell builds
+        assert!(evaluator.evaluate(&shell).is_err());
+        let text = crate::queries::write_brep(&crate::make_box([0.0; 3], [1.0, 1.0, 1.0]).unwrap().unwrap()).unwrap();
+        assert!(evaluator.load_blob(&sha256_hex(text.as_bytes()), &text));
+        assert!(evaluator.evaluate(&shell).unwrap().is_some(), "the reason is gone after the blob load");
+    }
+
     #[test]
     fn canonical_keys_ignore_field_order() {
         let a: Value = serde_json::from_str(r#"{"op":"scale","factor":2,"source":{"op":"solid"}}"#).unwrap();

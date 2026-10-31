@@ -8,6 +8,7 @@
 import type { SetbackCorner } from '../../model/blendTypes';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { Vec3 } from '../../model/types';
+import type { CommandResult } from '../types';
 import { round6 } from '../../lib/compactNumber';
 
 export interface CornerCrease {
@@ -47,7 +48,17 @@ export function creaseOfCorners(
   return found;
 }
 
-export function creaseText(creases: readonly CornerCrease[]): string {
+/** `result` with the creases in its summary and in `data.corners`; every other key of `data` (profile, nonTangent, ...) is kept. */
+export function withCreases(result: CommandResult, creases: readonly CornerCrease[]): CommandResult {
+  if (creases.length === 0) return result;
+  return {
+    ...result,
+    summary: `${result.summary}${creaseText(creases)}`,
+    data: { ...(result.data as Record<string, unknown> | undefined), corners: creases },
+  };
+}
+
+function creaseText(creases: readonly CornerCrease[]): string {
   if (creases.length === 0) return '';
   const each = creases.map((one) => `edge ${one.crease.sharpEdge} (entry ${one.crease.entryRad} rad)`).join(', ');
   return ` Sharp edge kept at ${creases.length} corner(s): ${each}; the star continues it as a crease that fades to nothing at the pole.`;

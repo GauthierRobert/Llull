@@ -3,7 +3,7 @@
  * from the kernel's exact face queries, plus validity. Numbers and coded findings instead of a zebra render.
  */
 
-import { hasFillet, blendSource, cornerSources, measureContact, STAR_SUFFIX } from '../../geometry/blend/continuity';
+import { hasFillet, blendSource, measureContact } from '../../geometry/blend/continuity';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { Entity, ShapeRecipe } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
@@ -15,13 +15,14 @@ import { diagonalOf } from './shapeDiagonal';
 import { recordsByFace } from './blendChains';
 import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
 import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances, withBlendScaleFloor } from './checkBlendTolerances';
+import { checkCornerPatches, roundContact } from './checkBlendStars';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
 import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
-import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
+import { RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
-import { creaseRowOf } from './checkCornerCrease';
 import { readChamferLegs } from './checkChamferLegs';
-import { chamferNodes } from '../../geometry/blend/blendInfo';
+import { chamferNodes, legFilletNodes } from '../../geometry/blend/blendInfo';
+import type { BlendRow, Contact, EntityCheck } from './checkBlendRows';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -38,55 +39,6 @@ const DEFAULT_G2_REL = 0.1;
 const G0_FRACTION = 1e-6;
 /** A face whose normal curvature is below this fraction of 1 / (bounding-box diagonal) is flat for the G2 reading (a plane's reading is noise). */
 const FLAT_CURVATURE_FRACTION = 1e-8;
-
-interface Contact {
-  readonly edge: number;
-  readonly name?: string;
-  readonly g0Gap: number;
-  readonly g1AngleRad: number;
-  /** Corner patches only: the largest angle at the two end points of the contact, where three faces meet (g1AngleRad covers the open interior). */
-  readonly g1EndAngleRad?: number;
-  /** Junctions only: the blend face on the other side. */
-  readonly neighbour?: string;
-  /** Junctions across a crease of the part only: the angle between the two blends' normals at the ends of the junction (each is tangent to its own support there); the junction is judged by what g1AngleRad allows beyond it. */
-  readonly creaseRad?: number;
-  readonly g2Gap: number;
-  readonly g2Rel: number;
-  readonly order: string;
-}
-
-interface BlendRow {
-  readonly entityId: string;
-  readonly face: number;
-  readonly name: string;
-  readonly kind: 'edge' | 'corner';
-  readonly sourceEdges: readonly string[];
-  readonly contacts: readonly Contact[];
-  /** Where this blend face meets the next blend face of its tangent chain (not a support): G0 / G1 across the junction edge, measured once from the lower face. */
-  readonly junctions?: readonly Contact[];
-  /** Realised radius along the blend (absent when the kernel cannot section the face). */
-  readonly radius?: RadiusReadback;
-  /** Whether the recipe's radius law was compared with the realised radius. */
-  readonly lawChecked?: boolean;
-  /** Why a law that could be compared was not (an edge of uneven speed whose spine position could not be read): named, never a guess. */
-  readonly lawNote?: string;
-  /** blend_union joints: where the radius asked for came from, the pick ("joints[i]") or "default". */
-  readonly source?: string;
-  /** Section the recipe asked for: "circular", "conic" or "curvature" (a non-circular section has no radius readback). */
-  readonly profile: string;
-}
-
-interface EntityCheck {
-  readonly blends: BlendRow[];
-  readonly findings: Finding[];
-  readonly unverified: number;
-  /** Junctions between blends of a chain that the kernel could not measure (counted apart from the contacts). */
-  readonly unverifiedJunctions: number;
-  /** The gap tolerance applied to this solid (document units). */
-  readonly g0: number;
-  /** Why nothing could be measured, when that is so. */
-  readonly notRun?: string;
-}
 
 function checkEntity(
   kernel: GeometryKernel,
@@ -132,9 +84,6 @@ function checkEntity(
       notRun: 'this kernel has no exact topology / face queries',
     };
   const named = topology.faces.some((face) => face.name !== undefined);
-  // the longest edge of a face (the contact lines): its width is area over this
-  const longestEdgeOf = (face: number): number =>
-    Math.max(...graph.edgeFaces.flatMap((around, edge) => (around.includes(face) ? [topology.edges[edge]?.length ?? 0] : [])), 0);
   if (!named)
     findings.push({
       code: 'BLD_CHECK_UNVERIFIED_PICK',
@@ -167,7 +116,10 @@ function checkEntity(
     const contacts: Contact[] = [];
     const before = unverified;
     // width of the blend: its area over its longest edge (the contact lines)
-    const longest = longestEdgeOf(face.index);
+    const longest = Math.max(
+      ...graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : [])),
+      0,
+    );
     const profiled = (laws.get(face.index)?.profile?.type ?? 'circular') !== 'circular';
     const own: Tolerances = profiled ? { ...tolerances, g0: g0Param ?? tolerances.g0 * PROFILE_G0_FACTOR } : tolerances;
     const faceTolerances = withBlendScaleFloor(own, face.area, longest);
@@ -283,77 +235,10 @@ function checkEntity(
             : `${unverified - before} contact line(s) of blend face ${face.index} could not be measured by the kernel`,
       });
   }
-  // A corner patch named `blend(v:...)#k` is one sub-patch of an exact star (cpp/blend_corner_exact.cxx, 06 BLD 13.21): judged at the default g0. A plain `blend(v:...)` is the B-spline fit of a plate
-  // surface (the fallback of the star): its gap to the edges it is sewn to is judged against 5x the default.
-  const world = { kernel, shape, topology, graph, entityId, unit };
+  // The corner patches (a star sub-patch `blend(v:...)#k` is judged at the default g0, the plate patch of the fallback at 5x it): checkBlendStars.ts
   const plateTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
-  for (const face of topology.faces) {
-    const sources = face.name === undefined ? null : cornerSources(face.name);
-    if (sources === null || face.name === undefined) continue;
-    const star = STAR_SUFFIX.test(face.name);
-    // the same blend-scale floor as a blend face: a curvature-continuous star meets a plane to the noise of its interpolation, not exactly (06 BLD 13.36)
-    const cornerTolerances = star ? withBlendScaleFloor(tolerances, face.area, longestEdgeOf(face.index)) : plateTolerances;
-    const contacts: Contact[] = [];
-    graph.edgeFaces.forEach((around, edge) => {
-      if (around.length !== 2 || !around.includes(face.index)) return;
-      const between = (faces: readonly number[]): boolean => faces.every((other) => STAR_SUFFIX.test(topology.faces[other]?.name ?? ''));
-      const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
-      // the spoke of a star that continues an edge of the part left sharp at the corner: judged by its shape, not as a tangent contact (13.33)
-      const crease = measured === null ? null : creaseRowOf(world, measured, face.index, edge, cornerTolerances);
-      if (crease !== null) {
-        contacts.push(crease.contact);
-        findings.push(...crease.findings);
-        return;
-      }
-      // G0 over the whole contact (end points included); G1 on the open interior, the end points judged apart (three faces meet there).
-      const last = (measured?.length ?? 0) - 1;
-      const interior =
-        measured === null
-          ? null
-          : measureContact(
-              measured.map((sample, at) => (at === 0 || at === last ? { ...sample, g1: 0 } : sample)),
-              cornerTolerances,
-            );
-      const ends =
-        measured === null
-          ? null
-          : measureContact(
-              measured.filter((_, at) => at === 0 || at === last),
-              cornerTolerances,
-            );
-      if (interior === null || ends === null) return void unverified++;
-      const name = topology.edges[edge]?.name;
-      contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(interior), g1EndAngleRad: sig(ends.g1AngleRad) });
-      findings.push(
-        // a spoke (two star sub-patches) is a G1 seam inside the corner: its curvature jump is reported, never a failure (06 BLD 13.36.4)
-        ...contactFindings(entityId, face.index, edge, interior, cornerTolerances, requireG2 && !between(around), unit).filter(
-          (found) => requireG2 || found.code !== 'BLD_CHECK_G2_JUMP',
-        ),
-      );
-      if (ends.g1AngleRad > cornerTolerances.g1AngleRad)
-        findings.push({
-          entityId,
-          face: face.index,
-          edge,
-          code: 'BLD_CHECK_G1_ANGLE',
-          severity: 'warn',
-          value: sig(ends.g1AngleRad),
-          limit: sig(cornerTolerances.g1AngleRad),
-          unit: 'rad',
-          remediation: REMEDIATION.BLD_CHECK_G1_ANGLE,
-          message: `the normals differ by ${sig(ends.g1AngleRad)} rad at an end point of edge ${edge} (corner patch ${face.index}, where three faces meet)`,
-        });
-    });
-    blends.push({
-      entityId,
-      face: face.index,
-      name: face.name,
-      kind: 'corner',
-      sourceEdges: [...sources],
-      contacts,
-      profile: star ? 'star' : 'patch',
-    });
-  }
+  const world = { kernel, shape, topology, graph, entityId, unit };
+  unverified += checkCornerPatches({ world, samples, tolerances, plateTolerances, requireG2 }, blends, findings);
   return { blends, findings, unverified, unverifiedJunctions, g0: tolerances.g0 };
 }
 
@@ -364,14 +249,6 @@ const invalid = (entityId: string, unit: string, message: string): Finding => ({
   unit,
   remediation: REMEDIATION.BLD_CHECK_INVALID,
   message,
-});
-
-const roundContact = (contact: ReturnType<typeof measureContact> & object): Omit<Contact, 'edge' | 'name'> => ({
-  g0Gap: sig(contact.g0Gap),
-  g1AngleRad: sig(contact.g1AngleRad),
-  g2Gap: sig(contact.g2Gap),
-  g2Rel: sig(contact.g2Rel),
-  order: contact.order,
 });
 
 /**
@@ -391,9 +268,9 @@ export const checkBlends = defineCommand({
   description:
     'Read-only continuity and radius check of the blends of solids: the results of fillet_edge, fillet_faces, fillet_full_round and blend_union (every solid with such a blend when `ids` is omitted). For each blend face the exact kernel measures, at `samples` points along each contact line where the ' +
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +
-    '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), ' +
-    'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), BLD_CHECK_RADIUS_LAW (fail: the realised radius is off the radius asked for by more than 1e-4 relative; compared for fillet_edge radius laws and for every joint of a blend_union, whose radii are the default radius or the joints pick), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
-    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares (an edge between two sub-patches that continues an edge of the part left sharp at the corner is a crease spoke, order "crease": G0 against g0, its angle at the sharp edge must equal the dihedral of that edge (creaseRad), must fade monotonically to the pole, and g1AngleRad is the pole reading, a warn above the limit) (an exact star, named blend(v:...)#k, is one row per sub-patch with profile "star" and is judged at g0; the plate patch of the fallback, named blend(v:...), has profile "patch"; the star of a curvature-profile step is built curvature-continuous (G2) to the blend and flat faces it meets, so require "G2" passes on those contacts, while the edges between two sub-patches (spokes) are G1 seams: their curvature jump is reported and never fails): G0 over the whole contact against g0 (star) or g0Corner (plate), G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
+    '1 for a plane against a circular fillet) with the order reached (G0 = not tangent, G1, G2). Findings carry stable codes: BLD_CHECK_G1_ANGLE (fail), BLD_CHECK_G2_JUMP (fail when require is G2, else info), BLD_CHECK_SPOKE_G2 (warn, require G2 only: a seam between two sub-patches of a G2 corner star), ' +
+    'BLD_CHECK_G0_GAP, BLD_CHECK_INVALID (fail), BLD_CHECK_UNVERIFIED_PICK (warn: kernel keeps no names), BLD_CHECK_UNVERIFIED_CONTACT (warn: a blend face has no measurable contact line, so nothing is claimed), BLD_CHECK_BLEND_LEGS (fail) and BLD_CHECK_BLEND_UNVERIFIED (warn) for a fillet with two legs (size2): such a row has no radius (size is a leg, a length on a face), its legs are read in `data.legs`; BLD_CHECK_RADIUS_LAW (fail: the realised radius is off the radius asked for by more than 1e-4 relative; compared for fillet_edge radius laws and for every joint of a blend_union, whose radii are the default radius or the joints pick), and with purpose "release" BLD_CHECK_TOLERANCE_DEFAULTED (warn) and BLD_CHECK_REVIEW (info; reviewRequired true). ' +
+    'Where one blend face meets the next blend face of a tangent chain (not a support of it) the row lists that junction edge under `junctions` (only between blends of one profiled fillet step; G0 against g0Profile = 5 x g0, G1 against g1AngleRad; BLD_CHECK_G0_GAP / BLD_CHECK_G1_ANGLE like a contact; a re-skinned profile chain can kink there when the wall curvature jumps; where the chain turns across a crease of the part (an N-gon rim, a polyline outline: the blends are mitred) each blend is tangent to its own support at one end of the junction, so the normals differ there by the crease of the SUPPORT faces (read from them, up to the 0.11 rad OCCT chains): the junction reports it as creaseRad, is judged against g1AngleRad beyond it, and each end against the crease of the supports it touches; a smooth chain keeps the plain g1AngleRad). A setback corner patch is a row of kind "corner" listing every edge it shares (an edge between two sub-patches that continues an edge of the part left sharp at the corner is a crease spoke, order "crease": G0 against g0, its angle at the sharp edge must equal the dihedral of that edge (creaseRad), must fade monotonically to the pole, and g1AngleRad is the pole reading, a warn above the limit) (an exact star, named blend(v:...)#k, is one row per sub-patch with profile "star" and is judged at g0; the plate patch of the fallback, named blend(v:...), has profile "patch"; the star of a curvature-profile step is G2 to the blend and flat faces it meets and G1 across its own seams: under require "G2" its contacts with those faces pass, and the curvature jump across a seam is a warn BLD_CHECK_SPOKE_G2, never BLD_CHECK_G2_JUMP; a G1 star fails with BLD_CHECK_G2_JUMP everywhere): G0 over the whole contact against g0 (star) or g0Corner (plate), G1 on the open interior (g1AngleRad) and at the two end points apart (g1EndAngleRad; above the limit it is a BLD_CHECK_G1_ANGLE warn). tolerances names every limit with `defaulted` (g0Corner only when a corner row exists).  Needs the exact native kernel (check kernel_info); without it, or with no filleted solid, status is "not_run". Does not modify the document.',
   params: z.object({
     ids: z
       .array(z.string())
@@ -437,7 +314,7 @@ export const checkBlends = defineCommand({
     for (const id of ids ?? Object.keys(doc.entities)) {
       const entity = doc.entities[id];
       const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
-      const withChamfer = recipe !== undefined && chamferNodes(recipe).length > 0;
+      const withChamfer = recipe !== undefined && (chamferNodes(recipe).length > 0 || legFilletNodes(recipe).length > 0);
       if (entity !== undefined && recipe !== undefined && hasFillet(recipe)) targets.push(entity);
       if (entity !== undefined && withChamfer) chamfered.push(entity);
       if (recipe !== undefined && (hasFillet(recipe) || withChamfer)) continue;
@@ -462,22 +339,24 @@ export const checkBlends = defineCommand({
       cornered: checks.some((check) => check.blends.some((blend) => blend.kind === 'corner' && blend.profile === 'patch')),
     });
     const legs = kernel === null ? [] : chamfered.map((entity) => readChamferLegs(kernel, entity, unit));
-    const chamferRows = legs.flatMap((read) => read.rows);
-    const unverifiedChamfers = chamferRows.filter((row) => row.note !== undefined);
+    const legRows = legs.flatMap((read) => read.rows);
+    const chamferRows = legRows.filter((row) => row.op === 'chamfer');
+    const filletLegRows = legRows.filter((row) => row.op === 'fillet');
+    const unverifiedChamfers = legRows.filter((row) => row.note !== undefined);
     const findings = [
       ...checks.flatMap((check) => check.findings),
       ...legs.flatMap((read) => read.findings),
       // a chamfer whose legs could not be compared is not a pass: it is a warning that names why
       ...unverifiedChamfers.map(
         (row): Finding => ({
-          code: 'BLD_CHECK_CHAMFER_UNVERIFIED',
+          code: row.op === 'fillet' ? 'BLD_CHECK_BLEND_UNVERIFIED' : 'BLD_CHECK_CHAMFER_UNVERIFIED',
           severity: 'warn',
           entityId: row.entityId,
           ...(row.face === null ? {} : { face: row.face }),
           edge: row.edge,
           unit,
-          remediation: REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
-          message: `the legs of the chamfer of edge ${row.edge} were not verified: ${row.note}`,
+          remediation: row.op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_UNVERIFIED : REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
+          message: `the legs of the ${row.op === 'fillet' ? 'blend' : 'chamfer'} of edge ${row.edge} were not verified: ${row.note}`,
         }),
       ),
     ];
@@ -507,13 +386,13 @@ export const checkBlends = defineCommand({
     const notRun =
       kernel === null
         ? 'no geometry kernel is installed'
-        : targets.length === 0 && chamferRows.length === 0
+        : targets.length === 0 && legRows.length === 0
           ? 'no filleted solid to check'
           : (checks.find((check) => check.notRun !== undefined)?.notRun ?? null);
     const status =
       kernel === null ||
-      (targets.length === 0 && chamferRows.length === 0) ||
-      (chamferRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
+      (targets.length === 0 && legRows.length === 0) ||
+      (legRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
         ? 'not_run'
         : statusOf(findings);
     const blends = checks.flatMap((check) => check.blends);
@@ -528,6 +407,7 @@ export const checkBlends = defineCommand({
       status,
       blends,
       ...(chamferRows.length === 0 ? {} : { chamfers: chamferRows }),
+      ...(filletLegRows.length === 0 ? {} : { legs: filletLegRows }),
       findings,
       tolerances: named,
       unverified,

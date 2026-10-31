@@ -1,5 +1,5 @@
 /**
- * Leg readback of check_blends for the variable and asymmetric chamfers (BLD M5, TECHNICAL_SPEC §13.24): at stations along each chamfered edge of the source, the chord from the edge to the contact line of the chamfer
+ * Leg readback of check_blends for the variable and asymmetric chamfers (BLD M5, TECHNICAL_SPEC §13.24) and for the fillets with two legs (size2, §13.34): at stations along each chamfered edge of the source, the chord from the edge to the contact line of the chamfer
  * face on each of the two faces, in the plane perpendicular to the edge (the leg as the chamfer is defined), against the law the recipe gave: size -> sizeEnd on the first face and size2 -> size2End on the other, or for a
  * distance-angle chamfer the second leg d sin(a) / sin(phi + a) of its dihedral phi at each station (a right angle gives d tan(a)).
  * @invariant a leg is compared at the stations of the source edge (equal arc length), at most 21; the contact lines are crossed with the plane of the station on a quadratic through three samples (an error of order h^3, not the chord
@@ -8,7 +8,7 @@
  * @failure a leg off its law by more than LEG_TOLERANCE of the law -> BLD_CHECK_CHAMFER_LEGS (fail)
  */
 
-import { chamferNodes } from '../../geometry/blend/blendInfo';
+import { chamferNodes, legFilletNodes, lawsOfNode } from '../../geometry/blend/blendInfo';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { Entity, Vec3 } from '../../model/types';
 import { roundSignificant } from '../../lib/significant';
@@ -23,6 +23,8 @@ const MAX_SKIPPED_FRACTION = 0.25;
 
 export interface ChamferRow {
   readonly entityId: string;
+  /** The operation whose legs are read: a chamfer, or a fillet with two legs (size2). */
+  readonly op: 'chamfer' | 'fillet';
   readonly edge: number;
   readonly name: string | null;
   /** The chamfer face of the result, null when the kernel did not give one. */
@@ -106,14 +108,18 @@ function crossing(lines: readonly (readonly Vec3[])[], point: Vec3, tangent: Vec
   return nearest;
 }
 
-/** The leg rows of every variable or asymmetric chamfer node of `entity`'s recipe, and a finding for each leg off its law. */
+/** The leg rows of every variable or asymmetric chamfer node and every two-leg fillet node of `entity`'s recipe, and a finding for each leg off its law. */
 export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: string): { rows: ChamferRow[]; findings: Finding[] } {
   const rows: ChamferRow[] = [];
   const findings: Finding[] = [];
   const query = kernel.faceQuery;
   const recipe = entity.kind === 'mesh' ? entity.brep : undefined;
   if (query === undefined || recipe === undefined) return { rows, findings };
-  for (const node of chamferNodes(recipe)) {
+  const nodes = [
+    ...chamferNodes(recipe).map((node) => ({ node, op: 'chamfer' as const })),
+    ...legFilletNodes(recipe).map((node) => ({ node, op: 'fillet' as const })),
+  ];
+  for (const { node, op } of nodes) {
     const source = kernel.evaluate(node.source);
     const built = kernel.evaluate(node);
     const before = source === null ? null : kernel.topology(source);
@@ -121,13 +127,23 @@ export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: st
     const sourceGraph = source === null ? null : query.faceGraph(source);
     const resultGraph = built === null ? null : query.faceGraph(built);
     node.edges.forEach((edge, at) => {
+      // a fillet gives its legs per edge (radii[at]); an edge of it without size2 is a circular blend with no legs to read
+      const law = op === 'fillet' ? lawsOfNode(node)[at] : undefined;
+      if (op === 'fillet' && law?.size2 === undefined) return;
       const name = before?.edges[edge]?.name ?? null;
-      const first: readonly [number, number] = [node.size, node.sizeEnd ?? node.size];
-      const angle = node.angleDeg;
+      const first: readonly [number, number] =
+        law === undefined ? [node.size, node.sizeEnd ?? node.size] : [law.size, law.sizeEnd ?? law.size];
+      const angle = law === undefined ? node.angleDeg : undefined;
       const second: readonly [number, number] =
-        node.faces === undefined ? first : [node.size2 ?? node.size, node.size2End ?? node.size2 ?? node.size];
+        law?.size2 !== undefined
+          ? [law.size2, law.size2End ?? law.size2]
+          : node.faces === undefined
+            ? first
+            : [node.size2 ?? node.size, node.size2End ?? node.size2 ?? node.size];
+      const faceName = op === 'fillet' ? 'blend' : 'chamfer';
       const row = (extra: Partial<ChamferRow>): ChamferRow => ({
         entityId: entity.id,
+        op,
         edge,
         name,
         face: null,
@@ -146,18 +162,18 @@ export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: st
         resultGraph === null ||
         name === null
       ) {
-        rows.push(row({ note: 'the kernel could not rebuild the chamfer to read its legs' }));
+        rows.push(row({ note: `the kernel could not rebuild the ${faceName === 'blend' ? 'blend' : 'chamfer'} to read its legs` }));
         return;
       }
-      const chamfer = after.faces.find((face) => face.name === `chamfer(${name})`);
+      const chamfer = after.faces.find((face) => face.name === `${faceName}(${name})`);
       if (chamfer === undefined) {
-        rows.push(row({ note: `the result has no face named chamfer(${name}): the legs are not measured` }));
+        rows.push(row({ note: `the result has no face named ${faceName}(${name}): the legs are not measured` }));
         return;
       }
       // the two faces of the source edge, by name, and which of them carries the first leg
       const sourceFaces = [...new Set(sourceGraph.edgeFaces[edge] ?? [])];
       const names = sourceFaces.map((face) => before.faces[face]?.name).filter((value): value is string => value !== undefined);
-      const firstIndex = node.faces === undefined ? undefined : (node.faces[at] as number);
+      const firstIndex = law === undefined ? (node.faces === undefined ? undefined : (node.faces[at] as number)) : law.sideFace;
       const firstFace = firstIndex === undefined ? undefined : before.faces[firstIndex]?.name;
       if (names.length !== 2 || new Set(names).size !== 2) {
         rows.push(row({ face: chamfer.index, note: 'the edge does not join two named faces, the legs are not measured' }));
@@ -249,7 +265,7 @@ export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: st
       rows.push(row({ face: chamfer.index, legs, skipped, maxDeviation: sig(worst) }));
       if (worst > LEG_TOLERANCE)
         findings.push({
-          code: 'BLD_CHECK_CHAMFER_LEGS',
+          code: op === 'fillet' ? 'BLD_CHECK_BLEND_LEGS' : 'BLD_CHECK_CHAMFER_LEGS',
           severity: 'fail',
           entityId: entity.id,
           face: chamfer.index,
@@ -257,8 +273,8 @@ export function readChamferLegs(kernel: GeometryKernel, entity: Entity, unit: st
           value: sig(worst),
           limit: LEG_TOLERANCE,
           unit,
-          remediation: REMEDIATION.BLD_CHECK_CHAMFER_LEGS,
-          message: `a leg of the chamfer of edge ${edge} is off its law by ${sig(worst)} (relative), more than ${LEG_TOLERANCE}`,
+          remediation: op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_LEGS : REMEDIATION.BLD_CHECK_CHAMFER_LEGS,
+          message: `a leg of the ${op === 'fillet' ? 'blend' : 'chamfer'} of edge ${edge} is off its law by ${sig(worst)} (relative), more than ${LEG_TOLERANCE}`,
         });
     });
   }

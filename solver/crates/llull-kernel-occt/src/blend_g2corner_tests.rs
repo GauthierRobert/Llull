@@ -33,6 +33,12 @@ fn corners_of(shape: &Shape) -> Vec<(String, String)> {
         .collect()
 }
 
+/// The `spokes` note of each corner ("G1" for a G2 star, absent otherwise).
+fn spokes_of(shape: &Shape) -> Vec<String> {
+    let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
+    notes["corners"].as_array().unwrap().iter().map(|corner| corner["spokes"].as_str().unwrap_or("").to_string()).collect()
+}
+
 fn all(continuity: &str) -> Vec<(String, String)> {
     vec![(continuity.to_string(), String::new()); 8]
 }
@@ -99,14 +105,17 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
     assert!(g2.contacts.1 < 1e-3, "curvature jump at the blend and flat faces {:e}", g2.contacts.1);
     assert!(g2.contacts.0 < 1e-4, "angle at the blend and flat faces {:e}", g2.contacts.0);
     assert!(g2.spokes.0 < 1e-4, "the spokes are G1: {:e}", g2.spokes.0);
-    // the spokes are G1 seams (no curvature match across them): stated, not hidden
-    assert!(g2.spokes.1 > 0.1, "{:e}", g2.spokes.1);
+    // the spokes are G1 seams (no curvature match across them): stated, not hidden, and reported as such in the notes
+    assert!(g2.spokes.1 > 0.5 && g2.spokes.1 < 1.2, "spoke curvature jump {:e}", g2.spokes.1);
+    assert_eq!(spokes_of(&shape), vec!["G1".to_string(); 8]);
     crate::test_bridge::set_corner_g2_star(false);
     let g1_shape = profile_cube(1.0, 1.0, 0.5);
     assert_eq!(corners_of(&g1_shape), all("G1"));
     assert_eq!(patch_degrees(&g1_shape), vec![(5, 5); 48]);
     let g1 = readings(&g1_shape);
     assert!(g1.contacts.1 > 0.5, "the G1 star jumps by {:e}", g1.contacts.1);
+    assert!(g2.spokes.1 <= g1.spokes.1, "the G2 star's spokes jump by {:e}, the G1 star's by {:e}", g2.spokes.1, g1.spokes.1);
+    assert_eq!(spokes_of(&g1_shape), vec![String::new(); 8]);
     assert!((volume(&shape) - volume(&g1_shape)).abs() < 1e-3 * volume(&g1_shape), "{} against {}", volume(&shape), volume(&g1_shape));
 }
 
@@ -148,7 +157,7 @@ fn a_g2_star_that_cannot_meet_the_gates_is_refused_by_name_and_the_g1_star_is_bu
     assert_eq!(corners.len(), 8);
     for (continuity, why) in &corners {
         assert_eq!(continuity, "G1");
-        assert!(why.contains("the curvature of the supports by"), "{why}");
+        assert!(why.contains("the curvature of the supports by") && why.contains("pole counts tried: 8, 11, 14, 24, 36"), "{why}");
     }
     assert!(readings(&shape).contacts.0 < 0.0095);
 }
@@ -164,4 +173,28 @@ fn the_g2_star_gives_the_same_solid_on_any_number_of_threads() {
         let fingerprint = (volume(&shape).to_bits(), topology(&shape).unwrap()["faces"].as_array().unwrap().len());
         assert_eq!(*reference.get_or_insert(fingerprint), fingerprint, "{threads} threads");
     }
+}
+
+#[test]
+fn a_g2_step_that_fails_after_the_sewing_is_built_with_the_g1_star_then_the_plate_and_says_so() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    // hook 7: a step with a G2 star fails after the fills; the G1 star pass builds it
+    crate::test_bridge::set_corner_exact_patch(7);
+    let g1 = profile_cube(1.0, 1.0, 0.5);
+    assert!(analyze(&g1).unwrap().valid);
+    for (continuity, why) in corners_of(&g1) {
+        assert_eq!(continuity, "G1");
+        assert!(why.contains("failed after the sewing") && why.contains("built with the G1 stars"), "{why}");
+    }
+    assert!(readings(&g1).contacts.1 > 0.5);
+    // hook 3: every step with a star fails after the fills; the plate pass builds it, and the note carries both downgrades
+    crate::test_bridge::set_corner_exact_patch(3);
+    let plate = profile_cube(1.0, 1.0, 0.5);
+    assert!(analyze(&plate).unwrap().valid);
+    for (continuity, why) in corners_of(&plate) {
+        assert_eq!(continuity, "");
+        assert!(why.contains("built with the plate patches") && why.contains("the G1 stars:"), "{why}");
+    }
+    assert_eq!(topology(&plate).unwrap()["faces"].as_array().unwrap().len(), 26);
 }

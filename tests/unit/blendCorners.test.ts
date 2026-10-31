@@ -749,3 +749,76 @@ describe('setback overrides survive replay and upstream edits', () => {
     expect(solidVertices(nudged).length).toBeGreaterThan(8);
   });
 });
+
+describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
+  type Finding = { code: string; severity: string; edge?: number };
+  type Contact = { edge: number; order: string };
+  /** Two star sub-patches (faces 2, 3): edge 0 and edge 2 are contacts with the flat faces 0 and 1, edge 1 is the seam between the sub-patches. */
+  function star(
+    curvature: (edge: number) => [number, number],
+    params: Record<string, unknown>,
+  ): { findings: Finding[]; contacts: Contact[]; status: string } {
+    const name = (rank: number): string =>
+      `blend(v:e(${SOURCE}:a|${SOURCE}:b),e(${SOURCE}:a|${SOURCE}:c),e(${SOURCE}:b|${SOURCE}:c))#${rank}`;
+    const topology: ShapeTopology = {
+      ...TOPOLOGY,
+      faces: [
+        ...TOPOLOGY.faces.slice(0, 2),
+        { index: 2, name: name(1), surface: 'bspline', area: 3 },
+        { index: 3, name: name(2), surface: 'bspline', area: 3 },
+      ],
+    };
+    const graph = {
+      faces: [],
+      edgeFaces: [
+        [0, 2],
+        [2, 3],
+        [1, 3],
+      ],
+      edgeConvexity: [],
+    } as unknown as FaceGraph;
+    const kernel = scriptedKernel({ topology, graph, g1: () => 0.001, curvature: (edge) => curvature(edge) });
+    const { doc, id } = cube();
+    const filleted = execute(doc, 'fillet_edge', { id, radius: 1, corners: [{ near: corner, setback: 2 }] }, {
+      kernel: scriptedKernel({ topology: TOPOLOGY }),
+    } as never);
+    const data = execute(filleted.document, 'check_blends', params, ctxOf(kernel)).data as {
+      findings: Finding[];
+      status: string;
+      blends: Array<{ kind: string; contacts: Contact[] }>;
+    };
+    return {
+      findings: data.findings,
+      status: data.status,
+      contacts: data.blends.filter((row) => row.kind === 'corner').flatMap((row) => row.contacts),
+    };
+  }
+  // the contacts with the flat faces are curvature-continuous (0 against 0); the seam jumps from 0.5 to 1.2
+  const g2Star = (edge: number): [number, number] => (edge === 1 ? [0.5, 1.2] : edge === 0 ? [0, 1e-3] : [0, 0]);
+
+  it('under require G2 the seam of a G2 star is a warn BLD_CHECK_SPOKE_G2 of its own, never BLD_CHECK_G2_JUMP; the contacts pass', () => {
+    const result = star(g2Star, { require: 'G2' });
+    expect(result.contacts.filter((contact) => contact.edge !== 1).every((contact) => contact.order === 'G2')).toBe(true);
+    expect(result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toEqual([
+      expect.objectContaining({ severity: 'warn', edge: 1, message: expect.stringContaining('seams of the corner are G1') }),
+      expect.objectContaining({ severity: 'warn', edge: 1 }),
+    ]);
+    expect(result.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);
+    expect(result.status).toBe('warn');
+  });
+
+  it('without require G2 the seam raises nothing and the star passes', () => {
+    const result = star(g2Star, {});
+    expect(result.findings.filter((found) => found.code.includes('G2'))).toEqual([]);
+    expect(result.status).toBe('pass');
+  });
+
+  it('a sub-patch whose contact with a flat face jumps is not a G2 star: BLD_CHECK_G2_JUMP fails at the contact and at its seam (judged from that sub-patch); only the sub-patch whose own contacts are G2 warns BLD_CHECK_SPOKE_G2', () => {
+    const result = star((edge) => (edge === 0 ? [0, 2] : edge === 1 ? [0.5, 1.2] : edge === 0 ? [0, 1e-3] : [0, 0]), { require: 'G2' });
+    const jumps = result.findings.filter((found) => found.code === 'BLD_CHECK_G2_JUMP' && found.severity === 'fail');
+    expect(jumps.map((found) => found.edge)).toContain(0);
+    expect(jumps.map((found) => found.edge)).toContain(1);
+    expect(result.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2' && found.edge === 1)).toBe(true);
+    expect(result.status).toBe('fail');
+  });
+});

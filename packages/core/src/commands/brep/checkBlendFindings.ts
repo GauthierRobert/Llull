@@ -37,11 +37,17 @@ export const REMEDIATION = {
     'the kernel did not give what the leg readback needs (the chamfer face by name, its contact lines, the faces of the edge): rebuild with the native kernel, or read the legs with inspect_topology and measure_distance',
   BLD_CHECK_CHAMFER_LEGS:
     'the chamfer face does not keep the legs of its law (a leg is measured on each face from the edge in the plane perpendicular to it): use smaller distances, or a constant chamfer, or report the part',
+  BLD_CHECK_BLEND_UNVERIFIED:
+    'the kernel did not give what the leg readback needs (the blend face by name, its contact lines, the faces of the edge): rebuild with the native kernel, or read the legs with inspect_topology and measure_distance',
+  BLD_CHECK_BLEND_LEGS:
+    'the blend face does not keep the legs of its law (a leg is measured on each face from the edge in the plane perpendicular to it): use smaller sizes, or report the part',
   BLD_CHECK_CLIFF_EDGE:
     'none needed: a cliff edge (fillet_faces cliff) is where the ball touches the far edge of a narrow face, so it is sharp there by construction',
   BLD_CHECK_G0_GAP: 'the faces do not meet at the contact: use a smaller radius or fewer edges per step',
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
+  BLD_CHECK_SPOKE_G2:
+    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G1 (tangent planes, not curvature), only its contacts with the blend and flat faces are G2',
   BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
   BLD_CHECK_RADIUS_LAW:
     'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',
@@ -118,4 +124,30 @@ export function cliffFinding(entityId: string, face: number, name: string, cliff
     remediation: REMEDIATION.BLD_CHECK_CLIFF_EDGE,
     message: `cliff edge, not a tangent contact (angle ${sig((cliff.angleRad * 180) / Math.PI)}°): blend face ${face} (${name}) touches the far edge of a consumed face at edge ${cliff.edge}`,
   };
+}
+
+/** The warn for the curvature jump across a spoke (an edge between two sub-patches) of a corner star whose contacts with the blend and flat faces are G2: its internal seams are G1 (06 BLD 13.36). */
+export function spokeFinding(
+  entityId: string,
+  face: number,
+  edge: number,
+  contact: NonNullable<ReturnType<typeof measureContact>>,
+  tolerances: Tolerances,
+  unit: string,
+): Finding[] {
+  if (contact.g2Rel <= tolerances.g2Rel) return [];
+  return [
+    {
+      code: 'BLD_CHECK_SPOKE_G2',
+      severity: 'warn',
+      entityId,
+      face,
+      edge,
+      value: sig(contact.g2Rel),
+      limit: sig(tolerances.g2Rel),
+      unit: 'ratio',
+      remediation: REMEDIATION.BLD_CHECK_SPOKE_G2,
+      message: `curvature jumps by ${sig(contact.g2Gap)} 1/${unit} (relative ${sig(contact.g2Rel)}) across edge ${edge}, a seam between two sub-patches of corner patch ${face}: the internal seams of the corner are G1, its contacts with the blend and flat faces are G2`,
+    },
+  ];
 }

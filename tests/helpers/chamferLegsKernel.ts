@@ -6,6 +6,16 @@ export const SOURCE: ShapeRecipe = { op: 'solid', entity: { id: 'b', kind: 'box'
 export const chamfer = (extra: Record<string, unknown> = {}): ShapeRecipe =>
   ({ op: 'chamfer', source: SOURCE, edges: [0], size: 1, sizeEnd: 2, faces: [0], size2: 2, size2End: 4, ...extra }) as ShapeRecipe;
 
+/** A fillet with two legs on the edge 0 of the source: 1 -> 2 on face 0 (`top`), 2 -> 4 on the other. */
+export const legFillet = (extra: Record<string, unknown> = {}): ShapeRecipe =>
+  ({
+    op: 'fillet',
+    source: SOURCE,
+    edges: [0],
+    size: 0,
+    radii: [{ size: 1, sizeEnd: 2, size2: 2, size2End: 4, sideFace: 0, ...extra }],
+  }) as ShapeRecipe;
+
 export const entityOf = (brep: ShapeRecipe): MeshSolidEntity => ({ id: 'm', kind: 'mesh', brep }) as never;
 
 /** The edge runs along x from 0 to 10; contact line k lies at the distance `legs[k](x)` from it in the plane perpendicular to x. */
@@ -14,6 +24,8 @@ export function stub(
     first?: (x: number) => number;
     second?: (x: number) => number;
     missing?: 'chamfer' | 'contact' | 'graph' | 'names' | 'build' | 'crossing';
+    /** The role of the face the legs are read on: a chamfer face `chamfer(E)` (default) or the blend face `blend(E)` of a fillet with two legs. */
+    role?: 'chamfer' | 'blend';
     /** The face normals at a station (the dihedral of a distance-angle chamfer): the faces 0 and 1 of the source; omitted = the kernel gives no normals. */
     normals?: readonly [Vec3, Vec3];
   } = {},
@@ -37,7 +49,12 @@ export function stub(
     faces: [
       { index: 0, name: 'top', surface: 'plane', area: 1 },
       { index: 1, name: 'side', surface: 'plane', area: 1 },
-      { index: 2, name: options.missing === 'chamfer' ? 'chamfer(other)' : 'chamfer(E)', surface: 'plane', area: 1 },
+      {
+        index: 2,
+        name: options.missing === 'chamfer' ? `${options.role ?? 'chamfer'}(other)` : `${options.role ?? 'chamfer'}(E)`,
+        surface: 'plane',
+        area: 1,
+      },
     ],
     edges: [0, 1].map((index) => ({
       index,
@@ -92,8 +109,10 @@ export function stub(
   };
   return {
     name: 'stub',
-    evaluate: (recipe: ShapeRecipe) => (options.missing === 'build' ? null : recipe.op === 'chamfer' ? { id: 'result' } : { id: 'source' }),
+    evaluate: (recipe: ShapeRecipe) =>
+      options.missing === 'build' ? null : recipe.op === 'chamfer' || recipe.op === 'fillet' ? { id: 'result' } : { id: 'source' },
     topology: (shape: { id: string }) => (shape.id === 'source' ? sourceTopology : resultTopology),
+    tessellate: () => ({ positions: [0, 0, 0, 10, 5, 5], indices: [] }),
     faceQuery: query,
   } as unknown as GeometryKernel;
 }

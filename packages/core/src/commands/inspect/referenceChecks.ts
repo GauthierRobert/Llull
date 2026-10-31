@@ -11,6 +11,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { REPICK_EDGES } from '../brep/edgeReferences';
+import { blendStepIssue } from './blendReferenceChecks';
 
 const EDGE_PICKING_STEPS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'project_edges_to_sketch']);
 
@@ -37,6 +38,7 @@ function nameProblem(kernel: GeometryKernel | null, doc: CadDocument, target: st
 }
 
 function stepIssue(doc: CadDocument, kernel: GeometryKernel | null, step: FeatureStep): ReferenceIssue | null {
+  if (step.name === 'blend_union') return blendStepIssue(doc, kernel, step);
   if (step.suppressed || !EDGE_PICKING_STEPS.has(step.name) || !isRecord(step.params)) return null;
   const target = step.params['id'];
   if (typeof target !== 'string' || !Object.hasOwn(doc.entities, target)) return null;

@@ -122,15 +122,7 @@ export function openFace(
     if (pick.error !== undefined) return rejection(doc, `${command}: ${pick.error.code} — ${pick.problem} on '${id}'; no-op.`, pick.error);
     return fail('WRP_FACE_NOT_FOUND', `${pick.problem} on '${id}'`, ['face'], [id]);
   }
-  let picked = pick.faces;
-  if (picked.some((index) => index < 0) && ref.faceNear !== undefined) {
-    // a point on an edge, a seam or a pole belongs to no single face: take the lowest-numbered face that contains it
-    const near = ref.faceNear;
-    const containing = Array.from({ length: topology?.faces.length ?? 0 }, (_, k) => k).filter(
-      (k) => query.faceContains(shape, k, near, 1e-6 * Math.max(1, ...near.map(Math.abs))) === true,
-    );
-    if (containing[0] !== undefined) picked = [containing[0]];
-  }
+  const picked = pick.faces;
   if (picked.length !== 1 || (picked[0] as number) < 0)
     return fail('WRP_FACE_NOT_FOUND', `face must pick exactly one face (got ${picked.length})`, ['face'], [id]);
   const face = picked[0] as number;

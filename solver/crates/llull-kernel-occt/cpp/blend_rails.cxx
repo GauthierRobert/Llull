@@ -9,6 +9,7 @@
 // (the host maps them to BLD_PROFILE_FAILED).
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -72,8 +73,12 @@ namespace {
 
 // How far (x the diagonal) the interpolated section poles may leave the circular fillet's contact lines between two stations.
 constexpr double kDeviationFraction = 1e-8;
-// Stations along a blend: the first uniform set, and the most the refinement inserts (where the surface between two stations misses the section).
-constexpr int kFirstStations = 24, kMostStations = 6000;
+// Stations along a blend: the first uniform set (and the grid of the convexity scan), and the most the refinement inserts (where the surface between two stations misses the section).
+// A blend whose sections are constant (the same section translated along: a constant size on a straight edge; 5 stations are enough, 24 were built) is first skinned from kSeedIntervals (kSeedClosedIntervals when closed)
+// and refined by the worst probe of each interval that misses the section; the probes are the 2 x kFirstStations grid points and the midpoint of every interval, which are the points the
+// uniform set of kFirstStations and its midpoints see, so the sparse skin holds the same 1e-8 x diagonal at the same points. Only constant sections take it (checked at the grid points); a varying
+// size, a curved rail or a faded end is skinned from the uniform set, bit-identical to before, and a constant one that needs more than kFirstStations stations is given up for the uniform set.
+constexpr int kFirstStations = 24, kMostStations = 6000, kProbeGrid = 2 * kFirstStations, kSeedIntervals = 4, kSeedClosedIntervals = 8;
 // The profile faces must meet the faces around them within this fraction of the diagonal (the corner patches' rule of 13.10.2); the sewing
 // tolerance below is an input of the sewing, not an acceptance rule.
 constexpr double kGapLimit = 5e-6;
@@ -96,6 +101,12 @@ constexpr double kSewingFraction = 1e-6, kSewingCap = 1e-3;
 constexpr double kRailAngle = 5e-3;
 // Parameter values closer than this fraction of the face's parameter range are the same iso-line.
 constexpr double kIsoFraction = 1e-6;
+// An end face is oblique when it meets the direction of the blend at a crease (angle between the direction and the end plane) of at least this many radians (about 29
+// degrees, so at most 61 degrees from square); below it the end is a crease OCCT did not chain. The two contact lines of a blend with an oblique end must overlap along
+// more than this fraction of the blend face's parameter length.
+constexpr double kMinObliqueCrease = 0.5, kMinCoreFraction = 1e-3;
+// The skin of a blend with an oblique end runs past the end of the circular blend's own patch by the overshoot of the cut (kObliqueSafety times the section chord x tan of the angle from square, in parameter), at least this fraction of the span.
+constexpr double kObliqueMargin = 0.005, kObliqueSafety = 1.5;
 
 gp_Vec face_normal(const BRepAdaptor_Surface &surface, const gp_Pnt2d &uv) {
   gp_Pnt point;
@@ -200,6 +211,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   const auto value = [&](const gp_Pnt2d &uv, int coordinate) { return coordinate == 0 ? uv.X() : uv.Y(); };
   std::vector<double> values;
   double lo = 1e300, hi = -1e300;
+  double rail_lo[2] = {1e300, 1e300}, rail_hi[2] = {-1e300, -1e300};
   for (const Item &rail : rails) {
     if (!iso(rail, across_coordinate) || iso(rail, along_coordinate)) {
       why = "a contact line of the blend is not an iso-line of its surface";
@@ -211,7 +223,11 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
     if (known == values.end()) values.push_back(v);
     const double piece_lo = std::min(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
     const double piece_hi = std::max(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
-    if (cluster < 2) blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi, rail.edge});
+    if (cluster < 2) {
+      blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi, rail.edge});
+      rail_lo[cluster] = std::min(rail_lo[cluster], piece_lo);
+      rail_hi[cluster] = std::max(rail_hi[cluster], piece_hi);
+    }
     lo = std::min(lo, piece_lo);
     hi = std::max(hi, piece_hi);
   }
@@ -223,28 +239,51 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   blend.across[1] = values[1];
   blend.lo = lo;
   blend.hi = hi;
+  blend.core[0] = std::max(rail_lo[0], rail_lo[1]);
+  blend.core[1] = std::min(rail_hi[0], rail_hi[1]);
   for (const Item &other : others) {
+    bool oblique = false;
     if (!iso(other, along_coordinate)) {
       why = "the blend ends obliquely on a neighbouring face (profile blends end on a face square to the blend, or on the next blend of a chain)";
-      if (BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane) {
+      const bool flat = !other.is_blend && BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane;
+      gp_Pnt at;
+      gp_Vec du, dv;
+      surface.D1(0.5 * (other.from.X() + other.to.X()), 0.5 * (other.from.Y() + other.to.Y()), at, du, dv);
+      const gp_Vec direction = blend.across_is_u ? dv : du;
+      if (flat && direction.Magnitude() > 1e-14) {
         // The end face against the direction of the blend: parallel to it (0 rad) is a crease of the picked contour that OCCT did not chain with the
-        // next edge (it chains them below about 0.1 rad), perpendicular is the square end the builder wants.
-        gp_Pnt at;
-        gp_Vec du, dv;
-        surface.D1(0.5 * (other.from.X() + other.to.X()), 0.5 * (other.from.Y() + other.to.Y()), at, du, dv);
-        const gp_Vec direction = blend.across_is_u ? dv : du;
-        if (direction.Magnitude() > 1e-14) {
-          const double crease = std::asin(std::min(1.0, std::fabs(direction.Normalized().Dot(normal_of(other.neighbour)))));
-          why += crease < 0.5 ? ": it runs out onto the next flat face at a crease of " + number(crease) +
-                                    " rad, which OCCT did not chain with it (OCCT chains the edges of a contour across creases of up to about 0.1 rad)"
-                              : ": its end is " + number(kPi / 2 - crease) + " rad away from square on a flat face";
+        // next edge (it chains them below about 0.1 rad); perpendicular is a square end. In between the end is oblique and the skin is cut by its plane (13.35).
+        const double crease = std::asin(std::min(1.0, std::fabs(direction.Normalized().Dot(normal_of(other.neighbour)))));
+        if (crease < kMinObliqueCrease) {
+          why += ": it runs out onto the next flat face at a crease of " + number(crease) +
+                 " rad, which OCCT did not chain with it (OCCT chains the edges of a contour across creases of up to about " + number(0.1) +
+                 " rad, and a blend ending less than " + number(kMinObliqueCrease) + " rad from the face's plane is not cut by it)";
+          return false;
         }
+        oblique = true;
+      } else {
+        if (!flat && !other.is_blend) {
+          // the curved end face is not trimmed: the measured angle of the face's normal from the direction of the blend
+          const gp_Pnt2d on = [&] {
+            gp_Pnt2d uv;
+            return mid_uv(other.edge, other.neighbour, uv) ? uv : gp_Pnt2d(0, 0);
+          }();
+          const gp_Vec normal = face_normal(BRepAdaptor_Surface(other.neighbour, Standard_False), on);
+          if (direction.Magnitude() > 1e-14 && normal.Magnitude() > 0.5)
+            why += ": its end face is curved (not trimmed; only a flat end face is) and its normal is " +
+                   number(std::acos(std::min(1.0, std::fabs(direction.Normalized().Dot(normal))))) + " rad from the direction of the blend there";
+        }
+        return false;
       }
+    }
+    const double at = oblique ? 0.5 * (value(other.from, along_coordinate) + value(other.to, along_coordinate)) : value(other.from, along_coordinate);
+    const double tolerance = kIsoFraction * range[along_coordinate];
+    const double middle = 0.5 * (lo + hi);
+    const int side = oblique ? (at < middle ? 0 : 1) : (std::fabs(at - lo) <= tolerance ? 0 : (std::fabs(at - hi) <= tolerance ? 1 : -1));
+    if (oblique && (value(other.from, along_coordinate) < middle) != (value(other.to, along_coordinate) < middle)) {
+      why = "internal error: an oblique end of the blend runs across the middle of the blend (the end face cuts the blend in two)";
       return false;
     }
-    const double at = value(other.from, along_coordinate);
-    const double tolerance = kIsoFraction * range[along_coordinate];
-    const int side = std::fabs(at - lo) <= tolerance ? 0 : (std::fabs(at - hi) <= tolerance ? 1 : -1);
     if (side < 0 || !blend.end[side].IsNull()) {
       why = "the blend face has an edge that is neither a contact line nor one clean end";
       return false;
@@ -254,6 +293,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
       return false;
     }
     blend.end[side] = other.edge;
+    blend.oblique[side] = oblique;
     (other.is_blend ? blend.end_blend[side] : blend.end_face[side]) = other.neighbour;
   }
   blend.closed = blend.end[0].IsNull() && blend.end[1].IsNull();
@@ -263,6 +303,11 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   }
   if (blend.end[0].IsNull() != blend.end[1].IsNull() || (!blend.closed && seam)) {
     why = "the blend face has only one end";
+    return false;
+  }
+  if ((blend.oblique[0] || blend.oblique[1]) && !(blend.core[1] - blend.core[0] > kMinCoreFraction * (hi - lo))) {
+    why = "internal error: the oblique end faces cut the two contact lines of the blend to nothing (they overlap along " + number(blend.core[1] - blend.core[0]) +
+          " of the " + number(hi - lo) + " parameter length of the blend face)";
     return false;
   }
   return true;
@@ -363,61 +408,125 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
     return out;
   };
   const double span = blend.hi - blend.lo;
-  std::vector<double> along;
-  std::vector<Section> stations;
-  const int first = blend.closed ? kFirstStations : kFirstStations + 1;
-  for (int j = 0; j < first; ++j) along.push_back(blend.lo + span * j / kFirstStations);
-  for (double at : along) {
-    Section section;
-    if (!section_at(source, blend, at, curved, param, section, why)) return nullptr;
-    stations.push_back(section);
-  }
-  for (;;) {
-    std::vector<Handle(Geom_BSplineCurve)> rows;
-    const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
-    if (surface.IsNull()) return nullptr;
-    std::vector<double> added;
-    std::vector<Section> added_sections;
-    double worst = 0;
-    const size_t intervals = blend.closed ? along.size() : along.size() - 1;
-    for (size_t j = 0; j < intervals; ++j) {
-      const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
-      const double at = 0.5 * (from + to);
-      Section middle;
-      if (!section_at(source, blend, at, curved, param, middle, why)) return nullptr;
+  // The true sections at the probe points, computed once: the grid of kProbeGrid steps, and the midpoints the refinement asks for.
+  std::map<double, Section> truth;
+  const auto truth_at = [&](double at, const Section *&out) {
+    auto found = truth.find(at);
+    if (found == truth.end()) {
+      Section section;
+      if (!section_at(source, blend, at, curved, param, section, why)) return false;
+      found = truth.emplace(at, section).first;
+    }
+    out = &found->second;
+    return true;
+  };
+  // `sparse`: start from the seed and probe the grid points too, abandoning it (null) past kFirstStations; else the uniform set of kFirstStations and the midpoints of its intervals.
+  const auto run = [&](bool sparse) -> Handle(Geom_BSplineSurface) {
+    const int seed = sparse ? (blend.closed ? kSeedClosedIntervals : kSeedIntervals) : kFirstStations;
+    std::vector<double> along;
+    std::vector<Section> stations;
+    for (int j = 0; j < (blend.closed ? seed : seed + 1); ++j) {
+      const Section *section = nullptr;
+      const double at = sparse ? blend.lo + span * (kProbeGrid * j / seed) / kProbeGrid : blend.lo + span * j / kFirstStations;
+      if (!truth_at(at, section)) return nullptr;
+      along.push_back(at);
+      stations.push_back(*section);
+    }
+    const bool varying = kind == 0 && fade.active;
+    for (;;) {
+      std::vector<Handle(Geom_BSplineCurve)> rows;
+      const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
+      if (surface.IsNull()) return nullptr;
       // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
-      const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
-      const bool varying = kind == 0 && fade.active;
-      const double expected_weight = varying ? weight_of(middle, at) : 1.0;
-      double gap = 0;
-      for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
-        const double scale = varying && row == 1 ? expected_weight : 1.0;  // the middle row of a faded conic is the pole times its weight
-        const gp_Pnt want(scale * expected[row].X(), scale * expected[row].Y(), scale * expected[row].Z());
-        gap = std::max(gap, rows[row]->Value(at).Distance(want));
-      }
-      if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
-      worst = std::max(worst, gap);
-      if (gap > limit) {
-        if (to - from < 1e-9 * span) {
-          why = "the blend surface follows the contact lines only to " + number(gap) + " (limit " + number(limit) + ") where the circular blend has a kink";
-          return nullptr;
+      const auto gap_at = [&](double at, const Section &middle) {
+        const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
+        const double expected_weight = varying ? weight_of(middle, at) : 1.0;
+        double gap = 0;
+        for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
+          const double scale = varying && row == 1 ? expected_weight : 1.0;  // the middle row of a faded conic is the pole times its weight
+          const gp_Pnt want(scale * expected[row].X(), scale * expected[row].Y(), scale * expected[row].Z());
+          gap = std::max(gap, rows[row]->Value(at).Distance(want));
         }
-        added.push_back(at);
-        added_sections.push_back(middle);
+        if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
+        return gap;
+      };
+      std::vector<double> added;
+      std::vector<Section> added_sections;
+      double worst = 0;
+      const size_t intervals = blend.closed ? along.size() : along.size() - 1;
+      for (size_t j = 0; j < intervals; ++j) {
+        const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
+        // the probes of the interval: the grid points strictly inside it, and its midpoint
+        std::vector<double> probes;
+        const double margin = 1e-9 * span;
+        for (int g = sparse ? static_cast<int>(std::floor((from - blend.lo) / span * kProbeGrid)) : kProbeGrid + 1; g <= kProbeGrid; ++g) {
+          const double at = blend.lo + span * g / kProbeGrid;
+          if (at >= to - margin) break;
+          if (at > from + margin) probes.push_back(at);
+        }
+        const double middle_at = 0.5 * (from + to);
+        if (std::none_of(probes.begin(), probes.end(), [&](double at) { return std::fabs(at - middle_at) <= margin; })) probes.push_back(middle_at);
+        double gap = -1, where = middle_at;
+        const Section *worst_section = nullptr;
+        for (const double at : probes) {
+          const Section *section = nullptr;
+          if (!truth_at(at, section)) return nullptr;
+          const double here = gap_at(at, *section);
+          if (here > gap) {
+            gap = here;
+            where = at;
+            worst_section = section;
+          }
+        }
+        worst = std::max(worst, gap);
+        if (gap > limit) {
+          if (to - from < 1e-9 * span) {
+            why = "the blend surface follows the contact lines only to " + number(gap) + " (limit " + number(limit) + ") where the circular blend has a kink";
+            return nullptr;
+          }
+          added.push_back(where);
+          added_sections.push_back(*worst_section);
+        }
+      }
+      if (added.empty()) return surface;
+      if (sparse && along.size() + added.size() > static_cast<size_t>(kFirstStations)) {
+        return nullptr;
+      }
+      if (along.size() + added.size() > static_cast<size_t>(kMostStations)) {
+        why = "the blend surface follows the contact lines only to " + number(worst) + " (limit " + number(limit) + ") with " + std::to_string(along.size()) +
+              " stations";
+        return nullptr;
+      }
+      for (size_t k = 0; k < added.size(); ++k) {
+        const auto place = std::lower_bound(along.begin(), along.end(), added[k]) - along.begin();
+        along.insert(along.begin() + place, added[k]);
+        stations.insert(stations.begin() + place, added_sections[k]);
       }
     }
-    if (added.empty()) return surface;
-    if (along.size() + added.size() > static_cast<size_t>(kMostStations)) {
-      why = "the blend surface follows the contact lines only to " + number(worst) + " (limit " + number(limit) + ") with " + std::to_string(along.size()) +
-            " stations";
-      return nullptr;
+  };
+  // a sparse skin that is given up or refused is skinned again from the uniform set: the failures and the results of the uniform set are the ones of before
+  // Constant sections only: every probe-grid section is the first one translated (the vectors from a to t, b, the centre and the bends agree to 1e-10 of the chord, same weight, no fade).
+  const auto constant_sections = [&]() {
+    if (fade.active) return false;
+    const Section *first = nullptr;
+    if (!truth_at(blend.lo, first)) return false;
+    const double tolerance = 1e-10 * std::max(first->a.Distance(first->b), 1e-12);
+    const auto same = [&](const gp_Vec &x, const gp_Vec &y) { return (x - y).Magnitude() <= tolerance; };
+    for (int g = 1; g <= kProbeGrid; ++g) {
+      const Section *other = nullptr;
+      if (!truth_at(blend.lo + span * g / kProbeGrid, other)) return false;
+      if (std::fabs(other->circle_weight - first->circle_weight) > 1e-10 || !same(gp_Vec(other->a, other->t), gp_Vec(first->a, first->t)) ||
+          !same(gp_Vec(other->a, other->b), gp_Vec(first->a, first->b)) || !same(gp_Vec(other->a, other->centre), gp_Vec(first->a, first->centre)) ||
+          !same(other->bend_a, first->bend_a) || !same(other->bend_b, first->bend_b))
+        return false;
     }
-    for (size_t k = 0; k < added.size(); ++k) {
-      const auto place = std::lower_bound(along.begin(), along.end(), added[k]) - along.begin();
-      along.insert(along.begin() + place, added[k]);
-      stations.insert(stations.begin() + place, added_sections[k]);
-    }
+    return true;
+  };
+  if (constant_sections()) {
+    const Handle(Geom_BSplineSurface) quick = run(true);
+    if (!quick.IsNull()) return quick;
   }
+  return run(false);
 }
 
 // Where a pass failed: only a chain junction that does not sew in a curved pass is worth the zero-curvature pass.
@@ -483,6 +592,46 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   std::vector<Blend> faces(static_cast<size_t>(blends.Extent()));
   for (int b = 1; b <= blends.Extent(); ++b)
     if (!analyse(TopoDS::Face(blends(b)), edge_faces, blends, faces[static_cast<size_t>(b - 1)], why)) return nullptr;
+  for (Blend &blend : faces)
+    for (int side = 0; side < 2; ++side)
+      if (blend.oblique[side]) {
+        blend.end_point[side] = BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side]));
+        blend.end_normal[side] = outward_normal(circular, blend.end_face[side]);
+      }
+  for (Blend &blend : faces) {
+    blend.reach[0] = blend.lo;
+    blend.reach[1] = blend.hi;
+    if (!blend.oblique[0] && !blend.oblique[1]) continue;
+    // The conic hugs its supports closer than the circle: its cut by an end plane can lie past the end of the circular blend's own patch, so the skin runs a
+    // margin further (as far as the surface goes when it is not periodic).
+    const BRepAdaptor_Surface surface(blend.face, Standard_False);
+    const bool periodic = blend.across_is_u ? surface.IsVPeriodic() : surface.IsUPeriodic();
+    const double first = blend.across_is_u ? surface.FirstVParameter() : surface.FirstUParameter(), last = blend.across_is_u ? surface.LastVParameter() : surface.LastUParameter();
+    // How far past the circular blend's patch the cut can lie: the plane crosses the section planes at the angle from square, so across a section of chord c it
+    // moves by up to c tan(angle) along the blend (measured per end: the direction of the blend and the chord there), kObliqueSafety times that, at least
+    // kObliqueMargin of the span.
+    const auto margin_at = [&](int side) {
+      const double along = blend.core[side];
+      gp_Pnt at;
+      gp_Vec du, dv;
+      const double mid = 0.5 * (blend.across[0] + blend.across[1]);
+      if (blend.across_is_u) surface.D1(mid, along, at, du, dv);
+      else surface.D1(along, mid, at, du, dv);
+      const gp_Vec direction = blend.across_is_u ? dv : du;
+      const gp_Pnt a = blend.across_is_u ? surface.Value(blend.across[0], along) : surface.Value(along, blend.across[0]);
+      const gp_Pnt b = blend.across_is_u ? surface.Value(blend.across[1], along) : surface.Value(along, blend.across[1]);
+      const double speed = direction.Magnitude();
+      const double cosine = speed > 1e-14 ? std::fabs(direction.Normalized().Dot(blend.end_normal[side])) : 1.0;
+      const double tangent = std::sqrt(std::max(0.0, 1.0 - cosine * cosine)) / std::max(cosine, 0.2);
+      const double needed = speed > 1e-14 ? kObliqueSafety * a.Distance(b) * tangent / speed : 0.0;
+      return std::min(std::max(needed, kObliqueMargin * (blend.hi - blend.lo)), 0.5 * (blend.hi - blend.lo));
+    };
+    const double margin_lo = blend.oblique[0] ? margin_at(0) : 0.0, margin_hi = blend.oblique[1] ? margin_at(1) : 0.0;
+    if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin_lo : std::max(first, blend.lo - margin_lo);
+    if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin_hi : std::min(last, blend.hi + margin_hi);
+  }
+  for (const Blend &blend : faces)
+    if ((blend.oblique[0] || blend.oblique[1]) && !check_extension(blend, kGapLimit * diagonal, why)) return nullptr;
 
   // Convex blends have the rolling ball inside the material, concave ones outside: a step that mixes them is not checked against the circular volume.
   BRepClass3d_SolidClassifier classifier(circular);
@@ -493,7 +642,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     // nothing about the convexity. A centre that is ON is skipped as well.
     for (int j = blend.closed ? 0 : 1; j < kFirstStations; ++j) {
       Section station;
-      if (!section_at(surface, blend, blend.lo + (blend.hi - blend.lo) * j / kFirstStations, false, 0.5, station, why)) return nullptr;
+      if (!section_at(surface, blend, blend.core[0] + (blend.core[1] - blend.core[0]) * j / kFirstStations, false, 0.5, station, why)) return nullptr;
       classifier.Perform(station.centre, 1e-9 * diagonal);
       if (classifier.State() == TopAbs_IN) any_convex = true;
       else if (classifier.State() == TopAbs_OUT) any_concave = true;
@@ -556,9 +705,16 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
       why = "the blend surface could not be turned into a face";
       return nullptr;
     }
-    skinned.push_back(made.Face());
+    Handle(Geom_Curve) end_curves[2];
+    if (blend.oblique[0] || blend.oblique[1]) {
+      TopoDS_Face trimmed;
+      if (!trim_oblique(made.Face(), blend, diagonal, kGapLimit * diagonal, trimmed, end_curves, why)) return nullptr;
+      skinned.push_back(trimmed);
+    } else {
+      skinned.push_back(made.Face());
+    }
     for (int side = 0; side < 2; ++side)
-      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], surface->VIso(side == 0 ? v0 : v1), {}});
+      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}, blend.oblique[side] ? kGapLimit * diagonal : 0.0});
     // The rails of a mitred blend end at new points: the support faces take the rail curves of the new surface between a shared vertex at each mitre.
     for (int rail = 0; rail < 2; ++rail) {
       bool moves[2];

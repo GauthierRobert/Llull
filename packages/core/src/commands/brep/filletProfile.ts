@@ -3,7 +3,7 @@
  * parameters that need no kernel (rho / shape range), then, for the planned edges, that a second leg goes with one constant size and that the face
  * carrying the first leg is known; the kernel builds the blend (straight or curved edges, planar or curved faces, constant or varying size) and says
  * why when it cannot (BLD_PROFILE_FAILED).
- * @failure rho or shape outside 0.05..0.95 -> BLD_RHO_RANGE / BLD_SHAPE_RANGE; size2 with a size that varies along the edge -> BLD_PROFILE_FAILED;
+ * @failure rho or shape outside 0.05..0.95 -> BLD_RHO_RANGE / BLD_SHAPE_RANGE; size2 with control points -> BLD_PROFILE_FAILED;
  *   size2 without a side -> BLD_ASYMMETRIC_SIDE_MISSING
  */
 
@@ -35,7 +35,7 @@ export const profileSchema = z
       .optional(),
   })
   .describe(
-    'Cross-section of the blend. conic and curvature profiles are built on straight or curved edges between planar or curved faces, with a constant or varying size (radiusEnd, sizes, law): the contact lines are those of the circular fillet of that radius, so a blend ends on a flat face square to it, on the next blend of a tangent chain, or closes on itself (a rim). Edges that meet at a vertex are all profiled in the same step with the same section and get a smooth corner patch (straight edges between planar faces). BLD_PROFILE_FAILED says what is not built. curvature is G2 to a planar face and matches the curvature of a curved one (except at a reported fallback to the G1 quartic: data.profile.fallback). Profiled edges that meet at a vertex need one constant size. The measured gap and the corner setbacks are in data.profile. Sizing is by radius or by legs (size2: straight edge between planar faces, one constant size).',
+    'Cross-section of the blend. conic and curvature profiles are built on straight or curved edges between planar or curved faces, with a constant or varying size (radiusEnd, sizes, law): the contact lines are those of the circular fillet of that radius, so a blend ends on a flat face square to it, on the next blend of a tangent chain, or closes on itself (a rim). Edges that meet at a vertex are all profiled in the same step with the same section and get a smooth corner patch (straight edges between planar faces). BLD_PROFILE_FAILED says what is not built. curvature is G2 to a planar face and matches the curvature of a curved one (except at a reported fallback to the G1 quartic: data.profile.fallback). Profiled edges that meet at a vertex need one constant size. The measured gap and the corner setbacks are in data.profile. Sizing is by radius or by legs (a circular section with unequal legs is elliptic) (size2, size2End: the two legs on the faces, built on straight and curved edges and faces; a leg is the chord from the edge to its contact line in the plane perpendicular to the edge).',
   );
 
 export type ProfileInput = z.infer<typeof profileSchema>;
@@ -88,8 +88,8 @@ export interface PlannedProfile {
 const where = (entry: number | undefined, field: string): string => (entry === undefined ? field : `edges[${entry}].${field}`);
 
 /**
- * `planned` ready for a profile blend: a second leg only with a constant size, and each leg pair with the unique face index carrying the first leg (`sideFace`).
- * @failure a varying size -> BLD_PROFILE_FAILED; size2 without a usable side -> BLD_ASYMMETRIC_SIDE_MISSING
+ * `planned` ready for a profile blend: a second leg runs straight between its ends (no control points), and each leg pair with the unique face index carrying the first leg (`sideFace`).
+ * @failure control points with size2 -> BLD_PROFILE_FAILED; size2 without a usable side -> BLD_ASYMMETRIC_SIDE_MISSING
  */
 export function prepareProfile(
   kernel: GeometryKernel,
@@ -104,10 +104,10 @@ export function prepareProfile(
       ready.push(item);
       continue;
     }
-    if (law.sizeEnd !== undefined || (law.sizes ?? []).length > 0)
+    if ((law.sizes ?? []).length > 0)
       return {
         code: 'BLD_PROFILE_FAILED',
-        message: `edge ${edge}: a second leg (size2) takes one constant size (no sizeEnd, control points or expression); a profile whose size varies is symmetric`,
+        message: `edge ${edge}: a second leg (size2) runs between its ends (sizeEnd, size2End), not through control points or an expression`,
         path: where(entry, 'size2'),
       };
     if (topology === null || item.side === undefined || (item.side.near === undefined && item.side.name === undefined))

@@ -20,7 +20,7 @@ import {
 } from '../../geometry/blend/blendInfo';
 import { blendSource } from '../../geometry/blend/continuity';
 import { controlParameters, radiusAt } from '../../geometry/blend/law';
-import { spineStations } from './spineStations';
+import { jointStations, spineStations } from './spineStations';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { BlendSection } from '../../geometry/kernelPorts';
@@ -65,7 +65,7 @@ export interface LawRecord {
   readonly law: EdgeRadius;
   /** The section the recipe asked for (absent = circular). */
   readonly profile?: BlendProfile;
-  /** The source shape and edge the law was given (absent for a blend_union joint, whose law is constant and whose edge exists only inside the union). */
+  /** The source shape and edge the law was given (absent for a blend_union joint, whose edge exists only inside the union: see `joint`). */
   readonly shape?: ShapeHandle;
   readonly topology?: ShapeTopology;
   readonly edge?: number;
@@ -73,6 +73,14 @@ export interface LawRecord {
   readonly chain: ReadonlySet<string>;
   /** blend_union joint contours: the pick that gave the radius ("joints[i]") or "default". */
   readonly source?: string;
+  /** blend_union joint contours: the joint edge is alone in its tangent chain (a varying law is comparable end to end), and five points along it (the direction of the law). */
+  readonly joint?: {
+    readonly isolated: boolean;
+    readonly samples?: readonly Vec3[];
+    /** The kernel's decision on the joint edge (absent: not reported, the law is compared at the parameter fraction as before) and, when uneven, its spine points. */
+    readonly unevenSpeed?: boolean;
+    readonly spine?: readonly Vec3[];
+  };
   /** The node has setback corners: its blends stop short of the edge ends, so a law that varies along the edge is not compared over the blend face. */
   readonly setback: boolean;
 }
@@ -128,10 +136,21 @@ export function lawIndex(kernel: GeometryKernel, recipe: ShapeRecipe): Map<strin
         if (!index.has(name))
           index.set(name, {
             node: first + offset,
-            law: { size: contour.radius },
+            law: {
+              size: contour.radius,
+              ...(contour.radiusEnd === undefined ? {} : { sizeEnd: contour.radiusEnd }),
+              ...(contour.sizes === undefined ? {} : { sizes: contour.sizes }),
+              ...(contour.interpolation === undefined ? {} : { interpolation: contour.interpolation }),
+            },
             chain: new Set(),
             setback: false,
             source: contour.source,
+            joint: {
+              isolated: contour.isolated === true,
+              ...(contour.samples === undefined ? {} : { samples: contour.samples }),
+              ...(contour.unevenSpeed === undefined ? {} : { unevenSpeed: contour.unevenSpeed }),
+              ...(contour.spine === undefined ? {} : { spine: contour.spine }),
+            },
           });
   }
   return index;
@@ -164,8 +183,10 @@ function directionOf(
 ): boolean | null {
   if (record === undefined) return null;
   if (span !== null) return span.forward;
-  const { shape, edge } = record;
-  if (constantLaw(record.law) || shape === undefined || edge === undefined) return true;
+  const { shape, edge, joint } = record;
+  if (constantLaw(record.law)) return true;
+  if (joint?.samples !== undefined) return sameDirection(sections, (t) => joint.samples?.[Math.round(t * 4)] ?? null);
+  if (shape === undefined || edge === undefined) return true;
   return sameDirection(sections, (t) => kernel.faceQuery?.edgeSamples(shape, edge, 5)?.[Math.round(t * 4)]?.point ?? null);
 }
 
@@ -179,6 +200,8 @@ export function checkRadius(
 ): RadiusCheck {
   // a conic / curvature section has no radius: the circle through three of its points would be a number without meaning
   if (record?.profile !== undefined && record.profile.type !== 'circular') return { radius: null, lawChecked: false, deviations: [] };
+  // a size2 row has no radius: `size` is a leg (a length on its face), read by the leg readback (checkChamferLegs.ts), and the section is not a circle of that radius (size2 equal to size included)
+  if (record?.law.size2 !== undefined) return { radius: null, lawChecked: false, deviations: [] };
   const sections = blendSectionsOf(kernel, shape, blend, FINE_SECTIONS);
   const fine = sections === null ? null : radiusSamples(sections);
   if (sections === null || fine === null) return { radius: null, lawChecked: false, deviations: [] };
@@ -196,7 +219,9 @@ export function checkRadius(
     direction !== null &&
     (constantLaw(record.law)
       ? true
-      : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge));
+      : record.joint !== undefined
+        ? record.joint.isolated
+        : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge));
   if (!comparable || record === undefined || direction === null || (record.setback && span === null))
     return { radius, lawChecked: false, deviations: [] };
   const exact = exactParameters(record.law);
@@ -210,10 +235,15 @@ export function checkRadius(
     return unchecked(
       `edge ${record.edge} is curved and the kernel does not report whether it runs at a steady speed, so the law is not read along it`,
     );
+  const unevenJoint = span === null && !constantLaw(record.law) && record.joint?.unevenSpeed === true;
   const read =
-    positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
-      ? spineStations(kernel, record.shape, record.edge, info, sections)
-      : null;
+    unevenJoint && record.joint !== undefined
+      ? record.joint.spine === undefined
+        ? { reason: 'the joint edge runs at an uneven speed and the kernel did not give its spine, so the law cannot be read along it' }
+        : jointStations(record.joint.spine, sections)
+      : positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
+        ? spineStations(kernel, record.shape, record.edge, info, sections)
+        : null;
   if (read !== null && 'reason' in read) return unchecked(read.reason);
   const onSpine =
     read === null ? null : fine.map((sample, k) => ({ t: read.stations[k] ?? 0, radius: sample.radius })).sort((x, y) => x.t - y.t);

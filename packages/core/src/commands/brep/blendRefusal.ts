@@ -21,6 +21,8 @@ const SCALE_TOLERANCE = 1 / 128;
 const scaleRadius = (law: EdgeRadius, factor: number): EdgeRadius => ({
   ...law,
   size: law.size * factor,
+  ...(law.size2 === undefined ? {} : { size2: law.size2 * factor }),
+  ...(law.size2End === undefined ? {} : { size2End: law.size2End * factor }),
   ...(law.sizeEnd === undefined ? {} : { sizeEnd: law.sizeEnd * factor }),
   ...(law.sizes === undefined ? {} : { sizes: law.sizes.map((point) => ({ t: point.t, size: point.size * factor })) }),
 });

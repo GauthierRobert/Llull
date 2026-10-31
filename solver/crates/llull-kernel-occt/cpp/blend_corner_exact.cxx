@@ -1035,8 +1035,10 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     attempts.push_back({kDegree - 1, 48, 0.5});
     attempts.push_back({kDegree - 1, 64, 1.0});
   }
+  std::string tried;  // the pole counts measured so far, named in the refusal of a G2 star
   for (const Attempt &attempt : attempts) {
     const int poles = attempt.poles;
+    tried += (tried.empty() ? "" : ", ") + std::to_string(poles);
     // the coarse interpolations must leave a margin under the angle limit; the finest may use all of it
     const double angle_limit = attempt.share * max_angle;
     out = Patches();
@@ -1136,7 +1138,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       return true;
     }
     why = "the sub-patches (" + std::to_string(poles) + " x " + std::to_string(poles) + " poles) leave the edges by " + std::to_string(out.gap) + " and the supports by " +
-          std::to_string(out.angle) + " rad" + (g2 ? " and the curvature of the supports by " + std::to_string(out.g2) + " /length (relative " + std::to_string(out.g2_relative) + ")" : std::string());
+          std::to_string(out.angle) + " rad" + (g2 ? " and the curvature of the supports by " + std::to_string(out.g2) + " /length (relative " + std::to_string(out.g2_relative) + ")" + " (pole counts tried: " + tried + ")" : std::string());
   }
   return false;
 }

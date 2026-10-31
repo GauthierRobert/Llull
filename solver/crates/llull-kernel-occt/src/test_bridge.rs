@@ -50,6 +50,8 @@ mod ffi {
         fn oriented_angle_probe(shape: &Shape, face: i32, reverse: bool) -> f64;
         /// The boundary angle of a face against its neighbours (-1: not measured), with the first loop edge dropped from the boundary or not.
         fn boundary_angle_probe(shape: &Shape, face: i32, drop_one: bool) -> f64;
+        /// `[Bezier-patch box, AddOptimal box, dense sample box]` (6 numbers each) of a synthetic many-patch B-spline face; the first box is zeros when the fast path refuses the face.
+        fn spline_bounds_probe(kind: i32) -> Vec<f64>;
     }
 }
 
@@ -132,4 +134,8 @@ pub fn last_shell_star_poles() -> i32 {
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
     ffi::adaptive_rule(crate::inner(shape).expect("a shape"))
+}
+
+pub fn spline_bounds(kind: i32) -> Vec<f64> {
+    ffi::spline_bounds_probe(kind)
 }

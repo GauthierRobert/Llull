@@ -555,9 +555,9 @@ fn the_blend_union_keeps_the_adaptive_mass_rule_of_its_operands() {
     let kinked = crate::features::fillet_laws(&block, &[top], &[1.0, 1.0, 1.0, 1.0, 0.5, 2.0]).unwrap().unwrap();
     assert!(crate::test_bridge::refined_mass(&kinked));
     let rib = make_box([8.0, -3.0, 1.0], [4.0, 16.0, 2.0]).unwrap().unwrap();
-    let fused = crate::features::blend(&[&kinked, &rib], 0.4, &[]).unwrap().unwrap();
+    let fused = crate::features::blend(&[&kinked, &rib], 0.4, &[], "").unwrap().unwrap();
     assert!(crate::test_bridge::refined_mass(&fused), "the fused blend keeps asking for the adaptive rule");
     let plain_block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
-    let plain = crate::features::blend(&[&plain_block, &rib], 0.4, &[]).unwrap().unwrap();
+    let plain = crate::features::blend(&[&plain_block, &rib], 0.4, &[], "").unwrap().unwrap();
     assert!(!crate::test_bridge::refined_mass(&plain), "plain operands do not");
 }

@@ -39,7 +39,7 @@ import { REPICK_EDGES } from './edgeReferences';
 import { describeProfileNotes, readProfileNotes } from './profileNotes';
 import { type CornerInput, type CornerRefusal, REPICK_VERTICES, resolveCorners } from './filletCorners';
 import type { SetbackCorner } from '../../model/blendTypes';
-import { creaseOfCorners, creaseText } from './filletCrease';
+import { creaseOfCorners, withCreases } from './filletCrease';
 
 export interface FilletRequest {
   readonly id: string;
@@ -192,7 +192,7 @@ function recipeOfPlan(
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : law.interpolation === 'monotone' ? 'monotone' : 'smooth'} control point(s)`}`;
+  `${round6(law.size)}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}${law.size2End === undefined ? '' : `>${round6(law.size2End)}`}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : law.interpolation === 'monotone' ? 'monotone' : 'smooth'} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;
@@ -317,14 +317,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           corners,
           plan.map((entry) => entry.edge),
         );
-  const creased: CommandResult =
-    creases.length === 0
-      ? profiledResult
-      : {
-          ...profiledResult,
-          summary: `${profiledResult.summary}${creaseText(creases)}`,
-          data: { ...(profiledResult.data as Record<string, unknown> | undefined), corners: creases },
-        };
+  const creased = withCreases(profiledResult, creases);
   const reported = kink === null ? creased : kinkReported(creased, kink);
   const record =
     (request.edgeNames ?? []).length > 0

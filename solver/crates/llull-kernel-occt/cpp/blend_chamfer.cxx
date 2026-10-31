@@ -184,20 +184,6 @@ bool make_straight_tool(const TopoDS_Shape &shape, const std::vector<std::string
   return name_tool(loft, from, a_from, b_from, "chamfer(" + edge_names[static_cast<size_t>(index)] + ")", tool, why);
 }
 
-// The outward unit normal of `face` at the point of it nearest to `point`; false when the surface has none there.
-bool face_normal(const TopoDS_Face &face, const gp_Pnt &point, gp_Vec &normal) {
-  const Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
-  GeomAPI_ProjectPointOnSurf projection(point, surface);
-  if (projection.NbPoints() < 1) return false;
-  double u = 0, v = 0;
-  projection.LowerDistanceParameters(u, v);
-  GeomLProp_SLProps props(surface, u, v, 1, 1e-9);
-  if (!props.IsNormalDefined()) return false;
-  normal = gp_Vec(props.Normal());
-  if (face.Orientation() == TopAbs_REVERSED) normal.Reverse();
-  return true;
-}
-
 // Whether both ends of the curved edge lie on a planar face perpendicular to the tangent there (the other faces at each end vertex).
 bool curved_ends_square(const TopoDS_Shape &shape, const TopoDS_Edge &edge, const TopoDS_Face &face0, const TopoDS_Face &face1, const gp_Vec &start_tangent,
                         const gp_Vec &end_tangent, std::string &why) {
@@ -218,27 +204,6 @@ bool curved_ends_square(const TopoDS_Shape &shape, const TopoDS_Edge &edge, cons
     }
   }
   return true;
-}
-
-// The point of `face` at the chord `d` from `corner` in the plane perpendicular to `tangent`, starting from the tangent-plane offset along `inward`: project onto the
-// face, drop the component along the edge, rescale to the chord, until the projected point is the rescaled one to 1e-9 d. False when it does not settle or leaves the face.
-bool leg_point(const TopoDS_Face &face, const gp_Pnt &corner, const gp_Vec &tangent, const gp_Vec &inward, double d, gp_Pnt &out) {
-  gp_Pnt guess = corner.Translated(inward * d);
-  for (int pass = 0; pass < 40; ++pass) {
-    gp_Pnt on;
-    if (!project_on_face(face, guess, on)) return false;
-    gp_Vec across(corner, on);
-    across -= tangent * across.Dot(tangent);
-    const double length = across.Magnitude();
-    if (!(length > 1e-12 * d)) return false;
-    const gp_Pnt next = corner.Translated(across * (d / length));
-    if (next.Distance(on) < 1e-9 * d) {
-      out = on;
-      return inside(face, on);
-    }
-    guess = next;
-  }
-  return false;
 }
 
 // Whether the faces around `edge` are both planes.
@@ -300,7 +265,7 @@ bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> 
     if (k == kStations - 1) last_tangent = tangent;
     gp_Vec normal[2], inward[2];
     for (int f = 0; f < 2; ++f) {
-      if (!face_normal(around[static_cast<size_t>(f)], corner, normal[f])) {
+      if (!face_unit_normal(around[static_cast<size_t>(f)], corner, normal[f])) {
         why = label + " meets a face with no normal at a station";
         return false;
       }
@@ -387,29 +352,24 @@ bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> 
   return name_tool(loft, first_wire, polygons[0][0], polygons[0][1], "chamfer(" + edge_names[static_cast<size_t>(index)] + ")", tool, why);
 }
 
-std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first, double last, double second,
-                             double second_last, std::string &why) {
-  if (edges.empty()) {
+std::unique_ptr<Shape> build_each(const Shape &source, const std::vector<ChamferEdge> &each, std::string &why) {
+  if (each.empty()) {
     why = "a variable chamfer needs its edges listed (not every edge of the solid)";
     return nullptr;
   }
-  const bool sided = !faces.empty();
-  if (sided && faces.size() != edges.size()) {
-    why = "a variable chamfer with two legs needs one face per edge";
-    return nullptr;
-  }
-  if (!(first > 0) || !(last > 0) || !std::isfinite(first) || !std::isfinite(last) ||
-      (sided && (!(second > 0) || !(second_last > 0) || !std::isfinite(second) || !std::isfinite(second_last)))) {
-    why = "the distances must be > 0";
-    return nullptr;
-  }
+  for (const ChamferEdge &entry : each)
+    for (const double distance : entry.given)
+      if (!(distance > 0) || !std::isfinite(distance)) {
+        why = "the distances must be > 0";
+        return nullptr;
+      }
   const TopTools_IndexedMapOfShape unique_edges = query::distinct(source.shape, TopAbs_EDGE);
   TopTools_IndexedMapOfShape all;
   TopExp::MapShapes(source.shape, TopAbs_VERTEX, all);
   std::map<int, std::vector<size_t>> at_vertex;  // vertex -> the chosen edges (positions in `edges`) that end there
   std::set<uint32_t> seen;
-  for (size_t position = 0; position < edges.size(); ++position) {
-    const uint32_t index = edges[position];
+  for (size_t position = 0; position < each.size(); ++position) {
+    const uint32_t index = each[position].index;
     if (static_cast<int>(index) >= unique_edges.Extent()) {
       why = "edge index out of range";
       return nullptr;
@@ -428,12 +388,12 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
   const naming::Named input = naming::named(source);
   const std::vector<std::string> names = naming::edge_names(source.shape, input.names);
   std::vector<Tool> tools;
-  for (size_t k = 0; k < edges.size(); ++k) {
-    const int index = static_cast<int>(edges[k]);
-    const double given[4] = {first, last, sided ? second : first, sided ? second_last : last};
+  for (size_t k = 0; k < each.size(); ++k) {
+    const int index = static_cast<int>(each[k].index);
+    const double *given = each[k].given;
     const BRepAdaptor_Curve curve(TopoDS::Edge(unique_edges(index + 1)));
     Tool tool;
-    const int leg1 = sided ? static_cast<int>(faces[k]) : -1;
+    const int leg1 = each[k].leg1;
     const bool built = curve.GetType() == GeomAbs_Line && faces_planar(source.shape, TopoDS::Edge(unique_edges(index + 1))) ? make_straight_tool(source.shape, names, index, leg1, given, tool, why)
                                                        : make_curved_tool(source.shape, names, index, leg1, given, tool, why);
     if (!built) return nullptr;
@@ -476,11 +436,26 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
   return naming::wrap_named(current.shape, current.names);
 }
 
+std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first, double last, double second,
+                             double second_last, std::string &why) {
+  const bool sided = !faces.empty();
+  if (sided && faces.size() != edges.size()) {
+    why = "a variable chamfer with two legs needs one face per edge";
+    return nullptr;
+  }
+  std::vector<ChamferEdge> each;
+  for (size_t k = 0; k < edges.size(); ++k)
+    each.push_back({edges[k], sided ? static_cast<int>(faces[k]) : -1, {first, last, sided ? second : first, sided ? second_last : last}});
+  return build_each(source, each, why);
+}
+
 std::string failure_text(const Standard_Failure &error) {
   return std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
 }
 
 }  // namespace
+
+std::unique_ptr<Shape> blend::chamfer_per_edge(const Shape &source, const std::vector<ChamferEdge> &each, std::string &why) { return build_each(source, each, why); }
 
 std::unique_ptr<Shape> chamfer_variable(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first, double last,
                                         double second, double second_last) {

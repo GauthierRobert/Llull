@@ -12,6 +12,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepLib.hxx>
+#include <BRep_Builder.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRep_Tool.hxx>
 #include <TopExp.hxx>
@@ -162,6 +163,21 @@ bool rebuild_face(const FaceEdit &edit, TopoDS_Face &out, std::string &why) {
     if (curve->Value(curve->FirstParameter()).Distance(head) > curve->Value(curve->LastParameter()).Distance(head)) {
       curve = curve->Reversed();
       std::swap(start, end);
+    }
+    // an oblique end (grow_limit > 0): the old vertices keep their place and the new curve ends within the gap the builder accepted of them, so their
+    // tolerance grows to hold it; every other replacement is built exactly as before
+    if (replacement.grow_limit > 0) {
+      BRep_Builder builder;
+      const TopoDS_Vertex heads[2] = {start.IsNull() ? first : start, end.IsNull() ? last : end};
+      for (int k = 0; k < 2; ++k) {
+        const double gap = BRep_Tool::Pnt(heads[k]).Distance(curve->Value(k == 0 ? curve->FirstParameter() : curve->LastParameter()));
+        if (gap > replacement.grow_limit) {
+          why = "internal error: the new end curve of an oblique end misses a vertex of the end face by " + std::to_string(gap) + " (limit " +
+                std::to_string(replacement.grow_limit) + ")";
+          return false;
+        }
+        if (gap > BRep_Tool::Tolerance(heads[k])) builder.UpdateVertex(heads[k], 1.05 * gap);
+      }
     }
     BRepBuilderAPI_MakeEdge edge(curve, start.IsNull() ? first : start, end.IsNull() ? last : end);
     if (!edge.IsDone()) {

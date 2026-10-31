@@ -126,6 +126,8 @@ struct Mode {
   double param = 0.0;
   bool automatic = false;
   double factor = 2.0;  // automatic corners: setback relative to the least one the neighbouring blends allow
+  bool no_g2 = false;     // the G1 star only (a curvature step whose G2 star failed after the sewing, 13.36)
+  std::string downgrade;  // why the step was built with a lesser patch than the G2 star: recorded as g2Refused of every curvature corner
 };
 // The factors an automatic corner tries in turn (the fill of a patch is more or less exact depending on the section and the size of the patch).
 constexpr double kAutomaticFactors[] = {2.0, 1.5, 2.5, 1.25, 3.0};
@@ -861,7 +863,7 @@ std::atomic<bool> g_crease_gate{true};   // test hook: set_corner_crease_gate (f
 std::atomic<bool> g_c0_knots_only{false}; // test hook: set_corner_c0_knots (true: only C0 knots at the joints of the chains, no C1 attempt)
 std::atomic<bool> g_g2_star{true};         // test hook: set_corner_g2_star (false: the G1 star for a curvature profile too)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
-std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole)
+std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole, 7: a step with a G2 star fails after the fills, so the G1 star pass must build it)
 std::atomic<bool> g_force_trim{false};   // test hook: set_corner_trim (the rolling-ball trim builder for every step, 13.22)
 std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
 
@@ -1956,7 +1958,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     job.corner = c;
     job.mixed = plan.mixed[c];
     job.creased = plan.sharp[c] >= 0;
-    job.g2 = mode.kind == 1;
+    job.g2 = mode.kind == 1 && !mode.no_g2;
     TopTools_IndexedMapOfShape removed;
     const TopoDS_Vertex apex = vertex_at(split, corners[c].at, vertex_tolerance);
     if (apex.IsNull()) {
@@ -2022,7 +2024,9 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   fill_all(jobs, patch_gap_limit, diagonal);
   for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
   // test hooks: 3 = a step with a star fails after the fills (the plate pass must then build it), 4 = every step fails there (the message names both reasons)
-  if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
+  // 7 = a step with a G2 star fails there (the G1 star pass must then build it)
+  const bool g2_star_used = std::any_of(jobs.begin(), jobs.end(), [](const FillJob &job) { return job.g2_built; });
+  if ((g_exact_mode.load() == 3 && star_used) || (g_exact_mode.load() == 7 && g2_star_used) || g_exact_mode.load() == 4) {
     fill_failed = true;
     why = std::string(kFailed) + "forced by the test hook after the fills";
     return nullptr;
@@ -2071,7 +2075,11 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
     }
     patch_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
-    patch_g2[c] = job.g2_built ? "" : job.g2_problem;
+    if (mode.kind == 1 && !job.g2_built) {
+      // every downgrade from the G2 star is recorded: why it was refused, and why the step was built with a lesser patch
+      patch_g2[c] = job.g2_problem;
+      if (!mode.downgrade.empty()) patch_g2[c] += (patch_g2[c].empty() ? "" : "; ") + mode.downgrade;
+    }
     patch_continuity[c] = job.patch_loop.empty() ? "" : (job.g2_built ? "G2" : "G1");
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
@@ -2183,6 +2191,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     for (size_t c = 0; c < corners.size(); ++c) {
       log.begin_object().key("vertex").point(corners[c].at).key("patch").string(patch_kinds[c]);
       if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
+      if (patch_continuity[c] == "G2") log.key("spokes").string("G1");
       if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
       log.key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
@@ -2200,10 +2209,25 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   bool star_used = false;
   std::unique_ptr<Shape> built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, true, star_used);
   if (built != nullptr || !star_used) return built;
-  const std::string star_why = why;
+  std::string star_why = why;
   bool unused = false;
   why.clear();
-  built = build_setback_pass(source, edge_raw, corner_raw, mode, fill_failed, corners_json, why, false, unused);
+  // a curvature step: the G1 star before the plate
+  if (mode.kind == 1 && mode.automatic) {
+    Mode g1_mode = mode;
+    g1_mode.no_g2 = true;
+    g1_mode.downgrade = "the step with the G2 stars failed after the sewing (" + star_why + "): built with the G1 stars";
+    why.clear();
+    built = build_setback_pass(source, edge_raw, corner_raw, g1_mode, fill_failed, corners_json, why, true, unused);
+    if (built != nullptr) return built;
+    star_why += "; the G1 stars: " + why;
+  }
+  Mode plate_mode = mode;
+  unused = false;
+  plate_mode.no_g2 = true;
+  plate_mode.downgrade = "the step with the stars failed after the sewing (" + star_why + "): built with the plate patches";
+  why.clear();
+  built = build_setback_pass(source, edge_raw, corner_raw, plate_mode, fill_failed, corners_json, why, false, unused);
   if (built == nullptr) why += " (the exact-boundary patch was refused: " + star_why + ")";
   return built;
 }

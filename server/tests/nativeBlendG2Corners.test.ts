@@ -24,7 +24,7 @@ interface Checked {
   readonly findings: Array<{ code: string; severity: string }>;
 }
 interface Notes {
-  readonly corners?: Array<{ readonly patch: string; readonly continuity?: string; readonly g2Refused?: string }>;
+  readonly corners?: Array<{ readonly patch: string; readonly continuity?: string; readonly g2Refused?: string; readonly spokes?: string }>;
 }
 
 describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OCCT kernel)', () => {
@@ -47,12 +47,12 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
   const check = (doc: CadDocument, id: string, require: 'G1' | 'G2'): Checked =>
     execute(doc, 'check_blends', { ids: [id], require }).data as Checked;
 
-  it('a curvature-profile cube passes check_blends require G2 through its corners; the spokes are reported, never failed', () => {
+  it('a curvature-profile cube has no failing finding under check_blends require G2; the seams of its corner stars warn BLD_CHECK_SPOKE_G2', () => {
     const { doc, id, notes } = rounded({ type: 'curvature', shape: 0.5 });
     expect(notes.corners).toHaveLength(8);
-    for (const corner of notes.corners ?? []) expect(corner.continuity).toBe('G2');
+    for (const corner of notes.corners ?? []) expect([corner.continuity, corner.spokes]).toEqual(['G2', 'G1']);
     const checked = check(doc, id, 'G2');
-    expect(checked.status).toBe('pass');
+    expect(checked.status).toBe('warn');
     expect(checked.findings.filter((found) => found.severity === 'fail')).toEqual([]);
     const corners = checked.blends.filter((row) => row.kind === 'corner');
     expect(corners).toHaveLength(48);
@@ -60,9 +60,13 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
     const contacts = corners.flatMap((row) => row.contacts);
     const seams = contacts.filter((contact) => contact.order !== 'G2');
     expect(contacts.filter((contact) => contact.order === 'G2').length).toBeGreaterThanOrEqual(48);
+    expect(seams.length).toBeGreaterThan(0);
     for (const seam of seams) expect(seam.order).toBe('G1');
     for (const contact of contacts) expect(contact.g1AngleRad).toBeLessThan(1e-3);
-    expect(checked.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP' && found.severity !== 'info')).toBe(false);
+    // the seams are warned under their own code, and nothing is a BLD_CHECK_G2_JUMP
+    expect(checked.findings.some((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toBe(true);
+    expect(checked.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2').every((found) => found.severity === 'warn')).toBe(true);
+    expect(checked.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);
   });
 
   it('the conic cube keeps the G1 star: require G2 fails at its corner contacts', () => {

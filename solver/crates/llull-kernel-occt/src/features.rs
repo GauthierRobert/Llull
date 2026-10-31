@@ -32,6 +32,24 @@ mod ffi {
             kind: f64,
             param: f64,
         ) -> Result<UniquePtr<Shape>>;
+        fn fillet_profile_legs(
+            shape: &Shape,
+            specs: &[f64],
+            edges: &[u32],
+            laws: &[f64],
+            legs: &[f64],
+            kind: f64,
+            param: f64,
+        ) -> Result<UniquePtr<Shape>>;
+        fn profile_legs_reason(
+            shape: &Shape,
+            specs: &[f64],
+            edges: &[u32],
+            laws: &[f64],
+            legs: &[f64],
+            kind: f64,
+            param: f64,
+        ) -> Result<String>;
         fn profile_blend_last_reason() -> Result<String>;
         fn shape_notes(shape: &Shape) -> Result<String>;
         fn profile_blend_reason(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<String>;
@@ -60,8 +78,8 @@ mod ffi {
             second: f64,
             second_last: f64,
         ) -> Result<String>;
-        fn blend_union(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<UniquePtr<Shape>>;
-        fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<String>;
+        fn blend_union(list: &ShapeList, radius: f64, joints: &[f64], names: &str) -> Result<UniquePtr<Shape>>;
+        fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64], names: &str) -> Result<String>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
         fn shell_open(shape: &Shape, thickness: f64, open_near: &[f64]) -> Result<UniquePtr<Shape>>;
 
@@ -136,6 +154,26 @@ pub fn fillet_profile(shape: &Shape, specs: &[f64]) -> Built {
 /// for `edges` / `laws` (empty when a leg is asymmetric) with the section `kind` / `param`.
 pub fn fillet_profile_blend(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Built {
     built(ffi::fillet_profile_blend(inner(shape)?, specs, edges, laws, kind, param))
+}
+
+/// [`fillet_profile_blend`] for a two-leg (`size2`) plan: `legs` holds 6 numbers per edge (unique edge index, unique face index carrying the first leg, size,
+/// sizeEnd (NaN = constant), size2, size2End (NaN = constant)); the prism builder (`specs`, constant legs) is tried first, then the chamfer-based builder
+/// (curved edges and faces, legs that vary along the edge).
+pub fn fillet_profile_legs(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], legs: &[f64], kind: f64, param: f64) -> Built {
+    built(ffi::fillet_profile_legs(inner(shape)?, specs, edges, laws, legs, kind, param))
+}
+
+/// Why [`fillet_profile_legs`] fails ("" when it builds).
+pub fn profile_legs_reason(
+    shape: &Shape,
+    specs: &[f64],
+    edges: &[u32],
+    laws: &[f64],
+    legs: &[f64],
+    kind: f64,
+    param: f64,
+) -> OcctResult<String> {
+    occt(ffi::profile_legs_reason(inner(shape)?, specs, edges, laws, legs, kind, param))
 }
 
 /// Why `fillet_profile_blend` fails ("" when it builds).
@@ -236,18 +274,19 @@ fn shape_list(shapes: &[&Shape]) -> Result<cxx::UniquePtr<ffi::ShapeList>, Strin
     Ok(list)
 }
 
-/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`, except the joints nearest to the picks `joints` (x, y, z, radius per pick).
-pub fn blend(shapes: &[&Shape], radius: f64, joints: &[f64]) -> Built {
+/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`, except the picked joints: `joints` = per pick by_name (0 | 1), x, y, z, then its radius law in the
+/// `fillet_laws` layout (size, size_end or NaN, mode, n, n x (t, size)); `names` = the persistent joint name of each pick, newline between (empty for a pick by point).
+pub fn blend(shapes: &[&Shape], radius: f64, joints: &[f64], names: &str) -> Built {
     let list = shape_list(shapes)?;
     let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
-    built(ffi::blend_union(list, radius, joints))
+    built(ffi::blend_union(list, radius, joints, names))
 }
 
 /// Why [`blend`] fails (empty when it builds).
-pub fn blend_reason(shapes: &[&Shape], radius: f64, joints: &[f64]) -> OcctResult<String> {
+pub fn blend_reason(shapes: &[&Shape], radius: f64, joints: &[f64], names: &str) -> OcctResult<String> {
     let list = shape_list(shapes)?;
     let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
-    occt(ffi::blend_union_reason(list, radius, joints))
+    occt(ffi::blend_union_reason(list, radius, joints, names))
 }
 
 /// Sealed hollow: the solid minus its inward offset.

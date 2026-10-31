@@ -117,8 +117,12 @@ describe('searchTools ranking regression table', () => {
   });
 
   it('does not rank natural-frequency queries onto animation or surface tools above the analysis tools', () => {
-    // sdof_response (PHY-09 quick check: natural frequency fnHz) is an analysis tool too.
-    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'sdof_response']);
+    // analysis_report legitimately matches through the natural-frequency synonym expansion (modal / eigen: it reports eigen modes), so it may sit
+    // between create_analysis and sdof_response (PHY-09 quick check: natural frequency fnHz); what matters is that only analysis tools lead.
+    const top = ranked('natural frequency', 3);
+    expect(top[0]).toBe('create_analysis');
+    expect(top).toContain('sdof_response');
+    expect(top.every((name) => ['create_analysis', 'analysis_report', 'sdof_response'].includes(name))).toBe(true);
   });
 });
 

@@ -110,6 +110,23 @@ const check = (
 };
 
 describe('check_blends radius readback', () => {
+  it('a blend with two legs (size2) is not read as a circle of the law radius: no radius row and no BLD_CHECK_RADIUS_LAW whatever the sections say (13.34)', () => {
+    const kernel = kernelWith(sectionsOf(() => 1.7));
+    const { doc } = filleted(kernel, { size: 1, size2: 2, side1Name: `${S}:z+` });
+    const { rows, findings } = check(kernel, doc);
+    expect(findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.radius).toBeUndefined();
+    // equal legs are legs too: size2 == size still reads no radius
+    const equal = filleted(kernel, { size: 1, size2: 1, side1Name: `${S}:z+` });
+    const equalRead = check(kernel, equal.doc);
+    expect(equalRead.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+    expect(equalRead.rows[0]?.radius).toBeUndefined();
+    // the same sections under a radius law are a failure: the skip is the legs, not the kernel
+    const radius = filleted(kernel, { size: 1 });
+    expect(check(kernel, radius.doc).findings.map((finding) => finding.code)).toContain('BLD_CHECK_RADIUS_LAW');
+  });
+
   it('a constant radius: min = max = r, a sample at every requested t, the law compared and met', () => {
     const kernel = kernelWith(sectionsOf(() => 1));
     const { doc } = filleted(kernel, { size: 1 });
@@ -539,7 +556,11 @@ describe('blendInfo helpers', () => {
 
 describe('check_blends over a blend_union (the radius of each joint is verified)', () => {
   const report =
-    (radius: number, source = 'default'): NonNullable<GeometryKernel['blendReport']> =>
+    (
+      radius: number,
+      source = 'default',
+      contour: { radiusEnd?: number; interpolation?: 'linear'; isolated?: boolean; samples?: Array<[number, number, number]> } = {},
+    ): NonNullable<GeometryKernel['blendReport']> =>
     () => ({
       stage: 'blend',
       contours: [],
@@ -548,7 +569,7 @@ describe('check_blends over a blend_union (the radius of each joint is verified)
       unsupportedVertices: [],
       done: true,
       valid: true,
-      notes: { builder: 'union', picks: [], contours: [{ radius, source, edges: [SOURCE_EDGE] }] },
+      notes: { builder: 'union', picks: [], contours: [{ radius, source, edges: [SOURCE_EDGE], ...contour }] },
     });
   const unioned = (kernel: GeometryKernel): { doc: CadDocument; id: string } => {
     const first = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
@@ -582,6 +603,51 @@ describe('check_blends over a blend_union (the radius of each joint is verified)
     expect(found[0]).toMatchObject({ severity: 'fail', limit: 1e-4 });
     expect(found[0]?.value).toBeCloseTo(0.5, 9);
     expect(status).toBe('fail');
+  });
+
+  describe('a radius law on a joint (13.32)', () => {
+    /** The joint runs along x from -10 to 10 (five points of the edge, like the kernel sends them). */
+    const along = (reverse: boolean): Array<[number, number, number]> =>
+      [0, 0.25, 0.5, 0.75, 1].map((t): [number, number, number] => [reverse ? 10 - 20 * t : -10 + 20 * t, 5, 2.5]);
+    const law = (extra: { isolated?: boolean; reverse?: boolean } = {}): NonNullable<GeometryKernel['blendReport']> =>
+      report(1, 'joints[0]', {
+        radiusEnd: 2,
+        interpolation: 'linear',
+        isolated: extra.isolated ?? true,
+        samples: along(extra.reverse ?? false),
+      });
+    const lawFindings = (kernel: GeometryKernel): ReturnType<typeof check> => check(kernel, unioned(kernel).doc);
+
+    it('a radius that follows the law along the joint: the law is compared at every parameter and met', () => {
+      const kernel = { ...kernelWith(sectionsOf((t) => 1 + t)), blendReport: law() };
+      const checked = lawFindings(kernel);
+      expect(checked.rows[0]).toMatchObject({ lawChecked: true, source: 'joints[0]', radius: { min: 1, max: 2 } });
+      expect(checked.findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW')).toEqual([]);
+      expect(checked.status).toBe('pass');
+    });
+
+    it('BLD_CHECK_RADIUS_LAW when the joint is rounded with a constant radius instead of the law', () => {
+      const kernel = { ...kernelWith(sectionsOf(() => 1)), blendReport: law() };
+      const found = lawFindings(kernel).findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW');
+      expect(found.length).toBeGreaterThan(0);
+      expect(found[0]).toMatchObject({ severity: 'fail' });
+    });
+
+    it('the direction of the law is the direction of the joint edge: sections running against it read the law mirrored', () => {
+      // the law runs 1 -> 2 from the joint start (x = -10); the sections start at x = 10 and the radius there is 2
+      const mirrored = { ...kernelWith(sectionsOf((t) => 2 - t, true)), blendReport: law() };
+      expect(lawFindings(mirrored).findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW')).toEqual([]);
+      const wrong = { ...kernelWith(sectionsOf((t) => 1 + t, true)), blendReport: law() };
+      expect(lawFindings(wrong).findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW').length).toBeGreaterThan(0);
+    });
+
+    it('a joint chained with others is not compared end to end (the kernel reads the law per joint edge): the radius is still read back', () => {
+      const kernel = { ...kernelWith(sectionsOf(() => 1)), blendReport: law({ isolated: false }) };
+      const checked = lawFindings(kernel);
+      expect(checked.rows[0]).toMatchObject({ radius: { min: 1, max: 1 } });
+      expect(checked.rows[0]).not.toHaveProperty('lawChecked', true);
+      expect(checked.findings.filter((finding) => finding.code === 'BLD_CHECK_RADIUS_LAW')).toEqual([]);
+    });
   });
 
   it('a kernel that reports no contours verifies nothing and still reads the radius back', () => {

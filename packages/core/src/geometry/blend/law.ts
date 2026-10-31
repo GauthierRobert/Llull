@@ -16,6 +16,7 @@ export interface LawInput {
   readonly interpolation?: 'smooth' | 'linear' | 'monotone' | undefined;
   readonly law?: { readonly expression: string; readonly samples?: number | undefined } | undefined;
   readonly size2?: number | undefined;
+  readonly size2End?: number | undefined;
 }
 
 type LawProblemCode = 'BLD_LAW_INVALID' | 'BLD_LAW_NOT_PERIODIC';
@@ -78,19 +79,24 @@ function explicitLaw(input: LawInput): EdgeRadius | LawProblem {
     previous = point.t;
   }
   if (input.size2 !== undefined && !positive(input.size2)) return invalid(`size2 must be > 0 (got ${input.size2})`, 'size2');
+  if (input.size2End !== undefined && input.size2 === undefined)
+    return invalid('size2End is the end value of the second leg: give size2 too', 'size2End');
+  if (input.size2End !== undefined && !positive(input.size2End)) return invalid(`size2End must be > 0 (got ${input.size2End})`, 'size2End');
   return {
     size,
     ...(sizeEnd === undefined ? {} : { sizeEnd }),
     ...(sizes.length === 0 ? {} : { sizes }),
     ...interpolationOf(input.interpolation, sizes.length > 0 || sizeEnd !== undefined),
     ...(input.size2 === undefined ? {} : { size2: input.size2 }),
+    ...(input.size2End === undefined ? {} : { size2End: input.size2End }),
   };
 }
 
 /** The `EdgeRadius` of `input`: an expression law sampled at `samples` uniform points (first = size, last = sizeEnd, the rest = sizes), else the explicit law. */
 export function resolveLaw(input: LawInput): EdgeRadius | LawProblem {
   if (input.law === undefined) return explicitLaw(input);
-  if (input.size2 !== undefined) return invalid('size2 is the second leg of a size: give size (not law)', 'size2');
+  if (input.size2 !== undefined || input.size2End !== undefined)
+    return invalid('size2 is the second leg of a size: give size (not law)', 'size2');
   if (input.size !== undefined || input.sizeEnd !== undefined || (input.sizes?.length ?? 0) > 0)
     return invalid('give either law (an expression of t) or size / sizeEnd / sizes, not both', 'law');
   const sampled = sampleExpression(input.law.expression, input.law.samples ?? DEFAULT_LAW_SAMPLES);
@@ -126,12 +132,19 @@ export const lawEnds = (law: EdgeRadius): readonly [number, number] => [law.size
 /** A law on a closed edge or chain must close on itself: `r(0) = r(1)` within `PERIODIC_CLOSURE` of the size. */
 export function periodicProblem(law: EdgeRadius): LawProblem | null {
   const [start, end] = lawEnds(law);
-  return Math.abs(start - end) <= PERIODIC_CLOSURE * Math.max(start, end)
+  if (Math.abs(start - end) > PERIODIC_CLOSURE * Math.max(start, end))
+    return {
+      code: 'BLD_LAW_NOT_PERIODIC',
+      message: `the edge is closed, so the radius must return to its start: r(0) = ${start} but r(1) = ${end}`,
+      path: 'sizeEnd',
+    };
+  const { size2, size2End } = law;
+  return size2 === undefined || size2End === undefined || Math.abs(size2 - size2End) <= PERIODIC_CLOSURE * Math.max(size2, size2End)
     ? null
     : {
         code: 'BLD_LAW_NOT_PERIODIC',
-        message: `the edge is closed, so the radius must return to its start: r(0) = ${start} but r(1) = ${end}`,
-        path: 'sizeEnd',
+        message: `the edge is closed, so the second leg must return to its start: size2 = ${size2} but size2End = ${size2End}`,
+        path: 'size2End',
       };
 }
 
@@ -158,6 +171,7 @@ export function scaleLaw(law: EdgeRadius, factor: number): EdgeRadius {
     ...law,
     size: law.size * factor,
     ...(law.size2 === undefined ? {} : { size2: law.size2 * factor }),
+    ...(law.size2End === undefined ? {} : { size2End: law.size2End * factor }),
     ...(law.sizeEnd === undefined ? {} : { sizeEnd: law.sizeEnd * factor }),
     ...(law.sizes === undefined ? {} : { sizes: law.sizes.map((point) => ({ t: point.t, size: point.size * factor })) }),
   };
@@ -246,11 +260,13 @@ export function lawNodes(law: EdgeRadius, length: number): ReadonlyArray<readonl
 
 /** `law` run from its end to its start: sizes swapped and control points mirrored (t -> 1 - t); the same law seen from the other end of the edge. */
 export function reverseLaw(law: EdgeRadius): EdgeRadius {
-  const { size, sizeEnd = size, sizes, ...rest } = law;
+  const { size, sizeEnd = size, sizes, size2, size2End, ...rest } = law;
   return {
     ...rest,
     size: sizeEnd,
     sizeEnd: size,
+    ...(size2 === undefined ? {} : { size2: size2End ?? size2 }),
+    ...(size2 === undefined || size2End === undefined ? {} : { size2End: size2 }),
     ...(sizes === undefined ? {} : { sizes: sizes.map((point) => ({ t: 1 - point.t, size: point.size })).reverse() }),
   };
 }

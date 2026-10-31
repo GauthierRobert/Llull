@@ -221,6 +221,8 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
     )
       return 'fillet: radii interpolation must be "smooth", "linear" or "monotone"';
     if (law['size2'] !== undefined && !positiveNumber(law['size2'])) return 'fillet: radii size2 must be > 0';
+    if (law['size2End'] !== undefined && (law['size2'] === undefined || !positiveNumber(law['size2End'])))
+      return 'fillet: radii size2End needs size2 and must be > 0';
     const sideFace = law['sideFace'];
     if (
       (law['size2'] === undefined) !== (sideFace === undefined) ||
@@ -239,6 +241,18 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
     }
   }
   return null;
+}
+
+/** Whether an untrusted `blend` joint pick is usable: a point and / or a non-empty name, and a radius law the fillet laws accept. */
+function jointValid(joint: unknown): boolean {
+  if (!isRecord(joint)) return false;
+  const named = typeof joint['name'] === 'string' && joint['name'].length > 0 && !joint['name'].includes('\n');
+  if (!named && !isVec3(joint['near'])) return false;
+  if (joint['near'] !== undefined && !isVec3(joint['near'])) return false;
+  if (joint['name'] !== undefined && !named) return false;
+  if (joint['nameMid'] !== undefined && !isVec3(joint['nameMid'])) return false;
+  const law = { size: joint['radius'], sizeEnd: joint['radiusEnd'], sizes: joint['sizes'], interpolation: joint['interpolation'] };
+  return radiiError({ op: 'fillet', radii: [law] }, 1) === null;
 }
 
 /** Why the `profile` of an untrusted fillet node is unusable (type circular / conic / curvature, rho / shape inside 0.05..0.95), or null. */
@@ -362,12 +376,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
       if (!isFiniteNumber(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
       const joints = node['joints'];
-      if (
-        joints !== undefined &&
-        (!Array.isArray(joints) ||
-          !joints.every((joint) => isRecord(joint) && isVec3(joint['near']) && isFiniteNumber(joint['radius']) && joint['radius'] > 0))
-      )
-        return 'blend: joints must be a list of { near: [x, y, z], radius > 0 }';
+      if (joints !== undefined && (!Array.isArray(joints) || !joints.every(jointValid)))
+        return 'blend: joints must be a list of { near: [x, y, z] and / or name, radius > 0, optional radiusEnd > 0, sizes, interpolation }';
       for (const source of sources) {
         const problem = child(source);
         if (problem !== null) return problem;

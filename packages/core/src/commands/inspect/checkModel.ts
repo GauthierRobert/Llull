@@ -223,7 +223,7 @@ export const checkModel = defineCommand({
     'dangling_dimension_ref (dimension entity references a missing entity id), ' +
     'dangling_reference (constraint/joint/drive relation references a missing entity or joint), ' +
     'parameter_error (a named parameter has an evaluation error), ' +
-    'REF_LOST / REF_SPLIT / feature_step_not_applied (a fillet or chamfer step no longer applies: a recorded edge is gone or split; re-pick it with edit_step_params).',
+    'REF_LOST / REF_SPLIT / feature_step_not_applied (a fillet or chamfer step no longer applies: a recorded edge is gone or split; a blend_union step whose joint name (joints[i].name) is lost, split or now numbered to another joint, reported by joint index and name; re-pick it with edit_step_params).',
   params: z.object({
     farThreshold: z
       .number()

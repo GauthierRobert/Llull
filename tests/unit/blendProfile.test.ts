@@ -49,7 +49,7 @@ describe('resolveProfile and prepareProfile', () => {
     expect(profileText({ type: 'curvature', shape: 0.5 })).toBe(', curvature profile shape 0.5');
   });
 
-  it('prepareProfile: any symmetric law passes; a varying size with size2, size2 without a usable side are refused with the entry path', () => {
+  it('prepareProfile: any symmetric law passes; legs that run (sizeEnd, size2End) pass with their face, control points with size2 and size2 without a usable side are refused with the entry path', () => {
     const kernel = scriptedKernel();
     const shape = kernel.evaluate({ op: 'solid', entity: { id: 'x', kind: 'box' } as never });
     const run = (planned: Parameters<typeof prepareProfile>[3], topology = TOPOLOGY): ReturnType<typeof prepareProfile> =>
@@ -59,7 +59,9 @@ describe('resolveProfile and prepareProfile', () => {
     expect(run(varying)).toEqual({ planned: varying });
     const piecewise = [{ edge: 0, law: { size: 1, sizes: [{ t: 0.5, size: 2 }] } }];
     expect(run(piecewise)).toEqual({ planned: piecewise });
-    expect(run([{ edge: 0, law: { size: 1, sizeEnd: 2, size2: 2 }, entry: 3 }])).toMatchObject({
+    const running = run([{ edge: 0, law: { size: 1, sizeEnd: 2, size2: 2, size2End: 3 }, side: { name: `${SOURCE}:z+` }, entry: 3 }]);
+    expect(running).toMatchObject({ planned: [{ edge: 0, law: { size: 1, sizeEnd: 2, size2: 2, size2End: 3, sideFace: 1 } }] });
+    expect(run([{ edge: 0, law: { size: 1, sizes: [{ t: 0.5, size: 2 }], size2: 2 }, entry: 3 }])).toMatchObject({
       code: 'BLD_PROFILE_FAILED',
       path: 'edges[3].size2',
     });
@@ -128,6 +130,24 @@ describe('fillet_edge profile and size2', () => {
     expect(brepOf(byName.document, byName.affected[0] as string)).toMatchObject({ radii: [{ sideFace: 0 }] });
   });
 
+  it('size2End: the second leg runs to its own end value, recorded on the law and read in the summary; a bare size2End or a bad one is BLD_LAW_INVALID on its path', () => {
+    const kernel = scriptedKernel({ distance: (face) => (face === 1 ? 0 : 5) });
+    const { doc, id } = box();
+    const run = (edge: Record<string, unknown>): ReturnType<typeof execute> =>
+      execute(doc, 'fillet_edge', { id, edges: [{ index: 0, side1Near: [0, 0, 2.5], ...edge }] }, context(kernel));
+    const done = run({ size: 1, sizeEnd: 2, size2: 2, size2End: 3 });
+    expect(done.error).toBeUndefined();
+    expect(brepOf(done.document, done.affected[0] as string)).toMatchObject({
+      radii: [{ size: 1, sizeEnd: 2, size2: 2, size2End: 3, sideFace: 1 }],
+    });
+    expect(done.summary).toContain('1>2 x 2>3');
+    const second = run({ size: 1, size2: 2, size2End: 3 });
+    expect(brepOf(second.document, second.affected[0] as string)).toMatchObject({ radii: [{ size: 1, size2: 2, size2End: 3 }] });
+    expect(run({ size: 1, size2End: 3 }).error).toMatchObject({ code: 'BLD_LAW_INVALID', paths: ['edges[0].size2End'] });
+    expect(run({ size: 1, size2: 2, size2End: -1 }).error).toMatchObject({ code: 'BLD_LAW_INVALID', paths: ['edges[0].size2End'] });
+    expect(run({ law: { expression: '1' }, size2End: 1 }).error).toMatchObject({ code: 'BLD_LAW_INVALID', paths: ['edges[0].size2'] });
+  });
+
   it('BLD_RHO_RANGE / BLD_SHAPE_RANGE before any kernel work; BLD_LAW_INVALID for a bad size2; BLD_ASYMMETRIC_SIDE_MISSING without a side', () => {
     const kernel = scriptedKernel();
     const { doc, id } = box();
@@ -186,13 +206,13 @@ describe('fillet_edge profile and size2', () => {
     ).toHaveLength(3);
   });
 
-  it('a second leg with a varying size is BLD_PROFILE_FAILED on the entry; the kernel is not asked', () => {
+  it('a second leg with control points is BLD_PROFILE_FAILED on the entry; the kernel is not asked', () => {
     const kernel = scriptedKernel();
     const { doc, id } = box();
     const result = execute(
       doc,
       'fillet_edge',
-      { id, edges: [{ index: 0, size: 1, sizeEnd: 2, size2: 2, side1Near: [0, 0, 2.5] }] },
+      { id, edges: [{ index: 0, size: 1, sizes: [{ t: 0.5, size: 2 }], size2: 2, side1Near: [0, 0, 2.5] }] },
       context(kernel),
     );
     expect(result.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
@@ -326,6 +346,9 @@ describe('recipe, kernel ops, check_blends and export of profile blends', () => 
     expect(validateShapeRecipe(legs({ sideFace: 1 }), leaf)).toContain('go together');
     expect(validateShapeRecipe(legs({ size2: 0, sideFace: 1 }), leaf)).toContain('size2 must be > 0');
     expect(validateShapeRecipe(legs({ size2: 2, sideFace: -1 }), leaf)).toContain('go together');
+    expect(validateShapeRecipe(legs({ size2: 2, size2End: 3, sideFace: 1 }), leaf)).toBeNull();
+    expect(validateShapeRecipe(legs({ size2End: 3 }), leaf)).toContain('size2End needs size2');
+    expect(validateShapeRecipe(legs({ size2: 2, size2End: 0, sideFace: 1 }), leaf)).toContain('size2End needs size2 and must be > 0');
   });
 
   it('an in-process kernel refuses a profile or two-leg fillet instead of rounding it circularly', () => {
