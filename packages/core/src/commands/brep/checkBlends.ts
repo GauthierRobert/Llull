@@ -431,7 +431,24 @@ export const checkBlends = defineCommand({
     });
     const legs = kernel === null ? [] : chamfered.map((entity) => readChamferLegs(kernel, entity, unit));
     const chamferRows = legs.flatMap((read) => read.rows);
-    const findings = [...checks.flatMap((check) => check.findings), ...legs.flatMap((read) => read.findings)];
+    const unverifiedChamfers = chamferRows.filter((row) => row.note !== undefined);
+    const findings = [
+      ...checks.flatMap((check) => check.findings),
+      ...legs.flatMap((read) => read.findings),
+      // a chamfer whose legs could not be compared is not a pass: it is a warning that names why
+      ...unverifiedChamfers.map(
+        (row): Finding => ({
+          code: 'BLD_CHECK_CHAMFER_UNVERIFIED',
+          severity: 'warn',
+          entityId: row.entityId,
+          ...(row.face === null ? {} : { face: row.face }),
+          edge: row.edge,
+          unit,
+          remediation: REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
+          message: `the legs of the chamfer of edge ${row.edge} were not verified: ${row.note}`,
+        }),
+      ),
+    ];
     const defaulted = Object.entries(named)
       .filter(([, tolerance]) => tolerance.defaulted)
       .map(([name]) => name);
@@ -464,11 +481,11 @@ export const checkBlends = defineCommand({
     const status =
       kernel === null ||
       (targets.length === 0 && chamferRows.length === 0) ||
-      (chamferRows.length === 0 && checks.every((check) => check.notRun !== undefined))
+      (chamferRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
         ? 'not_run'
         : statusOf(findings);
     const blends = checks.flatMap((check) => check.blends);
-    const unverified = checks.reduce((total, check) => total + check.unverified, 0);
+    const unverified = checks.reduce((total, check) => total + check.unverified, 0) + unverifiedChamfers.length;
     const unverifiedJunctions = checks.reduce((total, check) => total + check.unverifiedJunctions, 0);
     const fails = findings.filter((finding) => finding.severity === 'fail').length;
     const summary =

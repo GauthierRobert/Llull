@@ -298,7 +298,6 @@ function sidedChamferError(node: Record<string, unknown>, edgeCount: number): st
   if (!Array.isArray(faces) || faces.length !== edgeCount || !faces.every((face) => Number.isInteger(face) && (face as number) >= 0))
     return 'chamfer: faces needs one non-negative face index per listed edge';
   if ((size2 === undefined) === (angleDeg === undefined)) return 'chamfer: give exactly one of size2 or angleDeg with faces';
-  if (variable && size2 === undefined) return 'chamfer: a variable chamfer with faces gives size2 and size2End';
   if (size2 !== undefined && !positiveNumber(size2)) return 'chamfer: size2 must be > 0';
   if (angleDeg !== undefined && !(isFiniteNumber(angleDeg) && angleDeg > 0 && angleDeg < 90))
     return 'chamfer: angleDeg must be inside (0, 90)';

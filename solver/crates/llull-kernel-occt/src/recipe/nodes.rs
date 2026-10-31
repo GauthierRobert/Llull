@@ -223,7 +223,7 @@ fn variable_legs(recipe: &Value) -> Option<(Vec<u32>, f64, f64)> {
 
 /// A `chamfer` node (BLD M1): symmetric `size` by default; with `faces` (one unique face index per edge, the face carrying the first leg) a second
 /// leg `size2` (distance-distance) or `angleDeg` (distance-angle, degrees measured on that face, 0 < angle < 90); with `sizeEnd` a symmetric
-/// distance that runs linearly from `size` to `sizeEnd` along each straight edge (BLD M5).
+/// distance that runs linearly from `size` to `sizeEnd` along each edge; with `faces` also `size2` -> `size2End` for the other leg (straight or curved edges, BLD M5).
 fn chamfer_node(source: &Shape, edges: &[u32], size: f64, size_end: Option<f64>, recipe: &Value) -> Evaluated {
     if let Some(end) = size_end {
         // BLD M5: a distance running linearly from `size` to `end`; with `faces` the other leg runs from `size2` to `size2End`

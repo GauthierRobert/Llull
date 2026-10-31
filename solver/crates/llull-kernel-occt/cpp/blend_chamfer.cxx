@@ -4,9 +4,11 @@
 // in the plane perpendicular to it, and may differ (asymmetric: the leg on the face named by `faces` is the first one).
 // - A straight edge between two planar faces: the ruled loft of the two end triangles; the lateral face is the bilinear patch whose cross-section at
 //   every station is the straight chamfer section, so the removed volume of a right-angle edge is exactly 1/2 integral d1(s) d2(s) ds.
-// - A curved edge (an arc, a B-spline) between any two faces: a smooth loft through the sections at equal arc-length stations. Each section is the
-//   chamfer line a-b extended outward (inward for a concave edge) by the largest leg along both face normals, so the tool never shares a face with the
-//   solid; the leg points are the tangent-plane offsets projected back onto the faces (exact for a plane and for a generatrix of a cylinder).
+// - Any other edge (an arc, a B-spline, a generator line between a plane and a cylinder): a smooth loft through the sections at equal arc-length stations.
+//   A leg is the chord of length d in the plane perpendicular to the edge (found by projecting a tangent-plane guess onto the face and rescaling to d until
+//   it is on the face to 1e-9 d), so what check_blends measures is what was asked. Each section is the parallelogram a' b' b'+O a'+O: the chamfer line a-b
+//   extended along itself by a tenth of its length at both ends (the ends lie outside the solid for a convex edge, inside it for a concave one) and offset
+//   past the corner by its height plus the same margin, so the tool shares no face with the solid and cannot reach a support the legs do not.
 // CUT for a convex edge, FUSE for a concave one (blend_tool.hxx `apply_tools`).
 // Scope: no two chosen edges sharing a vertex, flat square ends, an edge that is not closed.
 #include <algorithm>
@@ -62,7 +64,6 @@ struct Legs {
   double start[2];
   double end[2];
   double at(int k, double s) const { return start[k] + (end[k] - start[k]) * s; }
-  double largest() const { return std::max(std::max(start[0], end[0]), std::max(start[1], end[1])); }
   double smallest() const { return std::min(std::min(start[0], end[0]), std::min(start[1], end[1])); }
 };
 
@@ -215,6 +216,36 @@ bool curved_ends_square(const TopoDS_Shape &shape, const TopoDS_Edge &edge, cons
   return true;
 }
 
+// The point of `face` at the chord `d` from `corner` in the plane perpendicular to `tangent`, starting from the tangent-plane offset along `inward`: project onto the
+// face, drop the component along the edge, rescale to the chord, until the projected point is the rescaled one to 1e-9 d. False when it does not settle or leaves the face.
+bool leg_point(const TopoDS_Face &face, const gp_Pnt &corner, const gp_Vec &tangent, const gp_Vec &inward, double d, gp_Pnt &out) {
+  gp_Pnt guess = corner.Translated(inward * d);
+  for (int pass = 0; pass < 40; ++pass) {
+    gp_Pnt on;
+    if (!project_on_face(face, guess, on)) return false;
+    gp_Vec across(corner, on);
+    across -= tangent * across.Dot(tangent);
+    const double length = across.Magnitude();
+    if (!(length > 1e-12 * d)) return false;
+    const gp_Pnt next = corner.Translated(across * (d / length));
+    if (next.Distance(on) < 1e-9 * d) {
+      out = on;
+      return inside(face, on);
+    }
+    guess = next;
+  }
+  return false;
+}
+
+// Whether the faces around `edge` are both planes.
+bool faces_planar(const TopoDS_Shape &shape, const TopoDS_Edge &edge) {
+  TopTools_IndexedDataMapOfShapeListOfShape owners;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
+  for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next())
+    if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), Standard_True).GetType() != GeomAbs_Plane) return false;
+  return true;
+}
+
 // The chamfer tool of one curved edge.
 bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_names, int index, int leg1, const double given[4], Tool &tool,
                       std::string &why) {
@@ -241,7 +272,6 @@ bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> 
   int side = 0;
   if (!first_leg_side(shape, leg1, around[0], around[1], index, side, why)) return false;
   const Legs legs = legs_of(given, side);
-  const double extension = legs.largest();
   const double probe = std::min(1e-4 * diagonal, 0.1 * legs.smallest());
   GCPnts_UniformAbscissa stations(curve, kStations);
   if (!stations.IsDone() || stations.NbPoints() < kStations) {
@@ -303,15 +333,28 @@ bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> 
       return false;
     }
     gp_Pnt leg[2];
-    for (int f = 0; f < 2; ++f) {
-      const gp_Pnt raw = corner.Translated(inward[f] * legs.at(f, s));
-      if (!project_on_face(around[static_cast<size_t>(f)], raw, leg[f]) || !inside(around[static_cast<size_t>(f)], leg[f])) {
-        why = "a leg of " + std::to_string(legs.at(f, s)) + " reaches past the faces of " + label + "; use smaller distances";
+    for (int f = 0; f < 2; ++f)
+      if (!leg_point(around[static_cast<size_t>(f)], corner, tangent, inward[f], legs.at(f, s), leg[f])) {
+        why = "a leg of " + std::to_string(legs.at(f, s)) + " reaches past the faces of " + label + ", or does not settle on them; use smaller distances";
         return false;
       }
+    gp_Vec line(leg[0], leg[1]);
+    const double span = line.Magnitude();
+    if (!(span > 1e-9 * diagonal)) {
+      why = "the chamfer line of " + label + " has no length";
+      return false;
     }
-    const gp_Vec out0 = normal[0] * (sigma * extension), out1 = normal[1] * (sigma * extension);
-    polygons.push_back({leg[0], leg[0].Translated(out0), corner.Translated(out0 + out1), leg[1].Translated(out1), leg[1]});
+    line /= span;
+    const double margin = 0.1 * span;
+    const gp_Vec to_corner(leg[0], corner);
+    const gp_Vec height = to_corner - line * to_corner.Dot(line);
+    if (!(height.Magnitude() > 1e-9 * span)) {
+      why = "the corner of " + label + " lies on its chamfer line";
+      return false;
+    }
+    const gp_Vec offset = height * ((height.Magnitude() + margin) / height.Magnitude());
+    const gp_Pnt a_end = leg[0].Translated(line * -margin), b_end = leg[1].Translated(line * margin);
+    polygons.push_back({a_end, b_end, b_end.Translated(offset), a_end.Translated(offset)});
   }
   if (!curved_ends_square(shape, edge, around[0], around[1], first_tangent, last_tangent, why)) {
     why = label + ": " + why;
@@ -337,7 +380,7 @@ bool make_curved_tool(const TopoDS_Shape &shape, const std::vector<std::string> 
     return false;
   }
   tool.convex = sigma > 0;
-  return name_tool(loft, first_wire, polygons[0][0], polygons[0][4], "chamfer(" + edge_names[static_cast<size_t>(index)] + ")", tool, why);
+  return name_tool(loft, first_wire, polygons[0][0], polygons[0][1], "chamfer(" + edge_names[static_cast<size_t>(index)] + ")", tool, why);
 }
 
 std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first, double last, double second,
@@ -389,7 +432,7 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
     const BRepAdaptor_Curve curve(TopoDS::Edge(unique_edges(index + 1)));
     Tool tool;
     const int leg1 = sided ? static_cast<int>(faces[k]) : -1;
-    const bool built = curve.GetType() == GeomAbs_Line ? make_straight_tool(source.shape, names, index, leg1, given, tool, why)
+    const bool built = curve.GetType() == GeomAbs_Line && faces_planar(source.shape, TopoDS::Edge(unique_edges(index + 1))) ? make_straight_tool(source.shape, names, index, leg1, given, tool, why)
                                                        : make_curved_tool(source.shape, names, index, leg1, given, tool, why);
     if (!built) return nullptr;
     tools.push_back(std::move(tool));
