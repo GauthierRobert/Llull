@@ -752,18 +752,77 @@ fn the_corner_fills_give_the_same_solid_on_any_number_of_threads() {
             analyze(&built).unwrap().valid,
         )
     };
+    let _reset = CornerHooks;
     let mut reference = None;
     for threads in [1, 2, 8, 1, 8] {
         crate::test_bridge::set_corner_threads(threads);
         let both = (fingerprint(&cube_shape, &cube_edges, &cube_corners), fingerprint(&boss_shape, &boss_edges, &boss_corners));
         assert_eq!((both.0 .2, both.1 .2), (26, 23), "faces on {threads} threads");
         assert!(both.0 .3 && both.1 .3, "valid on {threads} threads");
+        // the hook reports the threads the fill planned: a 1 would make this test compare the serial build with itself
+        assert_eq!(
+            crate::test_bridge::last_corner_threads(),
+            if threads == 1 { 1 } else { 4.min(threads) },
+            "threads used for {threads} requested (the boss has 4 corners, the last build)"
+        );
         if let Some(first) = reference {
             assert_eq!(both, first, "the solid is the same on {threads} threads as on the first run");
         }
         reference = reference.or(Some(both));
     }
-    crate::test_bridge::set_corner_threads(0);
+}
+
+/// Puts the test hooks of the corner fills back, even when the test fails.
+struct CornerHooks;
+
+impl Drop for CornerHooks {
+    fn drop(&mut self) {
+        crate::test_bridge::set_corner_threads(0);
+        crate::test_bridge::set_corner_fault(-1);
+        crate::test_bridge::set_corner_spawn_limit(-1);
+    }
+}
+
+fn cube_corner_step() -> (Shape, Vec<f64>, Vec<f64>) {
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let (edges, corners) = spec(&shape, &all, 1.0, &cube_vertices(10.0), 2.0);
+    (shape, edges, corners)
+}
+
+/// BLD §13.20 review: whatever a worker throws (here std::bad_alloc in the fill of corner 3) reaches the caller as an error from the build, in the corner order of a serial run; it does not
+/// end the process (a worker that lets it escape calls std::terminate).
+#[test]
+fn an_exception_in_a_parallel_fill_is_an_error_of_the_build_not_the_end_of_the_process() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    for threads in [1, 8] {
+        crate::test_bridge::set_corner_threads(threads);
+        crate::test_bridge::set_corner_fault(3);
+        assert!(fillet_setback(&shape, &edges, &corners).is_err(), "{threads} threads");
+    }
+    crate::test_bridge::set_corner_fault(-1);
+    assert!(fillet_setback(&shape, &edges, &corners).unwrap().is_some());
+}
+
+/// BLD §13.20 review: when a worker thread cannot be created (the second one here) the calling thread and the started ones take its jobs, every started thread is joined, and the solid is the same
+/// as on the planned threads.
+#[test]
+fn a_thread_that_cannot_be_created_leaves_its_jobs_to_the_others() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    let volume = |built: &Shape| mass_properties(built).unwrap().volume.to_bits();
+    crate::test_bridge::set_corner_threads(1);
+    let reference = volume(&fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid"));
+    crate::test_bridge::set_corner_threads(8);
+    for limit in [0, 1, 3] {
+        crate::test_bridge::set_corner_spawn_limit(limit);
+        let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+        assert_eq!(volume(&built), reference, "{limit} workers created");
+        assert!(analyze(&built).unwrap().valid);
+    }
 }
 
 /// BLD §13.18 review: the guards of the mixed corner are exercised on shapes the test chooses (cfg(test) seams in blend_corner.cxx). The oriented patch check on the blend face of a filleted block
