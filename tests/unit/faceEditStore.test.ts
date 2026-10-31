@@ -43,6 +43,15 @@ describe('face edit store: feature move picks', () => {
     expect(store().region).toEqual([0, 1, 10, 11, 20]);
   });
 
+  it('Shift-clicking the face that is already picked adds nothing (a second point on the same face would name one face twice)', () => {
+    store().setPick('e1', pick(1), [0, 1, 2]);
+    store().addFeatureFace([5, 0, 1], [2, 3]);
+    expect(store().also).toEqual([]);
+    expect(store().region).toEqual([0, 1, 2]);
+    store().addFeatureFace([5, 0, 0], [10]);
+    expect(store().also).toEqual([[5, 0, 0]]);
+  });
+
   it('changing the operation, or stopping, drops the added faces; the kernel labels outlive a cleared pick but not the mode', () => {
     store().setPick('e1', pick(1), [0, 1]);
     store().addFeatureFace([5, 0, 0], [10]);
