@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { type Cage, boxCage, cylinderCage, subdivide } from '@core/geometry/subdivision';
-import { solveExactG1 } from '@core/geometry/subd/g1Exact';
+import { type GroupSystem, solveExactG1 } from '@core/geometry/subd/g1Exact';
+import { solveSparse } from '@core/geometry/subd/g1Linear';
 import { MEASURE_STATIONS, patchNormal } from '@core/geometry/subd/g1Fit';
 import { cageToNurbs } from '@core/geometry/subd/toNurbs';
 import { edgeKey } from '@core/geometry/subd/edgeKey';
@@ -200,15 +201,48 @@ describe('solveExactG1', () => {
     });
   }
 
-  it('a cylinder of 24 sides (valence-24 cap stars, one group of 240 quads and over 900 unknown poles: the conjugate-gradient path, no limit-surface objective) is exact too', () => {
+  it('a cylinder of 24 sides (valence-24 cap stars, one group of 240 quads and over 900 unknown poles: the conjugate-gradient path with its projected limit-surface objective) is exact too', () => {
     const refined = subdivide(cylinderCage(1, 2, 24, 2), 1);
     const patches = quadCagePatches(refined);
     const result = solveExactG1(refined, patches, valenceOf(refined));
     expect(result.method).toBe('edges-freed');
-    expect(result.groups).toEqual([expect.objectContaining({ quads: 240, consistent: true })]);
+    expect(result.groups).toEqual([expect.objectContaining({ quads: 240, consistent: true, objective: 'limit' })]);
     expect(worstBreak(refined, patches)).toBeGreaterThan(0.5);
     expect(worstBreak(refined, result.patches)).toBeLessThan(1e-7);
   }, 60_000);
+
+  it('cylinder of 24 sides, group system re-evaluated: A x - b < 1e-9 x size on every row of every group (from the rows, not the reported residual), the limit objective cuts the sample misfit (0.53 x) of the nearest-to-start poles, two runs are identical', () => {
+    const refined = subdivide(cylinderCage(1, 2, 24, 2), 1);
+    const patches = quadCagePatches(refined);
+    const seen: GroupSystem[] = [];
+    const result = solveExactG1(refined, patches, valenceOf(refined), { onGroup: (group) => seen.push(group) });
+    // the attempts of both stages report; the last ones are the groups of the result
+    const groups = seen.slice(seen.length - result.groups.length);
+    expect(groups.length).toBeGreaterThan(0);
+    const misfit = (group: GroupSystem, poles: readonly Vec3[]): number =>
+      group.samples.reduce((sum, sample) => {
+        const at = [0, 1, 2].map((axis) =>
+          sample.terms.reduce((acc, [k, w]) => acc + w * ((poles[k] as Vec3)[axis] as number), (sample.constant as Vec3)[axis] as number),
+        );
+        return sum + at.reduce((acc, v, axis) => acc + (v - (sample.target[axis] as number)) ** 2, 0);
+      }, 0);
+    for (const group of groups) {
+      const violation = Math.max(
+        ...group.rows.flatMap((row, i) =>
+          [0, 1, 2].map((axis) =>
+            Math.abs(
+              row.reduce((sum, [k, c]) => sum + c * ((group.x[k] as Vec3)[axis] as number), 0) -
+                ((group.targets[i] as Vec3)[axis] as number),
+            ),
+          ),
+        ),
+      );
+      expect(violation).toBeLessThan(1e-9 * group.scale);
+      const plain = solveSparse(group.rows, group.targets, [...group.start], []);
+      expect(misfit(group, group.x)).toBeLessThan(0.6 * misfit(group, plain.x));
+    }
+    expect(solveExactG1(refined, patches, valenceOf(refined))).toEqual(result);
+  }, 120_000);
 
   it('the pentagonal cap (an open surface: its boundary edges are creases) is solved exactly: its quads at the boundary move, every pole on a boundary edge stays bit-identical', () => {
     const cap = subdivide(pentagonCap(), 1);

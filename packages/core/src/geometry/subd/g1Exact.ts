@@ -48,6 +48,8 @@ export interface ExactG1Group {
   /** Largest misfit of the end fit of a, beta0, beta1 to the START poles of an edge of this group, relative to the size of the cage (a diagnostic: the end rows are part of the system and are solved with the rest). */
   readonly endMisfit: number;
   readonly consistent: boolean;
+  /** Unknown poles of the group (above `DENSE_MAX_UNKNOWNS`: the conjugate-gradient path). */
+  readonly unknowns: number;
   /** "solved", or why not: "contradiction" (the conditions have no common solution at this degree), "degenerate edge" (an edge without an end fit: no tangent, or a folded pair), "work budget" (too big for the bounded solve). */
   readonly reason: 'solved' | 'contradiction' | 'degenerate edge' | 'work budget';
   /** What the free poles approach inside the solution set: "limit" (the limit surface at samples, dense path) or "start" (the geometry poles: groups too big for the dense path). */
@@ -66,6 +68,25 @@ export interface ExactG1 {
 
 const dot = (p: readonly number[], q: readonly number[]): number => p.reduce((sum, v, i) => sum + v * (q[i] as number), 0);
 const sub = (p: Vec3, q: Vec3): Vec3 => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
+
+export interface SolveOptions {
+  /** Work budget of a group's solve (see `solveDense` / `solveSparse`). */
+  readonly maxWork?: number;
+  /** "start": the groups over `DENSE_MAX_UNKNOWNS` skip the limit-surface objective (nearest-to-start poles: cheap); default "limit". The dense groups always spend the freedom on the limit surface. */
+  readonly sparseObjective?: 'limit' | 'start';
+  /** Diagnostic hook, called for every group with its system and solution (rows A, targets b, start poles, the limit-surface samples, the poles found): lets a test re-evaluate A x - b. */
+  readonly onGroup?: (group: GroupSystem) => void;
+}
+
+export interface GroupSystem {
+  readonly rows: readonly SparseRow[];
+  readonly targets: readonly Vec3[];
+  readonly start: readonly Vec3[];
+  readonly samples: readonly Sample[];
+  readonly x: readonly Vec3[];
+  /** Size of the cage (document units): the unit of the residuals. */
+  readonly scale: number;
+}
 
 /** One linear condition: sum of coefficient x unknown = rhs (per axis); `face` is the free quad the edge belongs to (the group it is counted in). */
 interface Row {
@@ -214,7 +235,7 @@ function solveAssembly(
   assembly: Assembly,
   evaluate: ReturnType<typeof surfaceEvaluator>,
   scale: number,
-  maxWork: number | undefined,
+  options: SolveOptions,
 ): { groups: ExactG1Group[]; out: Vec3[][] } {
   const { start, variableOf, rows } = assembly;
   const out: Vec3[][] = patches.map((patch) => patch.map((p): Vec3 => [p[0], p[1], p[2]]));
@@ -252,32 +273,32 @@ function solveAssembly(
     const initial = touched.map((u) => start[u] as Vec3);
     const small = touched.length <= DENSE_MAX_UNKNOWNS;
     const samples: Sample[] = [];
-    if (small)
-      for (const f of faces)
-        for (let i = 0; i < SAMPLES; i++)
-          for (let j = 0; j < SAMPLES; j++) {
-            const [u, v] = [(i + 0.5) / SAMPLES, (j + 0.5) / SAMPLES];
-            const hit = evaluate(f, u, v);
-            if (hit === null) continue;
-            const [bu, bv] = [bernstein(u), bernstein(v)];
-            const terms: Array<readonly [number, number]> = [];
-            const offset = [0, 0, 0];
-            for (let p = 0; p < 16; p++) {
-              const w = (bu[Math.floor(p / 4)] as number) * (bv[p % 4] as number);
-              const id = variableOf.get(f * 16 + p);
-              if (id !== undefined && column.has(id)) terms.push([column.get(id) as number, w]);
-              else
-                for (let k = 0; k < 3; k++) offset[k] = (offset[k] as number) + w * (((patches[f] as BezierPatch)[p] as Vec3)[k] as number);
-            }
-            samples.push({ terms, constant: [offset[0] as number, offset[1] as number, offset[2] as number], target: hit.point });
+    for (const f of faces)
+      for (let i = 0; i < SAMPLES; i++)
+        for (let j = 0; j < SAMPLES; j++) {
+          const [u, v] = [(i + 0.5) / SAMPLES, (j + 0.5) / SAMPLES];
+          const hit = evaluate(f, u, v);
+          if (hit === null) continue;
+          const [bu, bv] = [bernstein(u), bernstein(v)];
+          const terms: Array<readonly [number, number]> = [];
+          const offset = [0, 0, 0];
+          for (let p = 0; p < 16; p++) {
+            const w = (bu[Math.floor(p / 4)] as number) * (bv[p % 4] as number);
+            const id = variableOf.get(f * 16 + p);
+            if (id !== undefined && column.has(id)) terms.push([column.get(id) as number, w]);
+            else
+              for (let k = 0; k < 3; k++) offset[k] = (offset[k] as number) + w * (((patches[f] as BezierPatch)[p] as Vec3)[k] as number);
           }
+          samples.push({ terms, constant: [offset[0] as number, offset[1] as number, offset[2] as number], target: hit.point });
+        }
     const targets = withTerms.map((row) => row.rhs);
     const broken = faces.some((f) => assembly.degenerate.has(f));
     const solution = broken
-      ? { x: initial, residual: Infinity, status: 'ok' as const }
+      ? { x: initial, residual: Infinity, status: 'ok' as const, objective: 'start' as const }
       : small
-        ? solveDense(sparse, targets, initial, samples, maxWork)
-        : solveSparse(sparse, targets, initial, maxWork);
+        ? solveDense(sparse, targets, initial, samples, options.maxWork)
+        : solveSparse(sparse, targets, initial, options.sparseObjective === 'start' ? [] : samples, options.maxWork);
+    options.onGroup?.({ rows: sparse, targets, start: initial, samples, x: solution.x, scale });
     const residual = Math.max(solution.residual, stuck) / scale;
     const endMisfit = Math.max(0, ...faces.map((f) => assembly.endMisfit.get(f) ?? 0));
     const consistent = !broken && solution.status === 'ok' && residual < CONSISTENT;
@@ -293,8 +314,9 @@ function solveAssembly(
       residual: broken ? Infinity : residual,
       endMisfit,
       consistent,
+      unknowns: touched.length,
       reason,
-      objective: small ? 'limit' : 'start',
+      objective: solution.objective,
     });
   }
   return { groups, out };
@@ -309,7 +331,7 @@ export function solveExactG1(
   refined: Cage,
   patches: readonly BezierPatch[],
   valence: ReadonlyArray<number>,
-  options: { readonly mostRings?: number; readonly maxWork?: number } = {},
+  options: SolveOptions & { readonly mostRings?: number } = {},
 ): ExactG1 {
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const star = new Set<number>();
@@ -349,7 +371,7 @@ export function solveExactG1(
       assemble(refined, patches, topology, free, edgesFree, scale, frozen),
       evaluate,
       scale,
-      options.maxWork,
+      options,
     );
     return {
       patches: solved.out.map((p) => p as BezierPatch),
