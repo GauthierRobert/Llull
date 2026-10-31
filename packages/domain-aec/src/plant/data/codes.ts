@@ -80,7 +80,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_IDS_UNSUPPORTED_FACET:
     'This checker supports the entity, attribute, property, classification and partOf facets with simple values, patterns, enumerations and bounds.',
   DAT_REPORT_KIND_UNAVAILABLE:
-    'Use line_list, equipment_list, nozzle_schedule, mto or tag_register; valve_list and instrument_index arrive with the component and P&ID providers; kind custom needs a definition (save_report_definition).',
+    'Use line_list, equipment_list, nozzle_schedule, valve_list, instrument_index, mto or tag_register; kind custom needs a definition (save_report_definition).',
 };
 
 export const refuseDat = tableRejection(REMEDIATION);

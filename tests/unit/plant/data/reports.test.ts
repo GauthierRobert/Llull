@@ -172,9 +172,10 @@ describe('plant_report on SC-DAT-01 (VC-DAT-03, 04, 05)', () => {
 });
 
 describe('plant_report refusals (document unchanged)', () => {
-  it.each(['valve_list', 'instrument_index', 'custom'])('%s needs a sibling gap: DAT_REPORT_KIND_UNAVAILABLE', (kind) => {
-    const refused = expectRefusal(sc01, 'plant_report', { kind }, 'DAT_REPORT_KIND_UNAVAILABLE', 'kind');
-    expect(refused.summary).toMatch(/DAT-M5|save_report_definition/);
+  it('custom needs a definition: DAT_REPORT_KIND_UNAVAILABLE (valve_list and instrument_index are built since DAT-M5)', () => {
+    const refused = expectRefusal(sc01, 'plant_report', { kind: 'custom' }, 'DAT_REPORT_KIND_UNAVAILABLE', 'kind');
+    expect(refused.summary).toContain('save_report_definition');
+    for (const kind of ['valve_list', 'instrument_index']) expect(report(sc01, { kind })).toMatchObject({ kind, total: 0 });
   });
 
   it('refuses an unknown or ambiguous hierarchy node, a groupBy outside mto, and bad parameters', () => {
@@ -194,13 +195,13 @@ describe('plant_report refusals (document unchanged)', () => {
 
   it('an empty plant gives empty reports, not errors', () => {
     const empty = libraryDocument();
-    for (const kind of ['line_list', 'equipment_list', 'nozzle_schedule', 'mto', 'tag_register'])
+    for (const kind of ['line_list', 'equipment_list', 'nozzle_schedule', 'valve_list', 'instrument_index', 'mto', 'tag_register'])
       expect(report(empty, { kind })).toMatchObject({ total: 0, rows: [] });
   });
 });
 
 describe('plant_report on other models', () => {
-  it('a routed line: length from the run legs, bends from its points of intersection, nozzle ends are not inferred', () => {
+  it('a routed line: length from the run legs, bends from its points of intersection, nozzle ends are not inferred but the real nozzles are listed', () => {
     const scene = routedPumpToVessel();
     let doc = apply(scene.doc, 'define_plant_hierarchy', {
       nodes: [
@@ -224,7 +225,10 @@ describe('plant_report on other models', () => {
     expect(line['bends']).toBe(run?.pis.length);
     expect(line['straights']).toBe((run?.pis.length ?? 0) + 1);
     expect(report(doc, { kind: 'mto' }).rows[0]).toMatchObject({ spec: 'CS150', itemType: 'pipe', nominalSize: 100, unit: 'm' });
-    expect(report(doc, { kind: 'nozzle_schedule' }).total).toBe(0);
+    expect(report(doc, { kind: 'nozzle_schedule' }).rows.map((row) => [row['key'], row['inferred']])).toEqual([
+      ['P-101/N2', false],
+      ['V-101/N1', false],
+    ]);
   });
 
   it('an object bound to a line by lineId adds its pipe to the line', () => {

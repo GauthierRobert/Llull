@@ -15,19 +15,25 @@ const MAX_LIMIT = 20000;
 
 /**
  * @affects none; data = { kind, columns, rows, total, offset, limit, rowsByTag?, totals, method, defaults, files? }
- * @invariant rows in natural tag order (P-2 before P-10); identical input -> identical rows, csv text and xlsx bytes; lengths are centreline lengths in metres
- * @failure csv / xlsx of controlled content without a human confirmation -> MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE; unknown hierarchy node -> DAT_HIERARCHY_UNKNOWN; valve_list, instrument_index, custom -> DAT_REPORT_KIND_UNAVAILABLE; groupBy on another kind -> DAT_PARAM_INVALID; document unchanged
+ * @invariant rows in natural tag order (P-2 before P-10); identical input -> identical rows, csv text and xlsx bytes; legacy pipes are measured on the centreline, routed runs by cut length with the catalogue take-outs
+ * @failure csv / xlsx of controlled content without a human confirmation -> MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE; unknown hierarchy node -> DAT_HIERARCHY_UNKNOWN; custom without a definition -> DAT_REPORT_KIND_UNAVAILABLE; groupBy on another kind -> DAT_PARAM_INVALID; document unchanged
  */
 export const plantReport = defineCommand({
   name: 'plant_report',
   description:
     'Report on the plant objects as typed rows (pure, document unchanged). kind: line_list (one row per process line: line number, class, DN, fluid, spec, from, to, ' +
     'whether each end resolves, centreline length in m, straights, bends, design and operating conditions, hierarchy, unverified flag); equipment_list (tag, class, ' +
-    'description, design conditions, size in m, OperatingWeightKg, hierarchy); nozzle_schedule (nozzles INFERRED where a line end lies inside the equipment its from / to ' +
-    'names: N1, N2 per equipment in line creation order, DN of the line, SOURCE for the from end and SINK for the to end, inferred true); mto (material take-off: pipe in m ' +
-    'and bends in ea from the centreline, grouped by groupBy, default spec, itemType, nominalSize; no take-outs are deducted, method is "centreline" and each row names its ' +
-    'source lines); tag_register (every tag in scope with class, target kind, status modelled / reserved / orphan). valve_list and instrument_index need sibling ' +
-    'gaps and are refused with DAT_REPORT_KIND_UNAVAILABLE. definition: the id of a template saved with save_report_definition (kind may then be omitted): it keeps the ' +
+    'description, design conditions, size in m, OperatingWeightKg, hierarchy); nozzle_schedule (one row per nozzle: the nozzles of 03 EQP equipment (add_nozzle) with their DN, rating ' +
+    'and facing, inferred false, the line and flow direction from the line whose from / to names "<tag>:<mark>" or the routed run that ends at it; for other equipment nozzles INFERRED ' +
+    'where a line end lies inside the equipment its from / to names: N1, N2 per equipment in line creation order, DN of the line, SOURCE for the from end and SINK for the to end, ' +
+    'inferred true); valve_list (one row per valve: plant objects of the Valve class family standing for valves of routed runs, with component type, DN, face-to-face length in mm, spec, ' +
+    'line, run, status modelled / reserved / orphan; valves of the runs without a plant object are listed unclassified when no hierarchy is given); instrument_index (one row per P&ID ' +
+    'instrument of add_pid_instrument with ISA functions, loop, location, display, sheet, measured line and the plant object (class, hierarchy) when one stands for it, else status ' +
+    'unclassified when no hierarchy is given); mto (material take-off grouped by groupBy, default spec, itemType, nominalSize: legacy pipes by centreline in m with bends in ea; routed ' +
+    'runs by cut length in m with the take-outs of the 01 PSC catalogue deducted and every fitting, flange, gasket, bolt set and valve counted in ea under its takeoff key such as ' +
+    'elbow90LR or valveGate; method is centreline, cutLength or mixed and each row names its basis and source lines); tag_register (every tag in scope with class, target kind, status ' +
+    'modelled / reserved / orphan; with no hierarchy it also lists the tags of P&ID instruments no plant object stands for, reserved, target kind pidInstrument). ' +
+    'kind custom is refused with DAT_REPORT_KIND_UNAVAILABLE unless a definition is given. definition: the id of a template saved with save_report_definition (kind may then be omitted): it keeps the ' +
     'chosen columns, adds computed columns, filters and sorts. hierarchy: only objects at that node or below (code, path S1/P1/U10 or id). format json (default): data only; ' +
     'csv or xlsx: also data.files = [{ fileName, content | base64 }] with ALL rows (save with --save), header "Name (unit)". Rows are sorted by tag in natural order. ' +
     'offset / limit page data.rows (limit at most 20000, default 2000); total counts all rows; totals sum the whole report. rowsByTag indexes the returned rows by their ' +
@@ -40,7 +46,7 @@ export const plantReport = defineCommand({
       .enum(REPORT_KINDS)
       .optional()
       .describe(
-        'Report kind: line_list, equipment_list, nozzle_schedule, mto, tag_register (built); valve_list, instrument_index (refused for now); custom needs definition. Omit it when definition is given.',
+        'Report kind: line_list, equipment_list, nozzle_schedule, valve_list, instrument_index, mto, tag_register; custom needs definition. Omit it when definition is given.',
       ),
     definition: z
       .string()

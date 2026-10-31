@@ -6,6 +6,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { getPlantData, type PlantDataModel, withPlantData } from '@aec/plant/data/model';
 import { apply } from '../../../helpers/commandAssertions';
+import { valveScene } from '../piping/rteFixtures';
 
 export const PACK = path.resolve(__dirname, '../../../../docs/plant/08-plant-data-reports-interop/validation');
 
@@ -96,6 +97,51 @@ export function scDat01Document(): CadDocument {
     if (result.rejected === true) throw new Error(`${action.command}: ${result.summary}`);
     doc = result.document;
     if (action.as !== undefined && result.affected[0] !== undefined) aliases.set(action.as, result.affected[0]);
+  }
+  return doc;
+}
+
+/**
+ * The SC-DAT-02 scene built with the commands of the siblings that exist (03 EQP nozzles, 02 RTE route and inline components, 01 PSC spec CS150): pump P-101 and
+ * vessel V-101 with real nozzles, the routed line 100-P-1001-CS150 with two valves XV-1001 / NRV-1002 (the CS150 stub holds gate valves only), the hierarchy S1/P1/U10 and the
+ * default process library; every object classified.
+ */
+export function scDat02Document(): CadDocument {
+  const scene = valveScene();
+  const insert = { runId: scene.runId, type: 'valveGate', tag: 'NRV-1002', at: { leg: 1, centreDistance: 1500 } };
+  const second = apply(scene.doc, 'insert_inline_component', insert);
+  const secondId = Object.values(second.plant?.piping?.runs ?? {})[0]?.inline?.find((component) => component.tag === 'NRV-1002')
+    ?.id as string;
+  let doc = apply(second, 'define_plant_hierarchy', {
+    nodes: [
+      { code: 'S1', kind: 'site' },
+      { code: 'P1', kind: 'plant', parent: 'S1' },
+      { code: 'U10', kind: 'unit', parent: 'P1', properties: { areaNumber: '1' } },
+    ],
+  });
+  doc = apply(doc, 'load_plant_class_library', { library: 'llull-default-process' });
+  doc = apply(doc, 'assign_plant_object', { target: scene.valveId, className: 'IsolationValve', hierarchy: 'U10' });
+  doc = apply(doc, 'assign_plant_object', { target: secondId, className: 'CheckValve', hierarchy: 'U10' });
+  doc = apply(doc, 'assign_plant_object', {
+    target: scene.line,
+    className: 'ProcessLine',
+    hierarchy: 'U10',
+    properties: { fluidCode: 'P', spec: 'CS150' },
+  });
+  for (const [mark, className] of [
+    ['P-101', 'CentrifugalPump'],
+    ['V-101', 'PressureVessel'],
+  ] as const) {
+    const target = Object.values(doc.building?.elements ?? {}).find(
+      (element) => element.category === 'equipment' && element.mark === mark,
+    )?.id;
+    doc = apply(doc, 'assign_plant_object', {
+      target,
+      className,
+      hierarchy: 'U10',
+      tag: mark,
+      properties: { Description: mark, DesignPressure: 10 },
+    });
   }
   return doc;
 }

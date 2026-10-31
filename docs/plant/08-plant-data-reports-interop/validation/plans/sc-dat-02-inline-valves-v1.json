@@ -113,7 +113,7 @@
       "owner": "02 RTE / 01 PSC",
       "params": { "line": "$l2", "at": [6000, 0, 2000], "component": "check_valve", "tagFields": { "valveCode": "NRV", "seq": 1002 } }
     },
-    { "command": "plant_report", "unbuilt": true, "params": { "kind": "valve_list" } },
+    { "command": "plant_report", "params": { "kind": "valve_list" }, "note": "built (DAT-M5); the scene is built with the real 03 / 02 commands in tests/unit/plant/data/dataFixtures.ts scDat02Document" },
     { "command": "check_plant_data", "params": {} },
     { "command": "export_ifc", "params": { "schema": "IFC4X3_ADD2", "timestamp": "2026-10-18T00:00:00" } }
   ],

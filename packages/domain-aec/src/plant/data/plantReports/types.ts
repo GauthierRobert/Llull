@@ -32,8 +32,8 @@ export interface ReportTable {
   readonly rows: readonly ReportRow[];
   /** Column whose value identifies a row (`rowsByTag`), null when no column does. */
   readonly keyColumn: string | null;
-  /** How quantities were measured: `centreline` (stored polylines), `inferred` (nozzles from line ends), `none`. */
-  readonly method: 'centreline' | 'inferred' | 'none';
+  /** How quantities were measured: `centreline` (stored polylines), `cutLength` (routed runs: cut lengths with the take-outs of the catalogue, parts counted), `mixed` (both in one table), `inferred` (nozzles from line ends), `model` (nozzles read from 03 EQP), `none`. */
+  readonly method: 'centreline' | 'cutLength' | 'mixed' | 'inferred' | 'model' | 'none';
   readonly totals: Readonly<Record<string, number>>;
   /** Defaults the report applied that the caller did not choose (AF-31). */
   readonly defaults: Readonly<Record<string, string>>;

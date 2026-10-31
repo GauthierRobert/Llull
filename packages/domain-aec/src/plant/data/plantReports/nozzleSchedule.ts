@@ -1,8 +1,8 @@
 /**
- * Nozzle schedule (plant 08 DAT §5.6 step 5, §5.9): the MVP has no nozzle objects, so a nozzle is inferred where the end of a process line lies inside
- * the footprint of the equipment its `from` / `to` names (`inferNozzles.ts`, shared with the IFC ports). Nozzles are numbered N1, N2 ... per equipment in the
- * creation order of the lines (from end first). Equipment that carries its own 03 EQP nozzles infers nothing (its nozzles are the M5 provider). Flow
- * direction: the `from` end is a SOURCE of the equipment, the `to` end a SINK.
+ * Nozzle schedule (plant 08 DAT §5.6 step 5, §5.9): one row per nozzle. An equipment that carries 03 EQP nozzles lists them as modelled (DN, rating and facing of the
+ * nozzle, `inferred` false; M5); the flow direction and the line come from the process line whose `from` / `to` names the port `<tag>:<mark>` (from end = SOURCE, to end =
+ * SINK) or from the routed run that starts / ends at it. For any other equipment a nozzle is inferred where the end of a process line lies inside the footprint of the
+ * equipment its `from` / `to` names (`inferNozzles.ts`, shared with the IFC ports), numbered N1, N2 ... per equipment in the creation order of the lines (from end first).
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -10,6 +10,7 @@ import { getPlantData, type PlantObject } from '../model';
 import { naturalCompare } from '../naturalSort';
 import { objectRegistry } from '../registry';
 import { inferredNozzles } from './inferNozzles';
+import { modelledNozzleRows } from './modelledNozzles';
 import { columnOf, type ReportColumn, type ReportRow, type ReportTable } from './types';
 
 const COLUMNS: readonly ReportColumn[] = [
@@ -26,11 +27,11 @@ const COLUMNS: readonly ReportColumn[] = [
   columnOf('lineId', 'Line object', 'text', null, 'derived'),
 ];
 
-export function nozzleSchedule(doc: CadDocument, scoped: readonly PlantObject[]): ReportTable {
+export function nozzleSchedule(doc: CadDocument, scoped: readonly PlantObject[], wholePlant: boolean): ReportTable {
   const data = getPlantData(doc);
   const claimed = objectRegistry(data).byTarget;
   const inScope = new Set(scoped.map((object) => object.id));
-  const rows: ReportRow[] = [];
+  const rows: ReportRow[] = modelledNozzleRows(doc, inScope, wholePlant);
   for (const { equipment, name: nozzle, flowDirection, line, shape } of inferredNozzles(doc)) {
     if (!inScope.has(line.id)) continue;
     const tag = data.objects[claimed.get(`buildingElement:${equipment.id}`) ?? '']?.tag ?? equipment.mark;
@@ -51,5 +52,6 @@ export function nozzleSchedule(doc: CadDocument, scoped: readonly PlantObject[])
   rows.sort(
     (a, b) => naturalCompare(String(a['equipment']), String(b['equipment'])) || naturalCompare(String(a['nozzle']), String(b['nozzle'])),
   );
-  return { columns: COLUMNS, rows, keyColumn: 'key', method: 'inferred', totals: { nozzles: rows.length }, defaults: {} };
+  const method = rows.some((row) => row['inferred'] === true) || rows.length === 0 ? 'inferred' : 'model';
+  return { columns: COLUMNS, rows, keyColumn: 'key', method, totals: { nozzles: rows.length }, defaults: {} };
 }

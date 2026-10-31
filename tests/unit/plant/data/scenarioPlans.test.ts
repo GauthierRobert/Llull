@@ -1,7 +1,7 @@
 /**
  * Plant 08 DAT M1 - M4 (SC-DAT-04 Excel round trip and SC-DAT-05 ifc_summary of the buildingSMART samples run since M4): runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
  * `as` binds the first affected id, `$alias` is replaced in params and expected values) and compares each `expected` row with the step's `data` / `error`.
- * Steps flagged `unbuilt` (valve_list: M5; the sibling commands of SC-DAT-02) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01, DAT-M3 the export_ifc `schema` step 21.
+ * Steps flagged `unbuilt` (the sibling commands of SC-DAT-02; its valve_list is built since M5) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01, DAT-M3 the export_ifc `schema` step 21.
  * SC-DAT-03 uses onError "continue": a refused step is an outcome, not a failure (VC-DAT-12).
  */
 
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { execute, getCommand } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { PACK } from './dataFixtures';
+import { PACK, scDat02Document } from './dataFixtures';
 
 interface Expected {
   step: number;
@@ -142,5 +142,27 @@ describe('SC-DAT-03 (VC-DAT-12)', () => {
     expect(outcomes[8]?.error?.code).toBe('DAT_TAG_DUPLICATE');
     const findings = (outcomes[12]?.['findings'] ?? []) as Array<{ code: string }>;
     expect(findings.map((finding) => finding.code).sort()).toEqual(['DAT_LINE_END_UNRESOLVED', 'DAT_REQUIRED_PROPERTY_MISSING']);
+  });
+});
+
+describe('SC-DAT-02 (VC-DAT-04, 07; the sibling steps are provisional in the pack, so the scene is built with the real 03 / 02 commands)', () => {
+  const plan = JSON.parse(readFileSync(path.join(PACK, 'plans', 'sc-dat-02-inline-valves-v1.json'), 'utf8')) as Plan;
+  const doc = scDat02Document();
+
+  it('the valve_list step is a built command and the expected rows 13 and 14 hold on the scene', () => {
+    const step = plan.actions[13];
+    expect(step?.command).toBe('plant_report');
+    expect(step?.unbuilt).toBeUndefined();
+    const report = execute(doc, 'plant_report', step?.params ?? {});
+    const check = execute(doc, 'check_plant_data', plan.actions[14]?.params ?? {});
+    for (const row of plan.expected.filter((entry) => entry.step === 13 || entry.step === 14))
+      compare(pick(row.step === 13 ? report.data : check.data, row.path), row, new Map());
+  });
+
+  it('the report is the same after a replay of the feature history', () => {
+    const replayed = execute(doc, 'replay_history', {}).document;
+    expect(execute(replayed, 'plant_report', { kind: 'valve_list' }).data).toEqual(
+      execute(doc, 'plant_report', { kind: 'valve_list' }).data,
+    );
   });
 });

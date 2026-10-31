@@ -2,11 +2,13 @@
 
 import type { CadDocument } from '@core/model/types';
 import { equipmentList } from './equipmentList';
+import { instrumentIndex } from './instrumentIndex';
 import { lineList } from './lineList';
 import { DEFAULT_MTO_GROUPING, mto, type MtoDimension } from './mto';
 import { nozzleSchedule } from './nozzleSchedule';
 import { objectsInScope } from './scope';
 import { tagRegister } from './tagRegister';
+import { valveList } from './valveList';
 import type { ReportKind, ReportOutcome } from './types';
 
 export interface ReportQuery {
@@ -16,8 +18,6 @@ export interface ReportQuery {
 }
 
 const UNAVAILABLE: Readonly<Record<string, string>> = {
-  valve_list: 'valve_list reads valve objects from the component providers of 01 PSC / 02 RTE, which are not installed yet (DAT-M5)',
-  instrument_index: 'instrument_index reads instrument objects from the 04 PID provider, which is not installed yet (DAT-M5)',
   custom: 'kind custom needs definition: the id of a report saved with save_report_definition',
 };
 
@@ -33,12 +33,15 @@ export function buildReport(doc: CadDocument, query: ReportQuery): ReportOutcome
     };
   const scope = objectsInScope(doc, query.hierarchy);
   if (!scope.ok) return scope;
+  const whole = query.hierarchy === undefined;
   const table = {
     line_list: () => lineList(doc, scope.objects),
     equipment_list: () => equipmentList(doc, scope.objects),
-    nozzle_schedule: () => nozzleSchedule(doc, scope.objects),
-    tag_register: () => tagRegister(doc, scope.objects),
+    nozzle_schedule: () => nozzleSchedule(doc, scope.objects, whole),
+    valve_list: () => valveList(doc, scope.objects, whole),
+    instrument_index: () => instrumentIndex(doc, scope.objects, whole),
+    tag_register: () => tagRegister(doc, scope.objects, whole),
     mto: () => mto(doc, scope.objects, query.groupBy ?? DEFAULT_MTO_GROUPING),
-  }[query.kind as 'line_list' | 'equipment_list' | 'nozzle_schedule' | 'tag_register' | 'mto']();
+  }[query.kind as Exclude<ReportKind, 'custom'>]();
   return { ok: true, table };
 }

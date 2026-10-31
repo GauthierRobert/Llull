@@ -1,6 +1,7 @@
 /**
  * The providers DAT ships (plant 08 DAT §2): building elements (equipment mark, legacy pipe line number), routed lines (`plant.piping`, the line
- * number of the RTE template), inline components (valves and reducers of a run, read-only) and tie-in points (read-only, the battery limits).
+ * number of the RTE template), inline components (valves and reducers of a run, read-only), tie-in points (read-only, the battery limits), and, from M5,
+ * the 03 EQP nozzles and the 04 PID instruments (`providersSibling.ts`).
  * These are the existing tag fields of the model: the registry reads them, `assign_plant_object` writes the plant tag back into them, so there is
  * one tag system.
  */
@@ -13,9 +14,11 @@ import type { CadDocument } from '@core/model/types';
 import type { PipingModel } from '../types';
 import { renamedReference } from '../equipment/commands/renameEquipmentTag';
 import { getPiping } from '../piping/model';
+import { inlineInfoOf } from './inlineInfo';
 import { copyObject, getPlantData, withPlantData } from './model';
 import { registerPlantObjectProvider, type PlantObjectProvider, type ProviderElement } from './providers';
 import type { PlantValueInput } from './properties';
+import { nozzleProvider, pidInstrumentProvider } from './providersSibling';
 
 const TAGGED_CATEGORIES = ['equipment', 'pipe'] as const;
 type TaggedCategory = (typeof TAGGED_CATEGORIES)[number];
@@ -214,6 +217,11 @@ const inlineComponentProvider: PlantObjectProvider = {
   id: 'inlineComponent',
   element: (doc, id) => inlineElements(doc).find((element) => element.id === id),
   elements: (doc) => inlineElements(doc).filter((element) => element.tag !== undefined),
+  dn: (doc, id) => inlineInfoOf(doc, id)?.dn ?? undefined,
+  seeds: (doc, id) => {
+    const info = inlineInfoOf(doc, id);
+    return info?.dn == null ? {} : { nominalSize: info.dn };
+  },
 };
 
 function inlineElements(doc: CadDocument): ProviderElement[] {
@@ -256,8 +264,15 @@ const tieInProvider: PlantObjectProvider = {
   },
 };
 
-/** Registers the four providers (idempotent): the plugin's `onInstall`. */
+/** Registers the built-in providers and the two for the sibling gaps (nozzles of 03 EQP, instruments of 04 PID); idempotent: the plugin's `onInstall`. */
 export function registerBuiltinProviders(): void {
-  for (const provider of [buildingElementProvider, pipeLineProvider, inlineComponentProvider, tieInProvider])
+  for (const provider of [
+    buildingElementProvider,
+    pipeLineProvider,
+    inlineComponentProvider,
+    tieInProvider,
+    nozzleProvider,
+    pidInstrumentProvider,
+  ])
     registerPlantObjectProvider(provider);
 }
