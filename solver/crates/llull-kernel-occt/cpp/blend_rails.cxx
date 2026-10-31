@@ -73,10 +73,11 @@ namespace {
 
 // How far (x the diagonal) the interpolated section poles may leave the circular fillet's contact lines between two stations.
 constexpr double kDeviationFraction = 1e-8;
-// Stations along a blend: the uniform grid of the convexity scan and of the deviation probes, the first (sparse) set the skin starts from, and the most the refinement inserts.
-// The skin starts from kSeedIntervals (kSeedClosedIntervals on a closed blend) and inserts the worst probe of each interval that misses the section: the probes are the 2 x kFirstStations
-// grid points (so a feature the 24-station set plus its midpoints would see is seen here too) and the midpoint of every interval, so the surface holds the same 1e-8 x diagonal at the
-// same points with the fewest stations that do (CHK1: 41 stations per face on a 64-gon rim, 12 or so here).
+// Stations along a blend: the first uniform set (and the grid of the convexity scan), and the most the refinement inserts (where the surface between two stations misses the section).
+// A blend whose sections hardly change (a constant size on a straight edge: 5 stations are enough, 24 were built) is first skinned from kSeedIntervals (kSeedClosedIntervals when closed)
+// and refined by the worst probe of each interval that misses the section; the probes are the 2 x kFirstStations grid points and the midpoint of every interval, which are the points the
+// uniform set of kFirstStations and its midpoints see, so the sparse skin holds the same 1e-8 x diagonal at the same points. It is given up for the uniform set the moment it needs more than
+// kFirstStations stations (a mitred chain, a varying size, a curved rail: the stations then follow the tolerance, not the seed, and the result stays exactly the one of the uniform set).
 constexpr int kFirstStations = 24, kMostStations = 6000, kProbeGrid = 2 * kFirstStations, kSeedIntervals = 4, kSeedClosedIntervals = 8;
 // The profile faces must meet the faces around them within this fraction of the diagonal (the corner patches' rule of 13.10.2); the sewing
 // tolerance below is an input of the sewing, not an acceptance rule.
@@ -379,84 +380,94 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
     out = &found->second;
     return true;
   };
-  const int seed = blend.closed ? kSeedClosedIntervals : kSeedIntervals;
-  std::vector<double> along;
-  std::vector<Section> stations;
-  for (int j = 0; j < (blend.closed ? seed : seed + 1); ++j) {
-    const Section *section = nullptr;
-    const double at = blend.lo + span * (kProbeGrid * j / seed) / kProbeGrid;
-    if (!truth_at(at, section)) return nullptr;
-    along.push_back(at);
-    stations.push_back(*section);
-  }
-  const bool varying = kind == 0 && fade.active;
-  for (;;) {
-    std::vector<Handle(Geom_BSplineCurve)> rows;
-    const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
-    if (surface.IsNull()) return nullptr;
-    // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
-    const auto gap_at = [&](double at, const Section &middle) {
-      const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
-      const double expected_weight = varying ? weight_of(middle, at) : 1.0;
-      double gap = 0;
-      for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
-        const double scale = varying && row == 1 ? expected_weight : 1.0;  // the middle row of a faded conic is the pole times its weight
-        const gp_Pnt want(scale * expected[row].X(), scale * expected[row].Y(), scale * expected[row].Z());
-        gap = std::max(gap, rows[row]->Value(at).Distance(want));
-      }
-      if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
-      return gap;
-    };
-    std::vector<double> added;
-    std::vector<Section> added_sections;
-    double worst = 0;
-    const size_t intervals = blend.closed ? along.size() : along.size() - 1;
-    for (size_t j = 0; j < intervals; ++j) {
-      const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
-      // the probes of the interval: the grid points strictly inside it, and its midpoint
-      std::vector<double> probes;
-      const double margin = 1e-9 * span;
-      for (int g = static_cast<int>(std::floor((from - blend.lo) / span * kProbeGrid)); g <= kProbeGrid; ++g) {
-        const double at = blend.lo + span * g / kProbeGrid;
-        if (at >= to - margin) break;
-        if (at > from + margin) probes.push_back(at);
-      }
-      const double middle_at = 0.5 * (from + to);
-      if (std::none_of(probes.begin(), probes.end(), [&](double at) { return std::fabs(at - middle_at) <= margin; })) probes.push_back(middle_at);
-      double gap = -1, where = middle_at;
-      const Section *worst_section = nullptr;
-      for (const double at : probes) {
-        const Section *section = nullptr;
-        if (!truth_at(at, section)) return nullptr;
-        const double here = gap_at(at, *section);
-        if (here > gap) {
-          gap = here;
-          where = at;
-          worst_section = section;
+  // `sparse`: start from the seed and probe the grid points too, abandoning it (null) past kFirstStations; else the uniform set of kFirstStations and the midpoints of its intervals.
+  const auto run = [&](bool sparse) -> Handle(Geom_BSplineSurface) {
+    const int seed = sparse ? (blend.closed ? kSeedClosedIntervals : kSeedIntervals) : kFirstStations;
+    std::vector<double> along;
+    std::vector<Section> stations;
+    for (int j = 0; j < (blend.closed ? seed : seed + 1); ++j) {
+      const Section *section = nullptr;
+      const double at = sparse ? blend.lo + span * (kProbeGrid * j / seed) / kProbeGrid : blend.lo + span * j / kFirstStations;
+      if (!truth_at(at, section)) return nullptr;
+      along.push_back(at);
+      stations.push_back(*section);
+    }
+    const bool varying = kind == 0 && fade.active;
+    for (;;) {
+      std::vector<Handle(Geom_BSplineCurve)> rows;
+      const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
+      if (surface.IsNull()) return nullptr;
+      // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
+      const auto gap_at = [&](double at, const Section &middle) {
+        const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
+        const double expected_weight = varying ? weight_of(middle, at) : 1.0;
+        double gap = 0;
+        for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
+          const double scale = varying && row == 1 ? expected_weight : 1.0;  // the middle row of a faded conic is the pole times its weight
+          const gp_Pnt want(scale * expected[row].X(), scale * expected[row].Y(), scale * expected[row].Z());
+          gap = std::max(gap, rows[row]->Value(at).Distance(want));
+        }
+        if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
+        return gap;
+      };
+      std::vector<double> added;
+      std::vector<Section> added_sections;
+      double worst = 0;
+      const size_t intervals = blend.closed ? along.size() : along.size() - 1;
+      for (size_t j = 0; j < intervals; ++j) {
+        const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
+        // the probes of the interval: the grid points strictly inside it, and its midpoint
+        std::vector<double> probes;
+        const double margin = 1e-9 * span;
+        for (int g = sparse ? static_cast<int>(std::floor((from - blend.lo) / span * kProbeGrid)) : kProbeGrid + 1; g <= kProbeGrid; ++g) {
+          const double at = blend.lo + span * g / kProbeGrid;
+          if (at >= to - margin) break;
+          if (at > from + margin) probes.push_back(at);
+        }
+        const double middle_at = 0.5 * (from + to);
+        if (std::none_of(probes.begin(), probes.end(), [&](double at) { return std::fabs(at - middle_at) <= margin; })) probes.push_back(middle_at);
+        double gap = -1, where = middle_at;
+        const Section *worst_section = nullptr;
+        for (const double at : probes) {
+          const Section *section = nullptr;
+          if (!truth_at(at, section)) return nullptr;
+          const double here = gap_at(at, *section);
+          if (here > gap) {
+            gap = here;
+            where = at;
+            worst_section = section;
+          }
+        }
+        worst = std::max(worst, gap);
+        if (gap > limit) {
+          if (to - from < 1e-9 * span) {
+            why = "the blend surface follows the contact lines only to " + number(gap) + " (limit " + number(limit) + ") where the circular blend has a kink";
+            return nullptr;
+          }
+          added.push_back(where);
+          added_sections.push_back(*worst_section);
         }
       }
-      worst = std::max(worst, gap);
-      if (gap > limit) {
-        if (to - from < 1e-9 * span) {
-          why = "the blend surface follows the contact lines only to " + number(gap) + " (limit " + number(limit) + ") where the circular blend has a kink";
-          return nullptr;
-        }
-        added.push_back(where);
-        added_sections.push_back(*worst_section);
+      if (added.empty()) return surface;
+      if (sparse && along.size() + added.size() > static_cast<size_t>(kFirstStations)) {
+        return nullptr;
+      }
+      if (along.size() + added.size() > static_cast<size_t>(kMostStations)) {
+        why = "the blend surface follows the contact lines only to " + number(worst) + " (limit " + number(limit) + ") with " + std::to_string(along.size()) +
+              " stations";
+        return nullptr;
+      }
+      for (size_t k = 0; k < added.size(); ++k) {
+        const auto place = std::lower_bound(along.begin(), along.end(), added[k]) - along.begin();
+        along.insert(along.begin() + place, added[k]);
+        stations.insert(stations.begin() + place, added_sections[k]);
       }
     }
-    if (added.empty()) return surface;
-    if (along.size() + added.size() > static_cast<size_t>(kMostStations)) {
-      why = "the blend surface follows the contact lines only to " + number(worst) + " (limit " + number(limit) + ") with " + std::to_string(along.size()) +
-            " stations";
-      return nullptr;
-    }
-    for (size_t k = 0; k < added.size(); ++k) {
-      const auto place = std::lower_bound(along.begin(), along.end(), added[k]) - along.begin();
-      along.insert(along.begin() + place, added[k]);
-      stations.insert(stations.begin() + place, added_sections[k]);
-    }
-  }
+  };
+  // a sparse skin that is given up or refused is skinned again from the uniform set: the failures and the results of the uniform set are the ones of before
+  const Handle(Geom_BSplineSurface) quick = run(true);
+  if (!quick.IsNull()) return quick;
+  return run(false);
 }
 
 // Where a pass failed: only a chain junction that does not sew in a curved pass is worth the zero-curvature pass.

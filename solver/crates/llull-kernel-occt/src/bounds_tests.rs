@@ -99,7 +99,7 @@ fn conic_removed(points: &[(f64, f64)]) -> f64 {
 }
 
 #[test]
-fn a_kink_and_a_narrow_feature_of_a_straight_radius_law_are_followed_by_the_sparse_seed() {
+fn a_kink_and_a_narrow_feature_of_a_straight_radius_law_are_followed_whatever_the_first_stations() {
     let _serial = crate::serial_blends();
     let (block, edge) = block_and_edge();
     let whole = volume(&block);
