@@ -51,7 +51,7 @@ export function isVec2List(value: unknown, minimumLength: number): value is Vec2
 // prettier-ignore
 const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string>> = {
   wall: 'W', door: 'D', window: 'WN', slab: 'SL', column: 'C', beam: 'B', stair: 'ST', member: 'M', footing: 'F', panel: 'CL',
-  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS', grating: 'GR', railing: 'RL', ladder: 'LD',
+  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS', grating: 'GR', railing: 'RL', ladder: 'LD', steelStair: 'SS',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */

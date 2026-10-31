@@ -1,6 +1,6 @@
 {
   "id": "SC-STA-02",
-  "status": "PROPOSED — add_steel_stair, check_access are not built; add_level exists today",
+  "status": "BUILT (STA-M5): add_steel_stair; the byId rows read the findings through data.findings (byId lists indices)",
   "validates": [
     "VC-STA-04",
     "VC-STA-05"
@@ -157,13 +157,13 @@
     },
     {
       "step": 5,
-      "path": "data.byId.$st2.findings[code=STA_STAIR_TREAD].ruleset",
+      "path": "data.findings[code=STA_STAIR_TREAD].ruleset",
       "value": "osha_1910",
       "source": "200 < 241.3 mm (1910.25(c)(3))"
     },
     {
       "step": 5,
-      "path": "data.byId.$st2.findings[code=STA_STAIR_BLONDEL]",
+      "path": "data.findings[code=STA_STAIR_BLONDEL]",
       "value": "absent",
       "source": "636.4 in 600..660"
     }

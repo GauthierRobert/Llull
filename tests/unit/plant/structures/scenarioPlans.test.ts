@@ -1,7 +1,7 @@
 /**
  * Plant 06 STA: runs the validation pack's scenario plans (`validation/plans/*.json`) through `build_project` (the path of `llull run plan.json`)
  * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2, SC-STA-05 (negative access) and
- * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4. SC-STA-02, 03, 04 and 07 wait for M5..M8 (tests/unit/contract/blockedPlanCommands.json).
+ * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5. SC-STA-03, 04 and 07 wait for M6..M8 (tests/unit/contract/blockedPlanCommands.json).
  */
 
 import { readFileSync } from 'node:fs';
@@ -132,5 +132,29 @@ describe('SC-STA-05 negative access (VC-STA-05, VC-STA-13)', () => {
     expect(
       checked.findings.filter((finding) => finding.code === 'STA_EDGE_UNPROTECTED').every((finding) => finding.ids[0] === 'slab-1'),
     ).toBe(true);
+  });
+});
+
+describe('SC-STA-02 steel stair (VC-STA-04)', () => {
+  const { plan, report } = run('sc-sta-02-steel-stair.json');
+  /** `$alias` in an expected path is the stair id of the step that was named with `as`. */
+  const resolve = (expression: string): string =>
+    expression.replace(/\$(\w+)/g, (_, alias: string) => {
+      const index = plan.actions.findIndex((action) => (action as { as?: string }).as === alias);
+      return (report.steps[index]?.data as { stairId: string }).stairId;
+    });
+
+  it('runs every step', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('meets every expected row: counts, 2h+g, pitch, run, both rule outcomes', () => {
+    expect(plan.expected.length).toBeGreaterThanOrEqual(10);
+    for (const row of plan.expected) compare(pick(report.steps[row.step], resolve(row.path)), row);
+  });
+
+  it('is deterministic (AF-13)', () => {
+    expect(JSON.stringify(run('sc-sta-02-steel-stair.json').report.steps)).toBe(JSON.stringify(report.steps));
   });
 });

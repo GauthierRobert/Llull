@@ -152,6 +152,8 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, path: element.path.map(shift3) };
     case 'ladder':
       return { ...element, base: shift3(element.base) };
+    case 'steelStair':
+      return { ...element, start: shift3(element.start) };
     case 'door':
     case 'window':
     case 'plate':

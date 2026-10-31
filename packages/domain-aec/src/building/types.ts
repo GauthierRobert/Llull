@@ -32,7 +32,8 @@ export type BimCategory =
   | 'pipeSupport'
   | 'grating'
   | 'railing'
-  | 'ladder';
+  | 'ladder'
+  | 'steelStair';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -392,7 +393,10 @@ export interface RailingOpening {
   gate: boolean;
 }
 
-/** Slab (or grating) edges a railing was generated from: a provenance record, the path below is the stored geometry. */
+/**
+ * Slab (or grating) edges a railing was generated from, or the side of a steel stair (06 STA M5: `hostId` = the steelStair, ring 'boundary',
+ * edges [0] = left of the climb direction, [1] = right): a provenance record, the path below is the stored geometry.
+ */
 export interface RailingHost {
   readonly hostId: string;
   /** Slab ring: 'boundary' or the index of an opening. */
@@ -463,6 +467,36 @@ export interface LadderElement extends LevelElementBase {
   arrivalSurfaceId?: string;
 }
 
+/** Tread / landing surface of a steel stair: open-bar grating of a catalogue type, or plate of `thickness` (document units). */
+export type SteelStairTread = { kind: 'grating'; gratingType: string } | { kind: 'checker_plate'; thickness: number };
+
+/** A landing after riser `afterRiser` (counted from 1 at the bottom), `length` along the climb direction (document units). */
+export interface SteelStairLanding {
+  afterRiser: number;
+  length: number;
+}
+
+/**
+ * A steel stringer stair (06 STA M5): `riserCount` equal risers of `riserHeight`, treads of depth `going`, landings, two stringers outside the
+ * clear `width`. `start` = middle of the foot of the first riser (z relative to the level); the stair climbs toward `angle` (plan radians from +X).
+ * Its railings are separate `railing` elements hosted on it (left / right).
+ */
+export interface SteelStairElement extends LevelElementBase {
+  readonly category: 'steelStair';
+  start: Vec3;
+  angle: number;
+  rise: number;
+  /** Clear width between the stringers. */
+  width: number;
+  riserCount: number;
+  riserHeight: number;
+  going: number;
+  stringerProfile: string;
+  tread: SteelStairTread;
+  landings: SteelStairLanding[];
+  arrivalSurfaceId?: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -484,7 +518,8 @@ export type BuildingElement =
   | PipeSupportElement
   | GratingElement
   | RailingElement
-  | LadderElement;
+  | LadderElement
+  | SteelStairElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

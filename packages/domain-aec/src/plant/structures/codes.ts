@@ -5,7 +5,7 @@ import { tableRejection } from '@core/commands/noop';
 const REMEDIATION = {
   STA_RULESET_UNKNOWN: 'Call list_access_rules to see the loaded rulesets (iso_14122, osha_1910).',
   STA_UNKNOWN_ELEMENT:
-    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, slabs, gratings, railings and ladders, check_grating and update_grating gratings, update_railing railings.',
+    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, steel stairs, slabs, gratings, railings and ladders, check_grating and update_grating gratings, update_railing railings.',
   STA_INVALID_GEOMETRY:
     'Fix the geometry: finite numbers, a convex grating boundary of 3+ points or a railing path of 2+ distinct points, a non-zero bar direction.',
   STA_GRATING_TYPE_UNKNOWN: 'Call list_grating_types for the catalogue names.',
@@ -44,12 +44,14 @@ const REMEDIATION = {
     'delete_building_element the ladder and add_ladder again with cage.hoopSpacing / cage.diameter inside the limits.',
   STA_LADDER_LANDING_INTERVAL:
     'delete_building_element the ladder and add_ladder again with landings (leave landings unset to take the generated ones).',
-  STA_STAIR_BLONDEL: 'Change riserCount or treadDepth of the stair so that 2 x riser + going is within the ISO range.',
-  STA_STAIR_RISER: 'Increase riserCount so the riser height drops under the limit.',
-  STA_STAIR_TREAD: 'Increase treadDepth to at least the limit.',
-  STA_STAIR_ANGLE: 'Change riserCount or treadDepth so the pitch angle is within the limit.',
-  STA_STAIR_WIDTH: 'Increase the stair width to at least the limit.',
-  STA_STAIR_FLIGHT_RISE: 'Add an intermediate landing (add_stair landingAt) so no flight rises more than the limit.',
+  STA_STAIR_BLONDEL:
+    'Change riserCount or treadDepth of the stair (a steel stair: delete it and add_steel_stair again with another riserMax / going) so that 2 x riser + going is within the ISO range.',
+  STA_STAIR_RISER: 'Increase riserCount (steel stair: lower riserMax) so the riser height drops under the limit.',
+  STA_STAIR_TREAD: 'Increase treadDepth (steel stair: going) to at least the limit.',
+  STA_STAIR_ANGLE: 'Change riserCount or treadDepth (steel stair: riserMax / going) so the pitch angle is within the limit.',
+  STA_STAIR_WIDTH: 'Increase the stair width to at least the limit (steel stair: delete it and add_steel_stair again with a larger width).',
+  STA_STAIR_FLIGHT_RISE:
+    'Add an intermediate landing (add_stair landingAt, add_steel_stair landingEvery) so no flight rises more than the limit.',
   STA_EDGE_UNPROTECTED:
     'Protect the edge: add_railing { hostId, edges } (a railing below the top-rail minimum does not count: update_railing { height }) or a guard wall of at least 1100 mm.',
   STA_EDGE_RULE_UNSET: 'Pass edgeDropThresholdMm with its source (edgeDropSource): there is no graded drop-height rule to default to.',

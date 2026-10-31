@@ -11,6 +11,7 @@ import { type Exported, exportCurvedWallElement, exportWallElement } from './ifc
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
 import { exportOther } from './ifcOtherExport';
 import { exportGrating, exportRailing } from '../../plant/structures/exchange/ifcAccessExport';
+import { exportSteelStair } from '../../plant/structures/exchange/ifcSteelStairExport';
 import { exportLadder } from '../../plant/structures/exchange/ifcLadderExport';
 import { exportPipeSupport } from './ifcSupportExport';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
@@ -109,6 +110,10 @@ function exportElement(
     }
     case 'ladder': {
       const exported = exportLadder(context, doc, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'steelStair': {
+      const exported = exportSteelStair(context, doc, element, storeyPlacement);
       return exported ? [exported] : [];
     }
     case 'connection':

@@ -26,6 +26,7 @@ export const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string
   grating: 'Grating',
   railing: 'Railing',
   ladder: 'Ladder',
+  steelStair: 'Steel stair',
 };
 
 export function describe(element: BuildingElement, units: DocumentUnit): string {
@@ -73,5 +74,7 @@ export function describe(element: BuildingElement, units: DocumentUnit): string 
       return `${element.role} · ${element.height}`;
     case 'ladder':
       return `${element.climbHeight} · ${element.rungCount} rungs · ${element.fallProtection}`;
+    case 'steelStair':
+      return `${element.riserCount} risers · ${element.rise} rise · ${element.landings.length} landings`;
   }
 }
