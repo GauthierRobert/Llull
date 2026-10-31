@@ -42,8 +42,8 @@ mod ffi {
         fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn full_round_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
         fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, second: f64, angle: bool) -> Result<UniquePtr<Shape>>;
-        fn chamfer_variable(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Result<UniquePtr<Shape>>;
-        fn chamfer_variable_reason(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Result<String>;
+        fn chamfer_variable(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> Result<UniquePtr<Shape>>;
+        fn chamfer_variable_reason(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> Result<String>;
         fn blend_union(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<UniquePtr<Shape>>;
         fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<String>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
@@ -190,14 +190,16 @@ pub fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, se
     built(ffi::chamfer_sided(inner(shape)?, edges, faces, first, second, angle))
 }
 
-/// BLD M5 chamfer whose symmetric distance runs linearly from `first` at the start of each listed straight edge to `last` at its end.
-pub fn chamfer_variable(shape: &Shape, edges: &[u32], first: f64, last: f64) -> Built {
-    built(ffi::chamfer_variable(inner(shape)?, edges, first, last))
+/// BLD M5 chamfer whose distance runs linearly from `first` at the start of each listed edge to `last` at its end: symmetric when `faces` is empty,
+/// else the first leg is on the unique face `faces[k]` of edge k and the other leg runs from `second` to `second_last`. Straight edges between planar
+/// faces and curved edges (an arc, a B-spline) are built.
+pub fn chamfer_variable(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> Built {
+    built(ffi::chamfer_variable(inner(shape)?, edges, faces, first, last, second, second_last))
 }
 
 /// Why [`chamfer_variable`] fails (empty when it builds).
-pub fn chamfer_variable_reason(shape: &Shape, edges: &[u32], first: f64, last: f64) -> OcctResult<String> {
-    occt(ffi::chamfer_variable_reason(inner(shape)?, edges, first, last))
+pub fn chamfer_variable_reason(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> OcctResult<String> {
+    occt(ffi::chamfer_variable_reason(inner(shape)?, edges, faces, first, last, second, second_last))
 }
 
 /// The shape list of a blend: one fuse of `shapes`.

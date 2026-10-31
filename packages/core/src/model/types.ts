@@ -759,10 +759,7 @@ export function createEmptyDocument(): CadDocument {
 }
 
 /** World-space triangle mesh. `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices. */
-export interface MeshData {
-  readonly positions: ReadonlyArray<number>;
-  readonly indices: ReadonlyArray<number>;
-}
+export type MeshData = { readonly positions: ReadonlyArray<number>; readonly indices: ReadonlyArray<number> };
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
@@ -798,7 +795,7 @@ export type ShapeRecipe =
    * `radii` (fillet only): one law per entry of `edges` (same length, edges non-empty); `size` is then the placeholder 0, so a kernel that
    * does not read `radii` refuses instead of rounding every edge with one radius.
    * `faces` (chamfer only, BLD M1): per entry of `edges` the unique face index carrying the first leg `size`; with it, `size2` is the second leg
-   * (distance-distance) or `angleDeg` the angle in degrees (0, 90) measured on that face (distance-angle); exactly one of the two.
+   * (distance-distance) or `angleDeg` the angle in degrees (0, 90) measured on that face (distance-angle); exactly one of the two. With `sizeEnd` both legs run linearly start to end (BLD M5): `size2` -> `size2End`, no angle.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -810,6 +807,7 @@ export type ShapeRecipe =
       readonly near?: readonly Vec3[];
       readonly faces?: readonly number[];
       readonly size2?: number;
+      readonly size2End?: number;
       readonly angleDeg?: number;
       /** Fillet only (BLD M2): conic / curvature section; absent or circular = the rolling ball. A non-circular profile needs constant sizes. */
       readonly profile?: BlendProfile;

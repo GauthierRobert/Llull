@@ -31,6 +31,8 @@ function scaledFillet(recipe: FilletRecipe, factor: number): FilletRecipe {
     ...recipe,
     size: recipe.size * factor,
     ...(recipe.sizeEnd === undefined ? {} : { sizeEnd: recipe.sizeEnd * factor }),
+    ...(recipe.size2 === undefined ? {} : { size2: recipe.size2 * factor }),
+    ...(recipe.size2End === undefined ? {} : { size2End: recipe.size2End * factor }),
     ...(recipe.radii === undefined ? {} : { radii: recipe.radii.map((law) => scaleRadius(law, factor)) }),
   };
 }

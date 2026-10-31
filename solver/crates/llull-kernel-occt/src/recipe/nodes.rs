@@ -210,16 +210,28 @@ pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> 
     Some(flat)
 }
 
+/// The faces and the second leg (start, end) of a variable chamfer: none (symmetric, NaN legs) without `faces`, else `faces` with `size2` and `size2End` (both > 0);
+/// None when the node is malformed.
+fn variable_legs(recipe: &Value) -> Option<(Vec<u32>, f64, f64)> {
+    let Some(faces) = recipe.get("faces").filter(|faces| !faces.is_null()) else {
+        return recipe.get("size2End").is_none_or(Value::is_null).then(|| (Vec::new(), f64::NAN, f64::NAN));
+    };
+    let faces = indices(Some(faces))?;
+    let (second, second_end) = (number(recipe, "size2")?, number(recipe, "size2End")?);
+    (positive(second) && positive(second_end) && number(recipe, "angleDeg").is_none()).then_some((faces, second, second_end))
+}
+
 /// A `chamfer` node (BLD M1): symmetric `size` by default; with `faces` (one unique face index per edge, the face carrying the first leg) a second
 /// leg `size2` (distance-distance) or `angleDeg` (distance-angle, degrees measured on that face, 0 < angle < 90); with `sizeEnd` a symmetric
 /// distance that runs linearly from `size` to `sizeEnd` along each straight edge (BLD M5).
 fn chamfer_node(source: &Shape, edges: &[u32], size: f64, size_end: Option<f64>, recipe: &Value) -> Evaluated {
     if let Some(end) = size_end {
-        // BLD M5: a distance running linearly from `size` to `end`; symmetric legs only
-        if recipe.get("faces").is_some_and(|faces| !faces.is_null()) {
-            return refused();
-        }
-        return shape_of(features::chamfer_variable(source, edges, size, end));
+        // BLD M5: a distance running linearly from `size` to `end`; with `faces` the other leg runs from `size2` to `size2End`
+        let (faces, second, second_end) = match variable_legs(recipe) {
+            Some(legs) => legs,
+            None => return refused(),
+        };
+        return shape_of(features::chamfer_variable(source, edges, &faces, size, end, second, second_end));
     }
     let Some(faces) = recipe.get("faces").filter(|faces| !faces.is_null()) else {
         return shape_of(features::chamfer(source, edges, size));
@@ -377,7 +389,8 @@ impl Evaluator {
             let Some(source) = self.child(recipe, "source")? else { return Ok(Value::Null) };
             let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
             let (first, last) = (number(recipe, "size").unwrap_or(f64::NAN), number(recipe, "sizeEnd").unwrap_or(f64::NAN));
-            let reason = features::chamfer_variable_reason(&source, &edges, first, last).map_err(EvalError::Failure)?;
+            let Some((faces, second, second_end)) = variable_legs(recipe) else { return Ok(Value::Null) };
+            let reason = features::chamfer_variable_reason(&source, &edges, &faces, first, last, second, second_end).map_err(EvalError::Failure)?;
             return Ok(blend_stage_report("chamfer", &reason));
         }
         if op != Some("fillet") {
