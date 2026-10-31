@@ -13,6 +13,7 @@ import { diagonalOf } from './shapeDiagonal';
 import { filletEach } from './filletEach';
 import { type BlendBuild, type BlendContext, type FaceSetInput, faceSetSchema, pickedFaces, runFaceBlend } from './faceBlendRun';
 import { type ProfileInput, isProfileRefusal, profileSchema, resolveProfile } from './filletProfile';
+import { cliffOutcome } from './cliffOutcome';
 import { blendRejection } from './blendCodes';
 import { edgeLawSchema } from './filletSpec';
 import { edgeBlend, onePlanarFaceEach, readEdgeResult } from './faceBlendEdges';
@@ -96,7 +97,7 @@ function holdLineBlend(request: HoldRequest, context: BlendContext): BlendBuild 
 }
 
 /**
- * @affects removes the source solid; creates 1 mesh entity with the blend faces (and the consumed faces gone); data { id, blends, consumedFaces, unit } and, on the edge path, blendEdges [{ index, start, end }]
+ * @affects removes the source solid; creates 1 mesh entity with the blend faces (and the consumed faces gone); data { id, blends, consumedFaces, unit } (with cliff also cliffEngaged, and when engaged cliffEdgeAngle in degrees and cliffFace) and, on the edge path, blendEdges [{ index, start, end }]
  * @invariant requiresKernel; exactly one of radius / width / law / holdLine; radiusEnd only with radius, widthEnd only with width; each set resolves to faces and the sets share none; the blend is tangent to both sets
  * @failure BLD_FACESET_EMPTY, BLD_FACESETS_OVERLAP, BLD_FACE_FILLET_NO_SOLUTION (with the smallest radius), BLD_FACE_BLEND_UNSUPPORTED (no shared sharp edge for curved / multi-face sets or a varying size; a kernel tangent chain that rests on a face outside both sets; a varying size over several chains, a branch or a bend at a joint; startNear on a closed edge; a cliff face that is not a band between two straight edges parallel to the blend, a cliff edge higher off the other face than the radius, a cliff on curved or multi-face sets), BLD_BLEND_PARAMS (cliff with a varying size, a width, a hold line or a non-circular profile), BLD_HOLD_LINE_NOT_ON_FACE, BLD_LAW_INVALID, BLD_LAW_NOT_PERIODIC, BLD_CHORD_UNDEFINED, BLD_RHO_RANGE, BLD_SHAPE_RANGE, REF_LOST / REF_SPLIT -> unchanged document
  */
@@ -110,7 +111,7 @@ export const filletFaces = defineCommand({
     'profile { type: "conic", rho } or { type: "curvature", shape } changes the section. Each set may hold several faces, planar or curved (cylinders, cones, spheres, B-spline faces, tangent-continuous or not): the blend runs along every sharp edge shared by a face of facesA and a face of facesB, built as fillet_edge builds it (same radius laws, chord mode, profiles and limits; data.blendEdges lists them with their two ends). The blend rounds the whole tangent chain of every shared edge, as fillet_edge does: if that chain bounds a face outside facesA and facesB the blend is refused (BLD_FACE_BLEND_UNSUPPORTED names the edges and faces) rather than round a face you did not pick. ' +
     'radiusEnd (smooth start-to-end radius), law { expression, samples } (radius as an expression of t in [0, 1] along the shared edge) and width (the CHORD between the two contact lines at the start, widthEnd at the end) vary or size the blend like fillet_edge; a varying size runs over the whole blend: one edge, or a tangent chain of several shared edges (one open path or one closed loop whose joints are tangent: a line, an arc and a line of a rounded outline), where radiusEnd / widthEnd change in a straight line in arc length from the start of the chain to its end and law is an expression of t over the total arc length of the chain (the kernel gets one sub-law per edge, equal at every joint); several separate chains, a branch or a bend at a joint are refused by name. startNear picks which end of the edge or chain is t = 0. ' +
     'Faces that share no sharp edge (a chamfer between them is consumed) are blended only as one planar face per set with a constant radius that end on flat faces square to the blend. ' +
-    'cliff "A" | "B" (one planar face per set, constant radius, circular section): when the ball would run off the far edge of that face (the face is narrower than the tangent contact distance radius * tan(fold / 2)), the blend stops at that edge, the cliff edge: the ball stays tangent to the other face and touches the cliff edge instead of being tangent to its face, so the blend is G1 to the other face and meets the cliff edge at an angle; the cliff face is consumed. Without a run-off the ordinary tangent blend is built. Other trim modes (extending or trimming the blend past its ends) are not offered. Without cliff, a blend that runs off a face is refused (BLD_FACE_FILLET_NO_SOLUTION / BLD_FACE_BLEND_UNSUPPORTED). BLD_FACE_FILLET_NO_SOLUTION says when no ball of that radius stays in the material (and the smallest radius that does), ' +
+    'cliff "A" | "B" (one planar face per set, constant radius, circular section): when the ball would run off the far edge of that face (the face is narrower than the tangent contact distance radius * tan(fold / 2)), the blend stops at that edge, the cliff edge: the ball stays tangent to the other face and touches the cliff edge instead of being tangent to its face, so the blend is G1 to the other face and meets the cliff edge at an angle; the cliff face is consumed. Without a run-off the ordinary tangent blend is built. data.cliffEngaged says which, data.cliffEdgeAngle (degrees, 0 = tangent) is the angle at the cliff edge and data.cliffFace the consumed face. Other trim modes (extending or trimming the blend past its ends) are not offered. Without cliff, a blend that runs off a face is refused (BLD_FACE_FILLET_NO_SOLUTION / BLD_FACE_BLEND_UNSUPPORTED). BLD_FACE_FILLET_NO_SOLUTION says when no ball of that radius stays in the material (and the smallest radius that does), ' +
     'BLD_FACE_BLEND_UNSUPPORTED what else is not built. Needs the exact native kernel (check kernel_info); with the mesh kernel it no-ops. Run check_blends afterwards.',
   params: z.object({
     id: z.string().describe('Id of the 3D solid entity to blend. Must exist and be a 3D solid kind.'),
@@ -191,6 +192,7 @@ export const filletFaces = defineCommand({
     for (const [name, value] of Object.entries(positive))
       if (value !== undefined && !(value > 0))
         return blendRejection(doc, 'fillet_faces', 'BLD_LAW_INVALID', `${name} must be > 0 (got ${value})`, [id], [name]);
+    const { cliff } = params;
     if (params.cliff !== undefined) {
       const clash = [
         ['radiusEnd', radiusEnd],
@@ -218,8 +220,9 @@ export const filletFaces = defineCommand({
       command: 'fillet_faces',
       id,
       sets,
-      describe: (newId, triangles) =>
-        `fillet_faces: blended '${id}' (radius ${radius}${params.cliff === undefined ? '' : `, cliff edge on faces${params.cliff}`}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
+      describe: (newId, triangles, note) =>
+        `fillet_faces: blended '${id}' (radius ${radius}${params.cliff === undefined ? '' : `, cliff edge on faces${params.cliff}`}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${note}`,
+      ...(cliff === undefined ? {} : { outcome: (kernel, shape, after, before) => cliffOutcome(kernel, shape, after, before, cliff) }),
       build: (context) => {
         if (holdLine !== undefined)
           return holdLineBlend(

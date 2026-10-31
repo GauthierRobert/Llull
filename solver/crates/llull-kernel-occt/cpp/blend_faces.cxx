@@ -174,7 +174,10 @@ bool cliff_tool(const TopoDS_Shape &shape, const Corner &c, const TopoDS_Face &f
                 Tool &tool, std::string &why) {
   double low, high;
   extent_along(fa, c.start, c.inward_a, low, high);
-  if (low < -1e-6 * std::max(1.0, high) || !is_band(fa, c.start, c.inward_a, low, high))
+  if (std::fabs(low) > 1e-6 * std::max(1.0, high))
+    return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the cliff face must reach the corner line of the two faces (its near edge at the corner, not " + std::to_string(low) +
+                        " away from it): the material between would be removed with it");
+  if (!is_band(fa, c.start, c.inward_a, low, high))
     return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the cliff face must be a band between two straight edges parallel to the blend (its far edge is the cliff)");
   const double wedge = kPi - c.fold;
   const double width = high;
