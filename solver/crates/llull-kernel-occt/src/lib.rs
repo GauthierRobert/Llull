@@ -27,6 +27,8 @@ mod blend_chamfer_tests;
 #[cfg(test)]
 mod blend_corner_tests;
 #[cfg(test)]
+mod blend_end_tests;
+#[cfg(test)]
 mod blend_joint_tests;
 #[cfg(test)]
 mod blend_mitre_tests;

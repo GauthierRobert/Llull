@@ -43,6 +43,8 @@ struct Tool {
   TopoDS_Shape shape;
   std::vector<std::string> names;
   bool convex = true;
+  // A fused tool cut back to an oblique end: its end cap lies in the end face and is merged into it after the fuse.
+  bool trimmed = false;
 };
 
 // A straight edge between two planar faces, with the frame the spandrel tools are built in: the two faces, their outward normals, the unit
@@ -63,6 +65,18 @@ bool edge_frame(const TopoDS_Shape &shape, int index, const char *what, EdgeFram
 // Whether both ends of the straight edge of `frame` lie on a planar face perpendicular to it (the other faces at each end vertex), so a prism
 // along the edge can end flush; false with the reason in `why`.
 bool ends_square(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *what, std::string &why);
+
+// The flat face that closes a straight edge at one end: a point on it, its outward normal and whether it is oblique to the edge (not perpendicular).
+struct EndPlane {
+  gp_Pnt point;
+  gp_Vec normal;
+  bool oblique = false;
+};
+// Cosine of the angle between an end face's normal and the edge below which a prism cannot be extended across the face (about 80 degrees from square).
+constexpr double kMinEndCosine = 0.17;
+// The closing face at each end of the straight edge of `frame` (index 0: start): perpendicular to the edge (square) or one flat oblique face; false with
+// the reason in `why` for a curved face, several faces, or a face nearly parallel to the edge.
+bool end_planes(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *what, EndPlane (&ends)[2], std::string &why);
 
 // Diagonal of the true bounding box of `shape` (BRepBndLib::AddOptimal without enlargement: the bounds mass_properties gives, so the length
 // scale check_blends measures against). Construction tolerances use it; an acceptance limit uses the smaller of the source's and the result's.
