@@ -786,7 +786,6 @@ plane and cylinder faces does not hold for the cone's chart, whose axes are (tan
 volume of the same emboss on the whole cone (1e-4). Torus R 10 r 3 split along two meridians (`create_curve_on_face` iso + `split_face_by_curves`): a band of 3 along the outer equator across a meridian, 1.3 + 1.7 with join mismatch 0.0085, ends 0.055 (1.8 % of the band) from the exact equator point; from an anchor 3.9 away (mismatch 6.3 %, the circumferential stretch K rho^2 / 6 of the geodesic chart)
 the chain is refused with `WRP_DISTORTION_EXCEEDED`, and so is any limit below the measured mismatch.
 
-=======
 ### 14.14 Variable TrueType: `gvar`, `avar` version 2, `MVAR` (DES-3c)
 
 `variation` now instances TrueType fonts with a `gvar` table as well as CFF2 ones. Files: `lib/font/gvar.ts` (tuple variation store), `lib/font/variation.ts` (`avar` 2), `lib/font/mvar.ts`, `lib/font/glyf.ts` (the hooks), `lib/font/font.ts` (wiring).
