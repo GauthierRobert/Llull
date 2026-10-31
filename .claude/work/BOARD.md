@@ -148,13 +148,13 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   UI render overlays
     for the new entities. _Lane 1 + native_ _deps: —_
 - `[TODO]` **DES-4c** 04 DIR left after M0–M6 core + UI (done 2026-10-24, TECHNICAL\*SPEC §14): desktop-app hands-on pass on face handles / pole
-  drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), handles for curved faces and feature moves (hole / boss), multi-pole
+  drags / loop-cut drag / gizmo (draft sign and faceNear vs the native kernel), (handles for curved faces via kernel face labels, Move feature, multi-pole selection + falloff drag, chip layout DONE 2026-10-31) handles for curved faces and feature moves (hole / boss), multi-pole
   selection + falloff drag, chip layout, (exact G1 patches DONE 2026-10-31: linear tangent-plane conditions with free inner edge poles, `g1Solve` auto / exact / fit, exact on cubes / boxes / cylinders; left: valence-5 stars like the pentagonal cap, a limit-surface objective above 900 unknowns), (bench VC-18 + 200-face preview at 500 ms / 5 Hz idle, bevel across vertex chains DONE 2026-10-30),
   M7 (OCC reason in `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net` DONE 2026-10-30). _Lane 2 + 1 + native_ _deps: —_
 - `[TODO]` **DES-5c** 05 IMP left after M0–M6 (M4–M6 done 2026-10-25, §14.7): (surface-UV cell maps + strut-lattice maps and an exact-predicate Delaunay DONE 2026-10-30, §14.13-14.14);
   (scalar kinds `topology_density` / `fea_result` VC-IMP-29 DONE 2026-10-30, §14.11); (numerical homogenisation on `llull-voxfe` DONE 2026-10-30, §14.15); (BVH for explicit strut sets DONE 2026-10-30, §14.9: caps 100k beams / 6000 seeds;
-  (faster Voronoi Delaunay DONE 2026-10-31, §14.16: ~12x, identical output, 90k seeds / 900k beams); native `gradient`, native dual contouring and per-cell DC repair DONE 2026-10-30, §14.10); (3MF file sink DONE 2026-10-30, §14.12;
-  left: desktop export dialog uses toFile); GPU preview. _Lane 1 + native_ _deps: —_
+  (faster Voronoi Delaunay DONE 2026-10-31, §14.16: ~12x, identical output, 90k seeds / 900k beams); native `gradient`, native dual contouring and per-cell DC repair DONE 2026-10-30, §14.10); (3MF file sink DONE 2026-10-30, §14.12; desktop File > Export 3MF + in-app 3MF entry via toFile DONE 2026-10-31;
+  ); GPU preview (in review). _Lane 1 + native_ _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
 
