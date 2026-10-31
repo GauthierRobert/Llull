@@ -392,7 +392,32 @@ describeNative('BLD M2 mitre ends: profile blends on creased tangent chains (nat
     expect(volume(edited.document, longer)).toBeGreaterThan(volume(done.doc, done.id));
   }, 300_000);
 
-  it('what is still refused is refused by name with the measured reason: a crease OCCT does not chain, a varying size on a creased chain, a corner of 8 sides', () => {
+  it('a corner of 8 sides: the blend of one rim edge ends obliquely on the next wall and is built (13.35): valid solid, OCCT fillet volume, one new face, clean check_blends', () => {
+    const octagon = regular(8, 50);
+    const corner = prism(octagon, 20);
+    const near = sideNear(octagon, 0, 20);
+    const circle = execute(corner.doc, 'fillet_edge', {
+      id: corner.id,
+      edgesNear: [near],
+      radius: 1,
+      profile: { type: 'conic', rho: Math.SQRT2 - 1 },
+    });
+    expect(circle.error, circle.summary).toBeUndefined();
+    const circleId = circle.affected[0] as string;
+    const occt = execute(corner.doc, 'fillet_edge', { id: corner.id, edgesNear: [near], radius: 1 });
+    expect(occt.error, occt.summary).toBeUndefined();
+    const occtId = occt.affected[0] as string;
+    // the circular conic is OCCT's circular fillet to the gate; the solid is valid (positive volume below the prism's)
+    expect(volume(circle.document, circleId)).toBeGreaterThan(0);
+    expect(volume(circle.document, circleId)).toBeLessThan(volume(corner.doc, corner.id));
+    expect(Math.abs(volume(circle.document, circleId) - volume(occt.document, occtId))).toBeLessThan(1e-6 * volume(occt.document, occtId));
+    const faces = (doc: Doc, id: string): number => (execute(doc, 'inspect_topology', { id }).data as { faces: unknown[] }).faces.length;
+    expect(faces(circle.document, circleId)).toBe(faces(corner.doc, corner.id) + 1);
+    const findings = check(circle.document, circleId).findings.map((finding) => finding.code);
+    expect(findings.filter((code) => code !== 'BLD_CHECK_G2_JUMP')).toEqual([]);
+  });
+
+  it('what is still refused is refused by name with the measured reason: a crease OCCT does not chain, a varying size on a creased chain', () => {
     // 0.1005 rad: OCCT does not chain the bends, the blend runs out onto the next wall
     const { outline, lower } = bar(0.1005, 1);
     const body = prism(outline, 10);
@@ -406,18 +431,6 @@ describeNative('BLD M2 mitre ends: profile blends on creased tangent chains (nat
     expect(unchained.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [body.id] });
     expect(unchained.summary).toContain('crease of 0.1005 rad');
     expect(unchained.summary).toContain('about 0.1 rad');
-    // 8 sides: a crease of 0.785 rad is a corner, not a chain
-    const octagon = regular(8, 50);
-    const corner = prism(octagon, 20);
-    const sharp = execute(corner.doc, 'fillet_edge', {
-      id: corner.id,
-      edgesNear: [sideNear(octagon, 0, 20)],
-      radius: 1,
-      profile: PROFILES[0].profile,
-    });
-    expect(sharp.document).toBe(corner.doc);
-    expect(sharp.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [corner.id] });
-    expect(sharp.summary).toMatch(/runs out onto the next flat face at a crease of 0\.7\d* rad|away from square/);
     // a varying size on a creased chain: OCCT's variable-radius fillet cannot round it, so there is no circular blend to cut the profile from
     const points = regular(64, 50);
     const rim = prism(points, 20);

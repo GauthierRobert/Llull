@@ -310,14 +310,15 @@ fn a_rib_between_the_end_plane_and_the_far_cap_refuses_the_blend_instead_of_notc
 }
 
 #[test]
-fn an_oblique_end_of_a_curved_edge_is_refused_by_the_rail_builder_with_its_reason() {
+fn an_oblique_end_of_a_curved_edge_is_built_by_the_rail_builder() {
     let _serial = crate::serial_blends();
-    // the top rim arc of a cylinder cut by the plane x = -3: the arc leaves that plane at an angle, so the end is oblique to the edge
+    // the top rim arc of a cylinder cut by the plane x = 7 - 10 = -3: the arc leaves that plane at an angle, so the end is oblique to the edge (13.35)
     let slab = crate::make_box([-10.0, -10.0, 0.0], [7.0, 20.0, 3.0]).unwrap().unwrap();
     let round = crate::make_cylinder(8.0, 3.0).unwrap().unwrap();
     let part = crate::boolean(crate::BooleanOp::Intersect, &slab, &round, false).unwrap().unwrap();
     let edge = edges_where(&part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 3.0).abs() < 1e-9);
     assert_eq!(edge.len(), 1);
-    let why = blend(&part, &edge, 0.5, 2.0, 0.0).err().expect("refused");
-    assert!(why.contains("ends obliquely"), "{why}");
+    let built = blend(&part, &edge, 0.5, 0.0, 0.414_213_562_373_095_1).unwrap_or_else(|why| panic!("refused: {why}"));
+    let occt = fillet(&part, &edge, 0.5, None).unwrap().unwrap();
+    assert!(near(volume_of(&built), volume_of(&occt), 1e-6), "{} vs OCCT {}", volume_of(&built), volume_of(&occt));
 }
