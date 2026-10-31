@@ -699,15 +699,23 @@ static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<con
 static thread_local std::string g_last_reason;
 
 // The profile blend: the prism builder for constant sizes on straight edges between planar faces (exact), corners where edges meet, else the rail
-// builder (curved edges and faces, any size law). `specs` is empty when a size varies; `laws` is empty when a leg is asymmetric.
+// builder (curved edges and faces, any size law). `specs` is empty when a size varies; `laws` is empty when a leg is asymmetric, then `legs` holds
+// the legs (cpp/blend_legs.cxx) that the prism builder's refusals fall back to.
 static std::unique_ptr<Shape> build_blend(const Shape &source, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
-                                          rust::Slice<const double> laws, double kind, double param, std::string &notes, std::string &why) {
+                                          rust::Slice<const double> laws, rust::Slice<const double> legs, double kind, double param, std::string &notes,
+                                          std::string &why) {
   std::string prism_why;
   if (!specs.empty()) {
     bool scope = false;
     std::unique_ptr<Shape> built = build_profile(source, specs, notes, why, scope);
-    if (built || !scope || laws.empty()) return built;
+    if (built || !scope || (laws.empty() && legs.empty())) return built;
     prism_why = why;
+  }
+  if (!legs.empty()) {
+    std::unique_ptr<Shape> built = legs_blend(source, legs, static_cast<int>(kind), param, notes, why);
+    if (built || prism_why.empty()) return built;
+    why = prism_why + " (the two-leg builder, tried next, says: " + why + ")";
+    return nullptr;
   }
   if (laws.empty()) {
     why = why.empty() ? "profile specification is malformed" : why;
@@ -748,12 +756,12 @@ std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const doub
   }
 }
 
-std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
-                                            rust::Slice<const double> laws, double kind, double param) {
+std::unique_ptr<Shape> fillet_profile_legs(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                           rust::Slice<const double> laws, rust::Slice<const double> legs, double kind, double param) {
   g_last_reason.clear();
   std::string why, notes;
   try {
-    std::unique_ptr<Shape> built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
+    std::unique_ptr<Shape> built = build_blend(shape, specs, edges, laws, legs, kind, param, notes, why);
     if (built) built->notes = notes;
     if (built && has_straight_kink(laws)) built->refined_mass = true;
     g_last_reason = built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why);
@@ -764,20 +772,30 @@ std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<cons
   }
 }
 
+std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                            rust::Slice<const double> laws, double kind, double param) {
+  return fillet_profile_legs(shape, specs, edges, laws, rust::Slice<const double>(), kind, param);
+}
+
 rust::String profile_blend_last_reason() { return rust::String(g_last_reason); }
 
 rust::String shape_notes(const Shape &shape) { return rust::String(shape.notes); }
 
-rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
-                                  rust::Slice<const double> laws, double kind, double param) {
+rust::String profile_legs_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws,
+                                 rust::Slice<const double> legs, double kind, double param) {
   std::string why, notes;
   std::unique_ptr<Shape> built;
   try {
-    built = build_blend(shape, specs, edges, laws, kind, param, notes, why);
+    built = build_blend(shape, specs, edges, laws, legs, kind, param, notes, why);
   } catch (const Standard_Failure &error) {
     why = blend::occt_failure(error);
   }
   return rust::String(built ? std::string() : (why.empty() ? std::string("the profile blend failed") : why));
+}
+
+rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
+                                  rust::Slice<const double> laws, double kind, double param) {
+  return profile_legs_reason(shape, specs, edges, laws, rust::Slice<const double>(), kind, param);
 }
 
 rust::String profile_reason(const Shape &shape, rust::Slice<const double> specs) {

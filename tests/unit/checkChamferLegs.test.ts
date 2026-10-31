@@ -9,7 +9,8 @@ import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { readChamferLegs } from '@core/commands/brep/checkChamferLegs';
 import { createEmptyDocument, type ShapeRecipe, type Vec3 } from '@core/model/types';
 import { chamferNodes } from '@core/geometry/blend/blendInfo';
-import { SOURCE, chamfer, entityOf, stub } from '../helpers/chamferLegsKernel';
+import { SOURCE, chamfer, entityOf, legFillet, stub } from '../helpers/chamferLegsKernel';
+import { legFilletNodes } from '@core/geometry/blend/blendInfo';
 
 afterEach(() => setGeometryKernel(null));
 
@@ -28,6 +29,80 @@ describe('chamferNodes', () => {
     ).toHaveLength(2);
     expect(chamferNodes({ op: 'shell', source: chamfer(), thickness: 1 })).toHaveLength(1);
     expect(chamferNodes({ op: 'blend', sources: [chamfer()], radius: 1 })).toHaveLength(1);
+  });
+});
+
+describe('legFilletNodes', () => {
+  it('finds the fillet nodes that give an edge a second leg, not a symmetric one', () => {
+    expect(legFilletNodes({ op: 'fillet', source: SOURCE, edges: [0], size: 1 })).toEqual([]);
+    expect(legFilletNodes(legFillet())).toHaveLength(1);
+    expect(legFilletNodes({ op: 'shell', source: legFillet(), thickness: 1 })).toHaveLength(1);
+    expect(legFilletNodes(chamfer())).toEqual([]);
+  });
+});
+
+describe('readChamferLegs of a fillet with two legs (13.34)', () => {
+  it('reads the legs on the blend face against size -> sizeEnd and size2 -> size2End, as a row of the fillet', () => {
+    const { rows, findings } = readChamferLegs(stub({ role: 'blend' }), entityOf(legFillet()), 'mm');
+    expect(findings).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ op: 'fillet', edge: 0, name: 'E', face: 2, requested: { first: [1, 2], second: [2, 4] } });
+    expect(rows[0]?.maxDeviation).toBeLessThan(1e-12);
+  });
+
+  it('a constant second leg is read as constant; an edge without size2 in the same node has no row', () => {
+    const constant = readChamferLegs(
+      stub({ role: 'blend', second: () => 3 }),
+      entityOf(legFillet({ size2End: undefined, size2: 3 })),
+      'mm',
+    );
+    expect(constant.rows[0]?.requested).toMatchObject({ second: [3, 3] });
+    expect(constant.findings).toEqual([]);
+    const mixed = entityOf({
+      op: 'fillet',
+      source: SOURCE,
+      edges: [0, 1],
+      size: 0,
+      radii: [{ size: 1 }, { size: 1, size2: 2, sideFace: 0 }],
+    } as never);
+    expect(readChamferLegs(stub({ role: 'blend' }), mixed, 'mm').rows.map((row) => row.edge)).toEqual([1]);
+  });
+
+  it('a leg off its law is BLD_CHECK_BLEND_LEGS (not the chamfer code); a blend the kernel did not name is a row with a reason', () => {
+    const off = readChamferLegs(stub({ role: 'blend', first: () => 1.5 }), entityOf(legFillet()), 'mm');
+    expect(off.findings.map((finding) => finding.code)).toEqual(['BLD_CHECK_BLEND_LEGS']);
+    expect(off.findings[0]?.message).toContain('blend of edge 0');
+    const unnamed = readChamferLegs(stub({ role: 'blend', missing: 'chamfer' }), entityOf(legFillet()), 'mm');
+    expect(unnamed.rows[0]?.note).toContain('no face named blend(E)');
+    expect(unnamed.findings).toEqual([]);
+  });
+
+  it('check_blends reports the rows under legs (not chamfers), fails on a leg off its law and warns BLD_CHECK_BLEND_UNVERIFIED when it cannot read them', () => {
+    const withEntity = {
+      ...createEmptyDocument(),
+      entities: { m: { ...entityOf(legFillet()), mesh: { positions: [], indices: [] } } as never },
+      order: ['m'],
+    };
+    setGeometryKernel(stub({ role: 'blend', first: () => 1.5 }));
+    const failing = execute(withEntity as never, 'check_blends', {}).data as {
+      status: string;
+      legs: unknown[];
+      chamfers?: unknown;
+      findings: Array<{ code: string }>;
+    };
+    expect(failing.status).toBe('fail');
+    expect(failing.legs).toHaveLength(1);
+    expect(failing.chamfers).toBeUndefined();
+    expect(failing.findings.map((finding) => finding.code)).toContain('BLD_CHECK_BLEND_LEGS');
+    setGeometryKernel(stub({ role: 'blend', missing: 'contact' }));
+    const blind = execute(withEntity as never, 'check_blends', {}).data as {
+      status: string;
+      unverified: number;
+      findings: Array<{ code: string }>;
+    };
+    expect(blind.status).toBe('warn');
+    expect(blind.unverified).toBe(1);
+    expect(blind.findings.map((finding) => finding.code)).toContain('BLD_CHECK_BLEND_UNVERIFIED');
   });
 });
 

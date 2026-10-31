@@ -119,6 +119,28 @@ bool project_on_face(const TopoDS_Face &support, const gp_Pnt &point, gp_Pnt &on
 // False when the point does not project on the face or its parametrisation is degenerate there.
 bool support_curvature(const TopoDS_Face &support, const gp_Pnt &point, const gp_Vec &direction, const gp_Vec &toward, gp_Vec &nu, double &kappa);
 
+// The unit normal of `face` at the point of it nearest to `point` (the orientation of the face applied; a built solid's faces can point inward, so callers probe); false when the surface has none there.
+bool face_unit_normal(const TopoDS_Face &face, const gp_Pnt &point, gp_Vec &normal);
+
+// The point of `face` at the chord `d` from `corner` in the plane perpendicular to `tangent`, starting from the tangent-plane offset along `inward`: project onto the
+// face, drop the component along the edge, rescale to the chord, until the projected point is the rescaled one to 1e-9 d. False when it does not settle or leaves the face.
+bool leg_point(const TopoDS_Face &face, const gp_Pnt &corner, const gp_Vec &tangent, const gp_Vec &inward, double d, gp_Pnt &out);
+
+// One edge of a variable chamfer (cpp/blend_chamfer.cxx): the unique edge index, the unique face index carrying the first leg (-1: symmetric legs) and the legs
+// first start, first end, second start, second end (linear in the arc length).
+struct ChamferEdge {
+  uint32_t index;
+  int leg1;
+  double given[4];
+};
+// The variable chamfer of `each` (cut for convex edges, fused for concave); chamfer faces are named `chamfer(<edge name>)`. Null with the reason in `why`.
+std::unique_ptr<Shape> chamfer_per_edge(const Shape &source, const std::vector<ChamferEdge> &each, std::string &why);
+
+// Profile blend with two legs (cpp/blend_legs.cxx, TECHNICAL_SPEC §13.34): `legs` holds 6 numbers per edge (unique edge index, unique face index carrying the first
+// leg, size, sizeEnd (NaN: constant), size2, size2End (NaN: constant)); the chamfer of those legs is re-skinned with the section `kind` (0 conic, 2 circular-equivalent)
+// and `param` between the chamfer's own contact lines. Null with the reason in `why`.
+std::unique_ptr<Shape> legs_blend(const Shape &source, rust::Slice<const double> legs, int kind, double param, std::string &notes, std::string &why);
+
 // The rail-preserving profile blend (cpp/blend_rails.cxx): the circular fillet of unique edges `edges` with `laws` (the fillet_laws layout) re-skinned with
 // the section `kind` (0 conic, 1 curvature) and `param`. Null with the reason in `why`.
 // `notes` receives the JSON object the built shape carries (Shape::notes): builder, measured gap, a reported fallback. A curvature profile that

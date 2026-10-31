@@ -200,6 +200,8 @@ export function checkRadius(
 ): RadiusCheck {
   // a conic / curvature section has no radius: the circle through three of its points would be a number without meaning
   if (record?.profile !== undefined && record.profile.type !== 'circular') return { radius: null, lawChecked: false, deviations: [] };
+  // two legs (size2) are lengths on the faces, read by the leg readback (checkChamferLegs.ts): the section is not a circle of the law's radius
+  if (record?.law.size2 !== undefined) return { radius: null, lawChecked: false, deviations: [] };
   const sections = blendSectionsOf(kernel, shape, blend, FINE_SECTIONS);
   const fine = sections === null ? null : radiusSamples(sections);
   if (sections === null || fine === null) return { radius: null, lawChecked: false, deviations: [] };

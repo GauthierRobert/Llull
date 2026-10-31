@@ -37,6 +37,10 @@ export const REMEDIATION = {
     'the kernel did not give what the leg readback needs (the chamfer face by name, its contact lines, the faces of the edge): rebuild with the native kernel, or read the legs with inspect_topology and measure_distance',
   BLD_CHECK_CHAMFER_LEGS:
     'the chamfer face does not keep the legs of its law (a leg is measured on each face from the edge in the plane perpendicular to it): use smaller distances, or a constant chamfer, or report the part',
+  BLD_CHECK_BLEND_UNVERIFIED:
+    'the kernel did not give what the leg readback needs (the blend face by name, its contact lines, the faces of the edge): rebuild with the native kernel, or read the legs with inspect_topology and measure_distance',
+  BLD_CHECK_BLEND_LEGS:
+    'the blend face does not keep the legs of its law (a leg is measured on each face from the edge in the plane perpendicular to it): use smaller sizes, or report the part',
   BLD_CHECK_CLIFF_EDGE:
     'none needed: a cliff edge (fillet_faces cliff) is where the ball touches the far edge of a narrow face, so it is sharp there by construction',
   BLD_CHECK_G0_GAP: 'the faces do not meet at the contact: use a smaller radius or fewer edges per step',

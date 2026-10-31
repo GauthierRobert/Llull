@@ -150,6 +150,24 @@ describe('law helpers', () => {
     expect(controlParameters(law)).toEqual([0, 0.5, 1]);
   });
 
+  it('size2End: resolved with size2, scaled and swapped with the other leg when the law is reversed; a size2End without size2 is invalid', () => {
+    expect(resolveLaw({ size: 1, size2: 2, size2End: 3 })).toEqual({ size: 1, size2: 2, size2End: 3 });
+    expect(periodicProblem({ size: 1, size2: 2, size2End: 3 })).toMatchObject({ code: 'BLD_LAW_NOT_PERIODIC', path: 'size2End' });
+    expect(periodicProblem({ size: 1, size2: 2, size2End: 2 })).toBeNull();
+    expect(periodicProblem({ size: 1, size2: 2 })).toBeNull();
+    expect(resolveLaw({ size: 1, size2End: 3 })).toMatchObject({ code: 'BLD_LAW_INVALID', path: 'size2End' });
+    expect(resolveLaw({ size: 1, size2: 2, size2End: 0 })).toMatchObject({ code: 'BLD_LAW_INVALID', path: 'size2End' });
+    expect(scaleLaw({ size: 1, size2: 2, size2End: 3, sideFace: 0 }, 2)).toEqual({ size: 2, size2: 4, size2End: 6, sideFace: 0 });
+    expect(reverseLaw({ size: 1, sizeEnd: 2, size2: 2, size2End: 3, sideFace: 0 })).toEqual({
+      size: 2,
+      sizeEnd: 1,
+      size2: 3,
+      size2End: 2,
+      sideFace: 0,
+    });
+    expect(reverseLaw({ size: 1, sizeEnd: 2, size2: 2, sideFace: 0 })).toEqual({ size: 2, sizeEnd: 1, size2: 2, sideFace: 0 });
+  });
+
   it('scaleLaw multiplies every size and keeps the interpolation; lawTimesFactors keeps the shape for a constant factor, samples otherwise', () => {
     expect(scaleLaw({ ...law, interpolation: 'linear' }, 2)).toEqual({
       size: 2,

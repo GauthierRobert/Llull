@@ -47,7 +47,13 @@ export const edgeLawSchema = z
     size2: z
       .number()
       .describe(
-        'Asymmetric blend: the leg on the face NOT named by side1Near / side1Name (document units, > 0); size is then the leg on side 1. Needs a straight edge between two planar faces (BLD_PROFILE_FAILED otherwise); the section is the elliptic quarter of the circle unless profile says otherwise.',
+        'Asymmetric blend: the leg on the face NOT named by side1Near / side1Name (document units, > 0); size is then the leg on side 1 (a LENGTH on its face, not a radius). A leg is the chord from the edge to its contact line in the plane perpendicular to the edge. Built on straight edges between planar faces (exact), and on curved edges and curved faces (a cylinder rim, a boss foot, a sphere cap): the contact lines are those of the chamfer of the two legs and the section is G1 to both faces. Edges that meet at a vertex, an edge that continues a tangent chain that is not listed, and curvature profiles on curved edges are refused with the reason. The section is the elliptic quarter of the circle unless profile says otherwise.',
+      )
+      .optional(),
+    size2End: z
+      .number()
+      .describe(
+        'With size2: the second leg at the END of the edge (> 0, document units); the second leg runs linearly in the arc length from size2 to size2End, as the first leg does from size to sizeEnd (each leg varies on its own). Not on a closed edge (a rim has no start and end: give constant legs); no sizes control points or expression law with size2.',
       )
       .optional(),
     side1Near: vec3('With size2: a point [x, y, z] in document units on the face that carries size (side 1).').optional(),

@@ -110,6 +110,18 @@ const check = (
 };
 
 describe('check_blends radius readback', () => {
+  it('a blend with two legs (size2) is not read as a circle of the law radius: no radius row and no BLD_CHECK_RADIUS_LAW whatever the sections say (13.34)', () => {
+    const kernel = kernelWith(sectionsOf(() => 1.7));
+    const { doc } = filleted(kernel, { size: 1, size2: 2, side1Name: `${S}:z+` });
+    const { rows, findings } = check(kernel, doc);
+    expect(findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.radius).toBeUndefined();
+    // the same sections under a radius law are a failure: the skip is the legs, not the kernel
+    const radius = filleted(kernel, { size: 1 });
+    expect(check(kernel, radius.doc).findings.map((finding) => finding.code)).toContain('BLD_CHECK_RADIUS_LAW');
+  });
+
   it('a constant radius: min = max = r, a sample at every requested t, the law compared and met', () => {
     const kernel = kernelWith(sectionsOf(() => 1));
     const { doc } = filleted(kernel, { size: 1 });

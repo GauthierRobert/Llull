@@ -20,7 +20,7 @@ import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, typ
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
 import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
 import { readChamferLegs } from './checkChamferLegs';
-import { chamferNodes } from '../../geometry/blend/blendInfo';
+import { chamferNodes, legFilletNodes } from '../../geometry/blend/blendInfo';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -430,7 +430,7 @@ export const checkBlends = defineCommand({
     for (const id of ids ?? Object.keys(doc.entities)) {
       const entity = doc.entities[id];
       const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
-      const withChamfer = recipe !== undefined && chamferNodes(recipe).length > 0;
+      const withChamfer = recipe !== undefined && (chamferNodes(recipe).length > 0 || legFilletNodes(recipe).length > 0);
       if (entity !== undefined && recipe !== undefined && hasFillet(recipe)) targets.push(entity);
       if (entity !== undefined && withChamfer) chamfered.push(entity);
       if (recipe !== undefined && (hasFillet(recipe) || withChamfer)) continue;
@@ -455,22 +455,24 @@ export const checkBlends = defineCommand({
       cornered: checks.some((check) => check.blends.some((blend) => blend.kind === 'corner' && blend.profile === 'patch')),
     });
     const legs = kernel === null ? [] : chamfered.map((entity) => readChamferLegs(kernel, entity, unit));
-    const chamferRows = legs.flatMap((read) => read.rows);
-    const unverifiedChamfers = chamferRows.filter((row) => row.note !== undefined);
+    const legRows = legs.flatMap((read) => read.rows);
+    const chamferRows = legRows.filter((row) => row.op === 'chamfer');
+    const filletLegRows = legRows.filter((row) => row.op === 'fillet');
+    const unverifiedChamfers = legRows.filter((row) => row.note !== undefined);
     const findings = [
       ...checks.flatMap((check) => check.findings),
       ...legs.flatMap((read) => read.findings),
       // a chamfer whose legs could not be compared is not a pass: it is a warning that names why
       ...unverifiedChamfers.map(
         (row): Finding => ({
-          code: 'BLD_CHECK_CHAMFER_UNVERIFIED',
+          code: row.op === 'fillet' ? 'BLD_CHECK_BLEND_UNVERIFIED' : 'BLD_CHECK_CHAMFER_UNVERIFIED',
           severity: 'warn',
           entityId: row.entityId,
           ...(row.face === null ? {} : { face: row.face }),
           edge: row.edge,
           unit,
-          remediation: REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
-          message: `the legs of the chamfer of edge ${row.edge} were not verified: ${row.note}`,
+          remediation: row.op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_UNVERIFIED : REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
+          message: `the legs of the ${row.op === 'fillet' ? 'blend' : 'chamfer'} of edge ${row.edge} were not verified: ${row.note}`,
         }),
       ),
     ];
@@ -500,13 +502,13 @@ export const checkBlends = defineCommand({
     const notRun =
       kernel === null
         ? 'no geometry kernel is installed'
-        : targets.length === 0 && chamferRows.length === 0
+        : targets.length === 0 && legRows.length === 0
           ? 'no filleted solid to check'
           : (checks.find((check) => check.notRun !== undefined)?.notRun ?? null);
     const status =
       kernel === null ||
-      (targets.length === 0 && chamferRows.length === 0) ||
-      (chamferRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
+      (targets.length === 0 && legRows.length === 0) ||
+      (legRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
         ? 'not_run'
         : statusOf(findings);
     const blends = checks.flatMap((check) => check.blends);
@@ -521,6 +523,7 @@ export const checkBlends = defineCommand({
       status,
       blends,
       ...(chamferRows.length === 0 ? {} : { chamfers: chamferRows }),
+      ...(filletLegRows.length === 0 ? {} : { legs: filletLegRows }),
       findings,
       tolerances: named,
       unverified,

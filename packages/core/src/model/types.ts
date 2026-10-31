@@ -779,6 +779,8 @@ export interface EdgeRadius {
   readonly interpolation?: 'smooth' | 'linear' | 'monotone';
   /** Second leg (BLD M2): with it `size` is the leg on the face `sideFace` and `size2` the leg on the other face, document units. */
   readonly size2?: number;
+  /** Second leg at the end of the edge (13.34): the second leg runs linearly in the arc length from `size2` to `size2End`, as `size` does to `sizeEnd`. Absent = constant. */
+  readonly size2End?: number;
   /** Unique face index of the source shape carrying `size` when `size2` is given. */
   readonly sideFace?: number;
 }

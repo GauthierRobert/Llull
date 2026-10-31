@@ -151,10 +151,12 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
       id: cylinder.id,
       edges: [{ near: [5, 0, 5], size: 1, size2: 2, side1Near: [0, 0, 5] }],
     });
-    expect(legs.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [cylinder.id] });
-    expect(legs.summary).toContain('straight');
-    expect(legs.document).toBe(cylinder.doc);
-    const varying = execute(doc, 'fillet_edge', { id, edges: [{ near: topEdge, size: 1, sizeEnd: 2, size2: 2, side1Near: [0, 0, 2.5] }] });
+    // legs on a curved edge between a plane and a cylinder are built since 13.34 (nativeBlendLegs.test.ts)
+    expect(legs.error).toBeUndefined();
+    const varying = execute(doc, 'fillet_edge', {
+      id,
+      edges: [{ near: topEdge, size: 1, sizes: [{ t: 0.5, size: 2 }], size2: 2, side1Near: [0, 0, 2.5] }],
+    });
     expect(varying.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
     const corner = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge, [10, 0, 2.5]], radius: 1, profile: { type: 'conic', rho: 0.5 } });
     expect(corner.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });

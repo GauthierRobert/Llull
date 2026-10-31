@@ -141,7 +141,7 @@ const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
   BLD_FULL_ROUND_NO_SOLUTION:
     'the center face must be exactly as wide as the gap between the sides; use fillet_faces for a different width',
   BLD_PROFILE_FAILED:
-    'try the circular profile (probe_fillet) or a smaller size; a profile blend ends on a flat face square to it, on the next blend of a tangent chain, or closes on itself; edges that meet at a vertex are profiled together with one section; size2 needs a straight edge between planar faces',
+    'try the circular profile (probe_fillet) or a smaller size; a profile blend ends on a flat face square to it, on the next blend of a tangent chain, or closes on itself; edges that meet at a vertex are profiled together with one section; size2 legs are built on straight and curved edges but not at a vertex where edges meet',
 };
 
 export const remediationOf = (code: BlendFailureCode): string => REMEDIATION[code];

@@ -365,7 +365,7 @@ impl Evaluator {
             match profile_plan(recipe, &edges) {
                 Err(()) => return refused(),
                 Ok(Some(plan)) => {
-                    let built = features::fillet_profile_blend(&source, &plan.specs, &edges, &plan.laws, plan.kind, plan.param);
+                    let built = features::fillet_profile_legs(&source, &plan.specs, &edges, &plan.laws, &plan.legs, plan.kind, plan.param);
                     if matches!(built, Ok(None)) {
                         // the reason was computed while building: kept for blend_report, so a refusal is explained without a rebuild
                         let why = features::profile_blend_last_reason().map_err(EvalError::Failure)?;
@@ -454,7 +454,7 @@ impl Evaluator {
             Err(()) => {
                 return Ok(blend_stage_report(
                     "profile",
-                    "the profile blend parameters are malformed (rho or shape outside 0.05..0.95, size2 without a side, or size2 on an edge whose size varies)",
+                    "the profile blend parameters are malformed (rho or shape outside 0.05..0.95, size2 without a side, size2 on only some of the edges, or control points with size2)",
                 ))
             }
             Ok(Some(plan)) => {
@@ -468,7 +468,7 @@ impl Evaluator {
                 let kept = self.reports.get(&super::canonical_key(recipe)).and_then(|why| why.as_str().map(str::to_string));
                 let reason = match kept {
                     Some(why) => why,
-                    None => features::profile_blend_reason(&source, &plan.specs, &edges, &plan.laws, plan.kind, plan.param)
+                    None => features::profile_legs_reason(&source, &plan.specs, &edges, &plan.laws, &plan.legs, plan.kind, plan.param)
                         .map_err(EvalError::Failure)?,
                 };
                 return Ok(blend_stage_report("profile", &reason));

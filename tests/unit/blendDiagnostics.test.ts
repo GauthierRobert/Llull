@@ -199,7 +199,13 @@ function scripted(script: Script = {}): GeometryKernel & { evaluations: number; 
   const state = { evaluations: 0, reports: 0 };
   const scales = new Map<unknown, number>();
   const sizeOf = (recipe: ShapeRecipe): number =>
-    recipe.op === 'fillet' ? Math.max(recipe.size, recipe.sizeEnd ?? 0, ...(recipe.radii ?? []).map((law) => law.size)) : 0;
+    recipe.op === 'fillet'
+      ? Math.max(
+          recipe.size,
+          recipe.sizeEnd ?? 0,
+          ...(recipe.radii ?? []).map((law) => Math.max(law.size, law.size2 ?? 0, law.size2End ?? 0)),
+        )
+      : 0;
   const strip = (topology: ShapeTopology): ShapeTopology =>
     script.names === false
       ? {
@@ -325,6 +331,15 @@ describe('fillet_edge coded refusals', () => {
     expect(scaled.summary).toMatch(/largest that builds: all sizes x 0\.\d+ \(/);
     const none = execute(doc, 'fillet_edge', { id, edgeIndices: [3], radius: 1 }, context(scripted({ limit: 0.0001, report: tooLarge })));
     expect(none.summary).toContain('no smaller size builds either');
+  });
+
+  it('both legs of a two-leg edge are scaled together (size2 and size2End too) when looking for the largest that builds', () => {
+    const tooLarge = report({ contours: [{ edges: [3], status: 'startsol_failure' }] });
+    const { doc, id } = box();
+    const legs = { id, edges: [{ index: 3, size: 1, sizeEnd: 2, size2: 6, size2End: 8, side1Name: `${S}:z+` }] };
+    const scaled = execute(doc, 'fillet_edge', legs, context(scripted({ limit: 4, report: tooLarge })));
+    expect(scaled.error).toMatchObject({ code: 'BLD_RADIUS_TOO_LARGE' });
+    expect(scaled.summary).toMatch(/largest that builds: all sizes x 0\.\d+ \(/);
   });
 
   it('a faulty vertex of four edges is BLD_CORNER_UNSUPPORTED; a kernel without diagnostics keeps the generic summary', () => {

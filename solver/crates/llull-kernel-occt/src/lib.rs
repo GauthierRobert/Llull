@@ -42,6 +42,8 @@ mod blend_end_tests;
 #[cfg(test)]
 mod blend_joint_tests;
 #[cfg(test)]
+mod blend_legs_tests;
+#[cfg(test)]
 mod blend_mitre_tests;
 #[cfg(test)]
 mod blend_rail_tests;
