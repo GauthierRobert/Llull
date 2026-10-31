@@ -1,1 +1,427 @@
-{"format":"llull-document","version":3,"document":{"entities":{},"order":["grid-1:axis","grid-1:bubble-start","grid-1:label-start","grid-1:bubble-end","grid-1:label-end","grid-2:axis","grid-2:bubble-start","grid-2:label-start","grid-2:bubble-end","grid-2:label-end","grid-3:axis","grid-3:bubble-start","grid-3:label-start","grid-3:bubble-end","grid-3:label-end","grid-4:axis","grid-4:bubble-start","grid-4:label-start","grid-4:bubble-end","grid-4:label-end","grid-5:axis","grid-5:bubble-start","grid-5:label-start","grid-5:bubble-end","grid-5:label-end","wall-1:body-0","wall-1:body-1","wall-1:body-2","wall-2:body-0","wall-2:body-1","wall-2:body-2","wall-2:body-3","wall-3:body-0","wall-4:body-0","door-1:leaf","door-1:swing","door-1:swing-leaf","window-1:glass","slab-1:body","column-1:body","beam-1:body"],"layers":{"layer-default":{"id":"layer-default","name":"Layer 0","visible":true,"locked":false},"layer-S-GRID":{"id":"layer-S-GRID","name":"S-GRID","visible":true,"locked":false,"color":"#d04a4a"},"layer-A-WALL":{"id":"layer-A-WALL","name":"A-WALL","visible":true,"locked":false,"color":"#8a8a8a"},"layer-A-DOOR":{"id":"layer-A-DOOR","name":"A-DOOR","visible":true,"locked":false,"color":"#8b5a2b"},"layer-A-GLAZ":{"id":"layer-A-GLAZ","name":"A-GLAZ","visible":true,"locked":false,"color":"#4a90c2"},"layer-S-SLAB":{"id":"layer-S-SLAB","name":"S-SLAB","visible":true,"locked":false,"color":"#9a9a90"},"layer-S-COLS":{"id":"layer-S-COLS","name":"S-COLS","visible":true,"locked":false,"color":"#6d6d6d"},"layer-S-BEAM":{"id":"layer-S-BEAM","name":"S-BEAM","visible":true,"locked":false,"color":"#7d8a96"}},"layerOrder":["layer-default","layer-S-GRID","layer-A-WALL","layer-A-DOOR","layer-A-GLAZ","layer-S-SLAB","layer-S-COLS","layer-S-BEAM"],"selection":[],"camera":{"target":[0,0,0],"azimuth":2.356194490192345,"polar":1.0471975511965976,"distance":12},"groups":{},"units":"mm","displayPrecision":3,"parameters":{},"animations":{},"featureHistory":[{"id":"step-1","name":"set_units","params":{"units":"mm"},"suppressed":false,"affected":[]},{"id":"step-2","name":"add_grid_system","params":{"xSpacings":[5000,5000],"ySpacings":[4000]},"suppressed":false,"affected":["grid-1","grid-2","grid-3","grid-4","grid-5","grid-1:axis","grid-1:bubble-start","grid-1:label-start","grid-1:bubble-end","grid-1:label-end","grid-2:axis","grid-2:bubble-start","grid-2:label-start","grid-2:bubble-end","grid-2:label-end","grid-3:axis","grid-3:bubble-start","grid-3:label-start","grid-3:bubble-end","grid-3:label-end","grid-4:axis","grid-4:bubble-start","grid-4:label-start","grid-4:bubble-end","grid-4:label-end","grid-5:axis","grid-5:bubble-start","grid-5:label-start","grid-5:bubble-end","grid-5:label-end"]},{"id":"step-3","name":"draw_walls","params":{"points":[[0,0],[10000,0]]},"suppressed":false,"affected":["wall-1","wall-1:body-0"]},{"id":"step-4","name":"draw_walls","params":{"points":[[10000,0],[10000,8000]]},"suppressed":false,"affected":["wall-2","wall-2:body-0"]},{"id":"step-5","name":"draw_walls","params":{"points":[[10000,8000],[0,8000]]},"suppressed":false,"affected":["wall-3","wall-3:body-0"]},{"id":"step-6","name":"draw_walls","params":{"points":[[0,8000],[0,0]]},"suppressed":false,"affected":["wall-4","wall-4:body-0"]},{"id":"step-7","name":"add_door","params":{"wallId":"wall-1","offset":1500},"suppressed":false,"affected":["door-1","wall-1","door-1:leaf","door-1:swing","door-1:swing-leaf","wall-1:body-0","wall-1:body-1","wall-1:body-2"]},{"id":"step-8","name":"add_window","params":{"wallId":"wall-2","offset":3000},"suppressed":false,"affected":["window-1","wall-2","window-1:glass","wall-2:body-0","wall-2:body-1","wall-2:body-2","wall-2:body-3"]},{"id":"step-9","name":"add_slab","params":{"wallIds":["wall-1","wall-2","wall-3","wall-4"]},"suppressed":false,"affected":["slab-1","slab-1:body"]},{"id":"step-10","name":"add_column","params":{"location":[5000,4000]},"suppressed":false,"affected":["column-1","column-1:body"]},{"id":"step-11","name":"add_beam","params":{"start":[0,4000],"end":[10000,4000]},"suppressed":false,"affected":["beam-1","beam-1:body"]},{"id":"step-12","name":"add_level","params":{"name":"First"},"suppressed":false,"affected":["level-2"]},{"id":"step-13","name":"update_wall","params":{"wallId":"wall-1","height":2800},"suppressed":false,"affected":["wall-1","wall-1:body-0","wall-1:body-1","wall-1:body-2"]}],"configurations":{},"materials":{},"recipes":{},"components":{},"constraints":{},"constraintOrder":[],"joints":{},"jointOrder":[],"driveRelations":{},"driveRelationOrder":[],"nextStepNumber":14,"building":{"project":{"name":"Untitled project","client":"","address":"","author":"","drawingNumber":"A-101","revision":"0","date":""},"levels":{"level-1":{"id":"level-1","name":"Level 0","elevation":0,"height":3000},"level-2":{"id":"level-2","name":"First","elevation":3000,"height":3000}},"levelOrder":["level-1","level-2"],"activeLevelId":"level-2","elements":{"grid-1":{"id":"grid-1","category":"grid","mark":"1","entityIds":["grid-1:axis","grid-1:bubble-start","grid-1:label-start","grid-1:bubble-end","grid-1:label-end"],"start":[0,-1500],"end":[0,5500]},"grid-2":{"id":"grid-2","category":"grid","mark":"2","entityIds":["grid-2:axis","grid-2:bubble-start","grid-2:label-start","grid-2:bubble-end","grid-2:label-end"],"start":[5000,-1500],"end":[5000,5500]},"grid-3":{"id":"grid-3","category":"grid","mark":"3","entityIds":["grid-3:axis","grid-3:bubble-start","grid-3:label-start","grid-3:bubble-end","grid-3:label-end"],"start":[10000,-1500],"end":[10000,5500]},"grid-4":{"id":"grid-4","category":"grid","mark":"A","entityIds":["grid-4:axis","grid-4:bubble-start","grid-4:label-start","grid-4:bubble-end","grid-4:label-end"],"start":[-1500,0],"end":[11500,0]},"grid-5":{"id":"grid-5","category":"grid","mark":"B","entityIds":["grid-5:axis","grid-5:bubble-start","grid-5:label-start","grid-5:bubble-end","grid-5:label-end"],"start":[-1500,4000],"end":[11500,4000]},"wall-1":{"id":"wall-1","category":"wall","mark":"W1","entityIds":["wall-1:body-0","wall-1:body-1","wall-1:body-2"],"levelId":"level-1","start":[0,0],"end":[10000,0],"thickness":200,"height":2800,"baseOffset":0,"material":"concrete"},"wall-2":{"id":"wall-2","category":"wall","mark":"W2","entityIds":["wall-2:body-0","wall-2:body-1","wall-2:body-2","wall-2:body-3"],"levelId":"level-1","start":[10000,0],"end":[10000,8000],"thickness":200,"height":3000,"baseOffset":0,"material":"concrete"},"wall-3":{"id":"wall-3","category":"wall","mark":"W3","entityIds":["wall-3:body-0"],"levelId":"level-1","start":[10000,8000],"end":[0,8000],"thickness":200,"height":3000,"baseOffset":0,"material":"concrete"},"wall-4":{"id":"wall-4","category":"wall","mark":"W4","entityIds":["wall-4:body-0"],"levelId":"level-1","start":[0,8000],"end":[0,0],"thickness":200,"height":3000,"baseOffset":0,"material":"concrete"},"door-1":{"id":"door-1","category":"door","mark":"D1","entityIds":["door-1:leaf","door-1:swing","door-1:swing-leaf"],"hostId":"wall-1","offset":1500,"width":900,"height":2100,"sillHeight":0,"swing":"left","material":"timber"},"window-1":{"id":"window-1","category":"window","mark":"WN1","entityIds":["window-1:glass"],"hostId":"wall-2","offset":3000,"width":1200,"height":1200,"sillHeight":900,"swing":"left","material":"glass"},"slab-1":{"id":"slab-1","category":"slab","mark":"SL1","entityIds":["slab-1:body"],"levelId":"level-1","boundary":[[0,0],[10000,0],[10000,8000],[0,8000]],"thickness":200,"offset":0,"role":"floor","material":"concrete"},"column-1":{"id":"column-1","category":"column","mark":"C1","entityIds":["column-1:body"],"levelId":"level-1","location":[5000,4000],"shape":"rectangular","width":300,"depth":300,"height":3000,"material":"concrete"},"beam-1":{"id":"beam-1","category":"beam","mark":"B1","entityIds":["beam-1:body"],"levelId":"level-1","start":[0,4000],"end":[10000,4000],"width":300,"depth":500,"topOffset":0,"material":"concrete"}},"elementOrder":["grid-1","grid-2","grid-3","grid-4","grid-5","wall-1","wall-2","wall-3","wall-4","door-1","window-1","slab-1","column-1","beam-1"],"uid":"building-mvfjy6eg-1","counters":{"grid":5,"level":2,"wall":4,"door":1,"window":1,"slab":1,"column":1,"beam":1}}}}
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {},
+    "order": [
+      "grid-1:axis",
+      "grid-1:bubble-start",
+      "grid-1:label-start",
+      "grid-1:bubble-end",
+      "grid-1:label-end",
+      "grid-2:axis",
+      "grid-2:bubble-start",
+      "grid-2:label-start",
+      "grid-2:bubble-end",
+      "grid-2:label-end",
+      "grid-3:axis",
+      "grid-3:bubble-start",
+      "grid-3:label-start",
+      "grid-3:bubble-end",
+      "grid-3:label-end",
+      "grid-4:axis",
+      "grid-4:bubble-start",
+      "grid-4:label-start",
+      "grid-4:bubble-end",
+      "grid-4:label-end",
+      "grid-5:axis",
+      "grid-5:bubble-start",
+      "grid-5:label-start",
+      "grid-5:bubble-end",
+      "grid-5:label-end",
+      "wall-1:body-0",
+      "wall-1:body-1",
+      "wall-1:body-2",
+      "wall-2:body-0",
+      "wall-2:body-1",
+      "wall-2:body-2",
+      "wall-2:body-3",
+      "wall-3:body-0",
+      "wall-4:body-0",
+      "door-1:leaf",
+      "door-1:swing",
+      "door-1:swing-leaf",
+      "window-1:glass",
+      "slab-1:body",
+      "column-1:body",
+      "beam-1:body"
+    ],
+    "layers": {
+      "layer-default": { "id": "layer-default", "name": "Layer 0", "visible": true, "locked": false },
+      "layer-S-GRID": { "id": "layer-S-GRID", "name": "S-GRID", "visible": true, "locked": false, "color": "#d04a4a" },
+      "layer-A-WALL": { "id": "layer-A-WALL", "name": "A-WALL", "visible": true, "locked": false, "color": "#8a8a8a" },
+      "layer-A-DOOR": { "id": "layer-A-DOOR", "name": "A-DOOR", "visible": true, "locked": false, "color": "#8b5a2b" },
+      "layer-A-GLAZ": { "id": "layer-A-GLAZ", "name": "A-GLAZ", "visible": true, "locked": false, "color": "#4a90c2" },
+      "layer-S-SLAB": { "id": "layer-S-SLAB", "name": "S-SLAB", "visible": true, "locked": false, "color": "#9a9a90" },
+      "layer-S-COLS": { "id": "layer-S-COLS", "name": "S-COLS", "visible": true, "locked": false, "color": "#6d6d6d" },
+      "layer-S-BEAM": { "id": "layer-S-BEAM", "name": "S-BEAM", "visible": true, "locked": false, "color": "#7d8a96" }
+    },
+    "layerOrder": [
+      "layer-default",
+      "layer-S-GRID",
+      "layer-A-WALL",
+      "layer-A-DOOR",
+      "layer-A-GLAZ",
+      "layer-S-SLAB",
+      "layer-S-COLS",
+      "layer-S-BEAM"
+    ],
+    "selection": [],
+    "camera": { "target": [0, 0, 0], "azimuth": 2.356194490192345, "polar": 1.0471975511965976, "distance": 12 },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      { "id": "step-1", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "step-2",
+        "name": "add_grid_system",
+        "params": { "xSpacings": [5000, 5000], "ySpacings": [4000] },
+        "suppressed": false,
+        "affected": [
+          "grid-1",
+          "grid-2",
+          "grid-3",
+          "grid-4",
+          "grid-5",
+          "grid-1:axis",
+          "grid-1:bubble-start",
+          "grid-1:label-start",
+          "grid-1:bubble-end",
+          "grid-1:label-end",
+          "grid-2:axis",
+          "grid-2:bubble-start",
+          "grid-2:label-start",
+          "grid-2:bubble-end",
+          "grid-2:label-end",
+          "grid-3:axis",
+          "grid-3:bubble-start",
+          "grid-3:label-start",
+          "grid-3:bubble-end",
+          "grid-3:label-end",
+          "grid-4:axis",
+          "grid-4:bubble-start",
+          "grid-4:label-start",
+          "grid-4:bubble-end",
+          "grid-4:label-end",
+          "grid-5:axis",
+          "grid-5:bubble-start",
+          "grid-5:label-start",
+          "grid-5:bubble-end",
+          "grid-5:label-end"
+        ]
+      },
+      {
+        "id": "step-3",
+        "name": "draw_walls",
+        "params": {
+          "points": [
+            [0, 0],
+            [10000, 0]
+          ]
+        },
+        "suppressed": false,
+        "affected": ["wall-1", "wall-1:body-0"]
+      },
+      {
+        "id": "step-4",
+        "name": "draw_walls",
+        "params": {
+          "points": [
+            [10000, 0],
+            [10000, 8000]
+          ]
+        },
+        "suppressed": false,
+        "affected": ["wall-2", "wall-2:body-0"]
+      },
+      {
+        "id": "step-5",
+        "name": "draw_walls",
+        "params": {
+          "points": [
+            [10000, 8000],
+            [0, 8000]
+          ]
+        },
+        "suppressed": false,
+        "affected": ["wall-3", "wall-3:body-0"]
+      },
+      {
+        "id": "step-6",
+        "name": "draw_walls",
+        "params": {
+          "points": [
+            [0, 8000],
+            [0, 0]
+          ]
+        },
+        "suppressed": false,
+        "affected": ["wall-4", "wall-4:body-0"]
+      },
+      {
+        "id": "step-7",
+        "name": "add_door",
+        "params": { "wallId": "wall-1", "offset": 1500 },
+        "suppressed": false,
+        "affected": [
+          "door-1",
+          "wall-1",
+          "door-1:leaf",
+          "door-1:swing",
+          "door-1:swing-leaf",
+          "wall-1:body-0",
+          "wall-1:body-1",
+          "wall-1:body-2"
+        ]
+      },
+      {
+        "id": "step-8",
+        "name": "add_window",
+        "params": { "wallId": "wall-2", "offset": 3000 },
+        "suppressed": false,
+        "affected": ["window-1", "wall-2", "window-1:glass", "wall-2:body-0", "wall-2:body-1", "wall-2:body-2", "wall-2:body-3"]
+      },
+      {
+        "id": "step-9",
+        "name": "add_slab",
+        "params": { "wallIds": ["wall-1", "wall-2", "wall-3", "wall-4"] },
+        "suppressed": false,
+        "affected": ["slab-1", "slab-1:body"]
+      },
+      {
+        "id": "step-10",
+        "name": "add_column",
+        "params": { "location": [5000, 4000] },
+        "suppressed": false,
+        "affected": ["column-1", "column-1:body"]
+      },
+      {
+        "id": "step-11",
+        "name": "add_beam",
+        "params": { "start": [0, 4000], "end": [10000, 4000] },
+        "suppressed": false,
+        "affected": ["beam-1", "beam-1:body"]
+      },
+      { "id": "step-12", "name": "add_level", "params": { "name": "First" }, "suppressed": false, "affected": ["level-2"] },
+      {
+        "id": "step-13",
+        "name": "update_wall",
+        "params": { "wallId": "wall-1", "height": 2800 },
+        "suppressed": false,
+        "affected": ["wall-1", "wall-1:body-0", "wall-1:body-1", "wall-1:body-2"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 14,
+    "building": {
+      "project": {
+        "name": "Untitled project",
+        "client": "",
+        "address": "",
+        "author": "",
+        "drawingNumber": "A-101",
+        "revision": "0",
+        "date": ""
+      },
+      "levels": {
+        "level-1": { "id": "level-1", "name": "Level 0", "elevation": 0, "height": 3000 },
+        "level-2": { "id": "level-2", "name": "First", "elevation": 3000, "height": 3000 }
+      },
+      "levelOrder": ["level-1", "level-2"],
+      "activeLevelId": "level-2",
+      "elements": {
+        "grid-1": {
+          "id": "grid-1",
+          "category": "grid",
+          "mark": "1",
+          "entityIds": ["grid-1:axis", "grid-1:bubble-start", "grid-1:label-start", "grid-1:bubble-end", "grid-1:label-end"],
+          "start": [0, -1500],
+          "end": [0, 5500]
+        },
+        "grid-2": {
+          "id": "grid-2",
+          "category": "grid",
+          "mark": "2",
+          "entityIds": ["grid-2:axis", "grid-2:bubble-start", "grid-2:label-start", "grid-2:bubble-end", "grid-2:label-end"],
+          "start": [5000, -1500],
+          "end": [5000, 5500]
+        },
+        "grid-3": {
+          "id": "grid-3",
+          "category": "grid",
+          "mark": "3",
+          "entityIds": ["grid-3:axis", "grid-3:bubble-start", "grid-3:label-start", "grid-3:bubble-end", "grid-3:label-end"],
+          "start": [10000, -1500],
+          "end": [10000, 5500]
+        },
+        "grid-4": {
+          "id": "grid-4",
+          "category": "grid",
+          "mark": "A",
+          "entityIds": ["grid-4:axis", "grid-4:bubble-start", "grid-4:label-start", "grid-4:bubble-end", "grid-4:label-end"],
+          "start": [-1500, 0],
+          "end": [11500, 0]
+        },
+        "grid-5": {
+          "id": "grid-5",
+          "category": "grid",
+          "mark": "B",
+          "entityIds": ["grid-5:axis", "grid-5:bubble-start", "grid-5:label-start", "grid-5:bubble-end", "grid-5:label-end"],
+          "start": [-1500, 4000],
+          "end": [11500, 4000]
+        },
+        "wall-1": {
+          "id": "wall-1",
+          "category": "wall",
+          "mark": "W1",
+          "entityIds": ["wall-1:body-0", "wall-1:body-1", "wall-1:body-2"],
+          "levelId": "level-1",
+          "start": [0, 0],
+          "end": [10000, 0],
+          "thickness": 200,
+          "height": 2800,
+          "baseOffset": 0,
+          "material": "concrete"
+        },
+        "wall-2": {
+          "id": "wall-2",
+          "category": "wall",
+          "mark": "W2",
+          "entityIds": ["wall-2:body-0", "wall-2:body-1", "wall-2:body-2", "wall-2:body-3"],
+          "levelId": "level-1",
+          "start": [10000, 0],
+          "end": [10000, 8000],
+          "thickness": 200,
+          "height": 3000,
+          "baseOffset": 0,
+          "material": "concrete"
+        },
+        "wall-3": {
+          "id": "wall-3",
+          "category": "wall",
+          "mark": "W3",
+          "entityIds": ["wall-3:body-0"],
+          "levelId": "level-1",
+          "start": [10000, 8000],
+          "end": [0, 8000],
+          "thickness": 200,
+          "height": 3000,
+          "baseOffset": 0,
+          "material": "concrete"
+        },
+        "wall-4": {
+          "id": "wall-4",
+          "category": "wall",
+          "mark": "W4",
+          "entityIds": ["wall-4:body-0"],
+          "levelId": "level-1",
+          "start": [0, 8000],
+          "end": [0, 0],
+          "thickness": 200,
+          "height": 3000,
+          "baseOffset": 0,
+          "material": "concrete"
+        },
+        "door-1": {
+          "id": "door-1",
+          "category": "door",
+          "mark": "D1",
+          "entityIds": ["door-1:leaf", "door-1:swing", "door-1:swing-leaf"],
+          "hostId": "wall-1",
+          "offset": 1500,
+          "width": 900,
+          "height": 2100,
+          "sillHeight": 0,
+          "swing": "left",
+          "material": "timber"
+        },
+        "window-1": {
+          "id": "window-1",
+          "category": "window",
+          "mark": "WN1",
+          "entityIds": ["window-1:glass"],
+          "hostId": "wall-2",
+          "offset": 3000,
+          "width": 1200,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "slab-1": {
+          "id": "slab-1",
+          "category": "slab",
+          "mark": "SL1",
+          "entityIds": ["slab-1:body"],
+          "levelId": "level-1",
+          "boundary": [
+            [0, 0],
+            [10000, 0],
+            [10000, 8000],
+            [0, 8000]
+          ],
+          "thickness": 200,
+          "offset": 0,
+          "role": "floor",
+          "material": "concrete"
+        },
+        "column-1": {
+          "id": "column-1",
+          "category": "column",
+          "mark": "C1",
+          "entityIds": ["column-1:body"],
+          "levelId": "level-1",
+          "location": [5000, 4000],
+          "shape": "rectangular",
+          "width": 300,
+          "depth": 300,
+          "height": 3000,
+          "material": "concrete"
+        },
+        "beam-1": {
+          "id": "beam-1",
+          "category": "beam",
+          "mark": "B1",
+          "entityIds": ["beam-1:body"],
+          "levelId": "level-1",
+          "start": [0, 4000],
+          "end": [10000, 4000],
+          "width": 300,
+          "depth": 500,
+          "topOffset": 0,
+          "material": "concrete"
+        }
+      },
+      "elementOrder": [
+        "grid-1",
+        "grid-2",
+        "grid-3",
+        "grid-4",
+        "grid-5",
+        "wall-1",
+        "wall-2",
+        "wall-3",
+        "wall-4",
+        "door-1",
+        "window-1",
+        "slab-1",
+        "column-1",
+        "beam-1"
+      ],
+      "uid": "building-mvfjy6eg-1",
+      "counters": { "grid": 5, "level": 2, "wall": 4, "door": 1, "window": 1, "slab": 1, "column": 1, "beam": 1 }
+    }
+  }
+}

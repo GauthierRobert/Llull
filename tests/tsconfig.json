@@ -2,9 +2,7 @@
   /* Vitest suites run in Node (jsdom): they may use Node globals (Buffer, node:fs).
    The app sources come first, as in the root program, so ambient augmentations resolve alike. */
   "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "types": ["node"]
-  },
+  "compilerOptions": { "types": ["node"] },
   "include": ["../src", "../packages", "."],
   /* Node-side quality and production gates have their own tsconfig.json. */
   "exclude": ["quality", "production"]

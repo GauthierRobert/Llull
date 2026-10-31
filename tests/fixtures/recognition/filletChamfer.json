@@ -1,1 +1,321 @@
-{"graph":{"faces":[{"index":0,"surface":{"type":"plane","origin":[0,0,0],"normal":[1,0,0],"xDir":[0,0,1]},"reversed":true,"area":537.9999999999999,"loops":[[0,1,2,3,4]],"uvBounds":[0,20,-30,-2.9999999999999996]},{"index":1,"surface":{"type":"plane","origin":[0,0,20],"normal":[0,0,1],"xDir":[1,0,0]},"reversed":false,"area":1118.0685834705769,"loops":[[0,5,6,7,8]],"uvBounds":[-4.440892098500626e-16,40,-4.440892098500626e-16,28]},{"index":2,"surface":{"type":"plane","origin":[0,29,19],"normal":[0,0.7071067811865475,0.7071067811865475],"xDir":[1,0,0]},"reversed":false,"area":113.13708498984747,"loops":[[1,5,9,10]],"uvBounds":[0,40,-1.4142135623730976,1.4142135623730923]},{"index":3,"surface":{"type":"cylinder","origin":[2.9999999999999996,2.9999999999999996,0],"axis":[0,0,1],"xDir":[-1,0,0],"radius":3},"reversed":false,"area":94.24777960769379,"loops":[[11,2,12,6]],"uvBounds":[0,1.5707963267948966,0,20]},{"index":4,"surface":{"type":"plane","origin":[0,30,0],"normal":[0,1,0],"xDir":[0,0,1]},"reversed":false,"area":720,"loops":[[13,9,14,3]],"uvBounds":[0,18.000000000000004,0,40]},{"index":5,"surface":{"type":"plane","origin":[0,0,0],"normal":[0,0,1],"xDir":[1,0,0]},"reversed":true,"area":1198.0685834705769,"loops":[[4,11,14,15,16]],"uvBounds":[-4.440892098500626e-16,40,-4.440892098500626e-16,30]},{"index":6,"surface":{"type":"plane","origin":[40,0,0],"normal":[1,0,0],"xDir":[0,0,1]},"reversed":false,"area":597.9999999999999,"loops":[[7,10,17,13,16]],"uvBounds":[0,20,-30,0]},{"index":7,"surface":{"type":"plane","origin":[0,0,0],"normal":[0,1,0],"xDir":[0,0,1]},"reversed":true,"area":739.9999999999999,"loops":[[15,12,17,8]],"uvBounds":[0,20,2.9999999999999996,40]}],"edgeFaces":[[0,1],[0,2],[0,3],[0,4],[0,5],[1,2],[1,3],[1,6],[1,7],[2,4],[2,6],[3,5],[3,7],[4,6],[4,5],[5,7],[5,6],[6,7]],"edgeConvexity":["convex","convex","smooth","convex","convex","convex","convex","convex","convex","convex","convex","convex","smooth","convex","convex","convex","convex","convex"]},"topology":{"solids":1,"vertices":12,"volume":23881.37166941154,"faces":[{"index":0,"surface":"plane","area":537.9999999999999,"normal":[-1,0,0]},{"index":1,"surface":"plane","area":1118.0685834705769,"normal":[0,0,1]},{"index":2,"surface":"plane","area":113.13708498984747,"normal":[0,0.7071067811865475,0.7071067811865475]},{"index":3,"surface":"cylinder","area":94.24777960769379,"axis":{"origin":[2.9999999999999996,2.9999999999999996,0],"direction":[0,0,1],"radius":3,"span":[0,20]},"convex":true},{"index":4,"surface":"plane","area":720,"normal":[0,1,0]},{"index":5,"surface":"plane","area":1198.0685834705769,"normal":[0,0,-1]},{"index":6,"surface":"plane","area":597.9999999999999,"normal":[1,0,0]},{"index":7,"surface":"plane","area":739.9999999999999,"normal":[0,-1,0]}],"edges":[{"index":0,"curve":"line","length":25,"start":[0,2.9999999999999996,20],"end":[0,28,20],"mid":[0,15.5,20],"seam":false,"degenerate":false},{"index":1,"curve":"line","length":2.828427124746187,"start":[0,28,20],"end":[0,30,18],"mid":[0,29,19],"seam":false,"degenerate":false},{"index":2,"curve":"line","length":20,"start":[-4.440892098500626e-16,2.9999999999999996,0],"end":[-4.440892098500626e-16,2.9999999999999996,20],"mid":[-4.440892098500626e-16,2.9999999999999996,10],"seam":false,"degenerate":false},{"index":3,"curve":"line","length":18.000000000000004,"start":[0,30,0],"end":[0,30,18.000000000000004],"mid":[0,30,9.000000000000002],"seam":false,"degenerate":false},{"index":4,"curve":"line","length":27,"start":[0,2.9999999999999996,0],"end":[0,30,0],"mid":[0,16.5,0],"seam":false,"degenerate":false},{"index":5,"curve":"line","length":40,"start":[0,28,20],"end":[40,28,20],"mid":[20,28,20],"seam":false,"degenerate":false},{"index":6,"curve":"circle","length":4.712388980384691,"start":[-4.440892098500626e-16,3,20],"end":[2.9999999999999987,-4.440892098500626e-16,20],"mid":[0.8786796564403567,0.8786796564403576,20],"seam":false,"degenerate":false},{"index":7,"curve":"line","length":28,"start":[40,0,20],"end":[40,28,20],"mid":[40,14,20],"seam":false,"degenerate":false},{"index":8,"curve":"line","length":37,"start":[2.9999999999999996,0,20],"end":[40,0,20],"mid":[21.5,0,20],"seam":false,"degenerate":false},{"index":9,"curve":"line","length":40,"start":[0,30,18],"end":[40,30,18],"mid":[20,30,18],"seam":false,"degenerate":false},{"index":10,"curve":"line","length":2.828427124746187,"start":[40,28,20],"end":[40,30,18],"mid":[40,29,19],"seam":false,"degenerate":false},{"index":11,"curve":"circle","length":4.712388980384691,"start":[-4.440892098500626e-16,3,0],"end":[2.9999999999999987,-4.440892098500626e-16,0],"mid":[0.8786796564403567,0.8786796564403576,0],"seam":false,"degenerate":false},{"index":12,"curve":"line","length":20,"start":[2.9999999999999996,-4.440892098500626e-16,0],"end":[2.9999999999999996,-4.440892098500626e-16,20],"mid":[2.9999999999999996,-4.440892098500626e-16,10],"seam":false,"degenerate":false},{"index":13,"curve":"line","length":18.000000000000004,"start":[40,30,0],"end":[40,30,18.000000000000004],"mid":[40,30,9.000000000000002],"seam":false,"degenerate":false},{"index":14,"curve":"line","length":40,"start":[0,30,0],"end":[40,30,0],"mid":[20,30,0],"seam":false,"degenerate":false},{"index":15,"curve":"line","length":37,"start":[2.9999999999999996,0,0],"end":[40,0,0],"mid":[21.5,0,0],"seam":false,"degenerate":false},{"index":16,"curve":"line","length":30,"start":[40,0,0],"end":[40,30,0],"mid":[40,15,0],"seam":false,"degenerate":false},{"index":17,"curve":"line","length":20,"start":[40,0,0],"end":[40,0,20],"mid":[40,0,10],"seam":false,"degenerate":false}]},"outward":[[-1,0,0],[0,0,1],[0,0.7071067811865475,0.7071067811865475],null,[0,1,0],[0,0,-1],[1,0,0],[0,-1,0]],"cavity":[null,null,null,false,null,null,null,null]}
+{
+  "graph": {
+    "faces": [
+      {
+        "index": 0,
+        "surface": { "type": "plane", "origin": [0, 0, 0], "normal": [1, 0, 0], "xDir": [0, 0, 1] },
+        "reversed": true,
+        "area": 537.9999999999999,
+        "loops": [[0, 1, 2, 3, 4]],
+        "uvBounds": [0, 20, -30, -2.9999999999999996]
+      },
+      {
+        "index": 1,
+        "surface": { "type": "plane", "origin": [0, 0, 20], "normal": [0, 0, 1], "xDir": [1, 0, 0] },
+        "reversed": false,
+        "area": 1118.0685834705769,
+        "loops": [[0, 5, 6, 7, 8]],
+        "uvBounds": [-4.440892098500626e-16, 40, -4.440892098500626e-16, 28]
+      },
+      {
+        "index": 2,
+        "surface": { "type": "plane", "origin": [0, 29, 19], "normal": [0, 0.7071067811865475, 0.7071067811865475], "xDir": [1, 0, 0] },
+        "reversed": false,
+        "area": 113.13708498984747,
+        "loops": [[1, 5, 9, 10]],
+        "uvBounds": [0, 40, -1.4142135623730976, 1.4142135623730923]
+      },
+      {
+        "index": 3,
+        "surface": {
+          "type": "cylinder",
+          "origin": [2.9999999999999996, 2.9999999999999996, 0],
+          "axis": [0, 0, 1],
+          "xDir": [-1, 0, 0],
+          "radius": 3
+        },
+        "reversed": false,
+        "area": 94.24777960769379,
+        "loops": [[11, 2, 12, 6]],
+        "uvBounds": [0, 1.5707963267948966, 0, 20]
+      },
+      {
+        "index": 4,
+        "surface": { "type": "plane", "origin": [0, 30, 0], "normal": [0, 1, 0], "xDir": [0, 0, 1] },
+        "reversed": false,
+        "area": 720,
+        "loops": [[13, 9, 14, 3]],
+        "uvBounds": [0, 18.000000000000004, 0, 40]
+      },
+      {
+        "index": 5,
+        "surface": { "type": "plane", "origin": [0, 0, 0], "normal": [0, 0, 1], "xDir": [1, 0, 0] },
+        "reversed": true,
+        "area": 1198.0685834705769,
+        "loops": [[4, 11, 14, 15, 16]],
+        "uvBounds": [-4.440892098500626e-16, 40, -4.440892098500626e-16, 30]
+      },
+      {
+        "index": 6,
+        "surface": { "type": "plane", "origin": [40, 0, 0], "normal": [1, 0, 0], "xDir": [0, 0, 1] },
+        "reversed": false,
+        "area": 597.9999999999999,
+        "loops": [[7, 10, 17, 13, 16]],
+        "uvBounds": [0, 20, -30, 0]
+      },
+      {
+        "index": 7,
+        "surface": { "type": "plane", "origin": [0, 0, 0], "normal": [0, 1, 0], "xDir": [0, 0, 1] },
+        "reversed": true,
+        "area": 739.9999999999999,
+        "loops": [[15, 12, 17, 8]],
+        "uvBounds": [0, 20, 2.9999999999999996, 40]
+      }
+    ],
+    "edgeFaces": [
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [0, 4],
+      [0, 5],
+      [1, 2],
+      [1, 3],
+      [1, 6],
+      [1, 7],
+      [2, 4],
+      [2, 6],
+      [3, 5],
+      [3, 7],
+      [4, 6],
+      [4, 5],
+      [5, 7],
+      [5, 6],
+      [6, 7]
+    ],
+    "edgeConvexity": [
+      "convex",
+      "convex",
+      "smooth",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "smooth",
+      "convex",
+      "convex",
+      "convex",
+      "convex",
+      "convex"
+    ]
+  },
+  "topology": {
+    "solids": 1,
+    "vertices": 12,
+    "volume": 23881.37166941154,
+    "faces": [
+      { "index": 0, "surface": "plane", "area": 537.9999999999999, "normal": [-1, 0, 0] },
+      { "index": 1, "surface": "plane", "area": 1118.0685834705769, "normal": [0, 0, 1] },
+      { "index": 2, "surface": "plane", "area": 113.13708498984747, "normal": [0, 0.7071067811865475, 0.7071067811865475] },
+      {
+        "index": 3,
+        "surface": "cylinder",
+        "area": 94.24777960769379,
+        "axis": { "origin": [2.9999999999999996, 2.9999999999999996, 0], "direction": [0, 0, 1], "radius": 3, "span": [0, 20] },
+        "convex": true
+      },
+      { "index": 4, "surface": "plane", "area": 720, "normal": [0, 1, 0] },
+      { "index": 5, "surface": "plane", "area": 1198.0685834705769, "normal": [0, 0, -1] },
+      { "index": 6, "surface": "plane", "area": 597.9999999999999, "normal": [1, 0, 0] },
+      { "index": 7, "surface": "plane", "area": 739.9999999999999, "normal": [0, -1, 0] }
+    ],
+    "edges": [
+      {
+        "index": 0,
+        "curve": "line",
+        "length": 25,
+        "start": [0, 2.9999999999999996, 20],
+        "end": [0, 28, 20],
+        "mid": [0, 15.5, 20],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 1,
+        "curve": "line",
+        "length": 2.828427124746187,
+        "start": [0, 28, 20],
+        "end": [0, 30, 18],
+        "mid": [0, 29, 19],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 2,
+        "curve": "line",
+        "length": 20,
+        "start": [-4.440892098500626e-16, 2.9999999999999996, 0],
+        "end": [-4.440892098500626e-16, 2.9999999999999996, 20],
+        "mid": [-4.440892098500626e-16, 2.9999999999999996, 10],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 3,
+        "curve": "line",
+        "length": 18.000000000000004,
+        "start": [0, 30, 0],
+        "end": [0, 30, 18.000000000000004],
+        "mid": [0, 30, 9.000000000000002],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 4,
+        "curve": "line",
+        "length": 27,
+        "start": [0, 2.9999999999999996, 0],
+        "end": [0, 30, 0],
+        "mid": [0, 16.5, 0],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 5,
+        "curve": "line",
+        "length": 40,
+        "start": [0, 28, 20],
+        "end": [40, 28, 20],
+        "mid": [20, 28, 20],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 6,
+        "curve": "circle",
+        "length": 4.712388980384691,
+        "start": [-4.440892098500626e-16, 3, 20],
+        "end": [2.9999999999999987, -4.440892098500626e-16, 20],
+        "mid": [0.8786796564403567, 0.8786796564403576, 20],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 7,
+        "curve": "line",
+        "length": 28,
+        "start": [40, 0, 20],
+        "end": [40, 28, 20],
+        "mid": [40, 14, 20],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 8,
+        "curve": "line",
+        "length": 37,
+        "start": [2.9999999999999996, 0, 20],
+        "end": [40, 0, 20],
+        "mid": [21.5, 0, 20],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 9,
+        "curve": "line",
+        "length": 40,
+        "start": [0, 30, 18],
+        "end": [40, 30, 18],
+        "mid": [20, 30, 18],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 10,
+        "curve": "line",
+        "length": 2.828427124746187,
+        "start": [40, 28, 20],
+        "end": [40, 30, 18],
+        "mid": [40, 29, 19],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 11,
+        "curve": "circle",
+        "length": 4.712388980384691,
+        "start": [-4.440892098500626e-16, 3, 0],
+        "end": [2.9999999999999987, -4.440892098500626e-16, 0],
+        "mid": [0.8786796564403567, 0.8786796564403576, 0],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 12,
+        "curve": "line",
+        "length": 20,
+        "start": [2.9999999999999996, -4.440892098500626e-16, 0],
+        "end": [2.9999999999999996, -4.440892098500626e-16, 20],
+        "mid": [2.9999999999999996, -4.440892098500626e-16, 10],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 13,
+        "curve": "line",
+        "length": 18.000000000000004,
+        "start": [40, 30, 0],
+        "end": [40, 30, 18.000000000000004],
+        "mid": [40, 30, 9.000000000000002],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 14,
+        "curve": "line",
+        "length": 40,
+        "start": [0, 30, 0],
+        "end": [40, 30, 0],
+        "mid": [20, 30, 0],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 15,
+        "curve": "line",
+        "length": 37,
+        "start": [2.9999999999999996, 0, 0],
+        "end": [40, 0, 0],
+        "mid": [21.5, 0, 0],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 16,
+        "curve": "line",
+        "length": 30,
+        "start": [40, 0, 0],
+        "end": [40, 30, 0],
+        "mid": [40, 15, 0],
+        "seam": false,
+        "degenerate": false
+      },
+      {
+        "index": 17,
+        "curve": "line",
+        "length": 20,
+        "start": [40, 0, 0],
+        "end": [40, 0, 20],
+        "mid": [40, 0, 10],
+        "seam": false,
+        "degenerate": false
+      }
+    ]
+  },
+  "outward": [[-1, 0, 0], [0, 0, 1], [0, 0.7071067811865475, 0.7071067811865475], null, [0, 1, 0], [0, 0, -1], [1, 0, 0], [0, -1, 0]],
+  "cavity": [null, null, null, false, null, null, null, null]
+}

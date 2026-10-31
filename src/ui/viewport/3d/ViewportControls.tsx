@@ -4,6 +4,7 @@ import React, { useId } from 'react';
 import { type DisplayMode, type ClipAxis, type QualityOverride, useViewportStore, useStore } from '@ui/store';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { DeformOverlayControl, DeformOverlayPopover } from './overlays/DeformOverlayControl';
+import { ImplicitPreviewControl, ImplicitPreviewNote } from './implicitPreview/ImplicitPreviewControl';
 import { NumberField } from '@ui/components/NumberField';
 import { type SurfaceMapChoice, useSurfaceOverlayStore } from '@ui/store/surfaceOverlayStore';
 
@@ -310,10 +311,12 @@ export function ViewportControls(): React.ReactElement {
         <Divider />
         <SurfaceOverlayControl />
         <DeformOverlayControl />
+        <ImplicitPreviewControl />
         <AnimationTransportControls />
       </div>
       <SectionPopover />
       <DeformOverlayPopover />
+      <ImplicitPreviewNote />
     </div>
   );
 }

@@ -34,7 +34,7 @@
 | [plm](#plm) | 40 |
 | [scan](#scan) | 21 |
 | [mesh](#mesh) | 25 |
-| [implicit](#implicit) | 21 |
+| [implicit](#implicit) | 22 |
 | [freeform](#freeform) | 23 |
 
 ## core
@@ -991,6 +991,7 @@
 | `edit_field` | Change parameters of an existing implicit field node by id (design intent: radii, sizes, cell size, laws, blend radius...) and re-derive every implicit body bu… |  |
 | `evaluate_field` | Sample an implicit FIELD: signed value (negative inside, in document units; exact only if distanceQuality is "exact", otherwise a bound or approximation), opti… | read-only |
 | `field_from_solid` | Turn an existing CLOSED 3D solid (box, cylinder, extrusion, boolean result, imported mesh...) into an implicit FIELD whose negative side is the solid, so it ca… |  |
+| `implicit_gpu_program` | Compile the field of an implicit body (id from create_implicit_body) or of a field node to GLSL for a GPU ray-marched preview in the viewport, before or withou… | read-only |
 | `implicit_properties` | Measure an implicit body (id from create_implicit_body) or field (id from add_field_primitive / add_tpms_lattice...): volume with an error estimate, mesh area,… | read-only |
 | `infill_solid` | Lighten an existing closed 3D solid in one call: an inside skin of `wall` (document units) plus a lattice infill (TPMS or struts) clipped to the solid shrunk b… |  |
 | `lattice_properties` | Describe a lattice field (from add_strut_lattice or add_tpms_lattice). | read-only |

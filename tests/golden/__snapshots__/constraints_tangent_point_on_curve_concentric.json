@@ -6,94 +6,69 @@
       "#1": {
         "id": "#1",
         "kind": "line",
-        "start": [0,2],
-        "end": [20,2],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [0, 2],
+        "end": [20, 2],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#3": {
         "id": "#3",
         "kind": "circle",
-        "center": [9.20655996,-0.5],
+        "center": [9.20655996, -0.5],
         "radius": 2.5,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#4": {
         "id": "#4",
         "kind": "circle",
-        "center": [11.79344,-2.857552],
+        "center": [11.79344, -2.857552],
         "radius": 1,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#5": {
         "id": "#5",
         "kind": "circle",
-        "center": [3,2],
+        "center": [3, 2],
         "radius": 0.5,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#6": {
         "id": "#6",
         "kind": "circle",
-        "center": [30,5],
+        "center": [30, 5],
         "radius": 4,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#7": {
         "id": "#7",
         "kind": "circle",
-        "center": [30,5],
+        "center": [30, 5],
         "radius": 1,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       }
     },
-    "order": [
-      "#1",
-      "#3",
-      "#4",
-      "#5",
-      "#6",
-      "#7"
-    ],
-    "layers": {
-      "#2": {
-        "id": "#2",
-        "name": "Layer 0",
-        "visible": true,
-        "locked": false
-      }
-    },
-    "layerOrder": [
-      "#2"
-    ],
+    "order": ["#1", "#3", "#4", "#5", "#6", "#7"],
+    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["#2"],
     "selection": [],
-    "camera": {
-      "target": [
-        0,
-        0,
-        0
-      ],
-      "azimuth": 2.35619449,
-      "polar": 1.04719755,
-      "distance": 12
-    },
+    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -103,175 +78,93 @@
       {
         "id": "#8",
         "name": "draw_polyline",
-        "params": {"points":[[0,2],[20,2]]},
+        "params": {
+          "points": [
+            [0, 2],
+            [20, 2]
+          ]
+        },
         "suppressed": false,
         "affected": ["#1"]
       },
-      {
-        "id": "#9",
-        "name": "draw_arc",
-        "params": {"center":[6,-1],"radius":1},
-        "suppressed": false,
-        "affected": ["#3"]
-      },
-      {
-        "id": "#10",
-        "name": "draw_arc",
-        "params": {"center":[15,-4],"radius":1.5},
-        "suppressed": false,
-        "affected": ["#4"]
-      },
-      {
-        "id": "#11",
-        "name": "draw_arc",
-        "params": {"center":[3,4],"radius":0.5},
-        "suppressed": false,
-        "affected": ["#5"]
-      },
-      {
-        "id": "#12",
-        "name": "draw_arc",
-        "params": {"center":[30,5],"radius":4},
-        "suppressed": false,
-        "affected": ["#6"]
-      },
-      {
-        "id": "#13",
-        "name": "draw_arc",
-        "params": {"center":[31,6],"radius":1},
-        "suppressed": false,
-        "affected": ["#7"]
-      },
+      { "id": "#9", "name": "draw_arc", "params": { "center": [6, -1], "radius": 1 }, "suppressed": false, "affected": ["#3"] },
+      { "id": "#10", "name": "draw_arc", "params": { "center": [15, -4], "radius": 1.5 }, "suppressed": false, "affected": ["#4"] },
+      { "id": "#11", "name": "draw_arc", "params": { "center": [3, 4], "radius": 0.5 }, "suppressed": false, "affected": ["#5"] },
+      { "id": "#12", "name": "draw_arc", "params": { "center": [30, 5], "radius": 4 }, "suppressed": false, "affected": ["#6"] },
+      { "id": "#13", "name": "draw_arc", "params": { "center": [31, 6], "radius": 1 }, "suppressed": false, "affected": ["#7"] },
       {
         "id": "#14",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"fix","a":{"entityId":"#1"}}},
+        "params": { "constraint": { "kind": "fix", "a": { "entityId": "#1" } } },
         "suppressed": false,
         "affected": ["#15"]
       },
       {
         "id": "#16",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#1"},"b":{"entityId":"#3"}}},
+        "params": { "constraint": { "kind": "tangent", "a": { "entityId": "#1" }, "b": { "entityId": "#3" } } },
         "suppressed": false,
         "affected": ["#17"]
       },
       {
         "id": "#18",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"radius","a":{"entityId":"#3"},"value":2.5}},
+        "params": { "constraint": { "kind": "radius", "a": { "entityId": "#3" }, "value": 2.5 } },
         "suppressed": false,
         "affected": ["#19"]
       },
       {
         "id": "#20",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#3"},"b":{"entityId":"#4"}}},
+        "params": { "constraint": { "kind": "tangent", "a": { "entityId": "#3" }, "b": { "entityId": "#4" } } },
         "suppressed": false,
         "affected": ["#21"]
       },
       {
         "id": "#22",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"radius","a":{"entityId":"#4"},"value":1}},
+        "params": { "constraint": { "kind": "radius", "a": { "entityId": "#4" }, "value": 1 } },
         "suppressed": false,
         "affected": ["#23"]
       },
       {
         "id": "#24",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"point_on_curve","a":{"entityId":"#5","kind":"center"},"b":{"entityId":"#1"}}},
+        "params": { "constraint": { "kind": "point_on_curve", "a": { "entityId": "#5", "kind": "center" }, "b": { "entityId": "#1" } } },
         "suppressed": false,
         "affected": ["#25"]
       },
       {
         "id": "#26",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"fix","a":{"entityId":"#6"}}},
+        "params": { "constraint": { "kind": "fix", "a": { "entityId": "#6" } } },
         "suppressed": false,
         "affected": ["#27"]
       },
       {
         "id": "#28",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"concentric","a":{"entityId":"#6"},"b":{"entityId":"#7"}}},
+        "params": { "constraint": { "kind": "concentric", "a": { "entityId": "#6" }, "b": { "entityId": "#7" } } },
         "suppressed": false,
         "affected": ["#29"]
       },
-      {
-        "id": "#30",
-        "name": "solve_constraints",
-        "params": {},
-        "suppressed": false,
-        "affected": ["#1","#3","#4","#5","#6","#7"]
-      }
+      { "id": "#30", "name": "solve_constraints", "params": {}, "suppressed": false, "affected": ["#1", "#3", "#4", "#5", "#6", "#7"] }
     ],
     "configurations": {},
     "materials": {},
     "recipes": {},
     "components": {},
     "constraints": {
-      "#15": {
-        "kind": "fix",
-        "a": {"entityId":"#1"},
-        "b": {"entityId":"#1"},
-        "id": "#15"
-      },
-      "#17": {
-        "kind": "tangent",
-        "a": {"entityId":"#1"},
-        "b": {"entityId":"#3"},
-        "id": "#17"
-      },
-      "#19": {
-        "kind": "radius",
-        "a": {"entityId":"#3"},
-        "value": 2.5,
-        "b": {"entityId":"#3"},
-        "id": "#19"
-      },
-      "#21": {
-        "kind": "tangent",
-        "a": {"entityId":"#3"},
-        "b": {"entityId":"#4"},
-        "id": "#21"
-      },
-      "#23": {
-        "kind": "radius",
-        "a": {"entityId":"#4"},
-        "value": 1,
-        "b": {"entityId":"#4"},
-        "id": "#23"
-      },
-      "#25": {
-        "kind": "point_on_curve",
-        "a": {"entityId":"#5","kind":"center"},
-        "b": {"entityId":"#1"},
-        "id": "#25"
-      },
-      "#27": {
-        "kind": "fix",
-        "a": {"entityId":"#6"},
-        "b": {"entityId":"#6"},
-        "id": "#27"
-      },
-      "#29": {
-        "kind": "concentric",
-        "a": {"entityId":"#6"},
-        "b": {"entityId":"#7"},
-        "id": "#29"
-      }
+      "#15": { "kind": "fix", "a": { "entityId": "#1" }, "b": { "entityId": "#1" }, "id": "#15" },
+      "#17": { "kind": "tangent", "a": { "entityId": "#1" }, "b": { "entityId": "#3" }, "id": "#17" },
+      "#19": { "kind": "radius", "a": { "entityId": "#3" }, "value": 2.5, "b": { "entityId": "#3" }, "id": "#19" },
+      "#21": { "kind": "tangent", "a": { "entityId": "#3" }, "b": { "entityId": "#4" }, "id": "#21" },
+      "#23": { "kind": "radius", "a": { "entityId": "#4" }, "value": 1, "b": { "entityId": "#4" }, "id": "#23" },
+      "#25": { "kind": "point_on_curve", "a": { "entityId": "#5", "kind": "center" }, "b": { "entityId": "#1" }, "id": "#25" },
+      "#27": { "kind": "fix", "a": { "entityId": "#6" }, "b": { "entityId": "#6" }, "id": "#27" },
+      "#29": { "kind": "concentric", "a": { "entityId": "#6" }, "b": { "entityId": "#7" }, "id": "#29" }
     },
-    "constraintOrder": [
-      "#15",
-      "#17",
-      "#19",
-      "#21",
-      "#23",
-      "#25",
-      "#27",
-      "#29"
-    ],
+    "constraintOrder": ["#15", "#17", "#19", "#21", "#23", "#25", "#27", "#29"],
     "joints": {},
     "jointOrder": [],
     "driveRelations": {},

@@ -6,83 +6,59 @@
       "#1": {
         "id": "#1",
         "kind": "line",
-        "start": [0,-2],
-        "end": [0,30],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [0, -2],
+        "end": [0, 30],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#3": {
         "id": "#3",
         "kind": "line",
-        "start": [-15,6],
-        "end": [15,6],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [-15, 6],
+        "end": [15, 6],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#4": {
         "id": "#4",
         "kind": "line",
-        "start": [-15,6],
-        "end": [-15,24],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [-15, 6],
+        "end": [-15, 24],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#5": {
         "id": "#5",
         "kind": "line",
-        "start": [15,6],
-        "end": [15,24],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [15, 6],
+        "end": [15, 24],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#6": {
         "id": "#6",
         "kind": "line",
-        "start": [-4,30],
-        "end": [4,30],
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "start": [-4, 30],
+        "end": [4, 30],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#4a90d9"
       }
     },
-    "order": [
-      "#1",
-      "#3",
-      "#4",
-      "#5",
-      "#6"
-    ],
-    "layers": {
-      "#2": {
-        "id": "#2",
-        "name": "Layer 0",
-        "visible": true,
-        "locked": false
-      }
-    },
-    "layerOrder": [
-      "#2"
-    ],
+    "order": ["#1", "#3", "#4", "#5", "#6"],
+    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["#2"],
     "selection": [],
-    "camera": {
-      "target": [
-        0,
-        0,
-        0
-      ],
-      "azimuth": 2.35619449,
-      "polar": 1.04719755,
-      "distance": 12
-    },
+    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -92,228 +68,226 @@
       {
         "id": "#7",
         "name": "draw_polyline",
-        "params": {"points":[[0,-2],[0,30]]},
+        "params": {
+          "points": [
+            [0, -2],
+            [0, 30]
+          ]
+        },
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#8",
         "name": "draw_polyline",
-        "params": {"points":[[-14,7],[15,6]]},
+        "params": {
+          "points": [
+            [-14, 7],
+            [15, 6]
+          ]
+        },
         "suppressed": false,
         "affected": ["#3"]
       },
       {
         "id": "#9",
         "name": "draw_polyline",
-        "params": {"points":[[-14,7],[-15,23]]},
+        "params": {
+          "points": [
+            [-14, 7],
+            [-15, 23]
+          ]
+        },
         "suppressed": false,
         "affected": ["#4"]
       },
       {
         "id": "#10",
         "name": "draw_polyline",
-        "params": {"points":[[15,6],[14,25]]},
+        "params": {
+          "points": [
+            [15, 6],
+            [14, 25]
+          ]
+        },
         "suppressed": false,
         "affected": ["#5"]
       },
       {
         "id": "#11",
         "name": "draw_polyline",
-        "params": {"points":[[-3,30],[4,31]]},
+        "params": {
+          "points": [
+            [-3, 30],
+            [4, 31]
+          ]
+        },
         "suppressed": false,
         "affected": ["#6"]
       },
       {
         "id": "#12",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"fix","a":{"entityId":"#1"}}},
+        "params": { "constraint": { "kind": "fix", "a": { "entityId": "#1" } } },
         "suppressed": false,
         "affected": ["#13"]
       },
       {
         "id": "#14",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"symmetric","a":{"entityId":"#3","kind":"start"},"b":{"entityId":"#3","kind":"end"},"axis":{"entityId":"#1"}}},
+        "params": {
+          "constraint": {
+            "kind": "symmetric",
+            "a": { "entityId": "#3", "kind": "start" },
+            "b": { "entityId": "#3", "kind": "end" },
+            "axis": { "entityId": "#1" }
+          }
+        },
         "suppressed": false,
         "affected": ["#15"]
       },
       {
         "id": "#16",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#4","kind":"start"},"b":{"entityId":"#3","kind":"start"}}},
+        "params": {
+          "constraint": { "kind": "coincident", "a": { "entityId": "#4", "kind": "start" }, "b": { "entityId": "#3", "kind": "start" } }
+        },
         "suppressed": false,
         "affected": ["#17"]
       },
       {
         "id": "#18",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#5","kind":"start"},"b":{"entityId":"#3","kind":"end"}}},
+        "params": {
+          "constraint": { "kind": "coincident", "a": { "entityId": "#5", "kind": "start" }, "b": { "entityId": "#3", "kind": "end" } }
+        },
         "suppressed": false,
         "affected": ["#19"]
       },
       {
         "id": "#20",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"symmetric","a":{"entityId":"#4","kind":"end"},"b":{"entityId":"#5","kind":"end"},"axis":{"entityId":"#1"}}},
+        "params": {
+          "constraint": {
+            "kind": "symmetric",
+            "a": { "entityId": "#4", "kind": "end" },
+            "b": { "entityId": "#5", "kind": "end" },
+            "axis": { "entityId": "#1" }
+          }
+        },
         "suppressed": false,
         "affected": ["#21"]
       },
       {
         "id": "#22",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"perpendicular","a":{"entityId":"#3"},"b":{"entityId":"#4"}}},
+        "params": { "constraint": { "kind": "perpendicular", "a": { "entityId": "#3" }, "b": { "entityId": "#4" } } },
         "suppressed": false,
         "affected": ["#23"]
       },
       {
         "id": "#24",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"horizontal_distance","a":{"entityId":"#3","kind":"start"},"b":{"entityId":"#3","kind":"end"},"value":30}},
+        "params": {
+          "constraint": {
+            "kind": "horizontal_distance",
+            "a": { "entityId": "#3", "kind": "start" },
+            "b": { "entityId": "#3", "kind": "end" },
+            "value": 30
+          }
+        },
         "suppressed": false,
         "affected": ["#25"]
       },
       {
         "id": "#26",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"point_to_line","a":{"entityId":"#3","kind":"start"},"b":{"entityId":"#6"},"value":24}},
+        "params": {
+          "constraint": { "kind": "point_to_line", "a": { "entityId": "#3", "kind": "start" }, "b": { "entityId": "#6" }, "value": 24 }
+        },
         "suppressed": false,
         "affected": ["#27"]
       },
       {
         "id": "#28",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"vertical_distance","a":{"entityId":"#3","kind":"start"},"b":{"entityId":"#4","kind":"end"},"value":18}},
+        "params": {
+          "constraint": {
+            "kind": "vertical_distance",
+            "a": { "entityId": "#3", "kind": "start" },
+            "b": { "entityId": "#4", "kind": "end" },
+            "value": 18
+          }
+        },
         "suppressed": false,
         "affected": ["#29"]
       },
       {
         "id": "#30",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"midpoint","a":{"entityId":"#1","kind":"end"},"b":{"entityId":"#6"}}},
+        "params": { "constraint": { "kind": "midpoint", "a": { "entityId": "#1", "kind": "end" }, "b": { "entityId": "#6" } } },
         "suppressed": false,
         "affected": ["#31"]
       },
       {
         "id": "#32",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"horizontal","a":{"entityId":"#6"}}},
+        "params": { "constraint": { "kind": "horizontal", "a": { "entityId": "#6" } } },
         "suppressed": false,
         "affected": ["#33"]
       },
       {
         "id": "#34",
         "name": "add_constraint",
-        "params": {"constraint":{"kind":"aligned","a":{"entityId":"#6"},"value":8}},
+        "params": { "constraint": { "kind": "aligned", "a": { "entityId": "#6" }, "value": 8 } },
         "suppressed": false,
         "affected": ["#35"]
       },
-      {
-        "id": "#36",
-        "name": "solve_constraints",
-        "params": {},
-        "suppressed": false,
-        "affected": ["#1","#3","#4","#5","#6"]
-      }
+      { "id": "#36", "name": "solve_constraints", "params": {}, "suppressed": false, "affected": ["#1", "#3", "#4", "#5", "#6"] }
     ],
     "configurations": {},
     "materials": {},
     "recipes": {},
     "components": {},
     "constraints": {
-      "#13": {
-        "kind": "fix",
-        "a": {"entityId":"#1"},
-        "b": {"entityId":"#1"},
-        "id": "#13"
-      },
+      "#13": { "kind": "fix", "a": { "entityId": "#1" }, "b": { "entityId": "#1" }, "id": "#13" },
       "#15": {
         "kind": "symmetric",
-        "a": {"entityId":"#3","kind":"start"},
-        "b": {"entityId":"#3","kind":"end"},
-        "axis": {"entityId":"#1"},
+        "a": { "entityId": "#3", "kind": "start" },
+        "b": { "entityId": "#3", "kind": "end" },
+        "axis": { "entityId": "#1" },
         "id": "#15"
       },
-      "#17": {
-        "kind": "coincident",
-        "a": {"entityId":"#4","kind":"start"},
-        "b": {"entityId":"#3","kind":"start"},
-        "id": "#17"
-      },
-      "#19": {
-        "kind": "coincident",
-        "a": {"entityId":"#5","kind":"start"},
-        "b": {"entityId":"#3","kind":"end"},
-        "id": "#19"
-      },
+      "#17": { "kind": "coincident", "a": { "entityId": "#4", "kind": "start" }, "b": { "entityId": "#3", "kind": "start" }, "id": "#17" },
+      "#19": { "kind": "coincident", "a": { "entityId": "#5", "kind": "start" }, "b": { "entityId": "#3", "kind": "end" }, "id": "#19" },
       "#21": {
         "kind": "symmetric",
-        "a": {"entityId":"#4","kind":"end"},
-        "b": {"entityId":"#5","kind":"end"},
-        "axis": {"entityId":"#1"},
+        "a": { "entityId": "#4", "kind": "end" },
+        "b": { "entityId": "#5", "kind": "end" },
+        "axis": { "entityId": "#1" },
         "id": "#21"
       },
-      "#23": {
-        "kind": "perpendicular",
-        "a": {"entityId":"#3"},
-        "b": {"entityId":"#4"},
-        "id": "#23"
-      },
+      "#23": { "kind": "perpendicular", "a": { "entityId": "#3" }, "b": { "entityId": "#4" }, "id": "#23" },
       "#25": {
         "kind": "horizontal_distance",
-        "a": {"entityId":"#3","kind":"start"},
-        "b": {"entityId":"#3","kind":"end"},
+        "a": { "entityId": "#3", "kind": "start" },
+        "b": { "entityId": "#3", "kind": "end" },
         "value": 30,
         "id": "#25"
       },
-      "#27": {
-        "kind": "point_to_line",
-        "a": {"entityId":"#3","kind":"start"},
-        "b": {"entityId":"#6"},
-        "value": 24,
-        "id": "#27"
-      },
+      "#27": { "kind": "point_to_line", "a": { "entityId": "#3", "kind": "start" }, "b": { "entityId": "#6" }, "value": 24, "id": "#27" },
       "#29": {
         "kind": "vertical_distance",
-        "a": {"entityId":"#3","kind":"start"},
-        "b": {"entityId":"#4","kind":"end"},
+        "a": { "entityId": "#3", "kind": "start" },
+        "b": { "entityId": "#4", "kind": "end" },
         "value": 18,
         "id": "#29"
       },
-      "#31": {
-        "kind": "midpoint",
-        "a": {"entityId":"#1","kind":"end"},
-        "b": {"entityId":"#6"},
-        "id": "#31"
-      },
-      "#33": {
-        "kind": "horizontal",
-        "a": {"entityId":"#6"},
-        "b": {"entityId":"#6"},
-        "id": "#33"
-      },
-      "#35": {
-        "kind": "aligned",
-        "a": {"entityId":"#6"},
-        "value": 8,
-        "b": {"entityId":"#6"},
-        "id": "#35"
-      }
+      "#31": { "kind": "midpoint", "a": { "entityId": "#1", "kind": "end" }, "b": { "entityId": "#6" }, "id": "#31" },
+      "#33": { "kind": "horizontal", "a": { "entityId": "#6" }, "b": { "entityId": "#6" }, "id": "#33" },
+      "#35": { "kind": "aligned", "a": { "entityId": "#6" }, "value": 8, "b": { "entityId": "#6" }, "id": "#35" }
     },
-    "constraintOrder": [
-      "#13",
-      "#15",
-      "#17",
-      "#19",
-      "#21",
-      "#23",
-      "#25",
-      "#27",
-      "#29",
-      "#31",
-      "#33",
-      "#35"
-    ],
+    "constraintOrder": ["#13", "#15", "#17", "#19", "#21", "#23", "#25", "#27", "#29", "#31", "#33", "#35"],
     "joints": {},
     "jointOrder": [],
     "driveRelations": {},
