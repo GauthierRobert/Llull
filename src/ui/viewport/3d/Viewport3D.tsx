@@ -199,10 +199,12 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
-      <FeatureStartBar />
-      <CageEditBar />
-      <FaceEditBar />
-      <NurbsNetBar />
+      <div className="feature-chips">
+        <FeatureStartBar />
+        <CageEditBar />
+        <FaceEditBar />
+        <NurbsNetBar />
+      </div>
       <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />

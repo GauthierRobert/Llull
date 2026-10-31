@@ -1,10 +1,27 @@
 /* ---- Feature drag handles: start chips, value card, value box -------------- */
 
-.feature-start {
+/* The container spans the viewport (the bottom bars of the edit modes stay positioned against it). The start chips of the sole selected entity (Extrude / Fillet / Shell, Edit faces, Edit cage, Poles) share one column under the view-options toggle, so
+   they never sit on the view presets that open to the left of that toggle nor on each other. */
+.feature-chips {
   position: absolute;
-  top: calc(var(--vp-inset-top, var(--space-3)) + 4px);
-  right: calc(var(--vp-inset-right, var(--space-3)) + 52px);
+  inset: 0;
+  z-index: 15;
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: calc(var(--vp-inset-top, var(--space-3)) + 48px) var(--vp-inset-right, var(--space-3)) 0 var(--vp-inset-left, var(--space-3));
+  pointer-events: none;
+}
+
+.feature-chips > * {
+  pointer-events: auto;
+}
+
+.feature-start {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 5px;
   border: 1px solid var(--border-float);
@@ -12,7 +29,6 @@
   background: var(--surface-float);
   box-shadow: var(--shadow-float);
   backdrop-filter: blur(10px);
-  z-index: 15;
 }
 
 .feature-start__chip {

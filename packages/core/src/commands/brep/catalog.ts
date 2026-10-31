@@ -6,6 +6,7 @@ import { filletEdge, chamferEdge, shellSolid } from './modify3d';
 import { inspectTopology } from './topology';
 import { blendUnion } from './blend';
 import { inspectFaces } from './faces';
+import { inspectFaceTriangles } from './faceTriangles';
 import { draftFaces, pushPullFace, replaceFace, splitFace } from './faceOps';
 import { deleteFaces, moveFaces } from './faceMoves';
 import { splitBody } from './splitBody';
@@ -33,4 +34,5 @@ export const brepCommands = commandCatalog(
   splitBody,
   inspectTopology,
   inspectFaces,
+  inspectFaceTriangles,
 );

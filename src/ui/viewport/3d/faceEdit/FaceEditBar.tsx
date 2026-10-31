@@ -16,6 +16,7 @@ export function FaceEditBar(): React.ReactElement | null {
   const value = useFaceEditStore((s) => s.value);
   const status = useRemotePreviewStore((s) => s.status);
   const summary = useRemotePreviewStore((s) => s.summary);
+  const also = useFaceEditStore((s) => s.also.length);
   const hint = faceHint(op, pick !== null, value !== null);
   const editable = canEditFaces(sole);
   if (!editable) return null;
@@ -34,7 +35,9 @@ export function FaceEditBar(): React.ReactElement | null {
     value === null
       ? pick === null
         ? 'Click a face'
-        : 'Drag the arrow'
+        : op === 'move_feature'
+          ? `${also + 1} face${also === 0 ? '' : 's'} — drag a face in the view plane`
+          : 'Drag the arrow'
       : status === 'pending'
         ? `${formatFaceValue(op, value)}  previewing\u2026`
         : `${formatFaceValue(op, value)}  ${summary}`;

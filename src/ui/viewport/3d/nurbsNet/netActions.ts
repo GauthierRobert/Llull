@@ -6,13 +6,19 @@ import { useStore } from '@ui/store';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { useNurbsNetStore } from '@ui/store/nurbsNetStore';
 import type { Vec3 } from '@core/model/types';
-import { type PoleId, isNurbsNetEntity, poleMoveCommand } from './controlNet';
+import { type PoleId, isNurbsNetEntity, polesMoveCommand, samePole } from './controlNet';
+
+/** The poles a drag of `pole` moves: the whole selection when `pole` belongs to it, else just `pole`. */
+function movedPoles(pole: PoleId): readonly PoleId[] {
+  const { selected } = useNurbsNetStore.getState();
+  return selected.some((candidate) => samePole(candidate, pole)) ? selected : [pole];
+}
 
 /** Move the dragged pole to the displacement `delta` and refresh the ghost. */
 export function updatePoleDrag(entityId: string, pole: PoleId, delta: Vec3): void {
   const { document } = useStore.getState();
   const entity = document.entities[entityId];
-  const command = isNurbsNetEntity(entity) ? poleMoveCommand(entity, pole, delta) : null;
+  const command = isNurbsNetEntity(entity) ? polesMoveCommand(entity, movedPoles(pole), delta, useNurbsNetStore.getState().falloff) : null;
   if (command === null) {
     usePreviewStore.getState().setOutcome(null);
     useNurbsNetStore.getState().setDrag({ entityId, pole, delta, preview: null });
@@ -31,7 +37,9 @@ export function commitPoleDrag(): boolean {
   setDrag(null);
   if (drag === null) return false;
   const entity = useStore.getState().document.entities[drag.entityId];
-  const command = isNurbsNetEntity(entity) ? poleMoveCommand(entity, drag.pole, drag.delta) : null;
+  const command = isNurbsNetEntity(entity)
+    ? polesMoveCommand(entity, movedPoles(drag.pole), drag.delta, useNurbsNetStore.getState().falloff)
+    : null;
   if (command === null) return false;
   useStore.getState().dispatch(command.name, command.params);
   return true;

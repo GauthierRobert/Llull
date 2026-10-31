@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyDocument, type NurbsCurveEntity, type NurbsSurfaceEntity, type SubdivisionEntity } from '@core/model/types';
+import { createEmptyDocument, type Vec3, type NurbsCurveEntity, type NurbsSurfaceEntity, type SubdivisionEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { netAnchor, netSegments, pickPole, poleBuffer, poleMoveCommand, polesOf, toWorld } from '@ui/viewport/3d/nurbsNet/controlNet';
+import {
+  netAnchor,
+  netSegments,
+  pickPole,
+  poleBuffer,
+  polesInRect,
+  polesMoveCommand,
+  polesOf,
+  selectedPoleBuffer,
+  togglePole,
+  unitePoles,
+  toWorld,
+} from '@ui/viewport/3d/nurbsNet/controlNet';
 import { cancelsOnCaptureLoss, loopCutEdge, loopCutFactor } from '@ui/viewport/3d/cage/loopCutDrag';
 import { gestureCommand, DEFAULT_FALLOFF } from '@ui/viewport/3d/cage/gestureCommands';
 import { gizmoFramePosition } from '@ui/viewport/3d/gizmoSpace';
@@ -70,18 +82,18 @@ describe('control polygon and net', () => {
   });
 
   it('moves a pole by the entity-local delta of a world displacement', () => {
-    expect(poleMoveCommand(curve, 1, [0, 0, 0.0000001])).toBeNull();
-    expect(poleMoveCommand(curve, 1, [0.5, 0, 0])).toEqual({
+    expect(polesMoveCommand(curve, [1], [0, 0, 0.0000001])).toBeNull();
+    expect(polesMoveCommand(curve, [1], [0.5, 0, 0])).toEqual({
       name: 'edit_nurbs',
       params: { id: curve.id, operation: 'move_poles', indices: [1], delta: [0.5, 0, 0] },
     });
-    expect(poleMoveCommand(surface, [1, 1], [0, 0, 2])).toEqual({
+    expect(polesMoveCommand(surface, [[1, 1]], [0, 0, 2])).toEqual({
       name: 'edit_nurbs_surface',
       params: { id: surface.id, operation: 'move_poles', poles: [[1, 1]], delta: [0, 0, 2] },
     });
     // a pole id of the wrong shape never builds a command
-    expect(poleMoveCommand(curve, [0, 0], [1, 0, 0])).toBeNull();
-    expect(poleMoveCommand(surface, 0, [1, 0, 0])).toBeNull();
+    expect(polesMoveCommand(curve, [[0, 0]], [1, 0, 0])).toBeNull();
+    expect(polesMoveCommand(surface, [0], [1, 0, 0])).toBeNull();
   });
 
   it('converts a world drag to the local frame of a rotated entity, and the command accepts it', () => {
@@ -89,11 +101,79 @@ describe('control polygon and net', () => {
     const world = toWorld(turned, [1, 0, 0]);
     expect(world[0]).toBeCloseTo(10, 9);
     expect(world[1]).toBeCloseTo(1, 9);
-    const command = poleMoveCommand(turned, 0, [0, 1, 0]);
+    const command = polesMoveCommand(turned, [0], [0, 1, 0]);
     expect(command?.params['delta']).toEqual([1, 0, 0]);
     const doc = { ...curveRun.document, entities: { ...curveRun.document.entities, [turned.id]: turned } };
     const moved = execute(doc, command?.name ?? '', command?.params);
     expect((moved.document.entities[turned.id] as NurbsCurveEntity).curve.poles[0]).toEqual([1, 0, 0]);
+  });
+});
+
+describe('multi-pole selection and falloff drag', () => {
+  it('toggles and unites poles without duplicates (curve indices and surface pairs)', () => {
+    expect(togglePole([1, 2], 3)).toEqual([1, 2, 3]);
+    expect(togglePole([1, 2], 2)).toEqual([1]);
+    expect(togglePole([[0, 1]], [0, 1])).toEqual([]);
+    expect(
+      unitePoles(
+        [[0, 1]],
+        [
+          [0, 1],
+          [1, 2],
+        ],
+      ),
+    ).toEqual([
+      [0, 1],
+      [1, 2],
+    ]);
+    expect(Array.from(selectedPoleBuffer(curve, [0, 0, 0], [1, 3]))).toEqual([1, 2, 0, 3, 2, 0]);
+  });
+
+  it('a box selects the poles whose screen position is inside (corners in any order), none behind the camera', () => {
+    const project = (world: Vec3): { x: number; y: number } | null => (world[2] > 5 ? null : { x: world[0] * 10, y: world[1] * 10 });
+    expect(polesInRect(curve, project, { x0: 15, y0: 25, x1: -5, y1: -5 })).toEqual([0, 1]);
+    expect(polesInRect(curve, project, { x0: -5, y0: -5, x1: 35, y1: 25 })).toEqual([0, 1, 2, 3]);
+    expect(polesInRect(curve, () => null, { x0: -99, y0: -99, x1: 99, y1: 99 })).toEqual([]);
+  });
+
+  it('several poles and a falloff make ONE command that the core accepts and that moves the neighbours softly', () => {
+    const command = polesMoveCommand(curve, [1, 2], [0, 0, 1], { radius: 2, shape: 'linear' });
+    expect(command).toEqual({
+      name: 'edit_nurbs',
+      params: { id: curve.id, operation: 'move_poles', indices: [1, 2], delta: [0, 0, 1], falloff: { radius: 2, shape: 'linear' } },
+    });
+    const moved = execute(curveRun.document, command?.name ?? '', command?.params);
+    expect(moved.error, moved.summary).toBeUndefined();
+    const poles = (moved.document.entities[curve.id] as NurbsCurveEntity).curve.poles;
+    expect(poles[1]?.[2]).toBeCloseTo(1, 9);
+    expect(poles[2]?.[2]).toBeCloseTo(1, 9);
+    expect(poles[0]?.[2]).toBeGreaterThan(0);
+    expect(poles[0]?.[2]).toBeLessThan(1);
+    // radius 0 is no falloff: the field is left out
+    expect(polesMoveCommand(curve, [1], [0, 0, 1], { radius: 0, shape: 'smooth' })?.params).not.toHaveProperty('falloff');
+  });
+
+  it('a surface selection moves the listed poles with a radiusU / radiusV falloff; mixed pole shapes and an empty selection build nothing', () => {
+    const command = polesMoveCommand(
+      surface,
+      [
+        [0, 0],
+        [1, 1],
+      ],
+      [0, 0, 2],
+      { radius: 1, shape: 'smooth' },
+    );
+    expect(command?.params).toMatchObject({
+      poles: [
+        [0, 0],
+        [1, 1],
+      ],
+      falloff: { radiusU: 1, radiusV: 1, shape: 'smooth' },
+    });
+    const moved = execute(surfaceRun.document, command?.name ?? '', command?.params);
+    expect(moved.error, moved.summary).toBeUndefined();
+    expect(polesMoveCommand(surface, [[0, 0], 1], [0, 0, 1])).toBeNull();
+    expect(polesMoveCommand(curve, [], [0, 0, 1])).toBeNull();
   });
 });
 

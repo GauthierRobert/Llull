@@ -4,6 +4,7 @@
 import type { NurbsCurveEntity, NurbsSurfaceEntity, Vec3 } from '@core/model/types';
 import { applyEulerXYZ, inverseEulerXYZ } from '@lib/eulerRotation';
 import { add3, dot3, scale3, sub3 } from '@lib/vec3';
+import type { FalloffShape } from '@lib/falloff';
 
 export type NurbsNetEntity = NurbsCurveEntity | NurbsSurfaceEntity;
 
@@ -59,6 +60,14 @@ export function poleBuffer(entity: NurbsNetEntity, anchor: Vec3, only?: PoleId):
   return out;
 }
 
+/** Flat xyz of the poles listed in `ids` (entity-local minus the anchor). */
+export function selectedPoleBuffer(entity: NurbsNetEntity, anchor: Vec3, ids: readonly PoleId[]): Float32Array {
+  const chosen = polesOf(entity).filter((pole) => ids.some((id) => samePole(id, pole.id)));
+  const out = new Float32Array(chosen.length * 3);
+  chosen.forEach((pole, k) => out.set([pole.local[0] - anchor[0], pole.local[1] - anchor[1], pole.local[2] - anchor[2]], k * 3));
+  return out;
+}
+
 /** Entity-local point to document space. */
 export const toWorld = (entity: Pick<NurbsNetEntity, 'position' | 'rotation'>, local: Vec3): Vec3 =>
   add3(applyEulerXYZ(local, [0, 0, 0], entity.rotation), entity.position);
@@ -93,6 +102,39 @@ export function pickPole(
   return best === null ? null : { pole: best.pole, world: best.world };
 }
 
+/** Soft selection around the moved poles: radius in pole-index units (0 = none) and the weight curve. */
+export interface PoleFalloff {
+  readonly radius: number;
+  readonly shape: FalloffShape;
+}
+
+export const samePole = (a: PoleId, b: PoleId): boolean =>
+  typeof a === 'number' || typeof b === 'number' ? a === b : a[0] === b[0] && a[1] === b[1];
+
+/** `poles` with `pole` toggled (added when absent, removed when present). */
+export const togglePole = (poles: readonly PoleId[], pole: PoleId): PoleId[] =>
+  poles.some((candidate) => samePole(candidate, pole)) ? poles.filter((candidate) => !samePole(candidate, pole)) : [...poles, pole];
+
+/** `poles` united with `added` (no duplicates, order kept). */
+export const unitePoles = (poles: readonly PoleId[], added: readonly PoleId[]): PoleId[] =>
+  added.reduce<PoleId[]>((all, pole) => (all.some((candidate) => samePole(candidate, pole)) ? all : [...all, pole]), [...poles]);
+
+/** The poles whose screen position `project` puts inside the rectangle (corners in any order); a pole behind the camera (null) is out. */
+export function polesInRect(
+  entity: NurbsNetEntity,
+  project: (world: Vec3) => { x: number; y: number } | null,
+  rect: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number },
+): PoleId[] {
+  const [left, right] = [Math.min(rect.x0, rect.x1), Math.max(rect.x0, rect.x1)];
+  const [top, bottom] = [Math.min(rect.y0, rect.y1), Math.max(rect.y0, rect.y1)];
+  return polesOf(entity)
+    .filter((pole) => {
+      const at = project(toWorld(entity, pole.local));
+      return at !== null && at.x >= left && at.x <= right && at.y >= top && at.y <= bottom;
+    })
+    .map((pole) => pole.id);
+}
+
 export interface PoleCommand {
   readonly name: 'edit_nurbs' | 'edit_nurbs_surface';
   readonly params: Readonly<Record<string, unknown>>;
@@ -100,16 +142,39 @@ export interface PoleCommand {
 
 const round = (value: number): number => Math.round(value * 1e6) / 1e6 + 0;
 
-/** The command that moves `pole` by the world displacement `delta`, or null for a zero move. */
-export function poleMoveCommand(entity: NurbsNetEntity, pole: PoleId, delta: Vec3): PoleCommand | null {
+/**
+ * The ONE command that moves `poles` by the world displacement `delta` (the soft selection `falloff` spreads it to the neighbours), or null for a zero
+ * move, no pole, or a pole id of the wrong shape for the entity.
+ */
+export function polesMoveCommand(entity: NurbsNetEntity, poles: readonly PoleId[], delta: Vec3, falloff?: PoleFalloff): PoleCommand | null {
   const local = toLocalDelta(entity, delta);
-  if (Math.hypot(...local) < 1e-6) return null;
+  if (poles.length === 0 || Math.hypot(...local) < 1e-6) return null;
   const rounded: Vec3 = [round(local[0]), round(local[1]), round(local[2])];
-  if (entity.kind === 'nurbs_curve')
-    return typeof pole === 'number'
-      ? { name: 'edit_nurbs', params: { id: entity.id, operation: 'move_poles', indices: [pole], delta: rounded } }
-      : null;
-  return typeof pole === 'number'
-    ? null
-    : { name: 'edit_nurbs_surface', params: { id: entity.id, operation: 'move_poles', poles: [[pole[0], pole[1]]], delta: rounded } };
+  const soft = falloff !== undefined && falloff.radius > 0 ? falloff : undefined;
+  if (entity.kind === 'nurbs_curve') {
+    const indices = poles.filter((pole): pole is number => typeof pole === 'number');
+    if (indices.length !== poles.length) return null;
+    return {
+      name: 'edit_nurbs',
+      params: {
+        id: entity.id,
+        operation: 'move_poles',
+        indices,
+        delta: rounded,
+        ...(soft === undefined ? {} : { falloff: { radius: soft.radius, shape: soft.shape } }),
+      },
+    };
+  }
+  const grid = poles.filter((pole): pole is readonly [number, number] => typeof pole !== 'number');
+  if (grid.length !== poles.length) return null;
+  return {
+    name: 'edit_nurbs_surface',
+    params: {
+      id: entity.id,
+      operation: 'move_poles',
+      poles: grid.map((pole) => [pole[0], pole[1]]),
+      delta: rounded,
+      ...(soft === undefined ? {} : { falloff: { radiusU: soft.radius, radiusV: soft.radius, shape: soft.shape } }),
+    },
+  };
 }
