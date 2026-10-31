@@ -32,6 +32,8 @@
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <gp_Pln.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <gp_Ax2.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
@@ -1097,14 +1099,16 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     int edge = 0;
   };
   std::vector<std::vector<CutPlane>> planes(corners.size());
-  std::vector<TopoDS_Shape> regions(corners.size());
+  std::vector<TopoDS_Shape> regions(corners.size());  // the region as a solid: for the volume bound only
+  std::vector<std::vector<TopoDS_Face>> cut_faces(corners.size());
   for (size_t c = 0; c < corners.size(); ++c) {
     if (!by_planes[c]) continue;
     double widest = 0;
     for (const auto &entry : radius) widest = std::max(widest, std::max(entry.second.start, entry.second.end));
     for (const int edge : edges_at(vertex_edges_all, unique_edges, corner_vertices[c])) {
       const BRepAdaptor_Curve curve(TopoDS::Edge(unique_edges(edge + 1)));
-      const bool at_start = same_point(curve.Value(curve.FirstParameter()), corners[c].at, vertex_tolerance);
+      const bool start_here = same_point(curve.Value(curve.FirstParameter()), corners[c].at, vertex_tolerance);
+      const bool end_here = same_point(curve.Value(curve.LastParameter()), corners[c].at, vertex_tolerance);
       const auto found = std::find_if(corners[c].setbacks.begin(), corners[c].setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
       const double distance = found == corners[c].setbacks.end() || !(found->second > 0) ? reach[c] : found->second;
       const double along = GCPnts_AbscissaPoint::Length(curve);
@@ -1112,21 +1116,64 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
         why = std::string(kUnsupported) + "the setback " + number(distance) + " of edge " + std::to_string(edge) + " at " + where(corners[c].at) + " is not shorter than the edge (" + number(along) + ")";
         return nullptr;
       }
-      const double start = at_start ? curve.FirstParameter() : curve.LastParameter();
-      const GCPnts_AbscissaPoint point(curve, at_start ? distance : -distance, start);
-      if (!point.IsDone()) {
-        why = std::string(kFailed) + "the point at " + number(distance) + " along edge " + std::to_string(edge) + " could not be found";
-        return nullptr;
+      // a plane at each end of the edge that is at this vertex (a closed edge has both)
+      for (const bool at_start : {true, false}) {
+        if (at_start ? !start_here : !end_here) continue;
+        const double start = at_start ? curve.FirstParameter() : curve.LastParameter();
+        const GCPnts_AbscissaPoint point(curve, at_start ? distance : -distance, start);
+        if (!point.IsDone()) {
+          why = std::string(kFailed) + "the point at " + number(distance) + " along edge " + std::to_string(edge) + " could not be found";
+          return nullptr;
+        }
+        gp_Pnt at;
+        gp_Vec tangent;
+        curve.D1(point.Parameter(), at, tangent);
+        if (!(tangent.Magnitude() > 1e-300)) {
+          why = std::string(kFailed) + "edge " + std::to_string(edge) + " has no tangent at its setback point";
+          return nullptr;
+        }
+        tangent.Normalize();
+        planes[c].push_back({at, at_start ? tangent : tangent.Reversed(), edge});
       }
-      gp_Pnt at;
-      gp_Vec tangent;
-      curve.D1(point.Parameter(), at, tangent);
-      if (!(tangent.Magnitude() > 1e-300)) {
-        why = std::string(kFailed) + "edge " + std::to_string(edge) + " has no tangent at its setback point";
-        return nullptr;
+    }
+    // The tools of the split: for each plane the polygon of the region on it (a square about its point, clipped by the other planes), so that the planes cut the solid only on the boundary of the
+    // region and leave no seam on the faces beyond it.
+    {
+      const double reach_around = 3.0 * (reach[c] + widest);
+      for (size_t i = 0; i < planes[c].size(); ++i) {
+        const gp_Ax2 frame(planes[c][i].at, gp_Dir(planes[c][i].outward));
+        std::vector<gp_Pnt> polygon;
+        const double corner_signs[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+        for (const auto &sign : corner_signs)
+          polygon.push_back(planes[c][i].at.Translated(gp_Vec(frame.XDirection()) * (sign[0] * reach_around)).Translated(gp_Vec(frame.YDirection()) * (sign[1] * reach_around)));
+        for (size_t j = 0; j < planes[c].size() && polygon.size() >= 3; ++j) {
+          if (j == i) continue;
+          std::vector<gp_Pnt> clipped;
+          for (size_t k = 0; k < polygon.size(); ++k) {
+            const gp_Pnt &from = polygon[k], &to = polygon[(k + 1) % polygon.size()];
+            const double g_from = gp_Vec(planes[c][j].at, from) * planes[c][j].outward, g_to = gp_Vec(planes[c][j].at, to) * planes[c][j].outward;
+            if (g_from <= 0) clipped.push_back(from);
+            if ((g_from < 0 && g_to > 0) || (g_from > 0 && g_to < 0)) {
+              const double t = g_from / (g_from - g_to);
+              clipped.push_back(gp_Pnt(from.XYZ() + (to.XYZ() - from.XYZ()) * t));
+            }
+          }
+          polygon = clipped;
+        }
+        if (polygon.size() < 3) {
+          why = std::string(kUnsupported) + "the cut planes at " + where(corners[c].at) + " bound no region (the plane of edge " + std::to_string(planes[c][i].edge) + " is clipped away by the others)";
+          return nullptr;
+        }
+        BRepBuilderAPI_MakePolygon wire;
+        for (const gp_Pnt &point : polygon) wire.Add(point);
+        wire.Close();
+        BRepBuilderAPI_MakeFace face(gp_Pln(planes[c][i].at, gp_Dir(planes[c][i].outward)), wire.Wire(), Standard_True);
+        if (!face.IsDone()) {
+          why = std::string(kFailed) + "the cut face of edge " + std::to_string(planes[c][i].edge) + " at " + where(corners[c].at) + " could not be made";
+          return nullptr;
+        }
+        cut_faces[c].push_back(face.Face());
       }
-      tangent.Normalize();
-      planes[c].push_back({at, at_start ? tangent : tangent.Reversed(), edge});
     }
     const double half = 3.0 * (reach[c] + widest);
     TopoDS_Shape region = BRepPrimAPI_MakeBox(gp_Pnt(corners[c].at.X() - half, corners[c].at.Y() - half, corners[c].at.Z() - half), 2 * half, 2 * half, 2 * half).Shape();
@@ -1178,13 +1225,14 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const double volume_rounded = volume_of(current.shape);
   // The ball must hold OCCT's own corner at each vertex (the farthest point of the faces generated at the vertex), and meet no face that does not belong to the vertex.
   const TopTools_IndexedMapOfShape rounded_faces = query::distinct(current.shape, TopAbs_FACE);
-  std::vector<TopTools_IndexedMapOfShape> belongings(corners.size());
+  std::vector<TopTools_IndexedMapOfShape> belongings(corners.size()), seeds_of(corners.size());
   for (size_t c = 0; c < corners.size(); ++c) {
     TopTools_IndexedMapOfShape belonging;
     const auto add_all = [&](const TopTools_ListOfShape &list) {
       for (TopTools_ListIteratorOfListOfShape it(list); it.More(); it.Next()) belonging.Add(it.Value());
     };
     add_all(maker.Generated(corner_vertices[c]));
+    for (TopTools_ListIteratorOfListOfShape it(maker.Generated(corner_vertices[c])); it.More(); it.Next()) seeds_of[c].Add(it.Value());
     double minimum = 0;
     for (TopTools_ListIteratorOfListOfShape it(maker.Generated(corner_vertices[c])); it.More(); it.Next())
       for (TopExp_Explorer edges(it.Value(), TopAbs_EDGE); edges.More(); edges.Next()) {
@@ -1239,7 +1287,11 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   BRepAlgoAPI_Splitter splitter;
   TopTools_ListOfShape arguments, balls;
   arguments.Append(current.shape);
-  for (size_t c = 0; c < corners.size(); ++c) balls.Append(by_planes[c] ? regions[c] : BRepPrimAPI_MakeSphere(corners[c].at, reach[c]).Shape());
+  for (size_t c = 0; c < corners.size(); ++c) {
+    if (!by_planes[c]) balls.Append(BRepPrimAPI_MakeSphere(corners[c].at, reach[c]).Shape());
+    else
+      for (const TopoDS_Face &face : cut_faces[c]) balls.Append(face);
+  }
   splitter.SetArguments(arguments);
   splitter.SetTools(balls);
   splitter.Build();
@@ -1316,8 +1368,35 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     FillJob &job = jobs[c];
     job.corner = c;
     TopTools_IndexedMapOfShape removed;
-    for (int f = 1; f <= split_faces.Extent(); ++f)
-      if (!is_tool_face(c, TopoDS::Face(split_faces(f))) && piece_inside_cut(c, TopoDS::Face(split_faces(f)))) removed.Add(split_faces(f));
+    if (!by_planes[c]) {
+      for (int f = 1; f <= split_faces.Extent(); ++f)
+        if (!is_tool_face(c, TopoDS::Face(split_faces(f))) && piece_inside_cut(c, TopoDS::Face(split_faces(f)))) removed.Add(split_faces(f));
+    } else {
+      // The region of the planes is found from the vertex: the pieces of the faces generated at it that lie on its side of all the planes, then every piece reached across a shared edge that does too
+      // (never across a piece of the planes themselves). A feature elsewhere that the planes happen to enclose is not connected to it.
+      std::vector<TopoDS_Shape> queue;
+      for (int f = 1; f <= split_faces.Extent(); ++f) {
+        const TopoDS_Shape &parent = piece_parent[static_cast<size_t>(f)];
+        if (!parent.IsNull() && seeds_of[c].Contains(parent) && !is_tool_face(c, TopoDS::Face(split_faces(f))) && piece_inside_cut(c, TopoDS::Face(split_faces(f)))) {
+          removed.Add(split_faces(f));
+          queue.push_back(split_faces(f));
+        }
+      }
+      if (queue.empty()) {
+        why = std::string(kUnsupported) + "the cut planes do not isolate the vertex " + where(corners[c].at) + ": none of the faces generated at it lies on the vertex side of all of them";
+        return nullptr;
+      }
+      while (!queue.empty()) {
+        const TopoDS_Shape face = queue.back();
+        queue.pop_back();
+        for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next())
+          for (TopTools_ListIteratorOfListOfShape owner(split_edge_faces.FindFromKey(it.Current())); owner.More(); owner.Next()) {
+            if (removed.Contains(owner.Value()) || is_tool_face(c, TopoDS::Face(owner.Value())) || !piece_inside_cut(c, TopoDS::Face(owner.Value()))) continue;
+            removed.Add(owner.Value());
+            queue.push_back(owner.Value());
+          }
+      }
+    }
     if (by_planes[c])
       for (int f = 1; f <= removed.Extent(); ++f) {
         const TopoDS_Shape &parent = piece_parent[static_cast<size_t>(split_faces.FindIndex(removed(f)))];

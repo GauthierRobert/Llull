@@ -1462,7 +1462,7 @@ fn cylinder_spans(shape: &Shape) -> Vec<f64> {
 }
 
 /// BLD §13.22.6: different setbacks at one vertex on the trim path. The cube (r 1, 8 corners at 2) with the setbacks 1.5 / 2 / 2.5 along the three edges of the origin: planes normal to each edge at
-/// its own setback point cut the rolling-ball blend (so the setback is a distance ALONG the edge, as on the analytic path: the blend cylinders span 10 - 2 - s = 6.5 / 6 / 5.5), the star closes the
+/// its own setback point cut the rolling-ball blend (so the setback is a distance ALONG the edge, as on the analytic path: the blend cylinders span 10 - sqrt(3) - s = 6.768 / 6.268 / 5.768), the star closes the
 /// hole. Valid, tangent, the default g0; the volume differs from the equal-setback cube by 0.023 % (976.513 against 976.292).
 #[test]
 fn a_vertex_with_different_setbacks_is_cut_by_planes_normal_to_its_edges_and_gets_the_star() {
@@ -1529,4 +1529,50 @@ fn the_planes_of_different_setbacks_are_refused_by_name_when_they_do_not_isolate
     let text = build([2.0, 2.2, 2.4]);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("the cut planes do not isolate the vertex"), "{text}");
     assert_eq!(build([1.1, 1.2, 1.3]), "", "clear of the pocket");
+}
+
+/// BLD §13.22.6 review: the region of the planes is found from the vertex, not by the planes alone. A cube with a rib behind its top corner (a wall at x in [-5, -3], joined to the cube low down by a
+/// bar): the wall is inside the half-spaces of the planes at the corner (0, 0, 10) with the setbacks 1.5 / 2 / 2.5 but not connected to it there; the step builds.
+#[test]
+fn a_feature_behind_the_vertex_that_the_planes_enclose_but_does_not_touch_is_not_in_the_way() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let cube_block = cube(10.0);
+    let wall = make_box([-5.0, 0.0, 0.0], [2.0, 10.0, 10.0]).unwrap().unwrap();
+    let bar = make_box([-5.0, 0.0, 0.0], [5.0, 10.0, 2.0]).unwrap().unwrap();
+    let with_wall = boolean(BooleanOp::Union, &cube_block, &bar, true).unwrap().unwrap();
+    let part = boolean(BooleanOp::Union, &with_wall, &wall, true).unwrap().unwrap();
+    let vertex = [0.0, 0.0, 10.0];
+    let meeting = edges_at(&part, vertex);
+    assert_eq!(meeting.len(), 3, "the top corner of the cube");
+    let (edges, mut corners) = spec(&part, &meeting, 0.5, &[vertex], 2.0);
+    for (k, distance) in [1.5, 2.0, 2.5].iter().enumerate() {
+        corners[5 + 2 * k] = *distance;
+    }
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&part, &edges, &corners).unwrap().unwrap_or_else(|| panic!("{:?}", setback_reason(&part, &edges, &corners)));
+    assert!(analyze(&built).unwrap().valid);
+    assert!(worst_tangent_angle(&built) < 0.0095);
+}
+
+/// BLD §13.22.6 review: a concave vertex (the inner corner of the notch of `notched_cube`) with different setbacks: the planes bound the region on the material side; builds, adds material.
+#[test]
+fn a_concave_vertex_with_different_setbacks_is_cut_by_planes_too() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = notched_cube();
+    let inner = [5.0; 3];
+    let meeting = edges_at(&shape, inner);
+    let (edges, mut corners) = spec(&shape, &meeting, 0.5, &[inner], 1.5);
+    for (k, distance) in [1.2, 1.5, 1.8].iter().enumerate() {
+        corners[5 + 2 * k] = *distance;
+    }
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built =
+        fillet_setback(&shape, &edges, &corners).unwrap().unwrap_or_else(|| panic!("{:?}", setback_reason(&shape, &edges, &corners)));
+    assert!(analyze(&built).unwrap().valid);
+    assert!(mass_properties(&built).unwrap().volume > mass_properties(&shape).unwrap().volume, "the concave blends add material");
+    assert!(worst_tangent_angle(&built) < 0.0095);
 }

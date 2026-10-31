@@ -128,7 +128,13 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(checked.status).not.toBe('fail');
     const rolling = volume(plain.document, plain.affected[0] as string);
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
-    // on this cylinder the star of 1.2 / 1.6 leaves its supports by 0.00965 rad in the sewn solid (the limit is 0.0095) and the plate misses the blend ends: refused, with both reasons
+    // the setback is a distance ALONG the edge: the blend of the straight top edge (length sqrt(44) = 6.633) ends 1.3 from the vertex, so its cylinder spans 6.633 - 1.3 (a ball would cut it at
+    // sqrt(1.3^2 - 0.5^2) = 1.2, or at the largest setback)
+    const spans = faces(done.document, result)
+      .filter((face) => face.surface === 'cylinder')
+      .map((face) => (face.axis?.span?.[1] ?? 0) - (face.axis?.span?.[0] ?? 0));
+    expect(spans.some((span) => Math.abs(span - (Math.sqrt(44) - 1.3)) < 1e-4)).toBe(true);
+    // 1.4 to 1.6 on the third edge of this cylinder: the star leaves its supports by 0.00965 rad in the sewn solid (the limit is 0.0095) and the plate misses the blend ends: refused, with both reasons
     const refused = withSetback(1.6);
     expect(refused.error?.code).toBe('BLD_CORNER_FAILED');
     expect(refused.summary).toContain('the exact-boundary patch was refused');
