@@ -26,6 +26,8 @@ export interface XlsxSheet {
   readonly rows: readonly (readonly XlsxCell[])[];
   /** Adds `<sheetProtection sheet="1"/>` (no password). */
   readonly protect?: boolean;
+  /** The sheet is hidden in the workbook (state="hidden"), e.g. metadata the reader of a round trip needs. */
+  readonly hidden?: boolean;
 }
 
 const XLSX_MAX_ROWS = 1_048_576;
@@ -125,7 +127,12 @@ function packageEntries(sheets: readonly XlsxSheet[]): { name: string; text: str
       name: 'xl/workbook.xml',
       text:
         `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_REL}"><sheets>` +
-        sheets.map((sheet, index) => `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join('') +
+        sheets
+          .map(
+            (sheet, index) =>
+              `<sheet name="${escapeXml(sheet.name)}"${sheet.hidden === true ? ' state="hidden"' : ''} sheetId="${index + 1}" r:id="rId${index + 1}"/>`,
+          )
+          .join('') +
         '</sheets></workbook>',
     },
     {

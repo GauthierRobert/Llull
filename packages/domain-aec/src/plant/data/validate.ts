@@ -8,7 +8,7 @@ import { isRecord } from '@lib/isRecord';
 import { resolveClass } from './classes';
 import { ifcMappingProblem } from './ifcMapping';
 import { kindRank } from './hierarchy';
-import { HIERARCHY_KINDS, type PlantDataModel } from './model';
+import { DEFINITION_KINDS, HIERARCHY_KINDS, type PlantDataModel } from './model';
 import { definitionProblem } from './properties';
 import { parseTagFormat } from './tagFormat';
 import { objectErrors, isScalar, orderErrors } from './validateObjects';
@@ -123,13 +123,54 @@ function classErrors(raw: Record<string, unknown>): string[] {
   return [...errors, ...orderErrors(raw['classOrder'], classes, 'plant.data.classOrder')];
 }
 
+const isTextList = (value: unknown): boolean => Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+/** Saved report definitions (optional): the shape plant_report relies on. */
+function reportErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw)) return ['plant.data.reports must be an object'];
+  const errors: string[] = [];
+  for (const [key, definition] of Object.entries(raw)) {
+    const path = `plant.data.reports.${key}`;
+    if (!isRecord(definition)) {
+      errors.push(`${path} must be an object`);
+      continue;
+    }
+    if (definition['id'] !== key) errors.push(`${path}.id must equal its key`);
+    if (!(DEFINITION_KINDS as readonly string[]).includes(String(definition['kind'])))
+      errors.push(`${path}.kind must be one of ${DEFINITION_KINDS.join(', ')}`);
+    for (const field of ['columns', 'sort', 'groupBy'])
+      if (definition[field] !== undefined && !isTextList(definition[field])) errors.push(`${path}.${field} must be an array of names`);
+    if (definition['hierarchy'] !== undefined && typeof definition['hierarchy'] !== 'string')
+      errors.push(`${path}.hierarchy must be a string`);
+    if (definition['filter'] !== undefined && (!isRecord(definition['filter']) || !Object.values(definition['filter']).every(isScalar)))
+      errors.push(`${path}.filter must map column names to text, numbers, booleans or null`);
+    const computed = definition['computed'];
+    if (computed !== undefined)
+      if (
+        !Array.isArray(computed) ||
+        !computed.every(
+          (entry) =>
+            isRecord(entry) &&
+            typeof entry['name'] === 'string' &&
+            typeof entry['displayName'] === 'string' &&
+            typeof entry['expression'] === 'string' &&
+            (entry['unit'] === null || typeof entry['unit'] === 'string'),
+        )
+      )
+        errors.push(`${path}.computed must be an array of { name, displayName, expression, unit }`);
+  }
+  return errors;
+}
+
 /** Problems of a raw `plant.data` (empty = valid or absent). */
 export function plantDataErrors(raw: unknown): string[] {
   if (raw === undefined) return [];
   if (!isRecord(raw)) return ['plant.data must be an object'];
   if (raw['version'] !== 1) return ['plant.data.version must be 1'];
   const structural = [...settingsErrors(raw['settings']), ...hierarchyErrors(raw), ...classErrors(raw)];
-  if (structural.length > 0) return structural;
+  const reports = reportErrors(raw['reports']);
+  if (structural.length > 0 || reports.length > 0) return [...structural, ...reports];
   const data = raw as unknown as PlantDataModel;
   const resolution = data.classOrder.flatMap((name) => {
     const resolved = resolveClass(data, name);

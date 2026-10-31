@@ -18,7 +18,7 @@ export interface ReportQuery {
 const UNAVAILABLE: Readonly<Record<string, string>> = {
   valve_list: 'valve_list reads valve objects from the component providers of 01 PSC / 02 RTE, which are not installed yet (DAT-M5)',
   instrument_index: 'instrument_index reads instrument objects from the 04 PID provider, which is not installed yet (DAT-M5)',
-  custom: 'custom reports need saved report definitions (save_report_definition, DAT-M4)',
+  custom: 'kind custom needs definition: the id of a report saved with save_report_definition',
 };
 
 export function buildReport(doc: CadDocument, query: ReportQuery): ReportOutcome {

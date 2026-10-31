@@ -174,7 +174,7 @@ describe('plant_report on SC-DAT-01 (VC-DAT-03, 04, 05)', () => {
 describe('plant_report refusals (document unchanged)', () => {
   it.each(['valve_list', 'instrument_index', 'custom'])('%s needs a sibling gap: DAT_REPORT_KIND_UNAVAILABLE', (kind) => {
     const refused = expectRefusal(sc01, 'plant_report', { kind }, 'DAT_REPORT_KIND_UNAVAILABLE', 'kind');
-    expect(refused.summary).toMatch(/DAT-M[45]/);
+    expect(refused.summary).toMatch(/DAT-M5|save_report_definition/);
   });
 
   it('refuses an unknown or ambiguous hierarchy node, a groupBy outside mto, and bad parameters', () => {

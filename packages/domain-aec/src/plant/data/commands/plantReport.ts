@@ -4,7 +4,9 @@ import type { CommandResult } from '@core/commands/types';
 import { xlsxSheetName } from '@lib/xlsxWrite';
 import { buildReport } from '../plantReports/build';
 import { csvFile, xlsxFile, xlsxSheetOf, type DataFile } from '../plantReports/files';
-import { MTO_DIMENSIONS } from '../plantReports/mto';
+import { applyDefinition } from '../plantReports/definition';
+import { MTO_DIMENSIONS, type MtoDimension } from '../plantReports/mto';
+import { getPlantData } from '../model';
 import { REPORT_KINDS, type ReportRow } from '../plantReports/types';
 import { refuse } from './params';
 
@@ -24,8 +26,9 @@ export const plantReport = defineCommand({
     'description, design conditions, size in m, OperatingWeightKg, hierarchy); nozzle_schedule (nozzles INFERRED where a line end lies inside the equipment its from / to ' +
     'names: N1, N2 per equipment in line creation order, DN of the line, SOURCE for the from end and SINK for the to end, inferred true); mto (material take-off: pipe in m ' +
     'and bends in ea from the centreline, grouped by groupBy, default spec, itemType, nominalSize; no take-outs are deducted, method is "centreline" and each row names its ' +
-    'source lines); tag_register (every tag in scope with class, target kind, status modelled / reserved / orphan). valve_list, instrument_index and custom need sibling ' +
-    'gaps and are refused with DAT_REPORT_KIND_UNAVAILABLE. hierarchy: only objects at that node or below (code, path S1/P1/U10 or id). format json (default): data only; ' +
+    'source lines); tag_register (every tag in scope with class, target kind, status modelled / reserved / orphan). valve_list and instrument_index need sibling ' +
+    'gaps and are refused with DAT_REPORT_KIND_UNAVAILABLE. definition: the id of a template saved with save_report_definition (kind may then be omitted): it keeps the ' +
+    'chosen columns, adds computed columns, filters and sorts. hierarchy: only objects at that node or below (code, path S1/P1/U10 or id). format json (default): data only; ' +
     'csv or xlsx: also data.files = [{ fileName, content | base64 }] with ALL rows (save with --save), header "Name (unit)". Rows are sorted by tag in natural order. ' +
     'offset / limit page data.rows (limit at most 20000, default 2000); total counts all rows; totals sum the whole report. rowsByTag indexes the returned rows by their ' +
     'key (tag, or equipment/nozzle for nozzle_schedule) when keys are unique. Values flagged unverified are never hidden: the unverified column is true. ' +
@@ -35,8 +38,15 @@ export const plantReport = defineCommand({
     confirmExportControlled,
     kind: z
       .enum(REPORT_KINDS)
+      .optional()
       .describe(
-        'Report kind: line_list, equipment_list, nozzle_schedule, mto, tag_register (built); valve_list, instrument_index, custom (refused for now).',
+        'Report kind: line_list, equipment_list, nozzle_schedule, mto, tag_register (built); valve_list, instrument_index (refused for now); custom needs definition. Omit it when definition is given.',
+      ),
+    definition: z
+      .string()
+      .optional()
+      .describe(
+        'Id of a report saved with save_report_definition: its kind, hierarchy, groupBy, columns, computed columns, filter and sort apply (hierarchy / groupBy given here win).',
       ),
     hierarchy: z
       .string()
@@ -58,13 +68,35 @@ export const plantReport = defineCommand({
       const gated = exportRefusal(doc, 'plant_report', 'data', params.confirmExportControlled, ctx);
       if (gated !== null) return gated;
     }
-    const built = buildReport(doc, { kind: params.kind, hierarchy: params.hierarchy, groupBy: params.groupBy });
+    const definition = params.definition === undefined ? undefined : getPlantData(doc).reports?.[params.definition];
+    if (params.definition !== undefined && definition === undefined)
+      return refuse(doc, 'plant_report', {
+        code: 'DAT_PARAM_INVALID',
+        message: `no report definition "${params.definition}" (save_report_definition)`,
+        paths: ['definition'],
+      });
+    if (definition !== undefined && params.kind !== undefined && params.kind !== 'custom' && params.kind !== definition.kind)
+      return refuse(doc, 'plant_report', {
+        code: 'DAT_PARAM_INVALID',
+        message: `definition ${definition.id} is a ${definition.kind} report, not ${params.kind}`,
+        paths: ['kind'],
+      });
+    const kind = definition?.kind ?? params.kind;
+    if (kind === undefined)
+      return refuse(doc, 'plant_report', { code: 'DAT_PARAM_INVALID', message: 'send kind or definition', paths: ['kind'] });
+    const built = buildReport(doc, {
+      kind,
+      hierarchy: params.hierarchy ?? definition?.hierarchy,
+      groupBy: params.groupBy ?? (definition?.groupBy as MtoDimension[] | undefined),
+    });
     if (!built.ok) return refuse(doc, 'plant_report', { code: built.code, message: built.message, paths: [built.path] });
-    const { table } = built;
+    const shaped = definition === undefined ? built : applyDefinition(built.table, definition);
+    if (!shaped.ok) return refuse(doc, 'plant_report', { code: shaped.code, message: shaped.message, paths: [shaped.path] });
+    const { table } = shaped;
     const offset = params.offset ?? 0;
     const limit = params.limit ?? DEFAULT_LIMIT;
     const rows = table.rows.slice(offset, offset + limit);
-    const fileStem = params.kind.replace(/_/g, '-');
+    const fileStem = (definition?.id ?? kind).replace(/_/g, '-');
     const format = params.format ?? 'json';
     const files: DataFile[] =
       format === 'csv'
@@ -79,7 +111,7 @@ export const plantReport = defineCommand({
         : undefined;
     return report(
       doc,
-      `plant_report ${params.kind}: ${table.rows.length} row(s)${params.hierarchy === undefined ? '' : ` under ${params.hierarchy}`}` +
+      `plant_report ${definition?.id ?? kind}: ${table.rows.length} row(s)${params.hierarchy === undefined ? '' : ` under ${params.hierarchy}`}` +
         (Object.keys(table.totals).length === 0
           ? ''
           : ` (${Object.entries(table.totals)
@@ -87,7 +119,8 @@ export const plantReport = defineCommand({
               .join(', ')})`) +
         (files[0] === undefined ? '.' : `; file ${files[0].fileName}.`),
       {
-        kind: params.kind,
+        kind,
+        ...(definition === undefined ? {} : { definition: definition.id }),
         columns: table.columns,
         rows,
         total: table.rows.length,

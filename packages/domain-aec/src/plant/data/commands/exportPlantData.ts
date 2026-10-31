@@ -5,6 +5,8 @@ import { xlsxSheetName } from '@lib/xlsxWrite';
 import { csvFile, xlsxFile, xlsxSheetOf, type DataFile } from '../plantReports/files';
 import { columnOf, type ReportColumn, type ReportRow } from '../plantReports/types';
 import { buildDataTable, type TableColumn } from '../table';
+import { META_SHEET, plantDataHash } from '../importTable/meta';
+import { getPlantData } from '../model';
 import { refuse } from './params';
 
 const KEY_COLUMN = 'id';
@@ -90,14 +92,23 @@ export const exportPlantData = defineCommand({
       format === 'csv'
         ? tables.map((table) => csvFile(`${xlsxSheetName(table.name, []).replace(/\s+/g, '_')}.csv`, table))
         : [
-            xlsxFile(
-              'plant-data.xlsx',
-              tables.map((table) => {
+            xlsxFile('plant-data.xlsx', [
+              ...tables.map((table) => {
                 const name = xlsxSheetName(table.name, names);
                 names.push(name);
                 return xlsxSheetOf(name, table, true, (column) => !column.readOnly);
               }),
-            ),
+              {
+                name: META_SHEET,
+                columns: [{ header: 'key' }, { header: 'value' }],
+                rows: [
+                  ['plantDataHash', plantDataHash(getPlantData(doc))],
+                  ['generator', 'llull export_plant_data'],
+                ],
+                protect: true,
+                hidden: true,
+              },
+            ]),
           ];
     const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
     return report(

@@ -1,5 +1,5 @@
 /**
- * Plant 08 DAT M1 + M2 + M3: runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
+ * Plant 08 DAT M1 - M4 (SC-DAT-04 Excel round trip and SC-DAT-05 ifc_summary of the buildingSMART samples run since M4): runs the scenario plans of the validation pack (`validation/plans/*.json`) step by step through `execute` (the path of `llull run plan.json`;
  * `as` binds the first affected id, `$alias` is replaced in params and expected values) and compares each `expected` row with the step's `data` / `error`.
  * Steps flagged `unbuilt` (valve_list: M5; the sibling commands of SC-DAT-02) or whose command is not registered are skipped, and so are their rows. DAT-M2 added the plant_report steps 15-19 of SC-DAT-01, DAT-M3 the export_ifc `schema` step 21.
  * SC-DAT-03 uses onError "continue": a refused step is an outcome, not a failure (VC-DAT-12).
@@ -47,19 +47,37 @@ const bind = (value: unknown, aliases: Map<string, string>): unknown => {
   return value;
 };
 
-type Outcome = Record<string, unknown> & { error: { code: string } | undefined; rejected: boolean };
+/** A plan step cannot read a file: `fileRef` (xlsx / csv) and `ifcRef` name one relative to the pack, the test sends its content. */
+function withFiles(params: unknown): unknown {
+  if (params === null || typeof params !== 'object') return params;
+  const { fileRef, ifcRef, ...rest } = params as Record<string, unknown>;
+  if (typeof fileRef === 'string') return { ...rest, fileBase64: readFileSync(path.join(PACK, fileRef)).toString('base64') };
+  if (typeof ifcRef === 'string') return { ...rest, ifc: readFileSync(path.join(PACK, ifcRef), 'utf8') };
+  return params;
+}
+
+type Outcome = Record<string, unknown> & { error: { code: string } | undefined; refused: boolean };
 
 function runPlan(name: string): { plan: Plan; outcomes: Array<Outcome | null>; aliases: Map<string, string>; final: CadDocument } {
   const plan = JSON.parse(readFileSync(path.join(PACK, 'plans', name), 'utf8')) as Plan;
   let doc: CadDocument = createEmptyDocument();
   const aliases = new Map<string, string>();
-  const outcomes = plan.actions.map((action) => {
+  const step = (action: Plan['actions'][number]): Outcome | null => {
     if (getCommand(action.command) === undefined || action.unbuilt === true) return null;
-    const result = execute(doc, action.command, bind(action.params, aliases));
+    const planRef = action.command === 'build_project' ? action.params['planRef'] : undefined;
+    if (typeof planRef === 'string') {
+      // `build_project { planRef, steps: "a-b" }` is the shorthand of the CLI: replay those steps of the referenced plan
+      const [from = 0, to = 0] = String(action.params['steps']).split('-').map(Number);
+      const referenced = JSON.parse(readFileSync(path.join(PACK, 'plans', planRef), 'utf8')) as Plan;
+      for (const inner of referenced.actions.slice(from, to + 1)) step(inner);
+      return null;
+    }
+    const result = execute(doc, action.command, withFiles(bind(action.params, aliases)));
     doc = result.document;
     if (action.as !== undefined && result.affected[0] !== undefined) aliases.set(action.as, result.affected[0]);
-    return { ...(result.data as Record<string, unknown> | undefined), error: result.error, rejected: result.rejected === true };
-  });
+    return { ...(result.data as Record<string, unknown> | undefined), error: result.error, refused: result.rejected === true };
+  };
+  const outcomes = plan.actions.map(step);
   return { plan, outcomes, aliases, final: doc };
 }
 
@@ -73,13 +91,17 @@ function compare(actual: unknown, row: Expected, aliases: Map<string, string>): 
 describe.each([
   ['sc-dat-01-tank-pump-mvp.json', 'SC-DAT-01'],
   ['sc-dat-03-data-errors.json', 'SC-DAT-03'],
+  ['sc-dat-04-excel-roundtrip.json', 'SC-DAT-04'],
+  ['sc-dat-05-ifc-summary-bsi.json', 'SC-DAT-05'],
 ])('scenario plan %s', (file, id) => {
   const { plan, outcomes, aliases, final } = runPlan(file);
 
   it('meets the expected rows of every built step', () => {
     expect(plan.id).toBe(id);
-    const built = plan.expected.filter((row) => outcomes[row.step] != null);
-    if (id === 'SC-DAT-01') expect(built, 'every expected row of SC-DAT-01 runs since DAT-M3').toHaveLength(plan.expected.length);
+    // `cellsEqualTo` compares the export with the openpyxl fixture cell for cell: exportData.test.ts does it with the xlsx reader of the tests
+    const runnable = plan.expected.filter((row) => !row.path.endsWith('cellsEqualTo'));
+    const built = runnable.filter((row) => outcomes[row.step] != null);
+    if (id !== 'SC-DAT-03') expect(built, `every expected row of ${id} runs`).toHaveLength(runnable.length);
     else expect(built.length).toBeGreaterThanOrEqual(7);
     for (const row of built) compare(pick(outcomes[row.step], row.path), row, aliases);
   });
@@ -99,7 +121,7 @@ describe('SC-DAT-01 (VC-DAT-01, 11, 12)', () => {
     const { outcomes, final } = runPlan('sc-dat-01-tank-pump-mvp.json');
     const tags = Object.values(final.plant?.data?.objects ?? {}).map((object) => object.tag);
     expect(tags).toEqual(['T-101', 'P-101', '150-P-1001-A1A', '100-P-1002-A1A']);
-    expect(outcomes.filter((outcome) => outcome?.rejected === true)).toEqual([]);
+    expect(outcomes.filter((outcome) => outcome?.refused === true)).toEqual([]);
     const marks = Object.values(final.building?.elements ?? {}).flatMap((element) =>
       element.category === 'equipment' ? [element.mark] : [],
     );

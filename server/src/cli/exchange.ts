@@ -58,6 +58,10 @@ const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   register_material_library: { key: 'libraryJson', encoding: 'utf8' },
   import_pcf: { key: 'text', encoding: 'utf8' },
   import_dexpi: { key: 'text', encoding: 'utf8' },
+  import_plant_data: { key: 'fileBase64', encoding: 'base64' },
+  import_tag_list: { key: 'fileBase64', encoding: 'base64' },
+  ifc_summary: { key: 'ifc', encoding: 'utf8' },
+  check_ifc_requirements: { key: 'ids', encoding: 'utf8' },
 };
 
 /** The value `file=<path>` becomes: its content, or (mesh files) the key of the copy kept in this machine's mesh asset store. */

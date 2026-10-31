@@ -31,7 +31,8 @@ describe('export_plant_data', () => {
     expect(result.sheets['Equipment']?.rows).toBe(2);
     const mine = readXlsx(bytesOf(result.files[0]));
     const theirs = readXlsx(fixture('equipment-list-sc-dat-01.xlsx'));
-    expect(mine.sheets.map((sheet) => sheet.name)).toEqual(theirs.sheets.map((sheet) => sheet.name));
+    // the hidden _meta sheet (plant data hash, DAT-M4) is the only addition
+    expect(mine.sheets.map((sheet) => sheet.name)).toEqual([...theirs.sheets.map((sheet) => sheet.name), '_meta']);
     const strip = (row: Record<string, Cell>): Record<string, Cell> =>
       Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'ObjectId'));
     const ours = records(mine.sheets[0]?.rows ?? []).map(strip);
@@ -68,7 +69,7 @@ describe('export_plant_data', () => {
     expect(Object.keys(result.sheets)).toEqual(['Tank', 'ProcessLine']);
     expect(result.sheets['Tank']?.rows).toBe(1);
     expect(result.sheets['ProcessLine']?.rows).toBe(2);
-    expect(readXlsx(bytesOf(result.files[0])).sheets.map((sheet) => sheet.name)).toEqual(['Tank', 'ProcessLine']);
+    expect(readXlsx(bytesOf(result.files[0])).sheets.map((sheet) => sheet.name)).toEqual(['Tank', 'ProcessLine', '_meta']);
     expect(data<Exported>(outside, 'export_plant_data', { classes: ['Tank'], hierarchy: 'U20' }).sheets['Tank']?.rows).toBe(0);
   });
 

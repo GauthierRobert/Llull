@@ -59,8 +59,28 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_VALUE_UNVERIFIED: 'Verify the value against its source and send it again with set_plant_properties without the unverified flag.',
   DAT_RESERVED_TAG_UNMODELLED: 'Nothing to fix: the tag is held for a future object; assign it to a model object when it exists.',
   DAT_COLUMN_UNKNOWN: 'plant_data_table (without columns) returns the column names of the class.',
+  DAT_IMPORT_FORMAT:
+    'Send an .xlsx written by export_plant_data (or a .csv) within the limits, with the headers in row 1 and each header used once; name the sheet with sheet.',
+  DAT_IMPORT_KEY_MISSING: 'Keep the ObjectId (or Tag) column of the export, and give every row its key.',
+  DAT_IMPORT_UNKNOWN_OBJECT:
+    'Take the key from a fresh export_plant_data (ObjectId) or plant_data_table; new objects are made with assign_plant_object, not by import.',
+  DAT_IMPORT_UNKNOWN_COLUMN:
+    'Use the column headers of export_plant_data ("DisplayName (unit)"); an unknown column is ignored, a property the class lacks is not set.',
+  DAT_IMPORT_READONLY_COLUMN:
+    'Restore the cell: Tag, Class, Hierarchy and read-only properties are derived. Change the tag through its format fields (set_plant_properties, set_tag_format).',
+  DAT_IMPORT_TYPE:
+    'Enter a value of the property type (a number for pressures, one of the enum values, text matching the pattern) or clear the cell.',
+  DAT_IMPORT_FORMULA: 'Replace the formula by its value (copy, paste values) and save the file again: formulas are never evaluated.',
+  DAT_IMPORT_DUPLICATE_ROW: 'List each object once in the sheet.',
+  DAT_IMPORT_STALE: 'Export the sheet again if the plant objects changed after it was exported, or check the preview before apply.',
+  DAT_RENUMBER_RANGE: 'Widen the sequence field of the tag format (set_tag_format) or start lower / use a smaller step.',
+  DAT_IFC_PARSE:
+    'Send the text of an ISO 10303-21 IFC file (IFC2X3, IFC4 or IFC4X3_ADD2): the header must name FILE_SCHEMA and the DATA section must be well formed.',
+  DAT_IDS_PARSE: 'Send an IDS 1.0 document (XML with <ids> and <specifications>).',
+  DAT_IDS_UNSUPPORTED_FACET:
+    'This checker supports the entity, attribute, property, classification and partOf facets with simple values, patterns, enumerations and bounds.',
   DAT_REPORT_KIND_UNAVAILABLE:
-    'Use line_list, equipment_list, nozzle_schedule, mto or tag_register; valve_list and instrument_index arrive with the component and P&ID providers, custom with report definitions.',
+    'Use line_list, equipment_list, nozzle_schedule, mto or tag_register; valve_list and instrument_index arrive with the component and P&ID providers; kind custom needs a definition (save_report_definition).',
 };
 
 export const refuseDat = tableRejection(REMEDIATION);

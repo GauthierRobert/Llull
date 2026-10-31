@@ -120,6 +120,33 @@ export interface PlantDataSettings {
   readonly defaultTagScope: TagScope;
 }
 
+/** Report kinds a definition can be saved for (the built ones of plant_report). */
+export const DEFINITION_KINDS = ['line_list', 'equipment_list', 'nozzle_schedule', 'mto', 'tag_register'] as const;
+export type DefinitionKind = (typeof DEFINITION_KINDS)[number];
+
+/** A column computed from the numeric columns of a row with the parameter expression evaluator (). */
+export interface ComputedColumn {
+  readonly name: string;
+  readonly displayName: string;
+  readonly expression: string;
+  readonly unit: string | null;
+}
+
+/** A saved report template (plant 08 DAT §3 ): the kind and the choices plant_report applies to it. */
+export interface ReportDefinition {
+  readonly id: string;
+  readonly kind: DefinitionKind;
+  readonly hierarchy?: string;
+  readonly groupBy?: readonly string[];
+  /** Column names to keep, in this order (computed columns included); absent = all. */
+  readonly columns?: readonly string[];
+  readonly computed?: readonly ComputedColumn[];
+  /** Column name -> required value. */
+  readonly filter?: Readonly<Record<string, PlantValue>>;
+  /** Column names, a leading - sorts descending. */
+  readonly sort?: readonly string[];
+}
+
 export interface PlantDataModel {
   readonly version: 1;
   readonly hierarchy: Readonly<Record<string, HierarchyNode>>;
@@ -129,6 +156,8 @@ export interface PlantDataModel {
   readonly objects: Readonly<Record<string, PlantObject>>;
   readonly objectOrder: readonly string[];
   readonly settings: PlantDataSettings;
+  /** Saved report definitions by id (M4); absent until the first save_report_definition. */
+  readonly reports?: Readonly<Record<string, ReportDefinition>>;
 }
 
 export const DEFAULT_BATTERY_LIMIT_PATTERN = '^(BL|TI)-';
