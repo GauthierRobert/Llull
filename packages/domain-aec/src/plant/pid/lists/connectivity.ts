@@ -79,6 +79,12 @@ export function connectivity(pid: PidModel, sheetId?: string): { rows: Connectiv
       const key = `${item.lineId}|${item.passthrough?.['dexpi:segment'] ?? item.id}`;
       groups.set(key, [...(groups.get(key) ?? []), item]);
     }
+  // Pieces of a drawn segment are folded in flow order: the order of the line's segmentIds (inline insertion appends new pieces to itemOrder).
+  const rank = (segment: PidSegment): number => {
+    const line = pid.items[segment.lineId];
+    return line?.kind === 'line' ? line.segmentIds.indexOf(segment.id) : 0;
+  };
+  for (const group of groups.values()) group.sort((a, b) => rank(a) - rank(b));
   const row = (from: PidEndpoint, to: PidEndpoint, via: ConnectivityRow['via'], lineNumber: string): ConnectivityRow => ({
     from: endpointLabel(pid, from),
     fromType: endpointType(pid, from),

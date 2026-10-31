@@ -45,7 +45,7 @@ export const exportCode = defineCommand({
     const { language, name } = params;
     const refused = exportRefusal(doc, 'export_code', 'code', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel);
+    const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel, language !== 'freecad');
     const text =
       language === 'openscad' ? emitOpenScad(program) : language === 'freecad' ? emitFreeCad(program) : emitPython(program, language);
     const base = safeFileName(name, 'model');

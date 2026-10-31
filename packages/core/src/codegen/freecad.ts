@@ -9,6 +9,7 @@ import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCa
 import { FREECAD_SWEPT_PY } from './pythonSwept';
 import { sweptComment } from './sweptCalls';
 import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
+import { FREECAD_CHAMFER_PY } from './pythonChamfer';
 
 const HELPERS = String.raw`
 import math
@@ -185,6 +186,7 @@ export function emitFreeCad(program: FeatureProgram): string {
     HELPERS,
     SUBDIVISION_PY,
     FREECAD_SUBDIVISION_PY,
+    FREECAD_CHAMFER_PY,
     FREECAD_SWEPT_PY,
     '',
     `doc = App.newDocument("llull")`,

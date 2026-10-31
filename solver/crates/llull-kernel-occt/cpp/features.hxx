@@ -53,7 +53,7 @@ rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> 
 // an edge meeting there, setback distance) pairs. Null when the build fails; setback_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
 std::unique_ptr<Shape> fillet_setback(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners);
 rust::String setback_reason(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners);
-// Face blends (cpp/blend_faces.cxx): face_blend spec = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape;
+// Face blends (cpp/blend_faces.cxx): face_blend spec = unique index of face A, of face B, radius, section kind (0 conic, 1 curvature, 2 circular), rho / shape, optional cliff (0 none, 1 cliff edge on face A, 2 on face B: circular only);
 // full_round spec = unique indices of side 1, center, side 2. Null when the build fails; *_reason says why ("" = builds, "[BLD_CODE] ..." names the code).
 std::unique_ptr<Shape> face_blend(const Shape &shape, rust::Slice<const double> spec);
 rust::String face_blend_reason(const Shape &shape, rust::Slice<const double> spec);

@@ -61,8 +61,20 @@ export interface FaceBlendRequest {
   /** The face sets in the order of the command's params; each key is the param name. */
   readonly sets: Readonly<Record<string, FaceSetInput>>;
   readonly build: (context: BlendContext) => BlendBuild;
-  /** The summary tail after "<command>: ", given the new id. */
-  readonly describe: (newId: string, triangles: number) => string;
+  /** The summary tail after "<command>: ", given the new id and the `note` of `outcome` ('' without one). */
+  readonly describe: (newId: string, triangles: number, note: string) => string;
+  /** Reads the built shape for extra `data` fields and a summary `note` (fillet_faces cliff: whether the cliff engaged). */
+  readonly outcome?: (
+    kernel: GeometryKernel,
+    shape: ShapeHandle,
+    after: ShapeTopology | null,
+    before: ShapeTopology | null,
+  ) => FaceBlendOutcome;
+}
+
+export interface FaceBlendOutcome {
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly note: string;
 }
 
 const nameOf = (topology: ShapeTopology | null, face: number): string => topology?.faces[face]?.name ?? `face ${face}`;
@@ -128,8 +140,11 @@ export function runFaceBlend(doc: CadDocument, ctx: ExecutionContext | undefined
   const result = evaluateRecipe(kernel, built.recipe);
   if (typeof result === 'string') return blendRefusal(doc, command, id, kernel, built.recipe, result, topology);
   const after = kernel.topology(result.shape);
-  const committed = commitKernelResult(doc, kernel, result, [entity], (newId, triangles) => request.describe(newId, triangles));
-  return withNames({ ...committed, data: faceBlendData(topology, after, committed.affected[0], doc.units) });
+  const outcome = request.outcome?.(kernel, result.shape, after, topology);
+  const committed = commitKernelResult(doc, kernel, result, [entity], (newId, triangles) =>
+    request.describe(newId, triangles, outcome?.note ?? ''),
+  );
+  return withNames({ ...committed, data: { ...faceBlendData(topology, after, committed.affected[0], doc.units), ...outcome?.data } });
 }
 
 /** The `data` of a face-blend result: the new entity id, its blend faces (by persistent name), the faces the blend consumed, the unit. */

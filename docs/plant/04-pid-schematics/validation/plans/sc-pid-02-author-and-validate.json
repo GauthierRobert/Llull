@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-02",
-  "status": "DRAFT \u2014 unbuilt commands: create_pid_sheet, add_pid_equipment, add_pid_line, add_pid_inline, add_pid_instrument, add_pid_signal_line, add_pid_actuating_system, add_pid_off_page_connector, check_pid, pid_report.",
+  "status": "BUILT (PID-M3 authoring, PID-M4 check_pid and pid_report kind=line_list): tests/unit/plant/pid/authoringScenario.test.ts and checkScenario.test.ts.",
   "validates": [
     "VC-PID-10",
     "VC-PID-13",
@@ -13,7 +13,7 @@
       "params": {
         "number": "PID-001",
         "title": "Feed pump",
-        "size": "A3",
+        "paper": "A3",
         "convention": "ISA-5.1"
       },
       "as": "sheet"
@@ -302,13 +302,13 @@
     },
     {
       "step": 11,
-      "path": "data.findings[0].code",
+      "path": "data.items[0].code",
       "value": "PID_OPC_UNRESOLVED",
       "source": "by construction"
     },
     {
       "step": 11,
-      "path": "data.findings[?code=='PID_NOZZLE_UNCONNECTED'][*].item",
+      "path": "data.items[?code=='PID_NOZZLE_UNCONNECTED'][*].item",
       "value": [
         "T-101/N2"
       ],

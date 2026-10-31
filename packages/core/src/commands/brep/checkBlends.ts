@@ -16,8 +16,9 @@ import { recordsByFace } from './blendChains';
 import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
 import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
-import { REMEDIATION, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
+import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
+import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
 import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes } from '../../geometry/blend/blendInfo';
 
@@ -255,6 +256,8 @@ function checkEntity(
         remediation: REMEDIATION.BLD_CHECK_RADIUS_LAW,
         message: `blend face ${face.index} has radius ${deviation.actual} ${unit} at t = ${deviation.t} where the law gives ${deviation.expected}`,
       });
+    const cliffEdge = cliffEdgeOf(kernel, shape, topology, graph, face.index, samples);
+    if (cliffEdge !== null) findings.push(cliffFinding(entityId, face.index, face.name, cliffEdge));
     blends.push({
       entityId,
       face: face.index,

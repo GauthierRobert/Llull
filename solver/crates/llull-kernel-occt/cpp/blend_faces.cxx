@@ -153,6 +153,91 @@ bool arc_fits(const bool convex, const TopoDS_Shape &shape, const Corner &c, int
   return true;
 }
 
+// Whether every vertex of `face` lies at `low` or at `high` along `axis` from `origin` (the face is a band between two straight edges square to
+// `axis`: the shape a cliff edge needs).
+bool is_band(const TopoDS_Face &face, const gp_Pnt &origin, const gp_Vec &axis, double low, double high) {
+  TopTools_IndexedMapOfShape vertices;
+  TopExp::MapShapes(face, TopAbs_VERTEX, vertices);
+  const double tolerance = 1e-6 * std::max(1.0, high - low);
+  for (int v = 1; v <= vertices.Extent(); ++v) {
+    const double at = gp_Vec(origin, BRep_Tool::Pnt(TopoDS::Vertex(vertices(v)))).Dot(axis);
+    if (std::fabs(at - low) > tolerance && std::fabs(at - high) > tolerance) return false;
+  }
+  return true;
+}
+
+// The cliff blend of `fa` (the face whose far edge is the cliff, narrower than the ball's tangent contact) against `fb`: the ball of `radius` stays
+// tangent to `fb` and touches the far straight edge of `fa` instead of being tangent to it (TECHNICAL_SPEC 13.28). In the section plane with `fb` along
+// u and `fa` at the angle `wedge` from it, P at distance w along `fa` and Q at u = t along `fb`, the ball centre is (t, r) with
+// (t - w cos wedge)^2 + (r - w sin wedge)^2 = r^2, t the larger root; the blend is the arc Q -> P facing the corner, swept along the corner.
+bool cliff_tool(const TopoDS_Shape &shape, const Corner &c, const TopoDS_Face &fa, const TopoDS_Face &fb, double radius, const std::string &blend_name,
+                Tool &tool, std::string &why) {
+  double low, high;
+  extent_along(fa, c.start, c.inward_a, low, high);
+  if (std::fabs(low) > 1e-6 * std::max(1.0, high))
+    return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the cliff face must reach the corner line of the two faces (its near edge at the corner, not " + std::to_string(low) +
+                        " away from it): the material between would be removed with it");
+  if (!is_band(fa, c.start, c.inward_a, low, high))
+    return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the cliff face must be a band between two straight edges parallel to the blend (its far edge is the cliff)");
+  const double wedge = kPi - c.fold;
+  const double width = high;
+  const double height = width * std::sin(wedge);
+  if (height > radius)
+    return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the cliff edge stands " + std::to_string(height) + " off the other face, more than the ball radius " +
+                        std::to_string(radius) + ": use a larger radius");
+  const double reach = width * std::cos(wedge) + std::sqrt(radius * radius - (radius - height) * (radius - height));
+  if (!(reach > 1e-9)) return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the ball touching the cliff edge has no contact with the other face");
+  const gp_Vec across = unit(c.inward_a - c.inward_b * c.inward_a.Dot(c.inward_b));
+  const gp_Pnt p = c.start.Translated(c.inward_a * width), q = c.start.Translated(c.inward_b * reach);
+  const gp_Pnt centre = q.Translated(across * radius);
+  const gp_Vec to_p(centre, p);
+  const double angle_q = -kPi / 2;
+  double angle_p = std::atan2(to_p.Dot(across), to_p.Dot(c.inward_b));
+  if (angle_p > angle_q) angle_p -= 2 * kPi;
+  const double middle = (angle_q + angle_p) / 2;
+  const gp_Pnt shoulder = centre.Translated((c.inward_b * std::cos(middle) + across * std::sin(middle)) * radius);
+  for (double s : {0.0, 0.5, 1.0}) {
+    const gp_Vec along = c.direction * (s * c.length);
+    if (!inside(fb, q.Translated(along)) || !inside(fa, p.Translated(along)))
+      return bad(why, "[BLD_FACE_FILLET_NO_SOLUTION] the ball of radius " + std::to_string(radius) + " touching the cliff edge leaves the other face (contact " +
+                          std::to_string(reach) + " from the corner); use a smaller radius");
+  }
+  GC_MakeArcOfCircle arc_maker(q, shoulder, p);
+  if (!arc_maker.IsDone()) return bad(why, "the cliff arc could not be built");
+  BRepClass3d_SolidClassifier classifier(shape);
+  const Handle(Geom_TrimmedCurve) arc_curve = arc_maker.Value();
+  for (int k = 1; k < 8; ++k) {
+    const double at = arc_curve->FirstParameter() + (arc_curve->LastParameter() - arc_curve->FirstParameter()) * k / 8.0;
+    classifier.Perform(arc_curve->Value(at).Translated(c.direction * (c.length / 2)), kInsideTolerance);
+    if (classifier.State() == (c.convex ? TopAbs_OUT : TopAbs_IN))
+      return bad(why, "[BLD_FACE_FILLET_NO_SOLUTION] the ball of radius " + std::to_string(radius) +
+                          " touching the cliff edge is in the wrong region of the solid (the arc leaves the material); use a different radius");
+  }
+  BRepBuilderAPI_MakeEdge corner_to_q(c.start, q), arc(arc_curve), p_to_corner(p, c.start);
+  BRepBuilderAPI_MakeWire wire;
+  wire.Add(corner_to_q.Edge());
+  wire.Add(arc.Edge());
+  wire.Add(p_to_corner.Edge());
+  if (!corner_to_q.IsDone() || !arc.IsDone() || !p_to_corner.IsDone() || !wire.IsDone()) return bad(why, "the cliff outline does not close");
+  BRepBuilderAPI_MakeFace profile(wire.Wire(), Standard_True);
+  BRepPrimAPI_MakePrism prism(profile.Face(), gp_Vec(c.start, c.end));
+  prism.Build();
+  if (!profile.IsDone() || !prism.IsDone()) return bad(why, "the cliff blend tool could not be swept");
+  tool.shape = prism.Shape();
+  tool.convex = c.convex;
+  const TopTools_IndexedMapOfShape tool_faces = query::distinct(tool.shape, TopAbs_FACE);
+  tool.names.assign(static_cast<size_t>(tool_faces.Extent()), "");
+  for (int f = 0; f < tool_faces.Extent(); ++f) tool.names[static_cast<size_t>(f)] = "tool." + std::to_string(f);
+  TopoDS_Shape arc_edge;
+  for (TopExp_Explorer it(profile.Face(), TopAbs_EDGE); it.More(); it.Next())
+    if (BRepAdaptor_Curve(TopoDS::Edge(it.Current())).GetType() != GeomAbs_Line) arc_edge = it.Current();
+  const TopTools_ListOfShape &lateral = prism.Generated(arc_edge);
+  if (lateral.IsEmpty()) return bad(why, "the cliff blend face was not generated");
+  const int blend_face = tool_faces.FindIndex(lateral.First());
+  if (blend_face > 0) tool.names[static_cast<size_t>(blend_face - 1)] = blend_name;
+  return true;
+}
+
 std::string sorted_name(const std::string &first, const std::string &second) {
   return first < second ? "blend(e(" + first + "|" + second + "))" : "blend(e(" + second + "|" + first + "))";
 }
@@ -160,7 +245,7 @@ std::string sorted_name(const std::string &first, const std::string &second) {
 }  // namespace
 
 static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<const double> raw, std::string &why) {
-  if (raw.size() != 5) {
+  if (raw.size() != 5 && raw.size() != 6) {
     why = "face blend specification is malformed";
     return nullptr;
   }
@@ -168,6 +253,7 @@ static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<
   const double radius = raw[2];
   const int kind = static_cast<int>(raw[3]);
   const double param = raw[4];
+  const int cliff = raw.size() == 6 ? static_cast<int>(raw[5]) : 0;
   const TopTools_IndexedMapOfShape faces = query::distinct(source.shape, TopAbs_FACE);
   if (ia < 0 || ib < 0 || ia >= faces.Extent() || ib >= faces.Extent() || !(radius > 0)) {
     why = "face index out of range or radius <= 0";
@@ -177,13 +263,30 @@ static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<
     why = "[BLD_FACESETS_OVERLAP] the two face sets are the same face";
     return nullptr;
   }
+  if (cliff < 0 || cliff > 2 || (cliff != 0 && kind != 2)) {
+    why = "[BLD_FACE_BLEND_UNSUPPORTED] a cliff edge takes the circular section only";
+    return nullptr;
+  }
   const naming::Named input = naming::named(source);
-  const TopoDS_Face fa = TopoDS::Face(faces(ia + 1)), fb = TopoDS::Face(faces(ib + 1));
+  const std::string blend_name = sorted_name(input.names[static_cast<size_t>(ia)], input.names[static_cast<size_t>(ib)]);
+  // cliff 2 is the cliff on face B: the same build with the faces swapped
+  const TopoDS_Face fa = TopoDS::Face(faces((cliff == 2 ? ib : ia) + 1)), fb = TopoDS::Face(faces((cliff == 2 ? ia : ib) + 1));
   Corner c;
   // The legs depend on the fold, which corner_of computes: first with a unit leg to get the fold, then with the real one.
   if (!corner_of(source.shape, fa, fb, 1.0, c, why)) return nullptr;
   const double leg = radius * std::tan(c.fold / 2);
   if (!corner_of(source.shape, fa, fb, leg, c, why)) return nullptr;
+  if (cliff != 0) {
+    double low, high;
+    extent_along(fa, c.start, c.inward_a, low, high);
+    if (high < leg - 1e-9 * std::max(1.0, leg)) {
+      Tool tool;
+      if (!cliff_tool(source.shape, c, fa, fb, radius, blend_name, tool, why)) return nullptr;
+      naming::Named cliffed = input;
+      if (!apply_tools(cliffed, {tool}, why)) return nullptr;
+      return naming::wrap_named(cliffed.shape, cliffed.names);
+    }
+  }
   if (!legs_fit(c, fa, fb)) {
     why = "[BLD_FACE_FILLET_NO_SOLUTION] a ball of radius " + std::to_string(radius) + " does not fit between the two faces (its contact lines leave them); use a smaller radius";
     return nullptr;
@@ -210,7 +313,7 @@ static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<
     return nullptr;
   }
   Tool tool;
-  if (!spandrel_tool(c.start, c.end, c.a, c.b, kind, param, kPi - c.fold, sorted_name(input.names[static_cast<size_t>(ia)], input.names[static_cast<size_t>(ib)]), tool, why))
+  if (!spandrel_tool(c.start, c.end, c.a, c.b, kind, param, kPi - c.fold, blend_name, tool, why))
     return nullptr;
   tool.convex = c.convex;
   naming::Named current = input;

@@ -1,14 +1,14 @@
 {
   "id": "SC-DAT-04",
-  "status": "PROPOSED — DAT MVP commands flagged \"unbuilt\". A plan step cannot read a file: the import step runs from the CLI as `llull import_plant_data @params.json --doc d.llull.json` with params.json = { \"fileBase64\": <base64 of data/reference/equipment-list-sc-dat-01-edited.xlsx>, \"mode\": \"preview\" }.",
+  "status": "PARTLY BUILT — DAT-M2 built export_plant_data and plant_report; import_plant_data (M4) is flagged \"unbuilt\". A plan step cannot read a file: the import step runs from the CLI as `llull import_plant_data @params.json --doc d.llull.json` with params.json = { \"fileBase64\": <base64 of data/reference/equipment-list-sc-dat-01-edited.xlsx>, \"mode\": \"preview\" }.",
   "validates": ["VC-DAT-09"],
   "description": "Excel round trip of the SC-DAT-01 equipment list: export, edit outside llull (fixture), preview the import (diff only), apply the accepted change. Prerequisite: SC-DAT-01 steps 0-14 (the fixture's ObjectId column holds equipment-1 / equipment-2, the ids add_equipment issues on an empty building).",
   "actions": [
     { "command": "build_project", "params": { "planRef": "sc-dat-01-tank-pump-mvp.json", "steps": "0-14" }, "note": "shorthand: replay SC-DAT-01 steps 0-14" },
-    { "command": "export_plant_data", "unbuilt": true, "params": { "classes": ["Equipment"], "format": "xlsx" } },
+    { "command": "export_plant_data", "params": { "classes": ["Equipment"], "format": "xlsx" } },
     { "command": "import_plant_data", "unbuilt": true, "params": { "fileRef": "data/reference/equipment-list-sc-dat-01-edited.xlsx", "mode": "preview" } },
     { "command": "import_plant_data", "unbuilt": true, "params": { "fileRef": "data/reference/equipment-list-sc-dat-01-edited.xlsx", "mode": "apply" } },
-    { "command": "plant_report", "unbuilt": true, "params": { "kind": "equipment_list" } }
+    { "command": "plant_report", "params": { "kind": "equipment_list" } }
   ],
   "expected": [
     { "step": 1, "path": "sheets.Equipment.rows", "value": 2, "source": "plan" },

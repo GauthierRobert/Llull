@@ -43,6 +43,7 @@ import { SweepFramesOverlay } from './analysis/SweepFramesOverlay';
 import { DeformOverlay } from './overlays/DeformOverlay';
 import { ImplicitGpuPreview } from './implicitPreview/ImplicitGpuPreview';
 import { WrapOverlay } from './overlays/WrapOverlay';
+import { BlendOverlay } from './overlays/BlendOverlay';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
@@ -161,6 +162,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <DeformOverlay />
         <ImplicitGpuPreview />
         <WrapOverlay />
+        <BlendOverlay />
         <FocusOverlay />
       </group>
 

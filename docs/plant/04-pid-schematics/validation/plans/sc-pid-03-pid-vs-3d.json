@@ -1,10 +1,10 @@
 {
   "id": "SC-PID-03",
-  "status": "DRAFT — unbuilt commands: create_pid_sheet, add_pid_equipment, add_pid_line, add_pid_inline, check_pid_3d. The 3D side uses existing commands add_equipment and add_pipe_run (packages/domain-aec/src/industrial/equipment/equipment.ts). P3D_SPEC_MISMATCH and 3D valves need the 02-spec-driven-routing pipe class attribute and inline components; until then the valve is always P3D_UNPLACED.",
+  "status": "DRAFT — unbuilt commands: check_pid_3d (the authoring commands exist since PID-M3). The 3D side uses existing commands add_equipment and add_pipe_run (packages/domain-aec/src/industrial/equipment/equipment.ts). P3D_SPEC_MISMATCH and 3D valves need the 02-spec-driven-routing pipe class attribute and inline components; until then the valve is always P3D_UNPLACED.",
   "validates": ["VC-PID-11"],
   "description": "A clean P&ID (T-101 -> P-101, line 100-P-1001-A1 DN100) and a 3D model with four seeded inconsistencies: 3D pipe DN 80, extra 3D equipment E-201, the P&ID valve HV-104 not placed, and the 3D pipe starting at T-102. Expected findings are by construction.",
   "actions": [
-    { "command": "create_pid_sheet", "params": { "number": "PID-001", "title": "Feed", "size": "A3", "convention": "ISA-5.1" }, "as": "sheet" },
+    { "command": "create_pid_sheet", "params": { "number": "PID-001", "title": "Feed", "paper": "A3", "convention": "ISA-5.1" }, "as": "sheet" },
     { "command": "add_pid_equipment", "params": { "sheet": "$sheet", "class": "Tank", "tag": "T-101", "at": [60, 150], "nozzles": [ { "subTag": "N1", "side": "bottom", "dn": 100 } ] } },
     { "command": "add_pid_equipment", "params": { "sheet": "$sheet", "class": "CentrifugalPump", "tag": "P-101", "at": [160, 80], "nozzles": [ { "subTag": "N1", "side": "left", "dn": 100 } ] } },
     { "command": "add_pid_line", "params": { "sheet": "$sheet", "from": { "tag": "T-101", "nozzle": "N1" }, "to": { "tag": "P-101", "nozzle": "N1" }, "lineNumber": "100-P-1001-A1", "dn": 100, "pipingClass": "A1", "fluidCode": "P" }, "as": "suction" },

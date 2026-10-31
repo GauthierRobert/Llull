@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-01",
-  "status": "DRAFT — unbuilt commands: import_dexpi, pid_report, check_pid. CLI script (file= is read by the CLI and fills import_dexpi.text), run on a fresh --doc.",
+  "status": "BUILT (PID-M2 import / counts, PID-M4 lists / check_pid; tests/unit/plant/pid/checkScenario.test.ts). CLI script (file= is read by the CLI and fills import_dexpi.text), run on a fresh --doc.",
   "validates": ["VC-PID-01", "VC-PID-04", "VC-PID-05", "VC-PID-09", "VC-PID-12"],
   "description": "Import the DEXPI 1.3 reference P&ID (C01V04-VER.EX01, Proteus 4.1.1), read the object counts and the four lists, then run check_pid. Expected values are the independent census in data/dexpi_census.json (proteus13[0]).",
   "cli": [
@@ -38,13 +38,13 @@
     { "step": 1, "path": "data.counts.pipeFlowArrows", "value": 8, "abs": 0, "source": "census [S1][S2]" },
     { "step": 1, "path": "data.counts.shapeCatalogueEntries", "value": 24, "abs": 0, "source": "census [S1][S2]; pyDEXPI test 24 [S4]" },
     { "step": 2, "path": "data.rows.length", "value": 11, "abs": 0, "source": "11 PipingNetworkSystem line numbers 47121..47141 [S1]" },
-    { "step": 2, "path": "data.rows[?lineNumber=='47125'].nominalDiameter", "value": "DN 25", "source": "census lines [S1]" },
+    { "step": 2, "path": "data.rows[?lineNumber=='47125'].dn", "value": 25, "source": "census lines [S1]" },
     { "step": 2, "path": "data.rows[?lineNumber=='47125'].pipingClass", "value": "73HG12", "source": "census lines [S1]" },
     { "step": 3, "path": "data.rows.length", "value": 11, "abs": 0, "source": "5 Ball + 3 Globe + 1 Butterfly + 1 SwingCheck + 1 SpringLoadedGlobeSafety [S1]" },
-    { "step": 4, "path": "data.rows[*].tag", "value": ["PI 4712.01", "PICSA 4712.02", "HS 4750.01", "TICSA 4750.03"], "source": "category + functions + number of the 4 PIFs [S1]" },
+    { "step": 4, "path": "data.rows[*].tag", "value": ["HS 4750.01", "PI 4712.01", "PICSA 4712.02", "TICSA 4750.03"], "source": "category + functions + number of the 4 PIFs [S1]; rows are sorted by natural tag" },
     { "step": 5, "path": "data.rows[*].tag", "value": ["H1007", "H1008", "P4711", "P4712", "T4750"], "source": "TagNameAssignmentClass of the 5 top-level equipment [S1]" },
-    { "step": 6, "path": "data.findings[?code=='PID_SEGMENT_INVALID'].length", "value": 0, "abs": 0, "source": "pyDEXPI integration test asserts every segment VALID [S4]" },
-    { "step": 6, "path": "data.findings[?code=='PID_NOZZLE_UNCONNECTED'][*].item", "value": ["T4750/N3"], "source": "Nozzle-18 (N3, DN 80) is referenced by no Connection [S1]" },
-    { "step": 6, "path": "data.findings[?code=='PID_NOZZLE_UNCONNECTED_ACCESS'][*].item", "value": ["T4750/N8"], "source": "Nozzle-19 (N8, MANHOLE_SHAPE, DN 800) referenced by no Connection; access nozzle -> info [S1]" }
+    { "step": 6, "path": "data.items[?code=='PID_SEGMENT_INVALID'].length", "value": 0, "abs": 0, "source": "pyDEXPI integration test asserts every segment VALID [S4]" },
+    { "step": 6, "path": "data.items[?code=='PID_NOZZLE_UNCONNECTED'][*].item", "value": ["T4750/N3"], "source": "Nozzle-18 (N3, DN 80) is referenced by no Connection [S1]" },
+    { "step": 6, "path": "data.items[?code=='PID_NOZZLE_UNCONNECTED_ACCESS'][*].item", "value": ["T4750/N8"], "source": "Nozzle-19 (N8, MANHOLE_SHAPE, DN 800) referenced by no Connection; access nozzle -> info [S1]" }
   ]
 }

@@ -24,11 +24,12 @@ struct Patches {
   bool centre_from_hint = false;   // the centre is where the replaced surface crosses the axis (else the 3/8 rule of 13.21.4)
   double gap = 0;                  // largest distance from a sample of a loop edge to the patch edge at the same parameter
   double angle = 0;                // largest angle between the patch normal and the support normal along the loop, and between neighbouring sub-patches along their shared spokes
+  double crease = 0;               // largest angle between the normals on the two sides of a joint knot inside a sub-patch (the interior crease of a C0 knot)
 };
 
 // The loop (ordered, closed) with the support face of each edge (`supports[k]` carries `loop[k]`; the faces are the outward ones of the split solid). False with `why` when the
 // construction is refused or its own measures exceed `max_gap` / `max_angle`; the caller falls back to another fill.
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false);
+           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false);
 
 }  // namespace llull::corner_exact

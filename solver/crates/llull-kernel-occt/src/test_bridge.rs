@@ -27,6 +27,12 @@ mod ffi {
         fn set_corner_exact_patch(mode: i32);
         /// Whether every setback step uses the rolling-ball trim builder (13.22).
         fn set_corner_trim(on: bool);
+        /// The largest interior crease (rad) of the star sub-patches accepted since the last set_corner_exact_patch.
+        fn last_corner_crease() -> f64;
+        /// Whether the interior crease of the star sub-patches is gated (default) or only measured.
+        fn set_corner_crease_gate(on: bool);
+        /// Whether the star sub-patches take only C0 knots at the joints of their chains (no C1 attempt).
+        fn set_corner_c0_knots(on: bool);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
@@ -66,6 +72,18 @@ pub fn set_corner_fault(corner: i32) {
 
 pub fn set_corner_spawn_limit(workers: i32) {
     ffi::set_corner_spawn_limit(workers);
+}
+
+pub fn last_corner_crease() -> f64 {
+    ffi::last_corner_crease()
+}
+
+pub fn set_corner_c0_knots(on: bool) {
+    ffi::set_corner_c0_knots(on);
+}
+
+pub fn set_corner_crease_gate(on: bool) {
+    ffi::set_corner_crease_gate(on);
 }
 
 pub fn set_corner_exact_patch(mode: i32) {
