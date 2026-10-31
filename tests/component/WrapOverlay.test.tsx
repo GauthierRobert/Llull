@@ -10,6 +10,7 @@ import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { curveSegments, edgeSegments, parseWrapOverlay } from '@ui/viewport/3d/overlays/wrapOverlayGeometry';
 import { runQuery } from '@ui/services/localQuery';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { newEntity } from '@core/commands/entity/newEntity';
 import { fakeSplitKernel } from '../helpers/fakeSplitKernel';
 import { dispatchEntity, resetViewportStores } from '../helpers/componentEntities';
 import { resetOfflineStore } from '../helpers/storeTestHelpers';
@@ -130,5 +131,77 @@ describe('WrapOverlay', () => {
     useWrapOverlayStore.setState({ enabled: true });
     const { container } = render(<WrapOverlay />);
     expect(container.querySelectorAll('group[name^="wrap-overlay-"]')).toHaveLength(MAX_WRAP_OVERLAYS);
+  });
+
+  it('each layer draws its own lines: the primitives of the curves and of the edges disappear with their switch, and the popover says what is missing', () => {
+    const solid = dispatchEntity('add_box', { size: [60, 40, 10] }).id;
+    useStore.setState((state) => ({
+      document: {
+        ...state.document,
+        entities: {
+          ...state.document.entities,
+          'curve-9.1': newEntity(
+            'nurbs_curve',
+            'curve-9.1',
+            {
+              curve: {
+                degree: 1,
+                poles: [
+                  [0, 0, 0],
+                  [10, 0, 0],
+                ],
+                knots: [0, 1],
+                multiplicities: [2, 2],
+              },
+              onFace: {
+                entityId: solid,
+                faceIndex: 0,
+                pcurve: {
+                  degree: 1,
+                  poles: [
+                    [0, 0],
+                    [1, 0],
+                  ],
+                  knots: [0, 1],
+                  multiplicities: [2, 2],
+                },
+                frame: 'native' as const,
+                fitTolerance: 1e-6,
+                chartLength: 10,
+              },
+            },
+            [0, 0, 0],
+            '#ffffff',
+          ),
+        },
+      },
+    }));
+    useStore.getState().select([solid]);
+    useWrapOverlayStore.setState({ enabled: true });
+    const { container } = render(
+      <>
+        <WrapOverlay />
+        <ViewportControls />
+      </>,
+    );
+    const lines = (): number => container.querySelectorAll('primitive').length;
+    // one polyline of the curve and one convex edge, each drawn in two passes
+    expect(lines()).toBe(4);
+    act(() => useWrapOverlayStore.getState().setLayer('edges', false));
+    expect(lines()).toBe(2);
+    act(() => useWrapOverlayStore.getState().setLayer('curves', false));
+    expect(lines()).toBe(0);
+    act(() => useWrapOverlayStore.getState().setLayer('edges', true));
+    expect(lines()).toBe(2);
+    // without an exact kernel the edges are not there and the popover says so
+    act(() => setGeometryKernel(null));
+    act(() => useStore.getState().select([]));
+    act(() => useStore.getState().select([solid]));
+    expect(lines()).toBe(0);
+    act(() => useWrapOverlayStore.getState().setLayer('curves', true));
+    expect(lines()).toBe(2);
+    expect(screen.getByRole('status', { name: 'Wrap overlay status' }).textContent).toContain('no exact kernel');
+    act(() => useStore.getState().select([]));
+    expect(screen.queryByRole('status', { name: 'Wrap overlay status' })).toBeNull();
   });
 });

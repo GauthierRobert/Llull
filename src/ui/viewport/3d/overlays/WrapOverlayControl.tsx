@@ -32,7 +32,7 @@ export function WrapOverlayControl(): React.ReactElement {
         }
         onClick={() => setEnabled(!enabled)}
       >
-        <Icon name="transformMove" size={14} />
+        <Icon name="wrapSurface" size={14} />
         <span className="vp-btn__text">Wrap</span>
       </button>
     </div>
@@ -44,7 +44,9 @@ export function WrapOverlayPopover(): React.ReactElement | null {
   const enabled = useWrapOverlayStore((s) => s.enabled);
   const layers = useWrapOverlayStore((s) => s.layers);
   const setLayer = useWrapOverlayStore((s) => s.setLayer);
+  const status = useWrapOverlayStore((s) => s.status);
   if (!enabled) return null;
+  const lines = Object.values(status).flat();
   return (
     <div id={WRAP_OPTIONS_ID} className="vp-popover vp-deform-options" role="group" aria-label="Wrap overlay layers">
       {WRAP_LAYERS.map(({ value, label, title }) => (
@@ -53,6 +55,13 @@ export function WrapOverlayPopover(): React.ReactElement | null {
           {label}
         </label>
       ))}
+      {lines.length > 0 && (
+        <ul className="vp-wrap-status" role="status" aria-label="Wrap overlay status">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
       {layers.edges && (
         <ul className="vp-wrap-legend" aria-label="Face join colours">
           {LEGEND.map(({ key, label }) => (

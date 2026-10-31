@@ -1,7 +1,7 @@
 // Review overlays of the wrap results of the selected solids (03 WRP, presentation only): the curves lying on faces and the edges coloured by convexity,
 // drawn from `wrap_overlay` (a read-only host query, re-run when the solid or the document changes).
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { is3D, type Entity } from '@core/model/types';
 import { useStore } from '@ui/store';
@@ -24,9 +24,28 @@ export const WRAP_COLORS = {
 function WrapSolid({ entity }: { entity: Entity }): React.ReactElement | null {
   const layers = useWrapOverlayStore((s) => s.layers);
   const params = useMemo(() => ({ id: entity.id }), [entity.id]);
-  const documentState = useStore((s) => s.document);
-  const query = useHostQuery('wrap_overlay', params, documentState);
+  // the answer depends on the solid, the curves lying on faces and the history (which solids it was made from), not on the rest of the document
+  const inputs = useStore(
+    useShallow((s) => [
+      s.document.entities[entity.id],
+      s.document.featureHistory,
+      ...Object.values(s.document.entities).filter((other) => other.kind === 'nurbs_curve' && other.onFace !== undefined),
+    ]),
+  );
+  const query = useHostQuery('wrap_overlay', params, inputs);
   const view = useMemo(() => (query.status === 'done' && !query.isError ? parseWrapOverlay(query.data) : null), [query]);
+  const setStatus = useWrapOverlayStore((s) => s.setStatus);
+  const lines = useMemo(
+    () =>
+      query.status === 'done' && query.isError
+        ? [`${entity.id}: the overlay could not be read (${query.summary})`]
+        : (view?.notes ?? []).map((note) => `${entity.id}: ${note}`),
+    [query, view, entity.id],
+  );
+  useEffect(() => {
+    setStatus(entity.id, lines);
+    return () => setStatus(entity.id, []);
+  }, [entity.id, lines, setStatus]);
   const parts = useMemo(
     () =>
       view === null

@@ -2,13 +2,16 @@
 // Presentation only: every point comes from the command, nothing is derived from the document here.
 
 import type { Vec3 } from '@core/model/types';
+import type { WrapOverlayCurve, WrapOverlayEdge } from '@core/commands/wrap/wrapOverlay';
 import { chainsSegments } from './deformOverlayGeometry';
 
-export type EdgeConvexity = 'smooth' | 'convex' | 'concave' | 'unknown';
+export type EdgeConvexity = WrapOverlayEdge['convexity'];
 
 export interface WrapOverlayView {
-  readonly curves: ReadonlyArray<{ id: string; face: number; source: 'solid' | 'earlier'; points: Vec3[] }>;
-  readonly edges: ReadonlyArray<{ edge: number; faces: number[]; convexity: EdgeConvexity; points: Vec3[] }> | null;
+  readonly curves: ReadonlyArray<Pick<WrapOverlayCurve, 'id' | 'face' | 'source' | 'points'>>;
+  readonly edges: ReadonlyArray<WrapOverlayEdge> | null;
+  /** What the query says about itself: why the edges are missing, what was left out. */
+  readonly notes: readonly string[];
 }
 
 const isVec3 = (value: unknown): value is Vec3 =>
@@ -42,7 +45,17 @@ export function parseWrapOverlay(data: unknown): WrapOverlayView | null {
           : [];
       })
     : null;
-  return { curves, edges };
+  const truncated = (d['truncated'] ?? {}) as Record<string, unknown>;
+  const notes = [
+    ...(typeof d['edgesNote'] === 'string' ? [`edges not drawn: ${d['edgesNote']}`] : []),
+    ...(typeof truncated['curves'] === 'number' && truncated['curves'] > 0
+      ? [`${truncated['curves']} curve(s) left out (only the first 64 are drawn)`]
+      : []),
+    ...(typeof truncated['edges'] === 'number' && truncated['edges'] > 0
+      ? [`${truncated['edges']} edge(s) left out (only the first 400 are drawn)`]
+      : []),
+  ];
+  return { curves, edges, notes };
 }
 
 /** The curves of one origin as line segments. */

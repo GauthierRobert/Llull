@@ -22,6 +22,9 @@ interface WrapOverlayState {
   /** The master switch: nothing is drawn (and nothing is queried) while it is off. */
   enabled: boolean;
   layers: Readonly<Record<WrapLayer, boolean>>;
+  /** What each drawn solid has to say (edges not available, left out, a failed query): shown under the layer switches. */
+  status: Readonly<Record<string, readonly string[]>>;
+  setStatus(id: string, lines: readonly string[]): void;
   setEnabled(enabled: boolean): void;
   setLayer(layer: WrapLayer, on: boolean): void;
 }
@@ -29,6 +32,12 @@ interface WrapOverlayState {
 export const useWrapOverlayStore = create<WrapOverlayState>()((set) => ({
   enabled: false,
   layers: { curves: true, edges: true },
+  status: {},
+  setStatus: (id, lines) =>
+    set((state) => {
+      const { [id]: _previous, ...rest } = state.status;
+      return { status: lines.length === 0 ? rest : { ...rest, [id]: lines } };
+    }),
   setEnabled: (enabled) => set({ enabled }),
   setLayer: (layer, on) => set((state) => ({ layers: { ...state.layers, [layer]: on } })),
 }));

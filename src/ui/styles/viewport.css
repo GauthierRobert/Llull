@@ -896,6 +896,15 @@ button.lens-pill:hover .lens-pill__label {
   font-size: var(--text-xs);
 }
 
+.vp-wrap-status {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--fg-muted, var(--fg));
+}
+
 .vp-wrap-legend__swatch {
   display: inline-block;
   width: 10px;
