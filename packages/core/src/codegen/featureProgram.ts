@@ -215,7 +215,7 @@ function meshNote(subject: string, entity: Entity): string {
     return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export_step through the native kernel, without the Python bridge, keeps the exact faces).`;
   const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
   return blend
-    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a variable distance chamfer, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
+    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with an angle, or a variable / two-distance chamfer on a curved edge, a non-planar face or several edges with two distances, which only the CadQuery and build123d exports rebuild on straight edges between planes; a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
     : `${subject} has no analytic form; exported as a triangle mesh.`;
 }
 

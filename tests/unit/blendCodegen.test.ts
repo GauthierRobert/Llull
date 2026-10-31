@@ -10,21 +10,6 @@ import { scriptedKernel } from '../helpers/blendKernel';
 
 afterEach(() => setGeometryKernel(null));
 
-/** What each language writes for the exact mesh that replaces an inexpressible blend, and for the removal of the unblended source. */
-const MESH_EXPORT: Readonly<Record<string, { mesh: string; removed: string }>> = {
-  cadquery: { mesh: 'mesh([', removed: 'remove(box_1)' },
-  build123d: { mesh: 'mesh([', removed: 'remove(box_1)' },
-  freecad: { mesh: 'mesh([', removed: 'box_1 = None' },
-  openscad: { mesh: 'polyhedron', removed: '// box_1 removed' },
-};
-const expectMeshInstead = (doc: CadDocument, language: string): void => {
-  const { text, summary } = code(doc, language);
-  const expected = MESH_EXPORT[language] as { mesh: string; removed: string };
-  expect(summary, language).toContain('BLD_CODEGEN_UNSUPPORTED');
-  expect(text, language).toContain(expected.mesh);
-  expect(text, language).toContain(expected.removed);
-};
-
 const step = (doc: CadDocument, name: string, params: unknown): { doc: CadDocument; id: string } => {
   const result = execute(doc, name, params);
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
@@ -110,21 +95,5 @@ describe('export_code of radius laws', () => {
     const { text } = code(modelWith([{ index: 0, size: 1, sizeEnd: 2 }]), 'openscad');
     expect(text).toMatch(/polyhedron|module/);
     expect(text).not.toContain('fillet_laws');
-  });
-
-  it('a sided chamfer is not expressible: BLD_CODEGEN_UNSUPPORTED names it and the export carries the exact result as a mesh', () => {
-    setGeometryKernel(scriptedKernel());
-    const box = step(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
-    const chamfered = step(box.doc, 'chamfer_edge', { id: box.id, edgeIndices: [0], distance: 1, distance2: 2, side1Near: [0, 0, 0] });
-    for (const language of Object.keys(MESH_EXPORT)) expectMeshInstead(chamfered.doc, language);
-    const snapshot = code({ ...chamfered.doc, featureHistory: [] }, 'cadquery');
-    expect(snapshot.summary).toContain('BLD_CODEGEN_UNSUPPORTED');
-  });
-
-  it('a variable chamfer is not expressible either: never exported as a constant chamfer', () => {
-    setGeometryKernel(scriptedKernel());
-    const box = step(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
-    const chamfered = step(box.doc, 'chamfer_edge', { id: box.id, edgeIndices: [0], distance: 1, distanceEnd: 2 });
-    for (const language of Object.keys(MESH_EXPORT)) expectMeshInstead(chamfered.doc, language);
   });
 });

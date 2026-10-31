@@ -1475,3 +1475,23 @@ Done: the "varying size over a chain of several edges" of 13.13.5. When the two 
 - Red-proofs: no mirroring in `LawFillet` fails 5 native tests; laws not turned for backwards edges fails 1 unit and 6 native; bends accepted at joints and a loop law not checked each fail the refusal tests.
 
 **Left.** A smooth (zero end slope) law over a chain: the per-edge law vocabulary has no end slope (it would need `EdgeRadius` end slopes in `law_fillet.cxx`). A chain that bends by more than 0.01 rad (OCCT chains up to about 0.1 rad, 13.13.2). A law over a chain on `fillet_edge` (a chain picked with `edges[]` still takes one law per edge; `fillet_faces` distributes one over its chain).
+
+## 13.29 As built: variable and two-leg chamfers in `export_code` (DES-6c, 2026-10-31)
+
+Until now a chamfer with `distanceEnd`, `distance2` / `distance2End` fell back to `BLD_CODEGEN_UNSUPPORTED` and the exact result's triangles. It is now rebuilt exactly where the target can express it.
+
+**Construction (same as `cpp/blend_chamfer.cxx` `make_straight_tool`).** OCCT's `MakeChamfer` takes constant distances, so `chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near=None)` (new Python helper, `codegen/pythonChamfer.ts`, shared by CadQuery and build123d, which both run on OCP) builds per edge the ruled `BRepOffsetAPI_ThruSections` loft of the two end triangles (corner, point at the first leg on one face, point at the second leg on the other, legs linear in the arc length between), then `BRepAlgoAPI_Cut` (convex edge) or `Fuse` (concave edge; `UnifySameDomain` after). The same refusals as the kernel are run-time `ValueError`s: a non-planar face (so any curved edge), ends not on a plane perpendicular to the edge, a leg that leaves its face (checked at five stations), a volume that moves the wrong way. `lead` is the outward normal of the face carrying the first leg (the kernel's face index is not stable across OCC builds); the trace records `chamfer_edge` with `distance`, `distanceEnd`, `distance2`, `distance2End`, `side1Near`, so `import_code` / `apply_code_trace` replay it.
+
+**Exact, per target.**
+
+| Target | Variable (`distanceEnd`) / two-leg (`distance2`, `distance2End`) chamfer of a straight edge between planes |
+| --- | --- |
+| CadQuery, build123d | exact (the construction above) |
+| FreeCAD macro | refused by name: `chamfer_legs` raises `BLD_CODEGEN_UNSUPPORTED` when the macro runs (the same way as a fillet law FreeCAD cannot express); never a constant chamfer |
+| OpenSCAD | the exact result's triangles (no fillets or chamfers in the language) |
+
+**Still `BLD_CODEGEN_UNSUPPORTED` + exact triangles in every language:** a distance-angle chamfer (`angleDeg`); a curved edge (arc, B-spline, a generator line against a cylinder: the kernel's smooth loft through arc-length sections has no short OCP equivalent); a two-leg chamfer of more than one edge (one `side1Near` cannot name every leading face in the trace); a leading face that is not a plane; a variable chamfer without listed edges; a kernel without exact topology at export (straightness is read from it). Constant symmetric chamfers keep `chamfer(solid, edges, d)` (OCCT `MakeChamfer`). A constant two-leg chamfer (`distance2`, no `distanceEnd`) uses the same construction: its legs are measured on the faces, as the kernel does.
+
+**Measured** (`tests/unit/chamferCodegenOracle.test.ts`, run with cadquery 2.8 / build123d 0.12 on OCP 7.9.3, block 20 x 10 x 5, edge 10 long, legs 1 -> 1.5 and 2 -> 2.5): removed volume 14.16667 = 1/2 integral d1 d2 ds, the analytic value the native kernel is held to (13.14), to 6 decimals in both libraries; the legs sit on the faces the document names (vertices of the result at z = 1, 1.5 on the side face and x = 7.5, 8 on the top, paired by end; swapping the leading face swaps them); a concave edge (L-shaped union) is fused by the same exact amount; legs past the face and a slanted end are refused by name. The test is skipped without a python importing OCP + cadquery + build123d (`LLULL_PYTHON`). The text of the emitted program is pinned by `tests/unit/__snapshots__/chamferCodegen.test.ts.snap`.
+
+**Not done.** Curved-edge variable chamfers in generated code; a direct side-by-side run against `llull-kernel` (the oracle is the analytic volume the kernel is validated against); a FreeCAD (Part) construction.

@@ -141,6 +141,14 @@ export interface FilletLaw {
   readonly nodes: ReadonlyArray<readonly [number, number]> | null;
 }
 
+/** The legs of a variable / two-leg chamfer: the first leg runs `size` -> `end`, the second `second` -> `secondEnd`; `lead` = outward normal of the face carrying the first leg (the single listed edge), absent = equal legs. */
+export interface ChamferLegs {
+  readonly end: number;
+  readonly second: number;
+  readonly secondEnd: number;
+  readonly lead?: readonly [number, number, number];
+}
+
 export type Feature =
   | (FeatureBase & {
       readonly op: 'solid';
@@ -163,6 +171,8 @@ export type Feature =
       readonly size: Term;
       /** Fillets only (BLD M1): one radius law per entry of `edges` (start -> end, control points, interpolation); `size` is then the first law's start. */
       readonly laws?: ReadonlyArray<FilletLaw>;
+      /** Chamfers only (BLD M5): legs that vary start -> end and / or differ per face (`size` is the first leg at the edge start); absent = a constant symmetric chamfer. */
+      readonly legs?: ChamferLegs;
       /** Result triangles (world soup) for targets without fillets (OpenSCAD). */
       readonly mesh?: readonly number[];
     })

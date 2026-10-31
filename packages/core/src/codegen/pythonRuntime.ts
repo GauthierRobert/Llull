@@ -10,6 +10,7 @@
 
 import { OCP_SWEPT_PY, SWEPT_TRACE_PY } from './pythonSwept';
 import { OCP_SUBDIVISION_PY, SUBDIVISION_PY, SUBDIVISION_TRACE_PY } from './pythonSubdivision';
+import { CHAMFER_TRACE_PY, OCP_CHAMFER_PY } from './pythonChamfer';
 
 export type PythonBackend = 'cadquery' | 'build123d';
 
@@ -596,10 +597,12 @@ export function pythonRuntime(backend: PythonBackend): string {
     'import math',
     builders,
     SHARED_GEOMETRY,
+    OCP_CHAMFER_PY,
     SUBDIVISION_PY,
     OCP_SUBDIVISION_PY,
     OCP_SWEPT_PY,
     TRACE_RUNTIME,
+    CHAMFER_TRACE_PY,
     SUBDIVISION_TRACE_PY,
     SWEPT_TRACE_PY,
   ]
