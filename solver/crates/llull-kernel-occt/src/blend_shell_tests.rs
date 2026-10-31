@@ -1,4 +1,6 @@
 //! BLD §13.33.5: the sealed shell of a solid with corner-star faces (`shell_hollow`, `cpp/features.cxx`).
+//! Convention of the workspace for measurements that take minutes (`llull-topopt`, `llull-voxfe`): `#[ignore = "..."]`, run with `cargo test --release -p llull-kernel-occt blend_shell_tests -- --ignored`.
+//! `native:check` (cargo test, default members or --workspace in debug) therefore skips them; the pole gate, the fault hook and the 8-pole cube run in it.
 
 use crate::blend_corner_tests::{cube, cube_vertices, cut_block_setback, spec, CornerHooks};
 use crate::features::{fillet_setback, shell_hollow};
@@ -70,6 +72,7 @@ fn least_drop(shape: &Shape, thickness: f64) -> f64 {
 /// BLD §13.33.6: with the pole gate off, the 54-pole block (setbacks 1.2 / 1.2 / 1.3, 160 s) comes out of the offset and the cut as a solid that BRepCheck rejects (volume 474.5 -> 402.7, a broken
 /// cavity): the kernel refuses it by name from its result, not as a hollow solid.
 #[test]
+#[ignore = "160 s (release): cargo test --release -p llull-kernel-occt blend_shell_tests -- --ignored"]
 fn a_sealed_shell_of_54_poles_with_the_gate_off_is_refused_by_name_from_its_result() {
     let _serial = crate::serial_blends();
     let _corner = CornerHooks;
@@ -92,32 +95,29 @@ fn a_sealed_shell_whose_result_is_the_full_solid_is_refused_without_its_cavity()
     assert_eq!(refusal, "[SHL_NO_CAVITY] the offset returned a solid without its cavity");
 }
 
-/// Star faces of 42 poles (not under the gate of 30 with it off): at every thickness the sealed shell is refused by name or loses at least the bound of volume and carries a cavity.
+/// Star faces of 42 poles with the gate off (measured, radius 13, setbacks 1.2 / 1.2 / 1.3): at thickness 0.2 (1 shell, more faces than the source, a valid solid that lost 72 mm3) and at 0.4 (73 s,
+/// lost 141 mm3, not valid) the result has no second shell: both are refused by name as a solid without its cavity. Minutes in release: `--ignored` (see the module doc).
 #[test]
-fn a_sealed_shell_of_star_faces_is_refused_or_loses_its_volume_at_every_thickness() {
+#[ignore = "minutes (release): cargo test --release -p llull-kernel-occt blend_shell_tests -- --ignored"]
+fn a_sealed_shell_of_42_poles_with_the_gate_off_is_refused_without_its_cavity_at_0_2_and_0_4() {
     let _serial = crate::serial_blends();
     let _corner = CornerHooks;
     let _shell = ShellHooks;
     let block = cut_block_setback(13.0, 1.3).expect("the block with stars of 42 poles");
     crate::test_bridge::set_shell_star_pole_limit(1000);
     for thickness in [0.2, 0.4] {
-        match shell_hollow(&block, thickness) {
-            Err(text) => assert!(text.starts_with("[SHL_"), "{thickness}: {text}"),
-            Ok(shell) => {
-                let shell = shell.expect("a solid");
-                let drop = mass_properties(&block).unwrap().volume - mass_properties(&shell).unwrap().volume;
-                assert!(
-                    drop >= least_drop(&block, thickness) && analyze(&shell).unwrap().valid,
-                    "{thickness}: the volume dropped by {drop}"
-                );
-            }
-        }
+        assert_eq!(
+            refusal_of_thickness(&block, thickness),
+            "[SHL_NO_CAVITY] the offset returned a solid without its cavity",
+            "{thickness}"
+        );
     }
     assert_eq!(crate::test_bridge::last_shell_star_poles(), 42);
 }
 
 /// 27 poles (setbacks 1.2 on the three edges) stay under the gate: the sealed shell builds, valid, with its cavity.
 #[test]
+#[ignore = "26 s (release), minutes in debug: cargo test --release -p llull-kernel-occt blend_shell_tests -- --ignored"]
 fn a_sealed_shell_of_star_faces_of_27_poles_still_builds() {
     let _serial = crate::serial_blends();
     let _corner = CornerHooks;

@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { GeometryKernel, ShapeEdge, ShapeHandle, ShapeTopology } from '@core/geometry/kernel';
-import { creaseOfCorners, creaseText } from '@core/commands/brep/filletCrease';
+import type { CommandResult } from '@core/commands/types';
+import { creaseOfCorners, withCreases } from '@core/commands/brep/filletCrease';
 
 const edge = (index: number, start: [number, number, number], end: [number, number, number]): ShapeEdge => ({
   index,
@@ -41,7 +42,9 @@ describe('creaseOfCorners', () => {
     // edge 2 ends at the vertex: the LAST sample is the entry
     const found = creaseOfCorners(kernelOf([sample(0.1), sample(Math.PI / 2, Math.PI / 2)]), shape, topology, [corner], [0, 1]);
     expect(found).toEqual([{ vertex: [0, 0, 0], crease: { sharpEdge: 2, entryRad: 1.570796 } }]);
-    expect(creaseText(found)).toContain('Sharp edge kept at 1 corner(s): edge 2 (entry 1.570796 rad)');
+    expect(withCreases({ document: {}, summary: '', affected: [] } as unknown as CommandResult, found).summary).toContain(
+      'Sharp edge kept at 1 corner(s): edge 2 (entry 1.570796 rad)',
+    );
     // a concave fold reads negative; without a signed reading the unsigned angle stands
     expect(creaseOfCorners(kernelOf([sample(0.1), sample(1, -1)]), shape, topology, [corner], [0, 1])[0]?.crease.entryRad).toBe(-1);
     expect(creaseOfCorners(kernelOf([sample(0.1), sample(1)]), shape, topology, [corner], [0, 1])[0]?.crease.entryRad).toBe(1);
@@ -61,6 +64,26 @@ describe('creaseOfCorners', () => {
     expect(creaseOfCorners(kernelOf(null), shape, topology, [corner], [0, 1])).toEqual([]);
     expect(creaseOfCorners({} as GeometryKernel, shape, topology, [corner], [0, 1])).toEqual([]);
     expect(creaseOfCorners(kernelOf([]), shape, topology, [corner], [0, 1])).toEqual([]);
-    expect(creaseText([])).toBe('');
+  });
+});
+
+describe('withCreases', () => {
+  const crease = { vertex: [0, 0, 0] as [number, number, number], crease: { sharpEdge: 2, entryRad: 1.5 } };
+  const result = {
+    document: {},
+    summary: 'done.',
+    affected: ['a'],
+    data: { profile: { builder: 'corners' }, nonTangent: { edge: 1 } },
+  } as unknown as CommandResult;
+
+  it('adds data.corners and the summary sentence and keeps profile and nonTangent next to them', () => {
+    const merged = withCreases(result, [crease]);
+    expect(merged.data).toEqual({ profile: { builder: 'corners' }, nonTangent: { edge: 1 }, corners: [crease] });
+    expect(merged.summary).toContain('Sharp edge kept at 1 corner(s)');
+    expect(withCreases({ ...result, data: undefined } as CommandResult, [crease]).data).toEqual({ corners: [crease] });
+  });
+
+  it('returns the result as it is without creases', () => {
+    expect(withCreases(result, [])).toBe(result);
   });
 });

@@ -678,7 +678,8 @@ int most_star_poles(const Shape &shape) {
   return most;
 }
 
-// The volume and the area of a shape (0 when OCCT cannot integrate it).
+// The volume and the area of a shape by plain BRepGProp (the Gauss rule of OCCT, not the adaptive rule of facade.cxx volume_props): a few per cent off on B-spline faces, which the coarse
+// 0.25 x area x thickness bound of has_cavity tolerates (a real cavity removes about area x thickness).
 double volume_of(const TopoDS_Shape &shape) {
   GProp_GProps properties;
   BRepGProp::VolumeProperties(shape, properties);
@@ -691,13 +692,12 @@ double area_of(const TopoDS_Shape &shape) {
   return properties.Mass();
 }
 
-// A sealed shell must have lost at least a quarter of area x thickness of volume and carry a cavity (a second shell, or more faces than the source): OCCT's cut of an offset skin
-// of fine B-spline faces was measured to return the full solid (06 BLD 13.33.6).
+// A sealed shell must have lost at least a quarter of area x thickness of volume AND carry its cavity as a second shell of the solid (the void is bounded by its own closed shell). A face count
+// above the source's is not asked: a result can gain faces (the inner skin split by the cut) without enclosing anything. OCCT's cut of an offset skin of fine B-spline faces was measured to
+// return a solid with no second shell (06 BLD 13.33.6).
 bool has_cavity(const TopoDS_Shape &result, const Shape &source, double thickness) {
   const bool hollow = volume_of(result) < volume_of(source.shape) - 0.25 * area_of(source.shape) * thickness;
-  const bool cavity = unique_sub_shapes(result, TopAbs_SHELL).Extent() > 1 ||
-                      unique_sub_shapes(result, TopAbs_FACE).Extent() > unique_sub_shapes(source.shape, TopAbs_FACE).Extent();
-  return hollow && cavity;
+  return hollow && unique_sub_shapes(result, TopAbs_SHELL).Extent() > 1;
 }
 
 }  // namespace

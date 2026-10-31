@@ -39,7 +39,7 @@ import { REPICK_EDGES } from './edgeReferences';
 import { describeProfileNotes, readProfileNotes } from './profileNotes';
 import { type CornerInput, type CornerRefusal, REPICK_VERTICES, resolveCorners } from './filletCorners';
 import type { SetbackCorner } from '../../model/blendTypes';
-import { creaseOfCorners, creaseText } from './filletCrease';
+import { creaseOfCorners, withCreases } from './filletCrease';
 
 export interface FilletRequest {
   readonly id: string;
@@ -317,14 +317,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           corners,
           plan.map((entry) => entry.edge),
         );
-  const creased: CommandResult =
-    creases.length === 0
-      ? profiledResult
-      : {
-          ...profiledResult,
-          summary: `${profiledResult.summary}${creaseText(creases)}`,
-          data: { ...(profiledResult.data as Record<string, unknown> | undefined), corners: creases },
-        };
+  const creased = withCreases(profiledResult, creases);
   const reported = kink === null ? creased : kinkReported(creased, kink);
   const record =
     (request.edgeNames ?? []).length > 0

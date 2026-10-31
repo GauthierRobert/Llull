@@ -394,3 +394,42 @@ fn a_hole_with_a_sharp_edge_has_no_plate_fallback() {
     crate::test_bridge::set_corner_exact_patch(1);
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
 }
+
+/// BLD §13.33.7: the far end (the pole) of the crease spokes of real stars, which justifies the 0.3 rad of `checkCornerCrease.ts` (a spoke whose smaller end is not under it is no fading crease)
+/// and the 0.1 rad at which the check fails the pole reading: the cube (r 1, setback 2), the 60 degree prism (r 1, setback 3, three choices of the sharp edge) and the tetrahedron apex (r 0.5,
+/// setback 2, three choices). Measured: cube 0.0035, prism 0.0040 / 0.0078 / 0.0078, tetrahedron 0.0044 to 0.0047; the largest is pinned under 0.01 rad.
+#[test]
+fn the_far_end_of_every_crease_spoke_is_a_few_hundredths_of_a_radian_at_most() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let mut far_ends = Vec::new();
+    let cube = cube(10.0);
+    let (edges, corners) = step(&cube, [0.0; 3], 2, 1.0, 2.0);
+    let built = fillet_setback(&cube, &edges, &corners).unwrap().expect("a solid");
+    far_ends.push(("cube", along_the_crease(&read(&built).creases[0])[20]));
+    let prism = make_prism(&[0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 5.0, 75.0_f64.sqrt(), 0.0], [0.0, 0.0, 12.0]).unwrap().unwrap();
+    for sharp in 0..3 {
+        let (edges, corners) = step(&prism, [0.0; 3], sharp, 1.0, 3.0);
+        let built = fillet_setback(&prism, &edges, &corners).unwrap().expect("a solid");
+        far_ends.push(("prism", along_the_crease(&read(&built).creases[0])[20]));
+    }
+    let apex = [3.0, 2.0, 9.0];
+    let base = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [4.0, 9.0, 0.0]];
+    let (mut positions, mut indices) = (Vec::new(), Vec::<u32>::new());
+    let mut push = |a: [f64; 3], b: [f64; 3], c: [f64; 3]| {
+        let at = (positions.len() / 3) as u32;
+        positions.extend(a.iter().chain(&b).chain(&c));
+        indices.extend([at, at + 1, at + 2]);
+    };
+    for i in 0..3 {
+        push(base[i], base[(i + 1) % 3], apex);
+    }
+    push(base[0], base[2], base[1]);
+    let tetra = make_sewn_solid(&positions, &indices).unwrap().unwrap();
+    for sharp in 0..3 {
+        let (edges, corners) = step(&tetra, apex, sharp, 0.5, 2.0);
+        let built = fillet_setback(&tetra, &edges, &corners).unwrap().expect("a solid");
+        far_ends.push(("tetra", along_the_crease(&read(&built).creases[0])[20]));
+    }
+    assert!(far_ends.iter().all(|(_, far)| *far < 0.01), "{far_ends:?}");
+}

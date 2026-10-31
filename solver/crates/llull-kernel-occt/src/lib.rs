@@ -45,6 +45,8 @@ mod deform_infinite_tests;
 #[cfg(test)]
 mod deform_tests;
 #[cfg(test)]
+mod edge_fold_tests;
+#[cfg(test)]
 mod features_tests;
 #[cfg(test)]
 mod naming_tests;
