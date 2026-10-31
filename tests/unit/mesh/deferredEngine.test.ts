@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { createReplayCache } from '@core/commands/history/replayCache';
 import { composeMeshEngines, deferMeshOp, deferralCount, MESH_ENGINE_PENDING } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshProcessingEngine } from '@core/geometry/mesh/engineTypes';
 import type { SubdivisionEntity } from '@core/model/types';
@@ -58,8 +59,9 @@ describe('replay_history around a deferred step', () => {
 
   it('memoizes the steps before the first deferral and none after it, not even the ones that did not defer themselves', () => {
     const ready = { now: true };
-    const context = contextWith(lateEngine(ready, 4));
-    const cache = context.replayCache;
+    // its own replay cache: defaultContext() shares one per kernel across the worker, so other suites would move the counts
+    const cache = createReplayCache();
+    const context = { ...contextWith(lateEngine(ready, 4)), replayCache: cache };
     const fresh = docWithMeshes(cuboid([-4, -4, -4], [4, 4, 4]));
     const withBox = execute(
       execute(fresh.doc, 'quad_remesh', { id: fresh.ids[0] as string, targetQuadCount: 6 }, context).document,
@@ -69,16 +71,16 @@ describe('replay_history around a deferred step', () => {
     );
     // what replaying the import step alone adds to the cache: the only step before the first deferral
     const importOnly = docWithMeshes(cuboid([-3, -3, -3], [3, 3, 3])).doc;
-    const start = cache?.size ?? 0;
+    const start = cache.size;
     execute(importOnly, 'replay_history', {}, context);
-    const importEntries = (cache?.size ?? 0) - start;
+    const importEntries = cache.size - start;
     expect(importEntries).toBeGreaterThan(0);
     ready.now = false;
-    const before = cache?.size ?? 0;
+    const before = cache.size;
     execute(withBox.document, 'replay_history', {}, context);
-    expect((cache?.size ?? 0) - before).toBe(importEntries);
+    expect(cache.size - before).toBe(importEntries);
     ready.now = true;
     execute(withBox.document, 'replay_history', {}, context);
-    expect((cache?.size ?? 0) - before).toBeGreaterThan(importEntries);
+    expect(cache.size - before).toBeGreaterThan(importEntries);
   });
 });
