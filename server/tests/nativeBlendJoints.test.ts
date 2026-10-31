@@ -451,7 +451,7 @@ describeNative('BLD M5 (13.32): blend_union joints by name and per-joint radius 
         expect(built.result.error, built.result.summary).toBeUndefined();
         const brep = (built.doc.entities[built.id] as { brep: Parameters<typeof kernel.evaluate>[0] }).brep;
         const shape = kernel.evaluate(brep) as NonNullable<ReturnType<typeof kernel.evaluate>>;
-        const face = (kernel.topology(shape)?.faces ?? []).findIndex((candidate) => candidate.name.startsWith('blend('));
+        const face = (kernel.topology(shape)?.faces ?? []).findIndex((candidate) => (candidate.name ?? '').startsWith('blend('));
         expect(face).toBeGreaterThanOrEqual(0);
         const [a, b] = [3 / Math.cos(tilt), 3];
         const start = jointsOf(built.result)[0]?.start as number[];
