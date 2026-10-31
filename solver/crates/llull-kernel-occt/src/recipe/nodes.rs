@@ -487,7 +487,7 @@ impl Evaluator {
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
     }
 
-    /// The operands of a `blend` node, its flat joint picks (per entry of `joints`: by_name, x, y, z, then the radius law in the `fillet_laws` layout) and the
+    /// The operands of a `blend` node, its flat joint picks (per entry of `joints`: by_name, x, y, z (a pick by name: the midpoint recorded with the name, NaN x 3 when none), then the radius law in the `fillet_laws` layout) and the
     /// joint names joined by newlines; `None` when a pick is malformed (neither `near` nor `name`, or a law the fillet laws refuse).
     fn blend_operands(&mut self, recipe: &Value) -> Result<Option<BlendOperands>, EvalError> {
         let Some(sources) = recipe.get("sources").and_then(Value::as_array) else { return Ok(None) };
@@ -502,7 +502,7 @@ impl Evaluator {
             let name = joint.get("name").and_then(Value::as_str).filter(|name| !name.is_empty() && !name.contains('\n'));
             let near = numbers(joint.get("near"));
             let at = match (name, &near) {
-                (Some(_), _) => vec![0.0; 3],
+                (Some(_), _) => numbers(joint.get("nameMid")).filter(|mid| mid.len() == 3).unwrap_or_else(|| vec![f64::NAN; 3]),
                 (None, Some(near)) if near.len() == 3 => near.clone(),
                 _ => return Ok(None),
             };

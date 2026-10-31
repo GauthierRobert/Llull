@@ -24,9 +24,9 @@ const KERNEL_PICK_REFUSAL =
 
 /**
  * @affects removes the operand solids; creates 1 mesh entity (their union, joints filleted)
- * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC); every joint has `radius` except the joints (and their tangent chains) a `joints` pick names (by persistent name, else nearest to near), which have the pick's radius or radius law; a pick by near records the name of its joint (recordExtras joints[].name) so regeneration follows the joint
+ * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC); every joint has `radius` except the joints (and their tangent chains) a `joints` pick names (by persistent name, else nearest to near), which have the pick's radius or radius law; a pick by near records the name of its joint (recordExtras joints[].name; with a "#k" name also joints[].nameMid, the midpoint of the joint) so regeneration follows the joint; a name and near together: the name wins and the summary / data.joints[].nearIgnored say near is ignored
  * @failure missing / duplicate / 2D / instance operand, bad radius, no kernel, kernel lacks blends, kernel refusal (radius too large for a
- *   joint) -> no-op, affected:[]; a joint radius <= 0, two radii (laws) on one tangent chain, a pick farther than 10 x its radius from every joint, no joint to pick, a pick with neither near nor name, a varying law on a joint chained with others -> BLD_JOINT_PARAMS (path joints[i].near / .radius / .radiusEnd); a bad law -> BLD_LAW_INVALID; a law that does not close on a closed joint -> BLD_LAW_NOT_PERIODIC; a joint name that no joint has (REF_LOST) or that several have (REF_SPLIT) (path joints[i].name)
+ *   joint) -> no-op, affected:[]; a joint radius <= 0, two radii (laws) on one tangent chain, a pick farther than 10 x its radius from every joint, no joint to pick, a pick with neither near nor name, a varying law on a joint chained with others -> BLD_JOINT_PARAMS (path joints[i].near / .radius / .radiusEnd); a bad law -> BLD_LAW_INVALID; a law that does not close on a closed joint -> BLD_LAW_NOT_PERIODIC; a "#k" joint whose midpoint moved more than 10 x its radius since it was recorded (the numbering of two faces' joints changed) -> REF_LOST; interior sizes on a closed joint that do not mirror about t = 1/2 -> BLD_LAW_NOT_PERIODIC (path joints[i].sizes); a joint name that no joint has (REF_LOST) or that several have (REF_SPLIT) (path joints[i].name)
  * data = { joints [{ index, distanceToJoint, radius, radiusEnd?, name, start, end }], unit } when joints were given
  */
 export const blendUnion = defineCommand({
@@ -101,11 +101,20 @@ export const blendUnion = defineCommand({
     const picks = kernel.blendReport?.(recipe)?.notes?.picks;
     if (committed.document === doc || picks === undefined || picks.length === 0) return committed;
     // a pick by point records the name of its joint, so a later regeneration follows the joint (names win over points)
-    const recorded = given.map((joint, at) =>
-      joint.name === undefined && picks[at]?.name !== undefined ? { ...joint, name: picks[at]?.name } : joint,
-    );
+    const recorded = given.map((joint, at) => {
+      const pick = picks[at];
+      if (joint.name !== undefined || pick?.name === undefined) return joint;
+      // "#k" names number the joints of two faces by position: the midpoint recorded with one lets a regeneration refuse a joint that took the number over
+      return { ...joint, name: pick.name, ...(pick.name.includes('#') && pick.mid !== undefined ? { nameMid: pick.mid } : {}) };
+    });
+    const ignored = given.flatMap((joint, at) => (joint.name !== undefined && joint.near !== undefined ? [{ at, name: joint.name }] : []));
     return {
       ...committed,
+      ...(ignored.length === 0
+        ? {}
+        : {
+            summary: `${committed.summary} ${ignored.map((entry) => `joints[${entry.at}] picked by name ${entry.name}; near ignored`).join('; ')} (edit name to move the pick).`,
+          }),
       data: {
         joints: picks.map((pick, at) => ({
           index: at,
@@ -113,6 +122,7 @@ export const blendUnion = defineCommand({
           radius: pick.radius,
           ...(planned.joints[at]?.radiusEnd === undefined ? {} : { radiusEnd: planned.joints[at]?.radiusEnd }),
           ...(pick.name === undefined ? {} : { name: pick.name }),
+          ...(ignored.some((entry) => entry.at === at) ? { nearIgnored: true } : {}),
           ...(pick.start === undefined ? {} : { start: pick.start }),
           ...(pick.end === undefined ? {} : { end: pick.end }),
         })),

@@ -248,6 +248,7 @@ function jointValid(joint: unknown): boolean {
   if (!named && !isVec3(joint['near'])) return false;
   if (joint['near'] !== undefined && !isVec3(joint['near'])) return false;
   if (joint['name'] !== undefined && !named) return false;
+  if (joint['nameMid'] !== undefined && !isVec3(joint['nameMid'])) return false;
   const law = { size: joint['radius'], sizeEnd: joint['radiusEnd'], sizes: joint['sizes'], interpolation: joint['interpolation'] };
   return radiiError({ op: 'fillet', radii: [law] }, 1) === null;
 }

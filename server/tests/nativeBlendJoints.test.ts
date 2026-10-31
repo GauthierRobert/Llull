@@ -251,6 +251,64 @@ describeNative('BLD M5 (13.32): blend_union joints by name and per-joint radius 
       const rows = checked(one.doc, one.id).blends.filter((row) => row.kind === 'edge');
       expect(rows.map((row) => row.source).sort()).toEqual(['default', 'joints[0]']);
     });
+
+    it('a #k name records the midpoint of its joint, and a regeneration refuses (REF_LOST) the joint that took the number over when the two swapped order', () => {
+      const a = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 14 });
+      const b = made(a.doc, 'add_cylinder', { radius: 3, height: 20, rotation: [Math.PI / 2, -0.5, 0] });
+      const ids = [a.id, b.id];
+      // #k numbers the joints of the same two faces by the position of their midpoints: tilted this way the loop at y > 0 is #2 (its middle at about (-0.72, 4.95, 0))
+      const built = made(b.doc, 'blend_union', { ids, radius: 0.2, joints: [{ near: [-3, 4, 0], radius: 0.3 }] });
+      expect(built.result.error, built.result.summary).toBeUndefined();
+      const recorded = (params(built.doc)['joints'] as Array<{ name: string; nameMid: number[] }>)[0] as {
+        name: string;
+        nameMid: number[];
+      };
+      expect(recorded.name).toBe('e(cyl-1.1:side|cyl-2.1:side)#2');
+      expect(recorded.nameMid[1]).toBeGreaterThan(4.5);
+      const step = built.doc.featureHistory.find(
+        (candidate) => candidate.name === 'add_cylinder' && (candidate.affected ?? []).includes(b.id),
+      );
+      const tilt = (doc: Doc, angle: number): ReturnType<typeof execute> =>
+        execute(doc, 'edit_step_params', {
+          stepId: step?.id,
+          params: { ...(step?.params as Record<string, unknown>), rotation: [Math.PI / 2, angle, 0] },
+        });
+      // a small edit keeps the joint where it was: still the same loop
+      const nudged = tilt(built.doc, -0.45);
+      expect(nudged.rejected, nudged.summary).toBeUndefined();
+      expect(nudged.summary).not.toContain('REF_LOST');
+      // tilted the other way the loop at y > 0 is #1 and #2 is the loop at y < 0, about 10 away: the number is not followed to another joint
+      const swapped = tilt(built.doc, 0.5);
+      expect(swapped.summary).toContain('REF_LOST');
+      expect(swapped.summary).toContain('numbering');
+      // the same step without the recorded midpoint silently gives the radius to the other loop: what the midpoint prevents
+      const blendStep = built.doc.featureHistory.at(-1);
+      const bare = execute(built.doc, 'edit_step_params', {
+        stepId: blendStep?.id,
+        params: { ...(blendStep?.params as Record<string, unknown>), joints: [{ near: [-3, 4, 0], radius: 0.3, name: recorded.name }] },
+      });
+      expect(bare.rejected, bare.summary).toBeUndefined();
+      const silent = tilt(bare.document, 0.5);
+      expect(silent.rejected, silent.summary).toBeUndefined();
+      expect(silent.summary).not.toContain('REF_LOST');
+    });
+
+    it('editing near on a step that recorded the name of its joint changes nothing, and the result says so', () => {
+      const { doc, ids } = tee(1);
+      const built = made(doc, 'blend_union', { ids, radius: 1, joints: [{ near: [15, 10, 4], radius: 0.5 }] });
+      expect(built.result.summary).not.toContain('near ignored');
+      const step = built.doc.featureHistory.at(-1);
+      const edited = execute(built.doc, 'edit_step_params', {
+        stepId: step?.id,
+        params: { ...(step?.params as Record<string, unknown>), joints: [{ near: [25, 10, 4], radius: 0.5, name: NAME_LEFT }] },
+      });
+      expect(edited.rejected, edited.summary).toBeUndefined();
+      expect(volume(edited.document, edited.document.order[0] as string)).toBe(volume(built.doc, built.id));
+      // edit_step_params does not carry the regenerated step's own summary: the same params run directly say it
+      const direct = execute(doc, 'blend_union', { ids, radius: 1, joints: [{ near: [25, 10, 4], radius: 0.5, name: NAME_LEFT }] });
+      expect(direct.summary).toContain(`joints[0] picked by name ${NAME_LEFT}; near ignored`);
+      expect(jointsOf(direct)[0]).toMatchObject({ name: NAME_LEFT, nearIgnored: true });
+    });
   });
 
   describe('curved and chained joints', () => {
@@ -337,6 +395,124 @@ describeNative('BLD M5 (13.32): blend_union joints by name and per-joint radius 
         const expected = crossedCylindersFilletVolume(5, 3, radius);
         expect(Math.abs(added - expected) / expected, `radius ${radius}: ${added} vs ${expected}`).toBeLessThan(5e-3);
       }
+    });
+
+    it('a closed joint refuses interior sizes that do not mirror about t = 1/2 (its direction cannot be told), and takes ones that do', () => {
+      const { doc, ids } = boss();
+      const law = (sizes: Array<{ t: number; size: number }>): Record<string, unknown> => ({
+        ids,
+        radius: 1,
+        joints: [{ near: [5, 0, 1], radius: 0.5, radiusEnd: 0.5, sizes }],
+      });
+      const asymmetric = execute(doc, 'blend_union', law([{ t: 0.25, size: 0.8 }]));
+      expect(asymmetric.document).toBe(doc);
+      expect(asymmetric.error).toMatchObject({ code: 'BLD_LAW_NOT_PERIODIC', paths: ['joints[0].sizes'] });
+      expect(asymmetric.summary).toContain('mirror about t = 1/2');
+      const uneven = execute(
+        doc,
+        'blend_union',
+        law([
+          { t: 0.25, size: 0.8 },
+          { t: 0.75, size: 0.9 },
+        ]),
+      );
+      expect(uneven.error).toMatchObject({ code: 'BLD_LAW_NOT_PERIODIC' });
+      const mirrored = made(
+        doc,
+        'blend_union',
+        law([
+          { t: 0.25, size: 0.8 },
+          { t: 0.75, size: 0.8 },
+        ]),
+      );
+      expect(mirrored.result.error, mirrored.result.summary).toBeUndefined();
+    });
+
+    /**
+     * A post tilted 60 degrees on a plate: its joint is an ellipse (semi axes 6 and 3, a parameter speed that differs 2 : 1 around it). The law 0.2 -> 0.6 at a quarter ->
+     * 0.6 at three quarters -> 0.2 is to sit by arc length: the radius at the joint's arc quarter is read from the blend itself (the distance from the joint point to the
+     * blend face over 1 / sin(half the wedge) - 1; at the plateau, which any placement agrees on, the reading is the law value to 1e-3).
+     */
+    it.fails(
+      'a varying law on an uneven-speed joint is placed by arc length: the radius at the arc quarter of a tilted post joint is the law value (FAILS until feat/des-6c-chain2 lands the arc-length placement; flip to it then)',
+      () => {
+        const plate = made(createEmptyDocument(), 'add_box', { size: [80, 80, 40], position: [0, 0, -20] });
+        const tilt = Math.PI / 3;
+        const post = made(plate.doc, 'add_cylinder', { radius: 3, height: 20, rotation: [0, tilt, 0] });
+        const sizes = [
+          { t: 0.25, size: 0.6 },
+          { t: 0.75, size: 0.6 },
+        ];
+        const built = made(post.doc, 'blend_union', {
+          ids: [plate.id, post.id],
+          radius: 0.2,
+          joints: [{ near: [3 / Math.cos(tilt), 0, 0], radius: 0.2, radiusEnd: 0.2, interpolation: 'linear', sizes }],
+        });
+        expect(built.result.error, built.result.summary).toBeUndefined();
+        const brep = (built.doc.entities[built.id] as { brep: Parameters<typeof kernel.evaluate>[0] }).brep;
+        const shape = kernel.evaluate(brep) as NonNullable<ReturnType<typeof kernel.evaluate>>;
+        const face = (kernel.topology(shape)?.faces ?? []).findIndex((candidate) => candidate.name.startsWith('blend('));
+        expect(face).toBeGreaterThanOrEqual(0);
+        const [a, b] = [3 / Math.cos(tilt), 3];
+        const start = jointsOf(built.result)[0]?.start as number[];
+        const phi0 = Math.atan2((start[1] as number) / b, (start[0] as number) / a);
+        const steps = 20000;
+        const points: Array<[number, number]> = [];
+        const arc: number[] = [0];
+        for (let k = 0; k <= steps; k++) {
+          const phi = phi0 + (2 * Math.PI * k) / steps;
+          const point: [number, number] = [a * Math.cos(phi), b * Math.sin(phi)];
+          const before = points.at(-1);
+          if (before !== undefined) arc.push((arc.at(-1) as number) + Math.hypot(point[0] - before[0], point[1] - before[1]));
+          points.push(point);
+        }
+        const axis = [Math.sin(tilt), 0, Math.cos(tilt)] as const;
+        const radiusAtArc = (fraction: number): number => {
+          const [x, y] = points[arc.findIndex((length) => length >= fraction * (arc.at(-1) as number))] as [number, number];
+          const along = x * axis[0];
+          const radial = [x - along * axis[0], y, -along * axis[2]] as const;
+          const wedge = Math.PI - Math.acos(radial[2] / Math.hypot(...radial));
+          const distance = kernel.faceQuery?.projectOnFace(shape, face, [[x, y, 0]])?.[0]?.distance as number;
+          return distance / (1 / Math.sin(wedge / 2) - 1);
+        };
+        expect(radiusAtArc(0.5)).toBeCloseTo(0.6, 3);
+        expect(radiusAtArc(0.25)).toBeCloseTo(0.6, 2);
+      },
+    );
+
+    it('a default-radius union and a three-solid corner union keep the face names and the volume of the build before the law-capable fillet (pins measured with the parent kernel)', () => {
+      const names = (doc: Doc, id: string): string[] =>
+        (execute(doc, 'inspect_topology', { id }).data as { faces: Array<{ name?: string }> }).faces.map((face) => face.name ?? '').sort();
+      // pinned from the llull-kernel built before the LawFillet switch (BRepFilletAPI_MakeFillet), same inputs
+      for (const [scale, pinned] of [
+        [1, 6402.146018366026],
+        [10, 6402146.018366025],
+      ] as const) {
+        const { doc, ids } = tee(scale);
+        const joined = made(doc, 'blend_union', { ids, radius: 0.5 * scale });
+        expect(joined.result.error, joined.result.summary).toBeUndefined();
+        expect(Math.abs(volume(joined.doc, joined.id) - pinned) / pinned).toBeLessThan(1e-12);
+        const all = names(joined.doc, joined.id);
+        expect(all).toHaveLength(16);
+        expect(all.filter((name) => name.startsWith('blend('))).toEqual([
+          'blend(e(box-1.1:z+|box-2.1:x+))',
+          'blend(e(box-1.1:z+|box-2.1:x-))',
+        ]);
+      }
+      const floor = made(createEmptyDocument(), 'add_box', { size: [30, 30, 4], position: [15, 15, -2] });
+      const wallX = made(floor.doc, 'add_box', { size: [2, 30, 11], position: [1, 15, 4.5] });
+      const wallY = made(wallX.doc, 'add_box', { size: [30, 2, 11], position: [15, 1, 4.5] });
+      const corner = made(wallY.doc, 'blend_union', { ids: [floor.id, wallX.id, wallY.id], radius: 0.5 });
+      expect(corner.result.error, corner.result.summary).toBeUndefined();
+      expect(Math.abs(volume(corner.doc, corner.id) - 4763.5200047682665) / 4763.52).toBeLessThan(1e-12);
+      const cornerNames = names(corner.doc, corner.id);
+      expect(cornerNames).toHaveLength(27);
+      expect(cornerNames.filter((name) => name.startsWith('blend('))).toEqual([
+        'blend(e(box-1.1:z+|box-2.1:x+))',
+        'blend(e(box-1.1:z+|box-3.1:y+))',
+        'blend(e(box-2.1:x+|box-3.1:y+))',
+        'blend(v:e(box-1.1:z+|box-2.1:x+),e(box-1.1:z+|box-3.1:y+),e(box-2.1:x+|box-3.1:y+))',
+      ]);
     });
   });
 });

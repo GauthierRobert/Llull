@@ -198,6 +198,8 @@ export interface BlendBuildNotes {
     readonly name?: string;
     readonly start?: Vec3;
     readonly end?: Vec3;
+    /** The middle (parameter midpoint) of the joint edge: recorded with a `#k` name, which numbers the joints of two faces by position. */
+    readonly mid?: Vec3;
   }>;
   readonly contours?: ReadonlyArray<{
     readonly radius: number;

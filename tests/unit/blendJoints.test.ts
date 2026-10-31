@@ -142,6 +142,43 @@ describe('blend_union joints: persistent names', () => {
     expect(step?.params).toMatchObject({ joints: [{ name: 'e(box-1.1:z+|box-2.1:x-)' }] });
   });
 
+  it('a #k name records the midpoint of its joint with it (nameMid), a plain name does not', () => {
+    const notes = (name: string): NonNullable<GeometryKernel['blendReport']> =>
+      report({
+        notes: {
+          builder: 'union',
+          picks: [{ distance: 0, radius: 0.2, name, start: [0, 0, 0], end: [1, 0, 0], mid: [0.5, 2, 0] }],
+          contours: [],
+        },
+      });
+    const { doc, ids } = pair();
+    setGeometryKernel(withReport(notes('e(a|b)#2')));
+    const numbered = execute(doc, 'blend_union', { ids, radius: 0.1, joints: [{ near: [1, 1, 1], radius: 0.2 }] });
+    expect(numbered.document.featureHistory.at(-1)?.params).toMatchObject({ joints: [{ name: 'e(a|b)#2', nameMid: [0.5, 2, 0] }] });
+    setGeometryKernel(withReport(notes('e(a|b)')));
+    const plain = execute(doc, 'blend_union', { ids, radius: 0.1, joints: [{ near: [1, 1, 1], radius: 0.2 }] });
+    expect(JSON.stringify(plain.document.featureHistory.at(-1)?.params)).not.toContain('nameMid');
+    // replayed from the recorded step, the midpoint reaches the recipe with its name and is dropped without one
+    const params = numbered.document.featureHistory.at(-1)?.params as Record<string, unknown>;
+    const replayed = execute(doc, 'blend_union', params);
+    expect(blendOf(replayed.document, replayed.affected[0] as string).joints?.[0]).toMatchObject({
+      name: 'e(a|b)#2',
+      nameMid: [0.5, 2, 0],
+    });
+    const nameless = execute(doc, 'blend_union', { ids, radius: 0.1, joints: [{ near: [1, 1, 1], nameMid: [1, 2, 3], radius: 0.2 }] });
+    expect(JSON.stringify(blendOf(nameless.document, nameless.affected[0] as string).joints)).not.toContain('nameMid');
+  });
+
+  it('a pick with both a name and near says near is ignored, in the summary and in data.joints', () => {
+    setGeometryKernel(withReport(picked(['e(a|b)'])));
+    const { doc, ids } = pair();
+    const both = execute(doc, 'blend_union', { ids, radius: 0.1, joints: [{ name: 'e(a|b)', near: [1, 1, 1], radius: 0.2 }] });
+    expect(both.summary).toContain('joints[0] picked by name e(a|b); near ignored');
+    expect(both.data).toMatchObject({ joints: [{ index: 0, nearIgnored: true }] });
+    const byPoint = execute(doc, 'blend_union', { ids, radius: 0.1, joints: [{ near: [1, 1, 1], radius: 0.2 }] });
+    expect(byPoint.summary).not.toContain('near ignored');
+  });
+
   it('a kernel that names no joint leaves the step as it was given', () => {
     setGeometryKernel(withReport(picked([undefined])));
     const { doc, ids } = pair();
@@ -200,6 +237,8 @@ describe('blend recipes with named joints', () => {
       validateShapeRecipe(blend([{ near: [0, 0, 0], radius: 0.5, radiusEnd: 1, sizes: [{ t: 0.5, size: 2 }], interpolation: 'monotone' }])),
     ).toBeNull();
     expect(validateShapeRecipe(blend([{ name: 'e(a|b)', near: [0, 0, 0], radius: 0.5 }]))).toBeNull();
+    expect(validateShapeRecipe(blend([{ name: 'e(a|b)#1', nameMid: [0, 1, 2], radius: 0.5 }]))).toBeNull();
+    expect(validateShapeRecipe(blend([{ name: 'e(a|b)#1', nameMid: [0, 1], radius: 0.5 }]))).not.toBeNull();
   });
   it.each([
     ['neither near nor name', { radius: 0.5 }],

@@ -57,6 +57,8 @@ export interface FullRoundParams {
 export interface JointRadius {
   readonly near?: Vec3;
   readonly name?: string;
+  /** Where the joint of a `#k` name was (the midpoint of its edge) when the name was recorded: a regeneration refuses a joint of that name whose midpoint moved more than 10 x its radius. */
+  readonly nameMid?: Vec3;
   readonly radius: number;
   readonly radiusEnd?: number;
   readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;

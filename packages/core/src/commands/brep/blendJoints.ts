@@ -21,6 +21,9 @@ export const jointSchema = z.object({
       'Persistent name of the joint (an edge of the union, "e(<face>|<face>)", "#k" when the same two faces meet more than once). Recorded automatically from a pick by near and used on regeneration, so the same joint keeps its radius after an upstream edit; a name that no joint has now is REF_LOST, one that several have is REF_SPLIT (re-pick: remove name, or give a current one from data.joints[].name / check_blends sourceEdges). Wins over near.',
     )
     .optional(),
+  nameMid: vec3(
+    'Set by the command, not by you: the midpoint of the joint edge when its name with a #k suffix was recorded. A regeneration refuses (REF_LOST) the joint of that name when its midpoint moved more than 10 x its radius, because #k numbers the joints of two faces by position and an upstream edit can hand the number to another joint.',
+  ).optional(),
   radius: z
     .number()
     .describe(
@@ -116,6 +119,7 @@ export function planJoints(joints: readonly JointInput[]): { readonly joints: Jo
     planned.push({
       ...(joint.near === undefined ? {} : { near: joint.near }),
       ...(joint.name === undefined ? {} : { name: joint.name }),
+      ...(joint.name === undefined || joint.nameMid === undefined ? {} : { nameMid: joint.nameMid }),
       radius: law.size,
       ...(law.sizeEnd === undefined ? {} : { radiusEnd: law.sizeEnd }),
       ...(law.sizes === undefined || law.sizes.length === 0 ? {} : { sizes: law.sizes }),

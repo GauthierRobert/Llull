@@ -121,7 +121,7 @@ fn law_pick(at: [f64; 3], size: f64, end: f64, mode: f64) -> Vec<f64> {
 
 /// A pick by name with a constant radius.
 fn name_pick(size: f64) -> Vec<f64> {
-    vec![1.0, 0.0, 0.0, 0.0, size, f64::NAN, 0.0, 0.0]
+    vec![1.0, f64::NAN, f64::NAN, f64::NAN, size, f64::NAN, 0.0, 0.0]
 }
 
 fn notes_of(shape: &Shape) -> serde_json::Value {
@@ -161,11 +161,19 @@ fn a_joint_picked_by_name_is_the_joint_picked_by_point_and_the_notes_carry_its_n
     let by_name = crate::features::blend(&[&plate, &stem], 1.0, &name_pick(0.5), &name).unwrap().expect("builds");
     assert_eq!(volume_of(&by_name), volume_of(&by_point));
     assert_eq!(notes_of(&by_name)["picks"][0]["distance"].as_f64().unwrap(), 0.0);
-    // a pick by name never looks at the point
-    let mut both = name_pick(0.5);
-    both[1..4].copy_from_slice(&[25.0, 10.0, 4.0]);
-    let named = crate::features::blend(&[&plate, &stem], 1.0, &both, &name).unwrap().unwrap();
+    // a pick by name takes its x, y, z as the midpoint recorded with a #k name: the joint where it was is the joint, one ten radii away is REF_LOST
+    let mut mid = pick["mid"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<_>>();
+    assert!(name.contains('#'), "{name}");
+    let mut recorded = name_pick(0.5);
+    recorded[1..4].copy_from_slice(&mid);
+    let named = crate::features::blend(&[&plate, &stem], 1.0, &recorded, &name).unwrap().unwrap();
     assert_eq!(volume_of(&named), volume_of(&by_point));
+    mid[0] += 10.0;
+    recorded[1..4].copy_from_slice(&mid);
+    let moved = blend_reason_raw(&[&plate, &stem], &recorded, &name);
+    assert!(moved.starts_with("[REF_LOST] joints[0].name:") && moved.contains("numbering"), "{moved}");
+    // a pick by name without a recorded midpoint (NaN) is not checked
+    assert!(blend_reason_raw(&[&plate, &stem], &name_pick(0.5), &name).is_empty());
     // two picks: one by name, one by point on the other joint
     let mut two = name_pick(0.5);
     two.extend(law_pick([25.0, 10.0, 4.0], 1.5, f64::NAN, 0.0));
@@ -271,4 +279,24 @@ fn a_radius_that_varies_needs_a_joint_alone_in_its_tangent_chain() {
     let conflict = blend_reason_raw(&[&plate, &rounded], &two, names);
     assert!(conflict.starts_with("[BLD_JOINT_PARAMS] joints[1].radius:"), "{conflict}");
     assert!(conflict.contains("one radius per chain"), "{conflict}");
+}
+
+#[test]
+fn a_station_count_that_is_not_a_whole_number_within_the_flat_is_malformed_not_a_wild_cast() {
+    let _serial = crate::serial_blends();
+    let (plate, stem) = tee(1.0);
+    let malformed = |count: f64| {
+        let mut pick = law_pick([15.0, 10.0, 4.0], 0.5, f64::NAN, 0.0);
+        pick[7] = count;
+        blend_reason_raw(&[&plate, &stem], &pick, "")
+    };
+    // 2^63 doubles to 2 x count = 0 in size_t: the length check passed and the law was then read far past the data
+    for count in [9.223372036854775808e18, f64::INFINITY, 1e300, 1e7, 1.5, -1.0, f64::NAN, 3.0] {
+        assert!(
+            malformed(count).starts_with("[BLD_JOINT_PARAMS] joints: the joint radii are malformed"),
+            "count {count}: {}",
+            malformed(count)
+        );
+    }
+    assert!(malformed(0.0).is_empty());
 }

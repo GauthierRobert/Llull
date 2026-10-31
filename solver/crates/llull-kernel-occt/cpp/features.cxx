@@ -495,10 +495,12 @@ static int nearest_joint(const std::vector<TopoDS_Edge> &joints, const gp_Pnt &p
 
 namespace {
 
+constexpr double kMaxLawStations = 1e6;
+
 // One joint pick as the host sent it: by persistent name or by point, with its radius law in the layout of fillet_laws (size, size_end (NaN = constant), mode, n, n x (t, size)).
 struct JointPick {
   bool by_name = false;
-  gp_Pnt at;
+  gp_Pnt at;  // by point: the point; by name: the midpoint recorded with the name (NaN when none)
   std::string name;
   std::vector<double> law;
 };
@@ -518,7 +520,9 @@ bool read_picks(rust::Slice<const double> flat, const std::string &joined_names,
     pick.by_name = flat[at] != 0.0;
     pick.at = gp_Pnt(flat[at + 1], flat[at + 2], flat[at + 3]);
     const double count = flat[at + 4 + 3];
-    if (!(count >= 0) || at + 4 + kLawHeader + 2 * static_cast<size_t>(count) > flat.size()) return false;
+    // a count that is not a whole number up to the flat's own length is malformed (checked before the size_t cast: an infinite or huge double is undefined there)
+    if (!(count >= 0 && count <= kMaxLawStations) || count != std::floor(count) || at + 4 + kLawHeader + 2 * static_cast<size_t>(count) > flat.size())
+      return false;
     const size_t length = kLawHeader + 2 * static_cast<size_t>(count);
     pick.law.assign(flat.data() + at + 4, flat.data() + at + 4 + length);
     if (out.size() >= names.size()) return false;
@@ -562,6 +566,23 @@ bool valid_law(const std::vector<double> &law) {
 // `name` or a split image of it: an edge recorded as e(A|B) matches e(A|B)#1 (the rule of geometry/naming/references.ts).
 bool name_matches(const std::string &candidate, const std::string &name) {
   return candidate == name || (name.find('#') == std::string::npos && candidate.rfind(name + "#", 0) == 0);
+}
+
+// The point of a joint edge at the middle of its parameter range: what the numbering of the same two faces' edges (#k, naming.cxx) is ordered by.
+gp_Pnt joint_midpoint(const TopoDS_Edge &edge) {
+  const BRepAdaptor_Curve curve(edge);
+  return curve.Value(0.5 * (curve.FirstParameter() + curve.LastParameter()));
+}
+
+// A radius law whose stations (interior t) mirror about t = 1/2 with the same sizes: the same law read from either end of a closed joint.
+bool symmetric_stations(const std::vector<double> &law) {
+  const size_t count = static_cast<size_t>(law[3]);
+  for (size_t k = 0; k < count; ++k) {
+    const size_t other = count - 1 - k;
+    if (std::fabs(law[kLawHeader + 2 * k] + law[kLawHeader + 2 * other] - 1.0) > 1e-9) return false;
+    if (std::fabs(law[kLawHeader + 2 * k + 1] - law[kLawHeader + 2 * other + 1]) > 1e-9 * law[kLawHeader + 2 * k + 1]) return false;
+  }
+  return true;
 }
 
 std::string json_quote(const std::string &text) {
@@ -684,6 +705,22 @@ static std::unique_ptr<Shape> build_blend_union(const ShapeList &list, double ra
         return nullptr;
       }
       joint = found.front();
+      const std::string &found_name = joint_names[static_cast<size_t>(joint)];
+      if (found_name != pick.name) {
+        why = "[REF_SPLIT] " + label + ".name: '" + pick.name + "' now names only '" + found_name + "' (the joint was split, or its other part is no joint now); name " +
+              "the part you mean in full";
+        return nullptr;
+      }
+      // #k numbers the edges of the same two faces by position, so an upstream edit can hand the number to another joint: the joint must be where it was recorded
+      if (pick.name.find('#') != std::string::npos && std::isfinite(pick.at.X()) && std::isfinite(pick.at.Y()) && std::isfinite(pick.at.Z())) {
+        const double moved = joint_midpoint(joints[static_cast<size_t>(joint)]).Distance(pick.at);
+        if (moved > kJointReach * largest_size(pick.law)) {
+          why = "[REF_LOST] " + label + ".name: '" + pick.name + "' is now a joint whose middle is " + std::to_string(moved) + " from where it was recorded, more than 10 x its radius (" +
+                std::to_string(kJointReach * largest_size(pick.law)) + "): the numbering of the joints of those two faces changed; pick it again by near or name a current joint (joints: " +
+                names_list(joint_names) + ")";
+          return nullptr;
+        }
+      }
     } else {
       joint = nearest_joint(joints, pick.at, distance);
       if (joint < 0) {
@@ -703,6 +740,8 @@ static std::unique_ptr<Shape> build_blend_union(const ShapeList &list, double ra
     write_point(pick_notes, curve.Value(curve.FirstParameter()));
     pick_notes << ",\"end\":";
     write_point(pick_notes, curve.Value(curve.LastParameter()));
+    pick_notes << ",\"mid\":";
+    write_point(pick_notes, joint_midpoint(edge));
     pick_notes << "}";
     const int known = maker.Contour(edge);
     if (known > 0) {
@@ -715,6 +754,12 @@ static std::unique_ptr<Shape> build_blend_union(const ShapeList &list, double ra
       continue;
     }
     if (!constant_law(pick.law)) {
+      const bool closed_joint = TopExp::FirstVertex(edge, true).IsSame(TopExp::LastVertex(edge, true));
+      // the direction a closed joint is walked in cannot be read from its ends, so interior stations are only taken when they read the same either way
+      if (closed_joint && pick.law[3] > 0 && !symmetric_stations(pick.law)) {
+        why = "[BLD_LAW_NOT_PERIODIC] " + label + ".sizes: the joint is a closed curve and the direction its law runs in cannot be told, so interior sizes must mirror about t = 1/2 (a size at t and the same size at 1 - t)";
+        return nullptr;
+      }
       const double end = std::isnan(pick.law[1]) ? pick.law[0] : pick.law[1];
       if (TopExp::FirstVertex(edge, true).IsSame(TopExp::LastVertex(edge, true)) && std::fabs(pick.law[0] - end) > 1e-9 * std::max(pick.law[0], end)) {
         why = "[BLD_LAW_NOT_PERIODIC] " + label + ".radiusEnd: the joint is a closed curve, so the radius must return to its start: r(0) = " +
