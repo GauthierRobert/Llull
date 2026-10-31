@@ -32,6 +32,24 @@ mod ffi {
             kind: f64,
             param: f64,
         ) -> Result<UniquePtr<Shape>>;
+        fn fillet_profile_legs(
+            shape: &Shape,
+            specs: &[f64],
+            edges: &[u32],
+            laws: &[f64],
+            legs: &[f64],
+            kind: f64,
+            param: f64,
+        ) -> Result<UniquePtr<Shape>>;
+        fn profile_legs_reason(
+            shape: &Shape,
+            specs: &[f64],
+            edges: &[u32],
+            laws: &[f64],
+            legs: &[f64],
+            kind: f64,
+            param: f64,
+        ) -> Result<String>;
         fn profile_blend_last_reason() -> Result<String>;
         fn shape_notes(shape: &Shape) -> Result<String>;
         fn profile_blend_reason(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<String>;
@@ -136,6 +154,26 @@ pub fn fillet_profile(shape: &Shape, specs: &[f64]) -> Built {
 /// for `edges` / `laws` (empty when a leg is asymmetric) with the section `kind` / `param`.
 pub fn fillet_profile_blend(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Built {
     built(ffi::fillet_profile_blend(inner(shape)?, specs, edges, laws, kind, param))
+}
+
+/// [`fillet_profile_blend`] for a two-leg (`size2`) plan: `legs` holds 6 numbers per edge (unique edge index, unique face index carrying the first leg, size,
+/// sizeEnd (NaN = constant), size2, size2End (NaN = constant)); the prism builder (`specs`, constant legs) is tried first, then the chamfer-based builder
+/// (curved edges and faces, legs that vary along the edge).
+pub fn fillet_profile_legs(shape: &Shape, specs: &[f64], edges: &[u32], laws: &[f64], legs: &[f64], kind: f64, param: f64) -> Built {
+    built(ffi::fillet_profile_legs(inner(shape)?, specs, edges, laws, legs, kind, param))
+}
+
+/// Why [`fillet_profile_legs`] fails ("" when it builds).
+pub fn profile_legs_reason(
+    shape: &Shape,
+    specs: &[f64],
+    edges: &[u32],
+    laws: &[f64],
+    legs: &[f64],
+    kind: f64,
+    param: f64,
+) -> OcctResult<String> {
+    occt(ffi::profile_legs_reason(inner(shape)?, specs, edges, laws, legs, kind, param))
 }
 
 /// Why `fillet_profile_blend` fails ("" when it builds).

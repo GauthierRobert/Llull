@@ -46,6 +46,12 @@ std::unique_ptr<Shape> fillet_profile_blend(const Shape &shape, rust::Slice<cons
                                             rust::Slice<const double> laws, double kind, double param);
 // The reason the last fillet_profile_blend of this thread returned null (it computed it while building).
 rust::String profile_blend_last_reason();
+// fillet_profile_blend with two legs (cpp/blend_legs.cxx): `legs` holds 6 numbers per edge (unique edge, unique face carrying the first leg, size, sizeEnd (NaN: constant),
+// size2, size2End (NaN: constant)); the prism builder's refusals (curved edges and faces, legs that run) fall back to it.
+std::unique_ptr<Shape> fillet_profile_legs(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws,
+                                           rust::Slice<const double> legs, double kind, double param);
+rust::String profile_legs_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws,
+                                 rust::Slice<const double> legs, double kind, double param);
 rust::String shape_notes(const Shape &shape);
 rust::String profile_blend_reason(const Shape &shape, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
                                   rust::Slice<const double> laws, double kind, double param);

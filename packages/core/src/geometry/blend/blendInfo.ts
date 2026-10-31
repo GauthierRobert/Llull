@@ -137,6 +137,10 @@ export function chamferNodes(recipe: ShapeRecipe): FilletNode[] {
   }
 }
 
+/** Every fillet node of `recipe` that gives an edge two legs (`size2`), outermost first. */
+export const legFilletNodes = (recipe: ShapeRecipe): FilletNode[] =>
+  filletNodes(recipe).filter((node) => (node.radii ?? []).some((law) => law.size2 !== undefined));
+
 /** Every blend_union node of `recipe` (through sources and boolean operands), outermost first. */
 export function blendNodes(recipe: ShapeRecipe): Array<Extract<ShapeRecipe, { op: 'blend' }>> {
   switch (recipe.op) {

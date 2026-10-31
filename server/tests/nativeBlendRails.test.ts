@@ -496,9 +496,12 @@ describeNative('BLD M2 remainder: profiles on curved edges and faces, varying si
     expect(sharp.document).toBe(doc);
     const rim = cylinder(10, 20);
     const legs = execute(rim.doc, 'fillet_edge', { id: rim.id, edges: [{ near: [10, 0, 20], size: 1, size2: 2, side1Near: [0, 0, 20] }] });
-    expect(legs.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
-    expect(legs.summary).toContain('straight');
-    const both = execute(doc, 'fillet_edge', { id, edges: [{ near: [10, 5, 10], size: 1, sizeEnd: 2, size2: 2, side1Near: [10, 5, 10] }] });
+    // two legs on a curved edge are built since 13.34 (nativeBlendLegs.test.ts); control points with a leg are still refused
+    expect(legs.error).toBeUndefined();
+    const both = execute(doc, 'fillet_edge', {
+      id,
+      edges: [{ near: [10, 5, 10], size: 1, sizes: [{ t: 0.5, size: 2 }], size2: 2, side1Near: [10, 5, 10] }],
+    });
     expect(both.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
     const atVertex = [
       [10, 0, 10],
