@@ -3,24 +3,19 @@
  * lugs + dropouts → a single blended carbon frame).
  */
 
-import { type Entity, type ShapeRecipe, is3D } from '../../model/types';
+import { type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop, failer } from '../noop';
 import { blendRejection } from './blendCodes';
-import { jointSchema, planJoints } from './blendJoints';
+import { jointSchema, parsePickRefusal, planJoints, unionRecipe } from './blendJoints';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { round6 } from '../../lib/compactNumber';
-import { operandRecipe } from '../../geometry/operandRecipe';
 import { OCC_KERNEL_HINT } from './modifyTarget';
 
 const MAX_BLEND_OPERANDS = 200;
-
-/** `[CODE] joints[i].path: message` as the kernel words a refusal about a pick. */
-const KERNEL_PICK_REFUSAL =
-  /^\[(BLD_JOINT_PARAMS|BLD_LAW_NOT_PERIODIC|REF_LOST|REF_SPLIT)\]\s*(joints(?:\[\d+\])?(?:\.\w+)?):\s*([\s\S]*)$/;
 
 /**
  * @affects removes the operand solids; creates 1 mesh entity (their union, joints filleted)
@@ -74,17 +69,12 @@ export const blendUnion = defineCommand({
     const planned = planJoints(given);
     if ('refusal' in planned)
       return blendRejection(doc, 'blend_union', planned.refusal.code, planned.refusal.message, ids, [planned.refusal.path]);
-    const recipe: ShapeRecipe = {
-      op: 'blend',
-      sources: operands.map((entity) => operandRecipe(kernel, entity)),
-      radius,
-      ...(planned.joints.length === 0 ? {} : { joints: planned.joints }),
-    };
+    const recipe = unionRecipe(kernel, operands, radius, planned.joints);
     const result = evaluateRecipe(kernel, recipe);
     if (result === 'refused') {
       const why = kernel.blendReport?.(recipe)?.message;
-      const coded = KERNEL_PICK_REFUSAL.exec(why ?? '');
-      if (coded !== null) return blendRejection(doc, 'blend_union', coded[1] ?? '', coded[3] ?? '', ids, [coded[2] ?? 'joints']);
+      const coded = parsePickRefusal(why);
+      if (coded !== null) return blendRejection(doc, 'blend_union', coded.code, coded.text, ids, [coded.path]);
       return fail(
         `the kernel could not blend the joints of [${ids.join(', ')}] with radius ${radius}${why === undefined || why === '' ? '' : ` (${why})`}; try another radius (smaller usually fits; a crotch where 3 solids meet can reject specific radii)`,
       );
