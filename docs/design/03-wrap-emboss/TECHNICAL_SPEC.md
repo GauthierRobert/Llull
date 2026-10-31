@@ -788,6 +788,28 @@ the chain is refused with `WRP_DISTORTION_EXCEEDED`, and so is any limit below t
 
 **Deviations (never silent).** The chain of non-developable faces is a first-order unfolding: the join mismatch (over the window and at every crossing of the sketch) and the stretch are measured and refused above the limit, not zero. A sketch that leaves the joined window is refused rather than cut on the extended chord. A closed edge (a meridian) is joined only over the window the chart reaches, so a sketch farther from the edge than that is refused. The sphere / torus chains and the emboss closed form per face (`expectedVolumeDelta`) are checked on the native kernel only for the cone and torus cases above.
 
+### 14.14 Variable TrueType: `gvar`, `avar` version 2, `MVAR` (DES-3c)
+
+`variation` now instances TrueType fonts with a `gvar` table as well as CFF2 ones. Files: `lib/font/gvar.ts` (tuple variation store), `lib/font/variation.ts` (`avar` 2), `lib/font/mvar.ts`, `lib/font/glyf.ts` (the hooks), `lib/font/font.ts` (wiring).
+
+**`gvar`.** Per glyph, a list of tuples: a peak (embedded, or an index into the shared tuples), an optional intermediate region (start / end per axis; without one the region runs from 0 to the peak), point numbers (private, or the glyph's shared ones when the header flag 0x8000 is set; count 0 = every point; runs
+of byte or word steps), and packed deltas (runs of zeros, bytes, words) for x then y. A tuple's scalar at the instance is the product over axes of the usual tent (the region scalar of the `ItemVariationStore`, `regionScalar`); the tuple's deltas times its scalar are summed. The points are those of the glyph followed by four phantom points; a composite glyph's
+points are its component offsets (then the phantoms). **IUP:** a tuple that names only some points leaves the others of a contour to be inferred, per axis, from the touched points before and after them in the contour (cyclic): one touched point moves the whole contour; between two touched points an untouched one takes the delta of the nearer
+(in coordinate) end when it lies outside their range, the linear interpolation inside it, and 0 when the two touched points have the same coordinate but different deltas (the same delta when equal). The advance of a glyph without `HVAR` is the base advance plus (delta of phantom point 2) - (delta of phantom point 1); with `HVAR` that wins. The default instance reads
+no `gvar` at all (the outline is the static one).
+
+**`avar` version 2.** After the segment maps of version 1 (applied first, as before), a delta store: for every axis i (also one left at its default), through the optional axis index map (otherwise row i of subtable 0), `delta_i` is evaluated at the segment-mapped coordinates of all axes and the coordinate becomes
+clamp(c_i + delta_i / 16384, -1, 1) (2.14 fixed point). A table that stops before the two offsets is damaged (`WRP_FONT_PARSE`); a store with more axes than `fvar` too.
+
+**`MVAR`.** Value records (tag, outer, inner) over an `ItemVariationStore`; the deltas at the instance, rounded, are added to `hasc` (ascender), `hdsc` (descender), `hlgp` (line gap) and `cpht` (cap height, when it comes from OS/2). `xhgt` and the other tags are read and ignored (the layout does not use them).
+
+**Bounds (like the CFF work).** At most 64 axes and 4096 shared tuples, the glyph count at most the font's, every offset and run checked by `ByteView`, point numbers inside the glyph (+ 4), runs inside their counts, at most 4095 tuples per glyph, tuples x points of a glyph at most 2e6, and the tuple work of all the glyphs of a font is charged to the same
+operator budget as the CFF charstrings (20e6) when the font is scanned at import. `MVAR` has at most 256 records. Damage is `WRP_FONT_PARSE`; a font without variation data asked for an instance is `WRP_FONT_VARIATION`.
+
+**Measured (`tests/unit/wrap/gvar.test.ts`).** Generated fonts with closed-form outlines: wght 900 moves the right corners by 40 and IUP gives 20 / 40 / 20 / 0 to the points between (x = 0, 70, 140 ...), the advance +40 through the phantom point (HVAR +100 wins when present); wght 650 scales by 0.5 and the intermediate tuple (0.25 / 0.5 / 1) is at its peak (+8);
+wght 550 gives its 0.2 scalar; the wght- tuple's single touched point moves the whole contour by -10 s; composite offsets move by their deltas; a 150-point list (two-byte count), a step of 300 (word point numbers) and a delta of 300 (word delta) are read; `avar` 2 moves wdth to 0.5 at wght 900 (so the wdth tuple scales by 0.5) and to 0.125 through a bent wght map; `MVAR` moves the metrics (+50 / -20 / +10 / +30 at wght 900,
+half at 650). On Bahnschrift (system font, test skipped without it): the I stem grows with wght (144 / 204 / 284 wide at wght 300 / 400 / 700), the H narrows with wdth 75 (advance 1390 -> 870), the point structure is the same at every instance, and all glyphs of three instances read within the budgets. No reference outlines of a third-party renderer were available offline, so the real-font checks are properties, not values.
+
 ### 14.15 Mitred walls across a sharp plane-plane edge (DES-3c)
 
 An emboss or deboss chain whose outline crosses a straight edge between two plane faces is built face by face (slabs with walls normal to their face, §14.6) and the corner is closed by a mitre (`embossMitre.ts`).
@@ -828,25 +850,3 @@ divides its face into arcs of 30 and 60 degrees times the width (1e-3).
 cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
 (the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised through the test hooks of `freeformContours` (a field or projection no real surface gives) and by a C0 crease. A kernel defect found on the way (two sequential
 face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.
-
-### 14.14 Variable TrueType: `gvar`, `avar` version 2, `MVAR` (DES-3c)
-
-`variation` now instances TrueType fonts with a `gvar` table as well as CFF2 ones. Files: `lib/font/gvar.ts` (tuple variation store), `lib/font/variation.ts` (`avar` 2), `lib/font/mvar.ts`, `lib/font/glyf.ts` (the hooks), `lib/font/font.ts` (wiring).
-
-**`gvar`.** Per glyph, a list of tuples: a peak (embedded, or an index into the shared tuples), an optional intermediate region (start / end per axis; without one the region runs from 0 to the peak), point numbers (private, or the glyph's shared ones when the header flag 0x8000 is set; count 0 = every point; runs
-of byte or word steps), and packed deltas (runs of zeros, bytes, words) for x then y. A tuple's scalar at the instance is the product over axes of the usual tent (the region scalar of the `ItemVariationStore`, `regionScalar`); the tuple's deltas times its scalar are summed. The points are those of the glyph followed by four phantom points; a composite glyph's
-points are its component offsets (then the phantoms). **IUP:** a tuple that names only some points leaves the others of a contour to be inferred, per axis, from the touched points before and after them in the contour (cyclic): one touched point moves the whole contour; between two touched points an untouched one takes the delta of the nearer
-(in coordinate) end when it lies outside their range, the linear interpolation inside it, and 0 when the two touched points have the same coordinate but different deltas (the same delta when equal). The advance of a glyph without `HVAR` is the base advance plus (delta of phantom point 2) - (delta of phantom point 1); with `HVAR` that wins. The default instance reads
-no `gvar` at all (the outline is the static one).
-
-**`avar` version 2.** After the segment maps of version 1 (applied first, as before), a delta store: for every axis i (also one left at its default), through the optional axis index map (otherwise row i of subtable 0), `delta_i` is evaluated at the segment-mapped coordinates of all axes and the coordinate becomes
-clamp(c_i + delta_i / 16384, -1, 1) (2.14 fixed point). A table that stops before the two offsets is damaged (`WRP_FONT_PARSE`); a store with more axes than `fvar` too.
-
-**`MVAR`.** Value records (tag, outer, inner) over an `ItemVariationStore`; the deltas at the instance, rounded, are added to `hasc` (ascender), `hdsc` (descender), `hlgp` (line gap) and `cpht` (cap height, when it comes from OS/2). `xhgt` and the other tags are read and ignored (the layout does not use them).
-
-**Bounds (like the CFF work).** At most 64 axes and 4096 shared tuples, the glyph count at most the font's, every offset and run checked by `ByteView`, point numbers inside the glyph (+ 4), runs inside their counts, at most 4095 tuples per glyph, tuples x points of a glyph at most 2e6, and the tuple work of all the glyphs of a font is charged to the same
-operator budget as the CFF charstrings (20e6) when the font is scanned at import. `MVAR` has at most 256 records. Damage is `WRP_FONT_PARSE`; a font without variation data asked for an instance is `WRP_FONT_VARIATION`.
-
-**Measured (`tests/unit/wrap/gvar.test.ts`).** Generated fonts with closed-form outlines: wght 900 moves the right corners by 40 and IUP gives 20 / 40 / 20 / 0 to the points between (x = 0, 70, 140 ...), the advance +40 through the phantom point (HVAR +100 wins when present); wght 650 scales by 0.5 and the intermediate tuple (0.25 / 0.5 / 1) is at its peak (+8);
-wght 550 gives its 0.2 scalar; the wght- tuple's single touched point moves the whole contour by -10 s; composite offsets move by their deltas; a 150-point list (two-byte count), a step of 300 (word point numbers) and a delta of 300 (word delta) are read; `avar` 2 moves wdth to 0.5 at wght 900 (so the wdth tuple scales by 0.5) and to 0.125 through a bent wght map; `MVAR` moves the metrics (+50 / -20 / +10 / +30 at wght 900,
-half at 650). On Bahnschrift (system font, test skipped without it): the I stem grows with wght (144 / 204 / 284 wide at wght 300 / 400 / 700), the H narrows with wdth 75 (advance 1390 -> 870), the point structure is the same at every instance, and all glyphs of three instances read within the budgets. No reference outlines of a third-party renderer were available offline, so the real-font checks are properties, not values.
