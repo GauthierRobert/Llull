@@ -12,19 +12,55 @@ import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';
 import { namedDefault, wrapData } from './conventions';
-import { isRejection, openFace } from './faceSession';
+import type { openFace } from './faceSession';
 import { faceRefField } from './schemas';
 import { kernelVolume } from './embossRun';
+import { DEFAULT_HELIX_DEG, planKnurl } from './knurlPlan';
 import { cutHelicalGrooves } from './knurlHelixCut';
 import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG, depthForLand, freeEnds, grooveArea, knurlRecipe, landFor } from './knurlGeometry';
 
-/** Helix angle of a diagonal or diamond knurl when none is given: a named default of the pack (D-WRP-8), not a standard. */
-const DEFAULT_HELIX_DEG = 30;
-const MIN_TEETH = 3;
-/** Most teeth a knurl may have (as many instances as pattern_on_face allows): each is a tool solid of the boolean. */
-const MAX_TEETH = 2000;
 /** Relative difference between the measured volume change of the grooves and their closed form that is refused: the exact kernel integrates the quadrics to about 1e-6 (VC-WRP-39). */
 const KNURL_VOLUME_RESOLUTION = 1e-4;
+
+/** The parameters of add_knurl (shared by its read-only preview). */
+export const knurlParams = z.object({
+  id: z.string().describe('Id of the solid.'),
+  face: faceRefField,
+  pattern: z
+    .enum(['straight', 'diagonal', 'diamond'])
+    .describe('straight: teeth parallel to the axis; diagonal: one helix; diamond: two crossed helices.'),
+  pitch: z
+    .number()
+    .describe('Circular pitch asked for, document units, > 0. The pitch used is adjusted so a whole number of teeth closes (data.pitch).'),
+  helixAngleDeg: z
+    .number()
+    .optional()
+    .describe('Helix angle from the axis, degrees in (0, 90), for diagonal and diamond patterns. Default 30 (named default).'),
+  model: z
+    .enum(['cosmetic', 'geometry'])
+    .optional()
+    .describe(
+      'cosmetic (default): a PMI note only. geometry: cut V-grooves into the solid (straight: along the axis; diagonal and diamond: helical grooves).',
+    ),
+  depth: z
+    .number()
+    .optional()
+    .describe(
+      'geometry only: groove depth below the surface, document units, > 0. Default: the depth that leaves a flat land of 10 % of the pitch.',
+    ),
+  toothAngleDeg: z
+    .number()
+    .optional()
+    .describe(
+      'geometry only: included angle of the V groove, degrees in (0, 180) (normal to the groove for helical patterns). Default 90 (named default).',
+    ),
+  hand: z
+    .enum(['right', 'left'])
+    .optional()
+    .describe(
+      'geometry, diagonal pattern only: the hand of the helix (default right); refused with any other pattern or the cosmetic model. A diamond has both hands.',
+    ),
+});
 
 /**
  * @affects model cosmetic: adds 1 KnurlPmi (review required), affected = [pmiId]; model geometry: replaces the solid by the grooved result (a new mesh entity carrying the exact recipe)
@@ -47,87 +83,14 @@ export const addKnurl = defineCommand({
     'so toothAngleDeg is the included angle of a knurling wheel; depth defaults to the one leaving a 10 % land): data.expectedVolumeDelta is N x length x A_t for a diagonal and the numeric union of both hands for a diamond, ' +
     'data also gives lead, grooves, hands, land, turns and estimatedKernelSeconds. The V depth is measured from the outer radius of the face (the apex lies `depth` below the surface). Helical grooves run past both ends of the face, so each end must be a free cap (WRP_KNURL_GEOMETRY_UNSUPPORTED at a shoulder), and the cut is limited to the measured envelope of the exact kernel: ' +
     'grooves x 2.3 s x (turns of a groove along the face / 0.184)^1.8 at most 50 s, one kernel call being cut at 60 s (WRP_KNURL_TOO_MANY_GROOVES says the estimate: 8 grooves at 30 degrees take about 18 s, at 45 degrees about 50 s, at 60 degrees about 130 s) and a depth that makes the grooves meet is WRP_KNURL_DEPTH_INVALID. A face that is not a cylinder refuses with WRP_KNURL_FACE_NOT_CYLINDER. Needs the exact (native) kernel. Next: check_pmi, accept_pmi_review, mass_properties, render_view.',
-  params: z.object({
-    id: z.string().describe('Id of the solid.'),
-    face: faceRefField,
-    pattern: z
-      .enum(['straight', 'diagonal', 'diamond'])
-      .describe('straight: teeth parallel to the axis; diagonal: one helix; diamond: two crossed helices.'),
-    pitch: z
-      .number()
-      .describe(
-        'Circular pitch asked for, document units, > 0. The pitch used is adjusted so a whole number of teeth closes (data.pitch).',
-      ),
-    helixAngleDeg: z
-      .number()
-      .optional()
-      .describe('Helix angle from the axis, degrees in (0, 90), for diagonal and diamond patterns. Default 30 (named default).'),
-    model: z
-      .enum(['cosmetic', 'geometry'])
-      .optional()
-      .describe(
-        'cosmetic (default): a PMI note only. geometry: cut V-grooves into the solid (straight: along the axis; diagonal and diamond: helical grooves).',
-      ),
-    depth: z
-      .number()
-      .optional()
-      .describe(
-        'geometry only: groove depth below the surface, document units, > 0. Default: the depth that leaves a flat land of 10 % of the pitch.',
-      ),
-    toothAngleDeg: z
-      .number()
-      .optional()
-      .describe(
-        'geometry only: included angle of the V groove, degrees in (0, 180) (normal to the groove for helical patterns). Default 90 (named default).',
-      ),
-    hand: z
-      .enum(['right', 'left'])
-      .optional()
-      .describe(
-        'geometry, diagonal pattern only: the hand of the helix (default right); refused with any other pattern or the cosmetic model. A diamond has both hands.',
-      ),
-  }),
+  params: knurlParams,
   annotations: { readsMeshTriangles: true, requiresKernel: true },
   run: (doc, params, ctx): CommandResult => {
-    const session = openFace(doc, ctx, 'add_knurl', params.id, params.face);
-    if (isRejection(session)) return session;
+    const plan = planKnurl(doc, ctx, 'add_knurl', params);
+    if ('summary' in plan) return plan;
+    const { session, teeth, pitch, diameter, adjusted, helix } = plan;
     const fail = (code: string, message: string, path: string): CommandResult =>
       wrapRejection(doc, 'add_knurl', code, message, [params.id], [path]);
-    if (session.surface.type !== 'cylinder')
-      return fail(
-        'WRP_KNURL_FACE_NOT_CYLINDER',
-        `face ${session.face} of '${params.id}' is ${session.surface.type}, not a cylinder`,
-        'face',
-      );
-    if (!(Number.isFinite(params.pitch) && params.pitch > 0))
-      return fail('WRP_PARAM_INVALID', `pitch must be > 0 (got ${params.pitch})`, 'pitch');
-    if (params.helixAngleDeg !== undefined && !(params.helixAngleDeg > 0 && params.helixAngleDeg < 90))
-      return fail('WRP_PARAM_INVALID', `helixAngleDeg must be in (0, 90) (got ${params.helixAngleDeg})`, 'helixAngleDeg');
-    if (params.pattern === 'straight' && params.helixAngleDeg !== undefined)
-      return fail('WRP_PARAM_INVALID', 'helixAngleDeg goes with the diagonal and diamond patterns, not straight', 'helixAngleDeg');
-    if (params.hand !== undefined && !(params.pattern === 'diagonal' && params.model === 'geometry'))
-      return fail(
-        'WRP_PARAM_INVALID',
-        'hand goes with the diagonal pattern and model geometry (a diamond has both hands, the others no helix)',
-        'hand',
-      );
-    const diameter = 2 * session.surface.radius;
-    const teeth = Math.round((Math.PI * diameter) / params.pitch);
-    if (!Number.isFinite(teeth) || teeth > MAX_TEETH)
-      return fail(
-        'WRP_PARAM_INVALID',
-        `pitch ${params.pitch} gives ${teeth} teeth on diameter ${diameter} (at most ${MAX_TEETH})`,
-        'pitch',
-      );
-    if (teeth < MIN_TEETH)
-      return fail(
-        'WRP_PARAM_INVALID',
-        `pitch ${params.pitch} is too coarse for diameter ${diameter}: fewer than ${MIN_TEETH} teeth`,
-        'pitch',
-      );
-    const pitch = (Math.PI * diameter) / teeth;
-    const adjusted = Math.abs(pitch - params.pitch) > 1e-9 * params.pitch;
-    const helix = params.pattern === 'straight' ? undefined : (params.helixAngleDeg ?? DEFAULT_HELIX_DEG);
     if (params.model === 'geometry') return cutGrooves(doc, params, session, { teeth, pitch, diameter, adjusted });
     const target = solidTarget(doc, 'add_knurl', params.id, ctx);
     if (isRefusal(target)) return target;

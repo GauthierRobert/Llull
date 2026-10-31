@@ -858,7 +858,7 @@ The read-only query `wrap_overlay` (`id`, optional `samples`) returns what the v
 `edgesNote`). It is capped at 64 curves and 400 edges (`truncated` names what was cut). The UI toggle "Wrap" (viewport toolbar, `src/ui/viewport/3d/overlays/WrapOverlay*.tsx`, state in `wrapOverlayStore`, nothing persisted, no command) draws the
 first four selected solids: curves orange (earlier solid: yellow) and the edges by what a chain across them does: smooth green (the sketch develops across), convex orange and concave blue (mitred between two planes, §14.15), unknown grey, with a legend and a layer
 switch for each. Verified on the native kernel through the server and a headless Chromium (a bent plate with its silhouette curves and a stepped block with a convex and a concave edge); the geometry mapping and the toggles are in `tests/component/WrapOverlay.test.tsx`.
-**Left:** the footprint of an emboss on its face and the join mismatch per edge need data the document does not keep (they are results of the command, in `data.edges` of `emboss_on_face`); a knurl pattern preview before the command runs is param gathering for the knurl panel.
+**Left:** the footprint of an emboss on its face and the join mismatch per edge need data the document does not keep (they are results of the command, in `data.edges` of `emboss_on_face`); the join mismatch stays a result of the command. The footprint and the knurl pattern before the command runs are done in 14.19.
 
 ### 14.18 Vertical metrics variations and named instances (DES-3c)
 
@@ -881,3 +881,9 @@ and a requested name is matched against every language of the instance's subfami
 **Measured (closed forms by construction, `tests/unit/wrap/vvar.test.ts`).** Heights 1000..1400 with a VVAR of 0, 10, 20, 30, 40 on wght+: at wght 900 the glyphs read 1000, 1110, 1220, 1330, 1440, at wght 650 (coordinate 0.5)
 1000, 1105, 1210, 1315, 1420; through a map to rows 3 - k: 1030, 1120, 1210, 1300, 1400; without vmtx 1150 + 10 k; the phantom fallback 30 - 10 = 20 on glyph 2. Four instances give four names, and `Bold`, `bold`, `Test-Bold` equal
 the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layout of text (the heights are read by font_metrics, nothing lays text out vertically), `VORG`.
+
+### 14.19 Footprint and knurl previews (DES-3c)
+
+**Queries.** `preview_emboss_on_face` and `preview_add_knurl` take exactly the params of `emboss_on_face` / `add_knurl`, run the same placement and refusals (the shared `runEmboss` stops before the kernel build; `planKnurl` is the knurl's own plan), and change nothing (`document` returned as is, `affected: []`). Emboss: `data.footprint` = the loops of the sketch on the face as world polylines (`hole`, `points`, at most 600 points per loop), the chart's distortion, `expectedVolumeDelta` and the method. A chained emboss (`chain`) is refused (`WRP_PARAM_INVALID`). Knurl: `data.lines` = the groove lines (straight, diagonal, diamond; at most 400 lines, every n-th one drawn when thinned, at most 200 points each), `teeth`, `pitch`.
+
+**UI.** The palette form of the two commands (`preview` on) sends the typed params, debounced 250 ms, to the query (backend when online, local otherwise: `useHostQuery`) and draws the answer as a ghost on the face (`FootprintPreviewLayer`: loops cyan, holes magenta, knurl lines amber) with the query's own summary, or its refusal, in a `role="status"` line. Invalid or incomplete params, leaving the form or turning `preview` off clear the ghost. Nothing in the UI derives geometry. Tests: `tests/unit/wrap/preview.test.ts`, `tests/component/FootprintPreview.test.tsx`.

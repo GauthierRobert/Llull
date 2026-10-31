@@ -8,6 +8,7 @@ import { embossOnFace } from './embossOnFace';
 import { fontMetrics } from './fontMetrics';
 import { importFont, listFonts } from './importFont';
 import { patternOnFace } from './patternOnFace';
+import { previewAddKnurl, previewEmbossOnFace } from './previewWrap';
 import { projectToFace } from './projectToFace';
 import { splitAtSilhouette } from './splitAtSilhouette';
 import { splitFaceByCurves } from './splitFaceByCurves';
@@ -32,4 +33,6 @@ export const wrapCommands = commandCatalog(
   splitAtSilhouette,
   checkWrap,
   wrapOverlay,
+  previewEmbossOnFace,
+  previewAddKnurl,
 );

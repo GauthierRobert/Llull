@@ -7,6 +7,9 @@ import { useStore } from '@ui/store';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { isPreviewable } from '@ui/preview/previewable';
 import { usePreviewController } from '@ui/preview/usePreviewController';
+import { footprintPreviewCommand } from '@ui/preview/footprintPreview';
+import { useFootprintPreview } from '@ui/preview/useFootprintPreview';
+import { useFootprintPreviewStore } from '@ui/store/footprintPreviewStore';
 import { Icon } from '@ui/components/Icon';
 import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
 import { visibleFields } from './fieldVisibility';
@@ -139,9 +142,14 @@ export function CommandParamForm({
   const fields = useMemo(() => visibleFields(command.name, allFields, values), [command.name, allFields, values]);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
-  const previewing = preview && isPreviewable(command, fields);
+  const footprint = footprintPreviewCommand(command.name) !== null;
+  const previewing = preview && !footprint && isPreviewable(command, fields);
   const controller = usePreviewController();
   const previewOutcome = usePreviewStore((s) => s.outcome);
+
+  const footprintState = useFootprintPreviewStore((s) => s);
+  const parsedNow = useMemo(() => parseFormValues(fields, values), [fields, values]);
+  useFootprintPreview(command.name, parsedNow.ok ? parsedNow.params : null, preview);
 
   // External sync: ghost follows the typed params; invalid / incomplete params clear it.
   useEffect(() => {
@@ -248,6 +256,13 @@ export function CommandParamForm({
       {previewing && previewOutcome !== null && (
         <p className={`palette-form__preview${previewOutcome.ok ? '' : ' palette-form__preview--refused'}`} role="status">
           <strong>{previewOutcome.ok ? 'Preview' : 'Preview unavailable'}</strong> {previewOutcome.summary}
+        </p>
+      )}
+
+      {preview && footprint && footprintState.status !== 'idle' && (
+        <p className={`palette-form__preview${footprintState.status === 'refused' ? ' palette-form__preview--refused' : ''}`} role="status">
+          <strong>{footprintState.status === 'refused' ? 'Preview unavailable' : 'Preview'}</strong>{' '}
+          {footprintState.status === 'pending' ? 'computing' : footprintState.summary}
         </p>
       )}
 
