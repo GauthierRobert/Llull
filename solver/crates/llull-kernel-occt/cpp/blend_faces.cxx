@@ -4,6 +4,7 @@
 // the same tools as the profile blends (blend_profile.cxx). A reason that starts with "[CODE] " carries the stable BLD_* code it maps to.
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -11,17 +12,20 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRep_Tool.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
+#include <ElCLib.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <Precision.hxx>
 #include <Standard_Failure.hxx>
@@ -30,8 +34,10 @@
 #include <TopoDS.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Ax2.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pln.hxx>
+#include <gp_Pnt2d.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
@@ -65,13 +71,6 @@ gp_Pnt set_centroid(const FaceSet &set) {
     props.Add(one);
   }
   return props.CentreOfMass();
-}
-
-// Whether `point` is IN or ON some face of `set`.
-bool set_inside(const FaceSet &set, const gp_Pnt &point) {
-  for (const TopoDS_Face &face : set)
-    if (inside(face, point)) return true;
-  return false;
 }
 
 // Smallest and largest coordinate of the vertices of `face` along `axis` measured from `origin`.
@@ -124,11 +123,12 @@ struct Corner {
 
   // `point` of the section at the start moved to the fraction `s` of the sweep.
   gp_Pnt station(const gp_Pnt &point, double s) const { return revolved ? point.Rotated(axis, 2 * kPi * s) : point.Translated(direction * (s * length)); }
-  // Where the legs and the arc are checked: eighths of the sweep (a revolution closes on its start), the arc of a prism at its middle only.
-  std::vector<double> stations(bool arc) const {
+  // Where the section arc is checked: eighths of a revolution (it closes on its start); the ends (a hair inside) and the middle of a prism, so a taper
+  // whose small end leaves the right region is seen.
+  std::vector<double> stations() const {
+    if (!revolved) return {0.01, 0.5, 0.99};
     std::vector<double> at;
-    if (!revolved && arc) return {0.5};
-    for (int k = 0; k <= (revolved ? 7 : 8); ++k) at.push_back(k / 8.0);
+    for (int k = 0; k < 8; ++k) at.push_back(k / 8.0);
     return at;
   }
 };
@@ -260,6 +260,56 @@ bool support_line(const TopoDS_Face &face, const gp_Pnt &origin, const gp_Vec &a
   return true;
 }
 
+// A point well inside `face` and its surface normal (a grid of the face's parameter box, the first node the face classifier calls IN); false when none is.
+bool interior_point(const TopoDS_Face &face, gp_Pnt &point, gp_Vec &normal) {
+  const BRepAdaptor_Surface surface(face, Standard_True);
+  double u1, u2, v1, v2;
+  BRepTools::UVBounds(face, u1, u2, v1, v2);
+  for (const int count : {2, 4, 8, 16})
+    for (int i = 0; i < count; ++i)
+      for (int j = 0; j < count; ++j) {
+        const double u = u1 + (u2 - u1) * (i + 0.5) / count, v = v1 + (v2 - v1) * (j + 0.5) / count;
+        BRepClass_FaceClassifier classifier(face, gp_Pnt2d(u, v), 1e-9);
+        if (classifier.State() != TopAbs_IN) continue;
+        gp_Pnt at;
+        gp_Vec du, dv;
+        surface.D1(u, v, at, du, dv);
+        const gp_Vec across = du.Crossed(dv);
+        if (across.Magnitude() < 1e-12) continue;
+        point = at;
+        normal = unit(across);
+        return true;
+      }
+  return false;
+}
+
+// +1 when the meridian normal (-d_z in the radial direction, d_rho along the axis, at the angle of the probe) points out of the solid on the faces of
+// `set`, -1 when it points in, 0 when the side cannot be told. The probe is a point on a face of the set (not on the meridian at angle 0, which a gap or
+// a partial face may miss): the solid must be on exactly one side of it along the face's normal.
+double outward_facing(const TopoDS_Shape &shape, const FaceSet &set, const Line2 &line, const gp_Pnt &origin, const gp_Vec &axis, double scale) {
+  const double offset = 1e-6 * scale;
+  BRepClass3d_SolidClassifier classifier(shape);
+  for (const TopoDS_Face &face : set) {
+    gp_Pnt point;
+    gp_Vec normal;
+    if (!interior_point(face, point, normal)) continue;
+    double rho, z;
+    to_rho_z(point, origin, axis, rho, z);
+    const gp_Vec from_axis = gp_Vec(origin, point) - axis * z;
+    if (!(rho > 1e-9 * scale) && std::fabs(line.d_z) > 1e-12) continue;
+    const gp_Vec radial_here = rho > 1e-9 * scale ? from_axis / rho : gp_Vec();
+    const gp_Vec candidate = radial_here * (-line.d_z) + axis * line.d_rho;
+    classifier.Perform(point.Translated(normal * offset), kInsideTolerance);
+    const bool plus_out = classifier.State() == TopAbs_OUT;
+    classifier.Perform(point.Translated(normal * -offset), kInsideTolerance);
+    const bool minus_out = classifier.State() == TopAbs_OUT;
+    if (plus_out == minus_out) continue;
+    const double along = (plus_out ? normal : normal.Reversed()).Dot(candidate);
+    return along > 0 ? 1.0 : -1.0;
+  }
+  return 0.0;
+}
+
 // The corner of two face sets about one axis: the meridian lines meet at the corner, the blend is swept once around the axis.
 bool revolved_corner(const TopoDS_Shape &shape, const FaceSet &fa, const FaceSet &fb, double leg, Corner &c, std::string &why) {
   const double scale = std::max(1.0, diagonal_of(shape));
@@ -332,25 +382,17 @@ bool revolved_corner(const TopoDS_Shape &shape, const FaceSet &fa, const FaceSet
       }
     }
     const double sign = best < 0 ? -1.0 : 1.0;
-    const double near_end = sign > 0 ? low : -high, far_end = sign > 0 ? high : -low;
+    const double near_end = sign > 0 ? low : -high;
     if (near_end < -1e-6 * scale)
       return bad(why, std::string("[BLD_FACE_BLEND_UNSUPPORTED] the ") + (side == 0 ? "facesA" : "facesB") +
                           " faces reach past the virtual corner of the two supports (by " + std::to_string(-near_end) +
                           "): faces that meet are blended along their shared edge");
     inward[side] = radial * (sign * line.d_rho) + axis * (sign * line.d_z);
-    const double mid = sign * (near_end + far_end) / 2;
-    const gp_Pnt middle = point_of(corner_rho + mid * line.d_rho, corner_z + mid * line.d_z);
-    const gp_Vec candidate = radial * (-line.d_z) + axis * line.d_rho;
-    const double offset = 1e-6 * scale;
-    BRepClass3d_SolidClassifier classifier(shape);
-    classifier.Perform(middle.Translated(candidate * offset), kInsideTolerance);
-    if (classifier.State() == TopAbs_OUT) {
-      normal[side] = candidate;
-    } else {
-      classifier.Perform(middle.Translated(candidate * -offset), kInsideTolerance);
-      if (classifier.State() != TopAbs_OUT) return bad(why, "the outward side of a round face could not be told");
-      normal[side] = candidate.Reversed();
-    }
+    const double facing = outward_facing(shape, *sets[side], line, origin, axis, scale);
+    if (facing == 0)
+      return bad(why, std::string("[BLD_FACE_BLEND_UNSUPPORTED] the outward side of the ") + (side == 0 ? "facesA" : "facesB") +
+                          " faces could not be told (no point of them has the solid on exactly one side)");
+    normal[side] = (radial * (-line.d_z) + axis * line.d_rho) * facing;
   }
   c.revolved = true;
   c.axis = gp_Ax1(origin, gp_Dir(axis));
@@ -369,9 +411,8 @@ bool revolved_corner(const TopoDS_Shape &shape, const FaceSet &fa, const FaceSet
   c.length = 0;
   c.a = c.start.Translated(c.inward_a * leg);
   c.b = c.start.Translated(c.inward_b * leg);
-  double rho_a, z_a, rho_b, z_b;
-  to_rho_z(c.a, origin, axis, rho_a, z_a);
-  to_rho_z(c.b, origin, axis, rho_b, z_b);
+  // the signed distance from the axis along the meridian half plane of the corner: a contact point across the axis is negative (its absolute distance is not)
+  const double rho_a = gp_Vec(origin, c.a).Dot(radial), rho_b = gp_Vec(origin, c.b).Dot(radial);
   if (!(rho_a > 1e-9 * scale) || !(rho_b > 1e-9 * scale))
     return bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] the ball's contact would lie on or across the axis (radius " + std::to_string(leg / std::tan(c.fold / 2)) +
                         " is too large for the round faces)");
@@ -386,11 +427,96 @@ bool corner_of(const TopoDS_Shape &shape, const FaceSet &fa, const FaceSet &fb, 
 
 double leg_at(double leg_start, double leg_end, double s) { return leg_start + (leg_end - leg_start) * s; }
 
-// Whether the contact points of the ball (legs from `leg_start` to `leg_end` over the sweep) lie on the faces all along it.
-bool legs_fit(const Corner &c, const FaceSet &fa, const FaceSet &fb, double leg_start, double leg_end) {
-  for (const double s : c.stations(false)) {
-    const double leg = leg_at(leg_start, leg_end, s);
-    if (!set_inside(fa, c.station(c.start.Translated(c.inward_a * leg), s)) || !set_inside(fb, c.station(c.start.Translated(c.inward_b * leg), s)))
+// The parts of `edge` that lie on the faces of `set`, as intervals of the parameter `at` gives to the end points of each piece (the third point is the middle
+// point, which tells which way round a circle's arc goes). A piece is the boolean common of the edge with a face, so the faces' holes and gaps are exact.
+using Spans = std::vector<std::pair<double, double>>;
+
+Spans edge_pieces_on(const TopoDS_Edge &edge, const FaceSet &set, const std::function<void(const gp_Pnt &, const gp_Pnt &, const gp_Pnt &, Spans &)> &add) {
+  Spans spans;
+  for (const TopoDS_Face &face : set) {
+    try {
+      BRepAlgoAPI_Common common(edge, face);
+      if (!common.IsDone()) continue;
+      for (TopExp_Explorer it(common.Shape(), TopAbs_EDGE); it.More(); it.Next()) {
+        const TopoDS_Edge piece = TopoDS::Edge(it.Current());
+        TopoDS_Vertex first, last;
+        TopExp::Vertices(piece, first, last);
+        const BRepAdaptor_Curve curve(piece);
+        add(BRep_Tool::Pnt(first), BRep_Tool::Pnt(last), curve.Value((curve.FirstParameter() + curve.LastParameter()) / 2), spans);
+      }
+    } catch (const Standard_Failure &) {
+    }
+  }
+  return spans;
+}
+
+// Whether the intervals cover [0, total] without a gap wider than `tolerance`.
+bool spans_cover(Spans spans, double total, double tolerance) {
+  std::sort(spans.begin(), spans.end());
+  double reached = 0;
+  for (const auto &[from, to] : spans) {
+    if (from > reached + tolerance) return false;
+    reached = std::max(reached, to);
+  }
+  return reached >= total - tolerance;
+}
+
+// Whether the whole segment p0 -> p1 lies on the faces of `set` (a hole, a groove or a gap anywhere along it is found).
+bool segment_on(const FaceSet &set, const gp_Pnt &p0, const gp_Pnt &p1, double tolerance) {
+  const double length = p0.Distance(p1);
+  if (!(length > 1e-12)) return false;
+  BRepBuilderAPI_MakeEdge make(p0, p1);
+  if (!make.IsDone()) return false;
+  const gp_Vec along = gp_Vec(p0, p1) / length;
+  const auto fraction = [&](const gp_Pnt &p) { return gp_Vec(p0, p).Dot(along) / length; };
+  const Spans spans = edge_pieces_on(make.Edge(), set, [&](const gp_Pnt &a, const gp_Pnt &b, const gp_Pnt &, Spans &out) {
+    const double s1 = fraction(a), s2 = fraction(b);
+    if (std::fabs(s2 - s1) > 0) out.emplace_back(std::min(s1, s2), std::max(s1, s2));
+  });
+  return spans_cover(spans, 1.0, tolerance / length);
+}
+
+// Whether the whole circle lies on the faces of `set` (a slot, a gap or a missing sector anywhere round it is found).
+bool circle_on(const FaceSet &set, const gp_Circ &circle, double tolerance) {
+  BRepBuilderAPI_MakeEdge make(circle);
+  if (!make.IsDone()) return false;
+  const double full = 2 * kPi;
+  const Spans spans = edge_pieces_on(make.Edge(), set, [&](const gp_Pnt &a, const gp_Pnt &b, const gp_Pnt &m, Spans &out) {
+    if (a.Distance(b) < tolerance) {
+      out.emplace_back(0.0, full);
+      return;
+    }
+    double from = ElCLib::Parameter(circle, a), to = ElCLib::Parameter(circle, b);
+    const double middle = ElCLib::Parameter(circle, m);
+    if (from > to) std::swap(from, to);
+    if (middle >= from && middle <= to) {
+      out.emplace_back(from, to);
+    } else {
+      out.emplace_back(to, full);
+      out.emplace_back(0.0, from);
+    }
+  });
+  return spans_cover(spans, full, tolerance / circle.Radius());
+}
+
+// The circle about `axis` through `point`.
+gp_Circ circle_through(const gp_Ax1 &axis, const gp_Pnt &point) {
+  const gp_Vec direction(axis.Direction());
+  const gp_Vec from_origin(axis.Location(), point);
+  const gp_Pnt centre = axis.Location().Translated(direction * from_origin.Dot(direction));
+  return gp_Circ(gp_Ax2(centre, axis.Direction(), gp_Dir(gp_Vec(centre, point))), centre.Distance(point));
+}
+
+// Whether the contact lines of the ball (legs from `leg_start` to `leg_end` over the sweep, the contact circles of a revolution) lie on the faces ALL
+// along the sweep: the contact line / circle is intersected with the faces of each set and the pieces must cover it with no gap.
+bool legs_fit(const TopoDS_Shape &shape, const Corner &c, const FaceSet &fa, const FaceSet &fb, double leg_start, double leg_end) {
+  const double tolerance = 1e-6 * std::max(1.0, diagonal_of(shape));
+  const FaceSet *sets[2] = {&fa, &fb};
+  const gp_Vec inward[2] = {c.inward_a, c.inward_b};
+  for (int side = 0; side < 2; ++side) {
+    const gp_Pnt first = c.start.Translated(inward[side] * leg_start);
+    if (c.revolved ? !circle_on(*sets[side], circle_through(c.axis, first), tolerance)
+                   : !segment_on(*sets[side], first, c.end.Translated(inward[side] * leg_end), tolerance))
       return false;
   }
   return true;
@@ -400,7 +526,7 @@ bool legs_fit(const Corner &c, const FaceSet &fa, const FaceSet &fb, double leg_
 // material for a concave one (the blend adds material up to it).
 bool arc_fits(const TopoDS_Shape &shape, const Corner &c, int kind, double param, double leg_start, double leg_end) {
   BRepClass3d_SolidClassifier classifier(shape);
-  for (const double s : c.stations(true)) {
+  for (const double s : c.stations()) {
     const double leg = leg_at(leg_start, leg_end, s);
     const Handle(Geom_Curve) curve = section_curve(c.station(c.start, s), c.station(c.start.Translated(c.inward_a * leg), s),
                                                    c.station(c.start.Translated(c.inward_b * leg), s), kind, param, kPi - c.fold);
@@ -538,7 +664,7 @@ std::string smallest_radius_hint(const TopoDS_Shape &shape, const FaceSet &fa, c
     Corner trial;
     std::string ignored;
     const double leg = r * std::tan(c.fold / 2);
-    return corner_of(shape, fa, fb, leg, trial, ignored) && legs_fit(trial, fa, fb, leg, leg) && arc_fits(shape, trial, kind, param, leg, leg);
+    return corner_of(shape, fa, fb, leg, trial, ignored) && legs_fit(shape, trial, fa, fb, leg, leg) && arc_fits(shape, trial, kind, param, leg, leg);
   };
   double high = radius * 2;
   for (int step = 0; step < 24 && !works(high); ++step) high *= 2;
@@ -618,16 +744,17 @@ static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<
       bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] a varying radius between faces that do not meet takes the circular section only");
       return nullptr;
     }
-    if (c.revolved)
-      {
-      bad(why, "[BLD_FACE_BLEND_UNSUPPORTED] a varying radius between faces that do not meet is built between planar faces; a blend about an axis has a constant radius");
+    if (c.revolved) {
+      bad(why,
+          "[BLD_FACE_BLEND_UNSUPPORTED] a varying radius between faces that do not meet is built between planar faces; a blend about an axis has a "
+          "constant radius");
       return nullptr;
     }
     // radius at the start of the corner line (the end with the smaller coordinate along n_A x n_B) unless the start point is nearer the other end
     const bool from_end = has_start && start_near.Distance(c.end) < start_near.Distance(c.start);
     const double leg_start = (from_end ? radius_end : radius) * fold_factor, leg_end = (from_end ? radius : radius_end) * fold_factor;
     if (!corner_of(source.shape, fa, fb, leg_start, c, why)) return nullptr;
-    if (!legs_fit(c, fa, fb, leg_start, leg_end)) {
+    if (!legs_fit(source.shape, c, fa, fb, leg_start, leg_end)) {
       why = "[BLD_FACE_FILLET_NO_SOLUTION] a ball whose radius goes from " + std::to_string(from_end ? radius_end : radius) + " to " +
             std::to_string(from_end ? radius : radius_end) + " does not fit between the two faces (its contact lines leave them); use smaller radii";
       return nullptr;
@@ -658,7 +785,7 @@ static std::unique_ptr<Shape> build_face_blend(const Shape &source, rust::Slice<
       return naming::wrap_named(cliffed.shape, cliffed.names);
     }
   }
-  if (!legs_fit(c, fa, fb, leg, leg)) {
+  if (!legs_fit(source.shape, c, fa, fb, leg, leg)) {
     why = "[BLD_FACE_FILLET_NO_SOLUTION] a ball of radius " + std::to_string(radius) + " does not fit between the two faces (its contact lines leave them); use a smaller radius";
     return nullptr;
   }

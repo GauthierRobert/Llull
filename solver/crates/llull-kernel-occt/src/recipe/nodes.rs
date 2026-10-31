@@ -293,7 +293,7 @@ fn face_set(recipe: &Value, field: &str) -> Option<Vec<f64>> {
 /// BLD M4 `faceBlend` node as the flat spec of `features::face_blend`: first face of A and of B, radius, section kind, rho / shape, cliff (0 none, 1 on A,
 /// 2 on B), then the radius at the other end (0: constant), whether a start point is given and the point, the counts of the further faces of A and of B
 /// and those faces (cpp/blend_faces.cxx `build_face_blend`).
-fn face_blend_spec(recipe: &Value) -> Option<Vec<f64>> {
+pub(super) fn face_blend_spec(recipe: &Value) -> Option<Vec<f64>> {
     let radius = number(recipe, "radius").filter(|radius| positive(*radius))?;
     let profile = recipe.get("profile").filter(|profile| !profile.is_null());
     let factor = |field: &str| profile.and_then(|profile| number(profile, field)).filter(|value| (0.05..=0.95).contains(value));
