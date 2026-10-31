@@ -1,3 +1,6 @@
 # Local desktop builds (ignored by desktop/.gitignore, which Prettier does not read): bundled Python packages and packaged app assets.
 desktop/build/
 desktop/release/
+
+# Golden snapshots are written by compactJson (one-line arrays); prettier would expand them and every golden test would fail on format.
+tests/golden/__snapshots__/
