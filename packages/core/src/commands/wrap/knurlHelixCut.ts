@@ -5,7 +5,6 @@
  *   cut, a volume that differs from the expected one -> coded no-op
  */
 
-import { dot3, sub3 } from '../../lib/vec3';
 import { nextId } from '../../lib/id';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import type { CadDocument } from '../../model/types';
@@ -14,18 +13,9 @@ import { wrapRejection } from './codes';
 import { namedDefault, wrapData } from './conventions';
 import { kernelVolume } from './embossRun';
 import type { FaceSession } from './faceSession';
-import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG, freeEnds } from './knurlGeometry';
-import {
-  helicalDepthForLand,
-  helicalKnurlRecipe,
-  helicalLand,
-  helicalRemovedVolume,
-  estimatedKernelSeconds,
-  grooveSpan,
-  leadOf,
-  MAX_KERNEL_SECONDS,
-  type HelicalKnurl,
-} from './knurlHelix';
+import type { HelicalPlan } from './knurlGeometryPlan';
+import { DEFAULT_LAND_RATIO, DEFAULT_TOOTH_ANGLE_DEG } from './knurlGeometry';
+import { helicalKnurlRecipe, helicalRemovedVolume, leadOf } from './knurlHelix';
 
 /** Relative difference between the measured volume change and the expected one that is refused: the closed form agrees to 1e-6 on the native kernel, the numeric union of a diamond to 1.4e-5 (measured). */
 const DIAGONAL_RESOLUTION = 1e-4;
@@ -54,79 +44,12 @@ export function cutHelicalGrooves(
     readonly adjusted: boolean;
     readonly requestedPitch: number;
   },
+  plan: HelicalPlan,
 ): CommandResult {
   const fail = (code: string, message: string, path: string): CommandResult =>
     wrapRejection(doc, 'add_knurl', code, message, [params.id], [path]);
-  const { surface } = session;
-  if (surface.type !== 'cylinder') return fail('WRP_KNURL_FACE_NOT_CYLINDER', 'not a cylinder', 'face');
-  const diamond = params.pattern === 'diamond';
-  if (diamond && params.hand !== undefined)
-    return fail('WRP_PARAM_INVALID', 'hand goes with the diagonal pattern; a diamond has both hands', 'hand');
-  const toothAngleDeg = params.toothAngleDeg ?? DEFAULT_TOOTH_ANGLE_DEG;
-  if (!(toothAngleDeg > 0 && toothAngleDeg < 180))
-    return fail('WRP_PARAM_INVALID', `toothAngleDeg must be in (0, 180) (got ${toothAngleDeg})`, 'toothAngleDeg');
-  if (params.depth !== undefined && !(params.depth > 0))
-    return fail('WRP_PARAM_INVALID', `depth must be > 0 (got ${params.depth})`, 'depth');
-  const depth = params.depth ?? helicalDepthForLand(knurl.pitch, toothAngleDeg, params.helixAngleDeg, DEFAULT_LAND_RATIO);
-  const land = helicalLand(knurl.pitch, { depth, toothAngleDeg, helixDeg: params.helixAngleDeg });
-  if (land < 0.02 * knurl.pitch)
-    return fail(
-      'WRP_KNURL_DEPTH_INVALID',
-      `depth ${depth} leaves a land of ${land} between the grooves of one hand (needs at least 2 % of the pitch ${knurl.pitch}): the grooves would meet`,
-      'depth',
-    );
-  if (depth >= 0.5 * surface.radius)
-    return fail('WRP_DEPTH_EXCEEDS_SOLID', `depth ${depth} reaches half the radius ${surface.radius}`, 'depth');
-  const grooves = knurl.teeth * (diamond ? 2 : 1);
-  const [[, from], [, to]] = session.uvBounds;
-  if (!Number.isFinite(from) || !Number.isFinite(to) || !(to > from))
-    return fail('WRP_FACE_NOT_FOUND', 'the face has no axial extent', 'face');
-  const shape: HelicalKnurl = {
-    teeth: knurl.teeth,
-    radius: surface.radius,
-    depth,
-    toothAngleDeg,
-    helixDeg: params.helixAngleDeg,
-    hands: diamond ? 2 : 1,
-    left: params.hand === 'left',
-  };
-  const span = grooveSpan(shape, from, to);
-  const faceTurns = (to - from) / leadOf(shape);
-  const seconds = estimatedKernelSeconds(grooves, faceTurns);
-  if (seconds > MAX_KERNEL_SECONDS)
-    return fail(
-      'WRP_KNURL_TOO_MANY_GROOVES',
-      `${grooves} helical grooves (${knurl.teeth} teeth${diamond ? ' x 2 hands' : ''}) of ${faceTurns.toFixed(2)} turns along the face each would take the exact kernel about ${seconds.toFixed(0)} s (limit ${MAX_KERNEL_SECONDS} s, one kernel call is cut at 60 s): use a coarser pitch, a smaller helix angle (fewer turns), or the cosmetic model`,
-      'pitch',
-    );
-  const sample = session.query.faceDetails(session.shape, { samples: 1 })?.[session.face]?.samples[0];
-  const hit = sample === undefined ? null : (session.query.projectOnFace(session.shape, session.face, [sample])?.[0] ?? null);
-  if (hit === null || dot3(hit.normal, sub3(hit.point, surface.origin)) <= 0)
-    return fail(
-      'WRP_KNURL_FACE_NOT_CYLINDER',
-      `face ${session.face} is a bore (material outside it): only an outside cylinder is knurled`,
-      'face',
-    );
-  const [pastFrom, pastTo] = freeEnds(
-    session.query.faceGraph(session.shape),
-    session.face,
-    { origin: surface.origin, dir: surface.axis },
-    [from, to],
-    1e-6 * session.diagonal,
-  );
-  if (!pastFrom || !pastTo)
-    return fail(
-      'WRP_KNURL_GEOMETRY_UNSUPPORTED',
-      `a helical groove runs past both ends of the face, so each end must be a free cap: the ${!pastFrom ? 'start' : 'end'} of face ${session.face} meets a shoulder or a ring-shaped face (use the cosmetic model, or a straight pattern)`,
-      'face',
-    );
-  const recipe = helicalKnurlRecipe(
-    session.source,
-    shape,
-    { origin: surface.origin, axis: surface.axis, span },
-    nextId('mesh'),
-    session.entity.color,
-  );
+  const { origin, axis, depth, land, toothAngleDeg, from, to, shape, span, grooves, faceTurns, seconds, diamond } = plan;
+  const recipe = helicalKnurlRecipe(session.source, shape, { origin, axis, span }, nextId('mesh'), session.entity.color);
   if (typeof recipe === 'string') return fail('WRP_KERNEL_BUILD_FAILED', recipe, 'face');
   const built = evaluateRecipe(session.kernel, recipe);
   if (typeof built === 'string')

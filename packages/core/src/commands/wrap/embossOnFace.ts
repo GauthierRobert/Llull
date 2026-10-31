@@ -7,6 +7,67 @@ import { faceRefField, placementField } from './schemas';
 
 const MAX_PROFILES = 500;
 
+/** The parameters of emboss_on_face (shared by its read-only preview). */
+export const embossParams = z.object({
+  id: z.string().describe('Id of the solid to emboss.'),
+  face: faceRefField,
+  profileIds: z
+    .array(z.string())
+    .min(1)
+    .max(MAX_PROFILES)
+    .describe('Ids of the 2D profiles (or font texts) to emboss. Closed shapes for emboss, deboss, scribe; any curve for engrave.'),
+  mode: z
+    .enum(['emboss', 'deboss', 'scribe', 'engrave'])
+    .describe(
+      'emboss: material added outside the face; deboss: material removed inside it; scribe: the face is split along the outlines, no material change; engrave: a groove of width toolWidth is cut along the outline paths.',
+    ),
+  depth: z.number().optional().describe('Height of the emboss or depth of the deboss / groove, document units, > 0. Not used by scribe.'),
+  toolWidth: z
+    .number()
+    .optional()
+    .describe('engrave only: width of the flat tool, document units, > 0 (the groove is this wide with round ends).'),
+  placement: placementField.optional(),
+  chain: z
+    .array(faceRefField)
+    .max(15)
+    .optional()
+    .describe(
+      'Multi-face emboss: more faces (plane, cylinder, cone, sphere or torus) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch, for plane, cylinder, cone; sphere and torus faces use placement.method geodesic, the join mismatch and the stretch are measured and refused above maxLengthStrain with WRP_DISTORTION_EXCEEDED), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, rulings of cones, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces) or a straight edge between two plane faces, where the corner is mitred: a prism along the edge is united (emboss on a convex edge) or subtracted (deboss on a concave edge) over the stretches the sketch covers, and the outline must cross it at right angles (data.mitre; WRP_CHAIN_EDGE_SHARP for any other sharp edge or crossing; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
+    ),
+  walls: z
+    .enum(['normal', 'pull'])
+    .optional()
+    .describe(
+      'Wall form of emboss and deboss. normal (default): walls normal to the face. pull: walls parallel to pullDirection (the form a mould can release), the relief being the region prism along the pull cut to the layer between the face and its offset by depth; needs pullDirection, works on plane, cylinder, cone and sphere faces, emboss and deboss only.',
+    ),
+  pullDirection: z
+    .tuple([z.number(), z.number(), z.number()])
+    .optional()
+    .describe(
+      'walls pull only: direction [x, y, z] the mould opens along (world, not necessarily unit; its sign does not matter). It must cross the face at every point of the region (WRP_PULL_PARALLEL when it runs along the face).',
+    ),
+  draftDeg: z
+    .number()
+    .optional()
+    .describe(
+      'walls pull only: draft angle of the walls in degrees, [0, 45). The relief narrows away from the face (an emboss toward its top, a deboss toward its floor) by tan(draft) per unit of height, hinged on the plane through the placement anchor perpendicular to the pull (the tangent plane only when the pull is the face normal); the drafted base grows past the sketch footprint (data.draftBaseGrowth) and an oblique pull shifts the relief sideways (data.obliqueShift). A draft that closes the thinnest place of the region refuses with WRP_DRAFT_CLOSES (data.maxDraftDeg).',
+    ),
+  maxLengthStrain: z
+    .number()
+    .positive()
+    .optional()
+    .describe(
+      'Largest accepted relative length change of the wrap (1 = 100 %). Default 0.02 (named default); develop faces have none. Held to the measured stretch of a geodesic or parametric chart.',
+    ),
+  fitTolerance: z
+    .number()
+    .positive()
+    .optional()
+    .describe(
+      'Largest deviation of a fitted pcurve from its exact image, document units. Default: 1e-6 x the solid diagonal (named default).',
+    ),
+});
+
 /**
  * @affects replaces the solid by a kernel result (a new mesh entity carrying the exact recipe); the profiles stay
  * @invariant develop is an isometry: the footprint on the face has the area of the profile (data.regionArea) and the volume change follows the closed form of data.expectedVolumeDelta
@@ -28,65 +89,7 @@ export const embossOnFace = defineCommand({
     'angularSpanRad, distortion, unverified (font not pinned) and provenance. A sketch wider than one turn refuses with WRP_WRAP_OVERLAP, a region leaving the face with ' +
     'WRP_OUTSIDE_FACE, a cut as deep as the radius with WRP_DEPTH_EXCEEDS_SOLID, an open profile (not engrave) with WRP_PROFILE_OPEN, a sphere or torus with method develop with ' +
     'WRP_FACE_NOT_DEVELOPABLE, a stretch above the limit with WRP_DISTORTION_EXCEEDED. A freeform (B-spline) face works with method geodesic or parametric (develop refuses with WRP_FACE_NOT_DEVELOPABLE) and modes emboss, deboss and engrave: the sketch is charted on the exact surface, the walls run parallel to the outward normal at the anchor (not normal to the face; data.freeform.pullDirection), the top of the relief is the exact offset of the face by depth, so the relief is built from exact booleans (data.exact false, data.freeform.footprintDeviation = fit of the footprint outline); a fold of the geodesic chart refuses with WRP_CHART_FOLD (the chart is valid up to the first conjugate point; a cut-locus overlap before it is not detected), a deboss deeper than the material with WRP_DEPTH_EXCEEDS_SOLID (data.maxDepth), a periodic B-spline is charted as a strip (WRP_OUTSIDE_FACE at the seam), a face the pull sees edge-on or from both sides over the region with WRP_FACE_TOO_STEEP, scribe and a kernel with no B-spline for the face with WRP_METHOD_UNAVAILABLE. Needs the exact (native) kernel. Next: check_wrap, mass_properties, render_view.',
-  params: z.object({
-    id: z.string().describe('Id of the solid to emboss.'),
-    face: faceRefField,
-    profileIds: z
-      .array(z.string())
-      .min(1)
-      .max(MAX_PROFILES)
-      .describe('Ids of the 2D profiles (or font texts) to emboss. Closed shapes for emboss, deboss, scribe; any curve for engrave.'),
-    mode: z
-      .enum(['emboss', 'deboss', 'scribe', 'engrave'])
-      .describe(
-        'emboss: material added outside the face; deboss: material removed inside it; scribe: the face is split along the outlines, no material change; engrave: a groove of width toolWidth is cut along the outline paths.',
-      ),
-    depth: z.number().optional().describe('Height of the emboss or depth of the deboss / groove, document units, > 0. Not used by scribe.'),
-    toolWidth: z
-      .number()
-      .optional()
-      .describe('engrave only: width of the flat tool, document units, > 0 (the groove is this wide with round ends).'),
-    placement: placementField.optional(),
-    chain: z
-      .array(faceRefField)
-      .max(15)
-      .optional()
-      .describe(
-        'Multi-face emboss: more faces (plane, cylinder, cone, sphere or torus) adjacent to `face`, each sharing an edge with the faces before it, e.g. a cylinder and its tangent planes. The faces are unfolded into one chart (develop, no stretch, for plane, cylinder, cone; sphere and torus faces use placement.method geodesic, the join mismatch and the stretch are measured and refused above maxLengthStrain with WRP_DISTORTION_EXCEEDED), the sketch is cut at the shared edges and each part is embossed on its own face in one exact result. The shared edges must develop to straight lines (generatrices of cylinders, rulings of cones, straight plane edges: WRP_CHAIN_EDGE_CURVED otherwise) and, for emboss / deboss, be smooth (tangent faces) or a straight edge between two plane faces, where the corner is mitred: a prism along the edge is united (emboss on a convex edge) or subtracted (deboss on a concave edge) over the stretches the sketch covers, and the outline must cross it at right angles (data.mitre; WRP_CHAIN_EDGE_SHARP for any other sharp edge or crossing; scribe crosses sharp edges). data.faces lists the part on each face, data.expectedVolumeDelta is the sum of the closed forms.',
-      ),
-    walls: z
-      .enum(['normal', 'pull'])
-      .optional()
-      .describe(
-        'Wall form of emboss and deboss. normal (default): walls normal to the face. pull: walls parallel to pullDirection (the form a mould can release), the relief being the region prism along the pull cut to the layer between the face and its offset by depth; needs pullDirection, works on plane, cylinder, cone and sphere faces, emboss and deboss only.',
-      ),
-    pullDirection: z
-      .tuple([z.number(), z.number(), z.number()])
-      .optional()
-      .describe(
-        'walls pull only: direction [x, y, z] the mould opens along (world, not necessarily unit; its sign does not matter). It must cross the face at every point of the region (WRP_PULL_PARALLEL when it runs along the face).',
-      ),
-    draftDeg: z
-      .number()
-      .optional()
-      .describe(
-        'walls pull only: draft angle of the walls in degrees, [0, 45). The relief narrows away from the face (an emboss toward its top, a deboss toward its floor) by tan(draft) per unit of height, hinged on the plane through the placement anchor perpendicular to the pull (the tangent plane only when the pull is the face normal); the drafted base grows past the sketch footprint (data.draftBaseGrowth) and an oblique pull shifts the relief sideways (data.obliqueShift). A draft that closes the thinnest place of the region refuses with WRP_DRAFT_CLOSES (data.maxDraftDeg).',
-      ),
-    maxLengthStrain: z
-      .number()
-      .positive()
-      .optional()
-      .describe(
-        'Largest accepted relative length change of the wrap (1 = 100 %). Default 0.02 (named default); develop faces have none. Held to the measured stretch of a geodesic or parametric chart.',
-      ),
-    fitTolerance: z
-      .number()
-      .positive()
-      .optional()
-      .describe(
-        'Largest deviation of a fitted pcurve from its exact image, document units. Default: 1e-6 x the solid diagonal (named default).',
-      ),
-  }),
-  annotations: { requiresKernel: true },
+  params: embossParams,
+  annotations: { requiresKernel: true, previewQuery: 'preview_emboss_on_face' },
   run: (doc, params, ctx): CommandResult => runEmboss(doc, ctx, 'emboss_on_face', params),
 });
