@@ -72,7 +72,7 @@ pub(crate) fn revolved(points: &[(f64, f64)]) -> f64 {
 }
 
 /// The rational quadratic conic a, t, b of weight w sampled at `n` + 1 points (rho, z).
-fn conic(a: (f64, f64), t: (f64, f64), b: (f64, f64), w: f64, n: usize) -> Vec<(f64, f64)> {
+pub(crate) fn conic(a: (f64, f64), t: (f64, f64), b: (f64, f64), w: f64, n: usize) -> Vec<(f64, f64)> {
     (0..=n)
         .map(|k| {
             let u = k as f64 / n as f64;
@@ -84,7 +84,7 @@ fn conic(a: (f64, f64), t: (f64, f64), b: (f64, f64), w: f64, n: usize) -> Vec<(
 }
 
 /// The weight of the circular-equivalent conic whose tangent lines meet at `t`: sin of half the angle at `t` between the legs.
-fn circular_weight(a: (f64, f64), t: (f64, f64), b: (f64, f64)) -> f64 {
+pub(crate) fn circular_weight(a: (f64, f64), t: (f64, f64), b: (f64, f64)) -> f64 {
     let (u, v) = ((a.0 - t.0, a.1 - t.1), (b.0 - t.0, b.1 - t.1));
     let cosine = (u.0 * v.0 + u.1 * v.1) / (u.0.hypot(u.1) * v.0.hypot(v.1));
     (cosine.acos() / 2.0).sin()

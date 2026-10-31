@@ -225,6 +225,8 @@ fn a_curvature_section_with_no_g2_solution_is_refused_with_the_measured_reason()
     assert_eq!(foot.len(), 1);
     let on_plate = plate_face(&part);
     let legs = [leg_row(foot[0], on_plate, 1.0, NAN, 3.0, NAN)];
+    // shape 0.5 builds (the foot overhangs the plate: the outward normal at the edge points into the plate, which the volume window used to misread as a convex edge)
+    assert!(blend(&part, &legs, 1.0, 0.5).is_ok());
     // shape 0.95: the section passes a tangent line by more than the sag allows (5.1e-3 against 0 on the line of the plate, whose support does not curve away: the
     // pole bent toward the sphere's centre pushes the section across it)
     let why = blend(&part, &legs, 1.0, 0.95).err().expect("refused");

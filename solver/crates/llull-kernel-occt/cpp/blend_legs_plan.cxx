@@ -505,20 +505,8 @@ bool make_plan(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &uniq
   tangent.Normalize();
   gp_Vec normal[2], inward[2];
   BRepClass3d_SolidClassifier classifier(shape);
+  const double shortest_leg = std::min(std::min(plan.leg[0], plan.leg[1]), std::min(plan.leg[2], plan.leg[3]));
   for (int f = 0; f < 2; ++f) {
-    if (!face_unit_normal(plan.faces[f], corner, normal[f])) {
-      why = label + " meets a face with no normal at its middle";
-      return false;
-    }
-    classifier.Perform(corner.Translated(normal[f] * (1e-4 * diagonal)), 1e-9);
-    plan.flip[f] = classifier.State() == TopAbs_IN;
-    if (plan.flip[f]) normal[f].Reverse();
-    gp_Vec across = normal[f].Crossed(tangent);
-    if (across.Magnitude() < kDegenerate) {
-      why = label + " lies along the normal of a face";
-      return false;
-    }
-    across.Normalize();
     // The face lies to the left of its boundary edge seen from its own (oriented) normal, whatever the orientation flag says about the solid: the way into the
     // face is N x T with both taken with the face's orientation. A seam (the edge twice in the face) has no single way in.
     int seen = 0;
@@ -534,6 +522,30 @@ bool make_plan(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &uniq
       return false;
     }
     const gp_Vec way = face_normal.Crossed(tangent * edge_sense);
+    if (way.Magnitude() < kDegenerate) {
+      why = label + " lies along the normal of a face";
+      return false;
+    }
+    // Which way is outward is probed on the face a little way in from the edge, not at the edge: a face that overhangs the other (a ball standing over a plate)
+    // has an outward normal at the edge that points into the material of its neighbour.
+    const gp_Pnt guess = corner.Translated(way.Normalized() * std::min(0.01 * diagonal, 0.25 * shortest_leg));
+    gp_Pnt inside_face;
+    gp_Vec probe_normal = face_normal;
+    if (!project_on_face(plan.faces[f], guess, inside_face) || !face_unit_normal(plan.faces[f], inside_face, probe_normal)) {
+      why = label + " meets a face with no normal near its edge";
+      return false;
+    }
+    const double probe = 1e-3 * std::min(0.01 * diagonal, 0.25 * shortest_leg);
+    classifier.Perform(inside_face.Translated(probe_normal * probe), 1e-9);
+    plan.flip[f] = classifier.State() == TopAbs_IN;
+    normal[f] = face_normal;
+    if (plan.flip[f]) normal[f].Reverse();
+    gp_Vec across = normal[f].Crossed(tangent);
+    if (across.Magnitude() < kDegenerate) {
+      why = label + " lies along the normal of a face";
+      return false;
+    }
+    across.Normalize();
     plan.sign[f] = way.Dot(across) >= 0 ? 1.0 : -1.0;
     inward[f] = across * plan.sign[f];
   }

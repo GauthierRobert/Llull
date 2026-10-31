@@ -193,3 +193,45 @@ fn g2_holds_between_the_stations_with_small_legs_on_a_large_cap() {
         assert!(on * r < 0.02 && off * r < 0.02, "shape {shape}: jump x R stations {} between {}", on * r, off * r);
     }
 }
+
+#[test]
+fn a_concave_foot_whose_ball_overhangs_the_plate_builds_in_every_profile() {
+    let _serial = crate::serial_blends();
+    // Ball R 5 centred 2 above the plate top: the sphere leans outward over the foot, so the outward normal at the foot points down into the plate material.
+    let (r, centre): (f64, P) = (5.0, (0.0, 7.0));
+    let plate = make_box([-12.0, -12.0, 0.0], [24.0, 24.0, 5.0]).unwrap().unwrap();
+    let part = boolean(BooleanOp::Union, &plate, &sphere_at(r, centre.1), true).unwrap().unwrap();
+    let foot = edges_where(&part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 5.0).abs() < 1e-9);
+    assert_eq!(foot.len(), 1);
+    let top = plane_face(&part, [0.0, 0.0, 1.0]);
+    let corner: P = ((r * r - 4.0_f64).sqrt(), 5.0);
+    for (d_plate, d_ball) in [(1.0, 2.0), (2.0, 1.0)] {
+        let a = (corner.0 + d_plate, 5.0);
+        let b = meet(centre, r, corner, d_ball).into_iter().find(|p| p.1 > 5.0).unwrap();
+        let t = line_meet(a, (1.0, 0.0), b, tangent(centre, b));
+        let weight_circular = {
+            let (u, v) = ((a.0 - t.0, a.1 - t.1), (b.0 - t.0, b.1 - t.1));
+            ((u.0 * v.0 + u.1 * v.1) / (u.0.hypot(u.1) * v.0.hypot(v.1))).acos() / 2.0
+        }
+        .sin();
+        let shape = 0.2;
+        let sections: [(f64, f64, Vec<P>); 3] = [
+            (0.0, 0.5, crate::blend_legs_tests::conic(a, t, b, 1.0, 20000)),
+            (2.0, 0.0, crate::blend_legs_tests::conic(a, t, b, weight_circular, 20000)),
+            (1.0, shape, quintic(&poles(a, t, b, shape, (0.0, 0.0), toward_centre(centre, r, b, t, shape)), 20000)),
+        ];
+        for (kind, param, curve) in sections {
+            let mut outline = vec![corner];
+            outline.extend(curve);
+            outline.extend(arc(centre, b, corner));
+            let expected = revolved(&outline);
+            let shape_built = built(&part, &[leg_row(foot[0], top, d_plate, NAN, d_ball, NAN)], kind, param);
+            let added = volume_of(&shape_built) - volume_of(&part);
+            // the source is 3400 mm3: its mass-property integration bounds the difference to about 1e-6 of that
+            let slack = (1e-5 * expected).max(1e-6 * volume_of(&part));
+            assert!((added - expected).abs() < slack, "kind {kind} legs {d_plate} x {d_ball}: added {added} vs {expected}");
+            let (g0, g1, count) = contacts(&shape_built);
+            assert!(count >= 2 && g0 < 1e-6 * diagonal(&shape_built) && g1 < 1e-4, "kind {kind}: contacts {count} G0 {g0} G1 {g1}");
+        }
+    }
+}
