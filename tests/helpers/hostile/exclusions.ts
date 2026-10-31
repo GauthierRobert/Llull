@@ -13,6 +13,8 @@ export const EXCLUDED_COMMANDS: Readonly<Record<string, string>> = {
 export const EXCLUDED_FUNCTIONS: Readonly<Record<string, string>> = {
   'core/src/commands/brep/faceBlendEdges.ts:readEdgeResult': 'reads the in-process CommandResult of a kernel call, not external input',
   'core/src/commands/brep/profileNotes.ts:readProfileNotes': 'reads kernel notes of a recipe, not external input',
+  'core/src/commands/brep/checkChamferLegs.ts:readChamferLegs':
+    'reads the face queries of a rebuilt solid (in-process kernel answers), not external input',
   'core/src/commands/features/threads.ts:parseThread': 'takes the already zod-validated command params, not text',
   'core/src/commands/solids/loftAdvanced.ts:parseEnd': 'takes the already zod-validated command params, not text',
   'core/src/commands/solids/sweepLaws.ts:parseLaws': 'takes the already zod-validated command params, not text',

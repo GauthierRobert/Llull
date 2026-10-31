@@ -119,6 +119,24 @@ export function filletNodes(recipe: ShapeRecipe): FilletNode[] {
   }
 }
 
+/** Every variable (`sizeEnd`) or asymmetric (`faces`) chamfer node of `recipe` (through sources and boolean operands), outermost first. */
+export function chamferNodes(recipe: ShapeRecipe): FilletNode[] {
+  const own = recipe.op === 'chamfer' && (recipe.sizeEnd !== undefined || recipe.faces !== undefined) ? [recipe] : [];
+  switch (recipe.op) {
+    case 'solid':
+    case 'brep':
+    case 'faceSlab':
+    case 'sheetSolid':
+      return [];
+    case 'boolean':
+      return [...chamferNodes(recipe.a), ...chamferNodes(recipe.b)];
+    case 'blend':
+      return recipe.sources.flatMap(chamferNodes);
+    default:
+      return [...own, ...chamferNodes(recipe.source)];
+  }
+}
+
 /** Every blend_union node of `recipe` (through sources and boolean operands), outermost first. */
 export function blendNodes(recipe: ShapeRecipe): Array<Extract<ShapeRecipe, { op: 'blend' }>> {
   switch (recipe.op) {

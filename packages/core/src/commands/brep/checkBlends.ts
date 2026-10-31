@@ -18,6 +18,8 @@ import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBle
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
 import { REMEDIATION, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
+import { readChamferLegs } from './checkChamferLegs';
+import { chamferNodes } from '../../geometry/blend/blendInfo';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 
@@ -410,11 +412,15 @@ export const checkBlends = defineCommand({
     if (samples < 2 || samples > MAX_SAMPLES)
       return noop(doc, `check_blends: samples must be in 2..${MAX_SAMPLES} (got ${samples}); no-op.`);
     const targets: Entity[] = [];
+    const chamfered: Entity[] = [];
     for (const id of ids ?? Object.keys(doc.entities)) {
       const entity = doc.entities[id];
       const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
+      const withChamfer = recipe !== undefined && chamferNodes(recipe).length > 0;
       if (entity !== undefined && recipe !== undefined && hasFillet(recipe)) targets.push(entity);
-      else if (ids !== undefined)
+      if (entity !== undefined && withChamfer) chamfered.push(entity);
+      if (recipe !== undefined && (hasFillet(recipe) || withChamfer)) continue;
+      if (ids !== undefined)
         return refuse(doc, 'check_blends', 'SRF_ENTITY_NOT_FOUND', `no solid with a blend has id "${id}"`, [id], ['ids']);
     }
     const kernel = (ctx ?? currentContext()).kernel;
@@ -434,7 +440,26 @@ export const checkBlends = defineCommand({
       profiled: checks.some((check) => check.blends.some((blend) => blend.kind === 'edge' && blend.profile !== 'circular')),
       cornered: checks.some((check) => check.blends.some((blend) => blend.kind === 'corner' && blend.profile === 'patch')),
     });
-    const findings = checks.flatMap((check) => check.findings);
+    const legs = kernel === null ? [] : chamfered.map((entity) => readChamferLegs(kernel, entity, unit));
+    const chamferRows = legs.flatMap((read) => read.rows);
+    const unverifiedChamfers = chamferRows.filter((row) => row.note !== undefined);
+    const findings = [
+      ...checks.flatMap((check) => check.findings),
+      ...legs.flatMap((read) => read.findings),
+      // a chamfer whose legs could not be compared is not a pass: it is a warning that names why
+      ...unverifiedChamfers.map(
+        (row): Finding => ({
+          code: 'BLD_CHECK_CHAMFER_UNVERIFIED',
+          severity: 'warn',
+          entityId: row.entityId,
+          ...(row.face === null ? {} : { face: row.face }),
+          edge: row.edge,
+          unit,
+          remediation: REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
+          message: `the legs of the chamfer of edge ${row.edge} were not verified: ${row.note}`,
+        }),
+      ),
+    ];
     const defaulted = Object.entries(named)
       .filter(([, tolerance]) => tolerance.defaulted)
       .map(([name]) => name);
@@ -461,13 +486,17 @@ export const checkBlends = defineCommand({
     const notRun =
       kernel === null
         ? 'no geometry kernel is installed'
-        : targets.length === 0
+        : targets.length === 0 && chamferRows.length === 0
           ? 'no filleted solid to check'
           : (checks.find((check) => check.notRun !== undefined)?.notRun ?? null);
     const status =
-      kernel === null || targets.length === 0 || checks.every((check) => check.notRun !== undefined) ? 'not_run' : statusOf(findings);
+      kernel === null ||
+      (targets.length === 0 && chamferRows.length === 0) ||
+      (chamferRows.every((row) => row.maxDeviation === null) && checks.every((check) => check.notRun !== undefined))
+        ? 'not_run'
+        : statusOf(findings);
     const blends = checks.flatMap((check) => check.blends);
-    const unverified = checks.reduce((total, check) => total + check.unverified, 0);
+    const unverified = checks.reduce((total, check) => total + check.unverified, 0) + unverifiedChamfers.length;
     const unverifiedJunctions = checks.reduce((total, check) => total + check.unverifiedJunctions, 0);
     const fails = findings.filter((finding) => finding.severity === 'fail').length;
     const summary =
@@ -477,6 +506,7 @@ export const checkBlends = defineCommand({
     return report(doc, summary, {
       status,
       blends,
+      ...(chamferRows.length === 0 ? {} : { chamfers: chamferRows }),
       findings,
       tolerances: named,
       unverified,

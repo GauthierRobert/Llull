@@ -243,7 +243,8 @@ export const chamferEdge = defineCommand({
     'distance alone is a symmetric chamfer (equal legs on both faces). Asymmetric: add distance2 (second leg, document units) OR angleDeg ' +
     '(degrees, 0..90 exclusive, measured on the side1 face between that face and the chamfer; on a right-angle edge the second leg is distance * tan(angle)), together with side1Near (a point on the ' +
     'face that carries distance) or side1Name (persistent face name); for each selected edge the one of its two faces nearest to the point is side 1. ' +
-    'distanceEnd makes the symmetric distance vary linearly from distance at the edge start to distanceEnd at its end (a variable chamfer: straight edges between planar faces, flat square ends, listed edges that share no vertex; the exact native kernel builds it as a ruled section loft). ' +
+    'distanceEnd makes the distance vary linearly from distance at the edge start to distanceEnd at its end (a variable chamfer: listed edges that share no vertex, flat square ends, not a closed edge; the exact native kernel builds it as a loft of the sections: a ruled one on a straight edge between planes, a smooth one on a curved edge, an arc or a B-spline between any two faces, with the legs measured on each face from the edge in the plane perpendicular to it). ' +
+    'Asymmetric and variable: add distance2 (the leg on the other face at the edge start) and distance2End (at its end) with side1Near / side1Name, so the leg on side 1 runs distance -> distanceEnd and the other leg distance2 -> distance2End (angleDeg is for a constant chamfer). Edges that meet at a vertex need constant distances (a variable chamfer has no corner patch: BLD_CHAMFER_FAILED names it). ' +
     `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; ` +
     'with the mesh kernel it no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -296,17 +297,23 @@ export const chamferEdge = defineCommand({
       .min(1)
       .describe('Persistent face name of side 1 (inspect_topology lists face names on the native kernel); alternative to side1Near.')
       .optional(),
+    distance2End: z
+      .number()
+      .describe(
+        'Variable asymmetric chamfer: the second leg (on the face that is not side 1) at the END of each selected edge (> 0, document units); it runs linearly from distance2 at the edge start. Needs distanceEnd, distance2 and side1Near / side1Name; not with angleDeg.',
+      )
+      .optional(),
     distanceEnd: z
       .number()
       .describe(
-        'Variable chamfer: the symmetric distance at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d(s)^2 ds). ' +
-          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight, between two planar faces, ending on flat faces square to the edge, with no two chosen edges sharing a vertex; not with distance2 / angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
+        'Variable chamfer: the distance (the leg on side 1 when distance2 is given) at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d1(s) d2(s) ds). ' +
+          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge, with no two chosen edges sharing a vertex; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
       )
       .optional(),
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, distance, distance2, angleDeg, side1Near, side1Name, distanceEnd },
+    { id, edgeIndices = [], edgesNear = [], edgeNames, distance, distance2, angleDeg, side1Near, side1Name, distanceEnd, distance2End },
     ctx,
   ): CommandResult => {
     const sided = distance2 !== undefined || angleDeg !== undefined;
@@ -321,24 +328,28 @@ export const chamferEdge = defineCommand({
         [id],
         ['side1Near'],
       );
-    if (distanceEnd !== undefined) {
+    if (distanceEnd !== undefined || distance2End !== undefined) {
       const unlisted = edgeIndices.length + edgesNear.length + (edgeNames?.length ?? 0) === 0;
-      const problem = sided
-        ? 'distanceEnd is a symmetric variable chamfer: give no distance2 / angleDeg'
-        : !(distanceEnd > 0)
-          ? `distanceEnd must be > 0 (got ${distanceEnd})`
-          : unlisted
-            ? 'a variable chamfer needs its edges listed (edgeIndices, edgesNear or edgeNames), not every edge of the solid'
-            : null;
-      if (problem !== null)
-        return blendRejection(
-          doc,
-          'chamfer_edge',
-          'BLD_CHAMFER_VARIABLE_PARAMS',
-          problem,
-          [id],
-          [!sided && distanceEnd > 0 && unlisted ? 'edgeIndices' : 'distanceEnd'],
-        );
+      const found: readonly [string, string] | null =
+        distanceEnd === undefined
+          ? ['distance2End', 'distance2End needs distanceEnd (a variable chamfer runs from distance to distanceEnd)']
+          : angleDeg !== undefined
+            ? ['angleDeg', 'a variable chamfer takes distance2 and distance2End for its second leg, not angleDeg']
+            : distance2 !== undefined && distance2End === undefined
+              ? ['distance2End', 'a variable chamfer with distance2 needs distance2End (the second leg at the end of the edge)']
+              : distance2 === undefined && distance2End !== undefined
+                ? ['distance2End', 'distance2End needs distance2 (the second leg at the start of the edge)']
+                : !(distanceEnd > 0)
+                  ? ['distanceEnd', `distanceEnd must be > 0 (got ${distanceEnd})`]
+                  : distance2End !== undefined && !(distance2End > 0)
+                    ? ['distance2End', `distance2End must be > 0 (got ${distance2End})`]
+                    : unlisted
+                      ? [
+                          'edgeIndices',
+                          'a variable chamfer needs its edges listed (edgeIndices, edgesNear or edgeNames), not every edge of the solid',
+                        ]
+                      : null;
+      if (found !== null) return blendRejection(doc, 'chamfer_edge', 'BLD_CHAMFER_VARIABLE_PARAMS', found[1], [id], [found[0]]);
     }
     if (angleDeg !== undefined && !(angleDeg > 0 && angleDeg < 90))
       return blendRejection(
@@ -376,6 +387,7 @@ export const chamferEdge = defineCommand({
           edges: [...edges],
           size: distance,
           ...(distanceEnd === undefined ? {} : { sizeEnd: distanceEnd }),
+          ...(distance2End === undefined ? {} : { size2End: distance2End }),
           ...(near.length > 0 ? { near } : {}),
         };
         if (!sided) return base;
