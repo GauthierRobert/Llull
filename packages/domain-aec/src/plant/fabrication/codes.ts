@@ -45,6 +45,13 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Nothing to fix if the flange is not ASME B16.5: otherwise name the pressure class in the flange item code (e.g. FLWN-100-150) so the bolt table row can be found.',
   ISO_FIELD_WELD_STALE:
     'The weld no longer lies on a pipe of the line (it was edited): it is ignored; delete the line data or re-add the weld.',
+  ISO_DISCONNECTED:
+    'Reconnect the listed components (their connection points must coincide within 0.1 mm) or split them into separate lines.',
+  ISO_DIMENSION_MISMATCH: 'Report a bug with the plan: a dimension string must close to its overall by construction.',
+  ISO_UNVERIFIED_CATALOGUE: 'Verify the spec rows of the listed components (01 PSC) before the isometric is issued.',
+  ISO_SHEET_OVERFLOW:
+    'The line is drawn shrunk on one sheet: use a larger paper, or split the line at a weld or flange (sheet splitting is a later milestone).',
+  ISO_REVIEW_REQUIRED: 'An unissued isometric is for review only (NOT FOR CONSTRUCTION): a human issues it.',
   ISO_SPOOL_WEIGHT_INCOMPLETE: 'Components without a WEIGHT are not counted: the spool weight is a lower bound.',
 };
 

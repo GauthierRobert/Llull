@@ -492,7 +492,7 @@ Coverage gate 90/85/90/90 applies (`packages/domain-aec/src/**`).
 | --------- | ------- | ---------- | ------ |
 | ISO-M1 | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
 | ISO-M2 | **Built 2026-10-31 (§13.2).** welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
-| ISO-M3 | iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
+| ISO-M3 | **Built 2026-10-31 (§13.3).** iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
 | ISO-M4 | sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
 | ISO-M5 | `import_pcf as=route` via RTE; supports in PCF / iso; skew boxes; piping GA (`export_piping_ga`); VC-ISO-04, 13, 15 | 02 RTE | 5 d |
 | ISO-M6 | performance (VC-ISO-18), ISOGEN conformance check of the fixture (OQ-ISO-01), CSV weld map, revision clouds | licensed tool access | 3 d |
@@ -644,3 +644,41 @@ Slice `doc.plant.fabrication` gained optional `rules`, `fieldWelds`, `welds` (ke
 **Tests.** `tests/unit/plant/fabrication/{welds,spools,cutList,bom,lineSources,scenarioPlans}.test.ts`: VC-ISO-05 (13 welds against the reference script, branch welds last), VC-ISO-06 (2 spools; 1 without the WELD record), VC-ISO-07 (gap 0 / 3, WF allowance 100, both gaps), VC-ISO-08 / 09 (BOM identities, 3 gaskets and 24 studs 5/8 in), VC-ISO-14 (W14 after a new weld, old numbers kept), orphans and renumber, coded refusals with the document unchanged, `is pure`, replay equality, routed and legacy sources, a 1000-component timing check (bound 3 x the budget plus runner slack), and the pack plans SC-ISO-01 and SC-ISO-07 run step by step (the `check_isometric` steps skipped until M3). `blockedPlanCommands.json` lost `weld_list`, `split_spools`, `spool_list`, `cut_list`, `piping_bom`, `add_field_weld`, `set_fabrication_rules`; still blocked: `check_isometric` (sc-iso-01, 07), `add_end_flange` (sc-iso-02, RTE), `define_isometric` / `export_isometric` (sc-iso-03..05, 08), `export_piping_ga`.
 
 **Open.** VC-ISO-22 (CSV weld map) and the isometric timing of VC-ISO-18 are M6; stock-length nesting and stud lengths are V1; the sheet-scope BOM waits for M4; the sc-iso-02 BOM step waits for RTE flanges and branches.
+
+### 13.3 ISO-M3 (2026-10-31): iso graph, projection, layout, symbols, dimensions, tables, SVG / DXF single sheet, `check_isometric`
+
+Two commands in the plugin `piping-fabrication` (toolset `piping`): `export_isometric` (query / export, one sheet, SVG and / or DXF) and `check_isometric` (query). Both read a line through `analysis.ts analyseLine` (M2), so routed, imported and legacy lines draw alike.
+
+| File | Content |
+| ---- | ------- |
+| `iso/isoProjection.ts` | east -30 / north +30 / up 90 degrees (the `viewDirections.ts` iso frame, tested against it), `up_left` (plant turned +90 degrees), depth for crossings |
+| `iso/isoGraph.ts` | components to segments (an elbow, bend or tee through its centre point; an elbow without centre through the L corner), depth-first walk (run before branch), maximal straight runs, direction classes `+E .. -U | slope | skew` |
+| `iso/isoDimensions.ts` | string + overall dimension per run (3D distances, label = value rounded to 0.1 mm), `EL`, `E .. N ..`, slope (`SLOPE 1:n` or percent, degrees, fall direction) |
+| `iso/isoLayout.ts` | `l = clamp(k ln(1 + L / 200), 9, 110)` paper mm, k by bisection to fit, crossing passes (at most 12), uniform shrink + `overflow` below 70 % |
+| `iso/isoSymbols.ts`, `iso/isoLabels.ts` | symbols by family and joint class; dimension lines; label placement on the first candidate that meets no box / line |
+| `iso/isoTables.ts`, `iso/isoSheet.ts`, `iso/isoRender.ts` | bom / cut_list / weld_list / spool_list as text tables; sheet assembly (frame, title block, north arrow, NOT FOR CONSTRUCTION); primitives printed as SVG and DXF R12 (layers `ISO-PIPE`, `-SYMB`, `-DIM`, `-TEXT`, `-TABLE`, `-FRAME`) |
+| `check.ts` | the rule table below |
+
+**`check_isometric` rules** (code, severity): `ISO_DISCONNECTED` error (components not reachable from the line start; two connection points under 1 mm apart with different 0.1 mm keys), `ISO_OPEN_END` warning,
+`ISO_SKEY_MISSING` error, `ISO_ITEM_CODE_MISSING` warning, `ISO_WELDS_UNNUMBERED` warning (error with `style: final`), `ISO_SPOOL_TOO_LARGE` / `ISO_SPOOL_TOO_HEAVY` error (ids = spool names), `ISO_CUT_LENGTH_SHORT` error (only when a weld gap is stored),
+`ISO_DIMENSION_MISMATCH` error (guard), `ISO_UNVERIFIED_CATALOGUE` warning, `ISO_LEGACY_FITTINGS_DERIVED` warning, `ISO_SHEET_OVERFLOW` warning, `ISO_FIELD_WELD_STALE` warning, `ISO_REVIEW_REQUIRED` info (always); a line that cannot be read
+(`ISO_SEGMENT_TOO_SHORT` ...) is an error finding carrying its own code. `ok` = no error. **Connectivity-based open ends (the ISO-M1 note) are built**: on imported and routed lines a terminal whose end type is not `FL` / `CP` / `PL` and whose component is not a
+CAP / FLANGE-BLIND is an open end; legacy pipes keep the open ends of their network (they know `from` / `to`), so none is reported twice.
+
+**Deviations from §4 / §5 (all decided).**
+
+- `check_isometric` takes two optional params more: `style` (`check` default | `final`, only the severity of `ISO_WELDS_UNNUMBERED`) and `paper` (the sheet the overflow rule is evaluated for, default A3, without tables). An unknown `lineId` is a coded refusal `ISO_LINE_NOT_FOUND` (and a document without piping `ISO_NO_PIPING`), not an issue row; every defect of a line is a finding.
+- `export_isometric` has `style` `check | final` (the `spool` and `stress` styles, `spoolId`, `compareToIssue` arrive with M4+), `tables` (default: all four for final, none for check) and `northArrow` (an `IsoDefinition` does not exist before `define_isometric`, M4). `sheets[]` lists file names and the sha256 of the first file; the text of every file is in `files[]` only (`name`, `format`, `content`, `sha256`), as for `export_pcf`.
+  One sheet always: a line too large is shrunk (`layout.scale`) and warned (`ISO_SHEET_OVERFLOW`); no continuation marks, no `sheetAssignment`. A disconnected line is refused (`ISO_DISCONNECTED`, ids of the unreachable components); the dimension guard `ISO_DIMENSION_MISMATCH` is a warning row in `data.warnings` (`dimensionMismatches` > 0).
+- The sheet is built from paper-mm primitives printed by one SVG and one DXF writer (`iso/isoRender.ts`), not through `DrawingPainter` and `composeSheetSvg`: they carry a scale bar and "1:N" that an isometric must not show. The title block is drawn from `sheetLayout` metrics.
+- `ISO_SLOPE_BELOW_MIN` is not raised: 02 RTE has per-leg declared slopes (`check_piping`, `RTE_*_SLOPE`) but no required slope on a line. A run is a slope run when its direction is within 0.02 % of a horizontal axis in plan and falls at most 25 % (else skew, drawn at its projected angle; squaring-in triangles and the 22.5 degree rule are M5). Slope arrow and text are placed beside the run; `fallDirection` is the plan axis of the fall (`+X`, `-Y` ...).
+- Weld marks show the provisional number of an unnumbered joint (`numbered: false`, warning `ISO_WELDS_UNNUMBERED`); the cut list table is left out, with `ISO_GAP_UNDEFINED` as a warning, while no weld gap is stored (no silent default). Tables print at most 30 rows per table (the sheet says how many more; `data.tables` has all).
+- Supports are not drawn (M5). Gaps in a crossing are drawn on the farther pipe in SVG only. Label placement is greedy and can overlap in dense lines (reported by nothing but the picture).
+- No kernel (L9): `requiresKernel` is not set. No text reader was added (no hostile-input entry).
+
+**Tests.** `tests/unit/plant/fabrication/{isoDrawing,exportIsometric,checkIsometric,scenarioPlans}.test.ts`: VC-ISO-10 (axes against `viewDirections.ts`, `up_left`), VC-ISO-11 (76 / 2424 / 2348 / 152 = 5000, north 4000, every label = 3D distance), VC-ISO-12 (1:100, 1 %, 0.5729386977 degrees, +X; a percent case, rising and Y falls, no slope on level / vertical / steep / diagonal),
+VC-ISO-16 (one positive and one negative per rule on hand-mutated fixtures and legacy lines), VC-ISO-17 (same sha256 twice, after `replay_history`), layout (monotone, minimum length, fit, overflow, crossing search), refusals with the document unchanged, `is pure`, budgets (a 100 component sheet, a 120 line check, bounds 3 x the spec).
+The pack plans SC-ISO-01 (now every step, `check_isometric` ok), 03, 04 and 07 (step 4: `E-401-SP01` over the limit, open ends, `ok: false`) run step by step with every expected row. `blockedPlanCommands.json` lost sc-iso-01, 03, 04, 07 and 08 (sc-iso-08 still needs `add_pipe_support` / `includeSupports`, M5; its isometric step has no check yet);
+still blocked: `add_end_flange` (sc-iso-02), `define_isometric` (sc-iso-05), `export_piping_ga` (sc-iso-06).
+
+**Open.** The picture was checked by eye on the fixture (SVG rendered in a browser), not by a golden SVG hash; `tests/golden/plant_iso_l101.json` (VC-ISO-17 golden) and the 1000-component timing (VC-ISO-18) are M6; sheet split, continuation and spool isometrics are M4; skew boxes and supports M5. The 500-line `check_isometric` budget is exercised with 120 lines.

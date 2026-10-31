@@ -1,6 +1,6 @@
 /**
- * Plant 05 ISO M2: the pack's scenario plans SC-ISO-01 and SC-ISO-07 run step by step through `execute` (the path of `llull run plan.json`; `as` binds the first affected id).
- * Steps whose command is not registered yet (`check_isometric`, M3) are skipped with their rows. The `harness` of the plan inlines the fixture text and the TAB mutation.
+ * Plant 05 ISO M2 / M3: the pack's scenario plans SC-ISO-01, 03, 04 and 07 run step by step through `execute` (the path of `llull run plan.json`; `as` binds the first affected id).
+ * Steps whose command is not registered yet are skipped with their rows. The `harness` of the plan inlines the fixture text and the TAB mutation.
  */
 
 import { readFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ function pick(root: unknown, expression: string): unknown {
     if (index === undefined || !Array.isArray(value)) return value;
     if (index === '*') return value;
     const filter = /^(\w+)=(.+)$/.exec(index);
-    return filter ? value.find((item: Record<string, unknown>) => item[filter[1] as string] === filter[2]) : value[Number(index)];
+    return filter ? value.find((item: Record<string, unknown>) => String(item[filter[1] as string]) === filter[2]) : value[Number(index)];
   }, root);
 }
 
@@ -69,29 +69,35 @@ function run(file: string): { plan: Plan; outcomes: Array<Outcome | null>; final
   return { plan, outcomes, final: doc };
 }
 
-describe('SC-ISO-01: parse the sample PCF, then welds, spools, cut lists, BOM and export (VC-ISO-01, 03, 05..09)', () => {
+/** Every expected row of the given steps (or of every built step) holds in the outcomes. */
+function expectRows(plan: Plan, outcomes: Array<Outcome | null>, steps?: readonly number[]): void {
+  for (const row of plan.expected.filter((entry) => outcomes[entry.step] != null && (steps === undefined || steps.includes(entry.step)))) {
+    const actual = pickRow(outcomes[row.step], row.path);
+    if (row.value === 'present') expect(actual, row.path).toBeDefined();
+    else if (typeof row.value === 'number' && typeof actual === 'number')
+      expect(Math.abs(actual - row.value), row.path).toBeLessThanOrEqual(row.abs ?? 0);
+    else if (Array.isArray(row.value) && row.abs !== undefined)
+      (row.value as number[]).forEach((value, at) =>
+        expect(Math.abs(((actual as number[])[at] as number) - value), `${row.path}[${at}]`).toBeLessThanOrEqual(row.abs as number),
+      );
+    else expect(actual, row.path).toEqual(row.value);
+  }
+}
+
+const unbuilt = (plan: Plan): string[] =>
+  plan.actions.filter((action) => getCommand(action.command) === undefined).map((action) => action.command);
+
+describe('SC-ISO-01: parse the sample PCF, then welds, spools, cut lists, BOM, export and check (VC-ISO-01, 03, 05..09)', () => {
   const { plan, outcomes } = run('sc-iso-01-parse-sample-pcf.json');
 
-  it('every step of the plan up to check_isometric is built and runs', () => {
-    expect(plan.actions.filter((action) => getCommand(action.command) === undefined).map((action) => action.command)).toEqual([
-      'check_isometric',
-    ]);
-    expect(outcomes.filter((outcome, index) => outcome === null && index < plan.actions.length - 1)).toEqual([]);
+  it('every step of the plan is built and runs', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expect(outcomes.every((outcome) => outcome !== null)).toBe(true);
   });
 
-  it('meets every expected row of the built steps', () => {
-    const built = plan.expected.filter((row) => outcomes[row.step] != null);
-    expect(built.map((row) => row.step)).toEqual([1, 1, 1, 3, 3, 5, 6, 7, 8, 8, 9]);
-    for (const row of built) {
-      const actual = pickRow(outcomes[row.step], row.path);
-      if (typeof row.value === 'number' && typeof actual === 'number')
-        expect(Math.abs(actual - row.value), row.path).toBeLessThanOrEqual(row.abs ?? 0);
-      else if (Array.isArray(row.value) && row.abs !== undefined)
-        (row.value as number[]).forEach((value, at) =>
-          expect(Math.abs(((actual as number[])[at] as number) - value), `${row.path}[${at}]`).toBeLessThanOrEqual(row.abs as number),
-        );
-      else expect(actual, row.path).toEqual(row.value);
-    }
+  it('meets every expected row, the check_isometric one (ok on a clean line) included', () => {
+    expect(plan.expected.map((row) => row.step)).toEqual([1, 1, 1, 3, 3, 5, 6, 7, 8, 8, 9, 10]);
+    expectRows(plan, outcomes);
   });
 
   it('is deterministic: a second run gives the same step data', () => {
@@ -99,12 +105,38 @@ describe('SC-ISO-01: parse the sample PCF, then welds, spools, cut lists, BOM an
   });
 });
 
-describe('SC-ISO-07: broken inputs (the built part: TAB refusal, a 14 m legacy line against the user shipping envelope)', () => {
+describe('SC-ISO-03: the final isometric of L-101 on A3 (VC-ISO-10, 11)', () => {
+  const { plan, outcomes } = run('sc-iso-03-isometric-sheet.json');
+
+  it('meets every expected row: axes, north arrow, string dimensions closing to 5000, one sheet, 13 welds', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expect(plan.expected).toHaveLength(9);
+    expectRows(plan, outcomes);
+  });
+
+  it('writes the svg and the dxf of the sheet and byte-identical files on a second run (VC-ISO-17)', () => {
+    const files = (outcomes[2]?.data as { files: Array<{ name: string; sha256: string }> }).files;
+    expect(files.map((file) => file.name)).toEqual(['L-101_iso_sheet1.svg', 'L-101_iso_sheet1.dxf']);
+    const again = (run('sc-iso-03-isometric-sheet.json').outcomes[2]?.data as { files: Array<{ sha256: string }> }).files;
+    expect(again.map((file) => file.sha256)).toEqual(files.map((file) => file.sha256));
+  });
+});
+
+describe('SC-ISO-04: a drain falling 100 mm over 10 m (VC-ISO-12)', () => {
+  const { plan, outcomes } = run('sc-iso-04-sloped-line.json');
+
+  it('carries SLOPE 1:100, 1 %, 0.5729386977 degrees and the fall toward +X', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expectRows(plan, outcomes);
+  });
+});
+
+describe('SC-ISO-07: broken inputs (TAB refusal; a 14 m legacy line against the user shipping envelope) (VC-ISO-02, 16)', () => {
   const { plan, outcomes, final } = run('sc-iso-07-check-errors.json');
 
   it('the TAB on line 14 is refused with its code and path, and the rule is stored with its source', () => {
-    for (const row of plan.expected.filter((entry) => entry.step === 1))
-      expect(pickRow(outcomes[row.step], row.path), row.path).toEqual(row.value);
+    expect(unbuilt(plan)).toEqual([]);
+    expectRows(plan, outcomes, [1]);
     expect(final.plant?.fabrication?.rules?.maxSpool).toMatchObject({
       lengthMm: 12000,
       widthMm: 3000,
@@ -113,7 +145,12 @@ describe('SC-ISO-07: broken inputs (the built part: TAB refusal, a 14 m legacy l
     });
   });
 
-  it('the 14 m legacy pipe is a single spool over the 12 m envelope: split_spools names it E-401-SP01 (the spool part of VC-ISO-16)', () => {
+  it('check_isometric names the spool E-401-SP01 over the limit, the open ends, and is not ok', () => {
+    expectRows(plan, outcomes, [4]);
+    expect((outcomes[4]?.data as { ok: boolean }).ok).toBe(false);
+  });
+
+  it('split_spools refuses the same spool with the same code and id', () => {
     const refused = execute(final, 'split_spools', { lineId: 'E-401' });
     expect(refused.error?.code).toBe('ISO_SPOOL_TOO_LARGE');
     expect(refused.error?.ids).toEqual(['E-401-SP01']);

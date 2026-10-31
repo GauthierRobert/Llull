@@ -1,8 +1,10 @@
 import { commandCatalog } from '@core/commands/schema';
 import { addFieldWeld } from './commands/addFieldWeld';
+import { checkIsometric } from './commands/checkIsometric';
 import { cutList } from './commands/cutListCommand';
 import { deletePcfLine } from './commands/deletePcfLine';
 import { exportPcf } from './commands/exportPcf';
+import { exportIsometric } from './commands/exportIsometric';
 import { importPcf } from './commands/importPcf';
 import { numberWelds } from './commands/numberWelds';
 import { pipingBom } from './commands/pipingBom';
@@ -25,4 +27,6 @@ export const fabricationCatalog = commandCatalog(
   spoolList,
   cutList,
   pipingBom,
+  exportIsometric,
+  checkIsometric,
 );
