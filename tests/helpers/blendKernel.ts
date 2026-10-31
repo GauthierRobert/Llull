@@ -67,6 +67,8 @@ export interface BlendScript {
   faceAt?: ((point: readonly [number, number, number]) => { readonly face: number; readonly distance: number }) | null | undefined;
   /** Points of `edgeSamples` (default: along +x from the edge start). */
   edgePoint?: (edge: number, t: number) => [number, number, number];
+  /** `edgeSamples` answers only the few points of a direction probe (count <= 5): a dense sampling of an edge returns null. */
+  noDenseEdgeSamples?: boolean;
 }
 
 export type ScriptedKernel = GeometryKernel & { recipes: ShapeRecipe[] };
@@ -91,6 +93,7 @@ export function scriptedKernel(script: BlendScript = {}): ScriptedKernel {
             normalCurvature: (script.curvature ?? (() => [0, 0] as [number, number]))(edge, k / (count - 1)),
           })),
     edgeSamples: (_shape: unknown, edge: number, count: number) => {
+      if (script.noDenseEdgeSamples === true && count > 5) return null;
       const points = Array.from({ length: count }, (_, k) => (script.edgePoint ?? ((_e, t) => [20 * t, 0, 0]))(edge, k / (count - 1)));
       let arc = 0;
       return points.map((point, k) => {

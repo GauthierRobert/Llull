@@ -25,6 +25,7 @@ type Shape = NonNullable<ReturnType<IsolatedKernel['evaluate']>>;
 interface TopoEdge {
   index: number;
   curve: string;
+  unevenSpeed?: boolean;
 }
 interface Row {
   u: number;
@@ -61,6 +62,8 @@ describeNative('fillet_edge laws on an ellipse rim: arc-length abscissa for ever
     const edges = (execute(cut.document, 'inspect_topology', { id }).data as { edges: TopoEdge[] }).edges;
     const rim = edges.find((edge) => edge.curve === 'ellipse');
     expect(rim).toBeDefined();
+    // the kernel's own decision, reported with the topology (check_blends reads it)
+    expect(rim?.unevenSpeed).toBe(true);
     return { doc: cut.document, id, edge: (rim as TopoEdge).index };
   };
 
@@ -98,6 +101,9 @@ describeNative('fillet_edge laws on an ellipse rim: arc-length abscissa for ever
     return out;
   };
 
+  // The 4e-3 (absolute, about 1% of a radius of 0.3 to 0.6) is this test's own oracle budget, not the check's: every section is compared with the law at the station of its
+  // nearest point on a 1001 point polyline of the edge, also BETWEEN the law's nodes, where the law is the analytic form the test models (a cubic, a spline) of what OCCT
+  // interpolates. check_blends (RADIUS_LAW_TOLERANCE 1e-4 relative) reads only the abscissas where the law is exact and interpolates the 101 sections there (radiusAtT).
   const worstAgainst = (rows: Row[], law: (u: number) => number, from = 0.03, to = 0.97): number =>
     rows.filter((row) => row.u >= from && row.u <= to).reduce((worst, row) => Math.max(worst, Math.abs(row.radius - law(row.u))), 0);
 
@@ -184,5 +190,62 @@ describeNative('fillet_edge laws on an ellipse rim: arc-length abscissa for ever
     const three = execute(doc, 'fillet_edge', { id, edges: [{ index: edge, size: 0.3, sizeEnd: 0.4, sizes: [{ t: 0.5, size: 0.8 }] }] });
     expect(three.rejected, three.summary).toBeUndefined();
     expect(worstAgainst(realised(three.document, three.affected[0] as string, edge), spline)).toBeLessThan(6e-3);
+  });
+
+  it('a 9 node straight law (periodic: the same radius at both ends) on the SINGLE closed ellipse builds within 60 s and follows the law at the quarter points and the middle (the refinement checks all three), within 4e-3', () => {
+    const { doc, id, edge } = scene(false);
+    const sizes = [0.5, 0.55, 0.45, 0.58, 0.5, 0.42, 0.56, 0.47, 0.5];
+    const law: EdgeRadius = {
+      size: sizes[0] as number,
+      sizeEnd: sizes[8] as number,
+      sizes: sizes.slice(1, 8).map((size, k) => ({ t: (k + 1) / 8, size })),
+      interpolation: 'linear',
+    };
+    const started = performance.now();
+    const built = execute(doc, 'fillet_edge', { id, edges: [{ index: edge, ...law }] });
+    expect(built.rejected, built.summary).toBeUndefined();
+    expect(performance.now() - started).toBeLessThan(60_000);
+    const rows = realised(built.document, built.affected[0] as string, edge);
+    expect(rows.length).toBeGreaterThan(50);
+    for (const station of [0.125, 0.25, 0.5, 0.75, 0.875]) {
+      const near = rows.filter((row) => Math.abs(row.u - station) < 0.01);
+      expect(near.length, `sections near ${station}`).toBeGreaterThan(0);
+      for (const row of near) expect(Math.abs(row.radius - radiusAt(law, row.u))).toBeLessThan(4e-3);
+    }
+  });
+
+  it('ORACLE without projection: on a circular arc (constant curvature, steady speed) the spine station of a section is its angle about the axis, and the straight law 0.3 -> 0.6 is met there within 4e-3; check_blends agrees', () => {
+    const cylinder = execute(createEmptyDocument(), 'add_cylinder', { radius: 6, height: 10 });
+    const noX = execute(cylinder.document, 'add_box', { size: [40, 40, 60], position: [-20, 0, 0] });
+    const half = execute(noX.document, 'boolean', { op: 'subtract', a: cylinder.affected[0], b: noX.affected[0] });
+    const noY = execute(half.document, 'add_box', { size: [40, 40, 60], position: [0, -20, 0] });
+    const quarter = execute(noY.document, 'boolean', { op: 'subtract', a: half.affected[0], b: noY.affected[0] });
+    expect(quarter.rejected, quarter.summary).toBeUndefined();
+    const id = quarter.affected[0] as string;
+    const source = kernel.evaluate(recipeOf(quarter.document, id)) as Shape;
+    const topology = kernel.topology(source) as NonNullable<ReturnType<typeof kernel.topology>>;
+    const top = Math.max(...topology.edges.map((edge) => edge.start[2]));
+    const arc = topology.edges.find((edge) => edge.curve === 'circle' && edge.start[2] > top - 1e-6 && edge.length > 1);
+    expect(arc, 'the top circular arc').toBeDefined();
+    const startsOnX = Math.abs((arc as { start: readonly number[] }).start[1] as number) < 1e-6;
+    const law = { index: (arc as { index: number }).index, size: 0.3, sizeEnd: 0.6, interpolation: 'linear' };
+    const built = execute(quarter.document, 'fillet_edge', { id, edges: [law] });
+    expect(built.rejected, built.summary).toBeUndefined();
+    const out = built.affected[0] as string;
+    const shape = kernel.evaluate(recipeOf(built.document, out)) as Shape;
+    let compared = 0;
+    for (const blend of blendsOf(shape))
+      for (const section of blendSectionsOf(kernel, shape, blend, 101) ?? []) {
+        if (section.radius === null) continue;
+        // the axis is z through the origin: the station is the angle of the section's mid point over the quarter turn, read first-hand
+        const station = Math.atan2(section.mid[1], section.mid[0]) / (Math.PI / 2);
+        if (station < 0.03 || station > 0.97) continue;
+        compared += 1;
+        // the law runs from the start vertex of the edge: from the x axis (station 0) or from the y axis (station 1)
+        const along = startsOnX ? station : 1 - station;
+        expect(Math.abs(section.radius - (0.3 + 0.3 * along))).toBeLessThan(4e-3);
+      }
+    expect(compared).toBeGreaterThan(50);
+    expect(lawFindings(built.document, out)).toEqual([]);
   });
 });

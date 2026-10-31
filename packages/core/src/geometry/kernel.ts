@@ -39,6 +39,11 @@ export interface ShapeEdge {
   readonly mid: Vec3;
   /** Points along the curve, start to end (curved edges); `edgesNear` measures distance to them. */
   readonly samples?: readonly Vec3[];
+  /**
+   * The kernel's decision on a curved edge: its parameter fraction differs from its arc fraction (an ellipse, a B-spline), so a radius law is laid on the arc length
+   * node by node (native `llull-kernel`, law_fillet.cxx). Absent on a line and where the kernel does not say.
+   */
+  readonly unevenSpeed?: boolean;
   /** Bounds a single face (a cylinder's seam): no corner to fillet or chamfer. */
   readonly seam: boolean;
   /** Zero-length (a sphere or cone pole): no corner to fillet or chamfer. */

@@ -18,6 +18,7 @@
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
+#include "llull-kernel-occt/cpp/law_fillet.hxx"
 #include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/cpp/query_support.hxx"
 #include "llull-kernel-occt/src/queries.rs.h"
@@ -131,6 +132,8 @@ void write_edge(JsonWriter &out, const TopoDS_Edge &edge, int index, int face_co
   BRepGProp::LinearProperties(edge, props, Standard_False, Standard_False);
   const char *kind = query::curve_kind(curve.GetType());
   out.key("curve").string(kind).key("length").number(props.Mass());
+  // the kernel's own decision (law_fillet.cxx): a radius law on this edge is laid on its arc length, check_blends reads it back with the same definition
+  if (std::string(kind) != "line") out.key("unevenSpeed").boolean(uneven_speed(edge));
   out.key("start").point(curve.Value(first)).key("end").point(curve.Value(last)).key("mid").point(curve.Value((first + last) / 2));
   if (std::string(kind) != "line") {
     out.key("samples").begin_array();

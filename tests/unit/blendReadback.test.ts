@@ -277,18 +277,25 @@ describe('radius law over a setback blend (checkRadius)', () => {
   });
 });
 
-describe('radius law over a curved source edge (checkRadius reads the spine position on an edge of uneven speed)', () => {
+describe('radius law over a curved source edge (checkRadius reads the spine position on an edge the kernel reports as uneven)', () => {
   // a quarter circle of radius 10 from (10, 0) to (0, 10); the edge runs at an uneven speed (its parameter t is at the arc fraction t^2) and the sections are uniform in that parameter
   const at = (u: number, scale = 1): [number, number, number] => [
     10 * scale * Math.cos((Math.PI / 2) * u),
     10 * scale * Math.sin((Math.PI / 2) * u),
     2.5,
   ];
-  const edges = [
+  const edgesWith = (unevenSpeed: boolean | 'unreported'): ShapeTopology['edges'] => [
     edgeOf(0, { name: 'e(blend|a)', start: at(0, 0.9), end: at(1, 0.9), mid: at(0.5, 0.9) }),
     edgeOf(1, { name: 'e(blend|b)', start: at(0, 1.1), end: at(1, 1.1), mid: at(0.5, 1.1) }),
     edgeOf(2, { name: 'end', start: at(1, 3), end: at(1, 4), mid: at(1, 3.5) }),
-    edgeOf(3, { name: SOURCE_EDGE, curve: 'circle', start: at(0), end: at(1), mid: at(0.5) }),
+    edgeOf(3, {
+      name: SOURCE_EDGE,
+      curve: 'circle',
+      start: at(0),
+      end: at(1),
+      mid: at(0.5),
+      ...(unevenSpeed === 'unreported' ? {} : { unevenSpeed }),
+    }),
   ];
   const sections =
     (radius: (u: number) => number, speed: (t: number) => number) =>
@@ -298,16 +305,24 @@ describe('radius law over a curved source edge (checkRadius reads the spine posi
         return { t: k / (count - 1), a: at(u, 0.9), mid: at(u, 0.95), b: at(u, 1.1), radius: radius(u), centre: at(u, 0.9) };
       });
   const squared = (t: number): number => t * t;
-  const run = (law: EdgeRadius, radius: (u: number) => number, speed = squared): ReturnType<typeof checkRadius> => {
+  const run = (
+    law: EdgeRadius,
+    radius: (u: number) => number,
+    speed = squared,
+    unevenSpeed: boolean | 'unreported' = true,
+    script: Partial<Parameters<typeof scriptedKernel>[0]> = {},
+  ): ReturnType<typeof checkRadius> => {
+    const topology = { ...TOPOLOGY, edges: edgesWith(unevenSpeed) };
     const kernel = scriptedKernel({
-      topology: { ...TOPOLOGY, edges },
+      topology,
       graph: GRAPH,
       g1: () => 0,
       sections: sections(radius, speed),
       edgePoint: (_edge, t) => at(speed(t)),
+      ...script,
     });
     const shape = {} as ShapeHandle;
-    const record: LawRecord = { node: 0, law, shape, topology: { ...TOPOLOGY, edges }, edge: 3, chain: new Set(), setback: false };
+    const record: LawRecord = { node: 0, law, shape, topology, edge: 3, chain: new Set(), setback: false };
     return checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
   };
   const linear: EdgeRadius = { size: 1, sizeEnd: 2, interpolation: 'linear' };
@@ -316,15 +331,114 @@ describe('radius law over a curved source edge (checkRadius reads the spine posi
     expect(run(linear, (u) => 1 + u)).toMatchObject({ lawChecked: true, deviations: [] });
   });
 
-  it('an edge of steady speed keeps the fraction along the first contact edge (the sections are not projected)', () => {
+  it('an edge the kernel reports as steady keeps the fraction along the first contact edge (the sections are not projected)', () => {
     const steady = (t: number): number => t;
-    expect(run(linear, (u) => 1 + u, steady)).toMatchObject({ lawChecked: true, deviations: [] });
-    expect(run(linear, (u) => 1 + 0.5 * u, steady).deviations.length).toBeGreaterThan(5);
+    expect(run(linear, (u) => 1 + u, steady, false)).toMatchObject({ lawChecked: true, deviations: [] });
+    expect(run(linear, (u) => 1 + 0.5 * u, steady, false).deviations.length).toBeGreaterThan(5);
   });
 
   it('a radius that follows the law in the parameter instead, or another law, is reported', () => {
     expect(run(linear, (u) => 1 + Math.sqrt(u)).deviations.length).toBeGreaterThan(5);
     expect(run(linear, (u) => 1 + 0.5 * u).deviations.length).toBeGreaterThan(5);
+  });
+
+  it("the decision is the kernel's: a curved edge it does not report on is not compared (named), a constant law needs no position", () => {
+    const unreported = run(linear, (u) => 1 + u, squared, 'unreported');
+    expect(unreported).toMatchObject({ lawChecked: false, deviations: [] });
+    expect(unreported.lawNote).toContain('does not report whether it runs at a steady speed');
+    expect(run({ size: 1 }, () => 1, squared, 'unreported')).toMatchObject({ lawChecked: true, deviations: [] });
+  });
+
+  it('an uneven edge the kernel cannot sample densely is not compared (named), never read with the old fraction along the contact edge', () => {
+    const unread = run(linear, (u) => 1 + Math.sqrt(u), squared, true, { noDenseEdgeSamples: true });
+    expect(unread).toMatchObject({ lawChecked: false, deviations: [] });
+    expect(unread.lawNote).toContain('cannot sample it');
+    const noQuery = run(linear, (u) => 1 + u, squared, true, { noFaceQuery: true });
+    expect(noQuery.lawChecked).toBe(false);
+  });
+
+  it('a nearest edge point that jumps back between sections (the radius reaches the local radius of curvature of the edge) is not read', () => {
+    // sections crossing the centre of curvature of the arc: the nearest edge point climbs from 0.1 to 0.9 of the arc, then falls to its start
+    const around = (k: number): [number, number, number] => {
+      const to = (t: number, from: [number, number], end: [number, number]): [number, number, number] => [
+        from[0] + t * (end[0] - from[0]),
+        from[1] + t * (end[1] - from[1]),
+        2.5,
+      ];
+      return k < 0.5 ? to(k / 0.5, [3, 0.5], [0.5, 3]) : to((k - 0.5) / 0.5, [0.5, 3], [-1, -3]);
+    };
+    const topology = { ...TOPOLOGY, edges: edgesWith(true) };
+    const kernel = scriptedKernel({
+      topology,
+      graph: GRAPH,
+      g1: () => 0,
+      sections: (_face, count) =>
+        Array.from({ length: count }, (_, k) => ({
+          t: k / (count - 1),
+          a: at(0.5, 0.9),
+          mid: around(k / (count - 1)),
+          b: at(0.5, 1.1),
+          radius: 1.5,
+          centre: at(0.5, 0.9),
+        })),
+      edgePoint: (_edge, t) => at(t),
+    });
+    const shape = {} as ShapeHandle;
+    const record: LawRecord = { node: 0, law: linear, shape, topology, edge: 3, chain: new Set(), setback: false };
+    const result = checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
+    expect(result).toMatchObject({ lawChecked: false, deviations: [] });
+    expect(result.lawNote).toContain('jumps backwards');
+  });
+});
+
+describe('radius law over a closed source edge (a rim: the seam is neither 0 nor 1 by accident)', () => {
+  // a circle of radius 10 whose sections go once round from the station `first`
+  const ring = (u: number, scale = 1): [number, number, number] => [
+    10 * scale * Math.cos(2 * Math.PI * u),
+    10 * scale * Math.sin(2 * Math.PI * u),
+    2.5,
+  ];
+  const closedEdges = (): ShapeTopology['edges'] => [
+    edgeOf(0, { name: 'e(blend|a)', start: ring(0, 0.9), end: ring(0, 0.9), mid: ring(0.5, 0.9), length: 56 }),
+    edgeOf(1, { name: 'e(blend|b)', start: ring(0, 1.1), end: ring(0, 1.1), mid: ring(0.5, 1.1), length: 69 }),
+    edgeOf(2, { name: 'end', start: ring(0, 3), end: ring(0, 3), mid: ring(0.5, 3), length: 188 }),
+    edgeOf(3, { name: SOURCE_EDGE, curve: 'circle', start: ring(0), end: ring(0), mid: ring(0.5), length: 62.8, unevenSpeed: true }),
+  ];
+  const run = (law: EdgeRadius, first: number, radius: (station: number) => number): ReturnType<typeof checkRadius> => {
+    const topology = { ...TOPOLOGY, edges: closedEdges() };
+    const kernel = scriptedKernel({
+      topology,
+      graph: GRAPH,
+      g1: () => 0,
+      sections: (_face, count) =>
+        Array.from({ length: count }, (_, k) => {
+          const u = first + k / (count - 1);
+          return {
+            t: k / (count - 1),
+            a: ring(u, 0.9),
+            mid: ring(u, 0.95),
+            b: ring(u, 1.1),
+            radius: radius(u - first),
+            centre: ring(u, 0.9),
+          };
+        }),
+      edgePoint: (_edge, t) => ring(t),
+    });
+    const shape = {} as ShapeHandle;
+    const record: LawRecord = { node: 0, law, shape, topology, edge: 3, chain: new Set(), setback: false };
+    return checkRadius(kernel, shape, { face: 2, name: 'b', sourceEdge: SOURCE_EDGE, contacts: [0, 1] }, record, 5);
+  };
+  // a law whose ends differ: a step at the seam of the closed edge
+  const stepped: EdgeRadius = { size: 1, sizeEnd: 2, interpolation: 'linear' };
+
+  it('a blend that starts on the seam follows a law whose ends differ: the first section is the start of the law, the last its end', () => {
+    expect(run(stepped, 0, (u) => 1 + u)).toMatchObject({ lawChecked: true, deviations: [] });
+    expect(run(stepped, 0, (u) => 1 + 0.5 * u).deviations.length).toBeGreaterThan(5);
+  });
+
+  it('a blend whose first section lies just BEFORE the seam (station 0.99999) still starts at the law start: the seam is unwrapped by continuity', () => {
+    // the first section projects to 0.99999 and the second to 0.01: read as 1.0 and 1.01 it would be the END of the law
+    expect(run(stepped, -0.00001, (u) => 1 + Math.max(0, Math.min(1, u)))).toMatchObject({ lawChecked: true, deviations: [] });
   });
 });
 

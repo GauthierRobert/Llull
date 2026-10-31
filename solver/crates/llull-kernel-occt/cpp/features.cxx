@@ -412,6 +412,7 @@ std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32
     }
     if (uneven) {
       LawFillet law_maker(shape.shape);
+      // a LawNodeFailure (not a Standard_Failure: round_edges does not skip it) leaves as a refusal with its reason (cxx -> Err)
       return round_edges(shape, edges, law_maker, [&](LawFillet &target, const TopoDS_Edge &edge) { target.range(edge, radius, radius_end); }, "blend");
     }
   }

@@ -69,6 +69,8 @@ interface BlendRow {
   readonly radius?: RadiusReadback;
   /** Whether the recipe's radius law was compared with the realised radius. */
   readonly lawChecked?: boolean;
+  /** Why a law that could be compared was not (an edge of uneven speed whose spine position could not be read): named, never a guess. */
+  readonly lawNote?: string;
   /** blend_union joints: where the radius asked for came from, the pick ("joints[i]") or "default". */
   readonly source?: string;
   /** Section the recipe asked for: "circular", "conic" or "curvature" (a non-circular section has no radius readback). */
@@ -268,6 +270,7 @@ function checkEntity(
       ...(junctions.length === 0 ? {} : { junctions }),
       profile: laws.get(face.index)?.profile?.type ?? 'circular',
       ...(readback?.radius == null ? {} : { radius: readback.radius, lawChecked: readback.lawChecked }),
+      ...(readback?.lawNote === undefined ? {} : { lawNote: readback.lawNote }),
       ...(jointSource === undefined ? {} : { source: jointSource }),
     });
     if (unverified > before || contacts.length === 0)

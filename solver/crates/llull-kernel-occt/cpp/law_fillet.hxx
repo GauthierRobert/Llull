@@ -12,6 +12,8 @@
 #include <ChFi3d_FilBuilder.hxx>
 #include <ChFiDS_ErrorStatus.hxx>
 #include <ChFiDS_FilSpine.hxx>
+#include <cstdint>
+#include <stdexcept>
 #include <TopTools_ListOfShape.hxx>
 #include <TopTools_MapOfShape.hxx>
 #include <TopoDS_Edge.hxx>
@@ -24,9 +26,22 @@ namespace llull {
 // How the radius runs between the nodes of the law of an edge: the cubic spline of OCCT, exact straight pieces, or the monotone C1 cubic (no overshoot).
 enum class LawKind : int { Smooth = 0, Straight = 1, Monotone = 2 };
 
+// The gap between the parameter fraction and the arc fraction of an edge from which it does not run at a steady speed (the one definition: the kernel decides it, topology reports it).
+constexpr double kUnevenSpeed = 1e-5;
+
+// A radius law node that could not be placed on an uneven edge (the arc length could not be inverted, or the law would need more nodes than it may have): a refusal with this reason.
+struct LawNodeFailure : std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+
 // Whether the parameter fraction of `edge` differs from its arc fraction (an ellipse, a B-spline): a law given along its length must then be placed node by node (LawFillet).
-// A failure to invert the arc length abscissa throws Standard_Failure.
+// False for an edge whose arc length cannot be inverted (never throws): OCCT's own transition then reads the radius.
 bool uneven_speed(const TopoDS_Edge &edge);
+
+// Test hook (src/test_bridge.rs): every arc length inversion after the first `after` fails (-1: off).
+void set_law_inversion_fault(int32_t after);
+// Test hook: the most nodes a stretch of a law may take (0: the default, 128).
+void set_law_node_cap(int32_t nodes);
 
 // A fillet spine remembering which law kind each of its edges carries.
 class LawSpine : public ChFiDS_FilSpine {
