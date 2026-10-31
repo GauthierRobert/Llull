@@ -1,6 +1,6 @@
 /**
  * TR-KRN-92: the face-query port of the live OCC kernel against closed forms, one analytic fixture per surface type
- * (plane = box, cylinder, cone, sphere, torus). B-spline faces: `bspline` / `tessellateFace` are not implemented (null), see TECHNICAL_SPEC §13.B.
+ * (plane = box, cylinder, cone, sphere, torus). B-spline faces: `tessellateFace` is not implemented (null); `bspline` reads any face as a NURBS patch (01 DEF §17.11), see TECHNICAL_SPEC §13.B.
  */
 import { expect, it } from 'vitest';
 import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
@@ -294,7 +294,9 @@ describeNative('occt face query: unsupported and out-of-range requests', () => {
     expect(port().tessellateFace(shape, 0, 0.1)).toBeNull();
     expect(port().edgeSamples(shape, 99, 4)).toBeNull();
     expect(port().edgeContinuity(shape, 99, 4)).toBeNull();
-    expect(port().bspline(shape, 0)).toBeNull();
+    // bspline is implemented since DES-1c (01 DEF §17.11): a plane face reads as a degree 1 x 1 patch; a bad index is null
+    expect(port().bspline(shape, 0)).toMatchObject({ degreeU: 1, degreeV: 1 });
+    expect(port().bspline(shape, 99)).toBeNull();
     expect(port().faceGeometry(shape, -1)).toBeNull();
     expect(port().faceGeometry(shape, 6)).toBeNull();
     expect(port().projectOnFace(shape, 6, [[0, 0, 0]])).toBeNull();
@@ -325,6 +327,6 @@ describeNative('face query through the isolated worker kernel', () => {
     expect(query.tessellateFace(shape, 0, 0.1)).toBeNull();
     expect(query.edgeSamples(shape, 99, 2)).toBeNull();
     expect(query.edgeContinuity(shape, 99, 2)).toBeNull();
-    expect(query.bspline(shape, 0)).toBeNull();
+    expect(query.bspline(shape, 0)).toEqual(port().bspline(shape, 0));
   }, 180_000);
 });
