@@ -48,7 +48,7 @@ const convert = (cage: Cage, params: object = {}, open = false): { result: Retur
   return { result, data: result.data as Data };
 };
 
-/** A box without its top face (a bowl: one segment per side): its boundary edges are creases whose quads stay fixed, which the exact solve cannot satisfy (contradiction). */
+/** A box without its top face (a bowl: one segment per side): its boundary edges are creases. */
 function bowl(): Cage {
   const box = boxCage([2, 2, 2], [1, 1, 1]);
   return { vertices: box.vertices, faces: box.faces.filter((face) => !face.every((v) => (box.vertices[v] as Vec3)[2] === 1)), creases: [] };
@@ -103,16 +103,15 @@ describe('g1Solve "auto" keeps the exact solution only when it stays near the li
 });
 
 describe('the exact solve is bounded and refuses by name', () => {
-  it('an open bowl through the command: refused groups are named in the data and the summary, the fit is kept, and it ends within a stated time even with the tightest tolerance (no exact retry on finer levels)', () => {
+  it('an open bowl through the command with the tightest tolerance: only the exact solve meets it, it is solved (boundary quads free, boundary poles fixed) within a stated time', () => {
     const started = performance.now();
     const { result, data } = convert(bowl(), { tangentToleranceDeg: 0.01 }, true);
     const seconds = (performance.now() - started) / 1000;
     expect(seconds).toBeLessThan(120);
-    expect(data.g1Method).toBe('fit');
-    expect(data.exactG1Refused.length).toBeGreaterThan(0);
-    expect(data.exactG1Refused.every((group) => group.reason === 'contradiction')).toBe(true);
-    expect(result.summary).toMatch(/G1 fit \(\d+ group\(s\) refused by the exact solve\)/);
-    expect(data.g1Choice?.reason).toMatch(/exact solve/);
+    expect(data.g1Method).toBe('exact');
+    expect(data.exactG1Refused).toEqual([]);
+    expect(result.summary).toContain('G1 exact');
+    expect(data.maxEvG1Deg).toBeLessThan(1e-5);
   }, 180_000);
 
   it('a work budget too small for the group refuses it as "work budget" (dense path and conjugate-gradient path) and leaves the poles as given', () => {
@@ -170,9 +169,9 @@ describe('the exact solve is bounded and refuses by name', () => {
     expect(JSON.stringify(result.patches)).toBe(JSON.stringify(patches));
   });
 
-  it('cageToNurbs: "auto" at a finer level does not retry an exact solve that was refused (an open bowl builds without it)', () => {
+  it('cageToNurbs "auto" on an open bowl: nothing is refused; at the default tolerance the fit is kept because the exact solution moves the shape', () => {
     const result = cageToNurbs(bowl(), { packed: false, samples: 2, fitTangents: true, g1Solve: 'auto', tangentToleranceDeg: 0.5 });
+    expect(result.exactRefused).toEqual([]);
     expect(result.g1Method).toBe('fit');
-    expect(result.exactRefused.length).toBeGreaterThan(0);
   });
 });

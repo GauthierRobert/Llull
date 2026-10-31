@@ -853,3 +853,26 @@ Question: is the refusal of the pentagonal cap (group residuals 1.7e-2 and 7.7e-
 - **What would help the cap** is a different rule, not a nonlinear step: free the quads at a boundary vertex while keeping the crease-edge poles fixed (the edge-row machinery already skips edges that touch a creased vertex and never moves the poles of an edge with a quad outside the free set). It changes which poles an open or creased cage may move (G0 along creases is untouched), so it is a design decision, not built here.
 
 **Tests** (`tests/unit/subd/g1Exact.test.ts`, fixtures in `tests/unit/subd/pentagonFixture.ts`): the pyramid and bipyramid are exact (all groups consistent, valence 5 among them, break < 1e-7 rad, corner poles identical); the cap is refused while frozen and solved with the freeze lifted. Red-proof: the beta term of the conditions negated fails both new tests (and the existing ones, as recorded above).
+
+#### DES-4c (2026-10-31): quads at creases and boundaries move (supersedes the "never moves a quad that touches a crease vertex" rule; the valence-5 cap is solved)
+
+**Rule.** `solveExactG1` no longer freezes a quad that touches a crease or boundary vertex. Every pole ON a crease or boundary edge (the four boundary poles of the side, corners included) stays bit-identical: the boundary curves, hence G0 to the neighbours and along open edges,
+do not change. A crease edge has no continuity condition (no rows, no inner-pole unknowns). On a crease edge between two quads the two interior poles next to it (`sidePoles(k).r[1..2]`) are frozen too: they fix the cross derivative along the crease, so the crease KEEPS ITS ANGLE;
+without that, freeing the quads at a 90 degree crease changed its angle at once, and on a flat crease it opened a 25 degree kink (measured while building this: break 2.98e-8 -> 0.437 rad). A boundary edge has no neighbour, nothing to keep. A quad whose four interior poles are all frozen
+has nothing to move and is not in the free set. Edges that touch a crease vertex but are not creases now carry the G1 rows like any smooth edge (before: none).
+No crease, no change: the cube, boxes 2 x 2 x 2 and 3 x 2 x 1, cylinders of 5 and 8 sides, the pentagonal pyramid and bipyramid give BIT-IDENTICAL patches, method and free-quad counts against the previous code (compared by `JSON.stringify` of the patches, one-off).
+
+**Measured** (`cageToNurbs`, 4 x 4 samples, node, one run; deviation from the limit surface, `fit` is the old tangent-plane fit):
+
+| cage | exact | fit | auto |
+| --- | --- | --- | --- |
+| pentagonal cap (open, 45 quads, valence 5 and 3; boundary = creases) | break 1.7e-6 deg, deviation 2.60e-1, G0 gap 0, `exactG1Refused` EMPTY, 45 free quads, both groups consistent (2.7e-15, 1.5e-14), 234 ms | 0.223 deg, 1.72e-2, 238 ms | fit (exact deviation 15x the fit) |
+| open bowl (box without its top, 20 quads) | 1.5e-6 deg, 9.21e-2, 80 ms (was refused: contradiction) | 0.139 deg, 1.95e-2 | fit |
+| box 2 x 2 x 2 with the top rim a sharp crease loop (96 quads, 8 creases) | 1.5e-6 deg on the smooth edges, crease angle unchanged to 1e-12 (90 degrees), deviation 4.25e-2, 1.25 s | 0.099 deg, 9.48e-3 | fit |
+
+The exact solution of the cap is 15x further from the limit surface than the fit (10 % of its size): `g1Solve: "auto"` keeps the fit unless `tangentToleranceDeg` is tighter than the fit can reach (then the exact solve is the only one that meets it, and it is chosen). `"exact"` gives true G1 with the crease and boundary curves untouched.
+
+**Tests.** `tests/unit/subd/g1Exact.test.ts`: the cap solved (all groups consistent, boundary poles bit-identical, break < 1e-7 rad, every quad free), the closed box with a crease loop (crease poles bit-identical, crease angle equal to the plain one to 12 digits and above 1.5 rad, smooth edges G1), the open bowl, `cageToNurbs` on the cap (exact, nothing refused, `maxEvG0` 0);
+`g1Choice.test.ts`: the bowl through the command with a 0.01 degree tolerance is now solved exactly (it used to be the example of a refusal; the named refusals stay covered at solve level: folded pair, collapsed boundary, end misfit, work budget).
+Red-proofs: a crease edge treated as an ordinary edge (poles free, rows imposed) fails the crease test; the interior poles next to a crease not frozen (the crease angle changes) fails it too.
+**Not found refused any more:** every closed cage tried (frustum x100 and x1000, a needle, a twisted cube, top face collapsed to a segment or a point, random jitter of 0.45 and 0.9, 3 to 12 sided cylinders) is solved exactly; a command-level example of a refused group no longer exists, so `data.exactG1Refused` and the "G1 fit (N group(s) refused)" summary are covered only through the solve-level refusals.

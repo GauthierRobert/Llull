@@ -5,6 +5,7 @@ import { type Cage, boxCage, cylinderCage, subdivide } from '@core/geometry/subd
 import { solveExactG1 } from '@core/geometry/subd/g1Exact';
 import { MEASURE_STATIONS, patchNormal } from '@core/geometry/subd/g1Fit';
 import { cageToNurbs } from '@core/geometry/subd/toNurbs';
+import { edgeKey } from '@core/geometry/subd/edgeKey';
 import { buildTopology } from '@core/geometry/subd/topology';
 import { type BezierPatch, quadCagePatches } from '@core/geometry/subdivisionPatches';
 import type { Vec3 } from '@core/model/types';
@@ -29,11 +30,13 @@ function point(patch: BezierPatch, u: number, v: number): Vec3 {
 }
 
 /** Largest normal angle (radians, analytic normals: no differencing noise) at the measure stations over every edge between two quads. */
-function worstBreak(cage: Cage, patches: readonly BezierPatch[]): number {
+function worstBreak(cage: Cage, patches: readonly BezierPatch[], creasesOnly?: boolean): number {
   const topology = buildTopology(cage.vertices.length, cage.faces);
+  const creased = new Set(cage.creases.map(([a, b]) => edgeKey(a, b)));
   let worst = 0;
   for (const edge of topology.edges) {
     if (edge.faces.length !== 2) continue;
+    if (creasesOnly !== undefined && creased.has(edgeKey(edge.a, edge.b)) !== creasesOnly) continue;
     const [f, g] = edge.faces as [number, number];
     const [from, to] = topology.directed.get(`${edge.a}>${edge.b}`) === f ? [edge.a, edge.b] : [edge.b, edge.a];
     const kf = (cage.faces[f] as number[]).indexOf(from);
@@ -46,6 +49,29 @@ function worstBreak(cage: Cage, patches: readonly BezierPatch[]): number {
     }
   }
   return worst;
+}
+
+/** The four boundary poles of side k of a bicubic patch (indices i * 4 + j), directed along the side. */
+const sideBoundary = (k: number): number[] =>
+  [0, 1, 2, 3].map((x) => (k === 0 ? x * 4 : k === 1 ? 12 + x : k === 2 ? (3 - x) * 4 + 3 : 3 - x));
+
+/** Every pole on a crease or boundary edge (the boundary poles of its side, corners included) is bit-identical after the solve. */
+function expectCreasePolesUntouched(cage: Cage, before: readonly BezierPatch[], after: readonly BezierPatch[]): void {
+  const creased = new Set(cage.creases.map(([a, b]) => edgeKey(a, b)));
+  const topology = buildTopology(cage.vertices.length, cage.faces);
+  let checked = 0;
+  cage.faces.forEach((face, f) => {
+    face.forEach((v, k) => {
+      const w = face[(k + 1) % face.length] as number;
+      const edge = topology.edges.find((e) => edgeKey(e.a, e.b) === edgeKey(v, w));
+      if (edge === undefined || (edge.faces.length === 2 && !creased.has(edgeKey(v, w)))) return;
+      for (const index of sideBoundary(k)) {
+        expect((after[f] as BezierPatch)[index]).toEqual((before[f] as BezierPatch)[index]);
+        checked++;
+      }
+    });
+  });
+  expect(checked).toBeGreaterThan(0);
 }
 
 const hexahedra: Array<[string, Cage]> = (() => {
@@ -158,12 +184,17 @@ describe('solveExactG1', () => {
     expect(worstBreak(refined, result.patches)).toBeLessThan(1e-7);
   }, 60_000);
 
-  it('a star the solve cannot make G1 (a pentagonal cap) is reported with the residual of its groups and left as given', () => {
+  it('the pentagonal cap (an open surface: its boundary edges are creases) is solved exactly: its quads at the boundary move, every pole on a boundary edge stays bit-identical', () => {
     const cap = subdivide(pentagonCap(), 1);
+    expect(cap.creases.length).toBeGreaterThan(0);
     const patches = quadCagePatches(cap);
     const result = solveExactG1(cap, patches, valenceOf(cap));
-    expect(result.groups.some((group) => !group.consistent && group.residual > 1e-3)).toBe(true);
-    expect(JSON.stringify(result.patches)).toBe(JSON.stringify(patches));
+    expect(result.groups.length).toBeGreaterThan(0);
+    for (const group of result.groups) expect(group).toMatchObject({ consistent: true, reason: 'solved' });
+    expect(result.freeQuads).toBe(cap.faces.length);
+    expectCreasePolesUntouched(cap, patches, result.patches);
+    expect(worstBreak(cap, patches)).toBeGreaterThan(0.02);
+    expect(worstBreak(cap, result.patches)).toBeLessThan(1e-7);
   });
 
   it('valence 5 is not the obstruction: closed pentagonal pyramid and bipyramid (apexes of valence 5, pentagon centre of valence 5, corners of valence 3) are made exactly G1 by the linear solve', () => {
@@ -183,17 +214,38 @@ describe('solveExactG1', () => {
     }
   });
 
-  it('the pentagonal cap is refused because the quads at its boundary creases are frozen, not because of valence 5: with the freeze lifted every group is solved', () => {
-    const cap = subdivide(pentagonCap(), 1);
-    expect(cap.creases.length).toBeGreaterThan(0);
-    const frozen = solveExactG1(cap, quadCagePatches(cap), valenceOf(cap));
-    expect(frozen.groups.some((group) => !group.consistent)).toBe(true);
-    const lifted = { ...cap, creases: [] };
-    const patches = quadCagePatches(lifted);
-    const result = solveExactG1(lifted, patches, valenceOf(lifted));
+  it('a closed box whose top rim is a sharp crease loop (90 degrees): the quads at the crease move, the poles on the crease stay bit-identical, the crease keeps its angle and every smooth edge is G1', () => {
+    const base = boxCage([2, 2, 2], [2, 2, 2]);
+    const topology = buildTopology(base.vertices.length, base.faces);
+    const onLoop = (v: number): boolean => {
+      const [x, y, z] = base.vertices[v] as Vec3;
+      return z === 1 && Math.max(Math.abs(x), Math.abs(y)) === 1;
+    };
+    const cage: Cage = {
+      ...base,
+      creases: topology.edges.filter((e) => onLoop(e.a) && onLoop(e.b)).map((e): [number, number] => [e.a, e.b]),
+    };
+    expect(cage.creases.length).toBe(8);
+    const refined = subdivide(cage, 1);
+    const patches = quadCagePatches(refined);
+    const result = solveExactG1(refined, patches, valenceOf(refined));
     expect(result.groups.length).toBeGreaterThan(0);
     for (const group of result.groups) expect(group.consistent).toBe(true);
-    expect(worstBreak(lifted, result.patches)).toBeLessThan(1e-7);
+    expectCreasePolesUntouched(refined, patches, result.patches);
+    expect(worstBreak(refined, result.patches, false)).toBeLessThan(1e-7);
+    expect(worstBreak(refined, result.patches, true)).toBeCloseTo(worstBreak(refined, patches, true), 12);
+    expect(worstBreak(refined, result.patches, true)).toBeGreaterThan(1.5);
+  });
+
+  it('an open bowl (a box without its top): solved exactly with its boundary poles bit-identical', () => {
+    const box = boxCage([2, 2, 2], [1, 1, 1]);
+    const bowl: Cage = { ...box, faces: box.faces.filter((face) => !face.every((v) => (box.vertices[v] as Vec3)[2] === 1)) };
+    const refined = subdivide(bowl, 1);
+    const patches = quadCagePatches(refined);
+    const result = solveExactG1(refined, patches, valenceOf(refined));
+    for (const group of result.groups) expect(group.consistent).toBe(true);
+    expectCreasePolesUntouched(refined, patches, result.patches);
+    expect(worstBreak(refined, result.patches)).toBeLessThan(1e-7);
   });
 
   it('closed form: two flat patches whose cross derivatives differ by a factor 2 across their edge (a = 2, beta = 0) already satisfy the conditions and are not moved; a tilted pair is moved until it is G1 to 1e-7 rad', () => {
@@ -272,12 +324,13 @@ describe('cageToNurbs with fitTangents: exact where it exists, the fit otherwise
     }
   });
 
-  it('a star the exact solve refuses falls back to the tangent-plane fit and lists the groups', () => {
+  it('the pentagonal cap through cageToNurbs: exact, nothing refused, G0 untouched', () => {
     const result = cageToNurbs(pentagonCap(), { packed: false, samples: 4, fitTangents: true, g1Solve: 'exact' });
-    expect(result.g1Method).toBe('fit');
-    expect(result.exactMethod).toBeNull();
-    expect(result.exactRefused.length).toBeGreaterThan(0);
-    expect(result.maxEvG1Deg).toBeLessThan(1);
+    expect(result.g1Method).toBe('exact');
+    expect(result.exactMethod).toBe('edges-freed');
+    expect(result.exactRefused).toEqual([]);
+    expect(result.maxEvG0).toBe(0);
+    expect(result.maxEvG1Deg).toBeLessThan(1e-5);
   });
 
   it('exactG1 false forces the fit; without a G1 request there is no method', () => {

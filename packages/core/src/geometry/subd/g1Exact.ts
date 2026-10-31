@@ -8,7 +8,8 @@
  * edge between two free quads, shared by the two patches (G0 stays exact), over the star and as many rings of quads around it as it takes: same patch count, same corner poles.
  * Among the poles that satisfy the conditions the solve takes those nearest to the limit surface (least squares on samples inside the solution set); a group of quads
  * whose conditions contradict each other has no solution at this degree and is reported, not approximated.
- * @invariant corner poles never move, nor any pole of an edge that has a quad outside the free set; pure; the poles of a consistent group satisfy every condition to rounding
+ * Creases and boundaries: a quad that touches a crease or boundary vertex MAY move, but every pole on a crease or boundary edge stays bit-identical (G0 to the neighbours and the open edges untouched) and, on a crease edge between two quads, the two interior poles next to it stay too (the cross derivative, hence the crease angle, is kept); the crease edge itself has no condition.
+ * @invariant corner poles never move, nor any pole of an edge that has a quad outside the free set or that lies on a crease or boundary edge; pure; the poles of a consistent group satisfy every condition to rounding
  */
 
 import type { Vec3 } from '../../model/types';
@@ -16,6 +17,7 @@ import type { BezierPatch } from '../subdivisionPatches';
 import type { Cage } from '../subdivision';
 import { DENSE_MAX_UNKNOWNS, type Sample, type SparseRow, gaussSolve, solveDense, solveSparse } from './g1Linear';
 import { surfaceEvaluator } from './limit';
+import { edgeKey } from './edgeKey';
 import { buildTopology } from './topology';
 
 /** Pole indices (i * 4 + j) of side `k` of a patch: the boundary poles `b[m]` and the row next to them `r[m]`, m = 0..3 along the side (directed v_k -> v_k+1). */
@@ -95,8 +97,9 @@ function assemble(
   free: ReadonlySet<number>,
   edgesFree: boolean,
   scale: number,
+  frozen: ReadonlyMap<number, ReadonlySet<number>>,
 ): Assembly {
-  const creased = new Set(refined.creases.flat());
+  const creaseEdges = new Set(refined.creases.map(([a, b]) => edgeKey(a, b)));
   const pole = (f: number, index: number): Vec3 => (patches[f] as BezierPatch)[index] as Vec3;
   const variableOf = new Map<number, number>();
   const start: Vec3[] = [];
@@ -107,7 +110,7 @@ function assemble(
     start.push(value);
     return start.length - 1;
   };
-  for (const f of [...free].sort((x, y) => x - y)) for (const p of INTERIOR) declare(f * 16 + p, pole(f, p));
+  for (const f of [...free].sort((x, y) => x - y)) for (const p of INTERIOR) if (!frozen.get(f)?.has(p)) declare(f * 16 + p, pole(f, p));
   const sides = (edge: {
     a: number;
     b: number;
@@ -118,7 +121,7 @@ function assemble(
     return { f, g, P: sidePoles((refined.faces[f] as number[]).indexOf(from)), Q: sidePoles((refined.faces[g] as number[]).indexOf(to)) };
   };
   const usable = (edge: { a: number; b: number; faces: number[] }): boolean =>
-    edge.faces.length === 2 && !creased.has(edge.a) && !creased.has(edge.b);
+    edge.faces.length === 2 && !creaseEdges.has(edgeKey(edge.a, edge.b));
   if (edgesFree)
     for (const edge of topology.edges) {
       if (!usable(edge) || !free.has(edge.faces[0] as number) || !free.has(edge.faces[1] as number)) continue;
@@ -223,7 +226,7 @@ function solveAssembly(
   };
   const keysOf: number[][] = start.map(() => []);
   for (const [key, id] of variableOf) (keysOf[id] as number[]).push(key);
-  const interior = (f: number): number[] => INTERIOR.map((p) => variableOf.get(f * 16 + p) as number);
+  const interior = (f: number): number[] => INTERIOR.flatMap((p) => variableOf.get(f * 16 + p) ?? []);
   for (const f of free) for (const id of interior(f).slice(1)) join(interior(f)[0] as number, id);
   for (const row of rows)
     for (let i = 1; i < row.terms.length; i++)
@@ -306,11 +309,9 @@ export function solveExactG1(
   options: { readonly mostRings?: number; readonly maxWork?: number } = {},
 ): ExactG1 {
   const topology = buildTopology(refined.vertices.length, refined.faces);
-  const creased = new Set(refined.creases.flat());
-  const blocked = (f: number): boolean => (refined.faces[f] as number[]).some((v) => creased.has(v));
   const star = new Set<number>();
   refined.faces.forEach((face, f) => {
-    if (face.some((v) => valence[v] !== 4) && !blocked(f)) star.add(f);
+    if (face.some((v) => valence[v] !== 4)) star.add(f);
   });
   const original: ExactG1 = { patches: patches.map((p) => p.map((q): Vec3 => [q[0], q[1], q[2]])), groups: [], method: null, freeQuads: 0 };
   if (star.size === 0) return original;
@@ -322,13 +323,27 @@ export function solveExactG1(
   }
   const scale = Math.max(Math.hypot(...high.map((h, k) => h - (low[k] as number))), 1e-300);
   const evaluate = surfaceEvaluator(refined);
-  const attempt = (free: ReadonlySet<number>, edgesFree: boolean): ExactG1 => {
+  // the two interior poles next to every side on a crease edge between two quads stay where they are: they fix the cross derivative along it, so the crease keeps its angle (a boundary edge has no neighbour: nothing to keep)
+  const creaseEdges = new Set(refined.creases.map(([a, b]) => edgeKey(a, b)));
+  const edgeFaces = new Map(topology.edges.map((edge) => [edgeKey(edge.a, edge.b), edge.faces.length] as const));
+  const frozen = new Map<number, Set<number>>();
+  refined.faces.forEach((face, f) =>
+    face.forEach((v, k) => {
+      const key = edgeKey(v, face[(k + 1) % face.length] as number);
+      if (edgeFaces.get(key) !== 2 || !creaseEdges.has(key)) return;
+      const rows = sidePoles(k).r;
+      frozen.set(f, new Set([...(frozen.get(f) ?? []), rows[1] as number, rows[2] as number]));
+    }),
+  );
+  const attempt = (wanted: ReadonlySet<number>, edgesFree: boolean): ExactG1 => {
+    // a quad whose four interior poles are frozen has nothing to move
+    const free = new Set([...wanted].filter((f) => INTERIOR.some((p) => !frozen.get(f)?.has(p))));
     const solved = solveAssembly(
       refined,
       patches,
       free,
       valence,
-      assemble(refined, patches, topology, free, edgesFree, scale),
+      assemble(refined, patches, topology, free, edgesFree, scale, frozen),
       evaluate,
       scale,
       options.maxWork,
@@ -347,13 +362,13 @@ export function solveExactG1(
   const free = new Set(star);
   for (let rings = 1; rings <= (options.mostRings ?? MOST_RINGS); rings++) {
     for (const f of [...free])
-      for (const v of refined.faces[f] as number[]) for (const g of topology.vertexFaces[v] as number[]) if (!blocked(g)) free.add(g);
+      for (const v of refined.faces[f] as number[]) for (const g of topology.vertexFaces[v] as number[]) free.add(g);
     if (sizes.has(free.size)) continue;
     sizes.add(free.size);
     best = attempt(new Set(free), true);
     if (best.groups.every((g) => g.consistent)) return best;
   }
-  const everything = new Set(refined.faces.map((_, f) => f).filter((f) => !blocked(f)));
+  const everything = new Set(refined.faces.map((_, f) => f));
   if (everything.size > free.size && everything.size <= WHOLE_CAGE_QUADS) best = attempt(everything, true);
   return best;
 }
