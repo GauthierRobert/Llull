@@ -1,5 +1,5 @@
 /**
- * DES-6c: the monotone radius law on the native OCCT kernel (docs/design/06-variable-blends 13.22): `interpolation: "monotone"` is a C1 cubic Hermite law
+ * DES-6c: the monotone radius law on the native OCCT kernel (docs/design/06-variable-blends 13.23): `interpolation: "monotone"` is a C1 cubic Hermite law
  * through the stations installed in the fillet spine (Law_BSpFunc pieces), exact and never below the smallest station. Radius read back from the contact line
  * on the top face against the closed form, the volume against `abc - (1 - pi/4) L integral r(t)^2 dt` by Simpson quadrature, the two-station law against
  * OCCT's own smooth transition, check_blends reading the law back, and the steepness the kernel carries. Skipped when the llull-kernel binary is not built.
@@ -197,13 +197,176 @@ describeNative('BLD monotone radius laws (native OCCT kernel)', () => {
     }
   });
 
-  it('the steepest law the kernel builds: slope 0.96 on the 5 mm edge builds, so the refusal at 1 is not tighter than OCCT', () => {
-    const { doc, id } = block();
-    const steep = made(doc, 'fillet_edge', {
-      id,
-      edges: [{ near: [10, 5, 0], size: 1, sizeEnd: 1, sizes: [{ t: 0.5, size: 2.6 }], interpolation: 'monotone' }],
+  /** A 400 x 400 x 5 block (faces far wider than any radius below), its vertical edge at (200, 200): the edge is 5 mm long. */
+  it.each([0.5, 1.1, 1.5, 3, 12, 50])(
+    'no kernel limit on the slope: r 1 -> 1 + %d * 5 on a 5 mm edge builds, the linear law to 5e-8 and the monotone one to 1e-7 of their closed forms',
+    (slope) => {
+      const wide = made(createEmptyDocument(), 'add_box', { size: [400, 400, 5] });
+      const end = 1 + slope * 5;
+      const [linear, monotone] = [
+        made(wide.doc, 'fillet_edge', { id: wide.id, edges: [{ near: [200, 200, 0], size: 1, sizeEnd: end, interpolation: 'linear' }] }),
+        made(wide.doc, 'fillet_edge', { id: wide.id, edges: [{ near: [200, 200, 0], size: 1, sizeEnd: end, interpolation: 'monotone' }] }),
+      ];
+      expect(linear.result.error, linear.result.summary).toBeUndefined();
+      expect(monotone.result.error, monotone.result.summary).toBeUndefined();
+      const block = 400 * 400 * 5;
+      const [linearExpected, monotoneExpected] = [
+        block - Q * 5 * ((1 + end + end * end) / 3),
+        block -
+          Q *
+            5 *
+            squareIntegral([
+              { t: 0, size: 1 },
+              { t: 1, size: end },
+            ]),
+      ];
+      const [linearError, monotoneError] = [
+        Math.abs(volume(linear.doc, linear.id) - linearExpected) / linearExpected,
+        Math.abs(volume(monotone.doc, monotone.id) - monotoneExpected) / monotoneExpected,
+      ];
+      rows.push(
+        `| slope ${slope} (r 1 -> ${end}) on 5 mm | linear V ${linearError.toExponential(2)}, monotone V ${monotoneError.toExponential(2)} |`,
+      );
+      expect(linearError).toBeLessThan(5e-8);
+      expect(monotoneError).toBeLessThan(1e-7);
+    },
+  );
+
+  it('a closed rim (the periodic seam of the law): stations 1 / 2 / 1 on a cylinder rim of radius 10 follow the closed-form curve to 1e-5 all round, and r(0) = r(1)', () => {
+    const rim = made(createEmptyDocument(), 'add_cylinder', { radius: 10, height: 10 });
+    const done = made(rim.doc, 'fillet_edge', {
+      id: rim.id,
+      edges: [{ near: [10, 0, 10], size: 1, sizeEnd: 1, sizes: [{ t: 0.5, size: 2 }], interpolation: 'monotone' }],
     });
-    rows.push(`| steep monotone 1 / 2.6 / 1 on 5 mm | ${steep.result.error?.code ?? 'built'} |`);
-    expect(steep.result.error?.code).not.toBe('BLD_LAW_TOO_STEEP');
+    expect(done.result.error, done.result.summary).toBeUndefined();
+    const shape = kernel.evaluate((done.doc.entities[done.id] as MeshSolidEntity).brep as never);
+    const topology = kernel.topology(shape as never);
+    const contact = topology?.edges.find((edge) => edge.name?.startsWith('e(blend') && edge.name.endsWith(`|${rim.id}:top)`));
+    const samples = kernel.faceQuery?.edgeSamples(shape as never, contact?.index ?? -1, 1001) ?? [];
+    expect(samples).toHaveLength(1001);
+    const pair = [
+      { t: 0, size: 1 },
+      { t: 0.5, size: 2 },
+      { t: 1, size: 1 },
+    ];
+    let worst = 0;
+    samples.forEach((sample, k) => {
+      const radius = 10 - Math.hypot(sample.point[0], sample.point[1]);
+      worst = Math.max(worst, Math.abs(radius - monotoneRadius(pair, k / 1000)));
+    });
+    rows.push(`| closed rim 1 / 2 / 1 | worst ${worst.toExponential(2)} |`);
+    expect(worst).toBeLessThan(1e-5);
+  });
+
+  it('a conic profile with a monotone law builds, follows the law (check_blends: no BLD_CHECK_RADIUS_LAW) and is a different solid from the circular blend of the same law', () => {
+    const { doc, id } = block();
+    const circular = made(doc, 'fillet_edge', { id, edges: [{ near: topEdge, ...LAW }] });
+    const conic = made(doc, 'fillet_edge', { id, edges: [{ near: topEdge, ...LAW }], profile: { type: 'conic', rho: 0.4 } });
+    expect(conic.result.error, conic.result.summary).toBeUndefined();
+    const [circularV, conicV] = [volume(circular.doc, circular.id), volume(conic.doc, conic.id)];
+    rows.push(`| conic rho 0.4 with the monotone law | V ${conicV.toFixed(6)} (circular ${circularV.toFixed(6)}) |`);
+    expect(Math.abs(conicV - circularV)).toBeGreaterThan(1e-3);
+    const data = execute(conic.doc, 'check_blends', {}).data as { findings: Array<{ code: string }> };
+    expect(data.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+  });
+
+  it('a chain that mixes kinds (the rim of a rounded block: the long edges monotone, the others OCCT smooth) builds and keeps the monotone volume of each long edge', () => {
+    const slab = made(createEmptyDocument(), 'add_box', { size: [40, 20, 10], anchor: 'base-center' });
+    const round = made(slab.doc, 'fillet_edge', {
+      id: slab.id,
+      edgesNear: [
+        [20, 10, 5],
+        [20, -10, 5],
+        [-20, 10, 5],
+        [-20, -10, 5],
+      ],
+      radius: 5,
+    });
+    const shape = kernel.evaluate((round.doc.entities[round.id] as MeshSolidEntity).brep as never);
+    const rim = (kernel.topology(shape as never)?.edges ?? []).filter(
+      (edge) => Math.abs(edge.start[2] - 10) < 1e-9 && Math.abs(edge.end[2] - 10) < 1e-9,
+    );
+    const mixed = made(round.doc, 'fillet_edge', {
+      id: round.id,
+      edges: rim.map((edge) =>
+        edge.length > 20
+          ? {
+              index: edge.index,
+              size: 1.5,
+              sizeEnd: 1.5,
+              sizes: [
+                { t: 0.3, size: 1 },
+                { t: 0.7, size: 2 },
+              ],
+              interpolation: 'monotone',
+            }
+          : { index: edge.index, size: 1.5, sizeEnd: 1.5 },
+      ),
+    });
+    expect(mixed.result.error, mixed.result.summary).toBeUndefined();
+    const allSmooth = made(round.doc, 'fillet_edge', { id: round.id, edges: rim.map((edge) => ({ index: edge.index, size: 1.5 })) });
+    const difference = Math.abs(volume(mixed.doc, mixed.id) - volume(allSmooth.doc, allSmooth.id));
+    rows.push(`| mixed monotone + smooth chain | builds, volume differs from the constant 1.5 rim by ${difference.toFixed(4)} |`);
+    expect(difference).toBeGreaterThan(1e-3);
+  });
+
+  it('a tangent chain (the top rim of a rounded block: 8 edges, one spline): every edge follows ITS OWN monotone curve with zero slope at its ends, not a curve through the whole chain', () => {
+    const slab = made(createEmptyDocument(), 'add_box', { size: [40, 20, 10], anchor: 'base-center' });
+    const round = made(slab.doc, 'fillet_edge', {
+      id: slab.id,
+      edgesNear: [
+        [20, 10, 5],
+        [20, -10, 5],
+        [-20, 10, 5],
+        [-20, -10, 5],
+      ],
+      radius: 5,
+    });
+    expect(round.result.error, round.result.summary).toBeUndefined();
+    const shape = kernel.evaluate((round.doc.entities[round.id] as MeshSolidEntity).brep as never);
+    const rim = (kernel.topology(shape as never)?.edges ?? []).filter(
+      (edge) => Math.abs(edge.start[2] - 10) < 1e-9 && Math.abs(edge.end[2] - 10) < 1e-9,
+    );
+    expect(rim.length).toBe(8);
+    // equal radii at both ends and a decreasing run through the junction (2 -> 1.5 | 1.5 -> 1): the harmonic-mean slope of a run that crossed the edge boundary is not zero
+    const stations = [
+      { t: 0, size: 1.5 },
+      { t: 0.3, size: 1 },
+      { t: 0.7, size: 2 },
+      { t: 1, size: 1.5 },
+    ];
+    const law = {
+      size: 1.5,
+      sizeEnd: 1.5,
+      sizes: [
+        { t: 0.3, size: 1 },
+        { t: 0.7, size: 2 },
+      ],
+      interpolation: 'monotone' as const,
+    };
+    const chained = made(round.doc, 'fillet_edge', { id: round.id, edges: rim.map((edge) => ({ index: edge.index, ...law })) });
+    expect(chained.result.error, chained.result.summary).toBeUndefined();
+    const built = kernel.evaluate((chained.doc.entities[chained.id] as MeshSolidEntity).brep as never);
+    const after = kernel.topology(built as never);
+    const prefix = `e(blend(e(${slab.id}:y-|${slab.id}:z+))|${slab.id}:z+)`;
+    const contact = (after?.edges ?? []).filter((edge) => edge.name?.startsWith(prefix)).sort((x, y) => y.length - x.length)[0];
+    expect(contact?.length).toBeGreaterThan(28);
+    const samples = kernel.faceQuery?.edgeSamples(built as never, contact?.index ?? -1, 1001) ?? [];
+    expect(samples).toHaveLength(1001);
+    const against = (reversed: boolean): number => {
+      let worst = 0;
+      samples.forEach((sample) => {
+        // the position along the straight rim edge (x from -15 to 15) is the law parameter, up to the direction of the edge
+        const along = (sample.point[0] + 15) / 30;
+        const t = reversed ? 1 - along : along;
+        // the first and last 8 % of the edge are trimmed by the corner patches, where the contact line is not at distance r from the edge
+        if (t < 0.08 || t > 0.92) return;
+        worst = Math.max(worst, Math.abs(10 + sample.point[1] - monotoneRadius(stations, t)));
+      });
+      return worst;
+    };
+    const worst = Math.min(against(false), against(true));
+    rows.push(`| tangent chain, long edge | worst ${worst.toExponential(2)} |`);
+    expect(worst).toBeLessThan(1.5e-2);
   });
 });

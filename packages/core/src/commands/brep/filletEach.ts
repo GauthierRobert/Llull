@@ -15,7 +15,7 @@ import { noop } from '../noop';
 import { selectEdges } from './edgeSelection';
 import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
 import { chordsToRadii } from './filletChord';
-import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw, steepProblem } from '../../geometry/blend/law';
+import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
 import { blendRejection } from './blendCodes';
 import {
   type PlannedProfile,
@@ -113,14 +113,11 @@ function resolveShorthand(topology: ShapeTopology | null, request: FilletRequest
   return { planned: every.map((edge) => ({ edge, law })) };
 }
 
-/**
- * The first edge whose law cannot be carried, as a refusal: a closed edge (a rim) whose law does not close on itself (r(0) = r(1)), or an edge too short
- * for the steepest slope of its law (BLD_LAW_TOO_STEEP).
- */
+/** The first closed edge (a rim) whose law does not close on itself (r(0) = r(1)), as a refusal. */
 function openLawOnClosedEdge(topology: ShapeTopology | null, planned: readonly Planned[]): Refusal | null {
   for (const { edge, law, entry } of planned) {
     const shape = topology?.edges[edge];
-    const problem = shape === undefined ? null : ((closedEdge(shape) ? periodicProblem(law) : null) ?? steepProblem(law, shape.length));
+    const problem = shape !== undefined && closedEdge(shape) ? periodicProblem(law) : null;
     if (problem !== null)
       return {
         ...problem,

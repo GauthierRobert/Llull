@@ -55,7 +55,7 @@ export const edgeLawSchema = z
     interpolation: z
       .enum(INTERPOLATIONS)
       .describe(
-        'How the radius runs between the stations (start, the sizes control points, end): "smooth" (default: one smooth curve through them, the kernel interpolation, which can overshoot between stations), "linear" (straight transitions between consecutive points) or "monotone" (a C1 cubic that never overshoots a station: between two stations the radius stays between their radii, so it never goes below the smallest station; zero slope at both ends; exact in the kernel; needs sizes). The steepest slope of any law must stay below 1 (radius change per unit edge length), else BLD_LAW_TOO_STEEP.',
+        'How the radius runs between the stations (start, the sizes control points, end): "smooth" (default: one smooth curve through them, the kernel interpolation, which can overshoot between stations), "linear" (straight transitions between consecutive points) or "monotone" (a C1 cubic that never overshoots a station: between two stations the radius stays between their radii, so it never goes below the smallest station; zero slope at both ends; exact in the kernel; a start and an end alone make one smoothstep, which is not the "smooth" transition of the kernel).',
       )
       .optional(),
     law: z

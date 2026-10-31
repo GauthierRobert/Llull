@@ -112,7 +112,11 @@ void LawSpine::AppendElSpine(const Handle(ChFiDS_ElSpine) & elspine) {
     while (run + 1 < knots.size()) {
       const LawKind kind = kind_of(knots[run].position, knots[run + 1].position);
       size_t end = run + 1;
-      while (end + 1 < knots.size() && kind_of(knots[end].position, knots[end + 1].position) == kind) ++end;
+      // a run stays on one edge: the law of each edge is its own curve (zero slope at its ends), also where the edges chain tangentially into one spline
+      const int edge = Index(0.5 * (knots[run].position + knots[run + 1].position));
+      while (end + 1 < knots.size() && kind_of(knots[end].position, knots[end + 1].position) == kind &&
+             Index(0.5 * (knots[end].position + knots[end + 1].position)) == edge)
+        ++end;
       if (kind == LawKind::Straight) {
         for (size_t k = run; k < end; ++k) {
           Handle(Law_Linear) piece = new Law_Linear();

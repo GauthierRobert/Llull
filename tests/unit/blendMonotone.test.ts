@@ -7,8 +7,8 @@ import { createEmptyDocument, type CadDocument, type EdgeRadius, type ShapeRecip
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
-import { lawMaxSlope, lawNodes, radiusAt, resolveLaw, reverseLaw, steepProblem } from '@core/geometry/blend/law';
-import { monotoneMaxSlope, monotoneRadius, monotoneSlopes } from '@core/geometry/blend/monotone';
+import { lawNodes, radiusAt, resolveLaw, reverseLaw } from '@core/geometry/blend/law';
+import { monotoneRadius, monotoneSlopes } from '@core/geometry/blend/monotone';
 import { exactParameters } from '@core/geometry/blend/blendInfo';
 import { scriptedKernel } from '../helpers/blendKernel';
 import { expectNoOp } from '../helpers/expectNoOp';
@@ -71,8 +71,6 @@ describe('monotone slopes and values', () => {
     const n = 20000;
     for (let k = 0; k < n; k++) integral += monotoneRadius(points, (k + 0.5) / n) / n;
     expect(integral).toBeCloseTo(2, 8);
-    // the slope peak of the smoothstep is 1.5 times the secant
-    expect(monotoneMaxSlope(points)).toBeCloseTo(3, 3);
   });
 });
 
@@ -126,18 +124,7 @@ describe('the law resolver and its readers', () => {
   });
 });
 
-describe('BLD_LAW_TOO_STEEP', () => {
-  it('measures the steepest slope (radius per unit length): a straight piece, the monotone curve; refuses at 1 and above with the length that would carry it', () => {
-    expect(lawMaxSlope({ size: 1, sizeEnd: 3, interpolation: 'linear', sizes: [{ t: 0.5, size: 1 }] }, 10)).toBeCloseTo(0.4, 12);
-    expect(lawMaxSlope({ size: 1, sizeEnd: 3, sizes: [{ t: 0.5, size: 2 }], interpolation: 'monotone' }, 10)).toBeLessThan(0.4);
-    expect(steepProblem({ size: 1, sizeEnd: 2 }, 20)).toBeNull();
-    const steep = steepProblem({ size: 1, sizeEnd: 9, sizes: [{ t: 0.5, size: 5 }], interpolation: 'monotone' }, 6);
-    expect(steep).toMatchObject({ code: 'BLD_LAW_TOO_STEEP', path: 'sizes' });
-    expect(steep?.message).toMatch(/steepest slope is \d/);
-    expect(steep?.message).toContain('edge of length 6');
-    expect(steepProblem({ size: 1, sizeEnd: 9 }, 0)).toBeNull();
-  });
-
+describe('fillet_edge with a monotone law over a scripted kernel', () => {
   const context = (kernel: GeometryKernel): ReturnType<typeof defaultContext> => ({ ...defaultContext(), kernel });
   function box(): { doc: CadDocument; id: string } {
     const made = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
@@ -146,19 +133,9 @@ describe('BLD_LAW_TOO_STEEP', () => {
   const lastFillet = (kernel: ReturnType<typeof scriptedKernel>): Extract<ShapeRecipe, { op: 'fillet' }> | undefined =>
     [...kernel.recipes].reverse().find((recipe): recipe is Extract<ShapeRecipe, { op: 'fillet' }> => recipe.op === 'fillet');
 
-  it('fillet_edge refuses a monotone law the edge cannot carry, names the edge and the slope, and changes nothing; a gentle one reaches the kernel as monotone', () => {
+  it('a monotone law reaches the kernel as monotone, a steep one too (the native probe in nativeBlendMonotone.test.ts builds slopes up to 50 exactly: no steepness refusal)', () => {
     const kernel = scriptedKernel();
     const { doc, id } = box();
-    const steep = execute(
-      doc,
-      'fillet_edge',
-      { id, edges: [{ index: 0, size: 1, sizeEnd: 30, sizes: [{ t: 0.5, size: 15 }], interpolation: 'monotone' }] },
-      context(kernel),
-    );
-    expectNoOp(steep, doc, 'BLD_LAW_TOO_STEEP');
-    expect(steep.error).toMatchObject({ code: 'BLD_LAW_TOO_STEEP', ids: [id], paths: ['edges[0].sizes'] });
-    expect(steep.error?.remediation).toContain('gentler');
-    expect(kernel.recipes.some((recipe) => recipe.op === 'fillet')).toBe(false);
     const ok = execute(
       doc,
       'fillet_edge',
@@ -170,6 +147,13 @@ describe('BLD_LAW_TOO_STEEP', () => {
       radii: [{ size: 1, sizeEnd: 1.2, sizes: [{ t: 0.4, size: 2 }], interpolation: 'monotone' }],
     });
     expect(ok.summary).toContain('monotone control point(s)');
+    const steep = execute(
+      doc,
+      'fillet_edge',
+      { id, edges: [{ index: 0, size: 1, sizeEnd: 30, sizes: [{ t: 0.5, size: 15 }], interpolation: 'monotone' }] },
+      context(kernel),
+    );
+    expect(steep.error, steep.summary).toBeUndefined();
   });
 
   it('stations out of order and a radius <= 0 stay BLD_LAW_INVALID with the path of the value', () => {
@@ -202,6 +186,23 @@ describe('BLD_LAW_TOO_STEEP', () => {
       context(kernel),
     );
     expect(negative.error).toMatchObject({ code: 'BLD_LAW_INVALID', paths: ['edges[0].sizes[0].size'] });
+    expect(kernel.recipes.some((recipe) => recipe.op === 'fillet')).toBe(false);
+  });
+
+  it('a monotone law at a setback corner is BLD_CORNER_UNSUPPORTED (like every smooth or multi-station law), and nothing changes', () => {
+    const kernel = scriptedKernel();
+    const { doc, id } = box();
+    const corner = execute(
+      doc,
+      'fillet_edge',
+      {
+        id,
+        edges: [{ index: 0, size: 1, sizeEnd: 1.2, sizes: [{ t: 0.4, size: 2 }], interpolation: 'monotone' }],
+        corners: [{ near: [10, 5, 2.5], type: 'setback', setback: 2 }],
+      },
+      context(kernel),
+    );
+    expectNoOp(corner, doc, 'BLD_CORNER_UNSUPPORTED');
     expect(kernel.recipes.some((recipe) => recipe.op === 'fillet')).toBe(false);
   });
 });

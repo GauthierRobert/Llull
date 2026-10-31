@@ -6,7 +6,7 @@
 
 import { evaluateExpression } from '../../lib/expression';
 import type { EdgeRadius, Vec3 } from '../../model/types';
-import { type Station, monotoneMaxSlope, monotoneRadius } from './monotone';
+import { type Station, monotoneRadius } from './monotone';
 
 /** A radius law as the command parameters give it (`edges[]` entries without their edge selector). */
 export interface LawInput {
@@ -18,7 +18,7 @@ export interface LawInput {
   readonly size2?: number | undefined;
 }
 
-type LawProblemCode = 'BLD_LAW_INVALID' | 'BLD_LAW_NOT_PERIODIC' | 'BLD_LAW_TOO_STEEP';
+type LawProblemCode = 'BLD_LAW_INVALID' | 'BLD_LAW_NOT_PERIODIC';
 
 export interface LawProblem {
   readonly code: LawProblemCode;
@@ -252,39 +252,5 @@ export function reverseLaw(law: EdgeRadius): EdgeRadius {
     size: sizeEnd,
     sizeEnd: size,
     ...(sizes === undefined ? {} : { sizes: sizes.map((point) => ({ t: 1 - point.t, size: point.size })).reverse() }),
-  };
-}
-
-/** Slope (radius per unit length along the edge) a blend law cannot exceed: a ball rolling on a spine whose radius changes as fast as it advances has no solution. */
-const MAX_LAW_SLOPE = 1;
-
-/** Largest |dr/ds| of `law` on an edge of `length`: the steepest straight piece, or the steepest point of the monotone curve through the stations (the kernel's smooth law is estimated by it). */
-export function lawMaxSlope(law: EdgeRadius, length: number): number {
-  const [start, end] = lawEnds(law);
-  const stations: Station[] = [{ t: 0, size: start }, ...(law.sizes ?? []), { t: 1, size: end }];
-  if (law.interpolation === 'linear') {
-    let steepest = 0;
-    for (let k = 0; k + 1 < stations.length; k++) {
-      const [a, b] = [stations[k] as Station, stations[k + 1] as Station];
-      steepest = Math.max(steepest, Math.abs(b.size - a.size) / (b.t - a.t));
-    }
-    return steepest / length;
-  }
-  return monotoneMaxSlope(stations) / length;
-}
-
-/** The law is too steep for an edge of `length`: the radius would change as fast as the ball advances (BLD_LAW_TOO_STEEP), with the measured slope and the length that would carry it. */
-export function steepProblem(law: EdgeRadius, length: number): LawProblem | null {
-  if (!(length > 0)) return null;
-  const slope = lawMaxSlope(law, length);
-  if (slope < MAX_LAW_SLOPE) return null;
-  const [start, end] = lawEnds(law);
-  const spread =
-    Math.max(start, end, ...(law.sizes ?? []).map((point) => point.size)) -
-    Math.min(start, end, ...(law.sizes ?? []).map((point) => point.size));
-  return {
-    code: 'BLD_LAW_TOO_STEEP',
-    message: `the radius changes as fast as the ball advances: its steepest slope is ${slope.toFixed(3)} (must stay below ${MAX_LAW_SLOPE}) on an edge of length ${length}; a law that spans ${spread} needs an edge of about ${(spread / (0.5 * MAX_LAW_SLOPE)).toFixed(3)} or more`,
-    path: 'sizes',
   };
 }

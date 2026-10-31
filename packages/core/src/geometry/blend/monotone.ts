@@ -46,20 +46,3 @@ export function monotoneRadius(stations: readonly Station[], t: number, slopes: 
     (u3 - u2) * h * (slopes[k + 1] as number)
   );
 }
-
-/** Largest |dr/dt| of the law, read on 65 points of every piece (the derivative of a piece is a quadratic: the sampling error is far below the 5 % margin of the steepness rule). */
-export function monotoneMaxSlope(stations: readonly Station[]): number {
-  const slopes = monotoneSlopes(stations);
-  let worst = 0;
-  for (let k = 0; k + 1 < stations.length; k++) {
-    const [a, b] = [stations[k] as Station, stations[k + 1] as Station];
-    const secant = (b.size - a.size) / (b.t - a.t);
-    const [m0, m1] = [slopes[k] as number, slopes[k + 1] as number];
-    for (let step = 0; step <= 64; step++) {
-      const u = step / 64;
-      const slope = (6 * u - 6 * u * u) * secant + (3 * u * u - 4 * u + 1) * m0 + (3 * u * u - 2 * u) * m1;
-      worst = Math.max(worst, Math.abs(slope));
-    }
-  }
-  return worst;
-}
