@@ -51,8 +51,13 @@ beforeAll(async () => {
   backend = await startBackend(
     (entry, env) => fork(entry, [], { env, stdio: 'ignore' }),
     layout.serverEntry,
-    // Vitest sets TEST/VITEST, which keep the server from listening; the app never has them.
-    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: { ...process.env, TEST: undefined, VITEST: undefined } }),
+    // Vitest sets TEST/VITEST, which keep the server from listening; the app never has them. The kernel override (set after
+    // backendEnv, which drops inherited LLULL_* variables) points at a missing file, so this backend has no native kernel even where
+    // solver/target/release holds a built llull-kernel (the repo fallback of nativeBinaryPath).
+    {
+      ...backendEnv({ port, token, layout, userDataDir: userData, baseEnv: { ...process.env, TEST: undefined, VITEST: undefined } }),
+      LLULL_KERNEL_BIN: path.join(work, 'no-native', 'llull-kernel'),
+    },
     url,
   );
   session = createDocumentSession({ url, token });
