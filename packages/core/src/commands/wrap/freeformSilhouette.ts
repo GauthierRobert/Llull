@@ -19,13 +19,17 @@ import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/ve
 import type { SolidSession } from './faceSession';
 import type { SilhouetteCurve } from './silhouetteCurve';
 
-const GRID = 48;
+/** Cells per side of the sampling grid over the parameter box of a freeform face (reported as data.silhouette.grid). */
+export const FREEFORM_GRID = 48;
+const GRID = FREEFORM_GRID;
 /** |n . d| under this on every node of the grid: the face is parallel to the view (edge-on). */
 const EDGE_ON = 1e-9;
 /** |n . d| under this at a node without any sign change in the grid: a tangential view, refused. */
 const TANGENTIAL = 1e-3;
 /** The gradient of n . d along a contour must not fall under this fraction of its largest value there (a cusp or a branch point otherwise). */
 const GRADIENT_FLOOR = 0.05;
+/** ...and not under this in absolute terms (a change of n . d over one cell, 1 = the whole range): the contour is then ill-conditioned whatever the rest of the path does. */
+const GRADIENT_ABSOLUTE = 1e-4;
 const NEWTON_STEPS = 24;
 const CONVERGED = 1e-12;
 const PROBES = 48;
@@ -68,6 +72,46 @@ function link(segments: ReadonlyArray<readonly [string, string]>): Path[] {
   for (const [key, list] of neighbours) if (list.length === 1 && !seen.has(key)) paths.push({ keys: walk(key), closed: false });
   for (const key of neighbours.keys()) if (!seen.has(key)) paths.push({ keys: walk(key), closed: true });
   return paths;
+}
+
+/** A cubic through `sample(k / n)` within `tolerance` (fitBySampling); a closed loop is fitted with the same direction at both ends, so the seam is C1. */
+function fitSamples(
+  sample: (s: number) => Vec3 | null,
+  tolerance: number,
+  closed: boolean,
+  nullMeaning: string,
+): ReturnType<typeof fitBySampling> {
+  if (!closed) return fitBySampling(sample, tolerance, nullMeaning);
+  const h = 1e-4;
+  const [ahead, behind] = [sample(h), sample(1 - h)];
+  if (ahead === null || behind === null) return { error: nullMeaning };
+  // the derivative per unit s across the seam (central difference), used as it is: the sampler does not run at constant speed
+  const tangent = scale3(sub3(ahead, behind), 1 / (2 * h));
+  for (let n = 8; n <= 4096; n *= 2) {
+    const points: Vec3[] = [];
+    for (let k = 0; k <= n; k++) {
+      const point = sample(k / n);
+      if (point === null) return { error: nullMeaning };
+      points.push(point);
+    }
+    const through = interpolatePoints(points, {
+      degree: 3,
+      parameterization: 'uniform',
+      startTangent: tangent,
+      endTangent: tangent,
+      exactTangents: true,
+    });
+    if ('code' in through) return { error: 'a closed curve could not be fitted' };
+    let deviation = 0;
+    for (let k = 0; k < n; k++)
+      for (const fraction of [0.25, 0.5, 0.75]) {
+        const exact = sample((k + fraction) / n);
+        if (exact === null) return { error: nullMeaning };
+        deviation = Math.max(deviation, len3(sub3(evaluateCurve(through.curve, (k + fraction) / n), exact)));
+      }
+    if (deviation <= tolerance) return { curve: through.curve, deviation };
+  }
+  return { error: 'a closed curve could not be fitted within the fit tolerance' };
 }
 
 /**
@@ -202,7 +246,6 @@ export function freeformContours(
     const points = run.map((uv) => evaluateSurface(surface, uv[0], uv[1]));
     const total = points.reduce((sum, point, k) => (k === 0 ? 0 : sum + len3(sub3(point, points[k - 1] as Vec3))), 0);
     if (!(total > 1e-9 * diagonal)) return 'edge';
-    // the sampler must be smooth for the fit to converge: an interpolating cubic through the refined vertices, projected back onto the contour (a smooth map)
     // vertices closer than a third of a cell are dropped (they make the interpolation ill-conditioned; the projection restores the exactness), the two ends are kept
     const separate: Vec2[] = [];
     run.forEach((uv, k) => {
@@ -211,39 +254,59 @@ export function freeformContours(
         if (k === run.length - 1) separate[separate.length - 1] = uv;
       } else separate.push(uv);
     });
-    const through = interpolatePoints(
-      separate.map((uv): Vec3 => [uv[0], uv[1], 0]),
-      { degree: 3, parameterization: 'chord' },
-    );
+    const head = separate[0] as Vec2;
+    const tail = separate.at(-1) as Vec2;
+    const closed = separate.length > 5 && Math.hypot(head[0] - tail[0], head[1] - tail[1]) <= 1e-6 * cell;
+    // the sampler must be smooth for the fit to converge: an interpolating cubic through the refined vertices (a closed loop over a ring extended by three points on each side, read over one turn),
+    // projected back onto the contour at every evaluation
+    const ring = closed ? separate.slice(0, -1) : separate;
+    const extended = closed ? [...ring.slice(-3), ...ring, ...ring.slice(0, 4)] : ring;
+    const lifted = extended.map((uv): Vec3 => [uv[0], uv[1], 0]);
+    const through = interpolatePoints(lifted, { degree: 3, parameterization: 'chord' });
     if ('code' in through) return 'the contour of the freeform face cannot be interpolated';
-    const uvAt = (s: number): Vec2 => {
-      const point = evaluateCurve(through.curve, s);
-      const raw = clamp([point[0], point[1]]);
-      return project(raw) ?? raw;
+    const chords = lifted
+      .slice(1)
+      .reduce<number[]>((sum, point, k) => [...sum, (sum[k] as number) + len3(sub3(point, lifted[k] as Vec3))], [0]);
+    const [tStart, tEnd] = closed
+      ? [(chords[3] as number) / (chords.at(-1) as number), (chords[3 + ring.length] as number) / (chords.at(-1) as number)]
+      : [0, 1];
+    /** The contour point at s in [0, 1], or null when Newton cannot bring the interpolated point back onto it. */
+    const uvAt = (s: number): Vec2 | null => {
+      const point = evaluateCurve(through.curve, tStart + s * (tEnd - tStart));
+      return project(clamp([point[0], point[1]]));
     };
-    const fitted = fitBySampling(
+    const lost =
+      'Newton cannot follow the contour of the freeform face (the interpolated silhouette cannot be projected back onto n . d = 0): turn the direction a little';
+    const fitted = fitSamples(
       (s) => {
         const uv = uvAt(s);
-        return evaluateSurface(surface, uv[0], uv[1]);
+        return uv === null ? null : evaluateSurface(surface, uv[0], uv[1]);
       },
       tolerance,
-      'the silhouette of the freeform face cannot be fitted',
+      closed,
+      lost,
     );
     if (isMappingError(fitted)) return fitted.error;
-    const speed = Math.max(
-      ...run.map((uv) => {
-        const ds = surfaceDerivatives(surface, uv[0], uv[1], 1);
-        return Math.max(len3((ds[1] as Vec3[])[0] as Vec3), len3((ds[0] as Vec3[])[1] as Vec3));
-      }),
-    );
-    const parametric = fitBySampling(
-      (s) => [...uvAt(s), 0] as Vec3,
+    const speeds = Array.from({ length: 97 }, (_, k) => uvAt(k / 96)).map((uv) => {
+      if (uv === null) return Infinity;
+      const ds = surfaceDerivatives(surface, uv[0], uv[1], 1);
+      return Math.hypot(len3((ds[1] as Vec3[])[0] as Vec3), len3((ds[0] as Vec3[])[1] as Vec3));
+    });
+    const speed = Math.max(...speeds);
+    if (!Number.isFinite(speed)) return lost;
+    const parametric = fitSamples(
+      (s) => {
+        const uv = uvAt(s);
+        return uv === null ? null : ([uv[0], uv[1], 0] as Vec3);
+      },
       tolerance / speed,
-      'the silhouette of the freeform face cannot be fitted',
+      closed,
+      lost,
     );
     if (isMappingError(parametric)) return parametric.error;
     const [first, last] = curveDomain(fitted.curve);
-    const probes = Array.from({ length: PROBES }, (_, k) => evaluateCurve(fitted.curve, first + ((k + 0.37) / PROBES) * (last - first)));
+    const at = (k: number): number => first + ((k + 0.37) / PROBES) * (last - first);
+    const probes = Array.from({ length: PROBES }, (_, k) => evaluateCurve(fitted.curve, at(k)));
     const hits = query.projectOnFace(shape, face, probes);
     const slack = 2 * tolerance + 1e-7 * diagonal;
     if (
@@ -251,9 +314,17 @@ export function freeformContours(
       !hits.every((hit, k) => hit !== null && hit.distance < slack && query.faceContains(shape, face, probes[k] as Vec3, slack) === true)
     )
       return 'the fitted silhouette leaves the face (the kernel does not project it back within the tolerance)';
+    // the fit must lie on the contour, not only on the surface: the distance of the fitted pcurve to n . d = 0 (|F| / |grad F| in the parameter plane, times the surface speed)
+    for (let k = 0; k < PROBES; k++) {
+      const uv = evaluateCurve(parametric.curve, at(k));
+      const { f, fu, fv } = field([uv[0], uv[1]]);
+      if (!((Math.abs(f) / Math.hypot(fu, fv)) * speed <= slack))
+        return 'the fitted silhouette does not lie on the contour n . d = 0 within the tolerance (the interpolated contour was not followed)';
+    }
     // a contour along a boundary of the face already is an edge of the solid: both sides of the middle must be face
-    const middle = uvAt(0.5);
-    const [before, after] = [uvAt(0.49), uvAt(0.51)].map((uv) => evaluateSurface(surface, uv[0], uv[1])) as [Vec3, Vec3];
+    const [middle, ahead, behind] = [uvAt(0.5), uvAt(0.51), uvAt(0.49)];
+    if (middle === null || ahead === null || behind === null) return lost;
+    const [before, after] = [behind, ahead].map((uv) => evaluateSurface(surface, uv[0], uv[1])) as [Vec3, Vec3];
     const normal = query.evaluateFace(shape, face, [middle])?.[0]?.normal;
     const centre = evaluateSurface(surface, middle[0], middle[1]);
     if (normal !== undefined && len3(sub3(after, before)) > 0) {
@@ -288,7 +359,13 @@ export function freeformContours(
       const { fu, fv, length } = field(projected);
       gradients.push((Math.hypot(fu, fv) * cell) / length);
     }
-    if (Math.min(...gradients) < GRADIENT_FLOOR * Math.max(...gradients) || Math.min(...gradients) < 1e-9)
+    // the gradient also at the middle of every step: a branch point between two vertices shows there
+    for (let k = 1; k < refined.length; k++) {
+      const [p, q] = [refined[k - 1] as Vec2, refined[k] as Vec2];
+      const { fu, fv, length } = field([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]);
+      gradients.push((Math.hypot(fu, fv) * cell) / length);
+    }
+    if (Math.min(...gradients) < GRADIENT_FLOOR * Math.max(...gradients) || Math.min(...gradients) < GRADIENT_ABSOLUTE)
       return 'the contour has a cusp or is tangential to the view somewhere (the gradient of n . d vanishes along it): turn the direction a little';
     const ring = path.closed ? [...refined, refined[0] as Vec2] : refined;
     for (const run of insideRuns(ring, path.closed, inside, project)) {
@@ -320,8 +397,8 @@ function insideRuns(ring: readonly Vec2[], closed: boolean, inside: (uv: Vec2) =
     for (let step = 0; step < 50; step++) {
       const middle = (s0 + s1) / 2;
       const raw = lerp(good, bad, middle);
-      const uv = project(raw) ?? raw;
-      if (inside(uv)) {
+      const uv = project(raw);
+      if (uv !== null && inside(uv)) {
         s0 = middle;
         best = uv;
       } else s1 = middle;

@@ -218,7 +218,15 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       faces,
       ...(mitre === null
         ? {}
-        : { mitre: { fillerVolume: mitre.fillerVolume, overlapVolume: mitre.overlapVolume, exact: mitre.exact, edges: mitre.edges } }),
+        : {
+            mitre: {
+              fillerVolume: mitre.fillerVolume,
+              overlapVolume: mitre.overlapVolume,
+              exact: mitre.exact,
+              reasons: mitre.reasons,
+              edges: mitre.edges,
+            },
+          }),
       chain: chain.faces.map((face) => face.session.face),
       edges: chain.edges.map((edge) => ({
         edge: edge.edge,
@@ -260,8 +268,12 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     const change =
       volumeDelta === null
         ? 'volume change not measured'
-        : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${expected.toPrecision(9)})`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}. Source solid consumed, profiles kept.`;
+        : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${mitre !== null && !mitre.exact ? 'not exact' : expected.toPrecision(9)})`;
+    const mitred =
+      mitre === null
+        ? ''
+        : ` ${mitre.edges.map((e) => (e.kind === 'filler' ? `edge ${e.edge} mitred (filler ${(e.area * e.length).toPrecision(5)} ${doc.units}^3)` : `edge ${e.edge} slabs overlap (${(e.area * e.length).toPrecision(5)} ${doc.units}^3)`)).join(', ')}${mitre.exact ? '' : `; overlap not in the closed form (${mitre.reasons.join('; ')})`}.`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}.${mitred} Source solid consumed, profiles kept.`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }

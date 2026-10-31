@@ -61,8 +61,7 @@ describeNativeWhen({ capabilities: ['deform'], label: 'WRP freeform silhouette' 
       expect(info.curves.map((c) => c.face).sort()).toEqual([4, 5]);
       const volumes = done.data as { volumeBefore: number; volumeAfter: number; facesBefore: number; facesAfter: number };
       expect(Math.abs(volumes.volumeAfter / volumes.volumeBefore - 1)).toBeLessThan(1e-5);
-      // the command reports its face counts as the kernel gives them (see the note on sequential splits in the spec): the concave face, divided last, is at least divided
-      expect(volumes.facesAfter).toBeGreaterThan(volumes.facesBefore);
+      expect(volumes.facesAfter).toBe(volumes.facesBefore + 2);
       for (const piece of info.curves) {
         const radius = piece.face === 4 ? 50 : 44;
         expect(piece.kind).toBe('fitted');

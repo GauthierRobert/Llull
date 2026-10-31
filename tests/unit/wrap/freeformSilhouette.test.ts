@@ -184,6 +184,15 @@ describe('silhouette of a freeform face', () => {
       1e-6,
     );
     expect(report.curves[0]?.length).toBeGreaterThan(10);
+    // the seam is C1: the direction leaving the first point equals the direction arriving at the last
+    const curve = report.curves[0]?.curve as NonNullable<(typeof report.curves)[number]>['curve'];
+    const [lo, hi] = curveDomain(curve);
+    const h = 1e-6 * (hi - lo);
+    const leave = evaluateCurve(curve, lo + h).map((c, k) => c - (evaluateCurve(curve, lo)[k] as number));
+    const arrive = evaluateCurve(curve, hi).map((c, k) => c - (evaluateCurve(curve, hi - h)[k] as number));
+    const cosine =
+      (leave[0]! * arrive[0]! + leave[1]! * arrive[1]! + leave[2]! * arrive[2]!) / (Math.hypot(...leave) * Math.hypot(...arrive));
+    expect(cosine).toBeGreaterThan(1 - 1e-9);
     // each point is on the surface with the normal perpendicular to the view: the pcurve gives (u, v)
     const pcurve = report.curves[0]?.pcurve;
     expect(pcurve).toBeDefined();
@@ -225,6 +234,64 @@ describe('silhouette of a freeform face', () => {
     // a B-spline whose domain does not contain the parameter box of the face
     const shifted: PortSurface = { ...saddle, knotsU: [2, 3], knotsV: [2, 3] };
     expect(reasonOf(silhouetteOf(saddle, [1, 0, 0], {}, shifted))).toContain('outside its B-spline');
+  });
+
+  it('two separate contours (z = 0.05 (x^3 - 12 x) seen along x: the lines x = +-2) and a trimmed face with a hole (the parabola cut in two pieces)', () => {
+    const two = silhouetteOf(
+      bezierOf((x) => 0.05 * (x * x * x - 12 * x), 5),
+      [1, 0, 0],
+    );
+    expect(two.unsupported).toEqual([]);
+    expect(two.curves).toHaveLength(2);
+    const xs = two.curves.map((c) => {
+      const [first, last] = curveDomain(c.curve);
+      return evaluateCurve(c.curve, (first + last) / 2)[0] as number;
+    });
+    expect(xs.map((x) => Math.round(x * 1e6) / 1e6).sort((a, b) => a - b)).toEqual([-2, 2]);
+    const holed = silhouetteOf(saddlePatch(0.05, 5), [1, 0, 0], { trim: (point) => Math.hypot(point[0], point[1]) >= 1 });
+    expect(holed.curves).toHaveLength(2);
+    const a = 0.1;
+    const arc = (y: number): number => (y / 2) * Math.sqrt(1 + a * a * y * y) + Math.asinh(a * y) / (2 * a);
+    for (const piece of holed.curves) expect(piece.length).toBeCloseTo(arc(5) - arc(1), 5);
+  });
+
+  it('a contour the cubic fit cannot reach within the tolerance (a tight bump, a loop of about two cells) is refused by name, not approximated', () => {
+    const full = [0, 0, 0, 0, 0.4, 0.5, 0.6, 1, 1, 1, 1];
+    const g = Array.from({ length: 7 }, (_, i) => ((full[i + 1] as number) + (full[i + 2] as number) + (full[i + 3] as number)) / 3);
+    const patch: PortSurface = {
+      degreeU: 3,
+      degreeV: 3,
+      poles: g.map((u, i) => g.map((v, j): Vec3 => [-5 + 10 * u, -5 + 10 * v, i === 3 && j === 3 ? 20 : 0])),
+      knotsU: [0, 0.4, 0.5, 0.6, 1],
+      multsU: [4, 1, 1, 1, 4],
+      knotsV: [0, 0.4, 0.5, 0.6, 1],
+      multsV: [4, 1, 1, 1, 4],
+      periodicU: false,
+      periodicV: false,
+    };
+    const report = silhouetteOf(patch, [1, 0, 2]);
+    expect(report.curves).toEqual([]);
+    expect(reasonOf(report)).toContain('could not be fitted');
+  });
+
+  it('a crease (a C0 ridge: the normal jumps across it, so n . d changes sign without a zero) cannot be traced by Newton and is refused by name', () => {
+    // degree 3 with a triple interior knot: poles on x = -5, -5/3.., the ridge z = 3 (1 - |x| / 5) along y
+    const xs = [-5, -10 / 3, -5 / 3, 0, 5 / 3, 10 / 3, 5];
+    const ridge: PortSurface = {
+      degreeU: 3,
+      degreeV: 1,
+      poles: xs.map((x): Vec3[] => [
+        [x, -5, 3 * (1 - Math.abs(x) / 5)],
+        [x, 5, 3 * (1 - Math.abs(x) / 5)],
+      ]),
+      knotsU: [0, 0.5, 1],
+      multsU: [4, 3, 4],
+      knotsV: [0, 1],
+      multsV: [2, 2],
+      periodicU: false,
+      periodicV: false,
+    };
+    expect(reasonOf(silhouetteOf(ridge, [1, 0, 0]))).toContain('Newton');
   });
 
   it('a face parallel to the view is edge-on, a face turned toward it has none, and a face seen almost tangentially is refused by name', () => {

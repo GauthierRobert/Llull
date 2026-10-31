@@ -797,6 +797,8 @@ cases (emboss on a concave edge, deboss on a convex edge) the slabs overlap by t
 `data.expectedVolumeDelta` includes both: 48 d + d^2 L = 54 for an 8 x 6 rectangle centred on the edge of a box (d 1, L 6), 42 where the slabs overlap. `data.mitre` lists per edge `kind` (filler / overlap), the number of intervals, the covered length and the
 cross-section area, with `fillerVolume`, `overlapVolume` and `exact`.
 
+**Exactness.** The overlap of the two slabs is only as wide as the outline: the closed form is exact (`exact` true) when, over every covered stretch, the outline contains the strip of the clip polygon's reach on both faces, and when no outline comes within that reach of the edge without crossing it; otherwise `exact` is false, `expectedVolumeDelta` null and `data.mitre.reasons` says why. The filler is a column outside both slabs and does not depend on the width of the outline. Only the stretch of the line that is the edge counts (pieces meeting the line beyond its ends belong to another edge of the chain).
+
 **Refused by name (`WRP_CHAIN_EDGE_SHARP`, the message says which):** a convexity the kernel left unknown; an edge between faces that are not both planes; an edge sharper than the mitre can follow (|M| > 20 d); where a filler is needed, an outline that crosses the edge at an angle
 (only segments at right angles to the edge have a column the prism fills), through a vertex, with a curved piece, an odd number of times, or beyond the end of the edge. Where only an overlap is concerned the same crossings are built and `exact` is false (`expectedVolumeDelta` null: the closed form
 does not know the overlap). Scribe crosses sharp edges as before.
@@ -823,6 +825,6 @@ R 50 and R 44) seen along (cos 30, 0, sin 30) gives two rulings of length 30 (er
 divides its face into arcs of 30 and 60 degrees times the width (1e-3).
 
 **Deviations (never silent).** Features smaller than a cell of the grid (an island or a fold inside one cell) are not seen; a branch point inside a cell is refused when the contour's gradient falls under 5 % of its maximum or the
-cell has four crossings, a crossing that passes both tests is traced as two smooth branches. **Kernel defect found (not fixed here, native C++):** `split_face_by_curves` with curves on two different faces keeps only the last
-face's split: every `split_shape` ends with `ShapeUpgrade_UnifySameDomain` whose keep set holds only that step's tool edges, so the dividing edge of the previous step (two halves of one B-spline face) is merged back. The
-command reports the face counts as the kernel gives them (6 -> 7 for the bent plate, not 8), and a second `split_face_by_curves` on the result for the other face is refused with WRP_SPLIT_NO_EFFECT (7 faces before and after: it divides its face and merges the first split back). The fix belongs in `split_shape` (keep the edges shared by two faces of the source); each curve alone divides its face correctly.
+cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
+(the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised by a C0 crease only. A kernel defect found on the way (two sequential
+face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.

@@ -161,14 +161,16 @@ function torusShape(id: string, major: number, minor: number, options: FakeSplit
  * Two plane faces meeting along the y axis at (x, z) = (0, 0): face 0 is z = 0 with outward normal +z, face 1 has the normal (cos theta, 0, sin theta) (theta = 0: the plane x = 0), both 40 long in y.
  * Convex: the faces run to -x and along the tangent (sin theta, 0, -cos theta) (a box corner); concave: to +x and to the opposite tangent (the inside corner of an L).
  */
-function cornerShape(id: string, convexity: 'convex' | 'concave' | 'unknown', theta: number): SplitShape {
+function cornerShape(id: string, convexity: 'convex' | 'concave' | 'unknown', theta: number, curvedB: boolean): SplitShape {
   const nB: Vec3 = [Math.cos(theta), 0, Math.sin(theta)];
   const reverse = convexity === 'concave' ? -1 : 1;
   const tA: Vec3 = [-reverse, 0, 0];
   const tB: Vec3 = [reverse * Math.sin(theta), 0, -reverse * Math.cos(theta)];
   const along = (p: Vec3, t: Vec3): number => p[0] * t[0] + p[1] * t[1] + p[2] * t[2];
   const planeA: SurfaceParams = { type: 'plane', origin: [0, 0, 0], normal: [0, 0, 1], xDir: [1, 0, 0] };
-  const planeB: SurfaceParams = { type: 'plane', origin: [0, 0, 0], normal: nB, xDir: [0, 1, 0] };
+  const planeB: SurfaceParams = curvedB
+    ? { type: 'cylinder', origin: [0, 0, 0], axis: [0, 1, 0], xDir: [1, 0, 0], radius: 30 }
+    : { type: 'plane', origin: [0, 0, 0], normal: nB, xDir: [0, 1, 0] };
   return {
     id,
     volume: 1e5,
@@ -217,7 +219,12 @@ export interface FakeSplitOptions {
   /** The last sample of a closed edge differs from its first by 5e-9 (a kernel's rounding), which decides which of the two is the nearer to a point. */
   readonly closedNoise?: boolean;
   /** `add_box` is a pair of plane faces meeting in a sharp edge of this kind (face 1 turned by `theta` radians from the plane x = 0). */
-  readonly corner?: { readonly convexity: 'convex' | 'concave' | 'unknown'; readonly theta?: number };
+  readonly corner?: {
+    readonly convexity: 'convex' | 'concave' | 'unknown';
+    readonly theta?: number;
+    readonly curvedB?: boolean;
+    readonly noNormal?: boolean;
+  };
 }
 
 export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel {
@@ -244,7 +251,7 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
       if (entity.kind === 'sphere') return sphereShape(entity.id, entity.radius);
       if (entity.kind === 'torus') return torusShape(entity.id, entity.ringRadius, entity.tubeRadius, options);
       if (entity.kind === 'box' && options.corner !== undefined)
-        return cornerShape(entity.id, options.corner.convexity, options.corner.theta ?? 0);
+        return cornerShape(entity.id, options.corner.convexity, options.corner.theta ?? 0, options.corner.curvedB === true);
       if (entity.kind === 'extrusion') {
         const profile = entity.profile;
         const shoelace =
@@ -323,7 +330,8 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
           [Math.PI, 50],
         ],
       }),
-      projectOnFace: (shape, face, points) => points.map((point) => projectOn(shape, face, point)),
+      projectOnFace: (shape, face, points) =>
+        points.map((point) => (options.corner?.noNormal === true && face === 1 ? null : projectOn(shape, face, point))),
       evaluateFace: () => null,
       tessellateFace: () => null,
       faceSamples: () => null,

@@ -12,6 +12,7 @@ import { emptyDoc, make, type Made } from './support';
 
 type Run = ReturnType<typeof execute>;
 type Mitre = {
+  reasons: string[];
   fillerVolume: number;
   overlapVolume: number;
   exact: boolean;
@@ -43,7 +44,7 @@ const slanted = (doc: CadDocument): Made =>
     closed: true,
   });
 
-function run(options: FakeSplitOptions, mode: string, sketch: (doc: CadDocument) => Made = rectangle): Run {
+function runMany(options: FakeSplitOptions, mode: string, sketch: (doc: CadDocument) => { doc: CadDocument; ids: string[] }): Run {
   setGeometryKernel(fakeSplitKernel(options));
   const solid = make(emptyDoc(), 'add_box', { size: [60, 40, 10] });
   const drawn = sketch(solid.doc);
@@ -51,12 +52,19 @@ function run(options: FakeSplitOptions, mode: string, sketch: (doc: CadDocument)
     id: solid.id,
     face: { faceIndex: 0 },
     chain: [{ faceIndex: 1 }],
-    profileIds: [drawn.id],
+    profileIds: drawn.ids,
     mode,
     depth: 1,
     placement: { method: 'develop', anchor: { chart: [0, 0], on: [0, 0, 0] } },
   });
 }
+const run = (options: FakeSplitOptions, mode: string, sketch: (doc: CadDocument) => Made = rectangle): Run =>
+  runMany(options, mode, (doc) => {
+    const drawn = sketch(doc);
+    return { doc: drawn.doc, ids: [drawn.id] };
+  });
+const rectangleAt = (doc: CadDocument, x: number, width: number): Made =>
+  make(doc, 'draw_rectangle', { width, height: 6, position: [x, -3, 0] });
 const mitre = (result: Run): Mitre => (result.data as unknown as { mitre: Mitre }).mitre;
 const data = (result: Run): { volumeDelta: number; expectedVolumeDelta: number | null } =>
   result.data as unknown as { volumeDelta: number; expectedVolumeDelta: number | null };
@@ -136,5 +144,57 @@ describe('emboss_on_face across a sharp edge: the mitre', () => {
     expect(done.rejected, done.summary).toBeUndefined();
     expect(mitre(done).exact).toBe(false);
     expect(data(done).expectedVolumeDelta).toBeNull();
+  });
+
+  it('the filler sits on the side of the offset planes: the profile of an emboss on a convex edge has M = +(1, 1) d, a deboss on a concave edge M = -(1, 1) d (the sign of s)', () => {
+    const profileOf = (result: Run): number[][] => JSON.parse(/"profile":(\[\[.*?\]\])/.exec(recipeOf(result))?.[1] ?? '[]') as number[][];
+    const emboss = profileOf(run({ corner: { convexity: 'convex' } }, 'emboss'));
+    const deboss = profileOf(run({ corner: { convexity: 'concave' } }, 'deboss'));
+    expect(emboss.some(([x, y]) => Math.abs((x as number) - 1) < 1e-9 && Math.abs((y as number) - 1) < 1e-9)).toBe(true);
+    expect(deboss.some(([x, y]) => Math.abs((x as number) + 1) < 1e-9 && Math.abs((y as number) + 1) < 1e-9)).toBe(true);
+    expect(emboss.some(([x]) => (x as number) < -1e-9)).toBe(false);
+    expect(deboss.some(([x]) => (x as number) > 1e-9)).toBe(false);
+  });
+
+  it('an outline that does not reach the overlap of the slabs makes the closed form inexact: a 1.5 wide rectangle across a concave edge (overlap reach 1), and two rectangles 0.2 off the edge', () => {
+    const narrow = run({ corner: { convexity: 'concave' } }, 'emboss', (doc) => rectangleAt(doc, -0.5, 1.5));
+    expect(narrow.rejected, narrow.summary).toBeUndefined();
+    expect(mitre(narrow).exact).toBe(false);
+    expect(data(narrow).expectedVolumeDelta).toBeNull();
+    expect(narrow.summary).toContain('overlap not in the closed form');
+    const wide = run({ corner: { convexity: 'concave' } }, 'emboss', (doc) => rectangleAt(doc, -1.5, 3));
+    expect(mitre(wide).exact).toBe(true);
+    const beside = runMany({ corner: { convexity: 'concave' } }, 'emboss', (doc) => {
+      const a = rectangleAt(doc, -4, 3.8);
+      const b = rectangleAt(a.doc, 0.2, 3.8);
+      return { doc: b.doc, ids: [a.id, b.id] };
+    });
+    expect(beside.rejected, beside.summary).toBeUndefined();
+    expect(mitre(beside).exact).toBe(false);
+    expect(mitre(beside).reasons.join(' ')).toContain('without crossing');
+    expect(data(beside).expectedVolumeDelta).toBeNull();
+    // a filler is a column outside both slabs: a narrow outline still gets it (1.5 x 6 + the column 1 x 6 = 15)
+    const column = run({ corner: { convexity: 'convex' } }, 'emboss', (doc) => rectangleAt(doc, -0.5, 1.5));
+    expect(mitre(column).exact).toBe(true);
+    expect(data(column).expectedVolumeDelta).toBeCloseTo(15, 9);
+  });
+
+  it('where only an overlap is concerned a vertex on the edge or a curved piece crossing it is built without a closed form', () => {
+    const diamond = run({ corner: { convexity: 'convex' } }, 'deboss', (doc) =>
+      make(doc, 'draw_polyline', {
+        points: [
+          [-3, 0],
+          [0, 3],
+          [3, 0],
+          [0, -3],
+        ],
+        closed: true,
+      }),
+    );
+    expect(mitre(diamond).exact).toBe(false);
+    expect(mitre(diamond).reasons.join(' ')).toContain('vertex');
+    const round = run({ corner: { convexity: 'convex' } }, 'deboss', (doc) => make(doc, 'draw_arc', { center: [0, 0], radius: 3 }));
+    expect(mitre(round).exact).toBe(false);
+    expect(mitre(round).reasons.join(' ')).toContain('curved piece');
   });
 });

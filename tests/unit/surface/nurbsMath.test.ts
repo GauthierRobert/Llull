@@ -229,6 +229,21 @@ describe('interpolation (VC-SRF-08)', () => {
     }
   });
 
+  it('exact tangents are derivatives per unit parameter as given, not only directions', () => {
+    const result = interpolatePoints(points, {
+      degree: 3,
+      parameterization: 'uniform',
+      startTangent: [0, 7, 0],
+      endTangent: [3, 0, 0],
+      exactTangents: true,
+    });
+    if ('code' in result) throw new Error(result.message);
+    const [, start] = curveDerivatives(result.curve, 0, 1);
+    const [, end] = curveDerivatives(result.curve, 1, 1);
+    expect(start![1]!).toBeCloseTo(7, 9);
+    expect(end![0]!).toBeCloseTo(3, 9);
+  });
+
   it('honours start and end tangent directions', () => {
     const result = interpolatePoints(points, { degree: 3, parameterization: 'chord', startTangent: [0, 1, 0], endTangent: [1, 0, 0] });
     if ('code' in result) throw new Error(result.message);
