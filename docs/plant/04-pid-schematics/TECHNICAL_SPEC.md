@@ -447,7 +447,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/plant/pid/**` (NON
 | --- | --- | --- | --- |
 | M1 Model + XML | `plant/pid/model.ts`, `doc.plant.pid` (D2), persistence validation, `xmlRead`, plugin skeleton, toolset — **built 2026-10-25 (PID-M1), §13**; no command (none is listed for M1) | — | 4 d |
 | M2 DEXPI import | Proteus 1.3 mapper, census-equal import of 11 files, `pid_report kind=counts / connectivity`, DEXPI codes — **built 2026-10-31 (PID-M2), §13.4** | M1 | 6 d |
-| M3 Authoring + connectivity | sheets, equipment / nozzles, lines, inline split / heal, instruments, signals, actuating systems, OPC, flow | M1 | 8 d |
+| M3 Authoring + connectivity | sheets, equipment / nozzles, lines, inline split / heal, instruments, signals, actuating systems, OPC, flow — **built 2026-10-31 (PID-M3), §13.5** | M1 | 8 d |
 | M4 Tags + checks + lists | grammar + ISA table, tag registry, `check_pid` (16 rules), five lists, CSV | M3 | 6 d |
 | M5 Export + rendering | DEXPI 1.3 export (round trip), symbol library, `export_pid_svg`, 2D viewport branch | M2, M3 | 8 d |
 | M6 DEXPI 2.0 | 2.0 import / export, XSD check | M2, M5 | 5 d |
@@ -553,7 +553,33 @@ Commands `import_dexpi` and `pid_report` (toolset `pid`, now listed in `docs/FEA
 
 Deviations: `version` offers `auto` / `1.3` only (§4.1 lists more); `pid_report` offers `counts` / `connectivity` only (the lists are M4) and has no `filter`; connectivity rows are in import order, not natural-sorted (§5.7 sorts lists). `check_pid` stays unbuilt, so SC-PID-01 steps 2 to 6 stay blocked (`blockedPlanCommands.json` now lists only `check_pid` for that plan). `pid.lld` is unchanged.
 
-### 13.5 Tests
+### 13.5 PID-M3 (2026-10-31): authoring and connectivity
+
+Fourteen commands (toolset `pid`, `docs/FEATURES.md` lists 16 with M2), code in `packages/domain-aec/src/plant/pid/`: `commands/` (one file per command), `authoring/` (`refs.ts` lookups, derived tag index, tag rules, `Draft` working copy, `mintFree`; `geometry.ts` legs, split, heal, orthogonal route; `split.ts` split / heal of segments with tee follow; `remove.ts` delete closure; `move.ts` equipment move and end-leg re-route; `endpoints.ts`, `nozzles.ts`, `classes.ts`, `values.ts`, `lineNumber.ts`, `instrumentTag.ts`).
+
+| Command | One line |
+| ------- | -------- |
+| `create_pid_sheet` | sheet (`PID-001`, paper, convention, line-number template); `PID_SHEET_DUPLICATE` |
+| `add_pid_equipment` / `add_pid_nozzle` | equipment with nozzles on the symbol box (half extents by class, +y is top, rotation about the centre); `PID_CLASS_UNKNOWN` lists close names |
+| `add_pid_line` | line + first segment between `{tag, nozzle}`, `{line, at}` (tee, snapped within 5 mm), `{opc}` (connector created with the line) or `{free}`; orthogonal auto-route (straight, L, Z) or `via` |
+| `add_pid_inline` | splits the segment at the snapped point, ports at +/-5 mm, pieces inherit line / dn / class / flow / primary; dn and class default from the segment and are flagged `defaulted` |
+| `add_pid_instrument` | instrument, tag stored split, shared loop item `<letter>-<number>`, optional measuring signal from a line tap or a nozzle |
+| `add_pid_signal_line` | information flow between instruments / actuating systems |
+| `add_pid_actuating_system` | one per valve (`PID_ACTUATOR_EXISTS`), valve marked `operated`, controller = instrument |
+| `add_pid_off_page_connector` | OPC on a free line start (in) or end (out) |
+| `update_pid_item` | tag, attributes, dn, class, fluid, line number, `at`, `rotationDeg`; equipment takes nozzles and sub-equipment, attached segments / signals re-route their end legs |
+| `delete_pid_item` | removes the item and what depends on it; an inline item with `heal` (default) merges its two segments, restoring the route to 1e-9 mm (VC-PID-13) |
+| `reverse_pid_flow` | flips forward / reverse per line or segment (`none` becomes forward) |
+| `renumber_pid_lines` | template numbering in sheet, y, x order; lines lacking a needed field are skipped and listed |
+| `set_pid_conventions` | convention, line-number template, tag formats (pattern checked by `patternSafety`; enforced on later tags, at most 64 characters) |
+
+Connectivity (§5.2) is the M2 module `lists/connectivity.ts`, reused: authored segments carry `passthrough['dexpi:segment']` (their own id, shared by the pieces an inline item splits), so counts and connectivity rows fold them exactly like imported DEXPI segments; the module now folds the pieces in the order of `line.segmentIds` (inline insertion appends new segments to `itemOrder`, so model order no longer is flow order). Branch (tee) ends follow a split / heal: a `branch` end moves to the piece that carries its point. Ids are minted with `nextId` through `mintFree`, which skips an id a hand-edited file already uses (the slice fuzz found a collision with a seeded `pid-1.1`).
+
+Deviations from §4.1: `define_pid_symbol` (V1), `link_pid_item` (M7), `accept_pid_finding` and `issue_pid_sheet` (human gate, M4 / V1) are not built. Flat endpoint objects (`tag`, `nozzle`, `line`, `at`, `opc`, `targetSheet`, `free`; exactly one form, else `PID_LINE_ENDPOINT_INVALID`) instead of a union. `add_pid_instrument` splits the tag with a minimal letters + loop number + suffix pattern (`FIC-101`, `PDIT 12.01`, `FV-101A`); the ISA 5.1 letter table and `parse_instrument_tag` are M4 (an unparseable tag needs `parts`). An OPC `targetSheet` that is not a sheet yet cannot be stored (the model requires a sheet id): the number is kept in `passthrough['pid:targetSheet']` and `check_pid` (M4) reports the connector unresolved; a known sheet is stored as its id. Signal ends on an actuating system use the `instrument` endpoint type (the model allows `instrument` or `actuating` items there). `add_pid_inline` also refuses a point closer than 5 mm to a bend or to the end of its straight run (`PID_POINT_OFF_LINE`, there is no room for the two ports). `update_pid_item` cannot move inline items (delete and re-insert) and a moved equipment re-routes only the end legs (a jog may appear next to the moved nozzle). New codes (all with remediation in `dexpi/codes.ts`): `PID_PARAM_INVALID`, `PID_ACTUATOR_EXISTS`, `PID_LINE_NUMBER_FORMAT`; `PID_CLASS_UNKNOWN` closes on the classes of `proteusClasses.ts` until the M5 symbol library. Equipment sizes are defaults per class (`authoring/classes.ts`), not stored. `delete_pid_item` accepts a line number; a segment alone is refused (`PID_ITEM_KIND`). `renumber_pid_lines` with nothing to renumber is a no-op. Validation plans: `size` in SC-PID-02 / 03 became `paper` (the §4.1 name); `blockedPlanCommands.json` keeps `check_pid` for SC-PID-01 / 02 and `check_pid_3d` for SC-PID-03.
+
+Tests (`tests/unit/plant/pid/`): `authoringScenario.test.ts` (the SC-PID-02 plan file run step by step: 4 + 4 segments, seeded attributes, connectivity, counts, replay, plugin validation; check_pid and `line_list` stay M4), `authoringBasics.test.ts` (sheet, equipment, nozzle, line, conventions), `authoringInline.test.ts` (split, heal to 1e-9, tee follow, cascades, instruments, signals, actuating systems, OPC, flow), `authoringEdit.test.ts` (update, renumber, and for every command: `is pure`, valid after the step, save / load equality, replay equality, refusals leave the same document object). The slice fuzz seed of `pid` now has a query and a mutating command.
+
+### 13.6 Tests
 
 `tests/unit/lib/xmlRead.test.ts` (documents, namespaces, entities, CDATA, BOM, UTF-8 names, line ends, 46 coded refusals with line / column, limits, hostile shapes, never throws), `tests/unit/lib/xmlReadFiles.test.ts` (the 12 DEXPI files, truncated copies, budget), `tests/unit/plant/pid/persistence.test.ts` (state helpers, exact save / load round trip with all ten item kinds, about 90 refusals with their paths, repeated tags load), `tests/unit/plant/pid/plugin.test.ts` (skeleton, toolset, extension). M1 had no command, so no `is pure` test beyond `withPid`; the golden corpus and the tool-schema snapshot were unchanged.
 

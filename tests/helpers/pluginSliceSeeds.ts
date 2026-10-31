@@ -1,7 +1,7 @@
 /**
  * One valid seed document per plugin that owns a document slice (tests/unit/contract/pluginSliceFuzz.test.ts). A new plugin with a
  * `document` extension MUST add its row here: the fuzz test fails naming a plugin without one. Seeds are built through real commands (golden /
- * oracle plans and unit fixtures); `pid` has no command yet, so its slice is written with the model's own `withPid`.
+ * oracle plans and unit fixtures); `pid` slice is written with the model's own `withPid`.
  */
 
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
@@ -210,7 +210,12 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'export_pcf', params: constant({}) },
     mutate: { name: 'import_pcf', params: constant({ text: fixturePcf(), lineIdOverride: 'FUZZ-1' }) },
   },
-  pid: { roots: ['plant.pid'], build: () => withPid(createEmptyDocument(), pidModel) },
+  pid: {
+    roots: ['plant.pid'],
+    build: () => withPid(createEmptyDocument(), pidModel),
+    query: { name: 'pid_report', params: constant({ kind: 'connectivity' }) },
+    mutate: { name: 'create_pid_sheet', params: constant({ number: 'PID-FUZZ' }) },
+  },
   scan: {
     roots: ['scan'],
     build: scanDocument,

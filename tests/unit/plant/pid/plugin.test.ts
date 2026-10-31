@@ -6,18 +6,37 @@ import { TOOLSET_NAMES, TOOLSETS } from '@protocol/toolsets';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
 
+const PID_COMMANDS = [
+  'import_dexpi',
+  'pid_report',
+  'create_pid_sheet',
+  'add_pid_equipment',
+  'add_pid_nozzle',
+  'add_pid_line',
+  'add_pid_inline',
+  'add_pid_instrument',
+  'add_pid_signal_line',
+  'add_pid_actuating_system',
+  'add_pid_off_page_connector',
+  'update_pid_item',
+  'delete_pid_item',
+  'reverse_pid_flow',
+  'renumber_pid_lines',
+  'set_pid_conventions',
+];
+
 describe('pid plugin', () => {
-  it('is the pid toolset with the M2 commands and adds no derived entity', () => {
+  it('is the pid toolset with the M2 + M3 commands and adds no derived entity', () => {
     expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid' });
-    expect(pidPlugin.commands.map((command) => command.name)).toEqual(['import_dexpi', 'pid_report']);
+    expect(pidPlugin.commands.map((command) => command.name)).toEqual(PID_COMMANDS);
     expect(TOOLSET_NAMES).toContain('pid');
-    expect([...TOOLSETS.pid].sort()).toEqual(['import_dexpi', 'pid_report']);
+    expect([...TOOLSETS.pid].sort()).toEqual([...PID_COMMANDS].sort());
     expect(
       listCommands()
         .filter((command) => /pid|dexpi/.test(command.name))
         .map((command) => command.name)
         .sort(),
-    ).toEqual(['import_dexpi', 'pid_report']);
+    ).toEqual([...PID_COMMANDS].sort());
     expect(pidPlugin.document?.derivedEntityIds(createEmptyDocument())).toEqual(new Set());
   });
 
