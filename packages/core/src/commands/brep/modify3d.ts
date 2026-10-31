@@ -8,6 +8,7 @@ import type { CadDocument, Vec3 } from '../../model/types';
 import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
+import { chainSchema } from './filletChain';
 import { pickEdges } from './edgeReferences';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
@@ -187,6 +188,7 @@ export const filletEdge = defineCommand({
           'radius / radiusEnd / edgeIndices / edgesNear. Differing radii need a kernel that reads radius laws (native OCC); equal ones work everywhere exact.',
       )
       .optional(),
+    chain: chainSchema.optional(),
     corners: z
       .array(cornerSchema)
       .describe(
@@ -227,6 +229,7 @@ export const filletEdge = defineCommand({
       corners,
       partial,
       allowNonTangent,
+      chain,
     },
     ctx,
   ): CommandResult => {
@@ -234,7 +237,14 @@ export const filletEdge = defineCommand({
     if ('summary' in target) return target;
     const refused = refusePartial(doc, id, partial);
     if (refused !== null) return refused;
-    if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
+    if (
+      edges !== undefined ||
+      mode === 'chord' ||
+      radiusEnd !== undefined ||
+      profile !== undefined ||
+      corners !== undefined ||
+      chain !== undefined
+    )
       return filletEach(doc, ctx, {
         id,
         mode,
@@ -247,6 +257,7 @@ export const filletEdge = defineCommand({
         profile,
         corners,
         allowNonTangent,
+        chain,
       });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
     return modifyEdges(doc, ctx, {

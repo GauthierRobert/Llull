@@ -13,12 +13,19 @@ import { distance3 } from '../../lib/vec3';
 import type { Vec3 } from '../../model/types';
 import { DEFAULT_LAW_SAMPLES, MAX_LAW_SAMPLES, MIN_LAW_SAMPLES, sampleExpression } from '../../geometry/blend/law';
 import type { EdgeLawInput } from './filletSpec';
-import type { BlendContext } from './faceBlendRun';
+import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 
 /** Largest angle between the two edges at a joint of the chain (rad): the kernel chains edges that continue each other to about 0.1 rad (13.13.2); a size law over a creased chain is not offered. */
 const JOINT_TANGENT_RAD = 0.01;
 /** Two chain ends are the same vertex within this fraction of the longest edge. */
 const JOINT_GAP = 1e-6;
+
+/** What the chain layout reads of a shape: the kernel's edge sampler, the shape and its topology (a BlendContext and a fillet_edge target both fit). */
+export interface ChainContext {
+  readonly kernel: GeometryKernel;
+  readonly shape: ShapeHandle;
+  readonly topology: ShapeTopology | null;
+}
 
 export interface ChainEdge {
   readonly index: number;
@@ -53,7 +60,7 @@ interface End {
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /** The two ends of each seed with the direction they leave along the edge, or null when the kernel cannot sample one. */
-function endsOf(context: BlendContext, seeds: readonly number[]): End[] | null {
+function endsOf(context: ChainContext, seeds: readonly number[]): End[] | null {
   const ends: End[] = [];
   for (const edge of seeds) {
     const samples = context.kernel.faceQuery?.edgeSamples(context.shape, edge, 2) ?? null;
@@ -68,7 +75,7 @@ function endsOf(context: BlendContext, seeds: readonly number[]): End[] | null {
 
 /** The chain of `seeds` in walking order with the arc fractions, or why it is not one chain. */
 export function planChain(
-  context: BlendContext,
+  context: ChainContext,
   seeds: readonly number[],
   startNear: Vec3 | undefined,
   startPath: string,

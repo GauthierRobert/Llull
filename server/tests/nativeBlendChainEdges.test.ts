@@ -164,4 +164,47 @@ describeNative('fillet_edge laws: arc-length abscissa and the direction of a clo
     }
     expect(worst).toBeLessThan(2e-2);
   });
+
+  it('fillet_edge chain gives the same blend as fillet_faces over the same three edges (a line, a quarter circle, a line of a block corner rounded R 4): equal removed volume, and the chain is refused for edges that are not one chain', () => {
+    const volume = (doc: Doc, id: string): number => (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
+    const block = execute(createEmptyDocument(), 'add_box', { size: [20, 20, 10], position: [10, 10, 5] });
+    const rounded = execute(block.document, 'fillet_edge', { id: block.affected[0], edgesNear: [[0, 0, 5]], radius: 4 });
+    expect(rounded.rejected, rounded.summary).toBeUndefined();
+    const id = rounded.affected[0] as string;
+    const corner = Math.SQRT1_2 * 4;
+    const near = [
+      [10, 0, 10],
+      [4 - corner, 4 - corner, 10],
+      [0, 10, 10],
+    ];
+    const byEdge = execute(rounded.document, 'fillet_edge', {
+      id,
+      edgesNear: near,
+      radius: 1,
+      radiusEnd: 3,
+      chain: { startNear: [20, 0, 10] },
+    });
+    expect(byEdge.rejected, byEdge.summary).toBeUndefined();
+    const byFaces = execute(rounded.document, 'fillet_faces', {
+      id,
+      facesA: { near: [[10, 10, 10]] },
+      facesB: {
+        near: [
+          [0, 10, 5],
+          [10, 0, 5],
+          [4 - corner, 4 - corner, 5],
+        ],
+      },
+      radius: 1,
+      radiusEnd: 3,
+      startNear: [20, 0, 10],
+    });
+    expect(byFaces.rejected, byFaces.summary).toBeUndefined();
+    const [a, b] = [volume(byEdge.document, byEdge.affected[0] as string), volume(byFaces.document, byFaces.affected[0] as string)];
+    expect(Math.abs(a - b)).toBeLessThan(1e-6);
+    expect(volume(rounded.document, id) - a).toBeGreaterThan(1);
+    // the line along y = 0 and the line along x = 0 are not one chain without the arc between them
+    const apart = execute(rounded.document, 'fillet_edge', { id, edgesNear: [near[0], near[2]], radius: 1, radiusEnd: 3, chain: {} });
+    expect(apart.error?.code).toBe('BLD_CHAIN_UNSUPPORTED');
+  });
 });
