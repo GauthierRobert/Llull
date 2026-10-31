@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <ChFiDS_Stripe.hxx>
 #include <Law_BSpline.hxx>
 #include <Law_BSpFunc.hxx>
@@ -73,6 +74,43 @@ Handle(Law_BSpFunc) hermite_piece(const Knot &from, double from_slope, const Kno
   multiplicities(2) = 4;
   Handle(Law_BSpline) curve = new Law_BSpline(poles, knots, multiplicities, 3);
   return new Law_BSpFunc(curve, from.position, to.position);
+}
+
+// OCCT reads the relative position of a node of an edge as a fraction of the edge's PARAMETER range (measured: native test nativeBlendChainEdges), which is
+// not the fraction of its length where the curve does not run at a steady speed (an ellipse, a B-spline). A law is given along the edge's ARC length, so a node at
+// the arc fraction `arc` is placed at the parameter fraction of that point.
+double parameter_fraction(const BRepAdaptor_Curve &curve, double length, double arc) {
+  if (arc <= 0.0) return 0.0;
+  if (arc >= 1.0) return 1.0;
+  const double first = curve.FirstParameter(), last = curve.LastParameter();
+  const GCPnts_AbscissaPoint point(curve, arc * length, first);
+  if (!point.IsDone() || !(last > first)) return arc;
+  return std::min(1.0, std::max(0.0, (point.Parameter() - first) / (last - first)));
+}
+
+// Pieces a straight stretch between two nodes is cut into on an edge of uneven speed: a straight piece in the parameter is not straight in the arc length, so
+// the stretch becomes this many pieces whose nodes lie on the straight line in the arc length (a gap of about 1 / 256 x the curvature of the map x 1/8).
+constexpr int STRAIGHT_PIECES = 16;
+
+// The nodes (arc fraction, radius) of a law along `edge` as the nodes OCCT reads (parameter fraction, radius); a straight law is cut into STRAIGHT_PIECES per stretch where the speed is uneven.
+std::vector<gp_Pnt2d> parameter_nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &nodes, LawKind kind) {
+  const BRepAdaptor_Curve curve(edge);
+  const double length = GCPnts_AbscissaPoint::Length(curve, curve.FirstParameter(), curve.LastParameter());
+  if (!(length > Precision::Confusion())) return nodes;
+  double unevenness = 0.0;
+  for (const double arc : {0.25, 0.5, 0.75}) unevenness = std::max(unevenness, std::abs(parameter_fraction(curve, length, arc) - arc));
+  if (unevenness < 1e-7) return nodes;
+  std::vector<gp_Pnt2d> out;
+  for (size_t k = 0; k < nodes.size(); ++k) {
+    if (kind == LawKind::Straight && k > 0)
+      for (int piece = 1; piece < STRAIGHT_PIECES; ++piece) {
+        const double share = static_cast<double>(piece) / STRAIGHT_PIECES;
+        out.emplace_back(parameter_fraction(curve, length, nodes[k - 1].X() + share * (nodes[k].X() - nodes[k - 1].X())),
+                         nodes[k - 1].Y() + share * (nodes[k].Y() - nodes[k - 1].Y()));
+      }
+    out.emplace_back(parameter_fraction(curve, length, nodes[k].X()), nodes[k].Y());
+  }
+  return out;
 }
 
 }  // namespace
@@ -154,12 +192,25 @@ void LawBuilder::add_edge(const TopoDS_Edge &edge) {
 
 LawFillet::LawFillet(const TopoDS_Shape &shape) : builder_(shape) {}
 
-// Whether the spine walks `edge` (the edge `index` of its contour) from its end to its start: the point of the walk at the start of the edge's stretch is the edge's own end.
+// Whether the spine walks `edge` (the edge `index` of its contour) from its end to its start. An open edge: the point of the walk at the start of the edge's
+// stretch is the edge's own end. A closed edge (own start = own end, a circle, a periodic spline) ties on the endpoints, so its direction is the walk's tangent
+// against the edge's own tangent at its start. No contour mixes a closed edge with others (its vertex would carry three edge ends, a branch OCCT does not chain
+// through), so this is the contour of that one edge, which the spine walks in the edge's own direction: pinned by the native asymmetric circle law test.
 static bool walked_backwards(const Handle(LawSpine) & spine, int index, const TopoDS_Edge &edge) {
   if (spine.IsNull()) return false;
-  const gp_Pnt walked_start = spine->Value(spine->FirstParameter(index)), walked_end = spine->Value(spine->LastParameter(index));
+  const double from = spine->FirstParameter(index);
+  const gp_Pnt walked_start = spine->Value(from), walked_end = spine->Value(spine->LastParameter(index));
   const BRepAdaptor_Curve curve(edge);
-  const gp_Pnt own_start = curve.Value(curve.FirstParameter()), own_end = curve.Value(curve.LastParameter());
+  gp_Pnt own_start, own_end;
+  gp_Vec own_tangent;
+  curve.D1(curve.FirstParameter(), own_start, own_tangent);
+  own_end = curve.Value(curve.LastParameter());
+  if (own_start.Distance(own_end) <= Precision::Confusion()) {
+    gp_Pnt at;
+    gp_Vec walked_tangent;
+    spine->D1(from, at, walked_tangent);
+    if (walked_tangent.Magnitude() > Precision::Confusion() && own_tangent.Magnitude() > Precision::Confusion()) return walked_tangent.Dot(own_tangent) < 0.0;
+  }
   return walked_start.Distance(own_end) + walked_end.Distance(own_start) + 1e-9 < walked_start.Distance(own_start) + walked_end.Distance(own_end);
 }
 
@@ -198,10 +249,11 @@ bool LawFillet::nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &node
   if (nodes.size() == 2 && kind == LawKind::Smooth) return range(edge, nodes.front().Y(), nodes.back().Y());
   const Slot target = slot(edge);
   if (target.spine.IsNull()) return false;
+  const std::vector<gp_Pnt2d> placed = parameter_nodes(edge, nodes, kind);
   if (target.reversed)
-    for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) target.spine->add_node(1. - it->X(), it->Y(), target.index, kind);
+    for (auto it = placed.rbegin(); it != placed.rend(); ++it) target.spine->add_node(1. - it->X(), it->Y(), target.index, kind);
   else
-    for (const gp_Pnt2d &node : nodes) target.spine->add_node(node.X(), node.Y(), target.index, kind);
+    for (const gp_Pnt2d &node : placed) target.spine->add_node(node.X(), node.Y(), target.index, kind);
   return true;
 }
 
