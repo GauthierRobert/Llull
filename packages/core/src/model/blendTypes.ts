@@ -36,6 +36,10 @@ export interface FaceBlendParams {
   readonly profile?: BlendProfile;
   /** The set whose far straight edge is a cliff edge (13.28): the ball touches it instead of being tangent to the face; absent = tangent on both. */
   readonly cliff?: 'A' | 'B';
+  /** Radius at the other end of the corner line of faces that do not meet (13.31): the circular blend tapers in a straight line, a cone; absent = constant. */
+  readonly radiusEnd?: number;
+  /** A point near the end of the corner line where `radius` applies (with `radiusEnd`); absent = the end first along the cross product of the outward normals. */
+  readonly startNear?: Vec3;
 }
 
 /** Fields of a `fullRound` recipe node besides `source` (BLD M4): the two parallel side faces and the center face the half-round consumes. */

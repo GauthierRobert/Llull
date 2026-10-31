@@ -292,8 +292,9 @@ describeNative('BLD M4 remainder: fillet_faces over face sets, curved faces and 
       radius: 1,
     });
     expect(apart.document).toBe(fused.doc);
-    expect(apart.error).toMatchObject({ code: 'BLD_FACE_BLEND_UNSUPPORTED', paths: ['facesA'] });
-    expect(apart.summary).toContain('share no sharp edge');
+    // the plate underside and the boss wall: a ball tangent to both has its contact off the boss face (13.31): refused with the measured reason
+    expect(apart.error).toMatchObject({ code: 'BLD_FACE_FILLET_NO_SOLUTION', paths: ['radius'] });
+    expect(apart.summary).toContain('contact lines leave them');
     const noEdge = execute(l.doc, 'fillet_faces', {
       id: l.id,
       facesA: { near: [[75, 50, 50]] },
@@ -306,7 +307,7 @@ describeNative('BLD M4 remainder: fillet_faces over face sets, curved faces and 
       radius: 2,
     });
     expect(noEdge.error?.code).toBe('BLD_FACE_BLEND_UNSUPPORTED');
-    expect(noEdge.summary).toContain('share no sharp edge');
+    expect(noEdge.summary).toContain('not on one plane (face 1 is tilted');
     const orphan = execute(l.doc, 'fillet_faces', { id: l.id, ...two, radius: 2, widthEnd: 3 });
     expect(orphan.error).toMatchObject({ code: 'BLD_BLEND_PARAMS', paths: ['widthEnd'] });
     const cylinder = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 10, anchor: 'base-center' });
