@@ -5,9 +5,10 @@
 
 import { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import type { Entity, Vec3 } from '@core/model/types';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
-import { unitsPerPixel } from '../cage/dragMath';
+import { type AxisLock, translateDelta, unitsPerPixel } from '../cage/dragMath';
 import { createFrameScheduler } from '../cage/frameScheduler';
 import { capturePointer, releasePointer } from '../pointerCapture';
 import { createWorldRay, type WorldRay } from '../worldRay';
@@ -16,7 +17,7 @@ import { cancelFaceDrag, commitFaceDrag, updateFaceDrag } from './faceEditAction
 import { dragStep, grabsHandle, HANDLE_GRAB_PX, HANDLE_PX, travelAlongAxis } from './faceDragMath';
 import { type DragRules, dragValue, pickFaceAt, snapPlanes } from './facePicking';
 import { pickableTriangles } from './faceTriangles';
-import { distance3 } from '@lib/vec3';
+import { distance3, len3 } from '@lib/vec3';
 
 const DRAG_THRESHOLD_PX = 3;
 /** Pixels within which a dragged length snaps to another face's plane. */
@@ -29,6 +30,8 @@ interface Press {
   readonly x: number;
   readonly y: number;
   readonly rules: DragRules;
+  /** The view direction at the press: a feature move drags in the plane through the picked point facing it. */
+  readonly view: Vec3;
   active: boolean;
 }
 
@@ -43,6 +46,8 @@ export function useFacePointer(entity: Entity | undefined): void {
     if (host === null) return undefined;
     const rayAt = createWorldRay(gl, camera);
     let press: Press | null = null;
+    let lock: AxisLock = null;
+    const forward = new THREE.Vector3();
     const hoverFrame = createFrameScheduler(
       (cb) => window.requestAnimationFrame(cb),
       (handle) => window.cancelAnimationFrame(handle),
@@ -62,11 +67,18 @@ export function useFacePointer(entity: Entity | undefined): void {
         event.preventDefault();
       };
       const picked = edit.pick;
+      if (edit.op === 'move_feature' && event.shiftKey && picked !== null && edit.entityId === target.id) {
+        const extra = pickFaceAt(source, ray);
+        if (extra !== null) edit.addFeatureFace(extra.pick.point, extra.region);
+        consume();
+        return;
+      }
       if (picked !== null && edit.entityId === target.id) {
         const unit = perPixel(picked.point, ray);
         const onHandle = grabsHandle(ray, picked.point, picked.normal, HANDLE_PX * unit, HANDLE_GRAB_PX * unit);
         const onFace = !onHandle && pickFaceAt(source, ray)?.region.some((index) => edit.region.includes(index)) === true;
         if (onHandle || onFace) {
+          camera.getWorldDirection(forward);
           press = {
             ray,
             pointerId: event.pointerId,
@@ -74,6 +86,7 @@ export function useFacePointer(entity: Entity | undefined): void {
             x: event.clientX,
             y: event.clientY,
             rules: { op: edit.op, pick: picked, step: 0, planes: snapPlanes(source, picked), planeTolerance: PLANE_SNAP_PX * unit },
+            view: [forward.x, forward.y, forward.z],
             active: false,
           };
           capturePointer(event.target, event.pointerId);
@@ -95,6 +108,15 @@ export function useFacePointer(entity: Entity | undefined): void {
         if (!press.active && Math.hypot(event.clientX - press.x, event.clientY - press.y) < DRAG_THRESHOLD_PX) return;
         press.active = true;
         const { pick } = press.rules;
+        if (press.rules.op === 'move_feature') {
+          const vector = translateDelta(
+            { ray: press.ray, origin: pick.point, axis: press.view },
+            rayAt(event.clientX, event.clientY),
+            lock,
+          );
+          if (vector !== null) updateFaceDrag(len3(vector), vector);
+          return;
+        }
         const travel = travelAlongAxis(pick.point, pick.normal, press.ray, rayAt(event.clientX, event.clientY));
         if (travel === null) return;
         const step = dragStep(pickableTriangles(target).size, event.altKey);
@@ -113,6 +135,7 @@ export function useFacePointer(entity: Entity | undefined): void {
     const finish = (event: PointerEvent, commit: boolean): void => {
       const held = press;
       press = null;
+      lock = null;
       if (held === null) return;
       releasePointer(held.target, held.pointerId);
       if (!held.active) return;
@@ -124,6 +147,12 @@ export function useFacePointer(entity: Entity | undefined): void {
     const onLostCapture = (): void => {
       if (press?.active === true) cancelFaceDrag();
       press = null;
+    };
+
+    const onKey = (event: KeyboardEvent): void => {
+      const key = event.key.toLowerCase();
+      if (press?.active === true && useFaceEditStore.getState().op === 'move_feature' && (key === 'x' || key === 'y' || key === 'z'))
+        lock = key;
     };
 
     // r3f's pointer-missed click would clear the entity selection (and so leave the mode); clicks belong to the handles here.
@@ -145,6 +174,7 @@ export function useFacePointer(entity: Entity | undefined): void {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerCancel);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       host.removeEventListener('pointerdown', onPointerDown, true);
       host.removeEventListener('click', onClick, true);
@@ -152,6 +182,7 @@ export function useFacePointer(entity: Entity | undefined): void {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerCancel);
+      window.removeEventListener('keydown', onKey, true);
       hoverFrame.cancel();
       unsubscribe();
       if (press?.active === true) cancelFaceDrag();

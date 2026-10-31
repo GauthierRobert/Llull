@@ -8,7 +8,7 @@ export type FaceKeyAction =
   | { readonly kind: 'exit' }
   | { readonly kind: 'op'; readonly op: FaceOp };
 
-const OP_KEYS: Readonly<Record<string, FaceOp>> = { '1': 'push_pull', '2': 'flush', '3': 'draft', '4': 'offset' };
+const OP_KEYS: Readonly<Record<string, FaceOp>> = { '1': 'push_pull', '2': 'flush', '3': 'draft', '4': 'offset', '5': 'move_feature' };
 
 export function faceKeyAction(key: string, state: { dragging: boolean; hasPick: boolean }): FaceKeyAction | null {
   const lower = key.toLowerCase();

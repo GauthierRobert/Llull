@@ -61,7 +61,7 @@ function Handle(): React.ReactElement | null {
     const distance = camera.position.distanceTo(group.getWorldPosition(new THREE.Vector3()));
     group.scale.setScalar(Math.max(1e-6, unitsPerPixel(distance, VIEWPORT_FOV_DEGREES, height) * HANDLE_PX));
   });
-  if (pick === null) return null;
+  if (pick === null || op === 'move_feature') return null;
   const shift = value !== null && op !== 'draft' ? value : 0;
   const position = [
     pick.point[0] + pick.normal[0] * shift,

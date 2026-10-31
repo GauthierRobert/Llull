@@ -94,6 +94,32 @@ export function planarRegion(
   return queue;
 }
 
+/**
+ * The smooth patch of a curved face: triangles connected to the start one through edges across which the normal turns by less than `cosine` (default
+ * about 36 degrees, so a tessellated bore or boss is one patch while a 90 degree corner stops it).
+ */
+export function smoothRegion(
+  triangles: readonly Triangle[],
+  adjacency: readonly (readonly number[])[],
+  start: number,
+  cosine = 0.8,
+): number[] {
+  const normals = triangles.map(triangleNormal);
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const here = normals[queue[head] as number];
+    if (here === null || here === undefined) continue;
+    for (const next of adjacency[queue[head] as number] ?? []) {
+      const there = normals[next];
+      if (seen.has(next) || there === null || there === undefined || dot3(here, there) < cosine) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return queue;
+}
+
 /** Normal of `triangle` turned to face the viewer looking along `ray` (a picked surface is seen from outside, so this is the outward normal). */
 export function viewerFacingNormal(triangle: Triangle, ray: PickRay): Vec3 | null {
   const n = triangleNormal(triangle);

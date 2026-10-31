@@ -9,7 +9,7 @@ import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { useDisposable } from '../../useDisposable';
 import { useFloatGeometry } from '../cage/useFloatGeometry';
 import { NET_COLORS } from './netPalette';
-import { isNurbsNetEntity, netAnchor, netSegments, poleBuffer } from './controlNet';
+import { isNurbsNetEntity, netAnchor, netSegments, poleBuffer, selectedPoleBuffer } from './controlNet';
 import { useNetPointer } from './useNetPointer';
 
 const POLE_PX = 7;
@@ -37,11 +37,16 @@ export function NurbsNetLayer(): React.ReactElement | null {
   const visible = useNurbsNetStore((s) => s.visible);
   const hover = useNurbsNetStore((s) => s.hover);
   const drag = useNurbsNetStore((s) => s.drag);
+  const selected = useNurbsNetStore((s) => s.selected);
   const sole = useSoleSelectedEntity();
   const invalidate = useThree((s) => s.invalidate);
   const target = visible && isNurbsNetEntity(sole) ? sole : undefined;
   useNetPointer(target);
-  useEffect(() => invalidate(), [hover, drag, target, invalidate]);
+  // the selected poles belong to one entity: another entity (or the net turned off) starts with none
+  useEffect(() => {
+    useNurbsNetStore.getState().setSelected([]);
+  }, [target?.id]);
+  useEffect(() => invalidate(), [hover, drag, selected, target, invalidate]);
 
   const shown = drag !== null && drag.entityId === target?.id && drag.preview !== null ? drag.preview : target;
   const buffers = useMemo(() => {
@@ -55,6 +60,11 @@ export function NurbsNetLayer(): React.ReactElement | null {
     return grabbed === null ? null : poleBuffer(shown, buffers.anchor, grabbed);
   }, [shown, buffers, drag?.pole, hover]);
 
+  const chosen = useMemo(
+    () => (shown === undefined || buffers === null ? null : selectedPoleBuffer(shown, buffers.anchor, selected)),
+    [shown, buffers, selected],
+  );
+
   if (target === undefined || buffers === null) return null;
   const { position, rotation } = target;
   return (
@@ -62,6 +72,7 @@ export function NurbsNetLayer(): React.ReactElement | null {
       <group position={buffers.anchor}>
         <Segments positions={buffers.lines} color={NET_COLORS.net} />
         <Dots positions={buffers.poles} color={NET_COLORS.pole} size={POLE_PX} />
+        {chosen !== null && <Dots positions={chosen} color={NET_COLORS.selected} size={POLE_PX + 4} />}
         {marked !== null && <Dots positions={marked} color={drag === null ? NET_COLORS.hover : NET_COLORS.drag} size={POLE_PX + 5} />}
       </group>
     </group>

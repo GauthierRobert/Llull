@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type Entity, type Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
+import type { Triangle } from '@core/geometry/triangles';
 import { draftAngle, canEditFaces, faceCommand, formatFaceValue, type FacePick } from '@ui/viewport/3d/faceEdit/faceEditModel';
 import { faceKeyAction } from '@ui/viewport/3d/faceEdit/faceEditKeys';
 import { grabsHandle, rayToSegmentDistance, snapFaceValue, travelAlongAxis } from '@ui/viewport/3d/faceEdit/faceDragMath';
@@ -161,5 +162,57 @@ describe('face keys', () => {
     expect(faceKeyAction('3', { dragging: false, hasPick: false })).toEqual({ kind: 'op', op: 'draft' });
     expect(faceKeyAction('3', { dragging: true, hasPick: true })).toBeNull();
     expect(faceKeyAction('q', { dragging: false, hasPick: false })).toBeNull();
+  });
+});
+
+/** z component of the unit normal of a triangle: 0 on a vertical wall. */
+function cross(triangle: Triangle): number {
+  const [a, b, c] = triangle;
+  const n = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const length = Math.hypot(
+    ...[0, 1, 2].map(
+      (k) =>
+        ((b[(k + 1) % 3] as number) - (a[(k + 1) % 3] as number)) * ((c[(k + 2) % 3] as number) - (a[(k + 2) % 3] as number)) -
+        ((b[(k + 2) % 3] as number) - (a[(k + 2) % 3] as number)) * ((c[(k + 1) % 3] as number) - (a[(k + 1) % 3] as number)),
+    ),
+  );
+  return length === 0 ? 0 : n / length;
+}
+
+describe('curved faces and feature moves', () => {
+  const made = execute(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 10 });
+  const cylinder = made.document.entities[made.affected[0] as string] as Entity;
+  const round = entityToTriangles(cylinder, { components: {} });
+  const roundSource = { triangles: round, adjacency: triangleAdjacency(round), size: diagonalOf(round) };
+
+  it('a pick on the wall of a cylinder highlights the whole wall (a smooth patch), not the one facet nor the caps', () => {
+    const origin: Vec3 = [cylinder.position[0] + 30, cylinder.position[1], cylinder.position[2]];
+    const picked = pickFaceAt(roundSource, { origin, direction: [-1, 0, 0] });
+    expect(picked).not.toBeNull();
+    const region = picked?.region ?? [];
+    expect(region.length).toBeGreaterThan(8);
+    // every triangle of the patch is on the wall: no z-normal (cap) triangle
+    expect(region.every((index) => Math.abs(cross(round[index] as Triangle)) < 1e-6)).toBe(true);
+    expect(region.length).toBeLessThan(round.length);
+  });
+
+  it('a feature move is ONE move_faces translate naming the picked face and every Shift-clicked face; it waits for a drag vector', () => {
+    const pick: FacePick = { point: [1, 2, 3], normal: [1, 0, 0], lever: 0 };
+    expect(faceCommand('move_feature', 'e1', pick, 4, { also: [[1, 2, 0]], vector: null })).toBeNull();
+    expect(faceCommand('move_feature', 'e1', pick, 4)).toBeNull();
+    expect(faceCommand('move_feature', 'e1', pick, 0, { also: [], vector: [0, 0, 0] })).toBeNull();
+    expect(faceCommand('move_feature', 'e1', pick, 4, { also: [[1, 2, 0]], vector: [4, 0, 0] })).toEqual({
+      name: 'move_faces',
+      params: {
+        id: 'e1',
+        facesNear: [
+          [1, 2, 3],
+          [1, 2, 0],
+        ],
+        mode: 'translate',
+        vector: [4, 0, 0],
+      },
+    });
+    expect(faceKeyAction('5', { dragging: false, hasPick: false })).toEqual({ kind: 'op', op: 'move_feature' });
   });
 });

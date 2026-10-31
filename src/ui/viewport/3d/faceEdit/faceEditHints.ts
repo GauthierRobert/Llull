@@ -7,9 +7,12 @@ const DRAG_HINT: Readonly<Record<FaceOp, string>> = {
   flush: 'Release to move the face onto the plane; it snaps to other faces; Esc cancels',
   draft: 'Release to draft the face about the lowest edge; Esc cancels',
   offset: 'Release to offset the face; Alt = free, Esc cancels',
+  move_feature: 'Release to move the feature; X / Y / Z lock an axis, Esc cancels',
 };
 
 export function faceHint(op: FaceOp, picked: boolean, dragging: boolean): string {
   if (dragging) return DRAG_HINT[op];
-  return picked ? 'Drag the arrow (or the face) along its normal; Esc clears the pick' : '1-4 choose the operation; Esc leaves';
+  if (picked && op === 'move_feature')
+    return 'Shift-click the other faces of the feature, then drag one in the view plane; Esc clears the pick';
+  return picked ? 'Drag the arrow (or the face) along its normal; Esc clears the pick' : '1-5 choose the operation; Esc leaves';
 }

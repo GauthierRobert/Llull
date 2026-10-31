@@ -4,7 +4,15 @@ import type { Vec3 } from '@core/model/types';
 import { dot3 } from '@lib/vec3';
 import { draftAngle, type FaceOp, type FacePick } from './faceEditModel';
 import { snapFaceValue } from './faceDragMath';
-import { heightAbove, parallelPlaneOffsets, planarRegion, raycastTriangles, viewerFacingNormal, type PickRay } from './faceMesh';
+import {
+  heightAbove,
+  parallelPlaneOffsets,
+  planarRegion,
+  raycastTriangles,
+  smoothRegion,
+  viewerFacingNormal,
+  type PickRay,
+} from './faceMesh';
 import type { PickableTriangles } from './faceTriangles';
 
 const UP: Vec3 = [0, 0, 1];
@@ -22,9 +30,12 @@ export function pickFaceAt(source: PickableTriangles, ray: PickRay): FacePicked 
   if (hit === null || triangle === undefined) return null;
   const normal = viewerFacingNormal(triangle, ray);
   if (normal === null) return null;
+  // a coplanar patch of at most two triangles (one facet of a tessellated bore, boss or sphere) that is smoothly joined to its neighbours is a curved face
+  const planar = planarRegion(source.triangles, source.adjacency, hit.index);
+  const smooth = planar.length > 2 ? planar : smoothRegion(source.triangles, source.adjacency, hit.index);
   return {
     pick: { point: hit.point, normal, lever: Math.max(0, heightAbove(source.triangles, UP, hit.point)) },
-    region: planarRegion(source.triangles, source.adjacency, hit.index),
+    region: smooth.length > planar.length ? smooth : planar,
   };
 }
 

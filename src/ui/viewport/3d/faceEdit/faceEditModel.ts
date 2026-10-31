@@ -4,7 +4,7 @@
 import type { Entity, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
 
-export type FaceOp = 'push_pull' | 'flush' | 'draft' | 'offset';
+export type FaceOp = 'push_pull' | 'flush' | 'draft' | 'offset' | 'move_feature';
 
 export interface FaceOpSpec {
   readonly op: FaceOp;
@@ -22,7 +22,18 @@ export const FACE_OPS: readonly FaceOpSpec[] = [
     tip: 'Move a planar face onto a parallel plane; snaps to other faces (replace_face)',
   },
   { op: 'draft', label: 'Draft', unit: 'angle', tip: 'Tilt a face about the parting line at the bottom (draft_faces)' },
-  { op: 'offset', label: 'Offset', unit: 'length', tip: 'Offset a face and extend its neighbours (move_faces)' },
+  {
+    op: 'offset',
+    label: 'Offset',
+    unit: 'length',
+    tip: 'Offset a face (a plane, or a bore / boss wall: widen or thicken it) and extend its neighbours (move_faces)',
+  },
+  {
+    op: 'move_feature',
+    label: 'Move feature',
+    unit: 'length',
+    tip: 'Move a hole, boss or pocket as a whole: pick its wall, Shift-click its other faces, drag in the view plane (move_faces translate)',
+  },
 ];
 
 /** The face the user picked: a point on it (world) and its outward unit normal. */
@@ -75,7 +86,13 @@ export function draftAngle(offset: number, lever: number): number {
 const isIdleFaceValue = (op: FaceOp, value: number): boolean => Math.abs(value) < (op === 'draft' ? 1e-3 : 1e-6);
 
 /** The command a drag value commits, or null for an idle value. For `draft`, `value` is the angle in degrees. */
-export function faceCommand(op: FaceOp, entityId: string, pick: FacePick, value: number): FaceCommand | null {
+/** What a feature move adds to the pick: the other faces of the feature (a point on each) and the displacement of the drag. */
+export interface FeatureMove {
+  readonly also: readonly Vec3[];
+  readonly vector: Vec3 | null;
+}
+
+export function faceCommand(op: FaceOp, entityId: string, pick: FacePick, value: number, feature?: FeatureMove): FaceCommand | null {
   if (isIdleFaceValue(op, value)) return null;
   const faceNear = roundVec(pick.point);
   switch (op) {
@@ -94,6 +111,18 @@ export function faceCommand(op: FaceOp, entityId: string, pick: FacePick, value:
       return { name: 'draft_faces', params: { id: entityId, facesNear: [faceNear], angle: round(value) } };
     case 'offset':
       return { name: 'move_faces', params: { id: entityId, facesNear: [faceNear], mode: 'offset', distance: round(value) } };
+    case 'move_feature':
+      return feature?.vector === null || feature === undefined
+        ? null
+        : {
+            name: 'move_faces',
+            params: {
+              id: entityId,
+              facesNear: [faceNear, ...feature.also.map(roundVec)],
+              mode: 'translate',
+              vector: roundVec(feature.vector),
+            },
+          };
   }
 }
 
