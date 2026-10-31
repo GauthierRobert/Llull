@@ -89,7 +89,8 @@ fn what_it_cannot_build_is_refused_with_the_reason() {
     let reason = |edges: &[u32], first: f64, last: f64| chamfer_variable_reason(&part, edges, &[], first, last, f64::NAN, f64::NAN).unwrap();
     assert!(reason(&[top], 1.0, 2.0).is_empty());
     assert!(reason(&[], 1.0, 2.0).contains("listed"));
-    assert!(reason(&[top, side], 1.0, 2.0).contains("meet at a vertex"));
+    // edges that share a vertex build: the tools overlap and the mitre is the corner (13.25)
+    assert!(reason(&[top, side], 1.0, 2.0).is_empty());
     assert!(reason(&[top, top], 1.0, 2.0).contains("twice"));
     assert!(reason(&[top], 1.0, 6.0).contains("reaches past the faces"));
     assert!(reason(&[top], 0.0, 2.0).contains("> 0"));

@@ -116,7 +116,7 @@ describeNative('BLD M5: variable chamfer and per-joint blend_union radii (native
     expect(volume(done.doc, done.id)).toBeCloseTo(plain + 0.5 * 20 * (7 / 3), 6);
   });
 
-  it('refusals carry the reason and leave the document unchanged: a reach past the faces, edges that share a vertex, a closed edge (a full rim), a missing edge list', () => {
+  it('refusals carry the reason and leave the document unchanged: a reach past the faces, a closed edge (a full rim), a missing edge list', () => {
     const { doc, id } = block(1);
     const reach = execute(doc, 'chamfer_edge', { id, edgesNear: [[0, 5, 2.5]], distance: 1, distanceEnd: 6 });
     expect(reach.document).toBe(doc);
@@ -133,9 +133,8 @@ describeNative('BLD M5: variable chamfer and per-joint blend_union radii (native
       distance: 1,
       distanceEnd: 2,
     });
-    expect(corner.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED' });
-    expect(corner.error?.remediation).toContain('unlist edges that share a vertex');
-    expect(corner.summary).toContain('meet at a vertex');
+    // edges that share a vertex build since 13.25 (the mitre of the tools): nativeChamferCorner.test.ts
+    expect(corner.rejected, corner.summary).toBeUndefined();
     const pipe = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 10 });
     const rim = execute(pipe.doc, 'chamfer_edge', { id: pipe.id, edgesNear: [[5, 0, 5]], distance: 1, distanceEnd: 2 });
     expect(rim.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED' });

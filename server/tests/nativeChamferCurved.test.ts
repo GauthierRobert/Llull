@@ -357,7 +357,7 @@ describeNative('BLD M5: variable chamfer, asymmetric legs and curved edges (nati
     expect(Math.abs(volume(done.doc, done.id) - before - expected) / expected).toBeLessThan(1e-4);
   });
 
-  it('refuses by name: a closed edge, edges sharing a vertex, a leg past its face, and a law that does not fit', () => {
+  it('refuses by name: a closed edge, a leg past its face, and a law that does not fit', () => {
     const rim = must(createEmptyDocument(), 'add_cylinder', { radius: RADIUS, height: 10 });
     const circle = edges(rim.doc, rim.id).find((edge) => edge.curve === 'circle') as Edge;
     const closedEdge = execute(rim.doc, 'chamfer_edge', {
@@ -395,7 +395,7 @@ describeNative('BLD M5: variable chamfer, asymmetric legs and curved edges (nati
       distance: 1,
       distanceEnd: 2,
     });
-    expect(shared.error?.code).toBe('BLD_CHAMFER_FAILED');
-    expect(shared.summary).toContain('meet at a vertex');
+    // edges that share a vertex build (13.25: the mitre of the tools), see nativeChamferCorner.test.ts
+    expect(shared.rejected, shared.summary).toBeUndefined();
   });
 });

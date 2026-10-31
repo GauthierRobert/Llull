@@ -122,7 +122,7 @@ export function diagnoseBlend(report: BlendReport): BlendFailure | null {
 
 const REMEDIATION: Readonly<Record<BlendFailureCode, string>> = {
   BLD_CHAMFER_FAILED:
-    'use smaller distances (they must stay inside both faces along the whole edge), unlist edges that share a vertex, or use a constant chamfer (no distanceEnd); a variable chamfer needs straight edges between planar faces ending on flat square faces',
+    'use smaller distances (they must stay inside both faces along the whole edge), or use a constant chamfer (no distanceEnd); edges that meet at a vertex must be all convex or all concave; a variable chamfer ends on flat faces square to the edge',
   BLD_RADIUS_TOO_LARGE: 'use a smaller radius (probe_fillet returns the largest radius that builds), or fewer edges per step',
   BLD_WALKING_FAILURE: 'use a smaller radius or a smoother law, or split the chain (fillet in two steps)',
   BLD_TWISTED_SURFACE: 'reduce the radius law slope or the radius on concave faces',

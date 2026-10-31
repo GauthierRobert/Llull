@@ -249,7 +249,7 @@ describe('chamfer_edge distanceEnd (variable chamfer, BLD M5)', () => {
     expect(result.document).toBe(doc);
     expect(result.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED', ids: [id], paths: ['distanceEnd'] });
     expect(result.error?.remediation).toContain('use smaller distances');
-    expect(result.error?.remediation).toContain('unlist edges that share a vertex');
+    expect(result.error?.remediation).toContain('all convex or all concave');
     expect(result.error?.remediation).not.toContain('circular profile');
     expect(result.summary).toContain('the variable chamfer cannot be built: a distance of 6 reaches past the faces');
   });

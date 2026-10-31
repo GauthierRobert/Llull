@@ -22,6 +22,7 @@ import { filletEach } from './filletEach';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
 import { blendRejection } from './blendCodes';
+import { partialSchema, refusePartial } from './filletPartial';
 import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
@@ -112,7 +113,7 @@ function modifyEdges(
 /**
  * @affects removes source entity; creates 1 mesh entity with rounded edges
  * @invariant target must be a 3D solid; radius > 0; geometry kernel must be injected
- * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]
+ * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]; partial -> BLD_PARTIAL_UNSUPPORTED (a valid range) or BLD_LAW_INVALID (a bad range), see filletPartial.ts
  */
 export const filletEdge = defineCommand({
   name: 'fillet_edge',
@@ -189,6 +190,7 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     profile: profileSchema.optional(),
+    partial: partialSchema.optional(),
     mode: z
       .enum(FILLET_MODES)
       .describe(
@@ -200,9 +202,13 @@ export const filletEdge = defineCommand({
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners },
+    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners, partial },
     ctx,
   ): CommandResult => {
+    const target = validateSolidTarget(doc, 'fillet_edge', id);
+    if ('summary' in target) return target;
+    const refused = refusePartial(doc, id, partial);
+    if (refused !== null) return refused;
     if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
       return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile, corners });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
@@ -307,7 +313,7 @@ export const chamferEdge = defineCommand({
       .number()
       .describe(
         'Variable chamfer: the distance (the leg on side 1 when distance2 is given) at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d1(s) d2(s) ds). ' +
-          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge, with no two chosen edges sharing a vertex; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
+          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge; edges that meet at a vertex (the corner of a box with three edges) may be listed together when all are convex or all concave: the chamfer faces then meet along the mitre lines of their surfaces, without a separate corner face; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
       )
       .optional(),
   }),
