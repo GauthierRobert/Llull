@@ -20,20 +20,33 @@ export interface FaceRequest {
 
 export type FacePick =
   | { readonly faces: number[]; readonly record: string[] | null; readonly note: string }
-  | { readonly problem: string; readonly error?: CommandError };
+  | { readonly problem: string; readonly error?: CommandError; readonly nearIndex?: number };
 
 const REPICK_FACES =
   'Re-pick: edit_step_params on this step with new faceNames (inspect_topology lists the current face names), or remove faceNames to ' +
   'select by faceIndices / facesNear again.';
 
-function facesByPoint(kernel: GeometryKernel, shape: ShapeHandle, near: readonly Vec3[]): number[] | string {
+/** Faces picked by point, or the problem (with the index in `near` of the offending point, when one point caused it). */
+type PointPick = number[] | { readonly problem: string; readonly nearIndex?: number };
+
+function facesByPoint(kernel: GeometryKernel, shape: ShapeHandle, near: readonly Vec3[]): PointPick {
   if (near.length === 0) return [];
   const hits = kernel.faceQuery?.distance(shape, near) ?? null;
-  if (hits === null) return 'picking faces by point needs the exact face queries of the native kernel';
+  if (hits === null) return { problem: 'picking faces by point needs the exact face queries of the native kernel' };
   const mesh = kernel.tessellate(shape);
   const tolerance = 1e-3 * (mesh === null ? 1 : meshDiagonal(mesh)) + 1e-6;
   const far = hits.findIndex((hit) => hit.distance > tolerance);
-  if (far >= 0) return `point ${far} (${(near[far] ?? []).join(', ')}) is not on the solid (nearest face ${hits[far]?.distance} away)`;
+  if (far >= 0)
+    return {
+      problem: `point ${far} (${(near[far] ?? []).join(', ')}) is not on the solid (nearest face ${hits[far]?.distance} away)`,
+      nearIndex: far,
+    };
+  const unresolved = hits.findIndex((hit) => !Number.isInteger(hit.face) || hit.face < 0);
+  if (unresolved >= 0)
+    return {
+      problem: `point ${unresolved} (${(near[unresolved] ?? []).join(', ')}) resolves to no single face of the solid (a pole, a seam or a split face): move it onto the interior of one face`,
+      nearIndex: unresolved,
+    };
   return hits.map((hit) => hit.face);
 }
 
@@ -50,7 +63,7 @@ export function pickFaces(kernel: GeometryKernel, shape: ShapeHandle, topology: 
     };
   }
   const byPoint = facesByPoint(kernel, shape, request.near);
-  if (typeof byPoint === 'string') return { problem: byPoint };
+  if (!Array.isArray(byPoint)) return byPoint;
   const faces = [...new Set([...request.indices, ...byPoint])];
   if (faces.length === 0) return { problem: 'pick at least one face (faceIndices, facesNear or faceNames)' };
   const count = topology?.faces.length;

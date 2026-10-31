@@ -4,7 +4,7 @@ import { createEmptyDocument, type MeshSolidEntity } from '@core/model/types';
 import type { FaceOpParams } from '@core/model/faceOps';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
-import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
+import { getGeometryKernel, setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { kernelFromOps, type FaceQueryOps } from '@core/geometry/shapeKernel';
 import { validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { TETRA } from '../helpers/fakeKernel';
@@ -76,6 +76,19 @@ describe('face operations on an exact kernel', () => {
     const pulled = execute(box.document, 'push_pull_face', { id: box.affected[0], faceNear: [0, 0, 5], distance: -2 });
     expect(ops.at(-1)).toEqual({ kind: 'pushPull', faces: [0], distance: -2 });
     expect(pulled.summary).toMatch(/moved face 0 by -2/);
+  });
+
+  it('push_pull_face refuses a faceNear point that resolves to no face instead of sending face -1', () => {
+    const { ops } = exactKernel();
+    const box = boxDoc();
+    const kernel = getGeometryKernel() as GeometryKernel;
+    const query = kernel.faceQuery as unknown as { distance: (...args: unknown[]) => unknown };
+    query.distance = (_shape: unknown, points: readonly (readonly number[])[]) => points.map(() => ({ distance: 0, signed: 0, face: -1 }));
+    const pulled = execute(box.document, 'push_pull_face', { id: box.affected[0], faceNear: [0, 0, 5], distance: 1 });
+    expect(pulled.document).toBe(box.document);
+    expect(pulled.affected).toEqual([]);
+    expect(pulled.summary).toContain('resolves to no single face');
+    expect(ops).toEqual([]);
   });
 
   it('replace_face moves a planar face onto a parallel target plane, and refuses a tilted one', () => {
