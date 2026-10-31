@@ -392,7 +392,7 @@ describeNative('BLD M2 mitre ends: profile blends on creased tangent chains (nat
     expect(volume(edited.document, longer)).toBeGreaterThan(volume(done.doc, done.id));
   }, 300_000);
 
-  it('what is still refused is refused by name with the measured reason: a crease OCCT does not chain, a varying size on a creased chain, a corner of 8 sides', () => {
+  it('what is still refused is refused by name with the measured reason: a crease OCCT does not chain, a varying size on a creased chain; a corner of 8 sides builds with an oblique end', () => {
     // 0.1005 rad: OCCT does not chain the bends, the blend runs out onto the next wall
     const { outline, lower } = bar(0.1005, 1);
     const body = prism(outline, 10);
@@ -406,18 +406,16 @@ describeNative('BLD M2 mitre ends: profile blends on creased tangent chains (nat
     expect(unchained.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [body.id] });
     expect(unchained.summary).toContain('crease of 0.1005 rad');
     expect(unchained.summary).toContain('about 0.1 rad');
-    // 8 sides: a crease of 0.785 rad is a corner, not a chain
+    // 8 sides: a crease of 0.785 rad is a corner of the part; the blend of one rim edge ends obliquely on the next wall and is built (13.35)
     const octagon = regular(8, 50);
     const corner = prism(octagon, 20);
-    const sharp = execute(corner.doc, 'fillet_edge', {
+    const oblique = execute(corner.doc, 'fillet_edge', {
       id: corner.id,
       edgesNear: [sideNear(octagon, 0, 20)],
       radius: 1,
       profile: PROFILES[0].profile,
     });
-    expect(sharp.document).toBe(corner.doc);
-    expect(sharp.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [corner.id] });
-    expect(sharp.summary).toMatch(/runs out onto the next flat face at a crease of 0\.7\d* rad|away from square/);
+    expect(oblique.error, oblique.summary).toBeUndefined();
     // a varying size on a creased chain: OCCT's variable-radius fillet cannot round it, so there is no circular blend to cut the profile from
     const points = regular(64, 50);
     const rim = prism(points, 20);

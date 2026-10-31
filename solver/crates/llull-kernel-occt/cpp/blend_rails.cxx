@@ -101,6 +101,12 @@ constexpr double kSewingFraction = 1e-6, kSewingCap = 1e-3;
 constexpr double kRailAngle = 5e-3;
 // Parameter values closer than this fraction of the face's parameter range are the same iso-line.
 constexpr double kIsoFraction = 1e-6;
+// An end face is oblique when it meets the direction of the blend at a crease (angle between the direction and the end plane) of at least this many radians (about 29
+// degrees, so at most 61 degrees from square); below it the end is a crease OCCT did not chain. The two contact lines of a blend with an oblique end must overlap along
+// more than this fraction of the blend face's parameter length.
+constexpr double kMinObliqueCrease = 0.5, kMinCoreFraction = 1e-3;
+// The skin of a blend with an oblique end runs this fraction of the blend's parameter span past the end of the circular blend's own patch.
+constexpr double kObliqueMargin = 0.03;
 
 gp_Vec face_normal(const BRepAdaptor_Surface &surface, const gp_Pnt2d &uv) {
   gp_Pnt point;
@@ -205,6 +211,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   const auto value = [&](const gp_Pnt2d &uv, int coordinate) { return coordinate == 0 ? uv.X() : uv.Y(); };
   std::vector<double> values;
   double lo = 1e300, hi = -1e300;
+  double rail_lo[2] = {1e300, 1e300}, rail_hi[2] = {-1e300, -1e300};
   for (const Item &rail : rails) {
     if (!iso(rail, across_coordinate) || iso(rail, along_coordinate)) {
       why = "a contact line of the blend is not an iso-line of its surface";
@@ -216,7 +223,11 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
     if (known == values.end()) values.push_back(v);
     const double piece_lo = std::min(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
     const double piece_hi = std::max(value(rail.from, along_coordinate), value(rail.to, along_coordinate));
-    if (cluster < 2) blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi, rail.edge});
+    if (cluster < 2) {
+      blend.supports[cluster].push_back({rail.neighbour, piece_lo, piece_hi, rail.edge});
+      rail_lo[cluster] = std::min(rail_lo[cluster], piece_lo);
+      rail_hi[cluster] = std::max(rail_hi[cluster], piece_hi);
+    }
     lo = std::min(lo, piece_lo);
     hi = std::max(hi, piece_hi);
   }
@@ -228,28 +239,51 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   blend.across[1] = values[1];
   blend.lo = lo;
   blend.hi = hi;
+  blend.core[0] = std::max(rail_lo[0], rail_lo[1]);
+  blend.core[1] = std::min(rail_hi[0], rail_hi[1]);
   for (const Item &other : others) {
+    bool oblique = false;
     if (!iso(other, along_coordinate)) {
       why = "the blend ends obliquely on a neighbouring face (profile blends end on a face square to the blend, or on the next blend of a chain)";
-      if (BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane) {
+      const bool flat = !other.is_blend && BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane;
+      gp_Pnt at;
+      gp_Vec du, dv;
+      surface.D1(0.5 * (other.from.X() + other.to.X()), 0.5 * (other.from.Y() + other.to.Y()), at, du, dv);
+      const gp_Vec direction = blend.across_is_u ? dv : du;
+      if (flat && direction.Magnitude() > 1e-14) {
         // The end face against the direction of the blend: parallel to it (0 rad) is a crease of the picked contour that OCCT did not chain with the
-        // next edge (it chains them below about 0.1 rad), perpendicular is the square end the builder wants.
-        gp_Pnt at;
-        gp_Vec du, dv;
-        surface.D1(0.5 * (other.from.X() + other.to.X()), 0.5 * (other.from.Y() + other.to.Y()), at, du, dv);
-        const gp_Vec direction = blend.across_is_u ? dv : du;
-        if (direction.Magnitude() > 1e-14) {
-          const double crease = std::asin(std::min(1.0, std::fabs(direction.Normalized().Dot(normal_of(other.neighbour)))));
-          why += crease < 0.5 ? ": it runs out onto the next flat face at a crease of " + number(crease) +
-                                    " rad, which OCCT did not chain with it (OCCT chains the edges of a contour across creases of up to about 0.1 rad)"
-                              : ": its end is " + number(kPi / 2 - crease) + " rad away from square on a flat face";
+        // next edge (it chains them below about 0.1 rad); perpendicular is a square end. In between the end is oblique and the skin is cut by its plane (13.35).
+        const double crease = std::asin(std::min(1.0, std::fabs(direction.Normalized().Dot(normal_of(other.neighbour)))));
+        if (crease < kMinObliqueCrease) {
+          why += ": it runs out onto the next flat face at a crease of " + number(crease) +
+                 " rad, which OCCT did not chain with it (OCCT chains the edges of a contour across creases of up to about " + number(0.1) +
+                 " rad, and a blend ending less than " + number(kMinObliqueCrease) + " rad from the face's plane is not cut by it)";
+          return false;
         }
+        oblique = true;
+      } else {
+        if (!flat && !other.is_blend) {
+          // the curved end face is not trimmed: the measured angle of the face's normal from the direction of the blend
+          const gp_Pnt2d on = [&] {
+            gp_Pnt2d uv;
+            return mid_uv(other.edge, other.neighbour, uv) ? uv : gp_Pnt2d(0, 0);
+          }();
+          const gp_Vec normal = face_normal(BRepAdaptor_Surface(other.neighbour, Standard_False), on);
+          if (direction.Magnitude() > 1e-14 && normal.Magnitude() > 0.5)
+            why += ": its end face is curved (not trimmed; only a flat end face is) and its normal is " +
+                   number(std::acos(std::min(1.0, std::fabs(direction.Normalized().Dot(normal))))) + " rad from the direction of the blend there";
+        }
+        return false;
       }
+    }
+    const double at = oblique ? 0.5 * (value(other.from, along_coordinate) + value(other.to, along_coordinate)) : value(other.from, along_coordinate);
+    const double tolerance = kIsoFraction * range[along_coordinate];
+    const double middle = 0.5 * (lo + hi);
+    const int side = oblique ? (at < middle ? 0 : 1) : (std::fabs(at - lo) <= tolerance ? 0 : (std::fabs(at - hi) <= tolerance ? 1 : -1));
+    if (oblique && (value(other.from, along_coordinate) < middle) != (value(other.to, along_coordinate) < middle)) {
+      why = "an oblique end of the blend runs across the middle of the blend (the end face cuts the blend in two)";
       return false;
     }
-    const double at = value(other.from, along_coordinate);
-    const double tolerance = kIsoFraction * range[along_coordinate];
-    const int side = std::fabs(at - lo) <= tolerance ? 0 : (std::fabs(at - hi) <= tolerance ? 1 : -1);
     if (side < 0 || !blend.end[side].IsNull()) {
       why = "the blend face has an edge that is neither a contact line nor one clean end";
       return false;
@@ -259,6 +293,7 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
       return false;
     }
     blend.end[side] = other.edge;
+    blend.oblique[side] = oblique;
     (other.is_blend ? blend.end_blend[side] : blend.end_face[side]) = other.neighbour;
   }
   blend.closed = blend.end[0].IsNull() && blend.end[1].IsNull();
@@ -268,6 +303,11 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   }
   if (blend.end[0].IsNull() != blend.end[1].IsNull() || (!blend.closed && seam)) {
     why = "the blend face has only one end";
+    return false;
+  }
+  if ((blend.oblique[0] || blend.oblique[1]) && !(blend.core[1] - blend.core[0] > kMinCoreFraction * (hi - lo))) {
+    why = "the oblique end faces cut the two contact lines of the blend to nothing (they overlap along " + number(blend.core[1] - blend.core[0]) +
+          " of the " + number(hi - lo) + " parameter length of the blend face)";
     return false;
   }
   return true;
@@ -552,6 +592,27 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
   std::vector<Blend> faces(static_cast<size_t>(blends.Extent()));
   for (int b = 1; b <= blends.Extent(); ++b)
     if (!analyse(TopoDS::Face(blends(b)), edge_faces, blends, faces[static_cast<size_t>(b - 1)], why)) return nullptr;
+  for (Blend &blend : faces)
+    for (int side = 0; side < 2; ++side)
+      if (blend.oblique[side]) {
+        blend.end_point[side] = BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side]));
+        blend.end_normal[side] = outward_normal(circular, blend.end_face[side]);
+      }
+  for (Blend &blend : faces) {
+    blend.reach[0] = blend.lo;
+    blend.reach[1] = blend.hi;
+    if (!blend.oblique[0] && !blend.oblique[1]) continue;
+    // The conic hugs its supports closer than the circle: its cut by an end plane can lie past the end of the circular blend's own patch, so the skin runs a
+    // margin further (as far as the surface goes when it is not periodic).
+    const BRepAdaptor_Surface surface(blend.face, Standard_False);
+    const bool periodic = blend.across_is_u ? surface.IsVPeriodic() : surface.IsUPeriodic();
+    const double first = blend.across_is_u ? surface.FirstVParameter() : surface.FirstUParameter(), last = blend.across_is_u ? surface.LastVParameter() : surface.LastUParameter();
+    const double margin = kObliqueMargin * (blend.hi - blend.lo);
+    if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin : std::max(first, blend.lo - margin);
+    if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin : std::min(last, blend.hi + margin);
+  }
+  for (const Blend &blend : faces)
+    if ((blend.oblique[0] || blend.oblique[1]) && !check_extension(blend, kGapLimit * diagonal, why)) return nullptr;
 
   // Convex blends have the rolling ball inside the material, concave ones outside: a step that mixes them is not checked against the circular volume.
   BRepClass3d_SolidClassifier classifier(circular);
@@ -562,7 +623,7 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     // nothing about the convexity. A centre that is ON is skipped as well.
     for (int j = blend.closed ? 0 : 1; j < kFirstStations; ++j) {
       Section station;
-      if (!section_at(surface, blend, blend.lo + (blend.hi - blend.lo) * j / kFirstStations, false, 0.5, station, why)) return nullptr;
+      if (!section_at(surface, blend, blend.core[0] + (blend.core[1] - blend.core[0]) * j / kFirstStations, false, 0.5, station, why)) return nullptr;
       classifier.Perform(station.centre, 1e-9 * diagonal);
       if (classifier.State() == TopAbs_IN) any_convex = true;
       else if (classifier.State() == TopAbs_OUT) any_concave = true;
@@ -625,9 +686,16 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
       why = "the blend surface could not be turned into a face";
       return nullptr;
     }
-    skinned.push_back(made.Face());
+    Handle(Geom_Curve) end_curves[2];
+    if (blend.oblique[0] || blend.oblique[1]) {
+      TopoDS_Face trimmed;
+      if (!trim_oblique(made.Face(), blend, diagonal, kGapLimit * diagonal, trimmed, end_curves, why)) return nullptr;
+      skinned.push_back(trimmed);
+    } else {
+      skinned.push_back(made.Face());
+    }
     for (int side = 0; side < 2; ++side)
-      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], surface->VIso(side == 0 ? v0 : v1), {}});
+      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}});
     // The rails of a mitred blend end at new points: the support faces take the rail curves of the new surface between a shared vertex at each mitre.
     for (int rail = 0; rail < 2; ++rail) {
       bool moves[2];

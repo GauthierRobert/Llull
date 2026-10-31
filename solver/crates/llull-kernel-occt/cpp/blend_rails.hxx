@@ -54,6 +54,11 @@ struct Blend {
   TopoDS_Edge end[2];           // the section edge at lo / hi (null: none)
   TopoDS_Face end_face[2];      // its neighbour when that is a flat end face to rebuild (null: another blend of the chain)
   TopoDS_Face end_blend[2];     // its neighbour when that is the next blend of the chain
+  bool oblique[2] = {false, false};  // the end edge is not an iso-line: the end face is flat but not square to the blend; the skin runs to the farther rail's end and is cut by its plane (13.35)
+  double core[2] = {0, 0};      // the range along which both rails exist (lo / hi unless an end is oblique)
+  double reach[2] = {0, 0};     // oblique ends: lo / hi as the rails give them, before lo / hi are widened by kObliqueMargin of the span
+  gp_Pnt end_point[2];          // oblique ends: a point of the end plane and its outward normal (set from the circular solid)
+  gp_Vec end_normal[2];
   std::vector<RailPiece> supports[2];  // the support faces along each rail
   Mitre mitre[2];
 };
@@ -119,6 +124,17 @@ struct FaceEdit {
 
 // `edit.face` with every replacement applied (new pcurves on its plane); false with the reason in `why`.
 bool rebuild_face(const FaceEdit &edit, TopoDS_Face &out, std::string &why);
+
+// The contact lines of a blend with an oblique end are read from the circular blend's surface past the end of the shorter one (13.35): that extension must
+// still lie on the support faces, to `limit`. False with the measured deviation in `why` (OCCT extends a surface of a varying size by extrapolation, which
+// leaves the supports).
+bool check_extension(const Blend &blend, double limit, std::string &why);
+
+// The skin of a blend with an oblique end (13.35): `skin_face` runs past each oblique end plane; it is cut back to the solid's side of the plane (a box on the
+// outer side), which leaves ONE face and, per oblique end, one curve in the plane: the new end edge, returned in `end_curves[side]`. The contact lines must
+// meet that curve where the circular blend's own end edge has its vertices, to `gap_limit`. `diagonal` scales the cutting boxes. False with the reason in `why`.
+bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diagonal, double gap_limit, TopoDS_Face &trimmed,
+                  Handle(Geom_Curve) (&end_curves)[2], std::string &why);
 
 }  // namespace rails
 }  // namespace blend

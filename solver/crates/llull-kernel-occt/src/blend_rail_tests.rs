@@ -260,7 +260,7 @@ fn profile_blends_run_on_cones_and_acute_wedges() {
 #[test]
 fn what_the_rail_builder_cannot_make_is_named() {
     let _serial = crate::serial_blends();
-    // a blend of a varying size that ends obliquely on its neighbour (a constant size on a straight edge is the prism builder's, blend_end_tests.rs)
+    // a blend of a varying size whose oblique end needs the extension past the end of the edge (blend_rail_end_tests.rs builds the ones that do not)
     let mut chain = Vec::new();
     let parallelogram = [[0.0, 0.0], [10.0, 0.0], [14.0, 6.0], [4.0, 6.0]];
     for k in 0..4 {
@@ -271,7 +271,7 @@ fn what_the_rail_builder_cannot_make_is_named() {
     let skew = crate::features::prism_of_face(&face, [0.0, 0.0, 3.0]).unwrap().unwrap();
     let front = edges_where(&skew, |e| num(&e["mid"][2]) > 2.9 && num(&e["mid"][1]).abs() < 1e-9);
     let why = blend(&skew, &front, &[0.4, 0.6, 0.0, 0.0], 0.0, 0.5).err().unwrap();
-    assert!(why.contains("obliquely"), "{why}");
+    assert!(why.contains("does not continue past the end of the edge"), "{why}");
     // a size no circular fillet can have
     let slab = make_box([0.0; 3], [20.0, 20.0, 4.0]).unwrap().unwrap();
     let top = edges_where(&slab, |e| (num(&e["mid"][2]) - 4.0).abs() < 1e-9);
