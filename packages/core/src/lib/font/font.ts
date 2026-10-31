@@ -8,7 +8,9 @@
 import { readCff } from './cff';
 import { FONT_OPERATOR_BUDGET } from './type2';
 import { buildCmap } from './cmap';
-import { glyphContours, type GlyphSource } from './glyf';
+import { glyphContours, phantomAdvanceDelta, type GlyphSource } from './glyf';
+import { readGvar } from './gvar';
+import { readMetricDeltas } from './mvar';
 import { buildGposKerning } from './gpos';
 import { buildKerning } from './kern';
 import { isStrokeFont, readStrokeFont } from './stroke';
@@ -104,21 +106,38 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
   const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
   const cffTable = tables.flavor === 'cff' ? (tables.table('CFF ') ?? requireTable(tables, 'CFF2')) : null;
   const variable = cffTable !== null && cffTable.u8(0) === 2;
+  const gvarTable = cffTable === null ? tables.table('gvar') : null;
+  const variableGlyf = gvarTable !== null && space !== null;
+  const varying = variable || variableGlyf;
   if (Object.keys(variation).length > 0 && space === null)
     throw new FontError('WRP_FONT_VARIATION', 'variation: the font has no variation axes (no fvar table)');
   const instance = space === null ? {} : space.instance(variation);
-  if (Object.keys(instance).length > 0 && !variable)
+  if (Object.keys(instance).length > 0 && !varying)
     throw new FontError(
       'WRP_FONT_VARIATION',
-      'variation: only CFF2 variable fonts can be instanced (TrueType gvar and CFF 1.x have no variation support)',
+      'variation: only CFF2 and TrueType gvar variable fonts can be instanced (CFF 1.x and TrueType fonts without gvar have no variation data)',
     );
-  const coords = space === null || !variable ? [] : space.coordinates(variation);
+  const coords = space === null || !varying ? [] : space.coordinates(variation);
+  const moved = !coords.every((coord) => coord === 0);
   const cff = cffTable === null ? null : readCff(cffTable, coords);
-  const hvar = variable ? tables.table('HVAR') : null;
-  const advanceDelta = hvar === null || coords.every((coord) => coord === 0) ? null : readAdvanceDeltas(hvar, coords);
+  const hvar = varying ? tables.table('HVAR') : null;
+  const advanceDelta = hvar === null || !moved ? null : readAdvanceDeltas(hvar, coords);
+  const mvar = varying && moved ? tables.table('MVAR') : null;
+  const metricDeltas = mvar === null ? new Map<string, number>() : readMetricDeltas(mvar, coords);
+  const metric = (tag: string): number => Math.round(metricDeltas.get(tag) ?? 0);
+  const advances = new Map<number, number>();
+  const advanceWork = { remaining: FONT_OPERATOR_BUDGET };
   const source: GlyphSource | null =
     cff === null
-      ? { glyf: requireTable(tables, 'glyf'), loca: requireTable(tables, 'loca'), longLoca: header.longLoca, numGlyphs: header.numGlyphs }
+      ? {
+          glyf: requireTable(tables, 'glyf'),
+          loca: requireTable(tables, 'loca'),
+          longLoca: header.longLoca,
+          numGlyphs: header.numGlyphs,
+          ...(moved && gvarTable !== null && space !== null
+            ? { variation: { gvar: readGvar(gvarTable, header.numGlyphs, space.axes.length), coords } }
+            : {}),
+        }
       : null;
   if (source !== null && source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
     throw new FontError('WRP_FONT_PARSE', 'loca: shorter than its glyph count requires');
@@ -134,7 +153,7 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
     }
     return loops;
   };
-  let capHeight = permissions.capHeight;
+  let capHeight = permissions.capHeight === null ? null : permissions.capHeight + metric('cpht');
   let capHeightSource: ParsedFont['capHeightSource'] = 'os2';
   if (capHeight === null) {
     const top = outline(glyphIndex(0x48))
@@ -150,16 +169,28 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
     strokes: () => [],
     unitsPerEm: header.unitsPerEm,
     numGlyphs: header.numGlyphs,
-    ascender: header.ascender,
-    descender: header.descender,
-    lineGap: header.lineGap,
+    ascender: header.ascender + metric('hasc'),
+    descender: header.descender + metric('hdsc'),
+    lineGap: header.lineGap + metric('hlgp'),
     capHeight,
     capHeightSource,
     embedding: permissions.embedding,
     names: readNames(tables),
     glyphIndex,
-    advance: (glyph) =>
-      advanceDelta === null ? advanceOf(tables, header, glyph) : Math.round(advanceOf(tables, header, glyph) + advanceDelta(glyph)),
+    advance: (glyph) => {
+      const known = advances.get(glyph);
+      if (known !== undefined) return known;
+      const base = advanceOf(tables, header, glyph);
+      // a variable TrueType font without HVAR varies the advance through the phantom points of its glyph variations (charged to one budget for the font)
+      const advance =
+        advanceDelta !== null
+          ? Math.round(base + advanceDelta(glyph))
+          : source?.variation === undefined
+            ? base
+            : Math.round(base + phantomAdvanceDelta(source, glyph, advanceWork));
+      advances.set(glyph, advance);
+      return advance;
+    },
     axes: space?.axes ?? [],
     instance,
     kerning: buildGposKerning(tables.table('GPOS')) ?? buildKerning(tables.table('kern')),
@@ -171,7 +202,7 @@ function build(bytes: Uint8Array, variation: AxisValues): ParsedFont {
         points +=
           cff !== null
             ? cff.outline(glyph, budget).reduce((sum, loop) => sum + loop.length, 0)
-            : glyphContours(source as GlyphSource, glyph).reduce((sum, contour) => sum + contour.length, 0);
+            : glyphContours(source as GlyphSource, glyph, budget).reduce((sum, contour) => sum + contour.length, 0);
         if (points > MAX_FONT_POINTS) throw new FontError('WRP_FONT_PARSE', `glyf: more than ${MAX_FONT_POINTS} points in the whole font`);
       }
     },

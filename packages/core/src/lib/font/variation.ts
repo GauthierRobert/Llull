@@ -2,8 +2,8 @@
  * OpenType font variations (03 WRP M4, TECHNICAL_SPEC §5.5): the `fvar` axes, the `avar` segment maps, the ItemVariationStore (CFF2 `vstore`, `HVAR`) and the
  * `HVAR` advance deltas. A requested instance is a value per axis tag in design units; it becomes normalised coordinates in [-1, 1] rounded to 2.14 fixed point.
  * @invariant at most 64 axes, 4096 regions and 4096 variation data subtables; every offset is checked by `ByteView`; the same bytes and values give the same coordinates
- * @failure an unknown axis tag, a value outside the axis range, a font without axes, `avar` version 2 with a non-default instance -> WRP_FONT_VARIATION;
- *   damaged tables -> WRP_FONT_PARSE
+ * `avar` version 2 follows the segment maps: an ItemVariationStore of per-axis deltas (2.14 fixed) evaluated at the segment-mapped coordinates of all axes, through an optional axis index map.
+ * @failure an unknown axis tag, a value outside the axis range, a font without axes -> WRP_FONT_VARIATION; damaged tables -> WRP_FONT_PARSE
  */
 
 import { type ByteView, FontError, parseError } from './reader';
@@ -35,9 +35,15 @@ export interface VariationSpace {
   readonly instance: (values: AxisValues) => Record<string, number>;
 }
 
-function readSegmentMaps(avar: ByteView | null, axisCount: number): Array<ReadonlyArray<readonly [number, number]>> | 'version2' {
+interface SegmentMaps {
+  readonly maps: Array<ReadonlyArray<readonly [number, number]>>;
+  /** avar version 2: the per-axis delta store and the axis index map (null: axis i is row i of subtable 0). */
+  readonly second: { readonly store: ItemVariationStore; readonly map: ((index: number) => readonly [number, number]) | null } | null;
+}
+
+function readSegmentMaps(avar: ByteView | null, axisCount: number): SegmentMaps {
   const maps: Array<ReadonlyArray<readonly [number, number]>> = Array.from({ length: axisCount }, () => []);
-  if (avar === null) return maps;
+  if (avar === null) return { maps, second: null };
   const major = avar.u16(0);
   if (major !== 1 && major !== 2) throw parseError(`avar: version ${major} is not 1 or 2`);
   if (avar.u16(6) !== axisCount) throw parseError(`avar: ${avar.u16(6)} axes for the ${axisCount} of fvar`);
@@ -52,7 +58,13 @@ function readSegmentMaps(avar: ByteView | null, axisCount: number): Array<Readon
         throw parseError('avar: the segment map of an axis is not sorted by its input values');
     maps[axis] = pairs;
   }
-  return major === 2 ? 'version2' : maps;
+  if (major !== 2) return { maps, second: null };
+  const mapAt = avar.u32(at);
+  const storeAt = avar.u32(at + 4);
+  if (storeAt === 0) return { maps, second: null };
+  const store = readItemVariationStore(avar.sub(storeAt, avar.length - storeAt, 'avar store'));
+  if (store.axisCount > axisCount) throw parseError(`avar: a delta store of ${store.axisCount} axes for the ${axisCount} of fvar`);
+  return { maps, second: { store, map: mapAt === 0 ? null : readIndexMap(avar, mapAt) } };
 }
 
 function applySegments(pairs: ReadonlyArray<readonly [number, number]>, value: number): number {
@@ -93,7 +105,7 @@ export function readVariationSpace(fvar: ByteView | null, avar: ByteView | null)
     if (axes.some((other) => other.tag === axis.tag)) throw parseError(`fvar: axis '${axis.tag}' is listed twice`);
     axes.push(axis);
   }
-  const maps = readSegmentMaps(avar, axisCount);
+  const { maps, second } = readSegmentMaps(avar, axisCount);
   const checked = (values: AxisValues): void => {
     for (const [tag, value] of Object.entries(values)) {
       const axis = axes.find((candidate) => candidate.tag === tag);
@@ -119,18 +131,19 @@ export function readVariationSpace(fvar: ByteView | null, avar: ByteView | null)
     instance,
     coordinates: (values) => {
       const chosen = instance(values);
-      if (maps === 'version2' && Object.keys(chosen).length > 0)
-        throw new FontError(
-          'WRP_FONT_VARIATION',
-          'variation: avar version 2 (axis-variation maps) is not supported; only the default instance can be used',
-        );
-      return axes.map((axis, k) => {
+      const segmented = axes.map((axis, k) => {
         const value = chosen[axis.tag];
         if (value === undefined) return 0;
         const normal =
           value < axis.default ? (value - axis.default) / (axis.default - axis.min) : (value - axis.default) / (axis.max - axis.default);
-        const mapped = maps === 'version2' ? normal : applySegments(maps[k] as ReadonlyArray<readonly [number, number]>, toF2dot14(normal));
+        const mapped = applySegments(maps[k] as ReadonlyArray<readonly [number, number]>, toF2dot14(normal));
         return toF2dot14(Math.max(-1, Math.min(1, mapped)));
+      });
+      if (second === null) return segmented;
+      // avar version 2: every axis (also one left at its default) moves by its delta from the store, evaluated at the segment-mapped coordinates of all axes
+      return segmented.map((coordinate, k) => {
+        const [outer, inner] = second.map === null ? [0, k] : second.map(k);
+        return toF2dot14(Math.max(-1, Math.min(1, coordinate + second.store.delta(outer, inner, segmented) / 16384)));
       });
     },
   };
@@ -154,11 +167,12 @@ export interface ItemVariationStore {
   /** The scalar of each region of subtable `data` at `coords`. */
   readonly scalars: (data: number, coords: readonly number[]) => number[];
   /** The interpolated delta of row `inner` of subtable `outer`. */
+  /** The interpolated delta of row `inner` of subtable `outer` (0 for the no-variation index 0xFFFF / 0xFFFF). */
   readonly delta: (outer: number, inner: number, coords: readonly number[]) => number;
 }
 
 /** The scalar of one region at `coords` (OpenType 'Algorithm for interpolation of instance values'). */
-function regionScalar(region: Region, coords: readonly number[]): number {
+export function regionScalar(region: Region, coords: readonly number[]): number {
   let scalar = 1;
   for (let axis = 0; axis < region.length; axis++) {
     const [start, peak, end] = region[axis] as readonly [number, number, number];
@@ -220,6 +234,7 @@ export function readItemVariationStore(view: ByteView): ItemVariationStore {
     regionCount: (data) => subtable(data).regionIndexes.length,
     scalars,
     delta: (outer, inner, coords) => {
+      if (outer === 0xffff && inner === 0xffff) return 0;
       const data = subtable(outer);
       if (inner >= data.itemCount)
         throw parseError(`variation store: row ${inner} is outside the ${data.itemCount} rows of subtable ${outer}`);
@@ -244,12 +259,12 @@ export function readItemVariationStore(view: ByteView): ItemVariationStore {
 /** A DeltaSetIndexMap at `at` of `view`: the (outer, inner) pair of an index. */
 function readIndexMap(view: ByteView, at: number): (index: number) => readonly [number, number] {
   const format = view.u8(at);
-  if (format !== 0 && format !== 1) throw parseError(`HVAR: index map format ${format} is not 0 or 1`);
+  if (format !== 0 && format !== 1) throw parseError(`index map: format ${format} is not 0 or 1`);
   const entryFormat = view.u8(at + 1);
   const count = format === 0 ? view.u16(at + 2) : view.u32(at + 2);
   const size = ((entryFormat >> 4) & 3) + 1;
   const innerBits = (entryFormat & 15) + 1;
-  if (count === 0) throw parseError('HVAR: an index map without entries');
+  if (count === 0) throw parseError('index map: no entries');
   const first = at + (format === 0 ? 4 : 6);
   return (index) => {
     const entryAt = first + Math.min(index, count - 1) * size;
