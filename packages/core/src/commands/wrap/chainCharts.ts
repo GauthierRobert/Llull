@@ -51,6 +51,9 @@ export interface ChainEdge {
   readonly length: number;
   /** Length of the stretch of the edge the charts are joined over (its chord in the chain's coordinates). */
   readonly windowLength: number;
+  /** The joined stretch of the edge in the chain's coordinates (first and last point) and in the world. */
+  readonly line: readonly [Vec2, Vec2];
+  readonly world: readonly [Vec3, Vec3];
   readonly convexity: 'convex' | 'concave' | 'smooth' | 'unknown';
 }
 
@@ -504,6 +507,8 @@ export function buildChain(
         faces: [parent.session.face, child.face],
         length: edgeLength,
         windowLength: length,
+        line: [first, last],
+        world: [points[0] as Vec3, points[points.length - 1] as Vec3],
         cutGap: gap,
         mismatch: developableJoin ? 0 : Math.max(candidate.residual, gap) / length,
         convexity: graph.edgeConvexity[join.edge] ?? 'unknown',

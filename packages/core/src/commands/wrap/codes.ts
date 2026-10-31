@@ -46,7 +46,7 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_CHAIN_EDGE_CURVED:
     'Only an edge that develops to a straight line on both faces joins them (a generatrix of a cylinder, a straight edge of a plane); leave out the face across a circular edge, or wrap each face separately.',
   WRP_CHAIN_EDGE_SHARP:
-    'Raised walls cannot meet along a sharp edge without a mitre: blend or round the edge first (fillet_edge), or emboss each face separately; wrap_to_face and scribe cross sharp edges.',
+    'Raised walls are mitred only across a straight edge between two plane faces, with the sketch crossing it at right angles and not through a vertex (see data in the message): blend or round the edge first (fillet_edge), turn the sketch, or emboss each face separately; wrap_to_face and scribe cross sharp edges.',
   WRP_CHAIN_CLIP_FAILED:
     'The sketch outline touches a chain edge tangentially or the kernel could not orient it: move the sketch slightly (placement.anchor) or turn it (placement.angleDeg).',
   WRP_SILHOUETTE_NONE:

@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across sharp edges; the silhouette of a torus seen in its equatorial plane and of freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -653,7 +653,7 @@ it becomes part of the boundary (area 50 - 8 = 42 in the unit test), loops entir
 `WRP_CHAIN_CLIP_FAILED` too. `wrap_to_face` keeps the runs without chords: each becomes a curve on its own face (`data.faces`, `curves[].face`), a loop crossing an edge becomes open pieces.
 
 **Emboss across the faces.** Each face's part is mapped by its chart, checked on the face and embossed in chain order: `recipe_k = emboss(source: recipe_{k-1}, face: the face found again by an interior probe point)`. Walls on a shared smooth edge are the same plane, so the pieces fuse.
-**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss (`WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
+**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss except plane to plane (mitred since §14.15; otherwise `WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
 native half-space cut of the tools). `scribe` and `wrap_to_face` cross sharp edges. `data.expectedVolumeDelta` is the sum of the closed forms per face.
 
 **Measured (native kernel, `server/tests/nativeWrapChain.test.ts`).** Stadium (box 40 x 20 x 10 + two r 10 cylinders), band 6 x 30, depth 1: areas 60 + 120, volume change 186 = 60 + 120 x 1.05 (1e-6 relative); three faces (band 60 long over plane, cylinder end, opposite plane) 369.4248;
@@ -787,3 +787,19 @@ volume of the same emboss on the whole cone (1e-4). Torus R 10 r 3 split along t
 the chain is refused with `WRP_DISTORTION_EXCEEDED`, and so is any limit below the measured mismatch.
 
 **Deviations (never silent).** The chain of non-developable faces is a first-order unfolding: the join mismatch (over the window and at every crossing of the sketch) and the stretch are measured and refused above the limit, not zero. A sketch that leaves the joined window is refused rather than cut on the extended chord. A closed edge (a meridian) is joined only over the window the chart reaches, so a sketch farther from the edge than that is refused. The sphere / torus chains and the emboss closed form per face (`expectedVolumeDelta`) are checked on the native kernel only for the cone and torus cases above.
+
+### 14.15 Mitred walls across a sharp plane-plane edge (DES-3c)
+
+An emboss or deboss chain whose outline crosses a straight edge between two plane faces is built face by face (slabs with walls normal to their face, §14.6) and the corner is closed by a mitre (`embossMitre.ts`).
+With the two outward normals nA, nB at the edge, the depth d and s = +1 (emboss) or -1 (deboss), the offset planes meet at M = s d (nA + nB) / (1 + nA . nB) from the edge. A convex edge with an emboss, or a concave edge with a
+deboss, leaves the column (edge, s d nA, M, s d nB) between the slabs: a prism along the edge over the stretches the outline covers (one per pair of crossings) is united (emboss) or subtracted (deboss). In the other two
+cases (emboss on a concave edge, deboss on a convex edge) the slabs overlap by the same column and the union already is the mitred corner, so no filler is built and the closed form loses the overlap.
+`data.expectedVolumeDelta` includes both: 48 d + d^2 L = 54 for an 8 x 6 rectangle centred on the edge of a box (d 1, L 6), 42 where the slabs overlap. `data.mitre` lists per edge `kind` (filler / overlap), the number of intervals, the covered length and the
+cross-section area, with `fillerVolume`, `overlapVolume` and `exact`.
+
+**Refused by name (`WRP_CHAIN_EDGE_SHARP`, the message says which):** a convexity the kernel left unknown; an edge between faces that are not both planes; an edge sharper than the mitre can follow (|M| > 20 d); where a filler is needed, an outline that crosses the edge at an angle
+(only segments at right angles to the edge have a column the prism fills), through a vertex, with a curved piece, an odd number of times, or beyond the end of the edge. Where only an overlap is concerned the same crossings are built and `exact` is false (`expectedVolumeDelta` null: the closed form
+does not know the overlap). Scribe crosses sharp edges as before.
+
+**Measured (native kernel, `server/tests/nativeWrapMitre.test.ts`).** Box 60 x 40 x 10, rectangle 8 x 6 centred on the top-side edge, d 1: emboss on the convex edge +54 (the filler 6), deboss -42 (overlap 6); on the concave edge of an L-shaped solid emboss +42, deboss -54; each within 1e-5 of the
+closed form on the exact solid.
