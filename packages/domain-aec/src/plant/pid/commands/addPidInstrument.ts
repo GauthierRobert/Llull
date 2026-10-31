@@ -2,7 +2,7 @@ import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import type { Vec2 } from '@core/model/vectors';
 import { axisOf, nearestLeg, orthogonalRoute, SNAP_DISTANCE } from '../authoring/geometry';
-import { composeInstrumentTag, splitInstrumentTag } from '../authoring/instrumentTag';
+import { composeInstrumentTag, splitInstrumentTag, tagRefusal } from '../authoring/instrumentTag';
 import { Draft, checkTag, fail, findItem, findLine, findSheet, isFail, refuse, segmentsOf, mintFree } from '../authoring/refs';
 import {
   PID_INSTRUMENT_DISPLAYS,
@@ -23,7 +23,7 @@ export const addPidInstrument = defineCommand({
   name: 'add_pid_instrument',
   description:
     'Place an instrument (a DEXPI ProcessInstrumentationFunction, ISA bubble) on a P&ID sheet. Give the `tag` as letters + loop number (e.g. "FT-101", "FIC-101", "PDIT 12.01", ' +
-    '"FV-101A"; capital letters; the first letter is the measured variable, the rest the functions) or `parts` { category, functions, loop } when the tag does not fit that grammar. ' +
+    '"FV-101A"; capital letters; the first letter is the measured variable, the rest the functions; the letters must parse with the ISA 5.1 table, see parse_instrument_tag) or `parts` { category, functions, loop } when the tag does not fit that grammar. ' +
     'The tag is stored split (category, functions, loopNumber); instruments of the same first letter and loop number join one loop item (created on first use) unless `loop` names another one. ' +
     '`at` is the bubble centre in sheet mm; `location` is field, central, local_panel or auxiliary; `display` is discrete (default), shared, plc or software. `measures` ' +
     'draws the measuring line from the process: { line, at } (a tap on a line, snapped within 5 mm) or { tag, nozzle } (an equipment nozzle). Returns affected = [instrument id, loop id?, signal id?]; ' +
@@ -75,9 +75,7 @@ export const addPidInstrument = defineCommand({
       return refuse(
         doc,
         name,
-        fail('PID_TAG_FORMAT', `"${params.tag ?? ''}" is not letters + loop number (e.g. FIC-101); give { category, functions, loop }`, [
-          'tag',
-        ]),
+        fail('PID_TAG_FORMAT', `${tagRefusal(params.tag ?? '')}; give { category, functions, loop } to keep a nonstandard tag`, ['tag']),
       );
     const category = parts.category;
     const functions = parts.functions;

@@ -1,7 +1,7 @@
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { isValveClass } from '../authoring/classes';
-import { splitInstrumentTag } from '../authoring/instrumentTag';
+import { splitInstrumentTag, tagRefusal } from '../authoring/instrumentTag';
 import { moveEquipment, rerouteEnds } from '../authoring/move';
 import { Draft, checkTag, fail, findAny, isFail, refuse, segmentsOf } from '../authoring/refs';
 import { attributesParam, toValues } from '../authoring/values';
@@ -88,8 +88,7 @@ export const updatePidItem = defineCommand({
       next = { ...next, tag };
       if (next.kind === 'instrument') {
         const parts = splitInstrumentTag(tag);
-        if (parts === undefined)
-          return refuse(doc, name, fail('PID_TAG_FORMAT', `"${tag}" is not letters + loop number (e.g. FIC-101)`, ['set.tag']));
+        if (parts === undefined) return refuse(doc, name, fail('PID_TAG_FORMAT', tagRefusal(tag), ['set.tag']));
         next = { ...next, category: parts.category, functions: parts.functions, loopNumber: parts.loopNumber };
       }
     }
