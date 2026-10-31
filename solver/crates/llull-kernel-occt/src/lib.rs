@@ -46,6 +46,10 @@ mod blend_joint_tests;
 #[cfg(test)]
 mod blend_legs_curvature_tests;
 #[cfg(test)]
+mod blend_legs_oblique_tests;
+#[cfg(test)]
+mod blend_legs_revolved_tests;
+#[cfg(test)]
 mod blend_legs_tests;
 #[cfg(test)]
 mod blend_mitre_tests;

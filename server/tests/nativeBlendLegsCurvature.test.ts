@@ -18,6 +18,7 @@ interface Contact {
   readonly g0Gap: number;
   readonly g1AngleRad: number;
   readonly g2Gap: number;
+  readonly g2Rel: number;
 }
 interface Checked {
   readonly status: string;
@@ -81,8 +82,8 @@ describeNative('DES-6c 13.40: the curvature profile with two legs (native OCCT k
     return { doc: result.document, id: result.affected[0] as string, result };
   };
   const volume = (doc: Doc, id: string): number => (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
-  const check = (doc: Doc, id: string, require?: 'G2'): Checked =>
-    execute(doc, 'check_blends', { ids: [id], ...(require ? { require } : {}) }).data as Checked;
+  const check = (doc: Doc, id: string, require?: 'G2', samples?: number): Checked =>
+    execute(doc, 'check_blends', { ids: [id], ...(require ? { require } : {}), ...(samples ? { samples } : {}) }).data as Checked;
   const contactsOf = (checked: Checked): Contact[] => checked.blends.flatMap((row) => [...row.contacts]);
 
   it('a cylinder rim with legs 1 (top) x 3 (side) is G2 to both supports, removes the revolved quintic, and reads its legs back', () => {
@@ -150,16 +151,47 @@ describeNative('DES-6c 13.40: the curvature profile with two legs (native OCCT k
     }
     const expected = revolved(outline);
     expect(Math.abs(volume(cap.doc, cap.id) - volume(done.doc, done.id) - expected)).toBeLessThan(1e-5 * expected);
-    const checked = check(done.doc, done.id, 'G2');
+    // The skin has 24 intervals along the edge (more where it refines). check_blends reads the kernel at `samples` points per contact line: 11 (the default; only
+    // the ends and the middle fall on a station), 37 and 97 (every 4th is a station, the other 72 are between them). The jump must hold at every sample.
+    for (const samples of [11, 37, 97]) {
+      const checked = check(done.doc, done.id, 'G2', samples);
+      expect(checked.status).toBe('pass');
+      const method = (execute(done.doc, 'check_blends', { ids: [done.id], samples }).data as { provenance: { method: string } }).provenance
+        .method;
+      expect(method).toContain(`at ${samples} samples per contact line`);
+      const contacts = contactsOf(checked);
+      expect(contacts).toHaveLength(2);
+      for (const contact of contacts) {
+        expect(contact.order).toBe('G2');
+        expect(contact.g1AngleRad).toBeLessThan(1e-4);
+        // the relative normal-curvature jump over the samples, against the 0.1 that counts as G2 by default (measured below 1e-7)
+        expect(contact.g2Gap).toBeLessThan(1e-7); // measured 2.4e-9 (1/unit) against a sphere curvature of 0.1
+        expect(contact.g2Rel).toBeLessThan(1e-6);
+      }
+      expect(checked.legs?.[0]?.maxDeviation).toBeLessThan(1e-3);
+      expect(checked.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_G2_JUMP');
+    }
+  });
+
+  it('a lens of two spheres R 30 (curvature 1 / R at both contacts; R 10 is below the accuracy of the OCCT chamfer, 13.40) is G2 at both ends, read at 97 samples of which 72 are between stations', () => {
+    const low = made(createEmptyDocument(), 'add_sphere', { radius: 30, position: [0, 0, -9] });
+    const high = made(low.doc, 'add_sphere', { radius: 30, position: [0, 0, 9] });
+    const lens = made(high.doc, 'boolean', { op: 'intersect', a: low.id, b: high.id });
+    expect(lens.result.error).toBeUndefined();
+    const done = made(lens.doc, 'fillet_edge', {
+      id: lens.id,
+      edges: [{ near: [Math.sqrt(819), 0, 0], size: 3, size2: 6, side1Near: [0, 0, 21] }],
+      profile: { type: 'curvature', shape: 0.5 },
+    });
+    expect(done.result.error).toBeUndefined();
+    const checked = check(done.doc, done.id, 'G2', 97);
     expect(checked.status).toBe('pass');
     const contacts = contactsOf(checked);
     expect(contacts).toHaveLength(2);
     for (const contact of contacts) {
       expect(contact.order).toBe('G2');
-      expect(contact.g1AngleRad).toBeLessThan(1e-4);
+      expect(contact.g2Rel).toBeLessThan(1e-3);
     }
-    expect(checked.legs?.[0]?.maxDeviation).toBeLessThan(1e-3);
-    expect(checked.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_G2_JUMP');
   });
 
   it('refuses by name when the supports curvature gives no G2 section: a ball on a plate curves away from the corner', () => {

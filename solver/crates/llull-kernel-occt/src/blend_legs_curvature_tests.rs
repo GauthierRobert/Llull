@@ -6,22 +6,22 @@ use crate::blend_legs_tests::{
 };
 use crate::{boolean, make_box, make_cylinder, make_sphere, BooleanOp, Shape};
 
-type P = (f64, f64);
+pub(crate) type P = (f64, f64);
 const SCALES: [f64; 3] = [1.0, 10.0, 100.0];
 
-fn lerp(from: P, to: P, k: f64) -> P {
+pub(crate) fn lerp(from: P, to: P, k: f64) -> P {
     (from.0 + (to.0 - from.0) * k, from.1 + (to.1 - from.1) * k)
 }
 
 /// The six poles of the curvature section: A, T, B and the offsets (already scaled to the section) of the 3rd and 4th pole.
-fn poles(a: P, t: P, b: P, shape: f64, bend_a: P, bend_b: P) -> [P; 6] {
+pub(crate) fn poles(a: P, t: P, b: P, shape: f64, bend_a: P, bend_b: P) -> [P; 6] {
     let (lead, reach) = (0.8 * shape, 0.4 * shape + 0.6);
     let (pa, pb) = (lerp(a, t, reach), lerp(b, t, reach));
     [a, lerp(a, t, lead), (pa.0 + bend_a.0, pa.1 + bend_a.1), (pb.0 + bend_b.0, pb.1 + bend_b.1), lerp(b, t, lead), b]
 }
 
 /// The Bezier curve of degree 5 over `poles` at `n` + 1 points.
-fn quintic(poles: &[P; 6], n: usize) -> Vec<P> {
+pub(crate) fn quintic(poles: &[P; 6], n: usize) -> Vec<P> {
     let binomial = [1.0, 5.0, 10.0, 10.0, 5.0, 1.0];
     (0..=n)
         .map(|k| {
@@ -35,7 +35,7 @@ fn quintic(poles: &[P; 6], n: usize) -> Vec<P> {
 }
 
 /// The pole offset that gives the section the normal curvature `kappa` of its support at `from` (distance `reach` to the apex): 1.25 kappa lead^2 toward `toward`.
-fn bend(kappa: f64, reach: f64, shape: f64, toward: P) -> P {
+pub(crate) fn bend(kappa: f64, reach: f64, shape: f64, toward: P) -> P {
     let lead = 0.8 * shape * reach;
     let h = 1.25 * kappa * lead * lead;
     (toward.0 * h, toward.1 * h)
@@ -232,11 +232,11 @@ fn a_curvature_section_with_no_g2_solution_is_refused_with_the_measured_reason()
             && why.contains("pole offsets of 0 and -0.37"),
         "{why}"
     );
-    // the departure grows with the shape: legs 3 x 1 on a ball of 10 touching the plate at its equator build at 0.1 and are refused at 0.5
+    // the departure grows with the shape: legs 1 x 3 on a ball of 10 touching the plate at its equator build at 0.1 and are refused at 0.5
     let equator = crate::placed(&make_sphere(10.0).unwrap().unwrap(), [0.0; 3], [0.0, 0.0, 5.0], [0.0; 3]).unwrap().unwrap();
     let tangent_part = boolean(BooleanOp::Union, &plate, &equator, true).unwrap().unwrap();
     let seam = edges_where(&tangent_part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 5.0).abs() < 1e-9);
-    let row = [leg_row(seam[0], plate_face(&tangent_part), 3.0, NAN, 1.0, NAN)];
+    let row = [leg_row(seam[0], plate_face(&tangent_part), 1.0, NAN, 3.0, NAN)];
     assert!(blend(&tangent_part, &row, 1.0, 0.1).is_ok());
     assert!(blend(&tangent_part, &row, 1.0, 0.5).err().expect("refused").contains("leaves the triangle"));
 }
