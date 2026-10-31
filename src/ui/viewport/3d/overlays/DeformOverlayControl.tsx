@@ -68,17 +68,26 @@ function ReferenceFields(): React.ReactElement {
 /** The scale of the Jacobian map and, per drawn body, its range and folded vertices (or why there is no map). */
 function JacobianLegend(): React.ReactElement {
   const stats = useDeformOverlayStore((s) => s.jacobian);
+  const scope = useDeformOverlayStore((s) => s.jacobianScope);
+  const setScope = useDeformOverlayStore((s) => s.setJacobianScope);
   return (
     <div className="vp-deform-jacobian" role="status" aria-label="Jacobian map">
       <div className="vp-deform-reference__note">
         det J: blue 0.5, grey 1, red 2 (volume kept at 1); magenta = folded (at or below the floor)
       </div>
+      <label
+        className="vp-field-label"
+        title="Multiply the determinants of every deformation of a chain (the volume ratio against the original body), or read the last one alone"
+      >
+        <input type="checkbox" checked={scope === 'outermost'} onChange={(e) => setScope(e.target.checked ? 'outermost' : 'composed')} />
+        Outermost only
+      </label>
       {Object.entries(stats).map(([id, entry]) => (
         <div key={id} className="vp-deform-reference__note">
           {id}:{' '}
           {'failure' in entry
             ? entry.failure
-            : `outermost deform (${entry.law}): det J ${entry.min?.toPrecision(3) ?? '-'} .. ${entry.max?.toPrecision(3) ?? '-'}, ${entry.folded} folded (det J <= ${entry.floor})`}
+            : `${entry.deforms > 1 ? `composed (${entry.deforms} deforms)` : `outermost deform (${entry.law})`}: det J ${entry.min?.toPrecision(3) ?? '-'} .. ${entry.max?.toPrecision(3) ?? '-'}, ${entry.folded} folded (det J <= ${entry.floor})`}
         </div>
       ))}
     </div>

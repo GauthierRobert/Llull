@@ -201,3 +201,33 @@ describe('warpMesh work bound (01 DEF 17.7)', () => {
     expect(warpMesh(boxMesh(10, 10, 100), node, { tolerance: 1e-4, maxTriangles: 7 })).not.toBe(first);
   }, 120_000);
 });
+
+describe('warpMesh attributes (rest positions carried by the weld remap, never by coordinates)', () => {
+  /** The box with its first corner duplicated: triangle 0 uses vertex 8, a copy of vertex 0 at the same position. */
+  function boxWithTwin(): MeshData {
+    const box = boxMesh(10, 10, 100);
+    const indices = [...box.indices];
+    indices[0] = 8;
+    return { positions: [...box.positions, box.positions[0] as number, box.positions[1] as number, box.positions[2] as number], indices };
+  }
+
+  it('twin vertices with the same attribute weld into one that carries it: the attribute of every welded vertex is its own rest position', () => {
+    const mesh = boxWithTwin();
+    const node = deformNode({ kind: 'twist', angleRad: 0.5 }, { region: region(0, 100, 'linear') });
+    const result = warpMesh(mesh, node, { tolerance: 0.01, attributes: [mesh.positions] });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.attributes[0]).toEqual(result.restPositions);
+  });
+
+  it('twin vertices whose attributes differ (the inner map folded two rest points onto one position) are refused by name, not given the first one attribute', () => {
+    const mesh = boxWithTwin();
+    const moved = [...mesh.positions];
+    moved[24] = 5;
+    const node = deformNode({ kind: 'twist', angleRad: 0.5 }, { region: region(0, 100, 'linear') });
+    const result = warpMesh(mesh, node, { tolerance: 0.01, attributes: [moved] });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('DEF_APPROX_TOLERANCE');
+    expect(result.message).toContain('collapses distinct points');
+  });
+});

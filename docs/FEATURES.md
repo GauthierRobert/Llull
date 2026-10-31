@@ -160,7 +160,7 @@
 | `create_nurbs_surface` | Create a NURBS surface sheet (clamped tensor-product B-spline patch, optionally rational) from its control net. |  |
 | `deform_by_point` | Push the material of a 3D solid or mesh around a point: every point within radius of `point` moves along `direction` by distance x falloff(r), where r = (dista… |  |
 | `deform_curve_to_curve` | Deform a 3D solid or mesh by dragging curves: each pair names an initial nurbs_curve (lying on or near the body) and the target nurbs_curve it must land on. |  |
-| `deform_jacobian_map` | Jacobian determinant of the OUTERMOST deform node of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates). | read-only |
+| `deform_jacobian_map` | Jacobian determinant of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates): by default COMPOSED along the ch… | read-only |
 | `deform_lattice` | Free-form deformation of a 3D solid or mesh: a regular lattice of control points (degrees [l, m, n], l + 1 by m + 1 by n + 1 points, 1..8 per axis) fills a box… |  |
 | `deform_overlay` | Geometry to DRAW a deformation for review, in world coordinates (document units): data.frame {origin, x, y, z, length} (the deformation frame axes), data.regio… | read-only |
 | `delete_decal` | Remove one decal (by its id, from add_decal) from a solid. |  |

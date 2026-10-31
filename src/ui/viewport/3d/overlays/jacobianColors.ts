@@ -30,6 +30,8 @@ export interface JacobianView {
   readonly folded: number;
   readonly floor: number;
   readonly law: string;
+  /** Deform nodes whose determinants the map multiplies (1: a single deformation, or the outermost scope). */
+  readonly deforms: number;
 }
 
 const isNumbers = (value: unknown): value is number[] => Array.isArray(value) && value.every((item) => typeof item === 'number');
@@ -37,7 +39,7 @@ const isNumbers = (value: unknown): value is number[] => Array.isArray(value) &&
 /** The map of a `deform_jacobian_map` answer (one determinant per triangle); null when the data is not that shape (lengths that disagree, a triangle past the vertices). */
 export function parseJacobianMap(data: unknown): JacobianView | null {
   if (typeof data !== 'object' || data === null) return null;
-  const { positions, indices, determinant, floor, min, max, folded, law } = data as Record<string, unknown>;
+  const { positions, indices, determinant, floor, min, max, folded, law, deforms } = data as Record<string, unknown>;
   if (!isNumbers(positions) || !isNumbers(indices) || !isNumbers(determinant) || typeof floor !== 'number') return null;
   const vertices = positions.length / 3;
   if (!Number.isInteger(vertices) || indices.length !== 3 * determinant.length) return null;
@@ -62,5 +64,6 @@ export function parseJacobianMap(data: unknown): JacobianView | null {
     folded: typeof folded === 'number' ? folded : 0,
     floor,
     law: typeof law === 'string' ? law : '',
+    deforms: typeof deforms === 'number' && deforms >= 1 ? deforms : 1,
   };
 }

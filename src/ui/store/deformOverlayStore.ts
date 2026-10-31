@@ -36,7 +36,14 @@ export interface ReferenceDraft {
 
 /** What the Jacobian map of one body reports: its range and folded vertices, or why it could not be computed. */
 export type JacobianStats =
-  | { readonly min: number | null; readonly max: number | null; readonly folded: number; readonly floor: number; readonly law: string }
+  | {
+      readonly min: number | null;
+      readonly max: number | null;
+      readonly folded: number;
+      readonly floor: number;
+      readonly law: string;
+      readonly deforms: number;
+    }
   | { readonly failure: string };
 
 interface DeformOverlayState {
@@ -46,10 +53,13 @@ interface DeformOverlayState {
   reference: ReferenceDraft | null;
   /** Jacobian map summary per drawn entity id (set by the map itself while it is drawn). */
   jacobian: Readonly<Record<string, JacobianStats>>;
+  /** composed (default): det J multiplied along the whole chain of deformations; outermost: the last node alone. */
+  jacobianScope: 'composed' | 'outermost';
   setEnabled(enabled: boolean): void;
   setLayer(layer: DeformLayer, on: boolean): void;
   setReference(reference: ReferenceDraft | null): void;
   setJacobian(id: string, stats: JacobianStats | null): void;
+  setJacobianScope(scope: 'composed' | 'outermost'): void;
 }
 
 export const useDeformOverlayStore = create<DeformOverlayState>()((set) => ({
@@ -57,9 +67,11 @@ export const useDeformOverlayStore = create<DeformOverlayState>()((set) => ({
   layers: { frame: true, region: true, lattice: true, flow: true, sheet: true, reference: true, jacobian: false },
   reference: null,
   jacobian: {},
+  jacobianScope: 'composed',
   setEnabled: (enabled) => set({ enabled }),
   setLayer: (layer, on) => set((state) => ({ layers: { ...state.layers, [layer]: on } })),
   setReference: (reference) => set({ reference }),
+  setJacobianScope: (jacobianScope) => set({ jacobianScope }),
   setJacobian: (id, stats) =>
     set((state) => {
       const { [id]: _dropped, ...rest } = state.jacobian;
