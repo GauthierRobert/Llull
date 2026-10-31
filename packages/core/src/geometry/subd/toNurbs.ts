@@ -15,6 +15,7 @@ import { type Cage, subdivide } from '../subdivision';
 import { type BezierPatch, patchPoint, quadCagePatches } from '../subdivisionPatches';
 import { edgeKey } from './edgeKey';
 import { type ExactG1, type ExactG1Group, solveExactG1 } from './g1Exact';
+import { DENSE_MAX_UNKNOWNS } from './g1Linear';
 import { MEASURE_STATIONS, fitTangentPlanes, patchNormal } from './g1Fit';
 import { prepare, surfaceEvaluator } from './limit';
 import { blockSurface, packedBlocks } from './packedGrids';
@@ -33,6 +34,8 @@ export interface ToNurbsOptions {
    * With `fitTangents`: "exact" = the linear G1 solve (`g1Exact.ts`), the fit where it has no solution; "fit" = the approximate tangent-plane fit only; "auto" (default) = both are
    * built and the exact one is kept when its break is within the tolerance and its deviation from the limit surface is at most max(1.25 x the fit one, `deviationTolerance`),
    * the fit otherwise, the exact one when only it meets the tolerance.
+   * Cost: a group above `DENSE_MAX_UNKNOWNS` unknown poles is solved by conjugate gradients, and its limit-surface objective (a projected CG, up to 1.5e9 work units) runs only when the nearest-to-start
+   * exact solve is not already within max(1.25 x the fit, `deviationTolerance`) of the limit surface (then `exactObjective` reads "start"); "exact" always spends it.
    */
   readonly g1Solve?: 'exact' | 'fit' | 'auto' | undefined;
   /** "auto": the deviation (document units) up to which the exact solve is accepted whatever the fit does; default 1e-3 x the diagonal of the cage. */
@@ -234,7 +237,10 @@ function buildLevel(cage: Cage, levels: number, options: ToNurbsOptions, allowEx
   });
   if (!fit || !hasStar) return build(geometry);
   // the exact linear solve (a cage whose groups it cannot make G1 keeps the approximate fit), the approximate fit, the plain patches to measure both against
-  const exact = mode !== 'fit' && allowExact ? solveExactG1(refined, geometry, valence) : null;
+  // "auto" first builds the cheap exact solve (groups too big for the dense path keep the nearest-to-start poles) and spends the limit-surface objective on them only when it is needed
+  const solveExact = (sparseObjective: 'limit' | 'start'): ExactG1 | null =>
+    mode !== 'fit' && allowExact ? solveExactG1(refined, geometry, valence, { sparseObjective }) : null;
+  let exact = solveExact(mode === 'auto' ? 'start' : 'limit');
   const exactHolds = exact !== null && exact.groups.length > 0 && exact.groups.every((group) => group.consistent);
   const fitted = mode === 'exact' && exactHolds ? null : fitTangentPlanes(refined, geometry, valence);
   const plainMaxDeviation = deviation(refined, geometry, options.samples).max;
@@ -250,12 +256,17 @@ function buildLevel(cage: Cage, levels: number, options: ToNurbsOptions, allowEx
       breakDeg: Math.max(0, ...evEdgeReports(refined, patches, valence).map((edge) => edge.g1Deg)),
       deviation: deviation(refined, patches, options.samples).max,
     });
-    g1Choice = chooseSolve(
-      measure(exact.patches),
-      measure(fitted),
-      options.tangentToleranceDeg ?? Infinity,
-      options.deviationTolerance ?? 1e-3 * diagonal,
-    );
+    const [angleTolerance, deviationTolerance] = [options.tangentToleranceDeg ?? Infinity, options.deviationTolerance ?? 1e-3 * diagonal];
+    const fitMeasure = measure(fitted);
+    let exactMeasure = measure(exact.patches);
+    g1Choice = chooseSolve(exactMeasure, fitMeasure, angleTolerance, deviationTolerance);
+    // the limit objective of the big groups (the conjugate-gradient path: up to 1.5e9 work units) is only worth its cost when the nearest-to-start poles are not already within max(1.25 x the fit, the deviation tolerance)
+    const spared = g1Choice.chosen === 'exact' && exactMeasure.deviation <= Math.max(1.25 * fitMeasure.deviation, deviationTolerance);
+    if (!spared && exact.groups.some((group) => group.unknowns > DENSE_MAX_UNKNOWNS)) {
+      exact = solveExact('limit') ?? exact;
+      exactMeasure = measure(exact.patches);
+      g1Choice = chooseSolve(exactMeasure, fitMeasure, angleTolerance, deviationTolerance);
+    }
     chosen = g1Choice.chosen;
   } else if (mode === 'auto' && !exactHolds)
     g1Choice = {

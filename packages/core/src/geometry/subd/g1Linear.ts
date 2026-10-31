@@ -25,11 +25,13 @@ export interface Solution {
   readonly status: 'ok' | 'budget';
   /** What the freedom left by the rows was spent on: "limit" (nearest to the limit surface at the samples), "start" (nearest to the start poles: no samples, or no work left for them). */
   readonly objective: 'limit' | 'start';
+  /** Sparse path with samples: the CGLS iterations per projection that ran (0 or absent: none ran; with objective "start" and a value: the projection was too rough and the acceptance gate refused it). */
+  readonly projectionIterations?: number;
 }
 
 /** Groups up to this many unknown poles are solved by dense orthogonalisation (with the limit-surface objective); larger ones by conjugate gradients. */
 export const DENSE_MAX_UNKNOWNS = 900;
-/** Multiply-adds of the dense path (Gram-Schmidt twice: 2 rows^2 x unknowns) and of the sparse path (nonzeros x iterations x 2 products x 3 axes). */
+/** Multiply-adds of the dense path (Gram-Schmidt twice: 2 rows^2 x unknowns) and of the sparse path (nonzeros x iterations x 2 products x 3 axes); `maxWork` is an approximate bound (it counts the products over the nonzeros, not the vector bookkeeping). */
 const DENSE_MAX_WORK = 2.5e9;
 const SPARSE_MAX_WORK = 1.5e9;
 /** Iterations of the projected conjugate gradient of the objective, and its ridge (relative to a sample weight of 1). */
@@ -205,6 +207,10 @@ const SPARSE_OBJECTIVE_ITERATIONS = 30;
 /** Fewest inner CGLS iterations per projection worth running (below it the projection is too rough: the objective is skipped). */
 const MIN_INNER_ITERATIONS = 20;
 const MAX_INNER_ITERATIONS = 400;
+/** Projections per axis: one for the first residual, one per outer iteration. */
+const PROJECTIONS = SPARSE_OBJECTIVE_ITERATIONS + 1;
+/** Rounds of the repair (each at most 4 x inner CGLS iterations). */
+const REPAIR_ROUNDS = 3;
 
 /**
  * Conjugate gradients on the normal equations (CGLS) from `start` over the sparse rows: the nearest solution when the system is consistent, the least-squares one otherwise.
@@ -266,17 +272,19 @@ export function solveSparse(
   };
   if (capped || samples.length === 0) return solution;
   const sampleNonzeros = samples.reduce((sum, sample) => sum + sample.terms.length, 0);
-  // work left after the feasibility iterations (12 nonzeros each), for 3 axes x outer iterations x (a projection + the sample products)
+  // work left after the feasibility iterations (12 nonzeros each), per axis: PROJECTIONS projections (each `inner` CGLS iterations of 4 nonzeros, plus 2 products over the rows and 4 over the samples)
+  // and the repair (REPAIR_ROUNDS rounds of 4 x inner iterations of 4 nonzeros); maxWork is approximate (the counts are of multiply-adds by nonzeros, not of the vector bookkeeping)
   const left = maxWork - feasibilityIterations * 12 * nonzeros;
-  const inner = Math.min(
-    MAX_INNER_ITERATIONS,
-    Math.floor((left / (3 * SPARSE_OBJECTIVE_ITERATIONS) - 4 * sampleNonzeros - 2 * nonzeros) / Math.max(1, 4 * nonzeros)),
-  );
+  const perAxis = left / 3 - PROJECTIONS * (4 * sampleNonzeros + 2 * nonzeros);
+  const inner = Math.min(MAX_INNER_ITERATIONS, Math.floor(perAxis / Math.max(1, (PROJECTIONS * 4 + REPAIR_ROUNDS * 4 * 4) * nonzeros)));
   if (inner < MIN_INNER_ITERATIONS) return solution;
   const improved = columns.map((column, axis) => limitObjective(rows, samples, column, axis, inner));
   const repaired = improved.map((column, axis) => repair(rows, b, column, axis, inner));
   const residual = violation(rows, b, repaired);
-  return residual < solution.residual * 1e3 + 1e-12 ? { x: asPoints(repaired, n), residual, status: 'ok', objective: 'limit' } : solution;
+  // acceptance gate: a projection too rough to keep the conditions (the repair could not bring x back onto A x = b) keeps the nearest-to-start solution
+  return residual < solution.residual * 1e3 + 1e-12
+    ? { x: asPoints(repaired, n), residual, status: 'ok', objective: 'limit', projectionIterations: inner }
+    : { ...solution, projectionIterations: inner };
 }
 
 /** The product A^+ A v by CGLS on the rows from zero (the part of v in the row space of A), `iterations` at most. */
@@ -354,7 +362,7 @@ function limitObjective(
 function repair(rows: readonly SparseRow[], b: readonly Vec3[], x: Float64Array, axis: number, inner: number): Float64Array {
   const n = x.length;
   let current = x;
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < REPAIR_ROUNDS; round++) {
     const residual = Float64Array.from(rows, (row, i) => ((b[i] as Vec3)[axis] as number) - rowDot(row, current));
     if (Math.sqrt(dot(residual, residual)) < 1e-14) break;
     // A^+ residual by CGLS on the rows

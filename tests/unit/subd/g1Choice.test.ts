@@ -155,6 +155,16 @@ describe('the exact solve is bounded and refuses by name', () => {
     expect(data.maxEvG1Deg).toBeLessThan(1e-5);
   }, 120_000);
 
+  it('"auto" on a big group skips the limit-surface objective when the nearest-to-start exact solve is already within max(1.25 x the fit, deviationTolerance): objective start, still exact and G1; "exact" spends it', () => {
+    const cage = cylinderCage(1, 2, 24, 2);
+    const auto = convert(cage, { tangentToleranceDeg: 0.5 });
+    expect(auto.data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'start' } });
+    expect(auto.data.maxEvG1Deg).toBeLessThan(1e-5);
+    const exactDeviation = auto.data.g1Choice?.exactDeviation as number;
+    expect(exactDeviation).toBeLessThanOrEqual(1.25 * (auto.data.g1Choice?.fitDeviation as number));
+    expect(convert(cage, { g1Solve: 'exact', tangentToleranceDeg: 0.5 }).data.g1Exact?.objective).toBe('limit');
+  }, 180_000);
+
   it('whole-cage fallback: with no ring allowed around the star the box is solved by freeing every quad, and without that fallback it is refused', () => {
     const refined = subdivide(boxCage([2, 2, 2], [2, 2, 2]), 1);
     const patches = quadCagePatches(refined);
