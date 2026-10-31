@@ -809,6 +809,9 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
 
 std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
 std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
+std::atomic<double> g_last_crease{0};     // test hook: the largest interior crease of the star sub-patches accepted since set_corner_exact_patch (last_corner_crease)
+std::atomic<bool> g_crease_gate{true};   // test hook: set_corner_crease_gate (false: the interior crease is measured but not gated)
+std::atomic<bool> g_c0_knots_only{false}; // test hook: set_corner_c0_knots (true: only C0 knots at the joints of the chains, no C1 attempt)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
 std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole)
 std::atomic<bool> g_force_trim{false};   // test hook: set_corner_trim (the rolling-ball trim builder for every step, 13.22)
@@ -851,7 +854,9 @@ bool fill_exact(FillJob &job, double diagonal) {
         }
       return best < 1e299;
     };
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6)) return false;
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load())) return false;
+  for (double seen = g_last_crease.load(); exact.crease > seen && !g_last_crease.compare_exchange_weak(seen, exact.crease);) {
+  }
   job.hinted = exact.centre_from_hint;
   job.patches = exact.faces;
   job.patch_loop = exact.loop_index;
@@ -2123,7 +2128,13 @@ void set_corner_threads(int32_t count) { g_corner_threads.store(count); }
 int32_t last_corner_threads() { return g_last_threads.load(); }
 void set_corner_fault(int32_t corner) { g_fault_corner.store(corner); }
 void set_corner_spawn_limit(int32_t workers) { g_spawn_limit.store(workers); }
-void set_corner_exact_patch(int32_t mode) { g_exact_mode.store(mode); }
+void set_corner_exact_patch(int32_t mode) {
+  g_exact_mode.store(mode);
+  g_last_crease.store(0);
+}
+double last_corner_crease() { return g_last_crease.load(); }
+void set_corner_crease_gate(bool on) { g_crease_gate.store(on); }
+void set_corner_c0_knots(bool on) { g_c0_knots_only.store(on); }
 void set_corner_trim(bool on) { g_force_trim.store(on); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.

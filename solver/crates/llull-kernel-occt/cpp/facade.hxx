@@ -71,6 +71,9 @@ int32_t last_corner_threads();
 void set_corner_fault(int32_t corner);
 void set_corner_spawn_limit(int32_t workers);
 void set_corner_exact_patch(int32_t mode);
+double last_corner_crease();
+void set_corner_crease_gate(bool on);
+void set_corner_c0_knots(bool on);
 void set_corner_trim(bool on);
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
