@@ -167,7 +167,11 @@ fn contacts(shape: &Shape) -> (Contacts, Contacts) {
 fn assert_mitred(result: &Shape, expected_change: f64, before: f64, turn: f64, label: &str) {
     let mass = mass_properties(result).unwrap();
     let change = mass.volume - before;
-    assert!((change - expected_change).abs() < 1e-6 * expected_change.abs(), "{label}: changed {change} vs {expected_change}");
+    // the skin holds the circular blend's sections to 1e-8 of the diagonal (CHK1 changed which stations it keeps: 7e-5 mm3 on the 156775 mm3 of the 64-gon, 4e-10 of the part)
+    assert!(
+        (change - expected_change).abs() < 1e-6 * expected_change.abs() + 1e-9 * before,
+        "{label}: changed {change} vs {expected_change}"
+    );
     let notes = notes_of(result);
     assert_eq!(notes["builder"], "rails", "{label}");
     assert!(num(&notes["gap"]) <= num(&notes["gapLimit"]), "{label}: {notes}");

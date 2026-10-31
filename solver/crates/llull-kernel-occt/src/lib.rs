@@ -35,6 +35,8 @@ mod blend_rail_tests;
 #[cfg(test)]
 mod blend_tests;
 #[cfg(test)]
+mod bounds_tests;
+#[cfg(test)]
 mod deform_infinite_tests;
 #[cfg(test)]
 mod deform_tests;
@@ -63,6 +65,7 @@ mod ffi {
     }
 
     /// Unit-density mass properties; `inertia` = [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] at the centroid, `bounds` = min xyz then max xyz.
+    #[derive(Clone)]
     struct MassOut {
         volume: f64,
         area: f64,
@@ -75,6 +78,7 @@ mod ffi {
     }
 
     /// BRepCheck validity, free faces / edges and one lump per solid: `lumps` = [volume, area, min xyz, max xyz] per solid.
+    #[derive(Clone)]
     struct AnalysisOut {
         valid: bool,
         free_faces: i32,
@@ -118,8 +122,36 @@ mod ffi {
     }
 }
 
-/// An exact OCCT shape owned by Rust.
-pub struct Shape(cxx::UniquePtr<ffi::Shape>);
+/// An exact OCCT shape owned by Rust, with the answers of its read-only whole-shape queries kept (a shape never changes after it is built, and a host asks the
+/// same shape for its topology, face graph, analysis and mass several times: check_blends on a 64-gon rim read the topology 4 times, 360 ms each).
+pub struct Shape(cxx::UniquePtr<ffi::Shape>, Memo);
+
+#[derive(Default)]
+pub(crate) struct Memo {
+    json: std::cell::RefCell<std::collections::HashMap<&'static str, serde_json::Value>>,
+    mass: std::cell::RefCell<Option<MassOut>>,
+    analysis: std::cell::RefCell<Option<AnalysisOut>>,
+}
+
+impl Shape {
+    pub(crate) fn wrap(pointer: cxx::UniquePtr<ffi::Shape>) -> Self {
+        Self(pointer, Memo::default())
+    }
+
+    /// The JSON answer of the query `name` on this shape: computed once.
+    pub(crate) fn remembered(
+        &self,
+        name: &'static str,
+        compute: impl FnOnce() -> OcctResult<serde_json::Value>,
+    ) -> OcctResult<serde_json::Value> {
+        if let Some(found) = self.1.json.borrow().get(name) {
+            return Ok(found.clone());
+        }
+        let value = compute()?;
+        self.1.json.borrow_mut().insert(name, value.clone());
+        Ok(value)
+    }
+}
 
 /// A C++ throw (OCCT `Standard_Failure`, bad argument) during an operation.
 pub type OcctResult<T> = Result<T, String>;
@@ -130,7 +162,7 @@ pub type Built = OcctResult<Option<Shape>>;
 fn built(result: Result<cxx::UniquePtr<ffi::Shape>, cxx::Exception>) -> Built {
     match result {
         Ok(pointer) if pointer.is_null() => Ok(None),
-        Ok(pointer) => Ok(Some(Shape(pointer))),
+        Ok(pointer) => Ok(Some(Shape::wrap(pointer))),
         Err(error) => Err(error.what().to_string()),
     }
 }
@@ -231,11 +263,21 @@ pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64
 }
 
 pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {
-    occt(ffi::mass_properties(inner(shape)?))
+    if let Some(found) = shape.1.mass.borrow().as_ref() {
+        return Ok(found.clone());
+    }
+    let mass = occt(ffi::mass_properties(inner(shape)?))?;
+    *shape.1.mass.borrow_mut() = Some(mass.clone());
+    Ok(mass)
 }
 
 pub fn analyze(shape: &Shape) -> OcctResult<AnalysisOut> {
-    occt(ffi::analyze(inner(shape)?))
+    if let Some(found) = shape.1.analysis.borrow().as_ref() {
+        return Ok(found.clone());
+    }
+    let analysis = occt(ffi::analyze(inner(shape)?))?;
+    *shape.1.analysis.borrow_mut() = Some(analysis.clone());
+    Ok(analysis)
 }
 
 /// ISO 10303-21 text of `shapes` (STEPControl_AsIs, one product per root shape); `None` when a transfer is refused.

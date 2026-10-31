@@ -81,6 +81,9 @@ int32_t span_cut_count(const Shape &shape);
 double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse);
 double boundary_angle_probe(const Shape &shape, int32_t face, bool drop_one);
 
+// Test-only probe of surface_bounds.hxx: [Bezier-patch box, AddOptimal box, dense sample box] of a synthetic many-patch B-spline face (cpp/surface_bounds_probe.cxx).
+rust::Vec<double> spline_bounds_probe(int32_t kind);
+
 void init_runtime();
 rust::String occt_version();
 

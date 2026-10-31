@@ -9,6 +9,7 @@
 // (the host maps them to BLD_PROFILE_FAILED).
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -72,8 +73,11 @@ namespace {
 
 // How far (x the diagonal) the interpolated section poles may leave the circular fillet's contact lines between two stations.
 constexpr double kDeviationFraction = 1e-8;
-// Stations along a blend: the first uniform set, and the most the refinement inserts (where the surface between two stations misses the section).
-constexpr int kFirstStations = 24, kMostStations = 6000;
+// Stations along a blend: the uniform grid of the convexity scan and of the deviation probes, the first (sparse) set the skin starts from, and the most the refinement inserts.
+// The skin starts from kSeedIntervals (kSeedClosedIntervals on a closed blend) and inserts the worst probe of each interval that misses the section: the probes are the 2 x kFirstStations
+// grid points (so a feature the 24-station set plus its midpoints would see is seen here too) and the midpoint of every interval, so the surface holds the same 1e-8 x diagonal at the
+// same points with the fewest stations that do (CHK1: 41 stations per face on a 64-gon rim, 12 or so here).
+constexpr int kFirstStations = 24, kMostStations = 6000, kProbeGrid = 2 * kFirstStations, kSeedIntervals = 4, kSeedClosedIntervals = 8;
 // The profile faces must meet the faces around them within this fraction of the diagonal (the corner patches' rule of 13.10.2); the sewing
 // tolerance below is an input of the sewing, not an acceptance rule.
 constexpr double kGapLimit = 5e-6;
@@ -363,31 +367,36 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
     return out;
   };
   const double span = blend.hi - blend.lo;
+  // The true sections at the probe points, computed once: the grid of kProbeGrid steps, and the midpoints the refinement asks for.
+  std::map<double, Section> truth;
+  const auto truth_at = [&](double at, const Section *&out) {
+    auto found = truth.find(at);
+    if (found == truth.end()) {
+      Section section;
+      if (!section_at(source, blend, at, curved, param, section, why)) return false;
+      found = truth.emplace(at, section).first;
+    }
+    out = &found->second;
+    return true;
+  };
+  const int seed = blend.closed ? kSeedClosedIntervals : kSeedIntervals;
   std::vector<double> along;
   std::vector<Section> stations;
-  const int first = blend.closed ? kFirstStations : kFirstStations + 1;
-  for (int j = 0; j < first; ++j) along.push_back(blend.lo + span * j / kFirstStations);
-  for (double at : along) {
-    Section section;
-    if (!section_at(source, blend, at, curved, param, section, why)) return nullptr;
-    stations.push_back(section);
+  for (int j = 0; j < (blend.closed ? seed : seed + 1); ++j) {
+    const Section *section = nullptr;
+    const double at = blend.lo + span * (kProbeGrid * j / seed) / kProbeGrid;
+    if (!truth_at(at, section)) return nullptr;
+    along.push_back(at);
+    stations.push_back(*section);
   }
+  const bool varying = kind == 0 && fade.active;
   for (;;) {
     std::vector<Handle(Geom_BSplineCurve)> rows;
     const Handle(Geom_BSplineSurface) surface = skin(stations, along, blend.hi, blend.closed, kind, param, 1e-14, weights_of(stations, along), rows, why);
     if (surface.IsNull()) return nullptr;
-    std::vector<double> added;
-    std::vector<Section> added_sections;
-    double worst = 0;
-    const size_t intervals = blend.closed ? along.size() : along.size() - 1;
-    for (size_t j = 0; j < intervals; ++j) {
-      const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
-      const double at = 0.5 * (from + to);
-      Section middle;
-      if (!section_at(source, blend, at, curved, param, middle, why)) return nullptr;
-      // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
+    // every pole of the interpolated section against the pole of the true one: by the convex hull property this bounds the whole section
+    const auto gap_at = [&](double at, const Section &middle) {
       const std::vector<gp_Pnt> expected = section_poles(middle, kind, param);
-      const bool varying = kind == 0 && fade.active;
       const double expected_weight = varying ? weight_of(middle, at) : 1.0;
       double gap = 0;
       for (size_t row = 0; row < expected.size() && row < rows.size(); ++row) {
@@ -396,14 +405,44 @@ Handle(Geom_BSplineSurface) skin_blend(const Blend &blend, int kind, double para
         gap = std::max(gap, rows[row]->Value(at).Distance(want));
       }
       if (varying) gap = std::max(gap, std::fabs(rows.back()->Value(at).X() - expected_weight) * middle.a.Distance(middle.t));
+      return gap;
+    };
+    std::vector<double> added;
+    std::vector<Section> added_sections;
+    double worst = 0;
+    const size_t intervals = blend.closed ? along.size() : along.size() - 1;
+    for (size_t j = 0; j < intervals; ++j) {
+      const double from = along[j], to = j + 1 < along.size() ? along[j + 1] : blend.hi;
+      // the probes of the interval: the grid points strictly inside it, and its midpoint
+      std::vector<double> probes;
+      const double margin = 1e-9 * span;
+      for (int g = static_cast<int>(std::floor((from - blend.lo) / span * kProbeGrid)); g <= kProbeGrid; ++g) {
+        const double at = blend.lo + span * g / kProbeGrid;
+        if (at >= to - margin) break;
+        if (at > from + margin) probes.push_back(at);
+      }
+      const double middle_at = 0.5 * (from + to);
+      if (std::none_of(probes.begin(), probes.end(), [&](double at) { return std::fabs(at - middle_at) <= margin; })) probes.push_back(middle_at);
+      double gap = -1, where = middle_at;
+      const Section *worst_section = nullptr;
+      for (const double at : probes) {
+        const Section *section = nullptr;
+        if (!truth_at(at, section)) return nullptr;
+        const double here = gap_at(at, *section);
+        if (here > gap) {
+          gap = here;
+          where = at;
+          worst_section = section;
+        }
+      }
       worst = std::max(worst, gap);
       if (gap > limit) {
         if (to - from < 1e-9 * span) {
           why = "the blend surface follows the contact lines only to " + number(gap) + " (limit " + number(limit) + ") where the circular blend has a kink";
           return nullptr;
         }
-        added.push_back(at);
-        added_sections.push_back(middle);
+        added.push_back(where);
+        added_sections.push_back(*worst_section);
       }
     }
     if (added.empty()) return surface;

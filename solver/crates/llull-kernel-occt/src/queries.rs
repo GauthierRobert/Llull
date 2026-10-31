@@ -78,7 +78,7 @@ fn index(value: f64) -> Option<i32> {
 
 /// `ShapeTopology` (faces, edges, vertex and solid counts, volume).
 pub fn topology(shape: &Shape) -> OcctResult<Value> {
-    parsed(ffi::topology_json(inner(shape)?))
+    shape.remembered("topology", || parsed(ffi::topology_json(inner(shape)?)))
 }
 
 /// `faceDetails`: one located record per face with up to `samples` interior points.
@@ -92,7 +92,7 @@ pub fn face_contains(shape: &Shape, face: f64, point: [f64; 3], tolerance: f64) 
 }
 
 pub fn face_graph(shape: &Shape) -> OcctResult<Value> {
-    parsed(ffi::face_graph_json(inner(shape)?))
+    shape.remembered("faceGraph", || parsed(ffi::face_graph_json(inner(shape)?)))
 }
 
 pub fn face_geometry(shape: &Shape, face: f64) -> OcctResult<Value> {
@@ -254,7 +254,7 @@ fn build_part(
 pub fn read_brep(text: &str) -> OcctResult<Option<Shape>> {
     match ffi::read_brep(text) {
         Ok(pointer) if pointer.is_null() => Ok(None),
-        Ok(pointer) => Ok(Some(Shape(pointer))),
+        Ok(pointer) => Ok(Some(Shape::wrap(pointer))),
         Err(error) => Err(error.what().to_string()),
     }
 }
