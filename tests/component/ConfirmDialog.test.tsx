@@ -18,6 +18,16 @@ function setup(): { onConfirm: () => void; onCancel: () => void } {
 }
 
 describe('ConfirmDialog', () => {
+  it('renders outside its opener: a backdrop-filter menu ancestor would otherwise trap the fixed backdrop', () => {
+    const { container } = render(
+      <div style={{ backdropFilter: 'blur(10px)' }}>
+        <ConfirmDialog title="New project" message="Clears the model." confirmLabel="Clear" onConfirm={vi.fn()} onCancel={vi.fn()} />
+      </div>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'New project' });
+    expect(container.contains(dialog)).toBe(false);
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+  });
   it('is a named modal dialog with focus on Cancel', () => {
     setup();
     expect(screen.getByRole('dialog', { name: 'Delete project' })).toHaveAttribute('aria-modal', 'true');

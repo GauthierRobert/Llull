@@ -58,6 +58,12 @@ describe('paramForm', () => {
     expect(humanizeName('add_box')).toBe('Add box');
     expect(humanizeName('entityId')).toBe('Entity id');
   });
+  it('writes dimensions and format acronyms in capitals', () => {
+    expect(humanizeName('fillet_2d')).toBe('Fillet 2D');
+    expect(humanizeName('export_stl')).toBe('Export STL');
+    expect(humanizeName('import_iges_file')).toBe('Import IGES file');
+    expect(humanizeName('add_d2_step')).toBe('Add d2 step');
+  });
   it('derives one field per property, required first, with a kind per type', () => {
     const fields = fieldsFromSchema(SCHEMA);
     expect(fields.map((f) => f.name)).toEqual(['id', 'radius', 'mode', 'note', 'entityId2', 'anchor', 'flip', 'position', 'ids', 'points']);

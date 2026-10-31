@@ -33,10 +33,19 @@ export function outlineOfText(
   doc: CadDocument,
   entity: TextEntity,
   font: ParsedFont,
-  overrides: { readonly kerning?: boolean } = {},
+  overrides: { readonly kerning?: boolean; readonly direction?: 'horizontal' | 'vertical' } = {},
 ): TextOutline | TextOutlineFailure {
-  const source = overrides.kerning === undefined ? entity : { ...entity, kerning: overrides.kerning };
+  const source = {
+    ...entity,
+    ...(overrides.kerning === undefined ? {} : { kerning: overrides.kerning }),
+    ...(overrides.direction === undefined ? {} : { direction: overrides.direction }),
+  };
   const link = entity.onCurve;
+  if (link !== undefined && source.direction === 'vertical')
+    return {
+      code: 'WRP_TEXT_VERTICAL_CURVE',
+      message: `text '${entity.id}' is vertical and follows '${link.curveId}': vertical text cannot follow a curve`,
+    };
   let mapper;
   if (link !== undefined) {
     const curve = doc.entities[link.curveId];

@@ -1,5 +1,5 @@
 // Right-docked inspector: name, position and (3D only) rotation commit set_entity_name / move_entities / rotate_entity
-// with the delta from the stored value.
+// with the delta from the stored value; geometry edits the creating step (edit_step_params); colour commits set_entity_color.
 
 import { toDegrees, toRadians } from '@lib/angle';
 import React, { useMemo } from 'react';
@@ -15,7 +15,8 @@ import { entitiesFocus, sizeLabel } from '@ui/panels/entityFocus';
 import { formatMass, totalMassG } from '@ui/panels/materials/materialUsage';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
-import { dimensionRows } from './entityDimensions';
+import { GeometrySection } from './StepDimensionRows';
+import { ColorField } from './ColorField';
 import { ElementInspector } from './building/ElementInspector';
 import { ExchangeProvenanceSection } from './exchange/ExchangeReport';
 import { buildingElementOf } from '@aec/index';
@@ -87,7 +88,6 @@ function EntityHeadline({ entity }: { entity: Entity }): React.ReactElement | nu
 function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const provenance = useStore((s) => s.document.exchange?.provenance[entity.id]);
-  const geometryRows = dimensionRows(entity);
   return (
     <section className="props-detail" aria-label="Selection">
       <div className="props-summary">
@@ -142,14 +142,15 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         )}
       </PanelSection>
 
-      {geometryRows !== null && <PanelSection title="Geometry">{geometryRows}</PanelSection>}
+      <GeometrySection entity={entity} />
 
       <PanelSection title="Appearance">
         <PropRow label="Color">
-          <span className="props-color">
-            <span role="img" className="props-color-swatch" style={{ background: entity.color }} aria-label={entity.color} />
-            <span className="props-number">{entity.color}</span>
-          </span>
+          <ColorField
+            key={entity.id}
+            value={entity.color}
+            onCommit={(color) => dispatch('set_entity_color', { entityIds: [entity.id], color })}
+          />
         </PropRow>
       </PanelSection>
 

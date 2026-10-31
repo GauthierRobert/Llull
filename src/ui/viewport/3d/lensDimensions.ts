@@ -71,10 +71,17 @@ function dimensionsOf(params: Readonly<Record<string, unknown>>): LensDimension[
   return dimensions;
 }
 
-/** The first non-suppressed step that affected `entityId` and carries dimension params, or null. */
+/** Recorded `affected` ids, else (steps inserted by hand carry none) the step-scoped id `<prefix>-<step>.<k>` naming the step. */
+function stepProduced(step: FeatureStep, entityId: string): boolean {
+  if (step.affected !== undefined && step.affected.length > 0) return step.affected.includes(entityId);
+  const stepNumber = /^step-(\d+)$/.exec(step.id)?.[1];
+  return stepNumber !== undefined && new RegExp(`-${stepNumber}\\.\\d+$`).test(entityId);
+}
+
+/** The first non-suppressed step that produced `entityId` and carries dimension params, or null. */
 export function lensTarget(history: readonly FeatureStep[], entityId: string): LensTarget | null {
   for (const step of history) {
-    if (step.suppressed === true || step.affected?.includes(entityId) !== true || !isRecord(step.params)) continue;
+    if (step.suppressed === true || !stepProduced(step, entityId) || !isRecord(step.params)) continue;
     const dimensions = dimensionsOf(step.params);
     if (dimensions.length > 0) return { stepId: step.id, stepName: step.name, params: step.params, dimensions };
   }

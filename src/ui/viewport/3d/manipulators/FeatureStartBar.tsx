@@ -1,6 +1,8 @@
 // Floating chips over the viewport for the sole selected entity: Extrude for a sketch profile, Fillet / Shell for a solid.
-// Each starts a drag-handle session (live ghost, one dispatch on release); no document change happens here.
+// Each starts a drag-handle session (live ghost, one dispatch on release); no document change happens here. None for
+// plugin-derived geometry (building elements, implicit bodies…): it is read-only, so the command would be refused.
 
+import { derivedEntityIds } from '@core/plugins/host';
 import { useStore } from '@ui/store';
 import { useFeatureSessionStore } from '@ui/store/featureSessionStore';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
@@ -33,6 +35,8 @@ export function FeatureStartBar(): React.ReactElement | null {
   const entity = useSoleSelectedEntity();
   const session = useFeatureSessionStore((s) => s.session);
   if (entity === undefined || session !== null) return null;
+  // Read at render: a new entity object (the selection or the document changed) re-renders this bar.
+  if (derivedEntityIds(useStore.getState().document).has(entity.id)) return null;
   const features = featuresFor(entity.kind);
   if (features.length === 0) return null;
 

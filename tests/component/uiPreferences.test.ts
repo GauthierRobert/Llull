@@ -68,4 +68,24 @@ describe('layoutStore — narrow windows', () => {
     expect(useLayoutStore.getState().sidebarOpen).toBe(true);
     expect(useLayoutStore.getState().inspectorOpen).toBe(true);
   });
+  it('opens one dock at a time on a drawer-layout window, without persisting the forced close', async () => {
+    stubMatchMedia((query) => query.includes('max-width'));
+    const { useLayoutStore } = await import('@ui/store/layoutStore');
+    const layout = useLayoutStore.getState();
+    layout.toggleInspector();
+    expect([useLayoutStore.getState().sidebarOpen, useLayoutStore.getState().inspectorOpen]).toEqual([false, true]);
+    layout.selectSidebarTab('history');
+    expect([useLayoutStore.getState().sidebarOpen, useLayoutStore.getState().inspectorOpen]).toEqual([true, false]);
+    expect(JSON.parse(localStorage.getItem('llull-layout') ?? '{}')).toMatchObject({ sidebarOpen: true, inspectorOpen: true });
+    layout.toggleInspector();
+    expect([useLayoutStore.getState().sidebarOpen, useLayoutStore.getState().inspectorOpen]).toEqual([false, true]);
+    layout.pinSidebarTab('aero');
+    expect([useLayoutStore.getState().sidebarOpen, useLayoutStore.getState().inspectorOpen]).toEqual([true, false]);
+  });
+  it('keeps both docks open side by side on a wide window', async () => {
+    stubMatchMedia(() => false);
+    const { useLayoutStore } = await import('@ui/store/layoutStore');
+    useLayoutStore.getState().toggleSidebar();
+    expect([useLayoutStore.getState().sidebarOpen, useLayoutStore.getState().inspectorOpen]).toEqual([true, true]);
+  });
 });

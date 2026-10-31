@@ -1,5 +1,6 @@
 // Persisted layout UI state: open sidebar tab, pinned rail tabs, dock expansion. In the narrow drawer layout (shell.css) both docks start
-// closed without touching the stored desktop preference until the user toggles one.
+// closed without touching the stored desktop preference until the user toggles one, and opening one closes the other: side by side they
+// would leave almost no viewport.
 
 import { create } from 'zustand';
 import { isRecord } from '@lib/isRecord';
@@ -80,6 +81,14 @@ export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
     writeStored(STORAGE_KEY, { ...readStoredLayout(), ...patch });
     set(patch);
   };
+  // Drawer layout only, and not persisted: the desktop preference for the other dock survives.
+  const closeInDrawer = (dock: 'sidebarOpen' | 'inspectorOpen'): void => {
+    if (isDrawerLayout()) set({ [dock]: false });
+  };
+  const openSidebar = (patch: Partial<PersistedLayout>): void => {
+    commit({ ...patch, sidebarOpen: true });
+    closeInDrawer('inspectorOpen');
+  };
 
   return {
     ...readStoredLayout(),
@@ -88,20 +97,23 @@ export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
     selectSidebarTab(tab: SidebarTab): void {
       const { sidebarTab, sidebarOpen } = get();
       if (tab === sidebarTab && sidebarOpen) commit({ sidebarOpen: false });
-      else commit({ sidebarTab: tab, sidebarOpen: true });
+      else openSidebar({ sidebarTab: tab });
     },
 
     toggleSidebar(): void {
-      commit({ sidebarOpen: !get().sidebarOpen });
+      if (get().sidebarOpen) commit({ sidebarOpen: false });
+      else openSidebar({});
     },
 
     toggleInspector(): void {
-      commit({ inspectorOpen: !get().inspectorOpen });
+      const inspectorOpen = !get().inspectorOpen;
+      commit({ inspectorOpen });
+      if (inspectorOpen) closeInDrawer('sidebarOpen');
     },
 
     pinSidebarTab(tab: SidebarTab): void {
       const { pinnedTabs } = get();
-      commit({ sidebarTab: tab, sidebarOpen: true, pinnedTabs: pinnedTabs.includes(tab) ? pinnedTabs : [...pinnedTabs, tab] });
+      openSidebar({ sidebarTab: tab, pinnedTabs: pinnedTabs.includes(tab) ? pinnedTabs : [...pinnedTabs, tab] });
     },
 
     unpinSidebarTab(tab: SidebarTab): void {

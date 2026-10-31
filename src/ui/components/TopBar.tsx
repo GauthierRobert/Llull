@@ -1,31 +1,13 @@
-// Header: browser-panel toggle, brand, breadcrumbs (project › selection); live-sync status and the More menu
-// (file, export, theme, properties). The command palette trigger lives in the command bar.
+// Header: browser-panel toggle, brand, breadcrumbs (project › selection) and the More menu (file, export, theme,
+// properties); live-sync status sits in the status bar. The command palette trigger lives in the command bar.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
-import { type LiveStatus, useLayoutStore, useStore } from '@ui/store';
+import { useLayoutStore, useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
 import { MoreMenu } from '@ui/components/MoreMenu';
-
-function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
-  const isConnected = status === 'connected';
-  const isConnecting = status === 'connecting';
-
-  const label = `Live sync: ${status}`;
-
-  return (
-    <div
-      className={classNames('agent-pill', isConnected && 'agent-pill--connected', isConnecting && 'agent-pill--connecting')}
-      aria-label={label}
-      title={label}
-    >
-      <span className="agent-pill__dot" aria-hidden="true" />
-      <span className="agent-pill__text">{isConnected ? 'live' : isConnecting ? 'connecting…' : 'offline'}</span>
-    </div>
-  );
-}
 
 /** Breadcrumb tail: the sole selected entity's name (or id), "<n> selected" for several, null for none. */
 function useSelectionCrumb(): string | null {
@@ -57,7 +39,6 @@ function SidebarToggle(): React.ReactElement {
 }
 
 export function TopBar(): React.ReactElement {
-  const liveStatus = useStore((s) => s.liveStatus);
   const projectName = useStore((s) => projectNameOf(s.document));
   const isDirty = useSessionStore((s) => s.dirty);
   const selectionName = useSelectionCrumb();
@@ -100,7 +81,6 @@ export function TopBar(): React.ReactElement {
       </div>
 
       <div className="topbar__right">
-        <AgentPill status={liveStatus} />
         <MoreMenu />
       </div>
     </header>

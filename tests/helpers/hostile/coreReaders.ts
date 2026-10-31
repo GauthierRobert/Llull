@@ -130,6 +130,7 @@ export const CORE_READERS: readonly HostileReader[] = [
       'core/src/lib/font/gvar.ts:readGvar',
       'core/src/lib/font/mvar.ts:readMetricDeltas',
       'core/src/lib/font/variation.ts:readVerticalAdvanceDeltas',
+      'core/src/lib/font/variation.ts:readTopSideBearingDeltas',
       'core/src/lib/font/sfnt.ts:readNameStrings',
     ],
     input: 'bytes',

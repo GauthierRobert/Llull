@@ -96,6 +96,52 @@ export function verticalAdvanceOf(tables: SfntTables, header: FontHeader, glyph:
   return vmtx.u16(4 * Math.min(glyph, count - 1));
 }
 
+/**
+ * Top side bearing (font units) of glyph `glyph` from `vmtx` (the entry of its long metric, or the side-bearing array after them), null without `vhea` / `vmtx`: the distance from the top of the glyph to its vertical origin.
+ * @failure the same damage as `verticalAdvanceOf` -> WRP_FONT_PARSE
+ */
+export function topSideBearingOf(tables: SfntTables, header: FontHeader, glyph: number): number | null {
+  if (verticalAdvanceOf(tables, header, glyph) === null) return null;
+  const vhea = tables.table('vhea') as ByteView;
+  const vmtx = tables.table('vmtx') as ByteView;
+  const count = vhea.u16(34);
+  return glyph < count ? vmtx.i16(4 * glyph + 2) : vmtx.i16(4 * count + 2 * (glyph - count));
+}
+
+/**
+ * The vertical line metrics of `vhea` (typographic ascender, descender and line gap, font units), null without `vhea`.
+ */
+export function verticalLineOf(
+  tables: SfntTables,
+): { readonly ascender: number; readonly descender: number; readonly lineGap: number } | null {
+  const vhea = tables.table('vhea');
+  if (vhea === null) return null;
+  return { ascender: vhea.i16(4), descender: vhea.i16(6), lineGap: vhea.i16(8) };
+}
+
+/**
+ * Vertical origin y (font units, above the baseline) of glyph `glyph` from the `VORG` table of a CFF font: the record of the glyph, else `defaultVertOriginY`; null when the font has no `VORG`.
+ * @failure a version other than 1.0, a table shorter than its header or its records -> WRP_FONT_PARSE
+ */
+export function verticalOriginOf(tables: SfntTables, glyph: number): number | null {
+  const vorg = tables.table('VORG');
+  if (vorg === null) return null;
+  if (vorg.length < 8) throw parseError('VORG: shorter than its 8-byte header');
+  if (vorg.u16(0) !== 1 || vorg.u16(2) !== 0) throw parseError(`VORG: version ${vorg.u16(0)}.${vorg.u16(2)} is not 1.0`);
+  const count = vorg.u16(6);
+  if (vorg.length < 8 + 4 * count) throw parseError('VORG: shorter than its record count requires');
+  let low = 0;
+  let high = count - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const found = vorg.u16(8 + 4 * middle);
+    if (found === glyph) return vorg.i16(10 + 4 * middle);
+    if (found < glyph) low = middle + 1;
+    else high = middle - 1;
+  }
+  return vorg.i16(4);
+}
+
 /** Advance width (font units) of glyph `glyph`. */
 export function advanceOf(tables: SfntTables, header: FontHeader, glyph: number): number {
   const hmtx = requireTable(tables, 'hmtx');

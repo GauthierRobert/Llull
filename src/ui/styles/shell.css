@@ -129,44 +129,6 @@
   color: var(--fg-faint);
 }
 
-/* Agent status pill */
-.agent-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px 0 6px;
-  border-radius: var(--radius-full);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-  white-space: nowrap;
-}
-
-.agent-pill__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--fg-faint);
-}
-
-.agent-pill--connecting .agent-pill__dot {
-  background: var(--warning);
-  animation: pulse-dot 1.4s var(--ease) infinite;
-}
-
-.agent-pill--connected {
-  background: var(--agent-soft);
-  border-color: color-mix(in oklch, var(--agent) 35%, transparent);
-  color: var(--agent);
-}
-
-.agent-pill--connected .agent-pill__dot {
-  background: var(--agent);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--agent) 25%, transparent);
-  animation: pulse-dot 2.4s var(--ease) infinite;
-}
-
 @keyframes pulse-dot {
   0%,
   100% {
@@ -212,6 +174,12 @@
 
 .more-menu__panel .project-io {
   flex-wrap: wrap;
+}
+
+/* Long format names ("STEP AP242 with PMI…") must not push the select past the card: it takes the row beside its button. */
+.more-menu__panel .project-io__select {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .menu-item {
@@ -322,6 +290,44 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
+  /* With the scrollbar hidden, an edge fades out while more tabs lie beyond it (scroll-driven; no fade when nothing scrolls). */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--rail-fade-top),
+    #000 calc(100% - var(--rail-fade-bottom)),
+    transparent 100%
+  );
+  animation: rail-scroll-fade linear both;
+  animation-timeline: scroll(self);
+}
+
+@property --rail-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --rail-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes rail-scroll-fade {
+  from {
+    --rail-fade-top: 0px;
+    --rail-fade-bottom: 24px;
+  }
+  8%,
+  92% {
+    --rail-fade-top: 24px;
+    --rail-fade-bottom: 24px;
+  }
+  to {
+    --rail-fade-top: 24px;
+    --rail-fade-bottom: 0px;
+  }
 }
 
 .rail__divider {
@@ -458,7 +464,8 @@ button.rail-more__item:hover {
   right: var(--chrome-gap);
   z-index: 30;
   width: var(--inspector-w);
-  max-height: calc(100% - var(--vp-inset-top) - var(--chrome-gap) - 72px);
+  /* Ends above the axis gizmo (bottom-right, ~130px tall with its margin) instead of covering it. */
+  max-height: calc(100% - var(--vp-inset-top) - var(--chrome-gap) - 136px);
   overflow-y: auto;
   border-radius: var(--radius-float);
   background: var(--surface-1);
@@ -601,25 +608,9 @@ button.rail-more__item:hover {
 
 /* ==== Responsive — narrow windows drop secondary chrome ==== */
 
-@media (max-width: 1180px) {
-  .project-io__btn span,
-  .agent-pill__text {
-    display: none;
-  }
-
-  .agent-pill {
-    padding: 0 8px;
-  }
-}
-
-/* Tablet / narrow: floating cards overlap the viewport instead of reserving room for it. */
+/* Tablet / narrow: the cards start closed (drawer layout) and float with a deeper shadow. The viewport insets still follow
+   them, so the overlays anchored to the insets (view options, edit chips) never slide under an open card. */
 @media (max-width: 1024px) {
-  .app-layout[data-sidebar='open'],
-  .app-layout[data-inspector='open'] {
-    --vp-inset-left: calc(var(--chrome-gap) * 2 + var(--rail-w));
-    --vp-inset-right: var(--chrome-gap);
-  }
-
   .sidebar__body,
   .inspector {
     max-width: calc(100vw - var(--rail-w) - 4 * var(--chrome-gap));
@@ -649,7 +640,6 @@ button.rail-more__item:hover {
 
   .file-crumbs,
   .brand-wordmark,
-  .agent-pill,
   .topbar__sep {
     display: none;
   }
