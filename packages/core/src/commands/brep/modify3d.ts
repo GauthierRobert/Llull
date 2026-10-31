@@ -23,12 +23,14 @@ import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
 import { blendRejection } from './blendCodes';
 import { partialSchema, refusePartial } from './filletPartial';
-import { refuseKinkedFillet } from './filletTangency';
+import { findKink, kinkRefusal, kinkReported } from './filletTangency';
 import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 
 interface EdgeModification {
+  /** fillet_edge: build a blend that meets an earlier blend without tangency (reported, not refused). */
+  readonly allowNonTangent?: boolean | undefined;
   readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
   readonly pastTense: string;
   readonly amountName: 'radius' | 'distance' | 'thickness';
@@ -66,7 +68,7 @@ interface RecipeProblem {
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, edges = [], near = [], names, recipe }: EdgeModification,
+  { command, pastTense, amountName, amount, id, edges = [], near = [], names, recipe, allowNonTangent }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -106,11 +108,12 @@ function modifyEdges(
     (newId, triangles) =>
       `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}${selection.note}`,
   );
-  const kinked = command === 'fillet_edge' ? refuseKinkedFillet(doc, command, id, committed, source, ctx) : null;
-  if (kinked !== null) return kinked;
+  const kink = command === 'fillet_edge' ? findKink(doc, committed, source, ctx) : null;
+  if (kink !== null && allowNonTangent !== true) return kinkRefusal(doc, command, id, kink, 'radius');
+  const reported = kink === null ? committed : kinkReported(committed, kink);
   return selection.record === null || committed.document === doc
-    ? committed
-    : { ...committed, recordExtras: { edgeNames: selection.record } };
+    ? reported
+    : { ...reported, recordExtras: { edgeNames: selection.record } };
 }
 
 /**
@@ -194,6 +197,12 @@ export const filletEdge = defineCommand({
       .optional(),
     profile: profileSchema.optional(),
     partial: partialSchema.optional(),
+    allowNonTangent: z
+      .boolean()
+      .describe(
+        'Default false. A fillet step whose new blend meets a blend the solid already has with a normal angle over the check_blends G1 default (a radius larger than the round it runs onto: OCCT approximates it) is refused with BLD_FILLET_NOT_TANGENT. true builds it anyway and reports the contact in data.nonTangent and the summary.',
+      )
+      .optional(),
     mode: z
       .enum(FILLET_MODES)
       .describe(
@@ -205,7 +214,20 @@ export const filletEdge = defineCommand({
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners, partial },
+    {
+      id,
+      edgeIndices = [],
+      edgesNear = [],
+      edgeNames,
+      radius,
+      radiusEnd,
+      edges,
+      mode = 'radius',
+      profile,
+      corners,
+      partial,
+      allowNonTangent,
+    },
     ctx,
   ): CommandResult => {
     const target = validateSolidTarget(doc, 'fillet_edge', id);
@@ -213,13 +235,26 @@ export const filletEdge = defineCommand({
     const refused = refusePartial(doc, id, partial);
     if (refused !== null) return refused;
     if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
-      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile, corners });
+      return filletEach(doc, ctx, {
+        id,
+        mode,
+        edges,
+        edgeIndices,
+        edgesNear,
+        radius,
+        radiusEnd,
+        edgeNames,
+        profile,
+        corners,
+        allowNonTangent,
+      });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
     return modifyEdges(doc, ctx, {
       command: 'fillet_edge',
       pastTense: 'filleted',
       amountName: 'radius',
       amount: radius,
+      allowNonTangent,
       id,
       edges: edgeIndices,
       near: edgesNear,

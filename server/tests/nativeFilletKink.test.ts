@@ -130,4 +130,56 @@ describeNative('two circular fillet steps: a second blend larger than the round 
     expect(together.rejected, together.summary).toBeUndefined();
     expect(g1Findings(together.document, together.affected[0] as string)).toEqual([]);
   });
+
+  it('allowNonTangent builds the refused step, reports the contact in data.nonTangent and a warning, and an old kink never refuses a later step elsewhere on the part', () => {
+    const { doc, id } = firstStep([[0, 0, 10]], 1);
+    const kinked = execute(doc, 'fillet_edge', { id, edgesNear: [[10, 0, 20]], radius: 2, allowNonTangent: true });
+    expect(kinked.rejected, kinked.summary).toBeUndefined();
+    expect(kinked.summary).toContain('Warning (allowNonTangent)');
+    const info = (kinked.data as { nonTangent: { angleRad: number; edge: number; face: string; against: string } }).nonTangent;
+    expect(info.angleRad).toBeGreaterThan(0.04);
+    expect(info.against).toContain('blend(');
+    expect(g1Findings(kinked.document, kinked.affected[0] as string).length).toBeGreaterThan(0);
+    // the part now has a kink; a fillet of another corner (far from it) is judged on its own faces only
+    const later = execute(kinked.document, 'fillet_edge', { id: kinked.affected[0] as string, edgesNear: [[20, 20, 10]], radius: 1 });
+    expect(later.rejected, later.summary).toBeUndefined();
+  });
+
+  it('a first step made with fillet_faces is an earlier round too: a larger fillet_edge along its rim is refused at the radius path', () => {
+    const { doc, id } = cube();
+    const faces = execute(doc, 'fillet_faces', { id, facesA: { near: [[0, 10, 10]] }, facesB: { near: [[10, 0, 10]] }, radius: 1 });
+    expect(faces.rejected, faces.summary).toBeUndefined();
+    const second = execute(faces.document, 'fillet_edge', { id: faces.affected[0] as string, edgesNear: [[10, 0, 20]], radius: 2 });
+    expect(second.error?.code).toBe('BLD_FILLET_NOT_TANGENT');
+    expect(second.error?.paths).toEqual(['radius']);
+    const viaEdges = execute(faces.document, 'fillet_edge', { id: faces.affected[0] as string, edges: [{ near: [10, 0, 20], size: 2 }] });
+    expect(viaEdges.error?.code).toBe('BLD_FILLET_NOT_TANGENT');
+    expect(viaEdges.error?.paths).toEqual(['edges']);
+  });
+
+  it('an imported round has no blend names (IGES: faces f0, f1, ...): a larger fillet along its rim is refused all the same, against the curved face the solid already had', () => {
+    if (!(kernel.info?.().capabilities ?? []).includes('igesExchange'))
+      return console.warn('[kink] skipped: the kernel build has no IGES translator');
+    const { doc, id } = firstStep([[0, 0, 10]], 1);
+    const written = execute(doc, 'export_iges', { entityIds: [id] });
+    expect(written.rejected, written.summary).toBeUndefined();
+    const back = execute(createEmptyDocument(), 'import_iges', { text: (written.data as { iges: string }).iges });
+    expect(back.affected).toHaveLength(1);
+    const imported = back.affected[0] as string;
+    const listed = (
+      execute(back.document, 'inspect_topology', { id: imported }).data as {
+        edges: Array<{ index: number; curve: string; start: number[]; end: number[] }>;
+      }
+    ).edges;
+    const top = listed.find(
+      (edge) =>
+        edge.curve === 'line' &&
+        [edge.start, edge.end].every((p) => Math.abs(p[1] as number) < 1e-6 && Math.abs((p[2] as number) - 20) < 1e-6),
+    );
+    expect(top).toBeDefined();
+    const second = execute(back.document, 'fillet_edge', { id: imported, edgeIndices: [(top as { index: number }).index], radius: 2 });
+    expect(second.error?.code).toBe('BLD_FILLET_NOT_TANGENT');
+    const smaller = execute(back.document, 'fillet_edge', { id: imported, edgeIndices: [(top as { index: number }).index], radius: 1 });
+    expect(smaller.rejected, smaller.summary).toBeUndefined();
+  });
 });
