@@ -50,21 +50,25 @@ bool add_fillet_laws(LawFillet &maker, const TopTools_IndexedMapOfShape &unique,
     if (static_cast<int>(index) >= unique.Extent() || offset + kLawHeader > laws.size()) return false;
     const double start = laws[offset];
     const double end = laws[offset + 1];
-    const bool linear = laws[offset + 2] == 1.0;
+    const double mode = laws[offset + 2];
+    const bool linear = mode == 1.0;
+    const bool monotone = mode == 2.0;
     const size_t count = static_cast<size_t>(laws[offset + 3]);
     if (offset + kLawHeader + 2 * count > laws.size()) return false;
     const double *points = laws.data() + offset + kLawHeader;
     const TopoDS_Edge edge = TopoDS::Edge(unique(static_cast<int>(index) + 1));
     try {
       if (linear && (count > 0 || !std::isnan(end))) {
-        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), true);
+        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), LawKind::Straight);
       } else if (count == 0 && std::isnan(end)) {
         maker.constant(edge, start);
       } else if (count == 0) {
-        maker.range(edge, start, end);
+        // a start and an end: OCCT's own transition, or the exact monotone cubic (one Hermite piece with zero end slopes)
+        if (monotone) maker.nodes(edge, law_nodes(start, end, points, count), LawKind::Monotone);
+        else maker.range(edge, start, end);
       } else {
         // Evolving radius: (relative parameter, radius) from the start through the control points to the end.
-        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), false);
+        maker.nodes(edge, law_nodes(start, std::isnan(end) ? start : end, points, count), monotone ? LawKind::Monotone : LawKind::Smooth);
       }
     } catch (const Standard_Failure &) {
       if (!lenient) throw;
@@ -78,7 +82,7 @@ bool has_straight_kink(rust::Slice<const double> laws) {
   size_t offset = 0;
   while (offset + kLawHeader <= laws.size()) {
     const size_t count = static_cast<size_t>(laws[offset + 3]);
-    if (laws[offset + 2] == 1.0 && count > 0) return true;
+    if ((laws[offset + 2] == 1.0 || laws[offset + 2] == 2.0) && count > 0) return true;
     offset += kLawHeader + 2 * count;
   }
   return false;

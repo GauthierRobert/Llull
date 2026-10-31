@@ -213,8 +213,8 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
   for (const law of radii) {
     if (!isRecord(law) || !positiveNumber(law['size'])) return 'fillet: every radii entry needs size > 0';
     if (law['sizeEnd'] !== undefined && !positiveNumber(law['sizeEnd'])) return 'fillet: radii sizeEnd must be > 0';
-    if (law['interpolation'] !== undefined && law['interpolation'] !== 'smooth' && law['interpolation'] !== 'linear')
-      return 'fillet: radii interpolation must be "smooth" or "linear"';
+    if (law['interpolation'] !== undefined && law['interpolation'] !== 'smooth' && law['interpolation'] !== 'linear' && law['interpolation'] !== 'monotone')
+      return 'fillet: radii interpolation must be "smooth", "linear" or "monotone"';
     if (law['size2'] !== undefined && !positiveNumber(law['size2'])) return 'fillet: radii size2 must be > 0';
     const sideFace = law['sideFace'];
     if (

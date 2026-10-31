@@ -769,14 +769,14 @@ export type BooleanOp = 'union' | 'subtract' | 'intersect';
 /**
  * Radius law of one filleted edge: `size` at its start, `sizeEnd` at its end (linear between, constant when absent); `sizes` adds interior
  * control points (`t` in (0, 1) strictly increasing, relative position on the tangent chain, radius `size` there) the radius passes through
- * (BRepFilletAPI_MakeFillet radius law). `interpolation` "linear" joins the points with straight pieces; absent / "smooth" is the kernel's
+ * (BRepFilletAPI_MakeFillet radius law). `interpolation` "linear" joins the points with straight pieces; "monotone" is a C1 cubic through them that never overshoots a station (zero slope at the ends); absent / "smooth" is the kernel's
  * smooth interpolation (default).
  */
 export interface EdgeRadius {
   readonly size: number;
   readonly sizeEnd?: number;
   readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
-  readonly interpolation?: 'smooth' | 'linear';
+  readonly interpolation?: 'smooth' | 'linear' | 'monotone';
   /** Second leg (BLD M2): with it `size` is the leg on the face `sideFace` and `size2` the leg on the other face, document units. */
   readonly size2?: number;
   /** Unique face index of the source shape carrying `size` when `size2` is given. */

@@ -143,7 +143,7 @@ function recipeOfPlan(
     first !== undefined &&
     planned.every((entry) => sameLaw(entry.law, first.law)) &&
     first.law.sizes === undefined &&
-    first.law.interpolation !== 'linear' &&
+    first.law.interpolation === undefined &&
     first.law.size2 === undefined;
   const profiled = { ...(profile === undefined ? {} : { profile }), ...(corners.length === 0 ? {} : { corners: [...corners] }) };
   if (uniform)
@@ -160,7 +160,7 @@ function recipeOfPlan(
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : 'smooth'} control point(s)`}`;
+  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : law.interpolation === 'monotone' ? 'monotone' : 'smooth'} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;

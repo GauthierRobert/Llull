@@ -72,11 +72,11 @@ export function shapeCallOpen(shape: ShapeSpec, key = ''): string {
 const pairList = (pairs: ReadonlyArray<readonly [number, number]>): string =>
   `[${pairs.map(([a, b]) => `(${formatNumber(a)}, ${formatNumber(b)})`).join(', ')}]`;
 
-/** One radius law as `(size, size_end | None, [(t, size)…], linear, [(t, radius) nodes…] | None)`. */
+/** One radius law as `(size, size_end | None, [(t, size)…], linear | 'monotone', [(t, radius) nodes…] | None)`. */
 function lawTuple(law: FilletLaw): string {
   const end = law.sizeEnd === undefined ? 'None' : formatNumber(law.sizeEnd);
   const points = pairList((law.sizes ?? []).map((point): [number, number] => [point.t, point.size]));
-  return `(${formatNumber(law.size)}, ${end}, ${points}, ${law.linear ? 'True' : 'False'}, ${law.nodes === null ? 'None' : pairList(law.nodes)})`;
+  return `(${formatNumber(law.size)}, ${end}, ${points}, ${law.monotone === true ? "'monotone'" : law.linear ? 'True' : 'False'}, ${law.nodes === null ? 'None' : pairList(law.nodes)})`;
 }
 
 /** `v = fillet|chamfer(v, [edges], size[, near=[…]])`, `v = fillet_laws(v, [edges], [law, …][, near=[…]])` or `v = shell(v, thickness)`. */
