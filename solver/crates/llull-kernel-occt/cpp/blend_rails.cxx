@@ -242,7 +242,8 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
   blend.core[0] = std::max(rail_lo[0], rail_lo[1]);
   blend.core[1] = std::min(rail_hi[0], rail_hi[1]);
   for (const Item &other : others) {
-    bool oblique = false;
+    bool oblique = false, curved_end = false;
+    gp_Vec curved_normal(0, 0, 0);
     if (!iso(other, along_coordinate)) {
       why = "the blend ends obliquely on a neighbouring face (profile blends end on a face square to the blend, or on the next blend of a chain)";
       const bool flat = !other.is_blend && BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() == GeomAbs_Plane;
@@ -261,18 +262,42 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
           return false;
         }
         oblique = true;
-      } else {
-        if (!flat && !other.is_blend) {
-          // the curved end face is not trimmed: the measured angle of the face's normal from the direction of the blend
-          const gp_Pnt2d on = [&] {
-            gp_Pnt2d uv;
-            return mid_uv(other.edge, other.neighbour, uv) ? uv : gp_Pnt2d(0, 0);
-          }();
-          const gp_Vec normal = face_normal(BRepAdaptor_Surface(other.neighbour, Standard_False), on);
-          if (direction.Magnitude() > 1e-14 && normal.Magnitude() > 0.5)
-            why += ": its end face is curved (not trimmed; only a flat end face is) and its normal is " +
-                   number(std::acos(std::min(1.0, std::fabs(direction.Normalized().Dot(normal))))) + " rad from the direction of the blend there";
+      } else if (!flat && !other.is_blend && direction.Magnitude() > 1e-14) {
+        // A CURVED end face (13.37): the crease against its normal at both ends and the middle of the end edge; the skin is split by its surface.
+        double first_blend = 0, last_blend = 0, first_end = 0, last_end = 0;
+        const Handle(Geom2d_Curve) on_blend = BRep_Tool::CurveOnSurface(other.edge, face, first_blend, last_blend);
+        const Handle(Geom2d_Curve) on_end = BRep_Tool::CurveOnSurface(other.edge, other.neighbour, first_end, last_end);
+        if (on_blend.IsNull() || on_end.IsNull()) {
+          why += ": its end face is curved and the end edge has no parametric curve on one of the two faces";
+          return false;
         }
+        const BRepAdaptor_Surface end_surface(other.neighbour, Standard_False);
+        double worst = 10;
+        for (const double t : {0.0, 0.5, 1.0}) {
+          const gp_Pnt2d uv = on_blend->Value(first_blend + (last_blend - first_blend) * t);
+          gp_Pnt here;
+          gp_Vec eu, ev;
+          surface.D1(uv.X(), uv.Y(), here, eu, ev);
+          const gp_Vec along = blend.across_is_u ? ev : eu;
+          const gp_Vec normal = face_normal(end_surface, on_end->Value(first_end + (last_end - first_end) * t));
+          if (along.Magnitude() < 1e-14 || normal.Magnitude() < 0.5) {
+            why += ": its end face is curved and its normal or the direction of the blend is not defined along the end edge";
+            return false;
+          }
+          const double crease = std::asin(std::min(1.0, std::fabs(along.Normalized().Dot(normal))));
+          if (crease < worst) {
+            worst = crease;
+            curved_normal = normal;
+          }
+        }
+        if (worst < kMinObliqueCrease) {
+          why += ": its end face is curved and meets the blend at a crease of " + number(worst) + " rad at its sharpest point (a curved end face is cut only when it is at least " +
+                 number(kMinObliqueCrease) + " rad from the direction of the blend)";
+          return false;
+        }
+        oblique = true;
+        curved_end = true;
+      } else {
         return false;
       }
     }
@@ -288,12 +313,17 @@ bool analyse(const TopoDS_Face &face, const TopTools_IndexedDataMapOfShapeListOf
       why = "the blend face has an edge that is neither a contact line nor one clean end";
       return false;
     }
-    if (!other.is_blend && BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() != GeomAbs_Plane) {
+    if (!other.is_blend && !curved_end && BRepAdaptor_Surface(other.neighbour, Standard_False).GetType() != GeomAbs_Plane) {
       why = "the blend ends on a curved or non-flat face (profile blends end on a flat face square to the blend)";
       return false;
     }
     blend.end[side] = other.edge;
     blend.oblique[side] = oblique;
+    blend.curved[side] = curved_end;
+    if (curved_end) {
+      blend.end_normal[side] = curved_normal;
+      blend.end_sign[side] = other.neighbour.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
+    }
     (other.is_blend ? blend.end_blend[side] : blend.end_face[side]) = other.neighbour;
   }
   blend.closed = blend.end[0].IsNull() && blend.end[1].IsNull();
@@ -575,13 +605,14 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
 
   TopTools_IndexedMapOfShape blends;
   std::vector<int> chain;
+  std::map<int, TopoDS_Edge> source_edge;  // the edge of the part each blend face (index in `blends`) rounds
   // OCCT rounds the whole tangent chain of a picked edge: every edge of every contour has its blend face.
   for (int contour = 1; contour <= maker.NbContours(); ++contour)
     for (int k = 1; k <= maker.NbEdges(contour); ++k) {
       const int index = unique.FindIndex(maker.Edge(contour, k)) - 1;
       if (index >= 0) chain.push_back(index);
       for (TopTools_ListIteratorOfListOfShape it(maker.Generated(maker.Edge(contour, k))); it.More(); it.Next())
-        if (it.Value().ShapeType() == TopAbs_FACE) blends.Add(it.Value());
+        if (it.Value().ShapeType() == TopAbs_FACE) source_edge[blends.Add(it.Value())] = maker.Edge(contour, k);
     }
   if (blends.IsEmpty()) {
     why = "the circular blend produced no blend face";
@@ -594,7 +625,11 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     if (!analyse(TopoDS::Face(blends(b)), edge_faces, blends, faces[static_cast<size_t>(b - 1)], why)) return nullptr;
   for (Blend &blend : faces)
     for (int side = 0; side < 2; ++side)
-      if (blend.oblique[side]) {
+      if (blend.oblique[side] && blend.curved[side]) {
+        // a curved end face (13.37): the point and the sharpest normal only size the margin; the cut is by the surface itself
+        const BRepAdaptor_Curve end_edge(blend.end[side]);
+        blend.end_point[side] = end_edge.Value(0.5 * (end_edge.FirstParameter() + end_edge.LastParameter()));
+      } else if (blend.oblique[side]) {
         blend.end_point[side] = BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side]));
         blend.end_normal[side] = outward_normal(circular, blend.end_face[side]);
       }
@@ -630,6 +665,8 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin_lo : std::max(first, blend.lo - margin_lo);
     if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin_hi : std::min(last, blend.hi + margin_hi);
   }
+  for (size_t b = 0; b < faces.size(); ++b)
+    if ((faces[b].oblique[0] || faces[b].oblique[1]) && !plan_extension(faces[b], source_edge[static_cast<int>(b) + 1], diagonal, why)) return nullptr;
   for (const Blend &blend : faces)
     if ((blend.oblique[0] || blend.oblique[1]) && !check_extension(blend, kGapLimit * diagonal, why)) return nullptr;
 
@@ -713,8 +750,17 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     } else {
       skinned.push_back(made.Face());
     }
-    for (int side = 0; side < 2; ++side)
-      if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}, blend.oblique[side] ? kGapLimit * diagonal : 0.0});
+    if (blend.extend[0].active || blend.extend[1].active) {
+      // the size continued past an oblique end (13.37): the contact lines and the end curve meet the end face at new points
+      if (blend.mitre[0].active || blend.mitre[1].active) {
+        why = "internal error: the size of the blend is continued past an oblique end of the edge, and the blend also ends on a crease of its chain (a mitre): a mitre needs a constant size";
+        return nullptr;
+      }
+      if (!extension_edits(blend, surface, end_curves, kGapLimit * diagonal, edge_faces, edit_of, why)) return nullptr;
+    } else {
+      for (int side = 0; side < 2; ++side)
+        if (!blend.end_face[side].IsNull()) edit_of(blend.end_face[side]).replacements.push_back({blend.end[side], blend.oblique[side] ? end_curves[side] : Handle(Geom_Curve)(surface->VIso(side == 0 ? v0 : v1)), {}, blend.oblique[side] ? kGapLimit * diagonal : 0.0});
+    }
     // The rails of a mitred blend end at new points: the support faces take the rail curves of the new surface between a shared vertex at each mitre.
     for (int rail = 0; rail < 2; ++rail) {
       bool moves[2];

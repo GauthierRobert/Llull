@@ -14,6 +14,15 @@ import type { IsolatedKernel } from '../src/isolatedKernel';
 type Doc = CadDocument;
 const SCALES = [1, 10] as const;
 
+/** Composite Simpson rule of `f` on [a, b]. */
+const simpson = (f: (x: number) => number, a: number, b: number): number => {
+  const n = 2000;
+  const h = (b - a) / n;
+  let sum = f(a) + f(b);
+  for (let k = 1; k < n; k += 1) sum += f(a + k * h) * (k % 2 === 1 ? 4 : 2);
+  return (sum * h) / 3;
+};
+
 describeNative('BLD oblique ends of profile blends (native OCCT kernel)', () => {
   let kernel: IsolatedKernel;
   beforeAll(() => {
@@ -106,7 +115,7 @@ describeNative('BLD oblique ends of profile blends (native OCCT kernel)', () => 
     expect(refused.document).toBe(steep.doc);
   });
 
-  it('keeps the prism builder reason for a straight edge: a reflex end, a curved end face and a rib beyond the end plane', () => {
+  it('keeps the prism builder reason for a straight edge: a reflex end and a rib beyond the end plane', () => {
     const profile = { type: 'conic', rho: 0.5 };
     const reflex = prism(
       [
@@ -123,15 +132,35 @@ describeNative('BLD oblique ends of profile blends (native OCCT kernel)', () => 
     expect(noCorner.error?.code).toBe('BLD_PROFILE_FAILED');
     expect(noCorner.summary).toContain('is still inside the solid there');
     expect(noCorner.document).toBe(reflex.doc);
+  });
 
+  it('builds a straight edge that ends on a curved face through the rail builder (13.37) as the integral of the cut section', () => {
+    const profile = { type: 'conic', rho: 0.5 };
     const box = made(createEmptyDocument(), 'add_box', { size: [10, 10, 5], position: [5, 5, 2.5] });
     const cylinder = made(box.doc, 'add_cylinder', { radius: 8, height: 5, position: [0, 0, 2.5] });
     const curved = made(cylinder.doc, 'boolean', { op: 'intersect', a: box.id, b: cylinder.id, engine: 'kernel' });
+    // the prism builder refuses ("is on a curved face"); the rail builder cuts the blend by the cylinder, which leaves the section planes x = const at the depth
+    // sqrt(64 - x^2): the parabola of legs d = 0.5 is whole up to x* = sqrt(64 - d^2) and cut after it (q = sqrt(depth), dx = -2 q^3 / x dq)
     const onCylinder = execute(curved.doc, 'fillet_edge', { id: curved.id, edgesNear: [[4, 0, 5]], radius: 0.5, profile });
-    expect(onCylinder.error?.code).toBe('BLD_PROFILE_FAILED');
-    expect(onCylinder.summary).toContain('is on a curved face');
-    expect(onCylinder.document).toBe(curved.doc);
+    expect(onCylinder.error, onCylinder.summary).toBeUndefined();
+    const d = 0.5;
+    const star = Math.sqrt(64 - d * d);
+    const cut = simpson(
+      (q) => {
+        const u2 = (q * q) / d;
+        const u = Math.sqrt(u2);
+        return (d * d * (u2 - (4 / 3) * u2 * u + 0.5 * u2 * u2) * 2 * q ** 3) / Math.sqrt(64 - q ** 4);
+      },
+      0,
+      Math.sqrt(d),
+    );
+    const expected = (d * d * star) / 6 + cut;
+    const removed = volume(curved.doc, curved.id) - volume(onCylinder.document, onCylinder.affected[0] as string);
+    expect(Math.abs(removed - expected)).toBeLessThan(1e-5 * expected);
+  });
 
+  it('keeps the prism builder reason for a straight edge: a rib beyond the end plane', () => {
+    const profile = { type: 'conic', rho: 0.5 };
     const flared = prism(FLARED, 1);
     const rib = made(flared.doc, 'add_box', { size: [0.8, 0.2, 3], position: [-0.5, 0.4, 1.5] });
     const ribbed = made(rib.doc, 'boolean', { op: 'union', a: flared.id, b: rib.id, engine: 'kernel' });

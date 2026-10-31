@@ -1,11 +1,13 @@
 // Types and mitre pieces of the rail-preserving profile builder (cpp/blend_rails.cxx, cpp/blend_mitre.cxx; TECHNICAL_SPEC §13.11 and §13.16).
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include <BRepAdaptor_Surface.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_Curve.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -44,6 +46,16 @@ struct Mitre {
   double turn = 0;  // the crease (radians): the angle between the two end section planes, from the circular sections
 };
 
+// An oblique end whose contact lines run past the end of a STRAIGHT edge between two FLAT faces while the size varies (TECHNICAL_SPEC §13.37): the size law is
+// continued past the end vertex `vertex` (direction `outward`) by its end tangent, size(delta) = size + slope delta for delta > 0 (delta: distance beyond
+// the vertex along the edge); `size` and `slope` are the radius of the rolling ball there and its derivative, measured on the circular blend.
+struct Extension {
+  bool active = false;
+  gp_Pnt vertex;
+  gp_Vec outward{0, 0, 0};
+  double size = 0, slope = 0;
+};
+
 // A blend face of the circular fillet and what bounds it.
 struct Blend {
   TopoDS_Face face;
@@ -59,8 +71,11 @@ struct Blend {
   double reach[2] = {0, 0};     // oblique ends: lo / hi as the rails give them, before lo / hi are widened by kObliqueMargin of the span
   gp_Pnt end_point[2];          // oblique ends: a point of the end plane and its outward normal (set from the circular solid)
   gp_Vec end_normal[2];
+  bool curved[2] = {false, false};  // oblique ends: the end face is NOT flat; the skin is split by its surface and end_point / end_normal only size the margin (13.37)
+  double end_sign[2] = {1.0, 1.0};  // curved ends: +1 when the surface normal du x dv of the end face points out of the solid, else -1
   std::vector<RailPiece> supports[2];  // the support faces along each rail
   Mitre mitre[2];
+  Extension extend[2];          // oblique ends: the size law continued past the end of the edge (13.37)
 };
 
 // The conic of a blend that ends on the next blend of its chain fades to the circular arc at that end (TECHNICAL_SPEC 13.19): the weight of the
@@ -111,6 +126,14 @@ void apply_mitre(const Blend &blend, double along, Section &section);
 bool plan_mitres(std::vector<Blend> &blends, const TopTools_IndexedMapOfShape &blend_faces, const TopTools_IndexedDataMapOfShapeListOfShape &vertex_faces,
                  double diagonal, bool constant_size, std::string &why);
 
+// `blend` (oblique ends, a straight `source` edge between flat faces): where a section of the skin lies beyond the end vertex of the edge, sets `extend` for that
+// end to the continuation of the size law by its end tangent (TECHNICAL_SPEC §13.37); an end that needs nothing, or a blend this does not cover, stays as it
+// was. False with the reason in `why` (the continued size reaches zero).
+bool plan_extension(Blend &blend, const TopoDS_Edge &source, double diagonal, std::string &why);
+
+// Scales `section` (the circular blend's, with ball radius `radius`) about its apex to the continued size when its apex lies beyond the end vertex of an `extend` end.
+void continue_size(const Blend &blend, double radius, Section &section);
+
 // An edge of a face to rebuild and the curve that takes its place; `vertex` are the vertices at the curve's start / end (null: the old edge's own).
 struct Replacement {
   TopoDS_Edge old_edge;
@@ -136,6 +159,21 @@ bool check_extension(const Blend &blend, double limit, std::string &why);
 // meet that curve where the circular blend's own end edge has its vertices, to `gap_limit`. `diagonal` scales the cutting boxes. False with the reason in `why`.
 bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diagonal, double gap_limit, TopoDS_Face &trimmed,
                   Handle(Geom_Curve) (&end_curves)[2], std::string &why);
+
+// How far `point` lies outside the solid past the end face of oblique end `side` of `blend`: the signed distance along the outward normal of the end plane, or
+// (a curved end face, 13.37) of the nearest point of its surface; negative on the solid's side. False when the surface cannot be projected on.
+bool end_height(const Blend &blend, int side, const gp_Pnt &point, double &height);
+
+// The skin `face` split by the surface of the curved end face of oblique end `side` of `blend` (13.37) and cut back to the piece on the solid's side; false
+// with the reason in `why`. `diagonal` scales the parameter box of the cutting face.
+bool split_by_end_surface(TopoDS_Face &face, const Blend &blend, int side, double diagonal, std::string &why);
+
+// The edits of a blend whose size is continued past an oblique end (13.37): the contact lines and the end curve now meet the end face at new points, so
+// the end face, the two support faces and the edges they share with the end face are rebuilt around them (`edit_of` returns the edit of a face of the
+// circular solid). `skin` is the untrimmed skin of the blend, `end_curves` the cut of it by the end planes. False with the reason in `why`.
+bool extension_edits(const Blend &blend, const Handle(Geom_BSplineSurface) &skin, Handle(Geom_Curve) (&end_curves)[2], double gap_limit,
+                     const TopTools_IndexedDataMapOfShapeListOfShape &edge_faces, const std::function<FaceEdit &(const TopoDS_Face &)> &edit_of,
+                     std::string &why);
 
 }  // namespace rails
 }  // namespace blend

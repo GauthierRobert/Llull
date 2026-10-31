@@ -15,6 +15,7 @@
 #include <BRep_Builder.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRep_Tool.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <TopExp.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopoDS.hxx>
@@ -188,7 +189,20 @@ bool rebuild_face(const FaceEdit &edit, TopoDS_Face &out, std::string &why) {
     fresh.push_back(edge.Edge());
   }
   out = TopoDS::Face(reshape.Apply(edit.face));
-  for (const TopoDS_Edge &edge : fresh) BRepLib::BuildPCurveForEdgeOnPlane(edge, out);
+  const bool flat = BRepAdaptor_Surface(out, Standard_False).GetType() == GeomAbs_Plane;
+  for (const TopoDS_Edge &edge : fresh) {
+    if (flat) {
+      BRepLib::BuildPCurveForEdgeOnPlane(edge, out);
+      continue;
+    }
+    // a curved end face (13.37): the curve is projected on its surface
+    ShapeFix_Edge fixer;
+    double first = 0, last = 0;
+    if (!fixer.FixAddPCurve(edge, out, Standard_False) || BRep_Tool::CurveOnSurface(edge, out, first, last).IsNull()) {
+      why = "internal error: the new end curve of an oblique end could not be projected on the curved end face";
+      return false;
+    }
+  }
   return true;
 }
 
