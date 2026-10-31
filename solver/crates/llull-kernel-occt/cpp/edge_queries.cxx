@@ -156,6 +156,7 @@ rust::String edge_continuity_json(const Shape &shape, int32_t edge_index, int32_
     const double speed = d1.Magnitude();
     if (speed < 1e-14) return rust::String("null");
     const gp_Vec tangent = d1 / speed;
+    bool nudged = false;
     gp_Pnt on_surface[2];
     gp_Vec normals[2];
     double kappas[2] = {0, 0};
@@ -163,14 +164,20 @@ rust::String edge_continuity_json(const Shape &shape, int32_t edge_index, int32_
       const gp_Pnt2d uv = sides[k].pcurve->Value(sides[k].pc_first + t * (sides[k].pc_last - sides[k].pc_first));
       on_surface[k] = sides[k].surface.Value(uv.X(), uv.Y());
       if (normal_curvature(sides[k].surface, sides[k].reversed, uv.X(), uv.Y(), tangent, normals[k], kappas[k])) continue;
-      // The pole of a degenerate parametrization (the centre of an exact corner star, BLD 13.21) has no normal in its parameters: the normal of the surface just inside it stands for it.
+      // The pole of a degenerate parametrization (the centre of an exact corner star, BLD 13.21) has no normal in its parameters. ONLY at an end of the edge the normal of the surface just inside
+      // it stands for it (the sample is flagged and carries no curvature); anywhere else a sample without a normal makes the whole edge unmeasured.
+      if (i != 0 && i != count - 1) return rust::String("null");
       const double inside = t < 0.5 ? kPoleNudge : 1.0 - kPoleNudge;
       const gp_Pnt2d shifted = sides[k].pcurve->Value(sides[k].pc_first + inside * (sides[k].pc_last - sides[k].pc_first));
       if (!normal_curvature(sides[k].surface, sides[k].reversed, shifted.X(), shifted.Y(), tangent, normals[k], kappas[k])) return rust::String("null");
+      kappas[k] = 0;
+      nudged = true;
     }
     const double cosine = std::max(-1.0, std::min(1.0, normals[0].Dot(normals[1])));
     out.begin_object().key("t").number(t).key("point").point(point).key("g0").number(on_surface[0].Distance(on_surface[1]));
-    out.key("g1").number(std::acos(cosine)).key("normalCurvature").begin_array().number(kappas[0]).number(kappas[1]).end_array().end_object();
+    out.key("g1").number(std::acos(cosine)).key("normalCurvature").begin_array().number(kappas[0]).number(kappas[1]).end_array();
+    if (nudged) out.key("nudged").boolean(true);
+    out.end_object();
   }
   out.end_array();
   return rust::String(out.text());

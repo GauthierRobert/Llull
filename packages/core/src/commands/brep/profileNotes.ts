@@ -21,6 +21,7 @@ export interface ProfileData {
   readonly cornerSetbackFactor?: number;
   readonly corners?: ReadonlyArray<{
     readonly vertex: readonly [number, number, number];
+    readonly patch?: 'exact' | 'plate';
     readonly setbacks: ReadonlyArray<{ readonly edge: string; readonly distance: number }>;
   }>;
 }
@@ -44,6 +45,7 @@ export function describeProfileNotes(
       : { edges: notes.fallback.edges.map((edge) => nameOf(topology, edge)), reason: notes.fallback.reason };
   const corners = notes.corners?.map((corner) => ({
     vertex: corner.vertex,
+    ...(corner.patch === undefined ? {} : { patch: corner.patch }),
     setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
   }));
   const data: ProfileData = {

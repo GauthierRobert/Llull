@@ -13,6 +13,7 @@ namespace llull::corner_exact {
 
 struct Patches {
   std::vector<TopoDS_Face> faces;  // one per edge of the loop, around the centre
+  std::vector<size_t> loop_index;  // the edge of the loop each sub-patch has as its bottom
   gp_Pnt centre;                   // where the sub-patches meet
   double gap = 0;                  // largest distance from a sample of a loop edge to the patch edge at the same parameter
   double angle = 0;                // largest angle between the patch normal and the support normal along the loop, and between neighbouring sub-patches along their shared spokes

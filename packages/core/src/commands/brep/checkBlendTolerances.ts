@@ -56,7 +56,8 @@ export function namedTolerances(input: {
             value: sig(g0Given ? g0Used : g0Used * CORNER_G0_FACTOR),
             unit,
             defaulted: !g0Given,
-            source: 'corner patches (kind "corner"): 5x the default g0, the accuracy of the plate-surface fit of a setback patch',
+            source:
+              'plate corner patches (kind "corner", profile "patch"): 5x the default g0, the accuracy of the plate-surface fit of a setback patch (an exact star is judged at g0)',
           },
         }
       : {}),

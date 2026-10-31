@@ -640,7 +640,11 @@ rust::String blend_union_reason(const ShapeList &list, double radius, rust::Slic
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
   if (!(thickness > 0)) return nullptr;
   BRepOffsetAPI_MakeOffsetShape offset;
-  offset.PerformByJoin(shape.shape, -thickness, 1e-4, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc, Standard_False);
+  try {
+    offset.PerformByJoin(shape.shape, -thickness, 1e-4, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc, Standard_False);
+  } catch (const Standard_Failure &) {
+    return nullptr;  // an offset OCCT cannot take (a degenerate pole of a B-spline face, ...): a refusal, never an exception
+  }
   if (!offset.IsDone()) return nullptr;
   const std::vector<naming::Named> source{naming::named(shape)};
   const TopoDS_Shape skin = offset.Shape();
@@ -676,8 +680,11 @@ std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Sl
   TopTools_ListOfShape closing;
   for (int i = 1; i <= picked.Extent(); ++i) closing.Append(picked(i));
   BRepOffsetAPI_MakeThickSolid maker;
-  maker.MakeThickSolidByJoin(shape.shape, closing, -thickness, 1e-3, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc,
-                             Standard_False);
+  try {
+    maker.MakeThickSolidByJoin(shape.shape, closing, -thickness, 1e-3, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc, Standard_False);
+  } catch (const Standard_Failure &) {
+    return nullptr;  // an offset OCCT cannot take (a degenerate pole of a B-spline face, ...): a refusal, never an exception
+  }
   if (!maker.IsDone()) return nullptr;
   const TopoDS_Shape result = valid_or_null(maker.Shape());
   if (result.IsNull()) return nullptr;

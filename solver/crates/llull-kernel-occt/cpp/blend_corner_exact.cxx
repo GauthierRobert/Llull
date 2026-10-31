@@ -39,7 +39,7 @@ constexpr int kPoleCounts[] = {8, 11, 14, 24};
 // The corner of the outline of the hole at a vertex must open between these angles (radians) for a spoke to leave between its edges.
 constexpr double kMinWedge = 0.1;
 // Two supports meeting at a vertex must have normals within this cosine.
-constexpr double kNormalCosine = 0.999;
+constexpr double kNormalCosine = 1 - 1e-9;
 
 struct Hermite3 {
   double p0, d0, p1, d1;
@@ -95,6 +95,7 @@ struct Side {
   bool reversed = false;
   Handle(Geom2d_Curve) pcurve;
   BRepAdaptor_Surface surface;
+  size_t source = 0;     // the index of the edge in the loop given to build()
   bool flipped = false;  // the support face is reversed in its solid: its outward normal is the opposite of du ^ dv
 
   double param(double s) const { return reversed ? last - s * (last - first) : first + s * (last - first); }
@@ -161,7 +162,7 @@ struct Star {
   }
 };
 
-bool solve_vertex(Vertex &vertex, double scale, std::string &why) {
+bool solve_vertex(Vertex &vertex, std::string &why) {
   Vec a = project(vertex.leaving, vertex.normal), b = project(vertex.arriving * -1.0, vertex.normal);
   if (!unit(a) || !unit(b)) {
     why = "an edge of the hole has no tangent at a vertex";
@@ -176,7 +177,6 @@ bool solve_vertex(Vertex &vertex, double scale, std::string &why) {
     return false;
   }
   vertex.toward = a * std::cos(wedge / 2) + across * std::sin(wedge / 2);
-  (void)scale;
   return true;
 }
 
@@ -198,21 +198,22 @@ struct Patch {
   const Star &star;
   size_t k, j;
   Vec suv00, suv10, theta;
+  mutable bool broken = false;  // a support or spoke had no normal where one was needed
 
   Vec cross_bottom(double u) const {
     const Vertex &a = star.vertices[k], &b = star.vertices[j];
     Vec n;
-    star.sides[k].normal(u, n);
+    if (!star.sides[k].normal(u, n)) broken = true;
     return project(cubic_vec(u, a.spoke_tangent, suv00, b.spoke_tangent, suv10), n);
   }
   Vec cross_left(double v) const {
     Vec n;
-    star.spoke_normal(k, v, n);
+    if (!star.spoke_normal(k, v, n)) broken = true;
     return project(cubic_vec(v, star.vertices[k].leaving, suv00, Vec(0, 0, 0), theta), n);
   }
   Vec cross_right(double v) const {
     Vec n;
-    star.spoke_normal(j, v, n);
+    if (!star.spoke_normal(j, v, n)) broken = true;
     return project(cubic_vec(v, star.sides[k].tangent(1), suv10, Vec(0, 0, 0), theta), n);
   }
   Vec cross_top(double u) const { return star.arrival[k] * (1 - u) + star.arrival[j] * u; }
@@ -418,6 +419,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   star.sides.resize(m);
   for (size_t k = 0; k < m; ++k) {
     Side &side = star.sides[k];
+    side.source = k;
     side.curve.Initialize(loop[k]);
     BRep_Tool::Range(loop[k], side.first, side.last);
     double pf = 0, pl = 0;
@@ -495,7 +497,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       why = "a support has no normal rate at a vertex";
       return false;
     }
-    if (!solve_vertex(vertex, scale, why)) return false;
+    if (!solve_vertex(vertex, why)) return false;
     centre_normal += vertex.normal;
     centroid += vertex.at.XYZ();
   }
@@ -535,6 +537,10 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     std::vector<Handle(Geom_BSplineSurface)> surfaces;
     for (const Patch &patch : patches) {
       Handle(Geom_BSplineSurface) surface = interpolate(patch, poles);
+      if (patch.broken) {
+        why = "a support or a spoke of the hole has no normal along an edge";
+        return false;
+      }
       if (surface.IsNull()) {
         why = "the interpolation matrix is singular";
         return false;
@@ -578,6 +584,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
           return false;
         }
         out.faces.push_back(maker.Face());
+        out.loop_index.push_back(star.sides[out.faces.size() - 1].source);
       }
       return true;
     }

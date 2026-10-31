@@ -83,13 +83,17 @@ export function blendSource(faceName: string): { readonly edge: string; readonly
   return supports === null ? null : { edge, supports };
 }
 
+/** The suffix of one sub-patch of an exact corner star: `blend(v:<edge name>,...)#k` (the plate patch of the fallback has none). */
+export const STAR_SUFFIX = /#\d+$/;
+
 /**
  * For a corner patch name `blend(v:<edge name>,<edge name>,...)`: the names of the edges that meet at the vertex (split at top-level commas);
- * null for any other name.
+ * null for any other name. The `#k` of a star sub-patch is ignored.
  */
 export function cornerSources(faceName: string): readonly string[] | null {
-  if (!faceName.startsWith('blend(v:') || !faceName.endsWith(')')) return null;
-  const inner = faceName.slice(8, -1);
+  const base = faceName.replace(STAR_SUFFIX, '');
+  if (!base.startsWith('blend(v:') || !base.endsWith(')')) return null;
+  const inner = base.slice(8, -1);
   const parts: string[] = [];
   let depth = 0;
   let from = 0;

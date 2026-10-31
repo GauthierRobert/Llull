@@ -321,6 +321,27 @@ describeNative('BLD M3: setback corners and persistent vertex names (native OCCT
     expect(lost.affected).toHaveLength(0);
   });
 
+  it('a sub-patch of a corner star is picked by its blend(v:...)#k name, resolves to that one face and still does after the cube is resized upstream (13.21)', () => {
+    const { doc, id } = rounded(10, 2);
+    const names = faces(doc, id)
+      .map((face) => face.name ?? '')
+      .filter((name) => name.startsWith('blend(v:'));
+    expect(new Set(names).size).toBe(48);
+    expect(names.every((name) => /#[1-6]$/.test(name))).toBe(true);
+    const picked = names[0] as string;
+    const done = execute(doc, 'delete_faces', { id, faceNames: [picked] });
+    expect(done.error?.code ?? '').not.toMatch(/^REF_/);
+    expect(done.summary).not.toMatch(/REF_(SPLIT|LOST)/);
+    // the pick is recorded and is replayed: the name resolves to one face again after the cube is resized upstream
+    const boxStep = doc.featureHistory[0];
+    const resized = execute(done.error === undefined ? done.document : doc, 'edit_step_params', {
+      stepId: boxStep?.id,
+      params: { size: [30, 30, 30] },
+    });
+    expect(resized.rejected).not.toBe(true);
+    expect(resized.summary).not.toMatch(/REF_(SPLIT|LOST)/);
+  });
+
   it('VC-BLD-25: a setback fillet replays to the identical recipe and ids', () => {
     const { doc } = rounded(10, 2);
     const replayed = execute(doc, 'replay_history', {});
