@@ -800,7 +800,7 @@ describe('check_blends: the seams of a G2 corner star (06 BLD 13.36)', () => {
     const result = star(g2Star, { require: 'G2' });
     expect(result.contacts.filter((contact) => contact.edge !== 1).every((contact) => contact.order === 'G2')).toBe(true);
     expect(result.findings.filter((found) => found.code === 'BLD_CHECK_SPOKE_G2')).toEqual([
-      expect.objectContaining({ severity: 'warn', edge: 1, message: expect.stringContaining('seams of the corner are G1') }),
+      expect.objectContaining({ severity: 'warn', edge: 1, message: expect.stringContaining('seams of the corner are curvature-continuous beyond the stretch next to the vertices') }),
       expect.objectContaining({ severity: 'warn', edge: 1 }),
     ]);
     expect(result.findings.some((found) => found.code === 'BLD_CHECK_G2_JUMP')).toBe(false);

@@ -801,6 +801,7 @@ struct FillJob {
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
   bool g2 = false;                    // the star should be curvature-continuous to its supports (a curvature profile, 13.36)
   bool g2_built = false;              // it is
+  corner_exact::SpokeReading spokes;  // the curvature across its spokes (13.38)
   std::string g2_problem;             // why the G2 star was refused (the G1 star was built instead)
   std::vector<size_t> patch_part;     // 1 when the sub-patch starts inside that loop edge
   std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
@@ -917,6 +918,7 @@ bool fill_exact(FillJob &job, double diagonal) {
   for (double seen = g_last_crease.load(); exact.crease > seen && !g_last_crease.compare_exchange_weak(seen, exact.crease);) {
   }
   job.hinted = exact.centre_from_hint;
+  job.spokes = exact.spokes;
   job.patches = exact.faces;
   job.patch_loop = exact.loop_index;
   job.patch_part = exact.part;
@@ -1949,6 +1951,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   std::vector<TopoDS_Face> patches;
   std::vector<size_t> patch_corner;  // the corner of each patch
   std::vector<std::string> patch_kinds(corners.size());  // "exact" (a star) or "plate" per corner
+  std::vector<corner_exact::SpokeReading> patch_spokes(corners.size());
   std::vector<std::string> patch_g2(corners.size()), patch_continuity(corners.size());  // the continuity a star reached, and why its G2 form was refused
   std::vector<std::string> patch_names;
   // Serial: isolate the hole of every corner and give its fill its own copies of the support faces (13.20); parallel: the fills; serial, in corner order: the checks and the patches.
@@ -2081,6 +2084,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       if (!mode.downgrade.empty()) patch_g2[c] += (patch_g2[c].empty() ? "" : "; ") + mode.downgrade;
     }
     patch_continuity[c] = job.patch_loop.empty() ? "" : (job.g2_built ? "G2" : "G1");
+    patch_spokes[c] = job.spokes;
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
 
@@ -2191,7 +2195,11 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     for (size_t c = 0; c < corners.size(); ++c) {
       log.begin_object().key("vertex").point(corners[c].at).key("patch").string(patch_kinds[c]);
       if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
-      if (patch_continuity[c] == "G2") log.key("spokes").string("G1");
+      if (patch_continuity[c] == "G2") {
+        const corner_exact::SpokeReading &spokes = patch_spokes[c];
+        log.key("spokes").string(spokes.reach > 0 ? "G2" : "G1").key("spokeJump").number(spokes.jump);
+        if (spokes.reach > 0) log.key("spokeReach").number(spokes.reach).key("spokeRelative").number(spokes.relative).key("spokeVertexRelative").number(spokes.vertex_relative);
+      }
       if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
       log.key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();

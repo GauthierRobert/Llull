@@ -1,7 +1,7 @@
 /**
  * The corner rows of check_blends (06 BLD 13.10, 13.21, 13.33, 13.36): every corner patch face is a row of kind "corner" with a contact per edge it shares. A star sub-patch (named
  * `blend(v:...)#k`) is judged at the default g0; the plate patch of the fallback at g0Corner. The contacts of a G2 star with the blend and flat faces are G2; the edges between its
- * sub-patches (spokes) are G1 seams, reported with BLD_CHECK_SPOKE_G2 under `require: "G2"` (a warn), never as BLD_CHECK_G2_JUMP.
+ * sub-patches (spokes) are G2 seams beyond the stretch next to the vertices (G1 within it), reported with BLD_CHECK_SPOKE_G2 under `require: "G2"` (a warn), never as BLD_CHECK_G2_JUMP.
  * @invariant pure over the kernel answers; lengths in document units
  */
 

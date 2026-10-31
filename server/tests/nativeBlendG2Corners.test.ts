@@ -1,6 +1,7 @@
 /**
  * BLD §13.36 on the native OCCT kernel: the corner star of a curvature-profile step is curvature-continuous (G2) to the blend and flat faces it meets,
- * so a G2 chain stays G2 through its corners; check_blends reads it with `require: "G2"`. The edges between two sub-patches (spokes) are G1 seams.
+ * so a G2 chain stays G2 through its corners; check_blends reads it with `require: "G2"`. The edges between two sub-patches (spokes) are curvature-continuous beyond the first
+ * fifth of each spoke from its vertex (§13.38); next to the vertices they are tangent.
  * Skipped when the llull-kernel binary is not built.
  */
 
@@ -24,7 +25,16 @@ interface Checked {
   readonly findings: Array<{ code: string; severity: string }>;
 }
 interface Notes {
-  readonly corners?: Array<{ readonly patch: string; readonly continuity?: string; readonly g2Refused?: string; readonly spokes?: string }>;
+  readonly corners?: Array<{
+    readonly patch: string;
+    readonly continuity?: string;
+    readonly g2Refused?: string;
+    readonly spokes?: string;
+    readonly spokeReach?: number;
+    readonly spokeRelative?: number;
+    readonly spokeVertexRelative?: number;
+    readonly spokeJump?: number;
+  }>;
 }
 
 describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OCCT kernel)', () => {
@@ -50,7 +60,13 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
   it('a curvature-profile cube has no failing finding under check_blends require G2; the seams of its corner stars warn BLD_CHECK_SPOKE_G2', () => {
     const { doc, id, notes } = rounded({ type: 'curvature', shape: 0.5 });
     expect(notes.corners).toHaveLength(8);
-    for (const corner of notes.corners ?? []) expect([corner.continuity, corner.spokes]).toEqual(['G2', 'G1']);
+    for (const corner of notes.corners ?? []) {
+      expect([corner.continuity, corner.spokes, corner.spokeReach]).toEqual(['G2', 'G2', 0.2]);
+      // measured on the built sub-patches: G2 (under the 0.02 build gate) beyond the stretch, an honest relative jump within it, 50 times under the 0.83 of the G1 seams in absolute terms
+      expect(corner.spokeRelative).toBeLessThan(0.02);
+      expect(corner.spokeVertexRelative).toBeGreaterThan(0.1);
+      expect(corner.spokeJump).toBeLessThan(0.03);
+    }
     const checked = check(doc, id, 'G2');
     expect(checked.status).toBe('warn');
     expect(checked.findings.filter((found) => found.severity === 'fail')).toEqual([]);

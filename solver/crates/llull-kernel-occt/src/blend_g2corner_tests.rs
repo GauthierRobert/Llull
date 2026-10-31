@@ -33,10 +33,16 @@ fn corners_of(shape: &Shape) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The `spokes` note of each corner ("G1" for a G2 star, absent otherwise).
+/// The `spokes` note of each corner ("G2" or "G1" for a G2 star, absent otherwise).
 fn spokes_of(shape: &Shape) -> Vec<String> {
     let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
     notes["corners"].as_array().unwrap().iter().map(|corner| corner["spokes"].as_str().unwrap_or("").to_string()).collect()
+}
+
+/// A number of the corner notes (`spokeJump`, `spokeReach`, `spokeRelative`, `spokeVertexRelative`) of every corner.
+fn spoke_note(shape: &Shape, key: &str) -> Vec<f64> {
+    let notes: Value = serde_json::from_str(&shape_notes(shape).unwrap()).unwrap();
+    notes["corners"].as_array().unwrap().iter().map(|corner| corner[key].as_f64().unwrap_or(f64::NAN)).collect()
 }
 
 fn all(continuity: &str) -> Vec<(String, String)> {
@@ -105,16 +111,28 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
     assert!(g2.contacts.1 < 1e-3, "curvature jump at the blend and flat faces {:e}", g2.contacts.1);
     assert!(g2.contacts.0 < 1e-4, "angle at the blend and flat faces {:e}", g2.contacts.0);
     assert!(g2.spokes.0 < 1e-4, "the spokes are G1: {:e}", g2.spokes.0);
-    // the spokes are G1 seams (no curvature match across them): stated, not hidden, and reported as such in the notes
-    assert!(g2.spokes.1 > 0.5 && g2.spokes.1 < 1.2, "spoke curvature jump {:e}", g2.spokes.1);
-    assert_eq!(spokes_of(&shape), vec!["G1".to_string(); 8]);
+    // the spokes are curvature-continuous beyond the first fifth from each vertex (13.38): the jump over the 21 samples (the first is inside that stretch) is 50 times under the 0.83 of 13.36
+    assert!(g2.spokes.1 < 0.03, "spoke curvature jump {:e}", g2.spokes.1);
+    assert_eq!(spokes_of(&shape), vec!["G2".to_string(); 8]);
+    for (key, low, high) in
+        [("spokeReach", 0.2, 0.2), ("spokeRelative", 0.0, 0.02), ("spokeVertexRelative", 0.1, 2.0), ("spokeJump", 1e-3, 0.03)]
+    {
+        for value in spoke_note(&shape, key) {
+            assert!(value >= low && value <= high, "{key} {value:e} outside [{low}, {high}]");
+        }
+    }
     crate::test_bridge::set_corner_g2_star(false);
     let g1_shape = profile_cube(1.0, 1.0, 0.5);
     assert_eq!(corners_of(&g1_shape), all("G1"));
     assert_eq!(patch_degrees(&g1_shape), vec![(5, 5); 48]);
     let g1 = readings(&g1_shape);
     assert!(g1.contacts.1 > 0.5, "the G1 star jumps by {:e}", g1.contacts.1);
-    assert!(g2.spokes.1 <= g1.spokes.1, "the G2 star's spokes jump by {:e}, the G1 star's by {:e}", g2.spokes.1, g1.spokes.1);
+    assert!(
+        g1.spokes.1 > 0.5 && g2.spokes.1 < g1.spokes.1 / 20.0,
+        "the G2 star's spokes jump by {:e}, the G1 star's by {:e}",
+        g2.spokes.1,
+        g1.spokes.1
+    );
     assert_eq!(spokes_of(&g1_shape), vec![String::new(); 8]);
     assert!((volume(&shape) - volume(&g1_shape)).abs() < 1e-3 * volume(&g1_shape), "{} against {}", volume(&shape), volume(&g1_shape));
 }
@@ -135,7 +153,28 @@ fn unequal_sizes_other_shape_factors_and_a_larger_blend_stay_g2() {
         assert_eq!(corners_of(&shape), all("G2"), "{label}");
         let measured = readings(&shape);
         assert!(measured.contacts.1 < 1e-3 && measured.spokes.0 < 1e-4, "{label}: {:e} {:e}", measured.contacts.1, measured.spokes.0);
+        // the spokes: curvature-continuous beyond the stretch next to the vertices, the first sample of which is the worst
+        assert!(measured.spokes.1 < 0.2, "{label}: spoke jump {:e}", measured.spokes.1);
+        assert!(spoke_note(&shape, "spokeRelative").iter().all(|relative| *relative < 0.02), "{label}");
+        assert_eq!(spokes_of(&shape), vec!["G2".to_string(); 8], "{label}");
     }
+}
+
+#[test]
+fn spokes_whose_gate_is_not_met_stay_g1_in_a_star_that_is_still_g2_to_its_blends() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_spoke_gate(0.0);
+    let shape = profile_cube(1.0, 1.0, 0.5);
+    assert!(analyze(&shape).unwrap().valid);
+    // the star is the G2 star of 13.36 (no refusal is recorded), its spokes the G1 seams: the note says so and carries no stretch
+    assert_eq!(corners_of(&shape), all("G2"));
+    assert_eq!(spokes_of(&shape), vec!["G1".to_string(); 8]);
+    assert!(spoke_note(&shape, "spokeReach").iter().all(|value| value.is_nan()));
+    let measured = readings(&shape);
+    assert!(measured.contacts.1 < 1e-3 && measured.spokes.0 < 1e-4, "{:e} {:e}", measured.contacts.1, measured.spokes.0);
+    assert!(measured.spokes.1 > 0.5, "the G1 spokes jump by {:e}", measured.spokes.1);
+    assert!(spoke_note(&shape, "spokeJump").iter().all(|jump| *jump > 0.5));
 }
 
 #[test]

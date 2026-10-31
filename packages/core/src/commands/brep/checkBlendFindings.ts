@@ -47,7 +47,7 @@ export const REMEDIATION = {
   BLD_CHECK_G1_ANGLE: 'the blend is not tangent to a support face: rebuild the fillet with a smaller radius or fewer edges per step',
   BLD_CHECK_G2_JUMP: 'a circular fillet is never G2 to a plane: use a curvature-continuous profile when G2 is required',
   BLD_CHECK_SPOKE_G2:
-    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G1 (tangent planes, not curvature), only its contacts with the blend and flat faces are G2',
+    'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2", spokeReach) and with G1 next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1"); its contacts with the blend and flat faces are G2',
   BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
   BLD_CHECK_RADIUS_LAW:
     'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',
@@ -147,7 +147,7 @@ export function spokeFinding(
       limit: sig(tolerances.g2Rel),
       unit: 'ratio',
       remediation: REMEDIATION.BLD_CHECK_SPOKE_G2,
-      message: `curvature jumps by ${sig(contact.g2Gap)} 1/${unit} (relative ${sig(contact.g2Rel)}) across edge ${edge}, a seam between two sub-patches of corner patch ${face}: the internal seams of the corner are G1, its contacts with the blend and flat faces are G2`,
+      message: `curvature jumps by ${sig(contact.g2Gap)} 1/${unit} (relative ${sig(contact.g2Rel)}) across edge ${edge}, a seam between two sub-patches of corner patch ${face}: the internal seams of the corner are curvature-continuous beyond the stretch next to the vertices (or G1 all along when the build could not meet its gate), its contacts with the blend and flat faces are G2`,
     },
   ];
 }

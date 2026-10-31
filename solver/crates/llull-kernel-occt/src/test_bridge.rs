@@ -40,6 +40,8 @@ mod ffi {
         /// Whether the star sub-patches take only C0 knots at the joints of their chains (no C1 attempt).
         fn set_corner_c0_knots(on: bool);
         fn set_corner_g2_star(on: bool);
+        /// The share of the contact gate the curvature jump across a spoke of a G2 star may use (1: default; 0: never met, so the spokes stay G1).
+        fn set_corner_spoke_gate(scale: f64);
         /// Every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
         fn set_law_inversion_fault(after: i32);
         /// The most nodes a stretch of a radius law on an uneven edge may take (0: the default, 128).
@@ -106,6 +108,11 @@ pub fn set_corner_c0_knots(on: bool) {
 /// Test hook: false builds the G1 star for a curvature profile too (the G2 star is the default there, BLD 13.36).
 pub fn set_corner_g2_star(on: bool) {
     ffi::set_corner_g2_star(on);
+}
+
+/// Test hook: the share of the contact gate the spoke seams of a G2 star may use (BLD 13.38); 0 makes the G2 spokes always refused.
+pub fn set_corner_spoke_gate(scale: f64) {
+    ffi::set_corner_spoke_gate(scale);
 }
 
 pub fn set_corner_crease_gate(on: bool) {

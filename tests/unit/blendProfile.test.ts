@@ -456,6 +456,38 @@ describe('describeProfileNotes', () => {
     });
   });
 
+  it('a G2 star reports how its spokes meet: G2 beyond the stretch next to the vertices with the measured values, or G1', () => {
+    const star = {
+      vertex: [0, 0, 0] as [number, number, number],
+      patch: 'exact' as const,
+      continuity: 'G2' as const,
+      setbacks: [{ edge: 0, distance: 2 }],
+    };
+    const g2Spokes = {
+      ...star,
+      spokes: 'G2' as const,
+      spokeJump: 0.0148,
+      spokeReach: 0.2,
+      spokeRelative: 0.0045,
+      spokeVertexRelative: 1.74,
+    };
+    const g1Spokes = { ...star, spokes: 'G1' as const, spokeJump: 0.83 };
+    const both = describeProfileNotes({ builder: 'corners', factor: 2, corners: [g2Spokes, g1Spokes] }, TOPOLOGY, 'mm');
+    expect(both.text).toContain(
+      '2 corner star(s) G2 to their blends and flat faces (continuity "G2"), 1 of them with curvature-continuous seams',
+    );
+    expect(both.text).toContain('beyond the first 0.2 of each spoke from its vertex (spokes "G2"), 1 with G1 seams (spokes "G1")');
+    expect(both.data.corners?.[0]).toMatchObject({
+      spokes: 'G2',
+      spokeJump: 0.0148,
+      spokeReach: 0.2,
+      spokeRelative: 0.0045,
+      spokeVertexRelative: 1.74,
+    });
+    expect(both.data.corners?.[1]).toMatchObject({ spokes: 'G1', spokeJump: 0.83 });
+    expect(both.data.corners?.[1]).not.toHaveProperty('spokeReach');
+  });
+
   it('a mitred chain reports its crease and says the blends meet at that angle where each touches its own support', () => {
     const { text, data } = describeProfileNotes(
       { builder: 'rails', gap: 4e-14, gapLimit: 6.8e-4, junctionG1: 0.0982, creaseRad: 0.0982 },

@@ -221,8 +221,16 @@ export interface BlendBuildNotes {
     readonly patch?: 'exact' | 'plate';
     /** A star: "G2" when it is curvature-continuous to its blend and flat faces (a curvature profile, 13.36), else "G1". */
     readonly continuity?: 'G1' | 'G2';
-    /** A G2 star: its sub-patches meet each other with G1 only (the seams are not curvature-continuous). */
-    readonly spokes?: 'G1';
+    /** A G2 star: how its sub-patches meet each other along the spokes. "G2": curvature-continuous beyond the first `spokeReach` of each spoke from its vertex (13.38); "G1": tangent only. */
+    readonly spokes?: 'G1' | 'G2';
+    /** A G2 star: the largest jump of the normal curvature across a spoke (1/unit, whole spoke). */
+    readonly spokeJump?: number;
+    /** A G2 star with G2 spokes: the share of each spoke, from its vertex, over which the curvature correction fades in (the stretch where the seam is still G1). */
+    readonly spokeReach?: number;
+    /** The largest relative curvature jump across a spoke beyond that stretch (the build gate is 0.02). */
+    readonly spokeRelative?: number;
+    /** The largest relative curvature jump across a spoke within that stretch next to the vertices. */
+    readonly spokeVertexRelative?: number;
     /** Why the G2 star was refused (the G1 star was built instead). */
     readonly g2Refused?: string;
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;

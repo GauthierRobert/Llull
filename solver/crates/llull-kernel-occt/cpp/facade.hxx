@@ -75,6 +75,7 @@ double last_corner_crease();
 void set_corner_crease_gate(bool on);
 void set_corner_c0_knots(bool on);
 void set_corner_g2_star(bool on);
+void set_corner_spoke_gate(double scale);
 // Test-only hook (law_fillet.cxx): every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
 void set_law_inversion_fault(int32_t after);
 void set_law_node_cap(int32_t nodes);
