@@ -69,6 +69,9 @@ bool refined_mass_flag(const Shape &shape);
 void set_corner_threads(int32_t count);
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);
+// Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).
+double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse);
+double boundary_angle_probe(const Shape &shape, int32_t face, bool drop_one);
 
 void init_runtime();
 rust::String occt_version();

@@ -1121,6 +1121,25 @@ blend ends (limit 5e-6 x diagonal, `g0Corner`), the angle to the supports (0.01 
 - **Left, refused by name as before:** a profile (conic / curvature) corner at a mixed vertex (the automatic profile corners round convex edges), a vertex with an unrounded third edge, curved edges or faces, `size2`, a varying size at
   a mixed vertex has not been built or tested here (the algebra and Q handle a linear taper, no test), faces that are reflex at a vertex of four or more edges (the pairing is per face, so it should hold; untested).
 
+### 13.18.7 Second review round
+
+- **The volume bound is tighter and says what it catches.** Per corner it is the sum over its edges of setback x leg^2 (the slab of stub that edge leaves between the vertex and its blend end, the leg taken AT the
+  corner end of the edge, not mid-edge) plus the cube of the largest leg where the slabs meet; summed over the corners (about 2.05 on the notch rim step; the first version's cube of setback + leg was 25 x the measured
+  change on the rim and 109 x on the boss feet). It catches a patch far outside its corner. It does not catch a fold: a patch folded onto its neighbours changes the volume by less than any bound, and the oriented
+  check on the sewn solid is what catches it (the earlier claim of a sensitivity check with the bound at 0 is withdrawn: it only showed that the bound is evaluated).
+- **A tangency shortfall is retried, a wrong-way patch is not.** An oriented angle above kMixedFillAngle but below pi / 2 sets `fill_failed`, so the next fit setting or setback factor is tried; a patch that faces the other way
+  (above pi / 2) stays a hard failure.
+- **The guards are exercised** (`#[cfg(test)]` seams `oriented_angle_probe`, `boundary_angle_probe` in `blend_corner.cxx`, bridged in `test_bridge.rs`; the build never calls them): on the blend face of a filleted
+  block the oriented check reads < 1e-6 across its tangent edges as built and pi (to 1e-6) once the face is Reversed() in a rebuilt shell; the boundary measure is >= 0 for an intact boundary and -1 (not measured) with a loop edge
+  missing from `boundary`. `boundary_angle`'s 95 % rule is not exercised on its own.
+- **Q path.** The check classifies five points along each of the two segments (it was the midpoints).
+- **The taper test is pinned.** The notch rim with its top edges tapering 0.5 -> 0.3 BUILDS: 16 faces (9 planes, 5 blends, 2 patches), valid, worst patch angle 0.0075, volume change +0.724 in the band
+  prisms (closed form, 0.250 to 0.313) + the inner patch 0.339 + the rim patch (0.05 to 0.1). The 300 degree prism has 16 faces, two edges meet at Q = (3.2, 5, 6) and at (3.2, 5, 0) (the polyline corners), the prisms are
+  -0.677 and the two patches take +0.477 (+0.24 each: the sharp stub of a 300 degree corner is bigger than the notch rim's), the centroid is at y = 5 and Ixy = Iyz = 0.
+- **Patch edges are never skipped in the tests:** `worst_patch_angle` (every edge of a patch, 21 samples, no skip) sits next to `worst_tangent_angle` in the mixed tests.
+- **Not tested, stated:** a face that is reflex at a vertex whose edges are all of one kind (the behaviour change of 13.18.6): a convex solid has none, and the non-convex solids tried (a pyramid over a concave base, an L
+  prism) give a reflex face only at a vertex that also has a concave edge, i.e. a mixed one; a fixture needs a vertex of four or more edges and has not been built.
+
 ## 13.19 As built: a conic that fades to the circular arc at a kinked chain junction (DES-6c, 2026-10-30)
 
 ### 13.19.1 Why the junction kinked, and what cannot fix it
@@ -1167,8 +1186,7 @@ R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, con
   kMixedFillAngle (0.0095), sampled at 101 points; an anti-parallel pair reads pi and fails by name ("it faces the other way"); an edge with other than two faces, or without a curve on a face, fails as unmeasured.
 - **The volume check covers every step.** A step with a mixed corner used to skip the volume checks altogether. The sign test (convex steps lose volume, concave ones gain) is still only defined for a step of one kind,
   but a bound applies to all: the patches only replace the sharp stubs between the blend ends, which fit in a cube of the longest setback plus the longest tangent distance of the edges of each corner, so the volume after
-  the tools (measured: the prisms exactly) moves by less than the sum of those cubes. Sensitivity checked by setting the bound to 0: the notch rim then fails with "changed the volume by 0.3868 where the sharp
-  corners they replace bound it at 0".
+  the tools (measured: the prisms exactly) moves by less than the sum of those cubes. (Withdrawn in 13.18.7: the bound only shows that the check is evaluated.)
 - **Q is checked** (`plan_corner`, once the setbacks are final). It must be computable (|u x v . n| > 1e-9 |u||v| and finite: parallel contact lines refuse the corner naming the vertex), in front of nothing it should not
   be (the position of Q along each stub must be below that edge's setback: a taper can bring it forward of the contact point), inside the source face, and the two tool segments (P_a, Q) and (Q, P_b) must have their midpoints
   inside it. As the sector tends to 2 pi, Q goes to r cot(phi / 2): in plain geometry the notch edge's own tangent distance, r cot(phi / 2) too, outgrows the setback first (`a_reflex_face_too_narrow_for_its_path_is_refused_by_name`:
