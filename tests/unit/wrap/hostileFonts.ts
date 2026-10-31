@@ -5,7 +5,8 @@
  */
 
 import { buildCffFont, dictInt, u16, u32, type Token } from './cffBuilder';
-import { buildCff2, buildCff2Font } from './cff2Builder';
+import { buildCff2, buildCff2Font, buildFvar } from './cff2Builder';
+import { buildFont } from './fontBuilder';
 
 const AXIS = [{ tag: 'wght', min: 100, default: 400, max: 900 }] as const;
 
@@ -73,4 +74,41 @@ export function manyRangesFont(glyphs: number, unordered = false): Uint8Array {
   const ranges = Array.from({ length: glyphs }, (_, k) => [...u16(unordered && k === glyphs - 1 ? 0 : k), 0]).flat();
   const select = [3, ...u16(glyphs), ...ranges, ...u16(glyphs)];
   return wrap(buildCff2({ glyphs: Array.from({ length: glyphs }, () => ({ tokens: [] })), selectBytes: select }), glyphs);
+}
+
+/**
+ * A TrueType font whose one glyph has 20 000 points (repeat flags, about 160 bytes) and `tuples` size-0 tuples that share one run of zero deltas: about 4 x 10^8 steps (arrays the size of
+ * the glyph per tuple) from a font of a few kilobytes. The per-glyph and font-wide gvar bounds are what refuse it.
+ */
+export function gvarTupleFanFont(tuples: number): Uint8Array {
+  const points = 20_000;
+  const flags: number[] = [];
+  for (let left = points; left > 0; left -= 256) flags.push(0x01 | 0x08 | 0x10 | 0x20, Math.min(256, left) - 1);
+  const glyph = [...u16(1), ...new Array<number>(8).fill(0), ...u16(points - 1), ...u16(0), ...flags];
+  const zeros = new Array<number>(Math.ceil((points + 4) / 64)).fill(0x80 | 63);
+  const headers = Array.from({ length: tuples }, () => [...u16(0), ...u16(0)]).flat();
+  const glyphData = [...u16(tuples), ...u16(4 + headers.length), ...headers, ...zeros, ...zeros];
+  const sharedAt = 20 + 2 * 3;
+  const gvar = [
+    ...u16(1),
+    ...u16(0),
+    ...u16(1),
+    ...u16(1),
+    ...u32(sharedAt),
+    ...u16(2),
+    ...u16(0),
+    ...u32(sharedAt + 2),
+    ...u16(0),
+    ...u16(0),
+    ...u16(glyphData.length / 2),
+    ...u16(0x4000),
+    ...glyphData,
+  ];
+  return buildFont({
+    glyphs: [{ kind: 'empty' }, { kind: 'raw', bytes: glyph }],
+    advances: [500, 600],
+    codePoints: [[0x41, 1]],
+    cmap: 'f4',
+    tables: { fvar: buildFvar(AXIS), gvar: gvar.length % 2 === 0 ? gvar : [...gvar, 0] },
+  });
 }

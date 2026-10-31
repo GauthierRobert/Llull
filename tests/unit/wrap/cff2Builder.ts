@@ -41,7 +41,7 @@ export interface StoreSpec {
 }
 
 /** The bytes of an ItemVariationStore (format 1). */
-function buildStore(spec: StoreSpec): number[] {
+export function buildStore(spec: StoreSpec): number[] {
   const listAt = 8 + 4 * spec.data.length;
   const list = [
     ...u16(spec.axisCount),

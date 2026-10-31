@@ -9,12 +9,18 @@
 
 import type { StrutBeam } from '@core/geometry/field/program';
 import type { Vec3 } from '@core/model/types';
-import { type GraphResult, MAX_GRAPH_BEAMS } from './graph';
+import type { GraphResult } from './graph';
 import type { VoronoiNode } from './model';
 import { type Tet, delaunay, faceKey, facesOf } from './voronoiDelaunay';
 
-/** Seeds beyond this are refused: a seed adds about 9.2 beams (measured), so 10000 seeds give close to the 100000 beams of a graph lattice (98420 at the measured 10000; IMP_GRAPH_TOO_LARGE either way); the Delaunay pass takes 2.1 s there (14.14). */
-const MAX_SEEDS = 10_000;
+/** Seeds beyond this are refused: the Delaunay pass takes 2.4 s for 100000 seeds (14.16) and a seed adds 9 to 11 beams (measured), so the beam cap below binds first above about 90000 seeds. */
+const MAX_SEEDS = 100_000;
+/** Beams beyond this are refused (IMP_GRAPH_TOO_LARGE): the native field engine realises 1000000 beams in 15 s at a coarse voxel (14.16). A seed adds 9 to 11 beams (9.2 in a small box, 10.8 in a large one). */
+const MAX_VORONOI_BEAMS = 900_000;
+/** The beam estimate that refuses a box before any seed is placed (the least a seed adds). */
+const LEAST_BEAMS_PER_SEED = 9.2;
+/** Results up to this many beams are kept for the next call with the same parameters (about 250 MB at 1000000 beams: bigger ones are rebuilt). */
+const MEMO_MAX_BEAMS = 200_000;
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -44,18 +50,31 @@ function clipSegment(a: Vec3, b: Vec3, min: Vec3, max: Vec3): [Vec3, Vec3] | nul
   return [at(t0), at(t1)];
 }
 
-/** Beams of the Voronoi lattice of `node`. */
-export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density' | 'seed' | 'radius' | 'cap'>): GraphResult {
+type VoronoiParams = Pick<VoronoiNode, 'min' | 'max' | 'density' | 'seed' | 'radius' | 'cap'>;
+
+/** The last result: the command validates the node by compiling it, and a body compiles it again, with the very same parameters (the function is pure, the result is never mutated). */
+let last: { key: string; result: GraphResult } | null = null;
+
+/** Beams of the Voronoi lattice of `node` (the last result is reused for equal parameters). */
+export function voronoiGeometry(node: VoronoiParams): GraphResult {
+  const key = JSON.stringify([node.min, node.max, node.density, node.seed, node.radius, node.cap]);
+  if (last !== null && last.key === key) return last.result;
+  const result = buildVoronoi(node);
+  last = result.ok && result.graph.set.beams.length > MEMO_MAX_BEAMS ? null : { key, result };
+  return result;
+}
+
+function buildVoronoi(node: VoronoiParams): GraphResult {
   const { min, max } = node;
   const spacing = (1 / node.density) ** (1 / 3);
   const margin = 1.2 * spacing;
   const grown = [0, 1, 2].map((axis) => (max[axis] as number) - (min[axis] as number) + 2 * margin);
   const expected = Math.round(node.density * (grown[0] as number) * (grown[1] as number) * (grown[2] as number));
-  if (expected > MAX_SEEDS)
+  if (expected > MAX_SEEDS || expected * LEAST_BEAMS_PER_SEED > MAX_VORONOI_BEAMS)
     return {
       ok: false,
       code: 'IMP_GRAPH_TOO_LARGE',
-      message: `density ${node.density} puts ${expected} seeds in the box (limit ${MAX_SEEDS}, about 9 beams each): lower the density or shrink the region`,
+      message: `density ${node.density} puts ${expected} seeds in the box (limit ${MAX_SEEDS} seeds and ${MAX_VORONOI_BEAMS} beams, 9 to 11 beams each): lower the density or shrink the region`,
       ids: [],
     };
   const count = Math.max(expected, 8);
@@ -73,11 +92,20 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
   ] as const)
     points.push([centre[0] + s[0] * reach, centre[1] + s[1] * reach, centre[2] + s[2] * reach]);
   const { tets, skipped } = delaunay(points, count);
-  const owner = new Map<number, number[]>();
+  // the two tetrahedra of every shared face, faces in the order they first occur (the order of the beams, which the content hash depends on)
+  const slotOf = new Map<number, number>();
+  const firstOwner: number[] = [];
+  const secondOwner: number[] = [];
   tets.forEach(({ v }, index) => {
     for (const f of facesOf(v)) {
       const key = faceKey(f[0], f[1], f[2], points.length);
-      owner.set(key, [...(owner.get(key) ?? []), index]);
+      const slot = slotOf.get(key);
+      if (slot === undefined) {
+        slotOf.set(key, firstOwner.length);
+        firstOwner.push(index);
+        secondOwner.push(-1);
+      } else if (secondOwner[slot] === -1) secondOwner[slot] = index;
+      else secondOwner[slot] = -2;
     }
   });
   const nodes: Vec3[] = [];
@@ -93,9 +121,9 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
   const beams: StrutBeam[] = [];
   let dropped = skipped.length;
   let totalLength = 0;
-  for (const pair of owner.values()) {
-    if (pair.length !== 2) continue;
-    const cut = clipSegment((tets[pair[0] as number] as Tet).c, (tets[pair[1] as number] as Tet).c, min, max);
+  for (let slot = 0; slot < firstOwner.length; slot += 1) {
+    if ((secondOwner[slot] as number) < 0) continue;
+    const cut = clipSegment((tets[firstOwner[slot] as number] as Tet).c, (tets[secondOwner[slot] as number] as Tet).c, min, max);
     if (cut === null) continue;
     const [a, b] = [nodeAt(cut[0]), nodeAt(cut[1])];
     if (a === b) {
@@ -108,11 +136,11 @@ export function voronoiGeometry(node: Pick<VoronoiNode, 'min' | 'max' | 'density
   }
   if (beams.length === 0)
     return { ok: false, code: 'IMP_GRAPH_EMPTY', message: 'the seeds produced no Voronoi edge inside the box', ids: [] };
-  if (beams.length > MAX_GRAPH_BEAMS)
+  if (beams.length > MAX_VORONOI_BEAMS)
     return {
       ok: false,
       code: 'IMP_GRAPH_TOO_LARGE',
-      message: `${beams.length} beams exceed the limit of ${MAX_GRAPH_BEAMS}: lower the density`,
+      message: `${beams.length} beams exceed the limit of ${MAX_VORONOI_BEAMS}: lower the density`,
       ids: [],
     };
   return { ok: true, graph: { set: { periodic: null, nodes, beams }, dropped, totalLength, radiusMax: node.radius } };

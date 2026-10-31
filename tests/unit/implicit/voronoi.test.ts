@@ -10,9 +10,10 @@ const region = (): ReturnType<typeof ok> =>
 describe('add_voronoi_lattice', () => {
   it('is deterministic per seed, differs between seeds, and keeps every beam inside the box', () => {
     const box = region();
+    // A, B, A: the last result is reused for equal parameters, so the second A is computed again after B replaced it
     const a = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
-    const b = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
     const c = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 8, radius: 0.4 });
+    const b = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
     expect(a.doc.implicit?.fields[a.id]).toEqual({ ...b.doc.implicit?.fields[b.id], id: a.id });
     expect(a.data['totalLength']).toBe(b.data['totalLength']);
     expect(a.data['totalLength']).not.toBe(c.data['totalLength']);
@@ -50,7 +51,7 @@ describe('add_voronoi_lattice', () => {
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 0 }), 'IMP_PARAM_RANGE');
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, seed: 1.5 }), 'IMP_PARAM_RANGE');
     expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, radius: 0 }), 'IMP_STRUT_RADIUS_RANGE');
-    expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 5 }), 'IMP_GRAPH_TOO_LARGE');
+    expectRefused(box.doc, run(box.doc, 'add_voronoi_lattice', { ...base, density: 500 }), 'IMP_GRAPH_TOO_LARGE');
     const plane = ok(empty(), 'add_field_primitive', { shape: 'plane', normal: [0, 0, 1], offset: 0 });
     expectRefused(plane.doc, run(plane.doc, 'add_voronoi_lattice', { ...base, region: plane.id }), 'IMP_FIELD_UNBOUNDED');
   });
