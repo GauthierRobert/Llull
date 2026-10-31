@@ -80,6 +80,8 @@ export const useFaceEditStore = create<FaceEditState>()((set) => ({
   setValue: (value) => set(value === null ? { value, vector: null } : { value }),
   addFeatureFace: (point, region) =>
     set((state) => {
+      // the picked face itself is already part of the feature: a Shift-click on it adds nothing
+      if (region.some((index) => state.baseRegion.includes(index))) return state;
       const taken = state.extras.find((face) => face.region.some((index) => region.includes(index)));
       const extras = taken === undefined ? [...state.extras, { point, region }] : state.extras.filter((face) => face !== taken);
       return { extras, also: extras.map((face) => face.point), region: union(state.baseRegion, extras) };
