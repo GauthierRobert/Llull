@@ -1,7 +1,7 @@
 /**
  * Plant 06 STA: runs the validation pack's scenario plans (`validation/plans/*.json`) through `build_project` (the path of `llull run plan.json`)
- * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2. SC-STA-05 (negative access) runs in
- * `continue` mode since M3: its `add_ladder` step fails as an unknown command until M4, and the rows that need the ladder are skipped by name.
+ * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2, SC-STA-05 (negative access) and
+ * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4. SC-STA-02, 03, 04 and 07 wait for M5..M8 (tests/unit/contract/blockedPlanCommands.json).
  */
 
 import { readFileSync } from 'node:fs';
@@ -59,15 +59,15 @@ function compare(actual: unknown, row: Expected): void {
   else expect(actual, label).toEqual(row.value);
 }
 
-function run(file: string): { plan: Plan; report: Report } {
+function run(file: string, edit?: (plan: Plan) => void): { plan: Plan; report: Report } {
   const plan = JSON.parse(readFileSync(path.join(PLANS, file), 'utf8')) as Plan;
+  edit?.(plan);
   const result = execute(createEmptyDocument(), 'build_project', { actions: plan.actions, onError: 'continue' });
   return { plan, report: result.data as Report };
 }
 
-/** Rows that wait for a later milestone (ladder), describe a relation instead of a value, or are checked by name below. */
-const waits = (row: Expected): boolean =>
-  /LADDER/.test(row.path) || (typeof row.value === 'string' && /^(contains|non-empty)/.test(row.value));
+/** Rows that describe a relation instead of a value; they are checked by name below. */
+const waits = (row: Expected): boolean => typeof row.value === 'string' && /^(contains|non-empty)/.test(row.value);
 
 describe('SC-STA-06 grating span (VC-STA-06)', () => {
   const { plan, report } = run('sc-sta-06-grating-span.json');
@@ -87,18 +87,40 @@ describe('SC-STA-06 grating span (VC-STA-06)', () => {
   });
 });
 
-describe('SC-STA-05 negative access (VC-STA-05, VC-STA-13), railing and edge rows', () => {
-  const { plan, report } = run('sc-sta-05-access-negative.json');
-  const ladderStep = plan.actions.findIndex((action) => action.command === 'add_ladder');
+describe('SC-STA-01 caged ladder (VC-STA-01..03)', () => {
+  const { plan, report } = run('sc-sta-01-caged-ladder.json');
 
-  it('runs every registered step; only add_ladder (M4) fails', () => {
-    expect(report.steps.filter((step) => !step.ok).map((step) => step.command)).toEqual(['add_ladder']);
-    expect(report.steps[ladderStep]?.ok).toBe(false);
+  it('runs every step and meets every expected row', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    expect(plan.expected.length).toBeGreaterThanOrEqual(7);
+    for (const row of plan.expected) compare(pick(report.steps[row.step], row.path), row);
   });
 
-  it('meets the railing, edge and review rows', () => {
+  it('meets the variant: 8000 mm with a cage alone fails OSHA (STA_LADDER_CAGE_NOT_PRIMARY)', () => {
+    const variant = (plan as Plan & { variant: { expected: Expected[] } }).variant;
+    const changed = run('sc-sta-01-caged-ladder.json', (copy) => {
+      copy.actions[2]!.params['elevation'] = 8000;
+      copy.actions[4]!.params['climbHeight'] = 8000;
+    });
+    expect(variant.expected.length).toBeGreaterThanOrEqual(4);
+    for (const row of variant.expected) compare(pick(changed.report.steps[row.step], row.path), row);
+  });
+
+  it('is deterministic (AF-13)', () => {
+    expect(JSON.stringify(run('sc-sta-01-caged-ladder.json').report.steps)).toBe(JSON.stringify(report.steps));
+  });
+});
+
+describe('SC-STA-05 negative access (VC-STA-05, VC-STA-13)', () => {
+  const { plan, report } = run('sc-sta-05-access-negative.json');
+
+  it('runs every step', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+  });
+
+  it('meets the railing, ladder, edge and review rows', () => {
     const rows = plan.expected.filter((row) => !waits(row));
-    expect(rows.length).toBeGreaterThanOrEqual(8);
+    expect(rows.length).toBeGreaterThanOrEqual(11);
     for (const row of rows) compare(pick(report.steps[row.step], row.path), row);
   });
 

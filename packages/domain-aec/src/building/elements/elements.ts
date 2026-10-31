@@ -150,6 +150,8 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, boundary: element.boundary.map(shift) };
     case 'railing':
       return { ...element, path: element.path.map(shift3) };
+    case 'ladder':
+      return { ...element, base: shift3(element.base) };
     case 'door':
     case 'window':
     case 'plate':

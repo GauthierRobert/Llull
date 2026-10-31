@@ -7,12 +7,13 @@
 
 import { round6 } from '../../lib/compactNumber';
 import type { CadDocument, EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
-import type { ShapeTopology } from '../../geometry/kernel';
+import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop } from '../noop';
 import { selectEdges } from './edgeSelection';
+import { type ChainInput, chainEntries } from './filletChain';
 import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
 import { chordsToRadii } from './filletChord';
 import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
@@ -54,6 +55,8 @@ export interface FilletRequest {
   readonly corners?: readonly CornerInput[] | undefined;
   /** Build a fillet whose new blend meets an earlier blend without tangency (the finding is reported, not refused). */
   readonly allowNonTangent?: boolean | undefined;
+  /** The selected edges are one tangent chain with ONE radius law over its arc length (radius -> radiusEnd, or chain.law). */
+  readonly chain?: ChainInput | undefined;
 }
 
 interface Planned {
@@ -67,7 +70,7 @@ interface Planned {
 
 /** A refusal with a stable code: its message, the code, and the param path below the request (`edges[1].law.expression`, `radius`). */
 interface Refusal {
-  readonly code: LawProblem['code'] | 'BLD_CHORD_UNDEFINED';
+  readonly code: LawProblem['code'] | 'BLD_CHORD_UNDEFINED' | 'BLD_CHAIN_UNSUPPORTED';
   readonly message: string;
   readonly path: string;
 }
@@ -114,6 +117,31 @@ function resolveShorthand(topology: ShapeTopology | null, request: FilletRequest
       ? (topology?.edges ?? []).filter((edge) => !edge.seam && !edge.degenerate).map((edge) => edge.index)
       : picked.edges;
   return { planned: every.map((edge) => ({ edge, law })) };
+}
+
+/** The selected edges as ONE tangent chain with one radius law over its arc length (fillet_edge chain). */
+function resolveChain(
+  topology: ShapeTopology | null,
+  kernel: GeometryKernel,
+  shape: ShapeHandle,
+  request: FilletRequest,
+  chain: ChainInput,
+): Resolution {
+  const unsupported =
+    request.mode === 'chord' ? 'mode' : request.profile !== undefined ? 'profile' : request.corners !== undefined ? 'corners' : null;
+  if (unsupported !== null)
+    return {
+      refusal: {
+        code: 'BLD_CHAIN_UNSUPPORTED',
+        message: `chain runs one radius law over the chain: it does not combine with ${unsupported} (chord sizes, profile blends and setback corners are per edge); drop ${unsupported} or drop chain`,
+        path: unsupported,
+      },
+    };
+  if (request.edges !== undefined) return { problem: 'chain takes the selected edges (edgeIndices / edgesNear / edgeNames), not edges[]' };
+  const picked = selectEdges(topology, request.edgeIndices, request.edgesNear);
+  if ('problem' in picked) return { problem: picked.problem };
+  const built = chainEntries({ kernel, shape, topology }, picked.edges, chain, request.radius, request.radiusEnd);
+  return 'entries' in built ? resolveEntries(topology, built.entries) : built;
 }
 
 /** The first closed edge (a rim) whose law does not close on itself (r(0) = r(1)), as a refusal. */
@@ -222,7 +250,12 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   const named = byRecordedNames(topology, request);
   if ('problem' in named)
     return { ...fail(`${named.problem} on '${request.id}'`), error: commandError(named.code, REPICK_EDGES, [], ['edgeNames']) };
-  const resolved = named.edges === undefined ? resolveShorthand(topology, named) : resolveEntries(topology, named.edges);
+  const resolved =
+    request.chain !== undefined
+      ? resolveChain(topology, kernel, shape, named, request.chain)
+      : named.edges === undefined
+        ? resolveShorthand(topology, named)
+        : resolveEntries(topology, named.edges);
   if ('refusal' in resolved) return refuse(resolved.refusal);
   if ('problem' in resolved) return fail(`${resolved.problem} on '${request.id}'`);
   const validated = selectEdges(

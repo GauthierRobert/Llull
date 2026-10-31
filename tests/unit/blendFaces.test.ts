@@ -104,6 +104,24 @@ describe('fillet_faces', () => {
     expect(kernel.recipes.some((recipe) => recipe.op === 'faceBlend')).toBe(false);
   });
 
+  it('a near point that resolves to no face (face -1) is refused by name with its path, before any recipe, for every set', () => {
+    const { doc, id } = box();
+    const unresolved = (point: readonly number[]): { face: number; distance: number } => ({
+      face: point[0] === 7 ? -1 : (point[0] ?? 0),
+      distance: 0,
+    });
+    const kernel = scriptedKernel({ faceAt: unresolved });
+    const sets = { facesA: setOf(0), facesB: { near: [[1, 0, 0] as [number, number, number], [7, 0, 0] as [number, number, number]] } };
+    const result = execute(doc, 'fillet_faces', { id, ...sets, radius: 1 }, context(kernel));
+    expectNoOp(result, doc, 'BLD_FACESET_EMPTY');
+    expect(result.error).toMatchObject({ code: 'BLD_FACESET_EMPTY', ids: [id], paths: ['facesB.near[1]'] });
+    expect(result.summary).toContain('point 1 (7, 0, 0) resolves to no single face');
+    expect(kernel.recipes.some((recipe) => recipe.op === 'faceBlend')).toBe(false);
+    const full = execute(doc, 'fillet_full_round', { id, side1: setOf(0), center: setOf(7), side2: setOf(2) }, context(kernel));
+    expect(full.error).toMatchObject({ code: 'BLD_FACESET_EMPTY', paths: ['center.near[0]'] });
+    expect(full.document).toBe(doc);
+  });
+
   it('a kernel report with a [BLD_*] reason is that code, with its remediation; without a prefix it is BLD_PROFILE_FAILED', () => {
     const { doc, id } = box();
     const report = (stage: BlendReport['stage'], message: string): BlendReport => ({

@@ -13,12 +13,19 @@ import { distance3 } from '../../lib/vec3';
 import type { Vec3 } from '../../model/types';
 import { DEFAULT_LAW_SAMPLES, MAX_LAW_SAMPLES, MIN_LAW_SAMPLES, sampleExpression } from '../../geometry/blend/law';
 import type { EdgeLawInput } from './filletSpec';
-import type { BlendContext } from './faceBlendRun';
+import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 
 /** Largest angle between the two edges at a joint of the chain (rad): the kernel chains edges that continue each other to about 0.1 rad (13.13.2); a size law over a creased chain is not offered. */
 const JOINT_TANGENT_RAD = 0.01;
 /** Two chain ends are the same vertex within this fraction of the longest edge. */
 const JOINT_GAP = 1e-6;
+
+/** What the chain layout reads of a shape: the kernel's edge sampler, the shape and its topology (a BlendContext and a fillet_edge target both fit). */
+export interface ChainContext {
+  readonly kernel: GeometryKernel;
+  readonly shape: ShapeHandle;
+  readonly topology: ShapeTopology | null;
+}
 
 export interface ChainEdge {
   readonly index: number;
@@ -53,7 +60,7 @@ interface End {
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /** The two ends of each seed with the direction they leave along the edge, or null when the kernel cannot sample one. */
-function endsOf(context: BlendContext, seeds: readonly number[]): End[] | null {
+function endsOf(context: ChainContext, seeds: readonly number[]): End[] | null {
   const ends: End[] = [];
   for (const edge of seeds) {
     const samples = context.kernel.faceQuery?.edgeSamples(context.shape, edge, 2) ?? null;
@@ -68,7 +75,7 @@ function endsOf(context: BlendContext, seeds: readonly number[]): End[] | null {
 
 /** The chain of `seeds` in walking order with the arc fractions, or why it is not one chain. */
 export function planChain(
-  context: BlendContext,
+  context: ChainContext,
   seeds: readonly number[],
   startNear: Vec3 | undefined,
   startPath: string,
@@ -130,6 +137,11 @@ export function planChain(
   }
   if (walked.length !== seeds.length) return { problem: `the shared edges ${seeds.join(', ')} are not one chain`, path: startPath };
   const total = walked.reduce((sum, entry) => sum + lengthOf(entry.edge), 0);
+  if (!(total > 0) || walked.some((entry) => !(lengthOf(entry.edge) > 0)))
+    return {
+      problem: `the length of the shared edges ${seeds.join(', ')} is unknown or zero, so a size over their arc length cannot be laid out`,
+      path: startPath,
+    };
   let run = 0;
   const edges = walked.map((entry): ChainEdge => {
     const length = lengthOf(entry.edge);
@@ -163,7 +175,7 @@ export function chainLaws(plan: ChainPlan, size: ChainSize, endPath: string): Ed
     if (plan.closed && Math.abs(a - b) > PERIODIC * Math.max(a, b))
       return {
         code: 'BLD_LAW_NOT_PERIODIC',
-        message: `the shared edges form a closed loop, so the size must return to its start: ${a} at the start but ${b} at the end`,
+        message: `the shared edges form a closed loop, so the size must return to its start: ${a} at the start but ${b} at the end (leave radiusEnd out on a closed loop)`,
         path: endPath,
       };
     at = (tau) => a + (b - a) * tau;
@@ -178,7 +190,7 @@ export function chainLaws(plan: ChainPlan, size: ChainSize, endPath: string): Ed
     )
       return {
         code: 'BLD_LAW_NOT_PERIODIC',
-        message: `the shared edges form a closed loop, so the law must return to its start: r(0) = ${values[0]} but r(1) = ${values[values.length - 1]}`,
+        message: `the shared edges form a closed loop, so the law must return to its start: r(0) = ${values[0]} but r(1) = ${values[values.length - 1]} (use a periodic expression on a closed loop)`,
         path: 'law.expression',
       };
     stations = Math.max(MIN_LAW_SAMPLES, Math.min(MAX_LAW_SAMPLES, samples));

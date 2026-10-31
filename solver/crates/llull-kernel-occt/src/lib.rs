@@ -37,6 +37,8 @@ mod blend_rail_tests;
 #[cfg(test)]
 mod blend_tests;
 #[cfg(test)]
+mod blend_uneven_tests;
+#[cfg(test)]
 mod deform_infinite_tests;
 #[cfg(test)]
 mod deform_tests;

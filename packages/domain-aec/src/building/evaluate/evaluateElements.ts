@@ -7,6 +7,7 @@ import { curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { evaluateEquipment, evaluateFooting, evaluateMember, evaluatePanel, evaluatePipe, evaluateTray } from '../../industrial/evaluate';
 import { evaluatePlate, evaluateConnection } from '../../industrial/connections/evaluateConnections';
 import { evaluateGrating } from '../../plant/structures/evaluate/evaluateGrating';
+import { evaluateLadder } from '../../plant/structures/evaluate/evaluateLadder';
 import { evaluateRailing } from '../../plant/structures/evaluate/evaluateRailing';
 import { evaluatePipeSupport } from '../../industrial/piping/evaluateSupports';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
@@ -83,6 +84,8 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateGrating(context.doc, leveled, level);
     case 'railing':
       return evaluateRailing(context.doc, leveled, level);
+    case 'ladder':
+      return evaluateLadder(context.doc, leveled, level);
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member' ? evaluatePlate(context.doc, leveled, member, level) : [];

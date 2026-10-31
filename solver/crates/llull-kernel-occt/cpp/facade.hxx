@@ -74,6 +74,9 @@ void set_corner_exact_patch(int32_t mode);
 double last_corner_crease();
 void set_corner_crease_gate(bool on);
 void set_corner_c0_knots(bool on);
+// Test-only hook (law_fillet.cxx): every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
+void set_law_inversion_fault(int32_t after);
+void set_law_node_cap(int32_t nodes);
 void set_corner_trim(bool on);
 // Test-only view of the mass rule by knot span (mass_spans.hxx): how many faces of the shape the area rule cuts into pieces.
 int32_t span_cut_count(const Shape &shape);

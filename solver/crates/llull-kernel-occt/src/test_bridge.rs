@@ -33,6 +33,10 @@ mod ffi {
         fn set_corner_crease_gate(on: bool);
         /// Whether the star sub-patches take only C0 knots at the joints of their chains (no C1 attempt).
         fn set_corner_c0_knots(on: bool);
+        /// Every arc length inversion of a radius law on an uneven edge after the first `after` fails (-1: off).
+        fn set_law_inversion_fault(after: i32);
+        /// The most nodes a stretch of a radius law on an uneven edge may take (0: the default, 128).
+        fn set_law_node_cap(nodes: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
@@ -76,6 +80,14 @@ pub fn set_corner_spawn_limit(workers: i32) {
 
 pub fn last_corner_crease() -> f64 {
     ffi::last_corner_crease()
+}
+
+pub fn set_law_node_cap(nodes: i32) {
+    ffi::set_law_node_cap(nodes);
+}
+
+pub fn set_law_inversion_fault(after: i32) {
+    ffi::set_law_inversion_fault(after);
 }
 
 pub fn set_corner_c0_knots(on: bool) {

@@ -16,8 +16,9 @@ import { recordsByFace } from './blendChains';
 import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
 import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
-import { REMEDIATION, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
+import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
+import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
 import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes } from '../../geometry/blend/blendInfo';
 
@@ -68,6 +69,8 @@ interface BlendRow {
   readonly radius?: RadiusReadback;
   /** Whether the recipe's radius law was compared with the realised radius. */
   readonly lawChecked?: boolean;
+  /** Why a law that could be compared was not (an edge of uneven speed whose spine position could not be read): named, never a guess. */
+  readonly lawNote?: string;
   /** blend_union joints: where the radius asked for came from, the pick ("joints[i]") or "default". */
   readonly source?: string;
   /** Section the recipe asked for: "circular", "conic" or "curvature" (a non-circular section has no radius readback). */
@@ -255,6 +258,8 @@ function checkEntity(
         remediation: REMEDIATION.BLD_CHECK_RADIUS_LAW,
         message: `blend face ${face.index} has radius ${deviation.actual} ${unit} at t = ${deviation.t} where the law gives ${deviation.expected}`,
       });
+    const cliffEdge = cliffEdgeOf(kernel, shape, topology, graph, face.index, samples);
+    if (cliffEdge !== null) findings.push(cliffFinding(entityId, face.index, face.name, cliffEdge));
     blends.push({
       entityId,
       face: face.index,
@@ -265,6 +270,7 @@ function checkEntity(
       ...(junctions.length === 0 ? {} : { junctions }),
       profile: laws.get(face.index)?.profile?.type ?? 'circular',
       ...(readback?.radius == null ? {} : { radius: readback.radius, lawChecked: readback.lawChecked }),
+      ...(readback?.lawNote === undefined ? {} : { lawNote: readback.lawNote }),
       ...(jointSource === undefined ? {} : { source: jointSource }),
     });
     if (unverified > before || contacts.length === 0)

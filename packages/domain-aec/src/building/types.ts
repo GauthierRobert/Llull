@@ -31,7 +31,8 @@ export type BimCategory =
   | 'connection'
   | 'pipeSupport'
   | 'grating'
-  | 'railing';
+  | 'railing'
+  | 'ladder';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -421,6 +422,47 @@ export interface RailingElement extends LevelElementBase {
   host?: RailingHost;
 }
 
+/** Fall protection of a fixed ladder; `cage` carries the hoop data in `LadderElement.cage`. */
+export type LadderFallProtection = 'none' | 'cage' | 'ladder_safety_system' | 'pfas';
+
+/** How the climber leaves the ladder at the top: `through` the extended stiles (a railing gap with a gate is cut), `side_step` beside them (no gap is cut). */
+export type LadderExit = 'through' | 'side_step';
+
+/** Safety cage: first hoop height above the departure level, largest hoop spacing, inside diameter (all document units) and vertical bars. */
+export interface LadderCage {
+  startHeight: number;
+  hoopSpacing: number;
+  diameter: number;
+  bars: number;
+}
+
+/**
+ * A fixed vertical ladder (06 STA M4): two flat-bar stiles, round rungs at a uniform pitch, an optional cage and rest landings. `base` is the
+ * middle of the ladder at the departure level (z relative to the level); the climber faces `facing` (plan radians), toward the structure.
+ */
+export interface LadderElement extends LevelElementBase {
+  readonly category: 'ladder';
+  base: Vec3;
+  facing: number;
+  climbHeight: number;
+  /** Clear width between the stiles. */
+  clearWidth: number;
+  rungPitch: number;
+  rungCount: number;
+  exit: LadderExit;
+  fallProtection: LadderFallProtection;
+  cage?: LadderCage;
+  /** Heights above the base of the rest landings, ascending. */
+  landings: number[];
+  /** Stile extension above the arrival level. */
+  railExtension: number;
+  /** Rung centreline to the nearest object behind it, measured at creation (the search stops at 2000 mm). */
+  backClearance: number;
+  /** ISO date; absent = unknown (checked as installed after 2018-11-19). */
+  installedOn?: string;
+  arrivalSurfaceId?: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -441,7 +483,8 @@ export type BuildingElement =
   | MomentConnectionElement
   | PipeSupportElement
   | GratingElement
-  | RailingElement;
+  | RailingElement
+  | LadderElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

@@ -54,6 +54,13 @@ const plan = (value: ReturnType<typeof planChain>): ChainPlan => {
 };
 
 describe('planChain', () => {
+  it('an edge whose length the topology does not give is a problem, never a NaN fraction', () => {
+    const context = contextOf(LINE);
+    (context as unknown as { topology: { edges: unknown[] } }).topology.edges = [];
+    const found = planChain(context, [0, 1, 2], undefined, 'radiusEnd');
+    expect('problem' in found && [found.problem, found.path]).toEqual([expect.stringContaining('length'), 'radiusEnd']);
+  });
+
   it('an open path: the walking order, the arc fractions and the direction of each edge; t = 0 at the end of the lowest edge by default', () => {
     const found = plan(planChain(contextOf(LINE), [2, 0, 1], undefined, 'radiusEnd'));
     expect(found.closed).toBe(false);
@@ -184,6 +191,7 @@ describe('chainLaws', () => {
     );
     const open = chainLaws(loop, { start: 1, end: 2, law: undefined }, 'radiusEnd');
     expect(!Array.isArray(open) && open.code).toBe('BLD_LAW_NOT_PERIODIC');
+    expect(!Array.isArray(open) && open.message).toContain('leave radiusEnd out on a closed loop');
     expect(Array.isArray(chainLaws(loop, { start: 1, end: 1, law: undefined }, 'radiusEnd'))).toBe(true);
     const notClosing = chainLaws(loop, { start: 1, end: undefined, law: { expression: '1 + t' } }, 'law');
     expect(!Array.isArray(notClosing) && [notClosing.code, notClosing.path]).toEqual(['BLD_LAW_NOT_PERIODIC', 'law.expression']);

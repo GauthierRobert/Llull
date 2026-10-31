@@ -5,7 +5,7 @@ import { execute } from '@core/commands/registry';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { newEntity } from '@core/commands/entity/newEntity';
 import { withEntity } from '@core/commands/entity/entityOps';
-import type { BaseEntity, CadDocument, FeatureStep, NurbsCurveEntity, Vec3 } from '@core/model/types';
+import type { BaseEntity, CadDocument, FeatureStep, NurbsCurveEntity, ShapeRecipe, Vec3 } from '@core/model/types';
 import { fakeSplitKernel } from '../../helpers/fakeSplitKernel';
 import { emptyDoc, make } from './support';
 
@@ -187,5 +187,39 @@ describe('wrap_overlay', () => {
     const notSolid = execute(doc, 'wrap_overlay', { id: 'curve-1' });
     expect(notSolid.error?.code).toBe('WRP_NOT_A_SOLID');
     expect(notSolid.document).toBe(doc);
+  });
+});
+
+describe('wrap_overlay placement (world coordinates)', () => {
+  it('opens a moved and rotated kernel result through its PLACED recipe, so the kernel edge samples are already world and are not moved again', () => {
+    const base = fakeSplitKernel({ corner: { convexity: 'convex' } });
+    const seen: ShapeRecipe[] = [];
+    const spy: GeometryKernel = {
+      ...base,
+      evaluate: (recipe) => {
+        seen.push(recipe);
+        return base.evaluate(recipe.op === 'place' ? recipe.source : recipe);
+      },
+    };
+    setGeometryKernel(spy);
+    const box = make(emptyDoc(), 'add_box', { size: [60, 40, 10] });
+    const leaf = box.doc.entities[box.id] as BaseEntity & { kind: string };
+    const position: Vec3 = [4, 5, 6];
+    const rotation: Vec3 = [0.1, 0.2, 0.3];
+    const solid = {
+      ...leaf,
+      id: 'm',
+      kind: 'mesh',
+      mesh: { positions: [], indices: [] },
+      brep: { op: 'solid', entity: leaf },
+      position,
+      rotation,
+    };
+    const doc: CadDocument = { ...box.doc, entities: { ...box.doc.entities, m: solid as never }, order: [...box.doc.order, 'm'] };
+    const done = execute(doc, 'wrap_overlay', { id: 'm', samples: 3 });
+    expect(done.rejected, done.summary).toBeUndefined();
+    expect(seen.at(-1)).toMatchObject({ op: 'place', position, rotation });
+    const plain = data(execute(box.doc, 'wrap_overlay', { id: box.id, samples: 3 }))['edges'] as Array<{ points: Vec3[] }>;
+    expect((data(done)['edges'] as Array<{ points: Vec3[] }>)[0]?.points).toEqual(plain[0]?.points);
   });
 });

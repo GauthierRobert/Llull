@@ -14,7 +14,7 @@
     },
     { "command": "add_branch", "params": { "pipeId": "$main", "at": [7105, 4000, 1000], "to": [7105, 4000, 1500], "fitting": "tee" }, "as": "branch" },
     { "command": "add_end_flange", "params": { "lineId": "L-101", "at": [[0, 0, 3000], [8000, 4000, 1000], [7105, 4000, 1500]], "type": "weld_neck" } },
-    { "command": "add_field_weld", "params": { "lineId": "L-101", "at": [2500, 0, 3000], "type": "field" } },
+    { "command": "add_field_weld", "params": { "lineId": "L-101", "at": [2500, 0, 3000], "type": "site" } },
     { "command": "export_pcf", "params": { "lineIds": ["L-101"] }, "as": "pcf" },
     { "command": "import_pcf", "params": { "text": "=$pcf.data.files[0].content", "preview": true } },
     { "command": "piping_bom", "params": { "scope": "line", "lineId": "L-101" } }

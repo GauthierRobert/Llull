@@ -72,6 +72,8 @@ bool add_fillet_laws(LawFillet &maker, const TopTools_IndexedMapOfShape &unique,
       }
     } catch (const Standard_Failure &) {
       if (!lenient) throw;
+    } catch (const LawNodeFailure &) {
+      if (!lenient) throw;
     }
     offset += kLawHeader + 2 * count;
   }

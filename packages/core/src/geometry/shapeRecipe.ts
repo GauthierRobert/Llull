@@ -72,7 +72,7 @@ function keyText(recipe: ShapeRecipe): string {
     case 'faceOp':
       return `faceOp(${recipeKey(recipe.source)},${JSON.stringify(faceOpParamsOf(recipe))})`;
     case 'faceBlend':
-      return `faceBlend(${recipeKey(recipe.source)},[${recipe.facesA.join(',')}],[${recipe.facesB.join(',')}],${recipe.radius}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`})`;
+      return `faceBlend(${recipeKey(recipe.source)},[${recipe.facesA.join(',')}],[${recipe.facesB.join(',')}],${recipe.radius}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`}${recipe.cliff === undefined ? '' : `,cliff${recipe.cliff}`}${recipe.radiusEnd === undefined ? '' : `,end${recipe.radiusEnd}`}${recipe.startNear === undefined ? '' : `,from[${recipe.startNear.join(',')}]`})`;
     case 'fullRound':
       return `fullRound(${recipeKey(recipe.source)},[${recipe.side1.join(',')}],[${recipe.center.join(',')}],[${recipe.side2.join(',')}])`;
   }
@@ -295,6 +295,23 @@ function faceSetError(node: Record<string, unknown>, fields: readonly string[]):
   return null;
 }
 
+const cliffProblem = (node: Record<string, unknown>): string | null => {
+  const { cliff, profile } = node;
+  if (cliff === undefined) return null;
+  if (cliff !== 'A' && cliff !== 'B') return 'faceBlend: cliff must be "A" or "B"';
+  return profile === undefined || (isRecord(profile) && profile['type'] === 'circular')
+    ? null
+    : 'faceBlend: a cliff edge takes the circular section only';
+};
+
+const taperProblem = (node: Record<string, unknown>): string | null => {
+  const { radiusEnd, startNear } = node;
+  if (radiusEnd !== undefined && !positiveNumber(radiusEnd)) return 'faceBlend: radiusEnd must be > 0';
+  if (startNear !== undefined && (radiusEnd === undefined || !isVec3(startNear)))
+    return 'faceBlend: startNear is a finite [x, y, z] point and needs radiusEnd';
+  return null;
+};
+
 const radiusProblem = (node: Record<string, unknown>): string | null =>
   positiveNumber(node['radius']) ? null : `${String(node['op'])}: radius must be > 0`;
 
@@ -368,7 +385,12 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return faceOpProblem(node) ?? child(node['source']);
     case 'faceBlend':
       return (
-        faceSetError(node, ['facesA', 'facesB']) ?? radiusProblem(node) ?? profileError({ ...node, op: 'fillet' }) ?? child(node['source'])
+        faceSetError(node, ['facesA', 'facesB']) ??
+        radiusProblem(node) ??
+        taperProblem(node) ??
+        cliffProblem(node) ??
+        profileError({ ...node, op: 'fillet' }) ??
+        child(node['source'])
       );
     case 'fullRound':
       return faceSetError(node, ['side1', 'center', 'side2']) ?? child(node['source']);

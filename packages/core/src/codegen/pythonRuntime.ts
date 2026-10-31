@@ -10,6 +10,7 @@
 
 import { OCP_SWEPT_PY, SWEPT_TRACE_PY } from './pythonSwept';
 import { OCP_SUBDIVISION_PY, SUBDIVISION_PY, SUBDIVISION_TRACE_PY } from './pythonSubdivision';
+import { CHAMFER_TRACE_PY, OCP_CHAMFER_PY } from './pythonChamfer';
 
 export type PythonBackend = 'cadquery' | 'build123d';
 
@@ -346,13 +347,16 @@ def _edge_mid(edge):
     return (point.X(), point.Y(), point.Z())
 
 
-def _select_edges(topods, edges, near):
-    """llull edge selection: by mid point when given (robust across OCC builds), else by index."""
+def _select_edges(topods, edges, near, tolerance=None):
+    """llull edge selection: by mid point when given (robust across OCC builds), else by index. With a tolerance a mid point further from every edge raises."""
     unique = _unique_edges(topods)
     if near:
         mids = [_edge_mid(edge) for edge in unique]
         distance = lambda a, b: sum((x - y) ** 2 for x, y in zip(a, b))
-        return [unique[min(range(len(unique)), key=lambda i: distance(mids[i], p))] for p in near]
+        nearest = [min(range(len(unique)), key=lambda i: distance(mids[i], p)) for p in near]
+        if tolerance is not None and any(distance(mids[i], p) > tolerance ** 2 for i, p in zip(nearest, near)):
+            raise ValueError("llull: no edge of the solid has its mid point at %s (within %s); the edge to chamfer cannot be told" % (near, tolerance))
+        return [unique[i] for i in nearest]
     return [unique[i] for i in edges] if edges else unique
 
 
@@ -596,10 +600,12 @@ export function pythonRuntime(backend: PythonBackend): string {
     'import math',
     builders,
     SHARED_GEOMETRY,
+    OCP_CHAMFER_PY,
     SUBDIVISION_PY,
     OCP_SUBDIVISION_PY,
     OCP_SWEPT_PY,
     TRACE_RUNTIME,
+    CHAMFER_TRACE_PY,
     SUBDIVISION_TRACE_PY,
     SWEPT_TRACE_PY,
   ]

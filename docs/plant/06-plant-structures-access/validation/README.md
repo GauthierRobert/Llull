@@ -4,7 +4,7 @@ This pack defines how llull's plant access structures (gratings, platforms, ladd
 racks, fireproofing, reachability) will be proven right. Every reference value is either quoted from a source graded in
 [sources.md](sources.md) or derived from a cited closed form in [`data/derive_expected.py`](data/derive_expected.py)
 (run it with `python3 -I data/derive_expected.py`). **No expected value comes from running llull.** The commands do not
-exist progressively: a plan is marked `PROPOSED` and names the commands that are missing until they are built (SC-STA-06 is built since M2, SC-STA-05 runs without its ladder rows since M3).
+exist progressively: a plan is marked `PROPOSED` and names the commands that are missing until they are built (SC-STA-06 is built since M2, SC-STA-05 and SC-STA-01 since M4).
 
 When the commands land, the cases run without a human:
 
