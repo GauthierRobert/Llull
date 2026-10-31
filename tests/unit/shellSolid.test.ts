@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { setGeometryKernel } from '@core/geometry/kernel';
+import { setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { fakeKernel, type FakeKernel } from '../helpers/fakeKernel';
@@ -60,6 +60,45 @@ describe('shell_solid', () => {
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('could not hollow this solid');
+  });
+  it('says what the kernel named before it tried: a refusal that starts with [SHL_ is the summary, with the remedy', () => {
+    const named =
+      '[SHL_STAR_FACES] the solid carries corner-star faces of 64 x 64 poles. Open the shell at a face (openFacesNear), shell before filleting';
+    setGeometryKernel({ ...fakeKernel({ shell: null }), lastRefusal: () => 'OCC failure: ' + named });
+    const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toBe(`shell_solid: ${named}; document unchanged.`);
+    // any other kernel words, or none, keep the generic text
+    setGeometryKernel({ ...fakeKernel({ shell: null }), lastRefusal: () => 'Standard_Failure' });
+    expect(execute(doc, 'shell_solid', { id, thickness: 0.5 }).summary).toContain('could not hollow this solid');
+  });
+  it('a sealed shell of a solid with corner-star faces says so from the topology when the kernel has no words for it (a repeated refusal): open the shell at a face', () => {
+    const star = (index: number): ShapeTopology['faces'][number] => ({
+      index,
+      name: `blend(v:e(a|b),e(c|d))#${index}`,
+      surface: 'bspline',
+      area: 1,
+    });
+    const topology: ShapeTopology = {
+      solids: 1,
+      faces: [{ index: 0, name: 'box:x0', surface: 'plane', area: 1 }, star(1), star(2)],
+      edges: [],
+      vertices: 0,
+      volume: 1,
+    };
+    setGeometryKernel(fakeKernel({ shell: null, topology }));
+    const sealed = execute(doc, 'shell_solid', { id, thickness: 0.5 });
+    expect(sealed.document).toBe(doc);
+    expect(sealed.summary).toContain('could not hollow this solid');
+    expect(sealed.summary).toContain('carries 2 corner-star faces');
+    expect(sealed.summary).toContain('[SHL_STAR_FACES]');
+    // an open shell, or a solid without stars, keeps the generic text
+    const open = execute(doc, 'shell_solid', { id, thickness: 0.5, openFacesNear: [[0, 0, 2]] });
+    expect(open.summary).toContain('could not hollow this solid');
+    expect(open.summary).not.toContain('corner-star');
+    setGeometryKernel(fakeKernel({ shell: null, topology: { ...topology, faces: [topology.faces[0] as ShapeTopology['faces'][number]] } }));
+    expect(execute(doc, 'shell_solid', { id, thickness: 0.5 }).summary).not.toContain('corner-star');
   });
   it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
     setGeometryKernel(fakeKernel({ unsupported: ['shell'] }));

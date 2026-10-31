@@ -33,6 +33,8 @@ mod blend_mitre_tests;
 #[cfg(test)]
 mod blend_rail_tests;
 #[cfg(test)]
+mod blend_shell_tests;
+#[cfg(test)]
 mod blend_tests;
 #[cfg(test)]
 mod blend_third_tests;

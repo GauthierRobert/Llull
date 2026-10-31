@@ -4,6 +4,7 @@
 #include "llull-kernel-occt/cpp/features.hxx"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -652,8 +653,40 @@ rust::String blend_union_reason(const ShapeList &list, double radius, rust::Slic
   return rust::String(built ? std::string() : (why.empty() ? std::string("the blend failed") : why));
 }
 
+namespace {
+
+// The faces of an exact corner star (named blend(v:...)#k, blend_corner_exact.cxx) are interpolating B-splines of 8 to 70 poles per direction (the pole counts of the attempts, plus the knots at the
+// joints of a chain). OCCT's inward offset of such a face was measured on the cylinder block of 13.22.6 (thickness 0.2, release): 27 poles 26 s and a valid hollow solid; 54 poles 166 s and 161 s,
+// 70 poles 410 s, and a "hollow solid" of the volume of the full solid (the cut of the cavity silently did nothing). So a sealed shell refuses by name before the offset from 36 poles in a
+// direction (06 BLD 13.33.5); an open shell (shell_open) of the same solid builds in under a second and is not affected.
+constexpr int kShellStarPoleLimit = 36;
+std::atomic<int> g_shell_star_pole_limit{kShellStarPoleLimit};  // test hook: set_shell_star_pole_limit
+std::atomic<int> g_last_star_poles{0};                           // test hook: last_shell_star_poles
+
+// The most poles in a direction of a star face of `shape` (0 without one).
+int most_star_poles(const Shape &shape) {
+  const std::vector<std::string> names = naming::face_names(shape);
+  const TopTools_IndexedMapOfShape faces = unique_sub_shapes(shape.shape, TopAbs_FACE);
+  int most = 0;
+  for (int i = 1; i <= faces.Extent() && static_cast<size_t>(i) <= names.size(); ++i) {
+    const std::string &name = names[static_cast<size_t>(i - 1)];
+    if (name.rfind("blend(v:", 0) != 0 || name.find('#') == std::string::npos) continue;
+    const Handle(Geom_BSplineSurface) surface = Handle(Geom_BSplineSurface)::DownCast(BRep_Tool::Surface(TopoDS::Face(faces(i))));
+    if (!surface.IsNull()) most = std::max({most, static_cast<int>(surface->NbUPoles()), static_cast<int>(surface->NbVPoles())});
+  }
+  return most;
+}
+
+}  // namespace
+
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
   if (!(thickness > 0)) return nullptr;
+  const int star_poles = most_star_poles(shape);
+  g_last_star_poles.store(star_poles);
+  if (star_poles >= g_shell_star_pole_limit.load())
+    throw std::invalid_argument("[SHL_STAR_FACES] the solid carries corner-star faces of up to " + std::to_string(star_poles) +
+                                " poles per direction (setback corners of a blend): OCCT's inward offset of faces that fine takes minutes and can return a solid without its cavity, so the sealed shell is not tried. " +
+                                "Open the shell at a face (openFacesNear), shell before filleting, or use smaller setbacks so the stars build with fewer poles (under " + std::to_string(g_shell_star_pole_limit.load()) + ")");
   BRepOffsetAPI_MakeOffsetShape offset;
   try {
     offset.PerformByJoin(shape.shape, -thickness, 1e-4, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc, Standard_False);
@@ -986,4 +1019,9 @@ std::unique_ptr<Shape> unified_shape(const Shape &shape) {
   }
 }
 
+}  // namespace llull
+
+namespace llull {
+void set_shell_star_pole_limit(int32_t limit) { g_shell_star_pole_limit.store(limit); }
+int32_t last_shell_star_poles() { return g_last_star_poles.load(); }
 }  // namespace llull

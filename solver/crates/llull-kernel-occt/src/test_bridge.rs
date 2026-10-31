@@ -27,6 +27,10 @@ mod ffi {
         fn set_corner_exact_patch(mode: i32);
         /// Whether every setback step uses the rolling-ball trim builder (13.22).
         fn set_corner_trim(on: bool);
+        /// The pole count from which a sealed shell of a solid with corner-star faces refuses by name.
+        fn set_shell_star_pole_limit(limit: i32);
+        /// The most poles in a direction of a star face seen by the last sealed shell (0: none).
+        fn last_shell_star_poles() -> i32;
         /// The largest interior crease (rad) of the star sub-patches accepted since the last set_corner_exact_patch.
         fn last_corner_crease() -> f64;
         /// Whether the interior crease of the star sub-patches is gated (default) or only measured.
@@ -104,6 +108,14 @@ pub fn set_corner_exact_patch(mode: i32) {
 
 pub fn set_corner_trim(on: bool) {
     ffi::set_corner_trim(on);
+}
+
+pub fn set_shell_star_pole_limit(limit: i32) {
+    ffi::set_shell_star_pole_limit(limit);
+}
+
+pub fn last_shell_star_poles() -> i32 {
+    ffi::last_shell_star_poles()
 }
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
