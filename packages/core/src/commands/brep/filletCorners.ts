@@ -48,7 +48,8 @@ export const cornerSchema = z
       .number()
       .positive()
       .describe(
-        'Setback distance in document units, measured along each edge from the vertex, used for every edge meeting there. It must exceed the distance the neighbouring blends reach along that edge (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.',
+        'Setback distance in document units, used for every edge meeting there. It must exceed the distance the neighbouring blends reach (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.' +
+          ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and it is the RADIUS OF A BALL around the vertex (one distance for all the edges there; the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex). The two agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
       )
       .optional(),
     setbacks: z
@@ -58,7 +59,12 @@ export const cornerSchema = z
             'A point [x, y, z] in document units on or near the edge that meets the vertex. Give exactly one of near or name.',
           ).optional(),
           name: z.string().min(1).describe('Persistent name of the edge. Give exactly one of near or name.').optional(),
-          distance: z.number().positive().describe('Setback of this edge from the vertex, document units (> 0).'),
+          distance: z
+            .number()
+            .positive()
+            .describe(
+              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; a vertex on a curved edge or face takes one distance for all its edges (different distances are refused).',
+            ),
         }),
       )
       .describe('Per-edge setbacks overriding `setback` (each entry names one edge meeting the vertex).')

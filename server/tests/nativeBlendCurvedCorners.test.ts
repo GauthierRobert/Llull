@@ -16,6 +16,7 @@ interface Face {
 }
 interface Row {
   readonly kind: string;
+  readonly profile: string;
   readonly contacts: ReadonlyArray<{ readonly g0Gap: number; readonly g1AngleRad: number; readonly g1EndAngleRad: number }>;
 }
 
@@ -52,7 +53,7 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     };
   };
 
-  it('a vertex of a circular edge and two straight edges, one of them against a cylinder, takes a setback corner: valid, tangent, close to the rolling-ball blend', () => {
+  it('a vertex of a circular edge and two straight edges, one of them against a cylinder, takes a setback corner: a star of exact sub-patches, valid, tangent, at the default g0, close to the rolling-ball blend', () => {
     const { doc, id, vertex, edges } = dshape();
     const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
     expect(plain.error).toBeUndefined();
@@ -65,16 +66,52 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(done.error, done.summary).toBeUndefined();
     const result = done.affected[0] as string;
     const list = faces(done.document, result);
-    expect(list.some((face) => face.name?.startsWith('blend(v:'))).toBe(true);
+    expect(list).toHaveLength(16); // the block, the cylinder, 3 blends and a star of 6
+    const names = list.map((face) => face.name ?? '').filter((name) => name.startsWith('blend(v:'));
+    expect(names).toHaveLength(6);
+    expect(names.every((name) => /#[1-6]$/.test(name))).toBe(true);
     const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string; blends: Row[] };
     expect(checked.status).not.toBe('fail');
     const patches = checked.blends.filter((blend) => blend.kind === 'corner');
-    expect(patches.length).toBeGreaterThan(0);
+    expect(patches).toHaveLength(6);
+    expect(patches.every((row) => row.profile === 'star')).toBe(true);
+    const diagonal = Math.hypot(10, 10, 5);
     for (const contact of patches.flatMap((row) => row.contacts)) {
       expect(contact.g1AngleRad).toBeLessThan(0.0095);
-      expect(contact.g0Gap).toBeLessThan(5e-6 * Math.hypot(10, 10, 5));
+      expect(contact.g0Gap).toBeLessThan(1e-6 * diagonal); // the default g0, not the 5x of the plate
     }
     const rolling = volume(plain.document, plain.affected[0] as string);
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
+  });
+
+  it('refuses by name an edge at the setback vertex that is not rounded, a ball that does not hold the rolling-ball corner, and a step that mixes the two builders', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const left = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges.slice(0, 2),
+      radius: 0.5,
+      corners: [{ near: vertex, type: 'setback', setback: 1.2 }],
+    });
+    expect(left.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
+    expect(left.summary).toContain('not rounded');
+    const short = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [{ near: vertex, type: 'setback', setback: 0.5 }],
+    });
+    expect(short.error?.code).toBe('BLD_SETBACK_TOO_SHORT');
+    // the vertex (0, 0, 5) of the block is a plain cube corner: the analytic builder (along the edge); the other vertex is on a curved edge (a ball): one step cannot do both
+    const mixed = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: [...edges, [3, 0, 5], [0, 3, 5], [0, 0, 2.5]],
+      radius: 0.5,
+      corners: [
+        { near: vertex, type: 'setback', setback: 1.2 },
+        { near: [0, 0, 5], type: 'setback', setback: 1.2 },
+      ],
+    });
+    expect(mixed.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
+    expect(mixed.summary).toContain('mix');
   });
 });

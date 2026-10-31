@@ -23,7 +23,9 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
@@ -926,21 +928,37 @@ void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagona
 
 // ---- Setback corners on curved edges and faces: the rolling-ball trim (13.22) ----
 
-// Whether an edge to round is not a straight line between two planar faces: the analytic builder (prisms, chords) cannot take it.
-bool needs_trim(const TopoDS_Shape &shape, const std::map<int, Taper> &radius) {
-  if (g_force_trim.load()) return true;
-  const TopTools_IndexedMapOfShape edge_map = query::distinct(shape, TopAbs_EDGE);
-  TopTools_IndexedDataMapOfShapeListOfShape owners;
-  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
-  for (const auto &entry : radius) {
-    if (entry.first < 0 || entry.first >= edge_map.Extent()) continue;
-    const TopoDS_Edge edge = TopoDS::Edge(edge_map(entry.first + 1));
-    if (BRepAdaptor_Curve(edge).GetType() != GeomAbs_Line) return true;
-    if (!owners.Contains(edge)) continue;
-    for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next())
-      if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), Standard_False).GetType() != GeomAbs_Plane) return true;
-  }
+// Whether unique edge `index` is not a straight line between two planar faces: the analytic builder (prisms, chords) cannot take it.
+bool edge_needs_trim(const TopTools_IndexedMapOfShape &edge_map, const TopTools_IndexedDataMapOfShapeListOfShape &owners, int index) {
+  if (index < 0 || index >= edge_map.Extent()) return false;
+  const TopoDS_Edge edge = TopoDS::Edge(edge_map(index + 1));
+  if (BRepAdaptor_Curve(edge).GetType() != GeomAbs_Line) return true;
+  if (!owners.Contains(edge)) return false;
+  for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next())
+    if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), Standard_False).GetType() != GeomAbs_Plane) return true;
   return false;
+}
+
+// How the step is built: 0 the analytic builder (every corner has straight edges between planar faces only), 1 the rolling-ball trim (every corner has a curved edge or face, or the test hook),
+// 2 a mixture (refused: the two builders measure the setback differently, along the edge and from the vertex).
+int step_kind(const TopoDS_Shape &shape, const std::map<int, Taper> &radius, const std::vector<Corner> &corners, double tolerance) {
+  if (g_force_trim.load()) return 1;
+  const TopTools_IndexedMapOfShape edge_map = query::distinct(shape, TopAbs_EDGE);
+  TopTools_IndexedDataMapOfShapeListOfShape owners, vertex_edges;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges);
+  int trimmed = 0, analytic = 0;
+  const auto curved = [&](int index) { return edge_needs_trim(edge_map, owners, index); };
+  for (const Corner &corner : corners) {
+    const TopoDS_Vertex vertex = vertex_at(shape, corner.at, tolerance);
+    bool any = false;
+    if (!vertex.IsNull())
+      for (const int edge : edges_at(vertex_edges, edge_map, vertex)) any = any || curved(edge);
+    (any ? trimmed : analytic) += 1;
+  }
+  if (corners.empty())
+    for (const auto &entry : radius) (curved(entry.first) ? trimmed : analytic) += 1;
+  return trimmed == 0 ? 0 : (analytic == 0 ? 1 : 2);
 }
 
 // Whether a face piece of the split solid lies inside the ball (centre, radius): every edge of it that is not on the sphere has its middle inside, and there is one.
@@ -964,7 +982,7 @@ bool is_ball_face(const TopoDS_Face &face, const gp_Pnt &centre, double radius) 
 }
 
 // The setback corner on edges the analytic builder cannot take (a circle, a B-spline, a cylinder / cone / free-form face): OCCT's rolling-ball blend of the rounded edges, then
-// at each corner the faces inside the ball of radius `setback` around the vertex (OCCT's own corner) are cut away and the hole they leave is filled by the exact star (13.21).
+// at each corner the faces inside the ball of radius `setback` around the vertex (OCCT's own corner) are cut away and the hole they leave is filled by the exact star (13.21; the plate when the star is refused).
 std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Taper> &radius, const std::vector<Corner> &corners, bool &fill_failed,
                                      std::string &corners_json, std::string &why, bool allow_star, bool &star_used) {
   const TopoDS_Shape &shape = source.shape;
@@ -995,6 +1013,43 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
         why = std::string(kUnsupported) + "the setback distances at " + where(corners[a].at) + " and " + where(corners[b].at) + " overlap";
         return nullptr;
       }
+  const double vertex_tolerance = kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9);
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_edges_all, vertex_faces_all;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges_all);
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertex_faces_all);
+  const TopTools_IndexedMapOfShape unique_edges = query::distinct(shape, TopAbs_EDGE);
+  // Every edge that meets a setback vertex is rounded in this step, and every rounded edge ends at a setback vertex (the ball must be able to cut the whole of each blend).
+  std::vector<TopoDS_Vertex> corner_vertices;
+  for (const Corner &corner : corners) {
+    const TopoDS_Vertex vertex = vertex_at(shape, corner.at, vertex_tolerance);
+    if (vertex.IsNull()) {
+      why = std::string(kFailed) + "the solid has no vertex at " + where(corner.at);
+      return nullptr;
+    }
+    corner_vertices.push_back(vertex);
+    const std::vector<int> incident = edges_at(vertex_edges_all, unique_edges, vertex);
+    if (incident.size() < 3) {
+      why = std::string(kUnsupported) + "only " + std::to_string(incident.size()) + " edge(s) meet at " + where(corner.at) + ": a setback corner needs 3 or more";
+      return nullptr;
+    }
+    for (const int edge : incident)
+      if (radius.find(edge) == radius.end()) {
+        why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
+              " but is not rounded: a setback corner rounds every edge that meets there, in the same step";
+        return nullptr;
+      }
+  }
+  for (const auto &entry : radius) {
+    if (entry.first < 0 || entry.first >= unique_edges.Extent()) continue;
+    const BRepAdaptor_Curve curve(TopoDS::Edge(unique_edges(entry.first + 1)));
+    const bool at_corner = std::any_of(corners.begin(), corners.end(), [&](const Corner &corner) {
+      return same_point(curve.Value(curve.FirstParameter()), corner.at, vertex_tolerance) || same_point(curve.Value(curve.LastParameter()), corner.at, vertex_tolerance);
+    });
+    if (!at_corner) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(entry.first) + " does not end at a setback vertex: every rounded edge must meet one in this build";
+      return nullptr;
+    }
+  }
   {
     JsonWriter log;
     log.begin_array();
@@ -1027,6 +1082,41 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   TopTools_IndexedDataMapOfShapeListOfShape vertex_edges;
   TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges);
   const double volume_rounded = volume_of(current.shape);
+  // The ball must hold OCCT's own corner at each vertex (the farthest point of the faces generated at the vertex), and meet no face that does not belong to the vertex.
+  const TopTools_IndexedMapOfShape rounded_faces = query::distinct(current.shape, TopAbs_FACE);
+  for (size_t c = 0; c < corners.size(); ++c) {
+    TopTools_IndexedMapOfShape belonging;
+    const auto add_all = [&](const TopTools_ListOfShape &list) {
+      for (TopTools_ListIteratorOfListOfShape it(list); it.More(); it.Next()) belonging.Add(it.Value());
+    };
+    add_all(maker.Generated(corner_vertices[c]));
+    double minimum = 0;
+    for (TopTools_ListIteratorOfListOfShape it(maker.Generated(corner_vertices[c])); it.More(); it.Next())
+      for (TopExp_Explorer vertices(it.Value(), TopAbs_VERTEX); vertices.More(); vertices.Next())
+        minimum = std::max(minimum, BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current())).Distance(corners[c].at));
+    TopTools_IndexedMapOfShape incident_faces;
+    for (TopTools_ListIteratorOfListOfShape faces(vertex_faces_all.FindFromKey(corner_vertices[c])); faces.More(); faces.Next()) incident_faces.Add(faces.Value());
+    for (int f = 1; f <= incident_faces.Extent(); ++f) {
+      if (maker.Modified(incident_faces(f)).IsEmpty()) belonging.Add(incident_faces(f));
+      add_all(maker.Modified(incident_faces(f)));
+    }
+    for (const int edge : edges_at(vertex_edges_all, unique_edges, corner_vertices[c])) add_all(maker.Generated(unique_edges(edge + 1)));
+    if (!(reach[c] > minimum * (1 + 1e-3))) {
+      why = std::string(kTooShort) + "the setback ball of radius " + number(reach[c]) + " at " + where(corners[c].at) + " must exceed " + number(minimum) +
+            " (the farthest point of the rolling-ball corner there): it would cut the blends inside the corner";
+      return nullptr;
+    }
+    const TopoDS_Vertex centre = BRepBuilderAPI_MakeVertex(corners[c].at);
+    for (int f = 1; f <= rounded_faces.Extent(); ++f) {
+      if (belonging.Contains(rounded_faces(f))) continue;
+      BRepExtrema_DistShapeShape distance(centre, rounded_faces(f));
+      if (distance.IsDone() && distance.Value() < reach[c] * (1 + 1e-3)) {
+        why = std::string(kUnsupported) + "a face that does not meet the vertex " + where(corners[c].at) + " lies " + number(distance.Value()) +
+              " from it, inside or at the setback ball of radius " + number(reach[c]) + ": use a smaller setback";
+        return nullptr;
+      }
+    }
+  }
   BRepAlgoAPI_Splitter splitter;
   TopTools_ListOfShape arguments, balls;
   arguments.Append(current.shape);
@@ -1178,10 +1268,13 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   // The star replaces what is inside the balls: the volume moves by less than the balls hold.
   const double volume_after = volume_of(solid);
   double ball_volume = 0;
-  for (const double r : reach) ball_volume += 4.0 / 3.0 * kPi * r * r * r;
+  for (size_t c = 0; c < corners.size(); ++c) {
+    BRepAlgoAPI_Common common(current.shape, BRepPrimAPI_MakeSphere(corners[c].at, reach[c]).Shape());
+    ball_volume += common.IsDone() && !common.Shape().IsNull() ? volume_of(common.Shape()) : 4.0 / 3.0 * kPi * reach[c] * reach[c] * reach[c];
+  }
   if (!(volume_after > 0) || std::fabs(volume_after - volume_rounded) > ball_volume) {
     fill_failed = true;
-    why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (rolling-ball blend " + number(volume_rounded) + ", balls hold " + number(ball_volume) + ")";
+    why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (rolling-ball blend " + number(volume_rounded) + ", the rolling-ball blend holds " + number(ball_volume) + " inside the balls)";
     return nullptr;
   }
   const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
@@ -1201,7 +1294,15 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   std::vector<Corner> corners;
   if (!parse(edge_raw, corner_raw, mode.automatic, radius, corners, why)) return nullptr;
   const TopoDS_Shape &shape = source.shape;
-  if (!mode.automatic && needs_trim(shape, radius)) return build_trimmed(source, radius, corners, fill_failed, corners_json, why, allow_star, star_used);
+  if (!mode.automatic) {
+    const int kind = step_kind(shape, radius, corners, kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9));
+    if (kind == 2) {
+      why = std::string(kUnsupported) +
+            "the corners of this step mix vertices on straight edges between planar faces (the setback is measured along the edge) with vertices on a curved edge or face (it is the radius of a ball around the vertex): put them in separate steps";
+      return nullptr;
+    }
+    if (kind == 1) return build_trimmed(source, radius, corners, fill_failed, corners_json, why, allow_star, star_used);
+  }
   const double diagonal = blend::diagonal_of(shape);
   // Deliberately the box of the VERTICES: core matches vertices with the same scale (geometry/blend/vertices.ts); it decides no acceptance.
   const double vertex_tolerance = kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9);

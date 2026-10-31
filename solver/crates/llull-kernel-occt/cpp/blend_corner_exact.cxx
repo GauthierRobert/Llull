@@ -138,6 +138,9 @@ struct EdgeSide {
 struct Piece {
   size_t edge = 0;
   double a = 0, b = 1, s0 = 0, s1 = 1;
+  // The map sigma -> s of the piece when its edge is not traversed at a steady speed (a B-spline intersection curve of OCCT): the nodes (sigma, s, ds/dsigma) of a cubic Hermite inverse of the
+  // arc length, so that the chain is traversed at a steady speed whatever the parametrization of its edges.
+  std::vector<double> node_sigma, node_s, node_slope;
 };
 
 // A stretch of the loop between two spoke vertices: one or several loop edges (or parts of them) joined where their supports are tangent. Parametrized by sigma in [0,1]; with several
@@ -164,18 +167,21 @@ struct Side {
     piece = &pieces[at];
     const double width = piece->s1 - piece->s0;
     const double x = std::min(1.0, std::max(0.0, (sigma - piece->s0) / width));
-    if (!hermite) {
+    if (piece->node_s.empty()) {
       s = piece->a + (piece->b - piece->a) * x;
       rate = (piece->b - piece->a) / width;
       return;
     }
-    const EdgeSide &edge = (*raw)[piece->edge];
-    const double da = length / std::max(edge.tangent(piece->a).Magnitude(), 1e-300), db = length / std::max(edge.tangent(piece->b).Magnitude(), 1e-300);
-    const Hermite3 h = cubic(x);
-    s = h.p0 * piece->a + h.d0 * width * da + h.p1 * piece->b + h.d1 * width * db;
-    const double x2 = x * x;
-    const double dp0 = 6 * x2 - 6 * x, dd0 = 3 * x2 - 4 * x + 1, dp1 = -6 * x2 + 6 * x, dd1 = 3 * x2 - 2 * x;
-    rate = (dp0 * piece->a + dd0 * width * da + dp1 * piece->b + dd1 * width * db) / width;
+    const std::vector<double> &nodes = piece->node_sigma;
+    const size_t upper = static_cast<size_t>(std::min<std::ptrdiff_t>(std::max<std::ptrdiff_t>(std::upper_bound(nodes.begin(), nodes.end(), sigma) - nodes.begin(), 1), static_cast<std::ptrdiff_t>(nodes.size()) - 1));
+    const size_t lower = upper - 1;
+    const double step = nodes[upper] - nodes[lower];
+    const double t = std::min(1.0, std::max(0.0, (sigma - nodes[lower]) / step));
+    const Hermite3 h = cubic(t);
+    s = h.p0 * piece->node_s[lower] + h.d0 * step * piece->node_slope[lower] + h.p1 * piece->node_s[upper] + h.d1 * step * piece->node_slope[upper];
+    const double t2 = t * t;
+    const double dp0 = 6 * t2 - 6 * t, dd0 = 3 * t2 - 4 * t + 1, dp1 = -6 * t2 + 6 * t, dd1 = 3 * t2 - 2 * t;
+    rate = (dp0 * piece->node_s[lower] + dd0 * step * piece->node_slope[lower] + dp1 * piece->node_s[upper] + dd1 * step * piece->node_slope[upper]) / step;
   }
   gp_Pnt point(double sigma) const {
     const Piece *piece = nullptr;
@@ -644,6 +650,24 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       covered += lengths[p];
       chain.pieces[p].s1 = p + 1 == chain.pieces.size() ? 1.0 : covered / chain.length;
     }
+    // the steady-speed map of the pieces of a chain of several edges
+    for (Piece &piece : chain.pieces) {
+      constexpr int kNodes = 128;
+      std::vector<double> speed(kNodes + 1), cumulative(kNodes + 1, 0.0);
+      for (int i = 0; i <= kNodes; ++i) {
+        speed[i] = star.raw[piece.edge].tangent(piece.a + (piece.b - piece.a) * i / kNodes).Magnitude();
+      }
+      if (!chain.hermite) continue;  // one edge: its own parameter (a map would make the pcurve of the sewn edge differ from its curve by more than the sewing tolerance)
+      for (int i = 1; i <= kNodes; ++i) cumulative[i] = cumulative[i - 1] + 0.5 * (speed[i - 1] + speed[i]) / kNodes;
+      const double width = piece.s1 - piece.s0;
+      for (int i = 0; i <= kNodes; ++i) {
+        piece.node_sigma.push_back(piece.s0 + width * cumulative[i] / cumulative[kNodes]);
+        piece.node_s.push_back(piece.a + (piece.b - piece.a) * i / kNodes);
+        piece.node_slope.push_back(cumulative[kNodes] / (width * speed[i]) * (piece.b - piece.a));
+      }
+      piece.node_sigma.front() = piece.s0;
+      piece.node_sigma.back() = piece.s1;
+    }
     if (chain.hermite)
       for (int step = 0; step <= 8 * static_cast<int>(chain.pieces.size()); ++step) {
         const Piece *piece = nullptr;
@@ -741,8 +765,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
         if (star.sides[k].normal(t, support) && normal_of(surfaces[k], t, 0, mine)) {
           out.angle = std::max(out.angle, line_angle(support, mine));
           if (support * mine < 0) {
-            why = "sub-patch " + std::to_string(k) + " faces away from its support at " + std::to_string(t);
-            return false;
+            out.angle = kPi;  // a finer interpolation may still be right: the measure below rejects this one
           }
         }
         else
@@ -753,8 +776,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
           if (normal_of(surfaces[k], 0, t, left) && normal_of(surfaces[previous], 1, t, right)) {
             out.angle = std::max(out.angle, line_angle(left, right));
             if (left * right < 0) {
-              why = "sub-patches " + std::to_string(previous) + " and " + std::to_string(k) + " face opposite ways along their spoke at " + std::to_string(t);
-              return false;
+              out.angle = kPi;
             }
           }
           out.gap = std::max(out.gap, surfaces[k]->Value(0, t).Distance(surfaces[previous]->Value(1, t)));

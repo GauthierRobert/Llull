@@ -10,7 +10,7 @@ const REMEDIATION = {
   BLD_BLEND_PARAMS: 'give exactly one of radius, width, law or holdLine (radiusEnd only with radius, widthEnd only with width)',
   BLD_CHAMFER_PARAMS: 'give exactly one of distance2 or angleDeg (with side1Near / side1Name)',
   BLD_CORNER_UNSUPPORTED:
-    'give the vertex a setback corner on straight edges between planar faces (all convex or all concave at the vertex), all rounded in this step with a constant radius (corners: [{ near: <vertex>, type: "setback", setback: <distance> }]), or round fewer of the edges meeting there',
+    'give the vertex a setback corner (corners: [{ near: <vertex>, type: "setback", setback: <distance> }]) with every edge that meets there, and only those, rounded in this step with a constant radius: on straight edges between planar faces (all convex or all concave) the setback is along the edge; on a curved edge or face it is the radius of a ball around the vertex, one distance for the vertex, larger than the rolling-ball corner and clear of the other faces; do not mix the two kinds in one step; or round fewer of the edges meeting there',
   BLD_CHAMFER_VARIABLE_PARAMS: 'distanceEnd: > 0, symmetric legs (no distance2 / angleDeg), list the edges',
   BLD_JOINT_PARAMS:
     'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
