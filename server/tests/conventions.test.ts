@@ -24,7 +24,8 @@ describe('tool-count invariant', () => {
   it('buildCommandTools() names are exactly listCommands() names (no resource or retired bridge tools)', () => {
     const toolNames = buildCommandTools().map((t) => t.name);
     expect(toolNames).toEqual(listCommands().map((c) => c.name));
-    for (const name of toolNames) expect(name).not.toContain('conventions');
+    // the retired conventions resource tool, not a domain command that sets conventions (set_pid_conventions)
+    expect(toolNames.filter((name) => /^(get_|read_)?conventions$/.test(name))).toEqual([]);
     expect(toolNames).not.toContain('snapshot_in_from_ui');
     expect(toolNames).not.toContain('snapshot_out_to_ui');
   });
