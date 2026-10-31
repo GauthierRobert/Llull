@@ -1088,9 +1088,8 @@ fn the_cube_of_stars_goes_through_step_the_tessellation_and_a_shell() {
     // OCCT's thick solid cannot offset the collapsed row of a sub-patch, or the plate patches either: the shell is a refusal (None), never an exception, and a valid solid when it builds
     let (plate, _) = volume_of_step(&shape, &edges, &corners, 0);
     for solid in [&star, &plate] {
-        match crate::features::shell_open(solid, 0.3, &[5.0, 5.0, 10.0]).expect("no exception") {
-            Some(shelled) => assert!(analyze(&shelled).unwrap().valid),
-            None => {}
+        if let Some(shelled) = crate::features::shell_open(solid, 0.3, &[5.0, 5.0, 10.0]).expect("no exception") {
+            assert!(analyze(&shelled).unwrap().valid);
         }
     }
 }

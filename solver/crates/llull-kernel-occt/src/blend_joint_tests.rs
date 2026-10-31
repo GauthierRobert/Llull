@@ -291,7 +291,7 @@ fn a_station_count_that_is_not_a_whole_number_within_the_flat_is_malformed_not_a
         blend_reason_raw(&[&plate, &stem], &pick, "")
     };
     // 2^63 doubles to 2 x count = 0 in size_t: the length check passed and the law was then read far past the data
-    for count in [9.223372036854775808e18, f64::INFINITY, 1e300, 1e7, 1.5, -1.0, f64::NAN, 3.0] {
+    for count in [9.223_372_036_854_776e18, f64::INFINITY, 1e300, 1e7, 1.5, -1.0, f64::NAN, 3.0] {
         assert!(
             malformed(count).starts_with("[BLD_JOINT_PARAMS] joints: the joint radii are malformed"),
             "count {count}: {}",
