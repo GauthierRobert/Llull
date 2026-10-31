@@ -34,7 +34,7 @@ function solid(cage: Cage, open = false): { doc: CadDocument; id: string } {
   const made = run(empty, 'add_subdivision_solid', {
     vertices: cage.vertices,
     faces: cage.faces,
-    creases: [],
+    creases: cage.creases,
     levels: 1,
     ...(open ? { boundary: 'edge_and_corner' } : {}),
   });
@@ -113,6 +113,24 @@ describe('the exact solve is bounded and refuses by name', () => {
     expect(result.summary).toContain('G1 exact');
     expect(data.maxEvG1Deg).toBeLessThan(1e-5);
   }, 180_000);
+
+  it('the command-level refusal: a crease that ends at smooth vertices has no exact solution (its cross-derivative row is frozen), the fit is kept, and the refused group is named in the data and the summary', () => {
+    const base = boxCage([2, 2, 2], [2, 2, 2]);
+    const topology = buildTopology(base.vertices.length, base.faces);
+    const onRow = (v: number): boolean => {
+      const [, y, z] = base.vertices[v] as Vec3;
+      return z === 1 && y === 1;
+    };
+    const cage: Cage = {
+      ...base,
+      creases: topology.edges.filter((e) => onRow(e.a) && onRow(e.b)).map((e): [number, number] => [e.a, e.b]),
+    };
+    const { result, data } = convert(cage, { g1Solve: 'exact' });
+    expect(data.g1Method).toBe('fit');
+    expect(data.exactG1Refused.length).toBeGreaterThan(0);
+    expect(data.exactG1Refused[0]?.reason).toBe('contradiction');
+    expect(result.summary).toMatch(/G1 fit \(\d+ group\(s\) refused by the exact solve\)/);
+  });
 
   it('a work budget too small for the group refuses it as "work budget" (dense path and conjugate-gradient path) and leaves the poles as given', () => {
     for (const [cage, objective] of [

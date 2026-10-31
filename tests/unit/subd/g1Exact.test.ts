@@ -74,6 +74,32 @@ function expectCreasePolesUntouched(cage: Cage, before: readonly BezierPatch[], 
   expect(checked).toBeGreaterThan(0);
 }
 
+/** FNV-1a (32 bit) of the bytes of every pole of every patch as Float64. */
+function patchDigest(patches: readonly BezierPatch[]): string {
+  const flat = new Float64Array(patches.flatMap((patch) => patch.flatMap((p) => [p[0], p[1], p[2]])));
+  let hash = 0x811c9dc5;
+  for (const byte of new Uint8Array(flat.buffer)) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return hash.toString(16).padStart(8, '0');
+}
+
+/** Angle between the two patches along the crease edge a-b at parameter t (radians). */
+function creaseAngle(cage: Cage, patches: readonly BezierPatch[], a: number, b: number, t: number): number {
+  const topology = buildTopology(cage.vertices.length, cage.faces);
+  const edge = topology.edges.find((e) => edgeKey(e.a, e.b) === edgeKey(a, b)) as { faces: number[] };
+  const [f, g] = edge.faces as [number, number];
+  const sideOf = (face: number): number =>
+    (cage.faces[face] as number[]).findIndex((v, i, all) => edgeKey(v, all[(i + 1) % all.length] as number) === edgeKey(a, b));
+  const [kf, kg] = [sideOf(f), sideOf(g)];
+  // the shared edge runs f: from -> to, g: to -> from
+  const fromF = (cage.faces[f] as number[])[kf] as number;
+  const [first, second] = fromF === a ? [a, b] : [b, a];
+  const tg = (cage.faces[g] as number[])[kg] === first ? t : 1 - t;
+  const n1 = patchNormal(patches[f] as BezierPatch, ...side(kf, t));
+  const n2 = patchNormal(patches[g] as BezierPatch, ...side(kg, tg));
+  void second;
+  return Math.acos(Math.min(1, Math.max(-1, n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2])));
+}
+
 const hexahedra: Array<[string, Cage]> = (() => {
   const base = boxCage([2, 2, 2], [1, 1, 1]);
   const warp = (map: (v: Vec3, i: number) => Vec3): Cage => ({ ...base, vertices: base.vertices.map(map) });
@@ -235,6 +261,49 @@ describe('solveExactG1', () => {
     expect(worstBreak(refined, result.patches, false)).toBeLessThan(1e-7);
     expect(worstBreak(refined, result.patches, true)).toBeCloseTo(worstBreak(refined, patches, true), 12);
     expect(worstBreak(refined, result.patches, true)).toBeGreaterThan(1.5);
+  });
+
+  it('a crease that ENDS at smooth vertices (the top-front row of a 2 x 2 x 2 box): the crease angle is kept along the whole edge, or the group is refused with its poles unchanged', () => {
+    const base = boxCage([2, 2, 2], [2, 2, 2]);
+    const topology = buildTopology(base.vertices.length, base.faces);
+    const onRow = (v: number): boolean => {
+      const [, y, z] = base.vertices[v] as Vec3;
+      return z === 1 && y === 1;
+    };
+    const cage: Cage = {
+      ...base,
+      creases: topology.edges.filter((e) => onRow(e.a) && onRow(e.b)).map((e): [number, number] => [e.a, e.b]),
+    };
+    expect(cage.creases.length).toBe(2);
+    const refined = subdivide(cage, 1);
+    const patches = quadCagePatches(refined);
+    const result = solveExactG1(refined, patches, valenceOf(refined));
+    expectCreasePolesUntouched(refined, patches, result.patches);
+    for (const [a, b] of refined.creases) {
+      const two = buildTopology(refined.vertices.length, refined.faces).edges.find((e) => edgeKey(e.a, e.b) === edgeKey(a, b));
+      if (two?.faces.length !== 2) continue;
+      for (const t of [0, 0.5, 0.75, 1])
+        expect(creaseAngle(refined, result.patches, a, b, t)).toBeCloseTo(creaseAngle(refined, patches, a, b, t), 12);
+    }
+    // the groups the crease row makes unsolvable are refused with a named reason and left as given
+    expect(result.groups.every((group) => group.consistent || group.reason === 'contradiction')).toBe(true);
+  });
+
+  it('crease-free cages give bit-identical patches, method and free-quad counts to the code before the boundary rule (digests of the parent commit)', () => {
+    const cases: Array<[string, Cage, string, string, number]> = [
+      ['cube', boxCage([2, 2, 2], [1, 1, 1]), '603bab35', 'boundary-kept', 24],
+      ['box 2x2x2', boxCage([2, 2, 2], [2, 2, 2]), '2c91501c', 'edges-freed', 96],
+      ['box 3x2x1', boxCage([3, 2, 1], [3, 2, 1]), '314dba98', 'edges-freed', 64],
+      ['cylinder 5', cylinderCage(1, 2, 5, 1), '80911ea3', 'edges-freed', 30],
+      ['cylinder 8', cylinderCage(1, 2, 8, 2), '07572f8d', 'edges-freed', 80],
+      ['pyramid', pentagonalPyramid(), 'e2f8dad1', 'edges-freed', 20],
+      ['bipyramid', pentagonalBipyramid(), '3e01e569', 'edges-freed', 30],
+    ];
+    for (const [name, cage, digest, method, freeQuads] of cases) {
+      const refined = subdivide(cage, 1);
+      const result = solveExactG1(refined, quadCagePatches(refined), valenceOf(refined));
+      expect([name, patchDigest(result.patches), result.method, result.freeQuads]).toEqual([name, digest, method, freeQuads]);
+    }
   });
 
   it('an open bowl (a box without its top): solved exactly with its boundary poles bit-identical', () => {

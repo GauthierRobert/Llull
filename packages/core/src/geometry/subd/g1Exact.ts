@@ -8,7 +8,7 @@
  * edge between two free quads, shared by the two patches (G0 stays exact), over the star and as many rings of quads around it as it takes: same patch count, same corner poles.
  * Among the poles that satisfy the conditions the solve takes those nearest to the limit surface (least squares on samples inside the solution set); a group of quads
  * whose conditions contradict each other has no solution at this degree and is reported, not approximated.
- * Creases and boundaries: a quad that touches a crease or boundary vertex MAY move, but every pole on a crease or boundary edge stays bit-identical (G0 to the neighbours and the open edges untouched) and, on a crease edge between two quads, the two interior poles next to it stay too (the cross derivative, hence the crease angle, is kept); the crease edge itself has no condition.
+ * Creases and boundaries: a quad that touches a crease or boundary vertex MAY move, but every pole on a crease or boundary edge stays bit-identical (G0 to the neighbours and the open edges untouched) and, on a crease edge between two quads, the whole row of four poles next to it stays too (the cross derivative, hence the crease angle, is kept along the whole edge); the crease edge itself has no condition. The tangent plane along an OPEN (boundary) edge may change: its curve does not.
  * @invariant corner poles never move, nor any pole of an edge that has a quad outside the free set or that lies on a crease or boundary edge; pure; the poles of a consistent group satisfy every condition to rounding
  */
 
@@ -126,8 +126,11 @@ function assemble(
     for (const edge of topology.edges) {
       if (!usable(edge) || !free.has(edge.faces[0] as number) || !free.has(edge.faces[1] as number)) continue;
       const { f, g, P, Q } = sides(edge);
-      for (const m of [1, 2])
+      for (const m of [1, 2]) {
+        // a pole in the frozen cross-derivative row of a crease side (where a crease ends, the row reaches the inner poles of the next smooth edge) is a constant
+        if (frozen.get(f)?.has(P.b[m] as number) || frozen.get(g)?.has(Q.b[3 - m] as number)) continue;
         variableOf.set(g * 16 + (Q.b[3 - m] as number), declare(f * 16 + (P.b[m] as number), pole(f, P.b[m] as number)));
+      }
     }
   const rows: Row[] = [];
   const endMisfit = new Map<number, number>();
@@ -323,7 +326,7 @@ export function solveExactG1(
   }
   const scale = Math.max(Math.hypot(...high.map((h, k) => h - (low[k] as number))), 1e-300);
   const evaluate = surfaceEvaluator(refined);
-  // the two interior poles next to every side on a crease edge between two quads stay where they are: they fix the cross derivative along it, so the crease keeps its angle (a boundary edge has no neighbour: nothing to keep)
+  // the whole row of four poles next to every side on a crease edge between two quads stays where it is (its two end poles are the inner poles of the next edges): it is the cross derivative along the crease, so the crease keeps its angle along the whole edge (a boundary edge has no neighbour: nothing to keep)
   const creaseEdges = new Set(refined.creases.map(([a, b]) => edgeKey(a, b)));
   const edgeFaces = new Map(topology.edges.map((edge) => [edgeKey(edge.a, edge.b), edge.faces.length] as const));
   const frozen = new Map<number, Set<number>>();
@@ -332,7 +335,7 @@ export function solveExactG1(
       const key = edgeKey(v, face[(k + 1) % face.length] as number);
       if (edgeFaces.get(key) !== 2 || !creaseEdges.has(key)) return;
       const rows = sidePoles(k).r;
-      frozen.set(f, new Set([...(frozen.get(f) ?? []), rows[1] as number, rows[2] as number]));
+      frozen.set(f, new Set([...(frozen.get(f) ?? []), ...rows]));
     }),
   );
   const attempt = (wanted: ReadonlySet<number>, edgesFree: boolean): ExactG1 => {
