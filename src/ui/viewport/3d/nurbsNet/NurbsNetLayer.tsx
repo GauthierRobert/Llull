@@ -9,7 +9,7 @@ import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { useDisposable } from '../../useDisposable';
 import { useFloatGeometry } from '../cage/useFloatGeometry';
 import { NET_COLORS } from './netPalette';
-import { isNurbsNetEntity, netAnchor, netSegments, poleBuffer, selectedPoleBuffer } from './controlNet';
+import { isNurbsNetEntity, netAnchor, netSegments, poleBuffer, polesOf, selectedPoleBuffer } from './controlNet';
 import { useNetPointer } from './useNetPointer';
 
 const POLE_PX = 7;
@@ -41,11 +41,12 @@ export function NurbsNetLayer(): React.ReactElement | null {
   const sole = useSoleSelectedEntity();
   const invalidate = useThree((s) => s.invalidate);
   const target = visible && isNurbsNetEntity(sole) ? sole : undefined;
+  const poleCount = target === undefined ? 0 : polesOf(target).length;
   useNetPointer(target);
   // the selected poles belong to one entity: another entity (or the net turned off) starts with none
   useEffect(() => {
     useNurbsNetStore.getState().setSelected([]);
-  }, [target?.id]);
+  }, [target?.id, poleCount]);
   useEffect(() => invalidate(), [hover, drag, selected, target, invalidate]);
 
   const shown = drag !== null && drag.entityId === target?.id && drag.preview !== null ? drag.preview : target;

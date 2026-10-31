@@ -15,13 +15,19 @@ import { createWorldRay, type WorldRay } from '../worldRay';
 import { useFaceEditStore } from '@ui/store/faceEditStore';
 import { cancelFaceDrag, commitFaceDrag, updateFaceDrag } from './faceEditActions';
 import { dragStep, grabsHandle, HANDLE_GRAB_PX, HANDLE_PX, travelAlongAxis } from './faceDragMath';
-import { type DragRules, dragValue, pickFaceAt, snapPlanes } from './facePicking';
+import { type DragRules, type FaceLabels, dragValue, pickFaceAt, snapPlanes } from './facePicking';
 import { pickableTriangles } from './faceTriangles';
 import { distance3, len3 } from '@lib/vec3';
 
 const DRAG_THRESHOLD_PX = 3;
 /** Pixels within which a dragged length snaps to another face's plane. */
 const PLANE_SNAP_PX = 12;
+
+/** The kernel's labels of this entity version, or null (heuristic picking). */
+function labelsOf(entity: Entity): FaceLabels | null {
+  const labels = useFaceEditStore.getState().labels;
+  return labels !== null && labels.entity === entity ? labels.value : null;
+}
 
 interface Press {
   readonly ray: WorldRay;
@@ -68,7 +74,7 @@ export function useFacePointer(entity: Entity | undefined): void {
       };
       const picked = edit.pick;
       if (edit.op === 'move_feature' && event.shiftKey && picked !== null && edit.entityId === target.id) {
-        const extra = pickFaceAt(source, ray);
+        const extra = pickFaceAt(source, ray, labelsOf(target));
         if (extra !== null) edit.addFeatureFace(extra.pick.point, extra.region);
         consume();
         return;
@@ -76,7 +82,7 @@ export function useFacePointer(entity: Entity | undefined): void {
       if (picked !== null && edit.entityId === target.id) {
         const unit = perPixel(picked.point, ray);
         const onHandle = grabsHandle(ray, picked.point, picked.normal, HANDLE_PX * unit, HANDLE_GRAB_PX * unit);
-        const onFace = !onHandle && pickFaceAt(source, ray)?.region.some((index) => edit.region.includes(index)) === true;
+        const onFace = !onHandle && pickFaceAt(source, ray, labelsOf(target))?.region.some((index) => edit.region.includes(index)) === true;
         if (onHandle || onFace) {
           camera.getWorldDirection(forward);
           press = {
@@ -94,7 +100,7 @@ export function useFacePointer(entity: Entity | undefined): void {
           return;
         }
       }
-      const hit = pickFaceAt(source, ray);
+      const hit = pickFaceAt(source, ray, labelsOf(target));
       if (hit === null) return;
       edit.setPick(target.id, hit.pick, hit.region);
       consume();
@@ -127,7 +133,7 @@ export function useFacePointer(entity: Entity | undefined): void {
       hoverFrame.schedule(() => {
         const current = entityRef.current;
         if (current === undefined) return;
-        const hit = pickFaceAt(pickableTriangles(current), rayAt(clientX, clientY));
+        const hit = pickFaceAt(pickableTriangles(current), rayAt(clientX, clientY), labelsOf(current));
         useFaceEditStore.getState().setHover(hit === null ? null : { region: hit.region });
       });
     };
@@ -151,8 +157,11 @@ export function useFacePointer(entity: Entity | undefined): void {
 
     const onKey = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
-      if (press?.active === true && useFaceEditStore.getState().op === 'move_feature' && (key === 'x' || key === 'y' || key === 'z'))
+      if (press?.active === true && useFaceEditStore.getState().op === 'move_feature' && (key === 'x' || key === 'y' || key === 'z')) {
+        event.preventDefault();
+        event.stopPropagation();
         lock = key;
+      }
     };
 
     // r3f's pointer-missed click would clear the entity selection (and so leave the mode); clicks belong to the handles here.

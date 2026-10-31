@@ -94,30 +94,65 @@ export function planarRegion(
   return queue;
 }
 
+/** Angle in degrees between the unit normals of two triangles (0 when either is degenerate). */
+function turnBetween(a: Triangle, b: Triangle): number {
+  const [na, nb] = [triangleNormal(a), triangleNormal(b)];
+  return na === null || nb === null ? 0 : (Math.acos(Math.max(-1, Math.min(1, dot3(na, nb)))) * 180) / Math.PI;
+}
+
+/** Widest turn between neighbouring facets that still reads as one curved face (a tessellated bore has 5 to 20 degrees per facet). */
+const MAX_FACET_TURN_DEG = 40;
+const MIN_FACET_TURN_DEG = 0.5;
+const TURN_TOLERANCE = 0.25;
+const MAX_STRIP_PATCHES = 4096;
+
 /**
- * The smooth patch of a curved face: triangles connected to the start one through edges across which the normal turns by less than `cosine` (default
- * about 36 degrees, so a tessellated bore or boss is one patch while a 90 degree corner stops it).
+ * The facet strip of a curved face, the heuristic used only when the kernel cannot label the triangles. A facet (a coplanar patch of at most two triangles)
+ * joins a strip when its neighbours turn by the SAME small angle on both sides (a regular tessellation of a cylinder, cone or sphere); the strip grows into
+ * patches of at most two triangles that continue that turn. A flat face, a face next to a tangent fillet (turns of half and a whole step) and a 90 degree
+ * corner therefore stay as they are.
  */
-export function smoothRegion(
-  triangles: readonly Triangle[],
-  adjacency: readonly (readonly number[])[],
-  start: number,
-  cosine = 0.8,
-): number[] {
-  const normals = triangles.map(triangleNormal);
-  const seen = new Set<number>([start]);
-  const queue = [start];
-  for (let head = 0; head < queue.length; head++) {
-    const here = normals[queue[head] as number];
-    if (here === null || here === undefined) continue;
-    for (const next of adjacency[queue[head] as number] ?? []) {
-      const there = normals[next];
-      if (seen.has(next) || there === null || there === undefined || dot3(here, there) < cosine) continue;
-      seen.add(next);
-      queue.push(next);
+export function facetStripRegion(triangles: readonly Triangle[], adjacency: readonly (readonly number[])[], start: number): number[] {
+  const patchOf = (index: number): number[] => planarRegion(triangles, adjacency, index);
+  const neighbourPatches = (patch: readonly number[]): number[][] => {
+    const inside = new Set(patch);
+    const seen = new Set<number>();
+    const found: number[][] = [];
+    for (const t of patch)
+      for (const next of adjacency[t] ?? []) {
+        if (inside.has(next) || seen.has(next)) continue;
+        const neighbour = patchOf(next);
+        neighbour.forEach((n) => seen.add(n));
+        found.push(neighbour);
+      }
+    return found;
+  };
+  const turnOf = (from: readonly number[], to: readonly number[]): number =>
+    turnBetween(triangles[from[0] as number] as Triangle, triangles[to[0] as number] as Triangle);
+  const first = patchOf(start);
+  if (first.length > 2) return first;
+  const smooth = neighbourPatches(first)
+    .map((patch) => ({ patch, turn: turnOf(first, patch) }))
+    .filter(({ turn }) => turn >= MIN_FACET_TURN_DEG && turn <= MAX_FACET_TURN_DEG);
+  const widest = Math.max(0, ...smooth.map(({ turn }) => turn));
+  const sides = smooth.filter(({ turn }) => Math.abs(turn - widest) <= TURN_TOLERANCE * widest);
+  if (sides.length < 2) return first;
+  const region = new Set(first);
+  const accepted = new Set<number>([Math.min(...first)]);
+  const queue = [first];
+  for (let head = 0; head < queue.length && queue.length < MAX_STRIP_PATCHES; head++) {
+    const current = queue[head] as number[];
+    for (const neighbour of neighbourPatches(current)) {
+      const turn = turnOf(current, neighbour);
+      const lead = Math.min(...neighbour);
+      if (neighbour.length > 2 || accepted.has(lead) || turn < MIN_FACET_TURN_DEG || Math.abs(turn - widest) > TURN_TOLERANCE * widest)
+        continue;
+      accepted.add(lead);
+      neighbour.forEach((n) => region.add(n));
+      queue.push(neighbour);
     }
   }
-  return queue;
+  return [...region];
 }
 
 /** Normal of `triangle` turned to face the viewer looking along `ray` (a picked surface is seen from outside, so this is the outward normal). */

@@ -14,7 +14,7 @@ import {
   raycastTriangles,
   triangleAdjacency,
 } from '@ui/viewport/3d/faceEdit/faceMesh';
-import { dragValue, pickFaceAt, snapPlanes } from '@ui/viewport/3d/faceEdit/facePicking';
+import { dragValue, faceLabels, pickFaceAt, snapPlanes } from '@ui/viewport/3d/faceEdit/facePicking';
 
 const built = execute(createEmptyDocument(), 'add_box', { size: [4, 2, 2] });
 const box = built.document.entities[built.affected[0] as string] as Entity;
@@ -214,5 +214,69 @@ describe('curved faces and feature moves', () => {
       },
     });
     expect(faceKeyAction('5', { dragging: false, hasPick: false })).toEqual({ kind: 'op', op: 'move_feature' });
+  });
+});
+
+/** A strip of quads (2 triangles each) along y in [0, 1] through the points of `profile` in the (x, z) plane. */
+function strip(profile: ReadonlyArray<readonly [number, number]>): Triangle[] {
+  const out: Triangle[] = [];
+  for (let i = 0; i + 1 < profile.length; i++) {
+    const [a, b] = [profile[i] as readonly [number, number], profile[i + 1] as readonly [number, number]];
+    const [p0, p1, p2, p3]: [Vec3, Vec3, Vec3, Vec3] = [
+      [a[0], 0, a[1]],
+      [b[0], 0, b[1]],
+      [b[0], 1, b[1]],
+      [a[0], 1, a[1]],
+    ];
+    out.push([p0, p1, p2], [p0, p2, p3]);
+  }
+  return out;
+}
+const sourceOf = (triangles: Triangle[]): { triangles: Triangle[]; adjacency: number[][]; size: number } => ({
+  triangles,
+  adjacency: triangleAdjacency(triangles),
+  size: diagonalOf(triangles),
+});
+
+describe('which triangles a pick highlights', () => {
+  it('with the kernel labels the face is exactly the labelled triangles (a planar face with a hole, a fillet tangent to it)', () => {
+    const s = sourceOf(
+      strip([
+        [0, 0],
+        [2, 0],
+        [4, 0],
+        [4, 2],
+      ]),
+    );
+    const labels = faceLabels([0, 0, 0, 0, 1, 1]);
+    const ray = { origin: [3, 0.5, 5] as Vec3, direction: [0, 0, -1] as Vec3 };
+    expect(pickFaceAt(s, ray, labels)?.region.sort()).toEqual([0, 1, 2, 3]);
+    expect(pickFaceAt(s, { origin: [5, 0.5, 1] as Vec3, direction: [-1, 0, 0] as Vec3 }, labels)?.region).toEqual([4, 5]);
+  });
+
+  it('without labels a regular cylinder facet strip is one face, a flat 2-triangle face next to a tangent fillet is not, and a slot side wall stays alone', () => {
+    const ring = Array.from({ length: 25 }, (_, i) => [3 * Math.cos((i * Math.PI) / 12), 3 * Math.sin((i * Math.PI) / 12)] as const);
+    const cylinder = sourceOf(strip(ring));
+    const inside = { origin: [0, 0.5, 0] as Vec3, direction: [1, 0, 0] as Vec3 };
+    expect(pickFaceAt(cylinder, inside)?.region).toHaveLength(48);
+    // plane z = 0 (x -2..0), a quarter fillet of radius 1 in 6 chords (15 degrees each), then a vertical wall down to z = -3
+    const arc = Array.from({ length: 7 }, (_, i) => [Math.sin((i * 15 * Math.PI) / 180), -1 + Math.cos((i * 15 * Math.PI) / 180)] as const);
+    const profile: Array<readonly [number, number]> = [[-2, 0], ...arc, [arc[6]![0], -3]];
+    const part = sourceOf(strip(profile));
+    expect(pickFaceAt(part, { origin: [-1, 0.5, 5] as Vec3, direction: [0, 0, -1] as Vec3 })?.region).toHaveLength(2);
+    const fillet = pickFaceAt(part, { origin: [0.55, 0.5, 5] as Vec3, direction: [0, 0, -1] as Vec3 });
+    expect(fillet?.region.length).toBeGreaterThan(2);
+    expect(fillet?.region.length).toBeLessThanOrEqual(12);
+    expect(fillet?.region.every((t) => t >= 2 && t < 14)).toBe(true);
+    const slot = sourceOf(
+      strip([
+        [0, 0],
+        [0, 2],
+        [2, 2],
+        [2, 0],
+      ]),
+    );
+    expect(pickFaceAt(slot, { origin: [-3, 0.5, 1] as Vec3, direction: [1, 0, 0] as Vec3 })?.region).toHaveLength(2);
+    expect(pickFaceAt(slot, { origin: [1, 0.5, 5] as Vec3, direction: [0, 0, -1] as Vec3 })?.region).toHaveLength(2);
   });
 });

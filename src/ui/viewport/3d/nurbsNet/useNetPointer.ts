@@ -1,6 +1,6 @@
 // Pointer input of the control-net overlay: a press on a pole selects it (Shift adds / removes it) and grabs it, dragging moves the whole selection in
 // the view plane (X / Y / Z lock an axis, Esc cancels) and the release commits ONE move_poles command (the falloff of the bar spreads it to the
-// neighbours). Shift + drag on empty space draws a box and adds the poles inside it to the selection. The pointer is captured for a drag or a box; any
+// neighbours). Ctrl + drag on empty space (Shift + drag stays the camera's pan) draws a box and adds the poles inside it to the selection. The pointer is captured for a drag or a box; any
 // other press is left to the camera. Previews are local dry runs scheduled once per frame; nothing here edits the document.
 
 import { useEffect, useRef } from 'react';
@@ -79,7 +79,7 @@ export function useNetPointer(entity: NurbsNetEntity | undefined): void {
       const ray = rayAt(event.clientX, event.clientY);
       const hit = pickPole(target, ray, PICK_PX, unitsAt);
       if (hit === null) {
-        if (!event.shiftKey) return;
+        if (!(event.ctrlKey || event.metaKey)) return;
         box = { pointerId: event.pointerId, target: event.target, x: event.clientX, y: event.clientY, active: false };
         capturePointer(event.target, event.pointerId);
         event.stopPropagation();
@@ -198,7 +198,11 @@ export function useNetPointer(entity: NurbsNetEntity | undefined): void {
         event.preventDefault();
         event.stopPropagation();
         end(false);
-      } else if (key === 'x' || key === 'y' || key === 'z') lock = key;
+      } else if (key === 'x' || key === 'y' || key === 'z') {
+        event.preventDefault();
+        event.stopPropagation();
+        lock = key;
+      }
     };
     const onClick = (event: MouseEvent): void => {
       if (swallowClick || useNurbsNetStore.getState().hover !== null) event.stopPropagation();

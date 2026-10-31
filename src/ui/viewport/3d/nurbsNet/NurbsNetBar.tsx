@@ -33,7 +33,7 @@ function Falloff(): React.ReactElement {
     <div className="feature-start feature-start--falloff" role="group" aria-label="Pole selection">
       <span className="feature-start__note" aria-live="polite">
         {selected.length === 0
-          ? 'Shift-click or Shift-drag a box to select poles'
+          ? 'Shift-click poles, Ctrl-drag a box to select'
           : `${selected.length} pole${selected.length === 1 ? '' : 's'} selected`}
       </span>
       <label className="feature-start__note">

@@ -38,7 +38,7 @@ describe('NurbsNetBar', () => {
     expect(screen.queryByLabelText('Falloff radius (poles)')).toBeNull();
     const before = JSON.stringify(useStore.getState().document);
     fireEvent.click(screen.getByText('Show poles'));
-    expect(screen.getByText('Shift-click or Shift-drag a box to select poles')).not.toBeNull();
+    expect(screen.getByText('Shift-click poles, Ctrl-drag a box to select')).not.toBeNull();
     const profile = screen.getByLabelText('Falloff profile') as HTMLSelectElement;
     expect(profile.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Falloff radius (poles)'), { target: { value: '2.5' } });
