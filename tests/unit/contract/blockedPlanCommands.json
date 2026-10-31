@@ -67,7 +67,7 @@
       "check_equipment",
       "tank_shell_thickness"
     ],
-    "docs/plant/04-pid-schematics/validation/plans/sc-pid-01-import-dexpi-reference.json": ["check_pid", "import_dexpi", "pid_report"],
+    "docs/plant/04-pid-schematics/validation/plans/sc-pid-01-import-dexpi-reference.json": ["check_pid"],
     "docs/plant/04-pid-schematics/validation/plans/sc-pid-02-author-and-validate.json": [
       "add_pid_actuating_system",
       "add_pid_equipment",
@@ -76,8 +76,7 @@
       "add_pid_line",
       "add_pid_signal_line",
       "check_pid",
-      "create_pid_sheet",
-      "pid_report"
+      "create_pid_sheet"
     ],
     "docs/plant/04-pid-schematics/validation/plans/sc-pid-03-pid-vs-3d.json": [
       "add_pid_equipment",

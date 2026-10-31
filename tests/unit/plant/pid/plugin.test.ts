@@ -1,4 +1,4 @@
-/** Plant 04 PID M1: the plugin skeleton is installed with its toolset (no command yet) and its document extension validates `plant.pid` only. */
+/** Plant 04 PID: the plugin is installed with its toolset (M2: import_dexpi and pid_report) and its document extension validates `plant.pid` only. */
 
 import { describe, expect, it } from 'vitest';
 import { pidPlugin } from '@aec/index';
@@ -7,11 +7,17 @@ import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
 
 describe('pid plugin', () => {
-  it('is the pid toolset, registers no command in M1 and adds no derived entity', () => {
-    expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid', commands: [] });
+  it('is the pid toolset with the M2 commands and adds no derived entity', () => {
+    expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid' });
+    expect(pidPlugin.commands.map((command) => command.name)).toEqual(['import_dexpi', 'pid_report']);
     expect(TOOLSET_NAMES).toContain('pid');
-    expect(TOOLSETS.pid).toEqual([]);
-    expect(listCommands().filter((command) => /pid/.test(command.name))).toEqual([]);
+    expect([...TOOLSETS.pid].sort()).toEqual(['import_dexpi', 'pid_report']);
+    expect(
+      listCommands()
+        .filter((command) => /pid|dexpi/.test(command.name))
+        .map((command) => command.name)
+        .sort(),
+    ).toEqual(['import_dexpi', 'pid_report']);
     expect(pidPlugin.document?.derivedEntityIds(createEmptyDocument())).toEqual(new Set());
   });
 
