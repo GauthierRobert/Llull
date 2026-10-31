@@ -36,9 +36,33 @@ describe('ModelExport', () => {
       expect(exportThreeMf).toHaveBeenCalledTimes(1);
       expect(exportThreeMf).toHaveBeenCalledWith();
       expect(downloads).toEqual([]);
-      exportThreeMf.mockResolvedValue({ ok: false, message: 'Export cancelled' });
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Export cancelled', cancelled: true });
       fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
-      await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Export cancelled'));
+      await waitFor(() => expect(screen.getByRole('status').textContent).toBe(''));
+    } finally {
+      Reflect.deleteProperty(window, 'llull');
+    }
+  });
+  it('shows a refused or crashed 3MF export as a failure, an answer of the wrong shape as such, and a cancelled dialog as nothing', async () => {
+    const exportThreeMf = vi.fn();
+    Object.defineProperty(window, 'llull', { value: { exportThreeMf }, configurable: true });
+    try {
+      render(<ModelExport />);
+      fireEvent.change(screen.getByLabelText('Export format'), { target: { value: '3mf' } });
+      const status = (): string => screen.getByRole('status').textContent ?? '';
+      const click = (): boolean => fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
+      exportThreeMf.mockRejectedValue(new Error('An object could not be cloned'));
+      click();
+      await waitFor(() => expect(status()).toBe('3MF export failed: An object could not be cloned'));
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Refused: the caller is not the app window' });
+      click();
+      await waitFor(() => expect(status()).toBe('3MF export failed: Refused: the caller is not the app window'));
+      exportThreeMf.mockResolvedValue('nonsense');
+      click();
+      await waitFor(() => expect(status()).toContain('unexpected shape'));
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Export cancelled', cancelled: true });
+      click();
+      await waitFor(() => expect(status()).toBe(''));
     } finally {
       Reflect.deleteProperty(window, 'llull');
     }

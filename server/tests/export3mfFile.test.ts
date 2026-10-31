@@ -284,6 +284,21 @@ describe('moving a hosted export (--save, desktop export)', () => {
     expect(readdirSync(dir)).toEqual([]);
   });
 
+  it('a hosted file that cannot be removed after a complete copy is not an error: the destination stays and the move succeeds', () => {
+    const [from, to] = [path.join(dir, 'hosted.3mf'), path.join(dir, 'out.3mf')];
+    writeFileSync(from, 'package');
+    const locked: MoveOps = {
+      ...sameVolumeFails(to),
+      rmSync: (file, options) => {
+        if (file === from) throw Object.assign(new Error('EPERM: the file is in use'), { code: 'EPERM' });
+        rmSync(file, options);
+      },
+    };
+    expect(() => moveHostedFile(from, to, locked)).not.toThrow();
+    expect(readFileSync(to, 'utf8')).toBe('package');
+    expect(readdirSync(dir).sort()).toEqual(['hosted.3mf', 'out.3mf']);
+  });
+
   it('a hosted file outside the given export folder is not a hosted file (saveDataFiles refuses it)', () => {
     const [exports, outside] = [path.join(dir, 'exports'), path.join(dir, 'other.3mf')];
     mkdirSync(exports);

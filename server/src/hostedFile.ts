@@ -14,7 +14,7 @@ export interface MoveOps {
 
 /**
  * Moves `from` to `to`: a rename, else (another volume, a locked file) a copy to `<to>.part` that is renamed into place, so `to` never holds a partial file.
- * @failure the copy or the final rename fails -> the .part file and `from` are removed and the error is rethrown
+ * @failure the copy or the final rename fails -> the .part file and `from` are removed and the error is rethrown; removing `from` after a complete copy never fails the move
  */
 export function moveHostedFile(from: string, to: string, ops: MoveOps = fs): void {
   try {
@@ -27,10 +27,15 @@ export function moveHostedFile(from: string, to: string, ops: MoveOps = fs): voi
   try {
     ops.copyFileSync(from, part);
     ops.renameSync(part, to);
-    ops.rmSync(from, { force: true });
   } catch (error) {
     ops.rmSync(part, { force: true });
     ops.rmSync(from, { force: true });
     throw error;
+  }
+  // the destination is complete: a hosted file that cannot be removed is left to the export folder's reaper, never an error
+  try {
+    ops.rmSync(from, { force: true });
+  } catch {
+    // locked or already gone
   }
 }

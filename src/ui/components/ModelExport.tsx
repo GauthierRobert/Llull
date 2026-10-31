@@ -50,7 +50,7 @@ export function ModelExport(): React.ReactElement {
     }
     setStatus('Exporting 3MF…');
     const outcome = await bridge.exportThreeMf();
-    setStatus(outcome.message);
+    setStatus(outcome.cancelled ? '' : outcome.ok ? outcome.message : `3MF export failed: ${outcome.message}`);
   };
 
   const exportStl = (): void => {

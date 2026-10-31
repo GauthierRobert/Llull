@@ -15,6 +15,7 @@ import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vau
 import { currentHolder } from '@server/plm/vault/vault';
 import { createDocumentSession, type DocumentSession } from './documents';
 import { export3mfToFile } from './exportFile';
+import { ipcSenderAllowed } from './ipcGuard';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
@@ -141,6 +142,8 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
 interface ExportOutcome {
   readonly ok: boolean;
   readonly message: string;
+  /** The user closed the save dialog: not an error. */
+  readonly cancelled?: true;
 }
 
 /**
@@ -152,8 +155,9 @@ async function exportThreeMf(): Promise<ExportOutcome> {
   if (exporting) return { ok: false, message: 'Another export is still running' };
   exporting = true;
   try {
-    const result = await dialog.showSaveDialog({ defaultPath: 'model.3mf', filters: [{ name: '3MF', extensions: ['3mf'] }] });
-    if (result.canceled || result.filePath === undefined) return { ok: false, message: 'Export cancelled' };
+    const options = { defaultPath: 'model.3mf', filters: [{ name: '3MF', extensions: ['3mf'] }] };
+    const result = window === null ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(window, options);
+    if (result.canceled || result.filePath === undefined) return { ok: false, message: 'Export cancelled', cancelled: true };
     const chosen = path.extname(result.filePath) === '' ? `${result.filePath}.3mf` : result.filePath;
     return { ok: true, message: await export3mfToFile({ url: backendUrl, token, target: chosen, exportDir }) };
   } catch (error) {
@@ -167,7 +171,7 @@ async function exportThreeMf(): Promise<ExportOutcome> {
 async function exportThreeMfFromMenu(): Promise<void> {
   const outcome = await exportThreeMf();
   if (outcome.ok) await dialog.showMessageBox({ type: 'info', message: 'Exported 3MF', detail: outcome.message });
-  else if (outcome.message !== 'Export cancelled') dialog.showErrorBox('llull — Export 3MF failed', outcome.message);
+  else if (outcome.cancelled !== true) dialog.showErrorBox('llull — Export 3MF failed', outcome.message);
 }
 
 async function openDocument(filePath?: string): Promise<void> {
@@ -380,7 +384,11 @@ async function boot(): Promise<void> {
   );
   backendUrl = url;
   exportDir = desktopExportDir(process.env, userData);
-  ipcMain.handle('llull:export-3mf', () => exportThreeMf());
+  ipcMain.handle('llull:export-3mf', (event) =>
+    ipcSenderAllowed(event, window?.webContents ?? null, url)
+      ? exportThreeMf()
+      : { ok: false, message: 'Refused: the caller is not the app window' },
+  );
   session = createDocumentSession({ url, token });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
