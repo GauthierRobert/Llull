@@ -223,8 +223,8 @@ export function phantomAdvanceDeltas(
   source: GlyphSource,
   glyph: number,
   work?: { remaining: number },
-): { readonly width: number; readonly height: number } {
-  const none = { width: 0, height: 0 };
+): { readonly width: number; readonly height: number; readonly top: number } {
+  const none = { width: 0, height: 0, top: 0 };
   if (source.variation === undefined) return none;
   const [start, end] = range(source, glyph);
   const budget: Budget = { points: 0, components: 0, work: undefined };
@@ -247,5 +247,6 @@ export function phantomAdvanceDeltas(
   return {
     width: (deltas.dx[phantom + 1] as number) - (deltas.dx[phantom] as number),
     height: (deltas.dy[phantom + 2] as number) - (deltas.dy[phantom + 3] as number),
+    top: deltas.dy[phantom + 2] as number,
   };
 }

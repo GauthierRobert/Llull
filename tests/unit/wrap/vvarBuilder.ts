@@ -60,10 +60,10 @@ export function buildVhea(longMetrics: number): number[] {
   return [...out, ...u16(longMetrics)];
 }
 
-/** A `vmtx` table: the heights of the long metrics (top side bearing 0), then the side bearings of the remaining `glyphs - heights.length` glyphs. */
-export function buildVmtx(heights: readonly number[], glyphs: number): number[] {
+/** A `vmtx` table: the heights of the long metrics with their top side bearings (`tops`, default 0), then the side bearings of the remaining `glyphs - heights.length` glyphs. */
+export function buildVmtx(heights: readonly number[], glyphs: number, tops: readonly number[] = []): number[] {
   return [
-    ...heights.flatMap((height) => [...u16(height), ...u16(0)]),
+    ...heights.flatMap((height, k) => [...u16(height), ...u16((tops[k] ?? 0) & 0xffff)]),
     ...Array.from({ length: glyphs - heights.length }, () => u16(0)).flat(),
   ];
 }

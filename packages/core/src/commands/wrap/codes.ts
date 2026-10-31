@@ -62,6 +62,8 @@ export const WRAP_REMEDIATION: Readonly<Record<string, string>> = {
   WRP_KNURL_GEOMETRY_UNSUPPORTED:
     'Cut helical grooves only on a cylinder face whose two ends are free caps; for a face with a shoulder use the straight pattern or the cosmetic model.',
   WRP_TEXT_NO_FONT: 'Set `font` on the text (`edit_step_params` on its add_text step, or add_text with `font`).',
+  WRP_TEXT_VERTICAL_CURVE:
+    'Vertical text stacks upright glyphs in columns and cannot follow a curve: use `direction: "horizontal"` with `onCurve`, or drop `onCurve`.',
   WRP_TEXT_TOO_LONG: 'Split the text; outline text is limited to 2000 characters per entity.',
   WRP_PARAM_INVALID: 'Fix the named parameter; see `llull describe <command>`.',
   WRP_GLYPH_MISSING: 'Choose a font that covers the characters.',
