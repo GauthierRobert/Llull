@@ -7,6 +7,7 @@
 
 import { closedEdge } from '../../geometry/blend/law';
 import type { GeometryKernel, ShapeEdge } from '../../geometry/kernel';
+import type { Vec3 } from '../../model/types';
 import type { BlendSection } from '../../geometry/kernelPorts';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 
@@ -35,10 +36,37 @@ export function spineStations(
   sections: readonly BlendSection[],
 ): SpineStations | SpineUnreadable {
   const samples = kernel.faceQuery?.edgeSamples?.(shape, edge, SPINE_SAMPLES) ?? null;
+  return stationsOnSamples(`edge ${edge}`, samples, closedEdge(info), sections);
+}
+
+/**
+ * The stations of a blend_union joint (no edge of the result): `points` are the joint edge from its start to its end, uniform in its parameter (the kernel's
+ * contour note `spine`); the arc length is the polyline's. A joint is closed when its ends meet.
+ */
+export function jointStations(points: readonly Vec3[], sections: readonly BlendSection[]): SpineStations | SpineUnreadable {
+  let arc = 0;
+  const samples = points.map((point, k) => {
+    const before = points[k - 1];
+    if (before !== undefined) arc += Math.hypot(point[0] - before[0], point[1] - before[1], point[2] - before[2]);
+    return { point, s: arc };
+  });
+  const first = points[0];
+  const last = points[points.length - 1];
+  const closed =
+    first !== undefined && last !== undefined && Math.hypot(first[0] - last[0], first[1] - last[1], first[2] - last[2]) < 1e-6 * arc;
+  return stationsOnSamples('the joint edge', samples, closed, sections);
+}
+
+function stationsOnSamples(
+  label: string,
+  samples: ReadonlyArray<{ readonly point: Vec3; readonly s: number }> | null,
+  closed: boolean,
+  sections: readonly BlendSection[],
+): SpineStations | SpineUnreadable {
   const total = samples?.[samples.length - 1]?.s ?? 0;
   if (samples === null || samples.length < 2 || !(total > 0))
     return {
-      reason: `edge ${edge} runs at an uneven speed and the kernel cannot sample it (faceQuery.edgeSamples), so the law cannot be read at the spine position of each section`,
+      reason: `${label} runs at an uneven speed and the kernel cannot sample it, so the law cannot be read at the spine position of each section`,
     };
   const point = (k: number, axis: number): number => samples[k]?.point[axis] ?? 0;
   const raw = sections.map((section) => {
@@ -54,7 +82,6 @@ export function spineStations(
     }
     return best.s / total;
   });
-  const closed = closedEdge(info);
   const unwrapped = closed
     ? raw.reduce<number[]>((out, station, k) => {
         const before = out[k - 1];
@@ -70,8 +97,8 @@ export function spineStations(
     return {
       reason:
         direction === 0
-          ? `edge ${edge}: the sections of the blend all project to one point of the edge, so the law cannot be read along it`
-          : `edge ${edge}: the nearest edge point jumps backwards between sections ${jump - 1} and ${jump} (the radius approaches the local radius of curvature of the edge), so the law is not read at the spine`,
+          ? `${label}: the sections of the blend all project to one point of the edge, so the law cannot be read along it`
+          : `${label}: the nearest edge point jumps backwards between sections ${jump - 1} and ${jump} (the radius approaches the local radius of curvature of the edge), so the law is not read at the spine`,
     };
   const shift = closed ? -Math.floor(Math.min(...unwrapped) + SEAM_SLACK) : 0;
   return { stations: unwrapped.map((station) => station + shift), closed };

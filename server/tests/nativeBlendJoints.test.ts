@@ -10,8 +10,11 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { createNativeTestKernel, describeNative } from './kernelTestSupport';
 import type { IsolatedKernel } from '../src/isolatedKernel';
 import { crossedCylindersFilletVolume } from './filletOracle';
+import { blendFaceContacts } from '@core/geometry/blend/blendInfo';
+import { checkRadius, lawIndex } from '@core/commands/brep/checkBlendRadius';
 
 type Doc = CadDocument;
+type LawRecord = ReturnType<typeof lawIndex> extends Map<string, infer R> ? R : never;
 const SIZES = [1, 10, 100, 1000] as const;
 /** Area a concave right-angle fillet of radius 1 adds to the section: 1 - pi / 4. */
 const CORNER = 1 - Math.PI / 4;
@@ -27,7 +30,14 @@ interface JointData {
 }
 interface CheckedBlends {
   status: string;
-  blends: Array<{ kind: string; source?: string; lawChecked?: boolean; sourceEdges: string[]; radius?: { min: number; max: number } }>;
+  blends: Array<{
+    face: number;
+    kind: string;
+    source?: string;
+    lawChecked?: boolean;
+    sourceEdges: string[];
+    radius?: { min: number; max: number };
+  }>;
   findings: Array<{ code: string; severity: string }>;
 }
 
@@ -429,56 +439,69 @@ describeNative('BLD M5 (13.32): blend_union joints by name and per-joint radius 
     });
 
     /**
-     * A post tilted 60 degrees on a plate: its joint is an ellipse (semi axes 6 and 3, a parameter speed that differs 2 : 1 around it). The law 0.2 -> 0.6 at a quarter ->
-     * 0.6 at three quarters -> 0.2 is to sit by arc length: the radius at the joint's arc quarter is read from the blend itself (the distance from the joint point to the
-     * blend face over 1 / sin(half the wedge) - 1; at the plateau, which any placement agrees on, the reading is the law value to 1e-3).
+     * Joint laws on uneven-speed edges (13.32.5): the kernel lays the law on the arc length of the joint (law_fillet.cxx), and check_blends reads it back at the
+     * spine position of each section (the kernel's `unevenSpeed` flag on the contour note). The law has its nodes at 0.15 and 0.85, where the parameter fraction
+     * and the arc fraction of these joints differ (a 2:1 ellipse; two cylinders through each other off the axes), so a readback at the parameter fraction would flag it.
      */
-    it.fails(
-      'a varying law on an uneven-speed joint is placed by arc length: the radius at the arc quarter of a tilted post joint is the law value (FAILS until feat/des-6c-chain2 lands the arc-length placement; flip to it then)',
-      () => {
+    describe('laws on uneven-speed joints', () => {
+      const law = (peak: number): Record<string, unknown> => ({
+        radius: 0.2,
+        radiusEnd: 0.2,
+        interpolation: 'linear',
+        sizes: [
+          { t: 0.15, size: peak },
+          { t: 0.85, size: peak },
+        ],
+      });
+      const row = (data: CheckedBlends): CheckedBlends['blends'][number] | undefined =>
+        data.blends.find((candidate) => candidate.source === 'joints[0]');
+      const tiltedPost = (): { doc: Doc; ids: string[]; near: number[] } => {
         const plate = made(createEmptyDocument(), 'add_box', { size: [80, 80, 40], position: [0, 0, -20] });
         const tilt = Math.PI / 3;
         const post = made(plate.doc, 'add_cylinder', { radius: 3, height: 20, rotation: [0, tilt, 0] });
-        const sizes = [
-          { t: 0.25, size: 0.6 },
-          { t: 0.75, size: 0.6 },
-        ];
-        const built = made(post.doc, 'blend_union', {
-          ids: [plate.id, post.id],
-          radius: 0.2,
-          joints: [{ near: [3 / Math.cos(tilt), 0, 0], radius: 0.2, radiusEnd: 0.2, interpolation: 'linear', sizes }],
-        });
-        expect(built.result.error, built.result.summary).toBeUndefined();
-        const brep = (built.doc.entities[built.id] as { brep: Parameters<typeof kernel.evaluate>[0] }).brep;
-        const shape = kernel.evaluate(brep) as NonNullable<ReturnType<typeof kernel.evaluate>>;
-        const face = (kernel.topology(shape)?.faces ?? []).findIndex((candidate) => (candidate.name ?? '').startsWith('blend('));
-        expect(face).toBeGreaterThanOrEqual(0);
-        const [a, b] = [3 / Math.cos(tilt), 3];
-        const start = jointsOf(built.result)[0]?.start as number[];
-        const phi0 = Math.atan2((start[1] as number) / b, (start[0] as number) / a);
-        const steps = 20000;
-        const points: Array<[number, number]> = [];
-        const arc: number[] = [0];
-        for (let k = 0; k <= steps; k++) {
-          const phi = phi0 + (2 * Math.PI * k) / steps;
-          const point: [number, number] = [a * Math.cos(phi), b * Math.sin(phi)];
-          const before = points.at(-1);
-          if (before !== undefined) arc.push((arc.at(-1) as number) + Math.hypot(point[0] - before[0], point[1] - before[1]));
-          points.push(point);
-        }
-        const axis = [Math.sin(tilt), 0, Math.cos(tilt)] as const;
-        const radiusAtArc = (fraction: number): number => {
-          const [x, y] = points[arc.findIndex((length) => length >= fraction * (arc.at(-1) as number))] as [number, number];
-          const along = x * axis[0];
-          const radial = [x - along * axis[0], y, -along * axis[2]] as const;
-          const wedge = Math.PI - Math.acos(radial[2] / Math.hypot(...radial));
-          const distance = kernel.faceQuery?.projectOnFace(shape, face, [[x, y, 0]])?.[0]?.distance as number;
-          return distance / (1 / Math.sin(wedge / 2) - 1);
-        };
-        expect(radiusAtArc(0.5)).toBeCloseTo(0.6, 3);
-        expect(radiusAtArc(0.25)).toBeCloseTo(0.6, 2);
-      },
-    );
+        return { doc: post.doc, ids: [plate.id, post.id], near: [3 / Math.cos(tilt), 0, 0] };
+      };
+      const crossed = (): { doc: Doc; ids: string[]; near: number[] } => {
+        const a = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 14 });
+        const b = made(a.doc, 'add_cylinder', { radius: 2.5, height: 20, rotation: [Math.PI / 2, 0, 0], position: [2, 0, 2] });
+        return { doc: b.doc, ids: [a.id, b.id], near: [4.5, Math.sqrt(25 - 4.5 * 4.5), 2] };
+      };
+
+      it.each([
+        ['a post tilted 60 degrees on a plate (ellipse 6 x 3)', tiltedPost],
+        ['two cylinders through each other off the axes', crossed],
+      ])(
+        '%s: the law is read back at the spine position of each section (the kernel flags the joint uneven), within 1e-2, where the parameter fraction is off by 2e-2 or more',
+        (_label, scene) => {
+          const { doc, ids, near } = scene();
+          const built = made(doc, 'blend_union', { ids, radius: 0.2, joints: [{ near, ...law(0.6) }] });
+          expect(built.result.error, built.result.summary).toBeUndefined();
+          const brep = (built.doc.entities[built.id] as unknown as { brep: Parameters<typeof kernel.evaluate>[0] }).brep;
+          const shape = kernel.evaluate(brep) as NonNullable<ReturnType<typeof kernel.evaluate>>;
+          const face = row(checked(built.doc, built.id))?.face;
+          const blend = blendFaceContacts(
+            kernel.topology(shape) as NonNullable<ReturnType<typeof kernel.topology>>,
+            kernel.faceQuery?.faceGraph(shape) as NonNullable<ReturnType<NonNullable<typeof kernel.faceQuery>['faceGraph']>>,
+          ).find((candidate) => candidate.face === face) as NonNullable<ReturnType<typeof blendFaceContacts>[number]>;
+          const record = [...lawIndex(kernel, brep).values()].find(
+            (candidate) => candidate.source === 'joints[0]',
+          ) as NonNullable<LawRecord>;
+          expect(record.joint?.unevenSpeed).toBe(true);
+          expect(record.joint?.spine).toHaveLength(401);
+          const worst = (checkedRecord: LawRecord): number =>
+            Math.max(0, ...checkRadius(kernel, shape, blend, checkedRecord, 21).deviations.map((deviation) => deviation.deviation));
+          const along = checkRadius(kernel, shape, blend, record, 21);
+          expect(along.lawChecked).toBe(true);
+          expect(worst(record)).toBeLessThan(1e-2);
+          // the same record without the kernel's flag is read at the parameter fraction of the sections: off by a lot more
+          const legacy = {
+            ...record,
+            joint: { isolated: true, ...(record.joint?.samples === undefined ? {} : { samples: record.joint.samples }) },
+          };
+          expect(worst(legacy)).toBeGreaterThan(2e-2);
+        },
+      );
+    });
 
     it('a default-radius union and a three-solid corner union keep the face names and the volume of the build before the law-capable fillet (pins measured with the parent kernel)', () => {
       const names = (doc: Doc, id: string): string[] =>

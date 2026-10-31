@@ -210,6 +210,10 @@ export interface BlendBuildNotes {
     readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
     readonly interpolation?: 'linear' | 'monotone';
     readonly samples?: readonly Vec3[];
+    /** The kernel's decision on the joint edge of a varying law: its parameter fraction differs from its arc fraction, so the law is laid on the arc length (law_fillet.cxx). */
+    readonly unevenSpeed?: boolean;
+    /** With `unevenSpeed`: 401 points of the joint edge, uniform in its parameter, start to end (the joint is not an edge of the result). */
+    readonly spine?: readonly Vec3[];
   }>;
   readonly corners?: ReadonlyArray<{
     readonly vertex: Vec3;

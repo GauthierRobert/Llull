@@ -20,7 +20,7 @@ import {
 } from '../../geometry/blend/blendInfo';
 import { blendSource } from '../../geometry/blend/continuity';
 import { controlParameters, radiusAt } from '../../geometry/blend/law';
-import { spineStations } from './spineStations';
+import { jointStations, spineStations } from './spineStations';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 import type { BlendSection } from '../../geometry/kernelPorts';
@@ -74,7 +74,13 @@ export interface LawRecord {
   /** blend_union joint contours: the pick that gave the radius ("joints[i]") or "default". */
   readonly source?: string;
   /** blend_union joint contours: the joint edge is alone in its tangent chain (a varying law is comparable end to end), and five points along it (the direction of the law). */
-  readonly joint?: { readonly isolated: boolean; readonly samples?: readonly Vec3[] };
+  readonly joint?: {
+    readonly isolated: boolean;
+    readonly samples?: readonly Vec3[];
+    /** The kernel's decision on the joint edge (absent: not reported, the law is compared at the parameter fraction as before) and, when uneven, its spine points. */
+    readonly unevenSpeed?: boolean;
+    readonly spine?: readonly Vec3[];
+  };
   /** The node has setback corners: its blends stop short of the edge ends, so a law that varies along the edge is not compared over the blend face. */
   readonly setback: boolean;
 }
@@ -139,7 +145,12 @@ export function lawIndex(kernel: GeometryKernel, recipe: ShapeRecipe): Map<strin
             chain: new Set(),
             setback: false,
             source: contour.source,
-            joint: { isolated: contour.isolated === true, ...(contour.samples === undefined ? {} : { samples: contour.samples }) },
+            joint: {
+              isolated: contour.isolated === true,
+              ...(contour.samples === undefined ? {} : { samples: contour.samples }),
+              ...(contour.unevenSpeed === undefined ? {} : { unevenSpeed: contour.unevenSpeed }),
+              ...(contour.spine === undefined ? {} : { spine: contour.spine }),
+            },
           });
   }
   return index;
@@ -222,10 +233,15 @@ export function checkRadius(
     return unchecked(
       `edge ${record.edge} is curved and the kernel does not report whether it runs at a steady speed, so the law is not read along it`,
     );
+  const unevenJoint = span === null && !constantLaw(record.law) && record.joint?.unevenSpeed === true;
   const read =
-    positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
-      ? spineStations(kernel, record.shape, record.edge, info, sections)
-      : null;
+    unevenJoint && record.joint !== undefined
+      ? record.joint.spine === undefined
+        ? { reason: 'the joint edge runs at an uneven speed and the kernel did not give its spine, so the law cannot be read along it' }
+        : jointStations(record.joint.spine, sections)
+      : positioned && info.unevenSpeed === true && record.shape !== undefined && record.edge !== undefined
+        ? spineStations(kernel, record.shape, record.edge, info, sections)
+        : null;
   if (read !== null && 'reason' in read) return unchecked(read.reason);
   const onSpine =
     read === null ? null : fine.map((sample, k) => ({ t: read.stations[k] ?? 0, radius: sample.radius })).sort((x, y) => x.t - y.t);

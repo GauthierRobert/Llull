@@ -628,6 +628,18 @@ void write_samples(std::ostringstream &out, const TopoDS_Edge &edge) {
   out << "]";
 }
 
+// Points of the joint edge uniform in the parameter, start to end: the spine check_blends lays the sections of an uneven-speed joint on (an edge of the union does not exist in the result).
+constexpr int kSpinePoints = 400;
+void write_spine(std::ostringstream &out, const TopoDS_Edge &edge) {
+  const BRepAdaptor_Curve curve(edge);
+  out << "[";
+  for (int k = 0; k <= kSpinePoints; ++k) {
+    if (k > 0) out << ",";
+    write_point(out, curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * k / double(kSpinePoints)));
+  }
+  out << "]";
+}
+
 struct ContourNote {
   double radius = 0;
   std::vector<std::string> edges;
@@ -840,6 +852,13 @@ static std::unique_ptr<Shape> build_blend_union(const ShapeList &list, double ra
       }
       contour_notes << ",\"samples\":";
       write_samples(contour_notes, entry.picked);
+      // the kernel's own decision (law_fillet.cxx): the law of an uneven-speed joint is laid on its arc length, so check_blends reads it back along the spine
+      const bool uneven = uneven_speed(entry.picked);
+      contour_notes << ",\"unevenSpeed\":" << (uneven ? "true" : "false");
+      if (uneven) {
+        contour_notes << ",\"spine\":";
+        write_spine(contour_notes, entry.picked);
+      }
     }
     contour_notes << "}";
   }
