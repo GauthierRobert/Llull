@@ -225,20 +225,24 @@ fn a_curvature_section_with_no_g2_solution_is_refused_with_the_measured_reason()
     assert_eq!(foot.len(), 1);
     let on_plate = plate_face(&part);
     let legs = [leg_row(foot[0], on_plate, 1.0, NAN, 3.0, NAN)];
-    let why = blend(&part, &legs, 1.0, 0.5).err().expect("refused");
+    // shape 0.95: the section passes a tangent line by more than the sag allows (5.1e-3 against 0 on the line of the plate, whose support does not curve away: the
+    // pole bent toward the sphere's centre pushes the section across it)
+    let why = blend(&part, &legs, 1.0, 0.95).err().expect("refused");
     assert!(
-        why.contains("leaves the triangle of its tangent lines by 0.12")
-            && why.contains("normal curvatures 0 and -0.2")
-            && why.contains("pole offsets of 0 and -0.37"),
+        why.contains("leaves the triangle of its tangent lines by")
+            && why.contains("allowed on that side by the sag")
+            && why.contains("normal curvatures 0 and -0.2"),
         "{why}"
     );
-    // the departure grows with the shape: legs 1 x 3 on a ball of 10 touching the plate at its equator build at 0.1 and are refused at 0.5
+    // legs 3 x 1 and 1 x 3 on a ball of 10 touching the plate at its equator (curvature -0.1): the section passes the tangent line by 2.5e-5 and 3.7e-2 at shape 0.5 (measured),
+    // within the sag of the sphere over the lead (8.1e-3 and 7.7e-2), so both build (the volume window and the contact gap judge the rest)
     let equator = crate::placed(&make_sphere(10.0).unwrap().unwrap(), [0.0; 3], [0.0, 0.0, 5.0], [0.0; 3]).unwrap().unwrap();
     let tangent_part = boolean(BooleanOp::Union, &plate, &equator, true).unwrap().unwrap();
     let seam = edges_where(&tangent_part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 5.0).abs() < 1e-9);
-    let row = [leg_row(seam[0], plate_face(&tangent_part), 1.0, NAN, 3.0, NAN)];
-    assert!(blend(&tangent_part, &row, 1.0, 0.1).is_ok());
-    assert!(blend(&tangent_part, &row, 1.0, 0.5).err().expect("refused").contains("leaves the triangle"));
+    for (first, second) in [(3.0, 1.0), (1.0, 3.0)] {
+        let row = [leg_row(seam[0], plate_face(&tangent_part), first, NAN, second, NAN)];
+        assert!(blend(&tangent_part, &row, 1.0, 0.5).is_ok());
+    }
 }
 
 fn plate_face(shape: &Shape) -> u32 {

@@ -119,16 +119,16 @@ std::vector<gp_Pnt> curvature_poles(const Section &s, double shape) {
 
 namespace {
 
-// How far (x the chord A B) a curvature section may leave its triangle: a support that curves away from the corner makes the G2 section start on its far side of the
-// tangent line, by up to the sag of the support; beyond this fraction the section bulges (the volume window and the measured gap judge the rest).
-constexpr double kTriangleSlack = 1e-3;
-
 // The bends that give the quintic the normal curvature of each support at its contact (the offset of the 3rd pole along the support normal is 1.25 kappa
 // lead^2: Suu . N / |Su|^2 = 0.8 h / lead^2 at the start of a degree-5 Bezier), then the section measured: it must stay in the triangle A, T, B (the
 // side of the chord that holds the corner, and the corner side of both tangent lines) and turn by less than pi (a loop turns by more).
 bool curvature_section(const EdgePlan &plan, double shape, double s, Section &out, std::string &why) {
   const gp_Pnt ends[2] = {out.a, out.b};
   double kappas[2] = {0, 0}, offsets[2] = {0, 0};
+  // How far the section may pass a tangent line: a support that curves away from the corner (kappa < 0 toward the other contact) falls away from its tangent line by
+  // |kappa| lead^2 / 2 over the lead of the section, and the bent pole moves the section by at most 0.43 |kappa| lead^2 (the Bernstein weight of the 3rd pole peaks at 0.346);
+  // a support that curves toward the corner or is flat allows nothing. Sides: A -> T, T -> B, the chord B -> A (nothing).
+  double allowed[3] = {0, 0, 0};
   for (int side = 0; side < 2; ++side) {
     const gp_Pnt &from = ends[side];
     const double reach = from.Distance(out.t);
@@ -139,6 +139,7 @@ bool curvature_section(const EdgePlan &plan, double shape, double s, Section &ou
     }
     const double lead = 0.8 * shape * reach;
     offsets[side] = 1.25 * kappas[side] * lead * lead;
+    allowed[side] = kappas[side] < 0 ? -0.5 * kappas[side] * lead * lead : 0.0;
     (side == 0 ? out.bend_a : out.bend_b) = nu * offsets[side];
   }
   const std::vector<gp_Pnt> poles = curvature_poles(out, shape);
@@ -162,7 +163,7 @@ bool curvature_section(const EdgePlan &plan, double shape, double s, Section &ou
     const double here = dx * (q.second - p.second) - dy * (q.first - p.first);
     return (reference < 0 ? -here : here) / length;
   };
-  double worst = 0, drift = 0, turn_low = 0, turn_high = 0, previous = 0;
+  double worst = 0, excursion = 0, allowance = 0, drift = 0, turn_low = 0, turn_high = 0, previous = 0;
   const gp_Vec z_axis = x_axis.Crossed(y_axis);
   constexpr int kSamples = 64;
   for (int k = 0; k <= kSamples; ++k) {
@@ -174,7 +175,14 @@ bool curvature_section(const EdgePlan &plan, double shape, double s, Section &ou
     for (int i = 0; i < 5; ++i) tangent += gp_Vec(poles[static_cast<size_t>(i)], poles[static_cast<size_t>(i + 1)]) * slope[i];
     const std::pair<double, double> q(point.Dot(x_axis), point.Dot(y_axis));
     drift = std::max(drift, std::fabs(point.Dot(z_axis)));
-    for (int side = 0; side < 3; ++side) worst = std::max(worst, -inside_by(side, q));
+    for (int side = 0; side < 3; ++side) {
+      const double excess = -inside_by(side, q) - allowed[side] - 1e-9 * chord;
+      if (excess > worst) {
+        worst = excess;
+        excursion = -inside_by(side, q);
+        allowance = allowed[side];
+      }
+    }
     const double angle = std::atan2(tangent.Dot(y_axis), tangent.Dot(x_axis));
     double unwrapped = angle;
     if (k > 0) {
@@ -189,8 +197,8 @@ bool curvature_section(const EdgePlan &plan, double shape, double s, Section &ou
   }
   const std::string needs = "the supports' normal curvatures " + number_text(kappas[0]) + " and " + number_text(kappas[1]) + " need pole offsets of " +
                             number_text(offsets[0]) + " and " + number_text(offsets[1]) + " (shape " + number_text(shape) + ")";
-  if (worst > kTriangleSlack * chord) {
-    why = "edge " + std::to_string(plan.index) + ": the curvature (G2) section leaves the triangle of its tangent lines by " + number_text(worst) + " at " + number_text(s) +
+  if (worst > 0) {
+    why = "edge " + std::to_string(plan.index) + ": the curvature (G2) section leaves the triangle of its tangent lines by " + number_text(excursion) + " (allowed on that side by the sag of a support that curves away: " + number_text(allowance) + ") at " + number_text(s) +
           " along it (the offsets along the support normals also lift it " + number_text(drift) + " out of the plane of A, T, B): " + needs +
           "; use smaller legs, a smaller or larger shape, or a conic profile";
     return false;

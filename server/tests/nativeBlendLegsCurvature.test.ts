@@ -203,10 +203,11 @@ describeNative('DES-6c 13.40: the curvature profile with two legs (native OCCT k
     const refused = execute(joined.doc, 'fillet_edge', {
       id: joined.id,
       edges: [{ near: [foot, 0, 5], size: 1, size2: 3, side1Near: [20, 0, 5] }],
-      profile: { type: 'curvature', shape: 0.5 },
+      profile: { type: 'curvature', shape: 0.95 },
     });
     expect(refused.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
     expect(refused.summary).toContain('leaves the triangle of its tangent lines');
+    expect(refused.summary).toContain('allowed on that side by the sag of a support that curves away: 0');
     expect(refused.summary).toContain('normal curvatures 0 and -0.2');
     expect(refused.document).toBe(joined.doc);
   });
