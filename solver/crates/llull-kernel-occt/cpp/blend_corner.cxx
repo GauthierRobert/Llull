@@ -23,10 +23,17 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
+#include <BRepFilletAPI_MakeFillet.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
+#include <gp_Lin.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
+#include <ChFi3d_FilletShape.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
 #include <TopoDS_Compound.hxx>
@@ -732,7 +739,10 @@ struct FillJob {
   gp_Pnt centre;                      // the centre of the exact star
   bool has_centre = false;
   std::string exact_problem;          // why the exact star was refused
+  TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
+  bool hinted = false;                // the centre of the star was taken from the replaced surface
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
+  std::vector<size_t> patch_part;     // 1 when the sub-patch starts inside that loop edge
   std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
   std::vector<std::tuple<std::string, long long, long long, long long>> loop_keys;  // aligned with `loop`: the stable order of the sub-patches (13.21.2)
   double gap = 0;
@@ -789,7 +799,8 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
 std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
 std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
-std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills)
+std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole)
+std::atomic<bool> g_force_trim{false};   // test hook: set_corner_trim (the rolling-ball trim builder for every step, 13.22)
 std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
 
 // The key that orders the sub-patches of a star independently of where the loop starts: the name of the support the loop edge lies on, then its middle rounded to the sewing tolerance.
@@ -815,9 +826,25 @@ bool fill_exact(FillJob &job, double diagonal) {
     aligned.push_back(job.supports[static_cast<size_t>(at - job.boundary.begin())]);
   }
   corner_exact::Patches exact;
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem)) return false;
+  corner_exact::CentreHint hint;
+  if (!job.hole_copy.IsNull())
+    hint = [&job, diagonal](const gp_Pnt &from, const gp_Dir &axis, double &height) {
+      IntCurvesFace_ShapeIntersector intersector;
+      intersector.Load(job.hole_copy, 1e-7);
+      intersector.Perform(gp_Lin(from, axis), -diagonal, diagonal);
+      double best = 1e300;
+      for (int i = 1; i <= intersector.NbPnt(); ++i)
+        if (std::fabs(intersector.WParameter(i)) < best) {
+          best = std::fabs(intersector.WParameter(i));
+          height = intersector.WParameter(i);
+        }
+      return best < 1e299;
+    };
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6)) return false;
+  job.hinted = exact.centre_from_hint;
   job.patches = exact.faces;
   job.patch_loop = exact.loop_index;
+  job.patch_part = exact.part;
   job.centre = exact.centre;
   job.has_centre = true;
   job.gap = exact.gap;
@@ -829,6 +856,10 @@ void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
     if (g_fault_corner.load() == static_cast<int>(job.corner)) throw std::bad_alloc();
     if (job.allow_star && g_exact_mode.load() != 0 && fill_exact(job, diagonal)) {
       job.filled = true;
+      return;
+    }
+    if (g_exact_mode.load() >= 5 && !job.exact_problem.empty()) {
+      job.problem = "was not filled: the exact-boundary patch was refused: " + job.exact_problem;  // test hook 5: no fallback, the reason is the message
       return;
     }
     for (const FillSetting &setting : kFillSettings) {
@@ -897,6 +928,407 @@ void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagona
   work();
 }
 
+// ---- Setback corners on curved edges and faces: the rolling-ball trim (13.22) ----
+
+// Whether unique edge `index` is not a straight line between two planar faces: the analytic builder (prisms, chords) cannot take it.
+bool edge_needs_trim(const TopTools_IndexedMapOfShape &edge_map, const TopTools_IndexedDataMapOfShapeListOfShape &owners, int index) {
+  if (index < 0 || index >= edge_map.Extent()) return false;
+  const TopoDS_Edge edge = TopoDS::Edge(edge_map(index + 1));
+  if (BRepAdaptor_Curve(edge).GetType() != GeomAbs_Line) return true;
+  if (!owners.Contains(edge)) return false;
+  for (TopTools_ListIteratorOfListOfShape it(owners.FindFromKey(edge)); it.More(); it.Next())
+    if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), Standard_False).GetType() != GeomAbs_Plane) return true;
+  return false;
+}
+
+// How the step is built: 0 the analytic builder (every corner has straight edges between planar faces only), 1 the rolling-ball trim (every corner has a curved edge or face, or the test hook),
+// 2 a mixture (refused: the two builders measure the setback differently, along the edge and from the vertex).
+int step_kind(const TopoDS_Shape &shape, const std::map<int, Taper> &radius, const std::vector<Corner> &corners, double tolerance) {
+  if (g_force_trim.load()) return 1;
+  const TopTools_IndexedMapOfShape edge_map = query::distinct(shape, TopAbs_EDGE);
+  TopTools_IndexedDataMapOfShapeListOfShape owners, vertex_edges;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, owners);
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges);
+  int trimmed = 0, analytic = 0;
+  const auto curved = [&](int index) { return edge_needs_trim(edge_map, owners, index); };
+  for (const Corner &corner : corners) {
+    const TopoDS_Vertex vertex = vertex_at(shape, corner.at, tolerance);
+    bool any = false;
+    if (!vertex.IsNull())
+      for (const int edge : edges_at(vertex_edges, edge_map, vertex)) any = any || curved(edge);
+    (any ? trimmed : analytic) += 1;
+  }
+  if (corners.empty())
+    for (const auto &entry : radius) (curved(entry.first) ? trimmed : analytic) += 1;
+  return trimmed == 0 ? 0 : (analytic == 0 ? 1 : 2);
+}
+
+// Whether a face piece of the split solid lies inside the ball (centre, radius): every edge of it that is not on the sphere has its middle inside, and there is one.
+bool piece_inside_ball(const TopoDS_Face &face, const gp_Pnt &centre, double radius) {
+  int inside = 0;
+  for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next()) {
+    const TopoDS_Edge edge = TopoDS::Edge(it.Current());
+    if (BRep_Tool::Degenerated(edge)) continue;
+    const BRepAdaptor_Curve curve(edge);
+    const double distance = curve.Value(0.5 * (curve.FirstParameter() + curve.LastParameter())).Distance(centre);
+    if (distance > radius * (1 + 1e-6)) return false;
+    if (distance < radius * (1 - 1e-6)) ++inside;
+  }
+  return inside > 0;
+}
+
+// Whether a face is a piece of the ball itself (the splitter keeps the part of the tool's sphere that lies inside the solid): the sphere about `centre` of radius `radius`.
+bool is_ball_face(const TopoDS_Face &face, const gp_Pnt &centre, double radius) {
+  const BRepAdaptor_Surface surface(face, Standard_False);
+  return surface.GetType() == GeomAbs_Sphere && surface.Sphere().Location().Distance(centre) < 1e-6 * radius && std::fabs(surface.Sphere().Radius() - radius) < 1e-6 * radius;
+}
+
+// The setback corner on edges the analytic builder cannot take (a circle, a B-spline, a cylinder / cone / free-form face): OCCT's rolling-ball blend of the rounded edges, then
+// at each corner the faces inside the ball of radius `setback` around the vertex (OCCT's own corner) are cut away and the hole they leave is filled by the exact star (13.21; the plate when the star is refused).
+std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Taper> &radius, const std::vector<Corner> &corners, bool &fill_failed,
+                                     std::string &corners_json, std::string &why, bool allow_star, bool &star_used) {
+  const TopoDS_Shape &shape = source.shape;
+  const double diagonal = blend::diagonal_of(shape);
+  const double sewing_tolerance = std::max(1e-6 * diagonal, 1e-12);
+  const double patch_gap_limit = blend::kGapAccepted * kPatchGapFraction * diagonal;
+  for (const auto &[index, taper] : radius)
+    if (!taper.constant()) {
+      why = std::string(kUnsupported) + "a radius that varies along edge " + std::to_string(index) + " is not made at a corner on a curved edge or face (constant radius only)";
+      return nullptr;
+    }
+  std::vector<double> reach;
+  for (const Corner &corner : corners) {
+    double least = 1e300, most = 0;
+    for (const auto &entry : corner.setbacks) {
+      least = std::min(least, entry.second);
+      most = std::max(most, entry.second);
+    }
+    if (!(least > 0) || most - least > 1e-9 * most) {
+      why = std::string(kUnsupported) + "the edges at " + where(corner.at) + " have different setbacks: a corner on a curved edge or face trims at one distance from the vertex";
+      return nullptr;
+    }
+    reach.push_back(most);
+  }
+  for (size_t a = 0; a < corners.size(); ++a)
+    for (size_t b = a + 1; b < corners.size(); ++b)
+      if (corners[a].at.Distance(corners[b].at) < reach[a] + reach[b]) {
+        why = std::string(kUnsupported) + "the setback distances at " + where(corners[a].at) + " and " + where(corners[b].at) + " overlap";
+        return nullptr;
+      }
+  const double vertex_tolerance = kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9);
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_edges_all, vertex_faces_all;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges_all);
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertex_faces_all);
+  const TopTools_IndexedMapOfShape unique_edges = query::distinct(shape, TopAbs_EDGE);
+  // Every edge that meets a setback vertex is rounded in this step, and every rounded edge ends at a setback vertex (the ball must be able to cut the whole of each blend).
+  std::vector<TopoDS_Vertex> corner_vertices;
+  for (const Corner &corner : corners) {
+    const TopoDS_Vertex vertex = vertex_at(shape, corner.at, vertex_tolerance);
+    if (vertex.IsNull()) {
+      why = std::string(kFailed) + "the solid has no vertex at " + where(corner.at);
+      return nullptr;
+    }
+    corner_vertices.push_back(vertex);
+    const std::vector<int> incident = edges_at(vertex_edges_all, unique_edges, vertex);
+    if (incident.size() < 3) {
+      why = std::string(kUnsupported) + "only " + std::to_string(incident.size()) + " edge(s) meet at " + where(corner.at) + ": a setback corner needs 3 or more";
+      return nullptr;
+    }
+    for (const int edge : incident)
+      if (radius.find(edge) == radius.end()) {
+        why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
+              " but is not rounded: a setback corner rounds every edge that meets there, in the same step";
+        return nullptr;
+      }
+  }
+  for (const auto &entry : radius) {
+    if (entry.first < 0 || entry.first >= unique_edges.Extent()) continue;
+    const BRepAdaptor_Curve curve(TopoDS::Edge(unique_edges(entry.first + 1)));
+    const bool at_corner = std::any_of(corners.begin(), corners.end(), [&](const Corner &corner) {
+      return same_point(curve.Value(curve.FirstParameter()), corner.at, vertex_tolerance) || same_point(curve.Value(curve.LastParameter()), corner.at, vertex_tolerance);
+    });
+    if (!at_corner) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(entry.first) + " does not end at a setback vertex: every rounded edge must meet one in this build";
+      return nullptr;
+    }
+  }
+  {
+    JsonWriter log;
+    log.begin_array();
+    for (const Corner &corner : corners) {
+      log.begin_object().key("vertex").point(corner.at).key("setbacks").begin_array();
+      for (const auto &[edge, distance] : corner.setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
+      log.end_array().end_object();
+    }
+    corners_json = log.end_array().text();
+  }
+  const TopTools_IndexedMapOfShape edge_map = query::distinct(shape, TopAbs_EDGE);
+  BRepFilletAPI_MakeFillet maker(shape, ChFi3d_Rational);
+  for (const auto &[index, taper] : radius) {
+    if (index < 0 || index >= edge_map.Extent()) {
+      why = std::string(kFailed) + "edge " + std::to_string(index) + " is not an edge of the solid";
+      return nullptr;
+    }
+    maker.Add(taper.start, TopoDS::Edge(edge_map(index + 1)));
+  }
+  maker.Build();
+  if (!maker.IsDone() || maker.Shape().IsNull()) {
+    why = std::string(kFailed) + "the rolling-ball blend of the edges at the corners could not be built (OCCT refuses this combination of edges and radii)";
+    return nullptr;
+  }
+  const std::vector<naming::Named> sources{naming::named(source)};
+  const std::unique_ptr<Shape> rounded =
+      naming::wrap_named(maker.Shape(), naming::inherit(maker.Shape(), sources, naming::history_of(sources, maker), "blend"));
+  const naming::Named current = naming::named(*rounded);
+  const std::vector<std::string> edge_names = naming::edge_names(shape, sources[0].names);
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_edges;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertex_edges);
+  const double volume_rounded = volume_of(current.shape);
+  // The ball must hold OCCT's own corner at each vertex (the farthest point of the faces generated at the vertex), and meet no face that does not belong to the vertex.
+  const TopTools_IndexedMapOfShape rounded_faces = query::distinct(current.shape, TopAbs_FACE);
+  for (size_t c = 0; c < corners.size(); ++c) {
+    TopTools_IndexedMapOfShape belonging;
+    const auto add_all = [&](const TopTools_ListOfShape &list) {
+      for (TopTools_ListIteratorOfListOfShape it(list); it.More(); it.Next()) belonging.Add(it.Value());
+    };
+    add_all(maker.Generated(corner_vertices[c]));
+    double minimum = 0;
+    for (TopTools_ListIteratorOfListOfShape it(maker.Generated(corner_vertices[c])); it.More(); it.Next())
+      for (TopExp_Explorer edges(it.Value(), TopAbs_EDGE); edges.More(); edges.Next()) {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(edges.Current()))) continue;
+        const BRepAdaptor_Curve curve(TopoDS::Edge(edges.Current()));
+        for (int sample = 0; sample <= 10; ++sample)
+          minimum = std::max(minimum, curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * sample / 10.0).Distance(corners[c].at));
+      }
+    TopTools_IndexedMapOfShape incident_faces;
+    for (TopTools_ListIteratorOfListOfShape faces(vertex_faces_all.FindFromKey(corner_vertices[c])); faces.More(); faces.Next()) incident_faces.Add(faces.Value());
+    for (int f = 1; f <= incident_faces.Extent(); ++f) {
+      if (maker.Modified(incident_faces(f)).IsEmpty()) belonging.Add(incident_faces(f));
+      add_all(maker.Modified(incident_faces(f)));
+    }
+    for (const int edge : edges_at(vertex_edges_all, unique_edges, corner_vertices[c])) add_all(maker.Generated(unique_edges(edge + 1)));
+    if (!(reach[c] > minimum * (1 + 1e-3))) {
+      why = std::string(kTooShort) + "the setback ball of radius " + number(reach[c]) + " at " + where(corners[c].at) + " must exceed " + number(minimum) +
+            " (the farthest point of the rolling-ball corner there): it would cut the blends inside the corner";
+      return nullptr;
+    }
+    const TopoDS_Vertex centre = BRepBuilderAPI_MakeVertex(corners[c].at);
+    for (int f = 1; f <= rounded_faces.Extent(); ++f) {
+      if (belonging.Contains(rounded_faces(f))) continue;
+      BRepExtrema_DistShapeShape distance(centre, rounded_faces(f));
+      if (distance.IsDone() && distance.Value() < reach[c] * (1 + 1e-3)) {
+        why = std::string(kUnsupported) + "a face that does not meet the vertex " + where(corners[c].at) + " lies " + number(distance.Value()) +
+              " from it, inside or at the setback ball of radius " + number(reach[c]) + ": use a smaller setback";
+        return nullptr;
+      }
+    }
+  }
+  BRepAlgoAPI_Splitter splitter;
+  TopTools_ListOfShape arguments, balls;
+  arguments.Append(current.shape);
+  for (size_t c = 0; c < corners.size(); ++c) balls.Append(BRepPrimAPI_MakeSphere(corners[c].at, reach[c]).Shape());
+  splitter.SetArguments(arguments);
+  splitter.SetTools(balls);
+  splitter.Build();
+  if (!splitter.IsDone() || splitter.HasErrors()) {
+    why = std::string(kFailed) + "the blended solid could not be cut by the setback balls";
+    return nullptr;
+  }
+  const TopoDS_Shape split = splitter.Shape();
+  const std::vector<naming::Named> inputs{current};
+  const std::vector<std::string> split_names = naming::inherit(split, inputs, naming::history_of(inputs, splitter), "boolean");
+  const TopTools_IndexedMapOfShape split_faces = query::distinct(split, TopAbs_FACE);
+  TopTools_IndexedDataMapOfShapeListOfShape split_edge_faces;
+  TopExp::MapShapesAndAncestors(split, TopAbs_EDGE, TopAbs_FACE, split_edge_faces);
+  std::vector<FillJob> jobs(corners.size());
+  for (size_t c = 0; c < corners.size(); ++c) {
+    FillJob &job = jobs[c];
+    job.corner = c;
+    TopTools_IndexedMapOfShape removed;
+    for (int f = 1; f <= split_faces.Extent(); ++f)
+      if (!is_ball_face(TopoDS::Face(split_faces(f)), corners[c].at, reach[c]) && piece_inside_ball(TopoDS::Face(split_faces(f)), corners[c].at, reach[c])) removed.Add(split_faces(f));
+    for (int f = 1; f <= removed.Extent(); ++f) job.removed.push_back(removed(f));
+    std::vector<TopoDS_Edge> boundary;
+    std::vector<TopoDS_Face> supports;
+    TopTools_IndexedMapOfShape seen;
+    for (int f = 1; f <= removed.Extent(); ++f)
+      for (TopExp_Explorer it(removed(f), TopAbs_EDGE); it.More(); it.Next()) {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(it.Current())) || !seen.Add(it.Current())) continue;
+        for (TopTools_ListIteratorOfListOfShape owner(split_edge_faces.FindFromKey(it.Current())); owner.More(); owner.Next())
+          if (removed.FindIndex(owner.Value()) == 0 && !is_ball_face(TopoDS::Face(owner.Value()), corners[c].at, reach[c])) {
+            boundary.push_back(TopoDS::Edge(it.Current()));
+            supports.push_back(TopoDS::Face(owner.Value()));
+            break;
+          }
+      }
+    const std::vector<TopoDS_Edge> loop = boundary.empty() ? std::vector<TopoDS_Edge>() : loop_of(boundary);
+    if (removed.IsEmpty() || loop.size() != boundary.size()) {
+      job.hole_error = std::string(kFailed) + "the ball of radius " + number(reach[c]) + " at " + where(corners[c].at) + " leaves " + std::to_string(boundary.size()) +
+                       " boundary edge(s) that do not close one loop";
+      continue;
+    }
+    job.tolerance_3d = std::min(sewing_tolerance, kFillSetbackFraction * reach[c]);
+    job.tolerance_2d = 1e-5 * reach[c] / 2;
+    BRep_Builder builder;
+    TopoDS_Compound shared;
+    builder.MakeCompound(shared);
+    TopTools_IndexedMapOfShape distinct_supports;
+    for (const TopoDS_Face &support : supports)
+      if (distinct_supports.Add(support)) builder.Add(shared, support);
+    BRepBuilderAPI_Copy copy(shared, Standard_True, Standard_False);
+    const auto image = [&copy](const TopoDS_Shape &original) {
+      TopoDS_Shape found = copy.ModifiedShape(original);
+      found.Orientation(original.Orientation());
+      return found;
+    };
+    {
+      BRep_Builder hole_builder;
+      TopoDS_Compound hole;
+      hole_builder.MakeCompound(hole);
+      for (int f = 1; f <= removed.Extent(); ++f) hole_builder.Add(hole, removed(f));
+      job.hole_copy = TopoDS::Compound(BRepBuilderAPI_Copy(hole, Standard_True, Standard_False).Shape());
+    }
+    for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(image(edge)));
+    for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(image(support)));
+    for (const TopoDS_Edge &edge : loop) {
+      job.loop.push_back(TopoDS::Edge(image(edge)));
+      const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) - boundary.begin());
+      const int support_index = split_faces.FindIndex(supports[at]);
+      job.loop_keys.push_back(loop_key(edge, support_index > 0 && static_cast<size_t>(support_index) <= split_names.size() ? split_names[static_cast<size_t>(support_index - 1)] : std::string(),
+                                       std::max(1e-6 * diagonal, 1e-12)));
+    }
+    job.allow_star = allow_star;
+  }
+  fill_all(jobs, patch_gap_limit, diagonal);
+  for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
+  if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
+    fill_failed = true;
+    why = std::string(kFailed) + "forced by the test hook after the fills";
+    return nullptr;
+  }
+  TopTools_IndexedMapOfShape dropped;
+  std::vector<TopoDS_Face> patches;
+  std::vector<std::string> patch_names;
+  std::vector<bool> patch_is_star;
+  std::vector<std::string> corner_kinds(corners.size()), corner_centres(corners.size());
+  double worst_patch_gap = 0;
+  for (size_t c = 0; c < corners.size(); ++c) {
+    FillJob &job = jobs[c];
+    if (!job.hole_error.empty()) {
+      why = job.hole_error;
+      return nullptr;
+    }
+    if (job.error) std::rethrow_exception(job.error);
+    if (!job.filled) {
+      fill_failed = true;
+      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + job.problem;
+      return nullptr;
+    }
+    worst_patch_gap = std::max(worst_patch_gap, job.gap);
+    std::vector<std::string> around;
+    const TopoDS_Vertex apex = vertex_at(shape, corners[c].at, kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9));
+    if (!apex.IsNull())
+      for (const int edge : edges_at(vertex_edges, edge_map, apex)) around.push_back(edge_names[static_cast<size_t>(edge)]);
+    std::vector<size_t> rank(job.patch_loop.size());
+    {
+      std::vector<size_t> order(job.patch_loop.size());
+      for (size_t k = 0; k < order.size(); ++k) order[k] = k;
+      const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
+      for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
+    }
+    for (size_t k = 0; k < job.patches.size(); ++k) {
+      patches.push_back(job.patches[k]);
+      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
+      patch_is_star.push_back(!job.patch_loop.empty());
+      corner_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
+      corner_centres[c] = job.hinted ? "surface" : "rule";
+    }
+    for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
+  }
+  for (int f = 1; f <= split_faces.Extent(); ++f)
+    for (size_t c = 0; c < corners.size(); ++c)
+      if (is_ball_face(TopoDS::Face(split_faces(f)), corners[c].at, reach[c])) dropped.Add(split_faces(f));
+  BRepBuilderAPI_Sewing sewing(sewing_tolerance);
+  std::vector<TopoDS_Face> members;
+  std::vector<std::string> member_names;
+  for (int f = 1; f <= split_faces.Extent(); ++f) {
+    if (dropped.FindIndex(split_faces(f)) != 0) continue;
+    members.push_back(TopoDS::Face(split_faces(f)));
+    member_names.push_back(static_cast<size_t>(f) <= split_names.size() ? split_names[static_cast<size_t>(f - 1)] : std::string());
+  }
+  for (size_t p = 0; p < patches.size(); ++p) {
+    members.push_back(patches[p]);
+    member_names.push_back(patch_names[p]);
+  }
+  for (const TopoDS_Face &face : members) sewing.Add(face);
+  sewing.Perform();
+  const TopoDS_Shape sewn = sewing.SewedShape();
+  if (sewing.NbFreeEdges() > 0) {
+    fill_failed = true;
+    why = std::string(kFailed) + "the corner patches do not close the solid (" + std::to_string(sewing.NbFreeEdges()) + " free edge(s) after sewing)";
+    return nullptr;
+  }
+  std::string shells_why;
+  TopoDS_Solid solid = blend::solid_of_shells(sewn, shells_why);
+  if (solid.IsNull() || !BRepCheck_Analyzer(solid, Standard_True).IsValid()) {
+    why = std::string(kFailed) + "the blended solid fails the BRepCheck validity analysis" + (shells_why.empty() ? std::string() : ": " + shells_why);
+    return nullptr;
+  }
+  const double accepted = blend::kGapAccepted * kPatchGapFraction * std::min(diagonal, lower_diagonal(members, patches.size()));
+  if (worst_patch_gap > accepted) {
+    fill_failed = true;
+    why = std::string(kFailed) + "the corner patches miss the blend ends by " + number(worst_patch_gap) + " (limit " + number(accepted) + ")";
+    return nullptr;
+  }
+  // The star replaces what is inside the balls: the volume moves by less than the balls hold.
+  const double volume_after = volume_of(solid);
+  double ball_volume = 0;
+  for (size_t c = 0; c < corners.size(); ++c) {
+    BRepAlgoAPI_Common common(current.shape, BRepPrimAPI_MakeSphere(corners[c].at, reach[c]).Shape());
+    ball_volume += common.IsDone() && !common.Shape().IsNull() ? volume_of(common.Shape()) : 4.0 / 3.0 * kPi * reach[c] * reach[c] * reach[c];
+  }
+  if (!(volume_after > 0) || std::fabs(volume_after - volume_rounded) > ball_volume) {
+    fill_failed = true;
+    why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (rolling-ball blend " + number(volume_rounded) + ", the rolling-ball blend holds " + number(ball_volume) + " inside the balls)";
+    return nullptr;
+  }
+  // The oriented G1 check of every sub-patch of a star on the sewn solid: the star's own measures sample the boundary only, a sign flip inside a sub-patch ends here and the step is built again with the plate.
+  {
+    TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
+    TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
+    for (size_t p = 0; p < patches.size(); ++p) {
+      if (!patch_is_star[p]) continue;
+      double worst = 0;
+      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst)) {
+        fill_failed = true;
+        why = std::string(kFailed) + "a sub-patch of the corner star is not tangent to its neighbours in the sewn solid (outward normals differ by " + number(worst) + " rad, limit " +
+              number(kMixedFillAngle) + (worst > kPi / 2 ? ": it faces the other way" : "") + ")";
+        return nullptr;
+      }
+    }
+  }
+  const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
+  std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));
+  for (size_t m = 0; m < members.size(); ++m) {
+    const TopoDS_Shape image = sewing.IsModified(members[m]) ? sewing.Modified(members[m]) : members[m];
+    const int index = final_faces.FindIndex(image);
+    if (index > 0) names[static_cast<size_t>(index - 1)] = member_names[m];
+  }
+  {
+    // the log with the kind of patch and where the centre of the star came from (the replaced surface, or the 3/8 rule of 13.21.4 when it crosses no axis)
+    JsonWriter log;
+    log.begin_array();
+    for (size_t c = 0; c < corners.size(); ++c) {
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]).key("setbacks").begin_array();
+      for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
+      log.end_array().end_object();
+    }
+    corners_json = log.end_array().text();
+  }
+  return naming::wrap_named(solid, names);
+}
+
 std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
                                           bool &fill_failed, std::string &corners_json, std::string &why, bool allow_star, bool &star_used) {
   fill_failed = false;
@@ -904,6 +1336,15 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   std::vector<Corner> corners;
   if (!parse(edge_raw, corner_raw, mode.automatic, radius, corners, why)) return nullptr;
   const TopoDS_Shape &shape = source.shape;
+  if (!mode.automatic) {
+    const int kind = step_kind(shape, radius, corners, kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9));
+    if (kind == 2) {
+      why = std::string(kUnsupported) +
+            "the corners of this step mix vertices on straight edges between planar faces (the setback is measured along the edge) with vertices on a curved edge or face (it is the radius of a ball around the vertex): put them in separate steps";
+      return nullptr;
+    }
+    if (kind == 1) return build_trimmed(source, radius, corners, fill_failed, corners_json, why, allow_star, star_used);
+  }
   const double diagonal = blend::diagonal_of(shape);
   // Deliberately the box of the VERTICES: core matches vertices with the same scale (geometry/blend/vertices.ts); it decides no acceptance.
   const double vertex_tolerance = kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9);
@@ -1274,17 +1715,18 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
     // A star's sub-patches are told apart by #k, k = 1.. the rank of the support / position key of the loop edge each has as its bottom (stable under a different start of the loop).
-    std::vector<size_t> rank(job.loop_keys.size());
+    std::vector<size_t> rank(job.patch_loop.size());
     {
-      std::vector<size_t> order(job.loop_keys.size());
+      std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return job.loop_keys[a] < job.loop_keys[b]; });
+      const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
       patches.push_back(job.patches[k]);
       patch_corner.push_back(c);
-      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[job.patch_loop[k]] + 1)));
+      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
     }
     patch_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
@@ -1424,6 +1866,7 @@ int32_t last_corner_threads() { return g_last_threads.load(); }
 void set_corner_fault(int32_t corner) { g_fault_corner.store(corner); }
 void set_corner_spawn_limit(int32_t workers) { g_spawn_limit.store(workers); }
 void set_corner_exact_patch(int32_t mode) { g_exact_mode.store(mode); }
+void set_corner_trim(bool on) { g_force_trim.store(on); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
 // The oriented check on face `face` of the first solid of `shape`, rebuilt into a shell with that face reversed when `reverse`, over the tangent edges only: about 0 for a blend face as built,

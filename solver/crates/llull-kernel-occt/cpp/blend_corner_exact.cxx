@@ -35,11 +35,14 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr int kDegree = 5;
 constexpr int kCheckSamples = 100;
 // The poles per direction of the interpolation, tried in turn.
-constexpr int kPoleCounts[] = {8, 11, 14, 24};
+constexpr int kPoleCounts[] = {8, 11, 14, 24, 36};
 // The corner of the outline of the hole at a vertex must open between these angles (radians) for a spoke to leave between its edges.
 constexpr double kMinWedge = 0.1;
 // Two supports meeting at a vertex must have normals within this cosine.
 constexpr double kNormalCosine = 1 - 1e-9;
+// Two edges of the hole that turn by less than this at a vertex continue each other (a joint of a chain, no spoke); a hole with fewer than 3 corners gets spokes from the middles of its edges.
+constexpr double kCornerAngle = 0.02;
+constexpr size_t kSmoothSpokes = 6;
 
 struct Hermite3 {
   double p0, d0, p1, d1;
@@ -89,7 +92,7 @@ bool unit(Vec &v) {
 Vec project(const Vec &v, const Vec &normal) { return v - normal * (v * normal); }
 
 // One loop edge with the support it lies on, parametrized by s in [0,1] along the direction of the loop.
-struct Side {
+struct EdgeSide {
   BRepAdaptor_Curve curve;
   double first = 0, last = 0;
   bool reversed = false;
@@ -131,6 +134,96 @@ struct Side {
   }
 };
 
+// The length of a loop edge (Simpson over 32 steps of the speed).
+double edge_length(const EdgeSide &edge) {
+  constexpr int kSteps = 32;
+  double sum = 0;
+  for (int step = 0; step <= kSteps; ++step) sum += (step == 0 || step == kSteps ? 1.0 : (step % 2 == 1 ? 4.0 : 2.0)) * edge.tangent(static_cast<double>(step) / kSteps).Magnitude();
+  return sum / (3.0 * kSteps);
+}
+
+// A part [a, b] of loop edge `edge` (in the s of that edge) that covers [s0, s1] of the chain.
+struct Piece {
+  size_t edge = 0;
+  double a = 0, b = 1, s0 = 0, s1 = 1;
+  // The map sigma -> s of the piece when its edge is not traversed at a steady speed (a B-spline intersection curve of OCCT): the nodes (sigma, s, ds/dsigma) of a cubic Hermite inverse of the
+  // arc length, so that the chain is traversed at a steady speed whatever the parametrization of its edges.
+  std::vector<double> node_sigma, node_s, node_slope;
+};
+
+// A stretch of the loop between two spoke vertices: one or several loop edges (or parts of them) joined where their supports are tangent. Parametrized by sigma in [0,1]; with several
+// pieces the parameter is the length of the chain up to the speed at the ends of each piece (a cubic Hermite map per piece), so the tangent vector is continuous at the joints.
+struct Side {
+  const std::vector<EdgeSide> *raw = nullptr;
+  std::vector<Piece> pieces;
+  double length = 0;
+  size_t source = 0;  // the edge of the loop given to build() the chain starts on
+  size_t part = 0;    // 1 when it starts inside that edge
+  bool hermite = false;
+
+  // The chain parameters where one piece ends and the next starts.
+  std::vector<double> joints() const {
+    std::vector<double> found;
+    for (size_t p = 0; p + 1 < pieces.size(); ++p) found.push_back(pieces[p].s1);
+    return found;
+  }
+
+  // The piece at sigma, the s of its edge there and ds/dsigma.
+  void local(double sigma, const Piece *&piece, double &s, double &rate) const {
+    size_t at = 0;
+    while (at + 1 < pieces.size() && sigma > pieces[at].s1) ++at;
+    piece = &pieces[at];
+    const double width = piece->s1 - piece->s0;
+    const double x = std::min(1.0, std::max(0.0, (sigma - piece->s0) / width));
+    if (piece->node_s.empty()) {
+      s = piece->a + (piece->b - piece->a) * x;
+      rate = (piece->b - piece->a) / width;
+      return;
+    }
+    const std::vector<double> &nodes = piece->node_sigma;
+    const size_t upper = static_cast<size_t>(std::min<std::ptrdiff_t>(std::max<std::ptrdiff_t>(std::upper_bound(nodes.begin(), nodes.end(), sigma) - nodes.begin(), 1), static_cast<std::ptrdiff_t>(nodes.size()) - 1));
+    const size_t lower = upper - 1;
+    const double step = nodes[upper] - nodes[lower];
+    const double t = std::min(1.0, std::max(0.0, (sigma - nodes[lower]) / step));
+    const Hermite3 h = cubic(t);
+    s = h.p0 * piece->node_s[lower] + h.d0 * step * piece->node_slope[lower] + h.p1 * piece->node_s[upper] + h.d1 * step * piece->node_slope[upper];
+    const double t2 = t * t;
+    const double dp0 = 6 * t2 - 6 * t, dd0 = 3 * t2 - 4 * t + 1, dp1 = -6 * t2 + 6 * t, dd1 = 3 * t2 - 2 * t;
+    rate = (dp0 * piece->node_s[lower] + dd0 * step * piece->node_slope[lower] + dp1 * piece->node_s[upper] + dd1 * step * piece->node_slope[upper]) / step;
+  }
+  gp_Pnt point(double sigma) const {
+    const Piece *piece = nullptr;
+    double s = 0, rate = 0;
+    local(sigma, piece, s, rate);
+    return (*raw)[piece->edge].point(s);
+  }
+  Vec tangent(double sigma) const {
+    const Piece *piece = nullptr;
+    double s = 0, rate = 0;
+    local(sigma, piece, s, rate);
+    return (*raw)[piece->edge].tangent(s) * rate;
+  }
+  bool normal(double sigma, Vec &n) const {
+    const Piece *piece = nullptr;
+    double s = 0, rate = 0;
+    local(sigma, piece, s, rate);
+    return (*raw)[piece->edge].normal(s, n);
+  }
+  // d(normal)/dsigma at an end of the chain (a second-order difference inside the end piece).
+  bool normal_rate(double sigma, Vec &rate_out) const {
+    constexpr double h = 1e-4;
+    Vec a, b, c;
+    if (sigma < 0.5) {
+      if (!normal(sigma, a) || !normal(sigma + h, b) || !normal(sigma + 2 * h, c)) return false;
+      rate_out = (a * -3.0 + b * 4.0 - c) / (2 * h);
+    } else {
+      if (!normal(sigma, a) || !normal(sigma - h, b) || !normal(sigma - 2 * h, c)) return false;
+      rate_out = (a * 3.0 - b * 4.0 + c) / (2 * h);
+    }
+    return true;
+  }
+};
+
 // Everything of the star at one vertex of the loop.
 struct Vertex {
   gp_Pnt at;
@@ -142,7 +235,8 @@ struct Vertex {
 };
 
 struct Star {
-  std::vector<Side> sides;
+  std::vector<EdgeSide> raw;  // the loop edges, oriented along the loop
+  std::vector<Side> sides;    // the chains between the spoke vertices
   std::vector<Vertex> vertices;
   std::vector<Quintic> spokes;
   std::vector<Vec> spoke_rate_start;  // as vertices[k].rate
@@ -245,12 +339,7 @@ struct Patch {
 struct Basis {
   int poles;
   std::vector<double> knots;  // flat
-  explicit Basis(int count) : poles(count) {
-    const int spans = count - kDegree;
-    for (int k = 0; k <= kDegree; ++k) knots.push_back(0);
-    for (int k = 1; k < spans; ++k) knots.push_back(static_cast<double>(k) / spans);
-    for (int k = 0; k <= kDegree; ++k) knots.push_back(1);
-  }
+  explicit Basis(std::vector<double> flat) : poles(static_cast<int>(flat.size()) - kDegree - 1), knots(std::move(flat)) {}
   std::vector<double> at(double t) const {
     std::vector<double> values(static_cast<size_t>(poles), 0.0);
     int span = kDegree;
@@ -309,36 +398,65 @@ bool inverse_of(const Basis &basis, std::vector<std::vector<double>> &inverse) {
   return true;
 }
 
+// The clamped knot vector of about `poles` poles: uniform, with a knot of multiplicity kDegree - 1 (C1) at each joint of the bottom chain (where the supports change and the curvature
+// of the boundary jumps), the uniform knots next to a joint dropped.
+std::vector<double> flat_knots(int poles, const std::vector<double> &joints) {
+  const int spans = poles - kDegree;
+  std::vector<double> interior;
+  for (int k = 1; k < spans; ++k) {
+    const double t = static_cast<double>(k) / spans;
+    if (std::none_of(joints.begin(), joints.end(), [&](double joint) { return std::fabs(t - joint) < 0.5 / spans; })) interior.push_back(t);
+  }
+  for (const double joint : joints)
+    for (int k = 0; k < kDegree - 1; ++k) interior.push_back(joint);
+  std::sort(interior.begin(), interior.end());
+  std::vector<double> flat(static_cast<size_t>(kDegree) + 1, 0.0);
+  flat.insert(flat.end(), interior.begin(), interior.end());
+  flat.insert(flat.end(), static_cast<size_t>(kDegree) + 1, 1.0);
+  return flat;
+}
+
 Handle(Geom_BSplineSurface) interpolate(const Patch &patch, int poles) {
-  const Basis basis(poles);
-  std::vector<std::vector<double>> inverse;
-  if (!inverse_of(basis, inverse)) return nullptr;
-  const size_t n = static_cast<size_t>(poles);
-  std::vector<std::vector<gp_Pnt>> samples(n, std::vector<gp_Pnt>(n));
-  for (size_t i = 0; i < n; ++i)
-    for (size_t j = 0; j < n; ++j) samples[i][j] = patch.at(basis.greville(static_cast<int>(i)), basis.greville(static_cast<int>(j)));
+  const Basis basis_u(flat_knots(poles, patch.star.sides[patch.k].joints())), basis_v(flat_knots(poles, {}));
+  std::vector<std::vector<double>> inverse_u, inverse_v;
+  if (!inverse_of(basis_u, inverse_u) || !inverse_of(basis_v, inverse_v)) return nullptr;
+  const size_t nu = static_cast<size_t>(basis_u.poles), nv = static_cast<size_t>(basis_v.poles);
+  std::vector<std::vector<gp_Pnt>> samples(nu, std::vector<gp_Pnt>(nv));
+  for (size_t i = 0; i < nu; ++i)
+    for (size_t j = 0; j < nv; ++j) samples[i][j] = patch.at(basis_u.greville(static_cast<int>(i)), basis_v.greville(static_cast<int>(j)));
   // along u, then along v
-  std::vector<std::vector<gp_XYZ>> mid(n, std::vector<gp_XYZ>(n, gp_XYZ(0, 0, 0)));
-  for (size_t i = 0; i < n; ++i)
-    for (size_t j = 0; j < n; ++j)
-      for (size_t a = 0; a < n; ++a) mid[i][j] += samples[a][j].XYZ() * inverse[i][a];
-  TColgp_Array2OfPnt grid(1, poles, 1, poles);
-  for (size_t i = 0; i < n; ++i)
-    for (size_t j = 0; j < n; ++j) {
+  std::vector<std::vector<gp_XYZ>> mid(nu, std::vector<gp_XYZ>(nv, gp_XYZ(0, 0, 0)));
+  for (size_t i = 0; i < nu; ++i)
+    for (size_t j = 0; j < nv; ++j)
+      for (size_t a = 0; a < nu; ++a) mid[i][j] += samples[a][j].XYZ() * inverse_u[i][a];
+  TColgp_Array2OfPnt grid(1, static_cast<int>(nu), 1, static_cast<int>(nv));
+  for (size_t i = 0; i < nu; ++i)
+    for (size_t j = 0; j < nv; ++j) {
       gp_XYZ sum(0, 0, 0);
-      for (size_t b = 0; b < n; ++b) sum += mid[i][b] * inverse[j][b];
+      for (size_t b = 0; b < nv; ++b) sum += mid[i][b] * inverse_v[j][b];
       grid.SetValue(static_cast<int>(i) + 1, static_cast<int>(j) + 1, gp_Pnt(sum));
     }
   // the collapsed side is one point exactly (the interpolation leaves it 1e-9 apart: its derivative along u would be noise, not zero)
-  for (int i = 1; i <= poles; ++i) grid.SetValue(i, poles, patch.star.centre);
-  const int spans = poles - kDegree;
-  TColStd_Array1OfReal knots(1, spans + 1);
-  TColStd_Array1OfInteger mults(1, spans + 1);
-  for (int k = 0; k <= spans; ++k) {
-    knots.SetValue(k + 1, static_cast<double>(k) / spans);
-    mults.SetValue(k + 1, k == 0 || k == spans ? kDegree + 1 : 1);
-  }
-  return new Geom_BSplineSurface(grid, knots, knots, mults, mults, kDegree, kDegree);
+  for (int i = 1; i <= static_cast<int>(nu); ++i) grid.SetValue(i, static_cast<int>(nv), patch.star.centre);
+  const auto distinct = [](const Basis &basis) {
+    std::vector<double> values;
+    std::vector<int> counts;
+    for (const double knot : basis.knots) {
+      if (!values.empty() && knot == values.back()) ++counts.back();
+      else {
+        values.push_back(knot);
+        counts.push_back(1);
+      }
+    }
+    std::pair<TColStd_Array1OfReal, TColStd_Array1OfInteger> result{TColStd_Array1OfReal(1, static_cast<int>(values.size())), TColStd_Array1OfInteger(1, static_cast<int>(values.size()))};
+    for (size_t k = 0; k < values.size(); ++k) {
+      result.first.SetValue(static_cast<int>(k) + 1, values[k]);
+      result.second.SetValue(static_cast<int>(k) + 1, counts[k]);
+    }
+    return result;
+  };
+  const auto along_u = distinct(basis_u), along_v = distinct(basis_v);
+  return new Geom_BSplineSurface(grid, along_u.first, along_v.first, along_u.second, along_v.second, kDegree, kDegree);
 }
 
 // Puts the centre at `height` above the centroid along the mean normal and builds the spokes from it; false (with `why`) when the star is degenerate.
@@ -409,16 +527,17 @@ bool normal_of(const Handle(Geom_BSplineSurface) &surface, double u, double v, V
 
 }  // namespace
 
-bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why) {
-  const size_t m = loop.size();
-  if (m < 3 || supports.size() != m) {
+bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
+           const CentreHint &hint, bool spokes_at_every_vertex) {
+  const size_t raw_count = loop.size();
+  if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
     return false;
   }
   Star star;
-  star.sides.resize(m);
-  for (size_t k = 0; k < m; ++k) {
-    Side &side = star.sides[k];
+  star.raw.resize(raw_count);
+  for (size_t k = 0; k < raw_count; ++k) {
+    EdgeSide &side = star.raw[k];
     side.source = k;
     side.curve.Initialize(loop[k]);
     BRep_Tool::Range(loop[k], side.first, side.last);
@@ -433,45 +552,142 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   }
   // The direction of each edge along the loop.
   const auto ends = [&](size_t k, gp_Pnt &a, gp_Pnt &b) {
-    a = star.sides[k].curve.Value(star.sides[k].first);
-    b = star.sides[k].curve.Value(star.sides[k].last);
+    a = star.raw[k].curve.Value(star.raw[k].first);
+    b = star.raw[k].curve.Value(star.raw[k].last);
   };
   gp_Pnt a0, b0, a1, b1;
   ends(0, a0, b0);
   ends(1, a1, b1);
-  star.sides[0].reversed = std::min(a0.Distance(a1), a0.Distance(b1)) < std::min(b0.Distance(a1), b0.Distance(b1));
-  gp_Pnt cursor = star.sides[0].point(1);
+  star.raw[0].reversed = std::min(a0.Distance(a1), a0.Distance(b1)) < std::min(b0.Distance(a1), b0.Distance(b1));
+  gp_Pnt cursor = star.raw[0].point(1);
   double scale = 0;
-  for (size_t k = 1; k < m; ++k) {
+  for (size_t k = 1; k < raw_count; ++k) {
     gp_Pnt a, b;
     ends(k, a, b);
-    star.sides[k].reversed = b.Distance(cursor) < a.Distance(cursor);
-    cursor = star.sides[k].point(1);
+    star.raw[k].reversed = b.Distance(cursor) < a.Distance(cursor);
+    cursor = star.raw[k].point(1);
   }
-  for (size_t k = 0; k < m; ++k) {
-    scale = std::max(scale, star.sides[k].point(0).Distance(star.sides[k].point(1)));
-    if (star.sides[k].point(1).Distance(star.sides[(k + 1) % m].point(0)) > 1e-5 * std::max(scale, 1e-9)) {
+  for (size_t k = 0; k < raw_count; ++k) {
+    scale = std::max(scale, star.raw[k].point(0).Distance(star.raw[k].point(1)));
+    if (star.raw[k].point(1).Distance(star.raw[(k + 1) % raw_count].point(0)) > 1e-5 * std::max(scale, 1e-9)) {
       why = "the edges of the hole do not chain";
       return false;
     }
   }
   // The loop runs counter-clockwise seen from outside (the patch on the left): reverse it otherwise.
-  const auto side_normal = [&](size_t k, double s, Vec &n) { return star.sides[k].normal(s, n); };
   Vec mean(0, 0, 0), newell(0, 0, 0);
-  for (size_t k = 0; k < m; ++k) {
+  for (size_t k = 0; k < raw_count; ++k) {
     Vec n;
-    if (!side_normal(k, 0.0, n)) {
+    if (!star.raw[k].normal(0.0, n)) {
       why = "a support has no normal at a vertex";
       return false;
     }
     mean += n;
-    const gp_Pnt p = star.sides[k].point(0), q = star.sides[(k + 1) % m].point(0);
+    const gp_Pnt p = star.raw[k].point(0), q = star.raw[(k + 1) % raw_count].point(0);
     newell += Vec(p.XYZ()) ^ Vec(q.XYZ());
   }
   if (newell * mean < 0) {
-    std::reverse(star.sides.begin(), star.sides.end());
-    for (Side &side : star.sides) side.reversed = !side.reversed;
+    std::reverse(star.raw.begin(), star.raw.end());
+    for (EdgeSide &side : star.raw) side.reversed = !side.reversed;
   }
+  // The supports must be tangent at every vertex of the loop. The spokes leave from the CORNERS (where the two edges turn); a vertex where the edges continue each other (the contact
+  // of a blend with its support) is only a joint of a chain: at such a vertex the twist condition of the spoke would have two parallel equations with different right-hand sides.
+  std::vector<double> cuts;  // positions e + s along the loop where a spoke leaves
+  for (size_t k = 0; k < raw_count; ++k) {
+    const size_t before = (k + raw_count - 1) % raw_count;
+    Vec n_leaving, n_arriving;
+    if (!star.raw[k].normal(0, n_leaving) || !star.raw[before].normal(1, n_arriving)) {
+      why = "a support has no normal at a vertex";
+      return false;
+    }
+    if (n_leaving * n_arriving < kNormalCosine) {
+      why = "the supports of the hole are not tangent at a vertex (normals differ by " + std::to_string(std::acos(std::min(1.0, n_leaving * n_arriving))) + " rad)";
+      return false;
+    }
+    Vec leaving = star.raw[k].tangent(0), arriving = star.raw[before].tangent(1);
+    if (!unit(leaving) || !unit(arriving)) {
+      why = "an edge of the hole has no tangent at a vertex";
+      return false;
+    }
+    if (spokes_at_every_vertex || leaving * arriving < std::cos(kCornerAngle)) cuts.push_back(static_cast<double>(k));
+  }
+  // Fewer than 3 corners (a hole bounded by smooth curves): spokes also leave from the middles of the longest edges, where one support is smooth.
+  const size_t wanted = std::max<size_t>(3, std::min<size_t>(raw_count, kSmoothSpokes));
+  if (cuts.size() < wanted) {
+    std::vector<std::pair<double, size_t>> by_length;
+    for (size_t k = 0; k < raw_count; ++k) by_length.emplace_back(-edge_length(star.raw[k]), k);
+    std::sort(by_length.begin(), by_length.end());
+    for (size_t at = 0; at < by_length.size() && cuts.size() < wanted; ++at) cuts.push_back(static_cast<double>(by_length[at].second) + 0.5);
+    std::sort(cuts.begin(), cuts.end());
+  }
+  // The chains.
+  const size_t chain_count = cuts.size();
+  star.sides.resize(chain_count);
+  for (size_t c = 0; c < chain_count; ++c) {
+    Side &chain = star.sides[c];
+    chain.raw = &star.raw;
+    const double from = cuts[c];
+    double to = cuts[(c + 1) % chain_count];
+    if (to <= from) to += static_cast<double>(raw_count);
+    for (size_t e = static_cast<size_t>(std::floor(from)); static_cast<double>(e) < to - 1e-12; ++e) {
+      Piece piece;
+      piece.edge = e % raw_count;
+      piece.a = std::max(from - static_cast<double>(e), 0.0);
+      piece.b = std::min(to - static_cast<double>(e), 1.0);
+      if (piece.b - piece.a < 1e-9) continue;
+      chain.pieces.push_back(piece);
+    }
+    chain.source = star.raw[chain.pieces.front().edge].source;
+    chain.part = chain.pieces.front().a > 1e-9 ? 1 : 0;
+    chain.hermite = chain.pieces.size() > 1;
+    // the length of each piece (Simpson over 64 steps of the speed) and its share of the chain
+    std::vector<double> lengths;
+    for (const Piece &piece : chain.pieces) {
+      double sum = 0;
+      constexpr int kSteps = 64;
+      for (int step = 0; step <= kSteps; ++step) {
+        const double weight = step == 0 || step == kSteps ? 1.0 : (step % 2 == 1 ? 4.0 : 2.0);
+        sum += weight * star.raw[piece.edge].tangent(piece.a + (piece.b - piece.a) * step / kSteps).Magnitude();
+      }
+      lengths.push_back(sum * (piece.b - piece.a) / (3.0 * kSteps));
+      chain.length += lengths.back();
+    }
+    double covered = 0;
+    for (size_t p = 0; p < chain.pieces.size(); ++p) {
+      chain.pieces[p].s0 = covered / chain.length;
+      covered += lengths[p];
+      chain.pieces[p].s1 = p + 1 == chain.pieces.size() ? 1.0 : covered / chain.length;
+    }
+    // the steady-speed map of the pieces of a chain of several edges
+    for (Piece &piece : chain.pieces) {
+      constexpr int kNodes = 128;
+      std::vector<double> speed(kNodes + 1), cumulative(kNodes + 1, 0.0);
+      for (int i = 0; i <= kNodes; ++i) {
+        speed[i] = star.raw[piece.edge].tangent(piece.a + (piece.b - piece.a) * i / kNodes).Magnitude();
+      }
+      if (!chain.hermite) continue;  // one edge: its own parameter (a map would make the pcurve of the sewn edge differ from its curve by more than the sewing tolerance)
+      for (int i = 1; i <= kNodes; ++i) cumulative[i] = cumulative[i - 1] + 0.5 * (speed[i - 1] + speed[i]) / kNodes;
+      const double width = piece.s1 - piece.s0;
+      for (int i = 0; i <= kNodes; ++i) {
+        piece.node_sigma.push_back(piece.s0 + width * cumulative[i] / cumulative[kNodes]);
+        piece.node_s.push_back(piece.a + (piece.b - piece.a) * i / kNodes);
+        piece.node_slope.push_back(cumulative[kNodes] / (width * speed[i]) * (piece.b - piece.a));
+      }
+      piece.node_sigma.front() = piece.s0;
+      piece.node_sigma.back() = piece.s1;
+    }
+    if (chain.hermite)
+      for (int step = 0; step <= 8 * static_cast<int>(chain.pieces.size()); ++step) {
+        const Piece *piece = nullptr;
+        double local_s = 0, rate = 0;
+        chain.local(static_cast<double>(step) / (8.0 * static_cast<double>(chain.pieces.size())), piece, local_s, rate);
+        if (!(rate > 0)) {
+          why = "a chain of the hole boundary is not monotone in the length parametrization";
+          return false;
+        }
+      }
+  }
+  const size_t m = chain_count;
   // The vertices.
   star.vertices.resize(m);
   Vec centre_normal(0, 0, 0);
@@ -482,10 +698,6 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     Vec n_leaving, n_arriving;
     if (!star.sides[k].normal(0, n_leaving) || !star.sides[before].normal(1, n_arriving)) {
       why = "a support has no normal at a vertex";
-      return false;
-    }
-    if (n_leaving * n_arriving < kNormalCosine) {
-      why = "the supports of the hole are not tangent at a vertex (normals differ by " + std::to_string(std::acos(std::min(1.0, n_leaving * n_arriving))) + " rad)";
       return false;
     }
     vertex.normal = n_leaving + n_arriving;
@@ -518,7 +730,16 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   }
   // The centre: 3/8 of the mean height of the tangent planes of the vertices above the centroid. For a hole bounded by a cylinder arc and a plane chord the exact (thin plate) surface
   // passes there to 4e-6 of the volume of the corner (13.21.4).
-  if (!place(star, centroid, 0.375 * height / static_cast<double>(m), scale, why)) return false;
+  double centre_height = 0.375 * height / static_cast<double>(m);
+  bool from_hint = false;
+  if (hint) {
+    double known = 0;
+    if (hint(gp_Pnt(centroid), gp_Dir(centre_normal), known)) {
+      centre_height = known;
+      from_hint = true;
+    }
+  }
+  if (!place(star, centroid, centre_height, scale, why)) return false;
   // The patches.
   std::vector<Patch> patches;
   for (size_t k = 0; k < m; ++k) {
@@ -534,6 +755,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     const double angle_limit = poles == kPoleCounts[std::size(kPoleCounts) - 1] ? max_angle : 0.25 * max_angle;
     out = Patches();
     out.centre = star.centre;
+    out.centre_from_hint = from_hint;
     std::vector<Handle(Geom_BSplineSurface)> surfaces;
     for (const Patch &patch : patches) {
       Handle(Geom_BSplineSurface) surface = interpolate(patch, poles);
@@ -556,8 +778,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
         if (star.sides[k].normal(t, support) && normal_of(surfaces[k], t, 0, mine)) {
           out.angle = std::max(out.angle, line_angle(support, mine));
           if (support * mine < 0) {
-            why = "sub-patch " + std::to_string(k) + " faces away from its support at " + std::to_string(t);
-            return false;
+            out.angle = kPi;  // a finer interpolation may still be right: the measure below rejects this one
           }
         }
         else
@@ -568,8 +789,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
           if (normal_of(surfaces[k], 0, t, left) && normal_of(surfaces[previous], 1, t, right)) {
             out.angle = std::max(out.angle, line_angle(left, right));
             if (left * right < 0) {
-              why = "sub-patches " + std::to_string(previous) + " and " + std::to_string(k) + " face opposite ways along their spoke at " + std::to_string(t);
-              return false;
+              out.angle = kPi;
             }
           }
           out.gap = std::max(out.gap, surfaces[k]->Value(0, t).Distance(surfaces[previous]->Value(1, t)));
@@ -585,6 +805,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
         }
         out.faces.push_back(maker.Face());
         out.loop_index.push_back(star.sides[out.faces.size() - 1].source);
+        out.part.push_back(star.sides[out.faces.size() - 1].part);
       }
       return true;
     }
