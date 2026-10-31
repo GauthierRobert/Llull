@@ -2,17 +2,23 @@
 // themselves and whose cross-boundary tangent planes are those of the supports.
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
+#include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 
 namespace llull::corner_exact {
 
+// Where the surface the patch replaces crosses the axis (from, direction): the signed distance from `from`; false when it does not. A hole cut out of a smooth blend (13.22) knows its centre.
+using CentreHint = std::function<bool(const gp_Pnt &from, const gp_Dir &axis, double &height)>;
+
 struct Patches {
   std::vector<TopoDS_Face> faces;  // one per edge of the loop, around the centre
+  std::vector<size_t> part;        // 1 when the sub-patch starts inside that edge (a hole of smooth edges is cut at their middles)
   std::vector<size_t> loop_index;  // the edge of the loop each sub-patch has as its bottom
   gp_Pnt centre;                   // where the sub-patches meet
   double gap = 0;                  // largest distance from a sample of a loop edge to the patch edge at the same parameter
@@ -21,6 +27,7 @@ struct Patches {
 
 // The loop (ordered, closed) with the support face of each edge (`supports[k]` carries `loop[k]`; the faces are the outward ones of the split solid). False with `why` when the
 // construction is refused or its own measures exceed `max_gap` / `max_angle`; the caller falls back to another fill.
-bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why);
+bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
+           const CentreHint &hint = nullptr);
 
 }  // namespace llull::corner_exact

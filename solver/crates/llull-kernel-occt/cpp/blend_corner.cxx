@@ -28,6 +28,8 @@
 #include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
+#include <gp_Lin.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <ChFi3d_FilletShape.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -735,7 +737,9 @@ struct FillJob {
   gp_Pnt centre;                      // the centre of the exact star
   bool has_centre = false;
   std::string exact_problem;          // why the exact star was refused
+  TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
+  std::vector<size_t> patch_part;     // 1 when the sub-patch starts inside that loop edge
   std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
   std::vector<std::tuple<std::string, long long, long long, long long>> loop_keys;  // aligned with `loop`: the stable order of the sub-patches (13.21.2)
   double gap = 0;
@@ -819,9 +823,24 @@ bool fill_exact(FillJob &job, double diagonal) {
     aligned.push_back(job.supports[static_cast<size_t>(at - job.boundary.begin())]);
   }
   corner_exact::Patches exact;
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem)) return false;
+  corner_exact::CentreHint hint;
+  if (!job.hole_copy.IsNull())
+    hint = [&job, diagonal](const gp_Pnt &from, const gp_Dir &axis, double &height) {
+      IntCurvesFace_ShapeIntersector intersector;
+      intersector.Load(job.hole_copy, 1e-7);
+      intersector.Perform(gp_Lin(from, axis), -diagonal, diagonal);
+      double best = 1e300;
+      for (int i = 1; i <= intersector.NbPnt(); ++i)
+        if (std::fabs(intersector.WParameter(i)) < best) {
+          best = std::fabs(intersector.WParameter(i));
+          height = intersector.WParameter(i);
+        }
+      return best < 1e299;
+    };
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint)) return false;
   job.patches = exact.faces;
   job.patch_loop = exact.loop_index;
+  job.patch_part = exact.part;
   job.centre = exact.centre;
   job.has_centre = true;
   job.gap = exact.gap;
@@ -1066,6 +1085,13 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       found.Orientation(original.Orientation());
       return found;
     };
+    {
+      BRep_Builder hole_builder;
+      TopoDS_Compound hole;
+      hole_builder.MakeCompound(hole);
+      for (int f = 1; f <= removed.Extent(); ++f) hole_builder.Add(hole, removed(f));
+      job.hole_copy = TopoDS::Compound(BRepBuilderAPI_Copy(hole, Standard_True, Standard_False).Shape());
+    }
     for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(image(edge)));
     for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(image(support)));
     for (const TopoDS_Edge &edge : loop) {
@@ -1100,16 +1126,17 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     const TopoDS_Vertex apex = vertex_at(shape, corners[c].at, kVertexFraction * std::max(blend::vertex_diagonal_of(shape), 1e-9));
     if (!apex.IsNull())
       for (const int edge : edges_at(vertex_edges, edge_map, apex)) around.push_back(edge_names[static_cast<size_t>(edge)]);
-    std::vector<size_t> rank(job.loop_keys.size());
+    std::vector<size_t> rank(job.patch_loop.size());
     {
-      std::vector<size_t> order(job.loop_keys.size());
+      std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
-      std::sort(order.begin(), order.end(), [&](size_t x, size_t y) { return job.loop_keys[x] < job.loop_keys[y]; });
+      const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
       patches.push_back(job.patches[k]);
-      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[job.patch_loop[k]] + 1)));
+      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
     }
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
@@ -1545,17 +1572,18 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
     // A star's sub-patches are told apart by #k, k = 1.. the rank of the support / position key of the loop edge each has as its bottom (stable under a different start of the loop).
-    std::vector<size_t> rank(job.loop_keys.size());
+    std::vector<size_t> rank(job.patch_loop.size());
     {
-      std::vector<size_t> order(job.loop_keys.size());
+      std::vector<size_t> order(job.patch_loop.size());
       for (size_t k = 0; k < order.size(); ++k) order[k] = k;
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return job.loop_keys[a] < job.loop_keys[b]; });
+      const auto key_of = [&](size_t k) { return std::make_pair(job.loop_keys[job.patch_loop[k]], job.patch_part[k]); };
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key_of(a) < key_of(b); });
       for (size_t k = 0; k < order.size(); ++k) rank[order[k]] = k;
     }
     for (size_t k = 0; k < job.patches.size(); ++k) {
       patches.push_back(job.patches[k]);
       patch_corner.push_back(c);
-      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[job.patch_loop[k]] + 1)));
+      patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
     }
     patch_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);

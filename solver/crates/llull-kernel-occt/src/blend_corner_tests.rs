@@ -1136,3 +1136,26 @@ fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
     let reason = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("overlap"), "{reason}");
 }
+
+#[test]
+fn zz_trim_star() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let start = std::time::Instant::now();
+    match fillet_setback(&shape, &edges, &corners) {
+        Ok(Some(solid)) => println!(
+            "STAR {} ms volume {} faces {} valid {} tangent {} patchgap {} patchangle {}",
+            start.elapsed().as_millis(),
+            mass_properties(&solid).unwrap().volume,
+            topology(&solid).unwrap()["faces"].as_array().unwrap().len(),
+            analyze(&solid).unwrap().valid,
+            worst_tangent_angle(&solid),
+            worst_patch_gap(&solid),
+            worst_patch_angle(&solid)
+        ),
+        other => println!("STAR none {:?} {:?}", other.map(|s| s.is_some()), setback_reason(&shape, &edges, &corners)),
+    }
+}
