@@ -9,6 +9,8 @@ use serde_json::Value;
 const NAN: f64 = f64::NAN;
 const PI: f64 = std::f64::consts::PI;
 const SCALES: [f64; 3] = [1.0, 10.0, 100.0];
+/// Samples per contact line: the sections are interpolated between 24 stations, so 129 samples read the skin between them (off the stations) as well.
+const CONTACT_SAMPLES: f64 = 129.0;
 
 fn num(value: &Value) -> f64 {
     value.as_f64().unwrap()
@@ -93,7 +95,7 @@ fn contacts(shape: &Shape) -> (f64, f64, usize) {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
     let (mut g0, mut g1, mut found) = (0.0_f64, 0.0_f64, 0);
     for edge in 0..count {
-        let Some(samples) = edge_continuity(shape, edge as f64, 9.0).unwrap().as_array().cloned() else { continue };
+        let Some(samples) = edge_continuity(shape, edge as f64, CONTACT_SAMPLES).unwrap().as_array().cloned() else { continue };
         if samples.iter().any(|sample| num(&sample["g1"]) > 0.5) {
             continue;
         }
@@ -104,6 +106,17 @@ fn contacts(shape: &Shape) -> (f64, f64, usize) {
         }
     }
     (g0, g1, found)
+}
+
+/// The fewest samples edge_continuity returned for a contact line (an edge where two faces meet tangentially).
+fn least_contact_samples(shape: &Shape) -> usize {
+    let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
+    (0..count)
+        .filter_map(|edge| edge_continuity(shape, edge as f64, CONTACT_SAMPLES).unwrap().as_array().cloned())
+        .filter(|samples| samples.iter().all(|sample| num(&sample["g1"]) <= 0.5))
+        .map(|samples| samples.len())
+        .min()
+        .unwrap_or(0)
 }
 
 fn diagonal(shape: &Shape) -> f64 {
@@ -324,6 +337,8 @@ fn legs_that_run_along_an_arc_remove_the_revolved_integral_of_the_section() {
             assert!((removed - expected).abs() < 5e-5 * expected, "scale {scale} face {first_face}: removed {removed} vs {expected}");
             let (g0, g1, count) = contacts(&shape);
             assert!(count >= 2 && g0 < 1e-6 * diagonal(&shape) && g1 < 1e-4, "scale {scale}: contacts {count} G0 {g0} G1 {g1}");
+            // off the 24 stations of the skin: every contact line is read at 129 places
+            assert!(least_contact_samples(&shape) >= 129, "the contact lines are read between the stations");
         }
     }
 }
@@ -357,6 +372,24 @@ fn what_cannot_be_built_is_refused_with_the_reason() {
     let top_face = plane_face(&part, [0.0, 0.0, 1.0]);
     assert!(why(&part, &[leg_row(front_top, top_face, 1.0, 2.0, 1.0, 2.0), leg_row(left_top, top_face, 1.0, 2.0, 1.0, 2.0)], 0.0)
         .contains("meet at a vertex"));
+    // a convex rim and a concave foot in one step add and remove material
+    let plate = make_box([-30.0, -30.0, 0.0], [60.0, 60.0, 5.0]).unwrap().unwrap();
+    let boss = make_cylinder(5.0, 10.0).unwrap().unwrap();
+    let joined = boolean(BooleanOp::Union, &plate, &boss, true).unwrap().unwrap();
+    let circle_at = |z: f64| edges_where(&joined, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - z).abs() < 1e-9)[0];
+    let joined_top = plane_face(&joined, [0.0, 0.0, 1.0]);
+    // the boss top is the smaller of the two faces that face up
+    let boss_top = topology(&joined).unwrap()["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| face["surface"] == "plane" && num(&face["normal"][2]) > 0.99)
+        .min_by(|a, b| num(&a.1["area"]).total_cmp(&num(&b.1["area"])))
+        .map(|(index, _)| index as u32)
+        .unwrap();
+    let rows = [leg_row(circle_at(5.0), joined_top, 1.0, NAN, 2.0, NAN), leg_row(circle_at(10.0), boss_top, 1.0, NAN, 2.0, NAN)];
+    says(&joined, &rows, 0.0, "is concave");
     // OCCT chamfers a whole tangent chain: a D-shaped plate's arc drags its two tangent straight edges
     let half = boolean(
         BooleanOp::Intersect,
@@ -421,4 +454,53 @@ mod recipe_level {
         let unsided = fillet(json!([{ "size": 1, "size2": 2 }]), json!({}));
         assert!(evaluator.evaluate(&unsided).unwrap().is_none());
     }
+}
+
+/// A cylinder R 10 with two pockets of R 5 centred on (10, 5) and (-10, 5): the small arcs of the top meet the pocket walls (cylinders) square, the pocket arcs
+/// meet the top face of the part only where the pocket and the small cylinder cross.
+fn bitten_cylinder() -> Shape {
+    let place = |x: f64| crate::placed(&make_cylinder(5.0, 7.0).unwrap().unwrap(), [0.0; 3], [x, 5.0, -1.0], [0.0; 3]).unwrap().unwrap();
+    let cylinder = make_cylinder(10.0, 5.0).unwrap().unwrap();
+    let once = boolean(BooleanOp::Subtract, &cylinder, &place(10.0), true).unwrap().unwrap();
+    boolean(BooleanOp::Subtract, &once, &place(-10.0), true).unwrap().unwrap()
+}
+
+#[test]
+fn an_end_that_is_not_a_square_flat_face_and_a_section_that_leaves_the_solid_are_refused() {
+    let _serial = crate::serial_blends();
+    let part = bitten_cylinder();
+    let top = plane_face(&part, [0.0, 0.0, 1.0]);
+    let arcs = edges_where(&part, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 5.0).abs() < 1e-9);
+    let reasons: Vec<String> =
+        arcs.iter().filter_map(|arc| blend(&part, &[leg_row(*arc, top, 0.5, NAN, 1.0, NAN)], 0.0, 0.5).err()).collect();
+    assert!(reasons.iter().any(|why| why.contains("does not end on a face square to the edge")), "{reasons:?}");
+    // a sphere cap with a chord leg of 6 on a radius of 10: the tangent at its contact meets the plane line too far out, the section would leave the sphere
+    let ball = make_sphere(10.0).unwrap().unwrap();
+    let cut = make_box([-20.0, -20.0, -20.0], [40.0, 40.0, 25.0]).unwrap().unwrap();
+    let cap = boolean(BooleanOp::Intersect, &ball, &cut, true).unwrap().unwrap();
+    let rim = edges_where(&cap, |e| e["curve"] == "circle" && (num(&e["mid"][2]) - 5.0).abs() < 1e-9)[0];
+    let cap_top = plane_face(&cap, [0.0, 0.0, 1.0]);
+    let why = blend(&cap, &[leg_row(rim, cap_top, 1.0, NAN, 6.0, NAN)], 0.0, 0.5).err().expect("refused");
+    assert!(why.contains("is not between the source's") && why.contains("the section leaves the solid"), "{why}");
+    // the same chord at 2 builds
+    assert!(blend(&cap, &[leg_row(rim, cap_top, 1.0, NAN, 2.0, NAN)], 0.0, 0.5).is_ok());
+}
+
+#[test]
+fn a_straight_edge_between_planes_with_constant_legs_stays_with_the_prism_builder() {
+    let _serial = crate::serial_blends();
+    let part = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let edge = edges_where(&part, |e| (num(&e["mid"][2]) - 5.0).abs() < 1e-9 && num(&e["mid"][1]).abs() < 1e-9)[0];
+    let top = plane_face(&part, [0.0, 0.0, 1.0]);
+    let specs = [f64::from(edge), 0.0, 0.5, 1.0, 2.0, f64::from(top), 0.0];
+    let legs = leg_row(edge, top, 1.0, NAN, 2.0, NAN);
+    let built = fillet_profile_legs(&part, &specs, &[edge], &[], &legs, 0.0, 0.5).unwrap().expect("builds");
+    assert_eq!(crate::features::shape_notes(&built).unwrap(), "{\"builder\":\"prism\"}", "the exact builder is tried first");
+    // without the prism specs (legs that run) the leg builder takes the same edge
+    let running = built_with_notes(&part, &[leg_row(edge, top, 1.0, 2.0, 2.0, 3.0)]);
+    assert!(running.contains("\"builder\":\"legs\""), "{running}");
+}
+
+fn built_with_notes(shape: &Shape, rows: &[[f64; 6]]) -> String {
+    crate::features::shape_notes(&built(shape, rows, 0.0, 0.5)).unwrap()
 }

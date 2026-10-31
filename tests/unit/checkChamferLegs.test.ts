@@ -77,6 +77,29 @@ describe('readChamferLegs of a fillet with two legs (13.34)', () => {
     expect(unnamed.findings).toEqual([]);
   });
 
+  it('equal legs (size2 == size) are still legs: a row in data.legs, BLD_CHECK_BLEND_LEGS when a leg is wrong, no circle radius', () => {
+    const equal = legFillet({ size: 2, sizeEnd: undefined, size2: 2, size2End: undefined });
+    const withEntity = {
+      ...createEmptyDocument(),
+      entities: { m: { ...entityOf(equal), mesh: { positions: [], indices: [] } } as never },
+      order: ['m'],
+    };
+    setGeometryKernel(stub({ role: 'blend', first: () => 2, second: () => 2 }));
+    const good = execute(withEntity as never, 'check_blends', {}).data as {
+      legs: Array<{ requested: unknown; maxDeviation: number }>;
+      blends: Array<{ radius?: unknown }>;
+      findings: Array<{ code: string }>;
+    };
+    expect(good.legs).toHaveLength(1);
+    expect(good.legs[0]).toMatchObject({ requested: { first: [2, 2], second: [2, 2] } });
+    expect(good.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_BLEND_LEGS');
+    expect(good.blends.every((blend) => blend.radius === undefined)).toBe(true);
+    setGeometryKernel(stub({ role: 'blend', first: () => 2, second: () => 2.5 }));
+    const wrong = execute(withEntity as never, 'check_blends', {}).data as { status: string; findings: Array<{ code: string }> };
+    expect(wrong.status).toBe('fail');
+    expect(wrong.findings.map((finding) => finding.code)).toContain('BLD_CHECK_BLEND_LEGS');
+  });
+
   it('check_blends reports the rows under legs (not chamfers), fails on a leg off its law and warns BLD_CHECK_BLEND_UNVERIFIED when it cannot read them', () => {
     const withEntity = {
       ...createEmptyDocument(),

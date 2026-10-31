@@ -117,6 +117,11 @@ describe('check_blends radius readback', () => {
     expect(findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
     expect(rows).toHaveLength(1);
     expect(rows[0]?.radius).toBeUndefined();
+    // equal legs are legs too: size2 == size still reads no radius
+    const equal = filleted(kernel, { size: 1, size2: 1, side1Name: `${S}:z+` });
+    const equalRead = check(kernel, equal.doc);
+    expect(equalRead.findings.map((finding) => finding.code)).not.toContain('BLD_CHECK_RADIUS_LAW');
+    expect(equalRead.rows[0]?.radius).toBeUndefined();
     // the same sections under a radius law are a failure: the skip is the legs, not the kernel
     const radius = filleted(kernel, { size: 1 });
     expect(check(kernel, radius.doc).findings.map((finding) => finding.code)).toContain('BLD_CHECK_RADIUS_LAW');
