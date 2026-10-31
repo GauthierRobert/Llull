@@ -668,7 +668,7 @@ Plans (`llull run ... --continue`, native kernel): `baseline_variable_radius_law
 
 Not built, each refused by name with `BLD_PROFILE_FAILED` and the reason:
 
-- **Corners of curved edges or non-planar faces** (profiled edges meeting at a vertex where an edge is curved or a face is curved), **vertices with an unrounded edge** (two rounded edges and a third left sharp: the blends would have to be intersected and trimmed; a SETBACK corner at such a vertex is built since 13.33, a profile corner still refuses), **a profile with a `setback` corner** (`corners` still refuses a profile: M3 remainder). The corner patch is G1 only (13.10.2), also with a curvature profile.
+- **Corners of curved edges or non-planar faces** (profiled edges meeting at a vertex where an edge is curved or a face is curved), **vertices with an unrounded edge** (two rounded edges and a third left sharp: the blends would have to be intersected and trimmed; a SETBACK corner at such a vertex is built since 13.33, a profile corner still refuses), **a profile with a `setback` corner** (`corners` still refuses a profile: M3 remainder). The corner patch is G1 only (13.10.2); the corner star of a curvature profile is G2 to its blend and flat faces since 13.36.
 - **Ends**: a blend that ends obliquely on a face, on a curved face, or on a corner patch of OCCT's own (the end edge is then not a section; refused as "ends obliquely"). A blend that ends square on a flat face, on the next blend of a chain, or closes on itself is built.
 - **Asymmetric legs (`size2`) on a curved edge, on curved faces, or with a varying size.** The contact points of a leg pair are not the circular fillet's, so OCCT cannot supply the rails (a different rolling-ball construction would be needed).
 - **Solids with a void**: built since §13.17 (a second body outside the first is still refused by name).
@@ -1623,3 +1623,54 @@ A star's contact rows judged every edge of a sub-patch as a tangent contact; the
 ### 13.33.8 Tests, red-proofs
 
 `blend_third_tests.rs` (8 tests): the cube corner (star of 5, the closed form of the mitre equal to OCCT's rolling ball to 1e-6, the sliver bound, the star inside the rolling ball, G1 / G0, one crease spoke at 90 degrees falling monotonically, the sharp edge ending at its entry point); the 24 vertex x sharp-edge choices; the box with four top edges rounded; the concave notch vertex; the 60 degree prism and the tetrahedron apex (any dihedral angle); the refusals by name (two sharp, four edges, mixed, varying radius, sharp setback 0 / past the end, a setback too short, a crease under 0.2 rad); no plate fallback (hooks 0, 2, 3); the trim builder's unchanged message. `blend_shell_tests.rs`; `checkCornerCrease.test.ts` (6), `blendCorners.test.ts` (the unrounded edge gets its distance; `all` skips the vertex), `shellSolid.test.ts` (the named refusal, the generic text, the star hint from the topology of a repeated refusal); server `nativeBlendSharpThird.test.ts` and `nativeBlendCurvedCorners.test.ts`.
+
+## 13.36 As built: G2 corner stars for curvature-profile steps (DES-6c step 15, 2026-10-31)
+
+Before this step a corner of a curvature-profile chain (`profile: curvature`, the automatic profile corners of 13.13) was the G1 star of 13.21: the chain was G2 along its edges and the corner broke it (measured below: the normal curvature across the contact jumps by 1.04 per mm on a 10-cube with size 1). `check_blends require: "G2"` therefore failed at every corner row. The star is now built curvature-continuous to the blend and flat faces it meets, for the analytic setback corners (straight edges between planes) of a curvature profile; a conic or circular step keeps the G1 star (their section ends have a curvature the plane does not have, so there is nothing to match), and a G2 star the build cannot make is replaced by the G1 star with the reason in `data.profile.corners[].g2Refused`. Code: `cpp/blend_corner_exact.cxx` (`build(..., g2)`), `cpp/blend_corner.cxx` (`FillJob::g2`, `fill_exact`).
+
+### 13.36.1 What G2 means here
+
+`check_blends` reads the normal curvature of both faces in the direction across the edge (`edge_continuity`, `normalCurvature`), and `BLD_CHECK_G2_JUMP` compares them (`g2Rel` 0.1, with the flat floors). For the contacts of a sub-patch with a blend or a flat face the supports of a curvature profile have zero normal curvature across their end edges, so the star must have `n . S_vv = II_support(S_v, S_v)` along the whole bottom edge, with `S_v` the cross tangent. The edges between two sub-patches (the spokes) are inside the corner: they stay G1 seams (13.36.5).
+
+### 13.36.2 Construction
+
+The G1 sub-patch (13.21.1) is a Boolean sum of a cubic Hermite loft along v (bottom to the centre), a cubic Hermite loft along u (spoke to spoke) and the bicubic corner patch. Its second derivative along v at the bottom is whatever the cubic Hermite gives. The G2 sub-patch is the same Boolean sum with:
+
+1. **A quintic Hermite loft along v.** Value, first derivative (the projected cross tangent, as before) and second derivative `Q(u)` at the bottom, the centre with its arrival tangent and second derivative at the top. `Q(u)` is the cubic Hermite blend of the second derivatives of the two spokes and of the second derivatives of the cross tangents along them, with its component along the support normal replaced by `II_support(S_v, S_v)` (the second fundamental form of the support face, from `BRepAdaptor_Surface::D2` on its pcurve). The bottom row of the Boolean sum is then exact to the second order.
+2. **The cubic-by-quintic corner patch** instead of the bicubic one: the cross tangents along the spokes are replaced by their quintic Hermite form in v, so the difference `cross - hermite` that the Boolean sum adds vanishes to the second order at both ends of v, and the loft along u does not disturb the bottom row.
+3. **The third-order twist (the part that took the work).** The first version of this construction (a correction `delta(u) n(u) v^2 (1-v)^3` added to the G1 patch) met G2 only up to a stretch next to each vertex and tilted the tangent planes along the spokes by 0.13 rad: `n . S_vv - T` is linear in u at a vertex (the curvature of the section grows linearly from zero), so any correction that leaves the spokes alone leaves a jump there, and any that follows it tilts the spoke. The condition that avoids both: `(n . S_vv)' = T'` at the vertex, i.e. the second derivative of the cross tangent along the spoke has the normal part `T' - n' . q0`, which fixes the second derivative of the spoke's normal field and the third derivative of the spoke. Two sub-patches share a spoke, each with its own edge, so two equations; the unknowns are the component across the spoke of the second derivative of the normal field and a normal `bump * v^3 (1-v)^4 / 6` on the spoke (it changes only its third derivative at v = 0). They are solved at each vertex by four Newton passes with probes (the residual is affine in them). Without the bump the two equations have the same left side (the bisecting spoke makes `arriving . across = -leaving . across`): measured, the Jacobian is singular. With it the tilt along the spokes falls from 0.13 rad to 2e-4 at 14 poles and 6e-8 at 24.
+4. **Degree 7 and more poles.** The sub-patch is interpolated at the Greville points as before but with degree 7 (`kDegreeG2`): the curvature across the edge reads the second derivative of the interpolant, which converges like h^(degree-1). Measured on the cube (jump along the bottom edges): 11 poles 1.3e-1, 14 poles 1.7e-2, 24 poles 7.3e-5 (accepted). The G1 star is accepted at 8 poles.
+5. **Gates** (all must hold at one pole count, else the next, else refusal): the G0 and G1 gates of the G1 star, the vertex mismatch `|n . q0 - II_support(d, d)|` of the two spokes at the bottom vertices under `10 * 2e-4 / mean chain length` (the supports and the spokes must agree there), and along 101 samples of every bottom edge the jump of the normal curvature of the sub-patch against the support (the direction across, as `check_blends`) under `0.02 * max(|k|) + 2e-4 / mean chain length`. The end derivatives of the cross tangents are one-sided differences of six samples at h = 0.004 (errors O(h^5), O(h^4)); at h = 0.02 the second derivative error left a smooth residual of 8.6e-4 on the bottom edges, which no pole count removed.
+
+Refused by name without trying the gates: a chain with a joint (the supports change along it), a crease vertex. A refusal falls back to the G1 star and `data.profile.corners[].g2Refused` (and the summary) carry the measured reason, for example `the sub-patches (64 x 64 poles) leave the edges by 0.000000 and the supports by 3.141593 rad and the curvature of the supports by 86.5 /length`.
+
+### 13.36.3 check_blends
+
+A star sub-patch is judged with the blend-scale floor of a blend face (`BLEND_FLAT_FRACTION / (area / longest edge)`), as a blend face is; a spoke (both faces are star sub-patches) never fails `require: "G2"`: its curvature jump is an info finding.
+
+### 13.36.4 Measured (native llull-kernel, release; cube 10, every edge size 1, curvature shape 0.5, automatic corners, setback 2)
+
+| | G1 star | G2 star |
+| --- | --- | --- |
+| jump of the normal curvature, sub-patch against blend / flat face (1/mm, worst of 21 interior samples per edge) | 1.04 | 7.3e-5 |
+| G1 angle at those contacts (rad) | 6.7e-4 | 1.1e-6 |
+| G1 angle across the spokes (rad) | 1.4e-3 | 6e-8 |
+| curvature jump across the spokes (1/mm) | 1.43 | 0.83 (G1 seam) |
+| G0 at the contacts and spokes | 1e-14 | 1e-14 |
+| volume | 980.2641 | 980.7481 (+0.049 %) |
+| time of the whole `fillet_profile_blend` step, 8 corners, 66 faces | 0.79 s | 1.89 s |
+
+Other parts: sizes 0.8 to 1.1 on a 10 x 7 x 5 box 8.2e-5, shape 0.3 6.9e-6, shape 0.8 1.7e-5, size 2.4 3.0e-5, size 0.01 7.3e-3 (curvatures of 100 per mm: the same relative jump); all eight corners G2, spokes 1e-7 rad or less. Shape 0.05 is refused (the curvature of the section is a spike at its ends; at 64 poles a sub-patch turns round): G1 star, `g2Refused` set. A conic cube is built G1 and the G2 star is not tried.
+
+### 13.36.5 Not done (exactly)
+
+- **G2 across the spokes.** The sub-patches of a star are G1 to each other (6e-8 rad); the curvature across a spoke jumps by 0.83 per mm on the cube. It needs the same construction in the other direction (a quintic loft along u with a common second fundamental form along the spoke) and the fourth-order compatibility at the vertex (`S_uuvv`), which the one bump of 13.36.2 does not give.
+- **Other corners.** Only the analytic setback corners of a curvature profile with a single edge per chain are G2: circular and conic steps, corners of curved edges or faces (the trim builder of 13.22), the crease star of 13.33 and chains with joints keep the G1 star.
+- **The centre** is still the 3/8 rule: the G2 star has +0.05 % volume over the G1 star on the cube for the same height.
+- **A G2 star that fails after the sewing** retries the step with the plate (13.21.2), not with the G1 star.
+
+### 13.36.6 Tests, red-proofs
+
+`blend_g2corner_tests.rs` (5 tests): the cube (all corners G2, jump under 1e-3, contact angle under 1e-4, spokes G1 under 1e-4 and a curvature jump over 0.1, the G1 star with the hook off jumps over 0.5, volumes within 1e-3), other sizes and shapes, the conic cube (G1, no `g2Refused`), the shape 0.05 refusal (G1, reason named), the same solid on 1, 2 and 8 threads. `server/tests/nativeBlendG2Corners.test.ts` (3 tests): `check_blends require: "G2"` passes on the curvature cube with the corner rows listed, fails on the conic cube, the refusal reaches `data.profile`.
+
+**Red-proofs** (temporary `LLULL_MUT` switch read by the kernel, one build, removed; counts are failing tests of the 5 Rust tests unless stated): the normal part of `Q(u)` left as the blend gives it -> 2; the third-order Newton passes skipped (no normal-field acceleration, no bump) -> 2; the curvature gate ignored -> 2; degree 5 instead of 7 -> 1 (after the degree assertion was added; before it all five passed, the tests did not guard the degree); the G2 star tried for a conic step too -> 1; the G2 star never tried -> 3. Server (3 tests): the spoke exemption of `require: "G2"` removed -> 1; the blend-scale floor for star rows removed -> 1.

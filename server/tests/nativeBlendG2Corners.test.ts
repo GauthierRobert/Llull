@@ -44,7 +44,8 @@ describeNative('BLD 13.36: G2 corner stars of curvature-profile steps (native OC
     expect(done.error).toBeUndefined();
     return { doc: done.document, id: done.affected[0] as string, notes: (done.data as { profile: Notes }).profile };
   };
-  const check = (doc: CadDocument, id: string, require: 'G1' | 'G2'): Checked => execute(doc, 'check_blends', { ids: [id], require }).data as Checked;
+  const check = (doc: CadDocument, id: string, require: 'G1' | 'G2'): Checked =>
+    execute(doc, 'check_blends', { ids: [id], require }).data as Checked;
 
   it('a curvature-profile cube passes check_blends require G2 through its corners; the spokes are reported, never failed', () => {
     const { doc, id, notes } = rounded({ type: 'curvature', shape: 0.5 });

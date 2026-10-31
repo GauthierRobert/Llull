@@ -5,6 +5,7 @@
  */
 
 import { roundSignificant } from '../../lib/significant';
+import type { Tolerances } from './checkBlendFindings';
 
 /** Re-skinned profile faces are B-spline approximations like corner patches: their contacts and junctions are judged against this multiple of g0; the native builder refuses at exactly this limit. */
 export const PROFILE_G0_FACTOR = 5;
@@ -64,4 +65,14 @@ export function namedTolerances(input: {
     g1AngleRad: { value: input.g1AngleRad, unit: 'rad', defaulted: !input.g1Given, source: 'OCCT MakeFilling TolAng default' },
     g2Rel: { value: input.g2Rel, unit: 'ratio', defaulted: !input.g2Given, source: 'check_continuity default' },
   };
+}
+
+/** A normal curvature below this fraction of the blend's own scale (1 / its width) is flat for the G2 reading: a curvature-continuous blend meets a plane to the noise of its rails, not exactly. */
+const BLEND_FLAT_FRACTION = 1e-3;
+
+/** `base` with the flat floor of a face of this area whose longest edge is `longest` (width = area / longest): the reading of a blend face or of a corner star sub-patch. */
+export function withBlendScaleFloor(base: Tolerances, area: number, longest: number): Tolerances {
+  return longest > 0 && area > 0
+    ? { ...base, flatCurvature: Math.max(base.flatCurvature ?? 0, BLEND_FLAT_FRACTION / (area / longest)) }
+    : base;
 }

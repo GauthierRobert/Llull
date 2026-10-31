@@ -2,7 +2,7 @@
 
 use crate::blend_corner_tests::{cube, num, CornerHooks};
 use crate::features::{fillet_profile_blend, profile_blend_reason, shape_notes};
-use crate::queries::{edge_continuity, face_graph, topology};
+use crate::queries::{edge_continuity, face_bspline, face_graph, topology};
 use crate::{analyze, make_box, mass_properties, Shape};
 use serde_json::Value;
 
@@ -71,6 +71,19 @@ fn volume(shape: &Shape) -> f64 {
     mass_properties(shape).unwrap().volume
 }
 
+/// The (degreeU, degreeV) of every corner sub-patch.
+fn patch_degrees(shape: &Shape) -> Vec<(u64, u64)> {
+    let topo = topology(shape).unwrap();
+    let mut degrees = Vec::new();
+    for (index, face) in topo["faces"].as_array().unwrap().iter().enumerate() {
+        if face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:")) {
+            let surface = face_bspline(shape, index as f64).unwrap();
+            degrees.push((surface["degreeU"].as_u64().unwrap(), surface["degreeV"].as_u64().unwrap()));
+        }
+    }
+    degrees
+}
+
 /// The numbers of 13.36.4 (cube 10, size 1, curvature shape 0.5): the G2 star against the G1 star it replaces.
 #[test]
 fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes() {
@@ -79,6 +92,8 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
     let shape = profile_cube(1.0, 1.0, 0.5);
     assert!(analyze(&shape).unwrap().valid);
     assert_eq!(corners_of(&shape), all("G2"));
+    // degree 7 across and along: the curvature across an edge reads the second derivative of the interpolant
+    assert_eq!(patch_degrees(&shape), vec![(7, 7); 48]);
     assert_eq!(topology(&shape).unwrap()["faces"].as_array().unwrap().len(), 66);
     let g2 = readings(&shape);
     assert!(g2.contacts.1 < 1e-3, "curvature jump at the blend and flat faces {:e}", g2.contacts.1);
@@ -89,6 +104,7 @@ fn the_curvature_profile_cube_star_is_g2_to_its_blends_and_g1_across_its_spokes(
     crate::test_bridge::set_corner_g2_star(false);
     let g1_shape = profile_cube(1.0, 1.0, 0.5);
     assert_eq!(corners_of(&g1_shape), all("G1"));
+    assert_eq!(patch_degrees(&g1_shape), vec![(5, 5); 48]);
     let g1 = readings(&g1_shape);
     assert!(g1.contacts.1 > 0.5, "the G1 star jumps by {:e}", g1.contacts.1);
     assert!((volume(&shape) - volume(&g1_shape)).abs() < 1e-3 * volume(&g1_shape), "{} against {}", volume(&shape), volume(&g1_shape));

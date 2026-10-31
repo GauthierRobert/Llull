@@ -14,7 +14,7 @@ import type { CommandResult } from '../types';
 import { diagonalOf } from './shapeDiagonal';
 import { recordsByFace } from './blendChains';
 import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
-import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
+import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances, withBlendScaleFloor } from './checkBlendTolerances';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
 import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
 import { type RadiusReadback, RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
@@ -38,8 +38,6 @@ const DEFAULT_G2_REL = 0.1;
 const G0_FRACTION = 1e-6;
 /** A face whose normal curvature is below this fraction of 1 / (bounding-box diagonal) is flat for the G2 reading (a plane's reading is noise). */
 const FLAT_CURVATURE_FRACTION = 1e-8;
-/** A normal curvature below this fraction of the blend's own scale (1 / its width) is flat for the G2 reading: a curvature-continuous blend meets a plane to the noise of its rails, not exactly. */
-const BLEND_FLAT_FRACTION = 1e-3;
 
 interface Contact {
   readonly edge: number;
@@ -134,6 +132,9 @@ function checkEntity(
       notRun: 'this kernel has no exact topology / face queries',
     };
   const named = topology.faces.some((face) => face.name !== undefined);
+  // the longest edge of a face (the contact lines): its width is area over this
+  const longestEdgeOf = (face: number): number =>
+    Math.max(...graph.edgeFaces.flatMap((around, edge) => (around.includes(face) ? [topology.edges[edge]?.length ?? 0] : [])), 0);
   if (!named)
     findings.push({
       code: 'BLD_CHECK_UNVERIFIED_PICK',
@@ -166,16 +167,10 @@ function checkEntity(
     const contacts: Contact[] = [];
     const before = unverified;
     // width of the blend: its area over its longest edge (the contact lines)
-    const longest = Math.max(
-      ...graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : [])),
-      0,
-    );
+    const longest = longestEdgeOf(face.index);
     const profiled = (laws.get(face.index)?.profile?.type ?? 'circular') !== 'circular';
     const own: Tolerances = profiled ? { ...tolerances, g0: g0Param ?? tolerances.g0 * PROFILE_G0_FACTOR } : tolerances;
-    const faceTolerances: Tolerances =
-      longest > 0 && face.area > 0
-        ? { ...own, flatCurvature: Math.max(tolerances.flatCurvature ?? 0, BLEND_FLAT_FRACTION / (face.area / longest)) }
-        : own;
+    const faceTolerances = withBlendScaleFloor(own, face.area, longest);
     graph.edgeFaces.forEach((around, edge) => {
       if (around.length !== 2 || !around.includes(face.index)) return;
       const otherName = topology.faces[around.find((other) => other !== face.index) ?? -1]?.name;
@@ -297,15 +292,7 @@ function checkEntity(
     if (sources === null || face.name === undefined) continue;
     const star = STAR_SUFFIX.test(face.name);
     // the same blend-scale floor as a blend face: a curvature-continuous star meets a plane to the noise of its interpolation, not exactly (06 BLD 13.36)
-    const cornerWidth = Math.max(
-      ...graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : [])),
-      0,
-    );
-    const starTolerances: Tolerances =
-      cornerWidth > 0 && face.area > 0
-        ? { ...tolerances, flatCurvature: Math.max(tolerances.flatCurvature ?? 0, BLEND_FLAT_FRACTION / (face.area / cornerWidth)) }
-        : tolerances;
-    const cornerTolerances = star ? starTolerances : plateTolerances;
+    const cornerTolerances = star ? withBlendScaleFloor(tolerances, face.area, longestEdgeOf(face.index)) : plateTolerances;
     const contacts: Contact[] = [];
     graph.edgeFaces.forEach((around, edge) => {
       if (around.length !== 2 || !around.includes(face.index)) return;

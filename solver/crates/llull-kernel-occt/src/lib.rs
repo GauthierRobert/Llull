@@ -38,6 +38,7 @@ mod blend_rail_tests;
 mod blend_shell_tests;
 #[cfg(test)]
 mod blend_tests;
+#[cfg(test)]
 mod blend_third_tests;
 #[cfg(test)]
 mod blend_uneven_tests;
