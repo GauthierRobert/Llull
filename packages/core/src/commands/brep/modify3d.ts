@@ -125,7 +125,7 @@ export const filletEdge = defineCommand({
     'robust to parametric edits); with neither, ALL edges are filleted. ' +
     'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes?, interpolation?, law? }] instead. ' +
     'A radius law runs from size at the start of the edge to sizeEnd at its end, through sizes control points ({ t in (0, 1) along the picked edge, size }): ' +
-    'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "linear" joins them with straight pieces; ' +
+    'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "monotone" is a C1 cubic that never overshoots a station, "linear" joins them with straight pieces; ' +
     'or law { expression of t in [0, 1] (pi, cos, ...), samples } sampled at uniform t. On a CLOSED edge (a cylinder rim) the law must close on itself (r(0) = r(1), BLD_LAW_NOT_PERIODIC otherwise). ' +
     'corners [{ near | name | all, type: "setback", setback }] gives a vertex a setback corner instead of the rolling-ball one. A bad value is BLD_LAW_INVALID with the param path; run check_blends afterwards to read the realised radius back. ' +
     'profile { type: "conic", rho } or { type: "curvature", shape } changes the cross-section (conic: rho 0.4142 is the circle at 90 degrees; curvature: zero curvature at both contacts, G2 to planar faces); ' +

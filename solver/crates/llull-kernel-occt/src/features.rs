@@ -96,7 +96,7 @@ mod ffi {
 }
 
 /// Fillet of the unique edges `edges` (explorer order, `[]` = all); `radius_end` varies the radius linearly along each edge.
-/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), mode (0 smooth, 1 straight pieces), n, then n (t, size) pairs.
+/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), mode (0 smooth, 1 straight pieces, 2 monotone C1 cubic), n, then n (t, size) pairs.
 pub fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Built {
     built(ffi::fillet_laws(inner(shape)?, edges, laws))
 }

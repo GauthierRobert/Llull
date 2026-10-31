@@ -62,10 +62,33 @@ describe('export_code of radius laws', () => {
     expect(line.match(/\(/g)?.length).toBeGreaterThan(40);
   });
 
+  it('a monotone law sends dense nodes of the exact curve with the "monotone" tag, notes the approximation, and lands in the recorded trace as monotone', () => {
+    const entries = [
+      {
+        index: 0,
+        size: 1,
+        sizeEnd: 1.2,
+        sizes: [
+          { t: 0.3, size: 2 },
+          { t: 0.7, size: 1.4 },
+        ],
+        interpolation: 'monotone' as const,
+      },
+    ];
+    const { text, summary } = code(modelWith(entries), 'cadquery');
+    const line = /^box_1 = fillet_laws[(].*$/m.exec(text)?.[0] ?? '';
+    expect(line).toContain("'monotone', [(0, 1), ");
+    expect(line.split('(').length - 1).toBeGreaterThan(40);
+    expect(summary).toContain('monotone radius law exported as 12 nodes per piece');
+    expect(text).toContain('entry["interpolation"] = "monotone" if law[3] == "monotone" else "linear"');
+    const plain = code(modelWith([{ index: 0, size: 1, sizeEnd: 2, interpolation: 'monotone' as const }]), 'build123d').text;
+    expect(plain).toContain("[], 'monotone', [(0, 1), ");
+  });
+
   it('the history of a law fillet also reaches the recorded trace as the llull edges entries', () => {
     const { text } = code(modelWith([{ index: 0, size: 1, sizeEnd: 2, interpolation: 'linear' }]), 'cadquery');
     expect(text).toContain('feature = _record("fillet_edge", {"id": {"ref": solid.ref}, "edges": entries})');
-    expect(text).toContain('entry["interpolation"] = "linear"');
+    expect(text).toContain('entry["interpolation"] = "monotone" if law[3] == "monotone" else "linear"');
   });
 
   it('FreeCAD: a plain start -> end law is makeFillet(r1, r2); nodes are refused loudly with BLD_CODEGEN_UNSUPPORTED', () => {

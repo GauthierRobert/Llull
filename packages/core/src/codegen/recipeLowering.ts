@@ -70,6 +70,7 @@ function filletLaws(recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>, 
     ...(law.sizeEnd === undefined ? {} : { sizeEnd: law.sizeEnd }),
     ...(law.sizes === undefined ? {} : { sizes: law.sizes }),
     linear: law.interpolation === 'linear',
+    ...(law.interpolation === 'monotone' ? { monotone: true } : {}),
     nodes: lawNodes(law, lengths[at] ?? 1),
   }));
 }

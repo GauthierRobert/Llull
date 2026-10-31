@@ -181,7 +181,7 @@ pub(super) fn subdivision(entity: &Value) -> Evaluated {
 }
 
 /// `radii` (one `EdgeRadius` per edge, `packages/core/src/model/types.ts`) flattened per edge as size, sizeEnd (NaN = constant), mode (1 =
-/// `interpolation: "linear"`, else 0), n, then n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
+/// `interpolation: "linear"`, 2 = "monotone", else 0), n, then n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
 pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> {
     let laws = radii.as_array()?;
     if laws.len() != edge_count || edge_count == 0 {
@@ -195,8 +195,12 @@ pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> 
             return None;
         }
         let points = law.get("sizes").and_then(Value::as_array).cloned().unwrap_or_default();
-        let linear = law.get("interpolation").and_then(Value::as_str) == Some("linear");
-        flat.extend([size, end, if linear { 1.0 } else { 0.0 }, points.len() as f64]);
+        let mode = match law.get("interpolation").and_then(Value::as_str) {
+            Some("linear") => 1.0,
+            Some("monotone") => 2.0,
+            _ => 0.0,
+        };
+        flat.extend([size, end, mode, points.len() as f64]);
         let mut last_t = 0.0;
         for point in &points {
             let (t, radius) = (number(point, "t")?, number(point, "size")?);

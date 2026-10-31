@@ -15,7 +15,7 @@ import { noop } from '../noop';
 import { selectEdges } from './edgeSelection';
 import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
 import { chordsToRadii } from './filletChord';
-import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
+import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw, steepProblem } from '../../geometry/blend/law';
 import { blendRejection } from './blendCodes';
 import {
   type PlannedProfile,
@@ -113,11 +113,14 @@ function resolveShorthand(topology: ShapeTopology | null, request: FilletRequest
   return { planned: every.map((edge) => ({ edge, law })) };
 }
 
-/** The first closed edge (a rim) whose law does not close on itself (r(0) = r(1)), as a refusal. */
+/**
+ * The first edge whose law cannot be carried, as a refusal: a closed edge (a rim) whose law does not close on itself (r(0) = r(1)), or an edge too short
+ * for the steepest slope of its law (BLD_LAW_TOO_STEEP).
+ */
 function openLawOnClosedEdge(topology: ShapeTopology | null, planned: readonly Planned[]): Refusal | null {
   for (const { edge, law, entry } of planned) {
     const shape = topology?.edges[edge];
-    const problem = shape !== undefined && closedEdge(shape) ? periodicProblem(law) : null;
+    const problem = shape === undefined ? null : ((closedEdge(shape) ? periodicProblem(law) : null) ?? steepProblem(law, shape.length));
     if (problem !== null)
       return {
         ...problem,
@@ -143,7 +146,7 @@ function recipeOfPlan(
     first !== undefined &&
     planned.every((entry) => sameLaw(entry.law, first.law)) &&
     first.law.sizes === undefined &&
-    first.law.interpolation !== 'linear' &&
+    first.law.interpolation === undefined &&
     first.law.size2 === undefined;
   const profiled = { ...(profile === undefined ? {} : { profile }), ...(corners.length === 0 ? {} : { corners: [...corners] }) };
   if (uniform)
@@ -160,7 +163,7 @@ function recipeOfPlan(
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : 'smooth'} control point(s)`}`;
+  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : law.interpolation === 'monotone' ? 'monotone' : 'smooth'} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;

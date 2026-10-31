@@ -136,6 +136,8 @@ export interface FilletLaw {
   readonly sizeEnd?: number;
   readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
   readonly linear: boolean;
+  /** `interpolation: "monotone"`: the nodes are dense samples of the exact monotone curve (OCP interpolates them with its own cubic), and the recorded trace says "monotone". */
+  readonly monotone?: boolean;
   readonly nodes: ReadonlyArray<readonly [number, number]> | null;
 }
 

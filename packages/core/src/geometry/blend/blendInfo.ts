@@ -140,10 +140,10 @@ export function blendNodes(recipe: ShapeRecipe): Array<Extract<ShapeRecipe, { op
 export const lawsOfNode = (node: FilletNode): readonly EdgeRadius[] =>
   node.radii ?? node.edges.map(() => ({ size: node.size, ...(node.sizeEnd === undefined ? {} : { sizeEnd: node.sizeEnd }) }));
 
-/** The `t` values at which `law` is exact: every `t` for a constant or straight-piece law, only the control points and the ends for a smooth one. */
+/** The `t` values at which `law` is exact: every `t` for a constant, straight-piece or monotone law, only the control points and the ends for a smooth one. */
 export function exactParameters(law: EdgeRadius): readonly number[] | 'all' {
   const constant = law.sizeEnd === undefined && (law.sizes ?? []).length === 0;
-  if (constant || law.interpolation === 'linear') return 'all';
+  if (constant || law.interpolation === 'linear' || law.interpolation === 'monotone') return 'all';
   return [0, ...(law.sizes ?? []).map((point) => point.t), 1];
 }
 

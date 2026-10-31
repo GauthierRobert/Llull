@@ -236,7 +236,7 @@ def chamfer(solid, edges, distance, near=None):
 
 
 def fillet_laws(solid, edges, laws, near=None):
-    """Round edges with one radius law each: law = (size, size_end | None, [(t, size)...], linear, nodes | None); nodes = (t, radius) pairs OCCT interpolates with a cubic spline of zero end slopes (a straight law is sent as graded nodes along its polyline: OCP has no exact straight law)."""
+    """Round edges with one radius law each: law = (size, size_end | None, [(t, size)...], linear | "monotone", nodes | None); nodes = (t, radius) pairs OCCT interpolates with a cubic spline of zero end slopes (a straight or monotone law is sent as graded nodes along its exact curve: OCP has no exact straight or monotone law)."""
     entries = []
     for index, law in zip(edges, laws):
         entry = {"index": int(index), "size": _term(law[0])}
@@ -245,7 +245,7 @@ def fillet_laws(solid, edges, laws, near=None):
         if law[2]:
             entry["sizes"] = [{"t": float(t), "size": float(s)} for t, s in law[2]]
         if law[3]:
-            entry["interpolation"] = "linear"
+            entry["interpolation"] = "monotone" if law[3] == "monotone" else "linear"
         entries.append(entry)
     feature = _record("fillet_edge", {"id": {"ref": solid.ref}, "edges": entries})
     shape = _fillet_laws(solid.shape, [int(e) for e in edges], near, laws)

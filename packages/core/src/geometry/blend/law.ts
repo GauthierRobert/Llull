@@ -6,18 +6,19 @@
 
 import { evaluateExpression } from '../../lib/expression';
 import type { EdgeRadius, Vec3 } from '../../model/types';
+import { type Station, monotoneMaxSlope, monotoneRadius } from './monotone';
 
 /** A radius law as the command parameters give it (`edges[]` entries without their edge selector). */
 export interface LawInput {
   readonly size?: number | undefined;
   readonly sizeEnd?: number | undefined;
   readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }> | undefined;
-  readonly interpolation?: 'smooth' | 'linear' | undefined;
+  readonly interpolation?: 'smooth' | 'linear' | 'monotone' | undefined;
   readonly law?: { readonly expression: string; readonly samples?: number | undefined } | undefined;
   readonly size2?: number | undefined;
 }
 
-type LawProblemCode = 'BLD_LAW_INVALID' | 'BLD_LAW_NOT_PERIODIC';
+type LawProblemCode = 'BLD_LAW_INVALID' | 'BLD_LAW_NOT_PERIODIC' | 'BLD_LAW_TOO_STEEP';
 
 export interface LawProblem {
   readonly code: LawProblemCode;
@@ -56,6 +57,14 @@ export function sampleExpression(expression: string, samples: number): readonly 
   return values;
 }
 
+/**
+ * The interpolation a law keeps: "linear" (straight pieces), "monotone" (the exact C1 cubic; a constant law has nothing to interpolate and drops it), else the default.
+ */
+function interpolationOf(value: LawInput['interpolation'], varies: boolean): { interpolation?: 'linear' | 'monotone' } {
+  if (value === 'linear') return { interpolation: 'linear' };
+  return value === 'monotone' && varies ? { interpolation: 'monotone' } : {};
+}
+
 /** The explicit law of `input` (size, sizeEnd, sizes), or why it is not usable. */
 function explicitLaw(input: LawInput): EdgeRadius | LawProblem {
   const { size, sizeEnd, sizes = [] } = input;
@@ -73,7 +82,7 @@ function explicitLaw(input: LawInput): EdgeRadius | LawProblem {
     size,
     ...(sizeEnd === undefined ? {} : { sizeEnd }),
     ...(sizes.length === 0 ? {} : { sizes }),
-    ...(input.interpolation === 'linear' ? { interpolation: 'linear' as const } : {}),
+    ...interpolationOf(input.interpolation, sizes.length > 0 || sizeEnd !== undefined),
     ...(input.size2 === undefined ? {} : { size2: input.size2 }),
   };
 }
@@ -92,7 +101,7 @@ export function resolveLaw(input: LawInput): EdgeRadius | LawProblem {
     size: values[0] ?? 0,
     sizeEnd: values[count - 1] ?? 0,
     sizes: values.slice(1, -1).map((size, k) => ({ t: (k + 1) / (count - 1), size })),
-    ...(input.interpolation === 'linear' ? { interpolation: 'linear' as const } : {}),
+    ...interpolationOf(input.interpolation, true),
   };
 }
 
@@ -126,10 +135,11 @@ export function periodicProblem(law: EdgeRadius): LawProblem | null {
       };
 }
 
-/** Radius of `law` at relative position `t` in [0, 1]: straight pieces for `linear`, else linear between the ends when there are no control points (smooth interpolation through control points is the kernel's, approximated here by the straight pieces). */
+/** Radius of `law` at relative position `t` in [0, 1]: the exact monotone curve for `monotone`, straight pieces for `linear`, else linear between the ends when there are no control points (smooth interpolation through control points is the kernel's, approximated here by the straight pieces). */
 export function radiusAt(law: EdgeRadius, t: number): number {
   const [start, end] = lawEnds(law);
   const points = [{ t: 0, size: start }, ...(law.sizes ?? []), { t: 1, size: end }];
+  if (law.interpolation === 'monotone') return monotoneRadius(points, t);
   for (let k = 1; k < points.length; k++) {
     const to = points[k];
     const from = points[k - 1];
@@ -177,6 +187,26 @@ const STRAIGHT_BLEND = 1e-5;
 /** Growth of the node spacing away from an end or kink. */
 const STRAIGHT_GROWTH = 1.5;
 
+/** Nodes per piece of a monotone law in the OCP export (the stations plus these, on the exact curve). */
+const MONOTONE_EXPORT_NODES = 12;
+
+/** The stations of a monotone law and `MONOTONE_EXPORT_NODES` points of its exact curve inside every piece: OCP's cubic spline through them follows the curve to about 1e-5 relative. */
+function monotoneNodes(stations: ReadonlyArray<readonly [number, number]>): Array<readonly [number, number]> {
+  const points: Station[] = stations.map(([t, size]) => ({ t, size }));
+  const nodes: Array<readonly [number, number]> = [];
+  for (let piece = 0; piece + 1 < points.length; piece++) {
+    const [from, to] = [points[piece] as Station, points[piece + 1] as Station];
+    nodes.push([from.t, from.size]);
+    for (let k = 1; k <= MONOTONE_EXPORT_NODES; k++) {
+      const t = from.t + ((to.t - from.t) * k) / (MONOTONE_EXPORT_NODES + 1);
+      nodes.push([t, monotoneRadius(points, t)]);
+    }
+  }
+  const end = points[points.length - 1] as Station;
+  nodes.push([end.t, end.size]);
+  return nodes;
+}
+
 /**
  * The (relative position, radius) nodes the generated OCP code gives `BRepFilletAPI_MakeFillet.Add` for `law` on an edge of `length`, or null
  * when it takes the law as plain radii (constant, or start -> end). OCP can only interpolate nodes with a cubic spline of zero end slopes, so
@@ -186,12 +216,14 @@ const STRAIGHT_GROWTH = 1.5;
 export function lawNodes(law: EdgeRadius, length: number): ReadonlyArray<readonly [number, number]> | null {
   const [start, end] = lawEnds(law);
   const points = law.sizes ?? [];
-  if (points.length === 0 && (law.interpolation !== 'linear' || law.sizeEnd === undefined)) return null;
+  const exact = law.interpolation === 'linear' || law.interpolation === 'monotone';
+  if (points.length === 0 && (!exact || law.sizeEnd === undefined)) return null;
   const corners: Array<readonly [number, number]> = [
     [0, start],
     ...points.map((point): [number, number] => [point.t, point.size]),
     [1, end],
   ];
+  if (law.interpolation === 'monotone') return monotoneNodes(corners);
   if (law.interpolation !== 'linear') return corners;
   const blend = Math.min(STRAIGHT_BLEND / Math.max(length, 1e-9), 0.25 / corners.length);
   const nodes: Array<readonly [number, number]> = [corners[0] ?? [0, start]];
@@ -220,5 +252,39 @@ export function reverseLaw(law: EdgeRadius): EdgeRadius {
     size: sizeEnd,
     sizeEnd: size,
     ...(sizes === undefined ? {} : { sizes: sizes.map((point) => ({ t: 1 - point.t, size: point.size })).reverse() }),
+  };
+}
+
+/** Slope (radius per unit length along the edge) a blend law cannot exceed: a ball rolling on a spine whose radius changes as fast as it advances has no solution. */
+const MAX_LAW_SLOPE = 1;
+
+/** Largest |dr/ds| of `law` on an edge of `length`: the steepest straight piece, or the steepest point of the monotone curve through the stations (the kernel's smooth law is estimated by it). */
+export function lawMaxSlope(law: EdgeRadius, length: number): number {
+  const [start, end] = lawEnds(law);
+  const stations: Station[] = [{ t: 0, size: start }, ...(law.sizes ?? []), { t: 1, size: end }];
+  if (law.interpolation === 'linear') {
+    let steepest = 0;
+    for (let k = 0; k + 1 < stations.length; k++) {
+      const [a, b] = [stations[k] as Station, stations[k + 1] as Station];
+      steepest = Math.max(steepest, Math.abs(b.size - a.size) / (b.t - a.t));
+    }
+    return steepest / length;
+  }
+  return monotoneMaxSlope(stations) / length;
+}
+
+/** The law is too steep for an edge of `length`: the radius would change as fast as the ball advances (BLD_LAW_TOO_STEEP), with the measured slope and the length that would carry it. */
+export function steepProblem(law: EdgeRadius, length: number): LawProblem | null {
+  if (!(length > 0)) return null;
+  const slope = lawMaxSlope(law, length);
+  if (slope < MAX_LAW_SLOPE) return null;
+  const [start, end] = lawEnds(law);
+  const spread =
+    Math.max(start, end, ...(law.sizes ?? []).map((point) => point.size)) -
+    Math.min(start, end, ...(law.sizes ?? []).map((point) => point.size));
+  return {
+    code: 'BLD_LAW_TOO_STEEP',
+    message: `the radius changes as fast as the ball advances: its steepest slope is ${slope.toFixed(3)} (must stay below ${MAX_LAW_SLOPE}) on an edge of length ${length}; a law that spans ${spread} needs an edge of about ${(spread / (0.5 * MAX_LAW_SLOPE)).toFixed(3)} or more`,
+    path: 'sizes',
   };
 }

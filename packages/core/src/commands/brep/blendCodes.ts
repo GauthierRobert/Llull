@@ -4,6 +4,8 @@ import { tableRejection } from '../noop';
 
 const REMEDIATION = {
   BLD_LAW_INVALID: 'fix the named value; sizes are > 0 and expressions use t in [0, 1]',
+  BLD_LAW_TOO_STEEP:
+    'give the radius a gentler change (smaller difference between the stations), pick a longer edge, or spread the stations further apart',
   BLD_LAW_NOT_PERIODIC: 'make the end radius equal the start, or use a periodic expression',
   BLD_CHORD_UNDEFINED: 'use radius there, or split the edge',
   BLD_ASYMMETRIC_SIDE_MISSING: 'give side1Near (a point on the face that carries the first distance) or side1Name',
