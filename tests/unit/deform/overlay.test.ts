@@ -57,7 +57,9 @@ describe('deform_overlay of a deformed body', () => {
     expect(data.frame.x).toEqual([1, 0, 0]);
     expect(data.frame.length).toBeGreaterThan(0);
     expect(data.region).toMatchObject({ start: 0, end: 20, infinite: true, startCentre: [0, 0, 0], endCentre: [0, 0, 20] });
-    expect(data.region?.radius).toBeGreaterThan(50);
+    // the 10 x 10 bar twisted by 36 degrees per 20 units: its widest point is its corner at 7.07 from the axis, the planes reach 1.3 times that
+    expect(data.region?.radius).toBeGreaterThan(8);
+    expect(data.region?.radius).toBeLessThan(15);
     expect([data.lattice, data.flow, data.sheet, data.reference]).toEqual([null, null, null, null]);
     expect(result.summary).toContain('infinite region');
     expectPure(twisted.document, () => execute(twisted.document, 'deform_overlay', { id: next }));
@@ -171,7 +173,7 @@ describe('deform_overlay of a deformed body', () => {
       nodes: [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 2, 0, 0, 1, 1, 1, 2, 0, 0, 1],
       baseNodes: [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1],
     };
-    const overlay = deformOverlay(law, undefined, frame, 10);
+    const overlay = deformOverlay(law, undefined, frame, 10, 5);
     expect(overlay.sheet).toMatchObject({ nx: 2, ny: 2 });
     expect(overlay.sheet?.target).toEqual([
       [10, 0, 0],

@@ -110,9 +110,15 @@ function latticeOverlay(law: Extract<DeformLaw, { kind: 'lattice' }>, frame: Loc
 }
 
 /**
- * The overlay data of a deform node. `extent` is the half-diagonal of the body bounds (the size the frame axes and the region planes are drawn at).
+ * The overlay data of a deform node. `extent` is the half-diagonal of the body bounds (the length the frame axes are drawn at), `lateral` the reach of the body from the frame axis (the half size of the region planes).
  */
-export function deformOverlay(law: DeformLaw, region: DeformRegion | undefined, frame: LocalFrame, extent: number): DeformOverlayData {
+export function deformOverlay(
+  law: DeformLaw,
+  region: DeformRegion | undefined,
+  frame: LocalFrame,
+  extent: number,
+  lateral: number,
+): DeformOverlayData {
   const flow: FlowOverlay | null =
     law.kind === 'flowCurve'
       ? { target: tablePoints(frame, law.stations, 12), base: law.base === undefined ? null : tablePoints(frame, law.base.stations, 12) }
@@ -139,7 +145,7 @@ export function deformOverlay(law: DeformLaw, region: DeformRegion | undefined, 
             falloff: region.falloff,
             startCentre: toWorld(frame, [0, 0, region.start]),
             endCentre: toWorld(frame, [0, 0, region.end]),
-            radius: extent,
+            radius: lateral,
           },
     lattice: law.kind === 'lattice' ? latticeOverlay(law, frame) : null,
     flow,

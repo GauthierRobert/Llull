@@ -1,7 +1,7 @@
 /** deform_overlay — read-only geometry for the viewport overlays of a deformed body: frame, region slab, lattice net, flow curves, flow sheets, reference shape (01 DEF M4, FR-DEF-21). */
 
 import type { CadDocument } from '../../model/types';
-import { resolveFrame } from '../../geometry/deform/frame';
+import { resolveFrame, toLocal } from '../../geometry/deform/frame';
 import { deformOverlay } from '../../geometry/deform/overlay';
 import { referenceWire } from '../../geometry/deform/referenceWire';
 import { REFERENCE_FIELDS } from '../../geometry/deform/referenceShape';
@@ -68,7 +68,14 @@ export const deformOverlayQuery = defineCommand({
           'params.compareTo',
         ]);
     }
-    const overlay = deformOverlay(node.law, node.region, frame, bounds.radius);
+    // the region planes reach 30 % past the body from the frame axis (the body, not its length, sets how wide the planes are drawn)
+    const positions = entity.kind === 'mesh' ? entity.mesh.positions : [];
+    let reach = 0;
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const local = toLocal(frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]);
+      reach = Math.max(reach, Math.hypot(local[0], local[1]));
+    }
+    const overlay = deformOverlay(node.law, node.region, frame, bounds.radius, Math.max(1.3 * reach, 1e-9));
     const parts = [
       'frame',
       ...(overlay.region === null ? [] : [overlay.region.infinite ? 'infinite region' : 'region']),
