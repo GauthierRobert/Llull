@@ -42,7 +42,13 @@ export const implicitGpuProgram = defineCommand({
     return report(
       doc,
       `implicit_gpu_program: '${id}' compiled to GLSL (${glsl.instructionCount} instructions, ${glsl.constants.length} constants, quality ${glsl.quality}, lipschitz ${glsl.lipschitz}, key ${glsl.key}).`,
-      { id, field: target.fieldId, gpu: true, glsl: program, unit: doc.units },
+      {
+        id,
+        field: target.fieldId,
+        gpu: true,
+        glsl: { ...program, minFeature: Number.isFinite(compiled.minFeature) ? compiled.minFeature : null },
+        unit: doc.units,
+      },
     );
   },
 });

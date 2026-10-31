@@ -6,203 +6,561 @@
       "#1": {
         "id": "#1",
         "kind": "revolution",
-        "position": [0,0,-11.4],
-        "rotation": [0,0,-1.57079633],
+        "position": [0, 0, -11.4],
+        "rotation": [0, 0, -1.57079633],
         "layerId": "#2",
         "color": "#2f9c8f",
         "name": "Pipe #1 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:pipe"],
-        "profile": [[0,0],[16.7,0],[16.7,483.3],[0,483.3]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:pipe"],
+        "profile": [
+          [0, 0],
+          [16.7, 0],
+          [16.7, 483.3],
+          [0, 483.3]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#5": {
         "id": "#5",
         "kind": "revolution",
-        "position": [0,0,460.5],
-        "rotation": [0,0,-1.57079633],
+        "position": [0, 0, 460.5],
+        "rotation": [0, 0, -1.57079633],
         "layerId": "#6",
         "color": "#c0504d",
         "name": "Valve #5 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:valve"],
-        "profile": [[0,0],[28.39,0],[28.39,79],[0,79]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:valve"],
+        "profile": [
+          [0, 0],
+          [28.39, 0],
+          [28.39, 79],
+          [0, 79]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#7": {
         "id": "#7",
         "kind": "revolution",
-        "position": [0,0,500],
-        "rotation": [1.57079633,0,0],
+        "position": [0, 0, 500],
+        "rotation": [1.57079633, 0, 0],
         "layerId": "#6",
         "color": "#c0504d",
         "name": "Valve stem #5 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:valve"],
-        "profile": [[0,0],[2.672,0],[2.672,190],[0,190]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:valve"],
+        "profile": [
+          [0, 0],
+          [2.672, 0],
+          [2.672, 190],
+          [0, 190]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#8": {
         "id": "#8",
         "kind": "revolution",
-        "position": [0,-187,500],
-        "rotation": [1.57079633,0,0],
+        "position": [0, -187, 500],
+        "rotation": [1.57079633, 0, 0],
         "layerId": "#6",
         "color": "#c0504d",
         "name": "Handwheel #5 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:valve"],
-        "profile": [[0,0],[50,0],[50,6],[0,6]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:valve"],
+        "profile": [
+          [0, 0],
+          [50, 0],
+          [50, 6],
+          [0, 6]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#9": {
         "id": "#9",
         "kind": "revolution",
-        "position": [0,0,528.1],
-        "rotation": [0,0,-1.57079633],
+        "position": [0, 0, 528.1],
+        "rotation": [0, 0, -1.57079633],
         "layerId": "#2",
         "color": "#2f9c8f",
         "name": "Pipe #9 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:pipe"],
-        "profile": [[0,0],[16.7,0],[16.7,442.3],[0,442.3]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:pipe"],
+        "profile": [
+          [0, 0],
+          [16.7, 0],
+          [16.7, 442.3],
+          [0, 442.3]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#10": {
         "id": "#10",
         "kind": "revolution",
-        "position": [28,0,972],
-        "rotation": [-1.57079633,0,-3.14159265],
+        "position": [28, 0, 972],
+        "rotation": [-1.57079633, 0, -3.14159265],
         "layerId": "#11",
         "color": "#d9a441",
         "name": "Elbow #10 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:elbow"],
-        "profile": [[44.7,0],[43.4287882,6.39081332],[39.8086832,11.8086832],[34.3908133,15.4287882],[28,16.7],[21.6091867,15.4287882],[16.1913168,11.8086832],[12.5712118,6.39081332],[11.3,2.04516015e-15],[12.5712118,-6.39081332],[16.1913168,-11.8086832],[21.6091867,-15.4287882],[28,-16.7],[34.3908133,-15.4287882],[39.8086832,-11.8086832],[43.4287882,-6.39081332]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:elbow"],
+        "profile": [
+          [44.7, 0],
+          [43.4287882, 6.39081332],
+          [39.8086832, 11.8086832],
+          [34.3908133, 15.4287882],
+          [28, 16.7],
+          [21.6091867, 15.4287882],
+          [16.1913168, 11.8086832],
+          [12.5712118, 6.39081332],
+          [11.3, 2.04516015e-15],
+          [12.5712118, -6.39081332],
+          [16.1913168, -11.8086832],
+          [21.6091867, -15.4287882],
+          [28, -16.7],
+          [34.3908133, -15.4287882],
+          [39.8086832, -11.8086832],
+          [43.4287882, -6.39081332]
+        ],
+        "axis": [0, 0, 1],
         "angle": 1.57079633,
         "segments": 24,
-        "curves": [{"type":"arc","points":[[44.7,0],[28,16.7],[11.3,0]]},{"type":"arc","points":[[11.3,0],[28,-16.7],[44.7,0]]}]
+        "curves": [
+          {
+            "type": "arc",
+            "points": [
+              [44.7, 0],
+              [28, 16.7],
+              [11.3, 0]
+            ]
+          },
+          {
+            "type": "arc",
+            "points": [
+              [11.3, 0],
+              [28, -16.7],
+              [44.7, 0]
+            ]
+          }
+        ]
       },
       "#12": {
         "id": "#12",
         "kind": "revolution",
-        "position": [29.6,0,1000],
-        "rotation": [1.57079633,1.57079631,0],
+        "position": [29.6, 0, 1000],
+        "rotation": [1.57079633, 1.57079631, 0],
         "layerId": "#2",
         "color": "#2f9c8f",
         "name": "Pipe #12 25-P-5001-SW800",
-        "tags": ["piping:#3","piping-run:#4","piping-part:pipe"],
-        "profile": [[0,0],[16.7,0],[16.7,1470.4],[0,1470.4]],
-        "axis": [0,0,1],
+        "tags": ["piping:#3", "piping-run:#4", "piping-part:pipe"],
+        "profile": [
+          [0, 0],
+          [16.7, 0],
+          [16.7, 1470.4],
+          [0, 1470.4]
+        ],
+        "axis": [0, 0, 1],
         "angle": 6.28318531,
         "segments": 24
       }
     },
-    "order": [
-      "#1",
-      "#5",
-      "#7",
-      "#8",
-      "#9",
-      "#10",
-      "#12"
-    ],
+    "order": ["#1", "#5", "#7", "#8", "#9", "#10", "#12"],
     "layers": {
-      "#13": {
-        "id": "#13",
-        "name": "Layer 0",
-        "visible": true,
-        "locked": false
-      },
-      "#2": {
-        "id": "#2",
-        "name": "P-PIPE",
-        "visible": true,
-        "locked": false,
-        "color": "#2f9c8f"
-      },
-      "#6": {
-        "id": "#6",
-        "name": "P-VALV",
-        "visible": true,
-        "locked": false,
-        "color": "#c0504d"
-      },
-      "#11": {
-        "id": "#11",
-        "name": "P-FITT",
-        "visible": true,
-        "locked": false,
-        "color": "#d9a441"
-      }
+      "#13": { "id": "#13", "name": "Layer 0", "visible": true, "locked": false },
+      "#2": { "id": "#2", "name": "P-PIPE", "visible": true, "locked": false, "color": "#2f9c8f" },
+      "#6": { "id": "#6", "name": "P-VALV", "visible": true, "locked": false, "color": "#c0504d" },
+      "#11": { "id": "#11", "name": "P-FITT", "visible": true, "locked": false, "color": "#d9a441" }
     },
-    "layerOrder": [
-      "#13",
-      "#2",
-      "#6",
-      "#11"
-    ],
+    "layerOrder": ["#13", "#2", "#6", "#11"],
     "selection": [],
-    "camera": {
-      "target": [
-        0,
-        0,
-        0
-      ],
-      "azimuth": 2.35619449,
-      "polar": 1.04719755,
-      "distance": 12
-    },
+    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
     "featureHistory": [
-      {
-        "id": "#14",
-        "name": "set_units",
-        "params": {"units":"mm"},
-        "suppressed": false,
-        "affected": []
-      },
+      { "id": "#14", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
       {
         "id": "#15",
         "name": "import_piping_catalog",
-        "params": {"catalog":{"format":"#16","schemaVersion":1,"id":"#17","version":"1.0.0","title":"02 RTE V1 validation stub, small bore: socket-weld and threaded fittings, valves and flanges of NPS 1 (and a NPS 2 x 1 sockolet / threadolet), shaped after ASME B16.11 / B16.34 / B16.5 but with round declared INPUT dimensions. centreToEnd is measured to the socket mouth / threaded end face (B16.11 publishes the distance to the socket bottom A = centreToEnd - socketDepth). Not a standard; no value is verified.","licence":"open-data","families":[{"id":"#18","type":"elbow90","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"nps":1,"centreToEnd":41,"socketDepth":13,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"}}]},{"id":"#19","type":"elbow45","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"nps":1,"centreToEnd":35,"socketDepth":13,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"}}]},{"id":"asme-b16.11-sw-tee-rte-stub","type":"tee","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"nps":1,"centreToEndRun":41,"centreToEndBranch":41,"socketDepth":13,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"}}]},{"id":"asme-b16.34-sw-gate-rte-stub","type":"valveGate","standard":"ASME B16.34","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"nps":1,"class":800,"faceToFace":79,"socketDepth":13,"stemHeight":190,"handwheelDiameter":100,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"}}]},{"id":"mss-sp-97-sockolet-rte-stub","type":"sockolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"nps":2,"smallNps":1,"centreToOutlet":50,"socketDepth":13,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"}}]},{"id":"asme-b16.5-so-rte-stub","type":"flangeSocketWeld","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":1,"class":150,"facing":"RF","outsideDiameter":108,"thickness":14.3,"boltCircle":79.4,"boltCount":4,"boltDiameter":15.875,"raisedFaceDiameter":50.8,"lengthThroughHub":17.5,"socketDepth":13,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}}]},{"id":"#20","type":"elbow90","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"nps":1,"centreToEnd":38,"threadEngagement":17.3,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"}}]},{"id":"asme-b16.11-thd-tee-rte-stub","type":"tee","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"nps":1,"centreToEndRun":38,"centreToEndBranch":38,"threadEngagement":17.3,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"}}]},{"id":"asme-b16.34-thd-gate-rte-stub","type":"valveGate","standard":"ASME B16.34","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"nps":1,"class":800,"faceToFace":79,"threadEngagement":17.3,"stemHeight":190,"handwheelDiameter":100,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"}}]},{"id":"mss-sp-97-threadolet-rte-stub","type":"threadolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"nps":2,"smallNps":1,"centreToOutlet":50,"threadEngagement":17.3,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"}}]},{"id":"#21","type":"flangeThreaded","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":1,"class":150,"facing":"RF","outsideDiameter":108,"thickness":14.3,"boltCircle":79.4,"boltCount":4,"boltDiameter":15.875,"raisedFaceDiameter":50.8,"lengthThroughHub":17.5,"threadEngagement":14,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}}]},{"id":"asme-b16.20-sw-small-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":1,"class":150,"innerRingId":34.9,"centeringRingOd":69.9,"thickness":3,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"}}]},{"id":"asme-b16.5-bolting-small-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":1,"class":150,"facing":"RF","boltCount":4,"boltDiameter":15.875,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"}}]}]}},
+        "params": {
+          "catalog": {
+            "format": "#16",
+            "schemaVersion": 1,
+            "id": "#17",
+            "version": "1.0.0",
+            "title": "02 RTE V1 validation stub, small bore: socket-weld and threaded fittings, valves and flanges of NPS 1 (and a NPS 2 x 1 sockolet / threadolet), shaped after ASME B16.11 / B16.34 / B16.5 but with round declared INPUT dimensions. centreToEnd is measured to the socket mouth / threaded end face (B16.11 publishes the distance to the socket bottom A = centreToEnd - socketDepth). Not a standard; no value is verified.",
+            "licence": "open-data",
+            "families": [
+              {
+                "id": "#18",
+                "type": "elbow90",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "centreToEnd": 41,
+                    "socketDepth": 13,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#19",
+                "type": "elbow45",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "centreToEnd": 35,
+                    "socketDepth": 13,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.11-sw-tee-rte-stub",
+                "type": "tee",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "centreToEndRun": 41,
+                    "centreToEndBranch": 41,
+                    "socketDepth": 13,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.34-sw-gate-rte-stub",
+                "type": "valveGate",
+                "standard": "ASME B16.34",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 800,
+                    "faceToFace": 79,
+                    "socketDepth": 13,
+                    "stemHeight": 190,
+                    "handwheelDiameter": 100,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mss-sp-97-sockolet-rte-stub",
+                "type": "sockolet",
+                "standard": "MSS SP-97",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "nps": 2,
+                    "smallNps": 1,
+                    "centreToOutlet": 50,
+                    "socketDepth": 13,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.5-so-rte-stub",
+                "type": "flangeSocketWeld",
+                "standard": "ASME B16.5",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 150,
+                    "facing": "RF",
+                    "outsideDiameter": 108,
+                    "thickness": 14.3,
+                    "boltCircle": 79.4,
+                    "boltCount": 4,
+                    "boltDiameter": 15.875,
+                    "raisedFaceDiameter": 50.8,
+                    "lengthThroughHub": 17.5,
+                    "socketDepth": 13,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#20",
+                "type": "elbow90",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "centreToEnd": 38,
+                    "threadEngagement": 17.3,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.11-thd-tee-rte-stub",
+                "type": "tee",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "centreToEndRun": 38,
+                    "centreToEndBranch": 38,
+                    "threadEngagement": 17.3,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.34-thd-gate-rte-stub",
+                "type": "valveGate",
+                "standard": "ASME B16.34",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 800,
+                    "faceToFace": 79,
+                    "threadEngagement": 17.3,
+                    "stemHeight": 190,
+                    "handwheelDiameter": 100,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mss-sp-97-threadolet-rte-stub",
+                "type": "threadolet",
+                "standard": "MSS SP-97",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "nps": 2,
+                    "smallNps": 1,
+                    "centreToOutlet": 50,
+                    "threadEngagement": 17.3,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#21",
+                "type": "flangeThreaded",
+                "standard": "ASME B16.5",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 150,
+                    "facing": "RF",
+                    "outsideDiameter": 108,
+                    "thickness": 14.3,
+                    "boltCircle": 79.4,
+                    "boltCount": 4,
+                    "boltDiameter": 15.875,
+                    "raisedFaceDiameter": 50.8,
+                    "lengthThroughHub": 17.5,
+                    "threadEngagement": 14,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.20-sw-small-rte-stub",
+                "type": "gasketSpiralWound",
+                "standard": "ASME B16.20",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 150,
+                    "innerRingId": 34.9,
+                    "centeringRingOd": 69.9,
+                    "thickness": 3,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.5-bolting-small-rte-stub",
+                "type": "boltSet",
+                "standard": "ASME B16.5 bolting",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "nps": 1,
+                    "class": 150,
+                    "facing": "RF",
+                    "boltCount": 4,
+                    "boltDiameter": 15.875,
+                    "provenance": {
+                      "sourceId": "RTE",
+                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#22",
         "name": "import_pipe_spec",
-        "params": {"spec":{"format":"llull-pipe-spec","schemaVersion":1,"id":"SW800","title":"Small-bore socket-weld spec, NPS 1-2 (02 RTE V1 validation spec; dimensions of the SC-RTE-10 plan)","service":"SC-RTE V1 small-bore validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"fromNps":1,"toNps":2},"catalogs":["#17","llull-open-piping"],"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"components":[{"id":"P-PE","type":"pipe","fromNps":1,"toNps":2,"schedule":"80","ends":"PE","catalogRef":"asme-b36.10m"},{"id":"E90-SW","type":"elbow90","fromNps":1,"toNps":1,"ends":"SW","catalogRef":"asme-b16.11-sw"},{"id":"E45-SW","type":"elbow45","fromNps":1,"toNps":1,"ends":"SW","catalogRef":"asme-b16.11-sw"},{"id":"T-SW","type":"tee","fromNps":1,"toNps":1,"ends":"SW","catalogRef":"asme-b16.11-sw"},{"id":"V-GATE-SW","type":"valveGate","fromNps":1,"toNps":1,"ends":"SW","class":800,"catalogRef":"asme-b16.34-sw"},{"id":"SOCK","type":"sockolet","fromNps":2,"toNps":2,"branchFromNps":1,"branchToNps":1,"ends":"SW","catalogRef":"mss-sp-97-sockolet"},{"id":"F-SW","type":"flangeSocketWeld","fromNps":1,"toNps":1,"facing":"RF","class":150,"catalogRef":"asme-b16.5-so"},{"id":"G-SW","type":"gasketSpiralWound","fromNps":1,"toNps":1,"class":150,"catalogRef":"asme-b16.20"},{"id":"B-STUD","type":"boltSet","fromNps":1,"toNps":1,"class":150,"facing":"RF","catalogRef":"asme-b16.5-bolting"}],"status":"draft","provenance":{"author":"02 RTE V1 validation pack","accessed":"2026-10-24"},"branchTable":{"system":"NPS","cells":{"1":{"1":"T"},"2":{"1":"S"}}}}},
+        "params": {
+          "spec": {
+            "format": "llull-pipe-spec",
+            "schemaVersion": 1,
+            "id": "SW800",
+            "title": "Small-bore socket-weld spec, NPS 1-2 (02 RTE V1 validation spec; dimensions of the SC-RTE-10 plan)",
+            "service": "SC-RTE V1 small-bore validation plans",
+            "dimensionalStandard": "ASME",
+            "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
+            "corrosionAllowance": { "value": 3, "unit": "mm" },
+            "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
+            "sizeRange": { "fromNps": 1, "toNps": 2 },
+            "catalogs": ["#17", "llull-open-piping"],
+            "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
+            "components": [
+              { "id": "P-PE", "type": "pipe", "fromNps": 1, "toNps": 2, "schedule": "80", "ends": "PE", "catalogRef": "asme-b36.10m" },
+              { "id": "E90-SW", "type": "elbow90", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+              { "id": "E45-SW", "type": "elbow45", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+              { "id": "T-SW", "type": "tee", "fromNps": 1, "toNps": 1, "ends": "SW", "catalogRef": "asme-b16.11-sw" },
+              {
+                "id": "V-GATE-SW",
+                "type": "valveGate",
+                "fromNps": 1,
+                "toNps": 1,
+                "ends": "SW",
+                "class": 800,
+                "catalogRef": "asme-b16.34-sw"
+              },
+              {
+                "id": "SOCK",
+                "type": "sockolet",
+                "fromNps": 2,
+                "toNps": 2,
+                "branchFromNps": 1,
+                "branchToNps": 1,
+                "ends": "SW",
+                "catalogRef": "mss-sp-97-sockolet"
+              },
+              {
+                "id": "F-SW",
+                "type": "flangeSocketWeld",
+                "fromNps": 1,
+                "toNps": 1,
+                "facing": "RF",
+                "class": 150,
+                "catalogRef": "asme-b16.5-so"
+              },
+              { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 1, "toNps": 1, "class": 150, "catalogRef": "asme-b16.20" },
+              {
+                "id": "B-STUD",
+                "type": "boltSet",
+                "fromNps": 1,
+                "toNps": 1,
+                "class": 150,
+                "facing": "RF",
+                "catalogRef": "asme-b16.5-bolting"
+              }
+            ],
+            "status": "draft",
+            "provenance": { "author": "02 RTE V1 validation pack", "accessed": "2026-10-24" },
+            "branchTable": { "system": "NPS", "cells": { "1": { "1": "T" }, "2": { "1": "S" } } }
+          }
+        },
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#23",
         "name": "add_tie_in_point",
-        "params": {"tag":"SW-A","position":[0,0,0],"direction":[0,0,1],"dn":25,"endType":"SW"},
+        "params": { "tag": "SW-A", "position": [0, 0, 0], "direction": [0, 0, 1], "dn": 25, "endType": "SW" },
         "suppressed": false,
         "affected": ["#24"]
       },
       {
         "id": "#25",
         "name": "create_pipeline",
-        "params": {"service":"P","sequence":"5001","spec":"SW800","dn":25},
+        "params": { "service": "P", "sequence": "5001", "spec": "SW800", "dn": 25 },
         "suppressed": false,
         "affected": ["#3"]
       },
       {
         "id": "#26",
         "name": "route_pipe",
-        "params": {"lineId":"#3","from":{"portId":"#24"},"legs":[{"direction":"+Z","length":1000},{"direction":"+X","length":1500}],"inline":[{"type":"valveGate","tag":"XV-5","at":{"leg":0,"centreDistance":500},"stemDirection":[0,-1,0]}]},
+        "params": {
+          "lineId": "#3",
+          "from": { "portId": "#24" },
+          "legs": [
+            { "direction": "+Z", "length": 1000 },
+            { "direction": "+X", "length": 1500 }
+          ],
+          "inline": [{ "type": "valveGate", "tag": "XV-5", "at": { "leg": 0, "centreDistance": 500 }, "stemDirection": [0, -1, 0] }]
+        },
         "suppressed": false,
         "affected": ["#4"]
       }
@@ -220,21 +578,747 @@
     "nextStepNumber": 7,
     "plant": {
       "catalog": {
-        "catalogs": {"#17":{"format":"#16","schemaVersion":1,"id":"#17","version":"1.0.0","title":"02 RTE V1 validation stub, small bore: socket-weld and threaded fittings, valves and flanges of NPS 1 (and a NPS 2 x 1 sockolet / threadolet), shaped after ASME B16.11 / B16.34 / B16.5 but with round declared INPUT dimensions. centreToEnd is measured to the socket mouth / threaded end face (B16.11 publishes the distance to the socket bottom A = centreToEnd - socketDepth). Not a standard; no value is verified.","licence":"open-data","families":[{"id":"#18","type":"elbow90","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"dims":{"centreToEnd":{"value":41,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"}}}}]},{"id":"#19","type":"elbow45","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"dims":{"centreToEnd":{"value":35,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"}}}}]},{"id":"asme-b16.11-sw-tee-rte-stub","type":"tee","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"dims":{"centreToEndRun":{"value":41,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"}},"centreToEndBranch":{"value":41,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"}}}}]},{"id":"asme-b16.34-sw-gate-rte-stub","type":"valveGate","standard":"ASME B16.34","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":800,"dims":{"faceToFace":{"value":79,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"}},"stemHeight":{"value":190,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"}},"handwheelDiameter":{"value":100,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"}}}}]},{"id":"mss-sp-97-sockolet-rte-stub","type":"sockolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["SW"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"smallSize":{"system":"NPS","key":"1","value":1},"dims":{"centreToOutlet":{"value":50,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"}}}}]},{"id":"asme-b16.5-so-rte-stub","type":"flangeSocketWeld","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":150,"facing":"RF","dims":{"outsideDiameter":{"value":108,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"thickness":{"value":14.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"boltCircle":{"value":79.4,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"boltCount":{"value":4,"unit":"count","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"raisedFaceDiameter":{"value":50.8,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"lengthThroughHub":{"value":17.5,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}},"socketDepth":{"value":13,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"}}}}]},{"id":"#20","type":"elbow90","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"dims":{"centreToEnd":{"value":38,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"}},"threadEngagement":{"value":17.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"}}}}]},{"id":"asme-b16.11-thd-tee-rte-stub","type":"tee","standard":"ASME B16.11","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"dims":{"centreToEndRun":{"value":38,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"}},"centreToEndBranch":{"value":38,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"}},"threadEngagement":{"value":17.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"}}}}]},{"id":"asme-b16.34-thd-gate-rte-stub","type":"valveGate","standard":"ASME B16.34","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":800,"dims":{"faceToFace":{"value":79,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"}},"threadEngagement":{"value":17.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"}},"stemHeight":{"value":190,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"}},"handwheelDiameter":{"value":100,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"}}}}]},{"id":"mss-sp-97-threadolet-rte-stub","type":"threadolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["THD"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"smallSize":{"system":"NPS","key":"1","value":1},"dims":{"centreToOutlet":{"value":50,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"}},"threadEngagement":{"value":17.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"}}}}]},{"id":"#21","type":"flangeThreaded","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":150,"facing":"RF","dims":{"outsideDiameter":{"value":108,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"thickness":{"value":14.3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"boltCircle":{"value":79.4,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"boltCount":{"value":4,"unit":"count","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"raisedFaceDiameter":{"value":50.8,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"lengthThroughHub":{"value":17.5,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}},"threadEngagement":{"value":14,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"}}}}]},{"id":"asme-b16.20-sw-small-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":150,"dims":{"innerRingId":{"value":34.9,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"}},"centeringRingOd":{"value":69.9,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"}},"thickness":{"value":3,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"}}}}]},{"id":"asme-b16.5-bolting-small-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"1","value":1},"class":150,"facing":"RF","dims":{"boltCount":{"value":4,"unit":"count","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"}}}}]}]}},
+        "catalogs": {
+          "#17": {
+            "format": "#16",
+            "schemaVersion": 1,
+            "id": "#17",
+            "version": "1.0.0",
+            "title": "02 RTE V1 validation stub, small bore: socket-weld and threaded fittings, valves and flanges of NPS 1 (and a NPS 2 x 1 sockolet / threadolet), shaped after ASME B16.11 / B16.34 / B16.5 but with round declared INPUT dimensions. centreToEnd is measured to the socket mouth / threaded end face (B16.11 publishes the distance to the socket bottom A = centreToEnd - socketDepth). Not a standard; no value is verified.",
+            "licence": "open-data",
+            "families": [
+              {
+                "id": "#18",
+                "type": "elbow90",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToEnd": {
+                        "value": 41,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 90 elbow NPS 1: centre to socket mouth 41 (bottom 28), socket depth 13"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#19",
+                "type": "elbow45",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToEnd": {
+                        "value": 35,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW 45 elbow NPS 1: centre to socket mouth 35, socket depth 13"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.11-sw-tee-rte-stub",
+                "type": "tee",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToEndRun": {
+                        "value": 41,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"
+                        }
+                      },
+                      "centreToEndBranch": {
+                        "value": 41,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW tee NPS 1: C = M = 41, socket depth 13"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.34-sw-gate-rte-stub",
+                "type": "valveGate",
+                "standard": "ASME B16.34",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 800,
+                    "dims": {
+                      "faceToFace": {
+                        "value": 79,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"
+                        }
+                      },
+                      "stemHeight": {
+                        "value": 190,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"
+                        }
+                      },
+                      "handwheelDiameter": {
+                        "value": 100,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): SW gate valve Class 800 NPS 1: face-to-face 79, socket depth 13, handwheel centre 190 above the pipe centre, wheel diameter 100"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mss-sp-97-sockolet-rte-stub",
+                "type": "sockolet",
+                "standard": "MSS SP-97",
+                "dimensionalStandard": "ASME",
+                "ends": ["SW"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "2", "value": 2 },
+                    "smallSize": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToOutlet": {
+                        "value": 50,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): sockolet 2x1: outlet mouth 50 from the header centreline, socket depth 13"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.5-so-rte-stub",
+                "type": "flangeSocketWeld",
+                "standard": "ASME B16.5",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 150,
+                    "facing": "RF",
+                    "dims": {
+                      "outsideDiameter": {
+                        "value": 108,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "thickness": {
+                        "value": 14.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "boltCircle": {
+                        "value": 79.4,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "boltCount": {
+                        "value": 4,
+                        "unit": "count",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "boltDiameter": {
+                        "value": 15.875,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "raisedFaceDiameter": {
+                        "value": 50.8,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "lengthThroughHub": {
+                        "value": 17.5,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      },
+                      "socketDepth": {
+                        "value": 13,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): socket-weld flange Class 150 RF NPS 1: hub length 17.5 (back of the hub to the face), socket depth 13"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#20",
+                "type": "elbow90",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToEnd": {
+                        "value": 38,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"
+                        }
+                      },
+                      "threadEngagement": {
+                        "value": 17.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded 90 elbow NPS 1: centre to end face 38; pipe screwed in by 17.3 (B1.20.1 L2 0.683 in)"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.11-thd-tee-rte-stub",
+                "type": "tee",
+                "standard": "ASME B16.11",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToEndRun": {
+                        "value": 38,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"
+                        }
+                      },
+                      "centreToEndBranch": {
+                        "value": 38,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"
+                        }
+                      },
+                      "threadEngagement": {
+                        "value": 17.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded tee NPS 1: C = M = 38, engagement 17.3"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.34-thd-gate-rte-stub",
+                "type": "valveGate",
+                "standard": "ASME B16.34",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 800,
+                    "dims": {
+                      "faceToFace": {
+                        "value": 79,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"
+                        }
+                      },
+                      "threadEngagement": {
+                        "value": 17.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"
+                        }
+                      },
+                      "stemHeight": {
+                        "value": 190,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"
+                        }
+                      },
+                      "handwheelDiameter": {
+                        "value": 100,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded gate valve Class 800 NPS 1: end-to-end 79, engagement 17.3"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mss-sp-97-threadolet-rte-stub",
+                "type": "threadolet",
+                "standard": "MSS SP-97",
+                "dimensionalStandard": "ASME",
+                "ends": ["THD"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "2", "value": 2 },
+                    "smallSize": { "system": "NPS", "key": "1", "value": 1 },
+                    "dims": {
+                      "centreToOutlet": {
+                        "value": 50,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"
+                        }
+                      },
+                      "threadEngagement": {
+                        "value": 17.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threadolet 2x1: outlet face 50 from the header centreline, engagement 17.3"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "#21",
+                "type": "flangeThreaded",
+                "standard": "ASME B16.5",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 150,
+                    "facing": "RF",
+                    "dims": {
+                      "outsideDiameter": {
+                        "value": 108,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "thickness": {
+                        "value": 14.3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "boltCircle": {
+                        "value": 79.4,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "boltCount": {
+                        "value": 4,
+                        "unit": "count",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "boltDiameter": {
+                        "value": 15.875,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "raisedFaceDiameter": {
+                        "value": 50.8,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "lengthThroughHub": {
+                        "value": 17.5,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      },
+                      "threadEngagement": {
+                        "value": 14,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): threaded flange Class 150 RF NPS 1: hub length 17.5, engagement 14"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.20-sw-small-rte-stub",
+                "type": "gasketSpiralWound",
+                "standard": "ASME B16.20",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 150,
+                    "dims": {
+                      "innerRingId": {
+                        "value": 34.9,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"
+                        }
+                      },
+                      "centeringRingOd": {
+                        "value": 69.9,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"
+                        }
+                      },
+                      "thickness": {
+                        "value": 3,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): spiral-wound gasket Class 150 NPS 1, thickness 3.0 (the same declared input as NPS 4)"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "asme-b16.5-bolting-small-rte-stub",
+                "type": "boltSet",
+                "standard": "ASME B16.5 bolting",
+                "dimensionalStandard": "ASME",
+                "ends": ["FL"],
+                "sizes": [
+                  {
+                    "size": { "system": "NPS", "key": "1", "value": 1 },
+                    "class": 150,
+                    "facing": "RF",
+                    "dims": {
+                      "boltCount": {
+                        "value": 4,
+                        "unit": "count",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"
+                        }
+                      },
+                      "boltDiameter": {
+                        "value": 15.875,
+                        "unit": "mm",
+                        "verified": false,
+                        "provenance": {
+                          "sourceId": "RTE",
+                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): NPS 1 Class 150: 4 stud bolts 1/2 in"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
         "catalogOrder": ["#17"]
       },
       "spec": {
-        "specs": {"SW800":[{"format":"llull-pipe-spec","schemaVersion":1,"id":"SW800","revision":1,"title":"Small-bore socket-weld spec, NPS 1-2 (02 RTE V1 validation spec; dimensions of the SC-RTE-10 plan)","service":"SC-RTE V1 small-bore validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"2","value":2}},"catalogs":["#17","llull-open-piping"],"components":[{"id":"P-PE","type":"pipe","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"2","value":2},"catalogRef":"asme-b36.10m","ends":"PE","schedule":"80"},{"id":"E90-SW","type":"elbow90","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.11-sw","ends":"SW"},{"id":"E45-SW","type":"elbow45","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.11-sw","ends":"SW"},{"id":"T-SW","type":"tee","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.11-sw","ends":"SW"},{"id":"V-GATE-SW","type":"valveGate","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.34-sw","ends":"SW","class":800},{"id":"SOCK","type":"sockolet","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"2","value":2},"branchFrom":{"system":"NPS","key":"1","value":1},"branchTo":{"system":"NPS","key":"1","value":1},"catalogRef":"mss-sp-97-sockolet","ends":"SW"},{"id":"F-SW","type":"flangeSocketWeld","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.5-so","facing":"RF","class":150},{"id":"G-SW","type":"gasketSpiralWound","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.20","class":150},{"id":"B-STUD","type":"boltSet","from":{"system":"NPS","key":"1","value":1},"to":{"system":"NPS","key":"1","value":1},"catalogRef":"asme-b16.5-bolting","facing":"RF","class":150}],"branchTable":{"system":"NPS","cells":{"1":{"1":"T"},"2":{"1":"S"}}},"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"status":"draft","provenance":{"accessed":"2026-10-24","author":"02 RTE V1 validation pack"}}]},
+        "specs": {
+          "SW800": [
+            {
+              "format": "llull-pipe-spec",
+              "schemaVersion": 1,
+              "id": "SW800",
+              "revision": 1,
+              "title": "Small-bore socket-weld spec, NPS 1-2 (02 RTE V1 validation spec; dimensions of the SC-RTE-10 plan)",
+              "service": "SC-RTE V1 small-bore validation plans",
+              "dimensionalStandard": "ASME",
+              "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
+              "corrosionAllowance": { "value": 3, "unit": "mm" },
+              "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
+              "sizeRange": { "from": { "system": "NPS", "key": "1", "value": 1 }, "to": { "system": "NPS", "key": "2", "value": 2 } },
+              "catalogs": ["#17", "llull-open-piping"],
+              "components": [
+                {
+                  "id": "P-PE",
+                  "type": "pipe",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "2", "value": 2 },
+                  "catalogRef": "asme-b36.10m",
+                  "ends": "PE",
+                  "schedule": "80"
+                },
+                {
+                  "id": "E90-SW",
+                  "type": "elbow90",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.11-sw",
+                  "ends": "SW"
+                },
+                {
+                  "id": "E45-SW",
+                  "type": "elbow45",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.11-sw",
+                  "ends": "SW"
+                },
+                {
+                  "id": "T-SW",
+                  "type": "tee",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.11-sw",
+                  "ends": "SW"
+                },
+                {
+                  "id": "V-GATE-SW",
+                  "type": "valveGate",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.34-sw",
+                  "ends": "SW",
+                  "class": 800
+                },
+                {
+                  "id": "SOCK",
+                  "type": "sockolet",
+                  "from": { "system": "NPS", "key": "2", "value": 2 },
+                  "to": { "system": "NPS", "key": "2", "value": 2 },
+                  "branchFrom": { "system": "NPS", "key": "1", "value": 1 },
+                  "branchTo": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "mss-sp-97-sockolet",
+                  "ends": "SW"
+                },
+                {
+                  "id": "F-SW",
+                  "type": "flangeSocketWeld",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.5-so",
+                  "facing": "RF",
+                  "class": 150
+                },
+                {
+                  "id": "G-SW",
+                  "type": "gasketSpiralWound",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.20",
+                  "class": 150
+                },
+                {
+                  "id": "B-STUD",
+                  "type": "boltSet",
+                  "from": { "system": "NPS", "key": "1", "value": 1 },
+                  "to": { "system": "NPS", "key": "1", "value": 1 },
+                  "catalogRef": "asme-b16.5-bolting",
+                  "facing": "RF",
+                  "class": 150
+                }
+              ],
+              "branchTable": { "system": "NPS", "cells": { "1": { "1": "T" }, "2": { "1": "S" } } },
+              "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
+              "status": "draft",
+              "provenance": { "accessed": "2026-10-24", "author": "02 RTE V1 validation pack" }
+            }
+          ]
+        },
         "specOrder": ["SW800"]
       },
       "piping": {
-        "tieIns": {"#24":{"id":"#24","tag":"SW-A","kind":"tie_in","port":{"position":[0,0,0],"direction":[0,0,1],"dn":25,"endType":"SW"}}},
+        "tieIns": {
+          "#24": {
+            "id": "#24",
+            "tag": "SW-A",
+            "kind": "tie_in",
+            "port": { "position": [0, 0, 0], "direction": [0, 0, 1], "dn": 25, "endType": "SW" }
+          }
+        },
         "tieInOrder": ["#24"],
-        "lines": {"#3":{"id":"#3","lineNumber":"25-P-5001-SW800","service":"P","sequence":"5001","spec":"SW800","dn":25}},
+        "lines": { "#3": { "id": "#3", "lineNumber": "25-P-5001-SW800", "service": "P", "sequence": "5001", "spec": "SW800", "dn": 25 } },
         "lineOrder": ["#3"],
-        "runs": {"#4":{"id":"#4","lineId":"#3","start":{"point":[0,0,0],"direction":[0,0,1],"ref":{"kind":"tieIn","id":"#24"}},"end":{"point":[1500,0,1000]},"pis":[[0,0,1000]],"inline":[{"id":"#27","type":"valveGate","tag":"XV-5","leg":0,"centreDistance":500,"stemDirection":[0,-1,0]}]}},
+        "runs": {
+          "#4": {
+            "id": "#4",
+            "lineId": "#3",
+            "start": { "point": [0, 0, 0], "direction": [0, 0, 1], "ref": { "kind": "tieIn", "id": "#24" } },
+            "end": { "point": [1500, 0, 1000] },
+            "pis": [[0, 0, 1000]],
+            "inline": [{ "id": "#27", "type": "valveGate", "tag": "XV-5", "leg": 0, "centreDistance": 500, "stemDirection": [0, -1, 0] }]
+          }
+        },
         "runOrder": ["#4"],
-        "entityIds": {"#4":["#1","#5","#7","#8","#9","#10","#12"]}
+        "entityIds": { "#4": ["#1", "#5", "#7", "#8", "#9", "#10", "#12"] }
       }
     }
   }

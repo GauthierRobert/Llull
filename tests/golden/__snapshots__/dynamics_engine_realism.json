@@ -8,8 +8,8 @@
         "kind": "cylinder",
         "radius": 80,
         "height": 20,
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#6b8f9c",
         "materialId": "steel_4340"
@@ -17,9 +17,9 @@
       "#3": {
         "id": "#3",
         "kind": "box",
-        "size": [130,10,10],
-        "position": [48.4,0,0],
-        "rotation": [0,0,0],
+        "size": [130, 10, 10],
+        "position": [48.4, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#6b8f9c",
         "materialId": "steel_4340"
@@ -27,9 +27,9 @@
       "#4": {
         "id": "#4",
         "kind": "box",
-        "size": [30,30,30],
-        "position": [145.5,0,0],
-        "rotation": [0,0,0],
+        "size": [30, 30, 30],
+        "position": [145.5, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#6b8f9c",
         "materialId": "al_4032"
@@ -39,40 +39,17 @@
         "kind": "cylinder",
         "radius": 100,
         "height": 10,
-        "position": [0,300,0],
-        "rotation": [0,0,0],
+        "position": [0, 300, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
     },
-    "order": [
-      "#1",
-      "#3",
-      "#4",
-      "#5"
-    ],
-    "layers": {
-      "#2": {
-        "id": "#2",
-        "name": "Layer 0",
-        "visible": true,
-        "locked": false
-      }
-    },
-    "layerOrder": [
-      "#2"
-    ],
+    "order": ["#1", "#3", "#4", "#5"],
+    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["#2"],
     "selection": [],
-    "camera": {
-      "target": [
-        0,
-        0,
-        0
-      ],
-      "azimuth": 2.35619449,
-      "polar": 1.04719755,
-      "distance": 12
-    },
+    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -82,143 +59,158 @@
       {
         "id": "#6",
         "name": "add_cylinder",
-        "params": {"radius":80,"height":20,"axis":[0,0,1],"position":[0,0,0]},
+        "params": { "radius": 80, "height": 20, "axis": [0, 0, 1], "position": [0, 0, 0] },
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#7",
         "name": "add_box",
-        "params": {"size":[130,10,10],"position":[48.4,0,0]},
+        "params": { "size": [130, 10, 10], "position": [48.4, 0, 0] },
         "suppressed": false,
         "affected": ["#3"]
       },
       {
         "id": "#8",
         "name": "add_box",
-        "params": {"size":[30,30,30],"position":[145.5,0,0]},
+        "params": { "size": [30, 30, 30], "position": [145.5, 0, 0] },
         "suppressed": false,
         "affected": ["#4"]
       },
       {
         "id": "#9",
         "name": "add_cylinder",
-        "params": {"radius":100,"height":10,"axis":[0,0,1],"position":[0,300,0]},
+        "params": { "radius": 100, "height": 10, "axis": [0, 0, 1], "position": [0, 300, 0] },
         "suppressed": false,
         "affected": ["#5"]
       },
       {
         "id": "#10",
         "name": "assign_material",
-        "params": {"materialName":"steel_4340","entityIds":["#1","#3"]},
+        "params": { "materialName": "steel_4340", "entityIds": ["#1", "#3"] },
         "suppressed": false,
-        "affected": ["#1","#3"]
+        "affected": ["#1", "#3"]
       },
       {
         "id": "#11",
         "name": "assign_material",
-        "params": {"materialName":"al_4032","entityIds":["#4"]},
+        "params": { "materialName": "al_4032", "entityIds": ["#4"] },
         "suppressed": false,
         "affected": ["#4"]
       },
-      {
-        "id": "#12",
-        "name": "add_rigid_body",
-        "params": {"entityIds":["#1"],"id":"#13"},
-        "suppressed": false,
-        "affected": ["#13"]
-      },
-      {
-        "id": "#14",
-        "name": "add_rigid_body",
-        "params": {"entityIds":["#3"],"id":"#15"},
-        "suppressed": false,
-        "affected": ["#15"]
-      },
-      {
-        "id": "#16",
-        "name": "add_rigid_body",
-        "params": {"entityIds":["#4"],"id":"#17"},
-        "suppressed": false,
-        "affected": ["#17"]
-      },
+      { "id": "#12", "name": "add_rigid_body", "params": { "entityIds": ["#1"], "id": "#13" }, "suppressed": false, "affected": ["#13"] },
+      { "id": "#14", "name": "add_rigid_body", "params": { "entityIds": ["#3"], "id": "#15" }, "suppressed": false, "affected": ["#15"] },
+      { "id": "#16", "name": "add_rigid_body", "params": { "entityIds": ["#4"], "id": "#17" }, "suppressed": false, "affected": ["#17"] },
       {
         "id": "#18",
         "name": "add_rigid_body",
-        "params": {"entityIds":["#5"],"massKg":0.5,"id":"#19"},
+        "params": { "entityIds": ["#5"], "massKg": 0.5, "id": "#19" },
         "suppressed": false,
         "affected": ["#19"]
       },
       {
         "id": "#20",
         "name": "add_body_joint",
-        "params": {"id":"#21","kind":"revolute","child":"#13","anchor":[0,0,0],"axis":[0,0,1]},
+        "params": { "id": "#21", "kind": "revolute", "child": "#13", "anchor": [0, 0, 0], "axis": [0, 0, 1] },
         "suppressed": false,
         "affected": ["#21"]
       },
       {
         "id": "#22",
         "name": "add_body_joint",
-        "params": {"id":"#23","kind":"revolute","child":"#15","parent":"#13","anchor":[30.5,0,0],"axis":[0,0,1]},
+        "params": { "id": "#23", "kind": "revolute", "child": "#15", "parent": "#13", "anchor": [30.5, 0, 0], "axis": [0, 0, 1] },
         "suppressed": false,
         "affected": ["#23"]
       },
       {
         "id": "#24",
         "name": "add_body_joint",
-        "params": {"id":"#25","kind":"spherical","child":"#17","parent":"#15","anchor":[160.5,0,0]},
+        "params": { "id": "#25", "kind": "spherical", "child": "#17", "parent": "#15", "anchor": [160.5, 0, 0] },
         "suppressed": false,
         "affected": ["#25"]
       },
       {
         "id": "#26",
         "name": "add_body_joint",
-        "params": {"id":"#27","kind":"prismatic","child":"#17","anchor":[160.5,0,0],"axis":[1,0,0]},
+        "params": { "id": "#27", "kind": "prismatic", "child": "#17", "anchor": [160.5, 0, 0], "axis": [1, 0, 0] },
         "suppressed": false,
         "affected": ["#27"]
       },
       {
         "id": "#28",
         "name": "add_body_joint",
-        "params": {"id":"#29","kind":"revolute","child":"#19","anchor":[0,300,0],"axis":[0,0,1]},
+        "params": { "id": "#29", "kind": "revolute", "child": "#19", "anchor": [0, 300, 0], "axis": [0, 0, 1] },
         "suppressed": false,
         "affected": ["#29"]
       },
       {
         "id": "#30",
         "name": "add_gear_coupling",
-        "params": {"id":"#31","driver":"#21","driven":"#29","teeth":[21,51],"efficiency":0.99},
+        "params": { "id": "#31", "driver": "#21", "driven": "#29", "teeth": [21, 51], "efficiency": 0.99 },
         "suppressed": false,
         "affected": ["#31"]
       },
       {
         "id": "#32",
         "name": "set_engine_losses",
-        "params": {"#13":"#21","model":{"kind":"chen_flynn","aPa":40000,"bRatio":0.005,"cPaPerRpm":5,"dPaPerRpm2":0.0000015,"source":"test input (not measured data)"}},
+        "params": {
+          "#13": "#21",
+          "model": {
+            "kind": "chen_flynn",
+            "aPa": 40000,
+            "bRatio": 0.005,
+            "cPaPerRpm": 5,
+            "dPaPerRpm2": 0.0000015,
+            "source": "test input (not measured data)"
+          }
+        },
         "suppressed": false,
         "affected": ["#33"]
       },
       {
         "id": "#34",
         "name": "add_cylinder_pressure",
-        "params": {"#17":"#27","#13":"#21","boreMm":84,"compressionRatio":10.8,"model":{"kind":"single_zone","burn":{"ca50Deg":9,"durationDeg":50,"a":5,"m":2},"intakePressurePa":95000,"intakeTempK":330,"heat":{"kind":"calibrate_brake","brake":[{"rpm":5800,"brakeTorqueNm":121.012638}],"cylinderCount":4},"source":"test input"}},
+        "params": {
+          "#17": "#27",
+          "#13": "#21",
+          "boreMm": 84,
+          "compressionRatio": 10.8,
+          "model": {
+            "kind": "single_zone",
+            "burn": { "ca50Deg": 9, "durationDeg": 50, "a": 5, "m": 2 },
+            "intakePressurePa": 95000,
+            "intakeTempK": 330,
+            "heat": { "kind": "calibrate_brake", "brake": [{ "rpm": 5800, "brakeTorqueNm": 121.012638 }], "cylinderCount": 4 },
+            "source": "test input"
+          }
+        },
         "suppressed": false,
         "affected": ["#35"]
       },
       {
         "id": "#36",
         "name": "add_propeller",
-        "params": {"joint":"#29","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airspeedMps":20,"inertiaKgM2":0.25,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"}},
+        "params": {
+          "joint": "#29",
+          "diameter": 1.75,
+          "thrustCoefficient": 0.1,
+          "powerCoefficient": 0.05,
+          "airspeedMps": 20,
+          "inertiaKgM2": 0.25,
+          "table": {
+            "points": [
+              [0, 0.1, 0.05],
+              [0.4, 0.08, 0.055],
+              [0.8, 0.02, 0.04]
+            ],
+            "source": "synthetic test table",
+            "grade": "C"
+          }
+        },
         "suppressed": false,
         "affected": ["#37"]
       },
-      {
-        "id": "#38",
-        "name": "add_reference_data",
-        "params": {"preset":"#39"},
-        "suppressed": false,
-        "affected": ["#39"]
-      }
+      { "id": "#38", "name": "add_reference_data", "params": { "preset": "#39" }, "suppressed": false, "affected": ["#39"] }
     ],
     "configurations": {},
     "materials": {
@@ -253,43 +245,159 @@
     "driveRelationOrder": [],
     "nextStepNumber": 21,
     "dynamics": {
-      "gravity": [
-        0,
-        0,
-        -9.81
-      ],
+      "gravity": [0, 0, -9.81],
       "bodies": {
-        "#13": {"id":"#13","entityIds":["#1"],"fixed":false},
-        "#15": {"id":"#15","entityIds":["#3"],"fixed":false},
-        "#17": {"id":"#17","entityIds":["#4"],"fixed":false},
-        "#19": {"id":"#19","entityIds":["#5"],"fixed":false,"massKg":0.5}
+        "#13": { "id": "#13", "entityIds": ["#1"], "fixed": false },
+        "#15": { "id": "#15", "entityIds": ["#3"], "fixed": false },
+        "#17": { "id": "#17", "entityIds": ["#4"], "fixed": false },
+        "#19": { "id": "#19", "entityIds": ["#5"], "fixed": false, "massKg": 0.5 }
       },
       "joints": {
-        "#21": {"id":"#21","kind":"revolute","parent":"ground","child":"#13","anchor":[0,0,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0},
-        "#23": {"id":"#23","kind":"revolute","parent":"#13","child":"#15","anchor":[30.5,0,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0},
-        "#25": {"id":"#25","kind":"spherical","parent":"#15","child":"#17","anchor":[160.5,0,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0},
-        "#27": {"id":"#27","kind":"prismatic","parent":"ground","child":"#17","anchor":[160.5,0,0],"axis":[1,0,0],"damping":0,"friction":0,"initialVelocity":0},
-        "#29": {"id":"#29","kind":"revolute","parent":"ground","child":"#19","anchor":[0,300,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0}
+        "#21": {
+          "id": "#21",
+          "kind": "revolute",
+          "parent": "ground",
+          "child": "#13",
+          "anchor": [0, 0, 0],
+          "axis": [0, 0, 1],
+          "damping": 0,
+          "friction": 0,
+          "initialVelocity": 0
+        },
+        "#23": {
+          "id": "#23",
+          "kind": "revolute",
+          "parent": "#13",
+          "child": "#15",
+          "anchor": [30.5, 0, 0],
+          "axis": [0, 0, 1],
+          "damping": 0,
+          "friction": 0,
+          "initialVelocity": 0
+        },
+        "#25": {
+          "id": "#25",
+          "kind": "spherical",
+          "parent": "#15",
+          "child": "#17",
+          "anchor": [160.5, 0, 0],
+          "axis": [0, 0, 1],
+          "damping": 0,
+          "friction": 0,
+          "initialVelocity": 0
+        },
+        "#27": {
+          "id": "#27",
+          "kind": "prismatic",
+          "parent": "ground",
+          "child": "#17",
+          "anchor": [160.5, 0, 0],
+          "axis": [1, 0, 0],
+          "damping": 0,
+          "friction": 0,
+          "initialVelocity": 0
+        },
+        "#29": {
+          "id": "#29",
+          "kind": "revolute",
+          "parent": "ground",
+          "child": "#19",
+          "anchor": [0, 300, 0],
+          "axis": [0, 0, 1],
+          "damping": 0,
+          "friction": 0,
+          "initialVelocity": 0
+        }
       },
-      "gears": {
-        "#31": {"id":"#31","driver":"#21","driven":"#29","ratio":0.411764706,"efficiency":0.99,"teeth":[21,51]}
-      },
+      "gears": { "#31": { "id": "#31", "driver": "#21", "driven": "#29", "ratio": 0.411764706, "efficiency": 0.99, "teeth": [21, 51] } },
       "motors": {},
       "propellers": {
-        "#37": {"id":"#37","joint":"#29","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airDensity":1.225,"thrustDirection":[0,0,1],"airspeedMps":20,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"},"inertiaKgM2":0.25}
+        "#37": {
+          "id": "#37",
+          "joint": "#29",
+          "diameter": 1.75,
+          "thrustCoefficient": 0.1,
+          "powerCoefficient": 0.05,
+          "airDensity": 1.225,
+          "thrustDirection": [0, 0, 1],
+          "airspeedMps": 20,
+          "table": {
+            "points": [
+              [0, 0.1, 0.05],
+              [0.4, 0.08, 0.055],
+              [0.8, 0.02, 0.04]
+            ],
+            "source": "synthetic test table",
+            "grade": "C"
+          },
+          "inertiaKgM2": 0.25
+        }
       },
       "losses": {
-        "#33": {"id":"#33","#13":"#21","cylinders":[],"model":{"kind":"chen_flynn","aPa":40000,"bRatio":0.005,"cPaPerRpm":5,"dPaPerRpm2":0.0000015,"source":"test input (not measured data)"},"oilTempFactor":1}
+        "#33": {
+          "id": "#33",
+          "#13": "#21",
+          "cylinders": [],
+          "model": {
+            "kind": "chen_flynn",
+            "aPa": 40000,
+            "bRatio": 0.005,
+            "cPaPerRpm": 5,
+            "dPaPerRpm2": 0.0000015,
+            "source": "test input (not measured data)"
+          },
+          "oilTempFactor": 1
+        }
       },
       "cylinders": {
-        "#35": {"id":"#35","#17":"#27","#13":"#21","boreMm":84,"compressionRatio":10.8,"cycle":"four_stroke","firingOffsetDeg":0,"tdcCrankAngleRad":null,"ambientPressurePa":101325,"model":{"kind":"single_zone","burn":{"ca50Deg":9,"durationDeg":50,"a":5,"m":2,"rpmExponent":0.2},"woschni":{"c1":3.26,"c2Closed":2.28,"c2Exchange":6.18,"c3":0.00324,"tempExponent":-0.53,"wallTempK":450},"intakePressurePa":95000,"intakeTempK":330,"heat":{"kind":"table_vs_rpm","points":[[5800,860.88188]]},"source":"test input","calibratedRpm":[5800]}}
+        "#35": {
+          "id": "#35",
+          "#17": "#27",
+          "#13": "#21",
+          "boreMm": 84,
+          "compressionRatio": 10.8,
+          "cycle": "four_stroke",
+          "firingOffsetDeg": 0,
+          "tdcCrankAngleRad": null,
+          "ambientPressurePa": 101325,
+          "model": {
+            "kind": "single_zone",
+            "burn": { "ca50Deg": 9, "durationDeg": 50, "a": 5, "m": 2, "rpmExponent": 0.2 },
+            "woschni": { "c1": 3.26, "c2Closed": 2.28, "c2Exchange": 6.18, "c3": 0.00324, "tempExponent": -0.53, "wallTempK": 450 },
+            "intakePressurePa": 95000,
+            "intakeTempK": 330,
+            "heat": { "kind": "table_vs_rpm", "points": [[5800, 860.88188]] },
+            "source": "test input",
+            "calibratedRpm": [5800]
+          }
+        }
       }
     },
     "prototype": {
       "intents": {},
       "grounded": [],
       "references": {
-        "#39": {"id":"#39","quantity":"brake_torque_Nm","condition":{"throttle":"full","altitudeM":0,"note":"Rotax 912 ULS / S full throttle, 1352 cm3, ISA sea level"},"points":[{"value":99,"rpm":2500,"uncertainty":1},{"value":107,"rpm":3000,"uncertainty":1},{"value":114.5,"rpm":3500,"uncertainty":1},{"value":119,"rpm":4000,"uncertainty":1},{"value":124,"rpm":4500,"uncertainty":1},{"value":127.5,"rpm":5000,"uncertainty":1},{"value":128,"rpm":5100,"uncertainty":1},{"value":124.5,"rpm":5500,"uncertainty":1},{"value":121,"rpm":5800,"uncertainty":1}],"source":"BRP-Rotax OM-912 Ed.4 Rev.1 (2023) Fig. 4 full-throttle torque curve, digitised, +-1 N·m reading error [E-R2]; peak 128 N·m at 5100 rpm and 121 N·m at 5800 rpm agree with the datasheet [E-R1]","grade":"B","digitised":true,"calibrationRpm":[5800],"bandRel":0.05}
+        "#39": {
+          "id": "#39",
+          "quantity": "brake_torque_Nm",
+          "condition": { "throttle": "full", "altitudeM": 0, "note": "Rotax 912 ULS / S full throttle, 1352 cm3, ISA sea level" },
+          "points": [
+            { "value": 99, "rpm": 2500, "uncertainty": 1 },
+            { "value": 107, "rpm": 3000, "uncertainty": 1 },
+            { "value": 114.5, "rpm": 3500, "uncertainty": 1 },
+            { "value": 119, "rpm": 4000, "uncertainty": 1 },
+            { "value": 124, "rpm": 4500, "uncertainty": 1 },
+            { "value": 127.5, "rpm": 5000, "uncertainty": 1 },
+            { "value": 128, "rpm": 5100, "uncertainty": 1 },
+            { "value": 124.5, "rpm": 5500, "uncertainty": 1 },
+            { "value": 121, "rpm": 5800, "uncertainty": 1 }
+          ],
+          "source": "BRP-Rotax OM-912 Ed.4 Rev.1 (2023) Fig. 4 full-throttle torque curve, digitised, +-1 N·m reading error [E-R2]; peak 128 N·m at 5100 rpm and 121 N·m at 5800 rpm agree with the datasheet [E-R1]",
+          "grade": "B",
+          "digitised": true,
+          "calibrationRpm": [5800],
+          "bandRel": 0.05
+        }
       }
     }
   }

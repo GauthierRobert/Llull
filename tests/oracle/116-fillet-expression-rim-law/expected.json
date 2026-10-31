@@ -4,29 +4,11 @@
   "description": "VC-BLD-04: periodic expression law r(t) = 1 + 0.5 cos(2 pi t) on the top rim of a cylinder R 5 h 10 (smooth periodic interpolation of 33 samples)",
   "source": "analytic",
   "formula": "V = pi R^2 h - (1 - pi/4)-type Pappus integral over the meridian sections: generalised Pappus (data/periodic_rim_law.json); the 0.01 band is the pack tolerance",
-  "kernels": [
-    "occt"
-  ],
+  "kernels": ["occt"],
   "bodies": 1,
   "volume": 778.227638561,
   "area": null,
   "centroid": null,
-  "bbox": {
-    "min": [
-      -5,
-      -5,
-      -5
-    ],
-    "max": [
-      5,
-      5,
-      5
-    ]
-  },
-  "tolerance": {
-    "volume": 0.000013,
-    "area": 0.001,
-    "centroid": 0.001,
-    "bbox": 0.001
-  }
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.000013, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
 }

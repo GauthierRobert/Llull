@@ -1,20 +1,7 @@
 {
   "version": 2,
   "entityCount": 3,
-  "kinds": {
-    "instance": 3
-  },
-  "boundingBox": {
-    "min": [
-      -0.5,
-      -0.5,
-      -0.5
-    ],
-    "max": [
-      3.5,
-      0.5,
-      0.5
-    ]
-  },
+  "kinds": { "instance": 3 },
+  "boundingBox": { "min": [-0.5, -0.5, -0.5], "max": [3.5, 0.5, 0.5] },
   "featureSteps": 6
 }

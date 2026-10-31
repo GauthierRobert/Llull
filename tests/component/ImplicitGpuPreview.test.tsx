@@ -8,12 +8,35 @@ import { useStore } from '@ui/store';
 import { useImplicitPreviewStore } from '@ui/store/implicitPreviewStore';
 import { ImplicitPreviewControl, ImplicitPreviewNote } from '@ui/viewport/3d/implicitPreview/ImplicitPreviewControl';
 import { ImplicitGpuPreview, MAX_GPU_BODIES } from '@ui/viewport/3d/implicitPreview/ImplicitGpuPreview';
-import { MAX_MARCH_STEPS, STEP_SAFETY, fragmentShader, parseGpuAnswer } from '@ui/viewport/3d/implicitPreview/gpuProgram';
+import {
+  MAX_CLIP_PLANES,
+  MAX_MARCH_STEPS,
+  REFINE_STEPS,
+  STEP_SAFETY,
+  fragmentShader,
+  parseGpuAnswer,
+} from '@ui/viewport/3d/implicitPreview/gpuProgram';
 import { resetOfflineStore } from '../helpers/storeTestHelpers';
+
+const built = vi.hoisted(() => ({ materials: 0 }));
+vi.mock('three', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('three')>();
+  class CountingShaderMaterial extends actual.ShaderMaterial {
+    constructor(parameters?: ConstructorParameters<typeof actual.ShaderMaterial>[0]) {
+      super(parameters);
+      built.materials += 1;
+    }
+  }
+  return { ...actual, ShaderMaterial: CountingShaderMaterial };
+});
 
 vi.mock('@react-three/fiber', () => ({
   useThree: (select: (state: unknown) => unknown) =>
-    select({ camera: { position: { copy: () => ({ applyMatrix4: () => undefined }) } }, size: { height: 600 } }),
+    select({
+      camera: { position: { copy: () => ({ applyMatrix4: () => undefined }) } },
+      size: { height: 600 },
+      invalidate: () => undefined,
+    }),
   useFrame: () => undefined,
 }));
 
@@ -71,6 +94,58 @@ describe('GPU preview control and overlay', () => {
     expect(MAX_GPU_BODIES).toBe(2);
   });
 
+  it('the body the GPU draws is marked drawn (its mesh is hidden) and forgotten, note and mark, when deselected or when the switch goes off', () => {
+    const id = body('gyroid');
+    useStore.getState().select([id]);
+    useImplicitPreviewStore.setState({ enabled: true });
+    render(<ImplicitGpuPreview />);
+    expect(useImplicitPreviewStore.getState().drawn[id]).toBe(true);
+    act(() => useStore.getState().clearSelection());
+    expect(useImplicitPreviewStore.getState().drawn[id]).toBeUndefined();
+    expect(useImplicitPreviewStore.getState().fallbacks[id]).toBeUndefined();
+    act(() => useStore.getState().select([id]));
+    expect(useImplicitPreviewStore.getState().drawn[id]).toBe(true);
+    act(() => useImplicitPreviewStore.getState().setEnabled(false));
+    expect(useImplicitPreviewStore.getState().drawn[id]).toBeUndefined();
+  });
+
+  it('deselecting a body with no GPU path clears its note', () => {
+    const struts = body('struts');
+    useStore.getState().select([struts]);
+    useImplicitPreviewStore.setState({ enabled: true });
+    render(
+      <>
+        <ImplicitGpuPreview />
+        <ImplicitPreviewNote />
+      </>,
+    );
+    expect(screen.getByRole('status').textContent).toContain('strut_set');
+    act(() => useStore.getState().clearSelection());
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(useImplicitPreviewStore.getState().drawn[struts]).toBeUndefined();
+  });
+
+  it('a parameter drag that keeps the shader key keeps the material (only uniforms change); a structural edit builds a new one', () => {
+    const id = body('gyroid');
+    const field = (useStore.getState().document as unknown as { implicit: { bodies: Record<string, { field: string }> } }).implicit.bodies[
+      id
+    ]?.field as string;
+    useStore.getState().select([id]);
+    useImplicitPreviewStore.setState({ enabled: true });
+    built.materials = 0;
+    render(<ImplicitGpuPreview />);
+    expect(built.materials).toBe(1);
+    const edit = execute(useStore.getState().document, 'edit_field', { id: field, changes: { cellSize: 5 } });
+    expect(edit.error, edit.summary).toBeUndefined();
+    act(() => useStore.setState({ document: edit.document }));
+    expect(built.materials).toBe(1);
+    const family = execute(useStore.getState().document, 'edit_field', { id: field, changes: { kind: 'diamond' } });
+    if (family.error === undefined) {
+      act(() => useStore.setState({ document: family.document }));
+      expect(built.materials).toBe(2);
+    }
+  });
+
   it('a body with no GPU path draws nothing and the note names the blocking op; a body that compiles clears its entry', () => {
     const struts = body('struts');
     useStore.getState().select([struts]);
@@ -101,6 +176,7 @@ describe('implicit_gpu_program answer and shader text', () => {
       quality: 'approximate',
       bounds: { min: [0, 0, 0], max: [1, 1, 1] },
       instructionCount: 3,
+      minFeature: 0.5,
     },
   };
 
@@ -128,7 +204,17 @@ describe('implicit_gpu_program answer and shader text', () => {
     expect(shader).toContain('float fieldAt(float x, float y, float z)');
     expect(shader).toContain(`i < ${MAX_MARCH_STEPS}`);
     expect(shader).toContain('gl_FragDepth');
-    expect(shader).toContain('t += max(f * uStepScale');
+    // distances in document units: d = f * uStepScale is a lower bound, a step of d never crosses a sign change, no floor larger than d
+    expect(shader).toContain('d = F(ro + rd * t) * uStepScale;');
+    expect(shader).toContain('if (d < eps)');
+    expect(shader).toContain('t += min(d, uMaxStep);');
+    expect(shader.includes('t += max(')).toBe(false);
+    expect(shader).toContain(`i < ${REFINE_STEPS}`);
+    expect(shader).toContain('#include <tonemapping_fragment>');
+    expect(shader).toContain('#include <colorspace_fragment>');
+    expect(shader).toContain(`uniform vec4 uClip[${MAX_CLIP_PLANES}]`);
+    expect(shader).toContain('clip.z < -clip.w');
+    expect(fragmentShader(answer.glsl.source, 'abcd1234')).toContain('// llull-gpu:abcd1234');
     expect(STEP_SAFETY.exact).toBe(1);
     expect(STEP_SAFETY.approximate).toBeLessThan(STEP_SAFETY.bound);
     expect(STEP_SAFETY.bound).toBeLessThan(1);

@@ -6,58 +6,87 @@
       "#1": {
         "id": "#1",
         "kind": "nurbs_surface",
-        "surface": {"degreeU":1,"degreeV":1,"poles":[[[0,0,0],[0,10,0]],[[10,0,0],[10,10,0]]],"knotsU":[0,1],"multiplicitiesU":[2,2],"knotsV":[0,1],"multiplicitiesV":[2,2]},
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "surface": {
+          "degreeU": 1,
+          "degreeV": 1,
+          "poles": [
+            [
+              [0, 0, 0],
+              [0, 10, 0]
+            ],
+            [
+              [10, 0, 0],
+              [10, 10, 0]
+            ]
+          ],
+          "knotsU": [0, 1],
+          "multiplicitiesU": [2, 2],
+          "knotsV": [0, 1],
+          "multiplicitiesV": [2, 2]
+        },
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#9fb4c7"
       },
       "#3": {
         "id": "#3",
         "kind": "nurbs_surface",
-        "surface": {"degreeU":1,"degreeV":1,"poles":[[[0,0,10],[0,10,10]],[[10,0,10],[10,10,10]]],"knotsU":[0,1],"multiplicitiesU":[2,2],"knotsV":[0,1],"multiplicitiesV":[2,2]},
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "surface": {
+          "degreeU": 1,
+          "degreeV": 1,
+          "poles": [
+            [
+              [0, 0, 10],
+              [0, 10, 10]
+            ],
+            [
+              [10, 0, 10],
+              [10, 10, 10]
+            ]
+          ],
+          "knotsU": [0, 1],
+          "multiplicitiesU": [2, 2],
+          "knotsV": [0, 1],
+          "multiplicitiesV": [2, 2]
+        },
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#9fb4c7"
       },
       "#4": {
         "id": "#4",
         "kind": "nurbs_surface",
-        "surface": {"degreeU":1,"degreeV":1,"poles":[[[0,0,3],[0,10,3]],[[10,0,3],[10,10,3]]],"knotsU":[0,1],"multiplicitiesU":[2,2],"knotsV":[0,1],"multiplicitiesV":[2,2]},
-        "position": [0,0,0],
-        "rotation": [0,0,0],
+        "surface": {
+          "degreeU": 1,
+          "degreeV": 1,
+          "poles": [
+            [
+              [0, 0, 3],
+              [0, 10, 3]
+            ],
+            [
+              [10, 0, 3],
+              [10, 10, 3]
+            ]
+          ],
+          "knotsU": [0, 1],
+          "multiplicitiesU": [2, 2],
+          "knotsV": [0, 1],
+          "multiplicitiesV": [2, 2]
+        },
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "layerId": "#2",
         "color": "#9fb4c7"
       }
     },
-    "order": [
-      "#1",
-      "#3",
-      "#4"
-    ],
-    "layers": {
-      "#2": {
-        "id": "#2",
-        "name": "Layer 0",
-        "visible": true,
-        "locked": false
-      }
-    },
-    "layerOrder": [
-      "#2"
-    ],
+    "order": ["#1", "#3", "#4"],
+    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
+    "layerOrder": ["#2"],
     "selection": [],
-    "camera": {
-      "target": [
-        0,
-        0,
-        0
-      ],
-      "azimuth": 2.35619449,
-      "polar": 1.04719755,
-      "distance": 12
-    },
+    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
@@ -67,24 +96,44 @@
       {
         "id": "#5",
         "name": "create_nurbs_surface",
-        "params": {"degreeU":1,"degreeV":1,"poles":[[[0,0,0],[0,10,0]],[[10,0,0],[10,10,0]]]},
+        "params": {
+          "degreeU": 1,
+          "degreeV": 1,
+          "poles": [
+            [
+              [0, 0, 0],
+              [0, 10, 0]
+            ],
+            [
+              [10, 0, 0],
+              [10, 10, 0]
+            ]
+          ]
+        },
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#6",
         "name": "create_nurbs_surface",
-        "params": {"degreeU":1,"degreeV":1,"poles":[[[0,0,10],[0,10,10]],[[10,0,10],[10,10,10]]]},
+        "params": {
+          "degreeU": 1,
+          "degreeV": 1,
+          "poles": [
+            [
+              [0, 0, 10],
+              [0, 10, 10]
+            ],
+            [
+              [10, 0, 10],
+              [10, 10, 10]
+            ]
+          ]
+        },
         "suppressed": false,
         "affected": ["#3"]
       },
-      {
-        "id": "#7",
-        "name": "morph_bodies",
-        "params": {"fromId":"#1","toId":"#3","t":0.3},
-        "suppressed": false,
-        "affected": ["#4"]
-      }
+      { "id": "#7", "name": "morph_bodies", "params": { "fromId": "#1", "toId": "#3", "t": 0.3 }, "suppressed": false, "affected": ["#4"] }
     ],
     "configurations": {},
     "materials": {},
