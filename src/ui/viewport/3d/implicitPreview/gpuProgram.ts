@@ -25,7 +25,10 @@ export function parseGpuAnswer(data: unknown): GpuAnswer | null {
   if (typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
   if (d['gpu'] === false)
-    return { gpu: false, unsupported: Array.isArray(d['unsupported']) ? d['unsupported'].filter((n): n is string => typeof n === 'string') : [] };
+    return {
+      gpu: false,
+      unsupported: Array.isArray(d['unsupported']) ? d['unsupported'].filter((n): n is string => typeof n === 'string') : [],
+    };
   const glsl = d['glsl'] as Record<string, unknown> | undefined;
   if (d['gpu'] !== true || glsl === undefined || glsl === null) return null;
   const bounds = glsl['bounds'] as { min?: unknown; max?: unknown } | undefined;

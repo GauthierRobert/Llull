@@ -69,14 +69,26 @@ function GpuMesh({ program }: { program: GpuProgram }): React.ReactElement {
     inverse.copy(mesh.matrixWorld).invert();
     const u = material.uniforms;
     (u['uCamLocal']?.value as THREE.Vector3).copy(camera.position).applyMatrix4(inverse);
-    (u['uClipFromLocal']?.value as THREE.Matrix4).multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(mesh.matrixWorld);
+    (u['uClipFromLocal']?.value as THREE.Matrix4)
+      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      .multiply(mesh.matrixWorld);
     const pixel = 2 / (camera.projectionMatrix.elements[5] as number) / Math.max(height, 1);
     const ortho = (camera as THREE.OrthographicCamera).isOrthographicCamera === true;
     (u['uPixel'] as { value: number }).value = ortho ? 0 : pixel;
     (u['uMinEps'] as { value: number }).value = Math.max(1e-5 * diagonal, ortho ? pixel : 0);
   });
 
-  return <mesh ref={meshRef} geometry={geometry} material={material} renderOrder={1} frustumCulled={false} raycast={() => null} name="implicit-gpu-preview" />;
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      material={material}
+      renderOrder={1}
+      frustumCulled={false}
+      raycast={() => null}
+      name="implicit-gpu-preview"
+    />
+  );
 }
 
 function GpuBody({ entity }: { entity: MeshSolidEntity }): React.ReactElement | null {
@@ -91,7 +103,8 @@ function GpuBody({ entity }: { entity: MeshSolidEntity }): React.ReactElement | 
   if (answered !== null) last.current = answered.gpu ? answered.program : null;
   const setFallback = useImplicitPreviewStore((s) => s.setFallback);
   useEffect(() => {
-    if (answered !== null) setFallback(entity.id, answered.gpu ? [] : answered.unsupported.length > 0 ? answered.unsupported : ['unsupported']);
+    if (answered !== null)
+      setFallback(entity.id, answered.gpu ? [] : answered.unsupported.length > 0 ? answered.unsupported : ['unsupported']);
   }, [answered, entity.id, setFallback]);
   const program = answered === null && query.status !== 'done' ? last.current : answered?.gpu === true ? answered.program : null;
   if (program === null) return null;
