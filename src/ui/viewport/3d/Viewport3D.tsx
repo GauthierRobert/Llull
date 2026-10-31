@@ -41,6 +41,7 @@ import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
 import { SweepFramesOverlay } from './analysis/SweepFramesOverlay';
 import { DeformOverlay } from './overlays/DeformOverlay';
+import { WrapOverlay } from './overlays/WrapOverlay';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
@@ -155,6 +156,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <AnalysisOverlay />
         <SweepFramesOverlay />
         <DeformOverlay />
+        <WrapOverlay />
         <FocusOverlay />
       </group>
 
