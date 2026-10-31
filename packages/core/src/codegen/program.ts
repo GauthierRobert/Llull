@@ -141,12 +141,14 @@ export interface FilletLaw {
   readonly nodes: ReadonlyArray<readonly [number, number]> | null;
 }
 
-/** The legs of a variable / two-leg chamfer: the first leg runs `size` -> `end`, the second `second` -> `secondEnd`; `lead` = outward normal of the face carrying the first leg (the single listed edge), absent = equal legs. */
+/** The legs of a variable / two-leg chamfer: the first leg runs `size` -> `end`, the second `second` -> `secondEnd`; `lead` = outward normal of the face carrying the first leg (the single listed edge), absent = equal legs; `starts` = kernel start point per edge. */
 export interface ChamferLegs {
   readonly end: number;
   readonly second: number;
   readonly secondEnd: number;
   readonly lead?: readonly [number, number, number];
+  /** The kernel's start point of each listed edge (the legs run from it); the target's own edge may run the other way. */
+  readonly starts: ReadonlyArray<readonly [number, number, number]>;
 }
 
 export type Feature =

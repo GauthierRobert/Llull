@@ -5,14 +5,22 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
+import { getGeometryKernel, setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { modificationFeature } from '@core/codegen/recipeLowering';
 import type { ShapeRecipe } from '@core/model/types';
-import { scriptedKernel } from '../helpers/blendKernel';
+import { edgeOf, scriptedKernel, TOPOLOGY } from '../helpers/blendKernel';
 
 afterEach(() => setGeometryKernel(null));
 
 const LANGUAGES = ['cadquery', 'build123d', 'freecad', 'openscad'] as const;
+
+/** What each language writes for the exact mesh that replaces an inexpressible blend, and for the removal of the unblended source. */
+const MESH_EXPORT: Readonly<Record<string, { mesh: string; removed: string }>> = {
+  cadquery: { mesh: 'mesh([', removed: 'remove(box_1)' },
+  build123d: { mesh: 'mesh([', removed: 'remove(box_1)' },
+  freecad: { mesh: 'mesh([', removed: 'box_1 = None' },
+  openscad: { mesh: 'polyhedron', removed: '// box_1 removed' },
+};
 
 const chamfered = (params: Record<string, unknown>): CadDocument => {
   // the face nearest to the side-1 point is the one whose index is closest to its x
@@ -22,9 +30,10 @@ const chamfered = (params: Record<string, unknown>): CadDocument => {
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
   return result.document;
 };
-const code = (doc: CadDocument, language: string): { text: string; summary: string } => {
+const code = (doc: CadDocument, language: string): { text: string; summary: string; notes: string[] } => {
   const result = execute(doc, 'export_code', { language });
-  return { text: (result.data as { text: string }).text, summary: result.summary };
+  const data = result.data as { text: string; notes: string[] };
+  return { text: data.text, summary: result.summary, notes: data.notes };
 };
 const callLine = (text: string): string => text.split('\n').find((line) => line.startsWith('box_1 = chamfer')) ?? '';
 /** The generated construction: the OCP helper block of the runtime and the model's call. */
@@ -43,7 +52,7 @@ describe('export_code of variable and two-leg chamfers', () => {
     const doc = chamfered(VARIABLE);
     for (const language of ['cadquery', 'build123d']) {
       const { text, summary } = code(doc, language);
-      expect(callLine(text), language).toBe('box_1 = chamfer_legs(box_1, [0], 1, 1.5, 1, 1.5, near=[(10, 0, 0)])');
+      expect(callLine(text), language).toBe('box_1 = chamfer_legs(box_1, [0], 1, 1.5, 1, 1.5, near=[(10, 0, 0)], start=[(0, 0, 0)])');
       expect(text, language).toContain('BRepOffsetAPI_ThruSections(True, True)');
       expect(text, language).toContain('(True, BRepAlgoAPI_Cut), (False, BRepAlgoAPI_Fuse)');
       expect(summary, language).not.toContain('BLD_CODEGEN_UNSUPPORTED');
@@ -53,7 +62,7 @@ describe('export_code of variable and two-leg chamfers', () => {
 
   it('a two-leg variable chamfer names the face that carries the first leg by its outward normal', () => {
     const { text } = code(chamfered(TWO_LEG), 'cadquery');
-    expect(callLine(text)).toBe('box_1 = chamfer_legs(box_1, [0], 1, 1.5, 2, 2.5, lead=[(1, 0, 0)], near=[(10, 0, 0)])');
+    expect(callLine(text)).toBe('box_1 = chamfer_legs(box_1, [0], 1, 1.5, 2, 2.5, lead=[(1, 0, 0)], near=[(10, 0, 0)], start=[(0, 0, 0)])');
     const onZ = code(chamfered({ ...TWO_LEG, side1Near: [1, 0, 0] }), 'cadquery').text;
     expect(callLine(onZ)).toContain('lead=[(0, 0, 1)]');
   });
@@ -71,16 +80,29 @@ describe('export_code of variable and two-leg chamfers', () => {
   it('the emitted construction is deterministic, one per target', () => {
     const doc = chamfered(TWO_LEG);
     for (const language of LANGUAGES) expect(code(doc, language).text, language).toBe(code(doc, language).text);
-    for (const language of ['cadquery', 'build123d', 'freecad'])
-      expect(construction(code(doc, language).text), language).toMatchSnapshot(language);
+    // the helper text is one for both OCP libraries: pin it once
+    expect(construction(code(doc, 'cadquery').text)).toBe(construction(code(doc, 'build123d').text));
+    expect(construction(code(doc, 'cadquery').text)).toMatchSnapshot();
   });
 
-  it('FreeCAD calls the helper and refuses by name at run time; OpenSCAD carries the exact result as triangles', () => {
-    const doc = chamfered(TWO_LEG);
-    const freecad = code(doc, 'freecad').text;
-    expect(callLine(freecad)).toContain('chamfer_legs(box_1, [0], 1, 1.5, 2, 2.5');
-    expect(freecad).toContain('def chamfer_legs(shape, edges, first, last, second, second_last, lead=None, near=None):');
+  it('FreeCAD is resolved at export time: the exact triangles and BLD_CODEGEN_UNSUPPORTED in the summary and data, the run-time raise is only a backstop', () => {
+    for (const params of [TWO_LEG, VARIABLE, { edgeIndices: [0], distance: 1, distance2: 2, side1Near: [0, 0, 0] }]) {
+      const { text, summary, notes } = code(chamfered(params), 'freecad');
+      expect(summary).toContain('BLD_CODEGEN_UNSUPPORTED');
+      expect(notes.join(' ')).toContain('BLD_CODEGEN_UNSUPPORTED');
+      expect(text).toMatch(/^\w+ = mesh\(\[/m);
+      expect(text).not.toMatch(/^box_1 = chamfer/m);
+    }
+    const constant = code(chamfered({ edgeIndices: [0], distance: 1 }), 'freecad');
+    expect(constant.summary).not.toContain('BLD_CODEGEN_UNSUPPORTED');
+    expect(callLine(constant.text)).toBe('box_1 = chamfer(box_1, [0], 1, near=[(10, 0, 0)])');
+    const freecad = code(chamfered(TWO_LEG), 'freecad').text;
+    expect(freecad).toContain('def chamfer_legs(shape, edges, first, last, second, second_last, lead=None, near=None, start=None):');
     expect(freecad).toContain('raise ValueError("BLD_CODEGEN_UNSUPPORTED: variable and two-leg chamfers');
+  });
+
+  it('OpenSCAD carries the exact result as triangles', () => {
+    const doc = chamfered(TWO_LEG);
     const openscad = code(doc, 'openscad').text;
     expect(openscad).toContain('polyhedron(points');
     expect(openscad).not.toContain('chamfer_legs');
@@ -95,12 +117,15 @@ describe('export_code of variable and two-leg chamfers', () => {
 });
 
 describe('what the chamfer lowering refuses: BLD_CODEGEN_UNSUPPORTED and the exact mesh, in every language', () => {
-  const refused = (doc: CadDocument): void => {
+  /** `replaced`: the unblended source is removed before the mesh (a history export); a snapshot export has only the mesh. */
+  const refused = (doc: CadDocument, replaced = true): void => {
     for (const language of LANGUAGES) {
       const { text, summary } = code(doc, language);
       expect(summary, language).toContain('BLD_CODEGEN_UNSUPPORTED');
       expect(text, language).not.toMatch(/^box_1 = chamfer/m);
-      expect(text, language).toMatch(/^\w+ = mesh\(\[|polyhedron\(points/m);
+      const expected = MESH_EXPORT[language] as { mesh: string; removed: string };
+      expect(text, language).toContain(expected.mesh);
+      if (replaced) expect(text, language).toContain(expected.removed);
     }
   };
 
@@ -119,9 +144,27 @@ describe('what the chamfer lowering refuses: BLD_CODEGEN_UNSUPPORTED and the exa
     expect(modificationFeature(node([0]) as never, base, getGeometryKernel(), undefined)?.op).toBe('chamfer');
   });
 
+  it('edges that share a corner (their tools overlap, no closed form)', () => {
+    const edge = (index: number, start: [number, number, number], end: [number, number, number]): ShapeTopology['edges'][number] =>
+      edgeOf(index, { start, end, mid: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2] });
+    setGeometryKernel(
+      scriptedKernel({
+        topology: { ...TOPOLOGY, edges: [edge(0, [0, 0, 0], [20, 0, 0]), edge(1, [20, 0, 0], [20, 5, 0]), edge(2, [0, 9, 0], [20, 9, 0])] },
+      }),
+    );
+    const box = execute(createEmptyDocument(), 'add_box', { size: [20, 10, 5] });
+    const result = (indices: number[]): CadDocument =>
+      execute(box.document, 'chamfer_edge', { id: box.affected[0], edgeIndices: indices, distance: 1, distanceEnd: 2 }).document;
+    refused(result([0, 1]));
+    const apart = code(result([0, 2]), 'cadquery');
+    expect(apart.summary).not.toContain('BLD_CODEGEN_UNSUPPORTED');
+    expect(apart.text).toContain('chamfer_legs(box_1, [0, 2], 1, 2, 1, 2');
+    expect(apart.text).toContain('start=[(0, 0, 0), (0, 9, 0)]');
+  });
+
   it('a kernel without exact topology at export (it cannot tell a straight edge)', () => {
     const doc = chamfered(VARIABLE);
     setGeometryKernel(scriptedKernel({ noTopology: true }));
-    refused(doc);
+    refused(doc, false);
   });
 });

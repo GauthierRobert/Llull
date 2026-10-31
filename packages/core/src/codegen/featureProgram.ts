@@ -41,6 +41,8 @@ interface LowerContext {
   readonly env: Readonly<Record<string, number>>;
   /** Queried for exact edge mid points and fillet result triangles; null = indices only. */
   readonly kernel: GeometryKernel | null;
+  /** False for targets that cannot rebuild a variable / two-leg chamfer (FreeCAD): exported as the exact result's triangles. */
+  readonly chamferLegs: boolean;
 }
 
 /** Bind `value` to the raw `=expr` param when (and only when) the expression evaluates to it. */
@@ -194,6 +196,7 @@ function entityFeatures(
       take: (preferred) => namer.take(preferred),
       solid: (leaf, variable) => solidFeature(leaf, doc, undefined, ctx, base(variable)),
       base,
+      chamferLegs: ctx.chamferLegs,
     });
     if (lowered !== null) {
       variables.set(entity.id, lowered.variable);
@@ -215,7 +218,7 @@ function meshNote(subject: string, entity: Entity): string {
     return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export_step through the native kernel, without the Python bridge, keeps the exact faces).`;
   const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
   return blend
-    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with an angle, or a variable / two-distance chamfer on a curved edge, a non-planar face or several edges with two distances, which only the CadQuery and build123d exports rebuild on straight edges between planes; a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
+    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with an angle, or a variable / two-distance chamfer on a curved edge, a non-planar face or several edges with two distances, which only the CadQuery and build123d exports rebuild on straight edges between planes, not edges that share a corner, and not FreeCAD; a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
     : `${subject} has no analytic form; exported as a triangle mesh.`;
 }
 
@@ -363,7 +366,7 @@ function modificationStep(
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
   const value = brep.op === 'shell' ? brep.thickness : brep.size;
   const size = term(value, child(event.rawParams, sizeParam), ctx);
-  const feature = modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size);
+  const feature = modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size, ctx.chamferLegs);
   if (feature === null) return null;
   variables.delete(sourceId);
   variables.set(result.id, variable);
@@ -500,10 +503,11 @@ function buildProgram(
   doc: CadDocument,
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
   kernel: GeometryKernel | null = null,
+  chamferLegs = true,
 ): FeatureProgram {
   const namer = new Namer();
   const { parameters, identifiers } = lowerParameters(doc, namer);
-  const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel };
+  const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel, chamferLegs };
   const notes: string[] = skippedSurfaceNote(doc);
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
@@ -529,12 +533,14 @@ function buildProgram(
  * back to the current geometry when there is no history or replay does not reproduce the document.
  * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
  *   ids minted after an export differ from ids minted without one; no document content changes.
+ * @invariant chamferLegs=false (FreeCAD) exports a variable / two-leg chamfer as the exact result's triangles with BLD_CODEGEN_UNSUPPORTED
  * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).
  */
 export function buildFeatureProgram(
   doc: CadDocument,
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
   kernel: GeometryKernel | null = null,
+  chamferLegs = true,
 ): FeatureProgram {
-  return withRefusalNotes(withStraightLawNote(buildProgram(doc, getCommand, kernel)));
+  return withRefusalNotes(withStraightLawNote(buildProgram(doc, getCommand, kernel, chamferLegs)));
 }

@@ -89,9 +89,11 @@ export function modifierLine(feature: Extract<Feature, { op: 'fillet' | 'chamfer
     return `${v} = fillet_laws(${v}, [${feature.edges.map(formatNumber).join(', ')}], [${feature.laws.map(lawTuple).join(', ')}]${near})`;
   const edgeList = `[${feature.edges.map(formatNumber).join(', ')}]`;
   if (feature.legs !== undefined) {
-    const { end, second, secondEnd, lead } = feature.legs;
+    const { end, second, secondEnd, lead, starts } = feature.legs;
     const leadArgument = lead === undefined ? '' : `, lead=[(${lead.map(formatNumber).join(', ')})]`;
-    return `${v} = chamfer_legs(${v}, ${edgeList}, ${formatTerm(feature.size)}, ${formatNumber(end)}, ${formatNumber(second)}, ${formatNumber(secondEnd)}${leadArgument}${near})`;
+    const varying = end !== feature.size.value || secondEnd !== second;
+    const startArgument = varying ? `, start=[${starts.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]` : '';
+    return `${v} = chamfer_legs(${v}, ${edgeList}, ${formatTerm(feature.size)}, ${formatNumber(end)}, ${formatNumber(second)}, ${formatNumber(secondEnd)}${leadArgument}${near}${startArgument})`;
   }
   const size = formatTerm(feature.size);
   return `${v} = ${feature.op}(${v}, ${edgeList}, ${size}${near})`;

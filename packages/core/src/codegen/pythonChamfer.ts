@@ -5,10 +5,10 @@
  * on one face, point at the second leg on the other): a CUT for a convex edge, a FUSE for a concave one. CadQuery and build123d both run on OCP.
  * @invariant edges between two planar faces (so straight) with flat square ends only; any other edge raises BLD_CODEGEN_UNSUPPORTED at run time (the
  *   exporter lowers only edges the kernel reports as lines)
- * @invariant the FreeCAD macro has no such helper: `chamfer_legs` there raises BLD_CODEGEN_UNSUPPORTED, never a constant chamfer
+ * @invariant the FreeCAD export never emits `chamfer_legs` (the exact triangles with BLD_CODEGEN_UNSUPPORTED); a hand-written macro calling it raises BLD_CODEGEN_UNSUPPORTED, never a constant chamfer
  */
 
-/** OCP geometry: `_chamfer_legs(shape, edges, near, first, last, second, second_last, lead)` -> (shape, side-1 points). */
+/** OCP geometry: `_chamfer_legs(shape, edges, near, first, last, second, second_last, lead, start)` -> (shape, side-1 points). */
 export const OCP_CHAMFER_PY = String.raw`
 def _v_sub(a, b):
     return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
@@ -88,7 +88,23 @@ def _chamfer_in_solid(topods, point):
     return BRepClass3d_SolidClassifier(topods, gp_Pnt(*point), 1e-7).State() == TopAbs_IN
 
 
-def _chamfer_frame(topods, edge):
+def _chamfer_oriented(start, end, start_hint, varying):
+    """The edge ends in the kernel's direction: the target's curve may run the other way. No hint = the target's own direction (equal legs do not care)."""
+    if start_hint is None:
+        if varying:
+            raise ValueError("llull: chamfer_legs with legs that vary along the edge needs start=[...] (the kernel start point of each edge)")
+        return start, end
+    length = math.sqrt(_v_dot(_v_sub(end, start), _v_sub(end, start)))
+    tolerance = 1e-5 * max(1.0, length)
+    gap = lambda a, b: math.sqrt(_v_dot(_v_sub(a, b), _v_sub(a, b)))
+    if gap(start, start_hint) <= tolerance:
+        return start, end
+    if gap(end, start_hint) <= tolerance:
+        return end, start
+    raise ValueError("llull: cannot tell which end of the chamfered edge the legs start at (start point %s is neither end of the edge)" % (start_hint,))
+
+
+def _chamfer_frame(topods, edge, start_hint, varying):
     """The edge between two planes (so a straight one): its end points, unit direction, the two faces with outward normals and inward directions, convexity."""
     from OCP.BRepAdaptor import BRepAdaptor_Curve
     from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
@@ -125,10 +141,11 @@ def _chamfer_frame(topods, edge):
     fold = math.acos(max(-1.0, min(1.0, _v_dot(normals[0], normals[1]))))
     if fold < 1e-6 or fold > math.pi - 1e-6:
         raise ValueError("llull: the chamfered edge joins tangent or folded-flat faces (no corner to chamfer)")
+    start, end = _chamfer_oriented(start, end, start_hint, varying)
     return {
         "start": start,
         "end": end,
-        "direction": direction,
+        "direction": _v_unit(_v_sub(end, start)),
         "length": length,
         "faces": around,
         "normals": normals,
@@ -155,15 +172,19 @@ def _chamfer_square_ends(topods, edge, frame):
             raise ValueError("llull: an end of the chamfered edge is not on a face perpendicular to it (variable chamfers need flat square ends)")
 
 
-def _chamfer_tool(topods, edge, first, last, second, second_last, lead):
-    """(tool solid, convex, a point on the side-1 face): the ruled loft of the two end triangles."""
+def _chamfer_tool(topods, edge, first, last, second, second_last, lead, start_hint):
+    """(tool solid, convex, a point on the side-1 face, removed / added volume): the ruled loft of the two end triangles."""
     from OCP.BRepBuilderAPI import BRepBuilderAPI_MakePolygon
     from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
     from OCP.gp import gp_Pnt
 
-    frame = _chamfer_frame(topods, edge)
+    frame = _chamfer_frame(topods, edge, start_hint, last != first or second_last != second)
     _chamfer_square_ends(topods, edge, frame)
-    side = 0 if lead is None else max((0, 1), key=lambda k: _v_dot(lead, frame["normals"][k]))
+    side = 0
+    if lead is not None:
+        side = max((0, 1), key=lambda k: _v_dot(lead, frame["normals"][k]))
+        if _v_dot(lead, frame["normals"][side]) < 1.0 - 1e-4:
+            raise ValueError("llull: the lead normal %s is the outward normal of neither face of the chamfered edge" % (lead,))
     legs = {side: (first, last), 1 - side: (second, second_last)}
     at = lambda k, s: legs[k][0] + (legs[k][1] - legs[k][0]) * s
     place = lambda s, k: _v_add(
@@ -182,7 +203,9 @@ def _chamfer_tool(topods, edge, first, last, second, second_last, lead):
     loft.Build()
     if not loft.IsDone():
         raise ValueError("llull: the chamfer tool could not be lofted")
-    return loft.Shape(), frame["convex"], place(0.5, side)
+    d1, e1, d2, e2 = legs[0][0], legs[0][1], legs[1][0], legs[1][1]
+    area = 0.5 * frame["length"] * (d1 * d2 + (d1 * (e2 - d2) + d2 * (e1 - d1)) / 2.0 + (e1 - d1) * (e2 - d2) / 3.0)
+    return loft.Shape(), frame["convex"], place(0.5, side), area
 
 
 def _chamfer_volume(topods):
@@ -194,40 +217,54 @@ def _chamfer_volume(topods):
     return props.Mass()
 
 
-def _chamfer_legs(shape, edges, near, first, last, second, second_last, lead):
+def _chamfer_touching(topods, edge_list):
+    from OCP.TopAbs import TopAbs_VERTEX
+
+    corners = [_chamfer_sub_shapes(edge, TopAbs_VERTEX, _chamfer_cast("Vertex")) for edge in edge_list]
+    return any(
+        any(a.IsSame(b) for a in corners[i] for b in corners[j])
+        for i in range(len(corners))
+        for j in range(i + 1, len(corners))
+    )
+
+
+def _chamfer_legs(shape, edges, near, first, last, second, second_last, lead, start):
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
     from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
     topods = _shape_of(shape).wrapped
+    chosen = _select_edges(topods, edges, near, 1e-4)
+    if _chamfer_touching(topods, chosen):
+        raise ValueError("BLD_CODEGEN_UNSUPPORTED: variable chamfers of edges that share a corner are not generated (the tools overlap there)")
     tools = [
-        _chamfer_tool(topods, edge, first, last, second, second_last, lead[position] if lead else None)
-        for position, edge in enumerate(_select_edges(topods, edges, near))
+        _chamfer_tool(topods, edge, first, last, second, second_last, lead[position] if lead else None, start[position] if start else None)
+        for position, edge in enumerate(chosen)
     ]
     result = topods
     for convex, operation in ((True, BRepAlgoAPI_Cut), (False, BRepAlgoAPI_Fuse)):
-        for tool, tool_convex, _point in tools:
+        for tool, tool_convex, _point, _area in tools:
             if tool_convex != convex:
                 continue
             builder = operation(result, tool)
             if not builder.IsDone():
                 raise ValueError("llull: the boolean of the chamfer tools failed")
             result = builder.Shape()
-    if any(not tool_convex for _tool, tool_convex, _point in tools):
+    if any(not tool[1] for tool in tools):
         unifier = ShapeUpgrade_UnifySameDomain(result, False, True, False)
         unifier.Build()
         result = unifier.Shape()
     before, after = _chamfer_volume(topods), _chamfer_volume(result)
-    convex_only, concave_only = all(t[1] for t in tools), not any(t[1] for t in tools)
-    if not after > 0 or (convex_only and not after < before) or (concave_only and not after > before):
-        raise ValueError("llull: the variable chamfer changed the volume the wrong way (%s -> %s)" % (before, after))
-    return _wrap(result), [point for _tool, _convex, point in tools]
+    expected = sum(-area if convex else area for _tool, convex, _point, area in tools)
+    if not after > 0 or abs((after - before) - expected) > 1e-6 * max(1.0, abs(expected)):
+        raise ValueError("llull: the variable chamfer changed the volume by %s, the legs ask for %s (wrong way or wrong size)" % (after - before, expected))
+    return _wrap(result), [point for _tool, _convex, point, _area in tools]
 `;
 
-/** The traced helper: `chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near=None)`. */
+/** The traced helper: `chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near=None, start=None)`. */
 export const CHAMFER_TRACE_PY = String.raw`
-def chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near=None):
-    """Chamfer straight edges with legs that run linearly from first / second (edge start) to last / second_last (edge end); lead = outward normal of the face carrying first (per edge), None = equal legs."""
-    shape, points = _chamfer_legs(solid.shape, [int(e) for e in edges], near, float(first), float(last), float(second), float(second_last), lead)
+def chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near=None, start=None):
+    """Chamfer straight edges with legs that run linearly from first / second (edge start) to last / second_last (edge end); lead = outward normal of the face carrying first (per edge), None = equal legs; start = the kernel's start point of each edge (required when the legs vary: the target may run the edge the other way)."""
+    shape, points = _chamfer_legs(solid.shape, [int(e) for e in edges], near, float(first), float(last), float(second), float(second_last), lead, start)
     params = {"id": {"ref": solid.ref}, "edgeIndices": [int(e) for e in edges], "distance": _term(first), "distanceEnd": float(last)}
     if lead:
         params.update({"distance2": float(second), "distance2End": float(second_last), "side1Near": [float(c) for c in points[0]]})
@@ -239,8 +276,8 @@ def chamfer_legs(solid, edges, first, last, second, second_last, lead=None, near
     return rounded
 `;
 
-/** FreeCAD has no loft-and-boolean helper here: refuse by name, never a constant chamfer. */
+/** FreeCAD has no loft-and-boolean helper here. export_code(freecad) exports such a chamfer as the exact triangles (BLD_CODEGEN_UNSUPPORTED); this raise is the backstop for a hand-written macro, never a constant chamfer. */
 export const FREECAD_CHAMFER_PY = String.raw`
-def chamfer_legs(shape, edges, first, last, second, second_last, lead=None, near=None):
+def chamfer_legs(shape, edges, first, last, second, second_last, lead=None, near=None, start=None):
     raise ValueError("BLD_CODEGEN_UNSUPPORTED: variable and two-leg chamfers are generated for CadQuery and build123d (OCP); use those exports or the STEP of the model")
 `;
