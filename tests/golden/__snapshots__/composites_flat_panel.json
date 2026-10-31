@@ -6,24 +6,19 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [600, 400, 10],
-        "position": [300, 200, -5],
-        "rotation": [0, 0, 0],
+        "size": [600,400,10],
+        "position": [300,200,-5],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#3": {
         "id": "#3",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 0.0625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.0625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S1 outline"
@@ -31,15 +26,10 @@
       "#4": {
         "id": "#4",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 0.1875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.1875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S2 outline"
@@ -47,15 +37,10 @@
       "#5": {
         "id": "#5",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 0.3125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.3125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S3 outline"
@@ -63,15 +48,10 @@
       "#6": {
         "id": "#6",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 0.4375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.4375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S4 outline"
@@ -79,15 +59,10 @@
       "#7": {
         "id": "#7",
         "kind": "polyline",
-        "points": [
-          [182.5, 82.5],
-          [417.5, 82.5],
-          [417.5, 317.5],
-          [182.5, 317.5]
-        ],
+        "points": [[182.5,82.5],[417.5,82.5],[417.5,317.5],[182.5,317.5]],
         "closed": true,
-        "position": [0, 0, 0.5625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.5625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S5 outline"
@@ -95,15 +70,10 @@
       "#8": {
         "id": "#8",
         "kind": "polyline",
-        "points": [
-          [187.5, 87.5],
-          [412.5, 87.5],
-          [412.5, 312.5],
-          [187.5, 312.5]
-        ],
+        "points": [[187.5,87.5],[412.5,87.5],[412.5,312.5],[187.5,312.5]],
         "closed": true,
-        "position": [0, 0, 0.6875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.6875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S6 outline"
@@ -111,15 +81,10 @@
       "#9": {
         "id": "#9",
         "kind": "polyline",
-        "points": [
-          [192.5, 92.5],
-          [407.5, 92.5],
-          [407.5, 307.5],
-          [192.5, 307.5]
-        ],
+        "points": [[192.5,92.5],[407.5,92.5],[407.5,307.5],[192.5,307.5]],
         "closed": true,
-        "position": [0, 0, 0.8125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.8125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S7 outline"
@@ -127,15 +92,10 @@
       "#10": {
         "id": "#10",
         "kind": "polyline",
-        "points": [
-          [197.5, 97.5],
-          [402.5, 97.5],
-          [402.5, 302.5],
-          [197.5, 302.5]
-        ],
+        "points": [[197.5,97.5],[402.5,97.5],[402.5,302.5],[197.5,302.5]],
         "closed": true,
-        "position": [0, 0, 0.9375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0.9375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S8 outline"
@@ -143,15 +103,10 @@
       "#11": {
         "id": "#11",
         "kind": "polyline",
-        "points": [
-          [242.5, 142.5],
-          [357.5, 142.5],
-          [357.5, 257.5],
-          [242.5, 257.5]
-        ],
+        "points": [[242.5,142.5],[357.5,142.5],[357.5,257.5],[242.5,257.5]],
         "closed": true,
-        "position": [0, 0, 1.0625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.0625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S9 outline"
@@ -159,15 +114,10 @@
       "#12": {
         "id": "#12",
         "kind": "polyline",
-        "points": [
-          [247.5, 147.5],
-          [352.5, 147.5],
-          [352.5, 252.5],
-          [247.5, 252.5]
-        ],
+        "points": [[247.5,147.5],[352.5,147.5],[352.5,252.5],[247.5,252.5]],
         "closed": true,
-        "position": [0, 0, 1.1875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.1875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S10 outline"
@@ -175,15 +125,10 @@
       "#13": {
         "id": "#13",
         "kind": "polyline",
-        "points": [
-          [252.5, 152.5],
-          [347.5, 152.5],
-          [347.5, 247.5],
-          [252.5, 247.5]
-        ],
+        "points": [[252.5,152.5],[347.5,152.5],[347.5,247.5],[252.5,247.5]],
         "closed": true,
-        "position": [0, 0, 1.3125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.3125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S11 outline"
@@ -191,15 +136,10 @@
       "#14": {
         "id": "#14",
         "kind": "polyline",
-        "points": [
-          [257.5, 157.5],
-          [342.5, 157.5],
-          [342.5, 242.5],
-          [257.5, 242.5]
-        ],
+        "points": [[257.5,157.5],[342.5,157.5],[342.5,242.5],[257.5,242.5]],
         "closed": true,
-        "position": [0, 0, 1.4375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.4375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S12 outline"
@@ -207,15 +147,10 @@
       "#15": {
         "id": "#15",
         "kind": "polyline",
-        "points": [
-          [255, 155],
-          [345, 155],
-          [345, 245],
-          [255, 245]
-        ],
+        "points": [[255,155],[345,155],[345,245],[255,245]],
         "closed": true,
-        "position": [0, 0, 1.5625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.5625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S13 outline"
@@ -223,15 +158,10 @@
       "#16": {
         "id": "#16",
         "kind": "polyline",
-        "points": [
-          [250, 150],
-          [350, 150],
-          [350, 250],
-          [250, 250]
-        ],
+        "points": [[250,150],[350,150],[350,250],[250,250]],
         "closed": true,
-        "position": [0, 0, 1.6875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.6875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S14 outline"
@@ -239,15 +169,10 @@
       "#17": {
         "id": "#17",
         "kind": "polyline",
-        "points": [
-          [245, 145],
-          [355, 145],
-          [355, 255],
-          [245, 255]
-        ],
+        "points": [[245,145],[355,145],[355,255],[245,255]],
         "closed": true,
-        "position": [0, 0, 1.8125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.8125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S15 outline"
@@ -255,15 +180,10 @@
       "#18": {
         "id": "#18",
         "kind": "polyline",
-        "points": [
-          [240, 140],
-          [360, 140],
-          [360, 260],
-          [240, 260]
-        ],
+        "points": [[240,140],[360,140],[360,260],[240,260]],
         "closed": true,
-        "position": [0, 0, 1.9375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,1.9375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S16 outline"
@@ -271,15 +191,10 @@
       "#19": {
         "id": "#19",
         "kind": "polyline",
-        "points": [
-          [195, 95],
-          [405, 95],
-          [405, 305],
-          [195, 305]
-        ],
+        "points": [[195,95],[405,95],[405,305],[195,305]],
         "closed": true,
-        "position": [0, 0, 2.0625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.0625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S17 outline"
@@ -287,15 +202,10 @@
       "#20": {
         "id": "#20",
         "kind": "polyline",
-        "points": [
-          [190, 90],
-          [410, 90],
-          [410, 310],
-          [190, 310]
-        ],
+        "points": [[190,90],[410,90],[410,310],[190,310]],
         "closed": true,
-        "position": [0, 0, 2.1875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.1875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S18 outline"
@@ -303,15 +213,10 @@
       "#21": {
         "id": "#21",
         "kind": "polyline",
-        "points": [
-          [185, 85],
-          [415, 85],
-          [415, 315],
-          [185, 315]
-        ],
+        "points": [[185,85],[415,85],[415,315],[185,315]],
         "closed": true,
-        "position": [0, 0, 2.3125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.3125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S19 outline"
@@ -319,15 +224,10 @@
       "#22": {
         "id": "#22",
         "kind": "polyline",
-        "points": [
-          [180, 80],
-          [420, 80],
-          [420, 320],
-          [180, 320]
-        ],
+        "points": [[180,80],[420,80],[420,320],[180,320]],
         "closed": true,
-        "position": [0, 0, 2.4375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.4375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S20 outline"
@@ -335,15 +235,10 @@
       "#23": {
         "id": "#23",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 2.5625],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.5625],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S21 outline"
@@ -351,15 +246,10 @@
       "#24": {
         "id": "#24",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 2.6875],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.6875],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S22 outline"
@@ -367,15 +257,10 @@
       "#25": {
         "id": "#25",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 2.8125],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.8125],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S23 outline"
@@ -383,15 +268,10 @@
       "#26": {
         "id": "#26",
         "kind": "polyline",
-        "points": [
-          [0, 0],
-          [600, 0],
-          [600, 400],
-          [0, 400]
-        ],
+        "points": [[0,0],[600,0],[600,400],[0,400]],
         "closed": true,
-        "position": [0, 0, 2.9375],
-        "rotation": [0, 0, 0],
+        "position": [0,0,2.9375],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#2563eb",
         "name": "S24 outline"
@@ -424,160 +304,103 @@
       "#25",
       "#26"
     ],
-    "layers": { "#2": { "id": "#2", "name": "Layer 0", "visible": true, "locked": false } },
-    "layerOrder": ["#2"],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
     "featureHistory": [
-      { "id": "#27", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "#27",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
       {
         "id": "#28",
         "name": "add_box",
-        "params": { "size": [600, 400, 10], "anchor": "min", "position": [0, 0, -10] },
+        "params": {"size":[600,400,10],"anchor":"min","position":[0,0,-10]},
         "suppressed": false,
         "affected": ["#1"]
       },
       {
         "id": "#29",
         "name": "create_lamina_material",
-        "params": {
-          "name": "T300_5208",
-          "form": "ud_tape",
-          "E1": 181000,
-          "E2": 10300,
-          "G12": 7170,
-          "nu12": 0.28,
-          "Xt": 1500,
-          "Xc": 1500,
-          "Yt": 40,
-          "Yc": 246,
-          "S": 68,
-          "plyThickness": 0.125,
-          "density": 0.0016,
-          "basis": "b_basis",
-          "source": "Tsai & Hahn 1980 via Kaw Table 2.1 (density illustrative)"
-        },
+        "params": {"name":"T300_5208","form":"ud_tape","E1":181000,"E2":10300,"G12":7170,"nu12":0.28,"Xt":1500,"Xc":1500,"Yt":40,"Yc":246,"S":68,"plyThickness":0.125,"density":0.0016,"basis":"b_basis","source":"Tsai & Hahn 1980 via Kaw Table 2.1 (density illustrative)"},
         "suppressed": false,
         "affected": ["T300_5208"]
       },
       {
         "id": "#30",
         "name": "define_rosette",
-        "params": { "name": "R0", "origin": [0, 0, 0], "axis0": [1, 0, 0], "normal": [0, 0, 1], "method": "translational" },
+        "params": {"name":"R0","origin":[0,0,0],"axis0":[1,0,0],"normal":[0,0,1],"method":"translational"},
         "suppressed": false,
         "affected": ["#31"]
       },
       {
         "id": "#32",
         "name": "create_composite_part",
-        "params": { "name": "Skin panel", "toolSurface": { "entityId": "#1", "faceNear": [300, 200, 0] }, "rosette": "R0" },
+        "params": {"name":"Skin panel","toolSurface":{"entityId":"#1","faceNear":[300,200,0]},"rosette":"R0"},
         "suppressed": false,
         "affected": ["#33"]
       },
       {
         "id": "#34",
         "name": "define_zone",
-        "params": {
-          "part": "#33",
-          "name": "Z-base",
-          "boundary": [
-            [0, 0],
-            [600, 0],
-            [600, 400],
-            [0, 400]
-          ],
-          "laminate": "[45/-45/0/90]s",
-          "priority": 0
-        },
+        "params": {"part":"#33","name":"Z-base","boundary":[[0,0],[600,0],[600,400],[0,400]],"laminate":"[45/-45/0/90]s","priority":0},
         "suppressed": false,
         "affected": ["#35"]
       },
       {
         "id": "#36",
         "name": "define_zone",
-        "params": {
-          "part": "#33",
-          "name": "Z-pad",
-          "boundary": [
-            [200, 100],
-            [400, 100],
-            [400, 300],
-            [200, 300]
-          ],
-          "laminate": "[45/-45/0/90/0/-45/45/0]s",
-          "priority": 1
-        },
+        "params": {"part":"#33","name":"Z-pad","boundary":[[200,100],[400,100],[400,300],[200,300]],"laminate":"[45/-45/0/90/0/-45/45/0]s","priority":1},
         "suppressed": false,
         "affected": ["#37"]
       },
       {
         "id": "#38",
         "name": "define_zone",
-        "params": {
-          "part": "#33",
-          "name": "Z-hole",
-          "boundary": [
-            [260, 160],
-            [340, 160],
-            [340, 240],
-            [260, 240]
-          ],
-          "laminate": "[45/-45/0/90/0/-45/45/0/45/-45/0/90]s",
-          "priority": 2
-        },
+        "params": {"part":"#33","name":"Z-hole","boundary":[[260,160],[340,160],[340,240],[260,240]],"laminate":"[45/-45/0/90/0/-45/45/0/45/-45/0/90]s","priority":2},
         "suppressed": false,
         "affected": ["#39"]
       },
       {
         "id": "#40",
         "name": "set_ply_drop_rules",
-        "params": {
-          "part": "#33",
-          "rampRatio": 20,
-          "minStagger": 3,
-          "staggerUnit": "dropped_thickness",
-          "dropOrder": "inner_first",
-          "coverPlies": 2
-        },
+        "params": {"part":"#33","rampRatio":20,"minStagger":3,"staggerUnit":"dropped_thickness","dropOrder":"inner_first","coverPlies":2},
         "suppressed": false,
         "affected": ["#33"]
       },
       {
         "id": "#41",
         "name": "generate_plies_from_zones",
-        "params": { "part": "#33", "material": "T300_5208", "sequencePrefix": "S" },
+        "params": {"part":"#33","material":"T300_5208","sequencePrefix":"S"},
         "suppressed": false,
-        "affected": [
-          "#42",
-          "#43",
-          "#44",
-          "#45",
-          "#46",
-          "#47",
-          "#48",
-          "#49",
-          "#50",
-          "#51",
-          "#52",
-          "#53",
-          "#54",
-          "#55",
-          "#56",
-          "#57",
-          "#58",
-          "#59",
-          "#60",
-          "#61",
-          "#62",
-          "#63",
-          "#64",
-          "#65"
-        ]
+        "affected": ["#42","#43","#44","#45","#46","#47","#48","#49","#50","#51","#52","#53","#54","#55","#56","#57","#58","#59","#60","#61","#62","#63","#64","#65"]
       }
     ],
     "configurations": {},
@@ -593,647 +416,44 @@
     "nextStepNumber": 11,
     "composites": {
       "materials": {
-        "T300_5208": {
-          "form": "ud_tape",
-          "E1": 181000,
-          "E2": 10300,
-          "G12": 7170,
-          "Xt": 1500,
-          "Xc": 1500,
-          "Yt": 40,
-          "Yc": 246,
-          "S": 68,
-          "plyThickness": 0.125,
-          "density": 0.0016,
-          "source": "Tsai & Hahn 1980 via Kaw Table 2.1 (density illustrative)",
-          "name": "T300_5208",
-          "nu12": 0.28,
-          "basis": "b_basis"
-        }
+        "T300_5208": {"form":"ud_tape","E1":181000,"E2":10300,"G12":7170,"Xt":1500,"Xc":1500,"Yt":40,"Yc":246,"S":68,"plyThickness":0.125,"density":0.0016,"source":"Tsai & Hahn 1980 via Kaw Table 2.1 (density illustrative)","name":"T300_5208","nu12":0.28,"basis":"b_basis"}
       },
       "rosettes": {
-        "#31": { "id": "#31", "name": "R0", "origin": [0, 0, 0], "axis0": [1, 0, 0], "normal": [0, 0, 1], "method": "translational" }
+        "#31": {"id":"#31","name":"R0","origin":[0,0,0],"axis0":[1,0,0],"normal":[0,0,1],"method":"translational"}
       },
       "parts": {
-        "#33": {
-          "id": "#33",
-          "name": "Skin panel",
-          "toolFaces": [{ "entityId": "#1", "faceNear": [300, 200, 0] }],
-          "laminateSide": "positive_normal",
-          "rosetteId": "#31",
-          "surface": { "type": "plane", "origin": [0, 0, 0], "xDir": [1, 0, 0], "yDir": [0, 1, 0], "normal": [0, 0, 1] },
-          "outline": [
-            [0, 0],
-            [600, 0],
-            [600, 400],
-            [0, 400]
-          ],
-          "plyDropRules": {
-            "rampRatio": 20,
-            "minStagger": 3,
-            "staggerUnit": "dropped_thickness",
-            "dropOrder": "inner_first",
-            "coverPlies": 2
-          }
-        }
+        "#33": {"id":"#33","name":"Skin panel","toolFaces":[{"entityId":"#1","faceNear":[300,200,0]}],"laminateSide":"positive_normal","rosetteId":"#31","surface":{"type":"plane","origin":[0,0,0],"xDir":[1,0,0],"yDir":[0,1,0],"normal":[0,0,1]},"outline":[[0,0],[600,0],[600,400],[0,400]],"plyDropRules":{"rampRatio":20,"minStagger":3,"staggerUnit":"dropped_thickness","dropOrder":"inner_first","coverPlies":2}}
       },
       "zones": {
-        "#35": {
-          "id": "#35",
-          "partId": "#33",
-          "name": "Z-base",
-          "boundary": [
-            [0, 0],
-            [600, 0],
-            [600, 400],
-            [0, 400]
-          ],
-          "notation": "[45/-45/0/90]s",
-          "angles": [45, -45, 0, 90, 90, 0, -45, 45],
-          "priority": 0
-        },
-        "#37": {
-          "id": "#37",
-          "partId": "#33",
-          "name": "Z-pad",
-          "boundary": [
-            [200, 100],
-            [400, 100],
-            [400, 300],
-            [200, 300]
-          ],
-          "notation": "[45/-45/0/90/0/-45/45/0]s",
-          "angles": [45, -45, 0, 90, 0, -45, 45, 0, 0, 45, -45, 0, 90, 0, -45, 45],
-          "priority": 1
-        },
-        "#39": {
-          "id": "#39",
-          "partId": "#33",
-          "name": "Z-hole",
-          "boundary": [
-            [260, 160],
-            [340, 160],
-            [340, 240],
-            [260, 240]
-          ],
-          "notation": "[45/-45/0/90/0/-45/45/0/45/-45/0/90]s",
-          "angles": [45, -45, 0, 90, 0, -45, 45, 0, 45, -45, 0, 90, 90, 0, -45, 45, 0, 45, -45, 0, 90, 0, -45, 45],
-          "priority": 2
-        }
+        "#35": {"id":"#35","partId":"#33","name":"Z-base","boundary":[[0,0],[600,0],[600,400],[0,400]],"notation":"[45/-45/0/90]s","angles":[45,-45,0,90,90,0,-45,45],"priority":0},
+        "#37": {"id":"#37","partId":"#33","name":"Z-pad","boundary":[[200,100],[400,100],[400,300],[200,300]],"notation":"[45/-45/0/90/0/-45/45/0]s","angles":[45,-45,0,90,0,-45,45,0,0,45,-45,0,90,0,-45,45],"priority":1},
+        "#39": {"id":"#39","partId":"#33","name":"Z-hole","boundary":[[260,160],[340,160],[340,240],[260,240]],"notation":"[45/-45/0/90/0/-45/45/0/45/-45/0/90]s","angles":[45,-45,0,90,0,-45,45,0,45,-45,0,90,90,0,-45,45,0,45,-45,0,90,0,-45,45],"priority":2}
       },
       "plies": {
-        "#42": {
-          "id": "#42",
-          "partId": "#33",
-          "order": 0,
-          "name": "S1",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S1",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#43": {
-          "id": "#43",
-          "partId": "#33",
-          "order": 1,
-          "name": "S2",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S2",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#44": {
-          "id": "#44",
-          "partId": "#33",
-          "order": 2,
-          "name": "S3",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S3",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#45": {
-          "id": "#45",
-          "partId": "#33",
-          "order": 3,
-          "name": "S4",
-          "materialName": "T300_5208",
-          "orientation": 90,
-          "sequence": "S4",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#46": {
-          "id": "#46",
-          "partId": "#33",
-          "order": 4,
-          "name": "S5",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S5",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [182.5, 82.5],
-                [417.5, 82.5],
-                [417.5, 317.5],
-                [182.5, 317.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 7 }
-        },
-        "#47": {
-          "id": "#47",
-          "partId": "#33",
-          "order": 5,
-          "name": "S6",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S6",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [187.5, 87.5],
-                [412.5, 87.5],
-                [412.5, 312.5],
-                [187.5, 312.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 5 }
-        },
-        "#48": {
-          "id": "#48",
-          "partId": "#33",
-          "order": 6,
-          "name": "S7",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S7",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [192.5, 92.5],
-                [407.5, 92.5],
-                [407.5, 307.5],
-                [192.5, 307.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 3 }
-        },
-        "#49": {
-          "id": "#49",
-          "partId": "#33",
-          "order": 7,
-          "name": "S8",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S8",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [197.5, 97.5],
-                [402.5, 97.5],
-                [402.5, 302.5],
-                [197.5, 302.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 1 }
-        },
-        "#50": {
-          "id": "#50",
-          "partId": "#33",
-          "order": 8,
-          "name": "S9",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S9",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [242.5, 142.5],
-                [357.5, 142.5],
-                [357.5, 257.5],
-                [242.5, 257.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 7 }
-        },
-        "#51": {
-          "id": "#51",
-          "partId": "#33",
-          "order": 9,
-          "name": "S10",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S10",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [247.5, 147.5],
-                [352.5, 147.5],
-                [352.5, 252.5],
-                [247.5, 252.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 5 }
-        },
-        "#52": {
-          "id": "#52",
-          "partId": "#33",
-          "order": 10,
-          "name": "S11",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S11",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [252.5, 152.5],
-                [347.5, 152.5],
-                [347.5, 247.5],
-                [252.5, 247.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 3 }
-        },
-        "#53": {
-          "id": "#53",
-          "partId": "#33",
-          "order": 11,
-          "name": "S12",
-          "materialName": "T300_5208",
-          "orientation": 90,
-          "sequence": "S12",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [257.5, 157.5],
-                [342.5, 157.5],
-                [342.5, 242.5],
-                [257.5, 242.5]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 1 }
-        },
-        "#54": {
-          "id": "#54",
-          "partId": "#33",
-          "order": 12,
-          "name": "S13",
-          "materialName": "T300_5208",
-          "orientation": 90,
-          "sequence": "S13",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [255, 155],
-                [345, 155],
-                [345, 245],
-                [255, 245]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 2 }
-        },
-        "#55": {
-          "id": "#55",
-          "partId": "#33",
-          "order": 13,
-          "name": "S14",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S14",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [250, 150],
-                [350, 150],
-                [350, 250],
-                [250, 250]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 4 }
-        },
-        "#56": {
-          "id": "#56",
-          "partId": "#33",
-          "order": 14,
-          "name": "S15",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S15",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [245, 145],
-                [355, 145],
-                [355, 255],
-                [245, 255]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 6 }
-        },
-        "#57": {
-          "id": "#57",
-          "partId": "#33",
-          "order": 15,
-          "name": "S16",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S16",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [240, 140],
-                [360, 140],
-                [360, 260],
-                [240, 260]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#39"], "dropRank": 8 }
-        },
-        "#58": {
-          "id": "#58",
-          "partId": "#33",
-          "order": 16,
-          "name": "S17",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S17",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [195, 95],
-                [405, 95],
-                [405, 305],
-                [195, 305]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 2 }
-        },
-        "#59": {
-          "id": "#59",
-          "partId": "#33",
-          "order": 17,
-          "name": "S18",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S18",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [190, 90],
-                [410, 90],
-                [410, 310],
-                [190, 310]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 4 }
-        },
-        "#60": {
-          "id": "#60",
-          "partId": "#33",
-          "order": 18,
-          "name": "S19",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S19",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [185, 85],
-                [415, 85],
-                [415, 315],
-                [185, 315]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 6 }
-        },
-        "#61": {
-          "id": "#61",
-          "partId": "#33",
-          "order": 19,
-          "name": "S20",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S20",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [180, 80],
-                [420, 80],
-                [420, 320],
-                [180, 320]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#37", "#39"], "dropRank": 8 }
-        },
-        "#62": {
-          "id": "#62",
-          "partId": "#33",
-          "order": 20,
-          "name": "S21",
-          "materialName": "T300_5208",
-          "orientation": 90,
-          "sequence": "S21",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#63": {
-          "id": "#63",
-          "partId": "#33",
-          "order": 21,
-          "name": "S22",
-          "materialName": "T300_5208",
-          "orientation": 0,
-          "sequence": "S22",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#64": {
-          "id": "#64",
-          "partId": "#33",
-          "order": 22,
-          "name": "S23",
-          "materialName": "T300_5208",
-          "orientation": -45,
-          "sequence": "S23",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        },
-        "#65": {
-          "id": "#65",
-          "partId": "#33",
-          "order": 23,
-          "name": "S24",
-          "materialName": "T300_5208",
-          "orientation": 45,
-          "sequence": "S24",
-          "rosetteId": "#31",
-          "boundary": {
-            "kind": "polygons",
-            "polygons": [
-              [
-                [0, 0],
-                [600, 0],
-                [600, 400],
-                [0, 400]
-              ]
-            ]
-          },
-          "drape": { "method": "developable" },
-          "zoneOrigin": { "zoneIds": ["#35", "#37", "#39"], "dropRank": 0 }
-        }
+        "#42": {"id":"#42","partId":"#33","order":0,"name":"S1","materialName":"T300_5208","orientation":45,"sequence":"S1","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#43": {"id":"#43","partId":"#33","order":1,"name":"S2","materialName":"T300_5208","orientation":-45,"sequence":"S2","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#44": {"id":"#44","partId":"#33","order":2,"name":"S3","materialName":"T300_5208","orientation":0,"sequence":"S3","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#45": {"id":"#45","partId":"#33","order":3,"name":"S4","materialName":"T300_5208","orientation":90,"sequence":"S4","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#46": {"id":"#46","partId":"#33","order":4,"name":"S5","materialName":"T300_5208","orientation":0,"sequence":"S5","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[182.5,82.5],[417.5,82.5],[417.5,317.5],[182.5,317.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":7}},
+        "#47": {"id":"#47","partId":"#33","order":5,"name":"S6","materialName":"T300_5208","orientation":-45,"sequence":"S6","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[187.5,87.5],[412.5,87.5],[412.5,312.5],[187.5,312.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":5}},
+        "#48": {"id":"#48","partId":"#33","order":6,"name":"S7","materialName":"T300_5208","orientation":45,"sequence":"S7","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[192.5,92.5],[407.5,92.5],[407.5,307.5],[192.5,307.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":3}},
+        "#49": {"id":"#49","partId":"#33","order":7,"name":"S8","materialName":"T300_5208","orientation":0,"sequence":"S8","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[197.5,97.5],[402.5,97.5],[402.5,302.5],[197.5,302.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":1}},
+        "#50": {"id":"#50","partId":"#33","order":8,"name":"S9","materialName":"T300_5208","orientation":45,"sequence":"S9","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[242.5,142.5],[357.5,142.5],[357.5,257.5],[242.5,257.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":7}},
+        "#51": {"id":"#51","partId":"#33","order":9,"name":"S10","materialName":"T300_5208","orientation":-45,"sequence":"S10","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[247.5,147.5],[352.5,147.5],[352.5,252.5],[247.5,252.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":5}},
+        "#52": {"id":"#52","partId":"#33","order":10,"name":"S11","materialName":"T300_5208","orientation":0,"sequence":"S11","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[252.5,152.5],[347.5,152.5],[347.5,247.5],[252.5,247.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":3}},
+        "#53": {"id":"#53","partId":"#33","order":11,"name":"S12","materialName":"T300_5208","orientation":90,"sequence":"S12","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[257.5,157.5],[342.5,157.5],[342.5,242.5],[257.5,242.5]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":1}},
+        "#54": {"id":"#54","partId":"#33","order":12,"name":"S13","materialName":"T300_5208","orientation":90,"sequence":"S13","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[255,155],[345,155],[345,245],[255,245]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":2}},
+        "#55": {"id":"#55","partId":"#33","order":13,"name":"S14","materialName":"T300_5208","orientation":0,"sequence":"S14","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[250,150],[350,150],[350,250],[250,250]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":4}},
+        "#56": {"id":"#56","partId":"#33","order":14,"name":"S15","materialName":"T300_5208","orientation":-45,"sequence":"S15","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[245,145],[355,145],[355,255],[245,255]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":6}},
+        "#57": {"id":"#57","partId":"#33","order":15,"name":"S16","materialName":"T300_5208","orientation":45,"sequence":"S16","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[240,140],[360,140],[360,260],[240,260]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#39"],"dropRank":8}},
+        "#58": {"id":"#58","partId":"#33","order":16,"name":"S17","materialName":"T300_5208","orientation":0,"sequence":"S17","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[195,95],[405,95],[405,305],[195,305]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":2}},
+        "#59": {"id":"#59","partId":"#33","order":17,"name":"S18","materialName":"T300_5208","orientation":45,"sequence":"S18","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[190,90],[410,90],[410,310],[190,310]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":4}},
+        "#60": {"id":"#60","partId":"#33","order":18,"name":"S19","materialName":"T300_5208","orientation":-45,"sequence":"S19","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[185,85],[415,85],[415,315],[185,315]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":6}},
+        "#61": {"id":"#61","partId":"#33","order":19,"name":"S20","materialName":"T300_5208","orientation":0,"sequence":"S20","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[180,80],[420,80],[420,320],[180,320]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#37","#39"],"dropRank":8}},
+        "#62": {"id":"#62","partId":"#33","order":20,"name":"S21","materialName":"T300_5208","orientation":90,"sequence":"S21","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#63": {"id":"#63","partId":"#33","order":21,"name":"S22","materialName":"T300_5208","orientation":0,"sequence":"S22","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#64": {"id":"#64","partId":"#33","order":22,"name":"S23","materialName":"T300_5208","orientation":-45,"sequence":"S23","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}},
+        "#65": {"id":"#65","partId":"#33","order":23,"name":"S24","materialName":"T300_5208","orientation":45,"sequence":"S24","rosetteId":"#31","boundary":{"kind":"polygons","polygons":[[[0,0],[600,0],[600,400],[0,400]]]},"drape":{"method":"developable"},"zoneOrigin":{"zoneIds":["#35","#37","#39"],"dropRank":0}}
       },
       "plyOrder": [
         "#42",

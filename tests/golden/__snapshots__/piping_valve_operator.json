@@ -5,811 +5,312 @@
     "entities": {
       "#1": {
         "id": "#1",
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6e8296",
         "name": "Beam SB1 IPE200",
-        "tags": ["bim", "member", "element:#3"],
+        "tags": ["bim","member","element:#3"],
         "kind": "mesh",
-        "mesh": {
-          "positions": [
-            3050, 1000, 600, 2950, 1000, 600, 2950, 1000, 608.5, 2997.2, 1000, 608.5, 2997.2, 1000, 791.5, 2950, 1000, 791.5, 2950, 1000,
-            800, 3050, 1000, 800, 3050, 1000, 791.5, 3002.8, 1000, 791.5, 3002.8, 1000, 608.5, 3050, 1000, 608.5, 3050, -1000, 600, 2950,
-            -1000, 600, 2950, -1000, 608.5, 2997.2, -1000, 608.5, 2997.2, -1000, 791.5, 2950, -1000, 791.5, 2950, -1000, 800, 3050, -1000,
-            800, 3050, -1000, 791.5, 3002.8, -1000, 791.5, 3002.8, -1000, 608.5, 3050, -1000, 608.5
-          ],
-          "indices": [
-            11, 0, 1, 13, 12, 23, 1, 2, 3, 15, 14, 13, 4, 5, 6, 18, 17, 16, 4, 6, 7, 19, 18, 16, 7, 8, 9, 21, 20, 19, 4, 7, 9, 21, 19, 16,
-            3, 4, 9, 21, 16, 15, 3, 9, 10, 22, 21, 15, 1, 3, 10, 22, 15, 13, 1, 10, 11, 23, 22, 13, 12, 13, 1, 12, 1, 0, 13, 14, 2, 13, 2,
-            1, 14, 15, 3, 14, 3, 2, 15, 16, 4, 15, 4, 3, 16, 17, 5, 16, 5, 4, 17, 18, 6, 17, 6, 5, 18, 19, 7, 18, 7, 6, 19, 20, 8, 19, 8, 7,
-            20, 21, 9, 20, 9, 8, 21, 22, 10, 21, 10, 9, 22, 23, 11, 22, 11, 10, 23, 12, 0, 23, 0, 11
-          ]
-        }
+        "mesh": {"positions":[3050,1000,600,2950,1000,600,2950,1000,608.5,2997.2,1000,608.5,2997.2,1000,791.5,2950,1000,791.5,2950,1000,800,3050,1000,800,3050,1000,791.5,3002.8,1000,791.5,3002.8,1000,608.5,3050,1000,608.5,3050,-1000,600,2950,-1000,600,2950,-1000,608.5,2997.2,-1000,608.5,2997.2,-1000,791.5,2950,-1000,791.5,2950,-1000,800,3050,-1000,800,3050,-1000,791.5,3002.8,-1000,791.5,3002.8,-1000,608.5,3050,-1000,608.5],"indices":[11,0,1,13,12,23,1,2,3,15,14,13,4,5,6,18,17,16,4,6,7,19,18,16,7,8,9,21,20,19,4,7,9,21,19,16,3,4,9,21,16,15,3,9,10,22,21,15,1,3,10,22,15,13,1,10,11,23,22,13,12,13,1,12,1,0,13,14,2,13,2,1,14,15,3,14,3,2,15,16,4,15,4,3,16,17,5,16,5,4,17,18,6,17,6,5,18,19,7,18,7,6,19,20,8,19,8,7,20,21,9,20,9,8,21,22,10,21,10,9,22,23,11,22,11,10,23,12,0,23,0,11]}
       },
       "#4": {
         "id": "#4",
         "kind": "revolution",
-        "position": [0, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [0,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#5",
         "color": "#2f9c8f",
         "name": "Pipe #4 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:pipe"],
-        "profile": [
-          [0, 0],
-          [57.15, 0],
-          [57.15, 2775],
-          [0, 2775]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,2775],[0,2775]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#8": {
         "id": "#8",
         "kind": "revolution",
-        "position": [2851, 0, 0],
-        "rotation": [1.57079633, -1.57079633, 0],
+        "position": [2851,0,0],
+        "rotation": [1.57079633,-1.57079633,0],
         "layerId": "#9",
         "color": "#8f98a3",
         "name": "Flange #8 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:flange"],
-        "profile": [
-          [45.72, 0],
-          [114.3, 0],
-          [114.3, 22.4],
-          [71.4375, 22.4],
-          [57.15, 76],
-          [45.72, 76]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:flange"],
+        "profile": [[45.72,0],[114.3,0],[114.3,22.4],[71.4375,22.4],[57.15,76],[45.72,76]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#10": {
         "id": "#10",
         "kind": "revolution",
-        "position": [2851, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [2851,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#9",
         "color": "#8f98a3",
         "name": "Gasket #10 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:gasket"],
-        "profile": [
-          [53.2, 0],
-          [87.4, 0],
-          [87.4, 3],
-          [53.2, 3]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:gasket"],
+        "profile": [[53.2,0],[87.4,0],[87.4,3],[53.2,3]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#11": {
         "id": "#11",
         "kind": "revolution",
-        "position": [2854, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [2854,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#12",
         "color": "#c0504d",
         "name": "Valve #11 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:valve"],
-        "profile": [
-          [0, 0],
-          [97.155, 0],
-          [97.155, 292],
-          [0, 292]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:valve"],
+        "profile": [[0,0],[97.155,0],[97.155,292],[0,292]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#13": {
         "id": "#13",
         "kind": "revolution",
-        "position": [3000, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3000,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#12",
         "color": "#c0504d",
         "name": "Valve stem #11 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:valve"],
-        "profile": [
-          [0, 0],
-          [9.144, 0],
-          [9.144, 900],
-          [0, 900]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:valve"],
+        "profile": [[0,0],[9.144,0],[9.144,900],[0,900]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#14": {
         "id": "#14",
         "kind": "revolution",
-        "position": [3400, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3400,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#12",
         "color": "#c0504d",
         "name": "Actuator #11 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:valve"],
-        "profile": [
-          [0, 0],
-          [125, 0],
-          [125, 500],
-          [0, 500]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:valve"],
+        "profile": [[0,0],[125,0],[125,500],[0,500]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#15": {
         "id": "#15",
         "kind": "revolution",
-        "position": [3890, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3890,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#12",
         "color": "#c0504d",
         "name": "Handwheel #11 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:valve"],
-        "profile": [
-          [0, 0],
-          [100, 0],
-          [100, 20],
-          [0, 20]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:valve"],
+        "profile": [[0,0],[100,0],[100,20],[0,20]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#16": {
         "id": "#16",
         "kind": "revolution",
-        "position": [3146, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3146,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#9",
         "color": "#8f98a3",
         "name": "Gasket #16 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:gasket"],
-        "profile": [
-          [53.2, 0],
-          [87.4, 0],
-          [87.4, 3],
-          [53.2, 3]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:gasket"],
+        "profile": [[53.2,0],[87.4,0],[87.4,3],[53.2,3]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#17": {
         "id": "#17",
         "kind": "revolution",
-        "position": [3149, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3149,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#9",
         "color": "#8f98a3",
         "name": "Flange #17 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:flange"],
-        "profile": [
-          [45.72, 0],
-          [114.3, 0],
-          [114.3, 22.4],
-          [71.4375, 22.4],
-          [57.15, 76],
-          [45.72, 76]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:flange"],
+        "profile": [[45.72,0],[114.3,0],[114.3,22.4],[71.4375,22.4],[57.15,76],[45.72,76]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       },
       "#18": {
         "id": "#18",
         "kind": "revolution",
-        "position": [3225, 0, 0],
-        "rotation": [1.57079633, 1.57079633, 0],
+        "position": [3225,0,0],
+        "rotation": [1.57079633,1.57079633,0],
         "layerId": "#5",
         "color": "#2f9c8f",
         "name": "Pipe #18 100-P-5006-CS150OP",
-        "tags": ["piping:#6", "piping-run:#7", "piping-part:pipe"],
-        "profile": [
-          [0, 0],
-          [57.15, 0],
-          [57.15, 2775],
-          [0, 2775]
-        ],
-        "axis": [0, 0, 1],
+        "tags": ["piping:#6","piping-run:#7","piping-part:pipe"],
+        "profile": [[0,0],[57.15,0],[57.15,2775],[0,2775]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 24
       }
     },
-    "order": ["#4", "#1", "#8", "#10", "#11", "#13", "#14", "#15", "#16", "#17", "#18"],
+    "order": [
+      "#4",
+      "#1",
+      "#8",
+      "#10",
+      "#11",
+      "#13",
+      "#14",
+      "#15",
+      "#16",
+      "#17",
+      "#18"
+    ],
     "layers": {
-      "#19": { "id": "#19", "name": "Layer 0", "visible": true, "locked": false },
-      "#5": { "id": "#5", "name": "P-PIPE", "visible": true, "locked": false, "color": "#2f9c8f" },
-      "#9": { "id": "#9", "name": "P-FLNG", "visible": true, "locked": false, "color": "#8f98a3" },
-      "#12": { "id": "#12", "name": "P-VALV", "visible": true, "locked": false, "color": "#c0504d" },
-      "#2": { "id": "#2", "name": "S-BEAM", "visible": true, "locked": false, "color": "#7d8a96" }
+      "#19": {
+        "id": "#19",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      },
+      "#5": {
+        "id": "#5",
+        "name": "P-PIPE",
+        "visible": true,
+        "locked": false,
+        "color": "#2f9c8f"
+      },
+      "#9": {
+        "id": "#9",
+        "name": "P-FLNG",
+        "visible": true,
+        "locked": false,
+        "color": "#8f98a3"
+      },
+      "#12": {
+        "id": "#12",
+        "name": "P-VALV",
+        "visible": true,
+        "locked": false,
+        "color": "#c0504d"
+      },
+      "#2": {
+        "id": "#2",
+        "name": "S-BEAM",
+        "visible": true,
+        "locked": false,
+        "color": "#7d8a96"
+      }
     },
-    "layerOrder": ["#19", "#5", "#9", "#12", "#2"],
+    "layerOrder": [
+      "#19",
+      "#5",
+      "#9",
+      "#12",
+      "#2"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
     "featureHistory": [
-      { "id": "#20", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "#20",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
       {
         "id": "#21",
         "name": "import_piping_catalog",
-        "params": {
-          "catalog": {
-            "format": "#22",
-            "schemaVersion": 1,
-            "id": "#23",
-            "version": "1.0.0",
-            "title": "02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.",
-            "licence": "open-data",
-            "families": [
-              {
-                "id": "asme-b16.9-lr90-rte-stub",
-                "type": "elbow90",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "radius": "LR",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 2,
-                    "centreToEnd": 76,
-                    "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)" }
-                  },
-                  {
-                    "nps": 3,
-                    "centreToEnd": 114,
-                    "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)" }
-                  },
-                  {
-                    "nps": 4,
-                    "centreToEnd": 152,
-                    "provenance": {
-                      "sourceId": "S8+S9",
-                      "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"
-                    }
-                  },
-                  {
-                    "nps": 6,
-                    "centreToEnd": 229,
-                    "provenance": { "sourceId": "S8+S9+S10", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)" }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-lr45-rte-stub",
-                "type": "elbow45",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "radius": "LR",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "centreToEnd": 64,
-                    "provenance": { "sourceId": "S8+S10", "citation": "02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)" }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.5-wn-rf-rte-stub",
-                "type": "flangeWeldNeck",
-                "standard": "ASME B16.5",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "facing": "RF",
-                    "outsideDiameter": 228.6,
-                    "thickness": 22.4,
-                    "boltCircle": 190.5,
-                    "boltCount": 8,
-                    "boltDiameter": 15.875,
-                    "raisedFaceDiameter": 157.2,
-                    "lengthThroughHub": 76,
-                    "verifiedDims": ["outsideDiameter", "thickness", "boltCircle", "boltCount", "boltDiameter", "raisedFaceDiameter"],
-                    "provenance": {
-                      "sourceId": "S2+S3+S4",
-                      "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.20-sw-rte-stub",
-                "type": "gasketSpiralWound",
-                "standard": "ASME B16.20",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "innerRingId": 106.4,
-                    "centeringRingOd": 174.8,
-                    "thickness": 3,
-                    "verifiedDims": ["innerRingId", "centeringRingOd"],
-                    "provenance": {
-                      "sourceId": "S22+S23+S24",
-                      "citation": "ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.5-bolting-rte-stub",
-                "type": "boltSet",
-                "standard": "ASME B16.5 bolting",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "facing": "RF",
-                    "boltCount": 8,
-                    "boltDiameter": 15.875,
-                    "provenance": {
-                      "sourceId": "S14+S15",
-                      "citation": "ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-tee-rte-stub",
-                "type": "tee",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 2,
-                    "centreToEndRun": 64,
-                    "centreToEndBranch": 64,
-                    "provenance": {
-                      "sourceId": "S9+S10",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"
-                    }
-                  },
-                  {
-                    "nps": 4,
-                    "centreToEndRun": 105,
-                    "centreToEndBranch": 105,
-                    "provenance": {
-                      "sourceId": "S9+S10",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"
-                    }
-                  },
-                  {
-                    "nps": 6,
-                    "centreToEndRun": 143,
-                    "centreToEndBranch": 143,
-                    "provenance": {
-                      "sourceId": "S9+S10",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-reducing-tee-rte-stub",
-                "type": "reducingTee",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 6,
-                    "smallNps": 4,
-                    "centreToEndRun": 143,
-                    "centreToEndBranch": 130,
-                    "provenance": {
-                      "sourceId": "S9+S12",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#24",
-                "type": "reducerConcentric",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "smallNps": 3,
-                    "length": 102,
-                    "provenance": {
-                      "sourceId": "S13",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"
-                    }
-                  },
-                  {
-                    "nps": 6,
-                    "smallNps": 4,
-                    "length": 140,
-                    "provenance": {
-                      "sourceId": "S13",
-                      "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#25",
-                "type": "reducerEccentric",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "smallNps": 3,
-                    "length": 102,
-                    "provenance": {
-                      "sourceId": "S13",
-                      "citation": "02 RTE V1 declared INPUT: eccentric reducer 4x3, H = the concentric H (B16.9 tabulates one H for both), grade B"
-                    }
-                  },
-                  {
-                    "nps": 6,
-                    "smallNps": 4,
-                    "length": 140,
-                    "provenance": {
-                      "sourceId": "S13",
-                      "citation": "02 RTE V1 declared INPUT: eccentric reducer 6x4, H = the concentric H (B16.9 tabulates one H for both), grade B"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "mss-sp-97-weldolet-rte-stub",
-                "type": "weldolet",
-                "standard": "MSS SP-97",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "nps": 6,
-                    "smallNps": 2,
-                    "centreToOutlet": 144,
-                    "provenance": {
-                      "sourceId": "RTE",
-                      "citation": "02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        },
+        "params": {"catalog":{"format":"#22","schemaVersion":1,"id":"#23","version":"1.0.0","title":"02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.","licence":"open-data","families":[{"id":"asme-b16.9-lr90-rte-stub","type":"elbow90","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"nps":2,"centreToEnd":76,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)"}},{"nps":3,"centreToEnd":114,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)"}},{"nps":4,"centreToEnd":152,"provenance":{"sourceId":"S8+S9","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"}},{"nps":6,"centreToEnd":229,"provenance":{"sourceId":"S8+S9+S10","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)"}}]},{"id":"asme-b16.9-lr45-rte-stub","type":"elbow45","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"nps":4,"centreToEnd":64,"provenance":{"sourceId":"S8+S10","citation":"02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)"}}]},{"id":"asme-b16.5-wn-rf-rte-stub","type":"flangeWeldNeck","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","outsideDiameter":228.6,"thickness":22.4,"boltCircle":190.5,"boltCount":8,"boltDiameter":15.875,"raisedFaceDiameter":157.2,"lengthThroughHub":76,"verifiedDims":["outsideDiameter","thickness","boltCircle","boltCount","boltDiameter","raisedFaceDiameter"],"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}}]},{"id":"asme-b16.20-sw-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"innerRingId":106.4,"centeringRingOd":174.8,"thickness":3,"verifiedDims":["innerRingId","centeringRingOd"],"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}}]},{"id":"asme-b16.5-bolting-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","boltCount":8,"boltDiameter":15.875,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}}]},{"id":"asme-b16.9-tee-rte-stub","type":"tee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":2,"centreToEndRun":64,"centreToEndBranch":64,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}},{"nps":4,"centreToEndRun":105,"centreToEndBranch":105,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}},{"nps":6,"centreToEndRun":143,"centreToEndBranch":143,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}}]},{"id":"asme-b16.9-reducing-tee-rte-stub","type":"reducingTee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":6,"smallNps":4,"centreToEndRun":143,"centreToEndBranch":130,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}}]},{"id":"#24","type":"reducerConcentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":4,"smallNps":3,"length":102,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"}},{"nps":6,"smallNps":4,"length":140,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"}}]},{"id":"#25","type":"reducerEccentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":4,"smallNps":3,"length":102,"provenance":{"sourceId":"S13","citation":"02 RTE V1 declared INPUT: eccentric reducer 4x3, H = the concentric H (B16.9 tabulates one H for both), grade B"}},{"nps":6,"smallNps":4,"length":140,"provenance":{"sourceId":"S13","citation":"02 RTE V1 declared INPUT: eccentric reducer 6x4, H = the concentric H (B16.9 tabulates one H for both), grade B"}}]},{"id":"mss-sp-97-weldolet-rte-stub","type":"weldolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"nps":6,"smallNps":2,"centreToOutlet":144,"provenance":{"sourceId":"RTE","citation":"02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"}}]}]}},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#26",
         "name": "import_piping_catalog",
-        "params": {
-          "catalog": {
-            "format": "#22",
-            "schemaVersion": 1,
-            "id": "#27",
-            "version": "1.0.0",
-            "title": "02 RTE V1 validation stub: NPS 4 Class 150 RF flanged valves with their operator envelopes (stemHeight = valve centre to the top of the operator along the stem; handwheelDiameter / handwheelThickness = a disc centred at stemHeight; gearbox and actuator = a cylinder whose top is at stemHeight). Face-to-face lengths are the B16.10 values of the stub; every operator dimension is a declared input. Not a standard; no value is verified.",
-            "licence": "open-data",
-            "families": [
-              {
-                "id": "#28",
-                "type": "valveGate",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "facing": "RF",
-                    "faceToFace": 229,
-                    "stemHeight": 650,
-                    "handwheelDiameter": 400,
-                    "handwheelThickness": 30,
-                    "provenance": {
-                      "sourceId": "RTE",
-                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#29",
-                "type": "valveGlobe",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "facing": "RF",
-                    "faceToFace": 292,
-                    "stemHeight": 900,
-                    "actuatorDiameter": 250,
-                    "actuatorHeight": 500,
-                    "handwheelDiameter": 200,
-                    "handwheelThickness": 20,
-                    "provenance": {
-                      "sourceId": "RTE",
-                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#30",
-                "type": "valveBall",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "nps": 4,
-                    "class": 150,
-                    "facing": "RF",
-                    "faceToFace": 229,
-                    "stemHeight": 520,
-                    "gearboxDiameter": 200,
-                    "gearboxHeight": 250,
-                    "handwheelDiameter": 300,
-                    "handwheelThickness": 25,
-                    "provenance": {
-                      "sourceId": "RTE",
-                      "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        },
+        "params": {"catalog":{"format":"#22","schemaVersion":1,"id":"#27","version":"1.0.0","title":"02 RTE V1 validation stub: NPS 4 Class 150 RF flanged valves with their operator envelopes (stemHeight = valve centre to the top of the operator along the stem; handwheelDiameter / handwheelThickness = a disc centred at stemHeight; gearbox and actuator = a cylinder whose top is at stemHeight). Face-to-face lengths are the B16.10 values of the stub; every operator dimension is a declared input. Not a standard; no value is verified.","licence":"open-data","families":[{"id":"#28","type":"valveGate","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","faceToFace":229,"stemHeight":650,"handwheelDiameter":400,"handwheelThickness":30,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"}}]},{"id":"#29","type":"valveGlobe","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","faceToFace":292,"stemHeight":900,"actuatorDiameter":250,"actuatorHeight":500,"handwheelDiameter":200,"handwheelThickness":20,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}}]},{"id":"#30","type":"valveBall","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"nps":4,"class":150,"facing":"RF","faceToFace":229,"stemHeight":520,"gearboxDiameter":200,"gearboxHeight":250,"handwheelDiameter":300,"handwheelThickness":25,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}}]}]}},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#31",
         "name": "import_pipe_spec",
-        "params": {
-          "spec": {
-            "format": "llull-pipe-spec",
-            "schemaVersion": 1,
-            "id": "CS150OP",
-            "title": "CS150 with operator-bearing valves (02 RTE V1 validation spec): gate (handwheel), globe (actuator) and ball (gear box) valves of NPS 4",
-            "service": "SC-RTE validation plans",
-            "dimensionalStandard": "ASME",
-            "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
-            "corrosionAllowance": { "value": 3, "unit": "mm" },
-            "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
-            "sizeRange": { "fromNps": 2, "toNps": 6 },
-            "catalogs": ["#27", "#23", "llull-open-piping"],
-            "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
-            "components": [
-              { "id": "P-BW", "type": "pipe", "fromNps": 2, "toNps": 6, "schedule": "40", "ends": "BE", "catalogRef": "asme-b36.10m" },
-              {
-                "id": "E90-LR",
-                "type": "elbow90",
-                "fromNps": 2,
-                "toNps": 6,
-                "radius": "LR",
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "catalogRef": "asme-b16.9"
-              },
-              {
-                "id": "E45-LR",
-                "type": "elbow45",
-                "fromNps": 2,
-                "toNps": 6,
-                "radius": "LR",
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "catalogRef": "asme-b16.9"
-              },
-              { "id": "T-BW", "type": "tee", "fromNps": 2, "toNps": 6, "catalogRef": "asme-b16.9", "ends": "BW", "scheduleFromPipe": true },
-              {
-                "id": "RT-BW",
-                "type": "reducingTee",
-                "fromNps": 2,
-                "toNps": 6,
-                "catalogRef": "asme-b16.9",
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "branchFromNps": 2,
-                "branchToNps": 4
-              },
-              {
-                "id": "RED-C",
-                "type": "reducerConcentric",
-                "fromNps": 3,
-                "toNps": 6,
-                "catalogRef": "asme-b16.9",
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "branchFromNps": 2,
-                "branchToNps": 4
-              },
-              {
-                "id": "RED-E",
-                "type": "reducerEccentric",
-                "fromNps": 3,
-                "toNps": 6,
-                "catalogRef": "asme-b16.9-reducer-eccentric",
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "branchFromNps": 2,
-                "branchToNps": 4
-              },
-              {
-                "id": "W-BW",
-                "type": "weldolet",
-                "fromNps": 2,
-                "toNps": 6,
-                "branchFromNps": 2,
-                "branchToNps": 2,
-                "ends": "BW",
-                "scheduleFromPipe": true,
-                "catalogRef": "mss-sp-97"
-              },
-              {
-                "id": "F-WN",
-                "type": "flangeWeldNeck",
-                "fromNps": 2,
-                "toNps": 6,
-                "facing": "RF",
-                "class": 150,
-                "catalogRef": "asme-b16.5"
-              },
-              { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 2, "toNps": 6, "class": 150, "catalogRef": "asme-b16.20" },
-              {
-                "id": "B-STUD",
-                "type": "boltSet",
-                "fromNps": 2,
-                "toNps": 6,
-                "class": 150,
-                "facing": "RF",
-                "catalogRef": "asme-b16.5-bolting"
-              },
-              {
-                "id": "V-GATE",
-                "type": "valveGate",
-                "fromNps": 2,
-                "toNps": 6,
-                "ends": "FL",
-                "facing": "RF",
-                "class": 150,
-                "catalogRef": "asme-b16.10-gate-operators"
-              },
-              {
-                "id": "V-GLOBE",
-                "type": "valveGlobe",
-                "fromNps": 2,
-                "toNps": 6,
-                "ends": "FL",
-                "facing": "RF",
-                "class": 150,
-                "catalogRef": "asme-b16.10-globe-operators"
-              },
-              {
-                "id": "V-BALL",
-                "type": "valveBall",
-                "fromNps": 2,
-                "toNps": 6,
-                "ends": "FL",
-                "facing": "RF",
-                "class": 150,
-                "catalogRef": "asme-b16.10-ball-operators"
-              }
-            ],
-            "status": "draft",
-            "provenance": { "author": "02 RTE validation pack", "accessed": "2026-10-24" },
-            "branchTable": { "system": "NPS", "cells": { "4": { "4": "T" }, "6": { "2": "W", "4": "RT", "6": "T" } } },
-            "insulation": [
-              {
-                "code": "H",
-                "dnMax": 100,
-                "tempMaxC": 100,
-                "thicknessMm": 30,
-                "material": "mineral wool",
-                "conductivityWmK": 0.0598535265
-              },
-              {
-                "code": "H",
-                "dnMax": 100,
-                "tempMaxC": 200,
-                "thicknessMm": 50,
-                "material": "mineral wool",
-                "conductivityWmK": 0.0598535265
-              },
-              { "code": "H", "dnMax": 150, "tempMaxC": 200, "thicknessMm": 60, "material": "mineral wool", "conductivityWmK": 0.0598535265 }
-            ]
-          }
-        },
+        "params": {"spec":{"format":"llull-pipe-spec","schemaVersion":1,"id":"CS150OP","title":"CS150 with operator-bearing valves (02 RTE V1 validation spec): gate (handwheel), globe (actuator) and ball (gear box) valves of NPS 4","service":"SC-RTE validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"fromNps":2,"toNps":6},"catalogs":["#27","#23","llull-open-piping"],"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"components":[{"id":"P-BW","type":"pipe","fromNps":2,"toNps":6,"schedule":"40","ends":"BE","catalogRef":"asme-b36.10m"},{"id":"E90-LR","type":"elbow90","fromNps":2,"toNps":6,"radius":"LR","ends":"BW","scheduleFromPipe":true,"catalogRef":"asme-b16.9"},{"id":"E45-LR","type":"elbow45","fromNps":2,"toNps":6,"radius":"LR","ends":"BW","scheduleFromPipe":true,"catalogRef":"asme-b16.9"},{"id":"T-BW","type":"tee","fromNps":2,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RT-BW","type":"reducingTee","fromNps":2,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true,"branchFromNps":2,"branchToNps":4},{"id":"RED-C","type":"reducerConcentric","fromNps":3,"toNps":6,"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true,"branchFromNps":2,"branchToNps":4},{"id":"RED-E","type":"reducerEccentric","fromNps":3,"toNps":6,"catalogRef":"asme-b16.9-reducer-eccentric","ends":"BW","scheduleFromPipe":true,"branchFromNps":2,"branchToNps":4},{"id":"W-BW","type":"weldolet","fromNps":2,"toNps":6,"branchFromNps":2,"branchToNps":2,"ends":"BW","scheduleFromPipe":true,"catalogRef":"mss-sp-97"},{"id":"F-WN","type":"flangeWeldNeck","fromNps":2,"toNps":6,"facing":"RF","class":150,"catalogRef":"asme-b16.5"},{"id":"G-SW","type":"gasketSpiralWound","fromNps":2,"toNps":6,"class":150,"catalogRef":"asme-b16.20"},{"id":"B-STUD","type":"boltSet","fromNps":2,"toNps":6,"class":150,"facing":"RF","catalogRef":"asme-b16.5-bolting"},{"id":"V-GATE","type":"valveGate","fromNps":2,"toNps":6,"ends":"FL","facing":"RF","class":150,"catalogRef":"asme-b16.10-gate-operators"},{"id":"V-GLOBE","type":"valveGlobe","fromNps":2,"toNps":6,"ends":"FL","facing":"RF","class":150,"catalogRef":"asme-b16.10-globe-operators"},{"id":"V-BALL","type":"valveBall","fromNps":2,"toNps":6,"ends":"FL","facing":"RF","class":150,"catalogRef":"asme-b16.10-ball-operators"}],"status":"draft","provenance":{"author":"02 RTE validation pack","accessed":"2026-10-24"},"branchTable":{"system":"NPS","cells":{"4":{"4":"T"},"6":{"2":"W","4":"RT","6":"T"}}},"insulation":[{"code":"H","dnMax":100,"tempMaxC":100,"thicknessMm":30,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":100,"tempMaxC":200,"thicknessMm":50,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":150,"tempMaxC":200,"thicknessMm":60,"material":"mineral wool","conductivityWmK":0.0598535265}]}},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#32",
         "name": "add_tie_in_point",
-        "params": { "tag": "OA", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+        "params": {"tag":"OA","position":[0,0,0],"direction":[1,0,0],"dn":100,"endType":"BW"},
         "suppressed": false,
         "affected": ["#33"]
       },
       {
         "id": "#34",
         "name": "add_tie_in_point",
-        "params": { "tag": "OB", "position": [6000, 0, 0], "direction": [-1, 0, 0], "dn": 100, "endType": "BW" },
+        "params": {"tag":"OB","position":[6000,0,0],"direction":[-1,0,0],"dn":100,"endType":"BW"},
         "suppressed": false,
         "affected": ["#35"]
       },
       {
         "id": "#36",
         "name": "create_pipeline",
-        "params": { "service": "P", "sequence": "5006", "spec": "CS150OP", "dn": 100 },
+        "params": {"service":"P","sequence":"5006","spec":"CS150OP","dn":100},
         "suppressed": false,
         "affected": ["#6"]
       },
       {
         "id": "#37",
         "name": "route_pipe",
-        "params": { "lineId": "#6", "from": { "portId": "#33" }, "to": { "portId": "#35" } },
+        "params": {"lineId":"#6","from":{"portId":"#33"},"to":{"portId":"#35"}},
         "suppressed": false,
         "affected": ["#7"]
       },
       {
         "id": "#38",
         "name": "insert_inline_component",
-        "params": { "runId": "#7", "type": "valveGlobe", "tag": "XV-6", "at": { "leg": 0, "centreDistance": 3000 } },
+        "params": {"runId":"#7","type":"valveGlobe","tag":"XV-6","at":{"leg":0,"centreDistance":3000}},
         "suppressed": false,
-        "affected": ["#39", "#7"]
+        "affected": ["#39","#7"]
       },
       {
         "id": "#40",
         "name": "add_steel_member",
-        "params": { "role": "beam", "start": [3000, -1000, 700], "end": [3000, 1000, 700], "profile": "IPE200" },
+        "params": {"role":"beam","start":[3000,-1000,700],"end":[3000,1000,700],"profile":"IPE200"},
         "suppressed": false,
-        "affected": ["#3", "#1"]
+        "affected": ["#3","#1"]
       },
       {
         "id": "#41",
         "name": "remove_inline_component",
-        "params": { "runId": "#7", "componentId": "#39" },
+        "params": {"runId":"#7","componentId":"#39"},
         "suppressed": false,
         "affected": ["#7"]
       },
       {
         "id": "#42",
         "name": "insert_inline_component",
-        "params": {
-          "runId": "#7",
-          "type": "valveGlobe",
-          "tag": "XV-6",
-          "at": { "leg": 0, "centreDistance": 3000 },
-          "stemDirection": [1, 0, 0]
-        },
+        "params": {"runId":"#7","type":"valveGlobe","tag":"XV-6","at":{"leg":0,"centreDistance":3000},"stemDirection":[1,0,0]},
         "suppressed": false,
-        "affected": ["#43", "#7"]
+        "affected": ["#43","#7"]
       }
     ],
     "configurations": {},
@@ -825,894 +326,21 @@
     "nextStepNumber": 13,
     "plant": {
       "catalog": {
-        "catalogs": {
-          "#23": {
-            "format": "#22",
-            "schemaVersion": 1,
-            "id": "#23",
-            "version": "1.0.0",
-            "title": "02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.",
-            "licence": "open-data",
-            "families": [
-              {
-                "id": "asme-b16.9-lr90-rte-stub",
-                "type": "elbow90",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "radius": "LR",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "2", "value": 2 },
-                    "dims": {
-                      "centreToEnd": {
-                        "value": 76,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)" }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "3", "value": 3 },
-                    "dims": {
-                      "centreToEnd": {
-                        "value": 114,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": { "sourceId": "S8", "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)" }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "centreToEnd": {
-                        "value": 152,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S8+S9",
-                          "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "dims": {
-                      "centreToEnd": {
-                        "value": 229,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S8+S9+S10",
-                          "citation": "02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-lr45-rte-stub",
-                "type": "elbow45",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "radius": "LR",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "centreToEnd": {
-                        "value": 64,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": { "sourceId": "S8+S10", "citation": "02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)" }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.5-wn-rf-rte-stub",
-                "type": "flangeWeldNeck",
-                "standard": "ASME B16.5",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "facing": "RF",
-                    "dims": {
-                      "outsideDiameter": {
-                        "value": 228.6,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "thickness": {
-                        "value": 22.4,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "boltCircle": {
-                        "value": 190.5,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "boltCount": {
-                        "value": 8,
-                        "unit": "count",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "boltDiameter": {
-                        "value": 15.875,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "raisedFaceDiameter": {
-                        "value": 157.2,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      },
-                      "lengthThroughHub": {
-                        "value": 76,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S2+S3+S4",
-                          "citation": "ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.20-sw-rte-stub",
-                "type": "gasketSpiralWound",
-                "standard": "ASME B16.20",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "dims": {
-                      "innerRingId": {
-                        "value": 106.4,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S22+S23+S24",
-                          "citation": "ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"
-                        }
-                      },
-                      "centeringRingOd": {
-                        "value": 174.8,
-                        "unit": "mm",
-                        "verified": true,
-                        "provenance": {
-                          "sourceId": "S22+S23+S24",
-                          "citation": "ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"
-                        }
-                      },
-                      "thickness": {
-                        "value": 3,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S22+S23+S24",
-                          "citation": "ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.5-bolting-rte-stub",
-                "type": "boltSet",
-                "standard": "ASME B16.5 bolting",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "facing": "RF",
-                    "dims": {
-                      "boltCount": {
-                        "value": 8,
-                        "unit": "count",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S14+S15",
-                          "citation": "ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"
-                        }
-                      },
-                      "boltDiameter": {
-                        "value": 15.875,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S14+S15",
-                          "citation": "ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-tee-rte-stub",
-                "type": "tee",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "2", "value": 2 },
-                    "dims": {
-                      "centreToEndRun": {
-                        "value": 64,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"
-                        }
-                      },
-                      "centreToEndBranch": {
-                        "value": 64,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "centreToEndRun": {
-                        "value": 105,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"
-                        }
-                      },
-                      "centreToEndBranch": {
-                        "value": 105,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "dims": {
-                      "centreToEndRun": {
-                        "value": 143,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"
-                        }
-                      },
-                      "centreToEndBranch": {
-                        "value": 143,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S10",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "asme-b16.9-reducing-tee-rte-stub",
-                "type": "reducingTee",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "smallSize": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "centreToEndRun": {
-                        "value": 143,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S12",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"
-                        }
-                      },
-                      "centreToEndBranch": {
-                        "value": 130,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S9+S12",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#24",
-                "type": "reducerConcentric",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "smallSize": { "system": "NPS", "key": "3", "value": 3 },
-                    "dims": {
-                      "length": {
-                        "value": 102,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S13",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "smallSize": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "length": {
-                        "value": 140,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S13",
-                          "citation": "02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#25",
-                "type": "reducerEccentric",
-                "standard": "ASME B16.9",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "smallSize": { "system": "NPS", "key": "3", "value": 3 },
-                    "dims": {
-                      "length": {
-                        "value": 102,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S13",
-                          "citation": "02 RTE V1 declared INPUT: eccentric reducer 4x3, H = the concentric H (B16.9 tabulates one H for both), grade B"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "smallSize": { "system": "NPS", "key": "4", "value": 4 },
-                    "dims": {
-                      "length": {
-                        "value": 140,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "S13",
-                          "citation": "02 RTE V1 declared INPUT: eccentric reducer 6x4, H = the concentric H (B16.9 tabulates one H for both), grade B"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "mss-sp-97-weldolet-rte-stub",
-                "type": "weldolet",
-                "standard": "MSS SP-97",
-                "dimensionalStandard": "ASME",
-                "ends": ["BW"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "6", "value": 6 },
-                    "smallSize": { "system": "NPS", "key": "2", "value": 2 },
-                    "dims": {
-                      "centreToOutlet": {
-                        "value": 144,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"
-                        }
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "#27": {
-            "format": "#22",
-            "schemaVersion": 1,
-            "id": "#27",
-            "version": "1.0.0",
-            "title": "02 RTE V1 validation stub: NPS 4 Class 150 RF flanged valves with their operator envelopes (stemHeight = valve centre to the top of the operator along the stem; handwheelDiameter / handwheelThickness = a disc centred at stemHeight; gearbox and actuator = a cylinder whose top is at stemHeight). Face-to-face lengths are the B16.10 values of the stub; every operator dimension is a declared input. Not a standard; no value is verified.",
-            "licence": "open-data",
-            "families": [
-              {
-                "id": "#28",
-                "type": "valveGate",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "facing": "RF",
-                    "dims": {
-                      "faceToFace": {
-                        "value": 229,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
-                        }
-                      },
-                      "stemHeight": {
-                        "value": 650,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
-                        }
-                      },
-                      "handwheelDiameter": {
-                        "value": 400,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
-                        }
-                      },
-                      "handwheelThickness": {
-                        "value": 30,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#29",
-                "type": "valveGlobe",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "facing": "RF",
-                    "dims": {
-                      "faceToFace": {
-                        "value": 292,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      },
-                      "stemHeight": {
-                        "value": 900,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      },
-                      "actuatorDiameter": {
-                        "value": 250,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      },
-                      "actuatorHeight": {
-                        "value": 500,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      },
-                      "handwheelDiameter": {
-                        "value": 200,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      },
-                      "handwheelThickness": {
-                        "value": 20,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "#30",
-                "type": "valveBall",
-                "standard": "ASME B16.10",
-                "dimensionalStandard": "ASME",
-                "ends": ["FL"],
-                "sizes": [
-                  {
-                    "size": { "system": "NPS", "key": "4", "value": 4 },
-                    "class": 150,
-                    "facing": "RF",
-                    "dims": {
-                      "faceToFace": {
-                        "value": 229,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      },
-                      "stemHeight": {
-                        "value": 520,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      },
-                      "gearboxDiameter": {
-                        "value": 200,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      },
-                      "gearboxHeight": {
-                        "value": 250,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      },
-                      "handwheelDiameter": {
-                        "value": 300,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      },
-                      "handwheelThickness": {
-                        "value": 25,
-                        "unit": "mm",
-                        "verified": false,
-                        "provenance": {
-                          "sourceId": "RTE",
-                          "citation": "02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"
-                        }
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "catalogOrder": ["#23", "#27"]
+        "catalogs": {"#23":{"format":"#22","schemaVersion":1,"id":"#23","version":"1.0.0","title":"02 RTE validation stub: the INPUT dimensions of the SC-RTE plans (centre-to-end rounded to whole mm, flange hub length Y, gasket thickness, stud count). Not a standard; searched BEFORE llull-open-piping by spec CS150.","licence":"open-data","families":[{"id":"asme-b16.9-lr90-rte-stub","type":"elbow90","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"dims":{"centreToEnd":{"value":76,"unit":"mm","verified":false,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 2 (A 76.2 rounded)"}}}},{"size":{"system":"NPS","key":"3","value":3},"dims":{"centreToEnd":{"value":114,"unit":"mm","verified":false,"provenance":{"sourceId":"S8","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 3 (A 114.3 rounded)"}}}},{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEnd":{"value":152,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S9","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 4 (A 152.4 rounded; b16_9_fitting_dimensions.json)"}}}},{"size":{"system":"NPS","key":"6","value":6},"dims":{"centreToEnd":{"value":229,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S9+S10","citation":"02 RTE spec_stub_cs150.json elbow90LR NPS 6 (A 228.6 rounded)"}}}}]},{"id":"asme-b16.9-lr45-rte-stub","type":"elbow45","standard":"ASME B16.9","dimensionalStandard":"ASME","radius":"LR","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEnd":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S8+S10","citation":"02 RTE spec_stub_cs150.json elbow45LR NPS 4 (B 63.5 rounded)"}}}}]},{"id":"asme-b16.5-wn-rf-rte-stub","type":"flangeWeldNeck","standard":"ASME B16.5","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"outsideDiameter":{"value":228.6,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"thickness":{"value":22.4,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltCircle":{"value":190.5,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltCount":{"value":8,"unit":"count","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"raisedFaceDiameter":{"value":157.2,"unit":"mm","verified":true,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}},"lengthThroughHub":{"value":76,"unit":"mm","verified":false,"provenance":{"sourceId":"S2+S3+S4","citation":"ASME B16.5 NPS 4 Class 150 WN RF (asme_b16_5_wn_rf_flanges.json grade A row); lengthThroughHub Y = 76 is the SC-RTE stub input (sources differ by 1.3-1.6 mm), not verified"}}}}]},{"id":"asme-b16.20-sw-rte-stub","type":"gasketSpiralWound","standard":"ASME B16.20","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"dims":{"innerRingId":{"value":106.4,"unit":"mm","verified":true,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}},"centeringRingOd":{"value":174.8,"unit":"mm","verified":true,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}},"thickness":{"value":3,"unit":"mm","verified":false,"provenance":{"sourceId":"S22+S23+S24","citation":"ASME B16.20 NPS 4 Class 150 ring diameters (component_references.json); thickness 3.0 mm is the SC-RTE declared input (grade C), not verified"}}}}]},{"id":"asme-b16.5-bolting-rte-stub","type":"boltSet","standard":"ASME B16.5 bolting","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"boltCount":{"value":8,"unit":"count","verified":false,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}},"boltDiameter":{"value":15.875,"unit":"mm","verified":false,"provenance":{"sourceId":"S14+S15","citation":"ASME B16.5 NPS 4 Class 150: 8 stud bolts 5/8 in (02 RTE flanged_components.json); stud length not tabulated here"}}}}]},{"id":"asme-b16.9-tee-rte-stub","type":"tee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"2","value":2},"dims":{"centreToEndRun":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}},"centreToEndBranch":{"value":64,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 2 (C = M)"}}}},{"size":{"system":"NPS","key":"4","value":4},"dims":{"centreToEndRun":{"value":105,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}},"centreToEndBranch":{"value":105,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 4 (C = M)"}}}},{"size":{"system":"NPS","key":"6","value":6},"dims":{"centreToEndRun":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}},"centreToEndBranch":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S10","citation":"02 RTE b16_9_fitting_dimensions.json teeStraight_C_equals_M NPS 6 (C = M)"}}}}]},{"id":"asme-b16.9-reducing-tee-rte-stub","type":"reducingTee","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"4","value":4},"dims":{"centreToEndRun":{"value":143,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}},"centreToEndBranch":{"value":130,"unit":"mm","verified":false,"provenance":{"sourceId":"S9+S12","citation":"02 RTE b16_9_fitting_dimensions.json teeReducing_C_run_M_outlet 6x6x4 (C 143, M 130)"}}}}]},{"id":"#24","type":"reducerConcentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"smallSize":{"system":"NPS","key":"3","value":3},"dims":{"length":{"value":102,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 4x3 (H 102, grade B)"}}}},{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"4","value":4},"dims":{"length":{"value":140,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE b16_9_fitting_dimensions.json reducerConcentric_H 6x4 (H 140, grade B)"}}}}]},{"id":"#25","type":"reducerEccentric","standard":"ASME B16.9","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"smallSize":{"system":"NPS","key":"3","value":3},"dims":{"length":{"value":102,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE V1 declared INPUT: eccentric reducer 4x3, H = the concentric H (B16.9 tabulates one H for both), grade B"}}}},{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"4","value":4},"dims":{"length":{"value":140,"unit":"mm","verified":false,"provenance":{"sourceId":"S13","citation":"02 RTE V1 declared INPUT: eccentric reducer 6x4, H = the concentric H (B16.9 tabulates one H for both), grade B"}}}}]},{"id":"mss-sp-97-weldolet-rte-stub","type":"weldolet","standard":"MSS SP-97","dimensionalStandard":"ASME","ends":["BW"],"sizes":[{"size":{"system":"NPS","key":"6","value":6},"smallSize":{"system":"NPS","key":"2","value":2},"dims":{"centreToOutlet":{"value":144,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE declared INPUT: weldolet 6x2 outlet face 144 mm from the header centreline (MSS SP-97 dimension A is a manufacturer value, not sourced here); unverified"}}}}]}]},"#27":{"format":"#22","schemaVersion":1,"id":"#27","version":"1.0.0","title":"02 RTE V1 validation stub: NPS 4 Class 150 RF flanged valves with their operator envelopes (stemHeight = valve centre to the top of the operator along the stem; handwheelDiameter / handwheelThickness = a disc centred at stemHeight; gearbox and actuator = a cylinder whose top is at stemHeight). Face-to-face lengths are the B16.10 values of the stub; every operator dimension is a declared input. Not a standard; no value is verified.","licence":"open-data","families":[{"id":"#28","type":"valveGate","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"faceToFace":{"value":229,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"}},"stemHeight":{"value":650,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"}},"handwheelDiameter":{"value":400,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"}},"handwheelThickness":{"value":30,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): gate valve NPS 4 Class 150: handwheel disc 400 mm at 650 mm above the pipe centre, 30 mm thick"}}}}]},{"id":"#29","type":"valveGlobe","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"faceToFace":{"value":292,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}},"stemHeight":{"value":900,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}},"actuatorDiameter":{"value":250,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}},"actuatorHeight":{"value":500,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}},"handwheelDiameter":{"value":200,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}},"handwheelThickness":{"value":20,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): globe valve NPS 4 Class 150 with an actuator: cylinder 250 x 500 topping at 900 mm, override handwheel 200 mm"}}}}]},{"id":"#30","type":"valveBall","standard":"ASME B16.10","dimensionalStandard":"ASME","ends":["FL"],"sizes":[{"size":{"system":"NPS","key":"4","value":4},"class":150,"facing":"RF","dims":{"faceToFace":{"value":229,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}},"stemHeight":{"value":520,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}},"gearboxDiameter":{"value":200,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}},"gearboxHeight":{"value":250,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}},"handwheelDiameter":{"value":300,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}},"handwheelThickness":{"value":25,"unit":"mm","verified":false,"provenance":{"sourceId":"RTE","citation":"02 RTE V1 declared INPUT (stub, not from a standard, unverified): ball valve NPS 4 Class 150 with a gear operator: gear box 200 x 250 topping at 520 mm, handwheel 300 mm"}}}}]}]}},
+        "catalogOrder": ["#23","#27"]
       },
       "spec": {
-        "specs": {
-          "CS150OP": [
-            {
-              "format": "llull-pipe-spec",
-              "schemaVersion": 1,
-              "id": "CS150OP",
-              "revision": 1,
-              "title": "CS150 with operator-bearing valves (02 RTE V1 validation spec): gate (handwheel), globe (actuator) and ball (gear box) valves of NPS 4",
-              "service": "SC-RTE validation plans",
-              "dimensionalStandard": "ASME",
-              "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
-              "corrosionAllowance": { "value": 3, "unit": "mm" },
-              "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
-              "sizeRange": { "from": { "system": "NPS", "key": "2", "value": 2 }, "to": { "system": "NPS", "key": "6", "value": 6 } },
-              "catalogs": ["#27", "#23", "llull-open-piping"],
-              "components": [
-                {
-                  "id": "P-BW",
-                  "type": "pipe",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b36.10m",
-                  "ends": "BE",
-                  "schedule": "40"
-                },
-                {
-                  "id": "E90-LR",
-                  "type": "elbow90",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.9",
-                  "ends": "BW",
-                  "radius": "LR",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "E45-LR",
-                  "type": "elbow45",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.9",
-                  "ends": "BW",
-                  "radius": "LR",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "T-BW",
-                  "type": "tee",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.9",
-                  "ends": "BW",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "RT-BW",
-                  "type": "reducingTee",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "branchFrom": { "system": "NPS", "key": "2", "value": 2 },
-                  "branchTo": { "system": "NPS", "key": "4", "value": 4 },
-                  "catalogRef": "asme-b16.9",
-                  "ends": "BW",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "RED-C",
-                  "type": "reducerConcentric",
-                  "from": { "system": "NPS", "key": "3", "value": 3 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "branchFrom": { "system": "NPS", "key": "2", "value": 2 },
-                  "branchTo": { "system": "NPS", "key": "4", "value": 4 },
-                  "catalogRef": "asme-b16.9",
-                  "ends": "BW",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "RED-E",
-                  "type": "reducerEccentric",
-                  "from": { "system": "NPS", "key": "3", "value": 3 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "branchFrom": { "system": "NPS", "key": "2", "value": 2 },
-                  "branchTo": { "system": "NPS", "key": "4", "value": 4 },
-                  "catalogRef": "asme-b16.9-reducer-eccentric",
-                  "ends": "BW",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "W-BW",
-                  "type": "weldolet",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "branchFrom": { "system": "NPS", "key": "2", "value": 2 },
-                  "branchTo": { "system": "NPS", "key": "2", "value": 2 },
-                  "catalogRef": "mss-sp-97",
-                  "ends": "BW",
-                  "scheduleFromPipe": true
-                },
-                {
-                  "id": "F-WN",
-                  "type": "flangeWeldNeck",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.5",
-                  "facing": "RF",
-                  "class": 150
-                },
-                {
-                  "id": "G-SW",
-                  "type": "gasketSpiralWound",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.20",
-                  "class": 150
-                },
-                {
-                  "id": "B-STUD",
-                  "type": "boltSet",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.5-bolting",
-                  "facing": "RF",
-                  "class": 150
-                },
-                {
-                  "id": "V-GATE",
-                  "type": "valveGate",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.10-gate-operators",
-                  "ends": "FL",
-                  "facing": "RF",
-                  "class": 150
-                },
-                {
-                  "id": "V-GLOBE",
-                  "type": "valveGlobe",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.10-globe-operators",
-                  "ends": "FL",
-                  "facing": "RF",
-                  "class": 150
-                },
-                {
-                  "id": "V-BALL",
-                  "type": "valveBall",
-                  "from": { "system": "NPS", "key": "2", "value": 2 },
-                  "to": { "system": "NPS", "key": "6", "value": 6 },
-                  "catalogRef": "asme-b16.10-ball-operators",
-                  "ends": "FL",
-                  "facing": "RF",
-                  "class": 150
-                }
-              ],
-              "branchTable": { "system": "NPS", "cells": { "4": { "4": "T" }, "6": { "2": "W", "4": "RT", "6": "T" } } },
-              "insulation": [
-                {
-                  "code": "H",
-                  "dnMax": 100,
-                  "tempMaxC": 100,
-                  "thicknessMm": 30,
-                  "material": "mineral wool",
-                  "conductivityWmK": 0.0598535265
-                },
-                {
-                  "code": "H",
-                  "dnMax": 100,
-                  "tempMaxC": 200,
-                  "thicknessMm": 50,
-                  "material": "mineral wool",
-                  "conductivityWmK": 0.0598535265
-                },
-                {
-                  "code": "H",
-                  "dnMax": 150,
-                  "tempMaxC": 200,
-                  "thicknessMm": 60,
-                  "material": "mineral wool",
-                  "conductivityWmK": 0.0598535265
-                }
-              ],
-              "elbowAngles": { "anglesDeg": [90, 45], "toleranceDeg": 1, "trimmedAllowed": false },
-              "status": "draft",
-              "provenance": { "accessed": "2026-10-24", "author": "02 RTE validation pack" }
-            }
-          ]
-        },
+        "specs": {"CS150OP":[{"format":"llull-pipe-spec","schemaVersion":1,"id":"CS150OP","revision":1,"title":"CS150 with operator-bearing valves (02 RTE V1 validation spec): gate (handwheel), globe (actuator) and ball (gear box) valves of NPS 4","service":"SC-RTE validation plans","dimensionalStandard":"ASME","rating":{"system":"ASME B16.5","class":150,"materialGroup":"1.1"},"corrosionAllowance":{"value":3,"unit":"mm"},"designLimits":{"minTemperatureC":-29,"maxTemperatureC":200},"sizeRange":{"from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6}},"catalogs":["#27","#23","llull-open-piping"],"components":[{"id":"P-BW","type":"pipe","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b36.10m","ends":"BE","schedule":"40"},{"id":"E90-LR","type":"elbow90","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","radius":"LR","scheduleFromPipe":true},{"id":"E45-LR","type":"elbow45","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","radius":"LR","scheduleFromPipe":true},{"id":"T-BW","type":"tee","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RT-BW","type":"reducingTee","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"4","value":4},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RED-C","type":"reducerConcentric","from":{"system":"NPS","key":"3","value":3},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"4","value":4},"catalogRef":"asme-b16.9","ends":"BW","scheduleFromPipe":true},{"id":"RED-E","type":"reducerEccentric","from":{"system":"NPS","key":"3","value":3},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"4","value":4},"catalogRef":"asme-b16.9-reducer-eccentric","ends":"BW","scheduleFromPipe":true},{"id":"W-BW","type":"weldolet","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"branchFrom":{"system":"NPS","key":"2","value":2},"branchTo":{"system":"NPS","key":"2","value":2},"catalogRef":"mss-sp-97","ends":"BW","scheduleFromPipe":true},{"id":"F-WN","type":"flangeWeldNeck","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.5","facing":"RF","class":150},{"id":"G-SW","type":"gasketSpiralWound","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.20","class":150},{"id":"B-STUD","type":"boltSet","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.5-bolting","facing":"RF","class":150},{"id":"V-GATE","type":"valveGate","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.10-gate-operators","ends":"FL","facing":"RF","class":150},{"id":"V-GLOBE","type":"valveGlobe","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.10-globe-operators","ends":"FL","facing":"RF","class":150},{"id":"V-BALL","type":"valveBall","from":{"system":"NPS","key":"2","value":2},"to":{"system":"NPS","key":"6","value":6},"catalogRef":"asme-b16.10-ball-operators","ends":"FL","facing":"RF","class":150}],"branchTable":{"system":"NPS","cells":{"4":{"4":"T"},"6":{"2":"W","4":"RT","6":"T"}}},"insulation":[{"code":"H","dnMax":100,"tempMaxC":100,"thicknessMm":30,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":100,"tempMaxC":200,"thicknessMm":50,"material":"mineral wool","conductivityWmK":0.0598535265},{"code":"H","dnMax":150,"tempMaxC":200,"thicknessMm":60,"material":"mineral wool","conductivityWmK":0.0598535265}],"elbowAngles":{"anglesDeg":[90,45],"toleranceDeg":1,"trimmedAllowed":false},"status":"draft","provenance":{"accessed":"2026-10-24","author":"02 RTE validation pack"}}]},
         "specOrder": ["CS150OP"]
       },
       "piping": {
-        "tieIns": {
-          "#33": {
-            "id": "#33",
-            "tag": "OA",
-            "kind": "tie_in",
-            "port": { "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" }
-          },
-          "#35": {
-            "id": "#35",
-            "tag": "OB",
-            "kind": "tie_in",
-            "port": { "position": [6000, 0, 0], "direction": [-1, 0, 0], "dn": 100, "endType": "BW" }
-          }
-        },
-        "tieInOrder": ["#33", "#35"],
-        "lines": {
-          "#6": { "id": "#6", "lineNumber": "100-P-5006-CS150OP", "service": "P", "sequence": "5006", "spec": "CS150OP", "dn": 100 }
-        },
+        "tieIns": {"#33":{"id":"#33","tag":"OA","kind":"tie_in","port":{"position":[0,0,0],"direction":[1,0,0],"dn":100,"endType":"BW"}},"#35":{"id":"#35","tag":"OB","kind":"tie_in","port":{"position":[6000,0,0],"direction":[-1,0,0],"dn":100,"endType":"BW"}}},
+        "tieInOrder": ["#33","#35"],
+        "lines": {"#6":{"id":"#6","lineNumber":"100-P-5006-CS150OP","service":"P","sequence":"5006","spec":"CS150OP","dn":100}},
         "lineOrder": ["#6"],
-        "runs": {
-          "#7": {
-            "id": "#7",
-            "lineId": "#6",
-            "start": { "point": [0, 0, 0], "direction": [1, 0, 0], "ref": { "kind": "tieIn", "id": "#33" } },
-            "end": { "point": [6000, 0, 0], "direction": [-1, 0, 0], "ref": { "kind": "tieIn", "id": "#35" } },
-            "pis": [],
-            "inline": [{ "id": "#43", "type": "valveGlobe", "tag": "XV-6", "leg": 0, "centreDistance": 3000, "stemDirection": [1, 0, 0] }]
-          }
-        },
+        "runs": {"#7":{"id":"#7","lineId":"#6","start":{"point":[0,0,0],"direction":[1,0,0],"ref":{"kind":"tieIn","id":"#33"}},"end":{"point":[6000,0,0],"direction":[-1,0,0],"ref":{"kind":"tieIn","id":"#35"}},"pis":[],"inline":[{"id":"#43","type":"valveGlobe","tag":"XV-6","leg":0,"centreDistance":3000,"stemDirection":[1,0,0]}]}},
         "runOrder": ["#7"],
-        "entityIds": { "#7": ["#4", "#8", "#10", "#11", "#13", "#14", "#15", "#16", "#17", "#18"] }
+        "entityIds": {"#7":["#4","#8","#10","#11","#13","#14","#15","#16","#17","#18"]}
       }
     },
     "building": {
@@ -1725,27 +353,24 @@
         "revision": "0",
         "date": ""
       },
-      "levels": { "#44": { "id": "#44", "name": "Level 0", "elevation": 0, "height": 3000 } },
-      "levelOrder": ["#44"],
+      "levels": {
+        "#44": {"id":"#44","name":"Level 0","elevation":0,"height":3000}
+      },
+      "levelOrder": [
+        "#44"
+      ],
       "activeLevelId": "#44",
       "elements": {
-        "#3": {
-          "id": "#3",
-          "category": "member",
-          "mark": "SB1",
-          "entityIds": ["#1"],
-          "levelId": "#44",
-          "role": "beam",
-          "profile": "IPE200",
-          "start": [3000, -1000, 700],
-          "end": [3000, 1000, 700],
-          "roll": 0,
-          "material": "S355"
-        }
+        "#3": {"id":"#3","category":"member","mark":"SB1","entityIds":["#1"],"levelId":"#44","role":"beam","profile":"IPE200","start":[3000,-1000,700],"end":[3000,1000,700],"roll":0,"material":"S355"}
       },
-      "elementOrder": ["#3"],
+      "elementOrder": [
+        "#3"
+      ],
       "uid": "#45",
-      "counters": { "level": 1, "member": 1 }
+      "counters": {
+        "level": 1,
+        "member": 1
+      }
     }
   }
 }

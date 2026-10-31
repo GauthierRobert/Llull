@@ -4,28 +4,52 @@
   "document": {
     "entities": {},
     "order": [],
-    "layers": { "#1": { "id": "#1", "name": "Layer 0", "visible": true, "locked": false } },
-    "layerOrder": ["#1"],
+    "layers": {
+      "#1": {
+        "id": "#1",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#1"
+    ],
     "selection": [],
-    "camera": { "target": [0, 0, 0], "azimuth": 2.35619449, "polar": 1.04719755, "distance": 12 },
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
     "groups": {},
     "units": "mm",
     "displayPrecision": 3,
     "parameters": {},
     "animations": {},
     "featureHistory": [
-      { "id": "#2", "name": "set_units", "params": { "units": "mm" }, "suppressed": false, "affected": [] },
+      {
+        "id": "#2",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
       {
         "id": "#3",
         "name": "add_field_primitive",
-        "params": { "shape": "box", "size": [20, 20, 20], "position": [10, 10, 10] },
+        "params": {"shape":"box","size":[20,20,20],"position":[10,10,10]},
         "suppressed": false,
         "affected": ["#4"]
       },
       {
         "id": "#5",
         "name": "add_strut_lattice",
-        "params": { "cell": "octet", "cellSize": 10, "radius": 0.5, "origin": [0, 0, 0], "region": "#4" },
+        "params": {"cell":"octet","cellSize":10,"radius":0.5,"origin":[0,0,0],"region":"#4"},
         "suppressed": false,
         "affected": ["#6"]
       }
@@ -44,24 +68,8 @@
     "implicit": {
       "version": 1,
       "fields": {
-        "#4": {
-          "id": "#4",
-          "op": "primitive",
-          "shape": "box",
-          "dims": { "size": [20, 20, 20] },
-          "position": [10, 10, 10],
-          "rotation": [0, 0, 0]
-        },
-        "#6": {
-          "id": "#6",
-          "op": "struts",
-          "cell": "octet",
-          "cellSize": [10, 10, 10],
-          "origin": [0, 0, 0],
-          "rotation": [0, 0, 0],
-          "radius": 0.5,
-          "region": "#4"
-        }
+        "#4": {"id":"#4","op":"primitive","shape":"box","dims":{"size":[20,20,20]},"position":[10,10,10],"rotation":[0,0,0]},
+        "#6": {"id":"#6","op":"struts","cell":"octet","cellSize":[10,10,10],"origin":[0,0,0],"rotation":[0,0,0],"radius":0.5,"region":"#4"}
       },
       "bodies": {}
     }
