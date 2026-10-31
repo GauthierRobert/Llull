@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
+#include <exception>
+#include <new>
+#include <system_error>
 #include <thread>
 #include <cmath>
 #include <map>
@@ -719,6 +722,7 @@ struct FillJob {
   double gap = 0;
   std::string problem;
   bool filled = false;
+  std::exception_ptr error;  // whatever a worker threw (OCCT or std::bad_alloc): rethrown at this corner by the serial finish, as a serial build would have thrown it
 };
 
 // One fill of the hole of `job` with `setting`; false with the reason in job.problem when the patch cannot be used (not built, off its edges, off tangent).
@@ -766,21 +770,25 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
   return true;
 }
 
+std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
+std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
+std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
+std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
+
 void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
   try {
+    if (g_fault_corner.load() == static_cast<int>(job.corner)) throw std::bad_alloc();
     for (const FillSetting &setting : kFillSettings) {
       job.filled = fill_hole(job, setting, patch_gap_limit, diagonal);
       if (job.filled) return;
     }
-  } catch (const Standard_Failure &error) {
+  } catch (...) {
     job.filled = false;
-    job.problem = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+    job.error = std::current_exception();
   }
 }
 
-std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
-
-// The number of threads the fills of `jobs` run on: the override, else LLULL_CORNER_THREADS, else the hardware, at most 8 and at most one per job. The result of a build does not
+// The number of threads the fills of `jobs` run on: the override, else LLULL_CORNER_THREADS, else the hardware, at most 8 and at most one per job; per call. The result of a build does not
 // depend on it (the jobs are independent and the finish is serial, in corner order).
 size_t corner_threads(size_t jobs) {
   long wanted = g_corner_threads.load();
@@ -790,22 +798,46 @@ size_t corner_threads(size_t jobs) {
   return static_cast<size_t>(std::max(1L, std::min({wanted, 8L, static_cast<long>(jobs)})));
 }
 
+// Joins every started worker, whatever leaves the scope (a failed thread creation included).
+struct Workers {
+  std::vector<std::thread> started;
+  ~Workers() {
+    for (std::thread &worker : started)
+      if (worker.joinable()) worker.join();
+  }
+};
+
+// The fills run on the calling thread and on threads - 1 workers; when a worker cannot be created the others (the calling thread included) take its jobs. A failing corner is final (the serial
+// finish stops at the first one, in corner order): the jobs above the least failed position are skipped.
 void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagonal) {
   std::vector<size_t> todo;
-  for (size_t j = 0; j < jobs.size(); ++j)
-    if (jobs[j].hole_error.empty()) todo.push_back(j);
-  const size_t threads = corner_threads(todo.size());
-  if (threads <= 1) {
-    for (const size_t j : todo) fill_corner(jobs[j], patch_gap_limit, diagonal);
-    return;
+  for (size_t j = 0; j < jobs.size(); ++j) {
+    if (!jobs[j].hole_error.empty()) break;  // the finish stops at the first hole that is not isolated: nothing after it is read
+    todo.push_back(j);
   }
+  const size_t threads = corner_threads(todo.size());
+  g_last_threads.store(static_cast<int>(threads));
   std::atomic<size_t> next{0};
-  std::vector<std::thread> workers;
-  for (size_t t = 0; t < threads; ++t)
-    workers.emplace_back([&]() {
-      for (size_t at = next.fetch_add(1); at < todo.size(); at = next.fetch_add(1)) fill_corner(jobs[todo[at]], patch_gap_limit, diagonal);
-    });
-  for (std::thread &worker : workers) worker.join();
+  std::atomic<size_t> first_failed{todo.size()};
+  const auto work = [&]() {
+    for (size_t at = next.fetch_add(1); at < todo.size(); at = next.fetch_add(1)) {
+      if (at > first_failed.load()) continue;
+      fill_corner(jobs[todo[at]], patch_gap_limit, diagonal);
+      if (jobs[todo[at]].filled) continue;
+      size_t seen = first_failed.load();
+      while (at < seen && !first_failed.compare_exchange_weak(seen, at)) {
+      }
+    }
+  };
+  Workers workers;
+  try {
+    for (size_t t = 0; t + 1 < threads; ++t) {
+      if (g_spawn_limit.load() >= 0 && static_cast<int>(t) >= g_spawn_limit.load()) throw std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again));
+      workers.started.emplace_back(work);
+    }
+  } catch (const std::system_error &) {
+  }
+  work();
 }
 
 std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
@@ -1129,9 +1161,15 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     for (const TopoDS_Face &support : supports)
       if (distinct_supports.Add(support)) builder.Add(shared, support);
     BRepBuilderAPI_Copy copy(shared, Standard_True, Standard_False);
-    for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(copy.ModifiedShape(edge)));
-    for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(copy.ModifiedShape(support)));
-    for (const TopoDS_Edge &edge : loop) job.loop.push_back(TopoDS::Edge(copy.ModifiedShape(edge)));
+    // ModifiedShape gives the orientation of the first occurrence of the shape in the copy: the orientation looked up is restored.
+    const auto image = [&copy](const TopoDS_Shape &original) {
+      TopoDS_Shape found = copy.ModifiedShape(original);
+      found.Orientation(original.Orientation());
+      return found;
+    };
+    for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(image(edge)));
+    for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(image(support)));
+    for (const TopoDS_Edge &edge : loop) job.loop.push_back(TopoDS::Edge(image(edge)));
   }
   fill_all(jobs, patch_gap_limit, diagonal);
   for (size_t c = 0; c < corners.size(); ++c) {
@@ -1140,6 +1178,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
       why = job.hole_error;
       return nullptr;
     }
+    if (job.error) std::rethrow_exception(job.error);
     if (!job.filled) {
       fill_failed = true;
       why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + job.problem;
@@ -1272,6 +1311,10 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
 
 // Test hook (src/test_bridge.rs): the number of threads the corner fills use (0: LLULL_CORNER_THREADS, else the hardware).
 void set_corner_threads(int32_t count) { g_corner_threads.store(count); }
+// Test hooks: the threads the last fill used, the corner whose fill throws std::bad_alloc (-1: none), the worker whose creation fails (-1: none).
+int32_t last_corner_threads() { return g_last_threads.load(); }
+void set_corner_fault(int32_t corner) { g_fault_corner.store(corner); }
+void set_corner_spawn_limit(int32_t workers) { g_spawn_limit.store(workers); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
 // The oriented check on face `face` of the first solid of `shape`, rebuilt into a shell with that face reversed when `reverse`, over the tangent edges only: about 0 for a blend face as built,

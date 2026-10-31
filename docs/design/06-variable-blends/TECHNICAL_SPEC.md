@@ -1227,6 +1227,13 @@ as before (the patch edges were never the edges of the loop).
 **Threads.** `corner_threads`: the test hook `set_corner_threads`, else `LLULL_CORNER_THREADS`, else `std::thread::hardware_concurrency`, at most 8 and at most one per job; 1 runs inline. The build does not depend on the
 number: the jobs are independent, the finish is serial.
 
+**Failures (review).** The cap is per call (each build plans its own threads; none are shared between builds). A worker catches everything (`catch (...)`) and keeps the exception in its job (`FillJob::error`); the serial
+finish rethrows it at that corner, so an OCCT exception or a `std::bad_alloc` in a fill reaches the facade's try/catch as it did serially (a fill that throws is an error of the build, not a retry with the next fit
+setting). If a thread cannot be created (`std::system_error`) the calling thread and the started ones take its jobs from the counter, and a joiner (`Workers`) joins every started thread whatever leaves the scope. The first
+failed position is kept (atomic minimum): the jobs above it are skipped, and the jobs after the first hole that could not be isolated are not started, so a failing step costs no more than the serial one. Lookups in the copy
+(`ModifiedShape`) get the orientation of the shape looked up. Safety of the shared allocator rests on OCCT's default (`MMGT_OPT=0`, the system malloc, thread safe): `MMGT_OPT=1` without `MMGT_REENTRANT=1` would not be, and
+the sidecar sets neither. Tests: `an_exception_in_a_parallel_fill_is_an_error_of_the_build_not_the_end_of_the_process`, `a_thread_that_cannot_be_created_leaves_its_jobs_to_the_others`.
+
 ### 13.20.3 Measured, and what is the same
 
 - **Byte-identical.** The 8-corner cube and the four feet of the boss, before the change (serial, shared shapes): volume 0x408e4dd9f784d7b7 / 0x409efff50ae3049e, area 0x4080de16eeef0abe / 0x409451df6f694288. After, on 1, 2 and 8

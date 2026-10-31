@@ -17,6 +17,12 @@ mod ffi {
         fn adaptive_rule(shape: &Shape) -> bool;
         /// The number of threads the corner fills of the next builds use (0: default).
         fn set_corner_threads(count: i32);
+        /// The threads the last corner fill used.
+        fn last_corner_threads() -> i32;
+        /// The corner whose fill throws std::bad_alloc (-1: none).
+        fn set_corner_fault(corner: i32);
+        /// The worker whose creation fails (-1: none).
+        fn set_corner_spawn_limit(workers: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
@@ -44,6 +50,18 @@ pub fn span_cut_count(shape: &Shape) -> i32 {
 
 pub fn set_corner_threads(count: i32) {
     ffi::set_corner_threads(count);
+}
+
+pub fn last_corner_threads() -> i32 {
+    ffi::last_corner_threads()
+}
+
+pub fn set_corner_fault(corner: i32) {
+    ffi::set_corner_fault(corner);
+}
+
+pub fn set_corner_spawn_limit(workers: i32) {
+    ffi::set_corner_spawn_limit(workers);
 }
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
