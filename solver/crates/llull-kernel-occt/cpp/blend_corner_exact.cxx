@@ -525,10 +525,31 @@ bool normal_of(const Handle(Geom_BSplineSurface) &surface, double u, double v, V
   return unit(n);
 }
 
+// The crease of a sub-patch along its joint iso-lines: the largest angle between the normals on the two sides of a joint knot (u = joint -+ 1e-5), at v from the bottom to near the centre.
+// About zero for a C1 knot; the jump of the u derivative for a C0 knot, which the boundary measures never see (it is in the interior of the face).
+double joint_crease(const Handle(Geom_BSplineSurface) &surface, const std::vector<double> &joints) {
+  constexpr double kStep = 1e-5;
+  constexpr int kCreaseSamples = 20;
+  double worst = 0;
+  for (const double joint : joints) {
+    if (!(joint > 2 * kStep && joint < 1 - 2 * kStep)) continue;
+    for (int s = 0; s < kCreaseSamples; ++s) {
+      const double v = static_cast<double>(s) / kCreaseSamples;
+      Vec before, after;
+      if (!normal_of(surface, joint - kStep, v, before) || !normal_of(surface, joint + kStep, v, after)) {
+        worst = std::max(worst, kPi / 2);
+        continue;
+      }
+      worst = std::max(worst, before * after < 0 ? kPi : line_angle(before, after));
+    }
+  }
+  return worst;
+}
+
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -750,15 +771,26 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     patch.theta = star.arrival[j] - star.arrival[k];
     patches.push_back(patch);
   }
-  // The attempts: C1 knots at the joints of the chains first (the pole is steadier), C0 knots when the cross tangent of the support has a kink there that C1 cannot hold (the cylinder block:
-  // 0.0056 rad at 36 poles with C1, 13.22.6). A C1 attempt must leave 0.5 of the angle limit at its finest pole count, because the sewn solid is measured again, with the pole included.
+  // The attempts, in order (at most 12 interpolate-and-measure passes, 7 when no chain has a joint; 0.17 s on the cylinder block with 1.2 / 1.2 / 1.6 at 36 poles, about 0.45 s when the 48 and 64
+  // pole attempts are reached, 13.22.6): C1 knots at the joints of the chains (the pole is steadier); C0 knots, which hold the kink of the cross tangent of a support whose curvature jumps there
+  // (0.0056 rad at 36 poles with C1 on the cylinder block) but leave a crease in the interior of the sub-patch along the joint, refused by `joint_crease` when it passes the angle limit (0.37 rad
+  // there); then C1 at 48 and 64 poles, where the error of the kink (decaying like h) falls under the limit. The sewn solid is measured again with the pole included and reads the star about 1.7
+  // times larger than the star's own measure (0.0056 -> 0.0097 on the cylinder block), so the C1 attempts through 48 poles keep half the limit and the 64-pole one takes it all; a failure of the
+  // sewn solid then falls back to the plate.
   struct Attempt {
     int multiplicity, poles;
     double share;
   };
+  constexpr int kFinest = kPoleCounts[std::size(kPoleCounts) - 1];
   std::vector<Attempt> attempts;
+  const bool has_joints = std::any_of(star.sides.begin(), star.sides.end(), [](const auto &side) { return !side.joints().empty(); });
   for (const int multiplicity : {kDegree - 1, kDegree})
-    for (const int poles : kPoleCounts) attempts.push_back({multiplicity, poles, poles == kPoleCounts[std::size(kPoleCounts) - 1] ? (multiplicity == kDegree ? 1.0 : 0.5) : 0.25});
+    for (const int poles : kPoleCounts)
+      if ((multiplicity == kDegree - 1 && (!c0_knots_only || !has_joints)) || (multiplicity == kDegree && has_joints)) attempts.push_back({multiplicity, poles, poles == kFinest ? (multiplicity == kDegree ? 1.0 : 0.5) : 0.25});
+  if ((!c0_knots_only || !has_joints)) {
+    attempts.push_back({kDegree - 1, 48, 0.5});
+    attempts.push_back({kDegree - 1, 64, 1.0});
+  }
   for (const Attempt &attempt : attempts) {
     const int poles = attempt.poles;
     // the coarse interpolations must leave a margin under the angle limit; the finest may use all of it
@@ -805,6 +837,13 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
           out.gap = std::max(out.gap, surfaces[k]->Value(0, t).Distance(surfaces[previous]->Value(1, t)));
         }
       }
+    }
+    // The interior crease along the joint iso-lines of each sub-patch, gated at the full angle limit for C1 and C0 knots alike.
+    for (size_t k = 0; k < m; ++k) out.crease = std::max(out.crease, joint_crease(surfaces[k], star.sides[k].joints()));
+    if (gate_crease && out.crease > max_angle) {
+      why = "the sub-patches (" + std::to_string(poles) + " x " + std::to_string(poles) + " poles, " + (attempt.multiplicity == kDegree ? "C0" : "C1") + " joint knots) crease by " +
+            std::to_string(out.crease) + " rad along a joint of their bottom chain (limit " + std::to_string(max_angle) + ")";
+      continue;
     }
     if (out.gap <= max_gap && out.angle <= angle_limit) {
       for (const Handle(Geom_BSplineSurface) &surface : surfaces) {

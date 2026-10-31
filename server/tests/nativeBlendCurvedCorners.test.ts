@@ -134,10 +134,36 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
       .filter((face) => face.surface === 'cylinder')
       .map((face) => (face.axis?.span?.[1] ?? 0) - (face.axis?.span?.[0] ?? 0));
     expect(spans.some((span) => Math.abs(span - (Math.sqrt(44) - 1.3)) < 1e-4)).toBe(true);
-    // 1.6 along the same edge: builds too (C0 knots at the joints of the chains, 13.22.6; before, the star was refused at 0.00965 rad and the plate missed the blend ends)
-    const longer = withSetback(1.6);
-    expect(longer.error, longer.summary).toBeUndefined();
-    expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(2e-3);
+    // 1.4 and 1.6 along the same edge: build too (C1 knots at 48 or 64 poles, 13.22.6; before, the star was refused at 0.00965 rad and the plate missed the blend ends)
+    for (const longer of [withSetback(1.4), withSetback(1.6)]) {
+      expect(longer.error, longer.summary).toBeUndefined();
+      expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(2e-3);
+      expect(execute(longer.document, 'check_blends', { ids: [longer.affected[0] as string] }).data).toMatchObject({
+        status: expect.not.stringMatching(/^fail$/),
+      });
+    }
+  });
+
+  // Downstream of the star: shell_solid (an inward offset) of the 1.2 / 1.2 / 1.6 block, open at the bottom, is a valid hollow solid in about 0.8 s. The SEALED cavity is not tested: the offset of the
+  // 64-pole faces of a star takes 17 s with equal setbacks and 120 s (the kernel call limit, then refused by name: "could not hollow this solid") with 1.6; the plain rounded block takes 0.1 s (13.22.6).
+  it('the cylinder block with setbacks 1.2 / 1.2 / 1.6 can be shelled open at the bottom: a valid hollow solid with the faces of the star', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const rounded = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance: 1.6 }] }],
+    });
+    expect(rounded.error, rounded.summary).toBeUndefined();
+    const solid = rounded.affected[0] as string;
+    const full = volume(rounded.document, solid);
+    const hollow = execute(rounded.document, 'shell_solid', { id: solid, thickness: 0.2, openFacesNear: [[5, 5, 0]] });
+    expect(hollow.error, hollow.summary).toBeUndefined();
+    expect(hollow.affected).toHaveLength(1);
+    const result = hollow.affected[0] as string;
+    expect(volume(hollow.document, result)).toBeGreaterThan(0);
+    expect(volume(hollow.document, result)).toBeLessThan(full);
+    expect(faces(hollow.document, result).length).toBeGreaterThan(25);
   });
 
   it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {
